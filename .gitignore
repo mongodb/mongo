@@ -1,0 +1,11 @@
+*~
+*.o
+*.aps
+*.tar.gz
+*.suo
+*.ncb
+*.idb 
+*.obj 
+*.opt 
+*.pch 
+db/Debug
