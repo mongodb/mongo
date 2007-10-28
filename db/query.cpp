@@ -40,7 +40,7 @@ QueryResult* runQuery(const char *ns, const char *query, int ntoreturn) {
 	qr->reserved = 0;
 	qr->operation = opReply;
 	qr->cursorId = nextCursorId++;
-	qr->startOfs = 0;
+	qr->startingFrom = 0;
 	qr->nReturned = n;
 	b.decouple();
 

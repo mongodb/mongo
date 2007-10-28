@@ -61,34 +61,7 @@ struct OID {
       int reserved;
       string collection;
       a series of JSObjects terminated with a null object (i.e., just EOO)
-   GetByOID:
-      int reserved;
-      string collection;
-      OID oid;
-   Query:
-      int reserved;
-      string collection;
-	  unsigned nToReturn; // how many you want back as the beginning of the cursor data
-      string query;
-   GetMore:
-      int reserved;
-      unsigned cursorID;
-      unsigned nToReturn;
-
-   byte EOM
-*/
-
-/* db response format
-
-   GetByOID operation:
-      marshalled JSObject returned.  always specified, even if an error.
-
-   Query or GetMore: see query.h
-      int reserved;
-      unsigned cursorID;
-      unsigned startOfs;
-      unsigned nReturned;
-      list of marshalled JSObjects;
+   Query: see query.h
 */
 
 #pragma pack(pop)

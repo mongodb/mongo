@@ -36,7 +36,8 @@ void pdfileInit();
 class DbMessage {
 public:
 	DbMessage(Message& _m) : m(_m) {
-		int *r = (int *) _m.data;
+		theEnd = _m.data->_data + _m.data->dataLen();
+		int *r = (int *) _m.data->_data;
 		reserved = *r;
 		r++;
 		data = (const char *) r;
@@ -67,8 +68,11 @@ public:
 		JSObj js(nextjsobj);
 		if( js.size <= 4 )
 			nextjsobj = null;
-		else
+		else {
 			nextjsobj += js.size;
+			if( nextjsobj >= theEnd )
+				nextjsobj = 0;
+		}
 		return js;
 	}
 
@@ -77,6 +81,7 @@ private:
 	int reserved;
 	const char *data;
 	const char *nextjsobj;
+	const char *theEnd;
 };
 
 Record* findByOID(const char *ns, OID *oid) {
@@ -103,7 +108,7 @@ void updateByOID(const char *ns, char *objdata, int objsize, OID *oid) {
 		cout << "ERROR: updateByOID: growing records not implemented yet." << endl;
 		return;
 	}
-	/* note: need to be smarter if it gets a lot smaller??? */
+	/* note: need to be smarter if it gets a lot smaller? */
 	/* this really dumb for now as it gets smaller but doesn't allow regrowth 
 	to the original size! */
 	memcpy(r->data, objdata, objsize);
@@ -146,6 +151,7 @@ void dbinsert(Message& m) {
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
 		JSObj js = d.nextJsObj();
+		cout << "  temp dbinsert: got js object, size=" << js.objsize() << " ns:" << d.getns() << endl;
 		if( m.data->operation == dbInsert ) {
 			theDataFileMgr.insert(d.getns(), (void*) js.objdata(), js.objsize());
 		} else {
@@ -164,7 +170,7 @@ void run() {
 
 	pdfileInit();
 
-	theDataFileMgr.insert("sys.unittest.pdfile", "hello world", 12);
+	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello world", 12);
 	cout << "findAll:\n";
 	Cursor c = theDataFileMgr.findAll("sys.unittest.pdfile");
 	while( c.ok() ) {
@@ -209,7 +215,7 @@ void run() {
 			cout << "dbGetMore: not implemented!" << endl;
 		}
 		else {
-			cout << "    operation isn't supported (???)" << endl;
+			cout << "    operation isn't supported ?" << endl;
 		}
 	}
 }
