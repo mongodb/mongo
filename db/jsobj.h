@@ -9,7 +9,7 @@
 /* BinData = binary data types. 
    EOO = end of object
 */
-enum JSType { EOO = 0, Number=1, String=2, Object=3, Array=4, BinData=5, Undefined=6, jstOID=7, Bool=8, Date=9 };
+enum JSType { EOO = 0, Number=1, String=2, Object=3, Array=4, BinData=5, Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10 };
 
 /* subtypes of BinData. 
    bdtCustom and above are ones that the JS compiler understands, but are

@@ -1,6 +1,6 @@
 # makefile for our db project
 
-FLAGS=-I ..
+FLAGS=-I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db
 
 OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o
 
