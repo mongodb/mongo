@@ -9,3 +9,4 @@
 *.opt 
 *.pch 
 db/Debug
+db/db
