@@ -8,14 +8,17 @@
 
 int nextCursorId = 1;
 
-QueryResult* runQuery(const char *ns, const char *query, int ntoreturn) {
+QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
+
+	cout << "runQuery ns:" << ns << " ntoreturn:" << ntoreturn << " queryobjsize:" << 
+		jsobj.objsize() << endl;
 
 	/* temp implementation -- just returns everything! */
 
 	BufBuilder b;
 
 	QueryResult *qr = 0;
-	b.skip(qr->data - ((char *)qr));
+	b.skip(sizeof(QueryResult));
 
 	int n = 0;
 	Cursor c = theDataFileMgr.findAll(ns);
@@ -29,7 +32,7 @@ QueryResult* runQuery(const char *ns, const char *query, int ntoreturn) {
 		b.append(r->data, r->netLength());
 		n++;
 
-		if( n >= ntoreturn )
+		if( n >= ntoreturn && ntoreturn != 0 )
 			break;
 
 		c.advance();
@@ -39,7 +42,7 @@ QueryResult* runQuery(const char *ns, const char *query, int ntoreturn) {
 	qr->len = b.len();
 	qr->reserved = 0;
 	qr->operation = opReply;
-	qr->cursorId = nextCursorId++;
+	qr->cursorId = 0; //nextCursorId++;
 	qr->startingFrom = 0;
 	qr->nReturned = n;
 	b.decouple();

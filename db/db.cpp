@@ -49,6 +49,14 @@ public:
 		ns = data;
 	}
 
+	int pullInt() {
+		if( nextjsobj == data )
+			nextjsobj += strlen(data) + 1; // skip namespace
+		int i = *((int *)nextjsobj);
+		nextjsobj += 4;
+		return i;
+	}
+
 	OID* getOID() {
 		return (OID *) (data + strlen(data) + 1); // skip namespace
 	}
@@ -126,11 +134,11 @@ struct EmptyObject {
 
 void query(Message& m) {
 	DbMessage d(m);
-	const char *query;
-	int ntoreturn;
-	d.getQueryStuff(query, ntoreturn);
 
-	QueryResult* msgdata = runQuery(d.getns(), query, ntoreturn);
+	const char *ns = d.getns();
+	int ntoreturn = d.pullInt();
+	assert( d.moreJSObjs() );
+	QueryResult* msgdata = runQuery(ns, ntoreturn, d.nextJsObj());
 	Message resp;
 	resp.setData(msgdata, true);
 	dbMsgPort.reply(m, resp);
@@ -202,7 +210,7 @@ void run() {
 				break;
 			}
 		}
-		else if( m.data->operation == dbUpdate || dbInsert ) {
+		else if( m.data->operation == dbUpdate || m.data->operation == dbInsert ) {
 			dbinsert(m);
 		}
 		else if( m.data->operation == dbGetByOID ) {

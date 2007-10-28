@@ -1,5 +1,7 @@
 // jsobj.h
 
+#pragma once
+
 #include "../stdafx.h"
 #include "pdfile.h"
 

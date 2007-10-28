@@ -4,6 +4,7 @@
 
 #include "../stdafx.h"
 #include "../grid/message.h"
+#include "jsobj.h"
 
 /* requests:
 
@@ -24,16 +25,16 @@
       int reserved;
       int64 cursorID;
       int startingFrom;
-      int nReturned;
+      int nReturned; // 0=infinity
       list of marshalled JSObjects;
-*/ 
+*/
 
 struct QueryResult : public MsgData {
 	long long cursorId;
 	int startingFrom;
 	int nReturned;
-	char data[4];
+	const char *data() { return (char *) (((int *)&nReturned)+1); }
 };
 
-QueryResult* runQuery(const char *ns, const char *query, int ntoreturn);
+QueryResult* runQuery(const char *ns, int ntoreturn, JSObj);
 
