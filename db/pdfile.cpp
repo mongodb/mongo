@@ -143,7 +143,7 @@ Cursor DataFileMgr::findAll(const char *ns) {
 	return Cursor( e->firstRecord );
 }
 
-void DataFileMgr::insert(const char *ns, void *buf, int len) {
+void DataFileMgr::insert(const char *ns, const void *buf, int len) {
 	DiskLoc loc;
 	bool found = namespaceIndex.find(ns, loc);
 	if( !found ) {

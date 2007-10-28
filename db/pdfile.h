@@ -163,7 +163,7 @@ class DataFileMgr {
 public:
 	void init();
 
-	void insert(const char *ns, void *buf, int len);
+	void insert(const char *ns, const void *buf, int len);
 	Cursor findAll(const char *ns);
 
 private:

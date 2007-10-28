@@ -2,7 +2,7 @@
 
 FLAGS=-I ..
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o
 
 .cpp.o:
 	g++ -c $(FLAGS) $< -o $@
