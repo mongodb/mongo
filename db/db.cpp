@@ -223,7 +223,7 @@ void msg(const char *m) {
 	Message send;
 	Message response;
 
-	send.setData(1000, m);
+	send.setData( dbMsg , m);
 
 	cout << "contacting DB..." << endl;
 	bool ok = p.call(db, send, response);
