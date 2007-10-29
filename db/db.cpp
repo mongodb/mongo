@@ -74,10 +74,10 @@ public:
 		if( nextjsobj == data )
 			nextjsobj += strlen(data) + 1; // skip namespace
 		JSObj js(nextjsobj);
-		if( js.size <= 4 )
+		if( js.objsize() <= 0 )
 			nextjsobj = null;
 		else {
-			nextjsobj += js.size;
+			nextjsobj += js.objsize() + 4;
 			if( nextjsobj >= theEnd )
 				nextjsobj = 0;
 		}

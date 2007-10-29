@@ -85,6 +85,12 @@ ok:
 #pragma pack(push)
 #pragma pack(1)
 
+struct JSObj0 {
+	JSObj0() { totsize = 5; eoo = EOO; }
+	int totsize;
+	char eoo;
+} js0;
+
 struct JSObj1 {
 	JSObj1() {
 		totsize=sizeof(JSObj1); 
@@ -131,6 +137,11 @@ struct JSUnitTest {
 		JSMatcher n(j1);
 		assert( n.matches(j1) );
 		assert( !n.matches(j2) );
+
+		JSObj j0((const char *) &js0);
+		JSMatcher p(j0);
+		assert( p.matches(j1) );
+		assert( p.matches(j2) );
 	}
 } jsunittest;
 

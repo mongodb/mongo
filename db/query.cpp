@@ -16,6 +16,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
 	/* temp implementation -- just returns everything! */
 
 	BufBuilder b;
+	JSMatcher matcher(jsobj);
 
 	QueryResult *qr = 0;
 	b.skip(sizeof(QueryResult));
@@ -26,14 +27,13 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
 		Record *r = c.current();
 
 		JSObj js(r);
-		// check criteria here.
-
-		b.append(r->netLength()+4);
-		b.append(r->data, r->netLength());
-		n++;
-
-		if( n >= ntoreturn && ntoreturn != 0 )
-			break;
+		if( matcher.matches(js) ) {
+			b.append(r->netLength()+4);
+			b.append(r->data, r->netLength());
+			n++;
+			if( n >= ntoreturn && ntoreturn != 0 )
+				break;
+		}
 
 		c.advance();
 	}

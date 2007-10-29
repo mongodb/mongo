@@ -113,16 +113,17 @@ private:
 class JSObj {
 	friend class JSElemIter;
 public:
-	JSObj(const char *_data) : data(_data) {
-		size = *((int*) data);
+	JSObj(const char *msgdata) {
+		_objsize = *((int*) msgdata) - 4;
+		_objdata = msgdata + 4;
 	}
 	JSObj(Record *r) { 
-		size = r->netLength();
-		data = r->data;
+		_objsize = r->netLength();
+		_objdata = r->data;
 	}
 
-	const char *objdata() { return data + 4; } // skip the length field.
-	int objsize() { return size - 4; }
+	const char *objdata() { return _objdata; }
+	int objsize() { return _objsize; }
 
 	OID* getOID() {
 		const char *p = objdata();
@@ -130,9 +131,9 @@ public:
 			return 0;
 		return (OID *) ++p;
 	}
-
-	int size;
-	const char *data;
+private:
+	int _objsize;
+	const char *_objdata;
 };
 
 class JSElemIter {
