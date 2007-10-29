@@ -11,9 +11,10 @@
 /* BinData = binary data types. 
    EOO = end of object
 */
-enum JSType { EOO = 0, Number=1, String=2, Object=3, Array=4, BinData=5, Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10 };
+enum JSType { EOO = 0, Number=1, String=2, Object=3, Array=4, BinData=5, 
+              Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 };
 
-/* subtypes of BinData. 
+/* subtypes of BinData.
    bdtCustom and above are ones that the JS compiler understands, but are
    opaque to the database.
 */
@@ -30,23 +31,23 @@ struct OID {
 
 /* marshalled js object format:
 
-   <unsigned totalSize> {<byte JSType><string FieldName><Data>}* EOO
+   <unsigned totalSize> {<byte JSType><cstring FieldName><Data>}* EOO
       totalSize includes itself.
 
    Data:
+     Bool: <byte>
      EOO: nothing follows
      Undefined: nothing follows
      OID: an OID object
      Number: <double>
-     String: <unsigned strlen><string>       
-     Object: a nested object, which terminates with EOO.
-     Array:
-       <unsigned length>
-       {Object}[length]  
-       a nested object, which is the object properties of the array  
+     String: <unsigned32 strsizewithnull><cstring>
+	 Date:   <8bytes>
+	 Regex:  <cstring regex><cstring options>
+     Object: a nested object, leading with its entire size, which terminates with EOO.
+     Array:  same as object
      BinData:
-       <byte subtype>
        <unsigned len>
+       <byte subtype>
        <byte[len] data>
 */
 
@@ -68,7 +69,49 @@ struct OID {
 
 #pragma pack(pop)
 
+/* <type><fieldName    ><value> 
+   -------- size() ------------
+         -fieldNameSize-
+                        value()
+   type()
+*/
+class Element {
+	friend class JSElemIter;
+public:
+	JSType type() { return (JSType) *data; }
+	bool eoo() { return type() == EOO; }
+	int size();
+
+	// raw data be careful:
+	const char * value() { return (data + fieldNameSize + 1); }
+
+	// only valid for string, object, array:
+	int valuestrsize() { 
+		return *((int *) value());
+	}
+	// for strings.  also gives you start of the data for an embedded object
+	const char * valuestr() { return value() + 4; }
+	void* embeddedObject() { valuestr(); }
+
+	bool operator==(Element& r) { 
+		int sz = size();
+		return sz == r.size() && 
+			memcmp(data, r.data, sz) == 0;
+	}
+
+private:
+	Element(const char *d) : data(d) {
+		fieldNameSize = eoo() ? 0 : strlen(data+1) + 1;
+		totalSize = -1;
+	}
+	const char *data;
+	int fieldNameSize;
+	int totalSize;
+};
+
+
 class JSObj {
+	friend class JSElemIter;
 public:
 	JSObj(const char *_data) : data(_data) {
 		size = *((int*) data);
@@ -90,4 +133,32 @@ public:
 
 	int size;
 	const char *data;
+};
+
+class JSElemIter {
+public:
+	JSElemIter(JSObj& jso) {
+		pos = jso.objdata();
+		theend = jso.objdata() + jso.objsize();
+	}
+	bool more() { return pos < theend; }
+	Element next() {
+		Element e(pos);
+		pos += e.size();
+		return e;
+	}
+private:
+	const char *pos;
+	const char *theend;
+};
+
+class JSMatcher { 
+public:
+	JSMatcher(JSObj& pattern);
+
+	bool matches(JSObj& j);
+private:
+	JSObj& jsobj;
+	vector<Element> toMatch;
+	int n;
 };

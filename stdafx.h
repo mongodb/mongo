@@ -41,3 +41,4 @@ typedef void *HANDLE;
 
 #define null (0)
 
+#include <vector>

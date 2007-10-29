@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_SCL_SECURE_NO_DEPRECATE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -173,6 +173,10 @@
 			>
 			<File
 				RelativePath=".\db.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\jsobj.cpp"
 				>
 			</File>
 			<File
