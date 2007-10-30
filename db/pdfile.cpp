@@ -144,7 +144,7 @@ public:
 
 	void init() { 
 		const int LEN = 16 * 1024 * 1024;
-		void *p = f.map("/data/namespace.idx", LEN);
+		void *p = f.map("/data/db/namespace.idx", LEN);
 		ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
 	}
 
@@ -378,7 +378,7 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len) {
 }
 
 void DataFileMgr::init() {
-	temp.open("/data/temp.dat", 64 * 1024 * 1024);
+	temp.open("/data/db/temp.dat", 64 * 1024 * 1024);
 }
 
 void pdfileInit() {

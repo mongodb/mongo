@@ -73,7 +73,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
 
 		JSObj js(r);
 		if( matcher.matches(js) ) {
-			b.append(r->netLength()+4);
+			//b.append(r->netLength()+4);
 			b.append(r->data, r->netLength());
 			n++;
 			if( n >= ntoreturn && ntoreturn != 0 )

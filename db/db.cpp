@@ -242,7 +242,8 @@ void msg(const char *m) {
 	MessagingPort p;
 	p.init(29999);
 
-	SockAddr db("127.0.0.1", MessagingPort::DBPort);
+//	SockAddr db("127.0.0.1", MessagingPort::DBPort);
+	SockAddr db("10.0.21.60", MessagingPort::DBPort);
 
 	Message send;
 	Message response;
