@@ -56,15 +56,13 @@ struct OID {
    unsigned opid;         // arbitary; will be echoed back
    byte operation;
    
-   Update:
-      int reserved;
-      string collection;  // name of the collection (namespace)
-      a series of JSObjects terminated with a null object (i.e., just EOO)
-   Insert:
+   dbInsert:
       int reserved;
       string collection;
       a series of JSObjects terminated with a null object (i.e., just EOO)
-   Query: see query.h
+   dbUpdate: see query.h
+   dbDelete: see query.h
+   dbQuery: see query.h
 */
 
 #pragma pack(pop)
@@ -114,19 +112,20 @@ class JSObj {
 	friend class JSElemIter;
 public:
 	JSObj(const char *msgdata) {
-		_objsize = *((int*) msgdata) - 4;
-		_objdata = msgdata + 4;
+		_objdata = msgdata;
+		_objsize = *((int*) _objdata);
 	}
 	JSObj(Record *r) { 
-		_objsize = r->netLength();
 		_objdata = r->data;
+		_objsize = *((int*) _objdata);
+		assert( _objsize <= r->netLength() );
 	}
 
 	const char *objdata() { return _objdata; }
 	int objsize() { return _objsize; }
 
 	OID* getOID() {
-		const char *p = objdata();
+		const char *p = objdata() + 4;
 		if( *p != jstOID )
 			return 0;
 		return (OID *) ++p;
@@ -139,7 +138,7 @@ private:
 class JSElemIter {
 public:
 	JSElemIter(JSObj& jso) {
-		pos = jso.objdata();
+		pos = jso.objdata() + 4;
 		theend = jso.objdata() + jso.objsize();
 	}
 	bool more() { return pos < theend; }
@@ -163,3 +162,30 @@ private:
 	vector<Element> toMatch;
 	int n;
 };
+
+/*- just for testing -- */
+
+#pragma pack(push)
+#pragma pack(1)
+struct JSObj1 {
+	JSObj1() {
+		totsize=sizeof(JSObj1); 
+		n = Number; strcpy_s(nname, 5, "abcd"); N = 3.1;
+		s = String; strcpy_s(sname, 7, "abcdef"); slen = 10; 
+		strcpy_s(sval, 10, "123456789"); eoo = EOO;
+	}
+	unsigned totsize;
+
+	char n;
+	char nname[5];
+	double N;
+
+	char s;
+	char sname[7];
+	unsigned slen;
+	char sval[10];
+
+	char eoo;
+};
+#pragma pack(pop)
+extern JSObj1 js1;

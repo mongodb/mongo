@@ -132,7 +132,27 @@ struct EmptyObject {
 } emptyObject;
 #pragma pack(pop)
 
-void query(Message& m) {
+void receivedUpdate(Message& m) {
+	DbMessage d(m);
+	const char *ns = d.getns();
+	int flags = d.pullInt();
+	JSObj query = d.nextJsObj();
+	assert( d.moreJSObjs() );
+	JSObj toupdate = d.nextJsObj();
+	updateObjects(ns, toupdate, query, flags & 1);
+}
+
+void receivedDelete(Message& m) {
+	DbMessage d(m);
+	const char *ns = d.getns();
+	int flags = d.pullInt();
+	JSObj query = d.nextJsObj();
+	assert( d.moreJSObjs() );
+	JSObj pattern = d.nextJsObj();
+	deleteObjects(ns, pattern, flags & 1);
+}
+
+void receivedQuery(Message& m) {
 	DbMessage d(m);
 
 	const char *ns = d.getns();
@@ -144,7 +164,7 @@ void query(Message& m) {
 	dbMsgPort.reply(m, resp);
 }
 
-void getbyoid(Message& m) {
+/*void getbyoid(Message& m) {
 	DbMessage d(m);
 	Record *r = findByOID(d.getns(), d.getOID());
 	Message resp;
@@ -153,32 +173,28 @@ void getbyoid(Message& m) {
 	else
 		resp.setData(opReply, r->data, r->netLength());
 	dbMsgPort.reply(m, resp);
-}
+}*/
 
-void dbinsert(Message& m) {
+void receivedInsert(Message& m) {
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
 		JSObj js = d.nextJsObj();
 		cout << "  temp dbinsert: got js object, size=" << js.objsize() << " ns:" << d.getns() << endl;
-		if( m.data->operation == dbInsert ) {
-			theDataFileMgr.insert(d.getns(), (void*) js.objdata(), js.objsize());
-		} else {
-			// update
-			OID *oid = js.getOID();
-			if( oid == null )
-				cout << "error: no oid on update -- that isn't coded yet" << endl;
-			else
-				updateByOID(d.getns(), (char *) js.objdata(), js.objsize(), oid);
-		}
+		theDataFileMgr.insert(d.getns(), (void*) js.objdata(), js.objsize());
 	}
 }
 
-void run() { 
-	dbMsgPort.init(MessagingPort::DBPort);
+void testTheDb() {
+	/* this is not validly formatted, if you query this namespace bad things will happen */
+	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
 
-	pdfileInit();
+	JSObj j1((const char *) &js1);
+	deleteObjects("sys.unittest.delete", j1, false);
+	theDataFileMgr.insert("sys.unittest.delete", &js1, sizeof(js1));
+	deleteObjects("sys.unittest.delete", j1, false);
+	updateObjects("sys.unittest.delete", j1, j1, true);
+	updateObjects("sys.unittest.delete", j1, j1, false);
 
-	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello world", 12);
 	cout << "findAll:\n";
 	Cursor c = theDataFileMgr.findAll("sys.unittest.pdfile");
 	while( c.ok() ) {
@@ -188,6 +204,14 @@ void run() {
 		c.advance();
 	}
 	cout << endl;
+}
+
+void run() { 
+	dbMsgPort.init(MessagingPort::DBPort);
+
+	pdfileInit();
+
+	testTheDb();
 
 	Message m;
 	while( 1 ) { 
@@ -210,17 +234,20 @@ void run() {
 				break;
 			}
 		}
-		else if( m.data->operation == dbUpdate || m.data->operation == dbInsert ) {
-			dbinsert(m);
-		}
-		else if( m.data->operation == dbGetByOID ) {
-			getbyoid(m);
-		}
 		else if( m.data->operation == dbQuery ) { 
-			query(m);
+			receivedQuery(m);
+		}
+		else if( m.data->operation == dbInsert ) {
+			receivedInsert(m);
+		}
+		else if( m.data->operation == dbUpdate ) {
+			receivedUpdate(m);
+		}
+		else if( m.data->operation == dbDelete ) {
+			receivedDelete(m);
 		}
 		else if( m.data->operation == dbGetMore ) {
-			cout << "dbGetMore: not implemented!" << endl;
+			cout << "dbGetMore: not implemented yet!" << endl;
 		}
 		else {
 			cout << "    operation isn't supported ?" << endl;

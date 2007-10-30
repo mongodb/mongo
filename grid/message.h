@@ -39,9 +39,10 @@ enum Operations {
 
 	dbUpdate = 2001, /* update object */
 	dbInsert = 2002,
-	dbGetByOID = 2003,
+//	dbGetByOID = 2003,
 	dbQuery = 2004,
-	dbGetMore = 2005
+	dbGetMore = 2005,
+	dbDelete = 2006
 };
 
 struct MsgData {

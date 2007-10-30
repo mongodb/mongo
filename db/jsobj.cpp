@@ -91,26 +91,7 @@ struct JSObj0 {
 	char eoo;
 } js0;
 
-struct JSObj1 {
-	JSObj1() {
-		totsize=sizeof(JSObj1); 
-		n = Number; strcpy_s(nname, 5, "abcd"); N = 3.1;
-		s = String; strcpy_s(sname, 7, "abcdef"); slen = 10; 
-		strcpy_s(sval, 10, "123456789"); eoo = EOO;
-	}
-	unsigned totsize;
-
-	char n;
-	char nname[5];
-	double N;
-
-	char s;
-	char sname[7];
-	unsigned slen;
-	char sval[10];
-
-	char eoo;
-} js1;
+struct JSObj1 js1;
 
 struct JSObj2 {
 	JSObj2() {
