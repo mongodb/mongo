@@ -373,6 +373,7 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len) {
 		Record *oldlast = e->lastRecord.rec();
 		r->prevOfs = e->lastRecord.getOfs();
 		r->nextOfs = DiskLoc::NullOfs;
+		oldlast->nextOfs = loc.getOfs();
 		e->lastRecord = loc;
 	}
 }

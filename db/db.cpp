@@ -170,6 +170,7 @@ void receivedInsert(Message& m) {
 void testTheDb() {
 	/* this is not validly formatted, if you query this namespace bad things will happen */
 	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
+	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
 
 	JSObj j1((const char *) &js1);
 	deleteObjects("sys.unittest.delete", j1, false);
