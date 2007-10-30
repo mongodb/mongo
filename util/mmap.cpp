@@ -79,10 +79,15 @@ MemoryMappedFile::~MemoryMappedFile() {
 	fd = 0;
 }
 
+#ifndef O_NOATIME
+#warning NO O_NOATIME
+#define O_NOATIME 0
+#endif
+
 void* MemoryMappedFile::map(const char *filename, int length) {
 	len = length;
 
-	fd = open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
+        fd = open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
 	if( !fd ) {
 		cout << "couldn't open " << filename << ' ' << errno << endl;
 		return 0;
