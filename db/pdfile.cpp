@@ -5,6 +5,7 @@ todo:
 _ manage deleted records.  bucket?
 _ use deleted on inserts!
 _ quantize allocations
+_ table scans must be sequential, not next/prev pointers
 */
 
 #include "stdafx.h"
@@ -12,9 +13,6 @@ _ quantize allocations
 #include "db.h"
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
-
-#include <map>
-#include <string>
 
 DataFileMgr theDataFileMgr;
 
@@ -29,6 +27,7 @@ int bucketSizes[] = {
 	0x400000, 0x800000
 };
 const int Buckets = 19;
+const int MaxBucket = 18;
 
 class NamespaceDetails {
 public:
@@ -44,14 +43,100 @@ public:
 		return Buckets-1;
 	}
 
-	void addDeletedRec(Record *d, DiskLoc dloc) { 
+	void addDeletedRec(DeletedRecord *d, DiskLoc dloc) { 
 		int b = bucket(d->lengthWithHeaders);
 		DiskLoc& list = deletedList[b];
 		DiskLoc oldHead = list;
 		list = dloc;
-		d->nextDeleted() = oldHead;
+		d->nextDeleted = oldHead;
 	}
+
+	DiskLoc alloc(int lenToAlloc, DiskLoc& extentLoc);
+
+private:
+	DiskLoc _alloc(int len);
 };
+
+DiskLoc NamespaceDetails::alloc(int lenToAlloc, DiskLoc& extentLoc) {
+	lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
+	DiskLoc loc = _alloc(lenToAlloc);
+	if( loc.isNull() )
+		return loc;
+
+	DeletedRecord *r = loc.drec();
+
+	/* note we want to grab from the front so our next pointers on disk tend
+	to go in a forward direction which is important for performance. */
+	int regionlen = r->lengthWithHeaders;
+	extentLoc.set(loc.a(), r->extentOfs);
+
+	int left = regionlen - lenToAlloc;
+	if( left < 24 ) {
+		// you get the whole thing.
+		return loc;
+	}
+
+	/* split off some for further use. */
+	r->lengthWithHeaders = lenToAlloc;
+	DiskLoc newDelLoc = loc;
+	newDelLoc.inc(lenToAlloc);
+	DeletedRecord *newDel = newDelLoc.drec();
+	newDel->extentOfs = r->extentOfs;
+	newDel->lengthWithHeaders = left;
+	newDel->nextDeleted.Null();
+	addDeletedRec(newDel, newDelLoc);
+
+	return loc;
+}
+
+/* returned item is out of the deleted list upon return */
+DiskLoc NamespaceDetails::_alloc(int len) {
+	DiskLoc *prev;
+	DiskLoc *bestprev = 0;
+	DiskLoc bestmatch;
+	int bestmatchlen = 0x7fffffff;
+	int b = bucket(len);
+	DiskLoc cur = deletedList[b]; prev = &deletedList[b];
+	int extra = 5; // look for a better fit, a little.
+	int chain = 0;
+	while( 1 ) { 
+		if( cur.isNull() ) { 
+			// move to next bucket.  if we were doing "extra", just break
+			if( bestmatchlen < 0x7fffffff )
+				break;
+			b++;
+			if( b > MaxBucket ) {
+				// out of space. alloc a new extent.
+				return DiskLoc();
+			}
+			cur = deletedList[b]; prev = &deletedList[b];
+			continue;
+		}
+		DeletedRecord *r = cur.drec();
+		if( r->lengthWithHeaders >= len && 
+			r->lengthWithHeaders < bestmatchlen ) {
+				bestmatchlen = r->lengthWithHeaders;
+				bestmatch = cur;
+				bestprev = prev;
+		}
+		if( bestmatchlen < 0x7fffffff && --extra <= 0 )
+			break;
+		if( ++chain > 30 && b < MaxBucket ) {
+			// too slow, force move to next bucket to grab a big chunk
+			b++;
+			chain = 0;
+			cur.Null();
+		}
+		else {
+			cur = r->nextDeleted; prev = &r->nextDeleted;
+		}
+	}
+
+	/* unlink ourself from the deleted list */
+	*bestprev = bestmatch.drec()->nextDeleted;
+
+	return bestmatch;
+}
 
 class NamespaceIndex {
 public:
@@ -98,7 +183,8 @@ void PhysicalDataFile::open(const char *filename, int length) {
 }
 
 /* prev - previous extent for this namespace.  null=this is the first one. */
-Extent* PhysicalDataFile::newExtent(const char *ns, DiskLoc& loc, Extent *prev) {
+Extent* PhysicalDataFile::newExtent(const char *ns) {
+	DiskLoc loc;
 	int left = header->unusedLength - ExtentSize;
 	if( left < 0 ) {
 		cout << "ERROR: newExtent: no more room for extents. write more code" << endl;
@@ -110,22 +196,29 @@ Extent* PhysicalDataFile::newExtent(const char *ns, DiskLoc& loc, Extent *prev) 
 	header->unusedLength -= ExtentSize;
 	loc.setOfs(offset);
 	Extent *e = _getExtent(loc);
-	e->init(ns, ExtentSize, offset);
-	if( prev ) {
-		assert( prev->xnext.isNull() );
-		prev->xnext = e->myLoc;
-		e->xprev = prev->myLoc;
-	} else {
-		e->xprev.Null();
+	DiskLoc emptyLoc = e->init(ns, ExtentSize, offset);
+
+	DiskLoc oldExtentLoc;
+	if( namespaceIndex.find(ns, oldExtentLoc) ) {
+		Extent *old = oldExtentLoc.ext();
+		assert( old->xprev.isNull() );
+		old->xprev = loc;
+		e->xnext = oldExtentLoc;
+		namespaceIndex.details(ns)->firstExtent = loc;
 	}
-	e->xnext.Null();
+	else {
+		namespaceIndex.add(ns, loc);
+	}
+
+	namespaceIndex.details(ns)->addDeletedRec(emptyLoc.drec(), emptyLoc);
+
 	return e;
 }
 
 /*---------------------------------------------------------------------*/ 
 
 /* assumes already zeroed -- insufficient for block 'reuse' perhaps */
-void Extent::init(const char *nsname, int _length, int _offset) { 
+DiskLoc Extent::init(const char *nsname, int _length, int _offset) { 
 	magic = 0x41424344;
 	myLoc.setOfs(_offset);
 	xnext.Null(); xprev.Null();
@@ -133,16 +226,18 @@ void Extent::init(const char *nsname, int _length, int _offset) {
 	length = _length;
 	firstRecord.Null(); lastRecord.Null();
 
-	firstEmptyRegion = myLoc;
-	firstEmptyRegion.inc( (extentData-(char*)this) );
+	DiskLoc emptyLoc = myLoc;
+	emptyLoc.inc( (extentData-(char*)this) );
 
-	Record *empty1 = (Record *) extentData;
-	Record *empty = getRecord(firstEmptyRegion);
+	DeletedRecord *empty1 = (DeletedRecord *) extentData;
+	DeletedRecord *empty = (DeletedRecord *) getRecord(emptyLoc);
 	assert( empty == empty1 );
 	empty->lengthWithHeaders = _length - (extentData - (char *) this);
-	empty->next.Null();
+	empty->extentOfs = myLoc.getOfs();
+	return emptyLoc;
 }
 
+/*
 Record* Extent::newRecord(int len) {
 	if( firstEmptyRegion.isNull() )
 		return 0;
@@ -153,7 +248,7 @@ Record* Extent::newRecord(int len) {
 	Record *r = getRecord(newRecordLoc);
 	int left = r->netLength() - len;
 	if( left < 0 ) {
-		/* this might be wasteful if huge variance in record sizes in a namespace */
+	//
 		firstEmptyRegion.Null();
 		return 0;
 	}
@@ -186,6 +281,7 @@ Record* Extent::newRecord(int len) {
 
 	return r;
 }
+*/
 
 /*---------------------------------------------------------------------*/ 
 
@@ -200,32 +296,29 @@ Cursor DataFileMgr::findAll(const char *ns) {
 	return Cursor( e->firstRecord );
 }
 
-void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl) {
+void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl) 
+{
 	/* remove ourself from the record next/prev chain */
-	DiskLoc prev = todelete->prev.getPrev(dl);
-	if( !prev.isNull() )
-		getRecord(prev)->next.set( todelete->next.getNext(dl) );
-	DiskLoc next = todelete->next.getNext(dl);
-	if( !next.isNull() )
-		getRecord(next)->prev.set( todelete->prev.getPrev(dl) );
+	{
+		if( todelete->prevOfs != DiskLoc::NullOfs )
+			todelete->getPrev(dl).rec()->nextOfs = todelete->nextOfs;
+		if( todelete->nextOfs != DiskLoc::NullOfs )
+			todelete->getNext(dl).rec()->prevOfs = todelete->prevOfs;
+	}
 
 	/* remove ourself from extent pointers */
-	DiskLoc ext = todelete->prev.myExtent(dl);
-	if( !ext.isNull() ) {
-		// we are first.
-		Extent *e = DataFileMgr::getExtent(ext);
-		assert( e->firstRecord == dl );
-		e->firstRecord = next;
-	}
-	ext = todelete->next.myExtent(dl);
-	if( !ext.isNull() ) {
-		Extent *e = DataFileMgr::getExtent(ext);
-		assert( e->lastRecord == dl );
-		e->lastRecord = next;
+	{
+		Extent *e = todelete->myExtent(dl);
+		if( e->firstRecord == dl )
+			e->firstRecord.setOfs(todelete->nextOfs);
+		if( e->lastRecord == dl )
+			e->lastRecord.setOfs(todelete->prevOfs);
 	}
 
-	NamespaceDetails* d = namespaceIndex.details(ns);
-	d->addDeletedRec(todelete, dl);
+	{
+		NamespaceDetails* d = namespaceIndex.details(ns);
+		d->addDeletedRec((DeletedRecord*)todelete, dl);
+	}
 }
 
 /** Note: as written so far, if the object shrinks a lot, we don't free up space. */
@@ -246,16 +339,42 @@ void DataFileMgr::update(
 }
 
 void DataFileMgr::insert(const char *ns, const void *buf, int len) {
-	DiskLoc loc;
-	bool found = namespaceIndex.find(ns, loc);
-	if( !found ) {
+	NamespaceDetails *d = namespaceIndex.details(ns);
+	if( d == 0 ) {
 		cout << "New namespace: " << ns << endl;
-		temp.newExtent(ns, loc, 0);
-		namespaceIndex.add(ns, loc);
+		temp.newExtent(ns);
+		d = namespaceIndex.details(ns);
 	}
-	Extent *e = temp.getExtent(loc);
-	Record *r = e->newRecord(len); /*todo: if zero returned, need new extent */
+
+	DiskLoc extentLoc;
+	int lenWHdr = len + Record::HeaderSize;
+	DiskLoc loc = d->alloc(lenWHdr, extentLoc);
+	if( loc.isNull() ) {
+		// out of space
+		cout << "allocating new extent for " << ns << endl;
+		temp.newExtent(ns);
+		loc = d->alloc(lenWHdr, extentLoc);
+		if( loc.isNull() ) { 
+			cout << "ERROR: out of space in datafile.  write more code." << endl;
+			assert(false);
+			return;
+		}
+	}
+
+	Record *r = loc.rec();
+	assert( r->lengthWithHeaders >= lenWHdr );
 	memcpy(r->data, buf, len);
+	Extent *e = r->myExtent(loc);
+	if( e->lastRecord.isNull() ) { 
+		e->firstRecord = e->lastRecord = loc;
+		r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
+	}
+	else {
+		Record *oldlast = e->lastRecord.rec();
+		r->prevOfs = e->lastRecord.getOfs();
+		r->nextOfs = DiskLoc::NullOfs;
+		e->lastRecord = loc;
+	}
 }
 
 void DataFileMgr::init() {

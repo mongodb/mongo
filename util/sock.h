@@ -61,7 +61,7 @@ inline bool UDPConnection::init(const SockAddr& myAddr) {
 		cout << "invalid socket? " << errno << endl;
 		return false;
 	}
-	cout << sizeof(sockaddr_in) << ' ' << myAddr.addressSize << endl;
+	//cout << sizeof(sockaddr_in) << ' ' << myAddr.addressSize << endl;
 	if( bind(sock, (sockaddr *) &myAddr.sa, myAddr.addressSize) != 0 ) { 
 		cout << "udp init failed" << endl;
 		closesocket(sock);

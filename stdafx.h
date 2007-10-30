@@ -21,6 +21,10 @@ typedef char _TCHAR;
 #include <fstream>
 using namespace std;
 
+#include <map>
+#include <string>
+#include <vector>
+
 #if !defined(_WIN32)
 typedef int HANDLE;
 inline void strcpy_s(char *dst, unsigned len, const char *src) { strcpy(dst, src); }

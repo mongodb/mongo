@@ -18,3 +18,6 @@ db: $(OBJS) db.o
 clean:
 	-rm -f $(OBJS) db.o
 	-rm -f db
+
+cleandb:
+	rm /data/namespace.idx /data/temp.dat

@@ -48,7 +48,7 @@ public:
 	void open(const char *filename, int length = 64 * 1024 * 1024);
 
 private:
-	Extent* newExtent(const char *ns, DiskLoc& loc, Extent *prev);
+	Extent* newExtent(const char *ns);
 	Extent* getExtent(DiskLoc loc);
 	Extent* _getExtent(DiskLoc loc);
 	Record* recordAt(DiskLoc dl);
@@ -82,53 +82,31 @@ extern DataFileMgr theDataFileMgr;
 #pragma pack(push)
 #pragma pack(1)
 
-/* lots of code to make our next/prev pointers 4 bytes instead of 8! */
-class SmartLoc {
-public:
-	SmartLoc() { x = 0; }
-	DiskLoc getNextEmpty(const DiskLoc& myLoc) {
-		assert( x >= 0 );
-		return DiskLoc(myLoc.a(), x);
-	}
-	DiskLoc getNext(const DiskLoc& myLoc);
-	DiskLoc getPrev(const DiskLoc& myLoc);
-	/* if a next pointer, marks as last.  if a prev pointer, marks as first */
-	void markAsFirstOrLastInExtent(Extent *e);
-	bool firstInExtent() { return x < 0; }
-	bool lastInExtent() { return x < 0; }
-	void set(const DiskLoc& nextprevRecordLoc) { x = nextprevRecordLoc.getOfs(); }
-	void Null() { x = 0; } /* this is for empty records only. nonempties point to the extent. */
-	DiskLoc myExtent(const DiskLoc& myLoc);
-private:
-	int x;
-};
-
 class DeletedRecord {
 public:
-	DiskLoc nextDeleted;
 	int lengthWithHeaders;
-	int myOfs;
-	DiskLoc myExtent;
-
-	void init(const DiskLoc& extent, const DiskLoc& myLoc) {
-		myExtent = extent;
-		myOfs = myLoc.getOfs();
-	}
+	int extentOfs;
+	DiskLoc nextDeleted;
 };
-const int MinRecordSize = sizeof(DeletedRecord);
 
 class Record {
 public:
-	enum { HeaderSize = 12 };
-	SmartLoc next, prev;
+	enum { HeaderSize = 16 };
 	int lengthWithHeaders;
+	int extentOfs, nextOfs, prevOfs;
 	char data[4];
-	//	bool haveNext() { return !next.isNull(); }
 	int netLength() { return lengthWithHeaders - HeaderSize; }
-	void setNewLength(int netlen) { lengthWithHeaders = netlen + HeaderSize; }
+	//void setNewLength(int netlen) { lengthWithHeaders = netlen + HeaderSize; }
 
 	/* use this when a record is deleted. basically a union with next/prev fields */
-	DiskLoc& asDeleted() { return *((DeletedRecord*) this); }
+	DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
+
+	Extent* myExtent(const DiskLoc& myLoc) { 
+		return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
+	}
+	/* get the next record in the namespace, traversing extents as necessary */
+	DiskLoc getNext(const DiskLoc& myLoc);
+	DiskLoc getPrev(const DiskLoc& myLoc);
 };
 
 /* extents are regions where all the records within the region 
@@ -145,8 +123,11 @@ public:
 	DiskLoc firstRecord, lastRecord;
 	char extentData[4];
 
-	/* assumes already zeroed -- insufficient for block 'reuse' perhaps */
-	void init(const char *nsname, int _length, int _offset);
+	/* assumes already zeroed -- insufficient for block 'reuse' perhaps 
+	Returns a DeletedRecord location which is the data in the extent ready for us.
+	Caller will need to add that to the freelist structure in namespacedetail.
+	*/
+	DiskLoc init(const char *nsname, int _length, int _offset);
 
 	void assertOk() { assert(magic == 0x41424344); }
 
@@ -163,37 +144,6 @@ public:
 	Extent* getNextExtent() { return xnext.isNull() ? 0 : DataFileMgr::getExtent(xnext); }
 	Extent* getPrevExtent() { return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev); }
 };
-
-inline DiskLoc SmartLoc::getNext(const DiskLoc& myLoc) {
-	assert( x != 0 );
-	if( x > 0 )
-		return DiskLoc(myLoc.a(), x);
-	// we are the last one in this extent.
-	DiskLoc extLoc(myLoc.a(), -x);
-	Extent *e = DataFileMgr::getExtent(extLoc);
-	assert( e->lastRecord == myLoc );
-	Extent *nxt = e->getNextExtent();
-	return nxt ? nxt->firstRecord : DiskLoc();
-}
-inline DiskLoc SmartLoc::getPrev(const DiskLoc& myLoc) {
-	assert( x != 0 );
-	if( x > 0 )
-		return DiskLoc(myLoc.a(), x);
-	// we are the first one in this extent.
-	DiskLoc extLoc(myLoc.a(), -x);
-	Extent *e = DataFileMgr::getExtent(extLoc);
-	assert( e->firstRecord == myLoc );
-	Extent *prv = e->getPrevExtent();
-	return prv ? prv->lastRecord : DiskLoc();
-}
-/* only works if first (or last for 'next') record in the extent. */
-inline DiskLoc SmartLoc::myExtent(const DiskLoc& myLoc) {
-	return x < 0 ? DiskLoc(myLoc.a(), -x) : DiskLoc();
-}
-/* if a next pointer, marks as last.  if a prev pointer, marks as first */
-inline void SmartLoc::markAsFirstOrLastInExtent(Extent *e) { 
-	x = -e->myLoc.getOfs(); 
-}
 
 /*
       ----------------------
@@ -270,7 +220,7 @@ public:
 		if( eof() )
 			return false;
 		Record *r = current();
-		curr = r->next.getNext(curr);
+		curr = r->getNext(curr);
 		return ok();
 	}
 
@@ -287,4 +237,31 @@ inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
 }
 inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
 	return theDataFileMgr.temp.recordAt(dl);
+}
+
+inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
+	if( nextOfs )
+		return DiskLoc(myLoc.a(), nextOfs);
+	Extent *e = myLoc.ext();
+	if( e->xnext.isNull() )
+		return DiskLoc(); // end of table.
+	return e->xnext.ext()->firstRecord;
+}
+inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
+	if( prevOfs )
+		return DiskLoc(myLoc.a(), prevOfs);
+	Extent *e = myLoc.ext();
+	if( e->xprev.isNull() )
+		return DiskLoc();
+	return e->xprev.ext()->firstRecord;
+}
+
+inline Record* DiskLoc::rec() const {
+	return DataFileMgr::getRecord(*this);
+}
+inline DeletedRecord* DiskLoc::drec() const {
+	return (DeletedRecord*) rec();
+}
+inline Extent* DiskLoc::ext() const {
+	return DataFileMgr::getExtent(*this);
 }

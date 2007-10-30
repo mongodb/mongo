@@ -22,7 +22,7 @@ struct MyStartupTests {
 */
 
 void quicktest() { 
-	cout << "quicktest\n";
+	cout << "quicktest()\n";
 
 	MemoryMappedFile mmf;
 	char *m = (char *) mmf.map("/tmp/abc", 16384);
@@ -104,23 +104,6 @@ Record* findByOID(const char *ns, OID *oid) {
 		c.advance();
 	}
 	return 0;
-}
-
-void updateByOID(const char *ns, char *objdata, int objsize, OID *oid) {
-	Record *r = findByOID(ns, oid);
-	if( r == 0 ) { 
-		cout << "updateByOID: no such record " << ns << endl;
-		return;
-	}
-	if( objsize > r->netLength() ) {
-		cout << "ERROR: updateByOID: growing records not implemented yet." << endl;
-		return;
-	}
-	/* note: need to be smarter if it gets a lot smaller? */
-	/* this really dumb for now as it gets smaller but doesn't allow regrowth 
-	to the original size! */
-	memcpy(r->data, objdata, objsize);
-	r->setNewLength(objsize);
 }
 
 #pragma pack(push)
