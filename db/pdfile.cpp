@@ -6,6 +6,7 @@ _ manage deleted records.  bucket?
 _ use deleted on inserts!
 _ quantize allocations
 _ table scans must be sequential, not next/prev pointers
+_ regex support
 */
 
 #include "stdafx.h"

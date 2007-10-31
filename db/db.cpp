@@ -129,7 +129,6 @@ void receivedDelete(Message& m) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	int flags = d.pullInt();
-	JSObj query = d.nextJsObj();
 	assert( d.moreJSObjs() );
 	JSObj pattern = d.nextJsObj();
 	deleteObjects(ns, pattern, flags & 1);
@@ -253,7 +252,7 @@ void msg(const char *m) {
 
 	cout << "contacting DB..." << endl;
 	bool ok = p.call(db, send, response);
-	cout << "ok: " << ok << endl;
+	cout << "ok. response.data:" << ok << endl;
 	cout << "  " << response.data->id << endl;
 	cout << "  " << response.data->len << endl;
 	cout << "  " << response.data->operation << endl;
