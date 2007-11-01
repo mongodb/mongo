@@ -77,7 +77,7 @@ public:
 		if( js.objsize() <= 0 )
 			nextjsobj = null;
 		else {
-			nextjsobj += js.objsize() + 4;
+			nextjsobj += js.objsize();
 			if( nextjsobj >= theEnd )
 				nextjsobj = 0;
 		}
