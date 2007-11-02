@@ -141,9 +141,7 @@ public:
 		_objdata = r._objdata;
 		return *this;
 	}
-	JSObj(JSObj& r) {
-		*this = r;
-	}
+	JSObj() : iDelete(false), _objsize(0), _objdata(0) { }
 
 	bool iDelete;
 private:
