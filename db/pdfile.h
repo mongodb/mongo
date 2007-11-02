@@ -5,10 +5,12 @@
 #include "../stdafx.h"
 #include "../util/mmap.h"
 #include "storage.h"
+#include "jsobj.h"
 
 class PDFHeader;
 class Extent;
 class Record;
+class Cursor;
 
 /*---------------------------------------------------------------------*/ 
 
@@ -36,14 +38,14 @@ public:
 	char buf[128];
 };
 
-/*---------------------------------------------------------------------*/ 
+auto_ptr<Cursor> makeNamespaceCursor();
 
-class Cursor;
+/*---------------------------------------------------------------------*/ 
 
 class PDFHeader;
 class PhysicalDataFile {
 	friend class DataFileMgr;
-	friend class Cursor;
+	friend class BasicCursor;
 public:
 	void open(const char *filename, int length = 64 * 1024 * 1024);
 
@@ -59,7 +61,7 @@ private:
 };
 
 class DataFileMgr {
-	friend class Cursor;
+	friend class BasicCursor;
 public:
 	void init();
 
@@ -69,7 +71,7 @@ public:
 		const char *buf, int len);
 	void insert(const char *ns, const void *buf, int len);
 	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl);
-	Cursor findAll(const char *ns);
+	auto_ptr<Cursor> findAll(const char *ns);
 
 	static Extent* getExtent(const DiskLoc& dl);
 	static Record* getRecord(const DiskLoc& dl);
@@ -210,22 +212,37 @@ inline Extent* PhysicalDataFile::getExtent(DiskLoc loc) {
 
 class Cursor {
 public:
-	bool ok() { return !curr.isNull(); }
+	virtual bool ok() = 0;
 	bool eof() { return !ok(); }
-	Record* current() {
+	virtual Record* _current() = 0;
+	virtual JSObj current() = 0;
+	virtual DiskLoc currLoc() = 0;
+	virtual bool advance() = 0;
+};
+
+class BasicCursor : public Cursor {
+public:
+	bool ok() { return !curr.isNull(); }
+
+	Record* _current() {
 		assert( ok() );
 		return theDataFileMgr.temp.recordAt(curr); 
 	}
+	JSObj current() { 
+		return JSObj( _current() ); 
+	}
+	virtual DiskLoc currLoc() { return curr; }
+
 	bool advance() { 
 		if( eof() )
 			return false;
-		Record *r = current();
+		Record *r = _current();
 		curr = r->getNext(curr);
 		return ok();
 	}
 
-	Cursor(DiskLoc dl) : curr(dl) { }
-	Cursor() { }
+	BasicCursor(DiskLoc dl) : curr(dl) { }
+	BasicCursor() { }
 
 	DiskLoc curr;
 };

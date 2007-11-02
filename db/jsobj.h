@@ -3,7 +3,8 @@
 #pragma once
 
 #include "../stdafx.h"
-#include "pdfile.h"
+#include "../util/builder.h"
+//#include "pdfile.h"
 
 #pragma pack(push)
 #pragma pack(1)
@@ -107,6 +108,7 @@ private:
 	int totalSize;
 };
 
+class Record;
 
 class JSObj {
 	friend class JSElemIter;
@@ -114,11 +116,12 @@ public:
 	JSObj(const char *msgdata) {
 		_objdata = msgdata;
 		_objsize = *((int*) _objdata);
+		iDelete = false;
 	}
-	JSObj(Record *r) { 
-		_objdata = r->data;
-		_objsize = *((int*) _objdata);
-		assert( _objsize <= r->netLength() );
+	JSObj(Record *r);
+
+	~JSObj() { 
+//		if( iDelete ) { free((void*)_objdata); _objdata = 0; }
 	}
 
 	const char *objdata() { return _objdata; }
@@ -130,9 +133,52 @@ public:
 			return 0;
 		return (OID *) ++p;
 	}
+
+	JSObj& operator=(JSObj& r) {
+		iDelete = r.iDelete;
+		r.iDelete = false;
+		_objsize = r._objsize;
+		_objdata = r._objdata;
+		return *this;
+	}
+	JSObj(JSObj& r) {
+		*this = r;
+	}
+
+	bool iDelete;
 private:
 	int _objsize;
 	const char *_objdata;
+};
+
+class JSObjBuilder { 
+public:
+	JSObjBuilder() { b.skip(4); /*leave room for size field*/ }
+
+	void append(const char *fieldName, double n) { 
+		b.append((char) Number);
+		b.append(fieldName);
+		b.append(n);
+	}
+	void append(const char *fieldName, const char *str) {
+		b.append((char) String);
+		b.append(fieldName);
+		b.append((int) strlen(str)+1);
+		b.append(str);
+	}
+
+	JSObj done() { 
+		b.append((char) EOO);
+		char *data = b.buf();
+		*((int*)data) = b.len();
+		b.decouple();
+		JSObj j(data);
+		j.iDelete = true;
+		return j;
+	}
+
+private:
+	BufBuilder b;
 };
 
 class JSElemIter {
@@ -152,6 +198,7 @@ private:
 	const char *theend;
 };
 
+/* For when a js object is a pattern... */
 class JSMatcher { 
 public:
 	JSMatcher(JSObj& pattern);

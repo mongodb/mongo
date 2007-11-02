@@ -46,3 +46,16 @@ typedef void *HANDLE;
 #define null (0)
 
 #include <vector>
+
+// for debugging
+typedef struct _Ints { int i[100]; } *Ints;
+typedef struct _Chars { char c[200]; } *Chars;
+
+typedef char CHARS[400];
+
+typedef struct _OWS {
+	int size;
+	char type;
+	char string[400];
+} *OWS;
+

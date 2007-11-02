@@ -21,12 +21,13 @@ template <
 	class Type
 >
 class HashTable {
-private:
+public:
 	const char *name;
 	struct Node {
 		int hash;
 		Key k;
 		Type value;
+		bool inUse() { return hash != 0; }
 	} *nodes;
 	int n;
 
@@ -37,7 +38,7 @@ private:
 		int start = i;
 		int chain = 0;
 		while( 1 ) {
-			if( nodes[i].hash == 0 ) {
+			if( !nodes[i].inUse() ) {
 				return i;
 			}
 			if( nodes[i].hash == h && nodes[i].k == k ) {

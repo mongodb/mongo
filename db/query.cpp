@@ -14,11 +14,11 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 
 	JSMatcher matcher(pattern);
 
-	Cursor c = theDataFileMgr.findAll(ns);
-	while( c.ok() ) {
-		Record *r = c.current();
-		DiskLoc rloc = c.curr;
-		c.advance(); // must advance before deleting as the next ptr will die
+	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+	while( c->ok() ) {
+		Record *r = c->_current();
+		DiskLoc rloc = c->currLoc();
+		c->advance(); // must advance before deleting as the next ptr will die
 		JSObj js(r);
 		if( matcher.matches(js) ) {
 			cout << "  found match to delete" << endl;
@@ -35,16 +35,16 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 
 	JSMatcher matcher(pattern);
 
-	Cursor c = theDataFileMgr.findAll(ns);
-	while( c.ok() ) {
-		Record *r = c.current();
+	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+	while( c->ok() ) {
+		Record *r = c->_current();
 		JSObj js(r);
 		if( matcher.matches(js) ) {
 			cout << "  found match to update" << endl;
-			theDataFileMgr.update(ns, r, c.curr, updateobj.objdata(), updateobj.objsize());
+			theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
 			return;
 		}
-		c.advance();
+		c->advance();
 	}
 
 	cout << "  no match found. ";
@@ -67,20 +67,21 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
 	b.skip(sizeof(QueryResult));
 
 	int n = 0;
-	Cursor c = theDataFileMgr.findAll(ns);
-	while( c.ok() ) {
-		Record *r = c.current();
 
-		JSObj js(r);
+	auto_ptr<Cursor> c = 
+		strcmp(ns, "system.namespaces") == 0 ? 
+		makeNamespaceCursor() : 
+	    theDataFileMgr.findAll(ns);
+
+	while( c->ok() ) {
+		JSObj js = c->current();
 		if( matcher.matches(js) ) {
-			assert( js.objsize() <= r->netLength() );
-			b.append(r->data, js.objsize());
+			b.append((void*) js.objdata(), js.objsize());
 			n++;
 			if( n >= ntoreturn && ntoreturn != 0 )
 				break;
 		}
-
-		c.advance();
+		c->advance();
 	}
 
 	qr = (QueryResult *) b.buf();

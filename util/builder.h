@@ -2,6 +2,8 @@
 
 */
 
+#pragma once
+
 #include "../stdafx.h"
 
 class BufBuilder {
@@ -10,7 +12,9 @@ public:
 		data = (char *) malloc(size);
 		l = 0;
 	}
-	~BufBuilder() {
+	~BufBuilder() { kill(); } 
+
+	void kill() {
 		if( data ) {
 			free(data);
 			data = 0;

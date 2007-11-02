@@ -92,19 +92,18 @@ private:
 	const char *theEnd;
 };
 
-Record* findByOID(const char *ns, OID *oid) {
+/*Record* findByOID(const char *ns, OID *oid) {
 	// temp implementation
 	Cursor c = theDataFileMgr.findAll(ns);
 	while( c.ok() ) {
-		Record *r = c.current();
-		JSObj js(r);
+		JSObj js = c.current();
 		OID *i = js.getOID();
 		if( i && *oid == *i )
 			return r;
 		c.advance();
 	}
 	return 0;
-}
+}*/
 
 #pragma pack(push)
 #pragma pack(1)
@@ -179,12 +178,12 @@ void testTheDb() {
 	updateObjects("sys.unittest.delete", j1, j1, false);
 
 	cout << "findAll:\n";
-	Cursor c = theDataFileMgr.findAll("sys.unittest.pdfile");
-	while( c.ok() ) {
-		Record* r = c.current();
+	auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
+	while( c->ok() ) {
+		Record* r = c->_current();
 		cout << "  gotrec " << r->netLength() << ' ' << 
 			r->data << '\n';
-		c.advance();
+		c->advance();
 	}
 	cout << endl;
 }

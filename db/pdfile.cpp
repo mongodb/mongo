@@ -20,6 +20,13 @@ DataFileMgr theDataFileMgr;
 /* just temporary */
 const int ExtentSize = 1 * 1024 * 1024;
 
+JSObj::JSObj(Record *r) { 
+	_objdata = r->data;
+	_objsize = *((int*) _objdata);
+	assert( _objsize <= r->netLength() );
+	iDelete = false;
+}
+
 /*---------------------------------------------------------------------*/ 
 
 int bucketSizes[] = { 
@@ -140,6 +147,7 @@ DiskLoc NamespaceDetails::_alloc(int len) {
 }
 
 class NamespaceIndex {
+	friend class NamespaceCursor;
 public:
 	NamespaceIndex() { }
 
@@ -174,6 +182,43 @@ private:
 	MemoryMappedFile f;
 	HashTable<Namespace,NamespaceDetails> *ht;
 } namespaceIndex;
+
+class NamespaceCursor : public Cursor {
+public:
+	virtual bool ok() { return i >= 0; }
+	virtual Record* _current() { assert(false); return 0; }
+	virtual DiskLoc currLoc() { assert(false); return DiskLoc(); }
+
+	virtual JSObj current() {
+		NamespaceDetails &d = namespaceIndex.ht->nodes[i].value;
+		JSObjBuilder b;
+		b.append("name", namespaceIndex.ht->nodes[i].k.buf);
+		return b.done();
+	}
+
+	virtual bool advance() {
+		while( 1 ) {
+			i++;
+			if( i >= namespaceIndex.ht->n )
+				break;
+			if( namespaceIndex.ht->nodes[i].inUse() )
+				return true;
+		}
+		i = -1000000;
+		return false;
+	}
+
+	NamespaceCursor() { 
+		i = -1;
+		advance();
+	}
+private:
+	int i;
+};
+
+auto_ptr<Cursor> makeNamespaceCursor() {
+	return auto_ptr<Cursor>(new NamespaceCursor());
+}
 
 /*---------------------------------------------------------------------*/ 
 
@@ -286,15 +331,15 @@ Record* Extent::newRecord(int len) {
 
 /*---------------------------------------------------------------------*/ 
 
-Cursor DataFileMgr::findAll(const char *ns) {
+auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 	DiskLoc loc;
 	bool found = namespaceIndex.find(ns, loc);
 	if( !found ) {
 		cout << "info: findAll() namespace does not exist: " << ns << endl;
-		return Cursor(DiskLoc());
+		return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
 	}
 	Extent *e = temp.getExtent(loc);
-	return Cursor( e->firstRecord );
+	return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
 }
 
 void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl) 
