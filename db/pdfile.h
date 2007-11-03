@@ -69,7 +69,7 @@ public:
 		const char *ns,
 		Record *toupdate, const DiskLoc& dl,
 		const char *buf, int len);
-	void insert(const char *ns, const void *buf, int len);
+	void insert(const char *ns, const void *buf, int len, bool usethedefault = false);
 	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl);
 	auto_ptr<Cursor> findAll(const char *ns);
 

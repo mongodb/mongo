@@ -60,6 +60,7 @@ public:
 	/* buf must be all zeroes on initialization. */
 	HashTable(void *buf, int buflen, const char *_name) : name(_name) { 
 		int m = sizeof(Node);
+		// cout << "hashtab init, buflen:" << buflen << " m:" << m << endl;
 		n = buflen / m;
 		if( (n & 1) == 0 )
 			n--;

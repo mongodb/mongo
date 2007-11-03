@@ -154,6 +154,10 @@ public:
 	void init() { 
 		const int LEN = 16 * 1024 * 1024;
 		void *p = f.map("/data/db/namespace.idx", LEN);
+		if( p == 0 ) { 
+			cout << "couldn't open /data/db/namespace.idx" << endl;
+			exit(-3);
+		}
 		ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
 	}
 
@@ -218,6 +222,16 @@ private:
 
 auto_ptr<Cursor> makeNamespaceCursor() {
 	return auto_ptr<Cursor>(new NamespaceCursor());
+}
+
+void newNamespace(const char *ns) {
+	cout << "New namespace: " << ns << endl;
+	if( strcmp(ns, "system.namespaces") != 0 ) {
+		JSObjBuilder b;
+		b.append("name", ns);
+		JSObj j = b.done();
+		theDataFileMgr.insert("system.namespaces", j.objdata(), j.objsize(), true);
+	}
 }
 
 /*---------------------------------------------------------------------*/ 
@@ -384,10 +398,15 @@ void DataFileMgr::update(
 	memcpy(toupdate->data, buf, len);
 }
 
-void DataFileMgr::insert(const char *ns, const void *buf, int len) {
+void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
+	if( strncmp(ns, "system.", 7) == 0 && !god ) { 
+		cout << "ERROR: attempt to insert in system namespace " << ns << endl;
+		return;
+	}
+
 	NamespaceDetails *d = namespaceIndex.details(ns);
 	if( d == 0 ) {
-		cout << "New namespace: " << ns << endl;
+		newNamespace(ns);
 		temp.newExtent(ns);
 		d = namespaceIndex.details(ns);
 	}

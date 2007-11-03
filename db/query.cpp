@@ -12,6 +12,11 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 	cout << "delete ns:" << ns << " queryobjsize:" << 
 		pattern.objsize() << endl;
 
+	if( strncmp(ns, "system.", 7) == 0 ) { 
+		cout << "ERROR: attempt to delete in system namespace " << ns << endl;
+		return;
+	}
+
 	JSMatcher matcher(pattern);
 
 	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
@@ -32,6 +37,11 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) {
 	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
 		pattern.objsize() << endl;
+
+	if( strncmp(ns, "system.", 7) == 0 ) { 
+		cout << "ERROR: attempt to update in system namespace " << ns << endl;
+		return;
+	}
 
 	JSMatcher matcher(pattern);
 
@@ -69,8 +79,8 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
 	int n = 0;
 
 	auto_ptr<Cursor> c = 
-		strcmp(ns, "system.namespaces") == 0 ? 
-		makeNamespaceCursor() : 
+//		strcmp(ns, "system.namespaces") == 0 ? 
+//		makeNamespaceCursor() : 
 	    theDataFileMgr.findAll(ns);
 
 	while( c->ok() ) {

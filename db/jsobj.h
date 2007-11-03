@@ -116,13 +116,10 @@ public:
 	JSObj(const char *msgdata) {
 		_objdata = msgdata;
 		_objsize = *((int*) _objdata);
-		iDelete = false;
 	}
 	JSObj(Record *r);
 
-	~JSObj() { 
-//		if( iDelete ) { free((void*)_objdata); _objdata = 0; }
-	}
+	~JSObj() {}
 
 	const char *objdata() { return _objdata; }
 	int objsize() { return _objsize; }
@@ -135,13 +132,12 @@ public:
 	}
 
 	JSObj& operator=(JSObj& r) {
-		iDelete = r.iDelete;
-		r.iDelete = false;
 		_objsize = r._objsize;
 		_objdata = r._objdata;
 		return *this;
 	}
-	JSObj() : iDelete(false), _objsize(0), _objdata(0) { }
+	JSObj() : _objsize(0), _objdata(0) { 
+	}
 
 	bool iDelete;
 private:
@@ -169,10 +165,7 @@ public:
 		b.append((char) EOO);
 		char *data = b.buf();
 		*((int*)data) = b.len();
-		b.decouple();
-		JSObj j(data);
-		j.iDelete = true;
-		return j;
+		return JSObj(data);
 	}
 
 private:
