@@ -25,9 +25,10 @@
 	  int nToReturn; // how many you want back as the beginning of the cursor data
       JSObject query;
    dbGetMore:
-      int reserved;;
-      int64 cursorID;
+      int reserved;
+	  string collection; // redundant, might use for security.
       int nToReturn;
+      int64 cursorID;
 
    Note that on Update, there is only one object, which is different
    from insert where you can pass a list of objects to insert in the db.
@@ -51,7 +52,20 @@ struct QueryResult : public MsgData {
 	const char *data() { return (char *) (((int *)&nReturned)+1); }
 };
 
+QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 QueryResult* runQuery(const char *ns, int ntoreturn, JSObj);
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert);
 void deleteObjects(const char *ns, JSObj pattern, bool justOne);
+
+class Cursor;
+class ClientCursor {
+public:
+	ClientCursor() { cursorid=0; pos=0; }
+	long long cursorid;
+	string ns;
+	auto_ptr<JSMatcher> matcher;
+	auto_ptr<Cursor> c;
+	int pos;
+};
+

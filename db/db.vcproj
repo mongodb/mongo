@@ -292,6 +292,22 @@
 				RelativePath=".\makefile"
 				>
 			</File>
+			<File
+				RelativePath="..\pcre-7.4\pcrecpp.cc"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\pcre-7.4\pcrecpp.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="libs_etc"
@@ -571,22 +587,6 @@
 						UsePrecompiledHeader="0"
 					/>
 				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\pcre-7.4\pcrecpp.cc"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="0"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\pcre-7.4\pcrecpp.h"
-				>
 			</File>
 			<File
 				RelativePath="..\pcre-7.4\pcreposix.c"
