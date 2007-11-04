@@ -2,6 +2,7 @@
 
 #include "stdafx.h"
 #include "jsobj.h"
+#include "../util/goodies.h"
 
 int Element::size() {
 	if( totalSize >= 0 )
@@ -40,10 +41,25 @@ int Element::size() {
 			}
 			break;
 		default:
-			assert(false);
 			cout << "Element: bad type " << (int) type() << endl;
+			assert(false);
 	}
 	totalSize =  x + fieldNameSize;
+
+	if( !eoo() ) { 
+		const char *next = data + totalSize;
+		if( *next < 0 || *next > RegEx ) { 
+			// bad type.  
+			cout << "*********************************************\n";
+			cout << "Bad data or size in Element::size()" << endl;
+			cout << "bad type:" << (int) *next << endl;
+			cout << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << endl;
+			cout << "lastrec:" << endl;
+			dumpmemory(data, totalSize + 15);
+			assert(false);
+		}
+	}
+
 	return totalSize;
 }
 

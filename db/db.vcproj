@@ -227,6 +227,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\util\goodies.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\hashtab.h"
 				>
 			</File>
