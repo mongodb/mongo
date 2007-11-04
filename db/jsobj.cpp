@@ -36,7 +36,7 @@ int Element::size() {
 				const char *p = value();
 				int len1 = strlen(p);
 				p = p + len1 + 1;
-				x = 1 + len1 + strlen(p);
+				x = 1 + len1 + strlen(p) + 2;
 			}
 			break;
 		default:
@@ -48,13 +48,38 @@ int Element::size() {
 }
 
 JSMatcher::JSMatcher(JSObj &_jsobj) : 
-   jsobj(_jsobj) 
+   jsobj(_jsobj), nRegex(0)
 {
 	JSElemIter i(jsobj);
 	n = 0;
 	while( i.more() ) {
 		Element e = i.next();
-		if( !e.eoo() ) {
+		if( e.eoo() )
+			break;
+
+		if( e.type() == RegEx ) {
+			if( nRegex >= 4 ) {
+				cout << "ERROR: too many regexes in query" << endl;
+			}
+			else {
+				pcrecpp::RE_Options options;
+				options.set_utf8(true);
+				const char *flags = e.regexFlags();
+				while( flags && *flags ) { 
+					if( *flags == 'i' )
+						options.set_caseless(true);
+					else if( *flags == 'm' )
+						options.set_multiline(true);
+					else if( *flags == 'x' )
+						options.set_extended(true);
+					flags++;
+				}
+				regexs[nRegex].re = new pcrecpp::RE(e.regex(), options);
+				regexs[nRegex].fieldName = e.fieldName();
+				nRegex++;
+			}
+		}
+		else {
 			toMatch.push_back(e);
 			n++;
 		}
@@ -62,7 +87,6 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 }
 
 //#include <boost/regex.hpp>
-#include <pcrecpp.h> 
 //#include <pcre.h>
 
 struct RXTest { 
@@ -85,9 +109,25 @@ struct RXTest {
 
 bool JSMatcher::matches(JSObj& jsobj) {
 
-
 	/* assuming there is usually only one thing to match.  if more this
 	could be slow sometimes. */
+
+	for( int r = 0; r < nRegex; r++ ) { 
+		RegexMatcher& rm = regexs[r];
+		JSElemIter k(jsobj);
+		while( 1 ) {
+			if( !k.more() )
+				return false;
+			Element e = k.next();
+			if( strcmp(e.fieldName(), rm.fieldName) == 0 ) {
+				if( e.type() != String )
+					return false;
+				if( !rm.re->PartialMatch(e.valuestr()) )
+					return false;
+				break;
+			}
+		}
+	}
 
 	for( int i = 0; i < n; i++ ) {
 		Element& m = toMatch[i];

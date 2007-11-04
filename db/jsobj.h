@@ -81,6 +81,8 @@ public:
 	bool eoo() { return type() == EOO; }
 	int size();
 
+	const char * fieldName() { return data + 1; }
+
 	// raw data be careful:
 	const char * value() { return (data + fieldNameSize + 1); }
 
@@ -88,9 +90,17 @@ public:
 	int valuestrsize() { 
 		return *((int *) value());
 	}
+
 	// for strings.  also gives you start of the data for an embedded object
 	const char * valuestr() { return value() + 4; }
+
 	void* embeddedObject() { valuestr(); }
+
+	const char *regex() { assert(type() == RegEx); return value(); }
+	const char *regexFlags() { 
+		const char *p = regex();
+		return p + strlen(p) + 1;
+	}
 
 	bool operator==(Element& r) { 
 		int sz = size();
@@ -100,7 +110,7 @@ public:
 
 private:
 	Element(const char *d) : data(d) {
-		fieldNameSize = eoo() ? 0 : strlen(data+1) + 1;
+		fieldNameSize = eoo() ? 0 : strlen(fieldName()) + 1;
 		totalSize = -1;
 	}
 	const char *data;
@@ -189,6 +199,16 @@ private:
 	const char *theend;
 };
 
+#include <pcrecpp.h> 
+
+class RegexMatcher { 
+public:
+	const char *fieldName;
+	pcrecpp::RE *re;
+	RegexMatcher() { re = 0; }
+	~RegexMatcher() { delete re; }
+};
+
 /* For when a js object is a pattern... */
 class JSMatcher { 
 public:
@@ -199,6 +219,9 @@ private:
 	JSObj& jsobj;
 	vector<Element> toMatch;
 	int n;
+
+	RegexMatcher regexs[4];
+	int nRegex;
 };
 
 /*- just for testing -- */
