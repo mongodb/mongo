@@ -28,14 +28,4 @@ cleandb:
 	rm /data/db/*
 
 /usr/local/lib/libpcrecpp.a:
-	echo **you need to install pcre.**
-# this could be scripted i suppose:
-#
-# cd /tmp
-# curl -O ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-7.4.tar.gz
-# tar -xzf pcre-7.4.tar.gz 
-# ./configure --enable-utf8 --with-match-limit=200000 --with-match-limit-recursion=4000
-# make
-# make install
-#
-#  at that point is will be installed in /usr/*.  the version in git is for VC++.
+	cat pcre.txt
