@@ -1,7 +1,11 @@
 # makefile for our db project
 
-FLAGS=-I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
+FLAGS=-ggdb -O0 -I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
 
+#BOOSTLIB=libboost_regex-gcc41-1_34_1.so.1.34.1
+#BOOSTLIB=libboost_regex-gcc41-d-1_34_1.so.1.34.1
+
+LIBS= /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
 
 OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o
 
@@ -12,13 +16,26 @@ OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.
 # fast regressions and then immediately exit.  That way you know immediately if you
 # broke something horribly.
 
-db: $(OBJS) db.o
-	g++ $(FLAGS) -o $@ $(OBJS) db.o
-	./db quicktest
+db: $(OBJS) db.o $(LIBS)
+	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS)
+	-./db quicktest
 
 clean:
 	-rm -f $(OBJS) db.o
 	-rm -f db
 
 cleandb:
-	rm /data/namespace.idx /data/temp.dat
+	rm /data/db/*
+
+/usr/local/lib/libpcrecpp.a:
+	echo **you need to install pcre.**
+# this could be scripted i suppose:
+#
+# cd /tmp
+# curl -O ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-7.4.tar.gz
+# tar -xzf pcre-7.4.tar.gz 
+# ./configure --enable-utf8 --with-match-limit=200000 --with-match-limit-recursion=4000
+# make
+# make install
+#
+#  at that point is will be installed in /usr/*.  the version in git is for VC++.

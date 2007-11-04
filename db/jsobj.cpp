@@ -61,7 +61,31 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 	}
 }
 
+//#include <boost/regex.hpp>
+#include <pcrecpp.h> 
+//#include <pcre.h>
+
+struct RXTest { 
+	RXTest() { 
+//		pcre_compile(0, 0, 0, 0, 0);
+//pcre_compile(const char *, int, const char **, int *,
+//			 const unsigned char *);
+
+/*
+		static const boost::regex e("(\\d{4}[- ]){3}\\d{4}");
+		static const boost::regex b(".....");
+		cout << "regex result: " << regex_match("hello", e) << endl;
+		cout << "regex result: " << regex_match("abcoo", b) << endl;
+*/
+		pcrecpp::RE re("h.*o");
+		cout << "regex test: " << re.FullMatch("hello") << endl;
+		cout << "regex test: " << re.FullMatch("blah") << endl;
+	}
+} rxtest;
+
 bool JSMatcher::matches(JSObj& jsobj) {
+
+
 	/* assuming there is usually only one thing to match.  if more this
 	could be slow sometimes. */
 
