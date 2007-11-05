@@ -66,8 +66,38 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
 }
 
+map<DiskLoc, ClientCursor*> cursorsByLocation;
 typedef map<long long, ClientCursor*> CCMap;
 CCMap clientCursors;
+
+/* must call this on a delete so we clean up the cursors. */
+void aboutToDelete(const DiskLoc& dl) { 
+	map<DiskLoc,ClientCursor*>::iterator it = cursorsByLocation.find(dl);
+	if( it != cursorsByLocation.end() ) {
+		ClientCursor *cc = it->second;
+		assert( !cc->c->eof() );
+		cc->c->advance();
+		cc->updateLocation();
+	}
+}
+
+ClientCursor::~ClientCursor() {
+	if( !lastLoc.isNull() ) { 
+		int n = cursorsByLocation.erase(lastLoc);
+		assert( n == 1 );
+	}
+	lastLoc.Null();
+}
+
+void ClientCursor::updateLocation() {
+	if( !lastLoc.isNull() ) { 
+		int n = cursorsByLocation.erase(lastLoc);
+		assert( n == 1 );
+	}
+	if( !c->currLoc().isNull() )
+		cursorsByLocation[c->currLoc()] = this;
+	lastLoc = c->currLoc();
+}
 
 long long allocCursorId() { 
 	long long x;
@@ -115,6 +145,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
 				cc->ns = ns;
 				cc->pos = n;
 				clientCursors[cursorid] = cc;
+				cc->updateLocation();
 				break;
 			}
 		}
@@ -172,6 +203,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 				n++;
 				if( n >= ntoreturn && ntoreturn != 0 ) {
 					cc->pos += n;
+					cc->updateLocation();
 					break;
 				}
 			}

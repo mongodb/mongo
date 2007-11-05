@@ -5,6 +5,7 @@
 #include "../stdafx.h"
 #include "../grid/message.h"
 #include "jsobj.h"
+#include "storage.h"
 
 /* requests:
 
@@ -62,10 +63,14 @@ class Cursor;
 class ClientCursor {
 public:
 	ClientCursor() { cursorid=0; pos=0; }
+	~ClientCursor();
 	long long cursorid;
 	string ns;
 	auto_ptr<JSMatcher> matcher;
 	auto_ptr<Cursor> c;
 	int pos;
+	DiskLoc lastLoc;
+
+	void updateLocation();
 };
 
