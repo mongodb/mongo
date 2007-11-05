@@ -1,9 +1,10 @@
 # makefile for our db project
 
-FLAGS=-ggdb -O0 -I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
+FLAGS=-ggdb -pthread -O0 -I .. -I../boost -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
 
 #BOOSTLIB=libboost_regex-gcc41-1_34_1.so.1.34.1
 #BOOSTLIB=libboost_regex-gcc41-d-1_34_1.so.1.34.1
+BOOSTLIB=../lib/libboost_thread-gcc41-mt-d-1_34_1.a
 
 LIBS= /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
 
@@ -17,8 +18,8 @@ OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.
 # broke something horribly.
 
 db: $(OBJS) db.o $(LIBS)
-	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS)
-	-./db quicktest
+	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(BOOSTLIB)
+#	-./db quicktest
 
 clean:
 	-rm -f $(OBJS) db.o

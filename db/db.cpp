@@ -6,6 +6,7 @@
 #include "../grid/message.h"
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
+#include "../util/goodies.h"
 #include "pdfile.h"
 #include "jsobj.h"
 #include "query.h"
@@ -285,10 +286,20 @@ void msg(const char *m) {
 
 }
 
+void bar() { 
+cout << "hello" << endl;
+sleepsecs(6);
+cout << "hello2" << endl;
+}
+
 int main(int argc, char* argv[], char *envp[] )
 {
 	quicktest();
 
+//cout << "fork then sleep" << endl;
+//boost::thread foo(&bar);
+//	sleepsecs(30);
+//cout << "sleep" << endl;
 
 	if( argc >= 2 ) {
 		if( strcmp(argv[1], "quicktest") == 0 )

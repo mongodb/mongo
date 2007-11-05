@@ -23,3 +23,12 @@ inline void dumpmemory(const char *data, int len) {
 	} catch(...) { }
 }
 
+#include <boost/thread/thread.hpp>
+#include <boost/thread/xtime.hpp>
+
+inline void sleepsecs(int s) { 
+	boost::xtime xt;
+	boost::xtime_get(&xt, boost::TIME_UTC);
+	xt.sec += s;
+	boost::thread::sleep(xt);
+}

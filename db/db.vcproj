@@ -42,7 +42,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_SCL_SECURE_NO_DEPRECATE;BOOST_ALL_NO_LIB;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_SCL_SECURE_NO_DEPRECATE;BOOST_ALL_NO_LIB;BOOST_LIB_DIAGNOSTIC;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -324,6 +324,14 @@
 		<Filter
 			Name="libs_etc"
 			>
+			<File
+				RelativePath="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp"
+				>
+			</File>
+			<File
+				RelativePath="..\boost\boost\Debug\boost.lib"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="pcre"
