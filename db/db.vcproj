@@ -177,6 +177,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\introspect.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\jsobj.cpp"
 				>
 			</File>
@@ -232,6 +236,10 @@
 			</File>
 			<File
 				RelativePath="..\util\hashtab.h"
+				>
+			</File>
+			<File
+				RelativePath=".\introspect.h"
 				>
 			</File>
 			<File

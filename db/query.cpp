@@ -6,6 +6,7 @@
 #include "jsobj.h"
 #include "../util/builder.h"
 #include <time.h>
+#include "introspect.h"
 
 int nextCursorId = 1;
 
@@ -70,6 +71,16 @@ map<DiskLoc, ClientCursor*> cursorsByLocation;
 typedef map<long long, ClientCursor*> CCMap;
 CCMap clientCursors;
 
+class CursInspector : public SingleResultObjCursor { 
+	Cursor* clone() { return new CursInspector(*this); }
+	void fill() { 
+		b.append("cursorsByLocation", cursorsByLocation.size());
+		b.append("clientCursors", clientCursors.size());
+	}
+public:
+	CursInspector() { reg("intr.cursors"); }
+} _ciproto;
+
 /* must call this on a delete so we clean up the cursors. */
 void aboutToDelete(const DiskLoc& dl) { 
 	map<DiskLoc,ClientCursor*>::iterator it = cursorsByLocation.find(dl);
@@ -124,10 +135,9 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
 
 	int n = 0;
 
-	auto_ptr<Cursor> c = 
-		//		strcmp(ns, "system.namespaces") == 0 ? 
-		//		makeNamespaceCursor() : 
-	    theDataFileMgr.findAll(ns);
+	auto_ptr<Cursor> c = getSpecialCursor(ns);
+	if( c.get() == 0 )
+		theDataFileMgr.findAll(ns);
 
 	long long cursorid = 0;
 	while( c->ok() ) {
