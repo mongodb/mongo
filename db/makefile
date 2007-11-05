@@ -1,6 +1,6 @@
 # makefile for our db project
 
-FLAGS=-ggdb -pthread -O0 -I .. -I../boost -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
+FLAGS=-ggdb -pthread -O0 -I .. -I../boost -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/ $(INCS)
 
 #BOOSTLIB=libboost_regex-gcc41-1_34_1.so.1.34.1
 #BOOSTLIB=libboost_regex-gcc41-d-1_34_1.so.1.34.1
