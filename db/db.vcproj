@@ -177,6 +177,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\introspect.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\jsobj.cpp"
 				>
 			</File>
@@ -227,7 +231,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\util\goodies.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\hashtab.h"
+				>
+			</File>
+			<File
+				RelativePath=".\introspect.h"
 				>
 			</File>
 			<File
@@ -290,6 +302,22 @@
 			</File>
 			<File
 				RelativePath=".\makefile"
+				>
+			</File>
+			<File
+				RelativePath="..\pcre-7.4\pcrecpp.cc"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\pcre-7.4\pcrecpp.h"
 				>
 			</File>
 		</Filter>
@@ -571,22 +599,6 @@
 						UsePrecompiledHeader="0"
 					/>
 				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\pcre-7.4\pcrecpp.cc"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="0"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\pcre-7.4\pcrecpp.h"
-				>
 			</File>
 			<File
 				RelativePath="..\pcre-7.4\pcreposix.c"

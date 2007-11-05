@@ -356,8 +356,13 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 	return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
 }
 
+void aboutToDelete(const DiskLoc& dl);
+
 void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl) 
 {
+	/* check if any cursors point to us.  if so, advance them. */
+	aboutToDelete(dl);
+
 	/* remove ourself from the record next/prev chain */
 	{
 		if( todelete->prevOfs != DiskLoc::NullOfs )
@@ -375,6 +380,7 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 			e->lastRecord.setOfs(todelete->prevOfs);
 	}
 
+	/* add to the free list */
 	{
 		NamespaceDetails* d = namespaceIndex.details(ns);
 		d->addDeletedRec((DeletedRecord*)todelete, dl);

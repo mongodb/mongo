@@ -56,6 +56,13 @@ public:
 		nextjsobj += 4;
 		return i;
 	}
+	long long pullInt64() {
+		if( nextjsobj == data )
+			nextjsobj += strlen(data) + 1; // skip namespace
+		long long i = *((long long *)nextjsobj);
+		nextjsobj += 8;
+		return i;
+	}
 
 	OID* getOID() {
 		return (OID *) (data + strlen(data) + 1); // skip namespace
@@ -135,11 +142,21 @@ void receivedDelete(Message& m) {
 
 void receivedQuery(Message& m) {
 	DbMessage d(m);
-
 	const char *ns = d.getns();
 	int ntoreturn = d.pullInt();
 	assert( d.moreJSObjs() );
 	QueryResult* msgdata = runQuery(ns, ntoreturn, d.nextJsObj());
+	Message resp;
+	resp.setData(msgdata, true);
+	dbMsgPort.reply(m, resp);
+}
+
+void receivedGetMore(Message& m) {
+	DbMessage d(m);
+	const char *ns = d.getns();
+	int ntoreturn = d.pullInt();
+	long long cursorid = d.pullInt64();
+	QueryResult* msgdata = getMore(ns, ntoreturn, cursorid);
 	Message resp;
 	resp.setData(msgdata, true);
 	dbMsgPort.reply(m, resp);

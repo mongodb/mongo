@@ -2,6 +2,7 @@
 
 #include "stdafx.h"
 #include "jsobj.h"
+#include "../util/goodies.h"
 
 int Element::size() {
 	if( totalSize >= 0 )
@@ -40,10 +41,25 @@ int Element::size() {
 			}
 			break;
 		default:
-			assert(false);
 			cout << "Element: bad type " << (int) type() << endl;
+			assert(false);
 	}
 	totalSize =  x + fieldNameSize;
+
+	if( !eoo() ) { 
+		const char *next = data + totalSize;
+		if( *next < 0 || *next > RegEx ) { 
+			// bad type.  
+			cout << "*********************************************\n";
+			cout << "Bad data or size in Element::size()" << endl;
+			cout << "bad type:" << (int) *next << endl;
+			cout << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << endl;
+			cout << "lastrec:" << endl;
+			dumpmemory(data, totalSize + 15);
+			assert(false);
+		}
+	}
+
 	return totalSize;
 }
 
@@ -91,19 +107,16 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 
 struct RXTest { 
 	RXTest() { 
-//		pcre_compile(0, 0, 0, 0, 0);
-//pcre_compile(const char *, int, const char **, int *,
-//			 const unsigned char *);
-
-/*
+		/*
 		static const boost::regex e("(\\d{4}[- ]){3}\\d{4}");
 		static const boost::regex b(".....");
 		cout << "regex result: " << regex_match("hello", e) << endl;
 		cout << "regex result: " << regex_match("abcoo", b) << endl;
-*/
-		pcrecpp::RE re("h.*o");
-		cout << "regex test: " << re.FullMatch("hello") << endl;
-		cout << "regex test: " << re.FullMatch("blah") << endl;
+		*/
+		pcrecpp::RE re1(")({a}h.*o");
+		pcrecpp::RE re("h.llo");
+		assert( re.FullMatch("hello") );
+		assert( !re1.FullMatch("hello") );
 	}
 } rxtest;
 

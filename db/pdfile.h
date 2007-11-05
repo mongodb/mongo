@@ -218,6 +218,9 @@ public:
 	virtual JSObj current() = 0;
 	virtual DiskLoc currLoc() = 0;
 	virtual bool advance() = 0;
+
+	/* optional to implement.  if implemented, means 'this' is a prototype */
+	virtual Cursor* clone() { return 0; }
 };
 
 class BasicCursor : public Cursor {
