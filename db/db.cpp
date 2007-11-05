@@ -265,7 +265,8 @@ void msg(const char *m) {
 	p.init(29999);
 
 //	SockAddr db("127.0.0.1", MessagingPort::DBPort);
-	SockAddr db("10.0.21.60", MessagingPort::DBPort);
+//	SockAddr db("10.0.21.60", MessagingPort::DBPort);
+	SockAddr db("172.16.0.179", MessagingPort::DBPort);
 
 	Message send;
 	Message response;
@@ -288,6 +289,7 @@ int main(int argc, char* argv[], char *envp[] )
 {
 	quicktest();
 
+
 	if( argc >= 2 ) {
 		if( strcmp(argv[1], "quicktest") == 0 )
 			return 0;
@@ -299,6 +301,13 @@ int main(int argc, char* argv[], char *envp[] )
 			run();
 			return 0;
 		}
+		if( strcmp(argv[1], "longmsg") == 0 ) {
+			char buf[4096];
+			memset(buf, 'a', 4095);
+			buf[4095] = 0;
+			msg(buf);
+			return 0;
+		}
 	}
 
 	cout << "usage:\n";
@@ -306,6 +315,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  msg [msg]    send a request to the db server" << endl;
 	cout << "  msg end      shut down" << endl;
 	cout << "  run          run db" << endl;
+	cout << "  longmsg      send a long test message to the db server" << endl;
 	return 0;
 }
 

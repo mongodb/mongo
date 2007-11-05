@@ -19,6 +19,7 @@ struct Fragment {
 	short fragmentNo;
 	char data[1];
 	int fragmentDataLen() { return fragmentLen - 8; }
+	char* fragmentData() { return data; }
 
 	bool ok(int nRead) { 
 		if( nRead < MinFragmentLen || fragmentLen > nRead || fragmentLen < MinFragmentLen ) {
@@ -77,6 +78,7 @@ bool MessagingPort::recv(Message& m) {
 
 	/* we'll need to read more */
 	char *msgData = (char *) malloc(totalLen);
+	m.setData((MsgData*) msgData, true);
 	char *p = msgData;
 	memcpy(p, somd, ff->fragmentDataLen());
 	int sofar = ff->fragmentDataLen();
@@ -94,8 +96,12 @@ bool MessagingPort::recv(Message& m) {
 		Fragment *f = (Fragment *) b; 
 		if( !f->ok(n) )
 			return false;
-		if( f->msgId != msgid || f->fragmentNo != expectedFragmentNo ) {
-			cout << "bad fragment" << endl;
+		if( f->msgId != msgid ) {
+			cout << "bad fragment, wrong msg id, expected:" << msgid << " got:" << f->msgId << endl;
+			return false;
+		}
+		if( f->fragmentNo != expectedFragmentNo ) {
+			cout << "bad fragment, wrong fragmentNo, expected:" << expectedFragmentNo << " got:" << f->fragmentNo << endl;
 			return false;
 		}
 		if( from != m.from ) {
@@ -104,7 +110,7 @@ bool MessagingPort::recv(Message& m) {
 			return false;
 		}
 
-		memcpy(p, f->startOfMsgData(), f->fragmentDataLen());
+		memcpy(p, f->fragmentData(), f->fragmentDataLen());
 		p += f->fragmentDataLen();
 		wanted -= f->fragmentDataLen();
 		expectedFragmentNo++;
@@ -149,5 +155,6 @@ void MessagingPort::say(SockAddr& to, Message& toSend, int responseTo) {
 		p += l;
 		left -= l;
 		conn.sendto(buf, l+8, to);
+		f->fragmentNo++;
 	}
 }
