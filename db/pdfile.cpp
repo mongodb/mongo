@@ -24,7 +24,7 @@ JSObj::JSObj(Record *r) {
 	_objdata = r->data;
 	_objsize = *((int*) _objdata);
 	assert( _objsize <= r->netLength() );
-	iDelete = false;
+	iFree = false;
 }
 
 /*---------------------------------------------------------------------*/ 

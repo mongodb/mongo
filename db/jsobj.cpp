@@ -157,7 +157,47 @@ ok:
 	return true;
 }
 
-//------------------------------------------------------------------
+/* JSObj ------------------------------------------------------------*/
+
+int JSObj::getFieldNames(set<string>& fields) {
+	int n = 0;
+	JSElemIter i(*this);
+	while( i.more() ) {
+		Element e = i.next();
+		if( e.eoo() )
+			break;
+		fields.insert(e.fieldName());
+		n++;
+	}
+	return n;
+}
+
+int JSObj::addFields(JSObj& from, set<string>& fields) {
+	assert( _objdata == 0 ); /* partial implementation for now... */
+
+	JSObjBuilder b;
+
+	int N = fields.size();
+	int n = 0;
+	JSElemIter i(from);
+	while( i.more() ) {
+		Element e = i.next();
+		if( fields.count(e.fieldName()) ) {
+			b.append(e);
+			if( ++n == N ) 
+				break; // we can stop we found them all already
+		}
+	}
+
+	if( n ) {
+		_objdata = b.decouple(_objsize);
+		iFree = true;
+	}
+
+	return n;
+}
+
+/*-- test things ----------------------------------------------------*/
 
 #pragma pack(push)
 #pragma pack(1)

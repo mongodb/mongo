@@ -25,6 +25,7 @@
       string collection;
 	  int nToReturn; // how many you want back as the beginning of the cursor data
       JSObject query;
+	  [JSObject fieldsToReturn]
    dbGetMore:
       int reserved;
 	  string collection; // redundant, might use for security.
@@ -54,7 +55,9 @@ struct QueryResult : public MsgData {
 };
 
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
-QueryResult* runQuery(const char *ns, int ntoreturn, JSObj);
+
+QueryResult* runQuery(const char *ns, int ntoreturn, 
+					  JSObj j, auto_ptr< set<string> > fieldFilter);
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert);
 void deleteObjects(const char *ns, JSObj pattern, bool justOne);
@@ -70,6 +73,7 @@ public:
 	auto_ptr<Cursor> c;
 	int pos;
 	DiskLoc lastLoc;
+	auto_ptr< set<string> > filter;
 
 	void updateLocation();
 };
