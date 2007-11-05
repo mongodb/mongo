@@ -144,8 +144,14 @@ void receivedQuery(Message& m) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	int ntoreturn = d.pullInt();
-	assert( d.moreJSObjs() );
-	QueryResult* msgdata = runQuery(ns, ntoreturn, d.nextJsObj());
+	JSObj query = d.nextJsObj();
+	auto_ptr< set<string> > fields;
+	if( d.moreJSObjs() ) { 
+		fields = auto_ptr< set<string> >(new set<string>());
+		d.nextJsObj().getFieldNames(*fields);
+	}
+	QueryResult* msgdata = 
+		runQuery(ns, ntoreturn, query, fields);
 	Message resp;
 	resp.setData(msgdata, true);
 	dbMsgPort.reply(m, resp);

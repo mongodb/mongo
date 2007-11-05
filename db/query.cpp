@@ -121,7 +121,7 @@ long long allocCursorId() {
 	return x;
 }
 
-QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
+QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<string> > filter) {
 
 	cout << "runQuery ns:" << ns << " ntoreturn:" << ntoreturn << " queryobjsize:" << 
 		jsobj.objsize() << endl;
@@ -137,26 +137,38 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj) {
 
 	auto_ptr<Cursor> c = getSpecialCursor(ns);
 	if( c.get() == 0 )
-		theDataFileMgr.findAll(ns);
+		c = theDataFileMgr.findAll(ns);
 
 	long long cursorid = 0;
 	while( c->ok() ) {
 		JSObj js = c->current();
 		if( matcher->matches(js) ) {
-			b.append((void*) js.objdata(), js.objsize());
-			n++;
-			if( n >= ntoreturn && ntoreturn != 0 ) {
-				// more...so save a cursor
-				ClientCursor *cc = new ClientCursor();
-				cc->c = c;
-				cursorid = allocCursorId();
-				cc->cursorid = cursorid;
-				cc->matcher = matcher;
-				cc->ns = ns;
-				cc->pos = n;
-				clientCursors[cursorid] = cc;
-				cc->updateLocation();
-				break;
+			bool ok = true;
+			if( filter.get() ) {
+				JSObj x;
+				ok = x.addFields(js, *filter) > 0;
+				if( ok ) 
+					b.append((void*) x.objdata(), x.objsize());
+			}
+			else {
+				b.append((void*) js.objdata(), js.objsize());
+			}
+			if( ok ) {
+				n++;
+				if( n >= ntoreturn && ntoreturn != 0 ) {
+					// more...so save a cursor
+					ClientCursor *cc = new ClientCursor();
+					cc->c = c;
+					cursorid = allocCursorId();
+					cc->cursorid = cursorid;
+					cc->matcher = matcher;
+					cc->ns = ns;
+					cc->pos = n;
+					clientCursors[cursorid] = cc;
+					cc->updateLocation();
+					cc->filter = filter;
+					break;
+				}
 			}
 		}
 		c->advance();
@@ -209,12 +221,23 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 			}
 			JSObj js = c->current();
 			if( cc->matcher->matches(js) ) {
-				b.append((void*) js.objdata(), js.objsize());
-				n++;
-				if( n >= ntoreturn && ntoreturn != 0 ) {
-					cc->pos += n;
-					cc->updateLocation();
-					break;
+				bool ok = true;
+				if( cc->filter.get() ) {
+					JSObj x;
+					ok = x.addFields(js, *cc->filter) > 0;
+					if( ok ) 
+						b.append((void*) x.objdata(), x.objsize());
+				}
+				else {
+					b.append((void*) js.objdata(), js.objsize());
+				}
+				if( ok ) {
+					n++;
+					if( n >= ntoreturn && ntoreturn != 0 ) {
+						cc->pos += n;
+						cc->updateLocation();
+						break;
+					}
 				}
 			}
 		}

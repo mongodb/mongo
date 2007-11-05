@@ -4,7 +4,8 @@
 
 #include "../stdafx.h"
 #include "../util/builder.h"
-//#include "pdfile.h"
+
+#include <set>
 
 #pragma pack(push)
 #pragma pack(1)
@@ -108,6 +109,8 @@ public:
 			memcmp(data, r.data, sz) == 0;
 	}
 
+	const char * rawdata() { return data; }
+
 private:
 	Element(const char *d) : data(d) {
 		fieldNameSize = eoo() ? 0 : strlen(fieldName()) + 1;
@@ -125,11 +128,15 @@ class JSObj {
 public:
 	JSObj(const char *msgdata) {
 		_objdata = msgdata;
-		_objsize = *((int*) _objdata);
+		_objsize = *((int*) _objdata); iFree = false;
 	}
 	JSObj(Record *r);
+	JSObj() : _objsize(0), _objdata(0), iFree(false) { }
 
-	~JSObj() {}
+	~JSObj() { if( iFree ) { free((void*)_objdata); _objdata=0; } }
+
+	int addFields(JSObj& from, set<string>& fields); /* returns n added */
+	int getFieldNames(set<string>& fields);
 
 	const char *objdata() { return _objdata; }
 	int objsize() { return _objsize; }
@@ -144,12 +151,11 @@ public:
 	JSObj& operator=(JSObj& r) {
 		_objsize = r._objsize;
 		_objdata = r._objdata;
+		assert( !iFree );
 		return *this;
 	}
-	JSObj() : _objsize(0), _objdata(0) { 
-	}
 
-	bool iDelete;
+	bool iFree;
 private:
 	int _objsize;
 	const char *_objdata;
@@ -170,15 +176,27 @@ public:
 		b.append((int) strlen(str)+1);
 		b.append(str);
 	}
+	void append(Element& e) { b.append((void*) e.rawdata(), e.size()); }
 
 	JSObj done() { 
-		b.append((char) EOO);
-		char *data = b.buf();
-		*((int*)data) = b.len();
-		return JSObj(data);
+		return JSObj(_done());
+	}
+
+	char* decouple(int& l) {
+		char *x = _done();
+		l = b.len();
+		b.decouple();
+		return x;
 	}
 
 private:
+	char* _done() { 
+		b.append((char) EOO);
+		char *data = b.buf();
+		*((int*)data) = b.len();
+		return data;
+	}
+
 	BufBuilder b;
 };
 
