@@ -5,6 +5,7 @@
 
 #include "stdafx.h"
 #include "message.h"
+#include <time.h>
 
 const int FragMax = 1480;
 const int MSS = FragMax - 8;
@@ -40,8 +41,8 @@ struct Fragment {
 int NextMsgId = -1000;
 struct MsgStart {
 	MsgStart() {
-		srand(3);
-		NextMsgId = rand();
+		srand((unsigned) time(0));
+		NextMsgId = rand() ^ (int) time(0);
 		assert(MsgDataHeaderSize == 20);
 		assert(sizeof(Fragment) == 9);
 	}
@@ -130,16 +131,23 @@ void MessagingPort::reply(Message& received, Message& response) {
 
 bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
 	say(to, toSend);
-	bool ok = recv(response);
-	if( !ok )
-		return false;
-	assert( response.data->responseTo == toSend.data->id);
+	while( 1 ) {
+		bool ok = recv(response);
+		if( !ok )
+			return false;
+		cout << "got response: " << response.data->responseTo << endl;
+		if( response.data->responseTo == toSend.data->id ) 
+			break;
+		cout << "warning: MessagingPort::call() wrong id, skipping. got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
+		response.reset();
+	}
 	return true;
 }
 
 void MessagingPort::say(SockAddr& to, Message& toSend, int responseTo) {
 	toSend.data->reserved = 0;
 	toSend.data->id = NextMsgId++;
+	cout << "TEMP: sending msgid " << toSend.data->id << endl;
 	toSend.data->responseTo = responseTo;
 
 	int left = toSend.data->len;

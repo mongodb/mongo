@@ -332,6 +332,10 @@
 				RelativePath="..\boost\boost\Debug\boost.lib"
 				>
 			</File>
+			<File
+				RelativePath="..\..\boostw\boost_1_34_1\boost\version.hpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="pcre"
