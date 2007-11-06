@@ -2,6 +2,7 @@
 
 #include "stdafx.h"
 #include "jsobj.h"
+#include "../util/goodies.h"
 
 int Element::size() {
 	if( totalSize >= 0 )
@@ -36,34 +37,110 @@ int Element::size() {
 				const char *p = value();
 				int len1 = strlen(p);
 				p = p + len1 + 1;
-				x = 1 + len1 + strlen(p);
+				x = 1 + len1 + strlen(p) + 2;
 			}
 			break;
 		default:
-			assert(false);
 			cout << "Element: bad type " << (int) type() << endl;
+			assert(false);
 	}
 	totalSize =  x + fieldNameSize;
+
+	if( !eoo() ) { 
+		const char *next = data + totalSize;
+		if( *next < 0 || *next > RegEx ) { 
+			// bad type.  
+			cout << "*********************************************\n";
+			cout << "Bad data or size in Element::size()" << endl;
+			cout << "bad type:" << (int) *next << endl;
+			cout << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << endl;
+			cout << "lastrec:" << endl;
+			dumpmemory(data, totalSize + 15);
+			assert(false);
+		}
+	}
+
 	return totalSize;
 }
 
 JSMatcher::JSMatcher(JSObj &_jsobj) : 
-   jsobj(_jsobj) 
+   jsobj(_jsobj), nRegex(0)
 {
 	JSElemIter i(jsobj);
 	n = 0;
 	while( i.more() ) {
 		Element e = i.next();
-		if( !e.eoo() ) {
+		if( e.eoo() )
+			break;
+
+		if( e.type() == RegEx ) {
+			if( nRegex >= 4 ) {
+				cout << "ERROR: too many regexes in query" << endl;
+			}
+			else {
+				pcrecpp::RE_Options options;
+				options.set_utf8(true);
+				const char *flags = e.regexFlags();
+				while( flags && *flags ) { 
+					if( *flags == 'i' )
+						options.set_caseless(true);
+					else if( *flags == 'm' )
+						options.set_multiline(true);
+					else if( *flags == 'x' )
+						options.set_extended(true);
+					flags++;
+				}
+				regexs[nRegex].re = new pcrecpp::RE(e.regex(), options);
+				regexs[nRegex].fieldName = e.fieldName();
+				nRegex++;
+			}
+		}
+		else {
 			toMatch.push_back(e);
 			n++;
 		}
 	}
 }
 
+//#include <boost/regex.hpp>
+//#include <pcre.h>
+
+struct RXTest { 
+	RXTest() { 
+		/*
+		static const boost::regex e("(\\d{4}[- ]){3}\\d{4}");
+		static const boost::regex b(".....");
+		cout << "regex result: " << regex_match("hello", e) << endl;
+		cout << "regex result: " << regex_match("abcoo", b) << endl;
+		*/
+		pcrecpp::RE re1(")({a}h.*o");
+		pcrecpp::RE re("h.llo");
+		assert( re.FullMatch("hello") );
+		assert( !re1.FullMatch("hello") );
+	}
+} rxtest;
+
 bool JSMatcher::matches(JSObj& jsobj) {
+
 	/* assuming there is usually only one thing to match.  if more this
 	could be slow sometimes. */
+
+	for( int r = 0; r < nRegex; r++ ) { 
+		RegexMatcher& rm = regexs[r];
+		JSElemIter k(jsobj);
+		while( 1 ) {
+			if( !k.more() )
+				return false;
+			Element e = k.next();
+			if( strcmp(e.fieldName(), rm.fieldName) == 0 ) {
+				if( e.type() != String )
+					return false;
+				if( !rm.re->PartialMatch(e.valuestr()) )
+					return false;
+				break;
+			}
+		}
+	}
 
 	for( int i = 0; i < n; i++ ) {
 		Element& m = toMatch[i];
@@ -80,7 +157,47 @@ ok:
 	return true;
 }
 
-//------------------------------------------------------------------
+/* JSObj ------------------------------------------------------------*/
+
+int JSObj::getFieldNames(set<string>& fields) {
+	int n = 0;
+	JSElemIter i(*this);
+	while( i.more() ) {
+		Element e = i.next();
+		if( e.eoo() )
+			break;
+		fields.insert(e.fieldName());
+		n++;
+	}
+	return n;
+}
+
+int JSObj::addFields(JSObj& from, set<string>& fields) {
+	assert( _objdata == 0 ); /* partial implementation for now... */
+
+	JSObjBuilder b;
+
+	int N = fields.size();
+	int n = 0;
+	JSElemIter i(from);
+	while( i.more() ) {
+		Element e = i.next();
+		if( fields.count(e.fieldName()) ) {
+			b.append(e);
+			if( ++n == N ) 
+				break; // we can stop we found them all already
+		}
+	}
+
+	if( n ) {
+		_objdata = b.decouple(_objsize);
+		iFree = true;
+	}
+
+	return n;
+}
+
+/*-- test things ----------------------------------------------------*/
 
 #pragma pack(push)
 #pragma pack(1)

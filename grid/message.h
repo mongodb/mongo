@@ -62,7 +62,7 @@ inline int MsgData::dataLen() { return len - MsgDataHeaderSize; }
 
 class Message {
 public:
-	Message() { data = 0; }
+	Message() { data = 0; freeIt = false; }
 	~Message() { reset(); }
 
 	SockAddr from;
@@ -71,7 +71,7 @@ public:
 	void reset() {
 		if( freeIt && data )
 			free(data);
-		data = 0;
+		data = 0; freeIt = false;
 	}
 
 	void setData(MsgData *d, bool _freeIt) {

@@ -5,6 +5,7 @@
 #include "../stdafx.h"
 #include "../grid/message.h"
 #include "jsobj.h"
+#include "storage.h"
 
 /* requests:
 
@@ -24,10 +25,12 @@
       string collection;
 	  int nToReturn; // how many you want back as the beginning of the cursor data
       JSObject query;
+	  [JSObject fieldsToReturn]
    dbGetMore:
-      int reserved;;
-      int64 cursorID;
+      int reserved;
+	  string collection; // redundant, might use for security.
       int nToReturn;
+      int64 cursorID;
 
    Note that on Update, there is only one object, which is different
    from insert where you can pass a list of objects to insert in the db.
@@ -51,7 +54,27 @@ struct QueryResult : public MsgData {
 	const char *data() { return (char *) (((int *)&nReturned)+1); }
 };
 
-QueryResult* runQuery(const char *ns, int ntoreturn, JSObj);
+QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
+
+QueryResult* runQuery(const char *ns, int ntoreturn, 
+					  JSObj j, auto_ptr< set<string> > fieldFilter);
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert);
 void deleteObjects(const char *ns, JSObj pattern, bool justOne);
+
+class Cursor;
+class ClientCursor {
+public:
+	ClientCursor() { cursorid=0; pos=0; }
+	~ClientCursor();
+	long long cursorid;
+	string ns;
+	auto_ptr<JSMatcher> matcher;
+	auto_ptr<Cursor> c;
+	int pos;
+	DiskLoc lastLoc;
+	auto_ptr< set<string> > filter;
+
+	void updateLocation();
+};
+

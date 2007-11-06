@@ -1,0 +1,31 @@
+/* config.h for CMake builds */
+
+#cmakedefine HAVE_DIRENT_H
+#cmakedefine HAVE_UNISTD_H
+#cmakedefine HAVE_SYS_STAT_H
+#cmakedefine HAVE_SYS_TYPES_H
+#cmakedefine HAVE_TYPE_TRAITS_H
+#cmakedefine HAVE_BITS_TYPE_TRAITS_H
+
+#cmakedefine HAVE_BCOPY
+#cmakedefine HAVE_MEMMOVE
+#cmakedefine HAVE_STRERROR
+
+#cmakedefine PCRE_STATIC
+
+#cmakedefine SUPPORT_UTF8
+#cmakedefine SUPPORT_UCP
+#cmakedefine EBCDIC
+#cmakedefine BSR_ANYCRLF
+#cmakedefine NO_RECURSE
+
+#define NEWLINE			@NEWLINE@
+#define POSIX_MALLOC_THRESHOLD	@PCRE_POSIX_MALLOC_THRESHOLD@
+#define LINK_SIZE		@PCRE_LINK_SIZE@
+#define MATCH_LIMIT		@PCRE_MATCH_LIMIT@
+#define MATCH_LIMIT_RECURSION	@PCRE_MATCH_LIMIT_RECURSION@
+
+#define MAX_NAME_SIZE	32
+#define MAX_NAME_COUNT	10000
+
+/* end config.h for CMake builds */

@@ -5,6 +5,7 @@
 
 #include "stdafx.h"
 #include "message.h"
+#include <time.h>
 
 const int FragMax = 1480;
 const int MSS = FragMax - 8;
@@ -19,6 +20,7 @@ struct Fragment {
 	short fragmentNo;
 	char data[1];
 	int fragmentDataLen() { return fragmentLen - 8; }
+	char* fragmentData() { return data; }
 
 	bool ok(int nRead) { 
 		if( nRead < MinFragmentLen || fragmentLen > nRead || fragmentLen < MinFragmentLen ) {
@@ -39,8 +41,8 @@ struct Fragment {
 int NextMsgId = -1000;
 struct MsgStart {
 	MsgStart() {
-		srand(3);
-		NextMsgId = rand();
+		srand((unsigned) time(0));
+		NextMsgId = rand() ^ (int) time(0);
 		assert(MsgDataHeaderSize == 20);
 		assert(sizeof(Fragment) == 9);
 	}
@@ -77,6 +79,7 @@ bool MessagingPort::recv(Message& m) {
 
 	/* we'll need to read more */
 	char *msgData = (char *) malloc(totalLen);
+	m.setData((MsgData*) msgData, true);
 	char *p = msgData;
 	memcpy(p, somd, ff->fragmentDataLen());
 	int sofar = ff->fragmentDataLen();
@@ -94,8 +97,12 @@ bool MessagingPort::recv(Message& m) {
 		Fragment *f = (Fragment *) b; 
 		if( !f->ok(n) )
 			return false;
-		if( f->msgId != msgid || f->fragmentNo != expectedFragmentNo ) {
-			cout << "bad fragment" << endl;
+		if( f->msgId != msgid ) {
+			cout << "bad fragment, wrong msg id, expected:" << msgid << " got:" << f->msgId << endl;
+			return false;
+		}
+		if( f->fragmentNo != expectedFragmentNo ) {
+			cout << "bad fragment, wrong fragmentNo, expected:" << expectedFragmentNo << " got:" << f->fragmentNo << endl;
 			return false;
 		}
 		if( from != m.from ) {
@@ -104,7 +111,7 @@ bool MessagingPort::recv(Message& m) {
 			return false;
 		}
 
-		memcpy(p, f->startOfMsgData(), f->fragmentDataLen());
+		memcpy(p, f->fragmentData(), f->fragmentDataLen());
 		p += f->fragmentDataLen();
 		wanted -= f->fragmentDataLen();
 		expectedFragmentNo++;
@@ -124,16 +131,23 @@ void MessagingPort::reply(Message& received, Message& response) {
 
 bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
 	say(to, toSend);
-	bool ok = recv(response);
-	if( !ok )
-		return false;
-	assert( response.data->responseTo == toSend.data->id);
+	while( 1 ) {
+		bool ok = recv(response);
+		if( !ok )
+			return false;
+		cout << "got response: " << response.data->responseTo << endl;
+		if( response.data->responseTo == toSend.data->id ) 
+			break;
+		cout << "warning: MessagingPort::call() wrong id, skipping. got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
+		response.reset();
+	}
 	return true;
 }
 
 void MessagingPort::say(SockAddr& to, Message& toSend, int responseTo) {
 	toSend.data->reserved = 0;
 	toSend.data->id = NextMsgId++;
+	cout << "TEMP: sending msgid " << toSend.data->id << endl;
 	toSend.data->responseTo = responseTo;
 
 	int left = toSend.data->len;
@@ -149,5 +163,6 @@ void MessagingPort::say(SockAddr& to, Message& toSend, int responseTo) {
 		p += l;
 		left -= l;
 		conn.sendto(buf, l+8, to);
+		f->fragmentNo++;
 	}
 }

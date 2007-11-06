@@ -1,9 +1,14 @@
 # makefile for our db project
 
-FLAGS= -fPIC  -I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
+FLAGS= -fPIC -ggdb -pthread -O0  -I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
 
+#BOOSTLIB=libboost_regex-gcc41-1_34_1.so.1.34.1
+#BOOSTLIB=libboost_regex-gcc41-d-1_34_1.so.1.34.1
+BOOSTLIB=../lib/libboost_thread-gcc41-mt-d-1_34_1.a
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o
+LIBS= /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
+
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o
 
 .cpp.o:
 	g++ -c $(FLAGS) $< -o $@
@@ -12,13 +17,17 @@ OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.
 # fast regressions and then immediately exit.  That way you know immediately if you
 # broke something horribly.
 
-db: $(OBJS) db.o
-	g++ $(FLAGS) -o $@ $(OBJS) db.o
-	./db quicktest
+db: $(OBJS) db.o $(LIBS)
+	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(BOOSTLIB)
+#	-./db quicktest
 
 clean:
 	-rm -f $(OBJS) db.o
 	-rm -f db
 
 cleandb:
-	rm /data/namespace.idx /data/temp.dat
+	rm /data/db/*
+
+/usr/local/lib/libpcrecpp.a:
+	cat pcre.txt
+
