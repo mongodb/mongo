@@ -1,10 +1,11 @@
 # makefile for our db project
 
-FLAGS= -fPIC -ggdb -pthread -O0  -I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
+FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/
 
 #BOOSTLIB=libboost_regex-gcc41-1_34_1.so.1.34.1
 #BOOSTLIB=libboost_regex-gcc41-d-1_34_1.so.1.34.1
-BOOSTLIB=../lib/libboost_thread-gcc41-mt-d-1_34_1.a
+#BOOSTLIB=../lib/libboost_thread-gcc41-mt-d-1_34_1.a
+BOOSTLIB = -lboost_thread
 
 LIBS= /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
 
