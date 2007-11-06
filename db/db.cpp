@@ -6,6 +6,7 @@
 #include "../grid/message.h"
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
+#include "../util/goodies.h"
 #include "pdfile.h"
 #include "jsobj.h"
 #include "query.h"
@@ -260,17 +261,21 @@ void run() {
 	}
 }
 
-void msg(const char *m) { 
+void msg(const char *m, int extras = 0) { 
 	MessagingPort p;
 	p.init(29999);
 
-//	SockAddr db("127.0.0.1", MessagingPort::DBPort);
-	SockAddr db("10.0.21.60", MessagingPort::DBPort);
+	SockAddr db("127.0.0.1", MessagingPort::DBPort);
+//	SockAddr db("10.0.21.60", MessagingPort::DBPort);
+//	SockAddr db("172.16.0.179", MessagingPort::DBPort);
 
 	Message send;
 	Message response;
 
 	send.setData( dbMsg , m);
+
+	for( int i = 0; i < extras; i++ )
+		p.say(db, send);
 
 	cout << "contacting DB..." << endl;
 	bool ok = p.call(db, send, response);
@@ -284,9 +289,20 @@ void msg(const char *m) {
 
 }
 
+void bar() { 
+cout << "hello" << endl;
+sleepsecs(6);
+cout << "hello2" << endl;
+}
+
 int main(int argc, char* argv[], char *envp[] )
 {
 	quicktest();
+
+//cout << "fork then sleep" << endl;
+//boost::thread foo(&bar);
+//	sleepsecs(30);
+//cout << "sleep" << endl;
 
 	if( argc >= 2 ) {
 		if( strcmp(argv[1], "quicktest") == 0 )
@@ -295,8 +311,19 @@ int main(int argc, char* argv[], char *envp[] )
 			msg(argc >= 3 ? argv[2] : "ping");
 			return 0;
 		}
+		if( strcmp(argv[1], "msglots") == 0 ) {
+			msg(argc >= 3 ? argv[2] : "ping", 1000);
+			return 0;
+		}
 		if( strcmp(argv[1], "run") == 0 ) {
 			run();
+			return 0;
+		}
+		if( strcmp(argv[1], "longmsg") == 0 ) {
+			char buf[4096];
+			memset(buf, 'a', 4095);
+			buf[4095] = 0;
+			msg(buf);
 			return 0;
 		}
 	}
@@ -306,6 +333,8 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  msg [msg]    send a request to the db server" << endl;
 	cout << "  msg end      shut down" << endl;
 	cout << "  run          run db" << endl;
+	cout << "  longmsg      send a long test message to the db server" << endl;
+	cout << "  msglots      send a bunch of test messages, and then wait for answer o nthe last one" << endl;
 	return 0;
 }
 

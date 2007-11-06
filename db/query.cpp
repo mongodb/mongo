@@ -155,7 +155,8 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 			}
 			if( ok ) {
 				n++;
-				if( n >= ntoreturn && ntoreturn != 0 ) {
+				if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
+					(ntoreturn==0 && b.len()>1*1024*1024) ) {
 					// more...so save a cursor
 					ClientCursor *cc = new ClientCursor();
 					cc->c = c;
@@ -233,7 +234,8 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 				}
 				if( ok ) {
 					n++;
-					if( n >= ntoreturn && ntoreturn != 0 ) {
+					if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
+						(ntoreturn==0 && b.len()>1*1024*1024) ) {
 						cc->pos += n;
 						cc->updateLocation();
 						break;
