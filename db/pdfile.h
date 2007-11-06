@@ -50,7 +50,7 @@ public:
 	void open(const char *filename, int length = 64 * 1024 * 1024);
 
 private:
-	Extent* newExtent(const char *ns);
+	Extent* newExtent(const char *ns, int approxSize);
 	Extent* getExtent(DiskLoc loc);
 	Extent* _getExtent(DiskLoc loc);
 	Record* recordAt(DiskLoc dl);

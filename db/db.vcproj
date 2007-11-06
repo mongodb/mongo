@@ -320,6 +320,10 @@
 				RelativePath="..\pcre-7.4\pcrecpp.h"
 				>
 			</File>
+			<File
+				RelativePath=".\todo.txt"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="libs_etc"

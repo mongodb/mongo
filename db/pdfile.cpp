@@ -18,7 +18,7 @@ _ regex support
 DataFileMgr theDataFileMgr;
 
 /* just temporary */
-const int ExtentSize = 1 * 1024 * 1024;
+//const int ExtentSize = 1 * 1024 * 1024;
 
 JSObj::JSObj(Record *r) { 
 	_objdata = r->data;
@@ -39,10 +39,17 @@ const int MaxBucket = 18;
 
 class NamespaceDetails {
 public:
-	NamespaceDetails() { memset(reserved, 0, sizeof(reserved)); }
+	NamespaceDetails() { 
+		datasize = nrecords = 0;
+		lastExtentSize = 0;
+		memset(reserved, 0, sizeof(reserved));
+	} 
 	DiskLoc firstExtent;
 	DiskLoc deletedList[Buckets];
-	char reserved[256];
+	long long datasize;
+	long long nrecords;
+	int lastExtentSize;
+	char reserved[256-16-4];
 
 	static int bucket(int n) { 
 		for( int i = 0; i < Buckets; i++ )
@@ -243,10 +250,10 @@ void PhysicalDataFile::open(const char *filename, int length) {
 }
 
 /* prev - previous extent for this namespace.  null=this is the first one. */
-Extent* PhysicalDataFile::newExtent(const char *ns) {
+Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
+	int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
 	DiskLoc loc;
-	int left = header->unusedLength - ExtentSize;
-	if( left < 0 ) {
+	if( ExtentSize <= 0 ) {
 		cout << "ERROR: newExtent: no more room for extents. write more code" << endl;
 		assert(false);
 		exit(2);
@@ -270,7 +277,9 @@ Extent* PhysicalDataFile::newExtent(const char *ns) {
 		namespaceIndex.add(ns, loc);
 	}
 
-	namespaceIndex.details(ns)->addDeletedRec(emptyLoc.drec(), emptyLoc);
+	NamespaceDetails *d = namespaceIndex.details(ns);
+	d->lastExtentSize = approxSize;
+	d->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
 	return e;
 }
@@ -383,6 +392,8 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	/* add to the free list */
 	{
 		NamespaceDetails* d = namespaceIndex.details(ns);
+		d->nrecords--;
+		d->datasize -= todelete->netLength();
 		d->addDeletedRec((DeletedRecord*)todelete, dl);
 	}
 }
@@ -404,6 +415,25 @@ void DataFileMgr::update(
 	memcpy(toupdate->data, buf, len);
 }
 
+int initialExtentSize(int len) { 
+	long long sz = len * 16;
+	if( len < 1000 ) sz = len * 64;
+	if( sz > 1000000000 )
+		sz = 1000000000;
+	int z = ((int)sz) & 0xffffff00;
+	assert( z > len );
+	return z;
+}
+
+int followupExtentSize(int len, int lastExtentLen) {
+	int x = initialExtentSize(len);
+	int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
+	int sz = y > x ? y : x;
+	sz = ((int)sz) & 0xffffff00;
+	assert( sz > len );
+	return sz;
+}
+
 void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 	if( strncmp(ns, "system.", 7) == 0 && !god ) { 
 		cout << "ERROR: attempt to insert in system namespace " << ns << endl;
@@ -413,7 +443,7 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 	NamespaceDetails *d = namespaceIndex.details(ns);
 	if( d == 0 ) {
 		newNamespace(ns);
-		temp.newExtent(ns);
+		temp.newExtent(ns, initialExtentSize(len));
 		d = namespaceIndex.details(ns);
 	}
 
@@ -423,7 +453,7 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 	if( loc.isNull() ) {
 		// out of space
 		cout << "allocating new extent for " << ns << endl;
-		temp.newExtent(ns);
+		temp.newExtent(ns, followupExtentSize(len, d->lastExtentSize));
 		loc = d->alloc(lenWHdr, extentLoc);
 		if( loc.isNull() ) { 
 			cout << "ERROR: out of space in datafile.  write more code." << endl;
@@ -447,6 +477,9 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 		oldlast->nextOfs = loc.getOfs();
 		e->lastRecord = loc;
 	}
+
+	d->nrecords++;
+	d->datasize += r->netLength();
 }
 
 void DataFileMgr::init() {
