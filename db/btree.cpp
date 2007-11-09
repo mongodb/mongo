@@ -132,7 +132,7 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 		int m = (l+h)/2;
 		KeyNode M = keyNode(m);
 		int x = key.woCompare(M.key);
-		if( x < 0 )
+		if( x < 0 ) // key < M.key
 			h = m-1;
 		else if( x > 0 )
 			l = m+1;

@@ -185,7 +185,7 @@ ok:
 /* well ordered compare */
 int JSObj::woCompare(JSObj& r)  { 
 	JSElemIter i(*this);
-	JSElemIter j(*this);
+	JSElemIter j(r);
 	while( 1 ) { 
 		// so far, equal...
 
@@ -227,6 +227,27 @@ Element JSObj::getField(const char *name) {
 			return e;
 	}
 	return nullElement;
+}
+
+/* makes a new JSObj with the fields specified in pattern.
+   fields returned in the order they appear in pattern.
+   if any field missing, you get back an empty object overall.
+
+   n^2 implementation bad if pattern and object have lots 
+   of fields - normally pattern doesn't so should be fine.
+*/
+JSObj JSObj::extractFields(JSObj pattern, JSObjBuilder& b) { 
+	JSElemIter i(pattern);
+	while( i.more() ) {
+		Element e = i.next();
+		if( e.eoo() )
+			break;
+		Element x = getField(e.fieldName());
+		if( x.eoo() )
+			return JSObj();
+		b.append(x);
+	}
+	return b.done();
 }
 
 const char * JSObj::getStringField(const char *name) { 

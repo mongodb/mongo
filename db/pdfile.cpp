@@ -42,8 +42,8 @@ const int MaxIndexes = 10;
 
 class IndexDetails { 
 public:
-	DiskLoc head;
-	DiskLoc info;
+	DiskLoc head; /* btree head */
+	DiskLoc info; /* index info object. { name:, ns:, key: } */
 };
 
 class NamespaceDetails {
@@ -62,6 +62,15 @@ public:
 	int nIndexes;
 	IndexDetails indexes[MaxIndexes];
 	char reserved[256-16-4-4-8*MaxIndexes];
+
+	//returns offset in indexes[]
+	int findIndexByName(const char *name) { 
+		for( int i = 0; i < nIndexes; i++ ) {
+			if( strcmp(indexes[i].info.obj().getStringField("name"),name) == 0 )
+				return i;
+		}
+		return -1;
+	}
 
 	static int bucket(int n) { 
 		for( int i = 0; i < Buckets; i++ )
@@ -446,6 +455,46 @@ int followupExtentSize(int len, int lastExtentLen) {
 	return sz;
 }
 
+/* add keys to indexes for a new record */
+void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) { 
+	JSObj idxInfo = idx.info.obj();
+	JSObjBuilder b;
+	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
+	if( !key.isEmpty() ) {
+		string indexFullNS = idxInfo.getStringField("ns");
+		assert( !indexFullNS.empty() );
+		indexFullNS += ".$";
+		indexFullNS += idxInfo.getStringField("name"); // client.table.$index
+		idx.head.btree()->insert(
+			idx.head, 
+			indexFullNS.c_str(),
+			newRecordLoc, key, false);
+	}
+}
+
+/* note there are faster ways to build an index in bulk, that can be 
+   done eventually */
+void addExistingToIndex(const char *ns, IndexDetails& idx) {
+	cout << "Adding all existing records for " << ns << " to new index" << endl;
+	int n = 0;
+	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+	while( c->ok() ) {
+		JSObj js = c->current();
+		_indexRecord(idx, js, c->currLoc());
+		c->advance();
+		n++;
+	};
+	cout << "  indexing complete for " << n << " records" << endl;
+}
+
+/* add keys to indexes for a new record */
+void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) { 
+	JSObj obj((const char *)buf);
+	for( int i = 0; i < d->nIndexes; i++ ) { 
+		_indexRecord(d->indexes[i], obj, newRecordLoc);
+	}
+}
+
 DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 	bool addIndex = false;
 	if( strncmp(ns, "system.", 7) == 0 ) {
@@ -464,27 +513,33 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		d = namespaceIndex.details(ns);
 	}
 
-	NamespaceDetails *indexesBaseDetails = 0;
+	NamespaceDetails *tableToIndex = 0;
 	string indexFullNS;
+	const char *tabletoidxns = 0;
 	if( addIndex ) { 
 		JSObj io((const char *) buf);
-		const char *name = io.getStringField("name");
-		const char *idxns = io.getStringField("ns");
+		const char *name = io.getStringField("name"); // name of the index
+		tabletoidxns = io.getStringField("ns");  // table it indexes
 		JSObj key = io.getObjectField("key");
-		if( name == 0 || *name == 0 || idxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
-			cout << "ERROR: bad add index attempt name:" << (name?name:"") << " ns:" << (idxns?idxns:"") << endl;
+		if( name == 0 || *name == 0 || tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
+			cout << "ERROR: bad add index attempt name:" << (name?name:"") << " ns:" << 
+				(tabletoidxns?tabletoidxns:"") << endl;
 			return DiskLoc();
 		}
-		indexesBaseDetails = namespaceIndex.details(idxns);
-		if( indexesBaseDetails == 0 ) {
-			cout << "ERROR: bad add index attempt, no such table(ns):" << idxns << endl;
+		tableToIndex = namespaceIndex.details(tabletoidxns);
+		if( tableToIndex == 0 ) {
+			cout << "ERROR: bad add index attempt, no such table(ns):" << tabletoidxns << endl;
 			return DiskLoc();
 		}
-		if( indexesBaseDetails->nIndexes >= MaxIndexes ) { 
-			cout << "ERROR: bad add index attempt, too many indexes for:" << idxns << endl;
+		if( tableToIndex->nIndexes >= MaxIndexes ) { 
+			cout << "ERROR: bad add index attempt, too many indexes for:" << tabletoidxns << endl;
 			return DiskLoc();
 		}
-		indexFullNS = idxns; 
+		if( tableToIndex->findIndexByName(name) >= 0 ) { 
+			cout << "ERROR: bad add index attempt, index:" << name << " already exists for:" << tabletoidxns << endl;
+			return DiskLoc();
+		}
+		indexFullNS = tabletoidxns; 
 		indexFullNS += ".$";
 		indexFullNS += name; // client.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
 	}
@@ -523,13 +578,18 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	d->nrecords++;
 	d->datasize += r->netLength();
 
-	if( indexesBaseDetails ) { 
-		indexesBaseDetails->indexes[indexesBaseDetails->nIndexes].info = loc;
-		indexesBaseDetails->indexes[indexesBaseDetails->nIndexes].head = 
-			BtreeBucket::addHead(indexFullNS.c_str());
-		indexesBaseDetails->nIndexes++; 
+	if( tableToIndex ) { 
+		IndexDetails& idxinfo = tableToIndex->indexes[tableToIndex->nIndexes];
+		idxinfo.info = loc;
+		idxinfo.head = BtreeBucket::addHead(indexFullNS.c_str());
+		tableToIndex->nIndexes++; 
 		/* todo: index existing records here */
+		addExistingToIndex(tabletoidxns, idxinfo);
 	}
+
+	/* add this record to our indexes */
+	if( d->nIndexes )
+		indexRecord(d, buf, len, loc);
 
 	return loc;
 }

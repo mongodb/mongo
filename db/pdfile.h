@@ -279,6 +279,9 @@ inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
 inline Record* DiskLoc::rec() const {
 	return DataFileMgr::getRecord(*this);
 }
+inline JSObj DiskLoc::obj() const {
+	return JSObj(rec());
+}
 inline DeletedRecord* DiskLoc::drec() const {
 	return (DeletedRecord*) rec();
 }
@@ -287,5 +290,5 @@ inline Extent* DiskLoc::ext() const {
 }
 
 inline BtreeBucket* DiskLoc::btree() const { 
-	return (BtreeBucket*) rec();
+	return (BtreeBucket*) rec()->data;
 }

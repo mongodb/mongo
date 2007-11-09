@@ -8,6 +8,8 @@
 #include <set>
 
 class JSObj;
+class Record;
+class JSObjBuilder;
 
 #pragma pack(push)
 #pragma pack(1)
@@ -133,8 +135,6 @@ private:
 	int totalSize;
 };
 
-class Record;
-
 class JSObj {
 	friend class JSElemIter;
 public:
@@ -153,6 +153,12 @@ public:
 	Element getField(const char *name); /* return has eoo() true if no match */
 	const char * getStringField(const char *name);
 	JSObj getObjectField(const char *name);
+
+	/* makes a new JSObj with the fields specified in pattern.
+       fields returned in the order they appear in pattern.
+	   if any field missing, you get back an empty object overall.
+	   */
+	JSObj extractFields(JSObj pattern, JSObjBuilder& b);
 
 	const char *objdata() { return _objdata; }
 	int objsize() { return _objsize; } // includes the embedded size field
