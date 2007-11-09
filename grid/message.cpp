@@ -147,7 +147,7 @@ bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
 void MessagingPort::say(SockAddr& to, Message& toSend, int responseTo) {
 	toSend.data->reserved = 0;
 	toSend.data->id = NextMsgId++;
-	cout << "TEMP: sending msgid " << toSend.data->id << endl;
+//	cout << "TEMP: sending msgid " << toSend.data->id << endl;
 	toSend.data->responseTo = responseTo;
 
 	int left = toSend.data->len;

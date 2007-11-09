@@ -4,6 +4,8 @@
 #include "jsobj.h"
 #include "../util/goodies.h"
 
+Element nullElement;
+
 int Element::size() {
 	if( totalSize >= 0 )
 		return totalSize;
@@ -25,9 +27,11 @@ int Element::size() {
 			x = 13;
 			break;
 		case String:
+			x = valuestrsize() + 4 + 1;
+			break;
 		case Object:
 		case Array:
-			x = valuestrsize() + 4 + 1;
+			x = objsize() + 1;
 			break;
 		case BinData:
 			x = valuestrsize() + 4 + 1 + 1/*subtype*/;
@@ -61,6 +65,43 @@ int Element::size() {
 	}
 
 	return totalSize;
+}
+
+/* must be same type! */
+inline int compareElementValues(Element& l, Element& r) {
+	double x;
+	switch( l.type() ) {
+		case EOO:
+		case Undefined:
+		case jstNULL:
+			return true;
+		case Bool:
+			return *l.value() - *r.value();
+		case Date:
+			if( l.date() < r.date() )
+				return -1;
+			return l.date() == r.date() ? 0 : 1;
+		case Number:
+			x = l.number() - r.number();
+			if( x < 0 ) return -1;
+			return x == 0 ? 0 : 1;
+		case jstOID:
+			return memcmp(l.value(), r.value(), 12);
+		case String:
+			/* todo: utf version */
+			return strcmp(l.valuestr(), r.valuestr());
+		case Object:
+		case Array:
+		case BinData:
+		case RegEx:
+			cout << "compareElementValues: can't compare this type:" << (int) l.type() << endl;
+			assert(false);
+			break;
+		default:
+			cout << "compareElementValues: bad type " << (int) l.type() << endl;
+			assert(false);
+	}
+	return -1;
 }
 
 JSMatcher::JSMatcher(JSObj &_jsobj) : 
@@ -102,24 +143,6 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 	}
 }
 
-//#include <boost/regex.hpp>
-//#include <pcre.h>
-
-struct RXTest { 
-	RXTest() { 
-		/*
-		static const boost::regex e("(\\d{4}[- ]){3}\\d{4}");
-		static const boost::regex b(".....");
-		cout << "regex result: " << regex_match("hello", e) << endl;
-		cout << "regex result: " << regex_match("abcoo", b) << endl;
-		*/
-		pcrecpp::RE re1(")({a}h.*o");
-		pcrecpp::RE re("h.llo");
-		assert( re.FullMatch("hello") );
-		assert( !re1.FullMatch("hello") );
-	}
-} rxtest;
-
 bool JSMatcher::matches(JSObj& jsobj) {
 
 	/* assuming there is usually only one thing to match.  if more this
@@ -158,6 +181,63 @@ ok:
 }
 
 /* JSObj ------------------------------------------------------------*/
+
+/* well ordered compare */
+int JSObj::woCompare(JSObj& r)  { 
+	JSElemIter i(*this);
+	JSElemIter j(*this);
+	while( 1 ) { 
+		// so far, equal...
+
+		if( !i.more() || !j.more() ) {
+			cout << "woCompare: no eoo?" << endl;
+			assert(false);
+			break;
+		}
+
+		Element l = i.next();
+		Element r = j.next();
+
+		if( l == r ) {
+			if( l.eoo() )
+				return 0;
+			continue;
+		}
+
+		int x = (int) l.type() - (int) r.type();
+		if( x != 0 )
+			return x;
+		x = strcmp(l.fieldName(), r.fieldName());
+		if( x != 0 )
+			return x;
+		x = compareElementValues(l, r);
+		assert(x != 0);
+		return x;
+	}
+	return -1;
+} 
+
+Element JSObj::getField(const char *name) {
+	JSElemIter i(*this);
+	while( i.more() ) {
+		Element e = i.next();
+		if( e.eoo() )
+			break;
+		if( strcmp(e.fieldName(), name) == 0 )
+			return e;
+	}
+	return nullElement;
+}
+
+const char * JSObj::getStringField(const char *name) { 
+	Element e = getField(name);
+	return e.type() == String ? e.valuestr() : 0;
+}
+
+JSObj JSObj::getObjectField(const char *name) { 
+	Element e = getField(name);
+	return e.type() == Object ? e.embeddedObject() : JSObj();
+}
 
 int JSObj::getFieldNames(set<string>& fields) {
 	int n = 0;
@@ -208,6 +288,12 @@ struct JSObj0 {
 	char eoo;
 } js0;
 
+Element::Element() { 
+	data = (char *) &js0;
+	fieldNameSize = 0;
+	totalSize = -1;
+}
+
 struct JSObj1 js1;
 
 struct JSObj2 {
@@ -244,3 +330,19 @@ struct JSUnitTest {
 } jsunittest;
 
 #pragma pack(pop)
+
+struct RXTest { 
+	RXTest() { 
+		/*
+		static const boost::regex e("(\\d{4}[- ]){3}\\d{4}");
+		static const boost::regex b(".....");
+		cout << "regex result: " << regex_match("hello", e) << endl;
+		cout << "regex result: " << regex_match("abcoo", b) << endl;
+		*/
+		pcrecpp::RE re1(")({a}h.*o");
+		pcrecpp::RE re("h.llo");
+		assert( re.FullMatch("hello") );
+		assert( !re1.FullMatch("hello") );
+	}
+} rxtest;
+

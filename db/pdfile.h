@@ -69,7 +69,7 @@ public:
 		const char *ns,
 		Record *toupdate, const DiskLoc& dl,
 		const char *buf, int len);
-	void insert(const char *ns, const void *buf, int len, bool usethedefault = false);
+	DiskLoc insert(const char *ns, const void *buf, int len, bool god = false);
 	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl);
 	auto_ptr<Cursor> findAll(const char *ns);
 
@@ -284,4 +284,8 @@ inline DeletedRecord* DiskLoc::drec() const {
 }
 inline Extent* DiskLoc::ext() const {
 	return DataFileMgr::getExtent(*this);
+}
+
+inline BtreeBucket* DiskLoc::btree() const { 
+	return (BtreeBucket*) rec();
 }

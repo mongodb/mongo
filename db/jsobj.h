@@ -7,6 +7,8 @@
 
 #include <set>
 
+class JSObj;
+
 #pragma pack(push)
 #pragma pack(1)
 
@@ -87,15 +89,23 @@ public:
 	// raw data be careful:
 	const char * value() { return (data + fieldNameSize + 1); }
 
-	// only valid for string, object, array:
+	unsigned long long date() { return *((unsigned long long*) value()); }
+	double number() { return *((double *) value()); }
+
+	// for strings
 	int valuestrsize() { 
 		return *((int *) value());
 	}
 
-	// for strings.  also gives you start of the data for an embedded object
+	// for objects the size *includes* the size of the size field
+	int objsize() { 
+		return *((int *) value());
+	}
+
+	// for strings.  also gives you start of the real data for an embedded object
 	const char * valuestr() { return value() + 4; }
 
-	void* embeddedObject() { valuestr(); }
+	JSObj embeddedObject();
 
 	const char *regex() { assert(type() == RegEx); return value(); }
 	const char *regexFlags() { 
@@ -110,6 +120,8 @@ public:
 	}
 
 	const char * rawdata() { return data; }
+
+	Element();
 
 private:
 	Element(const char *d) : data(d) {
@@ -138,8 +150,18 @@ public:
 	int addFields(JSObj& from, set<string>& fields); /* returns n added */
 	int getFieldNames(set<string>& fields);
 
+	Element getField(const char *name); /* return has eoo() true if no match */
+	const char * getStringField(const char *name);
+	JSObj getObjectField(const char *name);
+
 	const char *objdata() { return _objdata; }
-	int objsize() { return _objsize; }
+	int objsize() { return _objsize; } // includes the embedded size field
+	bool isEmpty() { return objsize() <= 5; }
+
+	/* -1: l<r. 0:l==r. 1:l>r 
+	   wo='well ordered'.  fields must be in same order in each object.
+	*/
+	int woCompare(JSObj& r);
 
 	OID* getOID() {
 		const char *p = objdata() + 4;
@@ -268,3 +290,5 @@ struct JSObj1 {
 };
 #pragma pack(pop)
 extern JSObj1 js1;
+
+inline JSObj Element::embeddedObject() { assert(type()==Object); return JSObj(value()); }

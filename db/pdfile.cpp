@@ -14,6 +14,8 @@ _ regex support
 #include "db.h"
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
+#include "objwrappers.h"
+#include "btree.h"
 
 DataFileMgr theDataFileMgr;
 
@@ -36,12 +38,20 @@ int bucketSizes[] = {
 };
 const int Buckets = 19;
 const int MaxBucket = 18;
+const int MaxIndexes = 10;
+
+class IndexDetails { 
+public:
+	DiskLoc head;
+	DiskLoc info;
+};
 
 class NamespaceDetails {
 public:
 	NamespaceDetails() { 
 		datasize = nrecords = 0;
 		lastExtentSize = 0;
+		nIndexes = 0;
 		memset(reserved, 0, sizeof(reserved));
 	} 
 	DiskLoc firstExtent;
@@ -49,7 +59,9 @@ public:
 	long long datasize;
 	long long nrecords;
 	int lastExtentSize;
-	char reserved[256-16-4];
+	int nIndexes;
+	IndexDetails indexes[MaxIndexes];
+	char reserved[256-16-4-4-8*MaxIndexes];
 
 	static int bucket(int n) { 
 		for( int i = 0; i < Buckets; i++ )
@@ -434,10 +446,15 @@ int followupExtentSize(int len, int lastExtentLen) {
 	return sz;
 }
 
-void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
-	if( strncmp(ns, "system.", 7) == 0 && !god ) { 
-		cout << "ERROR: attempt to insert in system namespace " << ns << endl;
-		return;
+DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
+	bool addIndex = false;
+	if( strncmp(ns, "system.", 7) == 0 ) {
+		if( strcmp(ns, "system.indexes") == 0 )
+			addIndex = true;
+		else if( !god ) { 
+			cout << "ERROR: attempt to insert in system namespace " << ns << endl;
+			return DiskLoc();
+		}
 	}
 
 	NamespaceDetails *d = namespaceIndex.details(ns);
@@ -445,6 +462,31 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 		newNamespace(ns);
 		temp.newExtent(ns, initialExtentSize(len));
 		d = namespaceIndex.details(ns);
+	}
+
+	NamespaceDetails *indexesBaseDetails = 0;
+	string indexFullNS;
+	if( addIndex ) { 
+		JSObj io((const char *) buf);
+		const char *name = io.getStringField("name");
+		const char *idxns = io.getStringField("ns");
+		JSObj key = io.getObjectField("key");
+		if( name == 0 || *name == 0 || idxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
+			cout << "ERROR: bad add index attempt name:" << (name?name:"") << " ns:" << (idxns?idxns:"") << endl;
+			return DiskLoc();
+		}
+		indexesBaseDetails = namespaceIndex.details(idxns);
+		if( indexesBaseDetails == 0 ) {
+			cout << "ERROR: bad add index attempt, no such table(ns):" << idxns << endl;
+			return DiskLoc();
+		}
+		if( indexesBaseDetails->nIndexes >= MaxIndexes ) { 
+			cout << "ERROR: bad add index attempt, too many indexes for:" << idxns << endl;
+			return DiskLoc();
+		}
+		indexFullNS = idxns; 
+		indexFullNS += ".$";
+		indexFullNS += name; // client.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
 	}
 
 	DiskLoc extentLoc;
@@ -458,7 +500,7 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 		if( loc.isNull() ) { 
 			cout << "ERROR: out of space in datafile.  write more code." << endl;
 			assert(false);
-			return;
+			return DiskLoc();
 		}
 	}
 
@@ -480,6 +522,16 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 
 	d->nrecords++;
 	d->datasize += r->netLength();
+
+	if( indexesBaseDetails ) { 
+		indexesBaseDetails->indexes[indexesBaseDetails->nIndexes].info = loc;
+		indexesBaseDetails->indexes[indexesBaseDetails->nIndexes].head = 
+			BtreeBucket::addHead(indexFullNS.c_str());
+		indexesBaseDetails->nIndexes++; 
+		/* todo: index existing records here */
+	}
+
+	return loc;
 }
 
 void DataFileMgr::init() {

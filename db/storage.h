@@ -12,6 +12,7 @@
 class Record;
 class DeletedRecord;
 class Extent;
+class BtreeBucket;
 
 class DiskLoc {
 	int reserved; /* this will be volume, file #, etc. */
@@ -56,6 +57,7 @@ public:
 	Record* rec() const;
 	DeletedRecord* drec() const;
 	Extent* ext() const;
+	BtreeBucket* btree() const;
 };
 
 #pragma pack(pop)
