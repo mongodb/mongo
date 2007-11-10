@@ -6,6 +6,7 @@
 #include "../util/mmap.h"
 #include "storage.h"
 #include "jsobj.h"
+#include "namespace.h"
 
 class PDFHeader;
 class Extent;
@@ -13,32 +14,6 @@ class Record;
 class Cursor;
 
 /*---------------------------------------------------------------------*/ 
-
-class Namespace {
-public:
-	Namespace(const char *ns) { 
-		*this = ns;
-	}
-	Namespace& operator=(const char *ns) { 
-		memset(buf, 0, 128); /* this is just to keep stuff clean in the files for easy dumping and reading */
-		strcpy_s(buf, 128, ns); return *this; 
-	}
-
-	bool operator==(const Namespace& r) { return strcmp(buf, r.buf) == 0; }
-	int hash() const {
-		unsigned x = 0;
-		const char *p = buf;
-		while( *p ) { 
-			x = x * 131 + *p;
-			p++;
-		}
-		return (x & 0x7fffffff) | 0x8000000; // must be > 0
-	}
-
-	char buf[128];
-};
-
-auto_ptr<Cursor> makeNamespaceCursor();
 
 /*---------------------------------------------------------------------*/ 
 
@@ -217,10 +192,12 @@ public:
 	virtual Record* _current() = 0;
 	virtual JSObj current() = 0;
 	virtual DiskLoc currLoc() = 0;
-	virtual bool advance() = 0;
+	virtual bool advance() = 0; /*true=ok*/
 
 	/* optional to implement.  if implemented, means 'this' is a prototype */
 	virtual Cursor* clone() { return 0; }
+
+	virtual bool tempStopOnMiss() { return false; }
 };
 
 class BasicCursor : public Cursor {

@@ -184,16 +184,16 @@ ok:
 
 /* well ordered compare */
 int JSObj::woCompare(JSObj& r)  { 
+
+	if( isEmpty() )
+		return r.isEmpty() ? 0 : -1;
+	if( r.isEmpty() )
+		return 1;
+
 	JSElemIter i(*this);
 	JSElemIter j(r);
 	while( 1 ) { 
 		// so far, equal...
-
-		if( !i.more() || !j.more() ) {
-			cout << "woCompare: no eoo?" << endl;
-			assert(false);
-			break;
-		}
 
 		Element l = i.next();
 		Element r = j.next();

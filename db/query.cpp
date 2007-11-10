@@ -7,6 +7,7 @@
 #include "../util/builder.h"
 #include <time.h>
 #include "introspect.h"
+#include "btree.h"
 
 int nextCursorId = 1;
 
@@ -121,6 +122,45 @@ long long allocCursorId() {
 	return x;
 }
 
+/* todo: _ cache query plans 
+         _ use index on partial match with the query
+*/
+auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) { 
+	NamespaceDetails *d = namespaceIndex.details(ns);
+	if( d == 0 ) return auto_ptr<Cursor>();
+	set<string> queryFields;
+	query.getFieldNames(queryFields);
+	if( !order.isEmpty() ) {
+		set<string> orderFields;
+		order.getFieldNames(orderFields);
+		// order by
+		for(int i = 0; i < d->nIndexes; i++ ) { 
+			JSObj idxInfo = d->indexes[i].info.obj();
+			assert( strcmp(ns, idxInfo.getStringField("ns")) == 0 );
+			JSObj idxKey = idxInfo.getObjectField("key");
+			set<string> keyFields;
+			idxKey.getFieldNames(keyFields);
+			if( keyFields == orderFields ) {
+				JSObjBuilder b;
+				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, JSObj(), false));
+			}
+		}
+	}
+	// where/query
+	for(int i = 0; i < d->nIndexes; i++ ) { 
+		JSObj idxInfo = d->indexes[i].info.obj();
+		JSObj idxKey = idxInfo.getObjectField("key");
+		set<string> keyFields;
+		idxKey.getFieldNames(keyFields);
+		if( keyFields == queryFields ) {
+			JSObjBuilder b;
+			return auto_ptr<Cursor>( 
+				new BtreeCursor(d->indexes[i].head, query.extractFields(idxKey, b), true));
+		}
+	}
+	return auto_ptr<Cursor>();
+}
+
 QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<string> > filter) {
 
 	cout << "runQuery ns:" << ns << " ntoreturn:" << ntoreturn << " queryobjsize:" << 
@@ -128,7 +168,12 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 
 	BufBuilder b;
 
-	auto_ptr<JSMatcher> matcher(new JSMatcher(jsobj));
+	JSObj query = jsobj.getObjectField("query");
+	JSObj order = jsobj.getObjectField("orderby");
+	if( query.isEmpty() && order.isEmpty() )
+		query = jsobj;
+
+	auto_ptr<JSMatcher> matcher(new JSMatcher(query));
 
 	QueryResult *qr = 0;
 	b.skip(sizeof(QueryResult));
@@ -137,12 +182,18 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 
 	auto_ptr<Cursor> c = getSpecialCursor(ns);
 	if( c.get() == 0 )
+		c = getIndexCursor(ns, query, order);
+	if( c.get() == 0 )
 		c = theDataFileMgr.findAll(ns);
 
 	long long cursorid = 0;
 	while( c->ok() ) {
 		JSObj js = c->current();
-		if( matcher->matches(js) ) {
+		if( !matcher->matches(js) ) {
+			if( c->tempStopOnMiss() )
+				break;
+		}
+		else {
 			bool ok = true;
 			if( filter.get() ) {
 				JSObj x;
@@ -213,6 +264,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 		Cursor *c = cc->c.get();
 		while( 1 ) {
 			if( !c->ok() ) {
+done:
 				// done!  kill cursor.
 				cursorid = 0;
 				clientCursors.erase(it);
@@ -221,7 +273,11 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 				break;
 			}
 			JSObj js = c->current();
-			if( cc->matcher->matches(js) ) {
+			if( !cc->matcher->matches(js) ) {
+				if( c->tempStopOnMiss() )
+					goto done;
+			} 
+			else {
 				bool ok = true;
 				if( cc->filter.get() ) {
 					JSObj x;

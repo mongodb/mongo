@@ -5,6 +5,7 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 #include "storage.h"
+#include "pdfile.h"
 
 #pragma pack(push)
 #pragma pack(1)
@@ -76,6 +77,7 @@ protected:
 };
 
 class BtreeBucket : public BucketBasics { 
+	friend class BtreeCursor;
 public:
 	/* rc: 0 = ok */
 	static DiskLoc addHead(const char *ns); /* start a new index off, empty */
@@ -83,6 +85,9 @@ public:
 		JSObj& key, bool dupsAllowed);
 	void update(const DiskLoc& recordLoc, JSObj& key);
 	bool del(JSObj& key);
+	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found);
+	/* advance one key position in the index: */
+	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs);
 private:
 	static BtreeBucket* allocTemp(); /* caller must release with free() */
 	void insertHere(const DiskLoc& thisLoc, const char *ns, int keypos, 
@@ -92,6 +97,22 @@ private:
 		JSObj& key, bool dupsAllowed,
 		DiskLoc lChild, DiskLoc rChild);
 	bool find(JSObj& key, int& pos);
+};
+
+class BtreeCursor : public Cursor {
+public:
+	BtreeCursor(DiskLoc head, JSObj startKey, bool stopmiss);
+	virtual bool ok() { return !bucket.isNull(); }
+	bool eof() { return !ok(); }
+	virtual Record* _current() { return currLoc().rec(); }
+	virtual JSObj current() { return JSObj(_current()); }
+	virtual DiskLoc currLoc();
+	virtual bool advance();
+	virtual bool tempStopOnMiss() { return stopmiss; }
+private:
+	DiskLoc bucket;
+	int keyOfs;
+	bool stopmiss;
 };
 
 #pragma pack(pop)

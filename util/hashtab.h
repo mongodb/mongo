@@ -5,6 +5,8 @@
    Uses a contiguous block of memory, so you can put it in a memory mapped file very easily.
 */
 
+#pragma once 
+
 #include "../stdafx.h"
 #include <map>
 

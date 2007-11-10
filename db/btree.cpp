@@ -217,6 +217,63 @@ DiskLoc BtreeBucket::addHead(const char *ns) {
 	return loc;
 }
 
+DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs) {
+	assert( keyOfs >= 0 && keyOfs < n );
+
+	int ko = keyOfs + 1;
+	DiskLoc nextDown = ko==n ? nextChild : k(ko).prevChildBucket;
+	if( !nextDown.isNull() ) { 
+		keyOfs = 0;
+		return nextDown;
+	}
+
+	if( ko < n ) {
+		keyOfs = ko;
+		return thisLoc;
+	}
+
+	// end of bucket.  traverse back up.
+	DiskLoc childLoc = thisLoc;
+	DiskLoc ancestor = parent;
+	while( 1 ) {
+		if( ancestor.isNull() )
+			break;
+		BtreeBucket *an = ancestor.btree();
+		for( int i = 0; i < an->n; i++ ) {
+			if( an->k(i).prevChildBucket == childLoc ) { 
+				keyOfs = i;
+				return ancestor;
+			}
+		}
+		assert( an->nextChild == childLoc );
+		// parent exhausted also, keep going up
+		childLoc = ancestor;
+		ancestor = an->parent;
+	}
+
+	return DiskLoc();
+}
+
+DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found) { 
+	int p;
+	found = find(key, p);
+	if( found ) {
+		pos = p;
+		return thisLoc;
+	}
+
+	DiskLoc child = p == n ? nextChild : k(p).prevChildBucket;
+
+	if( !child.isNull() ) { 
+		DiskLoc l = child.btree()->locate(child, key, pos, found);
+		if( !l.isNull() )
+			return l;
+	}
+
+	pos = p;
+	return pos == n ? DiskLoc() /*theend*/ : thisLoc;
+}
+
 /* thisloc is the location of this bucket object.  you must pass that in. */
 int BtreeBucket::_insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
 						JSObj& key, bool dupsAllowed,
@@ -247,4 +304,24 @@ int BtreeBucket::insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& r
 						JSObj& key, bool dupsAllowed) 
 {
 	return _insert(thisLoc, ns, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc());
+}
+
+/* - BtreeCursor --------------------------------------------------- */
+
+BtreeCursor::BtreeCursor(DiskLoc head, JSObj k, bool sm) : stopmiss(sm) {
+	bool found;
+	bucket = head.btree()->locate(head, k, keyOfs, found);
+}
+
+
+DiskLoc BtreeCursor::currLoc() {
+	assert( !bucket.isNull() );
+	return bucket.btree()->k(keyOfs).recordLoc;
+}
+
+bool BtreeCursor::advance() { 
+	if( bucket.isNull() )
+		return false;
+	bucket = bucket.btree()->advance(bucket, keyOfs);
+	return !bucket.isNull();
 }
