@@ -307,7 +307,7 @@ int BtreeBucket::_insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& 
 	bool found = find(key, pos);
 	if( found ) {
 		// todo: support dup keys
-		cout << "dup key failing" << endl;
+		cout << "  dup key failing" << endl;
 		return 1;
 	}
 

@@ -94,18 +94,26 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		return;
 	}
 
-	JSMatcher matcher(pattern);
-
-	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-	while( c->ok() ) {
-		Record *r = c->_current();
-		JSObj js(r);
-		if( matcher.matches(js) ) {
-			cout << "  found match to update" << endl;
-			theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
-			return;
+	{
+		JSMatcher matcher(pattern);
+		JSObj order;
+		auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
+		if( c.get() == 0 )
+			c = theDataFileMgr.findAll(ns);
+		while( c->ok() ) {
+			Record *r = c->_current();
+			JSObj js(r);
+			if( !matcher.matches(js) ) {
+				if( c->tempStopOnMiss() )
+					break;
+			}
+			else {
+				cout << "  found match to update" << endl;
+				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
+				return;
+			}
+			c->advance();
 		}
-		c->advance();
 	}
 
 	cout << "  no match found. ";

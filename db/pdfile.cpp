@@ -354,12 +354,41 @@ void DataFileMgr::update(
 		Record *toupdate, const DiskLoc& dl,
 		const char *buf, int len) 
 {
-	if( toupdate->netLength() < len ) { 
+	if( toupdate->netLength() < len ) {
 		cout << "temp: update: moving record to a larger location " << ns << endl;
 		// doesn't fit.
 		deleteRecord(ns, toupdate, dl);
 		insert(ns, buf, len);
 		return;
+	}
+
+	/* has any index keys changed? */
+	{
+		NamespaceDetails *d = namespaceIndex.details(ns);
+		if( d->nIndexes ) {
+			JSObj newObj(buf);
+			JSObj oldObj = dl.obj();
+			for( int i = 0; i < d->nIndexes; i++ ) {
+				IndexDetails& idx = d->indexes[i];
+				JSObj idxKey = idx.info.obj().getObjectField("key");
+				JSObjBuilder b1,b2;
+				JSObj kNew = newObj.extractFields(idxKey, b1);
+				JSObj kOld = oldObj.extractFields(idxKey, b2);
+				if( !kNew.woEqual(kOld) ) {
+					cout << "  updating index, key changed " << idx.indexNamespace() << endl;
+					// delete old key
+					if( !kOld.isEmpty() )
+						idx.head.btree()->unindex(kOld);
+					// add new key
+					if( !kNew.isEmpty() ) {
+						idx.head.btree()->insert(
+							idx.head, 
+							idx.indexNamespace().c_str(),
+							dl, kNew, false);
+					}
+				}
+			}
+		}
 	}
 
 	memcpy(toupdate->data, buf, len);
