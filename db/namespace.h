@@ -39,6 +39,17 @@ class IndexDetails {
 public:
 	DiskLoc head; /* btree head */
 	DiskLoc info; /* index info object. { name:, ns:, key: } */
+
+	string indexNamespace() { 
+		JSObj io = info.obj();
+		string s;
+		s.reserve(128);
+		s = io.getStringField("ns");
+		assert( !s.empty() );
+		s += ".$";
+		s += io.getStringField("name"); // client.table.$index
+		return s;
+	}
 };
 
 extern int bucketSizes[];

@@ -146,6 +146,19 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 	return false;
 }
 
+bool BtreeBucket::unindex(JSObj& key ) { 
+	int pos;
+	if( find(key, pos) ) {
+		del(pos);
+		return true;
+	}
+	DiskLoc l = childForPos(pos);
+	if( l.isNull() )
+		return false;
+	return l.btree()->unindex(key);
+}
+
+
 BtreeBucket* BtreeBucket::allocTemp() { 
 	BtreeBucket *b = (BtreeBucket*) malloc(BucketSize);
 	b->init();
@@ -217,11 +230,18 @@ DiskLoc BtreeBucket::addHead(const char *ns) {
 	return loc;
 }
 
+DiskLoc BtreeBucket::getHead(const DiskLoc& thisLoc) {
+	DiskLoc p = thisLoc;
+	while( !p.btree()->isHead() )
+		p = p.btree()->parent;
+	return p;
+}
+
 DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs) {
 	assert( keyOfs >= 0 && keyOfs < n );
 
 	int ko = keyOfs + 1;
-	DiskLoc nextDown = ko==n ? nextChild : k(ko).prevChildBucket;
+	DiskLoc nextDown = childForPos(ko);
 	if( !nextDown.isNull() ) { 
 		keyOfs = 0;
 		return nextDown;
@@ -262,7 +282,7 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 		return thisLoc;
 	}
 
-	DiskLoc child = p == n ? nextChild : k(p).prevChildBucket;
+	DiskLoc child = childForPos(p);
 
 	if( !child.isNull() ) { 
 		DiskLoc l = child.btree()->locate(child, key, pos, found);
@@ -324,4 +344,27 @@ bool BtreeCursor::advance() {
 		return false;
 	bucket = bucket.btree()->advance(bucket, keyOfs);
 	return !bucket.isNull();
+}
+
+void BtreeCursor::noteLocation() {
+	if( !eof() ) {
+		JSObj o = bucket.btree()->keyAt(keyOfs).copy();
+		keyAtKeyOfs = o;
+	}
+}
+
+/* see if things moved around (deletes, splits, inserts) */
+void BtreeCursor::checkLocation() { 
+	if( eof() || bucket.btree()->keyAt(keyOfs).woEqual(keyAtKeyOfs) )
+		return;
+	cout << "  key seems to have moved in the index, refinding it" << endl;
+	bool found;
+	DiskLoc bold = bucket;
+	/* probably just moved in our node, so to be fast start from here rather than the head */
+	bucket = bucket.btree()->locate(bucket, keyAtKeyOfs, keyOfs, found);
+	if( found || bucket.btree()->isHead() )
+		return;
+	/* didn't find, check from the top */
+	DiskLoc head = bold.btree()->getHead(bold);
+	head.btree()->locate(head, keyAtKeyOfs, keyOfs, found);
 }

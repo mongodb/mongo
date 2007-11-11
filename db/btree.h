@@ -36,7 +36,7 @@ public:
 class BucketBasics {
 	friend class KeyNode;
 public:
-
+	bool isHead() { return parent.isNull(); }
 protected:
 	DiskLoc& getChild(int pos) { 
 		assert( pos >= 0 && pos <= n );
@@ -58,7 +58,15 @@ protected:
 	void pushFront(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevChild);
 	void del(int keypos);
 
+	/* !Packed means there is deleted fragment space within the bucket.
+       We "repack" when we run out of space before considering the node
+	   to be full. 
+	   */
 	enum Flags { Packed=1 };
+
+	DiskLoc childForPos(int p) { 
+		return p == n ? nextChild : k(p).prevChildBucket;
+	}
 
 	int totalDataSize() const;
 	void pack(); void setNotPacked(); void setPacked();
@@ -84,11 +92,13 @@ public:
 	int insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
 		JSObj& key, bool dupsAllowed);
 	void update(const DiskLoc& recordLoc, JSObj& key);
-	bool del(JSObj& key);
+	bool unindex(JSObj& key);
 	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found);
 	/* advance one key position in the index: */
 	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs);
+	DiskLoc getHead(const DiskLoc& thisLoc);
 private:
+	JSObj keyAt(int keyOfs) { return keyOfs >= n ? JSObj() : keyNode(keyOfs).key; }
 	static BtreeBucket* allocTemp(); /* caller must release with free() */
 	void insertHere(const DiskLoc& thisLoc, const char *ns, int keypos, 
 		const DiskLoc& recordLoc, JSObj& key,
@@ -109,10 +119,13 @@ public:
 	virtual DiskLoc currLoc();
 	virtual bool advance();
 	virtual bool tempStopOnMiss() { return stopmiss; }
+	virtual void noteLocation(); // updates keyAtKeyOfs...
+	virtual void checkLocation();
 private:
 	DiskLoc bucket;
 	int keyOfs;
 	bool stopmiss;
+	JSObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
 };
 
 #pragma pack(pop)

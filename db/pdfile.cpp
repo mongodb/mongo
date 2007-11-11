@@ -299,10 +299,29 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 
 void aboutToDelete(const DiskLoc& dl);
 
+void _unindexRecord(IndexDetails& id, JSObj& obj) { 
+	JSObj idxInfo = id.info.obj();
+	JSObjBuilder b;
+	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
+	if( !key.isEmpty() )
+		id.head.btree()->unindex(key);
+}
+
+void  unindexRecord(NamespaceDetails *d, Record *todelete) {
+	if( d->nIndexes == 0 ) return;
+	JSObj obj(todelete);
+	for( int i = 0; i < d->nIndexes; i++ ) { 
+		_unindexRecord(d->indexes[i], obj);
+	}
+}
+
 void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl) 
 {
 	/* check if any cursors point to us.  if so, advance them. */
 	aboutToDelete(dl);
+
+	NamespaceDetails* d = namespaceIndex.details(ns);
+	unindexRecord(d, todelete);
 
 	/* remove ourself from the record next/prev chain */
 	{
@@ -323,7 +342,6 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 
 	/* add to the free list */
 	{
-		NamespaceDetails* d = namespaceIndex.details(ns);
 		d->nrecords--;
 		d->datasize -= todelete->netLength();
 		d->addDeletedRec((DeletedRecord*)todelete, dl);
@@ -372,13 +390,9 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 	JSObjBuilder b;
 	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
 	if( !key.isEmpty() ) {
-		string indexFullNS = idxInfo.getStringField("ns");
-		assert( !indexFullNS.empty() );
-		indexFullNS += ".$";
-		indexFullNS += idxInfo.getStringField("name"); // client.table.$index
 		idx.head.btree()->insert(
 			idx.head, 
-			indexFullNS.c_str(),
+			idx.indexNamespace().c_str(),
 			newRecordLoc, key, false);
 	}
 }

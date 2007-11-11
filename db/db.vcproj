@@ -177,6 +177,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\clientcursor.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\db.cpp"
 				>
 			</File>

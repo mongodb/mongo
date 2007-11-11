@@ -138,9 +138,9 @@ private:
 class JSObj {
 	friend class JSElemIter;
 public:
-	JSObj(const char *msgdata) {
+	JSObj(const char *msgdata, bool ifree = false) : iFree(ifree) {
 		_objdata = msgdata;
-		_objsize = *((int*) _objdata); iFree = false;
+		_objsize = *((int*) _objdata);
 	}
 	JSObj(Record *r);
 	JSObj() : _objsize(0), _objdata(0), iFree(false) { }
@@ -168,6 +168,9 @@ public:
 	   wo='well ordered'.  fields must be in same order in each object.
 	*/
 	int woCompare(JSObj& r);
+	bool woEqual(JSObj& r) { 
+		return _objsize==r._objsize && memcmp(_objdata,r._objdata,_objsize)==0;
+	}
 
 	OID* getOID() {
 		const char *p = objdata() + 4;
@@ -177,11 +180,23 @@ public:
 	}
 
 	JSObj& operator=(JSObj& r) {
+		if( iFree ) free((void*)_objdata); 
 		_objsize = r._objsize;
 		_objdata = r._objdata;
-		assert( !iFree );
+		iFree = r.iFree;
+		/* kind of like auto_ptrs here.  note we leave objsize as it was 
+		   so you'll get notified if you try to use the object, instead of just
+		   thinking it is empty.
+		   */
+		if( iFree ) { r._objdata = 0; r.iFree = false; }
 		return *this;
 	}
+
+	/* makes a copy of the object.  Normally, a jsobj points to data "owned" 
+	   by something else.  this is a useful way to get your own copy of the buffer 
+	   data (which is freed when the new jsobj destructs).
+	   */
+	JSObj copy() const;
 
 	bool iFree;
 private:
@@ -298,3 +313,11 @@ struct JSObj1 {
 extern JSObj1 js1;
 
 inline JSObj Element::embeddedObject() { assert(type()==Object); return JSObj(value()); }
+
+inline JSObj JSObj::copy() const { 
+	if( _objsize == 0 )
+		return *this;
+	char *p = (char*) malloc(_objsize);
+	memcpy(p, _objdata, _objsize);
+	return JSObj(p, true);
+}

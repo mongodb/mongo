@@ -198,6 +198,14 @@ public:
 	virtual Cursor* clone() { return 0; }
 
 	virtual bool tempStopOnMiss() { return false; }
+
+	/* called after every query block is iterated -- i.e. between getMore() blocks
+	   so you can note where we are, if necessary.
+	   */
+	virtual void noteLocation() { } 
+
+	/* called before query getmore block is iterated */
+	virtual void checkLocation() { } 
 };
 
 class BasicCursor : public Cursor {
