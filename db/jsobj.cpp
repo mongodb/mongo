@@ -29,6 +29,9 @@ int Element::size() {
 		case String:
 			x = valuestrsize() + 4 + 1;
 			break;
+        case DBRef:
+          x = valuestrsize() + 4 + 12 + 1;
+          break;
 		case Object:
 		case Array:
 			x = objsize() + 1;
@@ -52,7 +55,7 @@ int Element::size() {
 
 	if( !eoo() ) { 
 		const char *next = data + totalSize;
-		if( *next < 0 || *next > RegEx ) { 
+		if( *next < 0 || *next > DBRef ) { 
 			// bad type.  
 			cout << "*********************************************\n";
 			cout << "Bad data or size in Element::size()" << endl;
