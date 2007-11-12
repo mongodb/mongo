@@ -52,7 +52,7 @@ struct OID {
      Object: a nested object, leading with its entire size, which terminates with EOO.
      Array:  same as object
      BinData:
-       <unsigned len>
+       <int len>
        <byte subtype>
        <byte[len] data>
 */
