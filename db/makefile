@@ -33,3 +33,8 @@ cleandb:
 /usr/local/lib/libpcrecpp.a:
 	cat pcre.txt
 
+pcre:
+	curl -O ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-7.4.tar.gz
+	tar -xzf pcre-7.4.tar.gz 
+	cd pcre-7.4 && ./configure --enable-utf8 --with-match-limit=200000 --with-match-limit-recursion=4000 && make && make install
+
