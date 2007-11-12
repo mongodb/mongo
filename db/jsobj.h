@@ -7,6 +7,10 @@
 
 #include <set>
 
+class JSObj;
+class Record;
+class JSObjBuilder;
+
 #pragma pack(push)
 #pragma pack(1)
 
@@ -87,15 +91,23 @@ public:
 	// raw data be careful:
 	const char * value() { return (data + fieldNameSize + 1); }
 
-	// only valid for string, object, array:
+	unsigned long long date() { return *((unsigned long long*) value()); }
+	double number() { return *((double *) value()); }
+
+	// for strings
 	int valuestrsize() { 
 		return *((int *) value());
 	}
 
-	// for strings.  also gives you start of the data for an embedded object
+	// for objects the size *includes* the size of the size field
+	int objsize() { 
+		return *((int *) value());
+	}
+
+	// for strings.  also gives you start of the real data for an embedded object
 	const char * valuestr() { return value() + 4; }
 
-	void* embeddedObject() { valuestr(); }
+	JSObj embeddedObject();
 
 	const char *regex() { assert(type() == RegEx); return value(); }
 	const char *regexFlags() { 
@@ -111,6 +123,8 @@ public:
 
 	const char * rawdata() { return data; }
 
+	Element();
+
 private:
 	Element(const char *d) : data(d) {
 		fieldNameSize = eoo() ? 0 : strlen(fieldName()) + 1;
@@ -121,14 +135,12 @@ private:
 	int totalSize;
 };
 
-class Record;
-
 class JSObj {
 	friend class JSElemIter;
 public:
-	JSObj(const char *msgdata) {
+	JSObj(const char *msgdata, bool ifree = false) : iFree(ifree) {
 		_objdata = msgdata;
-		_objsize = *((int*) _objdata); iFree = false;
+		_objsize = *((int*) _objdata);
 	}
 	JSObj(Record *r);
 	JSObj() : _objsize(0), _objdata(0), iFree(false) { }
@@ -138,8 +150,27 @@ public:
 	int addFields(JSObj& from, set<string>& fields); /* returns n added */
 	int getFieldNames(set<string>& fields);
 
+	Element getField(const char *name); /* return has eoo() true if no match */
+	const char * getStringField(const char *name);
+	JSObj getObjectField(const char *name);
+
+	/* makes a new JSObj with the fields specified in pattern.
+       fields returned in the order they appear in pattern.
+	   if any field missing, you get back an empty object overall.
+	   */
+	JSObj extractFields(JSObj pattern, JSObjBuilder& b);
+
 	const char *objdata() { return _objdata; }
-	int objsize() { return _objsize; }
+	int objsize() { return _objsize; } // includes the embedded size field
+	bool isEmpty() { return objsize() <= 5; }
+
+	/* -1: l<r. 0:l==r. 1:l>r 
+	   wo='well ordered'.  fields must be in same order in each object.
+	*/
+	int woCompare(JSObj& r);
+	bool woEqual(JSObj& r) { 
+		return _objsize==r._objsize && memcmp(_objdata,r._objdata,_objsize)==0;
+	}
 
 	OID* getOID() {
 		const char *p = objdata() + 4;
@@ -149,11 +180,23 @@ public:
 	}
 
 	JSObj& operator=(JSObj& r) {
+		if( iFree ) free((void*)_objdata); 
 		_objsize = r._objsize;
 		_objdata = r._objdata;
-		assert( !iFree );
+		iFree = r.iFree;
+		/* kind of like auto_ptrs here.  note we leave objsize as it was 
+		   so you'll get notified if you try to use the object, instead of just
+		   thinking it is empty.
+		   */
+		if( iFree ) { r._objdata = 0; r.iFree = false; }
 		return *this;
 	}
+
+	/* makes a copy of the object.  Normally, a jsobj points to data "owned" 
+	   by something else.  this is a useful way to get your own copy of the buffer 
+	   data (which is freed when the new jsobj destructs).
+	   */
+	JSObj copy() const;
 
 	bool iFree;
 private:
@@ -268,3 +311,13 @@ struct JSObj1 {
 };
 #pragma pack(pop)
 extern JSObj1 js1;
+
+inline JSObj Element::embeddedObject() { assert(type()==Object); return JSObj(value()); }
+
+inline JSObj JSObj::copy() const { 
+	if( _objsize == 0 )
+		return *this;
+	char *p = (char*) malloc(_objsize);
+	memcpy(p, _objdata, _objsize);
+	return JSObj(p, true);
+}

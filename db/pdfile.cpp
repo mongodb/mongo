@@ -14,11 +14,10 @@ _ regex support
 #include "db.h"
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
+#include "objwrappers.h"
+#include "btree.h"
 
 DataFileMgr theDataFileMgr;
-
-/* just temporary */
-const int ExtentSize = 1 * 1024 * 1024;
 
 JSObj::JSObj(Record *r) { 
 	_objdata = r->data;
@@ -34,36 +33,16 @@ int bucketSizes[] = {
 	0x8000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000, 0x200000,
 	0x400000, 0x800000
 };
-const int Buckets = 19;
-const int MaxBucket = 18;
 
-class NamespaceDetails {
-public:
-	NamespaceDetails() { memset(reserved, 0, sizeof(reserved)); }
-	DiskLoc firstExtent;
-	DiskLoc deletedList[Buckets];
-	char reserved[256];
+NamespaceIndex namespaceIndex;
 
-	static int bucket(int n) { 
-		for( int i = 0; i < Buckets; i++ )
-			if( bucketSizes[i] > n )
-				return i;
-		return Buckets-1;
-	}
-
-	void addDeletedRec(DeletedRecord *d, DiskLoc dloc) { 
-		int b = bucket(d->lengthWithHeaders);
-		DiskLoc& list = deletedList[b];
-		DiskLoc oldHead = list;
-		list = dloc;
-		d->nextDeleted = oldHead;
-	}
-
-	DiskLoc alloc(int lenToAlloc, DiskLoc& extentLoc);
-
-private:
-	DiskLoc _alloc(int len);
-};
+void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) { 
+	int b = bucket(d->lengthWithHeaders);
+	DiskLoc& list = deletedList[b];
+	DiskLoc oldHead = list;
+	list = dloc;
+	d->nextDeleted = oldHead;
+}
 
 DiskLoc NamespaceDetails::alloc(int lenToAlloc, DiskLoc& extentLoc) {
 	lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
@@ -146,46 +125,6 @@ DiskLoc NamespaceDetails::_alloc(int len) {
 	return bestmatch;
 }
 
-class NamespaceIndex {
-	friend class NamespaceCursor;
-public:
-	NamespaceIndex() { }
-
-	void init() { 
-		const int LEN = 16 * 1024 * 1024;
-		void *p = f.map("/data/db/namespace.idx", LEN);
-		if( p == 0 ) { 
-			cout << "couldn't open /data/db/namespace.idx" << endl;
-			exit(-3);
-		}
-		ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
-	}
-
-	void add(const char *ns, DiskLoc& loc) { 
-		Namespace n(ns);
-		NamespaceDetails details;
-		details.firstExtent = loc;
-		ht->put(n, details);
-	}
-
-	NamespaceDetails* details(const char *ns) { 
-		Namespace n(ns);
-		return ht->get(n); 
-	}
-
-	bool find(const char *ns, DiskLoc& loc) { 
-		NamespaceDetails *l = details(ns);
-		if( l ) {
-			loc = l->firstExtent;
-			return true;
-		}
-		return false;
-	}
-
-private:
-	MemoryMappedFile f;
-	HashTable<Namespace,NamespaceDetails> *ht;
-} namespaceIndex;
 
 class NamespaceCursor : public Cursor {
 public:
@@ -243,10 +182,10 @@ void PhysicalDataFile::open(const char *filename, int length) {
 }
 
 /* prev - previous extent for this namespace.  null=this is the first one. */
-Extent* PhysicalDataFile::newExtent(const char *ns) {
+Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
+	int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
 	DiskLoc loc;
-	int left = header->unusedLength - ExtentSize;
-	if( left < 0 ) {
+	if( ExtentSize <= 0 ) {
 		cout << "ERROR: newExtent: no more room for extents. write more code" << endl;
 		assert(false);
 		exit(2);
@@ -270,7 +209,9 @@ Extent* PhysicalDataFile::newExtent(const char *ns) {
 		namespaceIndex.add(ns, loc);
 	}
 
-	namespaceIndex.details(ns)->addDeletedRec(emptyLoc.drec(), emptyLoc);
+	NamespaceDetails *d = namespaceIndex.details(ns);
+	d->lastExtentSize = approxSize;
+	d->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
 	return e;
 }
@@ -358,10 +299,29 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 
 void aboutToDelete(const DiskLoc& dl);
 
+void _unindexRecord(IndexDetails& id, JSObj& obj) { 
+	JSObj idxInfo = id.info.obj();
+	JSObjBuilder b;
+	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
+	if( !key.isEmpty() )
+		id.head.btree()->unindex(key);
+}
+
+void  unindexRecord(NamespaceDetails *d, Record *todelete) {
+	if( d->nIndexes == 0 ) return;
+	JSObj obj(todelete);
+	for( int i = 0; i < d->nIndexes; i++ ) { 
+		_unindexRecord(d->indexes[i], obj);
+	}
+}
+
 void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl) 
 {
 	/* check if any cursors point to us.  if so, advance them. */
 	aboutToDelete(dl);
+
+	NamespaceDetails* d = namespaceIndex.details(ns);
+	unindexRecord(d, todelete);
 
 	/* remove ourself from the record next/prev chain */
 	{
@@ -382,7 +342,8 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 
 	/* add to the free list */
 	{
-		NamespaceDetails* d = namespaceIndex.details(ns);
+		d->nrecords--;
+		d->datasize -= todelete->netLength();
 		d->addDeletedRec((DeletedRecord*)todelete, dl);
 	}
 }
@@ -393,7 +354,7 @@ void DataFileMgr::update(
 		Record *toupdate, const DiskLoc& dl,
 		const char *buf, int len) 
 {
-	if( toupdate->netLength() < len ) { 
+	if( toupdate->netLength() < len ) {
 		cout << "temp: update: moving record to a larger location " << ns << endl;
 		// doesn't fit.
 		deleteRecord(ns, toupdate, dl);
@@ -401,20 +362,140 @@ void DataFileMgr::update(
 		return;
 	}
 
+	/* has any index keys changed? */
+	{
+		NamespaceDetails *d = namespaceIndex.details(ns);
+		if( d->nIndexes ) {
+			JSObj newObj(buf);
+			JSObj oldObj = dl.obj();
+			for( int i = 0; i < d->nIndexes; i++ ) {
+				IndexDetails& idx = d->indexes[i];
+				JSObj idxKey = idx.info.obj().getObjectField("key");
+				JSObjBuilder b1,b2;
+				JSObj kNew = newObj.extractFields(idxKey, b1);
+				JSObj kOld = oldObj.extractFields(idxKey, b2);
+				if( !kNew.woEqual(kOld) ) {
+					cout << "  updating index, key changed " << idx.indexNamespace() << endl;
+					// delete old key
+					if( !kOld.isEmpty() )
+						idx.head.btree()->unindex(kOld);
+					// add new key
+					if( !kNew.isEmpty() ) {
+						idx.head.btree()->insert(
+							idx.head, 
+							idx.indexNamespace().c_str(),
+							dl, kNew, false);
+					}
+				}
+			}
+		}
+	}
+
 	memcpy(toupdate->data, buf, len);
 }
 
-void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
-	if( strncmp(ns, "system.", 7) == 0 && !god ) { 
-		cout << "ERROR: attempt to insert in system namespace " << ns << endl;
-		return;
+int initialExtentSize(int len) { 
+	long long sz = len * 16;
+	if( len < 1000 ) sz = len * 64;
+	if( sz > 1000000000 )
+		sz = 1000000000;
+	int z = ((int)sz) & 0xffffff00;
+	assert( z > len );
+	return z;
+}
+
+int followupExtentSize(int len, int lastExtentLen) {
+	int x = initialExtentSize(len);
+	int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
+	int sz = y > x ? y : x;
+	sz = ((int)sz) & 0xffffff00;
+	assert( sz > len );
+	return sz;
+}
+
+/* add keys to indexes for a new record */
+void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) { 
+	JSObj idxInfo = idx.info.obj();
+	JSObjBuilder b;
+	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
+	if( !key.isEmpty() ) {
+		idx.head.btree()->insert(
+			idx.head, 
+			idx.indexNamespace().c_str(),
+			newRecordLoc, key, false);
+	}
+}
+
+/* note there are faster ways to build an index in bulk, that can be 
+   done eventually */
+void addExistingToIndex(const char *ns, IndexDetails& idx) {
+	cout << "Adding all existing records for " << ns << " to new index" << endl;
+	int n = 0;
+	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+	while( c->ok() ) {
+		JSObj js = c->current();
+		_indexRecord(idx, js, c->currLoc());
+		c->advance();
+		n++;
+	};
+	cout << "  indexing complete for " << n << " records" << endl;
+}
+
+/* add keys to indexes for a new record */
+void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) { 
+	JSObj obj((const char *)buf);
+	for( int i = 0; i < d->nIndexes; i++ ) { 
+		_indexRecord(d->indexes[i], obj, newRecordLoc);
+	}
+}
+
+DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
+	bool addIndex = false;
+	if( strncmp(ns, "system.", 7) == 0 ) {
+		if( strcmp(ns, "system.indexes") == 0 )
+			addIndex = true;
+		else if( !god ) { 
+			cout << "ERROR: attempt to insert in system namespace " << ns << endl;
+			return DiskLoc();
+		}
 	}
 
 	NamespaceDetails *d = namespaceIndex.details(ns);
 	if( d == 0 ) {
 		newNamespace(ns);
-		temp.newExtent(ns);
+		temp.newExtent(ns, initialExtentSize(len));
 		d = namespaceIndex.details(ns);
+	}
+
+	NamespaceDetails *tableToIndex = 0;
+	string indexFullNS;
+	const char *tabletoidxns = 0;
+	if( addIndex ) { 
+		JSObj io((const char *) buf);
+		const char *name = io.getStringField("name"); // name of the index
+		tabletoidxns = io.getStringField("ns");  // table it indexes
+		JSObj key = io.getObjectField("key");
+		if( name == 0 || *name == 0 || tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
+			cout << "ERROR: bad add index attempt name:" << (name?name:"") << " ns:" << 
+				(tabletoidxns?tabletoidxns:"") << endl;
+			return DiskLoc();
+		}
+		tableToIndex = namespaceIndex.details(tabletoidxns);
+		if( tableToIndex == 0 ) {
+			cout << "ERROR: bad add index attempt, no such table(ns):" << tabletoidxns << endl;
+			return DiskLoc();
+		}
+		if( tableToIndex->nIndexes >= MaxIndexes ) { 
+			cout << "ERROR: bad add index attempt, too many indexes for:" << tabletoidxns << endl;
+			return DiskLoc();
+		}
+		if( tableToIndex->findIndexByName(name) >= 0 ) { 
+			cout << "ERROR: bad add index attempt, index:" << name << " already exists for:" << tabletoidxns << endl;
+			return DiskLoc();
+		}
+		indexFullNS = tabletoidxns; 
+		indexFullNS += ".$";
+		indexFullNS += name; // client.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
 	}
 
 	DiskLoc extentLoc;
@@ -423,12 +504,12 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 	if( loc.isNull() ) {
 		// out of space
 		cout << "allocating new extent for " << ns << endl;
-		temp.newExtent(ns);
+		temp.newExtent(ns, followupExtentSize(len, d->lastExtentSize));
 		loc = d->alloc(lenWHdr, extentLoc);
 		if( loc.isNull() ) { 
 			cout << "ERROR: out of space in datafile.  write more code." << endl;
 			assert(false);
-			return;
+			return DiskLoc();
 		}
 	}
 
@@ -447,6 +528,24 @@ void DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 		oldlast->nextOfs = loc.getOfs();
 		e->lastRecord = loc;
 	}
+
+	d->nrecords++;
+	d->datasize += r->netLength();
+
+	if( tableToIndex ) { 
+		IndexDetails& idxinfo = tableToIndex->indexes[tableToIndex->nIndexes];
+		idxinfo.info = loc;
+		idxinfo.head = BtreeBucket::addHead(indexFullNS.c_str());
+		tableToIndex->nIndexes++; 
+		/* todo: index existing records here */
+		addExistingToIndex(tabletoidxns, idxinfo);
+	}
+
+	/* add this record to our indexes */
+	if( d->nIndexes )
+		indexRecord(d, buf, len, loc);
+
+	return loc;
 }
 
 void DataFileMgr::init() {

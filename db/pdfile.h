@@ -6,6 +6,7 @@
 #include "../util/mmap.h"
 #include "storage.h"
 #include "jsobj.h"
+#include "namespace.h"
 
 class PDFHeader;
 class Extent;
@@ -13,32 +14,6 @@ class Record;
 class Cursor;
 
 /*---------------------------------------------------------------------*/ 
-
-class Namespace {
-public:
-	Namespace(const char *ns) { 
-		*this = ns;
-	}
-	Namespace& operator=(const char *ns) { 
-		memset(buf, 0, 128); /* this is just to keep stuff clean in the files for easy dumping and reading */
-		strcpy_s(buf, 128, ns); return *this; 
-	}
-
-	bool operator==(const Namespace& r) { return strcmp(buf, r.buf) == 0; }
-	int hash() const {
-		unsigned x = 0;
-		const char *p = buf;
-		while( *p ) { 
-			x = x * 131 + *p;
-			p++;
-		}
-		return (x & 0x7fffffff) | 0x8000000; // must be > 0
-	}
-
-	char buf[128];
-};
-
-auto_ptr<Cursor> makeNamespaceCursor();
 
 /*---------------------------------------------------------------------*/ 
 
@@ -50,7 +25,7 @@ public:
 	void open(const char *filename, int length = 64 * 1024 * 1024);
 
 private:
-	Extent* newExtent(const char *ns);
+	Extent* newExtent(const char *ns, int approxSize);
 	Extent* getExtent(DiskLoc loc);
 	Extent* _getExtent(DiskLoc loc);
 	Record* recordAt(DiskLoc dl);
@@ -69,7 +44,7 @@ public:
 		const char *ns,
 		Record *toupdate, const DiskLoc& dl,
 		const char *buf, int len);
-	void insert(const char *ns, const void *buf, int len, bool usethedefault = false);
+	DiskLoc insert(const char *ns, const void *buf, int len, bool god = false);
 	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl);
 	auto_ptr<Cursor> findAll(const char *ns);
 
@@ -217,10 +192,20 @@ public:
 	virtual Record* _current() = 0;
 	virtual JSObj current() = 0;
 	virtual DiskLoc currLoc() = 0;
-	virtual bool advance() = 0;
+	virtual bool advance() = 0; /*true=ok*/
 
 	/* optional to implement.  if implemented, means 'this' is a prototype */
 	virtual Cursor* clone() { return 0; }
+
+	virtual bool tempStopOnMiss() { return false; }
+
+	/* called after every query block is iterated -- i.e. between getMore() blocks
+	   so you can note where we are, if necessary.
+	   */
+	virtual void noteLocation() { } 
+
+	/* called before query getmore block is iterated */
+	virtual void checkLocation() { } 
 };
 
 class BasicCursor : public Cursor {
@@ -279,9 +264,16 @@ inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
 inline Record* DiskLoc::rec() const {
 	return DataFileMgr::getRecord(*this);
 }
+inline JSObj DiskLoc::obj() const {
+	return JSObj(rec());
+}
 inline DeletedRecord* DiskLoc::drec() const {
 	return (DeletedRecord*) rec();
 }
 inline Extent* DiskLoc::ext() const {
 	return DataFileMgr::getExtent(*this);
+}
+
+inline BtreeBucket* DiskLoc::btree() const { 
+	return (BtreeBucket*) rec()->data;
 }

@@ -62,6 +62,11 @@ QueryResult* runQuery(const char *ns, int ntoreturn,
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert);
 void deleteObjects(const char *ns, JSObj pattern, bool justOne);
 
+/* Cursor -- and its derived classes -- are our internal cursors.
+
+   ClientCursor is a wrapper that represents a cursorid from our client 
+   application's perspective.
+*/
 class Cursor;
 class ClientCursor {
 public:
@@ -75,6 +80,19 @@ public:
 	DiskLoc lastLoc;
 	auto_ptr< set<string> > filter;
 
+	/* report to us that a new clientcursor exists so we can track it. You still
+	   do the initial updateLocation() yourself. 
+	   */
+	static void add(ClientCursor*);
+
+	/* call when cursor's location changes so that we can update the 
+	   cursorsbylocation map.  if you are locked and internally iterating, only 
+	   need to call when you are ready to "unlock".
+	   */
 	void updateLocation();
 };
 
+typedef map<long long, ClientCursor*> CCMap;
+extern CCMap clientCursors; /* cursorid -> ClientCursor */
+
+long long allocCursorId();

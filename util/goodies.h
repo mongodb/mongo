@@ -6,21 +6,28 @@
 #include "../stdafx.h"
 
 inline void dumpmemory(const char *data, int len) { 
+	if( len > 1024 )
+		len = 1024;
 	try {
 	const char *q = data;
 	const char *p = q;
 	while( len > 0 ) {
 		for( int i = 0; i < 16; i++ ) { 
-			cout << (*p >= 32 && *p <= 126) ? *p : '.';
+			if( *p >= 32 && *p <= 126 )
+				cout << *p;
+			else 
+				cout << '.';
 			p++;
 		}
 		cout << "  ";
+		p -= 16;
 		for( int i = 0; i < 16; i++ )
-			cout << (unsigned) *p << ' ';
+			cout << (unsigned) ((unsigned char)*p++) << ' ';
 		cout << endl;
 		len -= 16;
 	}
-	} catch(...) { }
+	} catch(...) {
+	}
 }
 
 #include <boost/thread/thread.hpp>

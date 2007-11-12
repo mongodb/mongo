@@ -173,6 +173,14 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\btree.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\clientcursor.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\db.cpp"
 				>
 			</File>
@@ -223,6 +231,10 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath=".\btree.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\builder.h"
 				>
 			</File>
@@ -252,6 +264,14 @@
 			</File>
 			<File
 				RelativePath="..\util\mmap.h"
+				>
+			</File>
+			<File
+				RelativePath=".\namespace.h"
+				>
+			</File>
+			<File
+				RelativePath=".\objwrappers.h"
 				>
 			</File>
 			<File
@@ -318,6 +338,10 @@
 			</File>
 			<File
 				RelativePath="..\pcre-7.4\pcrecpp.h"
+				>
+			</File>
+			<File
+				RelativePath=".\todo.txt"
 				>
 			</File>
 		</Filter>

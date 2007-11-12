@@ -297,6 +297,7 @@ cout << "hello2" << endl;
 
 int main(int argc, char* argv[], char *envp[] )
 {
+	dumpmemory("hello world", 12);
 	quicktest();
 
 //cout << "fork then sleep" << endl;

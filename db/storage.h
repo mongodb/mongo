@@ -12,6 +12,8 @@
 class Record;
 class DeletedRecord;
 class Extent;
+class BtreeBucket;
+class JSObj;
 
 class DiskLoc {
 	int reserved; /* this will be volume, file #, etc. */
@@ -53,9 +55,11 @@ public:
 		return reserved < b.reserved;
 	}
 
+	JSObj obj() const;
 	Record* rec() const;
 	DeletedRecord* drec() const;
 	Extent* ext() const;
+	BtreeBucket* btree() const;
 };
 
 #pragma pack(pop)

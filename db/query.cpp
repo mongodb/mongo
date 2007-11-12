@@ -7,8 +7,48 @@
 #include "../util/builder.h"
 #include <time.h>
 #include "introspect.h"
+#include "btree.h"
 
 int nextCursorId = 1;
+
+/* todo: _ cache query plans 
+         _ use index on partial match with the query
+*/
+auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) { 
+	NamespaceDetails *d = namespaceIndex.details(ns);
+	if( d == 0 ) return auto_ptr<Cursor>();
+	set<string> queryFields;
+	query.getFieldNames(queryFields);
+	if( !order.isEmpty() ) {
+		set<string> orderFields;
+		order.getFieldNames(orderFields);
+		// order by
+		for(int i = 0; i < d->nIndexes; i++ ) { 
+			JSObj idxInfo = d->indexes[i].info.obj();
+			assert( strcmp(ns, idxInfo.getStringField("ns")) == 0 );
+			JSObj idxKey = idxInfo.getObjectField("key");
+			set<string> keyFields;
+			idxKey.getFieldNames(keyFields);
+			if( keyFields == orderFields ) {
+				JSObjBuilder b;
+				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, JSObj(), false));
+			}
+		}
+	}
+	// where/query
+	for(int i = 0; i < d->nIndexes; i++ ) { 
+		JSObj idxInfo = d->indexes[i].info.obj();
+		JSObj idxKey = idxInfo.getObjectField("key");
+		set<string> keyFields;
+		idxKey.getFieldNames(keyFields);
+		if( keyFields == queryFields ) {
+			JSObjBuilder b;
+			return auto_ptr<Cursor>( 
+				new BtreeCursor(d->indexes[i].head, query.extractFields(idxKey, b), true));
+		}
+	}
+	return auto_ptr<Cursor>();
+}
 
 void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 	cout << "delete ns:" << ns << " queryobjsize:" << 
@@ -20,18 +60,27 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 	}
 
 	JSMatcher matcher(pattern);
-
-	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+	JSObj order;
+	auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
+	if( c.get() == 0 )
+		c = theDataFileMgr.findAll(ns);
 	while( c->ok() ) {
 		Record *r = c->_current();
 		DiskLoc rloc = c->currLoc();
 		c->advance(); // must advance before deleting as the next ptr will die
 		JSObj js(r);
-		if( matcher.matches(js) ) {
+		if( !matcher.matches(js) ) {
+			if( c->tempStopOnMiss() )
+				break;
+		}
+		else {
 			cout << "  found match to delete" << endl;
+			if( !justOne )
+				c->noteLocation();
 			theDataFileMgr.deleteRecord(ns, r, rloc);
 			if( justOne )
 				return;
+			c->checkLocation();
 		}
 	}
 }
@@ -45,18 +94,26 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		return;
 	}
 
-	JSMatcher matcher(pattern);
-
-	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-	while( c->ok() ) {
-		Record *r = c->_current();
-		JSObj js(r);
-		if( matcher.matches(js) ) {
-			cout << "  found match to update" << endl;
-			theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
-			return;
+	{
+		JSMatcher matcher(pattern);
+		JSObj order;
+		auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
+		if( c.get() == 0 )
+			c = theDataFileMgr.findAll(ns);
+		while( c->ok() ) {
+			Record *r = c->_current();
+			JSObj js(r);
+			if( !matcher.matches(js) ) {
+				if( c->tempStopOnMiss() )
+					break;
+			}
+			else {
+				cout << "  found match to update" << endl;
+				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
+				return;
+			}
+			c->advance();
 		}
-		c->advance();
 	}
 
 	cout << "  no match found. ";
@@ -67,60 +124,6 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
 }
 
-map<DiskLoc, ClientCursor*> cursorsByLocation;
-typedef map<long long, ClientCursor*> CCMap;
-CCMap clientCursors;
-
-class CursInspector : public SingleResultObjCursor { 
-	Cursor* clone() { return new CursInspector(*this); }
-	void fill() { 
-		b.append("cursorsByLocation", cursorsByLocation.size());
-		b.append("clientCursors", clientCursors.size());
-	}
-public:
-	CursInspector() { reg("intr.cursors"); }
-} _ciproto;
-
-/* must call this on a delete so we clean up the cursors. */
-void aboutToDelete(const DiskLoc& dl) { 
-	map<DiskLoc,ClientCursor*>::iterator it = cursorsByLocation.find(dl);
-	if( it != cursorsByLocation.end() ) {
-		ClientCursor *cc = it->second;
-		assert( !cc->c->eof() );
-		cc->c->advance();
-		cc->updateLocation();
-	}
-}
-
-ClientCursor::~ClientCursor() {
-	if( !lastLoc.isNull() ) { 
-		int n = cursorsByLocation.erase(lastLoc);
-		assert( n == 1 );
-	}
-	lastLoc.Null();
-}
-
-void ClientCursor::updateLocation() {
-	if( !lastLoc.isNull() ) { 
-		int n = cursorsByLocation.erase(lastLoc);
-		assert( n == 1 );
-	}
-	if( !c->currLoc().isNull() )
-		cursorsByLocation[c->currLoc()] = this;
-	lastLoc = c->currLoc();
-}
-
-long long allocCursorId() { 
-	long long x;
-	while( 1 ) {
-		x = (((long long)rand()) << 32);
-		x = x | time(0);
-		if( clientCursors.count(x) == 0 )
-			break;
-	}
-	return x;
-}
-
 QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<string> > filter) {
 
 	cout << "runQuery ns:" << ns << " ntoreturn:" << ntoreturn << " queryobjsize:" << 
@@ -128,7 +131,12 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 
 	BufBuilder b;
 
-	auto_ptr<JSMatcher> matcher(new JSMatcher(jsobj));
+	JSObj query = jsobj.getObjectField("query");
+	JSObj order = jsobj.getObjectField("orderby");
+	if( query.isEmpty() && order.isEmpty() )
+		query = jsobj;
+
+	auto_ptr<JSMatcher> matcher(new JSMatcher(query));
 
 	QueryResult *qr = 0;
 	b.skip(sizeof(QueryResult));
@@ -137,12 +145,18 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 
 	auto_ptr<Cursor> c = getSpecialCursor(ns);
 	if( c.get() == 0 )
+		c = getIndexCursor(ns, query, order);
+	if( c.get() == 0 )
 		c = theDataFileMgr.findAll(ns);
 
 	long long cursorid = 0;
 	while( c->ok() ) {
 		JSObj js = c->current();
-		if( matcher->matches(js) ) {
+		if( !matcher->matches(js) ) {
+			if( c->tempStopOnMiss() )
+				break;
+		}
+		else {
 			bool ok = true;
 			if( filter.get() ) {
 				JSObj x;
@@ -165,7 +179,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 					cc->matcher = matcher;
 					cc->ns = ns;
 					cc->pos = n;
-					clientCursors[cursorid] = cc;
+					ClientCursor::add(cc);
 					cc->updateLocation();
 					cc->filter = filter;
 					break;
@@ -213,6 +227,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 		Cursor *c = cc->c.get();
 		while( 1 ) {
 			if( !c->ok() ) {
+done:
 				// done!  kill cursor.
 				cursorid = 0;
 				clientCursors.erase(it);
@@ -221,7 +236,11 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 				break;
 			}
 			JSObj js = c->current();
-			if( cc->matcher->matches(js) ) {
+			if( !cc->matcher->matches(js) ) {
+				if( c->tempStopOnMiss() )
+					goto done;
+			} 
+			else {
 				bool ok = true;
 				if( cc->filter.get() ) {
 					JSObj x;
