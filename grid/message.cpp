@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include "message.h"
 #include <time.h>
+#include "../util/goodies.h"
 
 const int FragMax = 1480;
 const int MSS = FragMax - 8;
@@ -135,7 +136,7 @@ bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
 		bool ok = recv(response);
 		if( !ok )
 			return false;
-		cout << "got response: " << response.data->responseTo << endl;
+		//cout << "got response: " << response.data->responseTo << endl;
 		if( response.data->responseTo == toSend.data->id ) 
 			break;
 		cout << "warning: MessagingPort::call() wrong id, skipping. got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
@@ -164,5 +165,7 @@ void MessagingPort::say(SockAddr& to, Message& toSend, int responseTo) {
 		left -= l;
 		conn.sendto(buf, l+8, to);
 		f->fragmentNo++;
+
+		sleepmillis(50);
 	}
 }

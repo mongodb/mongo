@@ -90,10 +90,10 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) {
 	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
-		pattern.objsize() << endl;
+		pattern.objsize();
 
 	if( strncmp(ns, "system.", 7) == 0 ) { 
-		cout << "ERROR: attempt to update in system namespace " << ns << endl;
+		cout << "\nERROR: attempt to update in system namespace " << ns << endl;
 		return;
 	}
 
@@ -111,7 +111,7 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 					break;
 			}
 			else {
-				cout << "  found match to update" << endl;
+				cout << " found match to update" << endl;
 				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
 				return;
 			}
@@ -119,9 +119,9 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		}
 	}
 
-	cout << "  no match found. ";
+	cout << " no match ";
 	if( upsert )
-		cout << "doing upsert.";
+		cout << "- upsert.";
 	cout << endl;
 	if( upsert )
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
@@ -130,7 +130,7 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<string> > filter) {
 
 	cout << "runQuery ns:" << ns << " ntoreturn:" << ntoreturn << " queryobjsize:" << 
-		jsobj.objsize() << endl;
+		jsobj.objsize();
 
 	BufBuilder b;
 
@@ -201,6 +201,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 	qr->nReturned = n;
 	b.decouple();
 
+	cout << " nReturned:" << n << endl;
 	return qr;
 }
 

@@ -143,7 +143,7 @@ public:
 	int fileLength;
 	DiskLoc unused; /* unused is the portion of the file that doesn't belong to any allocated extents. -1 = no more */
 	int unusedLength;
-	int reserved[8192 - 4*4];
+	char reserved[8192 - 4*4 - 8];
 
 	char data[4];
 
@@ -160,6 +160,7 @@ public:
 	void init(int filelength) {
 		if( uninitialized() ) {
 			assert(filelength > 32768 );
+			assert( headerSize() == 8192 );
 			fileLength = filelength;
 			version = 3;
 			versionMinor = 0;
@@ -245,20 +246,20 @@ inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
 }
 
 inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
-	if( nextOfs )
+	if( nextOfs != DiskLoc::NullOfs )
 		return DiskLoc(myLoc.a(), nextOfs);
-	Extent *e = myLoc.ext();
+	Extent *e = myExtent(myLoc);
 	if( e->xnext.isNull() )
 		return DiskLoc(); // end of table.
 	return e->xnext.ext()->firstRecord;
 }
 inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
-	if( prevOfs )
+	if( prevOfs != DiskLoc::NullOfs )
 		return DiskLoc(myLoc.a(), prevOfs);
-	Extent *e = myLoc.ext();
+	Extent *e = myExtent(myLoc);
 	if( e->xprev.isNull() )
 		return DiskLoc();
-	return e->xprev.ext()->firstRecord;
+	return e->xprev.ext()->lastRecord;
 }
 
 inline Record* DiskLoc::rec() const {

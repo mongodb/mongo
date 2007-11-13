@@ -63,13 +63,14 @@ public:
 		memset(reserved, 0, sizeof(reserved));
 	} 
 	DiskLoc firstExtent;
+	DiskLoc lastExtent;
 	DiskLoc deletedList[Buckets];
 	long long datasize;
 	long long nrecords;
 	int lastExtentSize;
 	int nIndexes;
 	IndexDetails indexes[MaxIndexes];
-	char reserved[256-16-4-4-8*MaxIndexes];
+	char reserved[256-16-4-4-8*MaxIndexes-8];
 
 	//returns offset in indexes[]
 	int findIndexByName(const char *name) { 
@@ -111,7 +112,7 @@ public:
 	void add(const char *ns, DiskLoc& loc) { 
 		Namespace n(ns);
 		NamespaceDetails details;
-		details.firstExtent = loc;
+		details.lastExtent = details.firstExtent = loc;
 		ht->put(n, details);
 	}
 

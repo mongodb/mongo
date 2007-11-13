@@ -219,16 +219,16 @@ void run() {
 
 	testTheDb();
 
+	cout << "waiting for msg..." << endl;
 	Message m;
 	while( 1 ) { 
-		cout << "waiting for msg..." << endl;
 		m.reset();
 		if( !dbMsgPort.recv(m) ) {
 			cout << "recv() returned false" << endl;
 			break;
 		}
-		cout << "  got msg" << endl;
-		cout << "  op:" << m.data->operation << " len:" << m.data->len << endl;
+		//cout << "  got msg" << endl;
+		//cout << "  op:" << m.data->operation << " len:" << m.data->len << endl;
 
 		if( m.data->operation == dbMsg ) { 
 			bool end = strcmp("end", m.data->_data) == 0;

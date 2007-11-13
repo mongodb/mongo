@@ -44,6 +44,7 @@ void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
 	d->nextDeleted = oldHead;
 }
 
+/* lenToAlloc is WITH header */
 DiskLoc NamespaceDetails::alloc(int lenToAlloc, DiskLoc& extentLoc) {
 	lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
 	DiskLoc loc = _alloc(lenToAlloc);
@@ -198,21 +199,24 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
 	DiskLoc emptyLoc = e->init(ns, ExtentSize, offset);
 
 	DiskLoc oldExtentLoc;
-	if( namespaceIndex.find(ns, oldExtentLoc) ) {
-		Extent *old = oldExtentLoc.ext();
-		assert( old->xprev.isNull() );
-		old->xprev = loc;
-		e->xnext = oldExtentLoc;
-		namespaceIndex.details(ns)->firstExtent = loc;
+	NamespaceDetails *details = namespaceIndex.details(ns);
+	if( details ) { 
+		assert( !details->firstExtent.isNull() );
+		e->xprev = details->lastExtent;
+		details->lastExtent.ext()->xnext = loc;
+		details->lastExtent = loc;
 	}
 	else {
 		namespaceIndex.add(ns, loc);
+		details = namespaceIndex.details(ns);
 	}
 
-	NamespaceDetails *d = namespaceIndex.details(ns);
-	d->lastExtentSize = approxSize;
-	d->addDeletedRec(emptyLoc.drec(), emptyLoc);
+	details->lastExtentSize = approxSize;
+	details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
+	cout << "*** new extent size:" << hex << ExtentSize << " loc:" << hex << offset << endl;
+	cout << "    emptyLoc:" << hex << emptyLoc.getOfs() << endl;
+	cout << "    " << ns << endl;
 	return e;
 }
 
@@ -391,16 +395,20 @@ void DataFileMgr::update(
 		}
 	}
 
+	cout << "doing update in place" << endl;
 	memcpy(toupdate->data, buf, len);
 }
 
 int initialExtentSize(int len) { 
+//	if( 1 )
+//		return 4000000;
 	long long sz = len * 16;
 	if( len < 1000 ) sz = len * 64;
 	if( sz > 1000000000 )
 		sz = 1000000000;
 	int z = ((int)sz) & 0xffffff00;
 	assert( z > len );
+	cout << "TEMP: initialExtentSize(" << len << ") returns " << z << endl;
 	return z;
 }
 
@@ -450,6 +458,15 @@ void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newReco
 }
 
 DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
+	{
+		JSObj obj((const char *) buf);
+		OID *oid = obj.getOID();
+		cout << "insert() " << ns << " oid:";
+		if( oid )
+			cout << hex << oid->a << ':' << hex << oid->b;
+		cout << endl;
+	}
+
 	bool addIndex = false;
 	if( strncmp(ns, "system.", 7) == 0 ) {
 		if( strcmp(ns, "system.indexes") == 0 )
@@ -507,7 +524,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		temp.newExtent(ns, followupExtentSize(len, d->lastExtentSize));
 		loc = d->alloc(lenWHdr, extentLoc);
 		if( loc.isNull() ) { 
-			cout << "ERROR: out of space in datafile.  write more code." << endl;
+			cout << "****** ERROR: out of space in datafile.  write more code." << endl;
 			assert(false);
 			return DiskLoc();
 		}
@@ -545,6 +562,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	if( d->nIndexes )
 		indexRecord(d, buf, len, loc);
 
+	cout << " inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << endl;
 	return loc;
 }
 

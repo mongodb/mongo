@@ -39,3 +39,9 @@ inline void sleepsecs(int s) {
 	xt.sec += s;
 	boost::thread::sleep(xt);
 }
+inline void sleepmillis(int s) { 
+	boost::xtime xt;
+	boost::xtime_get(&xt, boost::TIME_UTC);
+	xt.nsec += s * 1000000;
+	boost::thread::sleep(xt);
+}
