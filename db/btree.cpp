@@ -237,17 +237,23 @@ DiskLoc BtreeBucket::getHead(const DiskLoc& thisLoc) {
 	return p;
 }
 
-DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs) {
+DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction) {
 	assert( keyOfs >= 0 && keyOfs < n );
-
-	int ko = keyOfs + 1;
-	DiskLoc nextDown = childForPos(ko);
+	int adj = direction < 0 ? 1 : 0;
+	int ko = keyOfs + direction;
+	DiskLoc nextDown = childForPos(ko+adj);
 	if( !nextDown.isNull() ) { 
-		keyOfs = 0;
+		while( 1 ) {
+			keyOfs = direction>0 ? 0 : nextDown.btree()->n - 1;
+			DiskLoc loc= nextDown.btree()->childForPos(keyOfs + adj);
+			if( loc.isNull() )
+				break;
+			nextDown = loc;
+		}
 		return nextDown;
 	}
 
-	if( ko < n ) {
+	if( ko < n && ko >= 0 ) {
 		keyOfs = ko;
 		return thisLoc;
 	}
@@ -260,12 +266,12 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs) {
 			break;
 		BtreeBucket *an = ancestor.btree();
 		for( int i = 0; i < an->n; i++ ) {
-			if( an->k(i).prevChildBucket == childLoc ) { 
+			if( an->childForPos(i+adj) == childLoc ) {
 				keyOfs = i;
 				return ancestor;
 			}
 		}
-		assert( an->nextChild == childLoc );
+		assert( direction<0 || an->nextChild == childLoc );
 		// parent exhausted also, keep going up
 		childLoc = ancestor;
 		ancestor = an->parent;
@@ -274,7 +280,7 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs) {
 	return DiskLoc();
 }
 
-DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found) { 
+DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction) { 
 	int p;
 	found = find(key, p);
 	if( found ) {
@@ -288,6 +294,10 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 		DiskLoc l = child.btree()->locate(child, key, pos, found);
 		if( !l.isNull() )
 			return l;
+	}
+
+	if( direction == -1 && p == n && n ) { 
+		p--;
 	}
 
 	pos = p;
@@ -328,9 +338,11 @@ int BtreeBucket::insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& r
 
 /* - BtreeCursor --------------------------------------------------- */
 
-BtreeCursor::BtreeCursor(DiskLoc head, JSObj k, bool sm) : stopmiss(sm) {
+BtreeCursor::BtreeCursor(DiskLoc head, JSObj k, int _direction, bool sm) : 
+    direction(_direction), stopmiss(sm) 
+{
 	bool found;
-	bucket = head.btree()->locate(head, k, keyOfs, found);
+	bucket = head.btree()->locate(head, k, keyOfs, found, direction);
 }
 
 
@@ -342,7 +354,7 @@ DiskLoc BtreeCursor::currLoc() {
 bool BtreeCursor::advance() { 
 	if( bucket.isNull() )
 		return false;
-	bucket = bucket.btree()->advance(bucket, keyOfs);
+	bucket = bucket.btree()->advance(bucket, keyOfs, direction);
 	return !bucket.isNull();
 }
 
@@ -361,7 +373,7 @@ void BtreeCursor::checkLocation() {
 	bool found;
 	DiskLoc bold = bucket;
 	/* probably just moved in our node, so to be fast start from here rather than the head */
-	bucket = bucket.btree()->locate(bucket, keyAtKeyOfs, keyOfs, found);
+	bucket = bucket.btree()->locate(bucket, keyAtKeyOfs, keyOfs, found, direction);
 	if( found || bucket.btree()->isHead() )
 		return;
 	/* didn't find, check from the top */

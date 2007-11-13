@@ -19,7 +19,7 @@ class JSObjBuilder;
 */
 enum JSType { EOO = 0, Number=1, String=2, Object=3, Array=4, BinData=5, 
               Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
-              DBRef=12 };
+              DBRef=12, MaxKey=127 };
 
 /* subtypes of BinData.
    bdtCustom and above are ones that the JS compiler understands, but are
@@ -82,6 +82,7 @@ struct OID {
 */
 class Element {
 	friend class JSElemIter;
+	friend class JSObj;
 public:
 	JSType type() { return (JSType) *data; }
 	bool eoo() { return type() == EOO; }
@@ -94,6 +95,7 @@ public:
 
 	unsigned long long date() { return *((unsigned long long*) value()); }
 	double number() { return *((double *) value()); }
+	OID& oid() { return *((OID*) value()); }
 
 	// for strings
 	int valuestrsize() { 
@@ -173,11 +175,15 @@ public:
 		return _objsize==r._objsize && memcmp(_objdata,r._objdata,_objsize)==0;
 	}
 
+	Element firstElement() { 
+		return Element(objdata() + 4);
+	}
+
 	OID* getOID() {
-		const char *p = objdata() + 4;
-		if( *p != jstOID )
+		Element e = firstElement();
+		if( e.type() != jstOID )
 			return 0;
-		return (OID *) ++p;
+		return &e.oid();
 	}
 
 	JSObj& operator=(JSObj& r) {
@@ -285,6 +291,8 @@ private:
 	RegexMatcher regexs[4];
 	int nRegex;
 };
+
+extern JSObj maxKey;
 
 /*- just for testing -- */
 

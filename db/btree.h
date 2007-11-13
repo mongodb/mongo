@@ -93,9 +93,9 @@ public:
 		JSObj& key, bool dupsAllowed);
 	void update(const DiskLoc& recordLoc, JSObj& key);
 	bool unindex(JSObj& key);
-	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found);
+	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction=1);
 	/* advance one key position in the index: */
-	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs);
+	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction);
 	DiskLoc getHead(const DiskLoc& thisLoc);
 private:
 	JSObj keyAt(int keyOfs) { return keyOfs >= n ? JSObj() : keyNode(keyOfs).key; }
@@ -111,7 +111,7 @@ private:
 
 class BtreeCursor : public Cursor {
 public:
-	BtreeCursor(DiskLoc head, JSObj startKey, bool stopmiss);
+	BtreeCursor(DiskLoc head, JSObj startKey, int direction, bool stopmiss);
 	virtual bool ok() { return !bucket.isNull(); }
 	bool eof() { return !ok(); }
 	virtual Record* _current() { return currLoc().rec(); }
@@ -124,6 +124,7 @@ public:
 private:
 	DiskLoc bucket;
 	int keyOfs;
+	int direction; // 1=fwd,-1=reverse
 	bool stopmiss;
 	JSObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
 };

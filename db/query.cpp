@@ -30,8 +30,11 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 			set<string> keyFields;
 			idxKey.getFieldNames(keyFields);
 			if( keyFields == orderFields ) {
+				bool reverse = 
+					order.firstElement().type() == Number && 
+					order.firstElement().number() < 0;
 				JSObjBuilder b;
-				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, JSObj(), false));
+				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, reverse ? maxKey : JSObj(), reverse ? -1 : 1, false));
 			}
 		}
 	}
@@ -44,7 +47,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 		if( keyFields == queryFields ) {
 			JSObjBuilder b;
 			return auto_ptr<Cursor>( 
-				new BtreeCursor(d->indexes[i].head, query.extractFields(idxKey, b), true));
+				new BtreeCursor(d->indexes[i].head, query.extractFields(idxKey, b), 1, true));
 		}
 	}
 	return auto_ptr<Cursor>();

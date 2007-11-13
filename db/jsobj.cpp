@@ -15,6 +15,7 @@ int Element::size() {
 		case EOO:
 		case Undefined:
 		case jstNULL:
+		case MaxKey:
 			break;
 		case Bool:
 			x = 2;
@@ -72,12 +73,16 @@ int Element::size() {
 
 /* must be same type! */
 inline int compareElementValues(Element& l, Element& r) {
+	int f;
 	double x;
 	switch( l.type() ) {
 		case EOO:
 		case Undefined:
 		case jstNULL:
-			return true;
+		case MaxKey:
+			f = l.type() - r.type();
+			if( f<0 ) return -1;
+			return f==0 ? 0 : 1;
 		case Bool:
 			return *l.value() - *r.value();
 		case Date:
@@ -305,6 +310,15 @@ int JSObj::addFields(JSObj& from, set<string>& fields) {
 
 #pragma pack(push)
 #pragma pack(1)
+
+struct MaxKeyData { 
+	MaxKeyData() { totsize=7; maxkey=MaxKey; name=0; eoo=EOO; }
+	int totsize;
+	char maxkey;
+	char name;
+	char eoo;
+} maxkeydata;
+JSObj maxKey((const char *) &maxkeydata);
 
 struct JSObj0 {
 	JSObj0() { totsize = 5; eoo = EOO; }
