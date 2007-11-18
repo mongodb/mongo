@@ -7,9 +7,7 @@
 #include "../util/sock.h"
 #include "protoimpl.h"
 
-using namespace boost;
-typedef boost::mutex::scoped_lock lock;
-
+boost::mutex coutmutex;
 boost::mutex mutexr;
 boost::condition threadActivate; // creating a new thread, grabbing threadUseThisOne
 ProtocolConnection *threadUseThisOne = 0;

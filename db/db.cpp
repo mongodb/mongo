@@ -224,15 +224,15 @@ void run() {
 		m.reset();
 
 		// temp:
-		sleepsecs(1);
+		//		sleepsecs(1);
 
-		cout << '\n' << curTimeMillis() << " waiting for msg..." << endl;
+		cout << curTimeMillis() % 10000 << " waiting for msg..." << endl;
 		if( !dbMsgPort.recv(m) ) {
 			cout << "MessagingPort::recv() returned false" << endl;
 			break;
 		}
 
-		cout << '\n' << curTimeMillis() << " **** db.cpp got msg ************\n" << endl;
+		cout << curTimeMillis() % 10000 << " db.cpp got msg" << endl;
 
 		//cout << "  got msg" << endl;
 		//cout << "  op:" << m.data->operation << " len:" << m.data->len << endl;
@@ -241,7 +241,7 @@ void run() {
 			char *p = m.data->_data;
 			int len = strlen(p);
 			if( len > 400 ) 
-				cout << curTimeMillis() << 
+				cout << curTimeMillis() % 10000 << 
 				   " long msg received, len:" << len << 
 				   " ends with: " << p + len - 10 << endl;
 			bool end = strcmp("end", p) == 0;
@@ -249,7 +249,7 @@ void run() {
 			resp.setData(opReply, "i am fine");
 			dbMsgPort.reply(m, resp);
 			if( end ) {
-				cout << curTimeMillis() << "   end msg" << endl;
+				cout << curTimeMillis() % 10000 << "   end msg" << endl;
 				break;
 			}
 		}
@@ -290,9 +290,9 @@ void msg(const char *m, int extras = 0) {
 	for( int i = 0; i < extras; i++ )
 		p.say(p.channel(), db, send);
 
-	cout << curTimeMillis() << " ****calling DB..." << endl;
+	cout << curTimeMillis() % 10000 << " ****calling DB..." << endl;
 	bool ok = p.call(db, send, response);
-	cout << curTimeMillis() << " ****ok. response.data:" << ok << " ****" << endl;
+	cout << curTimeMillis() % 10000 << " ****ok. response.data:" << ok << " ****" << endl;
 /*	cout << "  " << response.data->id << endl;
 	cout << "  " << response.data->len << endl;
 	cout << "  " << response.data->operation << endl;
@@ -311,7 +311,7 @@ cout << "hello2" << endl;
 int main(int argc, char* argv[], char *envp[] )
 {
 	srand(curTimeMillis());
-	cout << curTimeMillis() << endl;
+	cout << curTimeMillis() % 10000 << endl;
 
 	quicktest();
 

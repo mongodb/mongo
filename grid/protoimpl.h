@@ -4,6 +4,11 @@
 
 #include "message.h"
 
+using namespace boost;
+typedef boost::mutex::scoped_lock lock;
+
+extern boost::mutex coutmutex;
+
 const int FragMax = 1480;
 const int FragHeader = 10;
 const int MSS = FragMax - FragHeader;
@@ -71,6 +76,7 @@ inline void DUMPDATA(Fragment& f, const char *tabs) {
 }
 
 inline void SEND(UDPConnection& c, Fragment &f, SockAddr& to, const char *extra="") { 
+	lock lk(coutmutex);
 	DUMP(f, to, "\t\t\t\t\t>");
 	c.sendto((char *) &f, f.fragmentLen, to);
 	cout << extra;
@@ -152,8 +158,11 @@ inline F* __recv(UDPConnection& c, SockAddr& from) {
 		cout << ".recvfrom returned error " << getLastError() << " socket:" << c.sock << endl;
 	}
 	assert( f->fragmentLen == n );
-	DUMP(*f, from, "\t\t\t\t\t\t\t\t\t\t<");
-	DUMPDATA(*f,   "\t\t\t\t\t\t\t\t\t\t      ");
+	{
+		lock lk(coutmutex);
+		DUMP(*f, from, "\t\t\t\t\t\t\t\t\t\t<");
+		DUMPDATA(*f,   "\t\t\t\t\t\t\t\t\t\t      ");
+	}
 	return new F(f);
 }
 
