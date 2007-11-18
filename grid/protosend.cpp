@@ -113,8 +113,12 @@ void MS::send() {
 		pc.to = to;
 	}
 
-	while( pc.cs.pendingSend.size() >= 10 )
-		msgSent.wait(lk);
+	while( pc.cs.pendingSend.size() >= 1 ) {
+		cout << ".waiting for queued sends to complete " << pc.cs.pendingSend.size() << endl;
+		while( pc.cs.pendingSend.size() >= 1 )
+			msgSent.wait(lk);
+		cout << ".waitend" << endl;
+	}
 	lastComplainTime = curTimeMillis();
 	pc.cs.pendingSend.push_back(this);
 	/* todo: pace */
