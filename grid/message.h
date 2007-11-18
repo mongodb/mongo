@@ -18,7 +18,7 @@ public:
 	MessagingPort(int channel = AUTOASSIGNCHANNEL); 
 	~MessagingPort();
 
-	void init(int myUdpPort);
+	void init(int myUdpPort = 0 );
 
 	/* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.
 	   also, the Message data will go out of scope on the subsequent recv call. 
