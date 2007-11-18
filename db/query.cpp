@@ -194,7 +194,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 
 	qr = (QueryResult *) b.buf();
 	qr->len = b.len();
-	qr->reserved = 0;
+	//	qr->channel = 0;
 	qr->operation = opReply;
 	qr->cursorId = cursorid;
 	qr->startingFrom = 0;
@@ -273,7 +273,7 @@ done:
 	qr->cursorId = cursorid;
 	qr->startingFrom = start;
 	qr->len = b.len();
-	qr->reserved = 0;
+	//	qr->reserved = 0;
 	qr->operation = opReply;
 	qr->nReturned = n;
 	b.decouple();

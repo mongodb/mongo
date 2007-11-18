@@ -205,6 +205,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\grid\protorecv.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\grid\protosend.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\query.cpp"
 				>
 			</File>
@@ -223,6 +231,10 @@
 						UsePrecompiledHeader="1"
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\util\util.cpp"
+				>
 			</File>
 		</Filter>
 		<Filter
@@ -276,6 +288,14 @@
 			</File>
 			<File
 				RelativePath=".\pdfile.h"
+				>
+			</File>
+			<File
+				RelativePath="..\grid\protocol.h"
+				>
+			</File>
+			<File
+				RelativePath="..\grid\protoimpl.h"
 				>
 			</File>
 			<File

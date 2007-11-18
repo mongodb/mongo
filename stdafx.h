@@ -24,6 +24,7 @@ using namespace std;
 #include <map>
 #include <string>
 #include <vector>
+#include <set>
 
 #if !defined(_WIN32)
 typedef int HANDLE;

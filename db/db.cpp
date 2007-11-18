@@ -31,7 +31,7 @@ void quicktest() {
 	strcpy_s(m, 1000, "hello worldz");
 }
 
-MessagingPort dbMsgPort;
+MessagingPort dbMsgPort(MessagingPort::ANYCHANNEL);
 void pdfileInit();
 
 class DbMessage {
@@ -219,10 +219,10 @@ void run() {
 
 	testTheDb();
 
-	cout << "waiting for msg..." << endl;
 	Message m;
 	while( 1 ) { 
 		m.reset();
+		cout << "\nwaiting for msg..." << endl;
 		if( !dbMsgPort.recv(m) ) {
 			cout << "recv() returned false" << endl;
 			break;
@@ -275,17 +275,16 @@ void msg(const char *m, int extras = 0) {
 	send.setData( dbMsg , m);
 
 	for( int i = 0; i < extras; i++ )
-		p.say(db, send);
+		p.say(p.channel(), db, send);
 
 	cout << "contacting DB..." << endl;
 	bool ok = p.call(db, send, response);
 	cout << "ok. response.data:" << ok << endl;
-	cout << "  " << response.data->id << endl;
+/*	cout << "  " << response.data->id << endl;
 	cout << "  " << response.data->len << endl;
 	cout << "  " << response.data->operation << endl;
-	cout << "  " << response.data->reserved << endl;
-	cout << "  " << response.data->responseTo << endl;
-	cout << "  " << response.data->_data << endl;
+	cout << "  " << response.data->responseTo << endl;*/
+	cout << " data: " << response.data->_data << endl;
 
 }
 
@@ -297,26 +296,30 @@ cout << "hello2" << endl;
 
 int main(int argc, char* argv[], char *envp[] )
 {
-	quicktest();
+	srand(curTimeMillis());
 
-//cout << "fork then sleep" << endl;
-//boost::thread foo(&bar);
-//	sleepsecs(30);
-//cout << "sleep" << endl;
+	for( int i = 0; i < 30; i++ )
+		cout << rand() << ' ';
+	cout << endl;
+
+	quicktest();
 
 	if( argc >= 2 ) {
 		if( strcmp(argv[1], "quicktest") == 0 )
 			return 0;
 		if( strcmp(argv[1], "msg") == 0 ) {
 			msg(argc >= 3 ? argv[2] : "ping");
+			goingAway = true;
 			return 0;
 		}
 		if( strcmp(argv[1], "msglots") == 0 ) {
 			msg(argc >= 3 ? argv[2] : "ping", 1000);
+			goingAway = true;
 			return 0;
 		}
 		if( strcmp(argv[1], "run") == 0 ) {
 			run();
+			goingAway = true;
 			return 0;
 		}
 		if( strcmp(argv[1], "longmsg") == 0 ) {
@@ -324,6 +327,7 @@ int main(int argc, char* argv[], char *envp[] )
 			memset(buf, 'a', 4095);
 			buf[4095] = 0;
 			msg(buf);
+			goingAway = true;
 			return 0;
 		}
 	}
@@ -335,6 +339,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  run          run db" << endl;
 	cout << "  longmsg      send a long test message to the db server" << endl;
 	cout << "  msglots      send a bunch of test messages, and then wait for answer o nthe last one" << endl;
+	goingAway = true;
 	return 0;
 }
 

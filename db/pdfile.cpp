@@ -214,8 +214,8 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
 	details->lastExtentSize = approxSize;
 	details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
-	cout << "*** new extent size:" << hex << ExtentSize << " loc:" << hex << offset << endl;
-	cout << "    emptyLoc:" << hex << emptyLoc.getOfs() << endl;
+	cout << "*** new extent size:" << hex << ExtentSize << " loc:" << hex << offset << dec << endl;
+	cout << "    emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
 	cout << "    " << ns << endl;
 	return e;
 }
@@ -463,7 +463,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		OID *oid = obj.getOID();
 		cout << "insert() " << ns << " oid:";
 		if( oid )
-			cout << hex << oid->a << ':' << hex << oid->b;
+			cout << hex << oid->a << ':' << hex << oid->b << dec;
 		cout << endl;
 	}
 
@@ -507,7 +507,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 			return DiskLoc();
 		}
 		if( tableToIndex->findIndexByName(name) >= 0 ) { 
-			cout << "ERROR: bad add index attempt, index:" << name << " already exists for:" << tabletoidxns << endl;
+			cout << "WARNING: bad add index attempt, index:" << name << " already exists for:" << tabletoidxns << endl;
 			return DiskLoc();
 		}
 		indexFullNS = tabletoidxns; 
@@ -562,7 +562,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	if( d->nIndexes )
 		indexRecord(d, buf, len, loc);
 
-	cout << " inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << endl;
+	cout << " inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << endl;
 	return loc;
 }
 

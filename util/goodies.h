@@ -5,6 +5,9 @@
 
 #include "../stdafx.h"
 
+/* set to TRUE if we are exiting */
+extern bool goingAway;
+
 inline void dumpmemory(const char *data, int len) { 
 	if( len > 1024 )
 		len = 1024;
@@ -33,6 +36,21 @@ inline void dumpmemory(const char *data, int len) {
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
 
+struct WrappingInt {
+	WrappingInt() { x = 0; } 
+	WrappingInt(unsigned z) : x(z) { }
+	unsigned x;
+	operator unsigned() const { return x; }
+	WrappingInt& operator++() { x++; return *this; }
+	static int diff(unsigned a, unsigned b) { return a-b; }
+	bool operator<=(WrappingInt r) { 
+		// platform dependent
+		int df = (r.x - x);
+		return df >= 0;
+	}
+	bool operator>(WrappingInt r) { return !(r<=*this); }
+};
+
 inline void sleepsecs(int s) { 
 	boost::xtime xt;
 	boost::xtime_get(&xt, boost::TIME_UTC);
@@ -44,4 +62,14 @@ inline void sleepmillis(int s) {
 	boost::xtime_get(&xt, boost::TIME_UTC);
 	xt.nsec += s * 1000000;
 	boost::thread::sleep(xt);
+}
+// note this wraps
+inline unsigned curTimeMillis() {
+	boost::xtime xt;
+	boost::xtime_get(&xt, boost::TIME_UTC);
+	unsigned t = xt.nsec / 1000000;
+	return (xt.sec & 0xfffff) * 1000 + t;
+}
+inline int tdiff(unsigned told, unsigned tnew) { 
+	return WrappingInt::diff(tnew, told);
 }

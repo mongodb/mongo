@@ -3,6 +3,7 @@
 #pragma once
 
 #include "../util/sock.h"
+#include "protocol.h"
 
 class Message;
 
@@ -10,7 +11,11 @@ class MessagingPort {
 public:
 	enum { DBPort = 27017 };
 
-	MessagingPort();
+	/* channels: if you are a server you can pass ANYCHANNEL to indicate you never initiate a 
+	   msg to someone yourself. the default will assign a new channel id to the messagingport.
+	   */
+	enum { AUTOASSIGNCHANNEL = -1, ANYCHANNEL = -2 };
+	MessagingPort(int channel = AUTOASSIGNCHANNEL); 
 	~MessagingPort();
 
 	void init(int myUdpPort);
@@ -21,10 +26,16 @@ public:
 	bool recv(Message& m);
 	void reply(Message& received, Message& response);
 	bool call(SockAddr& to, Message& toSend, Message& response);
-	void say(SockAddr& to, Message& toSend, int responseTo = -1);
+	void say(int channel, SockAddr& to, Message& toSend, int responseTo = -1);
+	void say(SockAddr& to, Message& toSend, int responseTo = -1) { 
+		say(channel(), to, toSend, responseTo);
+	}
 
+	int channel() { return myChannel; }
 private:
+	ProtocolConnection *pc;
 	UDPConnection conn;
+	int myChannel;
 	enum { BufSize = 64 * 1024 };
 	char buf[BufSize];
 };
@@ -47,8 +58,7 @@ enum Operations {
 
 struct MsgData {
 	int len; /* len of the msg, including this field */
-	int reserved;
-	int id; /* request/reply id's match... */
+	MSGID id; /* request/reply id's match... */
 	int responseTo; /* id of the message we are responding to */
 	int operation;
 	char _data[4];
@@ -62,11 +72,14 @@ inline int MsgData::dataLen() { return len - MsgDataHeaderSize; }
 
 class Message {
 public:
-	Message() { data = 0; freeIt = false; }
+	Message() { data = 0; freeIt = false; channel = -1000; }
 	~Message() { reset(); }
 
 	SockAddr from;
 	MsgData *data;
+	int channel;
+
+//	int channel() { return data->channel; }
 
 	void reset() {
 		if( freeIt && data )
