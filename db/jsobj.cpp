@@ -327,7 +327,7 @@ struct JSObj0 {
 } js0;
 
 Element::Element() { 
-	data = (char *) &js0;
+	data = &js0.eoo;
 	fieldNameSize = 0;
 	totalSize = -1;
 }
