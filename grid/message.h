@@ -18,6 +18,8 @@ public:
 	MessagingPort(int channel = AUTOASSIGNCHANNEL); 
 	~MessagingPort();
 
+	void shutdown() { if( pc ) pc->shutdown(); pc = 0; }
+
 	void init(int myUdpPort = 0 );
 
 	/* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.

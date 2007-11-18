@@ -11,6 +11,8 @@ typedef WrappingInt MSGID;
 
 struct Fragment;
 
+#define ptrace(x) 
+
 class F; // fragment
 class MR; // message.  R=receiver side.
 class CR; // connection receiver side
@@ -44,8 +46,10 @@ public:
    of these in protoimpl.h.
 */
 
+void __sendRESET(ProtocolConnection *pc, EndPoint& to);
+
 // sender -> 
-void __sendFrag(ProtocolConnection *pc, EndPoint& to, F *); // transmit a fragment
+void __sendFrag(ProtocolConnection *pc, EndPoint& to, F *, bool retran=false); // transmit a fragment
 void __sendREQUESTACK(ProtocolConnection *pc, EndPoint& to, MSGID msgid, int fragNo); // transmit the REQUEST ACK msg
 
 // receiver -> 
@@ -63,6 +67,7 @@ public:
 	MSGID __msgid();
 	int __channel();
 	bool __isREQUESTACK(); // if true, this is just a request for acknowledgement not real data
+	int __firstFragMsgLen(); // only works on first fragment
 
 	// sender side:
 	bool __isACK(); // if true, this is an ack of a message
@@ -89,6 +94,8 @@ public:
 	const MSGID msgid;
 	int n() { return f.size(); }
 public:
+	int messageLenExpected;
+	int nExpected;
 	void reportMissings(bool reportAll);
 	vector<F*> f;
 	vector<unsigned> reportTimes;
@@ -123,7 +130,7 @@ public:
 class CR { 
 	friend class MR;
 public:
-	~CR() { cout << ".warning: ~CR() not implemented" << endl; }
+	~CR() { ptrace( cout << ".warning: ~CR() not implemented" << endl; ) }
 	CR(ProtocolConnection& _pc) : pc(_pc) { }
 	MR* recv();
 public:
@@ -145,6 +152,7 @@ public:
 	CS(ProtocolConnection& _pc) : pc(_pc) { }
 	ProtocolConnection& pc;
 	vector<MS*> pendingSend;
+	void resetIt();
 };
 
 typedef map<EndPoint,ProtocolConnection*> EndPointToPC;
@@ -162,6 +170,7 @@ public:
 	~ProtocolConnection() { 
 		cout << ".warning: ~ProtocolConnection() not implemented (leaks mem)" << endl;
 	}
+	void shutdown();
 	bool acceptAnyChannel() const;
 	UDPConnection& udpConnection;
 	/* note the channel for myEnd might be "any" --
@@ -172,6 +181,7 @@ public:
 	CR cr;
 	CS cs;
 	bool first;
+	EndPoint to;
 private:
 	void init();
 };

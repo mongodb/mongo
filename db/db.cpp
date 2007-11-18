@@ -222,21 +222,34 @@ void run() {
 	Message m;
 	while( 1 ) { 
 		m.reset();
-		cout << "\nwaiting for msg..." << endl;
+
+		// temp:
+		sleepsecs(1);
+
+		cout << '\n' << curTimeMillis() << " waiting for msg..." << endl;
 		if( !dbMsgPort.recv(m) ) {
-			cout << "recv() returned false" << endl;
+			cout << "MessagingPort::recv() returned false" << endl;
 			break;
 		}
+
+		cout << '\n' << curTimeMillis() << " **** db.cpp got msg ************\n" << endl;
+
 		//cout << "  got msg" << endl;
 		//cout << "  op:" << m.data->operation << " len:" << m.data->len << endl;
 
 		if( m.data->operation == dbMsg ) { 
-			bool end = strcmp("end", m.data->_data) == 0;
+			char *p = m.data->_data;
+			int len = strlen(p);
+			if( len > 400 ) 
+				cout << curTimeMillis() << 
+				   " long msg received, len:" << len << 
+				   " ends with: " << p + len - 10 << endl;
+			bool end = strcmp("end", p) == 0;
 			Message resp;
 			resp.setData(opReply, "i am fine");
 			dbMsgPort.reply(m, resp);
 			if( end ) {
-				cout << "    end msg" << endl;
+				cout << curTimeMillis() << "   end msg" << endl;
 				break;
 			}
 		}
@@ -277,15 +290,16 @@ void msg(const char *m, int extras = 0) {
 	for( int i = 0; i < extras; i++ )
 		p.say(p.channel(), db, send);
 
-	cout << "contacting DB..." << endl;
+	cout << curTimeMillis() << " ****calling DB..." << endl;
 	bool ok = p.call(db, send, response);
-	cout << "ok. response.data:" << ok << endl;
+	cout << curTimeMillis() << " ****ok. response.data:" << ok << " ****" << endl;
 /*	cout << "  " << response.data->id << endl;
 	cout << "  " << response.data->len << endl;
 	cout << "  " << response.data->operation << endl;
 	cout << "  " << response.data->responseTo << endl;*/
 	cout << " data: " << response.data->_data << endl;
 
+	p.shutdown();
 }
 
 void bar() { 
@@ -297,10 +311,7 @@ cout << "hello2" << endl;
 int main(int argc, char* argv[], char *envp[] )
 {
 	srand(curTimeMillis());
-
-	for( int i = 0; i < 30; i++ )
-		cout << rand() << ' ';
-	cout << endl;
+	cout << curTimeMillis() << endl;
 
 	quicktest();
 
@@ -326,6 +337,8 @@ int main(int argc, char* argv[], char *envp[] )
 			char buf[4096];
 			memset(buf, 'a', 4095);
 			buf[4095] = 0;
+			buf[4094] = 'b';
+			buf[0] = 'c';
 			msg(buf);
 			goingAway = true;
 			return 0;

@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <sstream>
+#include "goodies.h"
 
 #if defined(_WIN32)
 #include <winsock2.h>
@@ -70,8 +71,9 @@ inline int UDPConnection::recvfrom(char *buf, int len, SockAddr& sender) {
 }
 
 inline int UDPConnection::sendto(char *buf, int len, const SockAddr& EndPoint) {
-	if( rand() < (RAND_MAX>>4) ) { 
-		cout << "TEST: NOT SENDING PACKET" << endl;
+	if( 0 && rand() < (RAND_MAX>>4) ) { 
+		cout << " NOTSENT ";
+		//		cout << curTimeMillis() << " .TEST: NOT SENDING PACKET" << endl;
 		return 0;
 	}
 	return ::sendto(sock, buf, len, 0, (sockaddr *) &EndPoint.sa, EndPoint.addressSize);

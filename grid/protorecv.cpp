@@ -19,6 +19,14 @@ map<SockAddr,ProtocolConnection*> firstPCForThisAddress;
 
 EndPointToPC pcMap;
 
+void ProtocolConnection::shutdown() { 
+	ptrace( cout << ".shutdown()" << endl; )
+	if( acceptAnyChannel() || first ) 
+		return;
+	ptrace( cout << ".   to:" << to.toString() << endl; )
+	__sendRESET(this, to);
+}
+
 inline bool ProtocolConnection::acceptAnyChannel() const { 
 	return myEnd.channel == MessagingPort::ANYCHANNEL; 
 }
@@ -53,6 +61,7 @@ void MR::removeFromReceivingList() {
 MR::MR(ProtocolConnection *_pc, MSGID _msgid, EndPoint& _from) : 
         pc(*_pc), msgid(_msgid), from(_from) 
 {
+	messageLenExpected = nExpected = -1;
 	f.push_back(0);
 }
 
@@ -76,6 +85,8 @@ void MR::reportMissings(bool reportAll) {
 }
 
 inline bool MR::complete() { 
+	if( nExpected > (int) f.size() || nExpected == -1 )
+		return false;
 	for( unsigned i = 0; i < f.size(); i++ )
 		if( f[i] == 0 )
 			return false;
@@ -86,16 +97,22 @@ inline bool MR::complete() {
 bool MR::got(F *frag, EndPoint& fromAddr) {
 	MSGID msgid = frag->__msgid();
 	int i = frag->__num();
+	if( nExpected < 0 && i == 0 ) {
+		messageLenExpected = frag->__firstFragMsgLen();
+		int mss = pc.udpConnection.mtu() - FragHeader;
+		nExpected = (messageLenExpected + mss - 1) / mss;
+		ptrace( cout << ".got first frag expected:" << nExpected << " expectedLen:" << messageLenExpected << endl; )
+	}
 	if( i >= (int) f.size() )
 		f.resize(i+1, 0);
 	if( frag->__isREQUESTACK() ) { 
-		cout << "...got(): processing a REQUESTACK" << endl;
+		ptrace( cout << "...got(): processing a REQUESTACK" << endl; )
 		/* we're simply seeing if we got the data, and then acking. */
 		delete frag;
 		frag = 0;
 	}
 	else if( f[i] != 0 ) { 
-		cout << ".dup packet i:" << i << ' ' << from.toString() << endl;
+		ptrace( cout << ".dup packet i:" << i << ' ' << from.toString() << endl; )
 		delete frag;
 		return false;
 	}
@@ -106,7 +123,7 @@ bool MR::got(F *frag, EndPoint& fromAddr) {
 		reportMissings(frag == 0);
 		return false;
 	}
-	if( i+1 < n() /*not to the last frag yet*/ ) {
+	if( i+1 < nExpected /*not to the last frag yet*/ ) {
 		if( i > 0 && f[i-1] == 0 )
 			reportMissings(frag == 0);
 		return false;
@@ -154,13 +171,13 @@ void receiverThread() {
 	while( 1 ) {
 		F *f = __recv(mypc->udpConnection, fromAddr.sa);
 		fromAddr.channel = f->__channel();
-		cout << "..__recv() from:" << fromAddr.toString() << endl;
+		ptrace( cout << "..__recv() from:" << fromAddr.toString() << endl; )
 		ProtocolConnection *pc = mypc;
 		if( fromAddr.channel != pc->myEnd.channel ) {
 			if( !pc->acceptAnyChannel() ) { 
-				cout << ".WARNING: wrong channel\n";
-				cout << ".  expected:" << pc->myEnd.channel << " got:" << fromAddr.channel << '\n';
-				cout << ".  this may be ok if you just restarted" << endl;
+				ptrace( cout << ".WARNING: wrong channel\n"; )
+				ptrace( cout << ".  expected:" << pc->myEnd.channel << " got:" << fromAddr.channel << '\n'; )
+				ptrace( cout << ".  this may be ok if you just restarted" << endl; )
 				delete f;
 				continue;
 			}
@@ -168,7 +185,7 @@ void receiverThread() {
 
 		MsgTracker *& track = pc->cr.trackers[f->__channel()];
 		if( track == 0 ) {
-			cout << "..creating MsgTracker for channel " << f->__channel() << endl;
+			ptrace( cout << "..creating MsgTracker for channel " << f->__channel() << endl; )
 			track = new MsgTracker();
 		}
 
@@ -179,14 +196,14 @@ void receiverThread() {
 				continue;
 			}
 			if( f->__isMISSING() ) { 
-				cout << "....temp: calling gotMISSING" << endl;
 				gotMISSING(f, pc, fromAddr);
 				delete f;
 				continue;
 			}
 			if( f->op == F::RESET ) { 
-				cout << ".got RESET" << endl;
+				ptrace( cout << ".got RESET" << endl; )
 				track->reset();
+				pc->cs.resetIt();
 				delete f;
 				continue;
 			}
@@ -197,7 +214,7 @@ void receiverThread() {
 			if( f->__isREQUESTACK() )
 				__sendACK(pc, fromAddr, f->__msgid());
 			else { 
-				cout << ".ignoring packet about msg already received msg:" << f->__msgid() << " op:" << f->op << endl;
+				ptrace( cout << ".ignoring packet about msg already received msg:" << f->__msgid() << " op:" << f->op << endl; )
 			}
 			delete f;
 			continue;
@@ -205,13 +222,12 @@ void receiverThread() {
 
 		if( f->__msgid() <= track->lastFullyReceived && !track->recentlyReceivedList.empty() ) {
 			// reconnect on an old channel?
-			cout << ".warning: strange msgid:" << f->__msgid() << " received, last:" << track->lastFullyReceived
-				<< " conn:" << fromAddr.toString() << endl;
+			ptrace( cout << ".warning: strange msgid:" << f->__msgid() << " received, last:" << track->lastFullyReceived << " conn:" << fromAddr.toString() << endl; )
 		}
 
 		MR *m = pc->cr.getPendingMsg(f, fromAddr); /* todo: optimize for single fragment case? */
 		if( m == 0 ) { 
-			cout << "..getPendingMsg() returns 0" << endl;
+			ptrace( cout << "..getPendingMsg() returns 0" << endl; )
 			delete f;
 			continue;
 		}

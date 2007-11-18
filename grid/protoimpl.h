@@ -23,11 +23,11 @@ struct Fragment {
 
 	bool ok(int nRead) { 
 		if( nRead < MinFragmentLen || fragmentLen > nRead || fragmentLen < MinFragmentLen ) {
-			cout << "recv: fragment bad. fragmentLen:" << fragmentLen << " nRead:" << nRead << endl;
+			ptrace( cout << ".recv: fragment bad. fragmentLen:" << fragmentLen << " nRead:" << nRead << endl; )
 			return false;
 		}
 		if( fragmentNo == 0 && fragmentLen < MinFragmentLen + MsgDataHeaderSize ) { 
-			cout << "recv: bad first fragment. fragmentLen:" << fragmentLen << endl;
+			ptrace( cout << ".recv: bad first fragment. fragmentLen:" << fragmentLen << endl; )
 			return false;
 		}
 		return true;
@@ -37,10 +37,50 @@ struct Fragment {
 };
 #pragma pack(pop)
 
+const bool dumpIP = false;
+
+inline void DUMP(Fragment& f, SockAddr& t, const char *tabs) { 
+	cout << tabs << curTimeMillis() % 10000 << ' ';
+	short s = f.fragmentNo;
+	if( s == -32768 ) 
+		cout << "ACK M:" << f.msgId % 1000;
+	else if( s == -32767 )
+		cout << "MISSING";
+	else if( s == -32766 )
+		cout << "RESET ch:" << f.channel;
+	else if( s < 0 )
+		cout << "REQUESTACK";
+	else
+		cout << '#' << s << ' ' << f.fragmentLen << " M:" << f.msgId % 1000;
+	cout << ' ';
+	if( dumpIP )
+		cout << t.toString();
+}
+
+inline void DUMPDATA(Fragment& f, const char *tabs) { 
+	if( f.fragmentNo >= 0 ) { 
+		cout << '\n' << tabs;
+		int x = f.fragmentDataLen();
+		if( x > 28 ) x = 28;
+		for( int i = 0; i < x; i++ ) {
+			if( f.data[i] == 0 ) cout << (char) 254;
+			else cout << (f.data[i] >= 32 ? f.data[i] : '.');
+		}
+	}
+	cout << endl;
+}
+
+inline void SEND(UDPConnection& c, Fragment &f, SockAddr& to, const char *extra="") { 
+	DUMP(f, to, "\t\t\t\t\t>");
+	c.sendto((char *) &f, f.fragmentLen, to);
+	cout << extra;
+	DUMPDATA(f, "\t\t\t\t\t      ");
+}
+
 // sender ->
-inline void __sendFrag(ProtocolConnection *pc, EndPoint& to, F *f) {
+inline void __sendFrag(ProtocolConnection *pc, EndPoint& to, F *f, bool retran) {
 	assert( f->internals->channel == to.channel );
-	pc->udpConnection.sendto((char *) f->internals, f->internals->fragmentLen, to.sa);
+	SEND(pc->udpConnection, *f->internals, to.sa, retran ? " retran" : "");
 }
 
 inline void __sendREQUESTACK(ProtocolConnection *pc, EndPoint& to, 
@@ -50,19 +90,19 @@ inline void __sendREQUESTACK(ProtocolConnection *pc, EndPoint& to,
 	f.channel = to.channel; assert( f.channel >= 0 );
 	f.fragmentNo = ((short) -fragNo) -1;
 	f.fragmentLen = FragHeader;
-	cout << ".requesting ack, fragno=" << f.fragmentNo << " msg:" << f.msgId << ' ' << to.toString() << endl;
-	pc->udpConnection.sendto((char *)&f, f.fragmentLen, to.sa);
+	ptrace( cout << ".requesting ack, fragno=" << f.fragmentNo << " msg:" << f.msgId << ' ' << to.toString() << endl; )
+	SEND(pc->udpConnection, f, to.sa);
 }
 
 // receiver -> 
 inline void __sendACK(ProtocolConnection *pc, EndPoint& to, MSGID msgid) {
-	cout << "...__sendACK() to:" << to.toString() << " msg:" << msgid << endl;
+	ptrace( cout << "...__sendACK() to:" << to.toString() << " msg:" << msgid << endl; )
 	Fragment f;
 	f.msgId = msgid;
 	f.channel = to.channel; assert( f.channel >= 0 );
 	f.fragmentNo = -32768;
 	f.fragmentLen = FragHeader;
-	pc->udpConnection.sendto((char *)&f, f.fragmentLen, to.sa);
+	SEND(pc->udpConnection, f, to.sa);
 }
 
 /* this is to clear old state for the channel in terms of what msgids are 
@@ -74,15 +114,16 @@ inline void __sendRESET(ProtocolConnection *pc, EndPoint& to) {
 	f.channel = to.channel; assert( f.channel >= 0 );
 	f.fragmentNo = -32766;
 	f.fragmentLen = FragHeader;
-	cout << "...__sendRESET() to:" << to.toString() << endl;
-	pc->udpConnection.sendto((char *)&f, f.fragmentLen, to.sa);
+	ptrace( cout << "...__sendRESET() to:" << to.toString() << endl; )
+	SEND(pc->udpConnection, f, to.sa);
 }
 
 inline void __sendMISSING(ProtocolConnection *pc, EndPoint& to, 
 						  MSGID msgid, vector<short>& ids) {
-	int n = ids.size(); cout << "..sendMISSING n:" << n << ' ' << to.toString() << endl;
+	int n = ids.size(); 
+	ptrace( cout << "..sendMISSING n:" << n << " firstmissing:" << ids[0] << ' ' << to.toString() << endl; )
 	if( n > 256 ) {
-		cout << "..info: sendMISSING: n:" << n << ' ' << to.toString() << endl;
+		ptrace( cout << "..info: sendMISSING limiting to 256 ids" << endl; )
 		n = 256;
 	}
 	Fragment *f = (Fragment*) malloc(FragHeader + n*2);
@@ -93,9 +134,9 @@ inline void __sendMISSING(ProtocolConnection *pc, EndPoint& to,
 	short *s = (short *) f->data;
 	for( int i = 0; i < n; i++ )
 		*s++ = ids[i];
-	cout << "...sendMISSING fraglen:" << f->fragmentLen << endl;
-	pc->udpConnection.sendto((char *)f, f->fragmentLen, to.sa);
-// TEMPcomment	free(f);
+	ptrace( cout << "...sendMISSING fraglen:" << f->fragmentLen << endl; )
+	SEND(pc->udpConnection, *f, to.sa);
+	free(f);
 }
 
 // -> receiver
@@ -111,6 +152,8 @@ inline F* __recv(UDPConnection& c, SockAddr& from) {
 		cout << ".recvfrom returned error " << getLastError() << " socket:" << c.sock << endl;
 	}
 	assert( f->fragmentLen == n );
+	DUMP(*f, from, "\t\t\t\t\t\t\t\t\t\t<");
+	DUMPDATA(*f,   "\t\t\t\t\t\t\t\t\t\t      ");
 	return new F(f);
 }
 
@@ -118,16 +161,16 @@ inline F::F(Fragment *f) : internals(f), op(NORMAL) {
 	if( internals->fragmentNo < 0 ) { 
 		if( internals->fragmentNo == -32768 ) {
 			op = ACK;
-			cout << ".got ACK msg:" << internals->msgId << endl;
+			ptrace( cout << ".got ACK msg:" << internals->msgId << endl; )
 		} else if( internals->fragmentNo == -32767 ) {
 			op = MISSING;
-			cout << ".got MISSING" << endl;
+			ptrace( cout << ".got MISSING" << endl; )
 		} else if( internals->fragmentNo == -32766 ) {
 			op = RESET;
 		} else {
 			op = REQUESTACK;
 			internals->fragmentNo = -(internals->fragmentNo+1);
-			cout << ".got REQUESTACK frag:" << internals->fragmentNo << " msg:" << internals->msgId << endl;
+			ptrace( cout << ".got REQUESTACK frag:" << internals->fragmentNo << " msg:" << internals->msgId << endl; )
 		}
 	}
 }
@@ -141,4 +184,7 @@ inline bool F::__isMISSING() { return op == MISSING; }
 inline short* F::__getMissing(int& n) { 
 	n = internals->fragmentDataLen() / 2;
 	return (short *) internals->fragmentData();
+}
+inline int F::__firstFragMsgLen() { 
+	return internals->startOfMsgData()->len;
 }
