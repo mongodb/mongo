@@ -46,10 +46,25 @@ void ProtocolConnection::init() {
 
 /* find message for fragment */
 MR* CR::getPendingMsg(F *fr, EndPoint& fromAddr) {
+	MR *m;
+	map<int,MR*>::iterator i = pendingMessages.find(fr->__msgid());
+	if( i == pendingMessages.end() ) {
+		if( pendingMessages.size() > 20 ) {		
+			cout << ".warning: pendingMessages.size()>20, ignoring msg until we dequeue" << endl;
+			return 0;
+		}
+		m = new MR(&pc, fr->__msgid(), fromAddr);
+		pendingMessages[fr->__msgid()] = m;
+	}
+	else
+		m = i->second;
+	return m;
+/*
 	MR*& m = pendingMessages[fr->__msgid()];
 	if( m == 0 )		
 		m = new MR(&pc, fr->__msgid(), fromAddr);
 	return m;
+*/
 }
 
 void MR::removeFromReceivingList() {
