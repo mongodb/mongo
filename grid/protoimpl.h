@@ -2,6 +2,9 @@
 
 #pragma once
 
+const bool dumpIP = false;
+const bool dumpBytesDetailed = false;
+
 #include "message.h"
 
 using namespace boost;
@@ -42,8 +45,6 @@ struct Fragment {
 };
 #pragma pack(pop)
 
-const bool dumpIP = false;
-
 inline void DUMP(Fragment& f, SockAddr& t, const char *tabs) { 
 	cout << tabs << curTimeMillis() % 10000 << ' ';
 	short s = f.fragmentNo;
@@ -66,13 +67,39 @@ inline void DUMPDATA(Fragment& f, const char *tabs) {
 	if( f.fragmentNo >= 0 ) { 
 		cout << '\n' << tabs;
 		int x = f.fragmentDataLen();
-		if( x > 28 ) x = 28;
-		for( int i = 0; i < x; i++ ) {
-			if( f.data[i] == 0 ) cout << (char) 254;
-			else cout << (f.data[i] >= 32 ? f.data[i] : '.');
+		if( dumpBytesDetailed ) { 
+			char *p = (char *) &f;
+			cout << hex << *((unsigned*)p) << ' '; p+=4;
+			cout << *((short*)p) << ' '; p+=2;
+			cout << *((short*)p) << ' '; p+=2;
+			cout << *((short*)p) << '|'; p+=2;
+			if( x < 16 ) cout << "???";
+			else {
+				for( int i = 0; i < 4; i++ ) { // MSGDATA
+					cout << *((unsigned*)p);
+					cout << (i < 3 ? ' ' : '|');
+					p += 4;
+				}
+				cout << '\n' << tabs;
+				x -= 16;
+				if( x > 32 ) x = 32;
+				while( x-- > 0 ) { cout << (unsigned) (unsigned char) *p++ << ' '; } 
+			}
+		}
+		else { 
+			char *p = f.data;
+			if( f.fragmentNo == 0 ) { 
+				p += 16; x -= 16;
+			}
+			if( x > 28 ) x = 28;
+			for( int i = 0; i < x; i++ ) {
+				if( *p == 0 ) cout << (char) 0xb0;
+				else cout << (*p >= 32 ? *p : '.');
+				p++;
+			}
 		}
 	}
-	cout << endl;
+	cout << dec << endl;
 }
 
 inline void SEND(UDPConnection& c, Fragment &f, SockAddr& to, const char *extra="") { 

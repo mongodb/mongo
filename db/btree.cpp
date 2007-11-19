@@ -8,6 +8,8 @@
 const int BucketSize = 8192;
 const int KeyMax = BucketSize / 8;
 
+int ninserts = 0;
+
 inline KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
   prevChildBucket(k.prevChildBucket), recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs) { }
 
@@ -16,7 +18,20 @@ inline KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) :
 inline void BucketBasics::setNotPacked() { flags &= ~Packed; }
 inline void BucketBasics::setPacked() { flags |= Packed; }
 
-int BucketBasics::totalDataSize() const {
+void BucketBasics::assertValid() { 
+	assert( n >= 0 && n < BucketSize );
+	assert( emptySize >= 0 && emptySize < BucketSize );
+	assert( topSize >= n && topSize <= BucketSize );
+	assert( Size == BucketSize );
+	if( n > 1 ) {
+		JSObj k1 = keyNode(0).key;
+		JSObj k2 = keyNode(n-1).key;
+		int z = k1.woCompare(k2);
+		assert( z <= 0 );
+	}
+}
+
+inline int BucketBasics::totalDataSize() const {
 	return Size - (data-(char*)this);
 }
 
@@ -25,7 +40,7 @@ void BucketBasics::init(){
 	Size = BucketSize;
 	flags = Packed;
 	n = 0;
-	emptySize = totalDataSize();
+	emptySize = totalDataSize(); topSize = 0;
 	reserved = 0;
 }
 
@@ -33,9 +48,10 @@ void BucketBasics::init(){
    the keynodes grow from the front.
 */
 inline int BucketBasics::_alloc(int bytes) {
-	int ofs = emptySize - bytes;
-	assert( ofs >= 0 );
+	topSize += bytes;
 	emptySize -= bytes;
+	int ofs = totalDataSize() - topSize;
+	assert( ofs > 0 );
 	return ofs;
 }
 
@@ -48,15 +64,13 @@ void BucketBasics::del(int keypos) {
 	setNotPacked();
 }
 
-/* add a key.  must be < all existing */
-void BucketBasics::pushFront(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevChild) { 
+/* add a key.  must be > all existing.  be careful to set next ptr right. */
+void BucketBasics::pushBack(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevChild) { 
 	int bytesNeeded = key.objsize() + sizeof(_KeyNode);
 	assert( bytesNeeded <= emptySize );
-	for( int j = n; j > 0; j-- ) // make room
-		k(j) = k(j-1);
-	n++;
+	assert( n == 0 || keyNode(n-1).key.woCompare(key) <= 0 );
 	emptySize -= sizeof(_KeyNode);
-	_KeyNode& kn = k(0);
+	_KeyNode& kn = k(n++);
 	kn.prevChildBucket = prevChild;
 	kn.recordLoc = recordLoc;
 	kn.keyDataOfs = (short) _alloc(key.objsize());
@@ -92,31 +106,29 @@ void BucketBasics::pack() {
 	if( flags & Packed )
 		return;
 
-	int keysz = n * sizeof(_KeyNode);
-	int left = totalDataSize() - keysz;
-	for( int j = n-1; j >= 0; j++ ) {
+	int tdz = totalDataSize();
+	char temp[BucketSize];
+	int ofs = tdz;
+	for( int j = 0; j < n; j++ ) { 
 		short ofsold = k(j).keyDataOfs;
 		int sz = keyNode(j).key.objsize();
-		short ofsnew = keysz + left - sz;
-		if( ofsold != ofsnew ) {
-			memmove(dataAt(ofsnew), dataAt(ofsold), sz);
-			k(j).keyDataOfs = ofsnew;
-		}
-		left -= sz;
+		ofs -= sz;
+		memcpy(temp+ofs, dataAt(ofsold), sz);
+		k(j).keyDataOfs = ofs;
 	}
-	assert(left>=0);
-	emptySize = left;
+	int dataUsed = tdz - ofs;
+	memcpy(data + ofs, temp + ofs, dataUsed);
+	emptySize = tdz - dataUsed - n * sizeof(_KeyNode);
+	assert( emptySize >= 0 );
 
 	setPacked();
+	assertValid();
 }
 
 inline void BucketBasics::truncateTo(int N) {
 	n = N;
-	int sz = 0;
-	for( int i = 0; i < n; i++ )
-		sz += sizeof(_KeyNode) + keyNode(i).key.objsize();
-	emptySize = totalDataSize() - sz;
-	assert( emptySize >= 0 );
+	setNotPacked();
+	pack();
 }
 
 /* - BtreeBucket --------------------------------------------------- */
@@ -143,6 +155,10 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 	}
 	// not found
 	pos = l;
+	if( pos != n ) {
+		JSObj keyatpos = keyNode(pos).key;
+		assert( key.woCompare(keyatpos) <= 0 );
+	}
 	return false;
 }
 
@@ -150,6 +166,7 @@ bool BtreeBucket::unindex(JSObj& key ) {
 	int pos;
 	if( find(key, pos) ) {
 		del(pos);
+		assertValid();
 		return true;
 	}
 	DiskLoc l = childForPos(pos);
@@ -167,7 +184,7 @@ BtreeBucket* BtreeBucket::allocTemp() {
 
 void BtreeBucket::insertHere(const DiskLoc& thisLoc, const char *ns, int keypos, 
 							 const DiskLoc& recordLoc, JSObj& key,
-							 DiskLoc lchild, DiskLoc rchild) {
+							 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) {
 	if( basicInsert(keypos, recordLoc, key) ) {
 		_KeyNode& kn = k(keypos);
 		if( keypos+1 == n ) { // last key
@@ -183,43 +200,48 @@ void BtreeBucket::insertHere(const DiskLoc& thisLoc, const char *ns, int keypos,
 		return;
 	}
 
-	// split!
+	// split
 	BtreeBucket *r = allocTemp();
 	DiskLoc rLoc;
 	int mid = n / 2;
 	for( int i = mid+1; i < n; i++ ) {
 		KeyNode kn = keyNode(i);
-		r->pushFront(kn.recordLoc, kn.key, kn.prevChildBucket);
+		r->pushBack(kn.recordLoc, kn.key, kn.prevChildBucket);
 	}
+	r->nextChild = nextChild;
+	r->assertValid();
 	rLoc = theDataFileMgr.insert(ns, r, r->Size, true);
 	free(r); r = 0;
-	KeyNode middle = keyNode(mid);
-	truncateTo(mid); // mark on left that we no longer have anything from midpoint on.
-	nextChild = middle.prevChildBucket;
+
+	{
+		KeyNode middle = keyNode(mid);
+		nextChild = middle.prevChildBucket;
+
+		// promote middle to a parent node
+		if( parent.isNull() ) { 
+			// make a new parent if we were the root
+			BtreeBucket *p = allocTemp();
+			p->pushBack(middle.recordLoc, middle.key, thisLoc);
+			p->nextChild = rLoc;
+			p->assertValid();
+			idx.head = theDataFileMgr.insert(ns, p, p->Size, true);
+			free(p);
+		} 
+		else {
+			parent.btree()->_insert(parent, ns, middle.recordLoc, middle.key, false, thisLoc, rLoc, idx);
+		}
+	}
+
+	// mark on left that we no longer have anything from midpoint on.
+	truncateTo(mid);  // note this may trash middle.key!  thus we had to promote it before finishing up here.
 
 	// add our new key, there is room now
 	{
 		if( keypos < mid ) {
-			insertHere(thisLoc, ns, keypos, recordLoc, key, lchild, rchild);
+			insertHere(thisLoc, ns, keypos, recordLoc, key, lchild, rchild, idx);
 		} else {
 			int kp = keypos-mid-1; assert(kp>=0);
-			insertHere(rLoc, ns, kp, recordLoc, key, lchild, rchild);
-		}
-	}
-
-	// promote middle to a parent node
-	{
-		if( parent.isNull() ) { 
-			// make a new parent if we were the root
-			BtreeBucket *p = allocTemp();
-			p->pushFront(middle.recordLoc, middle.key, thisLoc);
-			p->nextChild = rLoc;
-			theDataFileMgr.insert(ns, p, p->Size, true);
-			free(p);
-			// set location of new head! xxx
-		} 
-		else {
-			parent.btree()->_insert(parent, ns, middle.recordLoc, middle.key, false, thisLoc, rLoc);
+			insertHere(rLoc, ns, kp, recordLoc, key, lchild, rchild, idx);
 		}
 	}
 }
@@ -307,33 +329,40 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 /* thisloc is the location of this bucket object.  you must pass that in. */
 int BtreeBucket::_insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
 						JSObj& key, bool dupsAllowed,
-						DiskLoc lChild, DiskLoc rChild) { 
+						DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) { 
 	if( key.objsize() > KeyMax ) { 
 		cout << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << endl;
 		return 2;
-	}
+	} assert( key.objsize() > 0 );
 
 	int pos;
 	bool found = find(key, pos);
 	if( found ) {
 		// todo: support dup keys
-		cout << "  dup key failing" << endl;
+		cout << "bree: skipping insert of duplicate key ns:" << ns << "keysize:" << key.objsize() << endl;
 		return 1;
 	}
 
 	DiskLoc& child = getChild(pos);
 	if( child.isNull() || !rChild.isNull() ) { 
-		insertHere(thisLoc, ns, pos, recordLoc, key, lChild, rChild);
+		insertHere(thisLoc, ns, pos, recordLoc, key, lChild, rChild, idx);
 		return 0;
 	}
 
-	return child.btree()->insert(child, ns, recordLoc, key, dupsAllowed);
+	return child.btree()->insert(child, ns, recordLoc, key, dupsAllowed, idx);
 }
 
 int BtreeBucket::insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
-						JSObj& key, bool dupsAllowed) 
+						JSObj& key, bool dupsAllowed, IndexDetails& idx) 
 {
-	return _insert(thisLoc, ns, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc());
+	ninserts++;
+	if( ninserts == 0x7dd ) { 
+		ninserts++;
+	}
+	assertValid();
+	int x = _insert(thisLoc, ns, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
+	assertValid();
+	return x;
 }
 
 /* - BtreeCursor --------------------------------------------------- */

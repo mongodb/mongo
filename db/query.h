@@ -47,12 +47,17 @@
       list of marshalled JSObjects;
 */
 
+#pragma pack(push)
+#pragma pack(1)
+
 struct QueryResult : public MsgData {
 	long long cursorId;
 	int startingFrom;
 	int nReturned;
 	const char *data() { return (char *) (((int *)&nReturned)+1); }
 };
+
+#pragma pack(pop)
 
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 

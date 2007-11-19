@@ -388,7 +388,7 @@ void DataFileMgr::update(
 						idx.head.btree()->insert(
 							idx.head, 
 							idx.indexNamespace().c_str(),
-							dl, kNew, false);
+							dl, kNew, false, idx);
 					}
 				}
 			}
@@ -430,7 +430,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 		idx.head.btree()->insert(
 			idx.head, 
 			idx.indexNamespace().c_str(),
-			newRecordLoc, key, false);
+			newRecordLoc, key, false, idx);
 	}
 }
 

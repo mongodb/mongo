@@ -37,6 +37,7 @@ class BucketBasics {
 	friend class KeyNode;
 public:
 	bool isHead() { return parent.isNull(); }
+	void assertValid();
 protected:
 	DiskLoc& getChild(int pos) { 
 		assert( pos >= 0 && pos <= n );
@@ -55,7 +56,7 @@ protected:
 	   keypos is where to insert -- inserted after that key #.  so keypos=0 is the leftmost one.
 	*/
 	bool basicInsert(int keypos, const DiskLoc& recordLoc, JSObj& key);
-	void pushFront(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevChild);
+	void pushBack(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevChild);
 	void del(int keypos);
 
 	/* !Packed means there is deleted fragment space within the bucket.
@@ -77,7 +78,8 @@ protected:
 	DiskLoc nextChild; // the next bucket
 	int Size; // total size of this btree node in bytes. constant.
 	int flags;
-	int emptySize;
+	int emptySize; // size of the empty region
+	int topSize; // size of the data at the top of the bucket (keys are at the beginning or 'bottom')
 	int n; // # of keys so far.
 	int reserved;
 	_KeyNode& k(int i) { return ((_KeyNode*)data)[i]; }
@@ -90,7 +92,7 @@ public:
 	/* rc: 0 = ok */
 	static DiskLoc addHead(const char *ns); /* start a new index off, empty */
 	int insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
-		JSObj& key, bool dupsAllowed);
+		JSObj& key, bool dupsAllowed, IndexDetails& idx);
 	void update(const DiskLoc& recordLoc, JSObj& key);
 	bool unindex(JSObj& key);
 	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction=1);
@@ -102,10 +104,10 @@ private:
 	static BtreeBucket* allocTemp(); /* caller must release with free() */
 	void insertHere(const DiskLoc& thisLoc, const char *ns, int keypos, 
 		const DiskLoc& recordLoc, JSObj& key,
-		DiskLoc lchild, DiskLoc rchild);
+		DiskLoc lchild, DiskLoc rchild, IndexDetails&);
 	int _insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
 		JSObj& key, bool dupsAllowed,
-		DiskLoc lChild, DiskLoc rChild);
+		DiskLoc lChild, DiskLoc rChild, IndexDetails&);
 	bool find(JSObj& key, int& pos);
 };
 
