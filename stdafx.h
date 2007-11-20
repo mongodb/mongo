@@ -5,6 +5,8 @@
 
 #pragma once
 
+const bool debug=true;
+
 #include "targetver.h"
 
 #include "assert.h"

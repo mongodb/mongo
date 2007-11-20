@@ -214,7 +214,7 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
 	details->lastExtentSize = approxSize;
 	details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
-	cout << "*** new extent size:" << hex << ExtentSize << " loc:" << hex << offset << dec << endl;
+	cout << "*** new extent size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset << dec << endl;
 	cout << "    emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
 	cout << "    " << ns << endl;
 	return e;
@@ -408,7 +408,7 @@ int initialExtentSize(int len) {
 		sz = 1000000000;
 	int z = ((int)sz) & 0xffffff00;
 	assert( z > len );
-	cout << "TEMP: initialExtentSize(" << len << ") returns " << z << endl;
+	cout << "initialExtentSize(" << len << ") returns " << z << endl;
 	return z;
 }
 
@@ -427,6 +427,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 	JSObjBuilder b;
 	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
 	if( !key.isEmpty() ) {
+		cout << "_indexRecord " << key.toString() << endl;
 		idx.head.btree()->insert(
 			idx.head, 
 			idx.indexNamespace().c_str(),
@@ -493,7 +494,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		tabletoidxns = io.getStringField("ns");  // table it indexes
 		JSObj key = io.getObjectField("key");
 		if( name == 0 || *name == 0 || tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
-			cout << "ERROR: bad add index attempt name:" << (name?name:"") << " ns:" << 
+			cout << "user warning: bad add index attempt name:" << (name?name:"") << " ns:" << 
 				(tabletoidxns?tabletoidxns:"") << endl;
 			return DiskLoc();
 		}

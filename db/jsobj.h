@@ -84,6 +84,7 @@ class Element {
 	friend class JSElemIter;
 	friend class JSObj;
 public:
+	string toString();
 	JSType type() { return (JSType) *data; }
 	bool eoo() { return type() == EOO; }
 	int size();
@@ -150,6 +151,7 @@ public:
 
 	~JSObj() { if( iFree ) { free((void*)_objdata); _objdata=0; } }
 
+	string toString();
 	int addFields(JSObj& from, set<string>& fields); /* returns n added */
 	int getFieldNames(set<string>& fields);
 

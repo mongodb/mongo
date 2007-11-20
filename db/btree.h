@@ -89,6 +89,7 @@ protected:
 class BtreeBucket : public BucketBasics { 
 	friend class BtreeCursor;
 public:
+	void dump();
 	/* rc: 0 = ok */
 	static DiskLoc addHead(const char *ns); /* start a new index off, empty */
 	int insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 

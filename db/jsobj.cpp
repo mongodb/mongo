@@ -6,6 +6,27 @@
 
 Element nullElement;
 
+string Element::toString() { 
+	switch( type() ) {
+    case EOO:
+		break;
+    case Date:
+		{
+			stringstream s;
+			s << fieldName() << ": " << hex << date();
+			return s.str();
+		}
+    default:
+		{
+			stringstream s;
+			s << fieldName() << ": ?";
+			return s.str();
+		}
+		break;
+	}
+	return "EOO";
+}
+
 int Element::size() {
 	if( totalSize >= 0 )
 		return totalSize;
@@ -189,6 +210,23 @@ ok:
 }
 
 /* JSObj ------------------------------------------------------------*/
+
+string JSObj::toString() { 
+	stringstream s;
+	s << "{ ";
+	JSElemIter i(*this);
+	Element e = i.next();
+	if( !e.eoo() )
+	while( 1 ) { 
+		s << e.toString();
+		e = i.next();
+		if( e.eoo() )
+			break;
+		s << ",";
+	}
+	s << " }";
+	return s.str();
+}
 
 /* well ordered compare */
 int JSObj::woCompare(JSObj& r)  { 

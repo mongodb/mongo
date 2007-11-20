@@ -19,15 +19,29 @@ inline void BucketBasics::setNotPacked() { flags &= ~Packed; }
 inline void BucketBasics::setPacked() { flags |= Packed; }
 
 void BucketBasics::assertValid() { 
+	if( !debug )
+		return;
 	assert( n >= 0 && n < BucketSize );
 	assert( emptySize >= 0 && emptySize < BucketSize );
 	assert( topSize >= n && topSize <= BucketSize );
 	assert( Size == BucketSize );
-	if( n > 1 ) {
-		JSObj k1 = keyNode(0).key;
-		JSObj k2 = keyNode(n-1).key;
-		int z = k1.woCompare(k2);
-		assert( z <= 0 );
+	if( 1 ) {
+		// slow:
+		for( int i = 0; i < n-1; i++ ) {
+			JSObj k1 = keyNode(i).key;
+			JSObj k2 = keyNode(i+1).key;
+			int z = k1.woCompare(k2);
+			assert( z <= 0 );
+		}
+	}
+	else {
+		//faster:
+		if( n > 1 ) {
+			JSObj k1 = keyNode(0).key;
+			JSObj k2 = keyNode(n-1).key;
+			int z = k1.woCompare(k2);
+			assert( z <= 0 );
+		}
 	}
 }
 
@@ -109,10 +123,12 @@ void BucketBasics::pack() {
 	int tdz = totalDataSize();
 	char temp[BucketSize];
 	int ofs = tdz;
+	topSize = 0;
 	for( int j = 0; j < n; j++ ) { 
 		short ofsold = k(j).keyDataOfs;
 		int sz = keyNode(j).key.objsize();
-		ofs -= sz;
+		ofs -= sz; 
+		topSize += sz;
 		memcpy(temp+ofs, dataAt(ofsold), sz);
 		k(j).keyDataOfs = ofs;
 	}
@@ -134,7 +150,7 @@ inline void BucketBasics::truncateTo(int N) {
 /* - BtreeBucket --------------------------------------------------- */
 
 /* pos: for existing keys k0...kn-1.
-   returns # it goes BEFORE.  so pos=0 -> newkey<k0.
+   returns # it goes BEFORE.  so key[pos-1] < key < key[pos]
    returns n if it goes after the last existing key.
 */
 bool BtreeBucket::find(JSObj& key, int& pos) { 
@@ -158,6 +174,9 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 	if( pos != n ) {
 		JSObj keyatpos = keyNode(pos).key;
 		assert( key.woCompare(keyatpos) <= 0 );
+		if( pos > 0 ) { 
+			assert( keyNode(pos-1).key.woCompare(key) <= 0 );
+		}
 	}
 	return false;
 }
@@ -206,7 +225,13 @@ void BtreeBucket::insertHere(const DiskLoc& thisLoc, const char *ns, int keypos,
 	int mid = n / 2;
 	for( int i = mid+1; i < n; i++ ) {
 		KeyNode kn = keyNode(i);
-		r->pushBack(kn.recordLoc, kn.key, kn.prevChildBucket);
+		if( i == keypos ) {
+			// slip in the new one
+			r->pushBack(recordLoc, key, kn.prevChildBucket);
+			r->pushBack(kn.recordLoc, kn.key, rchild);
+		}
+		else
+			r->pushBack(kn.recordLoc, kn.key, kn.prevChildBucket);
 	}
 	r->nextChild = nextChild;
 	r->assertValid();
@@ -240,8 +265,9 @@ void BtreeBucket::insertHere(const DiskLoc& thisLoc, const char *ns, int keypos,
 		if( keypos < mid ) {
 			insertHere(thisLoc, ns, keypos, recordLoc, key, lchild, rchild, idx);
 		} else {
-			int kp = keypos-mid-1; assert(kp>=0);
-			insertHere(rLoc, ns, kp, recordLoc, key, lchild, rchild, idx);
+			// handled above already.
+			// int kp = keypos-mid-1; assert(kp>=0);
+			//rLoc.btree()->insertHere(rLoc, ns, kp, recordLoc, key, lchild, rchild, idx);
 		}
 	}
 }
@@ -352,14 +378,22 @@ int BtreeBucket::_insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& 
 	return child.btree()->insert(child, ns, recordLoc, key, dupsAllowed, idx);
 }
 
+void BtreeBucket::dump() { 
+	cout << "DUMP btreebucket:\n";
+	for( int i = 0; i < n; i++ ) {
+		KeyNode k = keyNode(i);
+		cout << '\t' << i << '\t' << k.key.toString() << endl;
+	}
+}
+
 int BtreeBucket::insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
 						JSObj& key, bool dupsAllowed, IndexDetails& idx) 
 {
 	ninserts++;
-	if( ninserts == 0x7dd ) { 
-		ninserts++;
-	}
-	assertValid();
+//	if( ninserts == 0x7cf ) { 
+//		dump();
+//	}
+//	assertValid();
 	int x = _insert(thisLoc, ns, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
 	assertValid();
 	return x;
