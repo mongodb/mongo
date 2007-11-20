@@ -249,12 +249,13 @@ void BtreeBucket::insertHere(const DiskLoc& thisLoc, const char *ns, int keypos,
 			p->pushBack(middle.recordLoc, middle.key, thisLoc);
 			p->nextChild = rLoc;
 			p->assertValid();
-			idx.head = theDataFileMgr.insert(ns, p, p->Size, true);
+			parent = idx.head = theDataFileMgr.insert(ns, p, p->Size, true);
 			free(p);
 		} 
 		else {
 			parent.btree()->_insert(parent, ns, middle.recordLoc, middle.key, false, thisLoc, rLoc, idx);
 		}
+		rLoc.btree()->parent = parent;
 	}
 
 	// mark on left that we no longer have anything from midpoint on.
