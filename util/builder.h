@@ -8,7 +8,7 @@
 
 class BufBuilder {
 public:
-	BufBuilder(int initsize = 32768) : size(initsize) { 
+	BufBuilder(int initsize = 512) : size(initsize) { 
 		data = (char *) malloc(size);
 		l = 0;
 	}

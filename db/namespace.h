@@ -40,6 +40,9 @@ public:
 	DiskLoc head; /* btree head */
 	DiskLoc info; /* index info object. { name:, ns:, key: } */
 
+	void getKeysFromObject(JSObj& obj, set<JSObj>& keys);
+
+	// client.table.$index
 	string indexNamespace() { 
 		JSObj io = info.obj();
 		string s;
@@ -47,7 +50,7 @@ public:
 		s = io.getStringField("ns");
 		assert( !s.empty() );
 		s += ".$";
-		s += io.getStringField("name"); // client.table.$index
+		s += io.getStringField("name"); 
 		return s;
 	}
 };

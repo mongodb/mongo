@@ -89,10 +89,16 @@ public:
 	bool eoo() { return type() == EOO; }
 	int size();
 
+	// wrap this element up as a singleton object.
+	JSObj wrap();
+
 	const char * fieldName() { return data + 1; }
 
 	// raw data be careful:
-	const char * value() { return (data + fieldNameSize + 1); }
+	const char * value() const { return (data + fieldNameSize + 1); }
+	int valuesize() { return size() - fieldNameSize - 1; } 
+
+	bool boolean() { return *value() ? true : false; }
 
 	unsigned long long date() { return *((unsigned long long*) value()); }
 	double number() { return *((double *) value()); }
@@ -125,6 +131,14 @@ public:
 			memcmp(data, r.data, sz) == 0;
 	}
 
+	/* like operator== but doesn't check the fieldname,
+	   just the value.
+	   */
+	bool valuesEqual(Element& r) { 
+		return valuesize() == r.valuesize() && 
+			memcmp(value(),r.value(),valuesize()) == 0;
+	}
+
 	const char * rawdata() { return data; }
 
 	Element();
@@ -142,6 +156,7 @@ private:
 class JSObj {
 	friend class JSElemIter;
 public:
+explicit
 	JSObj(const char *msgdata, bool ifree = false) : iFree(ifree) {
 		_objdata = msgdata;
 		_objsize = *((int*) _objdata);
@@ -151,7 +166,11 @@ public:
 
 	~JSObj() { if( iFree ) { free((void*)_objdata); _objdata=0; } }
 
-	string toString();
+	void iWillFree() { 
+		assert(!iFree); iFree = true; 
+	}
+
+	string toString() const;
 	int addFields(JSObj& from, set<string>& fields); /* returns n added */
 	int getFieldNames(set<string>& fields);
 
@@ -165,15 +184,18 @@ public:
 	   */
 	JSObj extractFields(JSObj pattern, JSObjBuilder& b);
 
-	const char *objdata() { return _objdata; }
-	int objsize() { return _objsize; } // includes the embedded size field
-	bool isEmpty() { return objsize() <= 5; }
+	const char *objdata() const { return _objdata; }
+	int objsize() const { return _objsize; } // includes the embedded size field
+	bool isEmpty() const { return objsize() <= 5; }
+
+	/* this is broken if elements aren't in the same order. */
+	bool operator<(const JSObj& r) const { return woCompare(r) < 0; }
 
 	/* -1: l<r. 0:l==r. 1:l>r 
 	   wo='well ordered'.  fields must be in same order in each object.
 	*/
-	int woCompare(JSObj& r);
-	bool woEqual(JSObj& r) { 
+	int woCompare(const JSObj& r) const;
+	bool woEqual(const JSObj& r) const { 
 		return _objsize==r._objsize && memcmp(_objdata,r._objdata,_objsize)==0;
 	}
 
@@ -188,6 +210,15 @@ public:
 		return &e.oid();
 	}
 
+	JSObj(const JSObj& r) { 
+		_objsize = r._objsize;
+		_objdata = r._objdata;
+		iFree = r.iFree;
+		if( iFree ) { 
+			((JSObj&)r)._objdata = 0; 
+			((JSObj&)r).iFree = false; 
+		}
+	}
 	JSObj& operator=(JSObj& r) {
 		if( iFree ) free((void*)_objdata); 
 		_objsize = r._objsize;
@@ -217,6 +248,15 @@ class JSObjBuilder {
 public:
 	JSObjBuilder() { b.skip(4); /*leave room for size field*/ }
 
+	void append(Element& e) { b.append((void*) e.rawdata(), e.size()); }
+
+	/* append an element but with a new name */
+	void appendAs(Element& e, const char *as) { 
+		b.append((char) e.type());
+		b.append(as);
+		b.append((void *) e.value(), e.valuesize());
+	}
+
 	void append(const char *fieldName, double n) { 
 		b.append((char) Number);
 		b.append(fieldName);
@@ -228,18 +268,23 @@ public:
 		b.append((int) strlen(str)+1);
 		b.append(str);
 	}
-	void append(Element& e) { b.append((void*) e.rawdata(), e.size()); }
 
+	JSObj doneAndDecouple() { 
+		int l;
+		return JSObj(decouple(l));
+	}
 	JSObj done() { 
 		return JSObj(_done());
 	}
 
+	/* assume ownership of the buffer - you must then free it (with free()) */
 	char* decouple(int& l) {
 		char *x = _done();
 		l = b.len();
 		b.decouple();
 		return x;
 	}
+	void decouple() { b.decouple(); } // post done() call version.  be sure jsobj frees...
 
 private:
 	char* _done() { 
@@ -254,7 +299,7 @@ private:
 
 class JSElemIter {
 public:
-	JSElemIter(JSObj& jso) {
+	JSElemIter(const JSObj& jso) {
 		pos = jso.objdata() + 4;
 		theend = jso.objdata() + jso.objsize();
 	}
@@ -323,7 +368,10 @@ struct JSObj1 {
 #pragma pack(pop)
 extern JSObj1 js1;
 
-inline JSObj Element::embeddedObject() { assert(type()==Object); return JSObj(value()); }
+inline JSObj Element::embeddedObject() { 
+	assert( type()==Object || type()==Array ); 
+	return JSObj(value()); 
+}
 
 inline JSObj JSObj::copy() const { 
 	if( _objsize == 0 )
@@ -331,4 +379,11 @@ inline JSObj JSObj::copy() const {
 	char *p = (char*) malloc(_objsize);
 	memcpy(p, _objdata, _objsize);
 	return JSObj(p, true);
+}
+
+// wrap this element up as a singleton object.
+inline JSObj Element::wrap() { 
+	JSObjBuilder b;
+	b.append(*this);
+	return b.doneAndDecouple();
 }

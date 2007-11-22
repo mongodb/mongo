@@ -132,7 +132,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 	cout << "runQuery ns:" << ns << " ntoreturn:" << ntoreturn << " queryobjsize:" << 
 		jsobj.objsize();
 
-	BufBuilder b;
+	BufBuilder b(32768);
 
 	JSObj query = jsobj.getObjectField("query");
 	JSObj order = jsobj.getObjectField("orderby");
@@ -214,7 +214,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 	cout << "getMore ns:" << ns << " ntoreturn:" << ntoreturn << " cursorid:" << 
 		cursorid << endl;
 
-	BufBuilder b;
+	BufBuilder b(32768);
 
 	ClientCursor *cc = 0;
 	CCMap::iterator it = clientCursors.find(cursorid);

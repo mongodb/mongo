@@ -16,6 +16,7 @@ _ regex support
 #include "../util/hashtab.h"
 #include "objwrappers.h"
 #include "btree.h"
+#include <algorithm>
 
 DataFileMgr theDataFileMgr;
 
@@ -303,12 +304,47 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 
 void aboutToDelete(const DiskLoc& dl);
 
+void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) { 
+	JSObj keyPattern = info.obj().getObjectField("key");
+	JSObjBuilder b;
+	JSObj key = obj.extractFields(keyPattern, b);
+	if( key.isEmpty() )
+		return;
+	Element f = key.firstElement();
+	if( f.type() != Array ) {
+		b.decouple();
+		key.iWillFree();
+		keys.insert(key);
+		return;
+	}
+	JSObj arr = f.embeddedObject();
+	cout << arr.toString() << endl;
+	JSElemIter i(arr);
+	while( i.more() ) { 
+		Element e = i.next();
+		if( e.eoo() ) break;
+		JSObjBuilder b;
+		b.appendAs(e, f.fieldName());
+		JSObj o = b.doneAndDecouple();
+		cout << "TEMP: got key " << o.toString() << endl;
+		keys.insert(o);
+	}
+}
+
 void _unindexRecord(IndexDetails& id, JSObj& obj) { 
+	set<JSObj> keys;
+	id.getKeysFromObject(obj, keys);
+	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
+		JSObj j = *i;
+		id.head.btree()->unindex(j);
+	}
+/*
 	JSObj idxInfo = id.info.obj();
 	JSObjBuilder b;
 	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
 	if( !key.isEmpty() )
 		id.head.btree()->unindex(key);
+*/
 }
 
 void  unindexRecord(NamespaceDetails *d, Record *todelete) {
@@ -352,6 +388,24 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	}
 }
 
+void setDifference(set<JSObj>& l, set<JSObj>& r, vector<JSObj*> &diff) { 
+	set<JSObj>::iterator i = l.begin();
+	set<JSObj>::iterator j = r.begin();
+	while( 1 ) { 
+		if( i == l.end() )
+			break;
+		cout << i->toString() << endl;
+		while( j != r.end() && *j < *i )
+			j++;
+		if( !i->woEqual(*j) ) {
+			cout << "INDIFF:" << i->toString() << " j:" << j->toString() << endl;
+			const JSObj *j = &*i;
+			diff.push_back( (JSObj *) j );
+		}
+		i++;
+	}
+}
+
 /** Note: as written so far, if the object shrinks a lot, we don't free up space. */
 void DataFileMgr::update(
 		const char *ns,
@@ -375,6 +429,26 @@ void DataFileMgr::update(
 			for( int i = 0; i < d->nIndexes; i++ ) {
 				IndexDetails& idx = d->indexes[i];
 				JSObj idxKey = idx.info.obj().getObjectField("key");
+
+				set<JSObj> oldkeys;
+				set<JSObj> newkeys;
+				idx.getKeysFromObject(oldObj, oldkeys);
+				idx.getKeysFromObject(newObj, newkeys);
+				vector<JSObj*> removed;
+				setDifference(oldkeys, newkeys, removed);
+				for( unsigned i = 0; i < removed.size(); i++ ) { 
+					idx.head.btree()->unindex(*removed[i]);
+				}
+				vector<JSObj*> added;
+				setDifference(newkeys, oldkeys, added);
+				string idxns = idx.indexNamespace();
+				for( unsigned i = 0; i < added.size(); i++ ) { 
+					idx.head.btree()->insert(
+						idx.head, idxns.c_str(),
+						dl, *added[i], false, idx);
+				}
+
+/*
 				JSObjBuilder b1,b2;
 				JSObj kNew = newObj.extractFields(idxKey, b1);
 				JSObj kOld = oldObj.extractFields(idxKey, b2);
@@ -390,7 +464,8 @@ void DataFileMgr::update(
 							idx.indexNamespace().c_str(),
 							dl, kNew, false, idx);
 					}
-				}
+ 				}
+*/
 			}
 		}
 	}
@@ -423,6 +498,15 @@ int followupExtentSize(int len, int lastExtentLen) {
 
 /* add keys to indexes for a new record */
 void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) { 
+	cout << "temp: " << obj.toString() << endl;
+	set<JSObj> keys;
+	idx.getKeysFromObject(obj, keys);
+	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
+		cout << "_indexRecord " << i->toString() << endl;
+		idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
+                                (JSObj&) *i, false, idx);
+	}
+/*
 	JSObj idxInfo = idx.info.obj();
 	JSObjBuilder b;
 	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
@@ -433,6 +517,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 			idx.indexNamespace().c_str(),
 			newRecordLoc, key, false, idx);
 	}
+*/
 }
 
 /* note there are faster ways to build an index in bulk, that can be 

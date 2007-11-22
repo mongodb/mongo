@@ -7,24 +7,34 @@
 Element nullElement;
 
 string Element::toString() { 
+	stringstream s;
 	switch( type() ) {
     case EOO:
-		break;
+		return "EOO";
     case Date:
-		{
-			stringstream s;
-			s << fieldName() << ": " << hex << date();
-			return s.str();
+		s << fieldName() << ": " << hex << date(); break;
+	case Number:
+		s << fieldName() << ": " << number(); break;
+	case Bool: 
+		s << fieldName() << ": " << boolean() ? "true" : "false"; break;
+	case Undefined:
+		s << fieldName() << ": undefined"; break;
+	case jstNULL:
+		s << fieldName() << ": nul"; break;
+	case MaxKey:
+		s << fieldName() << ": MaxKey"; break;
+	case String:
+		s << fieldName() << ": ";
+		if( valuestrsize() > 80 ) s << "ALongString";
+		else { 
+			s << '"' << valuestr() << '"';
 		}
+		break;
     default:
-		{
-			stringstream s;
-			s << fieldName() << ": ?";
-			return s.str();
-		}
+		s << fieldName() << ": ?";
 		break;
 	}
-	return "EOO";
+	return s.str();
 }
 
 int Element::size() {
@@ -198,8 +208,16 @@ bool JSMatcher::matches(JSObj& jsobj) {
 		Element& m = toMatch[i];
 		JSElemIter k(jsobj);
 		while( k.more() ) {
-			if( k.next() == m )
+			Element e = k.next();
+			if( e == m )
 				goto ok;
+			if( e.type() == Array && strcmp(e.fieldName(), m.fieldName()) == 0 ) {
+				JSElemIter ai(e.embeddedObject());
+				while( ai.more() ) { 
+					if( ai.next().valuesEqual(m) )
+						goto ok;
+				}
+			}
 		}
 		return false;
 ok:
@@ -211,7 +229,7 @@ ok:
 
 /* JSObj ------------------------------------------------------------*/
 
-string JSObj::toString() { 
+string JSObj::toString() const { 
 	stringstream s;
 	s << "{ ";
 	JSElemIter i(*this);
@@ -222,14 +240,14 @@ string JSObj::toString() {
 		e = i.next();
 		if( e.eoo() )
 			break;
-		s << ",";
+		s << ", ";
 	}
 	s << " }";
 	return s.str();
 }
 
 /* well ordered compare */
-int JSObj::woCompare(JSObj& r)  { 
+int JSObj::woCompare(const JSObj& r) const { 
 
 	if( isEmpty() )
 		return r.isEmpty() ? 0 : -1;
