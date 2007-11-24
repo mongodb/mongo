@@ -207,6 +207,16 @@ public:
 
 	/* called before query getmore block is iterated */
 	virtual void checkLocation() { } 
+
+	/* used for multikey index traversal to avoid sending back dups. see JSMatcher::matches() */
+	set<DiskLoc> dups;
+	bool dup(DiskLoc loc) {
+		/* to save mem only call this when there is risk of dups (e.g. when 'deep'/multikey) */
+		if( dups.count(loc) > 0 )
+			return true;
+		dups.insert(loc);
+		return false;
+	}
 };
 
 class BasicCursor : public Cursor {

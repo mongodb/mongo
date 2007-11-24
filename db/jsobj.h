@@ -329,7 +329,7 @@ class JSMatcher {
 public:
 	JSMatcher(JSObj& pattern);
 
-	bool matches(JSObj& j);
+	bool matches(JSObj& j, bool *deep = 0);
 private:
 	JSObj& jsobj;
 	vector<Element> toMatch;

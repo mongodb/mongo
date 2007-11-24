@@ -182,7 +182,9 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 	}
 }
 
-bool JSMatcher::matches(JSObj& jsobj) {
+bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
+	if( deep ) 
+		*deep = false;
 
 	/* assuming there is usually only one thing to match.  if more this
 	could be slow sometimes. */
@@ -214,8 +216,11 @@ bool JSMatcher::matches(JSObj& jsobj) {
 			if( e.type() == Array && strcmp(e.fieldName(), m.fieldName()) == 0 ) {
 				JSElemIter ai(e.embeddedObject());
 				while( ai.more() ) { 
-					if( ai.next().valuesEqual(m) )
+					if( ai.next().valuesEqual(m) ) {
+						if( deep )
+							*deep = true;
 						goto ok;
+					}
 				}
 			}
 		}

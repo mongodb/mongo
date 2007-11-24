@@ -2,8 +2,10 @@
 
 #pragma once
 
-const bool dumpIP = false;
-const bool dumpBytesDetailed = false;
+/* packet dumping level of detail. */
+const bool dumpPackets = false; // this must be true to get anything at all
+const bool dumpIP = false; // output the ip address
+const bool dumpBytesDetailed = false; // more data output
 
 #include "message.h"
 
@@ -46,6 +48,8 @@ struct Fragment {
 #pragma pack(pop)
 
 inline void DUMP(Fragment& f, SockAddr& t, const char *tabs) { 
+	if( !dumpPackets )
+		return;
 	cout << tabs << curTimeMillis() % 10000 << ' ';
 	short s = f.fragmentNo;
 	if( s == -32768 ) 
@@ -64,6 +68,8 @@ inline void DUMP(Fragment& f, SockAddr& t, const char *tabs) {
 }
 
 inline void DUMPDATA(Fragment& f, const char *tabs) { 
+	if( !dumpPackets )
+		return;
 	if( f.fragmentNo >= 0 ) { 
 		cout << '\n' << tabs;
 		int x = f.fragmentDataLen();

@@ -72,11 +72,13 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 		DiskLoc rloc = c->currLoc();
 		c->advance(); // must advance before deleting as the next ptr will die
 		JSObj js(r);
-		if( !matcher.matches(js) ) {
+		bool deep;
+		if( !matcher.matches(js, &deep) ) {
 			if( c->tempStopOnMiss() )
 				break;
 		}
-		else {
+		else { 
+			assert( !deep || !c->dup(rloc) ); // can't be a dup, we deleted it!
 			cout << "  found match to delete" << endl;
 			if( !justOne )
 				c->noteLocation();
@@ -111,6 +113,10 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 					break;
 			}
 			else {
+				/* note: we only update one row and quit.  if you do multiple later, 
+				   be careful or multikeys in arrays could break things badly.  best 
+				   to only allow updating a single row with a multikey lookup.
+				   */
 				cout << " found match to update" << endl;
 				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
 				return;
@@ -155,11 +161,12 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 	long long cursorid = 0;
 	while( c->ok() ) {
 		JSObj js = c->current();
-		if( !matcher->matches(js) ) {
+		bool deep;
+		if( !matcher->matches(js, &deep) ) {
 			if( c->tempStopOnMiss() )
 				break;
 		}
-		else {
+		else if( !deep || !c->dup(c->currLoc()) ) {
 			bool ok = true;
 			if( filter.get() ) {
 				JSObj x;
@@ -244,11 +251,12 @@ done:
 				break;
 			}
 			JSObj js = c->current();
-			if( !cc->matcher->matches(js) ) {
+			bool deep;
+			if( !cc->matcher->matches(js, &deep) ) {
 				if( c->tempStopOnMiss() )
 					goto done;
 			} 
-			else {
+			else if( !deep || !c->dup(c->currLoc()) ) {
 				bool ok = true;
 				if( cc->filter.get() ) {
 					JSObj x;
