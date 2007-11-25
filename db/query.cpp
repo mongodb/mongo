@@ -46,10 +46,42 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 		idxKey.getFieldNames(keyFields);
 		if( keyFields == queryFields ) {
 			JSObjBuilder b;
+			JSObj q = query.extractFields(idxKey, b);
+			/* regexp: only supported if form is /^text/ */
+			JSObjBuilder b2;
+			JSElemIter it(q);
+			while( it.more() ) {
+				Element e = it.next();
+				if( e.eoo() )
+					break;
+				if( e.type() == RegEx ) { 
+					if( *e.regexFlags() )
+						goto fail;
+					const char *re = e.regex();
+					const char *p = re;
+					if( *p++ != '^' ) goto fail;
+					while( *p ) {
+						if( *p != ' ' && (*p<'0'||*p>'9') && (*p<='@'||*p>'Z') && (*p<'a'&&*p>'z') )
+							goto fail;
+						p++;
+					}
+					if( it.more() && !it.next().eoo() ) // we must be the last part of the key (for now until we are smarter)
+						goto fail;
+					// ok!
+                    b2.append(e.fieldName(), re+1);
+					break;
+				}
+				else
+					b2.append(e);
+			}
+			JSObj q2 = b2.done();
+			cout << "\nquery old: " << q.toString() << " new:" << q2.toString() << endl;
 			return auto_ptr<Cursor>( 
-				new BtreeCursor(d->indexes[i].head, query.extractFields(idxKey, b), 1, true));
+				new BtreeCursor(d->indexes[i].head, q2, 1, true));
 		}
 	}
+
+fail:
 	return auto_ptr<Cursor>();
 }
 

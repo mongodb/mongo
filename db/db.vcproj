@@ -361,6 +361,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\testdb.js"
+				>
+			</File>
+			<File
 				RelativePath=".\todo.txt"
 				>
 			</File>
