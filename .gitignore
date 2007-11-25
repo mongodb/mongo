@@ -10,3 +10,4 @@
 *.pch 
 db/Debug
 db/db
+log
