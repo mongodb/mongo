@@ -266,7 +266,7 @@ void run() {
 			receivedDelete(m);
 		}
 		else if( m.data->operation == dbGetMore ) {
-			cout << "dbGetMore: not implemented yet!" << endl;
+			receivedGetMore(m);
 		}
 		else {
 			cout << "    operation isn't supported ?" << endl;

@@ -309,8 +309,8 @@ done:
 					}
 				}
 			}
+			c->advance();
 		}
-		c->advance();
 	}
 
 	QueryResult *qr = (QueryResult *) b.buf();
