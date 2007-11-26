@@ -21,9 +21,9 @@ inline bool MS::complain(unsigned now) {
 	if( tdiff(lastComplainTime, now) < (int) complainInterval )
 		return false;
 	if( complainInterval > 4000 ) { 
-		ptrace( cout << ".no ack of send after " << complainInterval/1000 << " seconds " << to.toString() << endl; )
+		etrace( cout << ".no ack of send after " << complainInterval/1000 << " seconds " << to.toString() << endl; )
 		if( complainInterval > 35000 ) { 
-			ptrace( cout << ".GIVING UP on sending message" << endl; )
+			etrace( cout << ".GIVING UP on sending message" << endl; )
 			erasePending(&pc, msgid);
 			return true;
 		}

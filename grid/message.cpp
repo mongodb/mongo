@@ -115,6 +115,7 @@ void MessagingPort::say(int channel, SockAddr& to, Message& toSend, int response
 
 	int mss = conn.mtu() - FragHeader;
 	int left = toSend.data->len;
+	cout << "say() len:" << left << endl;
 	int i = 0;
 	char *p = (char *) toSend.data;
 	while( left>0 ) { 

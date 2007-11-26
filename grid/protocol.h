@@ -12,6 +12,7 @@ typedef WrappingInt MSGID;
 struct Fragment;
 
 #define ptrace(x) 
+#define etrace(x) x
 
 class F; // fragment
 class MR; // message.  R=receiver side.
