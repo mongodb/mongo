@@ -282,6 +282,7 @@ void msg(const char *m, int extras = 0) {
 //	SockAddr db("10.0.21.60", MessagingPort::DBPort);
 //	SockAddr db("172.16.0.179", MessagingPort::DBPort);
 
+for( int q = 0; q < 3; q++ ) {
 	Message send;
 	Message response;
 
@@ -298,6 +299,10 @@ void msg(const char *m, int extras = 0) {
 	cout << "  " << response.data->operation << endl;
 	cout << "  " << response.data->responseTo << endl;*/
 	cout << " data: " << response.data->_data << endl;
+
+				cout << "SLEEP 8 then sending again ----------------------------------------" << endl;
+				sleepsecs(8);
+}
 
 	p.shutdown();
 }
@@ -334,10 +339,10 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "longmsg") == 0 ) {
-			char buf[4096];
-			memset(buf, 'a', 4095);
-			buf[4095] = 0;
-			buf[4094] = 'b';
+			char buf[800000];
+			memset(buf, 'a', 799999);
+			buf[799999] = 0;
+			buf[799998] = 'b';
 			buf[0] = 'c';
 			msg(buf);
 			goingAway = true;

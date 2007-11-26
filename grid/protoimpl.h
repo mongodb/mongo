@@ -112,13 +112,15 @@ inline void SEND(UDPConnection& c, Fragment &f, SockAddr& to, const char *extra=
 	lock lk(coutmutex);
 	DUMP(f, to, "\t\t\t\t\t>");
 	c.sendto((char *) &f, f.fragmentLen, to);
-	cout << extra;
+	if( dumpPackets )
+		cout << extra;
 	DUMPDATA(f, "\t\t\t\t\t      ");
 }
 
 // sender ->
 inline void __sendFrag(ProtocolConnection *pc, EndPoint& to, F *f, bool retran) {
 	assert( f->internals->channel == to.channel );
+    ptrace( cout << ".sendfrag " << f->__num() << ' ' << retran << endl; )
 	SEND(pc->udpConnection, *f->internals, to.sa, retran ? " retran" : "");
 }
 
@@ -160,9 +162,9 @@ inline void __sendRESET(ProtocolConnection *pc, EndPoint& to) {
 inline void __sendMISSING(ProtocolConnection *pc, EndPoint& to, 
 						  MSGID msgid, vector<short>& ids) {
 	int n = ids.size(); 
-	ptrace( cout << "..sendMISSING n:" << n << " firstmissing:" << ids[0] << ' ' << to.toString() << endl; )
+	ptrace( cout << "..sendMISSING n:" << n << " firstmissing:" << ids[0] << " last:" << ids[ids.size()-1] << to.toString() << endl; )
 	if( n > 256 ) {
-		ptrace( cout << "..info: sendMISSING limiting to 256 ids" << endl; )
+		ptrace( cout << "\t..sendMISSING limiting to 256 ids" << endl; )
 		n = 256;
 	}
 	Fragment *f = (Fragment*) malloc(FragHeader + n*2);
@@ -173,7 +175,7 @@ inline void __sendMISSING(ProtocolConnection *pc, EndPoint& to,
 	short *s = (short *) f->data;
 	for( int i = 0; i < n; i++ )
 		*s++ = ids[i];
-	ptrace( cout << "...sendMISSING fraglen:" << f->fragmentLen << endl; )
+//	ptrace( cout << "...sendMISSING fraglen:" << f->fragmentLen << endl; )
 	SEND(pc->udpConnection, *f, to.sa);
 	free(f);
 }
@@ -186,9 +188,11 @@ inline F* __recv(UDPConnection& c, SockAddr& from) {
 		n = c.recvfrom((char*) f, c.mtu(), from);
 		if( n >= 0 )
 			break;
-		if( !goingAway ) 
-			sleepsecs(60);
-		cout << ".recvfrom returned error " << getLastError() << " socket:" << c.sock << endl;
+		if( !goingAway ) {
+			cout << ".recvfrom returned error " << getLastError() << " socket:" << c.sock << endl;
+			cout << "sleeping 2 seconds " << endl;
+			sleepsecs(2);
+		}
 	}
 	assert( f->fragmentLen == n );
 	{

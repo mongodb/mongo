@@ -11,8 +11,13 @@ typedef WrappingInt MSGID;
 
 struct Fragment;
 
+#if 1
 #define ptrace(x) 
-#define etrace(x) x
+#define etrace(x) 
+#else
+#define ptrace(x) { cout << curTimeMillis() % 10000; x }
+#define etrace(x) { cout << curTimeMillis() % 10000; x }
+#endif
 
 class F; // fragment
 class MR; // message.  R=receiver side.
@@ -96,7 +101,7 @@ public:
 	int n() { return f.size(); }
 public:
 	int messageLenExpected;
-	int nExpected;
+	int nExpected, nReceived;
 	void reportMissings(bool reportAll);
 	vector<F*> f;
 	vector<unsigned> reportTimes;
@@ -150,10 +155,30 @@ public:
 
 class CS { 
 public:
-	CS(ProtocolConnection& _pc) : pc(_pc) { }
+	CS(ProtocolConnection& _pc);
+
 	ProtocolConnection& pc;
 	vector<MS*> pendingSend;
 	void resetIt();
+
+	double delayMax;
+	double delay;
+	void delayGotMissing() { 
+		double delayOld = delay;
+		if( delay == 0 )
+			delay = 2.0;
+		else
+			delay = delay * 1.25;
+		if( delay > delayMax ) delay = delayMax;
+		if( delay != delayOld )
+			cout << ".DELAY INCREASED TO " << delay << endl;
+	}
+	void delaySentMsg() { 
+		if( delay != 0.0 ) {
+			delay = delay * 0.5;
+			cout << ".DELAY DECREASED TO " << delay << endl;
+		}
+	}
 };
 
 typedef map<EndPoint,ProtocolConnection*> EndPointToPC;
