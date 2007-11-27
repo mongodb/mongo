@@ -7,6 +7,9 @@
 
 class Cursor;
 
+#pragma pack(push)
+#pragma pack(1)
+
 class Namespace {
 public:
 	Namespace(const char *ns) { 
@@ -96,6 +99,8 @@ public:
 private:
 	DiskLoc _alloc(int len);
 };
+
+#pragma pack(pop)
 
 class NamespaceIndex {
 	friend class NamespaceCursor;

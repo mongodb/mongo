@@ -69,6 +69,8 @@ public:
 		nodes = (Node *) buf;
 		assert(nodes[n-1].hash == 0);
 		assert(nodes[0].hash == 0);
+
+		cout << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
 	}
 
 	Type* get(const Key& k) { 
