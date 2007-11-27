@@ -107,11 +107,13 @@ class NamespaceIndex {
 public:
 	NamespaceIndex() { }
 
-	void init() { 
+	void init(const char *dir) { 
+		string path = dir;
+		path += "namespace.idx";
 		const int LEN = 16 * 1024 * 1024;
-		void *p = f.map("/data/db/namespace.idx", LEN);
+		void *p = f.map(path.c_str(), LEN);
 		if( p == 0 ) { 
-			cout << "couldn't open /data/db/namespace.idx" << endl;
+			cout << "couldn't open namespace.idx" << endl;
 			exit(-3);
 		}
 		ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");

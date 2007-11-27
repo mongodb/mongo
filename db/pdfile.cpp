@@ -18,6 +18,8 @@ _ regex support
 #include "btree.h"
 #include <algorithm>
 
+const char *dbpath = "/data/db/";
+
 DataFileMgr theDataFileMgr;
 
 JSObj::JSObj(Record *r) { 
@@ -652,11 +654,13 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	return loc;
 }
 
-void DataFileMgr::init() {
-	temp.open("/data/db/temp.dat", 64 * 1024 * 1024);
+void DataFileMgr::init(const char *dir) {
+	string path = dir;
+	path += "temp.dat";
+	temp.open(path.c_str(), 64 * 1024 * 1024);
 }
 
 void pdfileInit() {
-	namespaceIndex.init();
-	theDataFileMgr.init();
+	namespaceIndex.init(dbpath);
+	theDataFileMgr.init(dbpath);
 }

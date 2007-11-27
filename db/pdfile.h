@@ -38,7 +38,7 @@ private:
 class DataFileMgr {
 	friend class BasicCursor;
 public:
-	void init();
+	void init(const char *);
 
 	void update(
 		const char *ns,
