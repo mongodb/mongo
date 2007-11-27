@@ -147,7 +147,7 @@ public:
 
 	ProtocolConnection& pc;
 	boost::condition receivedSome;
-	vector<MR*> received;
+ 	vector<MR*> received;
 	map<int,MR*> pendingMessages; /* partly received msgs */
 	map<int,MsgTracker*> trackers; /* channel -> tracker */
 };
@@ -191,6 +191,8 @@ extern EndPointToPC pcMap;
 
 class ProtocolConnection { 
 public:
+	string toString();
+
 	ProtocolConnection(UDPConnection& c, EndPoint& e) : udpConnection(c), myEnd(e), cs(*this), cr(*this) { 
 		init();
 	}

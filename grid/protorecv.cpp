@@ -17,6 +17,35 @@ map<SockAddr,ProtocolConnection*> firstPCForThisAddress;
 
 EndPointToPC pcMap;
 
+#include <signal.h>
+
+void sighandler(int x) { 
+	cout << "ProtocolConnections:" << endl;
+	lock lk(mutexr);
+	EndPointToPC::iterator it = pcMap.begin();
+	while( it != pcMap.end() ) { 
+		cout << "  conn " << it->second->toString() << endl;
+		it++;
+	}
+	cout << "done" << endl;
+}
+
+struct SetSignal { 
+	SetSignal() { 
+#if !defined(_WIN32)
+		signal(SIGUSR2, sighandler);
+#endif
+	}
+} setSignal;
+
+string ProtocolConnection::toString() { 
+	stringstream out;
+	out << to.toString() << " received.size:" << cr.received.size() <<
+		" pendingMessages.size:" << cr.pendingMessages.size() << 
+		"\tpendingSend.size:" << cs.pendingSend.size();
+	return out.str();
+} 
+
 void ProtocolConnection::shutdown() { 
 	ptrace( cout << ".shutdown()" << endl; )
 	if( acceptAnyChannel() || first ) 

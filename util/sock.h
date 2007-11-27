@@ -45,7 +45,7 @@ struct SockAddr {
 		stringstream out;
 		out << inet_ntoa(sa.sin_addr) << ':' 
 			<< sa.sin_port;
-			return out.str();
+		return out.str();
 	}
 
 	unsigned getPort() { return sa.sin_port; }
