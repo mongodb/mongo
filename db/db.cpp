@@ -28,7 +28,7 @@ void quicktest() {
 	cout << "quicktest()\n";
 
 	MemoryMappedFile mmf;
-	char *m = (char *) mmf.map("/tmp/abc", 16384);
+	char *m = (char *) mmf.map("/tmp/quicktest", 16384);
 	//	cout << "mmf reads: " << m << endl;
 	strcpy_s(m, 1000, "hello worldz");
 }
@@ -326,8 +326,10 @@ int main(int argc, char* argv[], char *envp[] )
 	quicktest();
 
 	if( argc >= 2 ) {
-		if( strcmp(argv[1], "quicktest") == 0 )
+	  if( strcmp(argv[1], "quicktest") == 0 ) {
+	    quicktest();
 			return 0;
+	  }
 		if( strcmp(argv[1], "msg") == 0 ) {
 			msg(argc >= 3 ? argv[2] : "ping");
 			goingAway = true;
