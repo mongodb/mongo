@@ -33,6 +33,14 @@ struct SockAddr {
 	struct sockaddr_in sa;
 	socklen_t addressSize;
 
+	bool isLocalHost() const { 
+#if defined(_WIN32)
+		return sa.sin_addr.S_un.S_addr == 0x100007f;
+#else
+		return sa.sin_addr.s_addr == 0x100007f; 
+#endif
+	}
+
 	string toString() { 
 		stringstream out;
 		out << inet_ntoa(sa.sin_addr) << ':' 
@@ -54,6 +62,8 @@ struct SockAddr {
 	}
 };
 
+const int MaxMTU = 16384;
+
 class UDPConnection {
 public:
 	UDPConnection() { sock = 0; }
@@ -61,7 +71,9 @@ public:
 	bool init(const SockAddr& myAddr);
 	int recvfrom(char *buf, int len, SockAddr& sender);
 	int sendto(char *buf, int len, const SockAddr& EndPoint);
-	int mtu() { return 1480; }
+	int mtu(const SockAddr& sa) { 
+		return sa.isLocalHost() ? 16384 : 1480;
+	}
 
 	SOCKET sock;
 };

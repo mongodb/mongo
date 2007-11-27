@@ -182,10 +182,12 @@ inline void __sendMISSING(ProtocolConnection *pc, EndPoint& to,
 
 // -> receiver
 inline F* __recv(UDPConnection& c, SockAddr& from) {
-	Fragment *f = (Fragment *) malloc(c.mtu());
+	Fragment *f = (Fragment *) malloc(MaxMTU);
 	int n;
 	while( 1 ) {
-		n = c.recvfrom((char*) f, c.mtu(), from);
+//		n = c.recvfrom((char*) f, c.mtu(), from);
+		n = c.recvfrom((char*) f, MaxMTU, from);
+		cout << "recvfrom returned " << n << endl;
 		if( n >= 0 )
 			break;
 		if( !goingAway ) {
@@ -195,6 +197,12 @@ inline F* __recv(UDPConnection& c, SockAddr& from) {
 		}
 	}
 	assert( f->fragmentLen == n );
+	if( f->fragmentNo > 0 ) {
+		// don't waste tons of space if the maxmtu is 16k but we get 1480
+		unsigned newsz = (f->fragmentLen + 255) & 0xffffff00;
+		if( newsz < MaxMTU )
+			f = (Fragment *) realloc(f, newsz);
+	}
 	{
 		lock lk(coutmutex);
 		DUMP(*f, from, "\t\t\t\t\t\t\t\t\t\t<");
@@ -222,6 +230,7 @@ inline F::F(Fragment *f) : internals(f), op(NORMAL) {
 }
 inline F::~F() { free(internals); internals=0; }
 inline int F::__num() { return internals->fragmentNo; }
+inline int F::__len() { return internals->fragmentLen; }
 inline MSGID F::__msgid() { return internals->msgId; }
 inline int F::__channel() { return internals->channel; }
 inline bool F::__isREQUESTACK() { return op == REQUESTACK; }

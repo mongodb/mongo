@@ -134,15 +134,8 @@ void MS::send() {
 		if( pc.myEnd.channel >= 0 )
 			__sendRESET(&pc, to);
 		pc.to = to;
-#if defined(_WIN32)
-		pc.cs.delayMax = 1.0;
-#else
-//		cout << "SADDR:" << pc.to.sa.sa.sin_addr.s_addr << endl;
-		if( pc.to.sa.sa.sin_addr.s_addr == 0x100007f ) {
-//			cout << "TEMP: LOCALHOST ************************************* " << endl;
+		if( pc.to.sa.isLocalHost() )
 			pc.cs.delayMax = 1.0;
-		}
-#endif
 	}
 
 	while( pc.cs.pendingSend.size() >= 1 ) {

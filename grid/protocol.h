@@ -70,6 +70,7 @@ public:
 	F(Fragment *f);
 	~F();
 	int __num();   //frag #
+	int __len();
 	MSGID __msgid();
 	int __channel();
 	bool __isREQUESTACK(); // if true, this is just a request for acknowledgement not real data

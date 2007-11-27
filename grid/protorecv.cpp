@@ -123,9 +123,14 @@ bool MR::got(F *frag, EndPoint& fromAddr) {
 	}
 	if( nExpected < 0 && i == 0 ) {
 		messageLenExpected = frag->__firstFragMsgLen();
-		int mss = pc.udpConnection.mtu() - FragHeader;
-		nExpected = (messageLenExpected + mss - 1) / mss;
-		ptrace( cout << ".got first frag expected:" << nExpected << " expectedLen:" << messageLenExpected << endl; )
+		if( messageLenExpected == frag->__len()-FragHeader )
+			nExpected = 1;
+		else {
+			int mss = frag->__len()-FragHeader;
+			assert( messageLenExpected > mss );
+			nExpected = (messageLenExpected + mss - 1) / mss;
+			ptrace( cout << ".got first frag, expect:" << nExpected << "packets, expectedLen:" << messageLenExpected << endl; )
+		}
 	}
 	if( i >= (int) f.size() )
 		f.resize(i+1, 0);

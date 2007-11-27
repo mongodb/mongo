@@ -113,7 +113,7 @@ void MessagingPort::say(int channel, SockAddr& to, Message& toSend, int response
 	ep.sa = to;
 	MS *ms = new MS(pc, ep, msgid);
 
-	int mss = conn.mtu() - FragHeader;
+	int mss = conn.mtu(to) - FragHeader;
 	int left = toSend.data->len;
 	cout << "say() len:" << left << endl;
 	int i = 0;
