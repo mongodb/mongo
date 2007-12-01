@@ -75,7 +75,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 					b2.append(e);
 			}
 			JSObj q2 = b2.done();
-			cout << "\nquery old: " << q.toString() << " new:" << q2.toString() << endl;
+//			cout << "\nquery old: " << q.toString() << " new:" << q2.toString() << endl;
 			return auto_ptr<Cursor>( 
 				new BtreeCursor(d->indexes[i].head, q2, 1, true));
 		}
@@ -86,8 +86,8 @@ fail:
 }
 
 void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
-	cout << "delete ns:" << ns << " queryobjsize:" << 
-		pattern.objsize() << endl;
+//	cout << "delete ns:" << ns << " queryobjsize:" << 
+//		pattern.objsize() << endl;
 
 	if( strncmp(ns, "system.", 7) == 0 ) { 
 		cout << "ERROR: attempt to delete in system namespace " << ns << endl;
@@ -111,7 +111,7 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 		}
 		else { 
 			assert( !deep || !c->dup(rloc) ); // can't be a dup, we deleted it!
-			cout << "  found match to delete" << endl;
+//			cout << "  found match to delete" << endl;
 			if( !justOne )
 				c->noteLocation();
 			theDataFileMgr.deleteRecord(ns, r, rloc);
@@ -123,8 +123,8 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 }
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) {
-	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
-		pattern.objsize();
+//	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
+//		pattern.objsize();
 
 	if( strncmp(ns, "system.", 7) == 0 ) { 
 		cout << "\nERROR: attempt to update in system namespace " << ns << endl;
@@ -149,7 +149,7 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 				   be careful or multikeys in arrays could break things badly.  best 
 				   to only allow updating a single row with a multikey lookup.
 				   */
-				cout << " found match to update" << endl;
+//				cout << " found match to update" << endl;
 				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
 				return;
 			}
@@ -157,10 +157,10 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		}
 	}
 
-	cout << " no match ";
-	if( upsert )
-		cout << "- upsert.";
-	cout << endl;
+//	cout << " no match ";
+//	if( upsert )
+//		cout << "- upsert.";
+//	cout << endl;
 	if( upsert )
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
 }

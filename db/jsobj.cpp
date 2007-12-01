@@ -211,8 +211,12 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 		JSElemIter k(jsobj);
 		while( k.more() ) {
 			Element e = k.next();
-			if( e == m )
-				goto ok;
+			if( strcmp(e.fieldName(), m.fieldName())== 0 ) {
+				if( e.valuesEqual(m) )
+					goto ok;
+				else
+					return false;
+			}
 			if( e.type() == Array && strcmp(e.fieldName(), m.fieldName()) == 0 ) {
 				JSElemIter ai(e.embeddedObject());
 				while( ai.more() ) { 
@@ -224,7 +228,12 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 				}
 			}
 		}
-		return false;
+
+		/* missing.  that is ok iff we were looking for null */
+		if( m.type() == jstNULL || m.type() == Undefined )
+			;
+		else
+			return false;
 ok:
 		;
 	}

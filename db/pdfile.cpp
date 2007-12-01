@@ -320,7 +320,7 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 		return;
 	}
 	JSObj arr = f.embeddedObject();
-	cout << arr.toString() << endl;
+//	cout << arr.toString() << endl;
 	JSElemIter i(arr);
 	while( i.more() ) { 
 		Element e = i.next();
@@ -328,7 +328,7 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 		JSObjBuilder b;
 		b.appendAs(e, f.fieldName());
 		JSObj o = b.doneAndDecouple();
-		cout << "TEMP: got key " << o.toString() << endl;
+//		cout << "TEMP: got key " << o.toString() << endl;
 		keys.insert(o);
 	}
 }
@@ -396,11 +396,11 @@ void setDifference(set<JSObj>& l, set<JSObj>& r, vector<JSObj*> &diff) {
 	while( 1 ) { 
 		if( i == l.end() )
 			break;
-		cout << i->toString() << endl;
+//		cout << i->toString() << endl;
 		while( j != r.end() && *j < *i )
 			j++;
 		if( !i->woEqual(*j) ) {
-			cout << "INDIFF:" << i->toString() << " j:" << j->toString() << endl;
+//			cout << "INDIFF:" << i->toString() << " j:" << j->toString() << endl;
 			const JSObj *j = &*i;
 			diff.push_back( (JSObj *) j );
 		}
@@ -415,7 +415,6 @@ void DataFileMgr::update(
 		const char *buf, int len) 
 {
 	if( toupdate->netLength() < len ) {
-		cout << "temp: update: moving record to a larger location " << ns << endl;
 		// doesn't fit.
 		deleteRecord(ns, toupdate, dl);
 		insert(ns, buf, len);
@@ -472,7 +471,7 @@ void DataFileMgr::update(
 		}
 	}
 
-	cout << "doing update in place" << endl;
+//	cout << "doing update in place" << endl;
 	memcpy(toupdate->data, buf, len);
 }
 
@@ -500,11 +499,11 @@ int followupExtentSize(int len, int lastExtentLen) {
 
 /* add keys to indexes for a new record */
 void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) { 
-	cout << "temp: " << obj.toString() << endl;
+//	cout << "temp: " << obj.toString() << endl;
 	set<JSObj> keys;
 	idx.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
-		cout << "_indexRecord " << i->toString() << endl;
+//		cout << "_indexRecord " << i->toString() << endl;
 		idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
                                 (JSObj&) *i, false, idx);
 	}
@@ -549,10 +548,10 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	{
 		JSObj obj((const char *) buf);
 		OID *oid = obj.getOID();
-		cout << "insert() " << ns << " oid:";
-		if( oid )
-			cout << hex << oid->a << ':' << hex << oid->b << dec;
-		cout << endl;
+//		cout << "insert() " << ns << " oid:";
+//		if( oid )
+//			cout << hex << oid->a << ':' << hex << oid->b << dec;
+//		cout << endl;
 	}
 
 	bool addIndex = false;
@@ -650,7 +649,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	if( d->nIndexes )
 		indexRecord(d, buf, len, loc);
 
-	cout << " inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << endl;
+//	cout << " inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << endl;
 	return loc;
 }
 

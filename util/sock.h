@@ -26,7 +26,7 @@ inline int getLastError() { return errno; }
 #endif
 
 struct SockAddr {
-	SockAddr() { addressSize = sizeof(sockaddr_in); }
+	SockAddr() { addressSize = sizeof(sockaddr_in); memset(&sa, 0, sizeof(sa)); }
 	SockAddr(int sourcePort); /* source side */ 
 	SockAddr(const char *ip, int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
 
@@ -45,7 +45,7 @@ struct SockAddr {
 		stringstream out;
 		out << inet_ntoa(sa.sin_addr) << ':' 
 			<< sa.sin_port;
-			return out.str();
+		return out.str();
 	}
 
 	unsigned getPort() { return sa.sin_port; }
