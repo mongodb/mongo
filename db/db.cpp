@@ -341,8 +341,8 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "dev") == 0 ) { 
-			cout << "dev mode: expect db files in ~/db/" << endl;
-			dbpath = "~/db/";
+			dbpath = "/home/dwight/db/";
+			cout << "dev mode: expect db files in " << dbpath << endl;
 			port++;
 			cout << "listening on port " << port << endl;
 			run();
@@ -371,7 +371,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  msg [msg]    send a request to the db server" << endl;
 	cout << "  msg end      shut down" << endl;
 	cout << "  run          run db" << endl;
-	cout << "  dev          run in dev mode (~/db/, diff port #)" << endl;
+	cout << "  dev          run in dev mode (diff db loc, diff port #)" << endl;
 	cout << "  longmsg      send a long test message to the db server" << endl;
 	cout << "  msglots      send a bunch of test messages, and then wait for answer o nthe last one" << endl;
 	goingAway = true;
