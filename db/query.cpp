@@ -61,7 +61,9 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 					const char *p = re;
 					if( *p++ != '^' ) goto fail;
 					while( *p ) {
-						if( *p != ' ' && (*p<'0'||*p>'9') && (*p<='@'||*p>'Z') && (*p<'a'&&*p>'z') )
+						if( *p == ' ' || (*p>='0'&&*p<='9') || (*p>='@'&&*p<='Z') || (*p>='a'&&*p<='z') )
+							;
+						else
 							goto fail;
 						p++;
 					}
