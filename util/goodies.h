@@ -89,9 +89,9 @@ typedef boost::mutex::scoped_lock lock;
 class Timer { 
 public:
 	Timer() { old = curTimeMicros(); }
+	int millis() { return micros() / 1000; }
 	int micros() { 
 		unsigned n = curTimeMicros();
-		cout << "old:" << old << " new:" << n << endl;
 		return tdiff(old, n); 
 	}
 private:

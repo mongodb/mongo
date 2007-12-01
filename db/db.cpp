@@ -143,7 +143,7 @@ void receivedDelete(Message& m) {
 	deleteObjects(ns, pattern, flags & 1);
 }
 
-void receivedQuery(Message& m) {
+void receivedQuery(Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	int ntoreturn = d.pullInt();
@@ -154,7 +154,7 @@ void receivedQuery(Message& m) {
 		d.nextJsObj().getFieldNames(*fields);
 	}
 	QueryResult* msgdata = 
-		runQuery(ns, ntoreturn, query, fields);
+		runQuery(ns, ntoreturn, query, fields, ss);
 	Message resp;
 	resp.setData(msgdata, true);
 	dbMsgPort.reply(m, resp);
@@ -186,7 +186,7 @@ void receivedInsert(Message& m) {
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
 		JSObj js = d.nextJsObj();
-		cout << "  temp dbinsert: got js object, size=" << js.objsize() << " ns:" << d.getns() << endl;
+//		cout << "  temp dbinsert: got js object, size=" << js.objsize() << " ns:" << d.getns() << endl;
 		theDataFileMgr.insert(d.getns(), (void*) js.objdata(), js.objsize());
 	}
 }
@@ -222,25 +222,31 @@ void run() {
 
 	testTheDb();
 
+	cout << curTimeMillis() % 10000 << " waiting for msg...\n" << endl;
 	Message m;
 	while( 1 ) { 
 		m.reset();
-
+		//ss.clear();
+		stringstream ss;
 		// temp:
 		//		sleepsecs(1);
 
-		cout << curTimeMillis() % 10000 << " waiting for msg..." << endl;
+
+
 		if( !dbMsgPort.recv(m) ) {
 			cout << "MessagingPort::recv() returned false" << endl;
 			break;
 		}
 
-		cout << curTimeMillis() % 10000 << " db.cpp got msg" << endl;
+		ss << curTimeMillis() % 10000 << ' ';
+
+		Timer t;
 
 		//cout << "  got msg" << endl;
 		//cout << "  op:" << m.data->operation << " len:" << m.data->len << endl;
 
 		if( m.data->operation == dbMsg ) { 
+			ss << "msg ";
 			char *p = m.data->_data;
 			int len = strlen(p);
 			if( len > 400 ) 
@@ -257,23 +263,30 @@ void run() {
 			}
 		}
 		else if( m.data->operation == dbQuery ) { 
-			receivedQuery(m);
+			receivedQuery(m, ss);
 		}
 		else if( m.data->operation == dbInsert ) {
+			ss << "insert ";
 			receivedInsert(m);
 		}
 		else if( m.data->operation == dbUpdate ) {
+			ss << "update ";
 			receivedUpdate(m);
 		}
 		else if( m.data->operation == dbDelete ) {
+			ss << "remove ";
 			receivedDelete(m);
 		}
 		else if( m.data->operation == dbGetMore ) {
+			ss << "getmore ";
 			receivedGetMore(m);
 		}
 		else {
 			cout << "    operation isn't supported ?" << endl;
 		}
+
+		ss << ' ' << t.millis() << "ms";
+		cout << ss.str().c_str() << endl;
 	}
 }
 

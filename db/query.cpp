@@ -165,10 +165,11 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
 }
 
-QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<string> > filter) {
-
-	cout << "runQuery ns:" << ns << " ntoreturn:" << ntoreturn << " queryobjsize:" << 
-		jsobj.objsize();
+QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, 
+					  auto_ptr< set<string> > filter, stringstream& ss) {
+	ss << "query:" << ns << " ntoreturn:" << ntoreturn;
+	if( jsobj.objsize() > 100 ) 
+		ss << " querysz:" << jsobj.objsize();
 
 	BufBuilder b(32768);
 
@@ -237,6 +238,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 	qr->_data[2] = 0;
 	qr->_data[3] = 0;
 	qr->len = b.len();
+	ss << " resLen:" << b.len();
 	//	qr->channel = 0;
 	qr->operation = opReply;
 	qr->cursorId = cursorid;
@@ -244,14 +246,14 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, auto_ptr< set<
 	qr->nReturned = n;
 	b.decouple();
 
-	cout << " nReturned:" << n << endl;
+	ss << " nReturned:" << n;
 	return qr;
 }
 
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 
-	cout << "getMore ns:" << ns << " ntoreturn:" << ntoreturn << " cursorid:" << 
-		cursorid << endl;
+//	cout << "getMore ns:" << ns << " ntoreturn:" << ntoreturn << " cursorid:" << 
+//		cursorid << endl;
 
 	BufBuilder b(32768);
 

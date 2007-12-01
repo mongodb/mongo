@@ -328,7 +328,6 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 		JSObjBuilder b;
 		b.appendAs(e, f.fieldName());
 		JSObj o = b.doneAndDecouple();
-//		cout << "TEMP: got key " << o.toString() << endl;
 		keys.insert(o);
 	}
 }
@@ -396,11 +395,9 @@ void setDifference(set<JSObj>& l, set<JSObj>& r, vector<JSObj*> &diff) {
 	while( 1 ) { 
 		if( i == l.end() )
 			break;
-//		cout << i->toString() << endl;
 		while( j != r.end() && *j < *i )
 			j++;
 		if( !i->woEqual(*j) ) {
-//			cout << "INDIFF:" << i->toString() << " j:" << j->toString() << endl;
 			const JSObj *j = &*i;
 			diff.push_back( (JSObj *) j );
 		}

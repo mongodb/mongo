@@ -90,8 +90,6 @@ inline ProtocolConnection::ProtocolConnection(ProtocolConnection& par, EndPoint&
 	first = true;
 	// todo: LOCK
 
-	cout << "TEMP2: count:" << pcMap.count(farEnd) << ' ' << farEnd.toString() << endl;
-
 	assert(pcMap.count(farEnd) == 0);
 //	pcMap[myEnd] = this;
 }
@@ -325,9 +323,7 @@ void receiverThread() {
 				continue;
 			}
 			cout << ".New connection accepted from " << fromAddr.toString() << endl;
-			cout << "TEMP1: count:" << pcMap.count(fromAddr) << ' ' << fromAddr.toString() << endl;
 			mypc = new ProtocolConnection(*startingConn, fromAddr);
-			cout << "TEMP3: count:" << pcMap.count(fromAddr) << ' ' << fromAddr.toString() << endl;
 			pcMap[fromAddr] = mypc;
 		}
 		else

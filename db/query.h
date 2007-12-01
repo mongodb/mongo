@@ -62,7 +62,8 @@ struct QueryResult : public MsgData {
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 
 QueryResult* runQuery(const char *ns, int ntoreturn, 
-					  JSObj j, auto_ptr< set<string> > fieldFilter);
+					  JSObj j, auto_ptr< set<string> > fieldFilter,
+					  stringstream&);
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert);
 void deleteObjects(const char *ns, JSObj pattern, bool justOne);
