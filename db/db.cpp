@@ -203,12 +203,11 @@ void testTheDb() {
 	updateObjects("sys.unittest.delete", j1, j1, true);
 	updateObjects("sys.unittest.delete", j1, j1, false);
 
-	cout << "findAll:\n";
 	auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
 	while( c->ok() ) {
 		Record* r = c->_current();
-		cout << "  gotrec " << r->netLength() << ' ' << 
-			r->data << '\n';
+//		cout << "  gotrec " << r->netLength() << ' ' << 
+//			r->data << '\n';
 		c->advance();
 	}
 	cout << endl;
@@ -217,7 +216,7 @@ void testTheDb() {
 int port = MessagingPort::DBPort;
 
 void run() { 
-	dbMsgPort.init(port);
+	dbMsgPort.init(port, 0);
 
 	pdfileInit();
 
@@ -279,34 +278,39 @@ void run() {
 }
 
 void msg(const char *m, int extras = 0) { 
-	MessagingPort p;
-	p.init(29999);
-
 //	SockAddr db("192.168.37.1", MessagingPort::DBPort);
 	SockAddr db("127.0.0.1", MessagingPort::DBPort);
 //	SockAddr db("10.0.21.60", MessagingPort::DBPort);
 //	SockAddr db("172.16.0.179", MessagingPort::DBPort);
+
+	MessagingPort p;
+	p.init(29999, &db);
 
 for( int q = 0; q < 3; q++ ) {
 	Message send;
 	Message response;
 
 	send.setData( dbMsg , m);
+	int len = send.data->dataLen();
 
 	for( int i = 0; i < extras; i++ )
 		p.say(p.channel(), db, send);
 
-	cout << curTimeMillis() % 10000 << " ****calling DB..." << endl;
+	Timer t;
 	bool ok = p.call(db, send, response);
-	cout << curTimeMillis() % 10000 << " ****ok. response.data:" << ok << " ****" << endl;
+	double tm = t.micros() + 1;
+	cout << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " << 
+		  ((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
 /*	cout << "  " << response.data->id << endl;
 	cout << "  " << response.data->len << endl;
 	cout << "  " << response.data->operation << endl;
 	cout << "  " << response.data->responseTo << endl;*/
-	cout << " data: " << response.data->_data << endl;
+//	cout << " data: " << response.data->_data << endl;
 
-				cout << "SLEEP 8 then sending again ----------------------------------------" << endl;
-				sleepsecs(8);
+	if(  q+1 < 3 ) {
+		cout << "\t\tSLEEP 8 then sending again" << endl;
+		sleepsecs(8);
+	}
 }
 
 	p.shutdown();
@@ -323,12 +327,10 @@ int main(int argc, char* argv[], char *envp[] )
 	srand(curTimeMillis());
 	cout << curTimeMillis() % 10000 << endl;
 
-	quicktest();
-
 	if( argc >= 2 ) {
 	  if( strcmp(argv[1], "quicktest") == 0 ) {
-	    quicktest();
-			return 0;
+		  quicktest();
+		  return 0;
 	  }
 		if( strcmp(argv[1], "msg") == 0 ) {
 			msg(argc >= 3 ? argv[2] : "ping");
@@ -341,6 +343,7 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "dev") == 0 ) { 
+			quicktest();
 			cout << "dev mode: expect db files in ~/db/" << endl;
 			dbpath = "~/db/";
 			port++;

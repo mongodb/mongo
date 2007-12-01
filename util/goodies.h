@@ -64,12 +64,36 @@ inline void sleepmillis(int s) {
 	boost::thread::sleep(xt);
 }
 // note this wraps
+inline int tdiff(unsigned told, unsigned tnew) { 
+	return WrappingInt::diff(tnew, told);
+}
 inline unsigned curTimeMillis() {
 	boost::xtime xt;
 	boost::xtime_get(&xt, boost::TIME_UTC);
 	unsigned t = xt.nsec / 1000000;
 	return (xt.sec & 0xfffff) * 1000 + t;
 }
-inline int tdiff(unsigned told, unsigned tnew) { 
-	return WrappingInt::diff(tnew, told);
+// measures up to 1024 seconds.  or, 512 seconds with tdiff that is...
+inline unsigned curTimeMicros() {
+	boost::xtime xt;
+	boost::xtime_get(&xt, boost::TIME_UTC);
+	unsigned t = xt.nsec / 1000;
+	unsigned secs = xt.sec % 1024;
+	t = secs*1000000 + t;
+	return t;
 }
+using namespace boost;
+typedef boost::mutex::scoped_lock lock;
+
+// simple scoped timer
+class Timer { 
+public:
+	Timer() { old = curTimeMicros(); }
+	int micros() { 
+		unsigned n = curTimeMicros();
+		cout << "old:" << old << " new:" << n << endl;
+		return tdiff(old, n); 
+	}
+private:
+	unsigned old;
+};

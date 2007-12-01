@@ -33,6 +33,7 @@ class ProtocolConnection; // connection overall
 */
 class EndPoint { 
 public:
+	EndPoint() : channel(0) { }
 	int channel;
 	SockAddr sa;
 	bool operator<(const EndPoint& r) const {
@@ -42,7 +43,10 @@ public:
 	}
 	string toString() { 
 		stringstream out;
-		out << sa.toString() << ':' << channel;
+		out << sa.toString() << ':';
+		if( channel == -2 ) out << "ANYCHANNEL";
+		else if( channel == -1 ) out << "AUTOASSIGNCHANNEL";
+		else out << channel;
 		return out.str();
 	}
 };
@@ -52,14 +56,14 @@ public:
    of these in protoimpl.h.
 */
 
-void __sendRESET(ProtocolConnection *pc, EndPoint& to);
+void __sendRESET(ProtocolConnection *pc);
 
 // sender -> 
 void __sendFrag(ProtocolConnection *pc, EndPoint& to, F *, bool retran=false); // transmit a fragment
 void __sendREQUESTACK(ProtocolConnection *pc, EndPoint& to, MSGID msgid, int fragNo); // transmit the REQUEST ACK msg
 
 // receiver -> 
-void __sendACK(ProtocolConnection *pc, EndPoint& to, MSGID msgid); // transmit ACK
+void __sendACK(ProtocolConnection *pc, MSGID msgid); // transmit ACK
 void __sendMISSING(ProtocolConnection *pc, EndPoint& to, MSGID msgid, vector<short>& ids); // transmit MISSING
 
 // -> receiver
@@ -109,6 +113,8 @@ public:
 	EndPoint from;
 };
 
+/* this is for knowing what is already received.  we might get dup packets later and need 
+   to ignore them. */
 class MsgTracker {
 public:
 	std::list<MSGID> recentlyReceivedList;
@@ -141,15 +147,15 @@ public:
 	CR(ProtocolConnection& _pc) : pc(_pc) { }
 	MR* recv();
 public:
-	MR* getPendingMsg(F *fr, EndPoint& fromAddr);
+	MR* getPendingMsg(F *fr);
 	bool oldMessageId(int channel, MSGID m);
 	void queueReceived(MR*);
 
 	ProtocolConnection& pc;
 	boost::condition receivedSome;
- 	vector<MR*> received;
+ 	vector<MR*> received; /* ready to dequeue and use */
 	map<int,MR*> pendingMessages; /* partly received msgs */
-	map<int,MsgTracker*> trackers; /* channel -> tracker */
+	MsgTracker oldMsgTracker;
 };
 
 /* -- sender side ------------------------------------------------*/
@@ -160,6 +166,7 @@ public:
 
 	ProtocolConnection& pc;
 	vector<MS*> pendingSend;
+	boost::condition msgSent;
 	void resetIt();
 
 	double delayMax;
@@ -183,7 +190,7 @@ public:
 };
 
 typedef map<EndPoint,ProtocolConnection*> EndPointToPC;
-extern EndPointToPC pcMap;
+extern EndPointToPC pcMap; /* the *far* endpoint -> pc */
 
 /* -- overall Connection object ----------------------------------*/
 
@@ -193,24 +200,29 @@ class ProtocolConnection {
 public:
 	string toString();
 
-	ProtocolConnection(UDPConnection& c, EndPoint& e) : udpConnection(c), myEnd(e), cs(*this), cr(*this) { 
-		init();
-	}
-	~ProtocolConnection() { 
-		cout << ".warning: ~ProtocolConnection() not implemented (leaks mem)" << endl;
-	}
+	ProtocolConnection(ProtocolConnection& par, EndPoint& to);
+	ProtocolConnection(UDPConnection& c, EndPoint& e, SockAddr *_farEnd);
+	~ProtocolConnection();
+
 	void shutdown();
 	bool acceptAnyChannel() const;
 	UDPConnection& udpConnection;
-	/* note the channel for myEnd might be "any" --
-  	   so you can't use channel for sending.  Use MS/MR.to 
+	/* note the channel for myEnd might be "any" for the any pc -
+  	   so you can't use that channel for sending.  Use MS/MR 
 	   for that.
 	   */
 	EndPoint myEnd;
+	EndPoint farEnd;
+
+	/* if this was instantiated automatically for an acceptAnyChannel(), 
+	   keep a ptr back to it and queue received msgs there. 
+	*/
+	ProtocolConnection *parent;
+
 	CR cr;
 	CS cs;
-	bool first;
-	EndPoint to;
+	bool first; // true if yet to send first message on this conn
+
 private:
 	void init();
 };
@@ -220,7 +232,7 @@ private:
 class MS { 
 public:
 	MS(ProtocolConnection *_pc, EndPoint &_to, MSGID _msgid) : 
-	  pc(*_pc), to(_to), msgid(_msgid), complainInterval(50) { }
+	  pc(_pc), to(_to), msgid(_msgid), complainInterval(50) { }
 	~MS() { 
 		for( unsigned i = 0; i < fragments.size(); i++ )
 			delete fragments[i];
@@ -234,7 +246,7 @@ public:
 	/* request retrainsmissions. */
 	bool complain(unsigned now);
 
-	ProtocolConnection& pc;
+	ProtocolConnection* pc;
 	EndPoint to;
 	const MSGID msgid;
 	unsigned lastComplainTime;

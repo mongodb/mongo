@@ -125,18 +125,25 @@ public:
 		return p + strlen(p) + 1;
 	}
 
-	bool operator==(Element& r) { 
-		int sz = size();
-		return sz == r.size() && 
-			memcmp(data, r.data, sz) == 0;
-	}
-
 	/* like operator== but doesn't check the fieldname,
 	   just the value.
 	   */
 	bool valuesEqual(Element& r) { 
-		return valuesize() == r.valuesize() && 
+		bool match= valuesize() == r.valuesize() && 
 			memcmp(value(),r.value(),valuesize()) == 0;
+		return match;
+		// todo: make "0" == 0.0, undefined==null
+	}
+
+	bool operator==(Element& r) { 
+		if( strcmp(fieldName(), r.fieldName()) != 0 )
+			return false;
+		return valuesEqual(r);
+/*
+		int sz = size();
+		return sz == r.size() && 
+			memcmp(data, r.data, sz) == 0;
+*/
 	}
 
 	const char * rawdata() { return data; }

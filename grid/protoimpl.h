@@ -9,9 +9,6 @@ const bool dumpBytesDetailed = false; // more data output
 
 #include "message.h"
 
-using namespace boost;
-typedef boost::mutex::scoped_lock lock;
-
 extern boost::mutex coutmutex;
 
 const int FragMax = 1480;
@@ -136,27 +133,27 @@ inline void __sendREQUESTACK(ProtocolConnection *pc, EndPoint& to,
 }
 
 // receiver -> 
-inline void __sendACK(ProtocolConnection *pc, EndPoint& to, MSGID msgid) {
-	ptrace( cout << "...__sendACK() to:" << to.toString() << " msg:" << msgid << endl; )
+inline void __sendACK(ProtocolConnection *pc, MSGID msgid) {
+	ptrace( cout << "...__sendACK() to:" << pc->farEnd.toString() << " msg:" << msgid << endl; )
 	Fragment f;
 	f.msgId = msgid;
-	f.channel = to.channel; assert( f.channel >= 0 );
+	f.channel = pc->farEnd.channel; assert( f.channel >= 0 );
 	f.fragmentNo = -32768;
 	f.fragmentLen = FragHeader;
-	SEND(pc->udpConnection, f, to.sa);
+	SEND(pc->udpConnection, f, pc->farEnd.sa);
 }
 
 /* this is to clear old state for the channel in terms of what msgids are 
    already sent. 
 */
-inline void __sendRESET(ProtocolConnection *pc, EndPoint& to) {
+inline void __sendRESET(ProtocolConnection *pc) {
 	Fragment f;
 	f.msgId = -1;
-	f.channel = to.channel; assert( f.channel >= 0 );
+	f.channel = pc->farEnd.channel; assert( f.channel >= 0 );
 	f.fragmentNo = -32766;
 	f.fragmentLen = FragHeader;
-	ptrace( cout << "...__sendRESET() to:" << to.toString() << endl; )
-	SEND(pc->udpConnection, f, to.sa);
+	ptrace( cout << "...__sendRESET() to:" << pc->farEnd.toString() << endl; )
+	SEND(pc->udpConnection, f, pc->farEnd.sa);
 }
 
 inline void __sendMISSING(ProtocolConnection *pc, EndPoint& to, 
@@ -187,7 +184,7 @@ inline F* __recv(UDPConnection& c, SockAddr& from) {
 	while( 1 ) {
 //		n = c.recvfrom((char*) f, c.mtu(), from);
 		n = c.recvfrom((char*) f, MaxMTU, from);
-		cout << "recvfrom returned " << n << endl;
+//		cout << "recvfrom returned " << n << endl;
 		if( n >= 0 )
 			break;
 		if( !goingAway ) {

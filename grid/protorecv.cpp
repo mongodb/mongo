@@ -6,28 +6,49 @@
 #include "../util/goodies.h"
 #include "../util/sock.h"
 #include "protoimpl.h"
+#include "../db/introspect.h"
 
+boost::mutex biglock;
 boost::mutex coutmutex;
-boost::mutex mutexr;
+boost::mutex threadStarterMutex;
 boost::condition threadActivate; // creating a new thread, grabbing threadUseThisOne
 ProtocolConnection *threadUseThisOne = 0;
 void receiverThread();
 
 map<SockAddr,ProtocolConnection*> firstPCForThisAddress;
 
+/* todo: eventually support multiple listeners on diff ports.  not 
+         bothering yet.
+*/
+ProtocolConnection *any = 0;
+
 EndPointToPC pcMap;
+
+class GeneralInspector : public SingleResultObjCursor { 
+	Cursor* clone() { return new GeneralInspector(*this); }
+	void fill() {
+		b.append("version", "1.0.0.0");
+		b.append("versionDesc", "none");
+		b.append("nConnections", pcMap.size());
+	}
+public:
+	GeneralInspector() { reg("intr.general"); }
+} _geninspectorproto;
 
 #include <signal.h>
 
+/* our version of netstat */
 void sighandler(int x) { 
 	cout << "ProtocolConnections:" << endl;
-	lock lk(mutexr);
+	lock lk(biglock);
 	EndPointToPC::iterator it = pcMap.begin();
 	while( it != pcMap.end() ) { 
 		cout << "  conn " << it->second->toString() << endl;
 		it++;
 	}
-	cout << "done" << endl;
+	cout << "any: ";
+	if( any ) cout << any->toString();
+	cout << "\ndone" << endl;
 }
 
 struct SetSignal { 
@@ -40,41 +61,81 @@ struct SetSignal {
 
 string ProtocolConnection::toString() { 
 	stringstream out;
-	out << to.toString() << " received.size:" << cr.received.size() <<
-		" pendingMessages.size:" << cr.pendingMessages.size() << 
-		"\tpendingSend.size:" << cs.pendingSend.size();
+	out << myEnd.toString() << " <> " <<
+		farEnd.toString() << " rcvd.size:" << cr.received.size() <<
+		" pndngMsgs.size:" << cr.pendingMessages.size() << 
+		" pndngSnd.size:" << cs.pendingSend.size();
 	return out.str();
 } 
+
+ProtocolConnection::~ProtocolConnection() { 
+	cout << ".warning: ~ProtocolConnection() not implemented (leaks mem etc)" << endl;
+	if( any == this )
+		any = 0;
+}
 
 void ProtocolConnection::shutdown() { 
 	ptrace( cout << ".shutdown()" << endl; )
 	if( acceptAnyChannel() || first ) 
 		return;
 	ptrace( cout << ".   to:" << to.toString() << endl; )
-	__sendRESET(this, to);
+	__sendRESET(this);
+}
+
+inline ProtocolConnection::ProtocolConnection(ProtocolConnection& par, EndPoint& _to) :
+  udpConnection(par.udpConnection), myEnd(par.myEnd), cs(*this), cr(*this) 
+{ 
+	parent = &par;
+	farEnd = _to;
+	first = true;
+	// todo: LOCK
+
+	cout << "TEMP2: count:" << pcMap.count(farEnd) << ' ' << farEnd.toString() << endl;
+
+	assert(pcMap.count(farEnd) == 0);
+//	pcMap[myEnd] = this;
 }
 
 inline bool ProtocolConnection::acceptAnyChannel() const { 
 	return myEnd.channel == MessagingPort::ANYCHANNEL; 
 }
 
-void ProtocolConnection::init() {
+inline void ProtocolConnection::init() {
 	first = true;
-	lock lk(mutexr);
+	lock lk(biglock);
+	lock tslk(threadStarterMutex);
+
+	if( acceptAnyChannel() ) {
+		assert( any == 0 );
+		any = this;
+	}
+	else {
+		pcMap[farEnd] = this;
+	}
+
 	if( firstPCForThisAddress.count(myEnd.sa) == 0 ) { 
 		firstPCForThisAddress[myEnd.sa] = this;
-		// need a receiver thread
+		// need a receiver thread.  one per port # we listen on. shared by channels.
 		boost::thread receiver(receiverThread);
 		threadUseThisOne = this;
-		pcMap[myEnd] = this;
 		threadActivate.notify_one();
 		return;
 	}
-	pcMap[myEnd] = this;
+}
+
+ProtocolConnection::ProtocolConnection(UDPConnection& c, EndPoint& e, SockAddr *_farEnd) : 
+  udpConnection(c), myEnd(e), cs(*this), cr(*this) 
+{ 
+	parent = this;
+	if( _farEnd ) { 
+		farEnd.channel = myEnd.channel;
+		farEnd.sa = *_farEnd;
+	}
+	init();
 }
 
 /* find message for fragment */
-MR* CR::getPendingMsg(F *fr, EndPoint& fromAddr) {
+MR* CR::getPendingMsg(F *fr) {
 	MR *m;
 	map<int,MR*>::iterator i = pendingMessages.find(fr->__msgid());
 	if( i == pendingMessages.end() ) {
@@ -82,7 +143,7 @@ MR* CR::getPendingMsg(F *fr, EndPoint& fromAddr) {
 			cout << ".warning: pendingMessages.size()>20, ignoring msg until we dequeue" << endl;
 			return 0;
 		}
-		m = new MR(&pc, fr->__msgid(), fromAddr);
+		m = new MR(&pc, fr->__msgid(), pc.farEnd);
 		pendingMessages[fr->__msgid()] = m;
 	}
 	else
@@ -170,7 +231,7 @@ bool MR::got(F *frag, EndPoint& fromAddr) {
 		frag = 0;
 		reportTimes.resize(f.size(), 0);
 		if( complete() ) {
-			__sendACK(&pc, fromAddr, msgid);
+			__sendACK(&pc, msgid);
 			return true;
 		} 
 		reportMissings(true);
@@ -189,7 +250,7 @@ bool MR::got(F *frag, EndPoint& fromAddr) {
 
 	if( !complete() )
 		return false;
-	__sendACK(&pc, fromAddr, msgid);
+	__sendACK(&pc, msgid);
 	return true;
 
 /*
@@ -216,27 +277,28 @@ bool MR::got(F *frag, EndPoint& fromAddr) {
 MR* CR::recv() { 
 	MR *x;
 	{
-		lock lk(mutexr);
+		lock lk(biglock);
 		while( received.empty() )
 			receivedSome.wait(lk);
 		x = received.back();
 		received.pop_back();
 	}
-	ptrace( cout << "TEMP: CR:recv complete! ***********************************"; )
 	return x;
 }
 
 // this is how we tell protosend.cpp we got these
-void gotACK(F*, ProtocolConnection *, EndPoint&);
-void gotMISSING(F*, ProtocolConnection *, EndPoint&);
+void gotACK(F*, ProtocolConnection *);
+void gotMISSING(F*, ProtocolConnection *);
 
 void receiverThread() {
-	ProtocolConnection *mypc;
+	ProtocolConnection *startingConn; // this thread manages many; this is just initiator or the parent for acceptany
+	UDPConnection *uc;
 	{
-		lock lk(mutexr);
+		lock lk(threadStarterMutex);
 		while( 1 ) {
 			if( threadUseThisOne != 0 ) {
-				mypc = threadUseThisOne;
+				uc = &threadUseThisOne->udpConnection;
+				startingConn = threadUseThisOne;
 				threadUseThisOne = 0;
 				break;
 			}
@@ -244,52 +306,60 @@ void receiverThread() {
 		}
 	}
 
+	cout << "\n.Activating a new receiverThread\n   " << startingConn->toString() << '\n' << endl;
+
 	EndPoint fromAddr;
 	while( 1 ) {
-		F *f = __recv(mypc->udpConnection, fromAddr.sa);
+		F *f = __recv(*uc, fromAddr.sa);
+		lock l(biglock);
 		fromAddr.channel = f->__channel();
 		ptrace( cout << "..__recv() from:" << fromAddr.toString() << " frag:" << f->__num() << endl; )
-		ProtocolConnection *pc = mypc;
-		if( fromAddr.channel != pc->myEnd.channel ) {
-			if( !pc->acceptAnyChannel() ) { 
-				ptrace( cout << ".WARNING: wrong channel\n"; )
-				ptrace( cout << ".  expected:" << pc->myEnd.channel << " got:" << fromAddr.channel << '\n'; )
-				ptrace( cout << ".  this may be ok if you just restarted" << endl; )
+		assert( fromAddr.channel >= 0 );
+		EndPointToPC::iterator it = pcMap.find(fromAddr);
+		ProtocolConnection *mypc;
+		if( it == pcMap.end() ) {
+			if( !startingConn->acceptAnyChannel() ) {
+				cout << ".WARNING: got packet from an unknown endpoint:" << fromAddr.toString() << endl;
+			    cout << ".  this may be ok if you just restarted" << endl;
 				delete f;
 				continue;
 			}
+			cout << ".New connection accepted from " << fromAddr.toString() << endl;
+			cout << "TEMP1: count:" << pcMap.count(fromAddr) << ' ' << fromAddr.toString() << endl;
+			mypc = new ProtocolConnection(*startingConn, fromAddr);
+			cout << "TEMP3: count:" << pcMap.count(fromAddr) << ' ' << fromAddr.toString() << endl;
+			pcMap[fromAddr] = mypc;
 		}
+		else
+			mypc = it->second;
 
-		MsgTracker *& track = pc->cr.trackers[f->__channel()];
-		if( track == 0 ) {
-			ptrace( cout << "..creating MsgTracker for channel " << f->__channel() << endl; )
-			track = new MsgTracker();
-		}
+		assert( fromAddr.channel == mypc->farEnd.channel );
+		MsgTracker& track = mypc->cr.oldMsgTracker;
 
 		if( f->op != F::NORMAL ) {
 			if( f->__isACK() ) { 
-				gotACK(f, pc, fromAddr);
+				gotACK(f, mypc);
 				delete f;
 				continue;
 			}
 			if( f->__isMISSING() ) { 
-				gotMISSING(f, pc, fromAddr);
+				gotMISSING(f, mypc);
 				delete f;
 				continue;
 			}
 			if( f->op == F::RESET ) { 
 				ptrace( cout << ".got RESET" << endl; )
-				track->reset();
-				pc->cs.resetIt();
+				track.reset();
+				mypc->cs.resetIt();
 				delete f;
 				continue;
 			}
 		}
 
-		if( track->recentlyReceived.count(f->__msgid()) ) { 
+		if( track.recentlyReceived.count(f->__msgid()) ) { 
 			// already done with it.  ignore, other than acking.
 			if( f->__isREQUESTACK() )
-				__sendACK(pc, fromAddr, f->__msgid());
+				__sendACK(mypc, f->__msgid());
 			else { 
 				ptrace( cout << ".ignoring packet about msg already received msg:" << f->__msgid() << " op:" << f->op << endl; )
 			}
@@ -297,26 +367,24 @@ void receiverThread() {
 			continue;
 		}
 
-		if( f->__msgid() <= track->lastFullyReceived && !track->recentlyReceivedList.empty() ) {
+		if( f->__msgid() <= track.lastFullyReceived && !track.recentlyReceivedList.empty() ) {
 			// reconnect on an old channel?
 			ptrace( cout << ".warning: strange msgid:" << f->__msgid() << " received, last:" << track->lastFullyReceived << " conn:" << fromAddr.toString() << endl; )
 		}
 
-		MR *m = pc->cr.getPendingMsg(f, fromAddr); /* todo: optimize for single fragment case? */
+		MR *m = mypc->cr.getPendingMsg(f); /* todo: optimize for single fragment case? */
 		if( m == 0 ) { 
 			ptrace( cout << "..getPendingMsg() returns 0" << endl; )
 			delete f;
 			continue;
 		}
 		if( m->got(f, fromAddr) ) {
-			track->got(m->msgid);
+			track.got(m->msgid);
 			m->removeFromReceivingList();
 			{
-				lock lk(mutexr);
-				pc->cr.received.push_back(m);
-				pc->cr.receivedSome.notify_one();
+				mypc->parent->cr.received.push_back(m);
+				mypc->parent->cr.receivedSome.notify_one();
 			}
 		}
 	}
 }
-

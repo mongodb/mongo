@@ -13,6 +13,10 @@ public:
 
 	/* channels: if you are a server you can pass ANYCHANNEL to indicate you never initiate a 
 	   msg to someone yourself. the default will assign a new channel id to the messagingport.
+
+	   channels are our version of "ports". we run multiple connections to a single endpoint 
+	   over one port, with one datagram receiver thread.  we then multiplex them out to the 
+	   appropriate receiver (MessagingPort::recv() caller) by channel.
 	   */
 	enum { AUTOASSIGNCHANNEL = -1, ANYCHANNEL = -2 };
 	MessagingPort(int channel = AUTOASSIGNCHANNEL); 
@@ -20,7 +24,7 @@ public:
 
 	void shutdown() { if( pc ) pc->shutdown(); pc = 0; }
 
-	void init(int myUdpPort = 0 );
+	void init(int myUdpPort, SockAddr *farEnd);
 
 	/* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.
 	   also, the Message data will go out of scope on the subsequent recv call. 

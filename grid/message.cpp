@@ -37,7 +37,9 @@ MessagingPort::~MessagingPort() {
 	delete pc; pc = 0;
 }
 
-void MessagingPort::init(int myUdpPort) {
+extern boost::mutex biglock;
+
+void MessagingPort::init(int myUdpPort, SockAddr *farEnd) {
 	SockAddr me(myUdpPort);
 	if( !conn.init(me) ) {
 		cout << "/conn init failure in MessagingPort::init " << myUdpPort << endl;
@@ -47,7 +49,7 @@ void MessagingPort::init(int myUdpPort) {
 	ep.channel = myChannel;
 	ep.sa = me;
 	cout << "/Initializing MessagingPort " << ep.toString() << endl;
-	pc = new ProtocolConnection(conn, ep);
+	pc = new ProtocolConnection(conn, ep, farEnd);
 }
 
 bool MessagingPort::recv(Message& m) {
