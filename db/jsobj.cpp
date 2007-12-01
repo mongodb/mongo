@@ -451,6 +451,12 @@ struct RXTest {
 		pcrecpp::RE re("h.llo");
 		assert( re.FullMatch("hello") );
 		assert( !re1.FullMatch("hello") );
+
+
+		pcrecpp::RE_Options options;
+		options.set_utf8(true);
+		pcrecpp::RE part("dwi", options);
+		assert( part.PartialMatch("dwight") );
 	}
 } rxtest;
 
