@@ -27,7 +27,7 @@ EndPointToPC pcMap;
 class GeneralInspector : public SingleResultObjCursor { 
 	Cursor* clone() { return new GeneralInspector(*this); }
 	void fill() {
-		b.append("version", "1.0.0.0");
+		b.append("version", "1.0.0.1");
 		b.append("versionDesc", "none");
 		b.append("nConnections", pcMap.size());
 	}

@@ -92,7 +92,10 @@ public:
 	// wrap this element up as a singleton object.
 	JSObj wrap();
 
-	const char * fieldName() { return data + 1; }
+	const char * fieldName() { 
+		if( eoo() ) return ""; // no fieldname for it.
+		return data + 1; 
+	}
 
 	// raw data be careful:
 	const char * value() const { return (data + fieldNameSize + 1); }

@@ -21,6 +21,7 @@ _ regex support
 const char *dbpath = "/data/db/";
 
 DataFileMgr theDataFileMgr;
+extern int otherTraceLevel;
 
 JSObj::JSObj(Record *r) { 
 	_objdata = r->data;
@@ -337,7 +338,17 @@ void _unindexRecord(IndexDetails& id, JSObj& obj) {
 	id.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
 		JSObj j = *i;
-		id.head.btree()->unindex(j);
+		if( otherTraceLevel >= 5 ) {
+			cout << "_unindexRecord() " << obj.toString();
+			cout << "\n  unindex:" << j.toString() << endl;
+		}
+		bool ok = id.head.btree()->unindex(j);
+		if( !ok ) { 
+			cout << "ERROR: _unindex failed" << endl;
+			cout << "  " << obj.toString() << endl;
+			cout << "  " << j.toString() << endl;
+			cout << "  if you added dup keys this can happen until we support that" << endl;
+		}
 	}
 /*
 	JSObj idxInfo = id.info.obj();

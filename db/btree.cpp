@@ -9,6 +9,7 @@ const int BucketSize = 8192;
 const int KeyMax = BucketSize / 8;
 
 int ninserts = 0;
+extern int otherTraceLevel;
 
 inline KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
   prevChildBucket(k.prevChildBucket), recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs) { }
@@ -31,7 +32,13 @@ void BucketBasics::assertValid() {
 			JSObj k1 = keyNode(i).key;
 			JSObj k2 = keyNode(i+1).key;
 			int z = k1.woCompare(k2);
-			assert( z <= 0 );
+			if( z > 0 ) {
+				cout << "ERROR: btree key order corrupt.  Keys:" << endl;
+				for( int j = 0; j < n; j++ ) { 
+					cout << "  " << keyNode(j).key.toString() << endl;
+				}
+				assert(false);
+			}
 		}
 	}
 	else {
@@ -168,6 +175,7 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 			pos = m;
 			return true;
 		}
+		x = key.woCompare(M.key);
 	}
 	// not found
 	pos = l;
@@ -183,8 +191,17 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 
 bool BtreeBucket::unindex(JSObj& key ) { 
 	int pos;
+	cout << key.toString() << endl;
+	if( otherTraceLevel >= 10 )
+		dump();
 	if( find(key, pos) ) {
+		if( otherTraceLevel >= 2 )
+			cout << "unindex(): found key to delete:" << key.toString() << endl;
 		del(pos);
+		if( otherTraceLevel >= 10 ) {
+			cout << "AFTER delete:" << endl;
+			dump();
+		}
 		assertValid();
 		return true;
 	}
@@ -406,6 +423,12 @@ BtreeCursor::BtreeCursor(DiskLoc head, JSObj k, int _direction, bool sm) :
     direction(_direction), stopmiss(sm) 
 {
 	bool found;
+
+	if( otherTraceLevel >= 12 ) {
+		cout << "BTreeCursor(). dumping head bucket" << endl;
+		head.btree()->dump();
+	}
+
 	bucket = head.btree()->locate(head, k, keyOfs, found, direction);
 }
 

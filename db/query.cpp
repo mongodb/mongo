@@ -167,13 +167,38 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
 }
 
+int queryTraceLevel = 0;
+int otherTraceLevel = 0;
+
+inline void runCommands(const char *ns, JSObj& jsobj, stringstream& ss) { 
+    if( strcmp(ns, "system.$cmd") != 0 ) 
+		return;
+
+	ss << "\n  $cmd: " << jsobj.toString();
+
+	Element e = jsobj.firstElement();
+	if( e.eoo() ) return;
+	if( e.type() == Number ) { 
+		if( strcmp(e.fieldName(),"queryTraceLevel") == 0 )
+			queryTraceLevel = (int) e.number();
+		else if( strcmp(e.fieldName(),"traceAll") == 0 ) { 
+			queryTraceLevel = (int) e.number();
+			otherTraceLevel = (int) e.number();
+		}
+	}
+}
+
 QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) {
 	ss << "query:" << ns << " ntoreturn:" << ntoreturn;
 	if( jsobj.objsize() > 100 ) 
 		ss << " querysz:" << jsobj.objsize();
+	if( queryTraceLevel >= 1 )
+		cout << "query: " << jsobj.toString() << endl;
 
 	BufBuilder b(32768);
+
+	runCommands(ns, jsobj, ss);
 
 	JSObj query = jsobj.getObjectField("query");
 	JSObj order = jsobj.getObjectField("orderby");
@@ -188,14 +213,20 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj,
 	int n = 0;
 
 	auto_ptr<Cursor> c = getSpecialCursor(ns);
-	if( c.get() == 0 )
+	if( c.get() == 0 ) {
 		c = getIndexCursor(ns, query, order);
-	if( c.get() == 0 )
+	}
+	if( c.get() == 0 ) {
 		c = theDataFileMgr.findAll(ns);
+		if( queryTraceLevel >= 1 )
+			cout << "  basiccursor" << endl;
+	}
 
+	int nscanned = 0;
 	long long cursorid = 0;
 	while( c->ok() ) {
 		JSObj js = c->current();
+		nscanned++;
 		bool deep;
 		if( !matcher->matches(js, &deep) ) {
 			if( c->tempStopOnMiss() )
@@ -233,6 +264,9 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj,
 		}
 		c->advance();
 	}
+
+	if( queryTraceLevel >=2 )
+		cout << "  nscanned:" << nscanned << "\n  ";
 
 	qr = (QueryResult *) b.buf();
 	qr->_data[0] = 0;
