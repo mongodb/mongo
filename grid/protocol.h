@@ -184,6 +184,7 @@ public:
 	void delaySentMsg() { 
 		if( delay != 0.0 ) {
 			delay = delay * 0.5;
+			if( delay<0.5 ) delay = 0;
 			cout << ".DELAY DECREASED TO " << delay << endl;
 		}
 	}
