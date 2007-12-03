@@ -182,6 +182,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 	}
 }
 
+/* deep means we looked into arrays for a match */
 bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	if( deep ) 
 		*deep = false;
@@ -207,25 +208,25 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	}
 
 	for( int i = 0; i < n; i++ ) {
-		Element& m = toMatch[i];
+		Element& m = toMatch[i]; 
 		JSElemIter k(jsobj);
 		while( k.more() ) {
 			Element e = k.next();
 			if( strcmp(e.fieldName(), m.fieldName())== 0 ) {
-				if( e.valuesEqual(m) )
+				if( e.valuesEqual(m) ) {
 					goto ok;
-				else
-					return false;
-			}
-			if( e.type() == Array && strcmp(e.fieldName(), m.fieldName()) == 0 ) {
-				JSElemIter ai(e.embeddedObject());
-				while( ai.more() ) { 
-					if( ai.next().valuesEqual(m) ) {
-						if( deep )
-							*deep = true;
-						goto ok;
+				}
+				else if( e.type() == Array ) {
+					JSElemIter ai(e.embeddedObject());
+					while( ai.more() ) { 
+						if( ai.next().valuesEqual(m) ) {
+							if( deep )
+								*deep = true;
+							goto ok;
+						}
 					}
 				}
+				return false;
 			}
 		}
 

@@ -78,6 +78,7 @@ inline int BucketBasics::_alloc(int bytes) {
 
 void BucketBasics::del(int keypos) { 
 	assert( keypos >= 0 && keypos <= n );
+	assert( childForPos(keypos).isNull() );
 	n--;
 	for( int j = keypos; j < n; j++ )
 		k(j) = k(j+1);
@@ -189,6 +190,11 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 	return false;
 }
 
+/*
+       e          j        p 
+  |          |        |          |
+  b        g h i    l n o      q r s
+*/
 bool BtreeBucket::unindex(JSObj& key ) { 
 	int pos;
 	cout << key.toString() << endl;

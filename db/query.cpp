@@ -226,6 +226,7 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj,
 	long long cursorid = 0;
 	while( c->ok() ) {
 		JSObj js = c->current();
+//		cout << js.toString() << endl;
 		nscanned++;
 		bool deep;
 		if( !matcher->matches(js, &deep) ) {

@@ -5,7 +5,7 @@ var fail = 0;
 var t = connect("test", "192.168.37.1");
 
 var z = 0;
-function progress() { print(++z); }
+function progress() {}// print(++z); }
 
 function failure(f, args) { 
  print("FAIL: " + f);
@@ -14,25 +14,20 @@ function failure(f, args) {
      print(args[1]);
 }
 
-function assert(x) { 
+function assert(x) {
     if( !x )
 	failure("assert", arguments);
 }
 
 function oneresult(c) { 
-    var L = c.toArray().length;
-    if( L != 1 ) {
-	failure("ERROR: wrong # of results: " + L, arguments);
-	print("CURSOR was:" + c);
-	print("c.toArray():" + c.toArray());
-	print(c.toArray().length);
+    if( c.length() != 1 ) {
+	failure("ERROR: wrong # of results: " + c.length(), arguments);
     }
 }
 
 function noresult(c) { 
-    var l = c.toArray().length;
-    if( l != 0 )
-	failure("ERROR: wrong # of results: " + l, arguments);
+    if( c.length() != 0 )
+	failure("ERROR: wrong # of results: " + c.length(), arguments);
 }
 
 function testkeys() { 
@@ -45,11 +40,12 @@ function testkeys() {
 }
 
 function testdelete() { 
+    print("testdelete");
     t.testkeys.remove({});
     testkeys();
     t.testkeys.remove({});
     testkeys();
-    assert( t.testkeys.find().toArray().length == 4 );
+    assert( t.testkeys.find().toArray().length == 4, "testkeys" );
 }
 
 function runall() { 
@@ -75,4 +71,8 @@ function runall() {
      t.reg.ensureIndex( { name: true } );
  }
 
+ testdelete();
+
 }
+
+print("testdb.js: try runall()");
