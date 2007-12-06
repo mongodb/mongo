@@ -333,7 +333,9 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 	}
 }
 
-void _unindexRecord(IndexDetails& id, JSObj& obj) { 
+int nUnindexes = 0;
+
+void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj) { 
 	set<JSObj> keys;
 	id.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
@@ -342,28 +344,27 @@ void _unindexRecord(IndexDetails& id, JSObj& obj) {
 			cout << "_unindexRecord() " << obj.toString();
 			cout << "\n  unindex:" << j.toString() << endl;
 		}
-		bool ok = id.head.btree()->unindex(j);
+		nUnindexes++;
+		bool ok = id.head.btree()->unindex(id.head, ns, j);
+
+#if defined(_WIN32)
+		//TMEPTEMPTEMPTEMP TEMP
+		id.head.btree()->fullValidate(id.head);
+#endif
 		if( !ok ) { 
-			cout << "ERROR: _unindex failed" << endl;
+			cout << "Warning: _unindex failed" << endl;
 			cout << "  " << obj.toString() << endl;
 			cout << "  " << j.toString() << endl;
 			cout << "  if you added dup keys this can happen until we support that" << endl;
 		}
 	}
-/*
-	JSObj idxInfo = id.info.obj();
-	JSObjBuilder b;
-	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
-	if( !key.isEmpty() )
-		id.head.btree()->unindex(key);
-*/
 }
 
-void  unindexRecord(NamespaceDetails *d, Record *todelete) {
+void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete) {
 	if( d->nIndexes == 0 ) return;
 	JSObj obj(todelete);
 	for( int i = 0; i < d->nIndexes; i++ ) { 
-		_unindexRecord(d->indexes[i], obj);
+		_unindexRecord(ns, d->indexes[i], obj);
 	}
 }
 
@@ -373,7 +374,7 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	aboutToDelete(dl);
 
 	NamespaceDetails* d = namespaceIndex.details(ns);
-	unindexRecord(d, todelete);
+	unindexRecord(ns, d, todelete);
 
 	/* remove ourself from the record next/prev chain */
 	{
@@ -445,12 +446,13 @@ void DataFileMgr::update(
 				idx.getKeysFromObject(newObj, newkeys);
 				vector<JSObj*> removed;
 				setDifference(oldkeys, newkeys, removed);
+				string idxns = idx.indexNamespace();
 				for( unsigned i = 0; i < removed.size(); i++ ) { 
-					idx.head.btree()->unindex(*removed[i]);
+					idx.head.btree()->unindex(idx.head, idxns.c_str(), *removed[i]);
 				}
 				vector<JSObj*> added;
 				setDifference(newkeys, oldkeys, added);
-				string idxns = idx.indexNamespace();
+				assert( !dl.isNull() );
 				for( unsigned i = 0; i < added.size(); i++ ) { 
 					idx.head.btree()->insert(
 						idx.head, idxns.c_str(),
@@ -512,6 +514,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 	idx.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
 //		cout << "_indexRecord " << i->toString() << endl;
+		assert( !newRecordLoc.isNull() );
 		idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
                                 (JSObj&) *i, false, idx);
 	}

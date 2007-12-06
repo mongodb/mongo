@@ -34,6 +34,15 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 					order.firstElement().type() == Number && 
 					order.firstElement().number() < 0;
 				JSObjBuilder b;
+#if defined(_WIN32)
+cout<< "TEMP FULLVALIDATE" << endl;
+d->indexes[i].head.btree()->fullValidate(d->indexes[i].head);
+{
+	stringstream ss;
+	d->indexes[i].head.btree()->shape(ss);
+	cout << ss.str() << endl;
+}
+#endif
 				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, reverse ? maxKey : JSObj(), reverse ? -1 : 1, false));
 			}
 		}
@@ -212,7 +221,9 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj,
 
 	int n = 0;
 
+	int aa = 123;
 	auto_ptr<Cursor> c = getSpecialCursor(ns);
+	int bb = 456;
 	if( c.get() == 0 ) {
 		c = getIndexCursor(ns, query, order);
 	}

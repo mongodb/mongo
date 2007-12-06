@@ -14,6 +14,10 @@ struct _KeyNode {
 	DiskLoc prevChildBucket;
 	DiskLoc recordLoc;
 	short keyDataOfs;
+	void setKeyDataOfs(short s) { keyDataOfs = s; }
+	void setUnused() { recordLoc.Null(); }
+	bool isUnused() { return recordLoc.isNull(); }
+	bool isUsed() { return !isUnused(); }
 };
 
 #pragma pack(pop)
@@ -38,6 +42,7 @@ class BucketBasics {
 public:
 	bool isHead() { return parent.isNull(); }
 	void assertValid();
+	void fullValidate(const DiskLoc& thisLoc); /* traverses everything */ 
 protected:
 	DiskLoc& getChild(int pos) { 
 		assert( pos >= 0 && pos <= n );
@@ -57,7 +62,7 @@ protected:
 	*/
 	bool basicInsert(int keypos, const DiskLoc& recordLoc, JSObj& key);
 	void pushBack(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevChild);
-	void del(int keypos);
+	void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs. 
 
 	/* !Packed means there is deleted fragment space within the bucket.
        We "repack" when we run out of space before considering the node
@@ -73,9 +78,12 @@ protected:
 	void pack(); void setNotPacked(); void setPacked();
 	int _alloc(int bytes);
 	void truncateTo(int N);
-
+	void markUnused(int keypos);
+public:
 	DiskLoc parent;
-	DiskLoc nextChild; // the next bucket
+protected:
+	void _shape(int level, stringstream&);
+	DiskLoc nextChild; // child bucket off and to the right of the highest key.
 	int Size; // total size of this btree node in bytes. constant.
 	int flags;
 	int emptySize; // size of the empty region
@@ -95,12 +103,18 @@ public:
 	int insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
 		JSObj& key, bool dupsAllowed, IndexDetails& idx);
 	void update(const DiskLoc& recordLoc, JSObj& key);
-	bool unindex(JSObj& key);
+	bool unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key);
 	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction=1);
 	/* advance one key position in the index: */
 	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction);
 	DiskLoc getHead(const DiskLoc& thisLoc);
+
+	/* get tree shape */
+	void shape(stringstream&);
 private:
+	void fixParentPtrs(const DiskLoc& thisLoc);
+	void delBucket(const DiskLoc& thisLoc, const char *ns);
+	void delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p);
 	JSObj keyAt(int keyOfs) { return keyOfs >= n ? JSObj() : keyNode(keyOfs).key; }
 	static BtreeBucket* allocTemp(); /* caller must release with free() */
 	void insertHere(const DiskLoc& thisLoc, const char *ns, int keypos, 
@@ -125,6 +139,7 @@ public:
 	virtual void noteLocation(); // updates keyAtKeyOfs...
 	virtual void checkLocation();
 private:
+	void checkUnused();
 	DiskLoc bucket;
 	int keyOfs;
 	int direction; // 1=fwd,-1=reverse

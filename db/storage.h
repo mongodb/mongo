@@ -25,7 +25,7 @@ public:
 	DiskLoc() { reserved = -1; ofs = NullOfs; }
 	DiskLoc(const DiskLoc& l) { reserved=l.reserved; ofs=l.ofs; }
 
-	bool isNull() { return ofs == NullOfs; }
+	bool isNull() const { return ofs == NullOfs; }
 	void Null() { reserved = -1; ofs = NullOfs; }
 	void assertOk() { assert(!isNull()); }
 
