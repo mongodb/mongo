@@ -103,7 +103,7 @@ public:
 	int insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
 		JSObj& key, bool dupsAllowed, IndexDetails& idx);
 	void update(const DiskLoc& recordLoc, JSObj& key);
-	bool unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key);
+	bool unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc);
 	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction=1);
 	/* advance one key position in the index: */
 	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction);
@@ -127,17 +127,31 @@ private:
 };
 
 class BtreeCursor : public Cursor {
+	friend class BtreeBucket;
 public:
-	BtreeCursor(DiskLoc head, JSObj startKey, int direction, bool stopmiss);
+	BtreeCursor(DiskLoc head, JSObj& startKey, int direction, bool stopmiss);
 	virtual bool ok() { return !bucket.isNull(); }
 	bool eof() { return !ok(); }
-	virtual Record* _current() { return currLoc().rec(); }
-	virtual JSObj current() { return JSObj(_current()); }
-	virtual DiskLoc currLoc();
 	virtual bool advance();
 	virtual bool tempStopOnMiss() { return stopmiss; }
 	virtual void noteLocation(); // updates keyAtKeyOfs...
 	virtual void checkLocation();
+
+	_KeyNode& _currKeyNode() { 
+		assert( !bucket.isNull() );
+		_KeyNode& kn = bucket.btree()->k(keyOfs);
+		assert( kn.isUsed() );
+		return kn;
+	}
+	KeyNode currKeyNode() { 
+		assert( !bucket.isNull() );
+		return bucket.btree()->keyNode(keyOfs);
+	}
+
+	virtual DiskLoc currLoc() { return _currKeyNode().recordLoc; }
+	virtual Record* _current() { return currLoc().rec(); }
+	virtual JSObj current() { return JSObj(_current()); }
+
 private:
 	void checkUnused();
 	DiskLoc bucket;

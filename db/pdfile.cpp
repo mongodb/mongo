@@ -335,7 +335,7 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 
 int nUnindexes = 0;
 
-void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj) { 
+void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc& dl) { 
 	set<JSObj> keys;
 	id.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
@@ -345,7 +345,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj) {
 			cout << "\n  unindex:" << j.toString() << endl;
 		}
 		nUnindexes++;
-		bool ok = id.head.btree()->unindex(id.head, ns, j);
+		bool ok = id.head.btree()->unindex(id.head, ns, j, dl);
 
 #if defined(_WIN32)
 		//TMEPTEMPTEMPTEMP TEMP
@@ -360,11 +360,11 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj) {
 	}
 }
 
-void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete) {
+void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete, const DiskLoc& dl) {
 	if( d->nIndexes == 0 ) return;
 	JSObj obj(todelete);
 	for( int i = 0; i < d->nIndexes; i++ ) { 
-		_unindexRecord(ns, d->indexes[i], obj);
+		_unindexRecord(ns, d->indexes[i], obj, dl);
 	}
 }
 
@@ -374,7 +374,7 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	aboutToDelete(dl);
 
 	NamespaceDetails* d = namespaceIndex.details(ns);
-	unindexRecord(ns, d, todelete);
+	unindexRecord(ns, d, todelete, dl);
 
 	/* remove ourself from the record next/prev chain */
 	{
@@ -448,7 +448,7 @@ void DataFileMgr::update(
 				setDifference(oldkeys, newkeys, removed);
 				string idxns = idx.indexNamespace();
 				for( unsigned i = 0; i < removed.size(); i++ ) { 
-					idx.head.btree()->unindex(idx.head, idxns.c_str(), *removed[i]);
+					idx.head.btree()->unindex(idx.head, idxns.c_str(), *removed[i], dl);
 				}
 				vector<JSObj*> added;
 				setDifference(newkeys, oldkeys, added);

@@ -12,7 +12,8 @@ int ninserts = 0;
 extern int otherTraceLevel;
 
 inline KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
-  prevChildBucket(k.prevChildBucket), recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs) { }
+  prevChildBucket(k.prevChildBucket), recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs) 
+{ }
 
 /* - BucketBasics --------------------------------------------------- */
 
@@ -208,6 +209,10 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 		else if( x > 0 )
 			l = m+1;
 		else {
+			// found it.  however, if dup keys are here, be careful we might have
+			// found one in the middle.  we want find() to return the leftmost instance.
+			while( m >= 1 && keyNode(m-1).key.woEqual(key) )
+				m--;
 			pos = m;
 			return true;
 		}
@@ -275,35 +280,21 @@ void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p) {
 		markUnused(p);
 }
 
-/*
-       e          j        p 
-  |          |        |          |
-  b        g h i    l n o      q r s
-*/
-bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key ) { 
-	int pos;
-	if( otherTraceLevel >= 10 )
-		dump();
-	if( find(key, pos) ) {
-		//todo:dup key support
-		if( k(pos).isUnused() )
-			return false;
-		if( otherTraceLevel >= 2 )
-			cout << "unindex(): found key to delete:" << key.toString() << endl;
-		delKeyAtPos(thisLoc, ns, pos);
-		/*
-		if( otherTraceLevel >= 10 ) {
-			cout << "AFTER delete:" << endl;
-			dump();
+bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc ) { 
+
+	BtreeCursor c(thisLoc, key, 1, true);
+	while( c.ok() ) { 
+		KeyNode kn = c.currKeyNode();
+		if( !kn.key.woEqual(key) )
+			break;
+		if( recordLoc == kn.recordLoc ) {
+			c.bucket.btree()->delKeyAtPos(c.bucket, ns, c.keyOfs);
+			return true;
 		}
-		assertValid();
-		*/
-		return true;
+		c.advance();
 	}
-	DiskLoc l = childForPos(pos);
-	if( l.isNull() )
-		return false;
-	return l.btree()->unindex(l, ns, key);
+
+	return false;
 }
 
 BtreeBucket* BtreeBucket::allocTemp() { 
@@ -499,9 +490,13 @@ int BtreeBucket::_insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& 
 	int pos;
 	bool found = find(key, pos);
 	if( found ) {
-		// todo: support dup keys
+		// on a dup key always insert on the right or else you will be broken.
+		pos++;
+		// todo: support unique keys.
+		/*
 		cout << "bree: skipping insert of duplicate key ns:" << ns << "keysize:" << key.objsize() << endl;
 		return 1;
+		*/
 	}
 
 	DiskLoc& child = getChild(pos);
@@ -549,16 +544,14 @@ void BtreeBucket::shape(stringstream& ss) {
 
 /* - BtreeCursor --------------------------------------------------- */
 
-BtreeCursor::BtreeCursor(DiskLoc head, JSObj k, int _direction, bool sm) : 
+BtreeCursor::BtreeCursor(DiskLoc head, JSObj& k, int _direction, bool sm) : 
     direction(_direction), stopmiss(sm) 
 {
 	bool found;
-
 	if( otherTraceLevel >= 12 ) {
 		cout << "BTreeCursor(). dumping head bucket" << endl;
 		head.btree()->dump();
 	}
-
 	bucket = head.btree()->locate(head, k, keyOfs, found, direction);
 	checkUnused();
 }
@@ -580,12 +573,12 @@ void BtreeCursor::checkUnused() {
 		cout << "btree unused skipped:" << u << endl;
 }
 
-DiskLoc BtreeCursor::currLoc() {
+/*DiskLoc BtreeCursor::currLoc() {
 	assert( !bucket.isNull() );
 	_KeyNode& kn = bucket.btree()->k(keyOfs);
 	assert( kn.isUsed() );
 	return kn.recordLoc;
-}
+}*/
 
 bool BtreeCursor::advance() { 
 	if( bucket.isNull() )

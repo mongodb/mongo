@@ -11,6 +11,8 @@
 
 int nextCursorId = 1;
 
+JSObj emptyObj;
+
 /* todo: _ cache query plans 
          _ use index on partial match with the query
 */
@@ -43,7 +45,7 @@ d->indexes[i].head.btree()->fullValidate(d->indexes[i].head);
 	cout << ss.str() << endl;
 }
 #endif
-				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, reverse ? maxKey : JSObj(), reverse ? -1 : 1, false));
+				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, reverse ? maxKey : emptyObj, reverse ? -1 : 1, false));
 			}
 		}
 	}
