@@ -173,7 +173,7 @@ void receivedGetMore(MessagingPort& dbMsgPort, Message& m) {
 }
 
 void receivedInsert(Message& m) {
-	cout << "GOT MSG id:" << m.data->id << endl;
+//	cout << "GOT MSG id:" << m.data->id << endl;
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
 		JSObj js = d.nextJsObj();
