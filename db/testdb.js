@@ -48,6 +48,15 @@ function testdelete() {
     assert( t.testkeys.find().toArray().length == 4, "testkeys" );
 }
 
+function index2() { 
+    t.z.remove({});
+    t.z.save( { a: -3 } );
+    t.z.ensureIndex( { a:true} );
+    for( var i = 0; i < 300; i++ )
+	t.z.save( { a: i, b: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddfffffffffffffffffffffffffffffff" } );
+    t.z.remove({});
+}
+
 function bigIndexTest() { 
     t.big.remove({});
     t.big.save( { name: "Dwight" } );

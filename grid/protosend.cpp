@@ -128,10 +128,8 @@ void gotACK(F* fr, ProtocolConnection *pc) {
 
 void MS::send() {
 	/* flow control */
-//	cout << "send() to:" << to.toString() << endl;
-	ptrace( cout << "..MS::send() pending=" << pc.cs.pendingSend.size() << endl; )
-
 	lock lk(biglock);
+	ptrace( cout << "..MS::send() pending=" << pc->cs.pendingSend.size() << endl; )
 
 	if( pc->acceptAnyChannel() ) { 
 		EndPointToPC::iterator it = pcMap.find(to);

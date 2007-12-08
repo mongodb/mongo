@@ -3,28 +3,32 @@
 #pragma once
 
 #include "../util/sock.h"
-#include "protocol.h"
 
 class Message;
+class MessagingPort; 
+typedef WrappingInt MSGID;
+const int DBPort = 27017;
+
+class Listener { 
+public:
+	Listener(int p) : port(p) { } 
+	void listen(); // never returns (start a thread)
+
+	/* spawn a thread, etc., then return */
+	virtual void accepted(MessagingPort *mp) = 0;
+private:
+	int port;
+};
 
 class MessagingPort {
 public:
-	enum { DBPort = 27017 };
-
-	/* channels: if you are a server you can pass ANYCHANNEL to indicate you never initiate a 
-	   msg to someone yourself. the default will assign a new channel id to the messagingport.
-
-	   channels are our version of "ports". we run multiple connections to a single endpoint 
-	   over one port, with one datagram receiver thread.  we then multiplex them out to the 
-	   appropriate receiver (MessagingPort::recv() caller) by channel.
-	   */
-	enum { AUTOASSIGNCHANNEL = -1, ANYCHANNEL = -2 };
-	MessagingPort(int channel = AUTOASSIGNCHANNEL); 
+	MessagingPort(int sock, SockAddr& farEnd);
+	MessagingPort();
 	~MessagingPort();
 
-	void shutdown() { if( pc ) pc->shutdown(); pc = 0; }
+	void shutdown();
 
-	void init(int myUdpPort, SockAddr *farEnd);
+	bool connect(SockAddr& farEnd);
 
 	/* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.
 	   also, the Message data will go out of scope on the subsequent recv call. 
@@ -32,18 +36,11 @@ public:
 	bool recv(Message& m);
 	void reply(Message& received, Message& response);
 	bool call(SockAddr& to, Message& toSend, Message& response);
-	void say(int channel, SockAddr& to, Message& toSend, int responseTo = -1);
-	void say(SockAddr& to, Message& toSend, int responseTo = -1) { 
-		say(channel(), to, toSend, responseTo);
-	}
+	void say(SockAddr& to, Message& toSend, int responseTo = -1);
 
-	int channel() { return myChannel; }
 private:
-	ProtocolConnection *pc;
-	UDPConnection conn;
-	int myChannel;
-	enum { BufSize = 64 * 1024 };
-	char buf[BufSize];
+	int sock;
+	SockAddr farEnd;
 };
 
 #pragma pack(push)
@@ -78,14 +75,11 @@ inline int MsgData::dataLen() { return len - MsgDataHeaderSize; }
 
 class Message {
 public:
-	Message() { data = 0; freeIt = false; channel = -1000; }
+	Message() { data = 0; freeIt = false; }
 	~Message() { reset(); }
 
 	SockAddr from;
 	MsgData *data;
-	int channel;
-
-//	int channel() { return data->channel; }
 
 	void reset() {
 		if( freeIt && data )

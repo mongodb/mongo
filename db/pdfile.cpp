@@ -556,13 +556,9 @@ void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newReco
 }
 
 DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
-	{
+	if( 0 ) { //strcmp(ns, "test.z") == 0 ) {
 		JSObj obj((const char *) buf);
-		OID *oid = obj.getOID();
-//		cout << "insert() " << ns << " oid:";
-//		if( oid )
-//			cout << hex << oid->a << ':' << hex << oid->b << dec;
-//		cout << endl;
+		cout << "  insert:" << obj.toString() << endl;
 	}
 
 	bool addIndex = false;

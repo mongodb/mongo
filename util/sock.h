@@ -11,11 +11,17 @@
 #include <ws2tcpip.h>
 typedef int socklen_t;
 inline int getLastError() { return WSAGetLastError(); }
+inline void disableNagle(int sock) { 
+	int x = 1;
+	if( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) ) 
+		cout << "ERROR: disableNagle failed" << endl;
+}
 #else
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <errno.h>
 inline void closesocket(int s) { close(s); }
@@ -23,11 +29,16 @@ const int INVALID_SOCKET = -1;
 typedef int SOCKET;
 #define h_errno errno
 inline int getLastError() { return errno; }
+inline void disableNagle(int sock) { 
+	int x = 1;
+	if( setsockopt(sock, SOL_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) ) 
+		cout << "ERROR: disableNagle failed" << endl;
+}
 #endif
 
 struct SockAddr {
 	SockAddr() { addressSize = sizeof(sockaddr_in); memset(&sa, 0, sizeof(sa)); }
-	SockAddr(int sourcePort); /* source side */ 
+	SockAddr(int sourcePort); /* listener side */ 
 	SockAddr(const char *ip, int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
 
 	struct sockaddr_in sa;

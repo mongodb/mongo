@@ -205,14 +205,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\grid\protorecv.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\grid\protosend.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\query.cpp"
 				>
 			</File>

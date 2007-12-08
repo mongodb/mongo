@@ -13,6 +13,8 @@
 
 extern const char *dbpath;
 
+boost::mutex dbMutex;
+
 struct MyStartupTests {
 	MyStartupTests() {
 		assert( sizeof(OID) == 12 );
@@ -33,7 +35,6 @@ void quicktest() {
 	strcpy_s(m, 1000, "hello worldz");
 }
 
-MessagingPort dbMsgPort(MessagingPort::ANYCHANNEL);
 void pdfileInit();
 
 class DbMessage {
@@ -143,7 +144,7 @@ void receivedDelete(Message& m) {
 	deleteObjects(ns, pattern, flags & 1);
 }
 
-void receivedQuery(Message& m, stringstream& ss) {
+void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	int ntoreturn = d.pullInt();
@@ -160,7 +161,7 @@ void receivedQuery(Message& m, stringstream& ss) {
 	dbMsgPort.reply(m, resp);
 }
 
-void receivedGetMore(Message& m) {
+void receivedGetMore(MessagingPort& dbMsgPort, Message& m) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	int ntoreturn = d.pullInt();
@@ -171,18 +172,8 @@ void receivedGetMore(Message& m) {
 	dbMsgPort.reply(m, resp);
 }
 
-/*void getbyoid(Message& m) {
-	DbMessage d(m);
-	Record *r = findByOID(d.getns(), d.getOID());
-	Message resp;
-	if( r == 0 )
-		resp.setData(opReply, (char *) &emptyObject, emptyObject.len);
-	else
-		resp.setData(opReply, r->data, r->netLength());
-	dbMsgPort.reply(m, resp);
-}*/
-
 void receivedInsert(Message& m) {
+	cout << "GOT MSG id:" << m.data->id << endl;
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
 		JSObj js = d.nextJsObj();
@@ -213,126 +204,133 @@ void testTheDb() {
 	cout << endl;
 }
 
-int port = MessagingPort::DBPort;
+int port = DBPort;
 
-void run() { 
-	dbMsgPort.init(port, 0);
+MessagingPort *grab = 0;
+void t();
 
+class OurListener : public Listener { 
+public:
+	OurListener(int p) : Listener(p) { }
+	virtual void accepted(MessagingPort *mp) {
+		assert( grab == 0 );
+		grab = mp;
+		boost::thread thr(t);
+		while( grab )
+			sleepmillis(1);
+	}
+};
+
+void listen(int port) { 
 	pdfileInit();
-
 	testTheDb();
+	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
+	OurListener l(port);
+	l.listen();
+}
 
-	cout << curTimeMillis() % 10000 << " waiting for msg...\n" << endl;
+void t()
+{
+	MessagingPort& dbMsgPort = *grab;
+	grab = 0;
+
 	Message m;
 	while( 1 ) { 
 		m.reset();
-		//ss.clear();
 		stringstream ss;
-		// temp:
-		//		sleepsecs(1);
-
-
 
 		if( !dbMsgPort.recv(m) ) {
-			cout << "MessagingPort::recv() returned false" << endl;
+			cout << "MessagingPort::recv(): returned false" << endl;
+			dbMsgPort.shutdown();
 			break;
 		}
 
 		ss << curTimeMillis() % 10000 << ' ';
 
-		Timer t;
+		{
+			lock lk(dbMutex);
+			Timer t;
 
-		//cout << "  got msg" << endl;
-		//cout << "  op:" << m.data->operation << " len:" << m.data->len << endl;
-
-		if( m.data->operation == dbMsg ) { 
-			ss << "msg ";
-			char *p = m.data->_data;
-			int len = strlen(p);
-			if( len > 400 ) 
-				cout << curTimeMillis() % 10000 << 
-				   " long msg received, len:" << len << 
-				   " ends with: " << p + len - 10 << endl;
-			bool end = strcmp("end", p) == 0;
-			Message resp;
-			resp.setData(opReply, "i am fine");
-			dbMsgPort.reply(m, resp);
-			if( end ) {
-				cout << curTimeMillis() % 10000 << "   end msg" << endl;
-				break;
+			if( m.data->operation == dbMsg ) { 
+				ss << "msg ";
+				char *p = m.data->_data;
+				int len = strlen(p);
+				if( len > 400 ) 
+					cout << curTimeMillis() % 10000 << 
+					" long msg received, len:" << len << 
+					" ends with: " << p + len - 10 << endl;
+				bool end = strcmp("end", p) == 0;
+				Message resp;
+				resp.setData(opReply, "i am fine");
+				dbMsgPort.reply(m, resp);
+				if( end ) {
+					cout << curTimeMillis() % 10000 << "   end msg" << endl;
+					dbMsgPort.shutdown();
+					sleepmillis(500);
+					exit(1);
+				}
 			}
-		}
-		else if( m.data->operation == dbQuery ) { 
-			receivedQuery(m, ss);
-		}
-		else if( m.data->operation == dbInsert ) {
-			ss << "insert ";
-			receivedInsert(m);
-		}
-		else if( m.data->operation == dbUpdate ) {
-			ss << "update ";
-			receivedUpdate(m);
-		}
-		else if( m.data->operation == dbDelete ) {
-			ss << "remove ";
-			receivedDelete(m);
-		}
-		else if( m.data->operation == dbGetMore ) {
-			ss << "getmore ";
-			receivedGetMore(m);
-		}
-		else {
-			cout << "    operation isn't supported ?" << endl;
-		}
+			else if( m.data->operation == dbQuery ) { 
+				receivedQuery(dbMsgPort, m, ss);
+			}
+			else if( m.data->operation == dbInsert ) {
+				ss << "insert ";
+				receivedInsert(m);
+			}
+			else if( m.data->operation == dbUpdate ) {
+				ss << "update ";
+				receivedUpdate(m);
+			}
+			else if( m.data->operation == dbDelete ) {
+				ss << "remove ";
+				receivedDelete(m);
+			}
+			else if( m.data->operation == dbGetMore ) {
+				ss << "getmore ";
+				receivedGetMore(dbMsgPort, m);
+			}
+			else {
+				cout << "    operation isn't supported ?" << endl;
+			}
 
-		ss << ' ' << t.millis() << "ms";
-		cout << ss.str().c_str() << endl;
+			ss << ' ' << t.millis() << "ms";
+			cout << ss.str().c_str() << endl;
+		}
 	}
 }
 
 void msg(const char *m, int extras = 0) { 
+	SockAddr db("127.0.0.1", DBPort);
 //	SockAddr db("192.168.37.1", MessagingPort::DBPort);
-	SockAddr db("127.0.0.1", MessagingPort::DBPort);
 //	SockAddr db("10.0.21.60", MessagingPort::DBPort);
 //	SockAddr db("172.16.0.179", MessagingPort::DBPort);
 
 	MessagingPort p;
-	p.init(29999, &db);
+	if( !p.connect(db) )
+		return;
 
-for( int q = 0; q < 3; q++ ) {
-	Message send;
-	Message response;
+	for( int q = 0; q < 3; q++ ) {
+		Message send;
+		Message response;
 
-	send.setData( dbMsg , m);
-	int len = send.data->dataLen();
+		send.setData( dbMsg , m);
+		int len = send.data->dataLen();
 
-	for( int i = 0; i < extras; i++ )
-		p.say(p.channel(), db, send);
+		for( int i = 0; i < extras; i++ )
+			p.say(db, send);
 
-	Timer t;
-	bool ok = p.call(db, send, response);
-	double tm = t.micros() + 1;
-	cout << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " << 
-		  ((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
-/*	cout << "  " << response.data->id << endl;
-	cout << "  " << response.data->len << endl;
-	cout << "  " << response.data->operation << endl;
-	cout << "  " << response.data->responseTo << endl;*/
-//	cout << " data: " << response.data->_data << endl;
-
-	if(  q+1 < 3 ) {
-		cout << "\t\tSLEEP 8 then sending again" << endl;
-		sleepsecs(8);
+		Timer t;
+		bool ok = p.call(db, send, response);
+		double tm = t.micros() + 1;
+		cout << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " << 
+			((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
+		if(  q+1 < 3 ) {
+			cout << "\t\tSLEEP 8 then sending again" << endl;
+			sleepsecs(8);
+		}
 	}
-}
 
 	p.shutdown();
-}
-
-void bar() { 
-cout << "hello" << endl;
-sleepsecs(6);
-cout << "hello2" << endl;
 }
 
 int main(int argc, char* argv[], char *envp[] )
@@ -361,12 +359,12 @@ int main(int argc, char* argv[], char *envp[] )
 			quicktest();
 			port++;
 			cout << "listening on port " << port << endl;
-			run();
+			listen(port);
 			goingAway = true;
 			return 0;
 		}
 		if( strcmp(argv[1], "run") == 0 ) {
-			run();
+			listen(port);
 			goingAway = true;
 			return 0;
 		}

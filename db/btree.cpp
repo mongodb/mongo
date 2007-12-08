@@ -12,10 +12,11 @@ int ninserts = 0;
 extern int otherTraceLevel;
 
 inline KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
-  prevChildBucket(k.prevChildBucket), recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs) 
+  prevChildBucket(k.prevChildBucket), 
+  recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs) 
 { }
 
-/* - BucketBasics --------------------------------------------------- */
+/* BucketBasics --------------------------------------------------- */
 
 inline void BucketBasics::setNotPacked() { flags &= ~Packed; }
 inline void BucketBasics::setPacked() { flags |= Packed; }
@@ -270,7 +271,8 @@ void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p) {
 			else
 				delBucket(thisLoc, ns);
 			return;
-		}		markUnused(p);
+		}
+		markUnused(p);
 		return;
 	}
 
@@ -280,14 +282,23 @@ void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p) {
 		markUnused(p);
 }
 
+int verbose = 0;
+int qqq = 0;
+
 bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc ) { 
+	cout << "unindex " << key.toString() << endl;
 
 	BtreeCursor c(thisLoc, key, 1, true);
+
+//	dump();
+
 	while( c.ok() ) { 
 		KeyNode kn = c.currKeyNode();
 		if( !kn.key.woEqual(key) )
 			break;
 		if( recordLoc == kn.recordLoc ) {
+			if( verbose )
+				c.bucket.btree()->dump();
 			c.bucket.btree()->delKeyAtPos(c.bucket, ns, c.keyOfs);
 			return true;
 		}
@@ -381,6 +392,7 @@ void BtreeBucket::insertHere(const DiskLoc& thisLoc, const char *ns, int keypos,
 	}
 
 	// mark on left that we no longer have anything from midpoint on.
+    bool highest = keypos == n;
 	truncateTo(mid);  // note this may trash middle.key!  thus we had to promote it before finishing up here.
 
 	// add our new key, there is room now
@@ -388,10 +400,10 @@ void BtreeBucket::insertHere(const DiskLoc& thisLoc, const char *ns, int keypos,
 		if( keypos < mid ) {
 			cout << "  keypos<mid, insertHere() the new key" << endl;
 			insertHere(thisLoc, ns, keypos, recordLoc, key, lchild, rchild, idx);
-		} else {
-			// handled above already.
-			// int kp = keypos-mid-1; assert(kp>=0);
-			//rLoc.btree()->insertHere(rLoc, ns, kp, recordLoc, key, lchild, rchild, idx);
+		} else if( highest ) {
+			// else handled above already.
+			int kp = keypos-mid-1; assert(kp>=0);
+			rLoc.btree()->insertHere(rLoc, ns, kp, recordLoc, key, lchild, rchild, idx);
 		}
 	}
 
@@ -509,17 +521,17 @@ int BtreeBucket::_insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& 
 }
 
 void BtreeBucket::dump() { 
-	cout << "DUMP btreebucket:\n";
-	cout << "     parent:" << hex << parent.getOfs() << dec << '\n';
+	cout << "DUMP btreebucket: ";
+	cout << " parent:" << hex << parent.getOfs() << dec;
 	for( int i = 0; i < n; i++ ) {
+		cout << '\n';
 		KeyNode k = keyNode(i);
-		cout << '\t' << i << '\t' << k.key.toString() << '\t' << hex << 
-			k.prevChildBucket.getOfs() << '\t' << k.recordLoc.getOfs() << dec;
+		cout << '\t' << i << '\t' << k.key.toString() << "\tleft:" << hex << 
+			k.prevChildBucket.getOfs() << "\trec:" << k.recordLoc.getOfs() << dec;
 		if( this->k(i).isUnused() )
 			cout << " UNUSED";
-		cout << endl;
 	}
-	cout << "     nextChild:" << hex << nextChild.getOfs() << dec << endl;
+	cout << " right:" << hex << nextChild.getOfs() << dec << endl;
 }
 
 int BtreeBucket::insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 

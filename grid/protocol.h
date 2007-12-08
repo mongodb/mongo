@@ -2,6 +2,8 @@
 
 #pragma once
 
+NOT USED 
+
 #include "boost/thread/mutex.hpp"
 #include "boost/thread/condition.hpp"
 #include "../util/sock.h"
@@ -11,11 +13,15 @@ typedef WrappingInt MSGID;
 
 struct Fragment;
 
-#if 1
+#if 0
 #define ptrace(x) 
-#define etrace(x) 
 #else
 #define ptrace(x) { cout << curTimeMillis() % 10000; x }
+#endif
+
+#if 1
+#define etrace(x) 
+#else
 #define etrace(x) { cout << curTimeMillis() % 10000; x }
 #endif
 

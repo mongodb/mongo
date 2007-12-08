@@ -10,7 +10,9 @@ BOOSTLIB = -lboost_thread
 
 LIBS= /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o ../grid/protorecv.o ../grid/protosend.o
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o
+
+# ../grid/protorecv.o ../grid/protosend.o
 
 .cpp.o:
 	g++ -c $(FLAGS) $< -o $@
