@@ -87,31 +87,49 @@ function runall() {
     t.big.remove( { } );
 }
 
+function testarrayindexing() { 
+    print("testarrayindexing");
+    t.ta.remove({});
+    t.ta.save({name:"aaa", tags:["abc", "123", "foo"], z:1});
+    t.ta.save({name:"baa", tags:["q", "123", 3], z:1});
+    t.ta.save({name:"caa", tags:["dm", "123"], z:1});
+    t.ta.save({name:"daa"});
+
+    for( var pass=0; pass<=1; pass++ ) { 
+	oneresult( t.ta.find({tags:"foo"}) );
+	oneresult( t.ta.find({tags:3}) );
+	assert( t.ta.find({tags:"123"}).length() == 3 );
+	t.ta.ensureIndex({tags:true});
+    }
+}
+
 function runquick() { 
     print("runquick");
     t.nullcheck.remove({});
     t.nullcheck.save( { a : 3 } );
-    oneresult( t.nullcheck.find() ); progress();
+    oneresult( t.nullcheck.find() ); 
 
-    /* todo uncomment when eliot fixes!
- assert( t.nullcheck.find({a:3})[0].a == 3, "a3" );
- oneresult( t.nullcheck.find( { b: null } ) ); progress();
- noresult( t.nullcheck.find( { b: 1 } ) ); progress();
- oneresult( t.nullcheck.find( { a : "3" } ) ); progress();
-    */
-
- // regex
- print("regex");
- t.reg.remove({});
- t.reg.save( { name: "Dwight" } );
- for( i = 0; i < 2; i++ ) {
-     oneresult( t.reg.find( { name: /Dwi./ } ), "re1" );
-     noresult( t.reg.find( { name: /dwi./ } ), "re2" );
-     oneresult( t.reg.find( { name: /dwi/i } ), "re3" );
-     t.reg.ensureIndex( { name: true } );
- }
-
- testdelete();
+    /* todo uncomment when eliot fixes! */
+    assert( t.nullcheck.find({a:3})[0].a == 3, "a3" );
+    oneresult( t.nullcheck.find( { b: null } ) ); progress();
+    noresult( t.nullcheck.find( { b: 1 } ) ); progress();
+    print("this one doesn't work yet todo:");
+    oneresult( t.nullcheck.find( { a : "3" } ) ); progress();
+    
+    // regex
+    print("regex");
+    t.reg.remove({});
+    t.reg.save( { name: "Dwight" } );
+    for( i = 0; i < 2; i++ ) {
+	oneresult( t.reg.find( { name: /Dwi./ } ), "re1" );
+	noresult( t.reg.find( { name: /dwi./ } ), "re2" );
+	oneresult( t.reg.find( { name: /dwi/i } ), "re3" );
+	t.reg.ensureIndex( { name: true } );
+    }
+    
+    testdelete();
+    
+    testarrayindexing();
 }
 
 print("testdb.js: try runall()");
