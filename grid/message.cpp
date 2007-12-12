@@ -104,7 +104,7 @@ bool MessagingPort::recv(Message& m) {
 
 	assert( x == 4 );
 
-	int z = (len+1023)&0xfc00; assert(z>=len);
+	int z = (len+1023)&0xfffffc00; assert(z>=len);
 	MsgData *md = (MsgData *) malloc(z);
 	md->len = len;
 	char *p = (char *) &md->id;
