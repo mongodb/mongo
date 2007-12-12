@@ -477,7 +477,7 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 	DiskLoc child = childForPos(p);
 
 	if( !child.isNull() ) { 
-		DiskLoc l = child.btree()->locate(child, key, pos, found);
+		DiskLoc l = child.btree()->locate(child, key, pos, found, direction);
 		if( !l.isNull() )
 			return l;
 	}
