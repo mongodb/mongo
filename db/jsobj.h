@@ -181,6 +181,7 @@ explicit
 	}
 
 	string toString() const;
+	/* note: addFields always adds _id even if not specified */
 	int addFields(JSObj& from, set<string>& fields); /* returns n added */
 	int getFieldNames(set<string>& fields);
 

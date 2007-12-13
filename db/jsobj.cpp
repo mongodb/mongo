@@ -17,6 +17,9 @@ string Element::toString() {
 		s << fieldName() << ": " << number(); break;
 	case Bool: 
 		s << fieldName() << ": " << boolean() ? "true" : "false"; break;
+	case Object:
+	case Array:
+		s << fieldName() << ": " << embeddedObject().toString(); break;
 	case Undefined:
 		s << fieldName() << ": undefined"; break;
 	case jstNULL:
@@ -352,6 +355,9 @@ int JSObj::getFieldNames(set<string>& fields) {
 	return n;
 }
 
+/* note: addFields always adds _id even if not specified 
+   returns n added not counting _id unless requested.
+*/
 int JSObj::addFields(JSObj& from, set<string>& fields) {
 	assert( _objdata == 0 ); /* partial implementation for now... */
 
@@ -360,12 +366,21 @@ int JSObj::addFields(JSObj& from, set<string>& fields) {
 	int N = fields.size();
 	int n = 0;
 	JSElemIter i(from);
+	bool gotId = false;
 	while( i.more() ) {
 		Element e = i.next();
-		if( fields.count(e.fieldName()) ) {
+		const char *fname = e.fieldName();
+		if( fields.count(fname) ) {
 			b.append(e);
-			if( ++n == N ) 
-				break; // we can stop we found them all already
+			++n;
+			gotId = gotId || strcmp(fname, "_id")==0;
+			if( n == N && gotId )
+				break;
+		} else if( strcmp(fname, "_id")==0 ) {
+			b.append(e);
+			gotId = true;
+			if( n == N && gotId )
+				break;
 		}
 	}
 
