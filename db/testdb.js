@@ -2,16 +2,14 @@
 
 var fail = 0;
 
-var t = connect("test", "192.168.79.1");
+var t = connect("test");
 
 var z = 0;
 function progress() {}// print(++z); }
 
 function failure(f, args) { 
- print("FAIL: " + f);
- fail++;
- if( args.length >= 2 )
-     print(args[1]);
+    print("FAIL: " + f + ' ' + (args.length<2?"":args[1]));
+    fail++;
 }
 
 function assert(x) {
@@ -113,15 +111,16 @@ function runquick() {
     assert( t.nullcheck.find({a:3})[0].a == 3, "a3" );
     oneresult( t.nullcheck.find( { b: null } ) ); progress();
     noresult( t.nullcheck.find( { b: 1 } ) ); progress();
-    print("this one doesn't work yet todo:");
-    oneresult( t.nullcheck.find( { a : "3" } ) ); progress();
+    oneresult( t.nullcheck.find( { a : "3" } ), "todo num to str match" ); progress();
     
     // regex
     print("regex");
     t.reg.remove({});
-    t.reg.save( { name: "Dwight" } );
+    t.reg.save( { name: "Dwight", a : 345, dt: Date() } );
     for( i = 0; i < 2; i++ ) {
 	oneresult( t.reg.find( { name: /Dwi./ } ), "re1" );
+	oneresult( t.reg.find( { dt: /20/ } ), "date regexp match" );
+	oneresult( t.reg.find( { a: /34/ } ), "regexp match number" );
 	noresult( t.reg.find( { name: /dwi./ } ), "re2" );
 	oneresult( t.reg.find( { name: /dwi/i } ), "re3" );
 	t.reg.ensureIndex( { name: true } );

@@ -18,7 +18,9 @@ void Listener::listen() {
 		return;
 	}
 	if( bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) { 
-		cout << "listen(): bind() failed" << errno << endl;
+		cout << "listen(): bind() failed errno:" << errno << endl;
+		if( errno == 98 )
+			cout << "98 == addr already in use" << endl;
 		closesocket(sock);
 		return;
 	}

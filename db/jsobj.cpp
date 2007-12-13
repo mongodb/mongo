@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
+#include <ctime>
 
 Element nullElement;
 
@@ -201,9 +202,26 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 				return false;
 			Element e = k.next();
 			if( strcmp(e.fieldName(), rm.fieldName) == 0 ) {
-				if( e.type() != String )
+				char buf[64];
+				const char *p = buf;
+				if( e.type() == String )
+					p = e.valuestr();
+				else if( e.type() == Number ) { 
+					sprintf(buf, "%Lf", e.number());
+				}
+				else if( e.type() == Date ) { 
+					unsigned long long d = e.date();
+					time_t t = (d/1000);
+#if defined(_WIN32)
+					ctime_s(buf, 64, &t);
+#else
+					ctime_r(&t, buf);
+					cout << "CTIME:" << buf << endl;
+#endif
+				}
+				else
 					return false;
-				if( !rm.re->PartialMatch(e.valuestr()) )
+				if( !rm.re->PartialMatch(p) )
 					return false;
 				break;
 			}
