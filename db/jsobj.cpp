@@ -207,7 +207,7 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 				if( e.type() == String )
 					p = e.valuestr();
 				else if( e.type() == Number ) { 
-					sprintf(buf, "%Lf", e.number());
+					sprintf(buf, "%f", e.number());
 				}
 				else if( e.type() == Date ) { 
 					unsigned long long d = e.date();
@@ -216,7 +216,6 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 					ctime_s(buf, 64, &t);
 #else
 					ctime_r(&t, buf);
-					cout << "CTIME:" << buf << endl;
 #endif
 				}
 				else
