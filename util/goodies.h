@@ -5,6 +5,11 @@
 
 #include "../stdafx.h"
 
+#if !defined(_WIN32)
+#include <pthread.h>
+inline pthread_t GetCurrentThreadId() { return pthread_self(); }
+#endif
+
 /* set to TRUE if we are exiting */
 extern bool goingAway;
 

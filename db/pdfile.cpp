@@ -409,9 +409,9 @@ void setDifference(set<JSObj>& l, set<JSObj>& r, vector<JSObj*> &diff) {
 			break;
 		while( j != r.end() && *j < *i )
 			j++;
-		if( !i->woEqual(*j) ) {
-			const JSObj *j = &*i;
-			diff.push_back( (JSObj *) j );
+		if( j == r.end() || !i->woEqual(*j) ) {
+			const JSObj *jo = &*i;
+			diff.push_back( (JSObj *) jo );
 		}
 		i++;
 	}

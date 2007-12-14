@@ -8,6 +8,9 @@
 #include <time.h>
 #include "../util/goodies.h"
 
+// if you want trace output:
+#define mmm(x)
+
 /* listener ------------------------------------------------------------------- */
 
 void Listener::listen() {
@@ -90,6 +93,7 @@ bool MessagingPort::connect(SockAddr& _far)
 }
 
 bool MessagingPort::recv(Message& m) {
+	mmm( cout << "*  recv() sock:" << this->sock << endl; )
 	int len;
 
 	int x = ::recv(sock, (char *) &len, 4, 0);
@@ -138,6 +142,8 @@ void MessagingPort::reply(Message& received, Message& response) {
 }
 
 bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
+	mmm( cout << "*call()" << endl; )
+	MSGID old = toSend.data->id;
 	say(to, toSend);
 	while( 1 ) {
 		bool ok = recv(response);
@@ -146,13 +152,20 @@ bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
 		//cout << "got response: " << response.data->responseTo << endl;
 		if( response.data->responseTo == toSend.data->id ) 
 			break;
-		cout << "warning: MessagingPort::call() wrong id, skipping. got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
+		cout << "********************" << endl;
+		cout << "ERROR: MessagingPort::call() wrong id got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
+		cout << "  old:" << old << endl;
+		cout << "  response msgid:" << response.data->id << endl;
+		cout << "  response len:  " << response.data->len << endl;
+		assert(false);
 		response.reset();
 	}
+	mmm( cout << "*call() end" << endl; )
 	return true;
 }
 
 void MessagingPort::say(SockAddr& to, Message& toSend, int responseTo) {
+	mmm( cout << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
 	MSGID msgid = NextMsgId;
 	++NextMsgId;
 	toSend.data->id = msgid;

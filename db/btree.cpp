@@ -33,6 +33,9 @@ void BucketBasics::_shape(int level, stringstream& ss) {
 
 void BucketBasics::fullValidate(const DiskLoc& thisLoc) { 
 	assertValid();
+	if( 1 ) 
+		return; // off for now...
+
 	for( int i = 0; i < n; i++ ) {
 		_KeyNode& kn = k(i);
 		if( !kn.prevChildBucket.isNull() ) { 
