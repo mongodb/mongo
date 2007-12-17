@@ -101,6 +101,17 @@ function testarrayindexing() {
     }
 }
 
+function testdups() { 
+ print("testdups");
+ for( pass=0;pass<2;pass++ ) {
+  t.td.remove({});
+  for( var x=0;x<2000;x++ )
+   t.td.save({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d", z: x, str: "a long string dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"});
+  assert( t.td.find({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d"}).toArray().length == 2000 );
+  t.td.ensureIndex({ggg:true});
+ }
+}
+
 function runquick() { 
     print("runquick");
     t.nullcheck.remove({});
@@ -129,6 +140,9 @@ function runquick() {
     testdelete();
     
     testarrayindexing();
+
+    print("testdups last to go, it takes a little time...");
+    testdups();
 }
 
 print("testdb.js: try runall()");

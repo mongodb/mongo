@@ -31,10 +31,16 @@ void BucketBasics::_shape(int level, stringstream& ss) {
 		nextChild.btree()->_shape(level+1,ss);
 }
 
+int bt_fv=0;
+int bt_dmp=0;
+
 void BucketBasics::fullValidate(const DiskLoc& thisLoc) { 
 	assertValid();
-	if( 1 ) 
-		return; // off for now...
+	if( bt_fv==0 ) 
+		return; 
+
+	if( bt_dmp )
+		((BtreeBucket *) this)->dump();
 
 	for( int i = 0; i < n; i++ ) {
 		_KeyNode& kn = k(i);
@@ -196,6 +202,23 @@ inline void BucketBasics::truncateTo(int N) {
 
 /* - BtreeBucket --------------------------------------------------- */
 
+/* return largest key in the subtree. */
+void BtreeBucket::findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey) {
+	DiskLoc loc = thisLoc;
+	while( 1 ) { 
+		BtreeBucket *b = loc.btree();
+		if( !b->nextChild.isNull() ) { 
+			loc = b->nextChild;
+			continue;
+		}
+		break;
+	}
+
+	assert(n>0);
+	largestLoc = loc;
+	largestKey = n-1;
+} 
+
 /* pos: for existing keys k0...kn-1.
    returns # it goes BEFORE.  so key[pos-1] < key < key[pos]
    returns n if it goes after the last existing key.
@@ -217,7 +240,21 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 			// found one in the middle.  we want find() to return the leftmost instance.
 			while( m >= 1 && keyNode(m-1).key.woEqual(key) )
 				m--;
+
 			pos = m;
+
+			DiskLoc ch = k(m).prevChildBucket;
+			if( !ch.isNull() ) {
+				// if dup keys, might be dups to the left.
+				DiskLoc largestLoc;
+				int largestKey;
+				ch.btree()->findLargestKey(ch, largestLoc, largestKey);
+				if( !largestLoc.isNull() ) { 
+					if( largestLoc.btree()->keyAt(largestKey).woEqual(key) )
+						return false;
+				}
+			}
+
 			return true;
 		}
 		x = key.woCompare(M.key);
@@ -562,10 +599,18 @@ void BtreeBucket::shape(stringstream& ss) {
 BtreeCursor::BtreeCursor(DiskLoc head, JSObj& k, int _direction, bool sm) : 
     direction(_direction), stopmiss(sm) 
 {
+//otherTraceLevel = 999;
+
 	bool found;
 	if( otherTraceLevel >= 12 ) {
-		cout << "BTreeCursor(). dumping head bucket" << endl;
-		head.btree()->dump();
+		if( otherTraceLevel >= 200 ) { 
+			cout << "::BtreeCursor() qtl>200.  validating entire index." << endl;
+			head.btree()->fullValidate(head);
+		}
+		else {
+			cout << "BTreeCursor(). dumping head bucket" << endl;
+			head.btree()->dump();
+		}
 	}
 	bucket = head.btree()->locate(head, k, keyOfs, found, direction);
 	checkUnused();

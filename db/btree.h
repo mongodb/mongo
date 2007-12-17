@@ -124,6 +124,7 @@ private:
 		JSObj& key, bool dupsAllowed,
 		DiskLoc lChild, DiskLoc rChild, IndexDetails&);
 	bool find(JSObj& key, int& pos);
+	void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
 };
 
 class BtreeCursor : public Cursor {

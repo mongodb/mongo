@@ -37,6 +37,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 					order.firstElement().number() < 0;
 				JSObjBuilder b;
 #if defined(_WIN32)
+				if( 0 ) {
 cout<< "TEMP FULLVALIDATE" << endl;
 d->indexes[i].head.btree()->fullValidate(d->indexes[i].head);
 {
@@ -44,6 +45,7 @@ d->indexes[i].head.btree()->fullValidate(d->indexes[i].head);
 	d->indexes[i].head.btree()->shape(ss);
 	cout << ss.str() << endl;
 }
+				}
 #endif
 				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, reverse ? maxKey : emptyObj, reverse ? -1 : 1, false));
 			}
@@ -235,11 +237,14 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj,
 			cout << "  basiccursor" << endl;
 	}
 
+	Cursor *cdbg = c.get(); // to assist debugging
+
 	int nscanned = 0;
 	long long cursorid = 0;
 	while( c->ok() ) {
 		JSObj js = c->current();
-//		cout << js.toString() << endl;
+		if( queryTraceLevel >= 50 )
+			cout << " checking against:\n " << js.toString() << endl;
 		nscanned++;
 		bool deep;
 		if( !matcher->matches(js, &deep) ) {
