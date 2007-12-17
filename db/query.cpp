@@ -183,6 +183,8 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 int queryTraceLevel = 0;
 int otherTraceLevel = 0;
 
+// e.g.
+//   system.cmd$.find( { queryTraceLevel: 2 } );
 inline void runCommands(const char *ns, JSObj& jsobj, stringstream& ss) { 
     if( strcmp(ns, "system.$cmd") != 0 ) 
 		return;
@@ -197,6 +199,18 @@ inline void runCommands(const char *ns, JSObj& jsobj, stringstream& ss) {
 		else if( strcmp(e.fieldName(),"traceAll") == 0 ) { 
 			queryTraceLevel = (int) e.number();
 			otherTraceLevel = (int) e.number();
+		}
+	}
+	else if( e.type() == String ) { 
+		if( strcmp(e.fieldName(),"deleteIndexes") == 0 ) { 
+			/* note: temp implementation.  space not reclaimed! */
+			NamespaceDetails *d = namespaceIndex.details(e.valuestr());
+			cout << "CMD: deleteIndexes " << e.valuestr() << endl;
+			if( d ) {
+				cout << "  d->nIndexes was " << d->nIndexes << endl;
+				cout << "  temp implementation, space not reclaimed" << endl;
+				d->nIndexes = 0;
+			}
 		}
 	}
 }
