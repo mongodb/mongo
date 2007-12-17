@@ -456,7 +456,7 @@ void DataFileMgr::update(
 				for( unsigned i = 0; i < added.size(); i++ ) { 
 					idx.head.btree()->insert(
 						idx.head, idxns.c_str(),
-						dl, *added[i], false, idx);
+						dl, *added[i], false, idx, true);
 				}
 
 /*
@@ -516,7 +516,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 //		cout << "_indexRecord " << i->toString() << endl;
 		assert( !newRecordLoc.isNull() );
 		idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
-                                (JSObj&) *i, false, idx);
+                                (JSObj&) *i, false, idx, true);
 	}
 /*
 	JSObj idxInfo = idx.info.obj();

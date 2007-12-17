@@ -100,8 +100,8 @@ public:
 	void dump();
 	/* rc: 0 = ok */
 	static DiskLoc addHead(const char *ns); /* start a new index off, empty */
-	int insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
-		JSObj& key, bool dupsAllowed, IndexDetails& idx);
+	int insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
+		JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel);
 	void update(const DiskLoc& recordLoc, JSObj& key);
 	bool unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc);
 	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction=1);
@@ -117,10 +117,10 @@ private:
 	void delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p);
 	JSObj keyAt(int keyOfs) { return keyOfs >= n ? JSObj() : keyNode(keyOfs).key; }
 	static BtreeBucket* allocTemp(); /* caller must release with free() */
-	void insertHere(const DiskLoc& thisLoc, const char *ns, int keypos, 
-		const DiskLoc& recordLoc, JSObj& key,
+	void insertHere(DiskLoc thisLoc, const char *ns, int keypos, 
+		DiskLoc recordLoc, JSObj& key,
 		DiskLoc lchild, DiskLoc rchild, IndexDetails&);
-	int _insert(const DiskLoc& thisLoc, const char *ns, const DiskLoc& recordLoc, 
+	int _insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
 		JSObj& key, bool dupsAllowed,
 		DiskLoc lChild, DiskLoc rChild, IndexDetails&);
 	bool find(JSObj& key, int& pos);
