@@ -104,7 +104,7 @@ public:
 	bool boolean() { return *value() ? true : false; }
 
 	unsigned long long date() { return *((unsigned long long*) value()); }
-	double number() { return *((double *) value()); }
+	double& number() { return *((double *) value()); }
 	OID& oid() { return *((OID*) value()); }
 
 	// for strings
@@ -213,6 +213,7 @@ explicit
 	Element firstElement() { 
 		return Element(objdata() + 4);
 	}
+	Element findElement(const char *name);
 
 	OID* getOID() {
 		Element e = firstElement();
@@ -258,6 +259,9 @@ private:
 class JSObjBuilder { 
 public:
 	JSObjBuilder() { b.skip(4); /*leave room for size field*/ }
+
+	/* add all the fields from the object specified to this object */
+	void appendElements(JSObj x);
 
 	void append(Element& e) { b.append((void*) e.rawdata(), e.size()); }
 
@@ -398,3 +402,24 @@ inline JSObj Element::wrap() {
 	b.append(*this);
 	return b.doneAndDecouple();
 }
+
+inline Element JSObj::findElement(const char *name) { 
+	JSElemIter it(*this);
+	while( it.more() ) {
+		Element e = it.next();
+		if( strcmp(name, e.fieldName()) == 0 ) 
+			return e;
+	}
+	return Element();
+}
+
+/* add all the fields from the object specified to this object */
+inline void JSObjBuilder::appendElements(JSObj x) { 
+	JSElemIter it(x);
+	while( it.more() ) {
+		Element e = it.next();
+		if( e.eoo() ) break;
+		append(e);
+	}
+}
+

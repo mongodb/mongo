@@ -137,9 +137,55 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 	}
 }
 
+struct Mod { 
+	const char *fieldName;
+	double n;
+};
+
+void applyMods(vector<Mod>& mods, JSObj obj) { 
+	for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) { 
+		Mod& m = *i;
+		Element e = obj.findElement(m.fieldName);
+		if( e.type() == Number ) {
+			e.number() += m.n;
+		}
+	}
+}
+
+/* get special operations like $inc 
+   { $inc: { a:1, b:1 } }
+*/
+void getMods(vector<Mod>& mods, JSObj from) { 
+	JSElemIter it(from);
+	while( it.more() ) {
+		Element e = it.next();
+		if( strcmp(e.fieldName(), "$inc") == 0 && e.type() == Object ) {
+			JSObj j = e.embeddedObject();
+			JSElemIter jt(j);
+			while( jt.more() ) { 
+				Element f = jt.next();
+				if( f.eoo() )
+					break;
+				Mod m;
+				m.fieldName = f.fieldName();
+				if( f.type() == Number ) {
+					m.n = f.number();
+cout <<"TEMP: " << m.fieldName << ' ' << m.n << endl;
+					mods.push_back(m);
+				} 
+			}
+		}
+	}
+}
+
+/* 
+todo:
+ support $inc: n
+ smart requery find record immediately
+*/
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) {
-//	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
-//		pattern.objsize();
+	//	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
+	//		pattern.objsize();
 
 	if( strncmp(ns, "system.", 7) == 0 ) { 
 		cout << "\nERROR: attempt to update in system namespace " << ns << endl;
@@ -164,7 +210,16 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 				   be careful or multikeys in arrays could break things badly.  best 
 				   to only allow updating a single row with a multikey lookup.
 				   */
-//				cout << " found match to update" << endl;
+
+				/* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
+				   regular ones at the moment. */
+				if( updateobj.firstElement().fieldName()[0] == '$' ) {
+					vector<Mod> mods;
+					getMods(mods, updateobj);
+					applyMods(mods, c->currLoc().obj());
+					return;
+				}
+
 				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
 				return;
 			}
@@ -172,12 +227,21 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 		}
 	}
 
-//	cout << " no match ";
-//	if( upsert )
-//		cout << "- upsert.";
-//	cout << endl;
-	if( upsert )
+	if( upsert ) {
+		if( updateobj.firstElement().fieldName()[0] == '$' ) {
+			/* upsert of an $inc. build a default */
+			vector<Mod> mods;
+			getMods(mods, updateobj);
+			JSObjBuilder b;
+			b.appendElements(pattern);
+			for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
+				b.append(i->fieldName, i->n);
+			JSObj obj = b.done();
+			theDataFileMgr.insert(ns, (void*) obj.objdata(), obj.objsize());
+			return;
+		}
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
+	}
 }
 
 int queryTraceLevel = 0;
@@ -185,34 +249,56 @@ int otherTraceLevel = 0;
 
 // e.g.
 //   system.cmd$.find( { queryTraceLevel: 2 } );
-inline void runCommands(const char *ns, JSObj& jsobj, stringstream& ss) { 
+// 
+// returns true if ran a cmd
+//
+inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilderForYa) { 
     if( strcmp(ns, "system.$cmd") != 0 ) 
-		return;
+		return false;
 
 	ss << "\n  $cmd: " << jsobj.toString();
 
+	bool ok = false;
+	bool valid = false;
+
 	Element e = jsobj.firstElement();
-	if( e.eoo() ) return;
+	if( e.eoo() ) goto done;
 	if( e.type() == Number ) { 
-		if( strcmp(e.fieldName(),"queryTraceLevel") == 0 )
+		if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
+			valid = ok = true;
 			queryTraceLevel = (int) e.number();
-		else if( strcmp(e.fieldName(),"traceAll") == 0 ) { 
+		} else if( strcmp(e.fieldName(),"traceAll") == 0 ) { 
+			valid = ok = true;
 			queryTraceLevel = (int) e.number();
 			otherTraceLevel = (int) e.number();
 		}
 	}
 	else if( e.type() == String ) { 
 		if( strcmp(e.fieldName(),"deleteIndexes") == 0 ) { 
+			valid = true;
 			/* note: temp implementation.  space not reclaimed! */
 			NamespaceDetails *d = namespaceIndex.details(e.valuestr());
 			cout << "CMD: deleteIndexes " << e.valuestr() << endl;
 			if( d ) {
+				ok = true;
 				cout << "  d->nIndexes was " << d->nIndexes << endl;
+				anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
 				cout << "  temp implementation, space not reclaimed" << endl;
 				d->nIndexes = 0;
 			}
+			else {
+				anObjBuilderForYa.append("errmsg", "ns not found");
+			}
 		}
 	}
+
+done:
+	if( !valid )
+		anObjBuilderForYa.append("errmsg", "no such cmd");
+	anObjBuilderForYa.append("ok", ok?1.0:0.0);
+	JSObj x = anObjBuilderForYa.done();
+	b.append((void*) x.objdata(), x.objsize());
+	return true;
 }
 
 QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, 
@@ -223,85 +309,84 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj,
 	if( queryTraceLevel >= 1 )
 		cout << "query: " << jsobj.toString() << endl;
 
+	int n = 0;
 	BufBuilder b(32768);
+	JSObjBuilder cmdResBuf;
+	long long cursorid = 0;
 
-	runCommands(ns, jsobj, ss);
-
-	JSObj query = jsobj.getObjectField("query");
-	JSObj order = jsobj.getObjectField("orderby");
-	if( query.isEmpty() && order.isEmpty() )
-		query = jsobj;
-
-	auto_ptr<JSMatcher> matcher(new JSMatcher(query));
-
-	QueryResult *qr = 0;
 	b.skip(sizeof(QueryResult));
 
-	int n = 0;
-
-	int aa = 123;
-	auto_ptr<Cursor> c = getSpecialCursor(ns);
-	int bb = 456;
-	if( c.get() == 0 ) {
-		c = getIndexCursor(ns, query, order);
+	if( runCommands(ns, jsobj, ss, b, cmdResBuf) ) { 
+		n = 1;
 	}
-	if( c.get() == 0 ) {
-		c = theDataFileMgr.findAll(ns);
-		if( queryTraceLevel >= 1 )
-			cout << "  basiccursor" << endl;
-	}
+	else {
 
-	Cursor *cdbg = c.get(); // to assist debugging
+		JSObj query = jsobj.getObjectField("query");
+		JSObj order = jsobj.getObjectField("orderby");
+		if( query.isEmpty() && order.isEmpty() )
+			query = jsobj;
 
-	int nscanned = 0;
-	long long cursorid = 0;
-	while( c->ok() ) {
-		JSObj js = c->current();
-		if( queryTraceLevel >= 50 )
-			cout << " checking against:\n " << js.toString() << endl;
-		nscanned++;
-		bool deep;
-		if( !matcher->matches(js, &deep) ) {
-			if( c->tempStopOnMiss() )
-				break;
+		auto_ptr<JSMatcher> matcher(new JSMatcher(query));
+
+		auto_ptr<Cursor> c = getSpecialCursor(ns);
+		if( c.get() == 0 ) {
+			c = getIndexCursor(ns, query, order);
 		}
-		else if( !deep || !c->dup(c->currLoc()) ) {
-			bool ok = true;
-			if( filter.get() ) {
-				JSObj x;
-				ok = x.addFields(js, *filter) > 0;
-				if( ok ) 
-					b.append((void*) x.objdata(), x.objsize());
-			}
-			else {
-				b.append((void*) js.objdata(), js.objsize());
-			}
-			if( ok ) {
-				n++;
-				if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
-					(ntoreturn==0 && b.len()>1*1024*1024) ) {
-					// more...so save a cursor
-					ClientCursor *cc = new ClientCursor();
-					cc->c = c;
-					cursorid = allocCursorId();
-					cc->cursorid = cursorid;
-					cc->matcher = matcher;
-					cc->ns = ns;
-					cc->pos = n;
-					ClientCursor::add(cc);
-					cc->updateLocation();
-					cc->filter = filter;
+		if( c.get() == 0 ) {
+			c = theDataFileMgr.findAll(ns);
+			if( queryTraceLevel >= 1 )
+				cout << "  basiccursor" << endl;
+		}
+
+		int nscanned = 0;
+		while( c->ok() ) {
+			JSObj js = c->current();
+			if( queryTraceLevel >= 50 )
+				cout << " checking against:\n " << js.toString() << endl;
+			nscanned++;
+			bool deep;
+			if( !matcher->matches(js, &deep) ) {
+				if( c->tempStopOnMiss() )
 					break;
+			}
+			else if( !deep || !c->dup(c->currLoc()) ) {
+				bool ok = true;
+				if( filter.get() ) {
+					JSObj x;
+					ok = x.addFields(js, *filter) > 0;
+					if( ok ) 
+						b.append((void*) x.objdata(), x.objsize());
+				}
+				else {
+					b.append((void*) js.objdata(), js.objsize());
+				}
+				if( ok ) {
+					n++;
+					if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
+						(ntoreturn==0 && b.len()>1*1024*1024) ) {
+							// more...so save a cursor
+							ClientCursor *cc = new ClientCursor();
+							cc->c = c;
+							cursorid = allocCursorId();
+							cc->cursorid = cursorid;
+							cc->matcher = matcher;
+							cc->ns = ns;
+							cc->pos = n;
+							ClientCursor::add(cc);
+							cc->updateLocation();
+							cc->filter = filter;
+							break;
+					}
 				}
 			}
+			c->advance();
 		}
-		c->advance();
+
+		if( queryTraceLevel >=2 )
+			cout << "  nscanned:" << nscanned << "\n  ";
 	}
 
-	if( queryTraceLevel >=2 )
-		cout << "  nscanned:" << nscanned << "\n  ";
-
-	qr = (QueryResult *) b.buf();
+	QueryResult *qr = (QueryResult *) b.buf();
 	qr->_data[0] = 0;
 	qr->_data[1] = 0;
 	qr->_data[2] = 0;

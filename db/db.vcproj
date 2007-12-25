@@ -189,6 +189,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\jseval.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\jsobj.cpp"
 				>
 			</File>
@@ -256,6 +260,10 @@
 			</File>
 			<File
 				RelativePath=".\introspect.h"
+				>
+			</File>
+			<File
+				RelativePath=".\jseval.h"
 				>
 			</File>
 			<File
