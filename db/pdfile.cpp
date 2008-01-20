@@ -21,6 +21,9 @@ _ regex support
 const char *dbpath = "/data/db/";
 
 DataFileMgr theDataFileMgr;
+map<string,Client*> clients;
+Client *client;
+
 extern int otherTraceLevel;
 
 JSObj::JSObj(Record *r) { 
@@ -38,7 +41,7 @@ int bucketSizes[] = {
 	0x400000, 0x800000
 };
 
-NamespaceIndex namespaceIndex;
+//NamespaceIndexMgr namespaceIndexMgr;
 
 void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) { 
 	int b = bucket(d->lengthWithHeaders);
@@ -130,7 +133,7 @@ DiskLoc NamespaceDetails::_alloc(int len) {
 	return bestmatch;
 }
 
-
+/*
 class NamespaceCursor : public Cursor {
 public:
 	virtual bool ok() { return i >= 0; }
@@ -166,24 +169,36 @@ private:
 
 auto_ptr<Cursor> makeNamespaceCursor() {
 	return auto_ptr<Cursor>(new NamespaceCursor());
-}
+}*/
 
 void newNamespace(const char *ns) {
 	cout << "New namespace: " << ns << endl;
-	if( strcmp(ns, "system.namespaces") != 0 ) {
+	if( strstr(ns, "system.namespaces") == 0 ) {
 		JSObjBuilder b;
 		b.append("name", ns);
 		JSObj j = b.done();
-		theDataFileMgr.insert("system.namespaces", j.objdata(), j.objsize(), true);
+		char client[256];
+		nsToClient(ns, client);
+		string s = client;
+		s += ".system.namespaces";
+		theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
 	}
 }
 
 /*---------------------------------------------------------------------*/ 
 
-void PhysicalDataFile::open(const char *filename, int length) {
+void PhysicalDataFile::open(int fn, const char *filename) {
+	int length;
+	if( fn <= 4 )
+		length = (64*1024*1024) << fn;
+	else
+		length = 0x7ff00000;
+	assert( length >= 64*1024*1024 && length % 4096 == 0 );
+
+	assert(fn == fileNo);
 	header = (PDFHeader *) mmf.map(filename, length);
 	assert(header);
-	header->init(length);
+	header->init(fileNo, length);
 }
 
 /* prev - previous extent for this namespace.  null=this is the first one. */
@@ -191,19 +206,19 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
 	int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
 	DiskLoc loc;
 	if( ExtentSize <= 0 ) {
-		cout << "ERROR: newExtent: no more room for extents. write more code" << endl;
-		assert(false);
-		exit(2);
+		cout << "INFO: newExtent(): file full, adding a new file " << ns << endl;
+		return client->addAFile()->newExtent(ns, approxSize);
 	}
 	int offset = header->unused.getOfs();
-	header->unused.setOfs( offset + ExtentSize );
+	header->unused.setOfs( fileNo, offset + ExtentSize );
 	header->unusedLength -= ExtentSize;
-	loc.setOfs(offset);
+	loc.setOfs(fileNo, offset);
 	Extent *e = _getExtent(loc);
-	DiskLoc emptyLoc = e->init(ns, ExtentSize, offset);
+	DiskLoc emptyLoc = e->init(ns, ExtentSize, fileNo, offset);
 
 	DiskLoc oldExtentLoc;
-	NamespaceDetails *details = namespaceIndex.details(ns);
+	NamespaceIndex *ni = nsindex(ns);
+	NamespaceDetails *details = ni->details(ns);
 	if( details ) { 
 		assert( !details->firstExtent.isNull() );
 		e->xprev = details->lastExtent;
@@ -211,8 +226,8 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
 		details->lastExtent = loc;
 	}
 	else {
-		namespaceIndex.add(ns, loc);
-		details = namespaceIndex.details(ns);
+		ni->add(ns, loc);
+		details = ni->details(ns);
 	}
 
 	details->lastExtentSize = approxSize;
@@ -227,9 +242,9 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
 /*---------------------------------------------------------------------*/ 
 
 /* assumes already zeroed -- insufficient for block 'reuse' perhaps */
-DiskLoc Extent::init(const char *nsname, int _length, int _offset) { 
+DiskLoc Extent::init(const char *nsname, int _length, int _fileNo, int _offset) { 
 	magic = 0x41424344;
-	myLoc.setOfs(_offset);
+	myLoc.setOfs(_fileNo, _offset);
 	xnext.Null(); xprev.Null();
 	ns = nsname;
 	length = _length;
@@ -296,17 +311,22 @@ Record* Extent::newRecord(int len) {
 
 auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 	DiskLoc loc;
-	bool found = namespaceIndex.find(ns, loc);
+	bool found = nsindex(ns)->find(ns, loc);
 	if( !found ) {
 		cout << "info: findAll() namespace does not exist: " << ns << endl;
 		return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
 	}
-	Extent *e = temp.getExtent(loc);
+	Extent *e = getExtent(loc);
 	return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
 }
 
 void aboutToDelete(const DiskLoc& dl);
 
+/* pull out the relevant key objects from obj, so we
+   can index them.  Note that the set is multiple elements 
+   only when it's a "multikey" array.
+   keys will be left empty if key not found in the object.
+*/
 void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) { 
 	JSObj keyPattern = info.obj().getObjectField("key");
 	JSObjBuilder b;
@@ -373,7 +393,7 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	/* check if any cursors point to us.  if so, advance them. */
 	aboutToDelete(dl);
 
-	NamespaceDetails* d = namespaceIndex.details(ns);
+	NamespaceDetails* d = nsdetails(ns);
 	unindexRecord(ns, d, todelete, dl);
 
 	/* remove ourself from the record next/prev chain */
@@ -387,10 +407,18 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	/* remove ourself from extent pointers */
 	{
 		Extent *e = todelete->myExtent(dl);
-		if( e->firstRecord == dl )
-			e->firstRecord.setOfs(todelete->nextOfs);
-		if( e->lastRecord == dl )
-			e->lastRecord.setOfs(todelete->prevOfs);
+		if( e->firstRecord == dl ) {
+			if( todelete->nextOfs == DiskLoc::NullOfs )
+				e->firstRecord.Null();
+			else
+				e->firstRecord.setOfs(dl.a(), todelete->nextOfs);
+		}
+		if( e->lastRecord == dl ) {
+			if( todelete->prevOfs == DiskLoc::NullOfs )
+				e->lastRecord.Null();
+			else
+				e->lastRecord.setOfs(dl.a(), todelete->prevOfs);
+		}
 	}
 
 	/* add to the free list */
@@ -432,7 +460,7 @@ void DataFileMgr::update(
 
 	/* has any index keys changed? */
 	{
-		NamespaceDetails *d = namespaceIndex.details(ns);
+		NamespaceDetails *d = nsdetails(ns);
 		if( d->nIndexes ) {
 			JSObj newObj(buf);
 			JSObj oldObj = dl.obj();
@@ -562,20 +590,27 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	}
 
 	bool addIndex = false;
-	if( strncmp(ns, "system.", 7) == 0 ) {
-		if( strcmp(ns, "system.indexes") == 0 )
-			addIndex = true;
-		else if( !god ) { 
-			cout << "ERROR: attempt to insert in system namespace " << ns << endl;
+	const char *sys = strstr(ns, "system.");
+	if( sys ) { 
+		if( sys == ns ) {
+			cout << "ERROR: attempt to insert for invalid client 'system': " << ns << endl;
 			return DiskLoc();
+		}
+		if( strstr(ns, ".system.") ) { 
+			if( strstr(ns, ".system.indexes") )
+				addIndex = true;
+			else if( !god ) { 
+				cout << "ERROR: attempt to insert in system namespace " << ns << endl;
+				return DiskLoc();
+			}
 		}
 	}
 
-	NamespaceDetails *d = namespaceIndex.details(ns);
+	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) {
 		newNamespace(ns);
-		temp.newExtent(ns, initialExtentSize(len));
-		d = namespaceIndex.details(ns);
+		client->newestFile()->newExtent(ns, initialExtentSize(len));
+		d = nsdetails(ns);
 	}
 
 	NamespaceDetails *tableToIndex = 0;
@@ -591,7 +626,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 				(tabletoidxns?tabletoidxns:"") << endl;
 			return DiskLoc();
 		}
-		tableToIndex = namespaceIndex.details(tabletoidxns);
+		tableToIndex = nsdetails(tabletoidxns);
 		if( tableToIndex == 0 ) {
 			cout << "ERROR: bad add index attempt, no such table(ns):" << tabletoidxns << endl;
 			return DiskLoc();
@@ -615,7 +650,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	if( loc.isNull() ) {
 		// out of space
 		cout << "allocating new extent for " << ns << endl;
-		temp.newExtent(ns, followupExtentSize(len, d->lastExtentSize));
+		client->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
 		loc = d->alloc(lenWHdr, extentLoc);
 		if( loc.isNull() ) { 
 			cout << "****** ERROR: out of space in datafile.  write more code." << endl;
@@ -661,12 +696,13 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 }
 
 void DataFileMgr::init(const char *dir) {
-	string path = dir;
+/*	string path = dir;
 	path += "temp.dat";
 	temp.open(path.c_str(), 64 * 1024 * 1024);
+*/
 }
 
 void pdfileInit() {
-	namespaceIndex.init(dbpath);
+//	namespaceIndex.init(dbpath);
 	theDataFileMgr.init(dbpath);
 }

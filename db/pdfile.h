@@ -1,6 +1,16 @@
-// pdfile.h
+/* pdfile.h
+
+   Files:
+     client.ns - namespace index
+     client.1  - data files
+     client.2 
+     ...
+*/
 
 #pragma once
+
+// see version, versionMinor, below.
+const int VERSION = 4;
 
 #include "../stdafx.h"
 #include "../util/mmap.h"
@@ -15,14 +25,13 @@ class Cursor;
 
 /*---------------------------------------------------------------------*/ 
 
-/*---------------------------------------------------------------------*/ 
-
 class PDFHeader;
 class PhysicalDataFile {
 	friend class DataFileMgr;
 	friend class BasicCursor;
 public:
-	void open(const char *filename, int length = 64 * 1024 * 1024);
+	PhysicalDataFile(int fn) : fileNo(fn) { }
+	void open(int fileNo, const char *filename);
 
 private:
 	Extent* newExtent(const char *ns, int approxSize);
@@ -33,6 +42,7 @@ private:
 	MemoryMappedFile mmf;
 	PDFHeader *header;
 	int length;
+	int fileNo;
 };
 
 class DataFileMgr {
@@ -51,7 +61,7 @@ public:
 	static Extent* getExtent(const DiskLoc& dl);
 	static Record* getRecord(const DiskLoc& dl);
 private:
-	PhysicalDataFile temp;
+	vector<PhysicalDataFile *> files;
 };
 
 extern DataFileMgr theDataFileMgr;
@@ -104,7 +114,7 @@ public:
 	Returns a DeletedRecord location which is the data in the extent ready for us.
 	Caller will need to add that to the freelist structure in namespacedetail.
 	*/
-	DiskLoc init(const char *nsname, int _length, int _offset);
+	DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset);
 
 	void assertOk() { assert(magic == 0x41424344); }
 
@@ -149,7 +159,7 @@ public:
 
 	static int headerSize() { return sizeof(PDFHeader) - 4; }
 
-	bool uninitialized() { if( version == 0 ) return true; assert(version == 3); return false; }
+	bool uninitialized() { if( version == 0 ) return true; assert(version == VERSION); return false; }
 
 	Record* getRecord(DiskLoc dl) {
 		int ofs = dl.getOfs();
@@ -157,14 +167,14 @@ public:
 		return (Record*) (((char *) this) + ofs);
 	}
 
-	void init(int filelength) {
+	void init(int fileno, int filelength) {
 		if( uninitialized() ) {
 			assert(filelength > 32768 );
 			assert( headerSize() == 8192 );
 			fileLength = filelength;
-			version = 3;
+			version = VERSION;
 			versionMinor = 0;
-			unused.setOfs( headerSize() );
+			unused.setOfs( fileno, headerSize() );
 			assert( (data-(char*)this) == headerSize() );
 			unusedLength = fileLength - headerSize() - 16;
 			memcpy(data+unusedLength, "      \nthe end\n", 16); 
@@ -225,7 +235,8 @@ public:
 
 	Record* _current() {
 		assert( ok() );
-		return theDataFileMgr.temp.recordAt(curr); 
+		return curr.rec();
+		//		return theDataFileMgr.temp.recordAt(curr); 
 	}
 	JSObj current() { 
 		return JSObj( _current() ); 
@@ -247,13 +258,6 @@ public:
 };
 
 inline Record* PhysicalDataFile::recordAt(DiskLoc dl) { return header->getRecord(dl); }
-
-inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
-	return theDataFileMgr.temp.getExtent(dl);
-}
-inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
-	return theDataFileMgr.temp.recordAt(dl);
-}
 
 inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
 	if( nextOfs != DiskLoc::NullOfs )
@@ -288,3 +292,91 @@ inline Extent* DiskLoc::ext() const {
 inline BtreeBucket* DiskLoc::btree() const { 
 	return (BtreeBucket*) rec()->data;
 }
+
+/*---------------------------------------------------------------------*/ 
+
+// customer, or rather a customer's database -- i guess down the line
+// there might be more than one for a cust, we'll see.
+class Client { 
+public:
+	Client(const char *nm) : name(nm) { 
+		namespaceIndex = new NamespaceIndex();
+		namespaceIndex->init(dbpath, nm);
+	} 
+
+	PhysicalDataFile* getFile(int n) { 
+		assert( n >= 0 && n < 100000 );
+#if defined(_DEBUG)
+		if( n > 100 )
+			cout << "getFile(): n=" << n << "?" << endl;
+#endif
+		while( n >= (int) files.size() )
+			files.push_back(0);
+		PhysicalDataFile* p = files[n];
+		if( p == 0 ) {
+			p = new PhysicalDataFile(n);
+			files[n] = p;
+			stringstream out;
+			out << dbpath << name << '.' << n;
+			p->open(n, out.str().c_str());
+		}
+		return p;
+	}
+
+	PhysicalDataFile* addAFile() {
+		int n = (int) files.size();
+		return getFile(n);
+	}
+
+	PhysicalDataFile* newestFile() { 
+		int n = (int) files.size();
+		if( n > 0 ) n--;
+		return getFile(n);
+	}
+
+	vector<PhysicalDataFile*> files;
+	string name; // "alleyinsider"
+	NamespaceIndex *namespaceIndex;
+};
+
+// tempish...move to TLS or pass all the way down as a parm
+extern map<string,Client*> clients;
+extern Client *client;
+inline void setClient(const char *ns) { 
+	char cl[256];
+	nsToClient(ns, cl);
+	map<string,Client*>::iterator it = clients.find(cl);
+	if( it != clients.end() ) {
+		client = it->second;
+		return;
+	}
+	Client *c = new Client(cl);
+	clients[cl] = c;
+	client = c;
+}
+
+inline NamespaceIndex* nsindex(const char *ns) { 
+#if defined(_DEBUG)
+	char buf[256];
+	nsToClient(ns, buf);
+	assert( client->name == buf );
+#endif
+	return client->namespaceIndex;
+}
+
+inline NamespaceDetails* nsdetails(const char *ns) { 
+	return nsindex(ns)->details(ns);
+}
+
+inline PhysicalDataFile& DiskLoc::pdf() const { 
+	return *client->getFile(fileNo);
+}
+
+inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
+	return client->getFile(dl.a())->getExtent(dl);
+}
+
+inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
+	return client->getFile(dl.a())->recordAt(dl);
+}
+

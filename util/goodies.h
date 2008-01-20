@@ -13,6 +13,9 @@ inline pthread_t GetCurrentThreadId() { return pthread_self(); }
 /* set to TRUE if we are exiting */
 extern bool goingAway;
 
+bool isPrime(int n); 
+int nextPrime(int n);
+
 inline void dumpmemory(const char *data, int len) { 
 	if( len > 1024 )
 		len = 1024;

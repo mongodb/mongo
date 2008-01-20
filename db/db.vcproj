@@ -189,10 +189,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\jseval.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\jsobj.cpp"
 				>
 			</File>
@@ -263,11 +259,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\jseval.h"
+				RelativePath=".\jsobj.h"
 				>
 			</File>
 			<File
-				RelativePath=".\jsobj.h"
+				RelativePath="..\util\lruishmap.h"
 				>
 			</File>
 			<File

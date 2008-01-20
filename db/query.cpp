@@ -8,6 +8,10 @@
 #include <time.h>
 #include "introspect.h"
 #include "btree.h"
+#include "../util/lruishmap.h"
+
+//ns->query->DiskLoc
+LRUishMap<JSObj,DiskLoc,5> lrutest(123);
 
 int nextCursorId = 1;
 
@@ -17,7 +21,7 @@ JSObj emptyObj;
          _ use index on partial match with the query
 */
 auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) { 
-	NamespaceDetails *d = namespaceIndex.details(ns);
+	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) return auto_ptr<Cursor>();
 	set<string> queryFields;
 	query.getFieldNames(queryFields);
@@ -104,7 +108,7 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 //	cout << "delete ns:" << ns << " queryobjsize:" << 
 //		pattern.objsize() << endl;
 
-	if( strncmp(ns, "system.", 7) == 0 ) { 
+	if( strstr(ns, ".system.") ) {
 		cout << "ERROR: attempt to delete in system namespace " << ns << endl;
 		return;
 	}
@@ -178,16 +182,19 @@ cout <<"TEMP: " << m.fieldName << ' ' << m.n << endl;
 	}
 }
 
-/* 
+/*
 todo:
- support $inc: n
  smart requery find record immediately
 */
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) {
+//cout << "TEMP BAD";
+//lrutest.find(updateobj);
+
+
 	//	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
 	//		pattern.objsize();
 
-	if( strncmp(ns, "system.", 7) == 0 ) { 
+	if( strstr(ns, ".system.") ) { 
 		cout << "\nERROR: attempt to update in system namespace " << ns << endl;
 		return;
 	}
@@ -277,7 +284,7 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 		if( strcmp(e.fieldName(),"deleteIndexes") == 0 ) { 
 			valid = true;
 			/* note: temp implementation.  space not reclaimed! */
-			NamespaceDetails *d = namespaceIndex.details(e.valuestr());
+			NamespaceDetails *d = nsdetails(e.valuestr());
 			cout << "CMD: deleteIndexes " << e.valuestr() << endl;
 			if( d ) {
 				ok = true;

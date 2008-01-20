@@ -128,25 +128,30 @@ struct EmptyObject {
 void receivedUpdate(Message& m) {
 	DbMessage d(m);
 	const char *ns = d.getns();
+	setClient(ns);
 	int flags = d.pullInt();
 	JSObj query = d.nextJsObj();
 	assert( d.moreJSObjs() );
 	JSObj toupdate = d.nextJsObj();
 	updateObjects(ns, toupdate, query, flags & 1);
+	client = 0;
 }
 
 void receivedDelete(Message& m) {
 	DbMessage d(m);
 	const char *ns = d.getns();
+	setClient(ns);
 	int flags = d.pullInt();
 	assert( d.moreJSObjs() );
 	JSObj pattern = d.nextJsObj();
 	deleteObjects(ns, pattern, flags & 1);
+	client = 0;
 }
 
 void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
+	setClient(ns);
 	int ntoreturn = d.pullInt();
 	JSObj query = d.nextJsObj();
 	auto_ptr< set<string> > fields;
@@ -159,17 +164,20 @@ void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	Message resp;
 	resp.setData(msgdata, true);
 	dbMsgPort.reply(m, resp);
+	client = 0;
 }
 
 void receivedGetMore(MessagingPort& dbMsgPort, Message& m) {
 	DbMessage d(m);
 	const char *ns = d.getns();
+	setClient(ns);
 	int ntoreturn = d.pullInt();
 	long long cursorid = d.pullInt64();
 	QueryResult* msgdata = getMore(ns, ntoreturn, cursorid);
 	Message resp;
 	resp.setData(msgdata, true);
 	dbMsgPort.reply(m, resp);
+	client = 0;
 }
 
 void receivedInsert(Message& m) {
@@ -178,11 +186,16 @@ void receivedInsert(Message& m) {
 	while( d.moreJSObjs() ) {
 		JSObj js = d.nextJsObj();
 //		cout << "  temp dbinsert: got js object, size=" << js.objsize() << " ns:" << d.getns() << endl;
-		theDataFileMgr.insert(d.getns(), (void*) js.objdata(), js.objsize());
+		const char *ns = d.getns();
+		setClient(ns);
+		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
 	}
+	client = 0;
 }
 
 void testTheDb() {
+	setClient("sys.unittest.pdfile");
+
 	/* this is not validly formatted, if you query this namespace bad things will happen */
 	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
 	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
@@ -197,11 +210,11 @@ void testTheDb() {
 	auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
 	while( c->ok() ) {
 		Record* r = c->_current();
-//		cout << "  gotrec " << r->netLength() << ' ' << 
-//			r->data << '\n';
 		c->advance();
 	}
 	cout << endl;
+
+	client = 0;
 }
 
 int port = DBPort;
@@ -336,7 +349,6 @@ void msg(const char *m, int extras = 0) {
 int main(int argc, char* argv[], char *envp[] )
 {
 	srand(curTimeMillis());
-	cout << curTimeMillis() % 10000 << endl;
 
 	if( argc >= 2 ) {
 	  if( strcmp(argv[1], "quicktest") == 0 ) {

@@ -43,8 +43,14 @@ public:
 	DiskLoc head; /* btree head */
 	DiskLoc info; /* index info object. { name:, ns:, key: } */
 
+	/* pull out the relevant key objects from obj, so we
+       can index them.  Note that the set is multiple elements 
+	   only when it's a "multikey" array.
+       keys will be left empty if key not found in the object.
+	*/
 	void getKeysFromObject(JSObj& obj, set<JSObj>& keys);
 
+    // returns name of this index's storage area
 	// client.table.$index
 	string indexNamespace() { 
 		JSObj io = info.obj();
@@ -107,9 +113,10 @@ class NamespaceIndex {
 public:
 	NamespaceIndex() { }
 
-	void init(const char *dir) { 
+	void init(const char *dir, const char *client) { 
 		string path = dir;
-		path += "namespace.idx";
+		path += client;
+		path += ".ns";
 		const int LEN = 16 * 1024 * 1024;
 		void *p = f.map(path.c_str(), LEN);
 		if( p == 0 ) { 
@@ -145,6 +152,54 @@ private:
 	HashTable<Namespace,NamespaceDetails> *ht;
 };
 
-extern NamespaceIndex namespaceIndex;
+extern const char *dbpath;
 
-auto_ptr<Cursor> makeNamespaceCursor();
+/*
+class NamespaceIndexMgr { 
+public:
+	NamespaceIndexMgr() { }
+	NamespaceIndex* get(const char *client) { 
+		map<string,NamespaceIndex*>::iterator it = m.find(client);
+		if( it != m.end() )
+			return it->second;
+		NamespaceIndex *ni = new NamespaceIndex();
+		ni->init(dbpath, client);
+		m[client] = ni;
+		return ni;
+	}
+private:
+	map<string,NamespaceIndex*> m;
+};
+
+extern NamespaceIndexMgr namespaceIndexMgr;
+*/
+
+// "client.a.b.c" -> "client"
+inline void nsToClient(const char *ns, char *client) { 
+	const char *p = ns;
+	char *q = client;
+	while( *p != '.' ) { 
+		if( *p == 0 ) { 
+			assert(false);
+			*client = 0;
+			return;
+		}
+		*q++ = *p++;
+	}
+	*q = 0;
+	assert(q-client<256);
+}
+
+/*
+inline NamespaceIndex* nsindex(const char *ns) { 
+	char client[256];
+	nsToClient(ns, client);
+	return namespaceIndexMgr.get(client);
+}
+
+inline NamespaceDetails* nsdetails(const char *ns) { 
+	return nsindex(ns)->details(ns);
+}
+*/
+
+//auto_ptr<Cursor> makeNamespaceCursor();

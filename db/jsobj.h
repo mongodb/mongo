@@ -209,6 +209,9 @@ explicit
 	bool woEqual(const JSObj& r) const { 
 		return _objsize==r._objsize && memcmp(_objdata,r._objdata,_objsize)==0;
 	}
+	bool operator==(const JSObj& r) const { 
+		return this->woEqual(r);*this == r; 
+	}
 
 	Element firstElement() { 
 		return Element(objdata() + 4);
@@ -249,6 +252,14 @@ explicit
 	   data (which is freed when the new jsobj destructs).
 	   */
 	JSObj copy() const;
+
+	int hash() const {
+		unsigned x = 0;
+		const char *p = _objdata;
+		for( int i = 0; i < _objsize; i++ )
+			x = x * 131 + p[i];
+		return (x & 0x7fffffff) | 0x8000000; // must be > 0
+	}
 
 	bool iFree;
 private:

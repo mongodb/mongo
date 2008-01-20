@@ -14,25 +14,26 @@ class DeletedRecord;
 class Extent;
 class BtreeBucket;
 class JSObj;
+class PhysicalDataFile;
 
 class DiskLoc {
-	int reserved; /* this will be volume, file #, etc. */
+	int fileNo; /* this will be volume, file #, etc. */
 	int ofs;
 public:
 	enum { NullOfs = -1 };
-	int a() const { return reserved; }
-	DiskLoc(int a, int b) : reserved(a), ofs(b) { }
-	DiskLoc() { reserved = -1; ofs = NullOfs; }
-	DiskLoc(const DiskLoc& l) { reserved=l.reserved; ofs=l.ofs; }
+	int a() const { return fileNo; }
+	DiskLoc(int a, int b) : fileNo(a), ofs(b) { }
+	DiskLoc() { fileNo = -1; ofs = NullOfs; }
+	DiskLoc(const DiskLoc& l) { fileNo=l.fileNo; ofs=l.ofs; }
 
 	bool isNull() const { return ofs == NullOfs; }
-	void Null() { reserved = -1; ofs = NullOfs; }
+	void Null() { fileNo = -1; ofs = NullOfs; }
 	void assertOk() { assert(!isNull()); }
 
 	int getOfs() const { return ofs; }
-	void set(int a, int b) { reserved=a; ofs=b; }
-	void setOfs(int _ofs) { 
-		reserved = -2; /*temp: fix for multiple datafiles */
+	void set(int a, int b) { fileNo=a; ofs=b; }
+	void setOfs(int _fileNo, int _ofs) { 
+		fileNo = _fileNo;
 		ofs = _ofs;
 	}
 
@@ -41,18 +42,18 @@ public:
 		ofs += amt;
 	}
 
-	bool sameFile(DiskLoc b) { return reserved == b.reserved; /* not really done...*/ }
+	bool sameFile(DiskLoc b) { return fileNo == b.fileNo; }
 
-	bool operator==(const DiskLoc& b) const { return reserved==b.reserved && ofs == b.ofs; }
+	bool operator==(const DiskLoc& b) const { return fileNo==b.fileNo && ofs == b.ofs; }
 	bool operator!=(const DiskLoc& b) const { return !(*this==b); }
 	const DiskLoc& operator=(const DiskLoc& b) { 
-		reserved=b.reserved; ofs = b.ofs;
+		fileNo=b.fileNo; ofs = b.ofs;
 		return *this;
 	}
 	bool operator<(const DiskLoc& b) const { 
-		if( reserved == b.reserved )
+		if( fileNo == b.fileNo )
 			return ofs < b.ofs;
-		return reserved < b.reserved;
+		return fileNo < b.fileNo;
 	}
 
 	JSObj obj() const;
@@ -60,6 +61,8 @@ public:
 	DeletedRecord* drec() const;
 	Extent* ext() const;
 	BtreeBucket* btree() const;
+
+	PhysicalDataFile& pdf() const;
 };
 
 #pragma pack(pop)
