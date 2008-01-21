@@ -174,7 +174,6 @@ void getMods(vector<Mod>& mods, JSObj from) {
 				m.fieldName = f.fieldName();
 				if( f.type() == Number ) {
 					m.n = f.number();
-cout <<"TEMP: " << m.fieldName << ' ' << m.n << endl;
 					mods.push_back(m);
 				} 
 			}
