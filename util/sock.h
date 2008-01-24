@@ -16,6 +16,8 @@ inline void disableNagle(int sock) {
 	if( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) ) 
 		cout << "ERROR: disableNagle failed" << endl;
 }
+inline void prebindOptions( int sock ){
+}
 #else
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -34,6 +36,14 @@ inline void disableNagle(int sock) {
 	if( setsockopt(sock, SOL_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) ) 
 		cout << "ERROR: disableNagle failed" << endl;
 }
+inline void prebindOptions( int sock ){
+  cout << "doing prebind option" << endl;
+  int x = 1;
+  if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x)) < 0 )
+    cout << "Failed to set socket opt, SO_REUSEADDR" << endl;
+}
+
+
 #endif
 
 struct SockAddr {

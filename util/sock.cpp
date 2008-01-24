@@ -64,6 +64,7 @@ void smain() {
   //-----------------------------------------------
   // Create a receiver socket to receive datagrams
   RecvSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  prebindOptions( RecvSocket );
 
   //-----------------------------------------------
   // Bind the socket to any address and the specified port.
@@ -118,6 +119,7 @@ void xmain() {
   // Create a receiver socket to receive datagrams
 
   RecvSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  prebindOptions( RecvSocket );
 
   //-----------------------------------------------
   // Bind the socket to any address and the specified port.
