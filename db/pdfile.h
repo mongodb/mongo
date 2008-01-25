@@ -264,9 +264,15 @@ inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
 	if( nextOfs != DiskLoc::NullOfs )
 		return DiskLoc(myLoc.a(), nextOfs);
 	Extent *e = myExtent(myLoc);
-	if( e->xnext.isNull() )
-		return DiskLoc(); // end of table.
-	return e->xnext.ext()->firstRecord;
+	while( 1 ) {
+		if( e->xnext.isNull() )
+			return DiskLoc(); // end of table.
+		e = e->xnext.ext();
+		if( !e->firstRecord.isNull() ) 
+			break;
+		// entire extent could be empty, keep looking
+	}
+	return e->firstRecord;
 }
 inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
 	if( prevOfs != DiskLoc::NullOfs )
