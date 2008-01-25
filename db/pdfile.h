@@ -41,7 +41,8 @@ private:
 
 	MemoryMappedFile mmf;
 	PDFHeader *header;
-	int length;
+int __unUsEd;
+//	int length;
 	int fileNo;
 };
 

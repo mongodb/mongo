@@ -317,6 +317,12 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 		return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
 	}
 	Extent *e = getExtent(loc);
+	while( e->firstRecord.isNull() && !e->xnext.isNull() ) {
+		cout << "  DFM::findAll(): extent empty, skipping ahead" << endl;
+		// find a nonempty extent
+		// it might be nice to free the whole extent here!  but have to clean up free recs then.
+		e = e->getNextExtent();
+	}
 	return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
 }
 
@@ -691,7 +697,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	if( d->nIndexes )
 		indexRecord(d, buf, len, loc);
 
-//	cout << " inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << endl;
+//	cout << "   inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << ' ' << ns << endl;
 	return loc;
 }
 
