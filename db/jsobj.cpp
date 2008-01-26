@@ -147,9 +147,13 @@ inline int compareElementValues(Element& l, Element& r) {
 	return -1;
 }
 
+/* JSMatcher --------------------------------------*/
+
 JSMatcher::JSMatcher(JSObj &_jsobj) : 
    jsobj(_jsobj), nRegex(0)
 {
+	int nBuilders = 0;
+
 	JSElemIter i(jsobj);
 	n = 0;
 	while( i.more() ) {
@@ -178,12 +182,54 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 				regexs[nRegex].fieldName = e.fieldName();
 				nRegex++;
 			}
+			continue;
 		}
-		else {
+
+		// greater than / less than...
+		// { a : { $gt: 3 } }
+		if( e.type() == Object ) {
+			Element fe = e.embeddedObject().firstElement();
+			const char *fn = fe.fieldName();
+			if( fn[0] == '$' && fn[1] && fn[2] == 't' ) { 
+				int op = 0;
+				if( fn[1] == 'g' ) { 
+					if( fn[3] == 0 ) op = GT;
+					else if( fn[3] == 'e' && fn[4] == 0 ) op = GTE;
+				}
+				else if( fn[1] == 'l' ) { 
+					if( fn[3] == 0 ) op = LT;
+					else if( fn[3] == 'e' && fn[4] == 0 ) op = LTE;
+				}
+				if( op && nBuilders < 8) { 
+					JSObjBuilder *b = new JSObjBuilder();
+					builders[nBuilders++] = b;
+					b->appendAs(fe, e.fieldName());
+					toMatch.push_back( b->done().firstElement() );
+					compareOp.push_back(op);
+					n++;
+					continue;
+				}
+			}
+		}
+
+		{
 			toMatch.push_back(e);
+			compareOp.push_back(Equality);
 			n++;
 		}
 	}
+}
+
+inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) { 
+	if( op == 0 ) 
+		return l.valuesEqual(r);
+
+	if( l.type() != r.type() )
+		return false;
+
+	int c = compareElementValues(l, r);
+	int z = 1 << (c+1); 
+	return (op & z);
 }
 
 /* deep means we looked into arrays for a match */
@@ -227,19 +273,21 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 		}
 	}
 
+	// check normal non-regex cases:
 	for( int i = 0; i < n; i++ ) {
 		Element& m = toMatch[i]; 
 		JSElemIter k(jsobj);
 		while( k.more() ) {
 			Element e = k.next();
 			if( strcmp(e.fieldName(), m.fieldName())== 0 ) {
-				if( e.valuesEqual(m) ) {
+				if( valuesMatch(e, m, compareOp[i]) ) {
 					goto ok;
 				}
 				else if( e.type() == Array ) {
 					JSElemIter ai(e.embeddedObject());
 					while( ai.more() ) { 
-						if( ai.next().valuesEqual(m) ) {
+						Element z = ai.next();
+						if( valuesMatch( z, m, compareOp[i]) ) {
 							if( deep )
 								*deep = true;
 							goto ok;

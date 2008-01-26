@@ -350,19 +350,49 @@ public:
 	~RegexMatcher() { delete re; }
 };
 
-/* For when a js object is a pattern... */
+/* For when a js object is a query pattern. 
+
+   e.g.
+       db.foo.find( { a : 3 } );
+
+   { a : 3 } is the pattern object.
+
+   GT/LT:
+   { a : { $gt
+
+*/
 class JSMatcher { 
 public:
+	enum { 
+		Equality = 0,
+		LT = 0x1,
+		LTE = 0x3,
+		GTE = 0x6,
+		GT = 0x4 };
+
 	JSMatcher(JSObj& pattern);
 
+	~JSMatcher() { 
+		for( int i = 0; i < nBuilders; i++ )
+			delete builders[i];
+	}
+
 	bool matches(JSObj& j, bool *deep = 0);
+
 private:
+	int valuesMatch(Element& l, Element& r, int op);
+
 	JSObj& jsobj;
 	vector<Element> toMatch;
+	vector<int> compareOp;
 	int n;
 
 	RegexMatcher regexs[4];
 	int nRegex;
+
+	// so we delete the mem when we're done:
+	JSObjBuilder *builders[8];
+	int nBuilders;
 };
 
 extern JSObj maxKey;
