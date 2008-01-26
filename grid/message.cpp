@@ -110,10 +110,16 @@ bool MessagingPort::recv(Message& m) {
 	}
 
 	assert( x == 4 );
-
+        
 	int z = (len+1023)&0xfffffc00; assert(z>=len);
 	MsgData *md = (MsgData *) malloc(z);
 	md->len = len;
+        
+        if ( len <= 0 ){
+          cout << "got a length of 0, something is wrong" << endl;
+          return false;
+        }
+
 	char *p = (char *) &md->id;
 	int left = len -4;
 	while( 1 ) {
