@@ -20,6 +20,7 @@ void Listener::listen() {
 		cout << "ERROR: listen(): invalid socket? " << errno << endl;
 		return;
 	}
+	prebindOptions( sock );
 	if( bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) { 
 		cout << "listen(): bind() failed errno:" << errno << endl;
 		if( errno == 98 )
