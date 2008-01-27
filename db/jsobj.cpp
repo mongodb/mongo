@@ -149,10 +149,48 @@ inline int compareElementValues(Element& l, Element& r) {
 
 /* JSMatcher --------------------------------------*/
 
+// If the element is something like:
+//   a : { $gt : 3 }
+// we append
+//   a : 3
+// else we just append the element.
+//
+void appendElementHandlingGtLt(JSObjBuilder& b, Element& e) { 
+	if( e.type() == Object ) {
+		Element fe = e.embeddedObject().firstElement();
+		const char *fn = fe.fieldName();
+		if( fn[0] == '$' && fn[1] && fn[2] == 't' ) { 
+			b.appendAs(fe, e.fieldName());
+			return;
+		}
+	}
+	b.append(e);
+}
+
+int getGtLtOp(Element& e) { 
+	int op = JSMatcher::Equality;
+	if( e.type() != Object ) 
+		return op;
+
+	Element fe = e.embeddedObject().firstElement();
+	const char *fn = fe.fieldName();
+	if( fn[0] == '$' && fn[1] && fn[2] == 't' ) { 
+		if( fn[1] == 'g' ) { 
+			if( fn[3] == 0 ) op = JSMatcher::GT;
+			else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::GTE;
+		}
+		else if( fn[1] == 'l' ) { 
+			if( fn[3] == 0 ) op = JSMatcher::LT;
+			else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::LTE;
+		}
+	}
+	return op;
+}
+
 JSMatcher::JSMatcher(JSObj &_jsobj) : 
    jsobj(_jsobj), nRegex(0)
 {
-	int nBuilders = 0;
+	nBuilders = 0;
 
 	JSElemIter i(jsobj);
 	n = 0;
@@ -191,7 +229,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 			Element fe = e.embeddedObject().firstElement();
 			const char *fn = fe.fieldName();
 			if( fn[0] == '$' && fn[1] && fn[2] == 't' ) { 
-				int op = 0;
+				int op = Equality;
 				if( fn[1] == 'g' ) { 
 					if( fn[3] == 0 ) op = GT;
 					else if( fn[3] == 'e' && fn[4] == 0 ) op = GTE;

@@ -368,7 +368,12 @@ public:
 		LT = 0x1,
 		LTE = 0x3,
 		GTE = 0x6,
-		GT = 0x4 };
+		GT = 0x4 
+	};
+
+	static int opDirection(int op) { 
+		return op <= LTE ? -1 : 1;
+	}
 
 	JSMatcher(JSObj& pattern);
 

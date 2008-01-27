@@ -17,20 +17,31 @@ int nextCursorId = 1;
 
 JSObj emptyObj;
 
+int getGtLtOp(Element& e);
+void appendElementHandlingGtLt(JSObjBuilder& b, Element& e);
+
 /* todo: _ cache query plans 
          _ use index on partial match with the query
+
+   parameters
+     query - the query, e.g., { name: 'joe' }
+     order - order by spec, e.g., { name: 1 } 1=ASC, -1=DESC
+
 */
 auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) { 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) return auto_ptr<Cursor>();
+
+	// queryFields, e.g. { 'name' }
 	set<string> queryFields;
 	query.getFieldNames(queryFields);
+
 	if( !order.isEmpty() ) {
 		set<string> orderFields;
 		order.getFieldNames(orderFields);
 		// order by
 		for(int i = 0; i < d->nIndexes; i++ ) { 
-			JSObj idxInfo = d->indexes[i].info.obj();
+			JSObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
 			assert( strcmp(ns, idxInfo.getStringField("ns")) == 0 );
 			JSObj idxKey = idxInfo.getObjectField("key");
 			set<string> keyFields;
@@ -40,24 +51,17 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 					order.firstElement().type() == Number && 
 					order.firstElement().number() < 0;
 				JSObjBuilder b;
-#if defined(_WIN32)
-				if( 0 ) {
-cout<< "TEMP FULLVALIDATE" << endl;
-d->indexes[i].head.btree()->fullValidate(d->indexes[i].head);
-{
-	stringstream ss;
-	d->indexes[i].head.btree()->shape(ss);
-	cout << ss.str() << endl;
-}
-				}
-#endif
+				/* todo: start with the right key, not just beginning of index, when query is also
+				         specified!
+				*/
 				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, reverse ? maxKey : emptyObj, reverse ? -1 : 1, false));
 			}
 		}
 	}
-	// where/query
+
+	// regular query without order by
 	for(int i = 0; i < d->nIndexes; i++ ) { 
-		JSObj idxInfo = d->indexes[i].info.obj();
+		JSObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
 		JSObj idxKey = idxInfo.getObjectField("key");
 		set<string> keyFields;
 		idxKey.getFieldNames(keyFields);
@@ -67,10 +71,30 @@ d->indexes[i].head.btree()->fullValidate(d->indexes[i].head);
 			/* regexp: only supported if form is /^text/ */
 			JSObjBuilder b2;
 			JSElemIter it(q);
+			bool first = true;
 			while( it.more() ) {
 				Element e = it.next();
 				if( e.eoo() )
 					break;
+
+				// GT/LT
+				if( e.type() == Object ) { 
+					int op = getGtLtOp(e);
+					if( op ) { 
+						if( !first || !it.next().eoo() ) {
+							// compound keys with GT/LT not supported yet via index.
+							goto fail;
+						}
+						int direction = - JSMatcher::opDirection(op);
+						return auto_ptr<Cursor>( new BtreeCursor(
+							d->indexes[i].head, 
+							direction == 1 ? emptyObj : maxKey, 
+							direction, 
+							true) );
+					}
+				}
+
+				first = false;
 				if( e.type() == RegEx ) { 
 					if( *e.regexFlags() )
 						goto fail;
@@ -90,11 +114,12 @@ d->indexes[i].head.btree()->fullValidate(d->indexes[i].head);
                     b2.append(e.fieldName(), re+1);
 					break;
 				}
-				else
+				else {
 					b2.append(e);
+					//appendElementHandlingGtLt(b2, e);
+				}
 			}
 			JSObj q2 = b2.done();
-//			cout << "\nquery old: " << q.toString() << " new:" << q2.toString() << endl;
 			return auto_ptr<Cursor>( 
 				new BtreeCursor(d->indexes[i].head, q2, 1, true));
 		}
