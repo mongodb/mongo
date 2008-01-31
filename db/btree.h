@@ -149,7 +149,7 @@ public:
 		return bucket.btree()->keyNode(keyOfs);
 	}
 
-	virtual DiskLoc currLoc() { return _currKeyNode().recordLoc; }
+	virtual DiskLoc currLoc() { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc(); }
 	virtual Record* _current() { return currLoc().rec(); }
 	virtual JSObj current() { return JSObj(_current()); }
 
