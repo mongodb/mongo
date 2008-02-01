@@ -481,8 +481,14 @@ DiskLoc BtreeBucket::getHead(const DiskLoc& thisLoc) {
 	return p;
 }
 
-DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction) {
-	assert( keyOfs >= 0 && keyOfs < n );
+DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) {
+	if( keyOfs < 0 || keyOfs >= n ) {
+		cout << "ASSERT failure BtreeBucket::advance, caller: " << caller << endl;
+		cout << "  thisLoc: " << thisLoc.toString() << endl;
+		cout << "  keyOfs: " << keyOfs << " direction: " << direction << endl;
+		cout << bucketSummary() << endl;
+		assert( keyOfs >= 0 && keyOfs < n );
+	}
 	int adj = direction < 0 ? 1 : 0;
 	int ko = keyOfs + direction;
 	DiskLoc nextDown = childForPos(ko+adj);
@@ -669,7 +675,7 @@ void BtreeCursor::checkUnused() {
 		_KeyNode& kn = b->k(keyOfs);
 		if( kn.isUsed() )
 			break;
-		bucket = b->advance(bucket, keyOfs, direction);
+		bucket = b->advance(bucket, keyOfs, direction, "checkUnused");
 		u++;
 	}
 	if( u > 10 )
@@ -686,7 +692,7 @@ void BtreeCursor::checkUnused() {
 bool BtreeCursor::advance() { 
 	if( bucket.isNull() )
 		return false;
-	bucket = bucket.btree()->advance(bucket, keyOfs, direction);
+	bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");
 	checkUnused();
 	return !bucket.isNull();
 }

@@ -81,6 +81,18 @@ protected:
 	void markUnused(int keypos);
 public:
 	DiskLoc parent;
+
+	string bucketSummary() const {
+		stringstream ss;
+		ss << "  Bucket info:" << endl;
+		ss << "    n: " << n << endl;
+		ss << "    parent: " << parent.toString() << endl;
+		ss << "    nextChild: " << parent.toString() << endl;
+		ss << "    Size: " << Size << " flags:" << flags << endl;
+		ss << "    emptySize: " << emptySize << " topSize: " << topSize << endl;
+		return ss.str();
+	}
+
 protected:
 	void _shape(int level, stringstream&);
 	DiskLoc nextChild; // child bucket off and to the right of the highest key.
@@ -106,7 +118,7 @@ public:
 	bool unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc);
 	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction=1);
 	/* advance one key position in the index: */
-	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction);
+	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
 	DiskLoc getHead(const DiskLoc& thisLoc);
 
 	/* get tree shape */

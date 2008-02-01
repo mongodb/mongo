@@ -26,6 +26,12 @@ public:
 	DiskLoc() { fileNo = -1; ofs = NullOfs; }
 	DiskLoc(const DiskLoc& l) { fileNo=l.fileNo; ofs=l.ofs; }
 
+	string toString() const {
+		stringstream ss;
+		ss << hex << fileNo << ':' << ofs;
+		return ss.str();
+	}
+
 	bool isNull() const { return ofs == NullOfs; }
 	void Null() { fileNo = -1; ofs = NullOfs; }
 	void assertOk() { assert(!isNull()); }
