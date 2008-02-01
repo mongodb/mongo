@@ -152,6 +152,7 @@ void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	setClient(ns);
+	int ntoskip = d.pullInt();
 	int ntoreturn = d.pullInt();
 	JSObj query = d.nextJsObj();
 	auto_ptr< set<string> > fields;
@@ -160,7 +161,7 @@ void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 		d.nextJsObj().getFieldNames(*fields);
 	}
 	QueryResult* msgdata = 
-		runQuery(ns, ntoreturn, query, fields, ss);
+		runQuery(ns, ntoskip, ntoreturn, query, fields, ss);
 	Message resp;
 	resp.setData(msgdata, true);
 	dbMsgPort.reply(m, resp);

@@ -332,9 +332,10 @@ done:
 	return true;
 }
 
-QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj, 
+QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) {
 	ss << "query:" << ns << " ntoreturn:" << ntoreturn;
+	if( ntoskip ) ss << " ntoskip:" << ntoskip;
 	if( jsobj.objsize() > 100 ) 
 		ss << " querysz:" << jsobj.objsize();
 	if( queryTraceLevel >= 1 )
@@ -380,33 +381,40 @@ QueryResult* runQuery(const char *ns, int ntoreturn, JSObj jsobj,
 				if( c->tempStopOnMiss() )
 					break;
 			}
-			else if( !deep || !c->dup(c->currLoc()) ) {
-				bool ok = true;
-				if( filter.get() ) {
-					JSObj x;
-					ok = x.addFields(js, *filter) > 0;
-					if( ok ) 
-						b.append((void*) x.objdata(), x.objsize());
+			else if( !deep || !c->dup(c->currLoc()) ) { // i.e., check for dups on deep items only
+				// got a match.
+				if( ntoskip > 0 ) {
+					ntoskip--;
 				}
 				else {
-					b.append((void*) js.objdata(), js.objsize());
-				}
-				if( ok ) {
-					n++;
-					if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
-						(ntoreturn==0 && b.len()>1*1024*1024) ) {
-							// more...so save a cursor
-							ClientCursor *cc = new ClientCursor();
-							cc->c = c;
-							cursorid = allocCursorId();
-							cc->cursorid = cursorid;
-							cc->matcher = matcher;
-							cc->ns = ns;
-							cc->pos = n;
-							ClientCursor::add(cc);
-							cc->updateLocation();
-							cc->filter = filter;
-							break;
+					bool ok = true;
+					if( filter.get() ) {
+						// we just want certain fields from the object.
+						JSObj x;
+						ok = x.addFields(js, *filter) > 0;
+						if( ok ) 
+							b.append((void*) x.objdata(), x.objsize());
+					}
+					else {
+						b.append((void*) js.objdata(), js.objsize());
+					}
+					if( ok ) {
+						n++;
+						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
+							(ntoreturn==0 && b.len()>1*1024*1024) ) {
+								// more...so save a cursor
+								ClientCursor *cc = new ClientCursor();
+								cc->c = c;
+								cursorid = allocCursorId();
+								cc->cursorid = cursorid;
+								cc->matcher = matcher;
+								cc->ns = ns;
+								cc->pos = n;
+								ClientCursor::add(cc);
+								cc->updateLocation();
+								cc->filter = filter;
+								break;
+						}
 					}
 				}
 			}
