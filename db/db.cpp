@@ -181,7 +181,7 @@ void receivedGetMore(MessagingPort& dbMsgPort, Message& m) {
 	client = 0;
 }
 
-void receivedInsert(Message& m) {
+void receivedInsert(Message& m, stringstream& ss) {
 //	cout << "GOT MSG id:" << m.data->id << endl;
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
@@ -189,6 +189,7 @@ void receivedInsert(Message& m) {
 //		cout << "  temp dbinsert: got js object, size=" << js.objsize() << " ns:" << d.getns() << endl;
 		const char *ns = d.getns();
 		setClient(ns);
+		ss << ns;
 		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
 	}
 	client = 0;
@@ -289,7 +290,7 @@ void t()
 			}
 			else if( m.data->operation == dbInsert ) {
 				ss << "insert ";
-				receivedInsert(m);
+				receivedInsert(m, ss);
 			}
 			else if( m.data->operation == dbUpdate ) {
 				ss << "update ";
