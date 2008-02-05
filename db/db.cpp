@@ -134,7 +134,6 @@ void receivedUpdate(Message& m) {
 	JSObj query = d.nextJsObj();
 	assert( d.moreJSObjs() );
         assert( query.objsize() < m.data->dataLen() );
-        cout << query.toString() << endl;
 	JSObj toupdate = d.nextJsObj();
         assert( toupdate.objsize() < m.data->dataLen() );
         
