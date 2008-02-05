@@ -34,6 +34,10 @@ string Element::toString() {
 			s << '"' << valuestr() << '"';
 		}
 		break;
+        case jstOID: 
+          s << fieldName() << " : OID ";
+          s << hex << oid().a << hex << oid().b;
+          break;
     default:
 		s << fieldName() << ": ?";
 		break;
