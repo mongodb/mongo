@@ -12,6 +12,7 @@
 #include "query.h"
 
 extern const char *dbpath;
+extern int curOp;
 
 boost::mutex dbMutex;
 
@@ -246,6 +247,8 @@ void listen(int port) {
 
 void t()
 {
+	try { 
+
 	MessagingPort& dbMsgPort = *grab;
 	grab = 0;
 
@@ -266,6 +269,7 @@ void t()
 			lock lk(dbMutex);
 			Timer t;
 
+			curOp = m.data->operation;
 			if( m.data->operation == dbMsg ) { 
 				ss << "msg ";
 				char *p = m.data->_data;
@@ -311,6 +315,12 @@ void t()
 			ss << ' ' << t.millis() << "ms";
 			cout << ss.str().c_str() << endl;
 		}
+	}
+
+	}
+	catch( AssertionException ) { 
+		cout << "Caught AssertionException, terminating" << endl;
+		exit(-7);
 	}
 }
 

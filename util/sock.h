@@ -1,7 +1,7 @@
 // sock.h
 
-#pragma once 
-
+#pragma once
+ 
 #include <stdio.h>
 #include <sstream>
 #include "goodies.h"

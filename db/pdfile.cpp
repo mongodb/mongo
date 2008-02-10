@@ -23,8 +23,16 @@ const char *dbpath = "/data/db/";
 DataFileMgr theDataFileMgr;
 map<string,Client*> clients;
 Client *client;
+const char *curNs = "";
+int curOp;
 
 extern int otherTraceLevel;
+
+void sayDbContext() { 
+	cout << " client: " << (client ? client->name.c_str() : "null");
+	cout << " op:" << curOp << endl;
+	cout << " ns: " << curNs << endl;
+}
 
 JSObj::JSObj(Record *r) { 
 	_objdata = r->data;

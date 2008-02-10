@@ -93,6 +93,7 @@ public:
 		return -1;
 	}
 
+	/* return which "deleted bucket" for this size object */
 	static int bucket(int n) { 
 		for( int i = 0; i < Buckets; i++ )
 			if( bucketSizes[i] > n )

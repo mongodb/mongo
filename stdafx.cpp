@@ -12,3 +12,17 @@ struct MyAsserts {
 
 	}
 } myassertsstdafx;
+
+#undef assert
+
+#undef yassert
+#include "assert.h"
+
+void sayDbContext();
+
+void asserted(const char *msg, const char *file, unsigned line) { 
+	cout << "Assertion failure " << msg << endl;
+	cout << ' ' << file << ' ' << line << endl;
+	sayDbContext();
+	throw AssertionException();
+}

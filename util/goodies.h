@@ -41,8 +41,12 @@ inline void dumpmemory(const char *data, int len) {
 	}
 }
 
+#undef yassert
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
+#undef assert
+#define assert xassert
+#define yassert 1
 
 struct WrappingInt {
 	WrappingInt() { x = 0; } 

@@ -134,8 +134,13 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 //		pattern.objsize() << endl;
 
 	if( strstr(ns, ".system.") ) {
-		cout << "ERROR: attempt to delete in system namespace " << ns << endl;
-		return;
+		if( strstr(ns, ".system.indexes") ) {
+			cout << "WARNING: delete on system namespace " << ns << endl;
+		}
+		else { 
+			cout << "ERROR: attempt to delete in system namespace " << ns << endl;
+			return;
+		}
 	}
 
 	JSMatcher matcher(pattern);
@@ -214,7 +219,6 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 //cout << "TEMP BAD";
 //lrutest.find(updateobj);
 
-
 	//	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
 	//		pattern.objsize();
 
@@ -278,14 +282,36 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 int queryTraceLevel = 0;
 int otherTraceLevel = 0;
 
+string validateNS(const char *ns, NamespaceDetails *d) {
+	stringstream ss;
+	ss << "validate...\n";
+	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+	int n = 0;
+	long long len = 0;
+	long long nlen = 0;
+	while( c->ok() ) { 
+		n++;
+		Record *r = c->_current();
+		len += r->lengthWithHeaders;
+		nlen += r->netLength();
+		c->advance();
+	}
+	ss << "  " << n << " objects found\n";
+	ss << "  " << len << " bytes record data w/headers\n";
+	ss << "  " << nlen << " bytes record data wout/headers\n";
+	return ss.str();
+}
+
 // e.g.
 //   system.cmd$.find( { queryTraceLevel: 2 } );
 // 
 // returns true if ran a cmd
 //
 inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilderForYa) { 
-    if( strcmp(ns, "system.$cmd") != 0 ) 
-		return false;
+
+	const char *p = strchr(ns, '.');
+	if( !p ) return false;
+	if( strcmp(p, ".$cmd") != 0 ) return false;
 
 	ss << "\n  $cmd: " << jsobj.toString();
 
@@ -295,6 +321,8 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 	Element e = jsobj.firstElement();
 	if( e.eoo() ) goto done;
 	if( e.type() == Number ) { 
+		if( strncmp(ns, "admin", p-ns) != 0 ) // admin only
+			return false;
 		if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
 			valid = ok = true;
 			queryTraceLevel = (int) e.number();
@@ -304,12 +332,31 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 			otherTraceLevel = (int) e.number();
 		}
 	}
-	else if( e.type() == String ) { 
+	else if( e.type() == String ) {
+		string us(ns, p-ns);
+//		char client[256];
+		if( strcmp( e.fieldName(), "validate") == 0 ) { 
+			valid = true;
+//			nsToClient(e.valuestr(), client);
+			string toValidateNs = us + '.' + e.valuestr();
+			NamespaceDetails *d = nsdetails(toValidateNs.c_str());
+			cout << "CMD: validate " << toValidateNs << endl;
+			if( d ) { 
+				ok = true;
+				anObjBuilderForYa.append("ns", toValidateNs.c_str());
+				string s = validateNS(toValidateNs.c_str(), d);
+				anObjBuilderForYa.append("result", s.c_str());
+			}
+			else {
+				anObjBuilderForYa.append("errmsg", "ns not found");
+			}
+		}
 		if( strcmp(e.fieldName(),"deleteIndexes") == 0 ) { 
 			valid = true;
 			/* note: temp implementation.  space not reclaimed! */
-			NamespaceDetails *d = nsdetails(e.valuestr());
-			cout << "CMD: deleteIndexes " << e.valuestr() << endl;
+			string toDeleteNs = us + '.' + e.valuestr();
+			NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
+			cout << "CMD: deleteIndexes " << toDeleteNs << endl;
 			if( d ) {
 				ok = true;
 				cout << "  d->nIndexes was " << d->nIndexes << endl;
@@ -332,6 +379,8 @@ done:
 	return true;
 }
 
+int nCaught = 0;
+
 QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) {
 	ss << "query:" << ns << " ntoreturn:" << ntoreturn;
@@ -348,7 +397,8 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 
 	b.skip(sizeof(QueryResult));
 
-	if( runCommands(ns, jsobj, ss, b, cmdResBuf) ) { 
+	/* we assume you are using findOne() for running a cmd... */
+	if( ntoreturn == 1 && runCommands(ns, jsobj, ss, b, cmdResBuf) ) { 
 		n = 1;
 	}
 	else {
@@ -360,69 +410,83 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 
 		auto_ptr<JSMatcher> matcher(new JSMatcher(query));
 
-		auto_ptr<Cursor> c = getSpecialCursor(ns);
-		if( c.get() == 0 ) {
-			c = getIndexCursor(ns, query, order);
-		}
-		if( c.get() == 0 ) {
-			c = theDataFileMgr.findAll(ns);
-			if( queryTraceLevel >= 1 )
-				cout << "  basiccursor" << endl;
-		}
-
 		int nscanned = 0;
-		while( c->ok() ) {
-			JSObj js = c->current();
-			if( queryTraceLevel >= 50 )
-				cout << " checking against:\n " << js.toString() << endl;
-			nscanned++;
-			bool deep;
-			if( !matcher->matches(js, &deep) ) {
-				if( c->tempStopOnMiss() )
-					break;
+		auto_ptr<Cursor> c = getSpecialCursor(ns);
+
+		try{
+
+			if( c.get() == 0 ) {
+				c = getIndexCursor(ns, query, order);
 			}
-			else if( !deep || !c->dup(c->currLoc()) ) { // i.e., check for dups on deep items only
-				// got a match.
-				if( ntoskip > 0 ) {
-					ntoskip--;
+			if( c.get() == 0 ) {
+				c = theDataFileMgr.findAll(ns);
+				if( queryTraceLevel >= 1 )
+					cout << "  basiccursor" << endl;
+			}
+
+			while( c->ok() ) {
+				JSObj js = c->current();
+				if( queryTraceLevel >= 50 )
+					cout << " checking against:\n " << js.toString() << endl;
+				nscanned++;
+				bool deep;
+
+				if( !matcher->matches(js, &deep) ) {
+					if( c->tempStopOnMiss() )
+						break;
 				}
-				else {
-					bool ok = true;
-					if( filter.get() ) {
-						// we just want certain fields from the object.
-						JSObj x;
-						ok = x.addFields(js, *filter) > 0;
-						if( ok ) 
-							b.append((void*) x.objdata(), x.objsize());
+				else if( !deep || !c->dup(c->currLoc()) ) { // i.e., check for dups on deep items only
+					// got a match.
+					if( ntoskip > 0 ) {
+						ntoskip--;
 					}
 					else {
-						b.append((void*) js.objdata(), js.objsize());
-					}
-					if( ok ) {
-						n++;
-						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
-							(ntoreturn==0 && b.len()>1*1024*1024) ) {
-								// more...so save a cursor
-								ClientCursor *cc = new ClientCursor();
-								cc->c = c;
-								cursorid = allocCursorId();
-								cc->cursorid = cursorid;
-								cc->matcher = matcher;
-								cc->ns = ns;
-								cc->pos = n;
-								ClientCursor::add(cc);
-								cc->updateLocation();
-								cc->filter = filter;
-								break;
+						bool ok = true;
+						if( filter.get() ) {
+							// we just want certain fields from the object.
+							JSObj x;
+							ok = x.addFields(js, *filter) > 0;
+							if( ok ) 
+								b.append((void*) x.objdata(), x.objsize());
+						}
+						else {
+							b.append((void*) js.objdata(), js.objsize());
+						}
+						if( ok ) {
+							n++;
+							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
+								(ntoreturn==0 && b.len()>1*1024*1024) ) {
+									// more...so save a cursor
+									ClientCursor *cc = new ClientCursor();
+									cc->c = c;
+									cursorid = allocCursorId();
+									cc->cursorid = cursorid;
+									cc->matcher = matcher;
+									cc->ns = ns;
+									cc->pos = n;
+									ClientCursor::add(cc);
+									cc->updateLocation();
+									cc->filter = filter;
+									break;
+							}
 						}
 					}
 				}
+				c->advance();
 			}
-			c->advance();
-		}
 
-		if( queryTraceLevel >=2 )
-			cout << "  nscanned:" << nscanned << "\n  ";
+			if( queryTraceLevel >=2 )
+				cout << "  nscanned:" << nscanned << "\n  ";
+		}
+		catch( AssertionException e ) { 
+			if( n )
+				throw e;
+			if( nCaught++ >= 100 ) { 
+				cout << "Too many query exceptions, terminating" << endl;
+				exit(-8);
+			}
+			cout << " Assertion running query, returning an empty result" << endl;
+		}
 	}
 
 	QueryResult *qr = (QueryResult *) b.buf();

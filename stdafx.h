@@ -9,7 +9,21 @@ const bool debug=true;
 
 #include "targetver.h"
 
-#include "assert.h"
+//#include "assert.h"
+
+// you can catch these
+class AssertionException { 
+public:
+	AssertionException() { }
+};
+
+void asserted(const char *msg, const char *file, unsigned line);
+#define assert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
+
+#define xassert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
+
+#define yassert 1
+
 #include <stdio.h>
 #include <sstream>
 

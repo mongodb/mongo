@@ -349,8 +349,10 @@ public:
 // tempish...move to TLS or pass all the way down as a parm
 extern map<string,Client*> clients;
 extern Client *client;
+extern const char *curNs;
 inline void setClient(const char *ns) { 
 	char cl[256];
+	curNs = ns;
 	nsToClient(ns, cl);
 	map<string,Client*>::iterator it = clients.find(cl);
 	if( it != clients.end() ) {
