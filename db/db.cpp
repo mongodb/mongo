@@ -86,6 +86,7 @@ public:
 		if( nextjsobj == data )
 			nextjsobj += strlen(data) + 1; // skip namespace
 		JSObj js(nextjsobj);
+                assert( js.objsize() < ( theEnd - data ) );
 		if( js.objsize() <= 0 )
 			nextjsobj = null;
 		else {
@@ -133,7 +134,11 @@ void receivedUpdate(Message& m) {
 	int flags = d.pullInt();
 	JSObj query = d.nextJsObj();
 	assert( d.moreJSObjs() );
+        assert( query.objsize() < m.data->dataLen() );
 	JSObj toupdate = d.nextJsObj();
+        assert( toupdate.objsize() < m.data->dataLen() );
+        
+        assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
 	updateObjects(ns, toupdate, query, flags & 1);
 	client = 0;
 }

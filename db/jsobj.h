@@ -34,6 +34,7 @@ struct OID {
 	long long a;
 	unsigned b;
 	bool operator==(const OID& r) { return a==r.a&&b==r.b; }
+          void out(){ cout << hex << a << hex << b << endl; };
 };
 
 /* marshalled js object format:
