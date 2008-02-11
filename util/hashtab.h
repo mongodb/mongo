@@ -82,6 +82,13 @@ public:
 		return 0;
 	}
 
+	void kill(const Key& k) { 
+		bool found;
+		int i = _find(k, found);
+		if( i >= 0 && found )
+			nodes[i].k.kill();
+	}
+
 	void put(const Key& k, const Type& value) {
 		bool found;
 		int i = _find(k, found);

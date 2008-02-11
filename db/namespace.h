@@ -20,6 +20,10 @@ public:
 		strcpy_s(buf, 128, ns); return *this; 
 	}
 
+	void kill() { 
+		buf[0] = 0x7f;
+	}
+
 	bool operator==(const Namespace& r) { return strcmp(buf, r.buf) == 0; }
 	int hash() const {
 		unsigned x = 0;
@@ -137,6 +141,11 @@ public:
 	NamespaceDetails* details(const char *ns) { 
 		Namespace n(ns);
 		return ht->get(n); 
+	}
+
+	void kill(const char *ns) {
+		Namespace n(ns);
+		ht->kill(n); 
 	}
 
 	bool find(const char *ns, DiskLoc& loc) { 

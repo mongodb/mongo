@@ -387,6 +387,20 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 				anObjBuilderForYa.append("errmsg", "ns not found");
 			}
 		}
+		else if( strcmp( e.fieldName(), "drop") == 0 ) { 
+			valid = true;
+			string dropNs = us + '.' + e.valuestr();
+			NamespaceDetails *d = nsdetails(dropNs.c_str());
+			cout << "CMD: clean " << dropNs << endl;
+			if( d ) { 
+				ok = true;
+				anObjBuilderForYa.append("ns", dropNs.c_str());
+				client->namespaceIndex->kill(dropNs.c_str());
+			}
+			else {
+				anObjBuilderForYa.append("errmsg", "ns not found");
+			}
+		}
 		else if( strcmp( e.fieldName(), "validate") == 0 ) { 
 			valid = true;
 			string toValidateNs = us + '.' + e.valuestr();
