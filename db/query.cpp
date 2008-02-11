@@ -282,23 +282,61 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 int queryTraceLevel = 0;
 int otherTraceLevel = 0;
 
+int initialExtentSize(int len);
+
+void clean(const char *ns, NamespaceDetails *d) {
+//	d->firstExtent.Null();
+//	d->lastExtent.Null();
+	for( int i = 0; i < Buckets; i++ ) 
+		d->deletedList[i].Null();
+//	d->datasize = 0; d->nrecords = 0; d->lastExtentSize = 0; d->nIndexes = 0;
+//	client->newestFile()->newExtent(ns, initialExtentSize(500));
+}
+
 string validateNS(const char *ns, NamespaceDetails *d) {
 	stringstream ss;
 	ss << "validate...\n";
-	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-	int n = 0;
-	long long len = 0;
-	long long nlen = 0;
-	while( c->ok() ) { 
-		n++;
-		Record *r = c->_current();
-		len += r->lengthWithHeaders;
-		nlen += r->netLength();
-		c->advance();
+
+	try { 
+
+		auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+		int n = 0;
+		long long len = 0;
+		long long nlen = 0;
+		while( c->ok() ) { 
+			n++;
+			Record *r = c->_current();
+			len += r->lengthWithHeaders;
+			nlen += r->netLength();
+			c->advance();
+		}
+		ss << "  " << n << " objects found\n";
+		ss << "  " << len << " bytes record data w/headers\n";
+		ss << "  " << nlen << " bytes record data wout/headers\n";
+
+		ss << "  deletedList: ";
+		for( int i = 0; i < Buckets; i++ ) { 
+			ss << (d->deletedList[i].isNull() ? '0' : '1');
+		}
+		ss << endl;
+		int ndel = 0;
+		long long delSize = 0;
+		for( int i = 0; i < Buckets; i++ ) { 
+			DiskLoc loc = d->deletedList[i];
+			while( !loc.isNull() ) { 
+				ndel++;
+				DeletedRecord *d = loc.drec();
+				delSize += d->lengthWithHeaders;
+				loc = d->nextDeleted;
+			}
+		}
+		ss << "  deleted: n: " << ndel << " size: " << delSize << endl;
+
 	}
-	ss << "  " << n << " objects found\n";
-	ss << "  " << len << " bytes record data w/headers\n";
-	ss << "  " << nlen << " bytes record data wout/headers\n";
+	catch(AssertionException) {
+		ss << "\n  exception during validate\n" << endl; 
+	}
+
 	return ss.str();
 }
 
@@ -334,10 +372,23 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 	}
 	else if( e.type() == String ) {
 		string us(ns, p-ns);
-//		char client[256];
-		if( strcmp( e.fieldName(), "validate") == 0 ) { 
+
+		if( strcmp( e.fieldName(), "clean") == 0 ) { 
 			valid = true;
-//			nsToClient(e.valuestr(), client);
+			string dropNs = us + '.' + e.valuestr();
+			NamespaceDetails *d = nsdetails(dropNs.c_str());
+			cout << "CMD: clean " << dropNs << endl;
+			if( d ) { 
+				ok = true;
+				anObjBuilderForYa.append("ns", dropNs.c_str());
+				clean(dropNs.c_str(), d);
+			}
+			else {
+				anObjBuilderForYa.append("errmsg", "ns not found");
+			}
+		}
+		else if( strcmp( e.fieldName(), "validate") == 0 ) { 
+			valid = true;
 			string toValidateNs = us + '.' + e.valuestr();
 			NamespaceDetails *d = nsdetails(toValidateNs.c_str());
 			cout << "CMD: validate " << toValidateNs << endl;
@@ -351,7 +402,7 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 				anObjBuilderForYa.append("errmsg", "ns not found");
 			}
 		}
-		if( strcmp(e.fieldName(),"deleteIndexes") == 0 ) { 
+		else if( strcmp(e.fieldName(),"deleteIndexes") == 0 ) { 
 			valid = true;
 			/* note: temp implementation.  space not reclaimed! */
 			string toDeleteNs = us + '.' + e.valuestr();

@@ -33,8 +33,9 @@ public:
 	PhysicalDataFile(int fn) : fileNo(fn) { }
 	void open(int fileNo, const char *filename);
 
-private:
+
 	Extent* newExtent(const char *ns, int approxSize);
+private:
 	Extent* getExtent(DiskLoc loc);
 	Extent* _getExtent(DiskLoc loc);
 	Record* recordAt(DiskLoc dl);
