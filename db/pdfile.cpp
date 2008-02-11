@@ -37,7 +37,15 @@ void sayDbContext() {
 JSObj::JSObj(Record *r) { 
 	_objdata = r->data;
 	_objsize = *((int*) _objdata);
-	assert( _objsize <= r->netLength() );
+	if( _objsize > r->netLength() ) { 
+		cout << "About to assert fail _objsize <= r->netLength()" << endl;
+		cout << " _objsize: " << _objsize << endl;
+		cout << " netLength(): " << r->netLength() << endl;
+		cout << " extentOfs: " << r->extentOfs << endl;
+		cout << " nextOfs: " << r->nextOfs << endl;
+		cout << " prevOfs: " << r->prevOfs << endl;
+		assert( _objsize <= r->netLength() );
+	}
 	iFree = false;
 }
 
