@@ -205,9 +205,11 @@ void newNamespace(const char *ns) {
 
 void PhysicalDataFile::open(int fn, const char *filename) {
 	int length;
-	if( fn <= 4 )
+	if( fn <= 4 ) {
 		length = (64*1024*1024) << fn;
-	else
+		if( strstr(filename, "alleyinsider") && length < 512 * 1024 * 1024 )
+			length = 512 * 1024 * 1024;
+	} else
 		length = 0x7ff00000;
 	assert( length >= 64*1024*1024 && length % 4096 == 0 );
 
