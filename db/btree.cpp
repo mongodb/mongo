@@ -706,16 +706,43 @@ void BtreeCursor::noteLocation() {
 
 /* see if things moved around (deletes, splits, inserts) */
 void BtreeCursor::checkLocation() { 
-	if( eof() || bucket.btree()->keyAt(keyOfs).woEqual(keyAtKeyOfs) )
-		return;
-	cout << "  key seems to have moved in the index, refinding it" << endl;
+	try {
+		if( eof() ) 
+			return;
+		BtreeBucket *b = bucket.btree();
+		if( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
+			b->k(keyOfs).isUsed()
+			)
+			return;
+	}
+	catch( AssertionException ) { 
+		cout << "Caught exception in checkLocation(), that's maybe ok" << endl;
+	}
+
 	bool found;
 	DiskLoc bold = bucket;
 	/* probably just moved in our node, so to be fast start from here rather than the head */
 	bucket = bucket.btree()->locate(bucket, keyAtKeyOfs, keyOfs, found, direction);
-	if( found || bucket.btree()->isHead() )
+	if( found || bucket.btree()->isHead() ) {
+		cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
+		checkUnused();
+/*
+		if( found && !bucket.btree()->k(keyOfs).isUsed() ) { 
+			cout << "   " << keyAtKeyOfs.toString() << endl;
+			cout << "   " << keyOfs << endl;
+			cout << "   " << bucket.btree()->keyNode(keyOfs).key.toString() << endl;
+			cout << "   " << bucket.btree()->keyNode(keyOfs).recordLoc.toString() << endl;
+			bucket.btree()->dump();
+			assert(false);
+		}
+*/
 		return;
+	}
 	/* didn't find, check from the top */
 	DiskLoc head = bold.btree()->getHead(bold);
 	head.btree()->locate(head, keyAtKeyOfs, keyOfs, found);
+	cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
+	if( found )
+		checkUnused();
+	//	assert( !found || bucket.btree()->k(keyOfs).isUsed() );
 }

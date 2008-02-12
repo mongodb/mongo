@@ -52,13 +52,17 @@ ClientCursor::~ClientCursor() {
 }
 
 void ClientCursor::updateLocation() {
+
+	DiskLoc cl = c->currLoc();
+	cout<< "  TEMP: updateLocation last:" << lastLoc.toString() << " cl:" << cl.toString() << '\n';
+
 	if( !lastLoc.isNull() ) { 
 		int n = cursorsByLocation.erase(lastLoc);
 		assert( n == 1 );
 	}
-	if( !c->currLoc().isNull() )
-		cursorsByLocation[c->currLoc()] = this;
-	lastLoc = c->currLoc();
+	if( !cl.isNull() )
+		cursorsByLocation[cl] = this;
+	lastLoc = cl;
 	c->noteLocation();
 }
 

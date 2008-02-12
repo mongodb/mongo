@@ -116,7 +116,11 @@ public:
 		JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel);
 	void update(const DiskLoc& recordLoc, JSObj& key);
 	bool unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc);
+
+	/* locate may return an "unused" key that is just a marker.  so be careful.
+	*/
 	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction=1);
+
 	/* advance one key position in the index: */
 	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
 	DiskLoc getHead(const DiskLoc& thisLoc);

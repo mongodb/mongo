@@ -148,7 +148,16 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 	auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
 	if( c.get() == 0 )
 		c = theDataFileMgr.findAll(ns);
+
+	Cursor &tempDebug = *c;
+	int temp = 0;
+	int tempd = 0;
+
+DiskLoc _tempDelLoc;
+
 	while( c->ok() ) {
+		temp++;
+
 		Record *r = c->_current();
 		DiskLoc rloc = c->currLoc();
 		c->advance(); // must advance before deleting as the next ptr will die
@@ -163,7 +172,9 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 //			cout << "  found match to delete" << endl;
 			if( !justOne )
 				c->noteLocation();
+_tempDelLoc = rloc;
 			theDataFileMgr.deleteRecord(ns, r, rloc);
+			tempd = temp;
 			if( justOne )
 				return;
 			c->checkLocation();
