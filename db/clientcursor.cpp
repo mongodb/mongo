@@ -34,6 +34,10 @@ void aboutToDelete(const DiskLoc& dl) {
 	if( it != cursorsByLocation.end() ) {
 		ClientCursor *cc = it->second;
 		assert( !cc->c->eof() );
+
+// dm testing attempt
+cc->c->checkLocation();
+
 		cc->c->advance();
 		cc->updateLocation();
 	}

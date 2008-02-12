@@ -205,12 +205,18 @@ void newNamespace(const char *ns) {
 
 void PhysicalDataFile::open(int fn, const char *filename) {
 	int length;
+	/*TEMP!
+	if( fn <= 48 )  { 
+		length = 16 * 1024 * 1024;
+	}
+	else */
 	if( fn <= 4 ) {
 		length = (64*1024*1024) << fn;
 		if( strstr(filename, "alleyinsider") && length < 512 * 1024 * 1024 )
 			length = 512 * 1024 * 1024;
 	} else
 		length = 0x7ff00000;
+
 	assert( length >= 64*1024*1024 && length % 4096 == 0 );
 
 	assert(fn == fileNo);
@@ -565,7 +571,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 	set<JSObj> keys;
 	idx.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
-//		cout << "_indexRecord " << i->toString() << endl;
+//		cout << "temp: _indexRecord " << i->toString() << endl;
 		assert( !newRecordLoc.isNull() );
 		idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
                                 (JSObj&) *i, false, idx, true);

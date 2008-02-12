@@ -313,7 +313,13 @@ public:
 	} 
 
 	PhysicalDataFile* getFile(int n) { 
-		assert( n >= 0 && n < 100000 );
+		if( 0 ) 
+			assert(false);
+
+		if( n < 0 || n >= 100000 ) {
+			cout << "getFile(): n=" << n << endl;
+			assert( n >= 0 && n < 100000 );
+		}
 #if defined(_DEBUG)
 		if( n > 100 )
 			cout << "getFile(): n=" << n << "?" << endl;

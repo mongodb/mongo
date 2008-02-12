@@ -485,7 +485,7 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
 	if( keyOfs < 0 || keyOfs >= n ) {
 		cout << "ASSERT failure BtreeBucket::advance, caller: " << caller << endl;
 		cout << "  thisLoc: " << thisLoc.toString() << endl;
-		cout << "  keyOfs: " << keyOfs << " direction: " << direction << endl;
+		cout << "  keyOfs: " << keyOfs << " n:" << n << " direction: " << direction << endl;
 		cout << bucketSummary() << endl;
 		assert( keyOfs >= 0 && keyOfs < n );
 	}
