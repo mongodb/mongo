@@ -33,8 +33,8 @@ typedef int SOCKET;
 inline int getLastError() { return errno; }
 inline void disableNagle(int sock) { 
 	int x = 1;
-	if( setsockopt(sock, SOL_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) ) 
-		cout << "ERROR: disableNagle failed" << endl;
+	if( setsockopt(sock, SOL_SOCKET, TCP_NODELAY, (char *) &x, sizeof(x)) ) 
+          cout << "ERROR: disableNagle failed" << endl;
 }
 inline void prebindOptions( int sock ){
   cout << "doing prebind option" << endl;
