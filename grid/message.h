@@ -56,7 +56,8 @@ enum Operations {
 //	dbGetByOID = 2003,
 	dbQuery = 2004,
 	dbGetMore = 2005,
-	dbDelete = 2006
+	dbDelete = 2006,
+	dbKillCursors = 2007
 };
 
 struct MsgData {

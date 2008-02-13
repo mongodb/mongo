@@ -583,6 +583,18 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 	return qr;
 }
 
+void killCursors(int n, long long *ids) {
+	int k = 0;
+	for( int i = 0; i < n; i++ ) {
+		CCMap::iterator it = clientCursors.find(ids[i]);
+		if( it != clientCursors.end() ) {
+			clientCursors.erase(it);
+			k++;
+		}
+	}
+	cout << "killCursors: found " << k << " of " << n << endl;
+}
+
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 
 //	cout << "getMore ns:" << ns << " ntoreturn:" << ntoreturn << " cursorid:" << 

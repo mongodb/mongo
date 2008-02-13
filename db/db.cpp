@@ -127,6 +127,15 @@ struct EmptyObject {
 } emptyObject;
 #pragma pack(pop)
 
+void killCursors(int n, long long *ids);
+void receivedKillCursors(Message& m) {
+	int *x = (int *) m.data->_data;
+	x++; // reserved
+	int n = *x++;
+	assert( n >= 1 && n <= 2000 );
+	killCursors(n, (long long *) x);
+}
+
 void receivedUpdate(Message& m) {
 	DbMessage d(m);
 	const char *ns = d.getns();
@@ -312,6 +321,10 @@ void t()
 			else if( m.data->operation == dbGetMore ) {
 				ss << "getmore ";
 				receivedGetMore(dbMsgPort, m);
+			}
+			else if( m.data->operation == dbKillCursors ) { 
+				ss << "killcursors ";
+				receivedKillCursors(m);
 			}
 			else {
 				cout << "    operation isn't supported ?" << endl;

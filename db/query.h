@@ -33,6 +33,10 @@
 	  string collection; // redundant, might use for security.
       int nToReturn;
       int64 cursorID;
+   dbKillCursors=2007
+      int reserved;
+      int n;
+	  int64 cursorIDs[n];
 
    Note that on Update, there is only one object, which is different
    from insert where you can pass a list of objects to insert in the db.
