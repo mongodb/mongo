@@ -54,7 +54,7 @@ ClientCursor::~ClientCursor() {
 void ClientCursor::updateLocation() {
 
 	DiskLoc cl = c->currLoc();
-	cout<< "  TEMP: updateLocation last:" << lastLoc.toString() << " cl:" << cl.toString() << '\n';
+//	cout<< "  TEMP: updateLocation last:" << lastLoc.toString() << " cl:" << cl.toString() << '\n';
 
 	if( !lastLoc.isNull() ) { 
 		int n = cursorsByLocation.erase(lastLoc);

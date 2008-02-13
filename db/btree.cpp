@@ -245,6 +245,7 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 
 			pos = m;
 
+/*
 			DiskLoc ch = k(m).prevChildBucket;
 			if( !ch.isNull() ) {
 				// if dup keys, might be dups to the left.
@@ -256,6 +257,7 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 						return false;
 				}
 			}
+*/
 
 			return true;
 		}
@@ -386,14 +388,27 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 		}
 		else {
 			k(keypos).prevChildBucket = lchild;
-			assert( k(keypos+1).prevChildBucket == lchild );
+			if( k(keypos+1).prevChildBucket != lchild ) { 
+				cout << "ERROR k(keypos+1).prevChildBucket != lchild" << endl;
+				cout << "  thisLoc: " << thisLoc.toString() << ' ' << ns << endl;
+				cout << "  keyPos: " << keypos << " n:" << n << endl;
+				cout << "  k(keypos+1).pcb: " << k(keypos+1).prevChildBucket.toString() << " lchild: " << lchild.toString() << endl;
+				cout << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
+				cout << "  key: " << key.toString() << endl;
+				dump();
+				cout << "\n\nDUMPING FULL INDEX" << endl;
+				bt_dmp=1;
+				bt_fv=1;
+				idx.head.btree()->fullValidate(idx.head);
+				assert(false);
+			}
 			k(keypos+1).prevChildBucket = rchild;
 		}
 		return;
 	}
 
 	// split
-	cout << "split begin " << hex << thisLoc.getOfs() << dec << endl;
+	cout << "splitting bucket  begin" << hex << thisLoc.getOfs() << dec << endl;
 	BtreeBucket *r = allocTemp();
 	DiskLoc rLoc;
 	int mid = n / 2;
@@ -418,8 +433,8 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 
 	{
 		KeyNode middle = keyNode(mid);
-		nextChild = middle.prevChildBucket;
-//		cout << "TEMP:" << middle.key.toString() << endl;
+		nextChild = middle.prevChildBucket; // middle key gets promoted, its children will be thisLoc (l) and rLoc (r)
+		cout << "TEMP:" << middle.key.toString() << endl;
 
 		// promote middle to a parent node
 		if( parent.isNull() ) { 
@@ -566,16 +581,22 @@ int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 
 	int pos;
 	bool found = find(key, pos);
+
 	if( found ) {
 		// on a dup key always insert on the right or else you will be broken.
 		pos++;
-		// todo: support unique keys.
-		/*
-		cout << "bree: skipping insert of duplicate key ns:" << ns << "keysize:" << key.objsize() << endl;
-		return 1;
+		// on a promotion, find the right point to update if dup keys.
+		/* not needed: we always insert right after the first key so we are ok with just pos++...
+		if( !rChild.isNull() ) { 
+			while( pos < n && k(pos).prevChildBucket != lchild ) { 
+				pos++;
+				cout << "looking for the right dup key" << endl;
+			}
+		}
 		*/
 	}
 
+//	cout << "TEMP: key: " << key.toString() << endl;
 	DiskLoc& child = getChild(pos);
 	if( child.isNull() || !rChild.isNull() /* means an 'internal' insert */ ) { 
 		insertHere(thisLoc, ns, pos, recordLoc, key, lChild, rChild, idx);
@@ -602,6 +623,10 @@ void BtreeBucket::dump() {
 int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
 						JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
 {
+/*	if( toplevel ) {
+		++ninserts;
+	}*/
+
 	bool chk = false;
 	if( 0 && toplevel ) { 
 		assert( isHead() );
@@ -613,10 +638,6 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 			cout << ' ' << p << ' ' << f << endl;
 			chk = true;
 		}
-		if( ninserts == 0x526f/*0x526e*/ ) { 
-			cout << "temp break" << endl;
-		}
-
 	}
 
 	int x = _insert(thisLoc, ns, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
@@ -633,7 +654,6 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 			idx.head.btree()->fullValidate(idx.head);
 			assert( f );
 		}
-		ninserts++;
 	}
 
 	return x;

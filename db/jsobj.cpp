@@ -137,6 +137,13 @@ inline int compareElementValues(Element& l, Element& r) {
 		case String:
 			/* todo: utf version */
 			return strcmp(l.valuestr(), r.valuestr());
+		case DBRef:
+			{
+				int lsz = l.valuesize();
+				int rsz = r.valuesize();
+				if( lsz - rsz != 0 ) return lsz - rsz;
+				return memcmp(l.value(), r.value(), lsz);
+			}
 		case Object:
 		case Array:
 		case BinData:
