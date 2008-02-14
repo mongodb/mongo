@@ -382,6 +382,22 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 	if( basicInsert(keypos, recordLoc, key) ) {
 		_KeyNode& kn = k(keypos);
 		if( keypos+1 == n ) { // last key
+			if( nextChild != lchild ) {
+				cout << "ERROR nextChild != lchild" << endl;
+				cout << "  thisLoc: " << thisLoc.toString() << ' ' << ns << endl;
+				cout << "  keyPos: " << keypos << " n:" << n << endl;
+				cout << "  nextChild: " << nextChild.toString() << " lchild: " << lchild.toString() << endl;
+				cout << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
+				cout << "  key: " << key.toString() << endl;
+				dump();
+#if defined(_WIN32)
+				cout << "\n\nDUMPING FULL INDEX" << endl;
+				bt_dmp=1;
+				bt_fv=1;
+				idx.head.btree()->fullValidate(idx.head);
+#endif
+				assert(false);
+			}
 			kn.prevChildBucket = nextChild;
 			nextChild = rchild;
 			assert( kn.prevChildBucket == lchild );
@@ -396,10 +412,12 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 				cout << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
 				cout << "  key: " << key.toString() << endl;
 				dump();
+#if defined(_WIN32)
 				cout << "\n\nDUMPING FULL INDEX" << endl;
 				bt_dmp=1;
 				bt_fv=1;
 				idx.head.btree()->fullValidate(idx.head);
+#endif
 				assert(false);
 			}
 			k(keypos+1).prevChildBucket = rchild;
@@ -623,9 +641,9 @@ void BtreeBucket::dump() {
 int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
 						JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
 {
-/*	if( toplevel ) {
+	if( toplevel ) {
 		++ninserts;
-	}*/
+	}
 
 	bool chk = false;
 	if( 0 && toplevel ) { 
