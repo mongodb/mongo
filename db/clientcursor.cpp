@@ -46,7 +46,7 @@ cc->c->checkLocation();
 ClientCursor::~ClientCursor() {
 	if( !lastLoc.isNull() ) { 
 		int n = cursorsByLocation.erase(lastLoc);
-		assert( n == 1 );
+		wassert( n == 1 );
 	}
 	lastLoc.Null();
 }

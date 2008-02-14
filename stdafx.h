@@ -18,11 +18,15 @@ public:
 };
 
 void asserted(const char *msg, const char *file, unsigned line);
+void wasserted(const char *msg, const char *file, unsigned line);
 #define assert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #define xassert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #define yassert 1
+
+/* warning only - keeps going */
+#define wassert(_Expression) (void)( (!!(_Expression)) || (wasserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #include <stdio.h>
 #include <sstream>

@@ -259,6 +259,8 @@ void listen(int port) {
 	l.listen();
 }
 
+int ctr = 0;
+
 void t()
 {
 	try { 
@@ -330,8 +332,12 @@ void t()
 				cout << "    operation isn't supported ?" << endl;
 			}
 
-			ss << ' ' << t.millis() << "ms";
-			cout << ss.str().c_str() << endl;
+			int ms = t.millis();
+			bool log = ctr++ % 100 == 0;
+			if( log || ms > 50 ) {
+				ss << ' ' << t.millis() << "ms";
+				cout << ss.str().c_str() << endl;
+			}
 		}
 	}
 

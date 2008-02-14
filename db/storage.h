@@ -24,17 +24,20 @@ public:
 	int a() const { return fileNo; }
 	DiskLoc(int a, int b) : fileNo(a), ofs(b) { }
 	DiskLoc() { fileNo = -1; ofs = NullOfs; }
-	DiskLoc(const DiskLoc& l) { fileNo=l.fileNo; ofs=l.ofs; }
 
-	string toString() const {
-		stringstream ss;
-		ss << hex << fileNo << ':' << ofs;
-		return ss.str();
-	}
+	DiskLoc(const DiskLoc& l) { fileNo=l.fileNo; ofs=l.ofs; }
 
 	bool isNull() const { return ofs == NullOfs; }
 	void Null() { fileNo = -1; ofs = NullOfs; }
 	void assertOk() { assert(!isNull()); }
+
+	string toString() const {
+		if( isNull() ) 
+			return "null";
+		stringstream ss;
+		ss << hex << fileNo << ':' << ofs;
+		return ss.str();
+	}
 
 	int getOfs() const { return ofs; }
 	void set(int a, int b) { fileNo=a; ofs=b; }

@@ -10,6 +10,8 @@ const int KeyMax = BucketSize / 8;
 
 int ninserts = 0;
 extern int otherTraceLevel;
+int split_debug = 0;
+int insert_debug = 0;
 
 inline KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
   prevChildBucket(k.prevChildBucket), 
@@ -39,7 +41,7 @@ void BucketBasics::fullValidate(const DiskLoc& thisLoc) {
 	if( bt_fv==0 ) 
 		return; 
 
-	cout << "fullValidate() [slow]" << endl;
+//	cout << "fullValidate() [slow]" << endl;
 
 	if( bt_dmp )
 		((BtreeBucket *) this)->dump();
@@ -331,7 +333,7 @@ int verbose = 0;
 int qqq = 0;
 
 bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc ) { 
-	cout << "unindex " << key.toString() << endl;
+//	cout << "unindex " << key.toString() << endl;
 
 	BtreeCursor c(thisLoc, key, 1, true);
 
@@ -360,8 +362,11 @@ BtreeBucket* BtreeBucket::allocTemp() {
 }
 
 inline void fix(const DiskLoc& thisLoc, const DiskLoc& child) { 
-	if( !child.isNull() )
+	if( !child.isNull() ) {
+		if( insert_debug )
+			cout << "      " << child.toString() << ".parent=" << thisLoc.toString() << endl;
 		child.btree()->parent = thisLoc;
+	}
 }
 
 /* this sucks.  maybe get rid of parent ptrs. */
@@ -377,6 +382,10 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 							 DiskLoc recordLoc, JSObj& key,
 							 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) 
 {
+	if( insert_debug )
+		cout << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' ' 
+		<< lchild.toString() << ' ' << rchild.toString() << " keypos:" << keypos << endl;
+
 	DiskLoc oldLoc = thisLoc;
 
 	if( basicInsert(keypos, recordLoc, key) ) {
@@ -399,8 +408,10 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 				assert(false);
 			}
 			kn.prevChildBucket = nextChild;
-			nextChild = rchild;
 			assert( kn.prevChildBucket == lchild );
+			nextChild = rchild;
+			if( !rchild.isNull() )
+				rchild.btree()->parent = thisLoc;
 		}
 		else {
 			k(keypos).prevChildBucket = lchild;
@@ -421,16 +432,20 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 				assert(false);
 			}
 			k(keypos+1).prevChildBucket = rchild;
+			if( !rchild.isNull() )
+				rchild.btree()->parent = thisLoc;
 		}
 		return;
 	}
 
 	// split
-	cout << "splitting bucket  begin" << hex << thisLoc.getOfs() << dec << endl;
+	if( split_debug )
+		cout << "    " << thisLoc.toString() << ".split" << endl;
 	BtreeBucket *r = allocTemp();
 	DiskLoc rLoc;
 	int mid = n / 2;
-	cout << "  mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
+	if( split_debug )
+		cout << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
 	for( int i = mid+1; i < n; i++ ) {
 		KeyNode kn = keyNode(i);
 		if( i == keypos ) {
@@ -445,14 +460,18 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 	r->assertValid();
 //r->dump();
 	rLoc = theDataFileMgr.insert(ns, r, r->Size, true);
-	cout << "  new rLoc:" << hex << rLoc.getOfs() << dec << ", ";
+	if( split_debug )
+		cout << "     new rLoc:" << rLoc.toString() << endl;
 	free(r); r = 0;
 	rLoc.btree()->fixParentPtrs(rLoc);
 
 	{
 		KeyNode middle = keyNode(mid);
 		nextChild = middle.prevChildBucket; // middle key gets promoted, its children will be thisLoc (l) and rLoc (r)
-		cout << "TEMP:" << middle.key.toString() << endl;
+		if( split_debug ) {
+			//rLoc.btree()->dump();
+			cout << "    middle key:" << middle.key.toString() << endl;
+		}
 
 		// promote middle to a parent node
 		if( parent.isNull() ) { 
@@ -462,7 +481,8 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 			p->nextChild = rLoc;
 			p->assertValid();
 			parent = idx.head = theDataFileMgr.insert(ns, p, p->Size, true);
-			cout << "  we were root, making new root:" << hex << parent.getOfs() << dec << endl;
+			if( split_debug )
+				cout << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
 			free(p);
 			rLoc.btree()->parent = parent;
 		} 
@@ -471,7 +491,8 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 			   so we don't want to overwrite that if it happens.
 			*/
 			rLoc.btree()->parent = parent;
-			cout << "  promoting middle key " << middle.key.toString() << endl;
+			if( split_debug )
+				cout << "    promoting middle key " << middle.key.toString() << endl;
 			parent.btree()->_insert(parent, ns, middle.recordLoc, middle.key, false, thisLoc, rLoc, idx);
 		}
 		BtreeBucket *br = rLoc.btree();
@@ -489,16 +510,22 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 	// add our new key, there is room now
 	{
 		if( keypos < mid ) {
-			cout << "  keypos<mid, insertHere() the new key" << endl;
+			if( split_debug )
+				cout << "  keypos<mid, insertHere() the new key" << endl;
 			insertHere(thisLoc, ns, keypos, recordLoc, key, lchild, rchild, idx);
 		} else if( highest ) {
 			// else handled above already.
 			int kp = keypos-mid-1; assert(kp>=0);
 			rLoc.btree()->insertHere(rLoc, ns, kp, recordLoc, key, lchild, rchild, idx);
+// set a bp here.
+//			if( !lchild.isNull() ) cout << lchild.btree()->parent.toString() << endl;
+//			if( !rchild.isNull() ) cout << rchild.btree()->parent.toString() << endl;
+//			cout << "temp" << endl;
 		}
 	}
 
-	cout << "split end " << hex << thisLoc.getOfs() << dec << endl;
+	if( split_debug )
+		cout << "     split end " << hex << thisLoc.getOfs() << dec << endl;
 }
 
 DiskLoc BtreeBucket::addHead(const char *ns) {
@@ -591,14 +618,20 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
 						JSObj& key, bool dupsAllowed,
 						DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) { 
-//dump();
 	if( key.objsize() > KeyMax ) { 
 		cout << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << endl;
 		return 2;
-	} assert( key.objsize() > 0 );
+	} 
+	assert( key.objsize() > 0 );
 
 	int pos;
 	bool found = find(key, pos);
+	if( insert_debug ) {
+		cout << "  " << thisLoc.toString() << '.' << "_insert " << 
+			key.toString() << '/' << recordLoc.toString() <<
+			" l:" << lChild.toString() << " r:" << rChild.toString() << endl;
+		cout << "    found:" << found << " pos:" << pos << " n:" << n << endl;
+	}
 
 	if( found ) {
 		// on a dup key always insert on the right or else you will be broken.
@@ -616,6 +649,8 @@ int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 
 //	cout << "TEMP: key: " << key.toString() << endl;
 	DiskLoc& child = getChild(pos);
+	if( insert_debug )
+		cout << "    getChild(" << pos << "): " << child.toString() << endl;
 	if( child.isNull() || !rChild.isNull() /* means an 'internal' insert */ ) { 
 		insertHere(thisLoc, ns, pos, recordLoc, key, lChild, rChild, idx);
 		return 0;
@@ -643,36 +678,29 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 {
 	if( toplevel ) {
 		++ninserts;
+		if( /*ninserts > 127250 || */ninserts % 1000 == 0 ) {
+			cout << "ninserts: " << ninserts << endl;
+			if( 0 && ninserts >= 127287 ) {
+				cout << "debug?" << endl;
+				split_debug = 1;
+			}
+			bt_fv = 1;
+			idx.head.btree()->fullValidate(idx.head);
+		}
+		if( 0 && ninserts >= 127287 ) { 
+			cout << "---------------------------------------------------------------- " << ninserts << endl;
+			cout << "insert() top level " << key.toString() << ' ' << recordLoc.toString() << endl;
+			bt_fv = 1;
+			split_debug = 1;
+			insert_debug = 1;
+			idx.head.btree()->fullValidate(idx.head);
+		}
 	}
 
 	bool chk = false;
-	if( 0 && toplevel ) { 
-		assert( isHead() );
-		string str = key.toString();
-		if( strstr(str.c_str(), "\"cut\"") != 0 ) {
-			cout << "btree insert " << ns << ' ' << str << endl;
-			int p=0; bool f=false;
-			cout << "  locate: " << locate(thisLoc, key, p, f,1).getOfs();
-			cout << ' ' << p << ' ' << f << endl;
-			chk = true;
-		}
-	}
 
 	int x = _insert(thisLoc, ns, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
 	assertValid(); 
-
-	if( 0 && toplevel ) {
-		if( ninserts == 0xb0 )
-			idx.head.btree()->fullValidate(idx.head);
-		if( chk ) {
-			cout << key.toString() << endl;
-			int p = 0; bool f = false;
-			cout << "  locate: " << idx.head.btree()->locate(idx.head, key, p, f,1).getOfs();
-			cout << ' ' << p << ' ' << f << endl;
-			idx.head.btree()->fullValidate(idx.head);
-			assert( f );
-		}
-	}
 
 	return x;
 }
@@ -742,6 +770,8 @@ void BtreeCursor::noteLocation() {
 	}
 }
 
+int clctr = 0;
+
 /* see if things moved around (deletes, splits, inserts) */
 void BtreeCursor::checkLocation() { 
 	try {
@@ -760,10 +790,10 @@ void BtreeCursor::checkLocation() {
 	bool found;
 	DiskLoc bold = bucket;
 	/* probably just moved in our node, so to be fast start from here rather than the head */
-	bucket = bucket.btree()->locate(bucket, keyAtKeyOfs, keyOfs, found, direction);
-	if( found || bucket.btree()->isHead() ) {
-		cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
-		checkUnused();
+//	bucket = bucket.btree()->locate(bucket, keyAtKeyOfs, keyOfs, found, direction);
+///	if( found || bucket.btree()->isHead() ) {
+//		cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
+//		checkUnused();
 /*
 		if( found && !bucket.btree()->k(keyOfs).isUsed() ) { 
 			cout << "   " << keyAtKeyOfs.toString() << endl;
@@ -774,12 +804,16 @@ void BtreeCursor::checkLocation() {
 			assert(false);
 		}
 */
-		return;
-	}
+//		return;
+//	}
+
+/* TODO: Switch to keep indexdetails and do idx.head! */
 	/* didn't find, check from the top */
 	DiskLoc head = bold.btree()->getHead(bold);
-	head.btree()->locate(head, keyAtKeyOfs, keyOfs, found);
-	cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
+	bucket = head.btree()->locate(head, keyAtKeyOfs, keyOfs, found, direction);
+//	head.btree()->locate(head, keyAtKeyOfs, keyOfs, found);
+	if( clctr++ % 128 == 0 )
+		cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
 	if( found )
 		checkUnused();
 	//	assert( !found || bucket.btree()->k(keyOfs).isUsed() );

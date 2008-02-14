@@ -20,9 +20,13 @@ struct MyAsserts {
 
 void sayDbContext();
 
-void asserted(const char *msg, const char *file, unsigned line) { 
+void wasserted(const char *msg, const char *file, unsigned line) { 
 	cout << "Assertion failure " << msg << endl;
 	cout << ' ' << file << ' ' << line << endl;
 	sayDbContext();
+}
+
+void asserted(const char *msg, const char *file, unsigned line) { 
+	wasserted(msg, file, line);
 	throw AssertionException();
 }
