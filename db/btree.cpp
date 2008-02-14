@@ -51,13 +51,13 @@ void BucketBasics::fullValidate(const DiskLoc& thisLoc) {
 		if( !kn.prevChildBucket.isNull() ) { 
 			DiskLoc left = kn.prevChildBucket;
 			BtreeBucket *b = left.btree();
-			assert( b->parent == thisLoc );
+			wassert( b->parent == thisLoc );
 			b->fullValidate(kn.prevChildBucket);
 		}
 	}
 	if( !nextChild.isNull() ) {
 		BtreeBucket *b = nextChild.btree();
-		assert( b->parent == thisLoc );
+		wassert( b->parent == thisLoc );
 		b->fullValidate(nextChild);
 	}
 }
@@ -684,8 +684,8 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 				cout << "debug?" << endl;
 				split_debug = 1;
 			}
-			bt_fv = 1;
-			idx.head.btree()->fullValidate(idx.head);
+			//bt_fv = 1;
+			//idx.head.btree()->fullValidate(idx.head);
 		}
 		if( 0 && ninserts >= 127287 ) { 
 			cout << "---------------------------------------------------------------- " << ninserts << endl;
