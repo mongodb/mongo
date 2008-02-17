@@ -114,6 +114,7 @@ function testdups() {
 
 function runquick() { 
     print("runquick");
+    start = Date();
     t.nullcheck.remove({});
     t.nullcheck.save( { a : 3 } );
     oneresult( t.nullcheck.find() ); 
@@ -143,6 +144,10 @@ function runquick() {
 
     print("testdups last to go, it takes a little time...");
     testdups();
+
+    print("runquick done");
+    print("start: " + start);
+    print("finish: " + Date());
 }
 
 print("testdb.js: try runall()");
