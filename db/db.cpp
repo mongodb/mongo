@@ -309,16 +309,25 @@ void t()
 				receivedQuery(dbMsgPort, m, ss);
 			}
 			else if( m.data->operation == dbInsert ) {
-				ss << "insert ";
-				receivedInsert(m, ss);
+				try { 
+					ss << "insert ";
+					receivedInsert(m, ss);
+				}
+				catch( AssertionException ) { cout << "Caught Assertion, continuing" << endl; }
 			}
 			else if( m.data->operation == dbUpdate ) {
-				ss << "update ";
-				receivedUpdate(m);
+				try { 
+					ss << "update ";
+					receivedUpdate(m);
+				}
+				catch( AssertionException ) { cout << "Caught Assertion, continuing" << endl; }
 			}
 			else if( m.data->operation == dbDelete ) {
-				ss << "remove ";
-				receivedDelete(m);
+				try { 
+					ss << "remove ";
+					receivedDelete(m);
+				}
+				catch( AssertionException ) { cout << "Caught Assertion, continuing" << endl; }
 			}
 			else if( m.data->operation == dbGetMore ) {
 				ss << "getmore ";
