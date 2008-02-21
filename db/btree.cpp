@@ -62,13 +62,15 @@ void BucketBasics::fullValidate(const DiskLoc& thisLoc) {
 	}
 }
 
+int nDumped = 0;
+
 void BucketBasics::assertValid() { 
 	if( !debug )
 		return;
-	assert( n >= 0 && n < BucketSize );
-	assert( emptySize >= 0 && emptySize < BucketSize );
-	assert( topSize >= n && topSize <= BucketSize );
-	assert( Size == BucketSize );
+	wassert( n >= 0 && n < BucketSize );
+	wassert( emptySize >= 0 && emptySize < BucketSize );
+	wassert( topSize >= n && topSize <= BucketSize );
+	wassert( Size == BucketSize );
 	if( 1 ) {
 		// slow:
 		for( int i = 0; i < n-1; i++ ) {
@@ -77,10 +79,14 @@ void BucketBasics::assertValid() {
 			int z = k1.woCompare(k2);
 			if( z > 0 ) {
 				cout << "ERROR: btree key order corrupt.  Keys:" << endl;
-				for( int j = 0; j < n; j++ ) { 
-					cout << "  " << keyNode(j).key.toString() << endl;
+				if( ++nDumped < 5 ) {
+					for( int j = 0; j < n; j++ ) { 
+						cout << "  " << keyNode(j).key.toString() << endl;
+					}
+					((BtreeBucket *) this)->dump();
 				}
-				assert(false);
+				wassert(false);
+				break;
 			}
 		}
 	}
@@ -90,7 +96,7 @@ void BucketBasics::assertValid() {
 			JSObj k1 = keyNode(0).key;
 			JSObj k2 = keyNode(n-1).key;
 			int z = k1.woCompare(k2);
-			assert( z <= 0 );
+			wassert( z <= 0 );
 		}
 	}
 }
@@ -269,9 +275,9 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 	pos = l;
 	if( pos != n ) {
 		JSObj keyatpos = keyNode(pos).key;
-		assert( key.woCompare(keyatpos) <= 0 );
+		wassert( key.woCompare(keyatpos) <= 0 );
 		if( pos > 0 ) { 
-			assert( keyNode(pos-1).key.woCompare(key) <= 0 );
+			wassert( keyNode(pos-1).key.woCompare(key) <= 0 );
 		}
 	}
 
