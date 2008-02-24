@@ -136,6 +136,8 @@ inline int compareElementValues(Element& l, Element& r) {
 		case String:
 			/* todo: utf version */
 			return strcmp(l.valuestr(), r.valuestr());
+		case Object:
+		case Array:
 		case DBRef:
 			{
 				int lsz = l.valuesize();
@@ -143,8 +145,6 @@ inline int compareElementValues(Element& l, Element& r) {
 				if( lsz - rsz != 0 ) return lsz - rsz;
 				return memcmp(l.value(), r.value(), lsz);
 			}
-		case Object:
-		case Array:
 		case BinData:
 		case RegEx:
 			cout << "compareElementValues: can't compare this type:" << (int) l.type() << endl;

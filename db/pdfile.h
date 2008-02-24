@@ -313,8 +313,7 @@ public:
 	} 
 
 	PhysicalDataFile* getFile(int n) { 
-		if( 0 ) 
-			assert(false);
+//			assert( name != "alleyinsider" );
 
 		if( n < 0 || n >= 100000 ) {
 			cout << "getFile(): n=" << n << endl;

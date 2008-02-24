@@ -252,6 +252,7 @@ public:
 };
 
 void listen(int port) { 
+	cout << "db version: 24feb08.1 embedded objects indexable" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
