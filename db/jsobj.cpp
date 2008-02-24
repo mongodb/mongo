@@ -3,7 +3,6 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
-#include <ctime>
 
 Element nullElement;
 
@@ -307,11 +306,7 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 				else if( e.type() == Date ) { 
 					unsigned long long d = e.date();
 					time_t t = (d/1000);
-#if defined(_WIN32)
-					ctime_s(buf, 64, &t);
-#else
-					ctime_r(&t, buf);
-#endif
+					time_t_to_String(t, buf);
 				}
 				else
 					return false;

@@ -666,7 +666,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 			return DiskLoc();
 		}
 		if( tableToIndex->findIndexByName(name) >= 0 ) { 
-			cout << "WARNING: bad add index attempt, index:" << name << " already exists for:" << tabletoidxns << endl;
+			//cout << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;
 			return DiskLoc();
 		}
 		indexFullNS = tabletoidxns; 
