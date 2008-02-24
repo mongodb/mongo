@@ -489,7 +489,7 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 		int nscanned = 0;
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
 
-		try{
+		/*try*/{
 
 			if( c.get() == 0 ) {
 				c = getIndexCursor(ns, query, order);
@@ -554,15 +554,15 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 			if( queryTraceLevel >=2 )
 				cout << "  nscanned:" << nscanned << "\n  ";
 		}
-		catch( AssertionException e ) { 
+		/*catch( AssertionException e ) { 
 			if( n )
 				throw e;
-			if( nCaught++ >= 100 ) { 
+			if( nCaught++ >= 1000 ) { 
 				cout << "Too many query exceptions, terminating" << endl;
 				exit(-8);
 			}
 			cout << " Assertion running query, returning an empty result" << endl;
-		}
+		}*/
 	}
 
 	QueryResult *qr = (QueryResult *) b.buf();

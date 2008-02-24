@@ -67,6 +67,7 @@ struct QueryResult : public MsgData {
 
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 
+// caller must free() returned QueryResult.
 QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, 
 					  JSObj j, auto_ptr< set<string> > fieldFilter,
 					  stringstream&);

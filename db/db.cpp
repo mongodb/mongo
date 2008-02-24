@@ -175,10 +175,30 @@ void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 		fields = auto_ptr< set<string> >(new set<string>());
 		d.nextJsObj().getFieldNames(*fields);
 	}
-	QueryResult* msgdata = 
-		runQuery(ns, ntoskip, ntoreturn, query, fields, ss);
+	QueryResult* msgdata;
+
+	try { 
+		msgdata = runQuery(ns, ntoskip, ntoreturn, query, fields, ss);
+	}
+	catch( AssertionException ) { 
+		cout << " Caught Assertion in runQuery, continuing" << endl; 
+		cout << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << endl;
+		cout << "  ns:" << ns << endl;
+		cout << "  query:" << query.toString() << endl;
+		msgdata = (QueryResult*) malloc(sizeof(QueryResult));
+		QueryResult *qr = msgdata;
+		qr->_data[0] = 0;
+		qr->_data[1] = 0;
+		qr->_data[2] = 0;
+		qr->_data[3] = 0;
+		qr->len = sizeof(QueryResult);
+		qr->operation = opReply;
+		qr->cursorId = 0;
+		qr->startingFrom = 0;
+		qr->nReturned = 0;
+	}
 	Message resp;
-	resp.setData(msgdata, true);
+	resp.setData(msgdata, true); // transport will free
 	dbMsgPort.reply(m, resp);
 	client = 0;
 }
@@ -252,7 +272,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 24feb08.1 embedded objects indexable" << endl;
+	cout << "db version: 24feb08.1 embedded objects indexable; catch query asserts" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
