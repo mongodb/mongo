@@ -390,6 +390,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 	id.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
 		JSObj j = *i;
+//		cout << "TEMP: j:" << j.toString() << endl;
 		if( otherTraceLevel >= 5 ) {
 			cout << "_unindexRecord() " << obj.toString();
 			cout << "\n  unindex:" << j.toString() << endl;
@@ -398,14 +399,13 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 		bool ok = id.head.btree()->unindex(id.head, ns, j, dl);
 
 #if defined(_WIN32)
-		//TMEPTEMPTEMPTEMP TEMP
 		id.head.btree()->fullValidate(id.head);
 #endif
 		if( !ok ) { 
-			cout << "Warning: _unindex failed" << endl;
-			cout << "  " << obj.toString() << endl;
-			cout << "  " << j.toString() << endl;
-			cout << "  if you added dup keys this can happen until we support that" << endl;
+			cout << "Assertion failure: _unindex failed" << '\n';
+			cout << "  obj:" << obj.toString() << '\n';
+			cout << "  key:" << j.toString() << '\n';
+			cout << "  dl:" << dl.toString() << endl;
 		}
 	}
 }

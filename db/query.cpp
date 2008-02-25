@@ -130,7 +130,7 @@ fail:
 }
 
 void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
-//	cout << "delete ns:" << ns << " queryobjsize:" << 
+//	cout << "TEMP delete ns:" << ns << " queryobjsize:" << 
 //		pattern.objsize() << endl;
 
 	if( strstr(ns, ".system.") ) {
@@ -162,6 +162,7 @@ DiskLoc _tempDelLoc;
 		DiskLoc rloc = c->currLoc();
 		c->advance(); // must advance before deleting as the next ptr will die
 		JSObj js(r);
+		//cout << "TEMP: " << js.toString() << endl;
 		bool deep;
 		if( !matcher.matches(js, &deep) ) {
 			if( c->tempStopOnMiss() )

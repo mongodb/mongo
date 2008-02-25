@@ -343,8 +343,6 @@ bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, co
 
 	BtreeCursor c(thisLoc, key, 1, true);
 
-//	dump();
-
 	while( c.ok() ) { 
 		KeyNode kn = c.currKeyNode();
 		if( !kn.key.woEqual(key) )
@@ -447,9 +445,30 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 	// split
 	if( split_debug )
 		cout << "    " << thisLoc.toString() << ".split" << endl;
+
+	int mid = n / 2;
+
+	/* on duplicate key, we need to ensure that they all end up on the RHS */
+	if( 0 ) {
+		assert(mid>0);
+		while( 1 ) {
+			KeyNode mn = keyNode(mid);
+			KeyNode left = keyNode(mid-1);
+			if( left.key < mn.key )
+				break;
+			mid--;
+			if( mid < 3 ) { 
+				cout << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
+				cout << "  ns:" << ns << endl;
+				cout << "  key:" << mn.key.toString() << endl;
+				break;
+			}
+		}
+	}
+
 	BtreeBucket *r = allocTemp();
 	DiskLoc rLoc;
-	int mid = n / 2;
+
 	if( split_debug )
 		cout << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
 	for( int i = mid+1; i < n; i++ ) {
@@ -600,6 +619,21 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 	int p;
 	found = find(key, p);
 	if( found ) {
+		/* todo: slow? this can be avoided for indexes that don't allow dup keys.  add support for that. */
+		{
+			// todo: fix for direction==-1!
+// dmtodo
+			DiskLoc lchild = k(p).prevChildBucket;
+			if( !lchild.isNull() ) {
+				// if dup keys, might be dups to the left.
+				DiskLoc largestLoc;
+				int largestKey;
+				lchild.btree()->findLargestKey(lchild, largestLoc, largestKey);
+				if( !largestLoc.isNull() && largestLoc.btree()->keyAt(largestKey).woEqual(key) )
+					return lchild.btree()->locate(lchild, key, pos, found, direction);
+			}
+		}
+
 		pos = p;
 		return thisLoc;
 	}
