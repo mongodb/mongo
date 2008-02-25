@@ -62,13 +62,15 @@ void BucketBasics::fullValidate(const DiskLoc& thisLoc) {
 	}
 }
 
+int nDumped = 0;
+
 void BucketBasics::assertValid() { 
 	if( !debug )
 		return;
-	assert( n >= 0 && n < BucketSize );
-	assert( emptySize >= 0 && emptySize < BucketSize );
-	assert( topSize >= n && topSize <= BucketSize );
-	assert( Size == BucketSize );
+	wassert( n >= 0 && n < BucketSize );
+	wassert( emptySize >= 0 && emptySize < BucketSize );
+	wassert( topSize >= n && topSize <= BucketSize );
+	wassert( Size == BucketSize );
 	if( 1 ) {
 		// slow:
 		for( int i = 0; i < n-1; i++ ) {
@@ -77,10 +79,14 @@ void BucketBasics::assertValid() {
 			int z = k1.woCompare(k2);
 			if( z > 0 ) {
 				cout << "ERROR: btree key order corrupt.  Keys:" << endl;
-				for( int j = 0; j < n; j++ ) { 
-					cout << "  " << keyNode(j).key.toString() << endl;
+				if( ++nDumped < 5 ) {
+					for( int j = 0; j < n; j++ ) { 
+						cout << "  " << keyNode(j).key.toString() << endl;
+					}
+					((BtreeBucket *) this)->dump();
 				}
-				assert(false);
+				wassert(false);
+				break;
 			}
 		}
 	}
@@ -90,7 +96,7 @@ void BucketBasics::assertValid() {
 			JSObj k1 = keyNode(0).key;
 			JSObj k2 = keyNode(n-1).key;
 			int z = k1.woCompare(k2);
-			assert( z <= 0 );
+			wassert( z <= 0 );
 		}
 	}
 }
@@ -269,9 +275,9 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 	pos = l;
 	if( pos != n ) {
 		JSObj keyatpos = keyNode(pos).key;
-		assert( key.woCompare(keyatpos) <= 0 );
+		wassert( key.woCompare(keyatpos) <= 0 );
 		if( pos > 0 ) { 
-			assert( keyNode(pos-1).key.woCompare(key) <= 0 );
+			wassert( keyNode(pos-1).key.woCompare(key) <= 0 );
 		}
 	}
 
@@ -336,8 +342,6 @@ bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, co
 //	cout << "unindex " << key.toString() << endl;
 
 	BtreeCursor c(thisLoc, key, 1, true);
-
-//	dump();
 
 	while( c.ok() ) { 
 		KeyNode kn = c.currKeyNode();
@@ -441,9 +445,30 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 	// split
 	if( split_debug )
 		cout << "    " << thisLoc.toString() << ".split" << endl;
+
+	int mid = n / 2;
+
+	/* on duplicate key, we need to ensure that they all end up on the RHS */
+	if( 0 ) {
+		assert(mid>0);
+		while( 1 ) {
+			KeyNode mn = keyNode(mid);
+			KeyNode left = keyNode(mid-1);
+			if( left.key < mn.key )
+				break;
+			mid--;
+			if( mid < 3 ) { 
+				cout << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
+				cout << "  ns:" << ns << endl;
+				cout << "  key:" << mn.key.toString() << endl;
+				break;
+			}
+		}
+	}
+
 	BtreeBucket *r = allocTemp();
 	DiskLoc rLoc;
-	int mid = n / 2;
+
 	if( split_debug )
 		cout << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
 	for( int i = mid+1; i < n; i++ ) {
@@ -594,6 +619,21 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 	int p;
 	found = find(key, p);
 	if( found ) {
+		/* todo: slow? this can be avoided for indexes that don't allow dup keys.  add support for that. */
+		{
+			// todo: fix for direction==-1!
+// dmtodo
+			DiskLoc lchild = k(p).prevChildBucket;
+			if( !lchild.isNull() ) {
+				// if dup keys, might be dups to the left.
+				DiskLoc largestLoc;
+				int largestKey;
+				lchild.btree()->findLargestKey(lchild, largestLoc, largestKey);
+				if( !largestLoc.isNull() && largestLoc.btree()->keyAt(largestKey).woEqual(key) )
+					return lchild.btree()->locate(lchild, key, pos, found, direction);
+			}
+		}
+
 		pos = p;
 		return thisLoc;
 	}

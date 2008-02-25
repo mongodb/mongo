@@ -104,12 +104,36 @@ function testarrayindexing() {
 function testdups() { 
  print("testdups");
  for( pass=0;pass<2;pass++ ) {
-  t.td.remove({});
-  for( var x=0;x<2000;x++ )
-   t.td.save({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d", z: x, str: "a long string dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"});
-  assert( t.td.find({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d"}).toArray().length == 2000 );
-  t.td.ensureIndex({ggg:true});
+     print(" pass:" + pass);
+     if( pass < 2 ) 
+	 t.td.remove({});
+     for( var x=0;x<2000;x++ )
+	 t.td.save({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d", z: x, 
+		     str: "a long string dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"});
+     assert( t.td.find({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d"}).toArray().length == 2000 );
+     //     t.td.ensureIndex({ggg:true});
+     if( pass == 0 )
+	 t.td.ensureIndex({ggg:1});
+     else if( pass == 1 ) 
+	 t.td.ensureIndex({ggg:-1});
  }
+ print(" end testdups");
+ print(" try t.td.remove({});");
+}
+
+function testdups2() { 
+ print("testdups");
+ for( pass=0;pass<1;pass++ ) {
+     print(" pass:" + pass);
+     t.td.remove({});
+     for( var x=0;x<250;x++ )
+	 t.td.save({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d", z: x, 
+		     str: "a long string dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"});
+     assert( t.td.find({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d"}).toArray().length == 2000 );
+     t.td.ensureIndex({ggg:true});
+ }
+ t.td.remove({});
+ print(" end testdups");
 }
 
 function runquick() { 

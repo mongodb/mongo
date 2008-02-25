@@ -100,6 +100,8 @@ DiskLoc NamespaceDetails::alloc(int lenToAlloc, DiskLoc& extentLoc) {
 	return loc;
 }
 
+void sayDbContext();
+
 /* returned item is out of the deleted list upon return */
 DiskLoc NamespaceDetails::_alloc(int len) {
 	DiskLoc *prev;
@@ -111,6 +113,12 @@ DiskLoc NamespaceDetails::_alloc(int len) {
 	int extra = 5; // look for a better fit, a little.
 	int chain = 0;
 	while( 1 ) { 
+		int a = cur.a();
+		if( a < -1 || a >= 100000 ) { 
+			cout << "Assertion failure - a() out of range in _alloc() " << a << endl;
+			sayDbContext();
+			cur.Null();
+		}
 		if( cur.isNull() ) { 
 			// move to next bucket.  if we were doing "extra", just break
 			if( bestmatchlen < 0x7fffffff )
@@ -390,6 +398,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 	id.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
 		JSObj j = *i;
+//		cout << "TEMP: j:" << j.toString() << endl;
 		if( otherTraceLevel >= 5 ) {
 			cout << "_unindexRecord() " << obj.toString();
 			cout << "\n  unindex:" << j.toString() << endl;
@@ -398,14 +407,13 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 		bool ok = id.head.btree()->unindex(id.head, ns, j, dl);
 
 #if defined(_WIN32)
-		//TMEPTEMPTEMPTEMP TEMP
 		id.head.btree()->fullValidate(id.head);
 #endif
 		if( !ok ) { 
-			cout << "Warning: _unindex failed" << endl;
-			cout << "  " << obj.toString() << endl;
-			cout << "  " << j.toString() << endl;
-			cout << "  if you added dup keys this can happen until we support that" << endl;
+			cout << "Assertion failure: _unindex failed" << '\n';
+			cout << "  obj:" << obj.toString() << '\n';
+			cout << "  key:" << j.toString() << '\n';
+			cout << "  dl:" << dl.toString() << endl;
 		}
 	}
 }
@@ -666,7 +674,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 			return DiskLoc();
 		}
 		if( tableToIndex->findIndexByName(name) >= 0 ) { 
-			cout << "WARNING: bad add index attempt, index:" << name << " already exists for:" << tabletoidxns << endl;
+			//cout << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;
 			return DiskLoc();
 		}
 		indexFullNS = tabletoidxns; 

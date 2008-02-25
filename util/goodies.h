@@ -63,6 +63,17 @@ struct WrappingInt {
 	bool operator>(WrappingInt r) { return !(r<=*this); }
 };
 
+#include <ctime>
+
+inline void time_t_to_String(time_t t, char *buf) {
+#if defined(_WIN32)
+	ctime_s(buf, 64, &t);
+#else
+	ctime_r(&t, buf);
+#endif
+	buf[24] = 0; // don't want the \n
+}
+
 inline void sleepsecs(int s) { 
 	boost::xtime xt;
 	boost::xtime_get(&xt, boost::TIME_UTC);

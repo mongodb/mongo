@@ -3,7 +3,6 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
-#include <ctime>
 
 Element nullElement;
 
@@ -137,6 +136,8 @@ inline int compareElementValues(Element& l, Element& r) {
 		case String:
 			/* todo: utf version */
 			return strcmp(l.valuestr(), r.valuestr());
+		case Object:
+		case Array:
 		case DBRef:
 			{
 				int lsz = l.valuesize();
@@ -144,8 +145,6 @@ inline int compareElementValues(Element& l, Element& r) {
 				if( lsz - rsz != 0 ) return lsz - rsz;
 				return memcmp(l.value(), r.value(), lsz);
 			}
-		case Object:
-		case Array:
 		case BinData:
 		case RegEx:
 			cout << "compareElementValues: can't compare this type:" << (int) l.type() << endl;
@@ -307,11 +306,7 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 				else if( e.type() == Date ) { 
 					unsigned long long d = e.date();
 					time_t t = (d/1000);
-#if defined(_WIN32)
-					ctime_s(buf, 64, &t);
-#else
-					ctime_r(&t, buf);
-#endif
+					time_t_to_String(t, buf);
 				}
 				else
 					return false;
