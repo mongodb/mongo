@@ -100,6 +100,8 @@ DiskLoc NamespaceDetails::alloc(int lenToAlloc, DiskLoc& extentLoc) {
 	return loc;
 }
 
+void sayDbContext();
+
 /* returned item is out of the deleted list upon return */
 DiskLoc NamespaceDetails::_alloc(int len) {
 	DiskLoc *prev;
@@ -111,6 +113,12 @@ DiskLoc NamespaceDetails::_alloc(int len) {
 	int extra = 5; // look for a better fit, a little.
 	int chain = 0;
 	while( 1 ) { 
+		int a = cur.a();
+		if( a < -1 || a >= 100000 ) { 
+			cout << "Assertion failure - a() out of range in _alloc() " << a << endl;
+			sayDbContext();
+			cur.Null();
+		}
 		if( cur.isNull() ) { 
 			// move to next bucket.  if we were doing "extra", just break
 			if( bestmatchlen < 0x7fffffff )
