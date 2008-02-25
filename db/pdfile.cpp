@@ -414,6 +414,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 			cout << "  obj:" << obj.toString() << '\n';
 			cout << "  key:" << j.toString() << '\n';
 			cout << "  dl:" << dl.toString() << endl;
+			//id.head.btree()->unindex(id.head, ns, j, dl);
 		}
 	}
 }

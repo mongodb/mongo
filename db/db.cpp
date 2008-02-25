@@ -272,7 +272,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 24feb08.2 embedded objects indexable; catch query asserts; dup keys; _alloc" << endl;
+	cout << "db version: 25feb08.1 unindex fixes" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;

@@ -217,16 +217,18 @@ void BtreeBucket::findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, in
 	DiskLoc loc = thisLoc;
 	while( 1 ) { 
 		BtreeBucket *b = loc.btree();
+//		b->dump();
 		if( !b->nextChild.isNull() ) { 
 			loc = b->nextChild;
 			continue;
 		}
+
+		assert(b->n>0);
+		largestLoc = loc;
+		largestKey = b->n-1;
+
 		break;
 	}
-
-	assert(n>0);
-	largestLoc = loc;
-	largestKey = n-1;
 } 
 
 /* pos: for existing keys k0...kn-1.
@@ -341,6 +343,10 @@ int qqq = 0;
 bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc ) { 
 //	cout << "unindex " << key.toString() << endl;
 
+	if( qqq ) { 
+		fullValidate(thisLoc);
+	}
+
 	BtreeCursor c(thisLoc, key, 1, true);
 
 	while( c.ok() ) { 
@@ -354,6 +360,10 @@ bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, co
 			return true;
 		}
 		c.advance();
+	}
+
+	if( qqq ) { 
+		fullValidate(thisLoc);
 	}
 
 	return false;
@@ -534,10 +544,15 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 
 	// add our new key, there is room now
 	{
-		if( keypos < mid ) {
+		
+//dump();
+
+		if( keypos <= mid ) {
+//		if( keypos < mid ) {
 			if( split_debug )
 				cout << "  keypos<mid, insertHere() the new key" << endl;
 			insertHere(thisLoc, ns, keypos, recordLoc, key, lchild, rchild, idx);
+//dump();
 		} else if( highest ) {
 			// else handled above already.
 			int kp = keypos-mid-1; assert(kp>=0);
@@ -578,6 +593,7 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
 	int ko = keyOfs + direction;
 	DiskLoc nextDown = childForPos(ko+adj);
 	if( !nextDown.isNull() ) { 
+//		nextDown.btree()->dump();//TEMP:
 		while( 1 ) {
 			keyOfs = direction>0 ? 0 : nextDown.btree()->n - 1;
 			DiskLoc loc= nextDown.btree()->childForPos(keyOfs + adj);
@@ -618,6 +634,7 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
 DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction) { 
 	int p;
 	found = find(key, p);
+//	dump();
 	if( found ) {
 		/* todo: slow? this can be avoided for indexes that don't allow dup keys.  add support for that. */
 		{
@@ -663,7 +680,7 @@ int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 		return 2;
 	} 
 	assert( key.objsize() > 0 );
-
+//dump();
 	int pos;
 	bool found = find(key, pos);
 	if( insert_debug ) {
@@ -713,10 +730,41 @@ void BtreeBucket::dump() {
 	cout << " right:" << hex << nextChild.getOfs() << dec << endl;
 }
 
+JSObj *music = 0;
+
+void tempMusic(DiskLoc thisLoc)
+{
+	BtreeCursor c(thisLoc, *music, 1, true);
+	while( c.ok() ) { 
+		KeyNode kn = c.currKeyNode();
+		if( !kn.key.woEqual(*music) )
+			break;
+		if( kn.recordLoc.getOfs() == 0x4c8d7c0 ) {
+			cout << "*** found it" << endl;
+				//				c.bucket.btree()->dump();
+			return;
+		}
+		c.advance();
+	}
+
+	cout << "*** NOT FOUND" << endl;
+}
+
 int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
 						JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
 {
 	if( toplevel ) {
+/*		if( key.toString() == "{ _searchIndex: \"music\" }" ) { 
+			if( music == 0 ) {
+				music = new JSObj(key.copy());
+				cout << music->toString() << endl;
+			}
+			tempMusic(thisLoc);
+			if( recordLoc.getOfs() == 0x4c8d7c0 ) {
+				cout << "About to add it!" << endl;
+			}
+		}
+*/
 		++ninserts;
 		if( /*ninserts > 127250 || */ninserts % 1000 == 0 ) {
 			cout << "ninserts: " << ninserts << endl;
@@ -727,14 +775,14 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 			//bt_fv = 1;
 			//idx.head.btree()->fullValidate(idx.head);
 		}
-		if( 0 && ninserts >= 127287 ) { 
+/*		if( 0 && ninserts >= 127287 ) { 
 			cout << "---------------------------------------------------------------- " << ninserts << endl;
 			cout << "insert() top level " << key.toString() << ' ' << recordLoc.toString() << endl;
 			bt_fv = 1;
 			split_debug = 1;
 			insert_debug = 1;
 			idx.head.btree()->fullValidate(idx.head);
-		}
+		}*/
 	}
 
 	bool chk = false;
@@ -742,6 +790,14 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 	int x = _insert(thisLoc, ns, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
 	assertValid(); 
 
+/*	if( toplevel ) {
+		if( recordLoc.getOfs() == 0x4c8d7c0 ) {
+			if( key.toString() == "{ _searchIndex: \"music\" }" ) { 
+				tempMusic(thisLoc);
+			}
+		}
+	}
+*/
 	return x;
 }
 
