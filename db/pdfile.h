@@ -82,7 +82,9 @@ class Record {
 public:
 	enum { HeaderSize = 16 };
 	int lengthWithHeaders;
-	int extentOfs, nextOfs, prevOfs;
+	int extentOfs;
+	int nextOfs;
+	int prevOfs;
 	char data[4];
 	int netLength() { return lengthWithHeaders - HeaderSize; }
 	//void setNewLength(int netlen) { lengthWithHeaders = netlen + HeaderSize; }
@@ -261,9 +263,19 @@ public:
 
 inline Record* PhysicalDataFile::recordAt(DiskLoc dl) { return header->getRecord(dl); }
 
+void sayDbContext();
+
 inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
-	if( nextOfs != DiskLoc::NullOfs )
+	if( nextOfs != DiskLoc::NullOfs ) {
+		/* defensive */
+		if( nextOfs >= 0 && nextOfs < 10 ) { 
+			cout << "Assertion failure - Record::getNext() referencing a deleted record?" << endl;
+			sayDbContext();
+			return DiskLoc();
+		}
+
 		return DiskLoc(myLoc.a(), nextOfs);
+	}
 	Extent *e = myExtent(myLoc);
 	while( 1 ) {
 		if( e->xnext.isNull() )

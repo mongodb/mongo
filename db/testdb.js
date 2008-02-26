@@ -136,6 +136,17 @@ function testdups2() {
  print(" end testdups");
 }
 
+function runcursors() {
+    for( i = 0; i < 50; i++ )
+	t.cur.save( { name:"ABC", k:/asfd/, a:i } );
+
+    c = t.cur.find().limit(2);
+    print(c[0].name);
+
+    t.cur.remove({});
+    print(" end runcursors");
+}
+
 function runquick() { 
     print("runquick");
     start = Date();
@@ -177,3 +188,4 @@ function runquick() {
 print("testdb.js: try runall()");
 print("               runquick()");
 print("               bigIndexTest()");
+print("               runcursors()");

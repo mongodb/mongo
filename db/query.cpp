@@ -533,17 +533,20 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 							n++;
 							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
 								(ntoreturn==0 && b.len()>1*1024*1024) ) {
-									// more...so save a cursor
-									ClientCursor *cc = new ClientCursor();
-									cc->c = c;
-									cursorid = allocCursorId();
-									cc->cursorid = cursorid;
-									cc->matcher = matcher;
-									cc->ns = ns;
-									cc->pos = n;
-									ClientCursor::add(cc);
-									cc->updateLocation();
-									cc->filter = filter;
+									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+									if( ntoreturn != 1 ) {
+										// more...so save a cursor
+										ClientCursor *cc = new ClientCursor();
+										cc->c = c;
+										cursorid = allocCursorId();
+										cc->cursorid = cursorid;
+										cc->matcher = matcher;
+										cc->ns = ns;
+										cc->pos = n;
+										ClientCursor::add(cc);
+										cc->updateLocation();
+										cc->filter = filter;
+									}
 									break;
 							}
 						}
@@ -587,11 +590,8 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 void killCursors(int n, long long *ids) {
 	int k = 0;
 	for( int i = 0; i < n; i++ ) {
-		CCMap::iterator it = clientCursors.find(ids[i]);
-		if( it != clientCursors.end() ) {
-			clientCursors.erase(it);
+		if( ClientCursor::erase(ids[i]) )
 			k++;
-		}
 	}
 	cout << "killCursors: found " << k << " of " << n << endl;
 }
@@ -603,14 +603,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 
 	BufBuilder b(32768);
 
-	ClientCursor *cc = 0;
-	CCMap::iterator it = clientCursors.find(cursorid);
-	if( it == clientCursors.end() ) { 
-		cout << "Cursor not found in map.  cursorid: " << cursorid << endl;
-	}
-	else {
-		cc = it->second;
-	}
+	ClientCursor *cc = ClientCursor::find(cursorid);
 
 	b.skip(sizeof(QueryResult));
 
@@ -624,9 +617,9 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 			if( !c->ok() ) {
 done:
 				// done!  kill cursor.
+				bool ok = ClientCursor::erase(cursorid);
+				assert(ok);
 				cursorid = 0;
-				clientCursors.erase(it);
-				delete cc;
 				cc = 0;
 				break;
 			}
