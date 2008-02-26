@@ -22,7 +22,9 @@ class DiskLoc {
 public:
 	enum { NullOfs = -1 };
 	int a() const { return fileNo; }
-	DiskLoc(int a, int b) : fileNo(a), ofs(b) { }
+	DiskLoc(int a, int b) : fileNo(a), ofs(b) { 
+		assert(ofs!=0);
+	}
 	DiskLoc() { fileNo = -1; ofs = NullOfs; }
 
 	DiskLoc(const DiskLoc& l) { fileNo=l.fileNo; ofs=l.ofs; }
@@ -57,6 +59,7 @@ public:
 	bool operator!=(const DiskLoc& b) const { return !(*this==b); }
 	const DiskLoc& operator=(const DiskLoc& b) { 
 		fileNo=b.fileNo; ofs = b.ofs;
+		assert(ofs!=0);
 		return *this;
 	}
 	bool operator<(const DiskLoc& b) const { 
