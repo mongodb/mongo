@@ -272,7 +272,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 24feb08.2 embedded objects indexable; catch query asserts; dup keys; _alloc" << endl;
+	cout << "db version: 25feb08.1 unindex fixes" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
@@ -291,6 +291,7 @@ void t()
 
 	Message m;
 	while( 1 ) { 
+		curOp = 0;
 		m.reset();
 		stringstream ss;
 
@@ -363,7 +364,8 @@ void t()
 				receivedKillCursors(m);
 			}
 			else {
-				cout << "    operation isn't supported ?" << endl;
+				cout << "    operation isn't supported: " << m.data->operation << endl;
+				assert(false);
 			}
 
 			int ms = t.millis();

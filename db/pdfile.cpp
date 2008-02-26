@@ -24,14 +24,16 @@ DataFileMgr theDataFileMgr;
 map<string,Client*> clients;
 Client *client;
 const char *curNs = "";
-int curOp;
+int MAGIC = 0x1000;
+int curOp = -2;
 
 extern int otherTraceLevel;
 
 void sayDbContext() { 
 	cout << " client: " << (client ? client->name.c_str() : "null");
 	cout << " op:" << curOp << endl;
-	cout << " ns: " << curNs << endl;
+	if( client )
+		cout << " ns: " << curNs << endl;
 }
 
 JSObj::JSObj(Record *r) { 
@@ -414,6 +416,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 			cout << "  obj:" << obj.toString() << '\n';
 			cout << "  key:" << j.toString() << '\n';
 			cout << "  dl:" << dl.toString() << endl;
+			//id.head.btree()->unindex(id.head, ns, j, dl);
 		}
 	}
 }
