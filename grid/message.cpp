@@ -95,21 +95,33 @@ bool MessagingPort::connect(SockAddr& _far)
 
 bool MessagingPort::recv(Message& m) {
 	mmm( cout << "*  recv() sock:" << this->sock << endl; )
-	int len;
+	int len = -1;
 
-	int x = ::recv(sock, (char *) &len, 4, 0);
-	if( x == 0 ) {
-		cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
-		m.reset();
-		return false;
-	}
-	if( x < 0 ) { 
-		cout << "MessagingPort::recv(): recv() error " << errno << ' ' << farEnd.toString()<<endl;
-		m.reset();
-		return false;
+	char *lenbuf = (char *) &len;
+	int lft = 4;
+	while( 1 ) {
+		int x = ::recv(sock, lenbuf, lft, 0);
+		if( x == 0 ) {
+			cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
+			m.reset();
+			return false;
+		}
+		if( x < 0 ) { 
+			cout << "MessagingPort::recv(): recv() error " << errno << ' ' << farEnd.toString()<<endl;
+			m.reset();
+			return false;
+		}
+		lft -= x;
+		if( lft == 0 )
+			break;
+		lenbuf += x;
+		cout << "MessagingPort::recv(): got " << x << " bytes wanted 4, lft=" << lft << endl;
+		assert( lft > 0 );
 	}
 
-	assert( x == 4 );
+//	assert( x == 4 );
+
+	assert( len >= 0 && len <= 16000000 );
         
 	int z = (len+1023)&0xfffffc00; assert(z>=len);
 	MsgData *md = (MsgData *) malloc(z);
@@ -123,7 +135,7 @@ bool MessagingPort::recv(Message& m) {
 	char *p = (char *) &md->id;
 	int left = len -4;
 	while( 1 ) {
-		x = ::recv(sock, p, left, 0);
+		int x = ::recv(sock, p, left, 0);
 		if( x == 0 ) {
 			cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
 			m.reset();

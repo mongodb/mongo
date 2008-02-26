@@ -291,6 +291,7 @@ void t()
 
 	Message m;
 	while( 1 ) { 
+		curOp = 0;
 		m.reset();
 		stringstream ss;
 
@@ -363,7 +364,8 @@ void t()
 				receivedKillCursors(m);
 			}
 			else {
-				cout << "    operation isn't supported ?" << endl;
+				cout << "    operation isn't supported: " << m.data->operation << endl;
+				assert(false);
 			}
 
 			int ms = t.millis();
