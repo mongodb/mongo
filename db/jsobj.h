@@ -385,6 +385,8 @@ public:
 
 	bool matches(JSObj& j, bool *deep = 0);
 
+	int getN() { return n; }
+
 private:
 	int valuesMatch(Element& l, Element& r, int op);
 

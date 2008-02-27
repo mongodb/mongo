@@ -72,6 +72,8 @@ function bigIndexTest() {
 }
 
 function runall() { 
+    runcursors();
+
     runquick();
 
     print("bigindextest stuff:");
@@ -137,13 +139,36 @@ function testdups2() {
 }
 
 function runcursors() {
-    for( i = 0; i < 50; i++ )
-	t.cur.save( { name:"ABC", k:/asfd/, a:i } );
-
-    c = t.cur.find().limit(2);
-    print(c[0].name);
-
+    print("initial remove");
     t.cur.remove({});
+    t.cur.findOne();
+    print(" done");
+
+    print( tojson( connect("intr").cursors.find() ) );
+
+    print("insert");
+
+    for( i = 0; i < 50000; i++ )
+	t.cur.save( { name:"ABC", k:/asfd/, a:i, 
+		    lng:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		    lng1:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		    lng2:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"} );
+
+    for( i = 0; i < 100; i++ ) {
+	c = t.cur.find().limit(2);
+	print(c[0].name);
+	t.cur.find({name:"ABC"}).limit(3)[0];
+    }
+
+    print( tojson( connect("intr").cursors.find() ) );
+
+    print("Remove...");
+    t.cur.remove({});
+    t.cur.findOne();
+    print(" done");
+
+    print( tojson( connect("intr").cursors.find() ) );
+
     print(" end runcursors");
 }
 

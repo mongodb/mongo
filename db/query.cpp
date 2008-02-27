@@ -486,6 +486,8 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 			query = jsobj;
 
 		auto_ptr<JSMatcher> matcher(new JSMatcher(query));
+JSMatcher &debug1 = *matcher;
+assert( debug1.getN() < 5000 );
 
 		int nscanned = 0;
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
@@ -507,6 +509,9 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj,
 					cout << " checking against:\n " << js.toString() << endl;
 				nscanned++;
 				bool deep;
+
+JSMatcher &debug = *matcher;
+assert( debug.getN() < 5000 );
 
 				if( !matcher->matches(js, &deep) ) {
 					if( c->tempStopOnMiss() )
