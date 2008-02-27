@@ -272,7 +272,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 25feb08.1 unindex fixes" << endl;
+	cout << "db version: 27feb08.1 latent cursor fixes" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
