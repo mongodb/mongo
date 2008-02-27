@@ -122,6 +122,7 @@ void ClientCursor::cleanupByLocation(DiskLoc loc, long long cursorid) {
 				}
 				break;
 			}
+			cc = cc->nextAtThisLocation;
 		}
 	}
 }
