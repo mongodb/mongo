@@ -168,6 +168,7 @@ public:
 	virtual DiskLoc currLoc() { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc(); }
 	virtual Record* _current() { return currLoc().rec(); }
 	virtual JSObj current() { return JSObj(_current()); }
+	virtual const char * toString() { return "BtreeCursor"; }
 
 private:
 	void checkUnused();

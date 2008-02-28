@@ -86,8 +86,9 @@ extern CCMap clientCursors; /* cursorid -> ClientCursor */
 */
 class Cursor;
 class ClientCursor {
+	friend class CursInspector;
 public:
-	ClientCursor() { cursorid=0; pos=0; }
+	ClientCursor() { cursorid=0; pos=0; nextAtThisLocation=0; }
 	~ClientCursor();
 	long long cursorid;
 	string ns;
@@ -122,6 +123,8 @@ public:
 private:
 	void addToByLocation(DiskLoc cl);
 	static void cleanupByLocation(DiskLoc loc, long long cursorid);
+public:
+	ClientCursor *nextAtThisLocation;
 };
 
 long long allocCursorId();

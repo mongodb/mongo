@@ -9,7 +9,7 @@
 class BufBuilder {
 public:
 	BufBuilder(int initsize = 512) : size(initsize) { 
-		data = (char *) malloc(size);
+		data = (char *) malloc(size); assert(data);
 		l = 0;
 	}
 	~BufBuilder() { kill(); } 

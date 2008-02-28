@@ -222,6 +222,8 @@ public:
 	/* called before query getmore block is iterated */
 	virtual void checkLocation() { } 
 
+	virtual const char * toString() { return "abstract?"; }
+
 	/* used for multikey index traversal to avoid sending back dups. see JSMatcher::matches() */
 	set<DiskLoc> dups;
 	bool dup(DiskLoc loc) {
@@ -257,6 +259,8 @@ public:
 
 	BasicCursor(DiskLoc dl) : curr(dl) { }
 	BasicCursor() { }
+
+	virtual const char * toString() { return "BasicCursor"; }
 
 	DiskLoc curr;
 };

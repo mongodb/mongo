@@ -827,6 +827,8 @@ BtreeCursor::BtreeCursor(DiskLoc head, JSObj& k, int _direction, bool sm) :
 	checkUnused();
 }
 
+int zzz = 0;
+
 /* skip unused keys. */
 void BtreeCursor::checkUnused() {
 	int u = 0;
@@ -840,7 +842,7 @@ void BtreeCursor::checkUnused() {
 		bucket = b->advance(bucket, keyOfs, direction, "checkUnused");
 		u++;
 	}
-	if( u > 10 )
+	if( u > 10 && ++zzz % 16 == 0 )
 		cout << "btree unused skipped:" << u << endl;
 }
 

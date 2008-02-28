@@ -32,5 +32,7 @@ public:
 		return false;
 	}
 
+	virtual const char * toString() { return "SingleResultObjCursor"; }
+
 };
 
