@@ -458,9 +458,17 @@ done:
 
 int nCaught = 0;
 
-QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, JSObj jsobj, 
-					  auto_ptr< set<string> > filter, stringstream& ss) {
-	ss << "query:" << ns << " ntoreturn:" << ntoreturn;
+QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
+					  auto_ptr< set<string> > filter, stringstream& ss) 
+{
+	bool wantMore = true;
+	int ntoreturn = _ntoreturn;
+	if( _ntoreturn < 0 ) { 
+		ntoreturn = -_ntoreturn;
+		wantMore = false;
+	}
+
+	ss << "query:" << ns << " _ntoreturn:" << _ntoreturn;
 	if( ntoskip ) ss << " ntoskip:" << ntoskip;
 	if( jsobj.objsize() > 100 ) 
 		ss << " querysz:" << jsobj.objsize();
@@ -539,7 +547,7 @@ assert( debug.getN() < 5000 );
 							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
 								(ntoreturn==0 && b.len()>1*1024*1024) ) {
 									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-									if( ntoreturn != 1 ) {
+									if( wantMore && ntoreturn != 1 ) {
 										// more...so save a cursor
 										ClientCursor *cc = new ClientCursor();
 										cc->c = c;
