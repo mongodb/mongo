@@ -406,7 +406,13 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 			cout << "\n  unindex:" << j.toString() << endl;
 		}
 		nUnindexes++;
-		bool ok = id.head.btree()->unindex(id.head, ns, j, dl);
+		bool ok = false;
+		try {
+			ok = id.head.btree()->unindex(id.head, ns, j, dl);
+		}
+		catch(AssertionException) { 
+			cout << " caught assertion _unindexRecord " << id.indexNamespace() << '\n';
+		}
 
 #if defined(_WIN32)
 		id.head.btree()->fullValidate(id.head);
@@ -416,7 +422,6 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 			cout << "  obj:" << obj.toString() << '\n';
 			cout << "  key:" << j.toString() << '\n';
 			cout << "  dl:" << dl.toString() << endl;
-			//id.head.btree()->unindex(id.head, ns, j, dl);
 		}
 	}
 }
@@ -516,36 +521,28 @@ void DataFileMgr::update(
 				vector<JSObj*> removed;
 				setDifference(oldkeys, newkeys, removed);
 				string idxns = idx.indexNamespace();
-				for( unsigned i = 0; i < removed.size(); i++ ) { 
-					idx.head.btree()->unindex(idx.head, idxns.c_str(), *removed[i], dl);
+				for( unsigned i = 0; i < removed.size(); i++ ) {
+					try {  
+						idx.head.btree()->unindex(idx.head, idxns.c_str(), *removed[i], dl);
+					}
+					catch(AssertionException) { 
+						cout << " caught assertion update unindex " << idxns.c_str() << '\n';
+					}
 				}
 				vector<JSObj*> added;
 				setDifference(newkeys, oldkeys, added);
 				assert( !dl.isNull() );
 				for( unsigned i = 0; i < added.size(); i++ ) { 
-					idx.head.btree()->insert(
-						idx.head, idxns.c_str(),
-						dl, *added[i], false, idx, true);
+					try {
+						idx.head.btree()->insert(
+							idx.head, idxns.c_str(),
+							dl, *added[i], false, idx, true);
+					}
+					catch(AssertionException) { 
+						cout << " caught assertion update index " << idxns.c_str() << '\n';
+					}
 				}
 
-/*
-				JSObjBuilder b1,b2;
-				JSObj kNew = newObj.extractFields(idxKey, b1);
-				JSObj kOld = oldObj.extractFields(idxKey, b2);
-				if( !kNew.woEqual(kOld) ) {
-					cout << "  updating index, key changed " << idx.indexNamespace() << endl;
-					// delete old key
-					if( !kOld.isEmpty() )
-						idx.head.btree()->unindex(kOld);
-					// add new key
-					if( !kNew.isEmpty() ) {
-						idx.head.btree()->insert(
-							idx.head, 
-							idx.indexNamespace().c_str(),
-							dl, kNew, false, idx);
-					}
- 				}
-*/
 			}
 		}
 	}
@@ -578,27 +575,19 @@ int followupExtentSize(int len, int lastExtentLen) {
 
 /* add keys to indexes for a new record */
 void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) { 
-//	cout << "temp: " << obj.toString() << endl;
 	set<JSObj> keys;
 	idx.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
-//		cout << "temp: _indexRecord " << i->toString() << endl;
+		//		cout << "temp: _indexRecord " << i->toString() << endl;
 		assert( !newRecordLoc.isNull() );
-		idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
-                                (JSObj&) *i, false, idx, true);
+		try {
+			idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
+				(JSObj&) *i, false, idx, true);
+		}
+		catch(AssertionException) { 
+			cout << " caught assertion _indexRecord " << idx.indexNamespace() << '\n';
+		}
 	}
-/*
-	JSObj idxInfo = idx.info.obj();
-	JSObjBuilder b;
-	JSObj key = obj.extractFields(idxInfo.getObjectField("key"), b);
-	if( !key.isEmpty() ) {
-		cout << "_indexRecord " << key.toString() << endl;
-		idx.head.btree()->insert(
-			idx.head, 
-			idx.indexNamespace().c_str(),
-			newRecordLoc, key, false, idx);
-	}
-*/
 }
 
 /* note there are faster ways to build an index in bulk, that can be 
