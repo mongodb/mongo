@@ -272,7 +272,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 27feb08.1 latent cursor fixes" << endl;
+	cout << "db version: leapday.1 getmore fixes" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
@@ -311,6 +311,7 @@ void t()
 			lock lk(dbMutex);
 			Timer t;
 
+			bool log = false;
 			curOp = m.data->operation;
 			if( m.data->operation == dbMsg ) { 
 				ss << "msg ";
@@ -332,6 +333,9 @@ void t()
 				}
 			}
 			else if( m.data->operation == dbQuery ) { 
+#if defined(_WIN32)
+			log = true;
+#endif
 				receivedQuery(dbMsgPort, m, ss);
 			}
 			else if( m.data->operation == dbInsert ) {
@@ -356,10 +360,12 @@ void t()
 				catch( AssertionException ) { cout << "Caught Assertion, continuing" << endl; }
 			}
 			else if( m.data->operation == dbGetMore ) {
+				log = true;
 				ss << "getmore ";
 				receivedGetMore(dbMsgPort, m);
 			}
 			else if( m.data->operation == dbKillCursors ) { 
+				log = true;
 				ss << "killcursors ";
 				receivedKillCursors(m);
 			}
@@ -369,7 +375,7 @@ void t()
 			}
 
 			int ms = t.millis();
-			bool log = ctr++ % 100 == 0;
+			log = log || ctr++ % 100 == 0;
 			if( log || ms > 50 ) {
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;

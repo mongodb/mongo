@@ -267,9 +267,9 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
 	details->lastExtentSize = approxSize;
 	details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
-	cout << "*** new extent size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset << dec << endl;
-	cout << "    emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
-	cout << "    " << ns << endl;
+	cout << "new extent size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset << dec;
+	cout << " emptyLoc:" << hex << emptyLoc.getOfs() << dec;
+	cout << ' ' << ns << endl;
 	return e;
 }
 

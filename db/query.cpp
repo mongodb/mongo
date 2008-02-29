@@ -548,17 +548,20 @@ assert( debug.getN() < 5000 );
 								(ntoreturn==0 && b.len()>1*1024*1024) ) {
 									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
 									if( wantMore && ntoreturn != 1 ) {
-										// more...so save a cursor
-										ClientCursor *cc = new ClientCursor();
-										cc->c = c;
-										cursorid = allocCursorId();
-										cc->cursorid = cursorid;
-										cc->matcher = matcher;
-										cc->ns = ns;
-										cc->pos = n;
-										ClientCursor::add(cc);
-										cc->updateLocation();
-										cc->filter = filter;
+										c->advance();
+										if( c->ok() ) {
+											// more...so save a cursor
+											ClientCursor *cc = new ClientCursor();
+											cc->c = c;
+											cursorid = allocCursorId();
+											cc->cursorid = cursorid;
+											cc->matcher = matcher;
+											cc->ns = ns;
+											cc->pos = n;
+											ClientCursor::add(cc);
+											cc->updateLocation();
+											cc->filter = filter;
+										}
 									}
 									break;
 							}
@@ -657,6 +660,7 @@ done:
 					n++;
 					if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
 						(ntoreturn==0 && b.len()>1*1024*1024) ) {
+						c->advance();
 						cc->pos += n;
 						cc->updateLocation();
 						break;
