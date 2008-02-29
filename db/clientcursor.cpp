@@ -143,11 +143,10 @@ ClientCursor::~ClientCursor() {
 
 // note this doesn't set lastLoc -- caller should.
 void ClientCursor::addToByLocation(DiskLoc cl) { 
-//if( 1 )
-//return;
-//TEMP!
-
-	assert( nextAtThisLocation == 0 );
+	if( nextAtThisLocation ) { 
+		wassert( nextAtThisLocation == 0 );
+		return;
+	}
 
 	DiskToCC::iterator j = byLocation.find(cl);
 	nextAtThisLocation = j == byLocation.end() ? 0 : j->second;
