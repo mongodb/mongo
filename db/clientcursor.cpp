@@ -28,7 +28,7 @@ class CursInspector : public SingleResultObjCursor {
 		b.append("byLocation_size", byLocation.size());
 		b.append("clientCursors_size", clientCursors.size());
 
-cout << byLocation.size() << endl;
+
 
 		stringstream ss;
 		ss << '\n';
@@ -113,21 +113,29 @@ void ClientCursor::cleanupByLocation(DiskLoc loc, long long cursorid) {
 				// found one to remove.
 				if( prev == 0 ) { 
 					if( cc->nextAtThisLocation )
-						byLocation[loc] = cc->nextAtThisLocation;
+						it->second = cc->nextAtThisLocation;
+//						byLocation[loc] = cc->nextAtThisLocation;
 					else
 						byLocation.erase(it);
 				}
 				else { 
 					prev->nextAtThisLocation = cc->nextAtThisLocation;
 				}
-				break;
+				cc->nextAtThisLocation = 0;
+				return;
 			}
 			cc = cc->nextAtThisLocation;
 		}
 	}
+
+	// not found!
+	cout << "Assertion failure - cleanupByLocation: not found " << cursorid << endl;
 }
 
 ClientCursor::~ClientCursor() {
+#if defined(_WIN32)
+	cout << "~clientcursor " << cursorid << endl;
+#endif
 	assert( pos != -2 );
 
 	cleanupByLocation(lastLoc, cursorid);
@@ -143,6 +151,8 @@ ClientCursor::~ClientCursor() {
 
 // note this doesn't set lastLoc -- caller should.
 void ClientCursor::addToByLocation(DiskLoc cl) { 
+	assert( cursorid );
+
 	if( nextAtThisLocation ) { 
 		wassert( nextAtThisLocation == 0 );
 		return;
@@ -154,6 +164,7 @@ void ClientCursor::addToByLocation(DiskLoc cl) {
 }
 
 void ClientCursor::updateLocation() {
+	assert( cursorid );
 
 	DiskLoc cl = c->currLoc();
 	//	cout<< "  TEMP: updateLocation last:" << lastLoc.toString() << " cl:" << cl.toString() << '\n';
@@ -192,9 +203,12 @@ long long allocCursorId() {
 	long long x;
 	while( 1 ) {
 		x = (((long long)rand()) << 32);
-		x = x | (int) curTimeMillis() | 0x80000000; // last or to w make sure not zero
+		x = x | (int) curTimeMillis() | 0x80000000; // OR to make sure not zero
 		if( clientCursors.count(x) == 0 )
 			break;
 	}
+#if defined(_WIN32)
+	cout << "alloccursorid " << x << endl;
+#endif
 	return x;
 }

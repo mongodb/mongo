@@ -3,6 +3,9 @@
 var fail = 0;
 
 var t = connect("test");
+db=t;
+
+core.db.db();
 
 var z = 0;
 function progress() {}// print(++z); }
@@ -103,6 +106,34 @@ function testarrayindexing() {
     }
 }
 
+function testgetmore() { 
+    print("testgetmore");
+    drop("gm");
+    gm=t.gm;
+    for(i=0;i<50000;i++){
+	gm.save({a:i, b:"adsffffffffffffffffffffffffffffffffffffffffffffffff\nfffffffffffffffffffffffffffffffffffffffffffffffffffff\nfffffffffffffffffffffffffffffffff"})
+	    }
+    assert(gm.find().length()==50000);
+
+    x = 0;
+    c=gm.find();
+    for(i=0;i<5000;i++) { x += c.next().a; }
+
+    assert(gm.find().length()==50000); // full iteration with a cursor already live
+    assert( gm.find()[10000].a == 10000 );
+    assert( gm.find()[29000].a == 29000 );
+    assert( gm.find()[9000].a == 9000 );
+    d=gm.find();
+    assert( d[20000].a==20000 );
+    assert( d[10000].a==10000 );
+    assert( d[40000].a==40000 );
+    assert(gm.find().length()==50000); // full iteration with a cursor already live
+
+    print( connect("intr").cursors.findOne().dump );
+
+    print("testgetmore end");
+}
+
 function testdups() { 
  print("testdups");
  for( pass=0;pass<2;pass++ ) {
@@ -175,6 +206,9 @@ function runcursors() {
 function runquick() { 
     print("runquick");
     start = Date();
+
+    testgetmore();
+
     t.nullcheck.remove({});
     t.nullcheck.save( { a : 3 } );
     oneresult( t.nullcheck.find() ); 
@@ -202,6 +236,8 @@ function runquick() {
     
     testarrayindexing();
 
+    runcursors();
+
     print("testdups last to go, it takes a little time...");
     testdups();
 
@@ -214,3 +250,4 @@ print("testdb.js: try runall()");
 print("               runquick()");
 print("               bigIndexTest()");
 print("               runcursors()");
+print("               testgetmore()");

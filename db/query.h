@@ -88,7 +88,12 @@ class Cursor;
 class ClientCursor {
 	friend class CursInspector;
 public:
-	ClientCursor() { cursorid=0; pos=0; nextAtThisLocation=0; }
+	ClientCursor() { 
+		cursorid=0; pos=0; nextAtThisLocation=0; 
+#if defined(_WIN32)
+	cout << "clientcursor() " << cursorid << endl;
+#endif
+	}
 	~ClientCursor();
 	long long cursorid;
 	string ns;

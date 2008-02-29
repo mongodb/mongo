@@ -369,7 +369,12 @@ void t()
 			}
 
 			int ms = t.millis();
+#if defined(_WIN32)
+			int op = m.data->operation;
+			bool log = ctr++ % 100 == 0 || op == dbQuery || op == dbGetMore || op == dbKillCursors;
+#else
 			bool log = ctr++ % 100 == 0;
+#endif
 			if( log || ms > 50 ) {
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;
