@@ -129,7 +129,7 @@ void ClientCursor::cleanupByLocation(DiskLoc loc, long long cursorid) {
 	}
 
 	// not found!
-	cout << "Assertion failure - cleanupByLocation: not found " << cursorid << endl;
+	//cout << "Assertion failure - cleanupByLocation: not found " << cursorid << endl;
 }
 
 ClientCursor::~ClientCursor() {

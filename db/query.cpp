@@ -458,6 +458,15 @@ done:
 
 int nCaught = 0;
 
+void killCursors(int n, long long *ids) {
+	int k = 0;
+	for( int i = 0; i < n; i++ ) {
+		if( ClientCursor::erase(ids[i]) )
+			k++;
+	}
+	cout << "killCursors: found " << k << " of " << n << endl;
+}
+
 QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) 
 {
@@ -601,15 +610,6 @@ assert( debug.getN() < 5000 );
 
 	ss << " nReturned:" << n;
 	return qr;
-}
-
-void killCursors(int n, long long *ids) {
-	int k = 0;
-	for( int i = 0; i < n; i++ ) {
-		if( ClientCursor::erase(ids[i]) )
-			k++;
-	}
-	cout << "killCursors: found " << k << " of " << n << endl;
 }
 
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {

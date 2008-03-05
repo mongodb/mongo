@@ -33,7 +33,7 @@
 	  string collection; // redundant, might use for security.
       int nToReturn;
       int64 cursorID;
-   dbKillCursors=2007
+   dbKillCursors=2007:
       int reserved;
       int n;
 	  int64 cursorIDs[n];
