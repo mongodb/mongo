@@ -440,26 +440,30 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 					// delete a specific index
 					if( f.type() == String ) { 
 						const char *idxName = f.valuestr();
-						int x = d->findIndexByName(idxName);
-						if( x >= 0 ) { 
+						if( *idxName == '*' && idxName[1] == 0 ) { 
+							ok = true;
 							cout << "  d->nIndexes was " << d->nIndexes << endl;
 							anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
-							d->nIndexes--;
-							for( int i = x; i < d->nIndexes; i++ )
-								d->indexes[i] = d->indexes[i+1];
-							ok=true;
+							anObjBuilderForYa.append("msg", "all indexes deleted for collection");
 							cout << "  alpha implementation, space not reclaimed" << endl;
-						} else { 
-							cout << "deleteIndexes: " << idxName << " not found" << endl;
+							d->nIndexes = 0;
+						}
+						else {
+							// delete just one index
+							int x = d->findIndexByName(idxName);
+							if( x >= 0 ) { 
+								cout << "  d->nIndexes was " << d->nIndexes << endl;
+								anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
+								d->nIndexes--;
+								for( int i = x; i < d->nIndexes; i++ )
+									d->indexes[i] = d->indexes[i+1];
+								ok=true;
+								cout << "  alpha implementation, space not reclaimed" << endl;
+							} else { 
+								cout << "deleteIndexes: " << idxName << " not found" << endl;
+							}
 						}
 					}
-				}
-				else {
-					ok = true;
-					cout << "  d->nIndexes was " << d->nIndexes << endl;
-					anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
-					cout << "  alpha implementation, space not reclaimed" << endl;
-					d->nIndexes = 0;
 				}
 			}
 			else {
