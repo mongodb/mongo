@@ -276,7 +276,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: leapday.1 getmore fixes PATCHED.1 killcursor" << endl;
+	cout << "db version: leapday.1 getmore fixes PATCHED.2 delete index" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
