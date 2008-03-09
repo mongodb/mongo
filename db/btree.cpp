@@ -754,6 +754,7 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 						JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
 {
 	if( toplevel ) {
+		assert( key.objsize() < BucketSize / 10 );
 /*		if( key.toString() == "{ _searchIndex: \"music\" }" ) { 
 			if( music == 0 ) {
 				music = new JSObj(key.copy());

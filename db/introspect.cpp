@@ -9,6 +9,7 @@
 
 typedef map<string,Cursor*> StringToCursor;
 StringToCursor *specialNamespaces;
+Profile profile;
 
 auto_ptr<Cursor> getSpecialCursor(const char *ns) {
 	StringToCursor::iterator it = specialNamespaces->find(ns);

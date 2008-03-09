@@ -34,7 +34,7 @@ public:
 	void open(int fileNo, const char *filename);
 
 
-	Extent* newExtent(const char *ns, int approxSize);
+	Extent* newExtent(const char *ns, int approxSize, int loops = 0);
 private:
 	Extent* getExtent(DiskLoc loc);
 	Extent* _getExtent(DiskLoc loc);
@@ -57,7 +57,7 @@ public:
 		Record *toupdate, const DiskLoc& dl,
 		const char *buf, int len);
 	DiskLoc insert(const char *ns, const void *buf, int len, bool god = false);
-	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl);
+	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false);
 	auto_ptr<Cursor> findAll(const char *ns);
 
 	static Extent* getExtent(const DiskLoc& dl);
@@ -326,6 +326,7 @@ public:
 	Client(const char *nm) : name(nm) { 
 		namespaceIndex = new NamespaceIndex();
 		namespaceIndex->init(dbpath, nm);
+		profile = 0;
 	} 
 
 	PhysicalDataFile* getFile(int n) { 
@@ -366,6 +367,7 @@ public:
 	vector<PhysicalDataFile*> files;
 	string name; // "alleyinsider"
 	NamespaceIndex *namespaceIndex;
+	int profile; // 0=off.
 };
 
 // tempish...move to TLS or pass all the way down as a parm

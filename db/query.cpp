@@ -134,7 +134,10 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 //		pattern.objsize() << endl;
 
 	if( strstr(ns, ".system.") ) {
-		if( strstr(ns, ".system.indexes") ) {
+		if( strstr(ns, ".system.namespaces") ){ 
+			cout << "WARNING: delete on system namespace " << ns << endl;
+		}
+		else if( strstr(ns, ".system.indexes") ) {
 			cout << "WARNING: delete on system namespace " << ns << endl;
 		}
 		else { 
@@ -352,6 +355,8 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	return ss.str();
 }
 
+bool userCreateNS(const char *ns, JSObj& j);
+
 // e.g.
 //   system.cmd$.find( { queryTraceLevel: 2 } );
 // 
@@ -368,24 +373,43 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 	bool ok = false;
 	bool valid = false;
 
-	Element e = jsobj.firstElement();
+cout << jsobj.toString() << endl;
+
+	Element e;
+//	e = jsobj.findElement("create");
+	//if( e.eoo() )
+//		e = jsobj.firstElement();
+	e = jsobj.firstElement();
+
 	if( e.eoo() ) goto done;
 	if( e.type() == Number ) { 
-		if( strncmp(ns, "admin", p-ns) != 0 ) // admin only
-			return false;
-		if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
+		if( strcmp(e.fieldName(), "profile") == 0 ) { 
+			anObjBuilderForYa.append("was", (double) client->profile);
+			client->profile = (int) e.number();
 			valid = ok = true;
-			queryTraceLevel = (int) e.number();
-		} else if( strcmp(e.fieldName(),"traceAll") == 0 ) { 
-			valid = ok = true;
-			queryTraceLevel = (int) e.number();
-			otherTraceLevel = (int) e.number();
+		}
+		else {
+			if( strncmp(ns, "admin", p-ns) != 0 ) // admin only
+				return false;
+			if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
+				valid = ok = true;
+				queryTraceLevel = (int) e.number();
+			} else if( strcmp(e.fieldName(),"traceAll") == 0 ) { 
+				valid = ok = true;
+				queryTraceLevel = (int) e.number();
+				otherTraceLevel = (int) e.number();
+			}
 		}
 	}
 	else if( e.type() == String ) {
 		string us(ns, p-ns);
 
-		if( strcmp( e.fieldName(), "clean") == 0 ) { 
+		if( strcmp( e.fieldName(), "create") == 0 ) { 
+			valid = true;
+			string ns = us + '.' + e.valuestr();
+			ok = userCreateNS(ns.c_str(), jsobj);
+		}
+		else if( strcmp( e.fieldName(), "clean") == 0 ) { 
 			valid = true;
 			string dropNs = us + '.' + e.valuestr();
 			NamespaceDetails *d = nsdetails(dropNs.c_str());

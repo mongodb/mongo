@@ -1,4 +1,5 @@
 // introspect.h
+// system management stuff.
 
 #pragma once
 
@@ -36,3 +37,26 @@ public:
 
 };
 
+/* --- profiling -------------------------------------------- */
+
+struct Profile { 
+	const char *str;
+	int ms;
+	int B;
+};
+
+extern Profile profile;
+
+inline void profileOp(const char *str) {
+	profile.str = str;
+}
+
+inline void profileBytes(int B) { 
+	profile.B = B;
+}
+
+inline void profileTime(int ms) { 
+	if( client->profile ) { 
+		profile.ms = ms;
+	}
+}

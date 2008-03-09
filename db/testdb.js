@@ -106,6 +106,18 @@ function testarrayindexing() {
     }
 }
 
+function testcapped() { 
+    print("testcapped");
+    drop("capped");
+
+    assert( createCollection("capped", { size: 4096, capped:true } ).ok );
+
+    capped = db.capped;
+    for(i=0; i<500; i++ ) { 
+	capped.save( { i: i, b: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxyyyyyyyyyyyyyyyyyyy" } );
+    }
+}
+
 function testgetmore() { 
     print("testgetmore");
     drop("gm");
@@ -207,6 +219,8 @@ function runquick() {
     print("runquick");
     start = Date();
 
+    testcapped();
+
     testgetmore();
 
     t.nullcheck.remove({});
@@ -251,3 +265,4 @@ print("               runquick()");
 print("               bigIndexTest()");
 print("               runcursors()");
 print("               testgetmore()");
+print("               testcapped()");

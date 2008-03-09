@@ -17,6 +17,7 @@ _ regex support
 #include "objwrappers.h"
 #include "btree.h"
 #include <algorithm>
+#include <list>
 
 const char *dbpath = "/data/db/";
 
@@ -69,10 +70,11 @@ void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
 	d->nextDeleted = oldHead;
 }
 
-/* lenToAlloc is WITH header */
-DiskLoc NamespaceDetails::alloc(int lenToAlloc, DiskLoc& extentLoc) {
+/* lenToAlloc is WITH header 
+*/
+DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
 	lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
-	DiskLoc loc = _alloc(lenToAlloc);
+	DiskLoc loc = _alloc(ns, lenToAlloc);
 	if( loc.isNull() )
 		return loc;
 
@@ -84,7 +86,7 @@ DiskLoc NamespaceDetails::alloc(int lenToAlloc, DiskLoc& extentLoc) {
 	extentLoc.set(loc.a(), r->extentOfs);
 
 	int left = regionlen - lenToAlloc;
-	if( left < 24 ) {
+	if( left < 24 || (left < (lenToAlloc >> 3) && capped == 0) ) {
 		// you get the whole thing.
 		return loc;
 	}
@@ -105,7 +107,7 @@ DiskLoc NamespaceDetails::alloc(int lenToAlloc, DiskLoc& extentLoc) {
 void sayDbContext();
 
 /* returned item is out of the deleted list upon return */
-DiskLoc NamespaceDetails::_alloc(int len) {
+DiskLoc NamespaceDetails::__alloc(int len) {
 	DiskLoc *prev;
 	DiskLoc *bestprev = 0;
 	DiskLoc bestmatch;
@@ -157,6 +159,81 @@ DiskLoc NamespaceDetails::_alloc(int len) {
 	*bestprev = bestmatch.drec()->nextDeleted;
 
 	return bestmatch;
+}
+
+/* combine adjacent deleted records
+
+   this is O(n^2) but we call it for capped tables where typically n==1 or 2! 
+   (or 3...there will be a little unused sliver at the end of the extent.)
+*/
+void NamespaceDetails::compact() { 
+	assert(capped==1);
+	list<DiskLoc> drecs;
+
+	for( int i = 0; i < Buckets; i++ ) { 
+		DiskLoc dl = deletedList[i];
+		deletedList[i].Null();
+		while( !dl.isNull() ) { 
+			DeletedRecord *r = dl.drec();
+			drecs.push_back(dl);
+			dl = r->nextDeleted;
+		}
+	}
+
+	drecs.sort();
+
+	list<DiskLoc>::iterator j = drecs.begin(); 
+	assert( j != drecs.end() );
+	DiskLoc a = *j;
+	while( 1 ) {
+		j++;
+		if( j == drecs.end() ) {
+			addDeletedRec(a.drec(), a);
+			break;
+		}
+		DiskLoc b = *j;
+		while( a.a() == b.a() && a.getOfs() + a.drec()->lengthWithHeaders == b.getOfs() ) { 
+			// a & b are adjacent.  merge.
+			a.drec()->lengthWithHeaders += b.drec()->lengthWithHeaders;
+			j++;
+			if( j == drecs.end() ) {
+				addDeletedRec(a.drec(), a);
+				return;
+			}
+			b = *j;
+		}
+		addDeletedRec(a.drec(), a);
+		a = b;
+	}
+}
+
+DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
+	if( !capped )
+		return __alloc(len);
+
+	assert( len < 400000000 );
+	int passes = 0;
+	DiskLoc loc;
+	while( 1 ) {
+		loc = __alloc(len);
+		if( !loc.isNull() )
+			break;
+
+		DiskLoc fr = firstExtent.ext()->firstRecord;
+		if( fr.isNull() ) { 
+			cout << "couldn't make room for new record in capped ns\n";
+			cout << " ns:" << ns;
+			cout << "\n len: " << len << endl;
+			assert(false);
+			return DiskLoc();
+		}
+
+		theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
+		compact();
+		assert( ++passes < 5000 );
+	}
+
+	return loc;
 }
 
 /*
@@ -211,6 +288,44 @@ void newNamespace(const char *ns) {
 	}
 }
 
+int initialExtentSize(int len) { 
+	long long sz = len * 16;
+	if( len < 1000 ) sz = len * 64;
+	if( sz > 1000000000 )
+		sz = 1000000000;
+	int z = ((int)sz) & 0xffffff00;
+	assert( z > len );
+	cout << "initialExtentSize(" << len << ") returns " << z << endl;
+	return z;
+}
+
+// { ..., capped: true, size: ... }
+bool userCreateNS(const char *ns, JSObj& j) { 
+	if( nsdetails(ns) )
+		return false;
+
+	newNamespace(ns);
+
+	int ies = initialExtentSize(128);
+	Element e = j.findElement("size");
+	if( e.type() == Number ) {
+		ies = (int) e.number();
+		ies += 256;
+		ies &= 0xffffff00;
+		if( ies > 1024 * 1024 * 1024 + 256 ) return false;
+	}
+
+	client->newestFile()->newExtent(ns, ies);
+	NamespaceDetails *d = nsdetails(ns);
+	assert(d);
+
+	e = j.findElement("capped");
+	if( e.type() == Bool && e.boolean() )
+		d->capped = 1;
+
+	return true;
+}
+
 /*---------------------------------------------------------------------*/ 
 
 void PhysicalDataFile::open(int fn, const char *filename) {
@@ -236,12 +351,18 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 }
 
 /* prev - previous extent for this namespace.  null=this is the first one. */
-Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize) {
+Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
+	assert( approxSize >= 0 && approxSize <= 0x7ff00000 );
+
 	int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
 	DiskLoc loc;
 	if( ExtentSize <= 0 ) {
+		if( loops > 8 ) { 
+			assert(false);
+			return 0;
+		}
 		cout << "INFO: newExtent(): file full, adding a new file " << ns << endl;
-		return client->addAFile()->newExtent(ns, approxSize);
+		return client->addAFile()->newExtent(ns, approxSize, loops+1);
 	}
 	int offset = header->unused.getOfs();
 	header->unused.setOfs( fileNo, offset + ExtentSize );
@@ -434,12 +555,17 @@ void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete, const
 	}
 }
 
-void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl) 
+void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK) 
 {
+	NamespaceDetails* d = nsdetails(ns);
+	if( d->capped && !cappedOK ) { 
+		cout << "failing remove on a capped ns " << ns << endl;
+		return;
+	}
+
 	/* check if any cursors point to us.  if so, advance them. */
 	aboutToDelete(dl);
 
-	NamespaceDetails* d = nsdetails(ns);
 	unindexRecord(ns, d, todelete, dl);
 
 	/* remove ourself from the record next/prev chain */
@@ -497,7 +623,14 @@ void DataFileMgr::update(
 		Record *toupdate, const DiskLoc& dl,
 		const char *buf, int len) 
 {
+	NamespaceDetails *d = nsdetails(ns);
+
 	if( toupdate->netLength() < len ) {
+		if( d && d->capped ) { 
+			cout << "failing a growing update on a capped ns " << ns << endl;
+			return;
+		}
+
 		// doesn't fit.
 		deleteRecord(ns, toupdate, dl);
 		insert(ns, buf, len);
@@ -551,19 +684,6 @@ void DataFileMgr::update(
 	memcpy(toupdate->data, buf, len);
 }
 
-int initialExtentSize(int len) { 
-//	if( 1 )
-//		return 4000000;
-	long long sz = len * 16;
-	if( len < 1000 ) sz = len * 64;
-	if( sz > 1000000000 )
-		sz = 1000000000;
-	int z = ((int)sz) & 0xffffff00;
-	assert( z > len );
-	cout << "initialExtentSize(" << len << ") returns " << z << endl;
-	return z;
-}
-
 int followupExtentSize(int len, int lastExtentLen) {
 	int x = initialExtentSize(len);
 	int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
@@ -614,11 +734,6 @@ void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newReco
 }
 
 DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
-	if( 0 ) { //strcmp(ns, "test.z") == 0 ) {
-		JSObj obj((const char *) buf);
-		cout << "  insert:" << obj.toString() << endl;
-	}
-
 	bool addIndex = false;
 	const char *sys = strstr(ns, "system.");
 	if( sys ) { 
@@ -676,15 +791,17 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 
 	DiskLoc extentLoc;
 	int lenWHdr = len + Record::HeaderSize;
-	DiskLoc loc = d->alloc(lenWHdr, extentLoc);
+	DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
 	if( loc.isNull() ) {
 		// out of space
-		cout << "allocating new extent for " << ns << endl;
-		client->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
-		loc = d->alloc(lenWHdr, extentLoc);
+		if( d->capped == 0 ) { // size capped doesn't grow
+			cout << "allocating new extent for " << ns << endl;
+			client->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
+			loc = d->alloc(ns, lenWHdr, extentLoc);
+		}
 		if( loc.isNull() ) { 
-			cout << "****** ERROR: out of space in datafile.  write more code." << endl;
-			assert(false);
+			cout << "out of space in datafile. capped:" << d->capped << endl;
+			assert(d->capped);
 			return DiskLoc();
 		}
 	}

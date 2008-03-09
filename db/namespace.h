@@ -76,6 +76,8 @@ public:
 		datasize = nrecords = 0;
 		lastExtentSize = 0;
 		nIndexes = 0;
+		capped = 0;
+		reservedddd = 0;
 		memset(reserved, 0, sizeof(reserved));
 	} 
 	DiskLoc firstExtent;
@@ -86,7 +88,9 @@ public:
 	int lastExtentSize;
 	int nIndexes;
 	IndexDetails indexes[MaxIndexes];
-	char reserved[256-16-4-4-8*MaxIndexes-8];
+	int capped;
+	int reservedddd;
+	char reserved[256-16-4-4-8*MaxIndexes-8-8];
 
 	//returns offset in indexes[]
 	int findIndexByName(const char *name) { 
@@ -105,10 +109,12 @@ public:
 		return Buckets-1;
 	}
 
-	DiskLoc alloc(int lenToAlloc, DiskLoc& extentLoc);
+	DiskLoc alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc);
 	void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
 private:
-	DiskLoc _alloc(int len);
+	DiskLoc __alloc(int len);
+	DiskLoc _alloc(const char *ns, int len);
+	void compact();
 };
 
 #pragma pack(pop)
