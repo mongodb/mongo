@@ -105,19 +105,6 @@ private:
 	const char *theEnd;
 };
 
-/*Record* findByOID(const char *ns, OID *oid) {
-	// temp implementation
-	Cursor c = theDataFileMgr.findAll(ns);
-	while( c.ok() ) {
-		JSObj js = c.current();
-		OID *i = js.getOID();
-		if( i && *oid == *i )
-			return r;
-		c.advance();
-	}
-	return 0;
-}*/
-
 #pragma pack(push)
 #pragma pack(1)
 struct EmptyObject {
@@ -276,7 +263,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 08mar2008 capped collections.2" << endl;
+	cout << "db version: 08mar2008 capped collections.3 rno" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
@@ -484,7 +471,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  run          run db" << endl;
 	cout << "  dev          run in dev mode (diff db loc, diff port #)" << endl;
 	cout << "  longmsg      send a long test message to the db server" << endl;
-	cout << "  msglots      send a bunch of test messages, and then wait for answer o nthe last one" << endl;
+	cout << "  msglots      send a bunch of test messages, and then wait for answer on the last one" << endl;
 	goingAway = true;
 	return 0;
 }

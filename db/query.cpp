@@ -515,6 +515,8 @@ void killCursors(int n, long long *ids) {
 	cout << "killCursors: found " << k << " of " << n << endl;
 }
 
+auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
+
 QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) 
 {
@@ -563,9 +565,8 @@ assert( debug1.getN() < 5000 );
 				c = getIndexCursor(ns, query, order);
 			}
 			if( c.get() == 0 ) {
-				c = theDataFileMgr.findAll(ns);
-				if( queryTraceLevel >= 1 )
-					cout << "  basiccursor" << endl;
+				//c = theDataFileMgr.findAll(ns);
+				c = findTableScan(ns, order);
 			}
 
 			while( c->ok() ) {

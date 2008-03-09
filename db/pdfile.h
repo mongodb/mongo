@@ -58,7 +58,7 @@ public:
 		const char *buf, int len);
 	DiskLoc insert(const char *ns, const void *buf, int len, bool god = false);
 	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false);
-	auto_ptr<Cursor> findAll(const char *ns);
+	static auto_ptr<Cursor> findAll(const char *ns);
 
 	static Extent* getExtent(const DiskLoc& dl);
 	static Record* getRecord(const DiskLoc& dl);
@@ -238,15 +238,11 @@ public:
 class BasicCursor : public Cursor {
 public:
 	bool ok() { return !curr.isNull(); }
-
 	Record* _current() {
 		assert( ok() );
 		return curr.rec();
-		//		return theDataFileMgr.temp.recordAt(curr); 
 	}
-	JSObj current() { 
-		return JSObj( _current() ); 
-	}
+	JSObj current() { return JSObj( _current() ); }
 	virtual DiskLoc currLoc() { return curr; }
 
 	bool advance() { 
@@ -259,10 +255,24 @@ public:
 
 	BasicCursor(DiskLoc dl) : curr(dl) { }
 	BasicCursor() { }
-
 	virtual const char * toString() { return "BasicCursor"; }
 
 	DiskLoc curr;
+};
+
+class ReverseCursor : public BasicCursor {
+public:
+	bool advance() { 
+		if( eof() )
+			return false;
+		Record *r = _current();
+		curr = r->getPrev(curr);
+		return ok();
+	}
+
+	ReverseCursor(DiskLoc dl) : BasicCursor(dl) { }
+	ReverseCursor() { }
+	virtual const char * toString() { return "ReverseCursor"; }
 };
 
 inline Record* PhysicalDataFile::recordAt(DiskLoc dl) { return header->getRecord(dl); }

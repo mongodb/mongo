@@ -490,6 +490,24 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 	return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
 }
 
+/* get a table scan cursor, but can be forward or reverse direction */
+auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
+	Element el = order.findElement("$natural");
+	if( el.type() != Number || el.number() >= 0 )
+		return DataFileMgr::findAll(ns);
+
+	// "reverse natural order"		// "reverse natural order"
+	NamespaceDetails *d = nsdetails(ns);
+	if( !d )
+		return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
+	Extent *e = d->lastExtent.ext();
+	while( e->lastRecord.isNull() && !e->xprev.isNull() ) {
+		cout << "  findTableScan: extent empty, skipping ahead" << endl;
+		e = e->getPrevExtent();
+	}
+	return auto_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
+}
+
 void aboutToDelete(const DiskLoc& dl);
 
 /* pull out the relevant key objects from obj, so we

@@ -120,6 +120,7 @@ function testcapped(max) {
     var a = capped.find().toArray();
     assert( a.length < 100 );
     assert( a[a.length-1].i == 499 );
+    assert( capped.find().sort({$natural:-1}).limit(1)[0].i == 499 );
     print("testcapped end");
 }
 
