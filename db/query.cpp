@@ -459,11 +459,36 @@ cout << jsobj.toString() << endl;
 			NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
 			cout << "CMD: deleteIndexes " << toDeleteNs << endl;
 			if( d ) {
-				ok = true;
-				cout << "  d->nIndexes was " << d->nIndexes << endl;
-				anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
-				cout << "  temp implementation, space not reclaimed" << endl;
-				d->nIndexes = 0;
+				Element f = jsobj.findElement("index");
+				if( !f.eoo() ) { 
+					// delete a specific index
+					if( f.type() == String ) { 
+						const char *idxName = f.valuestr();
+						if( *idxName == '*' && idxName[1] == 0 ) { 
+							ok = true;
+							cout << "  d->nIndexes was " << d->nIndexes << endl;
+							anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
+							anObjBuilderForYa.append("msg", "all indexes deleted for collection");
+							cout << "  alpha implementation, space not reclaimed" << endl;
+							d->nIndexes = 0;
+						}
+						else {
+							// delete just one index
+							int x = d->findIndexByName(idxName);
+							if( x >= 0 ) { 
+								cout << "  d->nIndexes was " << d->nIndexes << endl;
+								anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
+								d->nIndexes--;
+								for( int i = x; i < d->nIndexes; i++ )
+									d->indexes[i] = d->indexes[i+1];
+								ok=true;
+								cout << "  alpha implementation, space not reclaimed" << endl;
+							} else { 
+								cout << "deleteIndexes: " << idxName << " not found" << endl;
+							}
+						}
+					}
+				}
 			}
 			else {
 				anObjBuilderForYa.append("errmsg", "ns not found");
@@ -481,6 +506,15 @@ done:
 }
 
 int nCaught = 0;
+
+void killCursors(int n, long long *ids) {
+	int k = 0;
+	for( int i = 0; i < n; i++ ) {
+		if( ClientCursor::erase(ids[i]) )
+			k++;
+	}
+	cout << "killCursors: found " << k << " of " << n << endl;
+}
 
 QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) 
@@ -625,15 +659,6 @@ assert( debug.getN() < 5000 );
 
 	ss << " nReturned:" << n;
 	return qr;
-}
-
-void killCursors(int n, long long *ids) {
-	int k = 0;
-	for( int i = 0; i < n; i++ ) {
-		if( ClientCursor::erase(ids[i]) )
-			k++;
-	}
-	cout << "killCursors: found " << k << " of " << n << endl;
 }
 
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {

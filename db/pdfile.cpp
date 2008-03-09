@@ -330,11 +330,7 @@ bool userCreateNS(const char *ns, JSObj& j) {
 
 void PhysicalDataFile::open(int fn, const char *filename) {
 	int length;
-	/*TEMP!
-	if( fn <= 48 )  { 
-		length = 16 * 1024 * 1024;
-	}
-	else */
+
 	if( fn <= 4 ) {
 		length = (64*1024*1024) << fn;
 		if( strstr(filename, "alleyinsider") && length < 512 * 1024 * 1024 )

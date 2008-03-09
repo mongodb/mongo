@@ -132,7 +132,11 @@ void receivedKillCursors(Message& m) {
 	int *x = (int *) m.data->_data;
 	x++; // reserved
 	int n = *x++;
-	assert( n >= 1 && n <= 2000 );
+	assert( n >= 1 );
+	if( n > 2000 ) { 
+		cout << "Assertion failure, receivedKillCursors, n=" << n << endl;
+		assert( n < 30000 );
+	}
 	killCursors(n, (long long *) x);
 }
 
@@ -365,9 +369,12 @@ void t()
 				receivedGetMore(dbMsgPort, m);
 			}
 			else if( m.data->operation == dbKillCursors ) { 
-				log = true;
-				ss << "killcursors ";
-				receivedKillCursors(m);
+				try {
+					log = true;
+					ss << "killcursors ";
+					receivedKillCursors(m);
+				}
+				catch( AssertionException ) { cout << "Caught Assertion in kill cursors, continuing" << endl; }
 			}
 			else {
 				cout << "    operation isn't supported: " << m.data->operation << endl;

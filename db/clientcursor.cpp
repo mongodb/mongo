@@ -114,7 +114,6 @@ void ClientCursor::cleanupByLocation(DiskLoc loc, long long cursorid) {
 				if( prev == 0 ) { 
 					if( cc->nextAtThisLocation )
 						it->second = cc->nextAtThisLocation;
-//						byLocation[loc] = cc->nextAtThisLocation;
 					else
 						byLocation.erase(it);
 				}
@@ -129,7 +128,7 @@ void ClientCursor::cleanupByLocation(DiskLoc loc, long long cursorid) {
 	}
 
 	// not found!
-	cout << "Assertion failure - cleanupByLocation: not found " << cursorid << endl;
+	//cout << "Assertion failure - cleanupByLocation: not found " << cursorid << endl;
 }
 
 ClientCursor::~ClientCursor() {
@@ -192,6 +191,7 @@ bool ClientCursor::erase(long long id) {
 	CCMap::iterator it = clientCursors.find(id);
 	if( it != clientCursors.end() ) {
 		ClientCursor *cc = it->second;
+		it->second = 0; // defensive
 		clientCursors.erase(it);
 		delete cc; // destructor will fix byLocation map
 		return true;
