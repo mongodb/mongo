@@ -106,16 +106,21 @@ function testarrayindexing() {
     }
 }
 
-function testcapped() { 
+function testcapped(max) { 
     print("testcapped");
     drop("capped");
 
-    assert( createCollection("capped", { size: 4096, capped:true } ).ok );
+    assert( createCollection("capped", { size: 4096, capped:true, max:max } ).ok );
 
     capped = db.capped;
     for(i=0; i<500; i++ ) { 
 	capped.save( { i: i, b: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxyyyyyyyyyyyyyyyyyyy" } );
     }
+
+    var a = capped.find().toArray();
+    assert( a.length < 100 );
+    assert( a[a.length-1].i == 499 );
+    print("testcapped end");
 }
 
 function testgetmore() { 

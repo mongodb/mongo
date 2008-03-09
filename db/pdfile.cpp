@@ -167,7 +167,7 @@ DiskLoc NamespaceDetails::__alloc(int len) {
    (or 3...there will be a little unused sliver at the end of the extent.)
 */
 void NamespaceDetails::compact() { 
-	assert(capped==1);
+	assert(capped);
 	list<DiskLoc> drecs;
 
 	for( int i = 0; i < Buckets; i++ ) { 
@@ -214,10 +214,14 @@ DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 	assert( len < 400000000 );
 	int passes = 0;
 	DiskLoc loc;
+
+	// delete records until we have room and the max # objects limit achieved.
 	while( 1 ) {
-		loc = __alloc(len);
-		if( !loc.isNull() )
-			break;
+		if( nrecords < max ) { 
+			loc = __alloc(len);
+			if( !loc.isNull() )
+				break;
+		}
 
 		DiskLoc fr = firstExtent.ext()->firstRecord;
 		if( fr.isNull() ) { 
@@ -299,10 +303,12 @@ int initialExtentSize(int len) {
 	return z;
 }
 
-// { ..., capped: true, size: ... }
+// { ..., capped: true, size: ..., max: ... }
 bool userCreateNS(const char *ns, JSObj& j) { 
 	if( nsdetails(ns) )
 		return false;
+
+	cout << j.toString() << endl;
 
 	newNamespace(ns);
 
@@ -320,8 +326,15 @@ bool userCreateNS(const char *ns, JSObj& j) {
 	assert(d);
 
 	e = j.findElement("capped");
-	if( e.type() == Bool && e.boolean() )
+	if( e.type() == Bool && e.boolean() ) {
 		d->capped = 1;
+		e = j.findElement("max");
+		if( e.type() == Number ) { 
+			int mx = (int) e.number();
+			if( mx > 0 )
+				d->max = mx;
+		}
+	}
 
 	return true;
 }

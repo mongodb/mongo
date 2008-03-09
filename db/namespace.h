@@ -77,7 +77,7 @@ public:
 		lastExtentSize = 0;
 		nIndexes = 0;
 		capped = 0;
-		reservedddd = 0;
+		max = 0x7fffffff;
 		memset(reserved, 0, sizeof(reserved));
 	} 
 	DiskLoc firstExtent;
@@ -89,7 +89,7 @@ public:
 	int nIndexes;
 	IndexDetails indexes[MaxIndexes];
 	int capped;
-	int reservedddd;
+	int max; // max # of objects for a capped table.
 	char reserved[256-16-4-4-8*MaxIndexes-8-8];
 
 	//returns offset in indexes[]

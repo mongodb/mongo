@@ -276,7 +276,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 08mar2008 capped collections" << endl;
+	cout << "db version: 08mar2008 capped collections.2" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;

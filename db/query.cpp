@@ -300,17 +300,16 @@ int otherTraceLevel = 0;
 int initialExtentSize(int len);
 
 void clean(const char *ns, NamespaceDetails *d) {
-//	d->firstExtent.Null();
-//	d->lastExtent.Null();
 	for( int i = 0; i < Buckets; i++ ) 
 		d->deletedList[i].Null();
-//	d->datasize = 0; d->nrecords = 0; d->lastExtentSize = 0; d->nIndexes = 0;
-//	client->newestFile()->newExtent(ns, initialExtentSize(500));
 }
 
 string validateNS(const char *ns, NamespaceDetails *d) {
 	stringstream ss;
-	ss << "validate...\n";
+	ss << "\nvalidate ";
+	if( d->capped )
+		cout << " capped:" << d->capped << " max:" << d->max;
+	ss << "\n";
 
 	try { 
 
@@ -325,7 +324,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 			nlen += r->netLength();
 			c->advance();
 		}
-		ss << "  " << n << " objects found\n";
+		ss << "  " << n << " objects found, nobj:" << d->nrecords << "\n";
 		ss << "  " << len << " bytes record data w/headers\n";
 		ss << "  " << nlen << " bytes record data wout/headers\n";
 
