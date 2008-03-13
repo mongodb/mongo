@@ -117,11 +117,15 @@ DiskLoc NamespaceDetails::__alloc(int len) {
 	int extra = 5; // look for a better fit, a little.
 	int chain = 0;
 	while( 1 ) { 
-		int a = cur.a();
-		if( a < -1 || a >= 100000 ) { 
-			cout << "Assertion failure - a() out of range in _alloc() " << a << endl;
-			sayDbContext();
-			cur.Null();
+		{
+			int a = cur.a();
+			if( a < -1 || a >= 100000 ) { 
+				cout << "Assertion failure - a() out of range in _alloc() " << a << endl;
+				sayDbContext();
+				if( cur == *prev )
+					prev->Null();
+				cur.Null();
+			}
 		}
 		if( cur.isNull() ) { 
 			// move to next bucket.  if we were doing "extra", just break
@@ -548,7 +552,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 	id.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
 		JSObj j = *i;
-//		cout << "TEMP: j:" << j.toString() << endl;
+//		cout << "UNINDEX: j:" << j.toString() << " head:" << id.head.toString() << dl.toString() << endl;
 		if( otherTraceLevel >= 5 ) {
 			cout << "_unindexRecord() " << obj.toString();
 			cout << "\n  unindex:" << j.toString() << endl;
@@ -562,14 +566,12 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 			cout << " caught assertion _unindexRecord " << id.indexNamespace() << '\n';
 		}
 
-#if defined(_WIN32)
-		id.head.btree()->fullValidate(id.head);
-#endif
 		if( !ok ) { 
 			cout << "Assertion failure: _unindex failed" << '\n';
 			cout << "  obj:" << obj.toString() << '\n';
 			cout << "  key:" << j.toString() << '\n';
 			cout << "  dl:" << dl.toString() << endl;
+			sayDbContext();
 		}
 	}
 }
@@ -720,14 +722,17 @@ int followupExtentSize(int len, int lastExtentLen) {
 	return sz;
 }
 
+int deb=0;
+
 /* add keys to indexes for a new record */
 void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) { 
+
 	set<JSObj> keys;
 	idx.getKeysFromObject(obj, keys);
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
-		//		cout << "temp: _indexRecord " << i->toString() << endl;
 		assert( !newRecordLoc.isNull() );
 		try {
+//			cout << "TEMP index: " << newRecordLoc.toString() << obj.toString() << endl;
 			idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
 				(JSObj&) *i, false, idx, true);
 		}

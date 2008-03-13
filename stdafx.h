@@ -5,7 +5,11 @@
 
 #pragma once
 
+#if defined(_WIN32)
 const bool debug=true;
+#else
+const bool debug=false;
+#endif
 
 #include "targetver.h"
 
@@ -31,11 +35,7 @@ void wasserted(const char *msg, const char *file, unsigned line);
 #include <stdio.h>
 #include <sstream>
 
-//#if defined(_WIN32)
-//#include <tchar.h>
-//#else
 typedef char _TCHAR;
-//#endif
 
 #include <iostream>
 #include <fstream>

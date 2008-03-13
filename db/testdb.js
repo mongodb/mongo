@@ -58,6 +58,58 @@ function index2() {
     t.z.remove({});
 }
 
+function giantIndexTest() { 
+    print("giantIndexTest");
+    drop("giant");
+    db.giant.save({moe:1,foo:[33],bar:"aaaaa"});
+
+    var z = 0;
+    var prime = 127;
+    for( var i = 0; i < 20000; i++ ) { 
+	var ar = [];
+	for( var j = 0; j < 100; j++ ) { 
+	    z += prime;
+	    ar.push( z % 100 );
+	}
+	db.giant.save({foo:ar, bar:"bbbbb"});
+	if( i % 1000 == 0 ) print(i);
+	if( i == 10000 )
+	    db.giant.ensureIndex({foo:1});
+    }
+
+
+    assert( db.giant.findOne({foo:33}) );
+    print("giantIndexTest end");
+}
+
+function giant2() { 
+    print("giant2");
+    drop("giant");
+    db.giant.save({moe:1,foo:[33],bar:"aaaaa",q:-1});
+
+    var z = 0;
+    var prime = 127;
+    for( var i = 0; i < 20000; i++ ) { 
+	var ar = [];
+	for( var j = 0; j < 100; j++ ) { 
+	    z += prime;
+	    ar.push( z % 100 );
+	}
+	db.giant.save({foo:ar, bar:"bbbbb", q:i});
+	if( i % 1000 == 0 ) print(i);
+	if( 0 && i == 10000 )
+	    db.giant.ensureIndex({foo:1});
+    }
+
+
+    assert( db.giant.findOne({foo:33}) );
+    print("giant2  end");
+}
+
+// mx=-3; 
+// db.giant.find().forEach( function(x) { 
+//   if( x.q % 100 == 0 ) print(x.q); if( x.q > mx ) { x.name = "john smith"; db.giant.save(x); mx = x.q; } } );} } );  
+
 function bigIndexTest() { 
     t.big.remove({});
     t.big.save( { name: "Dwight" } );
@@ -154,19 +206,23 @@ function testgetmore() {
 
 function testdups() { 
  print("testdups");
- for( pass=0;pass<2;pass++ ) {
+ K = 2000;
+ for( pass=0;pass<1;pass++ ) {
      print(" pass:" + pass);
-     if( pass < 2 ) 
+     if( pass < 2 ) {
+	 print("removing keys");
 	 t.td.remove({});
-     for( var x=0;x<2000;x++ )
+     }
+     print("add keys");
+     for( var x=0;x<K;x++ )
 	 t.td.save({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d", z: x, 
 		     str: "a long string dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"});
-     assert( t.td.find({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d"}).toArray().length == 2000 );
+     assert( t.td.find({ggg:"asdfasdf bbb a a jdssjsjdjds dsdsdsdsds d"}).toArray().length == K );
      //     t.td.ensureIndex({ggg:true});
      if( pass == 0 )
 	 t.td.ensureIndex({ggg:1});
-     else if( pass == 1 ) 
-	 t.td.ensureIndex({ggg:-1});
+     //     else if( pass == 1 ) 
+     //	 t.td.ensureIndex({ggg:-1});
  }
  print(" end testdups");
  print(" try t.td.remove({});");
@@ -269,6 +325,8 @@ function runquick() {
 print("testdb.js: try runall()");
 print("               runquick()");
 print("               bigIndexTest()");
+print("               giantindexTest()");
 print("               runcursors()");
 print("               testgetmore()");
 print("               testcapped()");
+

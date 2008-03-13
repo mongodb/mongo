@@ -263,7 +263,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 08mar2008 capped collections.3 rno" << endl;
+	cout << "db version: mar2008 new dup key handling" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;

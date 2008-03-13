@@ -15,6 +15,7 @@ class Extent;
 class BtreeBucket;
 class JSObj;
 class PhysicalDataFile;
+class Bucket;
 
 class DiskLoc {
 	int fileNo; /* this will be volume, file #, etc. */
@@ -41,6 +42,7 @@ public:
 		return ss.str();
 	}
 
+	int& GETOFS() { return ofs; }
 	int getOfs() const { return ofs; }
 	void set(int a, int b) { fileNo=a; ofs=b; }
 	void setOfs(int _fileNo, int _ofs) { 
@@ -62,6 +64,13 @@ public:
 		assert(ofs!=0);
 		return *this;
 	}
+	int compare(const DiskLoc& b) const { 
+		int x = fileNo - b.fileNo;
+		if( x ) 
+			return x;
+		if( ofs == b.ofs ) return 0;
+		return ofs < b.ofs ? -1 : 1;
+	}
 	bool operator<(const DiskLoc& b) const { 
 		if( fileNo == b.fileNo )
 			return ofs < b.ofs;
@@ -73,6 +82,7 @@ public:
 	DeletedRecord* drec() const;
 	Extent* ext() const;
 	BtreeBucket* btree() const;
+	Bucket* bucket() const;
 
 	PhysicalDataFile& pdf() const;
 };

@@ -13,11 +13,14 @@
 struct _KeyNode {
 	DiskLoc prevChildBucket;
 	DiskLoc recordLoc;
-	short keyDataOfs;
-	void setKeyDataOfs(short s) { keyDataOfs = s; }
-	void setUnused() { recordLoc.Null(); }
-	bool isUnused() { return recordLoc.isNull(); }
-	bool isUsed() { return !isUnused(); }
+	short keyDataOfs() { return (short) _kdo; }
+	unsigned short _kdo;
+	void setKeyDataOfs(short s) { _kdo = s; assert(s>=0); }
+	void setKeyDataOfsSavingUse(short s) { _kdo = s; assert(s>=0); }
+	void setUnused() { recordLoc.GETOFS() |= 1; }
+//	void setUsed() { _kdo &= 0x7fff; }
+	int isUnused() { return (recordLoc.getOfs() & 1); }
+	int isUsed() { return !isUnused(); }
 };
 
 #pragma pack(pop)
@@ -40,9 +43,10 @@ public:
 class BucketBasics {
 	friend class KeyNode;
 public:
+	void dumpTree(DiskLoc thisLoc);
 	bool isHead() { return parent.isNull(); }
-	void assertValid();
-	void fullValidate(const DiskLoc& thisLoc); /* traverses everything */ 
+	void assertValid(bool force = false);
+	int fullValidate(const DiskLoc& thisLoc); /* traverses everything */ 
 protected:
 	DiskLoc& getChild(int pos) { 
 		assert( pos >= 0 && pos <= n );
@@ -114,12 +118,13 @@ public:
 	static DiskLoc addHead(const char *ns); /* start a new index off, empty */
 	int insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
 		JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel);
-	void update(const DiskLoc& recordLoc, JSObj& key);
+//	void update(const DiskLoc& recordLoc, JSObj& key);
 	bool unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc);
 
 	/* locate may return an "unused" key that is just a marker.  so be careful.
+  	   looks for a key:recordloc pair.
 	*/
-	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction=1);
+	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, DiskLoc recordLoc, int direction=1);
 
 	/* advance one key position in the index: */
 	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
@@ -139,7 +144,7 @@ private:
 	int _insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
 		JSObj& key, bool dupsAllowed,
 		DiskLoc lChild, DiskLoc rChild, IndexDetails&);
-	bool find(JSObj& key, int& pos);
+	bool find(JSObj& key, DiskLoc recordLoc, int& pos);
 	static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
 };
 
@@ -177,6 +182,7 @@ private:
 	int direction; // 1=fwd,-1=reverse
 	bool stopmiss;
 	JSObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
+	DiskLoc locAtKeyOfs;
 };
 
 #pragma pack(pop)

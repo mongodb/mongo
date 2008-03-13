@@ -346,6 +346,18 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 		}
 		ss << "  deleted: n: " << ndel << " size: " << delSize << endl;
 
+		int idxn = 0;
+		try  {
+			ss << "  nIndexes:" << d->nIndexes << endl;
+			for( ; idxn < d->nIndexes; idxn++ ) {
+				ss << "    " << d->indexes[idxn].indexNamespace() << " keys:" << 
+					d->indexes[idxn].head.btree()->fullValidate(d->indexes[idxn].head) << endl;
+			}
+		} 
+		catch(...) { 
+			ss << "\n  exception during index validate idxn:" << idxn << endl;
+		}
+
 	}
 	catch(AssertionException) {
 		ss << "\n  exception during validate\n" << endl; 

@@ -298,7 +298,7 @@ public:
 
 	JSObj doneAndDecouple() { 
 		int l;
-		return JSObj(decouple(l));
+		return JSObj(decouple(l), true);
 	}
 	JSObj done() { 
 		return JSObj(_done());

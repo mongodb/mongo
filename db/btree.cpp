@@ -12,10 +12,12 @@ int ninserts = 0;
 extern int otherTraceLevel;
 int split_debug = 0;
 int insert_debug = 0;
+DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
+DiskLoc minDiskLoc(0, 1);
 
 inline KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
   prevChildBucket(k.prevChildBucket), 
-  recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs) 
+  recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs()) 
 { }
 
 /* BucketBasics --------------------------------------------------- */
@@ -36,36 +38,48 @@ void BucketBasics::_shape(int level, stringstream& ss) {
 int bt_fv=0;
 int bt_dmp=0;
 
-void BucketBasics::fullValidate(const DiskLoc& thisLoc) { 
-	assertValid();
-	if( bt_fv==0 ) 
-		return; 
+void BucketBasics::dumpTree(DiskLoc thisLoc) { 
+	bt_dmp=1;
+	fullValidate(thisLoc);
+	bt_dmp=0;
+}
 
-//	cout << "fullValidate() [slow]" << endl;
+int BucketBasics::fullValidate(const DiskLoc& thisLoc) { 
+	assertValid(true);
+//	if( bt_fv==0 ) 
+//		return; 
 
-	if( bt_dmp )
+	if( bt_dmp ) {
+		cout << thisLoc.toString() << ' ';
 		((BtreeBucket *) this)->dump();
+	}
+
+	// keycount
+	int kc = 0;
 
 	for( int i = 0; i < n; i++ ) {
 		_KeyNode& kn = k(i);
+		if( kn.isUsed() ) kc++;
 		if( !kn.prevChildBucket.isNull() ) { 
 			DiskLoc left = kn.prevChildBucket;
 			BtreeBucket *b = left.btree();
 			wassert( b->parent == thisLoc );
-			b->fullValidate(kn.prevChildBucket);
+			kc += b->fullValidate(kn.prevChildBucket);
 		}
 	}
 	if( !nextChild.isNull() ) {
 		BtreeBucket *b = nextChild.btree();
 		wassert( b->parent == thisLoc );
-		b->fullValidate(nextChild);
+		kc += b->fullValidate(nextChild);
 	}
+
+	return kc;
 }
 
 int nDumped = 0;
 
-void BucketBasics::assertValid() { 
-	if( !debug )
+void BucketBasics::assertValid(bool force) { 
+	if( !debug && !force )
 		return;
 	wassert( n >= 0 && n < BucketSize );
 	wassert( emptySize >= 0 && emptySize < BucketSize );
@@ -76,7 +90,7 @@ void BucketBasics::assertValid() {
 		for( int i = 0; i < n-1; i++ ) {
 			JSObj k1 = keyNode(i).key;
 			JSObj k2 = keyNode(i+1).key;
-			int z = k1.woCompare(k2);
+			int z = k1.woCompare(k2); //OK
 			if( z > 0 ) {
 				cout << "ERROR: btree key order corrupt.  Keys:" << endl;
 				if( ++nDumped < 5 ) {
@@ -87,6 +101,9 @@ void BucketBasics::assertValid() {
 				}
 				wassert(false);
 				break;
+			}
+			else if( z == 0 ) { 
+				wassert( k(i).recordLoc < k(i+1).recordLoc );
 			}
 		}
 	}
@@ -151,7 +168,7 @@ void BucketBasics::pushBack(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevCh
 	kn.prevChildBucket = prevChild;
 	kn.recordLoc = recordLoc; 
 	kn.setKeyDataOfs( (short) _alloc(key.objsize()) );
-	char *p = dataAt(kn.keyDataOfs);
+	char *p = dataAt(kn.keyDataOfs());
 	memcpy(p, key.objdata(), key.objsize());
 }
 
@@ -171,7 +188,7 @@ bool BucketBasics::basicInsert(int keypos, const DiskLoc& recordLoc, JSObj& key)
 	kn.prevChildBucket.Null();
 	kn.recordLoc = recordLoc;
 	kn.setKeyDataOfs((short) _alloc(key.objsize()) );
-	char *p = dataAt(kn.keyDataOfs);
+	char *p = dataAt(kn.keyDataOfs());
 	memcpy(p, key.objdata(), key.objsize());
 	return true;
 }
@@ -188,12 +205,12 @@ void BucketBasics::pack() {
 	int ofs = tdz;
 	topSize = 0;
 	for( int j = 0; j < n; j++ ) { 
-		short ofsold = k(j).keyDataOfs;
+		short ofsold = k(j).keyDataOfs();
 		int sz = keyNode(j).key.objsize();
 		ofs -= sz; 
 		topSize += sz;
 		memcpy(temp+ofs, dataAt(ofsold), sz);
-		k(j).setKeyDataOfs( ofs );
+		k(j).setKeyDataOfsSavingUse( ofs );
 	}
 	int dataUsed = tdz - ofs;
 	memcpy(data + ofs, temp + ofs, dataUsed);
@@ -236,13 +253,15 @@ void BtreeBucket::findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, in
    returns n if it goes after the last existing key.
    note result might be Unused!
 */
-bool BtreeBucket::find(JSObj& key, int& pos) { 
+bool BtreeBucket::find(JSObj& key, DiskLoc recordLoc, int& pos) { 
 	/* binary search for this key */
 	int l=0; int h=n-1;
 	while( l <= h ) { 
 		int m = (l+h)/2;
 		KeyNode M = keyNode(m);
 		int x = key.woCompare(M.key);
+		if( x == 0 ) 
+			x = recordLoc.compare(M.recordLoc);
 		if( x < 0 ) // key < M.key
 			h = m-1;
 		else if( x > 0 )
@@ -250,8 +269,10 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 		else {
 			// found it.  however, if dup keys are here, be careful we might have
 			// found one in the middle.  we want find() to return the leftmost instance.
+/*
 			while( m >= 1 && keyNode(m-1).key.woEqual(key) )
 				m--;
+*/
 
 			pos = m;
 
@@ -271,7 +292,7 @@ bool BtreeBucket::find(JSObj& key, int& pos) {
 
 			return true;
 		}
-		x = key.woCompare(M.key);
+//?		x = key.woCompare(M.key);
 	}
 	// not found
 	pos = l;
@@ -341,31 +362,13 @@ int verbose = 0;
 int qqq = 0;
 
 bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc ) { 
-//	cout << "unindex " << key.toString() << endl;
-
-	if( qqq ) { 
-		fullValidate(thisLoc);
+	int pos;
+	bool found;
+	DiskLoc loc = locate(thisLoc, key, pos, found, recordLoc, 1);
+	if( found ) { 
+		loc.btree()->delKeyAtPos(loc, ns, pos);
+		return true;
 	}
-
-	BtreeCursor c(thisLoc, key, 1, true);
-
-	while( c.ok() ) { 
-		KeyNode kn = c.currKeyNode();
-		if( !kn.key.woEqual(key) )
-			break;
-		if( recordLoc == kn.recordLoc ) {
-			if( verbose )
-				c.bucket.btree()->dump();
-			c.bucket.btree()->delKeyAtPos(c.bucket, ns, c.keyOfs);
-			return true;
-		}
-		c.advance();
-	}
-
-	if( qqq ) { 
-		fullValidate(thisLoc);
-	}
-
 	return false;
 }
 
@@ -631,26 +634,10 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
 	return DiskLoc();
 }
 
-DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, int direction) { 
+DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, DiskLoc recordLoc, int direction) { 
 	int p;
-	found = find(key, p);
-//	dump();
+	found = find(key, recordLoc, p);
 	if( found ) {
-		/* todo: slow? this can be avoided for indexes that don't allow dup keys.  add support for that. */
-		{
-			// todo: fix for direction==-1!
-// dmtodo
-			DiskLoc lchild = k(p).prevChildBucket;
-			if( !lchild.isNull() ) {
-				// if dup keys, might be dups to the left.
-				DiskLoc largestLoc;
-				int largestKey;
-				lchild.btree()->findLargestKey(lchild, largestLoc, largestKey);
-				if( !largestLoc.isNull() && largestLoc.btree()->keyAt(largestKey).woEqual(key) )
-					return lchild.btree()->locate(lchild, key, pos, found, direction);
-			}
-		}
-
 		pos = p;
 		return thisLoc;
 	}
@@ -658,7 +645,7 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 	DiskLoc child = childForPos(p);
 
 	if( !child.isNull() ) { 
-		DiskLoc l = child.btree()->locate(child, key, pos, found, direction);
+		DiskLoc l = child.btree()->locate(child, key, pos, found, recordLoc, direction);
 		if( !l.isNull() )
 			return l;
 	}
@@ -680,9 +667,9 @@ int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 		return 2;
 	} 
 	assert( key.objsize() > 0 );
-//dump();
+
 	int pos;
-	bool found = find(key, pos);
+	bool found = find(key, recordLoc, pos);
 	if( insert_debug ) {
 		cout << "  " << thisLoc.toString() << '.' << "_insert " << 
 			key.toString() << '/' << recordLoc.toString() <<
@@ -691,8 +678,21 @@ int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 	}
 
 	if( found ) {
+		if( k(pos).isUnused() ) { 
+			cout << "an unused already occupying keyslot, write more code.\n";
+			cout << "  index may be corrupt (missing data) now.\n";
+		}
+
+		cout << "_insert(): key already exists in index\n";
+		cout << "  " << ns << " thisLoc:" << thisLoc.toString() << '\n';
+		cout << "  " << key.toString() << '\n';
+		cout << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
+		cout << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
+		cout << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
+		assert(false);
+
 		// on a dup key always insert on the right or else you will be broken.
-		pos++;
+//		pos++;
 		// on a promotion, find the right point to update if dup keys.
 		/* not needed: we always insert right after the first key so we are ok with just pos++...
 		if( !rChild.isNull() ) { 
@@ -755,17 +755,6 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 {
 	if( toplevel ) {
 		assert( key.objsize() < BucketSize / 10 );
-/*		if( key.toString() == "{ _searchIndex: \"music\" }" ) { 
-			if( music == 0 ) {
-				music = new JSObj(key.copy());
-				cout << music->toString() << endl;
-			}
-			tempMusic(thisLoc);
-			if( recordLoc.getOfs() == 0x4c8d7c0 ) {
-				cout << "About to add it!" << endl;
-			}
-		}
-*/
 		++ninserts;
 		if( /*ninserts > 127250 || */ninserts % 1000 == 0 ) {
 			cout << "ninserts: " << ninserts << endl;
@@ -773,17 +762,7 @@ int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 				cout << "debug?" << endl;
 				split_debug = 1;
 			}
-			//bt_fv = 1;
-			//idx.head.btree()->fullValidate(idx.head);
 		}
-/*		if( 0 && ninserts >= 127287 ) { 
-			cout << "---------------------------------------------------------------- " << ninserts << endl;
-			cout << "insert() top level " << key.toString() << ' ' << recordLoc.toString() << endl;
-			bt_fv = 1;
-			split_debug = 1;
-			insert_debug = 1;
-			idx.head.btree()->fullValidate(idx.head);
-		}*/
 	}
 
 	bool chk = false;
@@ -824,7 +803,7 @@ BtreeCursor::BtreeCursor(DiskLoc head, JSObj& k, int _direction, bool sm) :
 			head.btree()->dump();
 		}
 	}
-	bucket = head.btree()->locate(head, k, keyOfs, found, direction);
+	bucket = head.btree()->locate(head, k, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
 	checkUnused();
 }
 
@@ -866,6 +845,7 @@ void BtreeCursor::noteLocation() {
 	if( !eof() ) {
 		JSObj o = bucket.btree()->keyAt(keyOfs).copy();
 		keyAtKeyOfs = o;
+		locAtKeyOfs = bucket.btree()->k(keyOfs).recordLoc;
 	}
 }
 
@@ -878,9 +858,11 @@ void BtreeCursor::checkLocation() {
 			return;
 		BtreeBucket *b = bucket.btree();
 		if( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
-			b->k(keyOfs).isUsed()
-			)
+			b->k(keyOfs).recordLoc == locAtKeyOfs ) { 
+			if( !b->k(keyOfs).isUsed() )
+				checkUnused();
 			return;
+		}
 	}
 	catch( AssertionException ) { 
 		cout << "Caught exception in checkLocation(), that's maybe ok" << endl;
@@ -888,32 +870,21 @@ void BtreeCursor::checkLocation() {
 
 	bool found;
 	DiskLoc bold = bucket;
-	/* probably just moved in our node, so to be fast start from here rather than the head */
-//	bucket = bucket.btree()->locate(bucket, keyAtKeyOfs, keyOfs, found, direction);
-///	if( found || bucket.btree()->isHead() ) {
-//		cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
-//		checkUnused();
-/*
-		if( found && !bucket.btree()->k(keyOfs).isUsed() ) { 
-			cout << "   " << keyAtKeyOfs.toString() << endl;
-			cout << "   " << keyOfs << endl;
-			cout << "   " << bucket.btree()->keyNode(keyOfs).key.toString() << endl;
-			cout << "   " << bucket.btree()->keyNode(keyOfs).recordLoc.toString() << endl;
-			bucket.btree()->dump();
-			assert(false);
-		}
-*/
-//		return;
-//	}
 
 /* TODO: Switch to keep indexdetails and do idx.head! */
 	/* didn't find, check from the top */
 	DiskLoc head = bold.btree()->getHead(bold);
-	bucket = head.btree()->locate(head, keyAtKeyOfs, keyOfs, found, direction);
-//	head.btree()->locate(head, keyAtKeyOfs, keyOfs, found);
+	bucket = head.btree()->locate(head, keyAtKeyOfs, keyOfs, found, locAtKeyOfs, direction);
 	if( clctr++ % 128 == 0 )
 		cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
 	if( found )
 		checkUnused();
-	//	assert( !found || bucket.btree()->k(keyOfs).isUsed() );
 }
+
+/* ----------------------------------------------------------------------------- */
+
+struct BtreeUnitTest { 
+	BtreeUnitTest() { 
+		assert( minDiskLoc.compare(maxDiskLoc) < 0 );
+	}
+} btut;
