@@ -1,0 +1,2 @@
+
+FLAGS += -I/opt/java/include/ -I/opt/java/include/linux  

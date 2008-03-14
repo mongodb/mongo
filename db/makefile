@@ -1,18 +1,17 @@
 # makefile for our db project
 
-#FLAGS=-ggdb -pthread -O0 -I .. -I../boost -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/ $(INCS)
-FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -I/opt/java/include/ -I/opt/java/include/linux -Isrc/p -I/src/p/db -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/ -I/sw/include
+FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db
 
-#BOOSTLIB=libboost_regex-gcc41-1_34_1.so.1.34.1
-#BOOSTLIB=libboost_regex-gcc41-d-1_34_1.so.1.34.1
-#BOOSTLIB=../lib/libboost_thread-gcc41-mt-d-1_34_1.a
-BOOSTLIB = -L/sw/lib -lboost_thread
+LIB_DEPS = /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
+LIBS= $(LIB_DEPS) -lboost_thread
 
-LIBS= /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
+JVM_LIBS = -L/opt/java/lib/
 
 OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o
 
 # ../grid/protorecv.o ../grid/protosend.o
+
+include Makefile.$(shell uname -s)
 
 .cpp.o:
 	g++ -c $(FLAGS) $< -o $@
@@ -21,9 +20,12 @@ OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.
 # fast regressions and then immediately exit.  That way you know immediately if you
 # broke something horribly.
 
-db: $(OBJS) db.o $(LIBS)
-	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(BOOSTLIB)
+db: $(OBJS) db.o $(LIB_DEPS)
+	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS)
 #	-./db quicktest
+
+jtest: $(OBJS) javajs.o $(LIB_DEPS)
+	g++ $(FLAGS) -o $@ $(OBJS) javajs.o $(LIBS) $(JVM_LIBS)
 
 clean:
 	-rm -f $(OBJS) db.o
