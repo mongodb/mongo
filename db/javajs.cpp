@@ -32,7 +32,10 @@ JavaJSImpl::JavaJSImpl(){
   if ( res )
     throw "couldn't make jni ";
 
+  assert( _jvm );
+
   _dbhook = findClass( "ed/js/DBHook" );
+  assert( _dbhook );
 
   _scopeCreate = _env->GetStaticMethodID( _dbhook , "scopeCreate" , "()J" );
   _scopeReset = _env->GetStaticMethodID( _dbhook , "scopeReset" , "(J)Z" );

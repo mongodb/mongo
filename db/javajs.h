@@ -3,7 +3,7 @@
 #ifndef _JAVA_H_
 #define _JAVA_H_
 
-#include "JSObj.h"
+#include "jsobj.h"
 
 class JavaJSImpl {
  public:
