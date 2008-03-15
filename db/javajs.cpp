@@ -43,6 +43,8 @@ JavaJSImpl::JavaJSImpl(){
 
   _scopeGetNumber = _env->GetStaticMethodID( _dbhook , "scopeGetNumber" , "(JLjava/lang/String;)D" );
   _scopeGetString = _env->GetStaticMethodID( _dbhook , "scopeGetString" , "(JLjava/lang/String;)Ljava/lang/String;" );
+  _scopeGetObject = _env->GetStaticMethodID( _dbhook , "scopeGetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)I" );
+  _scopeGuessObjectSize = _env->GetStaticMethodID( _dbhook , "scopeGuessObjectSize" , "(JLjava/lang/String;)J" );
 
   _functionCreate = _env->GetStaticMethodID( _dbhook , "functionCreate" , "(Ljava/lang/String;)J" );
   _invoke = _env->GetStaticMethodID( _dbhook , "invoke" , "(JJLjava/nio/ByteBuffer;)I" );
@@ -53,6 +55,8 @@ JavaJSImpl::JavaJSImpl(){
 
   assert( _scopeGetNumber );
   assert( _scopeGetString );
+  assert( _scopeGetObject );
+  assert( _scopeGuessObjectSize );
 
   assert( _functionCreate );
   assert( _invoke );
@@ -99,6 +103,21 @@ char * JavaJSImpl::scopeGetString( long id , char * field ){
   return buf;
 }
 
+JSObj * JavaJSImpl::scopeGetObject( long id , char * field ){
+
+  long guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , (jlong)id , _env->NewStringUTF( field ) );
+  cout << "guess : " << guess << endl;
+
+  char * buf = new char( guess );
+  jobject bb = _env->NewDirectByteBuffer( (void*)buf , (jlong)guess );
+  
+  int len = _env->CallStaticIntMethod( _dbhook , _scopeGetObject , (jlong)id , _env->NewStringUTF( field ) , bb );
+  cout << "len : " << len << endl;
+  
+  buf[len] = 0;
+  return new JSObj( buf , true );
+}
+
 // other
 
 long JavaJSImpl::functionCreate( const char * code ){
@@ -130,7 +149,7 @@ void JavaJSImpl::run( char * js ){
 int main(){
 
   long scope = JavaJS.scopeCreate();
-  long func = JavaJS.functionCreate( "print( Math.random() ); foo = 5.6; bar = \"eliot\"; " );
+  long func = JavaJS.functionCreate( "print( Math.random() ); foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
 
   JSObj * o = 0;
 
@@ -140,6 +159,9 @@ int main(){
   
   cout << " foo : " << JavaJS.scopeGetNumber( scope , "foo" ) << endl;
   cout << " bar : " << JavaJS.scopeGetString( scope , "bar" ) << endl;
+  
+  JSObj * obj = JavaJS.scopeGetObject( scope , "abc" );
+  cout << obj->toString() << endl;
 
   return 0;
 

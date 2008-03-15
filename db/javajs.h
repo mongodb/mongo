@@ -16,6 +16,7 @@ class JavaJSImpl {
 
   double scopeGetNumber( long id , char * field );
   char * scopeGetString( long id , char * field );
+  JSObj * scopeGetObject( long id , char * field );
   
   long functionCreate( const char * code );
  
@@ -54,6 +55,8 @@ class JavaJSImpl {
 
   jmethodID _scopeGetNumber;
   jmethodID _scopeGetString;
+  jmethodID _scopeGetObject;
+  jmethodID _scopeGuessObjectSize;
 
   jmethodID _functionCreate;
   
@@ -62,4 +65,4 @@ class JavaJSImpl {
 } JavaJS;
 
 
-#endif _JAVA_H_
+#endif // _JAVA_H_
