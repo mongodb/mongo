@@ -23,6 +23,11 @@ public:
 
 void asserted(const char *msg, const char *file, unsigned line);
 void wasserted(const char *msg, const char *file, unsigned line);
+
+#ifdef assert
+#undef assert
+#endif
+
 #define assert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #define xassert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
