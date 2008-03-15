@@ -122,12 +122,18 @@ JSObj * JavaJSImpl::scopeGetObject( long id , char * field ){
 
 long JavaJSImpl::functionCreate( const char * code ){
   jstring s = _env->NewStringUTF( code );  
+  assert( s );
   long id = _env->CallStaticLongMethod( _dbhook , _functionCreate , s );
   return id;
 }
  
 int JavaJSImpl::invoke( long scope , long function , JSObj * obj  ){
-  int ret = _env->CallStaticIntMethod( _dbhook , _invoke , (jlong)scope , (jlong)function , 0 );
+  jobject bb = 0;
+  
+  if ( obj )
+    bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
+  
+  int ret = _env->CallStaticIntMethod( _dbhook , _invoke , (jlong)scope , (jlong)function , bb );
   return ret;
 }
 
@@ -162,6 +168,9 @@ int main(){
   
   JSObj * obj = JavaJS.scopeGetObject( scope , "abc" );
   cout << obj->toString() << endl;
+
+  long func2 = JavaJS.functionCreate( "print( tojson( obj ) );" );
+  JavaJS.invoke( scope , func2 , obj );
 
   return 0;
 
