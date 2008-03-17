@@ -1,12 +1,14 @@
 // java.cpp
 
+#include "stdafx.h"
+
 #include <jni.h>
 
 #include <iostream>
 #include <assert.h>
 #include <map>
 #include <list>
-#include <stringstream>
+
 
 #include "javajs.h"
 
@@ -18,13 +20,27 @@ JavaJSImpl::JavaJSImpl(){
   stringstream ss;
 
   ss << "-Djava.class.path=.";
-  ss << ed << "/build/";
+  ss << ":" << ed << "/build/";
 
-  cout << ss << endl;
+  { 
+    char includeDir[256];
+    sprintf( includeDir , "%s/include" , ed );
+    DIR * dir = opendir( includeDir );
+    
+    struct dirent * entry;
+    
+    while ( ( entry = readdir(dir) ) ){
+      ss << ":" << ed << "/include/" << entry->d_name;
+    }
+
+    closedir( dir );
+  }
+
+  cout << "using classpath : " << ss.str() << endl;
 
   char classpath[4096];
-  sprintf( classpath , 
-           "-Djava.class.path=.:../../ed/build:../ed/build:%s" ,
+  sprintf( classpath , "%s:%s" , 
+           ss.str().c_str() ,
            getenv( "CLASSPATH" ) ? getenv( "CLASSPATH" ) : "" );
 
   JavaVMOption options[2];

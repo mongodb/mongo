@@ -190,6 +190,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\javajs.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\jsobj.cpp"
 				>
 			</File>
@@ -257,6 +261,10 @@
 			</File>
 			<File
 				RelativePath=".\introspect.h"
+				>
+			</File>
+			<File
+				RelativePath=".\javajs.h"
 				>
 			</File>
 			<File
