@@ -3,7 +3,17 @@
 #ifndef _JAVA_H_
 #define _JAVA_H_
 
+#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
+
 #include "jsobj.h"
+
+
+void jasserted(const char *msg, const char *file, unsigned line);
+#define jassert(_Expression) (void)( (!!(_Expression)) || (jasserted(#_Expression, __FILE__, __LINE__), 0) )
+
+char * findEd();
 
 class JavaJSImpl {
  public:
@@ -21,6 +31,8 @@ class JavaJSImpl {
   long functionCreate( const char * code );
  
   int invoke( long scope , long functions , JSObj * obj  );
+
+  void printException();
  
  private:
 

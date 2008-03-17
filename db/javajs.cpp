@@ -5,12 +5,22 @@
 #include <iostream>
 #include <assert.h>
 #include <map>
+#include <list>
+#include <stringstream>
 
 #include "javajs.h"
 
 using namespace std;
 
 JavaJSImpl::JavaJSImpl(){
+
+  char * ed = findEd();
+  stringstream ss;
+
+  ss << "-Djava.class.path=.";
+  ss << ed << "/build/";
+
+  cout << ss << endl;
 
   char classpath[4096];
   sprintf( classpath , 
@@ -122,7 +132,7 @@ JSObj * JavaJSImpl::scopeGetObject( long id , char * field ){
 
 long JavaJSImpl::functionCreate( const char * code ){
   jstring s = _env->NewStringUTF( code );  
-  assert( s );
+  jassert( s );
   long id = _env->CallStaticLongMethod( _dbhook , _functionCreate , s );
   return id;
 }
@@ -149,6 +159,45 @@ void JavaJSImpl::run( char * js ){
   jstring s = _env->NewStringUTF( js );
   cout << _env->CallStaticObjectMethod( c , m , s ) << endl;
 }
+
+void JavaJSImpl::printException(){
+  jthrowable exc = _env->ExceptionOccurred();
+  if ( exc ){
+    _env->ExceptionDescribe();
+    _env->ExceptionClear();
+  }
+
+}
+
+void jasserted(const char *msg, const char *file, unsigned line) { 
+  
+  cout << "Java Assertion failure " << msg << " " << file << " " << line << endl;
+  JavaJS.printException();
+  throw AssertionException();
+}
+
+
+char * findEd(){
+
+  static list<char*> possibleEdDirs;
+  if ( ! possibleEdDirs.size() ){
+    possibleEdDirs.push_back( "../ed/" );
+    possibleEdDirs.push_back( "../../ed/" );
+  }
+
+  for ( list<char*>::iterator i = possibleEdDirs.begin() ; i != possibleEdDirs.end(); i++ ){
+    char * temp = *i;
+    DIR * test = opendir( temp );
+    if ( ! test )
+      continue;
+    
+    closedir( test );
+    cout << "found ed at : " << temp << endl;
+    return temp;
+  }
+  
+  return 0;
+};
 
 // ----
 
