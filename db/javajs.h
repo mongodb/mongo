@@ -1,7 +1,8 @@
 // java.h
 
-#ifndef _JAVA_H_
-#define _JAVA_H_
+#pragma once
+
+#include "../stdafx.h"
 
 #include "jsobj.h"
 
@@ -65,4 +66,3 @@ class JavaJSImpl {
 } JavaJS;
 
 
-#endif // _JAVA_H_

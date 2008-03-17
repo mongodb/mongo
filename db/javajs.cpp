@@ -1,5 +1,7 @@
 // java.cpp
 
+#include "stdafx.h"
+
 #include <jni.h>
 
 #include <iostream>
