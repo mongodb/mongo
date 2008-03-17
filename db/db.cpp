@@ -10,6 +10,7 @@
 #include "pdfile.h"
 #include "jsobj.h"
 #include "query.h"
+#include "introspect.h"
 
 extern const char *dbpath;
 extern int curOp;
@@ -127,20 +128,20 @@ void receivedKillCursors(Message& m) {
 	killCursors(n, (long long *) x);
 }
 
-void receivedUpdate(Message& m) {
+void receivedUpdate(Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	setClient(ns);
+	if( client->profile )
+		ss << ns << ' ';
 	int flags = d.pullInt();
 	JSObj query = d.nextJsObj();
 	assert( d.moreJSObjs() );
-        assert( query.objsize() < m.data->dataLen() );
+	assert( query.objsize() < m.data->dataLen() );
 	JSObj toupdate = d.nextJsObj();
-        assert( toupdate.objsize() < m.data->dataLen() );
-        
-        assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
-	updateObjects(ns, toupdate, query, flags & 1);
-	client = 0;
+	assert( toupdate.objsize() < m.data->dataLen() );
+	assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
+	updateObjects(ns, toupdate, query, flags & 1, ss);
 }
 
 void receivedDelete(Message& m) {
@@ -151,7 +152,6 @@ void receivedDelete(Message& m) {
 	assert( d.moreJSObjs() );
 	JSObj pattern = d.nextJsObj();
 	deleteObjects(ns, pattern, flags & 1);
-	client = 0;
 }
 
 void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
@@ -172,6 +172,7 @@ void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 		msgdata = runQuery(ns, ntoskip, ntoreturn, query, fields, ss);
 	}
 	catch( AssertionException ) { 
+		ss << " exception ";
 		cout << " Caught Assertion in runQuery, continuing" << endl; 
 		cout << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << endl;
 		cout << "  ns:" << ns << endl;
@@ -190,21 +191,25 @@ void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	}
 	Message resp;
 	resp.setData(msgdata, true); // transport will free
+	if( client->profile ) { 
+		ss << " bytes:" << resp.data->dataLen();
+	}
 	dbMsgPort.reply(m, resp);
-	client = 0;
 }
 
-void receivedGetMore(MessagingPort& dbMsgPort, Message& m) {
+void receivedGetMore(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
+	ss << ns;
 	setClient(ns);
 	int ntoreturn = d.pullInt();
+	ss << " ntoreturn:" << ntoreturn;
 	long long cursorid = d.pullInt64();
 	QueryResult* msgdata = getMore(ns, ntoreturn, cursorid);
 	Message resp;
 	resp.setData(msgdata, true);
+	ss << " bytes:" << resp.data->dataLen();
 	dbMsgPort.reply(m, resp);
-	client = 0;
 }
 
 void receivedInsert(Message& m, stringstream& ss) {
@@ -218,10 +223,11 @@ void receivedInsert(Message& m, stringstream& ss) {
 		ss << ns;
 		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
 	}
-	client = 0;
 }
 
 void testTheDb() {
+	stringstream ss;
+
 	setClient("sys.unittest.pdfile");
 
 	/* this is not validly formatted, if you query this namespace bad things will happen */
@@ -232,8 +238,8 @@ void testTheDb() {
 	deleteObjects("sys.unittest.delete", j1, false);
 	theDataFileMgr.insert("sys.unittest.delete", &js1, sizeof(js1));
 	deleteObjects("sys.unittest.delete", j1, false);
-	updateObjects("sys.unittest.delete", j1, j1, true);
-	updateObjects("sys.unittest.delete", j1, j1, false);
+	updateObjects("sys.unittest.delete", j1, j1, true,ss);
+	updateObjects("sys.unittest.delete", j1, j1, false,ss);
 
 	auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
 	while( c->ok() ) {
@@ -263,7 +269,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: mar2008 new dup key handling" << endl;
+	cout << "db version: 100 mar2008 profiling" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
@@ -282,6 +288,7 @@ void t()
 
 	Message m;
 	while( 1 ) { 
+		client = 0;
 		curOp = 0;
 		m.reset();
 		stringstream ss;
@@ -325,7 +332,7 @@ void t()
 			}
 			else if( m.data->operation == dbQuery ) { 
 #if defined(_WIN32)
-			log = true;
+				log = true;
 #endif
 				receivedQuery(dbMsgPort, m, ss);
 			}
@@ -334,26 +341,35 @@ void t()
 					ss << "insert ";
 					receivedInsert(m, ss);
 				}
-				catch( AssertionException ) { cout << "Caught Assertion, continuing" << endl; }
+				catch( AssertionException ) { 
+					cout << "Caught Assertion, continuing" << endl; 
+					ss << " exception ";
+				}
 			}
 			else if( m.data->operation == dbUpdate ) {
 				try { 
 					ss << "update ";
-					receivedUpdate(m);
+					receivedUpdate(m, ss);
 				}
-				catch( AssertionException ) { cout << "Caught Assertion, continuing" << endl; }
+				catch( AssertionException ) { 
+					cout << "Caught Assertion, continuing" << endl; 
+					ss << " exception ";
+				}
 			}
 			else if( m.data->operation == dbDelete ) {
 				try { 
 					ss << "remove ";
 					receivedDelete(m);
 				}
-				catch( AssertionException ) { cout << "Caught Assertion, continuing" << endl; }
+				catch( AssertionException ) { 
+					cout << "Caught Assertion, continuing" << endl; 
+					ss << " exception ";
+				}
 			}
 			else if( m.data->operation == dbGetMore ) {
 				log = true;
 				ss << "getmore ";
-				receivedGetMore(dbMsgPort, m);
+				receivedGetMore(dbMsgPort, m, ss);
 			}
 			else if( m.data->operation == dbKillCursors ) { 
 				try {
@@ -361,7 +377,10 @@ void t()
 					ss << "killcursors ";
 					receivedKillCursors(m);
 				}
-				catch( AssertionException ) { cout << "Caught Assertion in kill cursors, continuing" << endl; }
+				catch( AssertionException ) { 
+					cout << "Caught Assertion in kill cursors, continuing" << endl; 
+					ss << " exception ";
+				}
 			}
 			else {
 				cout << "    operation isn't supported: " << m.data->operation << endl;
@@ -369,10 +388,16 @@ void t()
 			}
 
 			int ms = t.millis();
-			log = log || ctr++ % 100 == 0;
-			if( log || ms > 50 ) {
+			log = log || ctr++ % 128 == 0;
+			if( log || ms > 100 ) {
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;
+			}
+			if( client && client->profile >= 1 ) { 
+				if( client->profile >= 2 || ms >= 100 ) { 
+					// profile it
+					profile(ss.str().c_str()+20/*skip ts*/, ms);
+				}
 			}
 		}
 	}

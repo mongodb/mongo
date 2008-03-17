@@ -55,7 +55,7 @@ public:
 	void update(
 		const char *ns,
 		Record *toupdate, const DiskLoc& dl,
-		const char *buf, int len);
+		const char *buf, int len, stringstream& profiling);
 	DiskLoc insert(const char *ns, const void *buf, int len, bool god = false);
 	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false);
 	static auto_ptr<Cursor> findAll(const char *ns);
@@ -341,6 +341,7 @@ public:
 		namespaceIndex = new NamespaceIndex();
 		namespaceIndex->init(dbpath, nm);
 		profile = 0;
+		profileName = name + ".system.profile";
 	} 
 
 	PhysicalDataFile* getFile(int n) { 
@@ -382,6 +383,7 @@ public:
 	string name; // "alleyinsider"
 	NamespaceIndex *namespaceIndex;
 	int profile; // 0=off.
+	string profileName; // "alleyinsider.system.profile"
 };
 
 // tempish...move to TLS or pass all the way down as a parm

@@ -230,18 +230,22 @@ void getMods(vector<Mod>& mods, JSObj from) {
 todo:
  smart requery find record immediately
 */
-void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) {
+void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
 //cout << "TEMP BAD";
 //lrutest.find(updateobj);
+
+	int profile = client->profile;
 
 	//	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
 	//		pattern.objsize();
 
 	if( strstr(ns, ".system.") ) { 
 		cout << "\nERROR: attempt to update in system namespace " << ns << endl;
+		ss << " can't update system namespace ";
 		return;
 	}
 
+	int nscanned = 0;
 	{
 		JSMatcher matcher(pattern);
 		JSObj order;
@@ -250,6 +254,7 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 			c = theDataFileMgr.findAll(ns);
 		while( c->ok() ) {
 			Record *r = c->_current();
+			nscanned++;
 			JSObj js(r);
 			if( !matcher.matches(js) ) {
 				if( c->tempStopOnMiss() )
@@ -261,21 +266,29 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 				   to only allow updating a single row with a multikey lookup.
 				   */
 
+				if( profile )
+					ss << " nscanned:" << nscanned;
+
 				/* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
 				   regular ones at the moment. */
 				if( updateobj.firstElement().fieldName()[0] == '$' ) {
 					vector<Mod> mods;
 					getMods(mods, updateobj);
 					applyMods(mods, c->currLoc().obj());
+					if( profile ) 
+						ss << " fastmod ";
 					return;
 				}
 
-				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize());
+				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
 				return;
 			}
 			c->advance();
 		}
 	}
+
+	if( profile )
+		ss << " nscanned:" << nscanned;
 
 	if( upsert ) {
 		if( updateobj.firstElement().fieldName()[0] == '$' ) {
@@ -288,8 +301,12 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert) 
 				b.append(i->fieldName, i->n);
 			JSObj obj = b.done();
 			theDataFileMgr.insert(ns, (void*) obj.objdata(), obj.objsize());
+			if( profile )
+				ss << " fastmodinsert ";
 			return;
 		}
+		if( profile )
+			ss << " upsert ";
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
 	}
 }
@@ -539,12 +556,11 @@ QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj,
 		wantMore = false;
 	}
 
-	ss << "query:" << ns << " _ntoreturn:" << _ntoreturn;
-	if( ntoskip ) ss << " ntoskip:" << ntoskip;
-	if( jsobj.objsize() > 100 ) 
-		ss << " querysz:" << jsobj.objsize();
-	if( queryTraceLevel >= 1 )
-		cout << "query: " << jsobj.toString() << endl;
+	ss << "query " << ns << " ntoreturn:" << ntoreturn;
+	if( ntoskip ) 
+		ss << " ntoskip:" << ntoskip;
+	if( client->profile )
+		ss << "<br>query: " << jsobj.toString() << ' ';
 
 	int n = 0;
 	BufBuilder b(32768);
@@ -641,8 +657,8 @@ assert( debug.getN() < 5000 );
 				c->advance();
 			}
 
-			if( queryTraceLevel >=2 )
-				cout << "  nscanned:" << nscanned << "\n  ";
+			if( client->profile )
+				ss << "  nscanned:" << nscanned << ' ';
 		}
 		/*catch( AssertionException e ) { 
 			if( n )
@@ -661,7 +677,7 @@ assert( debug.getN() < 5000 );
 	qr->_data[2] = 0;
 	qr->_data[3] = 0;
 	qr->len = b.len();
-	ss << " resLen:" << b.len();
+	ss << " reslen:" << b.len();
 	//	qr->channel = 0;
 	qr->operation = opReply;
 	qr->cursorId = cursorid;
@@ -669,7 +685,7 @@ assert( debug.getN() < 5000 );
 	qr->nReturned = n;
 	b.decouple();
 
-	ss << " nReturned:" << n;
+	ss << " nreturned:" << n;
 	return qr;
 }
 

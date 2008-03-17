@@ -650,17 +650,19 @@ void setDifference(set<JSObj>& l, set<JSObj>& r, vector<JSObj*> &diff) {
 void DataFileMgr::update(
 		const char *ns,
 		Record *toupdate, const DiskLoc& dl,
-		const char *buf, int len) 
+		const char *buf, int len, stringstream& ss) 
 {
 	NamespaceDetails *d = nsdetails(ns);
 
 	if( toupdate->netLength() < len ) {
 		if( d && d->capped ) { 
-			cout << "failing a growing update on a capped ns " << ns << endl;
+			ss << " failing a growing update on a capped ns " << ns << endl;
 			return;
 		}
 
 		// doesn't fit.
+		if( client->profile )
+			ss << " moved ";
 		deleteRecord(ns, toupdate, dl);
 		insert(ns, buf, len);
 		return;
@@ -688,6 +690,7 @@ void DataFileMgr::update(
 						idx.head.btree()->unindex(idx.head, idxns.c_str(), *removed[i], dl);
 					}
 					catch(AssertionException) { 
+						ss << " exception update unindex ";
 						cout << " caught assertion update unindex " << idxns.c_str() << '\n';
 					}
 				}
@@ -700,16 +703,19 @@ void DataFileMgr::update(
 							idx.head, idxns.c_str(),
 							dl, *added[i], false, idx, true);
 					}
-					catch(AssertionException) { 
+					catch(AssertionException) {
+						ss << " exception update index "; 
 						cout << " caught assertion update index " << idxns.c_str() << '\n';
 					}
 				}
+				if( client->profile )
+					ss << "<br>" << added.size() << " key updates ";
 
 			}
 		}
 	}
 
-//	cout << "doing update in place" << endl;
+	//	update in place
 	memcpy(toupdate->data, buf, len);
 }
 

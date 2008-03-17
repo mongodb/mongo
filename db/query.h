@@ -72,7 +72,7 @@ QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn,
 					  JSObj j, auto_ptr< set<string> > fieldFilter,
 					  stringstream&);
 
-void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert);
+void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss);
 void deleteObjects(const char *ns, JSObj pattern, bool justOne);
 
 class ClientCursor;

@@ -289,6 +289,11 @@ public:
 		b.append(fieldName);
 		b.append(n);
 	}
+	void appendDate(const char *fieldName, unsigned long long dt) { 
+		b.append((char) Date);
+		b.append(fieldName);
+		b.append(dt);
+	}
 	void append(const char *fieldName, const char *str) {
 		b.append((char) String);
 		b.append(fieldName);

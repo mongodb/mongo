@@ -96,6 +96,12 @@ inline unsigned curTimeMillis() {
 	unsigned t = xt.nsec / 1000000;
 	return (xt.sec & 0xfffff) * 1000 + t;
 }
+inline unsigned long long jsTime() {
+	boost::xtime xt;
+	boost::xtime_get(&xt, boost::TIME_UTC);
+	unsigned long long t = xt.nsec / 1000000;
+	return ((unsigned long long) xt.sec * 1000) + t;
+}
 // measures up to 1024 seconds.  or, 512 seconds with tdiff that is...
 inline unsigned curTimeMicros() {
 	boost::xtime xt;
