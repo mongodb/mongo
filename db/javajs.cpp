@@ -92,10 +92,13 @@ JavaJSImpl::JavaJSImpl(){
 
   _scopeGetNumber = _env->GetStaticMethodID( _dbhook , "scopeGetNumber" , "(JLjava/lang/String;)D" );
   _scopeGetString = _env->GetStaticMethodID( _dbhook , "scopeGetString" , "(JLjava/lang/String;)Ljava/lang/String;" );
+  _scopeGetBoolean = _env->GetStaticMethodID( _dbhook , "scopeGetBoolean" , "(JLjava/lang/String;)Z" );
+  _scopeGetType = _env->GetStaticMethodID( _dbhook , "scopeGetType" , "(JLjava/lang/String;)B" );
   _scopeGetObject = _env->GetStaticMethodID( _dbhook , "scopeGetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)I" );
   _scopeGuessObjectSize = _env->GetStaticMethodID( _dbhook , "scopeGuessObjectSize" , "(JLjava/lang/String;)J" );
-
+  
   _scopeSetNumber = _env->GetStaticMethodID( _dbhook , "scopeSetNumber" , "(JLjava/lang/String;D)Z" );
+  _scopeSetBoolean = _env->GetStaticMethodID( _dbhook , "scopeSetBoolean" , "(JLjava/lang/String;Z)Z" );
   _scopeSetString = _env->GetStaticMethodID( _dbhook , "scopeSetString" , "(JLjava/lang/String;Ljava/lang/String;)Z" );
   _scopeSetObject = _env->GetStaticMethodID( _dbhook , "scopeSetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)Z" );
 
@@ -109,9 +112,12 @@ JavaJSImpl::JavaJSImpl(){
   jassert( _scopeGetNumber );
   jassert( _scopeGetString );
   jassert( _scopeGetObject );
+  jassert( _scopeGetBoolean );
+  jassert( _scopeGetType );
   jassert( _scopeGuessObjectSize );
 
   jassert( _scopeSetNumber );
+  jassert( _scopeSetBoolean );
   jassert( _scopeSetString );
   jassert( _scopeSetObject );
 
@@ -307,10 +313,13 @@ int javajstest(){
   cout << "func4 done" << endl;
 
   cout << "func5 start" << endl;
-  jlong func5 = JavaJS.functionCreate( "function(){ print( \"this is fun\" ); } " );
+  jlong func5 = JavaJS.functionCreate( "function(){ z = true; print( \"this is fun\" ); } " );
   jassert( func5 );
   jassert( ! JavaJS.invoke( scope , func5 ) );
+  jassert( JavaJS.scopeGetBoolean( scope , "z" ) );
   cout << "func5 done" << endl;
+
+  
 
   return 0;
 
