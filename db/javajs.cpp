@@ -94,20 +94,28 @@ JavaJSImpl::JavaJSImpl(){
   _scopeGetObject = _env->GetStaticMethodID( _dbhook , "scopeGetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)I" );
   _scopeGuessObjectSize = _env->GetStaticMethodID( _dbhook , "scopeGuessObjectSize" , "(JLjava/lang/String;)J" );
 
+  _scopeSetNumber = _env->GetStaticMethodID( _dbhook , "scopeSetNumber" , "(JLjava/lang/String;D)Z" );
+  _scopeSetString = _env->GetStaticMethodID( _dbhook , "scopeSetString" , "(JLjava/lang/String;Ljava/lang/String;)Z" );
+  _scopeSetObject = _env->GetStaticMethodID( _dbhook , "scopeSetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)Z" );
+
   _functionCreate = _env->GetStaticMethodID( _dbhook , "functionCreate" , "(Ljava/lang/String;)J" );
   _invoke = _env->GetStaticMethodID( _dbhook , "invoke" , "(JJLjava/nio/ByteBuffer;)I" );
   
-  assert( _scopeCreate );  
-  assert( _scopeReset );
-  assert( _scopeFree );
+  jassert( _scopeCreate );  
+  jassert( _scopeReset );
+  jassert( _scopeFree );
 
-  assert( _scopeGetNumber );
-  assert( _scopeGetString );
-  assert( _scopeGetObject );
-  assert( _scopeGuessObjectSize );
+  jassert( _scopeGetNumber );
+  jassert( _scopeGetString );
+  jassert( _scopeGetObject );
+  jassert( _scopeGuessObjectSize );
 
-  assert( _functionCreate );
-  assert( _invoke );
+  jassert( _scopeSetNumber );
+  jassert( _scopeSetString );
+  jassert( _scopeSetObject );
+
+  jassert( _functionCreate );
+  jassert( _invoke );
 
   javajstest();  
 }
@@ -131,6 +139,24 @@ jboolean JavaJSImpl::scopeReset( jlong id ){
 
 void JavaJSImpl::scopeFree( jlong id ){
   _env->CallStaticVoidMethod( _dbhook , _scopeFree );
+}
+
+// scope setters
+
+bool JavaJSImpl::scopeSetNumber( jlong id , char * field , double val ){
+  return _env->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _env->NewStringUTF( field ) , val );
+}
+
+bool JavaJSImpl::scopeSetString( jlong id , char * field , char * val ){
+  return _env->CallStaticBooleanMethod( _dbhook , _scopeSetString , id , _env->NewStringUTF( field ) , _env->NewStringUTF( val ) );
+}
+
+bool JavaJSImpl::scopeSetObject( jlong id , char * field , JSObj * obj ){
+  jobject bb = 0;
+  if ( obj )
+    bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (obj->objsize()) );
+
+  return _env->CallStaticBooleanMethod( _dbhook , _scopeSetObject , id , _env->NewStringUTF( field ) , bb );
 }
 
 // scope getters
@@ -161,7 +187,6 @@ JSObj * JavaJSImpl::scopeGetObject( jlong id , char * field ){
   jobject bb = _env->NewDirectByteBuffer( (void*)buf , guess );
   
   int len = _env->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _env->NewStringUTF( field ) , bb );
-  cout << "len : " << len << endl;
   
   buf[len] = 0;
   return new JSObj( buf , true );
@@ -183,6 +208,7 @@ int JavaJSImpl::invoke( jlong scope , jlong function , JSObj * obj  ){
     bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (obj->objsize()) );
   
   int ret = _env->CallStaticIntMethod( _dbhook , _invoke , scope , function , bb );
+  cout << "invoke return : " << ret << endl;
   return ret;
 }
 
@@ -190,10 +216,10 @@ int JavaJSImpl::invoke( jlong scope , jlong function , JSObj * obj  ){
 
 void JavaJSImpl::run( char * js ){
   jclass c = findClass( "ed/js/JS" );
-  assert( c );
-    
+  jassert( c );
+  
   jmethodID m = _env->GetStaticMethodID( c , "eval" , "(Ljava/lang/String;)Ljava/lang/Object;" );
-  assert( m );
+  jassert( m );
   
   jstring s = _env->NewStringUTF( js );
   cout << _env->CallStaticObjectMethod( c , m , s ) << endl;
@@ -250,7 +276,7 @@ char * findEd(){
 int javajstest(){
 
   jlong scope = JavaJS.scopeCreate();
-  jlong func = JavaJS.functionCreate( "print( Math.random() ); foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
+  jlong func = JavaJS.functionCreate( "foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
 
   JSObj * o = 0;
 
@@ -264,8 +290,26 @@ int javajstest(){
   JSObj * obj = JavaJS.scopeGetObject( scope , "abc" );
   cout << obj->toString() << endl;
 
+  cout << "func2 start" << endl;
   jlong func2 = JavaJS.functionCreate( "print( tojson( obj ) );" );
-  JavaJS.invoke( scope , func2 , obj );
+  cout << "\t here" << endl;
+  jassert( JavaJS.invoke( scope , func2 , obj ) );
+  cout << "func2 end" << endl;
+
+  cout << "func3 start" << endl;
+  jassert( JavaJS.scopeSetNumber( scope , "a" , 5.17 ) );
+  jassert( JavaJS.scopeSetString( scope , "b" , "eliot" ) );
+  
+  jlong func3 = JavaJS.functionCreate( "print( \"5.17 == \" + a );  print( \"eliot == \" + b ); " );
+  jassert( JavaJS.invoke( scope , func3 , 0 ) );
+  cout << "func3 end" << endl;
+
+  cout << "func4 start" << endl;
+  jassert( JavaJS.scopeSetObject( scope , "c" , obj ) );
+  jlong func4 = JavaJS.functionCreate( "print( \"setObject : 517 == \" + c.foo );" );
+  jassert( func4 );
+  jassert( JavaJS.invoke( scope , func4 , 0 ) );
+  cout << "func4 done" << endl;
 
   return 0;
 
