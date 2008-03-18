@@ -2,9 +2,11 @@
 
 #pragma once
 
+#include "../stdafx.h"
+
+#pragma pack()
 #include <jni.h>
 
-#include "../stdafx.h"
 //#include "jsobj.h"
 
 #include <sys/types.h>
@@ -41,10 +43,10 @@ class JavaJSImpl {
   }
 
 
-  bool scopeSetNumber( jlong id , char * field , double val );
-  bool scopeSetString( jlong id , char * field , char * val );
-  bool scopeSetObject( jlong id , char * field , JSObj * obj );
-  bool scopeSetBoolean( jlong id , char * field , jboolean val ){
+  int scopeSetNumber( jlong id , char * field , double val );
+  int scopeSetString( jlong id , char * field , char * val );
+  int scopeSetObject( jlong id , char * field , JSObj * obj );
+  int scopeSetBoolean( jlong id , char * field , jboolean val ){
       return _env->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _env->NewStringUTF( field ) , val );
   }
   

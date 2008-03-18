@@ -21,6 +21,8 @@ using namespace std;
 JavaJSImpl JavaJS;
 
 JavaJSImpl::JavaJSImpl(){
+  _jvm = 0; _env = 0;
+  _dbhook = 0;
 
   char * ed = findEd();
   stringstream ss;
@@ -69,7 +71,9 @@ JavaJSImpl::JavaJSImpl(){
 
   JavaVMOption *options = new JavaVMOption[2];
   options[0].optionString = q;
+  options[0].extraInfo = 0;
   options[1].optionString = "-Djava.awt.headless=true";
+  options[1].extraInfo = 0;
   
   JavaVMInitArgs& vm_args = *(new JavaVMInitArgs());
   vm_args.version = JNI_VERSION_1_4;
@@ -151,15 +155,15 @@ void JavaJSImpl::scopeFree( jlong id ){
 
 // scope setters
 
-bool JavaJSImpl::scopeSetNumber( jlong id , char * field , double val ){
+int JavaJSImpl::scopeSetNumber( jlong id , char * field , double val ){
   return _env->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _env->NewStringUTF( field ) , val );
 }
 
-bool JavaJSImpl::scopeSetString( jlong id , char * field , char * val ){
+int JavaJSImpl::scopeSetString( jlong id , char * field , char * val ){
   return _env->CallStaticBooleanMethod( _dbhook , _scopeSetString , id , _env->NewStringUTF( field ) , _env->NewStringUTF( val ) );
 }
 
-bool JavaJSImpl::scopeSetObject( jlong id , char * field , JSObj * obj ){
+int JavaJSImpl::scopeSetObject( jlong id , char * field , JSObj * obj ){
   jobject bb = 0;
   if ( obj )
     bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (obj->objsize()) );
