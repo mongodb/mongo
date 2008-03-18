@@ -375,7 +375,7 @@ ok:
 		if( where->func == 0 )
 			return false; // didn't compile
 		JavaJS.scopeSetObject(where->scope, "obj", &jsobj);
-		JavaJS.invoke(where->scope, where->func, 0);
+		JavaJS.invoke(where->scope, where->func);
 	}
 
 	return true;
