@@ -2,7 +2,10 @@
 
 #pragma once
 
+#include <jni.h>
+
 #include "../stdafx.h"
+#include "jsobj.h"
 
 #include <sys/types.h>
 #if !defined(_WIN32)
@@ -10,10 +13,10 @@
 #endif
 #include <errno.h>
 
-#include "jsobj.h"
-
 void jasserted(const char *msg, const char *file, unsigned line);
 #define jassert(_Expression) (void)( (!!(_Expression)) || (jasserted(#_Expression, __FILE__, __LINE__), 0) )
+
+int javajstest();
 
 char * findEd();
 

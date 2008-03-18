@@ -1,7 +1,6 @@
 // java.cpp
 
 #include "stdafx.h"
-#include <jni.h>
 #include <iostream>
 #include <map>
 #include <list>
@@ -17,8 +16,6 @@ using namespace boost::filesystem;
 #include "javajs.h"
 
 using namespace std;
-
-int javajstest();
 
 JavaJSImpl JavaJS;
 
@@ -43,7 +40,6 @@ JavaJSImpl::JavaJSImpl(){
 	  directory_iterator i(includeDir);
 	  while( i != end ) {
 		  path p = *i;
-		  cout << p.string() << endl;
 		  ss << colon << p.string();
 		  i++;
 	  }
