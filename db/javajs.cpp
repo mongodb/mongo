@@ -140,11 +140,11 @@ void JavaJSImpl::scopeFree( jlong id ){
 // scope getters
 
 double JavaJSImpl::scopeGetNumber( jlong id , char * field ){
-  return _env->CallStaticDoubleMethod( _dbhook , _scopeGetNumber , (jlong)id , _env->NewStringUTF( field ) );
+  return _env->CallStaticDoubleMethod( _dbhook , _scopeGetNumber , id , _env->NewStringUTF( field ) );
 }
 
 char * JavaJSImpl::scopeGetString( jlong id , char * field ){
-  jstring s = (jstring)_env->CallStaticObjectMethod( _dbhook , _scopeGetString , (jlong)id , _env->NewStringUTF( field ) );
+  jstring s = (jstring)_env->CallStaticObjectMethod( _dbhook , _scopeGetString , id , _env->NewStringUTF( field ) );
   if ( ! s )
     return 0;
   
@@ -158,13 +158,13 @@ char * JavaJSImpl::scopeGetString( jlong id , char * field ){
 
 JSObj * JavaJSImpl::scopeGetObject( jlong id , char * field ){
 
-  jlong guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , (jlong)id , _env->NewStringUTF( field ) );
+  jlong guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _env->NewStringUTF( field ) );
   cout << "guess : " << guess << endl;
 
   char * buf = new char( (int) guess );
-  jobject bb = _env->NewDirectByteBuffer( (void*)buf , (jlong)guess );
+  jobject bb = _env->NewDirectByteBuffer( (void*)buf , guess );
   
-  int len = _env->CallStaticIntMethod( _dbhook , _scopeGetObject , (jlong)id , _env->NewStringUTF( field ) , bb );
+  int len = _env->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _env->NewStringUTF( field ) , bb );
   cout << "len : " << len << endl;
   
   buf[len] = 0;
@@ -184,9 +184,9 @@ int JavaJSImpl::invoke( jlong scope , jlong function , JSObj * obj  ){
   jobject bb = 0;
   
   if ( obj )
-    bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
+    bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (obj->objsize()) );
   
-  int ret = _env->CallStaticIntMethod( _dbhook , _invoke , (jlong)scope , (jlong)function , bb );
+  int ret = _env->CallStaticIntMethod( _dbhook , _invoke , scope , function , bb );
   return ret;
 }
 
