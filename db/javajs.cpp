@@ -33,17 +33,17 @@ JavaJSImpl::JavaJSImpl(){
 
   ss << "-Djava.class.path=.";
   ss << colon << ed << "/build/";
-
+  
   {
-	  path includeDir(ed);
-	  includeDir /= "include";
-	  directory_iterator end;
-	  directory_iterator i(includeDir);
-	  while( i != end ) {
-		  path p = *i;
-		  ss << colon << p.string();
-		  i++;
-	  }
+    path includeDir(ed);
+    includeDir /= "include";
+    directory_iterator end;
+    directory_iterator i(includeDir);
+    while( i != end ) {
+      path p = *i;
+      ss << colon << p.string();
+      i++;
+    }
   }
 
 #if defined(_WIN32)
@@ -56,7 +56,8 @@ JavaJSImpl::JavaJSImpl(){
 	  ss << colon << getenv( "CLASSPATH" );
 
   string s = ss.str();
-  char *p = (char *) s.c_str();
+  char * p = (char *)malloc( s.size() * 4 );
+  strcpy( p , s.c_str() );
   char *q = p;
 #if defined(_WIN32)
   while( *p ) {
@@ -124,7 +125,7 @@ JavaJSImpl::JavaJSImpl(){
   jassert( _functionCreate );
   jassert( _invoke );
 
-  javajstest();  
+  //javajstest();  
 }
 
 JavaJSImpl::~JavaJSImpl(){
