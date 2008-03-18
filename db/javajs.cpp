@@ -294,7 +294,7 @@ int javajstest(){
   cout << "func2 start" << endl;
   jlong func2 = JavaJS.functionCreate( "print( tojson( obj ) );" );
   cout << "\t here" << endl;
-  jassert( JavaJS.invoke( scope , func2 , obj ) );
+  jassert( ! JavaJS.invoke( scope , func2 , obj ) );
   cout << "func2 end" << endl;
 
   cout << "func3 start" << endl;
@@ -302,15 +302,21 @@ int javajstest(){
   jassert( JavaJS.scopeSetString( scope , "b" , "eliot" ) );
   
   jlong func3 = JavaJS.functionCreate( "print( \"5.17 == \" + a );  print( \"eliot == \" + b ); " );
-  jassert( JavaJS.invoke( scope , func3 , 0 ) );
+  jassert( ! JavaJS.invoke( scope , func3 , 0 ) );
   cout << "func3 end" << endl;
 
   cout << "func4 start" << endl;
   jassert( JavaJS.scopeSetObject( scope , "c" , obj ) );
   jlong func4 = JavaJS.functionCreate( "print( \"setObject : 517 == \" + c.foo );" );
   jassert( func4 );
-  jassert( JavaJS.invoke( scope , func4 , 0 ) );
+  jassert( ! JavaJS.invoke( scope , func4 , 0 ) );
   cout << "func4 done" << endl;
+
+  cout << "func5 start" << endl;
+  jlong func5 = JavaJS.functionCreate( "function(){ print( \"this is fun\" ); } " );
+  jassert( func5 );
+  jassert( ! JavaJS.invoke( scope , func5 , 0 ) );
+  cout << "func5 done" << endl;
 
   return 0;
 
