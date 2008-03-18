@@ -294,7 +294,8 @@ int javajstest(){
   cout << "func2 start" << endl;
   jlong func2 = JavaJS.functionCreate( "print( tojson( obj ) );" );
   cout << "\t here" << endl;
-  jassert( ! JavaJS.invoke( scope , func2 , obj ) );
+  int res = JavaJS.invoke( scope , func2 , obj );
+  jassert( ! res );
   cout << "func2 end" << endl;
 
   cout << "func3 start" << endl;
