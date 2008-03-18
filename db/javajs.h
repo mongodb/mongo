@@ -5,11 +5,12 @@
 #include "../stdafx.h"
 
 #include <sys/types.h>
+#if !defined(_WIN32)
 #include <dirent.h>
+#endif
 #include <errno.h>
 
 #include "jsobj.h"
-
 
 void jasserted(const char *msg, const char *file, unsigned line);
 #define jassert(_Expression) (void)( (!!(_Expression)) || (jasserted(#_Expression, __FILE__, __LINE__), 0) )
@@ -21,17 +22,17 @@ class JavaJSImpl {
   JavaJSImpl();
   ~JavaJSImpl();
   
-  long scopeCreate();
-  jboolean scopeReset( long id );
-  void scopeFree( long id );
+  jlong scopeCreate();
+  jboolean scopeReset( jlong id );
+  void scopeFree( jlong id );
 
-  double scopeGetNumber( long id , char * field );
-  char * scopeGetString( long id , char * field );
-  JSObj * scopeGetObject( long id , char * field );
+  double scopeGetNumber( jlong id , char * field );
+  char * scopeGetString( jlong id , char * field );
+  JSObj * scopeGetObject( jlong id , char * field );
   
-  long functionCreate( const char * code );
+  jlong functionCreate( const char * code );
  
-  int invoke( long scope , long functions , JSObj * obj  );
+  int invoke( jlong scope , jlong function , JSObj * obj  );
 
   void printException();
  
@@ -75,6 +76,4 @@ class JavaJSImpl {
   
   jmethodID _invoke;
 
-} JavaJS;
-
-
+};

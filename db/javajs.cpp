@@ -1,50 +1,76 @@
 // java.cpp
 
 #include "stdafx.h"
-
 #include <jni.h>
-
 #include <iostream>
-#include <assert.h>
 #include <map>
 #include <list>
 
+#undef yassert
+#include <boost/filesystem/convenience.hpp>
+#undef assert
+#define assert xassert
+#define yassert 1
+
+using namespace boost::filesystem;          
 
 #include "javajs.h"
 
 using namespace std;
+
+int javajstest();
+
+JavaJSImpl JavaJS;
 
 JavaJSImpl::JavaJSImpl(){
 
   char * ed = findEd();
   stringstream ss;
 
+#if defined(_WIN32)
+  char colon = ';';
+#else
+  char colon = ':';
+#endif
+
   ss << "-Djava.class.path=.";
-  ss << ":" << ed << "/build/";
+  ss << colon << ed << "/build/";
 
-  { 
-    char includeDir[256];
-    sprintf( includeDir , "%s/include" , ed );
-    DIR * dir = opendir( includeDir );
-    
-    struct dirent * entry;
-    
-    while ( ( entry = readdir(dir) ) ){
-      ss << ":" << ed << "/include/" << entry->d_name;
-    }
-
-    closedir( dir );
+  {
+	  path includeDir(ed);
+	  includeDir /= "include";
+	  directory_iterator end;
+	  directory_iterator i(includeDir);
+	  while( i != end ) {
+		  path p = *i;
+		  cout << p.string() << endl;
+		  ss << colon << p.string();
+		  i++;
+	  }
   }
 
-  cout << "using classpath : " << ss.str() << endl;
+#if defined(_WIN32)
+  ss << colon << "C:\\Program Files\\Java\\jdk1.6.0_05\\lib\\tools.jar";
+#else
+  ss << colon << "/opt/java/lib/tools.jar";
+#endif
 
-  char classpath[4096];
-  sprintf( classpath , "%s:%s" , 
-           ss.str().c_str() ,
-           getenv( "CLASSPATH" ) ? getenv( "CLASSPATH" ) : "" );
+  if( getenv( "CLASSPATH" ) )
+	  ss << colon << getenv( "CLASSPATH" );
+
+  string s = ss.str();
+  char *p = (char *) s.c_str();
+  char *q = p;
+#if defined(_WIN32)
+  while( *p ) {
+	  if( *p == '/' ) *p = '\\';
+	  p++;
+  }
+#endif
+  cout << "using classpath: " << q << endl;
 
   JavaVMOption options[2];
-  options[0].optionString = classpath;
+  options[0].optionString = q;
   options[1].optionString = "-Djava.awt.headless=true";
   
   JavaVMInitArgs vm_args;  
@@ -61,7 +87,7 @@ JavaJSImpl::JavaJSImpl(){
   assert( _jvm );
 
   _dbhook = findClass( "ed/js/DBHook" );
-  assert( _dbhook );
+  jassert( _dbhook );
 
   _scopeCreate = _env->GetStaticMethodID( _dbhook , "scopeCreate" , "()J" );
   _scopeReset = _env->GetStaticMethodID( _dbhook , "scopeReset" , "(J)Z" );
@@ -86,7 +112,8 @@ JavaJSImpl::JavaJSImpl(){
 
   assert( _functionCreate );
   assert( _invoke );
-  
+
+  javajstest();  
 }
 
 JavaJSImpl::~JavaJSImpl(){
@@ -98,25 +125,25 @@ JavaJSImpl::~JavaJSImpl(){
 
 // scope
 
-long JavaJSImpl::scopeCreate(){ 
+jlong JavaJSImpl::scopeCreate(){ 
   return _env->CallStaticLongMethod( _dbhook , _scopeCreate );
 }
 
-jboolean JavaJSImpl::scopeReset( long id ){
+jboolean JavaJSImpl::scopeReset( jlong id ){
   return _env->CallStaticBooleanMethod( _dbhook , _scopeReset );
 }
 
-void JavaJSImpl::scopeFree( long id ){
+void JavaJSImpl::scopeFree( jlong id ){
   _env->CallStaticVoidMethod( _dbhook , _scopeFree );
 }
 
 // scope getters
 
-double JavaJSImpl::scopeGetNumber( long id , char * field ){
+double JavaJSImpl::scopeGetNumber( jlong id , char * field ){
   return _env->CallStaticDoubleMethod( _dbhook , _scopeGetNumber , (jlong)id , _env->NewStringUTF( field ) );
 }
 
-char * JavaJSImpl::scopeGetString( long id , char * field ){
+char * JavaJSImpl::scopeGetString( jlong id , char * field ){
   jstring s = (jstring)_env->CallStaticObjectMethod( _dbhook , _scopeGetString , (jlong)id , _env->NewStringUTF( field ) );
   if ( ! s )
     return 0;
@@ -129,12 +156,12 @@ char * JavaJSImpl::scopeGetString( long id , char * field ){
   return buf;
 }
 
-JSObj * JavaJSImpl::scopeGetObject( long id , char * field ){
+JSObj * JavaJSImpl::scopeGetObject( jlong id , char * field ){
 
-  long guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , (jlong)id , _env->NewStringUTF( field ) );
+  jlong guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , (jlong)id , _env->NewStringUTF( field ) );
   cout << "guess : " << guess << endl;
 
-  char * buf = new char( guess );
+  char * buf = new char( (int) guess );
   jobject bb = _env->NewDirectByteBuffer( (void*)buf , (jlong)guess );
   
   int len = _env->CallStaticIntMethod( _dbhook , _scopeGetObject , (jlong)id , _env->NewStringUTF( field ) , bb );
@@ -146,14 +173,14 @@ JSObj * JavaJSImpl::scopeGetObject( long id , char * field ){
 
 // other
 
-long JavaJSImpl::functionCreate( const char * code ){
+jlong JavaJSImpl::functionCreate( const char * code ){
   jstring s = _env->NewStringUTF( code );  
   jassert( s );
-  long id = _env->CallStaticLongMethod( _dbhook , _functionCreate , s );
+  jlong id = _env->CallStaticLongMethod( _dbhook , _functionCreate , s );
   return id;
 }
  
-int JavaJSImpl::invoke( long scope , long function , JSObj * obj  ){
+int JavaJSImpl::invoke( jlong scope , jlong function , JSObj * obj  ){
   jobject bb = 0;
   
   if ( obj )
@@ -194,9 +221,15 @@ void jasserted(const char *msg, const char *file, unsigned line) {
 
 
 char * findEd(){
+#if defined(_WIN32)
+
+	return "c:/l/ed/ed";
+
+#else
 
   static list<char*> possibleEdDirs;
   if ( ! possibleEdDirs.size() ){
+    possibleEdDirs.push_back( "../../ed/ed/" ); // this one for dwight dev box
     possibleEdDirs.push_back( "../ed/" );
     possibleEdDirs.push_back( "../../ed/" );
   }
@@ -213,14 +246,15 @@ char * findEd(){
   }
   
   return 0;
+#endif
 };
 
 // ----
 
-int main(){
+int javajstest(){
 
-  long scope = JavaJS.scopeCreate();
-  long func = JavaJS.functionCreate( "print( Math.random() ); foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
+  jlong scope = JavaJS.scopeCreate();
+  jlong func = JavaJS.functionCreate( "print( Math.random() ); foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
 
   JSObj * o = 0;
 
@@ -234,9 +268,13 @@ int main(){
   JSObj * obj = JavaJS.scopeGetObject( scope , "abc" );
   cout << obj->toString() << endl;
 
-  long func2 = JavaJS.functionCreate( "print( tojson( obj ) );" );
+  jlong func2 = JavaJS.functionCreate( "print( tojson( obj ) );" );
   JavaJS.invoke( scope , func2 , obj );
 
   return 0;
 
 }
+
+#if defined(_MAIN)
+int main() { return javajstest(); }
+#endif

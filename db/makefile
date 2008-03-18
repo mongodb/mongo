@@ -3,11 +3,11 @@
 FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db
 
 LIB_DEPS = /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
-LIBS= $(LIB_DEPS) -lboost_thread
+LIBS= $(LIB_DEPS) -lboost_thread -lboost_filesystem
 
 JVM_LIBS = -L/opt/java/lib/
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o
 
 # ../grid/protorecv.o ../grid/protosend.o
 
@@ -21,7 +21,7 @@ include makefile.$(shell uname -s)
 # broke something horribly.
 
 db: $(OBJS) db.o $(LIB_DEPS)
-	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS)
+	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(JVM_LIBS)
 #	-./db quicktest
 
 jtest: $(OBJS) javajs.o $(LIB_DEPS)

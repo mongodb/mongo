@@ -204,6 +204,18 @@
 				RelativePath="..\..\..\boostw\boost_1_34_1\libs\thread\src\xtime.cpp"
 				>
 			</File>
+			<Filter
+				Name="filesys"
+				>
+				<File
+					RelativePath="..\..\..\boostw\boost_1_34_1\libs\filesystem\src\operations.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\boostw\boost_1_34_1\libs\filesystem\src\path.cpp"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Header Files"
