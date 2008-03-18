@@ -311,6 +311,12 @@ int javajstest(){
   jassert( JavaJS.invoke( scope , func4 , 0 ) );
   cout << "func4 done" << endl;
 
+  cout << "func5 start" << endl;
+  jlong func5 = JavaJS.functionCreate( "function(){ print( \"this is fun\" ); } " );
+  jassert( func5 );
+  jassert( JavaJS.invoke( scope , func5 , 0 ) );
+  cout << "func5 done" << endl;
+
   return 0;
 
 }
