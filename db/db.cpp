@@ -445,6 +445,9 @@ void msg(const char *m, int extras = 0) {
 
 int main(int argc, char* argv[], char *envp[] )
 {
+int javajstest();
+ javajstest();
+
 	srand(curTimeMillis());
 
 	if( argc >= 2 ) {

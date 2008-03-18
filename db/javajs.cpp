@@ -67,11 +67,11 @@ JavaJSImpl::JavaJSImpl(){
 #endif
   cout << "using classpath: " << q << endl;
 
-  JavaVMOption options[2];
+  JavaVMOption *options = new JavaVMOption[2];
   options[0].optionString = q;
   options[1].optionString = "-Djava.awt.headless=true";
   
-  JavaVMInitArgs vm_args;  
+  JavaVMInitArgs& vm_args = *(new JavaVMInitArgs());
   vm_args.version = JNI_VERSION_1_4;
   vm_args.options = options;
   vm_args.nOptions = 2;
@@ -125,7 +125,7 @@ JavaJSImpl::JavaJSImpl(){
   jassert( _functionCreate );
   jassert( _invoke );
 
-  //javajstest();  
+//  javajstest();  
 }
 
 JavaJSImpl::~JavaJSImpl(){
