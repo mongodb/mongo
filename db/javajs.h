@@ -32,11 +32,21 @@ class JavaJSImpl {
 
   double scopeGetNumber( jlong id , char * field );
   char * scopeGetString( jlong id , char * field );
+  jboolean scopeGetBoolean( jlong id , char * field ){
+    return _env->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , _env->NewStringUTF( field ) );
+  }
   JSObj * scopeGetObject( jlong id , char * field );
+  char scopeGetType( jlong id , char * field ){
+    return _env->CallStaticByteMethod( _dbhook , _scopeGetType , id , _env->NewStringUTF( field ) );
+  }
+
 
   bool scopeSetNumber( jlong id , char * field , double val );
   bool scopeSetString( jlong id , char * field , char * val );
   bool scopeSetObject( jlong id , char * field , JSObj * obj );
+  bool scopeSetBoolean( jlong id , char * field , jboolean val ){
+      return _env->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _env->NewStringUTF( field ) , val );
+  }
   
   jlong functionCreate( const char * code );
  
@@ -84,11 +94,14 @@ class JavaJSImpl {
   jmethodID _scopeGetNumber;
   jmethodID _scopeGetString;
   jmethodID _scopeGetObject;
+  jmethodID _scopeGetBoolean;
   jmethodID _scopeGuessObjectSize;
+  jmethodID _scopeGetType;
 
   jmethodID _scopeSetNumber;
   jmethodID _scopeSetString;
   jmethodID _scopeSetObject;
+  jmethodID _scopeSetBoolean;
 
   jmethodID _functionCreate;
   
