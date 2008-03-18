@@ -224,7 +224,8 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 			// $where: function()...
 			assert( where == 0 );
 			where = new Where();
-			where->func = JavaJS.functionCreate( e.valuestr() );
+			const char *code = e.valuestr();
+			where->func = JavaJS.functionCreate( code );
 			where->scope = JavaJS.scopeCreate();
 			continue;
 		}
@@ -375,7 +376,10 @@ ok:
 		if( where->func == 0 )
 			return false; // didn't compile
 		JavaJS.scopeSetObject(where->scope, "obj", &jsobj);
-		JavaJS.invoke(where->scope, where->func, 0);
+		if( JavaJS.invoke(where->scope, where->func) )
+			return false;
+		double n = JavaJS.scopeGetNumber(where->scope, "return");
+		return n != 0;
 	}
 
 	return true;

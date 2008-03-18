@@ -40,7 +40,13 @@ class JavaJSImpl {
   
   jlong functionCreate( const char * code );
  
-  int invoke( jlong scope , jlong function , JSObj * obj  );
+  /* return values:
+     public static final int NO_SCOPE = -1;
+	 public static final int NO_FUNCTION = -2;
+	 public static final int INVOKE_ERROR = -3;
+	 public static final int INVOKE_SUCCESS = 0;
+	*/
+  int invoke( jlong scope , jlong function );
 
   void printException();
  
