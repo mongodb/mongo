@@ -5,7 +5,7 @@
 #include <jni.h>
 
 #include "../stdafx.h"
-#include "jsobj.h"
+//#include "jsobj.h"
 
 #include <sys/types.h>
 #if !defined(_WIN32)
@@ -20,6 +20,7 @@ int javajstest();
 
 char * findEd();
 
+class JSObj;
 class JavaJSImpl {
  public:
   JavaJSImpl();
@@ -88,3 +89,5 @@ class JavaJSImpl {
   jmethodID _invoke;
 
 };
+
+extern JavaJSImpl JavaJS;

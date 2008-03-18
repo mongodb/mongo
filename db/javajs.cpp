@@ -14,6 +14,7 @@
 using namespace boost::filesystem;          
 
 #include "javajs.h"
+#include "jsobj.h"
 
 using namespace std;
 

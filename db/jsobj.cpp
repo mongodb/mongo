@@ -12,7 +12,7 @@ string Element::toString() {
     case EOO:
 		return "EOO";
     case Date:
-		s << fieldName() << ": " << hex << date(); break;
+		s << fieldName() << ": Date(" << hex << date() << ')'; break;
 	case Number:
 		s << fieldName() << ": " << number(); break;
 	case Bool: 
@@ -23,22 +23,31 @@ string Element::toString() {
 	case Undefined:
 		s << fieldName() << ": undefined"; break;
 	case jstNULL:
-		s << fieldName() << ": nul"; break;
+		s << fieldName() << ": null"; break;
 	case MaxKey:
 		s << fieldName() << ": MaxKey"; break;
+	case Code:
+		s << fieldName() << ": ";
+		if( valuestrsize() > 80 ) 
+			s << string(valuestr()).substr(0, 70) << "...";
+		else { 
+			s << valuestr();
+		}
+		break;
 	case String:
 		s << fieldName() << ": ";
-		if( valuestrsize() > 80 ) s << "ALongString";
+		if( valuestrsize() > 80 ) 
+			s << '"' << string(valuestr()).substr(0, 70) << "...\"";
 		else { 
 			s << '"' << valuestr() << '"';
 		}
 		break;
-        case jstOID: 
-          s << fieldName() << " : OID ";
-          s << hex << oid().a << hex << oid().b;
+	case jstOID: 
+          s << fieldName() << " : ObjId(";
+          s << hex << oid().a << hex << oid().b << ')';
           break;
     default:
-		s << fieldName() << ": ?";
+		s << fieldName() << ": ?type=" << type();
 		break;
 	}
 	return s.str();
@@ -65,6 +74,7 @@ int Element::size() {
 		case jstOID:
 			x = 13;
 			break;
+		case Code:
 		case String:
 			x = valuestrsize() + 4 + 1;
 			break;
@@ -133,6 +143,7 @@ inline int compareElementValues(Element& l, Element& r) {
 			return x == 0 ? 0 : 1;
 		case jstOID:
 			return memcmp(l.value(), r.value(), 12);
+		case Code:
 		case String:
 			/* todo: utf version */
 			return strcmp(l.valuestr(), r.valuestr());
@@ -198,7 +209,7 @@ int getGtLtOp(Element& e) {
 }
 
 JSMatcher::JSMatcher(JSObj &_jsobj) : 
-   jsobj(_jsobj), nRegex(0)
+   where(0), jsobj(_jsobj), nRegex(0)
 {
 	nBuilders = 0;
 
@@ -208,6 +219,15 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 		Element e = i.next();
 		if( e.eoo() )
 			break;
+
+		if( e.type() == Code && strcmp(e.fieldName(), "$where")==0 ) { 
+			// $where: function()...
+			assert( where == 0 );
+			where = new Where();
+			where->func = JavaJS.functionCreate( e.valuestr() );
+			where->scope = JavaJS.scopeCreate();
+			continue;
+		}
 
 		if( e.type() == RegEx ) {
 			if( nRegex >= 4 ) {
@@ -349,6 +369,13 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 			return false;
 ok:
 		;
+	}
+
+	if( where ) { 
+		if( where->func == 0 )
+			return false; // didn't compile
+		JavaJS.scopeSetObject(where->scope, "obj", &jsobj);
+		JavaJS.invoke(where->scope, where->func, 0);
 	}
 
 	return true;
