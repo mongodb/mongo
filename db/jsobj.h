@@ -360,7 +360,8 @@ public:
 class Where { 
 public:
 	~Where() {
-		JavaJS.scopeFree(scope);
+		JavaJS->scopeFree(scope);
+		scope = 0; func = 0;
 	}
 	jlong scope, func;
 };

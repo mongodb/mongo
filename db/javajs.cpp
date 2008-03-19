@@ -18,7 +18,7 @@ using namespace boost::filesystem;
 
 using namespace std;
 
-JavaJSImpl JavaJS;
+JavaJSImpl *JavaJS=0;
 
 JavaJSImpl::JavaJSImpl(){
   _jvm = 0; _env = 0;
@@ -242,7 +242,7 @@ void JavaJSImpl::printException(){
 void jasserted(const char *msg, const char *file, unsigned line) { 
   
   cout << "Java Assertion failure " << msg << " " << file << " " << line << endl;
-  JavaJS.printException();
+  JavaJS->printException();
   throw AssertionException();
 }
 
@@ -278,8 +278,9 @@ char * findEd(){
 
 // ----
 
-int javajstest(){
+int javajstest() {
 
+  JavaJSImpl& JavaJS = *::JavaJS;
   jlong scope = JavaJS.scopeCreate();
   jlong func = JavaJS.functionCreate( "foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
 

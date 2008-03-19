@@ -111,4 +111,4 @@ class JavaJSImpl {
 
 };
 
-extern JavaJSImpl JavaJS;
+extern JavaJSImpl *JavaJS;
