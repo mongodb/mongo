@@ -66,8 +66,9 @@ class JavaJSImpl {
   int invoke( jlong scope , jlong function );
 
   void printException();
- 
+
   void run( char * js );
+
  private:
   
   jobject create( const char * name ){

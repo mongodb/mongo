@@ -83,13 +83,20 @@ JavaJSImpl::JavaJSImpl(){
   vm_args->version = JNI_VERSION_1_4;
   vm_args->options = options;
   vm_args->nOptions = 3;
-  //vm_args->ignoreUnrecognized = JNI_TRUE;
+  vm_args->ignoreUnrecognized = JNI_FALSE;
 
   cerr << "Creating JVM" << endl;
   jint res = JNI_CreateJavaVM( &_jvm, (void**)&_env, vm_args);
-  jassert ( res == 0 );
+  jassert( res == 0 );
+  jassert( _jvm > 0 );
+  jassert( _env > 0 );
 
-  jassert( _jvm );
+  cerr
+    << "res : " << res << " " 
+    << "_jvm : " << _jvm  << " " 
+    << "_env : " << _env << " "
+    << endl;
+    
 
   _dbhook = findClass( "ed/js/DBHook" );
   jassert( _dbhook );
@@ -132,7 +139,6 @@ JavaJSImpl::JavaJSImpl(){
   jassert( _functionCreate );
   jassert( _invoke );
 
-//  javajstest();  
 }
 
 JavaJSImpl::~JavaJSImpl(){
@@ -300,14 +306,19 @@ int javajstest() {
 
 JavaJS.run("print(5);");
   
+  JavaJS.run( "print( 17 );" );
+
   if ( debug ) cout << "about to create scope" << endl;
   jlong scope = JavaJS.scopeCreate();
-
+  jassert( scope );
+  if ( debug ) cout << "got scope" << endl;
+         
+  
   jlong func1 = JavaJS.functionCreate( "foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
   jassert( ! JavaJS.invoke( scope , func1 ) );
   
-  assert( 5.6 == JavaJS.scopeGetNumber( scope , "foo" ) );
-  assert( ((string)"eliot") == JavaJS.scopeGetString( scope , "bar" ) );
+  jassert( 5.6 == JavaJS.scopeGetNumber( scope , "foo" ) );
+  jassert( ((string)"eliot") == JavaJS.scopeGetString( scope , "bar" ) );
   
   if ( debug ) cout << "func2 start" << endl;
   jassert( JavaJS.scopeSetNumber( scope , "a" , 5.17 ) );
