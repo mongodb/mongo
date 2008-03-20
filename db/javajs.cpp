@@ -14,14 +14,19 @@
 using namespace boost::filesystem;          
 
 #include "javajs.h"
+
+#ifdef J_USE_OBJ
 #include "jsobj.h"
+#warning including jsobj.h
+#endif
 
 using namespace std;
 
-JavaJSImpl *JavaJS=0;
+JavaJSImpl * JavaJS = 0;
 
 JavaJSImpl::JavaJSImpl(){
-  _jvm = 0; _env = 0;
+  _jvm = 0; 
+  _env = 0;
   _dbhook = 0;
 
   char * ed = findEd();
@@ -55,7 +60,7 @@ JavaJSImpl::JavaJSImpl(){
 #endif
 
   if( getenv( "CLASSPATH" ) )
-	  ss << colon << getenv( "CLASSPATH" );
+    ss << colon << getenv( "CLASSPATH" );
 
   string s = ss.str();
   char * p = (char *)malloc( s.size() * 4 );
@@ -63,30 +68,29 @@ JavaJSImpl::JavaJSImpl(){
   char *q = p;
 #if defined(_WIN32)
   while( *p ) {
-	  if( *p == '/' ) *p = '\\';
-	  p++;
+    if( *p == '/' ) *p = '\\';
+    p++;
   }
 #endif
+
   cout << "using classpath: " << q << endl;
 
-  JavaVMOption *options = new JavaVMOption[2];
+  JavaVMOption * options = new JavaVMOption[3];
   options[0].optionString = q;
-  options[0].extraInfo = 0;
   options[1].optionString = "-Djava.awt.headless=true";
-  options[1].extraInfo = 0;
+  options[2].optionString = "-Xmx300m";
   
-  JavaVMInitArgs& vm_args = *(new JavaVMInitArgs());
-  vm_args.version = JNI_VERSION_1_4;
-  vm_args.options = options;
-  vm_args.nOptions = 2;
-  vm_args.ignoreUnrecognized = JNI_TRUE;
+  JavaVMInitArgs * vm_args = new JavaVMInitArgs();
+  vm_args->version = JNI_VERSION_1_4;
+  vm_args->options = options;
+  vm_args->nOptions = 3;
+  //vm_args->ignoreUnrecognized = JNI_TRUE;
 
   cerr << "Creating JVM" << endl;
-  jint res = JNI_CreateJavaVM( &_jvm, (void**) &_env, &vm_args);
-  if ( res )
-    throw "couldn't make jni ";
+  jint res = JNI_CreateJavaVM( &_jvm, (void**)&_env, vm_args);
+  jassert ( res == 0 );
 
-  assert( _jvm );
+  jassert( _jvm );
 
   _dbhook = findClass( "ed/js/DBHook" );
   jassert( _dbhook );
@@ -109,7 +113,7 @@ JavaJSImpl::JavaJSImpl(){
 
   _functionCreate = _env->GetStaticMethodID( _dbhook , "functionCreate" , "(Ljava/lang/String;)J" );
   _invoke = _env->GetStaticMethodID( _dbhook , "invoke" , "(JJ)I" );
-  
+
   jassert( _scopeCreate );  
   jassert( _scopeReset );
   jassert( _scopeFree );
@@ -163,13 +167,18 @@ int JavaJSImpl::scopeSetString( jlong id , char * field , char * val ){
   return _env->CallStaticBooleanMethod( _dbhook , _scopeSetString , id , _env->NewStringUTF( field ) , _env->NewStringUTF( val ) );
 }
 
+#ifdef J_USE_OBJ
 int JavaJSImpl::scopeSetObject( jlong id , char * field , JSObj * obj ){
   jobject bb = 0;
-  if ( obj )
-    bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (obj->objsize()) );
+  if ( obj ){
+    //cout << "from c : " << obj->toString() << endl;
+    bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
+    jassert( bb );
+  }
 
   return _env->CallStaticBooleanMethod( _dbhook , _scopeSetObject , id , _env->NewStringUTF( field ) , bb );
 }
+#endif
 
 // scope getters
 
@@ -190,19 +199,25 @@ char * JavaJSImpl::scopeGetString( jlong id , char * field ){
   return buf;
 }
 
+#ifdef J_USE_OBJ
 JSObj * JavaJSImpl::scopeGetObject( jlong id , char * field ){
 
-  jlong guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _env->NewStringUTF( field ) );
-  cout << "guess : " << guess << endl;
+  int guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _env->NewStringUTF( field ) );
 
-  char * buf = new char( (int) guess );
+  char * buf = new char[ guess ];
   jobject bb = _env->NewDirectByteBuffer( (void*)buf , guess );
+  jassert( bb );
   
   int len = _env->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _env->NewStringUTF( field ) , bb );
-  
-  buf[len] = 0;
-  return new JSObj( buf , true );
+  //cout << "len : " << len << endl;
+  assert( len > 0 && len < guess ); 
+
+  JSObj * obj = new JSObj( buf , true );
+  //cout << "going to print" << endl;
+  //cout << obj->toString() << endl;
+  return obj;
 }
+#endif
 
 // other
 
@@ -240,18 +255,16 @@ void JavaJSImpl::printException(){
 }
 
 void jasserted(const char *msg, const char *file, unsigned line) { 
-  
-  cout << "Java Assertion failure " << msg << " " << file << " " << line << endl;
-  JavaJS->printException();
+  cout << "jassert failed " << msg << " " << file << " " << line << endl;
+  if ( JavaJS ) JavaJS->printException();
   throw AssertionException();
 }
 
 
 char * findEd(){
+
 #if defined(_WIN32)
-
-	return "c:/l/ed/ed";
-
+  return "c:/l/ed/ed";
 #else
 
   static list<char*> possibleEdDirs;
@@ -280,52 +293,71 @@ char * findEd(){
 
 int javajstest() {
 
+  int testObject = 1;
+  int debug = 0;
+
   JavaJSImpl& JavaJS = *::JavaJS;
+  
+  if ( debug ) cout << "about to create scope" << endl;
   jlong scope = JavaJS.scopeCreate();
-  jlong func = JavaJS.functionCreate( "foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
 
-  JSObj * o = 0;
-
-  cout << "scope : " << scope << endl;
-  cout << "func : " << func << endl;  
-  cout << "ret : " << JavaJS.invoke( scope , func ) << endl;
+  jlong func1 = JavaJS.functionCreate( "foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
+  jassert( ! JavaJS.invoke( scope , func1 ) );
   
-  cout << " foo : " << JavaJS.scopeGetNumber( scope , "foo" ) << endl;
-  cout << " bar : " << JavaJS.scopeGetString( scope , "bar" ) << endl;
+  assert( 5.6 == JavaJS.scopeGetNumber( scope , "foo" ) );
+  assert( ((string)"eliot") == JavaJS.scopeGetString( scope , "bar" ) );
   
-  JSObj * obj = JavaJS.scopeGetObject( scope , "abc" );
-  cout << obj->toString() << endl;
-
-  JavaJS.scopeSetObject( scope , "obj" , obj );
-  cout << "func2 start" << endl;
-  jlong func2 = JavaJS.functionCreate( "print( tojson( obj ) );" );
-  cout << "\t here" << endl;
-  jassert( ! JavaJS.invoke( scope , func2 ) );
-  cout << "func2 end" << endl;
-
-  cout << "func3 start" << endl;
+  if ( debug ) cout << "func2 start" << endl;
   jassert( JavaJS.scopeSetNumber( scope , "a" , 5.17 ) );
   jassert( JavaJS.scopeSetString( scope , "b" , "eliot" ) );
-  
-  jlong func3 = JavaJS.functionCreate( "print( \"5.17 == \" + a );  print( \"eliot == \" + b ); " );
+  jlong func2 = JavaJS.functionCreate( "assert( 5.17 == a ); assert( \"eliot\" == b );" );
+  jassert( ! JavaJS.invoke( scope , func2 ) );
+  if ( debug ) cout << "func2 end" << endl;
+
+  if ( debug ) cout << "func3 start" << endl;
+  jlong func3 = JavaJS.functionCreate( "function(){ z = true; } " );
+  jassert( func3 );
   jassert( ! JavaJS.invoke( scope , func3 ) );
-  cout << "func3 end" << endl;
-
-  cout << "func4 start" << endl;
-  jassert( JavaJS.scopeSetObject( scope , "c" , obj ) );
-  jlong func4 = JavaJS.functionCreate( "print( \"setObject : 517 == \" + c.foo );" );
-  jassert( func4 );
-  jassert( ! JavaJS.invoke( scope , func4 ) );
-  cout << "func4 done" << endl;
-
-  cout << "func5 start" << endl;
-  jlong func5 = JavaJS.functionCreate( "function(){ z = true; print( \"this is fun\" ); } " );
-  jassert( func5 );
-  jassert( ! JavaJS.invoke( scope , func5 ) );
   jassert( JavaJS.scopeGetBoolean( scope , "z" ) );
-  cout << "func5 done" << endl;
+  if ( debug ) cout << "func3 done" << endl;
 
-  
+#ifdef J_USE_OBJ  
+  if ( testObject ){
+
+    if ( debug ) cout << "going to get object" << endl;
+    JSObj * obj = JavaJS.scopeGetObject( scope , "abc" );
+    if ( debug ) cout << "done gettting object" << endl;
+
+    if ( obj && debug ){
+      cout << "obj : " << obj->toString() << endl;
+    }
+
+    if ( debug ) cout << "func4 start" << endl;    
+    JavaJS.scopeSetObject( scope , "obj" , obj );
+    if ( debug ) cout << "\t here 1" << endl;
+    jlong func4 = JavaJS.functionCreate( "print( tojson( obj ) );" );
+    if ( debug ) cout << "\t here 2" << endl;
+    jassert( ! JavaJS.invoke( scope , func4 ) );
+    if ( debug ) cout << "func4 end" << endl;
+    
+    if ( debug ) cout << "func5 start" << endl;
+    jassert( JavaJS.scopeSetObject( scope , "c" , obj ) );
+    jlong func5 = JavaJS.functionCreate( "print( \"setObject : 517 == \" + c.foo );" );
+    jassert( func5 );
+    jassert( ! JavaJS.invoke( scope , func5 ) );
+    if ( debug ) cout << "func5 done" << endl;
+  }
+#endif
+
+  if ( debug ) cout << "func6 start" << endl;
+  for ( int i=0; i<100; i++ ){
+    double val = i + 5;
+    JavaJS.scopeSetNumber( scope , "zzz" , val );
+    jlong func6 = JavaJS.functionCreate( " xxx = zzz; " );
+    jassert( ! JavaJS.invoke( scope , func6 ) );
+    jassert( val == JavaJS.scopeGetNumber( scope , "xxx" ) );
+  }
+  if ( debug ) cout << "func6 done" << endl;
 
   return 0;
 

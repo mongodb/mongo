@@ -4,10 +4,10 @@
 
 #include "../stdafx.h"
 
+#define J_USE_OBJ
+
 #pragma pack()
 #include <jni.h>
-
-//#include "jsobj.h"
 
 #include <sys/types.h>
 #if !defined(_WIN32)
@@ -16,13 +16,14 @@
 #include <errno.h>
 
 void jasserted(const char *msg, const char *file, unsigned line);
-#define jassert(_Expression) (void)( (!!(_Expression)) || (jasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define jassert(_Expression) if ( ! ( _Expression ) ){ jasserted(#_Expression, __FILE__, __LINE__); }
 
 int javajstest();
 
 char * findEd();
 
 class JSObj;
+
 class JavaJSImpl {
  public:
   JavaJSImpl();
@@ -37,7 +38,9 @@ class JavaJSImpl {
   jboolean scopeGetBoolean( jlong id , char * field ){
     return _env->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , _env->NewStringUTF( field ) );
   }
+#ifdef J_USE_OBJ
   JSObj * scopeGetObject( jlong id , char * field );
+#endif
   char scopeGetType( jlong id , char * field ){
     return _env->CallStaticByteMethod( _dbhook , _scopeGetType , id , _env->NewStringUTF( field ) );
   }
@@ -45,7 +48,9 @@ class JavaJSImpl {
 
   int scopeSetNumber( jlong id , char * field , double val );
   int scopeSetString( jlong id , char * field , char * val );
+#ifdef J_USE_OBJ
   int scopeSetObject( jlong id , char * field , JSObj * obj );
+#endif
   int scopeSetBoolean( jlong id , char * field , jboolean val ){
       return _env->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _env->NewStringUTF( field ) , val );
   }
