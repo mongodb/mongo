@@ -24,12 +24,16 @@ db: $(OBJS) db.o $(LIB_DEPS)
 	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(JVM_LIBS)
 #	-./db quicktest
 
-javatest: $(OBJS) javatest.o $(LIB_DEPS)
-	g++ $(FLAGS) -o $@ $(OBJS) javatest.o $(LIBS) $(JVM_LIBS)
+javatest: javatest.o $(OBJS) $(LIB_DEPS)
+	g++ $(FLAGS) -o $@ javatest.o $(OBJS) $(LIBS) $(JVM_LIBS)
+
+javatest2: javatest.o javajs.o $(LIB_DEPS)
+	g++ $(FLAGS) -o javatest2 javatest.o javajs.o $(LIBS) $(JVM_LIBS)
 
 clean:
 	-rm -f $(OBJS) db.o
 	-rm -f db
+	-rm -f *.o
 
 cleandb:
 	rm /data/db/*
