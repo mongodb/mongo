@@ -225,8 +225,10 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 			assert( where == 0 );
 			where = new Where();
 			const char *code = e.valuestr();
-			where->func = JavaJS->functionCreate( code );
+                        JavaJS = new JavaJSImpl();
+                        javajstest();
 			where->scope = JavaJS->scopeCreate();
+			where->func = JavaJS->functionCreate( code );
 			continue;
 		}
 
