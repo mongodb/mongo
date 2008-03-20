@@ -372,6 +372,15 @@ JavaJS.run("print(5);");
   }
   if ( debug ) cout << "func6 done" << endl;
 
+  jlong func7 = JavaJS.functionCreate( "return 11;" );
+  jassert( ! JavaJS.invoke( scope , func7 ) );
+  assert( 11 == JavaJS.scopeGetNumber( scope , "return" ) );
+
+  scope = JavaJS.scopeCreate();
+  jlong func8 = JavaJS.functionCreate( "function(){ return 12; }" );
+  jassert( ! JavaJS.invoke( scope , func8 ) );
+  assert( 12 == JavaJS.scopeGetNumber( scope , "return" ) );
+  
   return 0;
 
 }
