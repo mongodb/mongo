@@ -1,7 +1,7 @@
 
 FLAGS += -I/opt/java/include/ -I/opt/java/include/linux  
 
-JVM_LIBS += -L/opt/java/jre/lib/i386/server -L/opt/java/jre/lib/i386 \
-         -Xlinker -rpath -Xlinker /opt/java/jre/lib/i386/server  \
+JVM_LIBS += -L/opt/java/jre/lib/i386/client -L/opt/java/jre/lib/i386 \
+         -Xlinker -rpath -Xlinker /opt/java/jre/lib/i386/client  \
          -Xlinker -rpath -Xlinker /opt/java/jre/lib/i386  \
-         -ljvm
+         -ljvm -ljava
