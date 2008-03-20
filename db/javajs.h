@@ -67,9 +67,8 @@ class JavaJSImpl {
 
   void printException();
  
- private:
-
   void run( char * js );
+ private:
   
   jobject create( const char * name ){
     jclass c = findClass( name );

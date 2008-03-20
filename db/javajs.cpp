@@ -1,6 +1,7 @@
 // java.cpp
 
 #include "stdafx.h"
+#include "javajs.h"
 #include <iostream>
 #include <map>
 #include <list>
@@ -13,11 +14,9 @@
 
 using namespace boost::filesystem;          
 
-#include "javajs.h"
-
 #ifdef J_USE_OBJ
 #include "jsobj.h"
-#warning including jsobj.h
+#pragma message("warning: including jsobj.h")
 #endif
 
 using namespace std;
@@ -204,7 +203,7 @@ JSObj * JavaJSImpl::scopeGetObject( jlong id , char * field ){
 
   int guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _env->NewStringUTF( field ) );
 
-  char * buf = new char[ guess ];
+  char * buf = (char *) malloc(guess);
   jobject bb = _env->NewDirectByteBuffer( (void*)buf , guess );
   jassert( bb );
   
@@ -213,6 +212,7 @@ JSObj * JavaJSImpl::scopeGetObject( jlong id , char * field ){
   assert( len > 0 && len < guess ); 
 
   JSObj * obj = new JSObj( buf , true );
+  assert( obj->objsize() <= guess );
   //cout << "going to print" << endl;
   //cout << obj->toString() << endl;
   return obj;
@@ -294,9 +294,11 @@ char * findEd(){
 int javajstest() {
 
   int testObject = 1;
-  int debug = 0;
+  int debug = 1;
 
   JavaJSImpl& JavaJS = *::JavaJS;
+
+JavaJS.run("print(5);");
   
   if ( debug ) cout << "about to create scope" << endl;
   jlong scope = JavaJS.scopeCreate();

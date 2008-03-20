@@ -20,7 +20,7 @@
 				HttpUrl=""
 				PDBPath=""
 				SQLDebugging=""
-				Environment="PATH=C:\Program Files\Java\jdk1.6.0_05\jre\bin\server"
+				Environment="PATH=C:\Program Files\Java\jdk1.6.0_05\jre\bin\client"
 				EnvironmentMerge="true"
 				DebuggerFlavor="0"
 				MPIRunCommand=""
