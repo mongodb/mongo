@@ -9,6 +9,8 @@
 #pragma pack()
 #include <jni.h>
 
+#include "jsobj.h"
+
 #include <sys/types.h>
 #if !defined(_WIN32)
 #include <dirent.h>
@@ -33,25 +35,20 @@ class JavaJSImpl {
   jboolean scopeReset( jlong id );
   void scopeFree( jlong id );
 
-  double scopeGetNumber( jlong id , char * field );
-  char * scopeGetString( jlong id , char * field );
-  jboolean scopeGetBoolean( jlong id , char * field ){
+  double scopeGetNumber( jlong id , const char * field );
+  string scopeGetString( jlong id , const char * field );
+  jboolean scopeGetBoolean( jlong id , const char * field ){
     return _env->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , _env->NewStringUTF( field ) );
   }
-#ifdef J_USE_OBJ
-  JSObj * scopeGetObject( jlong id , char * field );
-#endif
-  char scopeGetType( jlong id , char * field ){
+  JSObj scopeGetObject( jlong id , const char * field );
+  char scopeGetType( jlong id , const char * field ){
     return _env->CallStaticByteMethod( _dbhook , _scopeGetType , id , _env->NewStringUTF( field ) );
   }
 
-
-  int scopeSetNumber( jlong id , char * field , double val );
-  int scopeSetString( jlong id , char * field , char * val );
-#ifdef J_USE_OBJ
-  int scopeSetObject( jlong id , char * field , JSObj * obj );
-#endif
-  int scopeSetBoolean( jlong id , char * field , jboolean val ){
+  int scopeSetNumber( jlong id , const char * field , double val );
+  int scopeSetString( jlong id , const char * field , char * val );
+  int scopeSetObject( jlong id , const char * field , JSObj * obj );
+  int scopeSetBoolean( jlong id , const char * field , jboolean val ) {
       return _env->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _env->NewStringUTF( field ) , val );
   }
   
@@ -117,3 +114,24 @@ class JavaJSImpl {
 };
 
 extern JavaJSImpl *JavaJS;
+
+// a javascript "scope"
+class Scope { 
+public:
+	Scope() { s = JavaJS->scopeCreate(); }
+	~Scope() { JavaJS->scopeFree(s); s = 0; }
+	void reset() { JavaJS->scopeReset(s); }
+
+	double getNumber(const char *field) { return JavaJS->scopeGetNumber(s,field); }
+	string getString(const char *field) { return JavaJS->scopeGetString(s,field); }
+	jboolean getBoolean(const char *field) { return JavaJS->scopeGetBoolean(s,field); }
+	JSObj scopeGetObject(const char *field ) { return JavaJS->scopeGetObject(s,field); }
+
+	void setNumber(const char *field, double val ) { JavaJS->scopeSetNumber(s,field,val); }
+	void setString(const char *field, char * val ) { JavaJS->scopeSetString(s,field,val); }
+	void setObject(const char *field, JSObj& obj ) { JavaJS->scopeSetObject(s,field,&obj); }
+	void setBoolean(const char *field, jboolean val ) { JavaJS->scopeSetBoolean(s,field,val); }
+
+	jlong s;
+};
+

@@ -9,6 +9,7 @@
 #include "introspect.h"
 #include "btree.h"
 #include "../util/lruishmap.h"
+#include "javajs.h"
 
 //ns->query->DiskLoc
 LRUishMap<JSObj,DiskLoc,5> lrutest(123);
@@ -385,6 +386,23 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 
 bool userCreateNS(const char *ns, JSObj& j);
 
+bool dbEval(JSObj& cmd, JSObjBuilder& result) { 
+	Element e = cmd.firstElement();
+	assert( e.type() == Code );
+	const char *code = e.valuestr();
+	if ( ! JavaJS )
+		JavaJS = new JavaJSImpl();
+	Scope s;
+	Element args = cmd.findElement("args");
+	if( args.type() == Object ) {
+		JSObj eo = args.embeddedObject();
+		s.setObject("args", eo);
+	}
+// FINISH...invoke
+	result.append("errmsg", "not implemented");
+	return false;
+}
+
 // e.g.
 //   system.cmd$.find( { queryTraceLevel: 2 } );
 // 
@@ -401,16 +419,17 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 	bool ok = false;
 	bool valid = false;
 
-cout << jsobj.toString() << endl;
+	//cout << jsobj.toString() << endl;
 
 	Element e;
-//	e = jsobj.findElement("create");
-	//if( e.eoo() )
-//		e = jsobj.firstElement();
 	e = jsobj.firstElement();
 
 	if( e.eoo() ) goto done;
-	if( e.type() == Number ) { 
+	if( e.type() == Code ) { 
+		valid = true;
+		ok = dbEval(jsobj, anObjBuilderForYa);
+	}
+	else if( e.type() == Number ) { 
 		if( strcmp(e.fieldName(), "profile") == 0 ) { 
 			anObjBuilderForYa.append("was", (double) client->profile);
 			client->profile = (int) e.number();

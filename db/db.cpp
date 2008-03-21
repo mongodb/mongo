@@ -269,7 +269,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 100 mar2008 profiling" << endl;
+	cout << "db version: 101 mar2008 where" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;

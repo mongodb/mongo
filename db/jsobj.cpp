@@ -3,6 +3,22 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
+#include "javajs.h"
+
+class Where { 
+public:
+	~Where() {
+		JavaJS->scopeFree(scope);
+		scope = 0; func = 0;
+	}
+	jlong scope, func;
+};
+
+JSMatcher::~JSMatcher() { 
+	for( int i = 0; i < nBuilders; i++ )
+		delete builders[i];
+	delete where;
+}
 
 Element nullElement;
 
@@ -104,7 +120,7 @@ int Element::size() {
 
 	if( !eoo() ) { 
 		const char *next = data + totalSize;
-		if( *next < 0 || *next > DBRef ) { 
+		if( *next < 0 || *next > JSTypeMax ) { 
 			// bad type.  
 			cout << "*********************************************\n";
 			cout << "Bad data or size in Element::size()" << endl;
