@@ -285,6 +285,13 @@ public:
 		b.append((void *) e.value(), e.valuesize());
 	}
 
+	/* add a subobject as a member */
+	void append(const char *fieldName, JSObj subObj) { 
+		b.append((char) Object);
+		b.append(fieldName);
+		b.append((void *) subObj.objdata(), subObj.objsize());
+	}
+
 	void append(const char *fieldName, double n) { 
 		b.append((char) Number);
 		b.append(fieldName);

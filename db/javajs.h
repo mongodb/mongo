@@ -125,12 +125,15 @@ public:
 	double getNumber(const char *field) { return JavaJS->scopeGetNumber(s,field); }
 	string getString(const char *field) { return JavaJS->scopeGetString(s,field); }
 	jboolean getBoolean(const char *field) { return JavaJS->scopeGetBoolean(s,field); }
-	JSObj scopeGetObject(const char *field ) { return JavaJS->scopeGetObject(s,field); }
+	JSObj getObject(const char *field ) { return JavaJS->scopeGetObject(s,field); }
+	int type(const char *field ) { return JavaJS->scopeGetType(s,field); }
 
 	void setNumber(const char *field, double val ) { JavaJS->scopeSetNumber(s,field,val); }
 	void setString(const char *field, char * val ) { JavaJS->scopeSetString(s,field,val); }
 	void setObject(const char *field, JSObj& obj ) { JavaJS->scopeSetObject(s,field,&obj); }
 	void setBoolean(const char *field, jboolean val ) { JavaJS->scopeSetBoolean(s,field,val); }
+
+	int invoke(jlong function) { return JavaJS->invoke(s,function); }
 
 	jlong s;
 };

@@ -76,7 +76,8 @@ JavaJSImpl::JavaJSImpl(){
   options[0].optionString = q;
   options[1].optionString = "-Djava.awt.headless=true";
   options[2].optionString = "-Xmx300m";
-  
+// -Xcheck:jni  
+
   JavaVMInitArgs * vm_args = new JavaVMInitArgs();
   vm_args->version = JNI_VERSION_1_4;
   vm_args->options = options;

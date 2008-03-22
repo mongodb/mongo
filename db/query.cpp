@@ -392,15 +392,36 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	const char *code = e.valuestr();
 	if ( ! JavaJS )
 		JavaJS = new JavaJSImpl();
+
+	jlong f = JavaJS->functionCreate(code);
+	if( f == 0 ) { 
+		result.append("errmsg", "compile failed");
+		return false;
+	}
+
 	Scope s;
 	Element args = cmd.findElement("args");
-	if( args.type() == Object ) {
+	if( args.type() == Array ) {
 		JSObj eo = args.embeddedObject();
 		s.setObject("args", eo);
 	}
-// FINISH...invoke
-	result.append("errmsg", "not implemented");
-	return false;
+
+	int res = s.invoke(f);
+	if( res ) {
+		result.append("errno", (double) res);
+		result.append("errmsg", "invoke failed");
+		return false;
+	}
+
+	int type = s.type("return");
+	if( type == Object )
+		result.append("retval", s.getObject("return"));
+	else if( type == Number ) 
+		result.append("retval", s.getNumber("return"));
+	else if( type == String )
+		result.append("retval", s.getString("return").c_str());
+
+	return true;
 }
 
 // e.g.
