@@ -7,15 +7,17 @@
 #define J_USE_OBJ
 
 #pragma pack()
+
 #include <jni.h>
-
-#include "jsobj.h"
-
+#include <boost/thread/tss.hpp>
+#include <errno.h>
 #include <sys/types.h>
+
 #if !defined(_WIN32)
 #include <dirent.h>
 #endif
-#include <errno.h>
+
+#include "jsobj.h"
 
 void jasserted(const char *msg, const char *file, unsigned line);
 #define jassert(_Expression) if ( ! ( _Expression ) ){ jasserted(#_Expression, __FILE__, __LINE__); }
@@ -38,18 +40,18 @@ class JavaJSImpl {
   double scopeGetNumber( jlong id , const char * field );
   string scopeGetString( jlong id , const char * field );
   jboolean scopeGetBoolean( jlong id , const char * field ){
-    return _env->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , _env->NewStringUTF( field ) );
+    return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , _getEnv()->NewStringUTF( field ) );
   }
   JSObj scopeGetObject( jlong id , const char * field );
   char scopeGetType( jlong id , const char * field ){
-    return _env->CallStaticByteMethod( _dbhook , _scopeGetType , id , _env->NewStringUTF( field ) );
+    return _getEnv()->CallStaticByteMethod( _dbhook , _scopeGetType , id , _getEnv()->NewStringUTF( field ) );
   }
 
   int scopeSetNumber( jlong id , const char * field , double val );
   int scopeSetString( jlong id , const char * field , char * val );
   int scopeSetObject( jlong id , const char * field , JSObj * obj );
   int scopeSetBoolean( jlong id , const char * field , jboolean val ) {
-      return _env->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _env->NewStringUTF( field ) , val );
+      return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
   }
   
   jlong functionCreate( const char * code );
@@ -66,6 +68,10 @@ class JavaJSImpl {
 
   void run( char * js );
 
+  void detach( JNIEnv * env ){
+    _jvm->DetachCurrentThread();
+  }
+
  private:
   
   jobject create( const char * name ){
@@ -73,21 +79,27 @@ class JavaJSImpl {
     if ( ! c )
       return 0;
     
-    jmethodID cons = _env->GetMethodID( c , "<init>" , "()V" );
+    jmethodID cons = _getEnv()->GetMethodID( c , "<init>" , "()V" );
     if ( ! cons )
       return 0;
 
-    return _env->NewObject( c , cons );
+    return _getEnv()->NewObject( c , cons );
   }
 
   jclass findClass( const char * name ){
-    return _env->FindClass( name );
+    return _getEnv()->FindClass( name );
   }
 
 
  private:
+  
+  JNIEnv * _getEnv();
+
   JavaVM * _jvm;
-  JNIEnv * _env;
+  JNIEnv * _mainEnv;
+  JavaVMInitArgs * _vmArgs;
+
+  boost::thread_specific_ptr<JNIEnv> * _envs;
 
   jclass _dbhook;
   
@@ -117,24 +129,24 @@ extern JavaJSImpl *JavaJS;
 
 // a javascript "scope"
 class Scope { 
-public:
-	Scope() { s = JavaJS->scopeCreate(); }
-	~Scope() { JavaJS->scopeFree(s); s = 0; }
-	void reset() { JavaJS->scopeReset(s); }
-
-	double getNumber(const char *field) { return JavaJS->scopeGetNumber(s,field); }
-	string getString(const char *field) { return JavaJS->scopeGetString(s,field); }
-	jboolean getBoolean(const char *field) { return JavaJS->scopeGetBoolean(s,field); }
-	JSObj getObject(const char *field ) { return JavaJS->scopeGetObject(s,field); }
-	int type(const char *field ) { return JavaJS->scopeGetType(s,field); }
-
-	void setNumber(const char *field, double val ) { JavaJS->scopeSetNumber(s,field,val); }
-	void setString(const char *field, char * val ) { JavaJS->scopeSetString(s,field,val); }
-	void setObject(const char *field, JSObj& obj ) { JavaJS->scopeSetObject(s,field,&obj); }
-	void setBoolean(const char *field, jboolean val ) { JavaJS->scopeSetBoolean(s,field,val); }
-
-	int invoke(jlong function) { return JavaJS->invoke(s,function); }
-
-	jlong s;
+ public:
+  Scope() { s = JavaJS->scopeCreate(); }
+  ~Scope() { JavaJS->scopeFree(s); s = 0; }
+  void reset() { JavaJS->scopeReset(s); }
+  
+  double getNumber(const char *field) { return JavaJS->scopeGetNumber(s,field); }
+  string getString(const char *field) { return JavaJS->scopeGetString(s,field); }
+  jboolean getBoolean(const char *field) { return JavaJS->scopeGetBoolean(s,field); }
+  JSObj getObject(const char *field ) { return JavaJS->scopeGetObject(s,field); }
+  int type(const char *field ) { return JavaJS->scopeGetType(s,field); }
+  
+  void setNumber(const char *field, double val ) { JavaJS->scopeSetNumber(s,field,val); }
+  void setString(const char *field, char * val ) { JavaJS->scopeSetString(s,field,val); }
+  void setObject(const char *field, JSObj& obj ) { JavaJS->scopeSetObject(s,field,&obj); }
+  void setBoolean(const char *field, jboolean val ) { JavaJS->scopeSetBoolean(s,field,val); }
+  
+  int invoke(jlong function) { return JavaJS->invoke(s,function); }
+  
+  jlong s;
 };
 

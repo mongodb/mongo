@@ -23,9 +23,13 @@ using namespace std;
 
 JavaJSImpl * JavaJS = 0;
 
+void myJNIClean( JNIEnv * env ){
+  JavaJS->detach( env );
+}
+
 JavaJSImpl::JavaJSImpl(){
   _jvm = 0; 
-  _env = 0;
+  _mainEnv = 0;
   _dbhook = 0;
 
   char * ed = findEd();
@@ -78,51 +82,55 @@ JavaJSImpl::JavaJSImpl(){
   options[2].optionString = "-Xmx300m";
 // -Xcheck:jni  
 
-  JavaVMInitArgs * vm_args = new JavaVMInitArgs();
-  vm_args->version = JNI_VERSION_1_4;
-  vm_args->options = options;
-  vm_args->nOptions = 3;
-  vm_args->ignoreUnrecognized = JNI_FALSE;
+  _vmArgs = new JavaVMInitArgs();
+  _vmArgs->version = JNI_VERSION_1_4;
+  _vmArgs->options = options;
+  _vmArgs->nOptions = 3;
+  _vmArgs->ignoreUnrecognized = JNI_FALSE;
 
   cerr << "Creating JVM" << endl;
-  jint res = JNI_CreateJavaVM( &_jvm, (void**)&_env, vm_args);
+  jint res = JNI_CreateJavaVM( &_jvm, (void**)&_mainEnv, _vmArgs );
 
   if( res ) {
 	  cout << "using classpath: " << q << endl;
 	  cerr
 		  << "res : " << res << " " 
 		  << "_jvm : " << _jvm  << " " 
-		  << "_env : " << _env << " "
+		  << "_env : " << _mainEnv << " "
 		  << endl;
   }
 
   jassert( res == 0 );
   jassert( _jvm > 0 );
-  jassert( _env > 0 );    
+  jassert( _mainEnv > 0 );    
+
+  _envs = new boost::thread_specific_ptr<JNIEnv>( myJNIClean );
+  assert( ! _envs->get() );
+  _envs->reset( _mainEnv );
 
   _dbhook = findClass( "ed/js/DBHook" );
   if( _dbhook == 0 )
 	  cout << "using classpath: " << q << endl;
   jassert( _dbhook );
 
-  _scopeCreate = _env->GetStaticMethodID( _dbhook , "scopeCreate" , "()J" );
-  _scopeReset = _env->GetStaticMethodID( _dbhook , "scopeReset" , "(J)Z" );
-  _scopeFree = _env->GetStaticMethodID( _dbhook , "scopeFree" , "(J)V" );
+  _scopeCreate = _mainEnv->GetStaticMethodID( _dbhook , "scopeCreate" , "()J" );
+  _scopeReset = _mainEnv->GetStaticMethodID( _dbhook , "scopeReset" , "(J)Z" );
+  _scopeFree = _mainEnv->GetStaticMethodID( _dbhook , "scopeFree" , "(J)V" );
 
-  _scopeGetNumber = _env->GetStaticMethodID( _dbhook , "scopeGetNumber" , "(JLjava/lang/String;)D" );
-  _scopeGetString = _env->GetStaticMethodID( _dbhook , "scopeGetString" , "(JLjava/lang/String;)Ljava/lang/String;" );
-  _scopeGetBoolean = _env->GetStaticMethodID( _dbhook , "scopeGetBoolean" , "(JLjava/lang/String;)Z" );
-  _scopeGetType = _env->GetStaticMethodID( _dbhook , "scopeGetType" , "(JLjava/lang/String;)B" );
-  _scopeGetObject = _env->GetStaticMethodID( _dbhook , "scopeGetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)I" );
-  _scopeGuessObjectSize = _env->GetStaticMethodID( _dbhook , "scopeGuessObjectSize" , "(JLjava/lang/String;)J" );
+  _scopeGetNumber = _mainEnv->GetStaticMethodID( _dbhook , "scopeGetNumber" , "(JLjava/lang/String;)D" );
+  _scopeGetString = _mainEnv->GetStaticMethodID( _dbhook , "scopeGetString" , "(JLjava/lang/String;)Ljava/lang/String;" );
+  _scopeGetBoolean = _mainEnv->GetStaticMethodID( _dbhook , "scopeGetBoolean" , "(JLjava/lang/String;)Z" );
+  _scopeGetType = _mainEnv->GetStaticMethodID( _dbhook , "scopeGetType" , "(JLjava/lang/String;)B" );
+  _scopeGetObject = _mainEnv->GetStaticMethodID( _dbhook , "scopeGetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)I" );
+  _scopeGuessObjectSize = _mainEnv->GetStaticMethodID( _dbhook , "scopeGuessObjectSize" , "(JLjava/lang/String;)J" );
   
-  _scopeSetNumber = _env->GetStaticMethodID( _dbhook , "scopeSetNumber" , "(JLjava/lang/String;D)Z" );
-  _scopeSetBoolean = _env->GetStaticMethodID( _dbhook , "scopeSetBoolean" , "(JLjava/lang/String;Z)Z" );
-  _scopeSetString = _env->GetStaticMethodID( _dbhook , "scopeSetString" , "(JLjava/lang/String;Ljava/lang/String;)Z" );
-  _scopeSetObject = _env->GetStaticMethodID( _dbhook , "scopeSetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)Z" );
+  _scopeSetNumber = _mainEnv->GetStaticMethodID( _dbhook , "scopeSetNumber" , "(JLjava/lang/String;D)Z" );
+  _scopeSetBoolean = _mainEnv->GetStaticMethodID( _dbhook , "scopeSetBoolean" , "(JLjava/lang/String;Z)Z" );
+  _scopeSetString = _mainEnv->GetStaticMethodID( _dbhook , "scopeSetString" , "(JLjava/lang/String;Ljava/lang/String;)Z" );
+  _scopeSetObject = _mainEnv->GetStaticMethodID( _dbhook , "scopeSetObject" , "(JLjava/lang/String;Ljava/nio/ByteBuffer;)Z" );
 
-  _functionCreate = _env->GetStaticMethodID( _dbhook , "functionCreate" , "(Ljava/lang/String;)J" );
-  _invoke = _env->GetStaticMethodID( _dbhook , "invoke" , "(JJ)I" );
+  _functionCreate = _mainEnv->GetStaticMethodID( _dbhook , "functionCreate" , "(Ljava/lang/String;)J" );
+  _invoke = _mainEnv->GetStaticMethodID( _dbhook , "invoke" , "(JJ)I" );
 
   jassert( _scopeCreate );  
   jassert( _scopeReset );
@@ -155,65 +163,65 @@ JavaJSImpl::~JavaJSImpl(){
 // scope
 
 jlong JavaJSImpl::scopeCreate(){ 
-  return _env->CallStaticLongMethod( _dbhook , _scopeCreate );
+  return _getEnv()->CallStaticLongMethod( _dbhook , _scopeCreate );
 }
 
 jboolean JavaJSImpl::scopeReset( jlong id ){
-  return _env->CallStaticBooleanMethod( _dbhook , _scopeReset );
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeReset );
 }
 
 void JavaJSImpl::scopeFree( jlong id ){
-  _env->CallStaticVoidMethod( _dbhook , _scopeFree );
+  _getEnv()->CallStaticVoidMethod( _dbhook , _scopeFree );
 }
 
 // scope setters
 
 int JavaJSImpl::scopeSetNumber( jlong id , const char * field , double val ){
-  return _env->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _env->NewStringUTF( field ) , val );
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
 }
 
 int JavaJSImpl::scopeSetString( jlong id , const char * field , char * val ){
-  return _env->CallStaticBooleanMethod( _dbhook , _scopeSetString , id , _env->NewStringUTF( field ) , _env->NewStringUTF( val ) );
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetString , id , _getEnv()->NewStringUTF( field ) , _getEnv()->NewStringUTF( val ) );
 }
 
 int JavaJSImpl::scopeSetObject( jlong id , const char * field , JSObj * obj ){
   jobject bb = 0;
   if ( obj ){
     //cout << "from c : " << obj->toString() << endl;
-    bb = _env->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
+    bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
     jassert( bb );
   }
 
-  return _env->CallStaticBooleanMethod( _dbhook , _scopeSetObject , id , _env->NewStringUTF( field ) , bb );
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetObject , id , _getEnv()->NewStringUTF( field ) , bb );
 }
 
 // scope getters
 
 double JavaJSImpl::scopeGetNumber( jlong id , const char * field ){
-  return _env->CallStaticDoubleMethod( _dbhook , _scopeGetNumber , id , _env->NewStringUTF( field ) );
+  return _getEnv()->CallStaticDoubleMethod( _dbhook , _scopeGetNumber , id , _getEnv()->NewStringUTF( field ) );
 }
 
 string JavaJSImpl::scopeGetString( jlong id , const char * field ) {
-  jstring s = (jstring)_env->CallStaticObjectMethod( _dbhook , _scopeGetString , id , _env->NewStringUTF( field ) );
+  jstring s = (jstring)_getEnv()->CallStaticObjectMethod( _dbhook , _scopeGetString , id , _getEnv()->NewStringUTF( field ) );
   if ( ! s )
     return "";
   
-  const char * c = _env->GetStringUTFChars( s , 0 );
+  const char * c = _getEnv()->GetStringUTFChars( s , 0 );
   string retStr(c);
-  _env->ReleaseStringUTFChars( s , c );
+  _getEnv()->ReleaseStringUTFChars( s , c );
   return retStr;
 }
 
 #ifdef J_USE_OBJ
 JSObj JavaJSImpl::scopeGetObject( jlong id , const char * field ) 
 {
-  int guess = _env->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _env->NewStringUTF( field ) );
+  int guess = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _getEnv()->NewStringUTF( field ) );
 
   char * buf = (char *) malloc(guess);
-  jobject bb = _env->NewDirectByteBuffer( (void*)buf , guess );
+  jobject bb = _getEnv()->NewDirectByteBuffer( (void*)buf , guess );
   jassert( bb );
   
-  int len = _env->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _env->NewStringUTF( field ) , bb );
+  int len = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _getEnv()->NewStringUTF( field ) , bb );
   //cout << "len : " << len << endl;
   assert( len > 0 && len < guess ); 
 
@@ -226,14 +234,14 @@ JSObj JavaJSImpl::scopeGetObject( jlong id , const char * field )
 // other
 
 jlong JavaJSImpl::functionCreate( const char * code ){
-  jstring s = _env->NewStringUTF( code );  
+  jstring s = _getEnv()->NewStringUTF( code );  
   jassert( s );
-  jlong id = _env->CallStaticLongMethod( _dbhook , _functionCreate , s );
+  jlong id = _getEnv()->CallStaticLongMethod( _dbhook , _functionCreate , s );
   return id;
 }
  
 int JavaJSImpl::invoke( jlong scope , jlong function ){
-  return _env->CallStaticIntMethod( _dbhook , _invoke , scope , function );
+  return _getEnv()->CallStaticIntMethod( _dbhook , _invoke , scope , function );
 }
 
 // --- fun run method
@@ -242,20 +250,31 @@ void JavaJSImpl::run( char * js ){
   jclass c = findClass( "ed/js/JS" );
   jassert( c );
   
-  jmethodID m = _env->GetStaticMethodID( c , "eval" , "(Ljava/lang/String;)Ljava/lang/Object;" );
+  jmethodID m = _getEnv()->GetStaticMethodID( c , "eval" , "(Ljava/lang/String;)Ljava/lang/Object;" );
   jassert( m );
   
-  jstring s = _env->NewStringUTF( js );
-  cout << _env->CallStaticObjectMethod( c , m , s ) << endl;
+  jstring s = _getEnv()->NewStringUTF( js );
+  cout << _getEnv()->CallStaticObjectMethod( c , m , s ) << endl;
 }
 
 void JavaJSImpl::printException(){
-  jthrowable exc = _env->ExceptionOccurred();
+  jthrowable exc = _getEnv()->ExceptionOccurred();
   if ( exc ){
-    _env->ExceptionDescribe();
-    _env->ExceptionClear();
+    _getEnv()->ExceptionDescribe();
+    _getEnv()->ExceptionClear();
   }
 
+}
+
+JNIEnv * JavaJSImpl::_getEnv(){
+  JNIEnv * env = _envs->get();
+  if ( env )
+    return env;
+
+  int res = _jvm->AttachCurrentThread( (void**)&env , (void*)&_vmArgs );
+  jassert( res == 0 );
+  _envs->reset( env );
+  return env;
 }
 
 void jasserted(const char *msg, const char *file, unsigned line) { 

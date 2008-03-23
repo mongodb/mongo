@@ -9,6 +9,7 @@
 #include "../util/goodies.h"
 #include "pdfile.h"
 #include "jsobj.h"
+#include "javajs.h"
 #include "query.h"
 #include "introspect.h"
 
@@ -445,8 +446,8 @@ void msg(const char *m, int extras = 0) {
 
 int main(int argc, char* argv[], char *envp[] )
 {
-  //JavaJS = new JavaJSImpl();
-  //javajstest();
+  JavaJS = new JavaJSImpl();
+  javajstest();
 
 	srand(curTimeMillis());
 
