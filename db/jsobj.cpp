@@ -224,6 +224,8 @@ int getGtLtOp(Element& e) {
 	return op;
 }
 
+#include "pdfile.h"
+
 JSMatcher::JSMatcher(JSObj &_jsobj) : 
    where(0), jsobj(_jsobj), nRegex(0)
 {
@@ -246,6 +248,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
                           javajstest();
                         }
 			where->scope = JavaJS->scopeCreate();
+			JavaJS->scopeSetString(where->scope, "$client", client->name.c_str());
 			where->func = JavaJS->functionCreate( code );
 			continue;
 		}

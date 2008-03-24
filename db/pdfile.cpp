@@ -27,12 +27,13 @@ Client *client;
 const char *curNs = "";
 int MAGIC = 0x1000;
 int curOp = -2;
+int callDepth = 0;
 
 extern int otherTraceLevel;
 
 void sayDbContext() { 
 	cout << " client: " << (client ? client->name.c_str() : "null");
-	cout << " op:" << curOp << endl;
+	cout << " op:" << curOp << ' ' << callDepth << endl;
 	if( client )
 		cout << " ns: " << curNs << endl;
 }

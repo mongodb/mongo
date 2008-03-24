@@ -20,7 +20,12 @@ private:
 	int port;
 };
 
-class MessagingPort {
+class AbstractMessagingPort { 
+public:
+	virtual void reply(Message& received, Message& response) = 0;
+};
+
+class MessagingPort : public AbstractMessagingPort {
 public:
 	MessagingPort(int sock, SockAddr& farEnd);
 	MessagingPort();
@@ -81,6 +86,16 @@ public:
 
 	SockAddr from;
 	MsgData *data;
+
+	Message& operator=(Message& r) { 
+		assert( data == 0 );
+		data = r.data;
+		assert( r.freeIt );
+		r.freeIt = false;
+		r.data = 0;
+		freeIt = true;
+		return *this;
+	}
 
 	void reset() {
 		if( freeIt && data )

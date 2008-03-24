@@ -155,7 +155,7 @@ void receivedDelete(Message& m) {
 	deleteObjects(ns, pattern, flags & 1);
 }
 
-void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
+void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	setClient(ns);
@@ -198,7 +198,7 @@ void receivedQuery(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	dbMsgPort.reply(m, resp);
 }
 
-void receivedGetMore(MessagingPort& dbMsgPort, Message& m, stringstream& ss) {
+void receivedGetMore(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	ss << ns;
@@ -255,7 +255,7 @@ void testTheDb() {
 int port = DBPort;
 
 MessagingPort *grab = 0;
-void t();
+void connThread();
 
 class OurListener : public Listener { 
 public:
@@ -263,7 +263,7 @@ public:
 	virtual void accepted(MessagingPort *mp) {
 		assert( grab == 0 );
 		grab = mp;
-		boost::thread thr(t);
+		boost::thread thr(connThread);
 		while( grab )
 			sleepmillis(1);
 	}
@@ -279,8 +279,111 @@ void listen(int port) {
 }
 
 int ctr = 0;
+extern int callDepth;
 
-void t()
+class JniMessagingPort : public AbstractMessagingPort { 
+public:
+	JniMessagingPort(Message& _container) : container(_container) { }
+	void reply(Message& received, Message& response) { 
+		container = response;
+	}
+	Message container;
+};
+
+/* a call from java/js to the database locally. 
+
+     m - inbound message
+     out - outbound message, if there is any, will be set here.
+           if there is one, out.data will be non-null on return.
+		   The out.data buffer will automatically clean up when out
+		   goes out of scope (out.freeIt==true)
+*/
+void jniCallback(Message& m, Message& out)
+{
+	Client *clientOld = client;
+
+	JniMessagingPort jmp(out);
+	callDepth++;
+	int curOpOld = curOp;
+
+	try { 
+
+		stringstream ss;
+		char buf[64];
+		time_t_to_String(time(0), buf);
+		buf[20] = 0; // don't want the year
+		ss << buf << " dbjs ";
+
+		{
+			Timer t;
+
+			bool log = false;
+			curOp = m.data->operation;
+			if( m.data->operation == dbQuery ) { 
+				receivedQuery(jmp, m, ss);
+			}
+			else if( m.data->operation == dbInsert ) {
+				ss << "insert ";
+				receivedInsert(m, ss);
+			}
+			else if( m.data->operation == dbUpdate ) {
+				ss << "update ";
+				receivedUpdate(m, ss);
+			}
+			else if( m.data->operation == dbDelete ) {
+				ss << "remove ";
+				receivedDelete(m);
+			}
+			else if( m.data->operation == dbGetMore ) {
+				log = true;
+				ss << "getmore ";
+				receivedGetMore(jmp, m, ss);
+			}
+			else if( m.data->operation == dbKillCursors ) { 
+				try {
+					log = true;
+					ss << "killcursors ";
+					receivedKillCursors(m);
+				}
+				catch( AssertionException ) { 
+					cout << "Caught Assertion in kill cursors, continuing" << endl; 
+					ss << " exception ";
+				}
+			}
+			else {
+				cout << "    jnicall: operation isn't supported: " << m.data->operation << endl;
+				assert(false);
+			}
+
+			int ms = t.millis();
+			log = log || ctr++ % 128 == 0;
+			if( log || ms > 100 ) {
+				ss << ' ' << t.millis() << "ms";
+				cout << ss.str().c_str() << endl;
+			}
+			if( client && client->profile >= 1 ) { 
+				if( client->profile >= 2 || ms >= 100 ) { 
+					// profile it
+					profile(ss.str().c_str()+20/*skip ts*/, ms);
+				}
+			}
+		}
+
+	}
+	catch( AssertionException ) { 
+		cout << "Caught AssertionException in jniCall()" << endl;
+	}
+
+	curOp = curOpOld;
+	callDepth--;
+
+	if( client != clientOld ) { 
+		client = clientOld;
+		wassert(false);
+	}
+}
+
+void connThread()
 {
 	try { 
 

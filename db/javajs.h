@@ -48,7 +48,7 @@ class JavaJSImpl {
   }
 
   int scopeSetNumber( jlong id , const char * field , double val );
-  int scopeSetString( jlong id , const char * field , char * val );
+  int scopeSetString( jlong id , const char * field , const char * val );
   int scopeSetObject( jlong id , const char * field , JSObj * obj );
   int scopeSetBoolean( jlong id , const char * field , jboolean val ) {
       return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
@@ -141,7 +141,7 @@ class Scope {
   int type(const char *field ) { return JavaJS->scopeGetType(s,field); }
   
   void setNumber(const char *field, double val ) { JavaJS->scopeSetNumber(s,field,val); }
-  void setString(const char *field, char * val ) { JavaJS->scopeSetString(s,field,val); }
+  void setString(const char *field, const char * val ) { JavaJS->scopeSetString(s,field,val); }
   void setObject(const char *field, JSObj& obj ) { JavaJS->scopeSetObject(s,field,&obj); }
   void setBoolean(const char *field, jboolean val ) { JavaJS->scopeSetBoolean(s,field,val); }
   

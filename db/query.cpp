@@ -400,6 +400,7 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	}
 
 	Scope s;
+	s.setString("$client", client->name.c_str());
 	Element args = cmd.findElement("args");
 	if( args.type() == Array ) {
 		JSObj eo = args.embeddedObject();

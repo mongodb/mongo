@@ -204,7 +204,7 @@ int JavaJSImpl::scopeSetNumber( jlong id , const char * field , double val ){
   return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
 }
 
-int JavaJSImpl::scopeSetString( jlong id , const char * field , char * val ){
+int JavaJSImpl::scopeSetString( jlong id , const char * field , const char * val ){
   return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetString , id , _getEnv()->NewStringUTF( field ) , _getEnv()->NewStringUTF( val ) );
 }
 
