@@ -21,6 +21,30 @@ using namespace boost::filesystem;
 
 using namespace std;
 
+#if defined(_WIN32)
+/* [dm] this being undefined without us adding it here means there is 
+        no tss cleanup on windows for boost lib?
+        we don't care for now esp on windows only
+
+		the boost source says:
+
+		  This function's sole purpose is to cause a link error in cases where
+		  automatic tss cleanup is not implemented by Boost.Threads as a
+		  reminder that user code is responsible for calling the necessary
+		  functions at the appropriate times (and for implementing an a
+		  tss_cleanup_implemented() function to eliminate the linker's
+		  missing symbol error).
+
+		  If Boost.Threads later implements automatic tss cleanup in cases
+		  where it currently doesn't (which is the plan), the duplicate
+		  symbol error will warn the user that their custom solution is no
+		  longer needed and can be removed. 
+*/
+extern "C" void tss_cleanup_implemented(void) {
+	cout << "tss_cleanup_implemented called" << endl;
+}
+#endif
+
 JavaJSImpl * JavaJS = 0;
 
 void myJNIClean( JNIEnv * env ){
