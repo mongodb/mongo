@@ -6,8 +6,6 @@
 
 #define J_USE_OBJ
 
-#pragma pack()
-
 #include <jni.h>
 #include <boost/thread/tss.hpp>
 #include <errno.h>
@@ -24,7 +22,7 @@ void jasserted(const char *msg, const char *file, unsigned line);
 
 int javajstest();
 
-char * findEd();
+const char * findEd();
 
 class JSObj;
 
@@ -66,7 +64,7 @@ class JavaJSImpl {
 
   void printException();
 
-  void run( char * js );
+  void run( const char * js );
 
   void detach( JNIEnv * env ){
     _jvm->DetachCurrentThread();

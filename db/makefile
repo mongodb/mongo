@@ -3,7 +3,7 @@
 FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib
 
 LIB_DEPS = -lpcrecpp -lpcre
-LIBS= $(LIB_DEPS) -lboost_thread -lboost_filesystem
+LIBS= $(LIB_DEPS) -lboost_thread -lboost_filesystem -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
 
@@ -11,25 +11,27 @@ OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.
 
 # ../grid/protorecv.o ../grid/protosend.o
 
+GPP = g++
 
 include makefile.$(shell uname -s).$(shell uname -m)
 
+
 .cpp.o:
-	g++ -c $(FLAGS) $< -o $@
+	$(GPP) -c $(FLAGS) $< -o $@
 
 # Our convention is that passing 'quicktest' on the command line means run 
 # fast regressions and then immediately exit.  That way you know immediately if you
 # broke something horribly.
 
 db: $(OBJS) db.o 
-	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(JVM_LIBS)
+	$(GPP) $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(JVM_LIBS)
 #	-./db quicktest
 
 javatest: javatest.o $(OBJS)
-	g++ $(FLAGS) -o $@ javatest.o $(OBJS) $(LIBS) $(JVM_LIBS)
+	$(GPP) $(FLAGS) -o $@ javatest.o $(OBJS) $(LIBS) $(JVM_LIBS)
 
 javatest2: javatest.o javajs.o
-	g++ $(FLAGS) -o javatest2 javatest.o javajs.o $(LIBS) $(JVM_LIBS)
+	$(GPP) $(FLAGS) -o javatest2 javatest.o javajs.o $(LIBS) $(JVM_LIBS)
 
 clean:
 	-rm -f $(OBJS) db.o

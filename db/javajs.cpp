@@ -56,7 +56,7 @@ JavaJSImpl::JavaJSImpl(){
   _mainEnv = 0;
   _dbhook = 0;
 
-  char * ed = findEd();
+  const char * ed = findEd();
   stringstream ss;
 
 #if defined(_WIN32)
@@ -102,8 +102,8 @@ JavaJSImpl::JavaJSImpl(){
 
   JavaVMOption * options = new JavaVMOption[3];
   options[0].optionString = q;
-  options[1].optionString = "-Djava.awt.headless=true";
-  options[2].optionString = "-Xmx300m";
+  options[1].optionString = (char*)"-Djava.awt.headless=true";
+  options[2].optionString = (char*)"-Xmx300m";
 // -Xcheck:jni  
 
   _vmArgs = new JavaVMInitArgs();
@@ -270,7 +270,7 @@ int JavaJSImpl::invoke( jlong scope , jlong function ){
 
 // --- fun run method
 
-void JavaJSImpl::run( char * js ){
+void JavaJSImpl::run( const char * js ){
   jclass c = findClass( "ed/js/JS" );
   jassert( c );
   
@@ -308,21 +308,21 @@ void jasserted(const char *msg, const char *file, unsigned line) {
 }
 
 
-char * findEd(){
+const char * findEd(){
 
 #if defined(_WIN32)
   return "c:/l/ed";
 #else
 
-  static list<char*> possibleEdDirs;
+  static list<const char*> possibleEdDirs;
   if ( ! possibleEdDirs.size() ){
     possibleEdDirs.push_back( "../../ed/ed/" ); // this one for dwight dev box
     possibleEdDirs.push_back( "../ed/" );
     possibleEdDirs.push_back( "../../ed/" );
   }
 
-  for ( list<char*>::iterator i = possibleEdDirs.begin() ; i != possibleEdDirs.end(); i++ ){
-    char * temp = *i;
+  for ( list<const char*>::iterator i = possibleEdDirs.begin() ; i != possibleEdDirs.end(); i++ ){
+    const char * temp = *i;
     DIR * test = opendir( temp );
     if ( ! test )
       continue;
@@ -345,7 +345,7 @@ int javajstest() {
 
   JavaJSImpl& JavaJS = *::JavaJS;
 
-JavaJS.run("print(5);");
+  JavaJS.run( "print(5);" );
   
   JavaJS.run( "print( 17 );" );
 
