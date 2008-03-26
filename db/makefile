@@ -11,7 +11,8 @@ OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.
 
 # ../grid/protorecv.o ../grid/protosend.o
 
-include makefile.$(shell uname -s)
+
+include makefile.$(shell uname -s).$(shell uname -m)
 
 .cpp.o:
 	g++ -c $(FLAGS) $< -o $@
