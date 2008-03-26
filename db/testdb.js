@@ -243,6 +243,19 @@ function testdups2() {
  print(" end testdups");
 }
 
+
+/*
+ *   tests UTF-8 in the regexp package in the db : save a string w/ two unicode characters
+ *   and then pass a regex that looks for a match of both chars.   If regex on db is borked
+ *   we'll be matching against the two "low order" characters, rather than the two double-byte
+ *   characters
+ */
+function test_utf8() {
+    db.utf.save({str:"123abc\u0253\u0253"});
+    assert(db.utf.findOne({str:RegExp("\u0253{2,2}")}));
+    db.utf.remove({});
+}
+
 function runcursors() {
     print("initial remove");
     t.cur.remove({});
@@ -313,6 +326,9 @@ function runquick() {
     testarrayindexing();
 
     runcursors();
+
+    print("Testing UTF-8 support in db regex");
+    test_utf8();
 
     print("testdups last to go, it takes a little time...");
     testdups();
