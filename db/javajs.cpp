@@ -341,7 +341,7 @@ char * findEd(){
 int javajstest() {
 
   int testObject = 1;
-  int debug = 1;
+  const int debug = 0;
 
   JavaJSImpl& JavaJS = *::JavaJS;
 

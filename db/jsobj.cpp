@@ -401,8 +401,7 @@ ok:
 		JavaJS->scopeSetObject(where->scope, "obj", &jsobj);
 		if( JavaJS->invoke(where->scope, where->func) )
 			return false;
-		double n = JavaJS->scopeGetNumber(where->scope, "return");
-		return n != 0;
+		return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
 	}
 
 	return true;

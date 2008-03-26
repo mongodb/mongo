@@ -270,7 +270,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 101 mar2008 where" << endl;
+	cout << "db version: 102 mar2008 where" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
@@ -549,8 +549,8 @@ void msg(const char *m, int extras = 0) {
 
 int main(int argc, char* argv[], char *envp[] )
 {
-  JavaJS = new JavaJSImpl();
-  javajstest();
+	JavaJS = new JavaJSImpl();
+	//javajstest();
 
 	srand(curTimeMillis());
 

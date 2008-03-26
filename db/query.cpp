@@ -436,7 +436,7 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 	if( !p ) return false;
 	if( strcmp(p, ".$cmd") != 0 ) return false;
 
-	ss << "\n  $cmd: " << jsobj.toString();
+//	ss << "\n  $cmd: " << jsobj.toString();
 
 	bool ok = false;
 	bool valid = false;
