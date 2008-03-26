@@ -21,14 +21,14 @@ include makefile.$(shell uname -s).$(shell uname -m)
 # fast regressions and then immediately exit.  That way you know immediately if you
 # broke something horribly.
 
-db: $(OBJS) db.o $(LIB_DEPS)
+db: $(OBJS) db.o 
 	g++ $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(JVM_LIBS)
 #	-./db quicktest
 
-javatest: javatest.o $(OBJS) $(LIB_DEPS)
+javatest: javatest.o $(OBJS)
 	g++ $(FLAGS) -o $@ javatest.o $(OBJS) $(LIBS) $(JVM_LIBS)
 
-javatest2: javatest.o javajs.o $(LIB_DEPS)
+javatest2: javatest.o javajs.o
 	g++ $(FLAGS) -o javatest2 javatest.o javajs.o $(LIBS) $(JVM_LIBS)
 
 clean:
