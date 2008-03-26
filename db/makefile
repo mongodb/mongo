@@ -1,8 +1,8 @@
 # makefile for our db project
 
-FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db
+FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib
 
-LIB_DEPS = /usr/local/lib/libpcrecpp.a /usr/local/lib/libpcre.a
+LIB_DEPS = -lpcrecpp -lpcre
 LIBS= $(LIB_DEPS) -lboost_thread -lboost_filesystem
 
 JVM_LIBS = -L/opt/java/lib/
@@ -11,7 +11,8 @@ OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.
 
 # ../grid/protorecv.o ../grid/protosend.o
 
-include makefile.$(shell uname -s)
+
+include makefile.$(shell uname -s).$(shell uname -m)
 
 .cpp.o:
 	g++ -c $(FLAGS) $< -o $@

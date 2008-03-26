@@ -1,0 +1,10 @@
+#
+#  assumption - Java JDK installed at /opt/java
+#
+
+FLAGS += -I/opt/java/include/ -I/opt/java/include/linux  
+
+JVM_LIBS += -L/opt/java/jre/lib/amd64/server -L/opt/java/jre/lib/amd64 \
+         -Xlinker -rpath -Xlinker /opt/java/jre/lib/amd64/server  \
+         -Xlinker -rpath -Xlinker /opt/java/jre/lib/amd64  \
+         -ljvm -ljava
