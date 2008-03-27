@@ -340,7 +340,6 @@ const char * findEd(){
 
 int javajstest() {
 
-  int testObject = 1;
   const int debug = 0;
 
   JavaJSImpl& JavaJS = *::JavaJS;
@@ -376,31 +375,41 @@ int javajstest() {
   if ( debug ) cout << "func3 done" << endl;
 
 #ifdef J_USE_OBJ  
-  if ( testObject ){
-
-    if ( debug ) cout << "going to get object" << endl;
-    JSObj obj = JavaJS.scopeGetObject( scope , "abc" );
-    if ( debug ) cout << "done gettting object" << endl;
-
-    if ( debug ){
-      cout << "obj : " << obj.toString() << endl;
-    }
-
-    if ( debug ) cout << "func4 start" << endl;    
-    JavaJS.scopeSetObject( scope , "obj" , &obj );
-    if ( debug ) cout << "\t here 1" << endl;
-    jlong func4 = JavaJS.functionCreate( "print( tojson( obj ) );" );
-    if ( debug ) cout << "\t here 2" << endl;
-    jassert( ! JavaJS.invoke( scope , func4 ) );
-    if ( debug ) cout << "func4 end" << endl;
-    
-    if ( debug ) cout << "func5 start" << endl;
-    jassert( JavaJS.scopeSetObject( scope , "c" , &obj ) );
-    jlong func5 = JavaJS.functionCreate( "print( \"setObject : 517 == \" + c.foo );" );
-    jassert( func5 );
-    jassert( ! JavaJS.invoke( scope , func5 ) );
-    if ( debug ) cout << "func5 done" << endl;
+  
+  if ( debug ) cout << "going to get object" << endl;
+  JSObj obj = JavaJS.scopeGetObject( scope , "abc" );
+  if ( debug ) cout << "done gettting object" << endl;
+  
+  if ( debug ){
+    cout << "obj : " << obj.toString() << endl;
   }
+
+  {
+    int start = time(0);
+    for ( int i=0; i<5000; i++ ){
+      JavaJS.scopeSetObject( scope , "obj" , &obj );
+    }
+    int end = time(0);
+
+    cout << "time : " << ( end - start ) << endl;
+  }
+  
+  
+  if ( debug ) cout << "func4 start" << endl;    
+  JavaJS.scopeSetObject( scope , "obj" , &obj );
+  if ( debug ) cout << "\t here 1" << endl;
+  jlong func4 = JavaJS.functionCreate( "print( tojson( obj ) );" );
+  if ( debug ) cout << "\t here 2" << endl;
+  jassert( ! JavaJS.invoke( scope , func4 ) );
+  if ( debug ) cout << "func4 end" << endl;
+  
+  if ( debug ) cout << "func5 start" << endl;
+  jassert( JavaJS.scopeSetObject( scope , "c" , &obj ) );
+  jlong func5 = JavaJS.functionCreate( "print( \"setObject : 517 == \" + c.foo );" );
+  jassert( func5 );
+  jassert( ! JavaJS.invoke( scope , func5 ) );
+  if ( debug ) cout << "func5 done" << endl;
+
 #endif
 
   if ( debug ) cout << "func6 start" << endl;
@@ -421,6 +430,7 @@ int javajstest() {
   jlong func8 = JavaJS.functionCreate( "function(){ return 12; }" );
   jassert( ! JavaJS.invoke( scope , func8 ) );
   assert( 12 == JavaJS.scopeGetNumber( scope , "return" ) );
+
   
   return 0;
 
