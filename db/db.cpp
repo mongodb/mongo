@@ -287,7 +287,7 @@ public:
 	void reply(Message& received, Message& response) { 
 		container = response;
 	}
-	Message container;
+	Message & container;
 };
 
 /* a call from java/js to the database locally. 
@@ -550,7 +550,7 @@ void msg(const char *m, int extras = 0) {
 int main(int argc, char* argv[], char *envp[] )
 {
 	JavaJS = new JavaJSImpl();
-	//javajstest();
+	javajstest();
 
 	srand(curTimeMillis());
 

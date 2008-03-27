@@ -19,6 +19,9 @@ using namespace boost::filesystem;
 #pragma message("warning: including jsobj.h")
 #endif
 
+#include "../grid/message.h"
+#include "db.h"
+
 using namespace std;
 
 #if defined(_WIN32)
@@ -134,8 +137,11 @@ JavaJSImpl::JavaJSImpl(){
 
   _dbhook = findClass( "ed/db/JSHook" );
   if( _dbhook == 0 )
-	  cout << "using classpath: " << q << endl;
+    cout << "using classpath: " << q << endl;
   jassert( _dbhook );
+
+  _dbjni = findClass( "ed/db/DBJni" );
+  jassert( _dbjni );
 
   _scopeCreate = _mainEnv->GetStaticMethodID( _dbhook , "scopeCreate" , "()J" );
   _scopeReset = _mainEnv->GetStaticMethodID( _dbhook , "scopeReset" , "(J)Z" );
@@ -174,6 +180,19 @@ JavaJSImpl::JavaJSImpl(){
 
   jassert( _functionCreate );
   jassert( _invoke );
+  
+  JNINativeMethod * nativeSay = new JNINativeMethod();
+  nativeSay->name = (char*)"native_say";
+  nativeSay->signature = (char*)"(Ljava/nio/ByteBuffer;)V";
+  nativeSay->fnPtr = (void*)java_native_say;
+  _mainEnv->RegisterNatives( _dbjni , nativeSay , 1 );
+
+
+  JNINativeMethod * nativeCall = new JNINativeMethod();
+  nativeCall->name = (char*)"native_call";
+  nativeCall->signature = (char*)"(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I";
+  nativeCall->fnPtr = (void*)java_native_call;
+  _mainEnv->RegisterNatives( _dbjni , nativeCall , 1 );
 
 }
 
@@ -200,6 +219,10 @@ void JavaJSImpl::scopeFree( jlong id ){
 
 // scope setters
 
+int JavaJSImpl::scopeSetBoolean( jlong id , const char * field , jboolean val ) {
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
+}
+
 int JavaJSImpl::scopeSetNumber( jlong id , const char * field , double val ){
   return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
 }
@@ -221,8 +244,16 @@ int JavaJSImpl::scopeSetObject( jlong id , const char * field , JSObj * obj ){
 
 // scope getters
 
+char JavaJSImpl::scopeGetType( jlong id , const char * field ){
+  return _getEnv()->CallStaticByteMethod( _dbhook , _scopeGetType , id , _getEnv()->NewStringUTF( field ) );
+}
+
 double JavaJSImpl::scopeGetNumber( jlong id , const char * field ){
   return _getEnv()->CallStaticDoubleMethod( _dbhook , _scopeGetNumber , id , _getEnv()->NewStringUTF( field ) );
+}
+
+jboolean JavaJSImpl::scopeGetBoolean( jlong id , const char * field ){
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , _getEnv()->NewStringUTF( field ) );
 }
 
 string JavaJSImpl::scopeGetString( jlong id , const char * field ) {
@@ -335,6 +366,35 @@ const char * findEd(){
   return 0;
 #endif
 };
+
+// ---
+
+JNIEXPORT void JNICALL java_native_say(JNIEnv * env , jclass, jobject outBuffer ){
+  cerr << "native say called!" << endl;
+
+  Message out( env->GetDirectBufferAddress( outBuffer ) , false );
+  Message in;
+
+  jniCallback( out , in );
+}
+
+JNIEXPORT jint JNICALL java_native_call(JNIEnv * env , jclass, jobject outBuffer , jobject inBuffer ){
+  cerr << "native call called!" << endl;
+  
+  Message out( env->GetDirectBufferAddress( outBuffer ) , false );
+  Message in;
+
+  jniCallback( out , in );
+
+  cerr << "in.data : " << in.data << endl;
+  if ( in.data && in.data->len > 0 ){
+    cerr << "copying data of len :" << in.data->len << endl;
+    memcpy( env->GetDirectBufferAddress( inBuffer ) , in.data , in.data->len );
+    return in.data->len;
+  }
+
+  return 0;
+}
 
 // ----
 

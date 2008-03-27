@@ -37,21 +37,15 @@ class JavaJSImpl {
 
   double scopeGetNumber( jlong id , const char * field );
   string scopeGetString( jlong id , const char * field );
-  jboolean scopeGetBoolean( jlong id , const char * field ){
-    return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , _getEnv()->NewStringUTF( field ) );
-  }
+  jboolean scopeGetBoolean( jlong id , const char * field );
   JSObj scopeGetObject( jlong id , const char * field );
-  char scopeGetType( jlong id , const char * field ){
-    return _getEnv()->CallStaticByteMethod( _dbhook , _scopeGetType , id , _getEnv()->NewStringUTF( field ) );
-  }
+  char scopeGetType( jlong id , const char * field );
 
   int scopeSetNumber( jlong id , const char * field , double val );
   int scopeSetString( jlong id , const char * field , const char * val );
   int scopeSetObject( jlong id , const char * field , JSObj * obj );
-  int scopeSetBoolean( jlong id , const char * field , jboolean val ) {
-      return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
-  }
-  
+  int scopeSetBoolean( jlong id , const char * field , jboolean val );
+
   jlong functionCreate( const char * code );
  
   /* return values:
@@ -100,6 +94,7 @@ class JavaJSImpl {
   boost::thread_specific_ptr<JNIEnv> * _envs;
 
   jclass _dbhook;
+  jclass _dbjni;
   
   jmethodID _scopeCreate;
   jmethodID _scopeReset;
@@ -148,3 +143,5 @@ class Scope {
   jlong s;
 };
 
+JNIEXPORT void JNICALL java_native_say(JNIEnv *, jclass, jobject outBuffer );
+JNIEXPORT jint JNICALL java_native_call(JNIEnv *, jclass, jobject outBuffer , jobject inBuffer );
