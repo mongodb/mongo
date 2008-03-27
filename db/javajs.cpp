@@ -132,7 +132,7 @@ JavaJSImpl::JavaJSImpl(){
   assert( ! _envs->get() );
   _envs->reset( _mainEnv );
 
-  _dbhook = findClass( "ed/js/DBHook" );
+  _dbhook = findClass( "ed/db/JSHook" );
   if( _dbhook == 0 )
 	  cout << "using classpath: " << q << endl;
   jassert( _dbhook );
