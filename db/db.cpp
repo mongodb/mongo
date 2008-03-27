@@ -300,87 +300,87 @@ public:
 */
 void jniCallback(Message& m, Message& out)
 {
-  Client *clientOld = client;
-  
-  JniMessagingPort jmp(out);
-  callDepth++;
-  int curOpOld = curOp;
-  
-  try { 
-    
-    stringstream ss;
-    char buf[64];
-    time_t_to_String(time(0), buf);
-    buf[20] = 0; // don't want the year
-    ss << buf << " dbjs ";
-    
-    {
-      Timer t;
-      
-      bool log = false;
-      curOp = m.data->operation;
-      if( m.data->operation == dbQuery ) { 
-        receivedQuery(jmp, m, ss);
-      }
-      else if( m.data->operation == dbInsert ) {
-        ss << "insert ";
-        receivedInsert(m, ss);
-      }
-      else if( m.data->operation == dbUpdate ) {
-        ss << "update ";
-        receivedUpdate(m, ss);
-      }
-      else if( m.data->operation == dbDelete ) {
-        ss << "remove ";
-        receivedDelete(m);
-      }
-      else if( m.data->operation == dbGetMore ) {
-        log = true;
-        ss << "getmore ";
-        receivedGetMore(jmp, m, ss);
-      }
-      else if( m.data->operation == dbKillCursors ) { 
-        try {
-          log = true;
-          ss << "killcursors ";
-          receivedKillCursors(m);
-        }
-        catch( AssertionException ) { 
-          cout << "Caught Assertion in kill cursors, continuing" << endl; 
-          ss << " exception ";
-        }
-      }
-      else {
-        cout << "    jnicall: operation isn't supported: " << m.data->operation << endl;
-        assert(false);
-      }
+	Client *clientOld = client;
 
-      int ms = t.millis();
-      log = log || ctr++ % 128 == 0;
-      if( log || ms > 100 ) {
-        ss << ' ' << t.millis() << "ms";
-        cout << ss.str().c_str() << endl;
-      }
-      if( client && client->profile >= 1 ) { 
-        if( client->profile >= 2 || ms >= 100 ) { 
-          // profile it
-          profile(ss.str().c_str()+20/*skip ts*/, ms);
-        }
-      }
-    }
+	JniMessagingPort jmp(out);
+	callDepth++;
+	int curOpOld = curOp;
 
-  }
-  catch( AssertionException ) { 
-    cout << "Caught AssertionException in jniCall()" << endl;
-  }
+	try { 
 
-  curOp = curOpOld;
-  callDepth--;
+		stringstream ss;
+		char buf[64];
+		time_t_to_String(time(0), buf);
+		buf[20] = 0; // don't want the year
+		ss << buf << " dbjs ";
 
-  if( client != clientOld ) { 
-    client = clientOld;
-    wassert(false);
-  }
+		{
+			Timer t;
+
+			bool log = false;
+			curOp = m.data->operation;
+			if( m.data->operation == dbQuery ) { 
+				receivedQuery(jmp, m, ss);
+			}
+			else if( m.data->operation == dbInsert ) {
+				ss << "insert ";
+				receivedInsert(m, ss);
+			}
+			else if( m.data->operation == dbUpdate ) {
+				ss << "update ";
+				receivedUpdate(m, ss);
+			}
+			else if( m.data->operation == dbDelete ) {
+				ss << "remove ";
+				receivedDelete(m);
+			}
+			else if( m.data->operation == dbGetMore ) {
+				log = true;
+				ss << "getmore ";
+				receivedGetMore(jmp, m, ss);
+			}
+			else if( m.data->operation == dbKillCursors ) { 
+				try {
+					log = true;
+					ss << "killcursors ";
+					receivedKillCursors(m);
+				}
+				catch( AssertionException ) { 
+					cout << "Caught Assertion in kill cursors, continuing" << endl; 
+					ss << " exception ";
+				}
+			}
+			else {
+				cout << "    jnicall: operation isn't supported: " << m.data->operation << endl;
+				assert(false);
+			}
+
+			int ms = t.millis();
+			log = log || ctr++ % 128 == 0;
+			if( log || ms > 100 ) {
+				ss << ' ' << t.millis() << "ms";
+				cout << ss.str().c_str() << endl;
+			}
+			if( client && client->profile >= 1 ) { 
+				if( client->profile >= 2 || ms >= 100 ) { 
+					// profile it
+					profile(ss.str().c_str()+20/*skip ts*/, ms);
+				}
+			}
+		}
+
+	}
+	catch( AssertionException ) { 
+		cout << "Caught AssertionException in jniCall()" << endl;
+	}
+
+	curOp = curOpOld;
+	callDepth--;
+
+	if( client != clientOld ) { 
+		client = clientOld;
+		wassert(false);
+	}
 }
 
 void connThread()
