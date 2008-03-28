@@ -445,15 +445,15 @@ int javajstest() {
   }
 
   {
-    int start = time(0);
+    time_t start = time(0);
     for ( int i=0; i<5000; i++ ){
       JavaJS.scopeSetObject( scope , "obj" , &obj );
     }
-    int end = time(0);
+    time_t end = time(0);
 
-    cout << "time : " << ( end - start ) << endl;
+	if( debug )
+		cout << "time : " << ( end - start ) << endl;
   }
-  
   
   if ( debug ) cout << "func4 start" << endl;    
   JavaJS.scopeSetObject( scope , "obj" , &obj );
