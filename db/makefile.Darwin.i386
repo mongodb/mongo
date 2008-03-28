@@ -2,5 +2,3 @@
 FLAGS += -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/ -I/sw/include -L/sw/lib
 
 JVM_LIBS += -L/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Libraries/  -framework JavaVM
-
-GPP = gcc-4.2
