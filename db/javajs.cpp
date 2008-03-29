@@ -404,10 +404,6 @@ int javajstest() {
 
   JavaJSImpl& JavaJS = *::JavaJS;
 
-  JavaJS.run( "print(5);" );
-  
-  JavaJS.run( "print( 17 );" );
-
   if ( debug ) cout << "about to create scope" << endl;
   jlong scope = JavaJS.scopeCreate();
   jassert( scope );
@@ -458,14 +454,14 @@ int javajstest() {
   if ( debug ) cout << "func4 start" << endl;    
   JavaJS.scopeSetObject( scope , "obj" , &obj );
   if ( debug ) cout << "\t here 1" << endl;
-  jlong func4 = JavaJS.functionCreate( "print( tojson( obj ) );" );
+  jlong func4 = JavaJS.functionCreate( "tojson( obj );" );
   if ( debug ) cout << "\t here 2" << endl;
   jassert( ! JavaJS.invoke( scope , func4 ) );
   if ( debug ) cout << "func4 end" << endl;
   
   if ( debug ) cout << "func5 start" << endl;
   jassert( JavaJS.scopeSetObject( scope , "c" , &obj ) );
-  jlong func5 = JavaJS.functionCreate( "print( \"setObject : 517 == \" + c.foo );" );
+  jlong func5 = JavaJS.functionCreate( "assert( 517 == c.foo );" );
   jassert( func5 );
   jassert( ! JavaJS.invoke( scope , func5 ) );
   if ( debug ) cout << "func5 done" << endl;
