@@ -622,8 +622,8 @@ QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj,
 			query = jsobj;
 
 		auto_ptr<JSMatcher> matcher(new JSMatcher(query));
-JSMatcher &debug1 = *matcher;
-assert( debug1.getN() < 5000 );
+		JSMatcher &debug1 = *matcher;
+		assert( debug1.getN() < 5000 );
 
 		int nscanned = 0;
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
@@ -659,6 +659,7 @@ assert( debug.getN() < 5000 );
 					}
 					else {
 						bool ok = true;
+						assert( js.objsize() >= 0 ); //defensive for segfaults
 						if( filter.get() ) {
 							// we just want certain fields from the object.
 							JSObj x;
