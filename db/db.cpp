@@ -132,6 +132,7 @@ void receivedKillCursors(Message& m) {
 void receivedUpdate(Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
+	assert(*ns);
 	setClient(ns);
 	if( client->profile )
 		ss << ns << ' ';
@@ -148,6 +149,7 @@ void receivedUpdate(Message& m, stringstream& ss) {
 void receivedDelete(Message& m) {
 	DbMessage d(m);
 	const char *ns = d.getns();
+	assert(*ns);
 	setClient(ns);
 	int flags = d.pullInt();
 	assert( d.moreJSObjs() );
@@ -220,6 +222,7 @@ void receivedInsert(Message& m, stringstream& ss) {
 		JSObj js = d.nextJsObj();
 //		cout << "  temp dbinsert: got js object, size=" << js.objsize() << " ns:" << d.getns() << endl;
 		const char *ns = d.getns();
+		assert(*ns);
 		setClient(ns);
 		ss << ns;
 		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
