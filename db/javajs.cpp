@@ -44,7 +44,7 @@ using namespace std;
 		  longer needed and can be removed. 
 */
 extern "C" void tss_cleanup_implemented(void) {
-	cout << "tss_cleanup_implemented called" << endl;
+	//cout << "tss_cleanup_implemented called" << endl;
 }
 #endif
 

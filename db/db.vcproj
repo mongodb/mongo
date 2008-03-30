@@ -281,6 +281,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\minilex.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\mmap.h"
 				>
 			</File>

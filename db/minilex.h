@@ -1,0 +1,97 @@
+// minilex.h
+// mini js lexical analyzer.  idea is to be dumb and fast.
+
+struct MiniLex {
+	strhashmap reserved;
+	bool ic[256]; // ic=Identifier Character
+	bool starter[256];
+
+	// dm: very dumb about comments and escaped quotes -- but we are faster then at least, 
+	// albeit returning too much (which is ok for jsbobj current usage).
+	void grabVariables(char *code /*modified and must stay in scope*/, strhashmap& vars) { 
+		char *p = code;
+		char last = 0;
+		while( *p ) { 
+			if( starter[*p] ) { 
+				char *q = p+1;
+				while( *q && ic[*q] ) q++;
+				const char *identifier = p;
+				bool done = *q == 0;
+				*q = 0;
+				if( !reserved.count(identifier) ) {
+					// we try to be smart about 'obj' but have to be careful as obj.obj 
+					// can happen; this is so that nFields is right for simplistic where cases
+					// so we can stop scanning in jsobj when we find the field of interest.
+					if( strcmp(identifier,"obj")==0 && p>code && p[-1] != '.' )
+						;
+					else
+						vars[identifier] = 1;
+				}
+				if( done )
+					break;
+				p = q + 1;
+				continue;
+			}
+
+			if( *p == '\'' ) {
+				p++;
+				while( *p && *p != '\'' ) p++;
+			}
+			else if( *p == '"' ) {
+				p++;
+				while( *p && *p != '"' ) p++;
+			}
+			p++;
+		}
+	}
+
+	MiniLex() { 
+		strhashmap atest;
+		atest["foo"] = 3;
+		assert( atest.count("bar") == 0 );
+		assert( atest.count("foo") == 1 );
+		assert( atest["foo"] == 3 );
+
+		for( int i = 0; i < 256; i++ ) { 
+			ic[i] = starter[i] = false;
+		}
+		for( int i = 'a'; i <= 'z'; i++ )
+			ic[i] = starter[i] = true;
+		for( int i = 'A'; i <= 'Z'; i++ )
+			ic[i] = starter[i] = true;
+		for( int i = '0'; i <= '9'; i++ )
+			ic[i] = true;
+		for( int i = 128; i < 256; i++ )
+			ic[i] = starter[i] = true;
+		ic['$'] = starter['$'] = true;
+		ic['_'] = starter['_'] = true;
+
+		reserved["break"] = true;
+		reserved["case"] = true;
+		reserved["catch"] = true;
+		reserved["continue"] = true;
+		reserved["default"] = true;
+		reserved["delete"] = true;
+		reserved["do"] = true;
+		reserved["else"] = true;
+		reserved["finally"] = true;
+		reserved["for"] = true;
+		reserved["function"] = true;
+		reserved["if"] = true;
+		reserved["in"] = true;
+		reserved["instanceof"] = true;
+		reserved["new"] = true;
+		reserved["return"] = true;
+		reserved["switch"] = true;
+		reserved["this"] = true;
+		reserved["throw"] = true;
+		reserved["try"] = true;
+		reserved["typeof"] = true;
+		reserved["var"] = true;
+		reserved["void"] = true;
+		reserved["while"] = true;
+		reserved["with "] = true;
+	}
+};
+
+

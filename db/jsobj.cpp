@@ -5,13 +5,88 @@
 #include "../util/goodies.h"
 #include "javajs.h"
 
+#if defined(_WIN32)
+
+#include <hash_map>
+using namespace stdext;
+
+typedef const char * MyStr;
+struct less_str {
+   bool operator()(const MyStr & x, const MyStr & y) const {
+      if ( strcmp(x, y) > 0)
+         return true;
+
+      return false;
+   }
+};
+
+typedef hash_map<const char*, int, hash_compare<const char *, less_str> > strhashmap;
+
+#else
+
+#include <ext/hash_map>
+using namespace __gnu_cxx;
+
+typedef const char * MyStr;
+struct eq_str {
+   bool operator()(const MyStr & x, const MyStr & y) const {
+      if ( strcmp(x, y) == 0)
+         return true;
+
+      return false;
+   }
+};
+
+typedef hash_map<const char*, int, hash<const char *>, eq_str > strhashmap;
+
+#endif
+
+#include "minilex.h"
+
+MiniLex minilex;
+
 class Where { 
 public:
+	Where() { codeCopy = 0; }
 	~Where() {
 		JavaJS->scopeFree(scope);
-		scope = 0; func = 0;
+		delete codeCopy;
+		scope = 0; func = 0; codeCopy = 0;
 	}
 	jlong scope, func;
+	strhashmap fields;
+//	map<string,int> fields;
+	bool fullObject;
+	int nFields;
+	char *codeCopy;
+
+	void setFunc(const char *code) {
+		codeCopy = new char[strlen(code)+1];
+		strcpy(codeCopy,code);
+		func = JavaJS->functionCreate( code );
+		minilex.grabVariables(codeCopy, fields);
+		fullObject = fields.count("fullObject") > 0;
+		nFields = fields.size();
+	}
+
+	void buildSubset(JSObj& src, JSObjBuilder& dst) { 
+		JSElemIter it(src);
+		int n = 0;
+		if( !it.more() ) return;
+		while( 1 ) {
+			Element e = it.next();
+			if( e.eoo() )
+				break;
+			if( //n == 0 && 
+				fields.find(e.fieldName()) != fields.end()
+				//fields.count(e.fieldName())
+				) {
+				dst.append(e);
+				if( ++n >= nFields )
+					break;
+			}
+		}
+	}
 };
 
 JSMatcher::~JSMatcher() { 
@@ -243,13 +318,10 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 			assert( where == 0 );
 			where = new Where();
 			const char *code = e.valuestr();
-                        if ( ! JavaJS ){
-                          JavaJS = new JavaJSImpl();
-                          javajstest();
-                        }
+			assert( JavaJS );
 			where->scope = JavaJS->scopeCreate();
 			JavaJS->scopeSetString(where->scope, "$client", client->name.c_str());
-			where->func = JavaJS->functionCreate( code );
+			where->setFunc(code);
 			continue;
 		}
 
@@ -398,7 +470,14 @@ ok:
 	if( where ) { 
 		if( where->func == 0 )
 			return false; // didn't compile
-		JavaJS->scopeSetObject(where->scope, "obj", &jsobj);
+		if( jsobj.objsize() < 200 || where->fullObject ) {
+			JavaJS->scopeSetObject(where->scope, "obj", &jsobj);
+		} else {
+			JSObjBuilder b;
+			where->buildSubset(jsobj, b);
+			JSObj temp = b.done();
+			JavaJS->scopeSetObject(where->scope, "obj", &temp);
+		}
 		if( JavaJS->invoke(where->scope, where->func) )
 			return false;
 		return JavaJS->scopeGetBoolean(where->scope, "return") != 0;

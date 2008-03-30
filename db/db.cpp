@@ -273,7 +273,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 102 mar2008 where" << endl;
+	cout << "db version: 103 mar2008 minilex" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
@@ -552,9 +552,6 @@ void msg(const char *m, int extras = 0) {
 
 int main(int argc, char* argv[], char *envp[] )
 {
-	JavaJS = new JavaJSImpl();
-	javajstest();
-
 	srand(curTimeMillis());
 
 	if( argc >= 2 ) {
@@ -583,6 +580,8 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "run") == 0 ) {
+			JavaJS = new JavaJSImpl();
+			javajstest();
 			listen(port);
 			goingAway = true;
 			return 0;

@@ -313,6 +313,11 @@ public:
 		int l;
 		return JSObj(decouple(l), true);
 	}
+
+	/* this version, jsobjbuilder still frees the jsobj
+	when the builder goes out of scope.  use it this way
+	by default, that's simplest.
+	*/
 	JSObj done() { 
 		return JSObj(_done());
 	}
