@@ -277,7 +277,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 104 mar2008 minilex" << endl;
+	cout << "db version: 105 31mar2008 minilex" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections on port " << port << " ...\n" << endl;
@@ -304,6 +304,8 @@ public:
            if there is one, out.data will be non-null on return.
 		   The out.data buffer will automatically clean up when out
 		   goes out of scope (out.freeIt==true)
+
+   note we should already be in the mutex lock from connThread() at this point.
 */
 void jniCallback(Message& m, Message& out)
 {
@@ -399,8 +401,6 @@ void connThread()
 
 	Message m;
 	while( 1 ) { 
-		client = 0;
-		curOp = 0;
 		m.reset();
 		stringstream ss;
 
@@ -419,6 +419,8 @@ void connThread()
 		{
 			lock lk(dbMutex);
 			Timer t;
+			client = 0;
+			curOp = 0;
 
 			bool log = false;
 			curOp = m.data->operation;
