@@ -65,7 +65,10 @@ public:
 		strcpy(codeCopy,code);
 		func = JavaJS->functionCreate( code );
 		minilex.grabVariables(codeCopy, fields);
-		fullObject = fields.count("fullObject") > 0;
+		// if user references db, eg db.foo.save(obj), 
+		// we make sure we have the whole thing.
+		fullObject = fields.count("fullObject") +
+			fields.count("db") > 0;
 		nFields = fields.size();
 	}
 

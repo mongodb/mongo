@@ -404,6 +404,8 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	Element args = cmd.findElement("args");
 	if( args.type() == Array ) {
 		JSObj eo = args.embeddedObject();
+		cout << "args:" << eo.toString() << endl;
+		cout << "code:\n" << code << endl;
 		s.setObject("args", eo);
 	}
 
