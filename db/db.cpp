@@ -280,7 +280,7 @@ void listen(int port) {
 	cout << "db version: 104 mar2008 minilex" << endl;
 	pdfileInit();
 	testTheDb();
-	cout << curTimeMillis() % 10000 << " waiting for connections...\n" << endl;
+	cout << curTimeMillis() % 10000 << " waiting for connections on port " << port << " ...\n" << endl;
 	OurListener l(port);
 	l.listen();
 }
@@ -600,6 +600,33 @@ int main(int argc, char* argv[], char *envp[] )
 			goingAway = true;
 			return 0;
 		}
+
+		/*
+		 *  *** POST STANDARD SWITCH METHOD - if we don't satisfy, we switch to a 
+		 *     slightly different mode where "run" is assumed and we can set values
+		 */
+		
+		for (int i = 1; i < argc; i++)  {
+		    
+		    char *s = argv[i];
+		    
+		    if (s && strcmp(s, "--port") == 0) { 
+		        port = atoi(argv[++i]);
+		    }
+		    else if (s && strcmp(s, "--dbpath") == 0) { 
+                dbpath = argv[++i];
+            }
+		}
+
+		cout << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
+
+	    //  note - this code is copied from the "run" DwightVerb
+	    
+	    JavaJS = new JavaJSImpl();
+        javajstest();
+        listen(port);
+        goingAway = true;
+        return 0;
 	}
 
 	cout << "usage:\n";
@@ -610,6 +637,9 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  dev          run in dev mode (diff db loc, diff port #)" << endl;
 	cout << "  longmsg      send a long test message to the db server" << endl;
 	cout << "  msglots      send a bunch of test messages, and then wait for answer on the last one" << endl;
+	cout << endl << "Alternate Usage :" << endl;
+	cout << " --port <portno>  --dbpath <root>" << endl << endl;
+	
 	goingAway = true;
 	return 0;
 }
