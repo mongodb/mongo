@@ -194,8 +194,12 @@ void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& s
 	}
 	Message resp;
 	resp.setData(msgdata, true); // transport will free
-	if( client->profile ) { 
-		ss << " bytes:" << resp.data->dataLen();
+	if( client ) { 
+		if( client->profile )
+			ss << " bytes:" << resp.data->dataLen();
+	}
+	else { 
+		cout << "ERROR: client is null; ns=" << ns << endl;
 	}
 	dbMsgPort.reply(m, resp);
 }
