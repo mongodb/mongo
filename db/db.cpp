@@ -556,6 +556,18 @@ void msg(const char *m, int extras = 0) {
 	p.shutdown();
 }
 
+void initAndListen(int listenPort, const char *dbPath) { 
+
+    dbpath = dbPath;
+
+    cout << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
+
+    JavaJS = new JavaJSImpl();
+    javajstest();
+    listen(listenPort);    
+}
+
+
 int main(int argc, char* argv[], char *envp[] )
 {
 	srand(curTimeMillis());
@@ -586,9 +598,9 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "run") == 0 ) {
-			JavaJS = new JavaJSImpl();
-			javajstest();
-			listen(port);
+		    
+		    initAndListen(port, dbpath);
+		    
 			goingAway = true;
 			return 0;
 		}
@@ -620,13 +632,8 @@ int main(int argc, char* argv[], char *envp[] )
             }
         }
 
-        cout << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
-
-        //  note - this code is copied from the "run" DwightVerb
-
-        JavaJS = new JavaJSImpl();
-        javajstest();
-        listen(port);
+        initAndListen(port, dbpath);
+        
         goingAway = true;
         return 0;
 	}
