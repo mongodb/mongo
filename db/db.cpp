@@ -522,8 +522,12 @@ void connThread()
 	}
 }
 
-void msg(const char *m, int extras = 0) { 
-	SockAddr db("127.0.0.1", DBPort);
+
+void msg(const char *m, const char *address, int port, int extras = 0) {
+
+    SockAddr db(address, port);
+
+//	SockAddr db("127.0.0.1", DBPort);
 //	SockAddr db("192.168.37.1", MessagingPort::DBPort);
 //	SockAddr db("10.0.21.60", MessagingPort::DBPort);
 //	SockAddr db("172.16.0.179", MessagingPort::DBPort);
@@ -556,6 +560,11 @@ void msg(const char *m, int extras = 0) {
 	p.shutdown();
 }
 
+void msg(const char *m, int extras = 0) { 
+    msg(m, "127.0.0.1", DBPort, extras);
+}
+
+
 void initAndListen(int listenPort, const char *dbPath) { 
 
     dbpath = dbPath;
@@ -567,7 +576,6 @@ void initAndListen(int listenPort, const char *dbPath) {
     listen(listenPort);    
 }
 
-
 int main(int argc, char* argv[], char *envp[] )
 {
 	srand(curTimeMillis());
@@ -578,7 +586,22 @@ int main(int argc, char* argv[], char *envp[] )
 		  return 0;
 	  }
 		if( strcmp(argv[1], "msg") == 0 ) {
-			msg(argc >= 3 ? argv[2] : "ping");
+
+		    // msg(argc >= 3 ? argv[2] : "ping");
+
+		    const char *m = "ping";
+		    int thePort = DBPort;
+		    
+		    if (argc >= 3) { 
+		        m = argv[2];
+		        
+		        if (argc > 3) { 
+		            thePort = atoi(argv[3]);
+		        }
+		    }
+		    
+		    msg(m, "127.0.0.1", thePort);
+		    
 			goingAway = true;
 			return 0;
 		}
@@ -639,13 +662,13 @@ int main(int argc, char* argv[], char *envp[] )
 	}
 
 	cout << "usage:\n";
-	cout << "  quicktest    just check basic assertions and exit" << endl;
-	cout << "  msg [msg]    send a request to the db server" << endl;
-	cout << "  msg end      shut down" << endl;
-	cout << "  run          run db" << endl;
-	cout << "  dev          run in dev mode (diff db loc, diff port #)" << endl;
-	cout << "  longmsg      send a long test message to the db server" << endl;
-	cout << "  msglots      send a bunch of test messages, and then wait for answer on the last one" << endl;
+	cout << "  quicktest         just check basic assertions and exit" << endl;
+	cout << "  msg [msg] [port]  send a request to the db server listening on port (or default)" << endl;
+	cout << "  msg end [port]    shut down db server listening on port (or default)" << endl;
+	cout << "  run               run db" << endl;
+	cout << "  dev               run in dev mode (diff db loc, diff port #)" << endl;
+	cout << "  longmsg           send a long test message to the db server" << endl;
+	cout << "  msglots           send a bunch of test messages, and then wait for answer on the last one" << endl;
 	cout << endl << "Alternate Usage :" << endl;
 	cout << " --port <portno>  --dbpath <root>" << endl << endl;
 	
