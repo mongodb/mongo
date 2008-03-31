@@ -603,28 +603,28 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 
-		/*
-		 *  *** POST STANDARD SWITCH METHOD - if we don't satisfy, we switch to a 
-		 *     slightly different mode where "run" is assumed and we can set values
-		 */
-		
-		for (int i = 1; i < argc; i++)  {
-		    
-		    char *s = argv[i];
-		    
-		    if (s && strcmp(s, "--port") == 0) { 
-		        port = atoi(argv[++i]);
-		    }
-		    else if (s && strcmp(s, "--dbpath") == 0) { 
+        /*
+         *  *** POST STANDARD SWITCH METHOD - if we don't satisfy, we switch to a 
+         *     slightly different mode where "run" is assumed and we can set values
+         */
+
+        for (int i = 1; i < argc; i++)  {
+    
+            char *s = argv[i];
+            
+            if (s && strcmp(s, "--port") == 0) { 
+                port = atoi(argv[++i]);
+            }
+            else if (s && strcmp(s, "--dbpath") == 0) { 
                 dbpath = argv[++i];
             }
-		}
+        }
 
-		cout << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
+        cout << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
 
-	    //  note - this code is copied from the "run" DwightVerb
-	    
-	    JavaJS = new JavaJSImpl();
+        //  note - this code is copied from the "run" DwightVerb
+
+        JavaJS = new JavaJSImpl();
         javajstest();
         listen(port);
         goingAway = true;
