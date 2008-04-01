@@ -510,7 +510,7 @@ string JSObj::toString() const {
 
 /* well ordered compare */
 int JSObj::woCompare(const JSObj& r) const { 
-
+        assert( _objdata );
 	if( isEmpty() )
 		return r.isEmpty() ? 0 : -1;
 	if( r.isEmpty() )

@@ -235,6 +235,9 @@ explicit
 			((JSObj&)r)._objdata = 0; 
 			((JSObj&)r).iFree = false; 
 		}
+
+                assert( _objsize == 0 || _objdata );
+
 	}
 	JSObj& operator=(JSObj& r) {
 		if( iFree ) free((void*)_objdata); 
@@ -325,6 +328,7 @@ public:
 	/* assume ownership of the buffer - you must then free it (with free()) */
 	char* decouple(int& l) {
 		char *x = _done();
+                assert( x );
 		l = b.len();
 		b.decouple();
 		return x;

@@ -540,8 +540,10 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 		Element e = i.next();
 		if( e.eoo() ) break;
 		JSObjBuilder b;
+
 		b.appendAs(e, f.fieldName());
 		JSObj o = b.doneAndDecouple();
+                assert( o.objdata() );
 		keys.insert(o);
 	}
 }
