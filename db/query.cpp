@@ -16,7 +16,16 @@ LRUishMap<JSObj,DiskLoc,5> lrutest(123);
 
 int nextCursorId = 1;
 
-JSObj emptyObj;
+#pragma pack(push)
+#pragma pack(1)
+struct EmptyObject {
+	EmptyObject() { len = 5; jstype = EOO; }
+	int len;
+	char jstype;
+} emptyObject;
+#pragma pack(pop)
+
+JSObj emptyObj((char *) &emptyObject);
 
 int getGtLtOp(Element& e);
 void appendElementHandlingGtLt(JSObjBuilder& b, Element& e);

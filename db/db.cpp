@@ -107,15 +107,6 @@ private:
 	const char *theEnd;
 };
 
-#pragma pack(push)
-#pragma pack(1)
-struct EmptyObject {
-	EmptyObject() { len = 5; jstype = EOO; }
-	int len;
-	char jstype;
-} emptyObject;
-#pragma pack(pop)
-
 void killCursors(int n, long long *ids);
 void receivedKillCursors(Message& m) {
 	int *x = (int *) m.data->_data;
