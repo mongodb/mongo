@@ -140,6 +140,12 @@ JavaJSImpl::JavaJSImpl(){
     cout << "using classpath: " << q << endl;
   jassert( _dbhook );
 
+  {
+    jmethodID init = _mainEnv->GetStaticMethodID( _dbhook ,  "init" , "(Ljava/lang/String;)V" );
+    jassert( init );
+    _mainEnv->CallStaticVoidMethod( _dbhook , init , _getEnv()->NewStringUTF( ed ) );
+  }
+
   _dbjni = findClass( "ed/db/DBJni" );
   jassert( _dbjni );
 
