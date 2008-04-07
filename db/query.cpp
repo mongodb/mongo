@@ -386,6 +386,8 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 
 bool userCreateNS(const char *ns, JSObj& j);
 
+const int edebug=0;
+
 bool dbEval(JSObj& cmd, JSObjBuilder& result) { 
 	Element e = cmd.firstElement();
 	assert( e.type() == Code );
@@ -404,8 +406,10 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	Element args = cmd.findElement("args");
 	if( args.type() == Array ) {
 		JSObj eo = args.embeddedObject();
-//		cout << "args:" << eo.toString() << endl;
-//		cout << "code:\n" << code << endl;
+		if( edebug ) {
+			cout << "args:" << eo.toString() << endl;
+			cout << "code:\n" << code << endl;
+		}
 		s.setObject("args", eo);
 	}
 
@@ -598,7 +602,6 @@ QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj,
 		ntoreturn = -_ntoreturn;
 		wantMore = false;
 	}
-
 	ss << "query " << ns << " ntoreturn:" << ntoreturn;
 	if( ntoskip ) 
 		ss << " ntoskip:" << ntoskip;

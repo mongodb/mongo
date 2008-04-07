@@ -216,6 +216,7 @@ void receivedGetMore(AbstractMessagingPort& dbMsgPort, Message& m, stringstream&
 	Message resp;
 	resp.setData(msgdata, true);
 	ss << " bytes:" << resp.data->dataLen();
+	ss << " nreturned:" << msgdata->nReturned;
 	dbMsgPort.reply(m, resp);
 }
 

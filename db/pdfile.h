@@ -408,7 +408,12 @@ inline NamespaceIndex* nsindex(const char *ns) {
 #if defined(_DEBUG)
 	char buf[256];
 	nsToClient(ns, buf);
-	assert( client->name == buf );
+	if( client->name != buf ) { 
+		cout << "ERROR: attempt to write to wrong database client\n";
+		cout << " ns:" << ns << '\n';
+		cout << " client->name:" << client->name << endl;
+		assert( client->name == buf );
+	}
 #endif
 	return client->namespaceIndex;
 }
