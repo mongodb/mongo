@@ -395,7 +395,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 
 bool userCreateNS(const char *ns, JSObj& j);
 
-const int edebug=0;
+const int edebug=1;
 
 bool dbEval(JSObj& cmd, JSObjBuilder& result) { 
 	Element e = cmd.firstElement();
@@ -430,12 +430,15 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	}
 
 	int type = s.type("return");
-	if( type == Object )
+	if( type == Object || type == Array )
 		result.append("retval", s.getObject("return"));
 	else if( type == Number ) 
 		result.append("retval", s.getNumber("return"));
 	else if( type == String )
 		result.append("retval", s.getString("return").c_str());
+	else if( type == Bool ) {
+		result.appendBool("retval", s.getBoolean("return"));
+	}
 
 	return true;
 }

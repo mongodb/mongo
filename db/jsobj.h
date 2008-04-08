@@ -295,6 +295,11 @@ public:
 		b.append((void *) subObj.objdata(), subObj.objsize());
 	}
 
+	void appendBool(const char *fieldName, int val) { 
+		b.append((char) Bool);
+		b.append(fieldName);
+		b.append((char) (val?1:0));
+	}
 	void append(const char *fieldName, double n) { 
 		b.append((char) Number);
 		b.append(fieldName);

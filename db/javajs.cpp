@@ -284,7 +284,7 @@ JSObj JavaJSImpl::scopeGetObject( jlong id , const char * field )
   
   int len = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _getEnv()->NewStringUTF( field ) , bb );
   //cout << "len : " << len << endl;
-  assert( len > 0 && len < guess ); 
+  jassert( len > 0 && len < guess ); 
 
   JSObj obj(buf, true);
   assert( obj.objsize() <= guess );

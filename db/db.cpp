@@ -269,7 +269,7 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 105 31mar2008 minilex" << endl;
+	cout << "db version: 106 apr2008 group" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections on port " << port << " ...\n" << endl;
