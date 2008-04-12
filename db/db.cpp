@@ -432,7 +432,7 @@ void connThread()
 					cout << curTimeMillis() % 10000 << "   end msg" << endl;
 					dbMsgPort.shutdown();
 					sleepmillis(500);
-					exit(1);
+					exit(EXIT_SUCCESS);
 				}
 			}
 			else if( m.data->operation == dbQuery ) { 
