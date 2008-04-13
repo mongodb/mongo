@@ -39,6 +39,7 @@ void wasserted(const char *msg, const char *file, unsigned line);
 
 #include <stdio.h>
 #include <sstream>
+#include <signal.h>
 
 typedef char _TCHAR;
 

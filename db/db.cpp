@@ -568,8 +568,14 @@ void initAndListen(int listenPort, const char *dbPath) {
     listen(listenPort);    
 }
 
+void sigHandler( int signal ) {
+  psignal( signal, "Signal Received : ");
+}  /*handler*/
+
 int main(int argc, char* argv[], char *envp[] )
 {
+    signal(SIGPIPE, sigHandler);
+
 	srand(curTimeMillis());
 
 	if( argc >= 2 ) {
