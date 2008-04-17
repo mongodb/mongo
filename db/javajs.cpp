@@ -480,7 +480,8 @@ int javajstest() {
     JavaJS.scopeSetNumber( scope , "zzz" , val );
     jlong func6 = JavaJS.functionCreate( " xxx = zzz; " );
     jassert( ! JavaJS.invoke( scope , func6 ) );
-    jassert( val == JavaJS.scopeGetNumber( scope , "xxx" ) );
+	double n = JavaJS.scopeGetNumber( scope , "xxx" );
+    jassert( val == n );
   }
   if ( debug ) cout << "func6 done" << endl;
 

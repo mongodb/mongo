@@ -565,6 +565,7 @@ void initAndListen(int listenPort, const char *dbPath) {
 
     JavaJS = new JavaJSImpl();
     javajstest();
+
     listen(listenPort);    
 }
 
