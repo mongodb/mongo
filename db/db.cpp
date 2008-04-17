@@ -432,7 +432,7 @@ void connThread()
 					cout << curTimeMillis() % 10000 << "   end msg" << endl;
 					dbMsgPort.shutdown();
 					sleepmillis(500);
-					exit(1);
+					exit(EXIT_SUCCESS);
 				}
 			}
 			else if( m.data->operation == dbQuery ) { 
@@ -569,8 +569,14 @@ void initAndListen(int listenPort, const char *dbPath) {
     listen(listenPort);    
 }
 
+void sigHandler( int signal ) {
+  psignal( signal, "Signal Received : ");
+}  /*handler*/
+
 int main(int argc, char* argv[], char *envp[] )
 {
+    signal(SIGPIPE, sigHandler);
+
 	srand(curTimeMillis());
 
 	if( argc >= 2 ) {
