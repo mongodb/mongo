@@ -36,6 +36,7 @@ struct SockStartupTests {
         WSADATA d;
 		if( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
 			cout << "ERROR: wsastartup failed " << errno << endl;
+			problem() << "ERROR: wsastartup failed " << errno << endl;
 			exit(1);
 		}
 #endif

@@ -277,14 +277,13 @@ public:
 
 inline Record* PhysicalDataFile::recordAt(DiskLoc dl) { return header->getRecord(dl); }
 
-void sayDbContext();
+void sayDbContext(const char *msg = 0);
 
 inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
 	if( nextOfs != DiskLoc::NullOfs ) {
 		/* defensive */
 		if( nextOfs >= 0 && nextOfs < 10 ) { 
-			cout << "Assertion failure - Record::getNext() referencing a deleted record?" << endl;
-			sayDbContext();
+			sayDbContext("Assertion failure - Record::getNext() referencing a deleted record?");
 			return DiskLoc();
 		}
 

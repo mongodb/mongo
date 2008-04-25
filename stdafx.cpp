@@ -18,9 +18,10 @@ struct MyAsserts {
 #undef yassert
 #include "assert.h"
 
-void sayDbContext();
+void sayDbContext(const char *p = 0);
 
 void wasserted(const char *msg, const char *file, unsigned line) { 
+	problem() << "Assertion failure " << msg << ' ' << file << ' ' << line << endl;
 	cout << "Assertion failure " << msg << endl;
 	cout << ' ' << file << ' ' << line << endl;
 	sayDbContext();

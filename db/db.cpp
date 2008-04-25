@@ -114,6 +114,7 @@ void receivedKillCursors(Message& m) {
 	int n = *x++;
 	assert( n >= 1 );
 	if( n > 2000 ) { 
+		problem() << "Assertion failure, receivedKillCursors, n=" << n << endl;
 		cout << "Assertion failure, receivedKillCursors, n=" << n << endl;
 		assert( n < 30000 );
 	}
@@ -167,6 +168,7 @@ void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& s
 	}
 	catch( AssertionException ) { 
 		ss << " exception ";
+		problem() << " Caught Assertion in runQuery " << ns << endl; 
 		cout << " Caught Assertion in runQuery, continuing" << endl; 
 		cout << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << endl;
 		cout << "  ns:" << ns << endl;
@@ -269,7 +271,8 @@ public:
 };
 
 void listen(int port) { 
-	cout << "db version: 106 apr2008 group" << endl;
+	problem() << "db version: 107 apr2008 group" << endl;
+	cout << "db version: 107 apr2008 group" << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections on port " << port << " ...\n" << endl;
@@ -347,6 +350,7 @@ void jniCallback(Message& m, Message& out)
 					receivedKillCursors(m);
 				}
 				catch( AssertionException ) { 
+					problem() << "Caught Assertion in kill cursors, continuing" << endl; 
 					cout << "Caught Assertion in kill cursors, continuing" << endl; 
 					ss << " exception ";
 				}
@@ -372,6 +376,7 @@ void jniCallback(Message& m, Message& out)
 
 	}
 	catch( AssertionException ) { 
+		problem() << "Caught AssertionException in jniCall()" << endl;
 		cout << "Caught AssertionException in jniCall()" << endl;
 	}
 
@@ -432,6 +437,7 @@ void connThread()
 					cout << curTimeMillis() % 10000 << "   end msg" << endl;
 					dbMsgPort.shutdown();
 					sleepmillis(500);
+					problem() << "exiting end msg" << endl;
 					exit(EXIT_SUCCESS);
 				}
 			}
@@ -447,6 +453,7 @@ void connThread()
 					receivedInsert(m, ss);
 				}
 				catch( AssertionException ) { 
+					problem() << "Caught Assertion insert, continuing" << endl; 
 					cout << "Caught Assertion, continuing" << endl; 
 					ss << " exception ";
 				}
@@ -457,7 +464,8 @@ void connThread()
 					receivedUpdate(m, ss);
 				}
 				catch( AssertionException ) { 
-					cout << "Caught Assertion, continuing" << endl; 
+					problem() << "Caught Assertion update, continuing" << endl; 
+					cout << "Caught Assertion update, continuing" << endl; 
 					ss << " exception ";
 				}
 			}
@@ -467,7 +475,8 @@ void connThread()
 					receivedDelete(m);
 				}
 				catch( AssertionException ) { 
-					cout << "Caught Assertion, continuing" << endl; 
+					problem() << "Caught Assertion receviedDelete, continuing" << endl; 
+					cout << "Caught Assertion receviedDelete, continuing" << endl; 
 					ss << " exception ";
 				}
 			}
@@ -484,6 +493,7 @@ void connThread()
 				}
 				catch( AssertionException ) { 
 					cout << "Caught Assertion in kill cursors, continuing" << endl; 
+					problem() << "Caught Assertion in kill cursors, continuing" << endl; 
 					ss << " exception ";
 				}
 			}
@@ -510,6 +520,7 @@ void connThread()
 	}
 	catch( AssertionException ) { 
 		cout << "Caught AssertionException, terminating" << endl;
+		problem() << "Caught AssertionException, terminating" << endl;
 		exit(-7);
 	}
 }
@@ -556,12 +567,47 @@ void msg(const char *m, int extras = 0) {
     msg(m, "127.0.0.1", DBPort, extras);
 }
 
+#if !defined(_WIN32)
+
+#include <signal.h>
+
+void pipeSigHandler( int signal ) {
+  psignal( signal, "Signal Received : ");
+}
+
+void segvhandler(int x) { 
+	cout << "got SIGSEGV " << x << ", terminating :-(" << endl;
+	problem() << "got SIGSEGV " << x << ", terminating :-(" << endl;
+	exit(-9);
+}
+
+void mysighandler(int x) { 
+	// [dm] not working.  why?
+	cout << "got kill or ctrl c signal " << x << ", terminating" << endl;
+	problem() << "got kill or ctrl c signal " << x << ", terminating" << endl;
+	exit(0);
+}
+
+void setupSignals() {
+	cout << "SETUPSIGNALS " << signal(SIGINT, mysighandler) << endl;
+//	assert( signal(SIGINT, mysighandler) != SIG_ERR );
+	assert( signal(SIGTERM, mysighandler) != SIG_ERR );
+	assert( signal(SIGQUIT, mysighandler) != SIG_ERR );
+	assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
+}
+
+#else
+void setupSignals() {}
+#endif
 
 void initAndListen(int listenPort, const char *dbPath) { 
+
+	setupSignals();
 
     dbpath = dbPath;
 
     cout << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
+    problem() << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
 
     JavaJS = new JavaJSImpl();
     javajstest();
@@ -569,14 +615,13 @@ void initAndListen(int listenPort, const char *dbPath) {
     listen(listenPort);    
 }
 
-void sigHandler( int signal ) {
-  psignal( signal, "Signal Received : ");
-}  /*handler*/
+ofstream problems("../log/dbproblems.log", ios_base::app | ios_base::out);
 
 int main(int argc, char* argv[], char *envp[] )
 {
-    signal(SIGPIPE, sigHandler);
-
+#if !defined(_WIN32)
+    signal(SIGPIPE, pipeSigHandler);
+#endif
 	srand(curTimeMillis());
 
 	if( argc >= 2 ) {

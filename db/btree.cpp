@@ -471,6 +471,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 				break;
 			mid--;
 			if( mid < 3 ) { 
+				problem() << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
 				cout << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
 				cout << "  ns:" << ns << endl;
 				cout << "  key:" << mn.key.toString() << endl;

@@ -47,6 +47,7 @@ typedef char _TCHAR;
 #include <fstream>
 using namespace std;
 
+#include "time.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -86,3 +87,13 @@ typedef struct _OWS {
 	char string[400];
 } *OWS;
 
+extern ofstream problems;
+
+// not threadsafe
+inline ofstream& problem() { 
+	time_t t;
+	time(&t);
+	string now(ctime(&t),0,20);
+	problems << now;
+	return problems;
+}

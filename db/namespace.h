@@ -131,7 +131,7 @@ public:
 		const int LEN = 16 * 1024 * 1024;
 		void *p = f.map(path.c_str(), LEN);
 		if( p == 0 ) { 
-			cout << "couldn't open namespace.idx " << path.c_str() << endl;
+			problem() << "couldn't open namespace.idx " << path.c_str() << " terminating" << endl;
 			exit(-3);
 		}
 		ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");

@@ -31,7 +31,11 @@ int callDepth = 0;
 
 extern int otherTraceLevel;
 
-void sayDbContext() { 
+void sayDbContext(const char *errmsg) { 
+	if( errmsg ) { 
+		cout << errmsg << '\n';
+		problem() << errmsg << endl;
+	}
 	cout << " client: " << (client ? client->name.c_str() : "null");
 	cout << " op:" << curOp << ' ' << callDepth << endl;
 	if( client )
@@ -105,8 +109,6 @@ DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentL
 	return loc;
 }
 
-void sayDbContext();
-
 /* returned item is out of the deleted list upon return */
 DiskLoc NamespaceDetails::__alloc(int len) {
 	DiskLoc *prev;
@@ -121,7 +123,8 @@ DiskLoc NamespaceDetails::__alloc(int len) {
 		{
 			int a = cur.a();
 			if( a < -1 || a >= 100000 ) { 
-				cout << "Assertion failure - a() out of range in _alloc() " << a << endl;
+				problem() << "Assertion failure - a() out of range in _alloc() " << a << endl;
+				cout << "Assertion failure - a() out of range in _alloc() " << a << '\n';
 				sayDbContext();
 				if( cur == *prev )
 					prev->Null();
@@ -570,6 +573,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 		}
 
 		if( !ok ) { 
+			problem() << "Assertion failure: _unindex failed " << ns << endl;
 			cout << "Assertion failure: _unindex failed" << '\n';
 			cout << "  obj:" << obj.toString() << '\n';
 			cout << "  key:" << j.toString() << '\n';
@@ -695,6 +699,7 @@ void DataFileMgr::update(
 					catch(AssertionException) { 
 						ss << " exception update unindex ";
 						cout << " caught assertion update unindex " << idxns.c_str() << '\n';
+						problem() << " caught assertion update unindex " << idxns.c_str() << endl;
 					}
 				}
 				vector<JSObj*> added;
@@ -709,6 +714,7 @@ void DataFileMgr::update(
 					catch(AssertionException) {
 						ss << " exception update index "; 
 						cout << " caught assertion update index " << idxns.c_str() << '\n';
+						problem() << " caught assertion update index " << idxns.c_str() << endl;
 					}
 				}
 				if( client->profile )
@@ -747,6 +753,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 		}
 		catch(AssertionException) { 
 			cout << " caught assertion _indexRecord " << idx.indexNamespace() << '\n';
+			problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;
 		}
 	}
 }
