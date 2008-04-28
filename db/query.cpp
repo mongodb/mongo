@@ -464,7 +464,7 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 	Element e;
 	e = jsobj.firstElement();
 
-	assert(false);
+//	assert(false);
 
 	if( e.eoo() ) goto done;
 	if( e.type() == Code ) { 
