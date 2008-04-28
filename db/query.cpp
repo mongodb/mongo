@@ -448,13 +448,11 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 // 
 // returns true if ran a cmd
 //
-inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilderForYa) { 
+inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilderForYa) { 
 
 	const char *p = strchr(ns, '.');
 	if( !p ) return false;
 	if( strcmp(p, ".$cmd") != 0 ) return false;
-
-//	ss << "\n  $cmd: " << jsobj.toString();
 
 	bool ok = false;
 	bool valid = false;
@@ -463,8 +461,6 @@ inline bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuild
 
 	Element e;
 	e = jsobj.firstElement();
-
-//	assert(false);
 
 	if( e.eoo() ) goto done;
 	if( e.type() == Code ) { 
@@ -589,6 +585,21 @@ done:
 	if( !valid )
 		anObjBuilderForYa.append("errmsg", "no such cmd");
 	anObjBuilderForYa.append("ok", ok?1.0:0.0);
+	JSObj x = anObjBuilderForYa.done();
+	b.append((void*) x.objdata(), x.objsize());
+	return true;
+}
+
+bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilderForYa) { 
+	try {
+		return _runCommands(ns, jsobj, ss, b, anObjBuilderForYa);
+	}
+	catch( AssertionException ) {
+		;
+	}
+	ss << " assertion ";
+	anObjBuilderForYa.append("errmsg", "db assertion failure");
+	anObjBuilderForYa.append("ok", 0.0);
 	JSObj x = anObjBuilderForYa.done();
 	b.append((void*) x.objdata(), x.objsize());
 	return true;
