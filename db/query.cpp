@@ -470,8 +470,17 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 	else if( e.type() == Number ) { 
 		if( strcmp(e.fieldName(), "profile") == 0 ) { 
 			anObjBuilderForYa.append("was", (double) client->profile);
-			client->profile = (int) e.number();
-			valid = ok = true;
+			int p = (int) e.number();
+			valid = true;
+			if( p == -1 )
+				ok = true;
+			else if( p >= 0 && p <= 2 ) { 
+				ok = true;
+				client->profile = p;
+			}
+			else {
+				ok = false;
+			}
 		}
 		else {
 			if( strncmp(ns, "admin", p-ns) != 0 ) // admin only
