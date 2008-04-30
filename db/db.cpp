@@ -582,7 +582,8 @@ void segvhandler(int x) {
 }
 
 void mysighandler(int x) { 
-	// [dm] not working.  why?
+	// [dm] not working.  why? 
+	// [gmj] because the VM catches sig 3 to do a thread dump
 	cout << "got kill or ctrl c signal " << x << ", terminating" << endl;
 	problem() << "got kill or ctrl c signal " << x << ", terminating" << endl;
 	exit(0);
@@ -603,6 +604,19 @@ void setupSignals() {}
 void initAndListen(int listenPort, const char *dbPath) { 
 
 	setupSignals();
+
+    /*
+     * ensure that the dbpath ends w/ '/' as that's key in preventing things like 
+     *    /data/dbadmin.ns
+     */
+    
+    if (dbPath && dbPath[strlen(dbPath)-1] != '/') {
+    	char *t = (char *) malloc(strlen(dbPath) + 2);
+    	
+    	strcpy(t, dbPath);
+    	strcat(t, "/");
+    	dbPath = t;
+    }
 
     dbpath = dbPath;
 
@@ -686,8 +700,6 @@ int main(int argc, char* argv[], char *envp[] )
          *  *** POST STANDARD SWITCH METHOD - if we don't satisfy, we switch to a 
          *     slightly different mode where "run" is assumed and we can set values
          */
-
-		char *dbDataPath = null;
 		
         for (int i = 1; i < argc; i++)  {
     
@@ -697,31 +709,11 @@ int main(int argc, char* argv[], char *envp[] )
                 port = atoi(argv[++i]);
             }
             else if (s && strcmp(s, "--dbpath") == 0) { 
-            	dbDataPath = strdup(argv[++i]);
+            	dbpath = argv[++i];
             }
         }
         
-        if (!dbDataPath) { 
-        	dbDataPath = strdup(dbpath);
-        }
-
-        /*
-         * ensure that the dbpath ends w/ '/' as that's key in preventing things like 
-         *    /data/dbadmin.ns
-         */
-        
-        if (dbDataPath && dbDataPath[strlen(dbDataPath)-1] != '/') {
-        	char *t = (char *) malloc(strlen(dbDataPath) + 2);
-        	
-        	strcpy(t, dbDataPath);
-        	strcat(t, "/");
-        	free(dbDataPath);
-        	dbDataPath = t;
-        }
-        
-        initAndListen(port, dbDataPath);
-        
-        free(dbDataPath);  // be formal
+        initAndListen(port, dbpath);
         
         goingAway = true;
         return 0;
