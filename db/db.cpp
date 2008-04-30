@@ -583,7 +583,8 @@ void segvhandler(int x) {
 }
 
 void mysighandler(int x) { 
-	// [dm] not working.  why?
+	// [dm] not working.  why? 
+	// [gmj] because the VM catches sig 3 to do a thread dump
 	cout << "got kill or ctrl c signal " << x << ", terminating" << endl;
 	problem() << "got kill or ctrl c signal " << x << ", terminating" << endl;
 	exit(0);
@@ -605,10 +606,25 @@ void initAndListen(int listenPort, const char *dbPath) {
 
 	setupSignals();
 
+    /*
+     * ensure that the dbpath ends w/ '/' as that's key in preventing things like 
+     *    /data/dbadmin.ns
+     */
+    
+    if (dbPath && dbPath[strlen(dbPath)-1] != '/') {
+    	char *t = (char *) malloc(strlen(dbPath) + 2);
+    	
+    	strcpy(t, dbPath);
+    	strcat(t, "/");
+    	dbPath = t;
+    }
+
     dbpath = dbPath;
 
-    cout << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
-    problem() << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
+    pid_t pid = getpid();
+    
+    cout << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
+    problem() << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
 
     JavaJS = new JavaJSImpl();
     javajstest();
@@ -687,7 +703,7 @@ int main(int argc, char* argv[], char *envp[] )
          *  *** POST STANDARD SWITCH METHOD - if we don't satisfy, we switch to a 
          *     slightly different mode where "run" is assumed and we can set values
          */
-
+		
         for (int i = 1; i < argc; i++)  {
     
             char *s = argv[i];
@@ -696,10 +712,10 @@ int main(int argc, char* argv[], char *envp[] )
                 port = atoi(argv[++i]);
             }
             else if (s && strcmp(s, "--dbpath") == 0) { 
-                dbpath = argv[++i];
+            	dbpath = argv[++i];
             }
         }
-
+        
         initAndListen(port, dbpath);
         
         goingAway = true;
