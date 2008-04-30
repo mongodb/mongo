@@ -620,8 +620,10 @@ void initAndListen(int listenPort, const char *dbPath) {
 
     dbpath = dbPath;
 
-    cout << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
-    problem() << "10Gen DB : starting :  port = " << port << " dbpath = " << dbpath << endl;
+    pid_t pid = getpid();
+    
+    cout << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
+    problem() << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
 
     JavaJS = new JavaJSImpl();
     javajstest();
