@@ -687,6 +687,8 @@ int main(int argc, char* argv[], char *envp[] )
          *     slightly different mode where "run" is assumed and we can set values
          */
 
+		char *dbDataPath = null;
+		
         for (int i = 1; i < argc; i++)  {
     
             char *s = argv[i];
@@ -695,11 +697,31 @@ int main(int argc, char* argv[], char *envp[] )
                 port = atoi(argv[++i]);
             }
             else if (s && strcmp(s, "--dbpath") == 0) { 
-                dbpath = argv[++i];
+            	dbDataPath = strdup(argv[++i]);
             }
         }
+        
+        if (!dbDataPath) { 
+        	dbDataPath = strdup(dbpath);
+        }
 
-        initAndListen(port, dbpath);
+        /*
+         * ensure that the dbpath ends w/ '/' as that's key in preventing things like 
+         *    /data/dbadmin.ns
+         */
+        
+        if (dbDataPath && dbDataPath[strlen(dbDataPath)-1] != '/') {
+        	char *t = (char *) malloc(strlen(dbDataPath) + 2);
+        	
+        	strcpy(t, dbDataPath);
+        	strcat(t, "/");
+        	free(dbDataPath);
+        	dbDataPath = t;
+        }
+        
+        initAndListen(port, dbDataPath);
+        
+        free(dbDataPath);  // be formal
         
         goingAway = true;
         return 0;
