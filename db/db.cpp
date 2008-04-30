@@ -271,8 +271,9 @@ public:
 };
 
 void listen(int port) { 
-	problem() << "db version: 107 apr2008 group" << endl;
-	cout << "db version: 107 apr2008 group" << endl;
+	const char *Version = "db version: 108 30apr2008 sai hack";
+	problem() << Version << endl;
+	cout << Version << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections on port " << port << " ...\n" << endl;

@@ -354,8 +354,8 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 
 	if( fn <= 4 ) {
 		length = (64*1024*1024) << fn;
-		if( strstr(filename, "alleyinsider") && length < 512 * 1024 * 1024 )
-			length = 512 * 1024 * 1024;
+		if( strstr(filename, "alleyinsider") && length < 1024 * 1024 * 1024 )
+			length = 1024 * 1024 * 1024;
 	} else
 		length = 0x7ff00000;
 
