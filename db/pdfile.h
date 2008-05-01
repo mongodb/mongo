@@ -316,6 +316,7 @@ inline JSObj DiskLoc::obj() const {
 	return JSObj(rec());
 }
 inline DeletedRecord* DiskLoc::drec() const {
+	assert( fileNo != -1 );
 	return (DeletedRecord*) rec();
 }
 inline Extent* DiskLoc::ext() const {
@@ -323,10 +324,12 @@ inline Extent* DiskLoc::ext() const {
 }
 
 inline BtreeBucket* DiskLoc::btree() const { 
+	assert( fileNo != -1 );
 	return (BtreeBucket*) rec()->data;
 }
 
 inline Bucket* DiskLoc::bucket() const { 
+	assert( fileNo != -1 );
 	return (Bucket*) rec()->data;
 }
 
@@ -422,14 +425,17 @@ inline NamespaceDetails* nsdetails(const char *ns) {
 }
 
 inline PhysicalDataFile& DiskLoc::pdf() const { 
+	assert( fileNo != -1 );
 	return *client->getFile(fileNo);
 }
 
 inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
+	assert( dl.a() != -1 );
 	return client->getFile(dl.a())->getExtent(dl);
 }
 
 inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
+	assert( dl.a() != -1 );
 	return client->getFile(dl.a())->recordAt(dl);
 }
 
