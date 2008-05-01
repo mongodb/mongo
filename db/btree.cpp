@@ -6,7 +6,7 @@
 
 /* it is easy to do custom sizes for a namespace - all the same for now */
 const int BucketSize = 8192;
-const int KeyMax = BucketSize / 8;
+const int KeyMax = BucketSize / 10;
 
 int ninserts = 0;
 extern int otherTraceLevel;
@@ -361,7 +361,12 @@ void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p) {
 int verbose = 0;
 int qqq = 0;
 
-bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc ) { 
+bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc ) {
+	if( key.objsize() > KeyMax ) {
+		problem() << "unindex: key too large to index, skipping " << ns << ' ' << key.toString() << endl;
+		return false;
+	}
+
 	int pos;
 	bool found;
 	DiskLoc loc = locate(thisLoc, key, pos, found, recordLoc, 1);
@@ -664,9 +669,9 @@ int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 						JSObj& key, bool dupsAllowed,
 						DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) { 
 	if( key.objsize() > KeyMax ) { 
-		cout << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << endl;
+		problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << ns << endl;
 		return 2;
-	} 
+	}
 	assert( key.objsize() > 0 );
 
 	int pos;
@@ -751,11 +756,15 @@ void tempMusic(DiskLoc thisLoc)
 	cout << "*** NOT FOUND" << endl;
 }
 
+/* todo: meaning of return code unclear clean up */
 int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
 						JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
 {
 	if( toplevel ) {
-		assert( key.objsize() < BucketSize / 10 );
+		if( key.objsize() > KeyMax ) { 
+			problem() << "Btree::insert: key too large to index, skipping " << ns << ' ' << key.toString() << '\n';
+			return 3;
+		}
 		++ninserts;
 		if( /*ninserts > 127250 || */ninserts % 1000 == 0 ) {
 			cout << "ninserts: " << ninserts << endl;

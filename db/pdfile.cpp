@@ -570,15 +570,16 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 		}
 		catch(AssertionException) { 
 			cout << " caught assertion _unindexRecord " << id.indexNamespace() << '\n';
-		}
-
-		if( !ok ) { 
 			problem() << "Assertion failure: _unindex failed " << ns << endl;
 			cout << "Assertion failure: _unindex failed" << '\n';
 			cout << "  obj:" << obj.toString() << '\n';
 			cout << "  key:" << j.toString() << '\n';
 			cout << "  dl:" << dl.toString() << endl;
 			sayDbContext();
+		}
+
+		if( !ok ) { 
+			cout << "unindex failed (key too big?) " << id.indexNamespace() << '\n';
 		}
 	}
 }

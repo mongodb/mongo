@@ -271,7 +271,7 @@ public:
 };
 
 void listen(int port) { 
-	const char *Version = "db version: 108 30apr2008 sai hack";
+	const char *Version = "db version: 109 30apr2008 sai hack,keylen";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
@@ -621,7 +621,12 @@ void initAndListen(int listenPort, const char *dbPath) {
 
     dbpath = dbPath;
 
-    pid_t pid = getpid();
+#if !defined(_WIN32)
+    pid_t pid = 0;
+    pid = getpid();
+#else
+	int pid=0;
+#endif
     
     cout << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
     problem() << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
