@@ -637,7 +637,7 @@ void initAndListen(int listenPort, const char *dbPath) {
     listen(listenPort);    
 }
 
-ofstream problems("../log/dbproblems.log", ios_base::app | ios_base::out);
+ofstream problems("dbproblems.log", ios_base::app | ios_base::out);
 
 int main(int argc, char* argv[], char *envp[] )
 {
