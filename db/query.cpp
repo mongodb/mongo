@@ -332,13 +332,22 @@ void clean(const char *ns, NamespaceDetails *d) {
 }
 
 string validateNS(const char *ns, NamespaceDetails *d) {
+	bool valid = true;
 	stringstream ss;
-	ss << "\nvalidate ";
+	ss << "\nvalidate\n";
 	if( d->capped )
-		cout << " capped:" << d->capped << " max:" << d->max;
-	ss << "\n";
+		ss << "  capped:" << d->capped << " max:" << d->max << '\n';
+
+	ss << "  firstExtent:" << d->firstExtent.toString() << " lastExtent:" << d->lastExtent.toString() << '\n';
+	ss << "  datasize?:" << d->datasize << " nrecords?:" << d->nrecords << " lastExtentSize:" << d->lastExtentSize << '\n';
 
 	try { 
+
+		{
+			ss << "  first extent:\n";
+			d->firstExtent.ext()->dump(ss);
+			valid = valid && d->firstExtent.ext()->validates();
+		}
 
 		auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
 		int n = 0;
@@ -389,6 +398,9 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	catch(AssertionException) {
 		ss << "\n  exception during validate\n" << endl; 
 	}
+
+	if( !valid ) 
+		ss << "  ns corrupt, requires dbchk\n";
 
 	return ss.str();
 }

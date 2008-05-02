@@ -114,6 +114,17 @@ public:
 	DiskLoc firstRecord, lastRecord;
 	char extentData[4];
 
+	bool validates() { 
+		return !(firstRecord.isNull() ^ lastRecord.isNull()) &&
+			length >= 0 && !myLoc.isNull();
+	}
+
+	void dump(iostream& s) { 
+		s << "    loc:" << myLoc.toString() << " xnext:" << xnext.toString() << " xprev:" << xprev.toString() << '\n';
+		s << "    ns:" << ns.buf << '\n';
+		s << "    size:" << length << " firstRecord:" << firstRecord.toString() << " lastRecord:" << lastRecord.toString() << '\n';
+	}
+
 	/* assumes already zeroed -- insufficient for block 'reuse' perhaps 
 	Returns a DeletedRecord location which is the data in the extent ready for us.
 	Caller will need to add that to the freelist structure in namespacedetail.
