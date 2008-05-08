@@ -203,8 +203,9 @@ void receivedGetMore(AbstractMessagingPort& dbMsgPort, Message& m, stringstream&
 	ss << ns;
 	setClient(ns);
 	int ntoreturn = d.pullInt();
-	ss << " ntoreturn:" << ntoreturn;
 	long long cursorid = d.pullInt64();
+	ss << " cid:" << cursorid;
+	ss << " ntoreturn:" << ntoreturn;
 	QueryResult* msgdata = getMore(ns, ntoreturn, cursorid);
 	Message resp;
 	resp.setData(msgdata, true);
