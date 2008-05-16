@@ -130,9 +130,12 @@ void receivedUpdate(Message& m, stringstream& ss) {
 		ss << ns << ' ';
 	int flags = d.pullInt();
 	JSObj query = d.nextJsObj();
+cout << query.toString() << endl;
 	assert( d.moreJSObjs() );
 	assert( query.objsize() < m.data->dataLen() );
 	JSObj toupdate = d.nextJsObj();
+cout << toupdate.toString() << endl;
+cout << "TEMP " << flags << endl;
 	assert( toupdate.objsize() < m.data->dataLen() );
 	assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
 	updateObjects(ns, toupdate, query, flags & 1, ss);
@@ -455,7 +458,7 @@ void connThread()
 					receivedInsert(m, ss);
 				}
 				catch( AssertionException ) { 
-					problem() << "Caught Assertion insert, continuing" << endl; 
+					problem() << " Caught Assertion insert, continuing" << endl; 
 					cout << "Caught Assertion, continuing" << endl; 
 					ss << " exception ";
 				}
@@ -466,7 +469,7 @@ void connThread()
 					receivedUpdate(m, ss);
 				}
 				catch( AssertionException ) { 
-					problem() << "Caught Assertion update, continuing" << endl; 
+					problem() << " Caught Assertion update, continuing" << endl; 
 					cout << "Caught Assertion update, continuing" << endl; 
 					ss << " exception ";
 				}
@@ -477,7 +480,7 @@ void connThread()
 					receivedDelete(m);
 				}
 				catch( AssertionException ) { 
-					problem() << "Caught Assertion receviedDelete, continuing" << endl; 
+					problem() << " Caught Assertion receviedDelete, continuing" << endl; 
 					cout << "Caught Assertion receviedDelete, continuing" << endl; 
 					ss << " exception ";
 				}
@@ -495,7 +498,7 @@ void connThread()
 				}
 				catch( AssertionException ) { 
 					cout << "Caught Assertion in kill cursors, continuing" << endl; 
-					problem() << "Caught Assertion in kill cursors, continuing" << endl; 
+					problem() << " Caught Assertion in kill cursors, continuing" << endl; 
 					ss << " exception ";
 				}
 			}

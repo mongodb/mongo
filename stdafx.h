@@ -89,11 +89,17 @@ typedef struct _OWS {
 
 extern ofstream problems;
 
+class Client;
+extern Client *client;
+extern const char *curNs;
+
 // not threadsafe
 inline ofstream& problem() { 
 	time_t t;
 	time(&t);
 	string now(ctime(&t),0,20);
 	problems << now;
+	if( client ) 
+		problems << curNs << ' ';
 	return problems;
 }
