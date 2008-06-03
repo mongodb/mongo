@@ -34,6 +34,7 @@ function noresult(c) {
 function testdots() { 
     t.dots.remove({});
     t.dots.save( { a: 3, b: { y: 4, z : 5 } } );
+    t.dots.save( { a: 9, b: [ { y:88, z:0 } ] } );
     oneresult( t.dots.find( { a:3 } ) );
     oneresult( t.dots.find( { b: { y:4,z:5} } ) );
     oneresult( t.dots.find( { a:3, b: { y:4,z:5} } ) );
@@ -41,6 +42,7 @@ function testdots() {
     oneresult( t.dots.find( { "b.y":4 } ) );
     oneresult( t.dots.find( { "b.z":5 } ) );
     noresult( t.dots.find( { "b.z":55 } ) );
+    oneresult( t.dots.find( { "b.y":88 } ) );
 }
 
 function testkeys() { 

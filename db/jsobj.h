@@ -399,6 +399,11 @@ class Where;
 
 */
 class JSMatcher { 
+	int matchesDotted(
+		const char *fieldName, 
+		Element& toMatch, JSObj& obj, 
+		int compareOp, bool *deep, bool isArr);
+
 public:
 	enum { 
 		Equality = 0,

@@ -399,6 +399,62 @@ inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) {
 	return (op & z);
 }
 
+/* return value
+   -1 mismatch
+    0 missing element
+    1 match
+*/
+int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj, int compareOp, bool *deep, bool isArr = false) { 
+	{
+		const char *p = strchr(fieldName, '.');
+		if( p ) { 
+			string left(fieldName, p-fieldName);
+
+			Element e = obj.getField(left.c_str());
+			if( e.eoo() )
+				return 0;
+			if( e.type() != Object && e.type() != Array )
+				return -1;
+
+			return matchesDotted(p+1, toMatch, e.embeddedObject(), compareOp, deep, e.type() == Array);
+		}
+	}
+
+	Element e = obj.getField(fieldName);
+
+	if( valuesMatch(e, toMatch, compareOp) ) {
+		return 1;
+	}
+	else if( e.type() == Array ) {
+		JSElemIter ai(e.embeddedObject());
+		while( ai.more() ) { 
+			Element z = ai.next();
+			if( valuesMatch( z, toMatch, compareOp) ) {
+				if( deep )
+					*deep = true;
+				return 1;
+			}
+		}
+	}
+	else if( isArr ) { 
+		JSElemIter ai(obj);
+		while( ai.more() ) { 
+			Element z = ai.next();
+			if( z.type() == Object ) {
+				int cmp = matchesDotted(fieldName, toMatch, z.embeddedObject(), compareOp, deep);
+				if( cmp > 0 ) { 
+					if( deep ) *deep = true;
+					return 1;
+				}
+			}
+		}
+	}
+	else if( e.eoo() ) { 
+		return 0;
+	}
+	return -1;
+}
+
 /* deep means we looked into arrays for a match */
 bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	if( deep ) 
@@ -435,8 +491,18 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	// check normal non-regex cases:
 	for( int i = 0; i < n; i++ ) {
 		Element& m = toMatch[i]; 
+ 
+		int cmp = matchesDotted(toMatch[i].fieldName(), toMatch[i], jsobj, compareOp[i], deep);
 
-		Element e = jsobj.getFieldDotted(m.fieldName());
+		/* missing is ok iff we were looking for null */
+		if( cmp < 0 ) 
+			return false;
+		if( cmp == 0 && (m.type() != jstNULL && m.type() != Undefined ) )
+			return false;
+	}
+
+/*
+		Element e = jsobj.getFieldDotted(m.fieldName(), arrayElName);
 		if( !e.eoo() ) {
 			if( valuesMatch(e, m, compareOp[i]) ) {
 				goto ok;
@@ -454,15 +520,16 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 			}
 			return false;
 		}
+*/
 
 		/* missing.  that is ok iff we were looking for null */
-		if( m.type() == jstNULL || m.type() == Undefined )
-			;
-		else
-			return false;
-ok:
-		;
-	}
+//		if( m.type() == jstNULL || m.type() == Undefined )
+//			;
+//////		else
+//			return false;
+//ok:
+//		;
+//	}
 
 	if( where ) { 
 		if( where->func == 0 )
@@ -601,7 +668,8 @@ const char * JSObj::getStringField(const char *name) {
 
 JSObj JSObj::getObjectField(const char *name) { 
 	Element e = getField(name);
-	return e.type() == Object ? e.embeddedObject() : JSObj();
+	JSType t = e.type();
+	return t == Object || t == Array ? e.embeddedObject() : JSObj();
 }
 
 int JSObj::getFieldNames(set<string>& fields) {
