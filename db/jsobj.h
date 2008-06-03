@@ -402,7 +402,7 @@ class JSMatcher {
 	int matchesDotted(
 		const char *fieldName, 
 		Element& toMatch, JSObj& obj, 
-		int compareOp, bool *deep, bool isArr);
+		int compareOp, bool *deep, bool isArr = false);
 
 public:
 	enum { 

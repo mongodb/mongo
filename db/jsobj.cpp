@@ -404,7 +404,7 @@ inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) {
     0 missing element
     1 match
 */
-int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj, int compareOp, bool *deep, bool isArr = false) { 
+int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj, int compareOp, bool *deep, bool isArr) { 
 	{
 		const char *p = strchr(fieldName, '.');
 		if( p ) { 
@@ -416,7 +416,8 @@ int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj
 			if( e.type() != Object && e.type() != Array )
 				return -1;
 
-			return matchesDotted(p+1, toMatch, e.embeddedObject(), compareOp, deep, e.type() == Array);
+			JSObj eo = e.embeddedObject();
+			return matchesDotted(p+1, toMatch, eo, compareOp, deep, e.type() == Array);
 		}
 	}
 
@@ -441,7 +442,8 @@ int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj
 		while( ai.more() ) { 
 			Element z = ai.next();
 			if( z.type() == Object ) {
-				int cmp = matchesDotted(fieldName, toMatch, z.embeddedObject(), compareOp, deep);
+				JSObj eo = z.embeddedObject();
+				int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep);
 				if( cmp > 0 ) { 
 					if( deep ) *deep = true;
 					return 1;
