@@ -112,7 +112,7 @@ public:
 	DiskLoc alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc);
 	void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
 private:
-	DiskLoc __alloc(int len);
+	DiskLoc __stdAlloc(int len);
 	DiskLoc _alloc(const char *ns, int len);
 	void compact();
 };

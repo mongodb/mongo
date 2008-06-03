@@ -130,12 +130,11 @@ void receivedUpdate(Message& m, stringstream& ss) {
 		ss << ns << ' ';
 	int flags = d.pullInt();
 	JSObj query = d.nextJsObj();
-cout << query.toString() << endl;
+
 	assert( d.moreJSObjs() );
 	assert( query.objsize() < m.data->dataLen() );
 	JSObj toupdate = d.nextJsObj();
-cout << toupdate.toString() << endl;
-cout << "TEMP " << flags << endl;
+
 	assert( toupdate.objsize() < m.data->dataLen() );
 	assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
 	updateObjects(ns, toupdate, query, flags & 1, ss);
@@ -275,7 +274,7 @@ public:
 };
 
 void listen(int port) { 
-	const char *Version = "db version: 109 30apr2008 sai hack,keylen";
+	const char *Version = "db version: 110 2jun2008 embedded obj queries";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();

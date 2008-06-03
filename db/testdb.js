@@ -31,6 +31,18 @@ function noresult(c) {
 	failure("ERROR: wrong # of results: " + c.length(), arguments);
 }
 
+function testdots() { 
+    t.dots.remove({});
+    t.dots.save( { a: 3, b: { y: 4, z : 5 } } );
+    oneresult( t.dots.find( { a:3 } ) );
+    oneresult( t.dots.find( { b: { y:4,z:5} } ) );
+    oneresult( t.dots.find( { a:3, b: { y:4,z:5} } ) );
+    noresult( t.dots.find( { b: { y:4} } ) );
+    oneresult( t.dots.find( { "b.y":4 } ) );
+    oneresult( t.dots.find( { "b.z":5 } ) );
+    noresult( t.dots.find( { "b.z":55 } ) );
+}
+
 function testkeys() { 
     t.testkeys.save( { name: 5 } );
     t.testkeys.ensureIndex({name:true});
@@ -293,6 +305,8 @@ function runcursors() {
 function runquick() { 
     print("runquick");
     start = Date();
+
+    testdots();
 
     testcapped();
 

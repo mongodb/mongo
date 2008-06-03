@@ -187,7 +187,13 @@ explicit
 	int addFields(JSObj& from, set<string>& fields); /* returns n added */
 	int getFieldNames(set<string>& fields);
 
+	/* return has eoo() true if no match 
+	   supports "." notation to reach into embedded objects
+	*/
+	Element getFieldDotted(const char *name); 
+
 	Element getField(const char *name); /* return has eoo() true if no match */
+
 	const char * getStringField(const char *name);
 	JSObj getObjectField(const char *name);
 
@@ -410,6 +416,7 @@ public:
 
 	~JSMatcher();
 
+	/* deep means we looked into arrays for a match */
 	bool matches(JSObj& j, bool *deep = 0);
 
 	int getN() { return n; }

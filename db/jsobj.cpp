@@ -409,56 +409,50 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 
 	for( int r = 0; r < nRegex; r++ ) { 
 		RegexMatcher& rm = regexs[r];
-		JSElemIter k(jsobj);
-		while( 1 ) {
-			if( !k.more() )
-				return false;
-			Element e = k.next();
-			if( strcmp(e.fieldName(), rm.fieldName) == 0 ) {
-				char buf[64];
-				const char *p = buf;
-				if( e.type() == String )
-					p = e.valuestr();
-				else if( e.type() == Number ) { 
-					sprintf(buf, "%f", e.number());
-				}
-				else if( e.type() == Date ) { 
-					unsigned long long d = e.date();
-					time_t t = (d/1000);
-					time_t_to_String(t, buf);
-				}
-				else
-					return false;
-				if( !rm.re->PartialMatch(p) )
-					return false;
-				break;
+		Element e = jsobj.getFieldDotted(rm.fieldName);
+		if( e.eoo() )
+			return false;
+		{
+			char buf[64];
+			const char *p = buf;
+			if( e.type() == String )
+				p = e.valuestr();
+			else if( e.type() == Number ) { 
+				sprintf(buf, "%f", e.number());
 			}
+			else if( e.type() == Date ) { 
+				unsigned long long d = e.date();
+				time_t t = (d/1000);
+				time_t_to_String(t, buf);
+			}
+			else
+				return false;
+			if( !rm.re->PartialMatch(p) )
+				return false;
 		}
 	}
 
 	// check normal non-regex cases:
 	for( int i = 0; i < n; i++ ) {
 		Element& m = toMatch[i]; 
-		JSElemIter k(jsobj);
-		while( k.more() ) {
-			Element e = k.next();
-			if( strcmp(e.fieldName(), m.fieldName())== 0 ) {
-				if( valuesMatch(e, m, compareOp[i]) ) {
-					goto ok;
-				}
-				else if( e.type() == Array ) {
-					JSElemIter ai(e.embeddedObject());
-					while( ai.more() ) { 
-						Element z = ai.next();
-						if( valuesMatch( z, m, compareOp[i]) ) {
-							if( deep )
-								*deep = true;
-							goto ok;
-						}
+
+		Element e = jsobj.getFieldDotted(m.fieldName());
+		if( !e.eoo() ) {
+			if( valuesMatch(e, m, compareOp[i]) ) {
+				goto ok;
+			}
+			else if( e.type() == Array ) {
+				JSElemIter ai(e.embeddedObject());
+				while( ai.more() ) { 
+					Element z = ai.next();
+					if( valuesMatch( z, m, compareOp[i]) ) {
+						if( deep )
+							*deep = true;
+						goto ok;
 					}
 				}
-				return false;
 			}
+			return false;
 		}
 
 		/* missing.  that is ok iff we were looking for null */
@@ -542,6 +536,30 @@ int JSObj::woCompare(const JSObj& r) const {
 	}
 	return -1;
 } 
+
+/* return has eoo() true if no match 
+   supports "." notation to reach into embedded objects
+*/
+Element JSObj::getFieldDotted(const char *name) {
+	{
+		const char *p = strchr(name, '.');
+		if( p ) { 
+			string left(name, p-name);
+			JSObj sub = getObjectField(left.c_str());
+			return sub.isEmpty() ? nullElement : sub.getFieldDotted(p+1);
+		}
+	}
+
+	JSElemIter i(*this);
+	while( i.more() ) {
+		Element e = i.next();
+		if( e.eoo() )
+			break;
+		if( strcmp(e.fieldName(), name) == 0 )
+			return e;
+	}
+	return nullElement;
+}
 
 Element JSObj::getField(const char *name) {
 	JSElemIter i(*this);

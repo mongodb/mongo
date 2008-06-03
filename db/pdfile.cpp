@@ -109,8 +109,10 @@ DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentL
 	return loc;
 }
 
-/* returned item is out of the deleted list upon return */
-DiskLoc NamespaceDetails::__alloc(int len) {
+/* for non-capped collections.
+   returned item is out of the deleted list upon return 
+*/
+DiskLoc NamespaceDetails::__stdAlloc(int len) {
 	DiskLoc *prev;
 	DiskLoc *bestprev = 0;
 	DiskLoc bestmatch;
@@ -217,7 +219,7 @@ void NamespaceDetails::compact() {
 
 DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 	if( !capped )
-		return __alloc(len);
+		return __stdAlloc(len);
 
 	assert( len < 400000000 );
 	int passes = 0;
@@ -226,7 +228,7 @@ DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 	// delete records until we have room and the max # objects limit achieved.
 	while( 1 ) {
 		if( nrecords < max ) { 
-			loc = __alloc(len);
+			loc = __stdAlloc(len);
 			if( !loc.isNull() )
 				break;
 		}
