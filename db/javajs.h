@@ -23,12 +23,14 @@ void jasserted(const char *msg, const char *file, unsigned line);
 int javajstest();
 
 const char * findEd();
+const char * findEd(const char *);
 
 class JSObj;
 
 class JavaJSImpl {
  public:
   JavaJSImpl();
+  JavaJSImpl(const char *);
   ~JavaJSImpl();
   
   jlong scopeCreate();

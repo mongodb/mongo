@@ -54,12 +54,16 @@ void myJNIClean( JNIEnv * env ){
   JavaJS->detach( env );
 }
 
-JavaJSImpl::JavaJSImpl(){
+JavaJSImpl::JavaJSImpl() {
+	JavaJSImpl(null);
+}
+
+JavaJSImpl::JavaJSImpl(const char *appserverPath){
   _jvm = 0; 
   _mainEnv = 0;
   _dbhook = 0;
 
-  const char * ed = findEd();
+  const char * ed = findEd(appserverPath);
   stringstream ss;
 
 #if defined(_WIN32)
@@ -345,9 +349,38 @@ void jasserted(const char *msg, const char *file, unsigned line) {
 }
 
 
+const char* findEd(const char *path) {
+	
+	if (!path) {
+		return findEd();
+	}
+	
+	cout << "Appserver location specified : " << path << endl;
+	
+	if (!path) {
+		cout << "   invalid appserver location : " << path << " : terminating - prepare for bus error" << endl;
+		return 0;
+	}
+	
+	DIR *testDir = opendir(path);
+
+	if (testDir) { 
+		cout << "   found directory for appserver : " << path << endl;
+		closedir(testDir);
+		return path;
+	}
+	else {
+		cout << "   ERROR : not a directory for specified appserver location : " << path << " - prepare for bus error" << endl;
+		return null;
+	}
+}
+
 const char * findEd(){
 
+	cout << "Appserver location not specified.  Searching.... " << endl;
+
 #if defined(_WIN32)
+	cout << "    WIN32 default : c:/l/ed/" << endl;
   return "c:/l/ed";
 #else
 
@@ -365,10 +398,11 @@ const char * findEd(){
       continue;
     
     closedir( test );
-    cout << "found ed at : " << temp << endl;
+	cout << "   found directory for appserver : " << temp << endl;
     return temp;
   }
   
+  cout << "   ERROR : can't find directory for appserver - prepare for bus error" << endl;  
   return 0;
 #endif
 };

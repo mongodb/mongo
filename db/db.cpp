@@ -605,7 +605,7 @@ void setupSignals() {
 void setupSignals() {}
 #endif
 
-void initAndListen(int listenPort, const char *dbPath) { 
+void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
 
 	setupSignals();
 
@@ -634,7 +634,7 @@ void initAndListen(int listenPort, const char *dbPath) {
     cout << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
     problem() << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
 
-    JavaJS = new JavaJSImpl();
+    JavaJS = new JavaJSImpl(appserverLoc);
     javajstest();
 
     listen(listenPort);    
@@ -712,6 +712,8 @@ int main(int argc, char* argv[], char *envp[] )
          *     slightly different mode where "run" is assumed and we can set values
          */
 		
+        char *appsrvPath = null;
+		
         for (int i = 1; i < argc; i++)  {
     
             char *s = argv[i];
@@ -722,9 +724,12 @@ int main(int argc, char* argv[], char *envp[] )
             else if (s && strcmp(s, "--dbpath") == 0) { 
             	dbpath = argv[++i];
             }
+            else if (s && strcmp(s, "--appsrvpath") == 0) { 
+                appsrvPath = argv[++i];
+            }
         }
         
-        initAndListen(port, dbpath);
+        initAndListen(port, dbpath, appsrvPath);
         
         goingAway = true;
         return 0;
@@ -739,7 +744,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  longmsg           send a long test message to the db server" << endl;
 	cout << "  msglots           send a bunch of test messages, and then wait for answer on the last one" << endl;
 	cout << endl << "Alternate Usage :" << endl;
-	cout << " --port <portno>  --dbpath <root>" << endl << endl;
+	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl << endl;
 	
 	goingAway = true;
 	return 0;
