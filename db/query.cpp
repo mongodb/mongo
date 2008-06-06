@@ -737,9 +737,9 @@ assert( debug.getN() < 5000 );
 											cc->matcher = matcher;
 											cc->ns = ns;
 											cc->pos = n;
+											cc->filter = filter;
 											ClientCursor::add(cc);
 											cc->updateLocation();
-											cc->filter = filter;
 										}
 									}
 									break;
