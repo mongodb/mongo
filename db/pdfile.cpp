@@ -68,6 +68,7 @@ int bucketSizes[] = {
 //NamespaceIndexMgr namespaceIndexMgr;
 
 void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) { 
+	DEBUGGING cout << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
 	int b = bucket(d->lengthWithHeaders);
 	DiskLoc& list = deletedList[b];
 	DiskLoc oldHead = list;
@@ -90,6 +91,8 @@ DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentL
 	int regionlen = r->lengthWithHeaders;
 	extentLoc.set(loc.a(), r->extentOfs);
 
+	DEBUGGING cout << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
+
 	int left = regionlen - lenToAlloc;
 	if( left < 24 || (left < (lenToAlloc >> 3) && capped == 0) ) {
 		// you get the whole thing.
@@ -104,6 +107,7 @@ DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentL
 	newDel->extentOfs = r->extentOfs;
 	newDel->lengthWithHeaders = left;
 	newDel->nextDeleted.Null();
+
 	addDeletedRec(newDel, newDelLoc);
 
 	return loc;
@@ -171,6 +175,27 @@ DiskLoc NamespaceDetails::__stdAlloc(int len) {
 	return bestmatch;
 }
 
+void NamespaceDetails::dumpDeleted(set<DiskLoc> *extents) { 
+//	cout << "DUMP deleted chains" << endl;
+	for( int i = 0; i < Buckets; i++ ) { 
+//		cout << "  bucket " << i << endl;
+		DiskLoc dl = deletedList[i];
+		while( !dl.isNull() ) { 
+			DeletedRecord *r = dl.drec();
+			DiskLoc extLoc(dl.a(), r->extentOfs);
+			if( extents == 0 || extents->count(extLoc) <= 0 ) {
+				cout << "  bucket " << i << endl;
+				cout << "   " << dl.toString() << " ext:" << extLoc.toString();
+				if( extents && extents->count(extLoc) <= 0 )
+					cout << '?';
+				cout << " len:" << r->lengthWithHeaders << endl;
+			}
+			dl = r->nextDeleted;
+		}
+	}
+//	cout << endl;
+}
+
 /* combine adjacent deleted records
 
    this is O(n^2) but we call it for capped tables where typically n==1 or 2! 
@@ -198,6 +223,7 @@ void NamespaceDetails::compact() {
 	while( 1 ) {
 		j++;
 		if( j == drecs.end() ) {
+			DEBUGGING cout << "TEMP: compact adddelrec\n";
 			addDeletedRec(a.drec(), a);
 			break;
 		}
@@ -207,11 +233,13 @@ void NamespaceDetails::compact() {
 			a.drec()->lengthWithHeaders += b.drec()->lengthWithHeaders;
 			j++;
 			if( j == drecs.end() ) {
+				DEBUGGING cout << "temp: compact adddelrec2\n";
 				addDeletedRec(a.drec(), a);
 				return;
 			}
 			b = *j;
 		}
+		DEBUGGING cout << "temp: compact adddelrec3\n";
 		addDeletedRec(a.drec(), a);
 		a = b;
 	}
@@ -405,6 +433,7 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
 	}
 
 	details->lastExtentSize = approxSize;
+	DEBUGGING cout << "temp: newextent adddelrec " << ns << endl;
 	details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
 	cout << "new extent size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset << dec;
@@ -487,12 +516,33 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 	DiskLoc loc;
 	bool found = nsindex(ns)->find(ns, loc);
 	if( !found ) {
-		cout << "info: findAll() namespace does not exist: " << ns << endl;
+		//		cout << "info: findAll() namespace does not exist: " << ns << endl;
 		return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
 	}
+
 	Extent *e = getExtent(loc);
+
+	DEBUGGING {
+		cout << "temp: listing extents for " << ns << endl;
+		DiskLoc tmp = loc;
+		set<DiskLoc> extents;
+
+		while( 1 ) { 
+			Extent *f = getExtent(tmp);
+			cout << "extent: " << tmp.toString() << endl;
+			extents.insert(tmp);
+			tmp = f->xnext;
+			if( tmp.isNull() )
+				break;
+			f = f->getNextExtent();
+		}
+
+		cout << endl;
+		nsdetails(ns)->dumpDeleted(&extents);
+	}
+
 	while( e->firstRecord.isNull() && !e->xnext.isNull() ) {
-		cout << "  DFM::findAll(): extent empty, skipping ahead" << endl;
+	    OCCASIONALLY cout << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead" << endl;
 		// find a nonempty extent
 		// it might be nice to free the whole extent here!  but have to clean up free recs then.
 		e = e->getNextExtent();
@@ -512,7 +562,7 @@ auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
 		return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
 	Extent *e = d->lastExtent.ext();
 	while( e->lastRecord.isNull() && !e->xprev.isNull() ) {
-		cout << "  findTableScan: extent empty, skipping ahead" << endl;
+		OCCASIONALLY cout << "  findTableScan: extent empty, skipping ahead" << endl;
 		e = e->getPrevExtent();
 	}
 	return auto_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
@@ -568,11 +618,11 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 		nUnindexes++;
 		bool ok = false;
 		try {
-			ok = id.head.btree()->unindex(id.head, ns, j, dl);
+			ok = id.head.btree()->unindex(id.head, id, j, dl);
 		}
 		catch(AssertionException) { 
 			cout << " caught assertion _unindexRecord " << id.indexNamespace() << '\n';
-			problem() << "Assertion failure: _unindex failed " << ns << endl;
+			problem() << "Assertion failure: _unindex failed " << id.indexNamespace() << endl;
 			cout << "Assertion failure: _unindex failed" << '\n';
 			cout << "  obj:" << obj.toString() << '\n';
 			cout << "  key:" << j.toString() << '\n';
@@ -596,6 +646,8 @@ void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete, const
 
 void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK) 
 {
+	int tempextofs = todelete->extentOfs;
+
 	NamespaceDetails* d = nsdetails(ns);
 	if( d->capped && !cappedOK ) { 
 		cout << "failing remove on a capped ns " << ns << endl;
@@ -636,6 +688,17 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	{
 		d->nrecords--;
 		d->datasize -= todelete->netLength();
+///		DEBUGGING << "temp: dddelrec deleterecord " << ns << endl;
+//		if( todelete->extentOfs == 0xaca500 ) { 
+//			cout << "break\n";
+//		}
+/*
+TEMP: add deleted rec 0:aca5b0 aca500
+temp: adddelrec deleterecord admin.blog.posts
+TEMP: add deleted rec 0:b9e750 b6a500
+temp: adddelrec deleterecord admin.blog.posts
+*/
+
 		d->addDeletedRec((DeletedRecord*)todelete, dl);
 	}
 }
@@ -697,7 +760,7 @@ void DataFileMgr::update(
 				string idxns = idx.indexNamespace();
 				for( unsigned i = 0; i < removed.size(); i++ ) {
 					try {  
-						idx.head.btree()->unindex(idx.head, idxns.c_str(), *removed[i], dl);
+						idx.head.btree()->unindex(idx.head, idx, *removed[i], dl);
 					}
 					catch(AssertionException) { 
 						ss << " exception update unindex ";
@@ -711,7 +774,7 @@ void DataFileMgr::update(
 				for( unsigned i = 0; i < added.size(); i++ ) { 
 					try {
 						idx.head.btree()->insert(
-							idx.head, idxns.c_str(),
+							idx.head, 
 							dl, *added[i], false, idx, true);
 					}
 					catch(AssertionException) {
@@ -750,8 +813,8 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
 		assert( !newRecordLoc.isNull() );
 		try {
-//			cout << "TEMP index: " << newRecordLoc.toString() << obj.toString() << endl;
-			idx.head.btree()->insert(idx.head, idx.indexNamespace().c_str(), newRecordLoc,
+//			DEBUGGING << "temp index: " << newRecordLoc.toString() << obj.toString() << endl;
+			idx.head.btree()->insert(idx.head, newRecordLoc,
 				(JSObj&) *i, false, idx, true);
 		}
 		catch(AssertionException) { 
@@ -810,7 +873,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	}
 
 	NamespaceDetails *tableToIndex = 0;
-	string indexFullNS;
+
 	const char *tabletoidxns = 0;
 	if( addIndex ) { 
 		JSObj io((const char *) buf);
@@ -824,20 +887,20 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		}
 		tableToIndex = nsdetails(tabletoidxns);
 		if( tableToIndex == 0 ) {
-			cout << "ERROR: bad add index attempt, no such table(ns):" << tabletoidxns << endl;
+			cout << "user warning: bad add index attempt, no such table(ns):" << tabletoidxns << endl;
 			return DiskLoc();
 		}
 		if( tableToIndex->nIndexes >= MaxIndexes ) { 
-			cout << "ERROR: bad add index attempt, too many indexes for:" << tabletoidxns << endl;
+			cout << "user warning: bad add index attempt, too many indexes for:" << tabletoidxns << endl;
 			return DiskLoc();
 		}
 		if( tableToIndex->findIndexByName(name) >= 0 ) { 
 			//cout << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;
 			return DiskLoc();
 		}
-		indexFullNS = tabletoidxns; 
-		indexFullNS += ".$";
-		indexFullNS += name; // client.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
+		//indexFullNS = tabletoidxns; 
+		//indexFullNS += ".$";
+		//indexFullNS += name; // client.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
 	}
 
 	DiskLoc extentLoc;
@@ -879,7 +942,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	if( tableToIndex ) { 
 		IndexDetails& idxinfo = tableToIndex->indexes[tableToIndex->nIndexes];
 		idxinfo.info = loc;
-		idxinfo.head = BtreeBucket::addHead(indexFullNS.c_str());
+		idxinfo.head = BtreeBucket::addHead(idxinfo);
 		tableToIndex->nIndexes++; 
 		/* todo: index existing records here */
 		addExistingToIndex(tabletoidxns, idxinfo);

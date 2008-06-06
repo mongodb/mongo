@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "goodies.h"
 
+unsigned occasion = 0;
 bool goingAway = false;
 
 bool isPrime(int n) { 

@@ -45,7 +45,10 @@ const int MaxIndexes = 10;
 class IndexDetails { 
 public:
 	DiskLoc head; /* btree head */
-	DiskLoc info; /* index info object. { name:, ns:, key: } */
+	/* index info object. 
+	  { name:"nameofindex", ns:"parentnsname", key: {keypattobject} } 
+	*/
+	DiskLoc info; 
 
 	/* pull out the relevant key objects from obj, so we
        can index them.  Note that the set is multiple elements 
@@ -111,6 +114,7 @@ public:
 
 	DiskLoc alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc);
 	void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
+	void dumpDeleted(set<DiskLoc> *extents = 0);
 private:
 	DiskLoc __stdAlloc(int len);
 	DiskLoc _alloc(const char *ns, int len);

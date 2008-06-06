@@ -253,7 +253,11 @@ public:
 		assert( ok() );
 		return curr.rec();
 	}
-	JSObj current() { return JSObj( _current() ); }
+	JSObj current() { 
+		Record *r = _current();
+		JSObj j(r);
+		return j;
+	}
 	virtual DiskLoc currLoc() { return curr; }
 
 	bool advance() { 

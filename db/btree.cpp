@@ -307,7 +307,7 @@ bool BtreeBucket::find(JSObj& key, DiskLoc recordLoc, int& pos) {
 	return false;
 }
 
-void BtreeBucket::delBucket(const DiskLoc& thisLoc, const char *ns) { 
+void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) { 
 	assert( !isHead() );
 
 	BtreeBucket *p = parent.btree();
@@ -332,11 +332,11 @@ found:
 	//defensive:
 	n = -1;
 	parent.Null();
-	theDataFileMgr.deleteRecord(ns, thisLoc.rec(), thisLoc);
+	theDataFileMgr.deleteRecord(id.indexNamespace().c_str(), thisLoc.rec(), thisLoc);
 }
 
 /* note: may delete the entire bucket!  this invalid upon return sometimes. */
-void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p) { 
+void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p) { 
 	assert(n>0);
 	DiskLoc left = childForPos(p);
 
@@ -345,7 +345,7 @@ void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p) {
 			if( isHead() )
 				_delKeyAtPos(p); // we don't delete the top bucket ever
 			else
-				delBucket(thisLoc, ns);
+				delBucket(thisLoc, id);
 			return;
 		}
 		markUnused(p);
@@ -361,9 +361,9 @@ void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p) {
 int verbose = 0;
 int qqq = 0;
 
-bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc ) {
+bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, JSObj& key, const DiskLoc& recordLoc ) {
 	if( key.objsize() > KeyMax ) {
-		problem() << "unindex: key too large to index, skipping " << ns << ' ' << key.toString() << endl;
+		problem() << "unindex: key too large to index, skipping " << id.indexNamespace() << ' ' << key.toString() << endl;
 		return false;
 	}
 
@@ -371,7 +371,7 @@ bool BtreeBucket::unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, co
 	bool found;
 	DiskLoc loc = locate(thisLoc, key, pos, found, recordLoc, 1);
 	if( found ) { 
-		loc.btree()->delKeyAtPos(loc, ns, pos);
+		loc.btree()->delKeyAtPos(loc, id, pos);
 		return true;
 	}
 	return false;
@@ -400,7 +400,7 @@ void BtreeBucket::fixParentPtrs(const DiskLoc& thisLoc) {
 
 /* keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
 */
-void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos, 
+void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos, 
 							 DiskLoc recordLoc, JSObj& key,
 							 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) 
 {
@@ -415,7 +415,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 		if( keypos+1 == n ) { // last key
 			if( nextChild != lchild ) {
 				cout << "ERROR nextChild != lchild" << endl;
-				cout << "  thisLoc: " << thisLoc.toString() << ' ' << ns << endl;
+				cout << "  thisLoc: " << thisLoc.toString() << ' ' << idx.indexNamespace() << endl;
 				cout << "  keyPos: " << keypos << " n:" << n << endl;
 				cout << "  nextChild: " << nextChild.toString() << " lchild: " << lchild.toString() << endl;
 				cout << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
@@ -439,7 +439,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 			k(keypos).prevChildBucket = lchild;
 			if( k(keypos+1).prevChildBucket != lchild ) { 
 				cout << "ERROR k(keypos+1).prevChildBucket != lchild" << endl;
-				cout << "  thisLoc: " << thisLoc.toString() << ' ' << ns << endl;
+				cout << "  thisLoc: " << thisLoc.toString() << ' ' << idx.indexNamespace() << endl;
 				cout << "  keyPos: " << keypos << " n:" << n << endl;
 				cout << "  k(keypos+1).pcb: " << k(keypos+1).prevChildBucket.toString() << " lchild: " << lchild.toString() << endl;
 				cout << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
@@ -478,7 +478,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 			if( mid < 3 ) { 
 				problem() << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
 				cout << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
-				cout << "  ns:" << ns << endl;
+				cout << "  ns:" << idx.indexNamespace() << endl;
 				cout << "  key:" << mn.key.toString() << endl;
 				break;
 			}
@@ -503,7 +503,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 	r->nextChild = nextChild;
 	r->assertValid();
 //r->dump();
-	rLoc = theDataFileMgr.insert(ns, r, r->Size, true);
+	rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size, true);
 	if( split_debug )
 		cout << "     new rLoc:" << rLoc.toString() << endl;
 	free(r); r = 0;
@@ -524,7 +524,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 			p->pushBack(middle.recordLoc, middle.key, thisLoc);
 			p->nextChild = rLoc;
 			p->assertValid();
-			parent = idx.head = theDataFileMgr.insert(ns, p, p->Size, true);
+			parent = idx.head = theDataFileMgr.insert(idx.indexNamespace().c_str(), p, p->Size, true);
 			if( split_debug )
 				cout << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
 			free(p);
@@ -537,7 +537,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 			rLoc.btree()->parent = parent;
 			if( split_debug )
 				cout << "    promoting middle key " << middle.key.toString() << endl;
-			parent.btree()->_insert(parent, ns, middle.recordLoc, middle.key, false, thisLoc, rLoc, idx);
+			parent.btree()->_insert(parent, middle.recordLoc, middle.key, false, thisLoc, rLoc, idx);
 		}
 		BtreeBucket *br = rLoc.btree();
 //br->dump();
@@ -560,16 +560,15 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 //		if( keypos < mid ) {
 			if( split_debug )
 				cout << "  keypos<mid, insertHere() the new key" << endl;
-			insertHere(thisLoc, ns, keypos, recordLoc, key, lchild, rchild, idx);
+			insertHere(thisLoc, keypos, recordLoc, key, lchild, rchild, idx);
 //dump();
 		} else if( highest ) {
 			// else handled above already.
 			int kp = keypos-mid-1; assert(kp>=0);
-			rLoc.btree()->insertHere(rLoc, ns, kp, recordLoc, key, lchild, rchild, idx);
+			rLoc.btree()->insertHere(rLoc, kp, recordLoc, key, lchild, rchild, idx);
 // set a bp here.
 //			if( !lchild.isNull() ) cout << lchild.btree()->parent.toString() << endl;
 //			if( !rchild.isNull() ) cout << rchild.btree()->parent.toString() << endl;
-//			cout << "temp" << endl;
 		}
 	}
 
@@ -577,9 +576,9 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, const char *ns, int keypos,
 		cout << "     split end " << hex << thisLoc.getOfs() << dec << endl;
 }
 
-DiskLoc BtreeBucket::addHead(const char *ns) {
+DiskLoc BtreeBucket::addHead(IndexDetails& id) {
 	BtreeBucket *p = allocTemp();
-	DiskLoc loc = theDataFileMgr.insert(ns, p, p->Size, true);
+	DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), p, p->Size, true);
 	return loc;
 }
 
@@ -665,11 +664,11 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 }
 
 /* thisloc is the location of this bucket object.  you must pass that in. */
-int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
+int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc, 
 						JSObj& key, bool dupsAllowed,
 						DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) { 
 	if( key.objsize() > KeyMax ) { 
-		problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << ns << endl;
+		problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << idx.indexNamespace() << endl;
 		return 2;
 	}
 	assert( key.objsize() > 0 );
@@ -690,7 +689,7 @@ int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 		}
 
 		cout << "_insert(): key already exists in index\n";
-		cout << "  " << ns << " thisLoc:" << thisLoc.toString() << '\n';
+		cout << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
 		cout << "  " << key.toString() << '\n';
 		cout << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
 		cout << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
@@ -710,16 +709,16 @@ int BtreeBucket::_insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc,
 		*/
 	}
 
-//	cout << "TEMP: key: " << key.toString() << endl;
+	DEBUGGING cout << "TEMP: key: " << key.toString() << endl;
 	DiskLoc& child = getChild(pos);
 	if( insert_debug )
 		cout << "    getChild(" << pos << "): " << child.toString() << endl;
 	if( child.isNull() || !rChild.isNull() /* means an 'internal' insert */ ) { 
-		insertHere(thisLoc, ns, pos, recordLoc, key, lChild, rChild, idx);
+		insertHere(thisLoc, pos, recordLoc, key, lChild, rChild, idx);
 		return 0;
 	}
 
-	return child.btree()->insert(child, ns, recordLoc, key, dupsAllowed, idx, false);
+	return child.btree()->insert(child, recordLoc, key, dupsAllowed, idx, false);
 }
 
 void BtreeBucket::dump() { 
@@ -757,27 +756,29 @@ void tempMusic(DiskLoc thisLoc)
 }
 
 /* todo: meaning of return code unclear clean up */
-int BtreeBucket::insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
+int BtreeBucket::insert(DiskLoc thisLoc, DiskLoc recordLoc, 
 						JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
 {
 	if( toplevel ) {
 		if( key.objsize() > KeyMax ) { 
-			problem() << "Btree::insert: key too large to index, skipping " << ns << ' ' << key.toString() << '\n';
+			problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.toString() << '\n';
 			return 3;
 		}
 		++ninserts;
-		if( /*ninserts > 127250 || */ninserts % 1000 == 0 ) {
+		/*
+		if( ninserts % 1000 == 0 ) {
 			cout << "ninserts: " << ninserts << endl;
 			if( 0 && ninserts >= 127287 ) {
 				cout << "debug?" << endl;
 				split_debug = 1;
 			}
 		}
+		*/
 	}
 
 	bool chk = false;
 
-	int x = _insert(thisLoc, ns, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
+	int x = _insert(thisLoc, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
 	assertValid(); 
 
 /*	if( toplevel ) {

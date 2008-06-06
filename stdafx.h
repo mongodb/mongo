@@ -103,3 +103,9 @@ inline ofstream& problem() {
 		problems << curNs << ' ';
 	return problems;
 }
+
+#define DEBUGGING if( 0 ) 
+
+extern unsigned occasion; 
+
+#define OCCASIONALLY if( ++occasion % 16 == 0 ) 

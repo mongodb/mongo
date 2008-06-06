@@ -114,12 +114,12 @@ class BtreeBucket : public BucketBasics {
 	friend class BtreeCursor;
 public:
 	void dump();
-	/* rc: 0 = ok */
-	static DiskLoc addHead(const char *ns); /* start a new index off, empty */
-	int insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
+
+	static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
+	int insert(DiskLoc thisLoc, DiskLoc recordLoc, 
 		JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel);
-//	void update(const DiskLoc& recordLoc, JSObj& key);
-	bool unindex(const DiskLoc& thisLoc, const char *ns, JSObj& key, const DiskLoc& recordLoc);
+
+	bool unindex(const DiskLoc& thisLoc, IndexDetails& id, JSObj& key, const DiskLoc& recordLoc);
 
 	/* locate may return an "unused" key that is just a marker.  so be careful.
   	   looks for a key:recordloc pair.
@@ -134,14 +134,14 @@ public:
 	void shape(stringstream&);
 private:
 	void fixParentPtrs(const DiskLoc& thisLoc);
-	void delBucket(const DiskLoc& thisLoc, const char *ns);
-	void delKeyAtPos(const DiskLoc& thisLoc, const char *ns, int p);
+	void delBucket(const DiskLoc& thisLoc, IndexDetails&);
+	void delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p);
 	JSObj keyAt(int keyOfs) { return keyOfs >= n ? JSObj() : keyNode(keyOfs).key; }
 	static BtreeBucket* allocTemp(); /* caller must release with free() */
-	void insertHere(DiskLoc thisLoc, const char *ns, int keypos, 
+	void insertHere(DiskLoc thisLoc, int keypos, 
 		DiskLoc recordLoc, JSObj& key,
 		DiskLoc lchild, DiskLoc rchild, IndexDetails&);
-	int _insert(DiskLoc thisLoc, const char *ns, DiskLoc recordLoc, 
+	int _insert(DiskLoc thisLoc, DiskLoc recordLoc, 
 		JSObj& key, bool dupsAllowed,
 		DiskLoc lChild, DiskLoc rChild, IndexDetails&);
 	bool find(JSObj& key, DiskLoc recordLoc, int& pos);
