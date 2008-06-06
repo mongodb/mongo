@@ -274,7 +274,7 @@ public:
 };
 
 void listen(int port) { 
-	const char *Version = "db version: 110 2jun2008 embedded obj queries";
+	const char *Version = "db version: 111 6jun2008";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
@@ -579,25 +579,27 @@ void pipeSigHandler( int signal ) {
   psignal( signal, "Signal Received : ");
 }
 
-void segvhandler(int x) { 
+void segvhandler(int x) {
 	cout << "got SIGSEGV " << x << ", terminating :-(" << endl;
 	problem() << "got SIGSEGV " << x << ", terminating :-(" << endl;
-	exit(-9);
+	exit(9);
 }
 
 void mysighandler(int x) { 
-	// [dm] not working.  why? 
-	// [gmj] because the VM catches sig 3 to do a thread dump
-	cout << "got kill or ctrl c signal " << x << ", terminating" << endl;
-	problem() << "got kill or ctrl c signal " << x << ", terminating" << endl;
-	exit(0);
+   signal(x, SIG_IGN); 
+   cout << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+   problem() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+   {
+	   lock lk(dbMutex);
+	   cout << "exiting" << endl;
+	   problem() << "exiting" << endl;
+	   exit(12);
+   }
 }
 
 void setupSignals() {
-	cout << "SETUPSIGNALS " << signal(SIGINT, mysighandler) << endl;
-//	assert( signal(SIGINT, mysighandler) != SIG_ERR );
+	assert( signal(SIGINT, mysighandler) != SIG_ERR );
 	assert( signal(SIGTERM, mysighandler) != SIG_ERR );
-	assert( signal(SIGQUIT, mysighandler) != SIG_ERR );
 	assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
 }
 
@@ -607,7 +609,7 @@ void setupSignals() {}
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
 
-	setupSignals();
+//	setupSignals();
 
     /*
      * ensure that the dbpath ends w/ '/' as that's key in preventing things like 
@@ -636,6 +638,8 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 
     JavaJS = new JavaJSImpl(appserverLoc);
     javajstest();
+
+	setupSignals();
 
     listen(listenPort);    
 }
