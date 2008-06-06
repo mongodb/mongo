@@ -87,18 +87,19 @@ typedef struct _OWS {
 	char string[400];
 } *OWS;
 
-extern ofstream problems;
+//extern ofstream problems;
 
 class Client;
 extern Client *client;
 extern const char *curNs;
 
 // not threadsafe
-inline ofstream& problem() { 
+inline ostream& problem() {
+	ostream& problems = cout;
 	time_t t;
 	time(&t);
 	string now(ctime(&t),0,20);
-	problems << now;
+	problems << "problem " << now;
 	if( client ) 
 		problems << curNs << ' ';
 	return problems;

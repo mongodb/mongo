@@ -274,7 +274,7 @@ public:
 };
 
 void listen(int port) { 
-	const char *Version = "db version: 111 6jun2008";
+	const char *Version = "db version: 112 6jun2008";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
@@ -644,7 +644,7 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
     listen(listenPort);    
 }
 
-ofstream problems("dbproblems.log", ios_base::app | ios_base::out);
+//ofstream problems("dbproblems.log", ios_base::app | ios_base::out);
 
 int main(int argc, char* argv[], char *envp[] )
 {
