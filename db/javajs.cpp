@@ -350,7 +350,12 @@ void jasserted(const char *msg, const char *file, unsigned line) {
 
 
 const char* findEd(const char *path) {
-	
+
+#if defined(_WIN32)
+	cout << "    WIN32 default : c:/l/ed/" << endl;
+  return "c:/l/ed";
+#else
+
 	if (!path) {
 		return findEd();
 	}
@@ -373,6 +378,7 @@ const char* findEd(const char *path) {
 		cout << "   ERROR : not a directory for specified appserver location : " << path << " - prepare for bus error" << endl;
 		return null;
 	}
+#endif
 }
 
 const char * findEd(){
