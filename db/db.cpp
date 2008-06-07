@@ -600,7 +600,6 @@ void mysighandler(int x) {
 void setupSignals() {
 	assert( signal(SIGINT, mysighandler) != SIG_ERR );
 	assert( signal(SIGTERM, mysighandler) != SIG_ERR );
-	assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
 }
 
 #else
@@ -609,7 +608,9 @@ void setupSignals() {}
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
 
-//	setupSignals();
+#if !defined(_WIN32)
+	assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
+#endif
 
     /*
      * ensure that the dbpath ends w/ '/' as that's key in preventing things like 
