@@ -407,7 +407,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 
 bool userCreateNS(const char *ns, JSObj& j);
 
-const int edebug=1;
+const int edebug=0;
 
 bool dbEval(JSObj& cmd, JSObjBuilder& result) { 
 	Element e = cmd.firstElement();

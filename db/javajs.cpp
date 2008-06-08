@@ -14,6 +14,19 @@
 
 using namespace boost::filesystem;          
 
+
+//#define JNI_DEBUG 1
+
+#ifdef JNI_DEBUG
+#undef JNI_DEBUG
+#define JNI_DEBUG(x) cerr << x << endl
+#else
+#undef JNI_DEBUG
+#define JNI_DEBUG(x) 
+#endif
+
+
+
 #ifdef J_USE_OBJ
 #include "jsobj.h"
 #pragma message("warning: including jsobj.h")
@@ -416,7 +429,7 @@ const char * findEd(){
 // ---
 
 JNIEXPORT void JNICALL java_native_say(JNIEnv * env , jclass, jobject outBuffer ){
-  cerr << "native say called!" << endl;
+  JNI_DEBUG( "native say called!" );
 
   Message out( env->GetDirectBufferAddress( outBuffer ) , false );
   Message in;
@@ -425,16 +438,16 @@ JNIEXPORT void JNICALL java_native_say(JNIEnv * env , jclass, jobject outBuffer 
 }
 
 JNIEXPORT jint JNICALL java_native_call(JNIEnv * env , jclass, jobject outBuffer , jobject inBuffer ){
-  cerr << "native call called!" << endl;
+  JNI_DEBUG( "native call called!" );
   
   Message out( env->GetDirectBufferAddress( outBuffer ) , false );
   Message in;
 
   jniCallback( out , in );
 
-  cerr << "in.data : " << in.data << endl;
+  JNI_DEBUG( "in.data : " << in.data );
   if ( in.data && in.data->len > 0 ){
-    cerr << "copying data of len :" << in.data->len << endl;
+    JNI_DEBUG( "copying data of len :" << in.data->len );
     memcpy( env->GetDirectBufferAddress( inBuffer ) , in.data , in.data->len );
     return in.data->len;
   }
@@ -445,7 +458,7 @@ JNIEXPORT jint JNICALL java_native_call(JNIEnv * env , jclass, jobject outBuffer
 // ----
 
 int javajstest() {
-
+  
   const int debug = 0;
 
   JavaJSImpl& JavaJS = *::JavaJS;
