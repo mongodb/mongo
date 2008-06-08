@@ -1,5 +1,5 @@
 
-limit coredumpsize 1000000
+limit coredumpsize 200m 
 
 while ( 1 == 1 )
 
