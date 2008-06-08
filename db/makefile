@@ -1,6 +1,6 @@
 # makefile for our db project
 
-FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib
+FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib
 
 LIB_DEPS = -lpcrecpp -lpcre
 LIB_BOOST = -lboost_thread -lboost_filesystem
@@ -70,3 +70,5 @@ info:
 	@echo 'Req version of GPP :' $(_REQ_GPP_VER)
 	@# todo - determine if we have the right version of gcc and error if not
 	@echo ''
+
+
