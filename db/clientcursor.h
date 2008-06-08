@@ -16,28 +16,33 @@ class ClientCursor;
 typedef map<CursorId, ClientCursor*> CCById;
 extern CCById clientCursorsById;
 
+
 class ClientCursor {
 	friend class CursInspector;
+	DiskLoc _lastLoc; // use getter and setter not this.
+	static CursorId allocCursorId();
 public:
-	ClientCursor() { 
-		cursorid=0; pos=0; 
+	ClientCursor() : cursorid( allocCursorId() ), pos(0) { 
+		clientCursorsById.insert( make_pair(cursorid, this) );
 	}
 	~ClientCursor();
-	CursorId cursorid;
+	const CursorId cursorid;
 	string ns;
 	auto_ptr<JSMatcher> matcher;
 	auto_ptr<Cursor> c;
 	int pos;
-	DiskLoc lastLoc;
+	DiskLoc lastLoc() const { return _lastLoc; }
+	void setLastLoc(DiskLoc);
 	auto_ptr< set<string> > filter; // which fields query wants returned
 
-	/* report to us that a new clientcursor exists so we can track it.
-	   note you do not need to call updateLocation, but location should be set before
-	   calling.
-	   */
-	static void add(ClientCursor*);
-
-	static bool erase(CursorId cursorid);
+	static bool erase(CursorId id) { 
+		ClientCursor *cc = find(id);
+		if( cc ) {
+			delete cc; 
+			return true;
+		}
+		return false;
+	}
 
 	static ClientCursor* find(CursorId id) {
 		CCById::iterator it = clientCursorsById.find(id);
@@ -61,4 +66,3 @@ public:
 //	ClientCursor *nextAtThisLocation;
 };
 
-CursorId allocCursorId();

@@ -732,13 +732,11 @@ assert( debug.getN() < 5000 );
 											// more...so save a cursor
 											ClientCursor *cc = new ClientCursor();
 											cc->c = c;
-											cursorid = allocCursorId();
-											cc->cursorid = cursorid;
+											cursorid = cc->cursorid;
 											cc->matcher = matcher;
 											cc->ns = ns;
 											cc->pos = n;
 											cc->filter = filter;
-											ClientCursor::add(cc);
 											cc->updateLocation();
 										}
 									}
