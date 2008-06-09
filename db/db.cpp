@@ -406,7 +406,7 @@ void connThread()
 		stringstream ss;
 
 		if( !dbMsgPort.recv(m) ) {
-			cout << "MessagingPort::recv(): returned false" << endl;
+			cout << "MessagingPort::recv(): returned false " << dbMsgPort.farEnd.toString() << endl;
 			dbMsgPort.shutdown();
 			break;
 		}

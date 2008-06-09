@@ -130,6 +130,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 				}
 			}
 			JSObj q2 = b2.done();
+			cout << "using index " << d->indexes[i].indexNamespace() << endl;
 			return auto_ptr<Cursor>( 
 				new BtreeCursor(d->indexes[i].head, q2, 1, true));
 		}

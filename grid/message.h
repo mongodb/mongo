@@ -45,6 +45,7 @@ public:
 
 private:
 	int sock;
+public:
 	SockAddr farEnd;
 };
 
