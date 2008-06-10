@@ -130,6 +130,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 				}
 			}
 			JSObj q2 = b2.done();
+			cout << "using index " << d->indexes[i].indexNamespace() << endl;
 			return auto_ptr<Cursor>( 
 				new BtreeCursor(d->indexes[i].head, q2, 1, true));
 		}
@@ -732,14 +733,12 @@ assert( debug.getN() < 5000 );
 											// more...so save a cursor
 											ClientCursor *cc = new ClientCursor();
 											cc->c = c;
-											cursorid = allocCursorId();
-											cc->cursorid = cursorid;
+											cursorid = cc->cursorid;
 											cc->matcher = matcher;
 											cc->ns = ns;
 											cc->pos = n;
-											ClientCursor::add(cc);
-											cc->updateLocation();
 											cc->filter = filter;
+											cc->updateLocation();
 										}
 									}
 									break;

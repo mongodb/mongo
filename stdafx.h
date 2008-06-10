@@ -99,11 +99,20 @@ inline ostream& problem() {
 	time_t t;
 	time(&t);
 	string now(ctime(&t),0,20);
-	problems << "problem " << now;
+	problems << "~ " << now;
 	if( client ) 
 		problems << curNs << ' ';
 	return problems;
 }
+
+/* for now, running on win32 means development not production -- 
+   use this to log things just there.
+*/
+#if !defined(_WIN32)
+#define DEV if( 1 ) 
+#else
+#define DEV if( 0 ) 
+#endif
 
 #define DEBUGGING if( 0 ) 
 

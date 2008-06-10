@@ -249,6 +249,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\clientcursor.h"
+				>
+			</File>
+			<File
 				RelativePath=".\db.h"
 				>
 			</File>

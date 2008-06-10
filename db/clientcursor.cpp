@@ -1,9 +1,9 @@
-// clientcursor.cpp
-
-/* Cursor -- and its derived classes -- are our internal cursors.
+/* clientcursor.cpp
 
    ClientCursor is a wrapper that represents a cursorid from our client 
    application's perspective.
+
+   Cursor -- and its derived classes -- are our internal cursors.
 */
 
 #include "stdafx.h"
@@ -13,58 +13,29 @@
 
 /* TODO: FIX cleanup of clientCursors when hit the end. (ntoreturn insufficient) */
 
-typedef map<DiskLoc, ClientCursor*> DiskToCC;
-map<DiskLoc, ClientCursor*> byLocation;
-//HashTable<DiskLoc,ClientCursor*> byLocation(malloc(10000000), 10000000, "bylocation");
+CCById clientCursorsById;
 
-CCMap clientCursors;
+/* ------------------------------------------- */
 
-class CursInspector : public SingleResultObjCursor { 
-	Cursor* clone() { 
-		return new CursInspector(); 
+typedef multimap<DiskLoc, ClientCursor*> ByLoc;
+ByLoc byLoc;
+
+void ClientCursor::setLastLoc(DiskLoc L) { 
+	if( L == _lastLoc ) 
+		return;
+
+	if( !_lastLoc.isNull() ) {
+		ByLoc::iterator i = kv_find(byLoc, _lastLoc, this);
+		if( i != byLoc.end() )
+			byLoc.erase(i);
 	}
-//	Cursor* clone() { return new CursInspector(*this); }
-	void fill() { 
-		b.append("byLocation_size", byLocation.size());
-		b.append("clientCursors_size", clientCursors.size());
 
+	if( !L.isNull() )
+		byLoc.insert( make_pair(L, this) );
+	_lastLoc = L;
+}
 
-
-		stringstream ss;
-		ss << '\n';
-		int x = 40;
-		DiskToCC::iterator it = byLocation.begin();
-		while( it != byLocation.end() ) {
-			DiskLoc dl = it->first;
-			ClientCursor *cc = it->second;
-			ss << dl.toString() << " -> \n";
-
-			while( cc ) {
-				ss << "    cid:" << cc->cursorid << ' ' << cc->ns << " pos:" << cc->pos << " LL:" << cc->lastLoc.toString();
-				try { 
-					setClient(cc->ns.c_str());
-					Record *r = dl.rec();
-					ss << " lwh:" << hex << r->lengthWithHeaders << " nxt:" << r->nextOfs << " prv:" << r->prevOfs << dec << ' ' << cc->c->toString();
-					if( r->nextOfs >= 0 && r->nextOfs < 16 ) 
-						ss << " DELETED??? (!)";
-				}
-				catch(...) { 
-					ss << " EXCEPTION";
-				}
-				ss << "\n";
-				cc = cc->nextAtThisLocation;
-			}
-			if( --x <= 0 ) {
-				ss << "only first 40 shown\n" << endl;
-				break;
-			}
-			it++;
-		}
-		b.append("dump", ss.str().c_str());
-	}
-public:
-	CursInspector() { reg("intr.cursors"); }
-} _ciproto;
+/* ------------------------------------------- */
 
 /* must call this when a btree node is updated */
 void removedKey(const DiskLoc& btreeLoc, int keyPos) { 
@@ -73,142 +44,104 @@ void removedKey(const DiskLoc& btreeLoc, int keyPos) {
 
 /* must call this on a delete so we clean up the cursors. */
 void aboutToDelete(const DiskLoc& dl) { 
-	DiskToCC::iterator it = byLocation.find(dl);
-//	cout << "atd:" << dl.toString() << endl;
-	if( it != byLocation.end() ) {
-		ClientCursor *cc = it->second;
-		byLocation.erase(it);
+	vector<ClientCursor*> toAdvance;
 
-		assert( cc != 0 );
-		int z = 0;
-		while( cc ) { 
-			z++;
-//			cout << "cc: " << cc->ns << endl;
-			ClientCursor *nxt = cc->nextAtThisLocation;
-			cc->nextAtThisLocation = 0; // updateLocation will manipulate linked list ptrs, so clean that up first.
-			cc->c->checkLocation();
-			cc->c->advance();
-			cc->lastLoc.Null(); // so updateLocation doesn't try to remove, just to be faster -- we handled that.
-			cc->updateLocation();
-			cc = nxt;
-		}
-//		cout << "z:" << z << endl;
-	}
-}
-
-void ClientCursor::cleanupByLocation(DiskLoc loc, long long cursorid) { 
-	if( loc.isNull() )
-		return;
-
-	DiskToCC::iterator it = byLocation.find(loc);
-	if( it != byLocation.end() ) {
-		ClientCursor *first = it->second;
-		ClientCursor *cc = first;
-		ClientCursor *prev = 0;
-
-		while( 1 ) {
-			if( cc == 0 ) 
-				break;
-			if( cc->cursorid == cursorid ) { 
-				// found one to remove.
-				if( prev == 0 ) { 
-					if( cc->nextAtThisLocation )
-						it->second = cc->nextAtThisLocation;
-					else
-						byLocation.erase(it);
-				}
-				else { 
-					prev->nextAtThisLocation = cc->nextAtThisLocation;
-				}
-				cc->nextAtThisLocation = 0;
-				return;
-			}
-			cc = cc->nextAtThisLocation;
-		}
+	for( ByLoc::iterator i = byLoc.lower_bound(dl); 
+		i != byLoc.upper_bound(dl); ++i ) { 
+			toAdvance.push_back(i->second);
 	}
 
-	// not found!
-	//cout << "Assertion failure - cleanupByLocation: not found " << cursorid << endl;
+	for( vector<ClientCursor*>::iterator i = toAdvance.begin();
+		i != toAdvance.end(); ++i ) 
+	{ 
+		(*i)->c->checkLocation();
+		(*i)->c->advance();
+		wassert( (*i)->c->currLoc() != dl );
+		(*i)->updateLocation();
+	}
 }
 
 ClientCursor::~ClientCursor() {
-#if defined(_WIN32)
-	cout << "~clientcursor " << cursorid << endl;
-#endif
+	DEV cout << "~clientcursor " << cursorid << endl;
 	assert( pos != -2 );
-
-	cleanupByLocation(lastLoc, cursorid);
-
-	assert( pos != -2 );
-
-	// defensive
-	lastLoc.Null();
-	cursorid = -1; 
+	setLastLoc( DiskLoc() ); // removes us from bylocation multimap
+	clientCursorsById.erase(cursorid);
+	// defensive:
+	(CursorId&) cursorid = -1; 
 	pos = -2;
-	nextAtThisLocation = 0;
 }
 
-// note this doesn't set lastLoc -- caller should.
-void ClientCursor::addToByLocation(DiskLoc cl) { 
-	assert( cursorid );
-
-	if( nextAtThisLocation ) { 
-		wassert( nextAtThisLocation == 0 );
-		return;
-	}
-
-	DiskToCC::iterator j = byLocation.find(cl);
-	nextAtThisLocation = j == byLocation.end() ? 0 : j->second;
-	byLocation[cl] = this;
-}
-
+/* call when cursor's location changes so that we can update the 
+   cursorsbylocation map.  if you are locked and internally iterating, only 
+   need to call when you are ready to "unlock".
+*/
 void ClientCursor::updateLocation() {
 	assert( cursorid );
-
 	DiskLoc cl = c->currLoc();
-	//	cout<< "  TEMP: updateLocation last:" << lastLoc.toString() << " cl:" << cl.toString() << '\n';
-
-	if( !lastLoc.isNull() )
-		cleanupByLocation(lastLoc, cursorid);
-
-	if( !cl.isNull() )
-		addToByLocation(cl);
-
-	lastLoc = cl;
+	if( lastLoc() == cl ) {
+		cout << "info: lastloc==curloc " << ns << '\n';
+		return;
+	}
+	setLastLoc(cl);
 	c->noteLocation();
 }
 
-/* report to us that a new clientcursor exists so we can track it. 
-   note you still must call updateLocation (which likely should be changed)
-*/
-void ClientCursor::add(ClientCursor* cc) {
-	clientCursors[cc->cursorid] = cc;
-}
-
-// todo: delete the ClientCursor.
-// todo: other map
-bool ClientCursor::erase(long long id) { 
-	CCMap::iterator it = clientCursors.find(id);
-	if( it != clientCursors.end() ) {
-		ClientCursor *cc = it->second;
-		it->second = 0; // defensive
-		clientCursors.erase(it);
-		delete cc; // destructor will fix byLocation map
-		return true;
-	}
-	return false;
-}
-
-long long allocCursorId() { 
+int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
+long long ClientCursor::allocCursorId() { 
 	long long x;
+	int ctm = (int) curTimeMillis();
 	while( 1 ) {
 		x = (((long long)rand()) << 32);
-		x = x | (int) curTimeMillis() | 0x80000000; // OR to make sure not zero
-		if( clientCursors.count(x) == 0 )
+		x = x | ctm | 0x80000000; // OR to make sure not zero
+		if( ctm != ctmLast || ClientCursor::find(x) == 0 )
 			break;
 	}
-#if defined(_WIN32)
-	cout << "alloccursorid " << x << endl;
-#endif
+	ctmLast = ctm;
+	DEV cout << "alloccursorid " << x << endl;
 	return x;
 }
+
+class CursInspector : public SingleResultObjCursor { 
+	Cursor* clone() { 
+		return new CursInspector(); 
+	}
+	void fill() { 
+		b.append("byLocation_size", byLoc.size());
+		b.append("clientCursors_size", clientCursorsById.size());
+/* todo update for new impl:
+		stringstream ss;
+		ss << '\n';
+		int x = 40;
+		DiskToCC::iterator it = clientCursorsByLocation.begin();
+		while( it != clientCursorsByLocation.end() ) {
+			DiskLoc dl = it->first;
+			ss << dl.toString() << " -> \n";
+			set<ClientCursor*>::iterator j = it->second.begin();
+			while( j != it->second.end() ) {
+				ss << "    cid:" << j->second->cursorid << ' ' << j->second->ns << " pos:" << j->second->pos << " LL:" << j->second->lastLoc.toString();
+				try { 
+					setClient(j->second->ns.c_str());
+					Record *r = dl.rec();
+					ss << " lwh:" << hex << r->lengthWithHeaders << " nxt:" << r->nextOfs << " prv:" << r->prevOfs << dec << ' ' << j->second->c->toString();
+					if( r->nextOfs >= 0 && r->nextOfs < 16 ) 
+						ss << " DELETED??? (!)";
+				}
+				catch(...) { 
+					ss << " EXCEPTION";
+				}
+				ss << "\n";
+				j++;
+			}
+			if( --x <= 0 ) {
+				ss << "only first 40 shown\n" << endl;
+				break;
+			}
+			it++;
+		}
+		b.append("dump", ss.str().c_str());
+*/
+	}
+public:
+	CursInspector() { reg("intr.cursors"); }
+} _ciproto;
+
