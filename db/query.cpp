@@ -734,6 +734,7 @@ assert( debug.getN() < 5000 );
 											ClientCursor *cc = new ClientCursor();
 											cc->c = c;
 											cursorid = cc->cursorid;
+											DEV cout << "  query has more, cursorid: " << cursorid << endl;
 											cc->matcher = matcher;
 											cc->ns = ns;
 											cc->pos = n;
@@ -795,13 +796,17 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 	int start = 0;
 	int n = 0;
 
-	if( cc ) {
+	if( !cc ) { 
+		DEV cout << "getMore: cursorid not found " << ns << " " << cursorid << endl;
+	}
+	else {
 		start = cc->pos;
 		Cursor *c = cc->c.get();
 		while( 1 ) {
 			if( !c->ok() ) {
 done:
 				// done!  kill cursor.
+				DEV cout << "  getmore: last batch, erasing cursor " << cursorid << endl;
 				bool ok = ClientCursor::erase(cursorid);
 				assert(ok);
 				cursorid = 0;

@@ -97,7 +97,7 @@ long long ClientCursor::allocCursorId() {
 			break;
 	}
 	ctmLast = ctm;
-	DEV cout << "alloccursorid " << x << endl;
+	DEV cout << "  alloccursorid " << x << endl;
 	return x;
 }
 

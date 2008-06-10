@@ -108,10 +108,10 @@ inline ostream& problem() {
 /* for now, running on win32 means development not production -- 
    use this to log things just there.
 */
-#if !defined(_WIN32)
+#if defined(_WIN32)
 #define DEV if( 1 ) 
 #else
-#define DEV if( 0 ) 
+#define DEV if( 1 ) 
 #endif
 
 #define DEBUGGING if( 0 ) 
