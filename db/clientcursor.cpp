@@ -86,14 +86,17 @@ void ClientCursor::updateLocation() {
 	c->noteLocation();
 }
 
+int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
 long long ClientCursor::allocCursorId() { 
 	long long x;
+	int ctm = (int) curTimeMillis();
 	while( 1 ) {
 		x = (((long long)rand()) << 32);
-		x = x | (int) curTimeMillis() | 0x80000000; // OR to make sure not zero
-		if( ClientCursor::find(x) == 0 )
+		x = x | ctm | 0x80000000; // OR to make sure not zero
+		if( ctm != ctmLast || ClientCursor::find(x) == 0 )
 			break;
 	}
+	ctmLast = ctm;
 	DEV cout << "alloccursorid " << x << endl;
 	return x;
 }

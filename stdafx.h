@@ -99,7 +99,7 @@ inline ostream& problem() {
 	time_t t;
 	time(&t);
 	string now(ctime(&t),0,20);
-	problems << "problem " << now;
+	problems << "~ " << now;
 	if( client ) 
 		problems << curNs << ' ';
 	return problems;
