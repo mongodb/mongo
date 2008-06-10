@@ -446,9 +446,6 @@ void connThread()
 				}
 			}
 			else if( m.data->operation == dbQuery ) { 
-#if defined(_WIN32)
-				log = true;
-#endif
 				receivedQuery(dbMsgPort, m, ss);
 			}
 			else if( m.data->operation == dbInsert ) {
@@ -508,6 +505,7 @@ void connThread()
 
 			int ms = t.millis();
 			log = log || ctr++ % 128 == 0;
+			DEV log = true;
 			if( log || ms > 100 ) {
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;
