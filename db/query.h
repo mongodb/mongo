@@ -68,7 +68,7 @@ struct QueryResult : public MsgData {
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 
 // caller must free() returned QueryResult.
-QueryResult* runQuery(const char *ns, int ntoskip, int ntoreturn, 
+QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn, 
 					  JSObj j, auto_ptr< set<string> > fieldFilter,
 					  stringstream&);
 
@@ -102,6 +102,7 @@ public:
 	int pos;
 	DiskLoc lastLoc;
 	auto_ptr< set<string> > filter;
+	Message originalMessage;
 
 	/* report to us that a new clientcursor exists so we can track it. You still
 	   do the initial updateLocation() yourself. 

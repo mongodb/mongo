@@ -152,6 +152,7 @@ void receivedDelete(Message& m) {
 }
 
 void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss) {
+	MSGID responseTo = m.data->id;
 	DbMessage d(m);
 	const char *ns = d.getns();
 	setClient(ns);
@@ -166,7 +167,7 @@ void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& s
 	QueryResult* msgdata;
 
 	try { 
-		msgdata = runQuery(ns, ntoskip, ntoreturn, query, fields, ss);
+		msgdata = runQuery(m, ns, ntoskip, ntoreturn, query, fields, ss);
 	}
 	catch( AssertionException ) { 
 		ss << " exception ";
@@ -196,7 +197,7 @@ void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& s
 	else { 
 		cout << "ERROR: client is null; ns=" << ns << endl;
 	}
-	dbMsgPort.reply(m, resp);
+	dbMsgPort.reply(m, resp, responseTo);
 }
 
 void receivedGetMore(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss) {
@@ -274,7 +275,7 @@ public:
 };
 
 void listen(int port) { 
-	const char *Version = "db version: 112 6jun2008";
+	const char *Version = "db version: 112.patch114 11jun2008";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
@@ -290,6 +291,9 @@ extern int callDepth;
 class JniMessagingPort : public AbstractMessagingPort { 
 public:
 	JniMessagingPort(Message& _container) : container(_container) { }
+	void reply(Message& received, Message& response, MSGID) { 
+		container = response;
+	}
 	void reply(Message& received, Message& response) { 
 		container = response;
 	}

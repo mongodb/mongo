@@ -639,7 +639,7 @@ void killCursors(int n, long long *ids) {
 
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
 
-QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
+QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) 
 {
 	bool wantMore = true;
@@ -740,6 +740,7 @@ assert( debug.getN() < 5000 );
 											ClientCursor::add(cc);
 											cc->updateLocation();
 											cc->filter = filter;
+											cc->originalMessage = message;
 										}
 									}
 									break;

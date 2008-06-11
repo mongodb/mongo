@@ -22,6 +22,7 @@ private:
 
 class AbstractMessagingPort { 
 public:
+	virtual void reply(Message& received, Message& response,MSGID) = 0;
 	virtual void reply(Message& received, Message& response) = 0;
 };
 
@@ -40,6 +41,7 @@ public:
 	*/
 	bool recv(Message& m);
 	void reply(Message& received, Message& response);
+	void reply(Message& received, Message& response, MSGID);
 	bool call(SockAddr& to, Message& toSend, Message& response);
 	void say(SockAddr& to, Message& toSend, int responseTo = -1);
 
