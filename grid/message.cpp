@@ -163,6 +163,10 @@ void MessagingPort::reply(Message& received, Message& response) {
 	say(received.from, response, received.data->id);
 }
 
+void MessagingPort::reply(Message& received, Message& response, MSGID responseTo) {
+	say(received.from, response, responseTo);
+}
+
 bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
 	mmm( cout << "*call()" << endl; )
 	MSGID old = toSend.data->id;

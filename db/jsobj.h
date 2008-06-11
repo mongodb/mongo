@@ -4,6 +4,7 @@
 
 #include "../stdafx.h"
 #include "../util/builder.h"
+#include "boost/utility.hpp"
 //#include "javajs.h"
 
 #include <set>
@@ -398,7 +399,7 @@ class Where;
    { a : { $gt
 
 */
-class JSMatcher { 
+class JSMatcher : boost::noncopyable { 
 	int matchesDotted(
 		const char *fieldName, 
 		Element& toMatch, JSObj& obj, 

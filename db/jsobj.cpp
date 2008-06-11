@@ -457,6 +457,8 @@ int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj
 	return -1;
 }
 
+extern int dump;
+
 /* deep means we looked into arrays for a match */
 bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	if( deep ) 
@@ -493,7 +495,6 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	// check normal non-regex cases:
 	for( int i = 0; i < n; i++ ) {
 		Element& m = toMatch[i]; 
- 
 		int cmp = matchesDotted(toMatch[i].fieldName(), toMatch[i], jsobj, compareOp[i], deep);
 
 		/* missing is ok iff we were looking for null */

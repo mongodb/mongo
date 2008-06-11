@@ -22,6 +22,7 @@ private:
 
 class AbstractMessagingPort { 
 public:
+	virtual void reply(Message& received, Message& response, MSGID responseTo) = 0; // like the reply below, but doesn't rely on received.data still being available
 	virtual void reply(Message& received, Message& response) = 0;
 };
 
@@ -39,6 +40,7 @@ public:
 	   also, the Message data will go out of scope on the subsequent recv call. 
 	*/
 	bool recv(Message& m);
+	void reply(Message& received, Message& response, MSGID responseTo);
 	void reply(Message& received, Message& response);
 	bool call(SockAddr& to, Message& toSend, Message& response);
 	void say(SockAddr& to, Message& toSend, int responseTo = -1);

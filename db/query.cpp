@@ -64,6 +64,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 				/* todo: start with the right key, not just beginning of index, when query is also
 				         specified!
 				*/
+				DEV cout << " using index " << d->indexes[i].indexNamespace() << '\n';
 				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, reverse ? maxKey : emptyObj, reverse ? -1 : 1, false));
 			}
 		}
@@ -183,7 +184,7 @@ DiskLoc _tempDelLoc;
 				break;
 		}
 		else { 
-			assert( !deep || !c->dup(rloc) ); // can't be a dup, we deleted it!
+			assert( !deep || !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
 //			cout << "  found match to delete" << endl;
 			if( !justOne )
 				c->noteLocation();
@@ -640,7 +641,7 @@ void killCursors(int n, long long *ids) {
 
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
 
-QueryResult* runQuery(const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
+QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) 
 {
 	bool wantMore = true;
@@ -704,7 +705,7 @@ assert( debug.getN() < 5000 );
 					if( c->tempStopOnMiss() )
 						break;
 				}
-				else if( !deep || !c->dup(c->currLoc()) ) { // i.e., check for dups on deep items only
+				else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
 					// got a match.
 					if( ntoskip > 0 ) {
 						ntoskip--;
@@ -739,6 +740,7 @@ assert( debug.getN() < 5000 );
 											cc->ns = ns;
 											cc->pos = n;
 											cc->filter = filter;
+											cc->originalMessage = message;
 											cc->updateLocation();
 										}
 									}
@@ -782,6 +784,8 @@ assert( debug.getN() < 5000 );
 	return qr;
 }
 
+int dump = 0;
+
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 
 //	cout << "getMore ns:" << ns << " ntoreturn:" << ntoreturn << " cursorid:" << 
@@ -814,30 +818,38 @@ done:
 				break;
 			}
 			JSObj js = c->current();
+
 			bool deep;
+
 			if( !cc->matcher->matches(js, &deep) ) {
 				if( c->tempStopOnMiss() )
 					goto done;
 			} 
-			else if( !deep || !c->dup(c->currLoc()) ) {
-				bool ok = true;
-				if( cc->filter.get() ) {
-					JSObj x;
-					ok = x.addFields(js, *cc->filter) > 0;
-					if( ok ) 
-						b.append((void*) x.objdata(), x.objsize());
+			else { 
+				//cout << "matches " << c->currLoc().toString() << ' ' << deep << '\n';
+				if( deep && c->getsetdup(c->currLoc()) ) { 
+					//cout << "  but it's a dup \n";
 				}
 				else {
-					b.append((void*) js.objdata(), js.objsize());
-				}
-				if( ok ) {
-					n++;
-					if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
-						(ntoreturn==0 && b.len()>1*1024*1024) ) {
-						c->advance();
-						cc->pos += n;
-						cc->updateLocation();
-						break;
+					bool ok = true;
+					if( cc->filter.get() ) {
+						JSObj x;
+						ok = x.addFields(js, *cc->filter) > 0;
+						if( ok ) 
+							b.append((void*) x.objdata(), x.objsize());
+					}
+					else {
+						b.append((void*) js.objdata(), js.objsize());
+					}
+					if( ok ) {
+						n++;
+						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
+							(ntoreturn==0 && b.len()>1*1024*1024) ) {
+								c->advance();
+								cc->pos += n;
+								cc->updateLocation();
+								break;
+						}
 					}
 				}
 			}

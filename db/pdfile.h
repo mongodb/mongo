@@ -237,7 +237,7 @@ public:
 
 	/* used for multikey index traversal to avoid sending back dups. see JSMatcher::matches() */
 	set<DiskLoc> dups;
-	bool dup(DiskLoc loc) {
+	bool getsetdup(DiskLoc loc) {
 		/* to save mem only call this when there is risk of dups (e.g. when 'deep'/multikey) */
 		if( dups.count(loc) > 0 )
 			return true;

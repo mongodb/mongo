@@ -111,7 +111,7 @@ inline ostream& problem() {
 #if defined(_WIN32)
 #define DEV if( 1 ) 
 #else
-#define DEV if( 1 ) 
+#define DEV if( 0 ) 
 #endif
 
 #define DEBUGGING if( 0 ) 

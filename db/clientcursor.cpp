@@ -62,7 +62,6 @@ void aboutToDelete(const DiskLoc& dl) {
 }
 
 ClientCursor::~ClientCursor() {
-	DEV cout << "~clientcursor " << cursorid << endl;
 	assert( pos != -2 );
 	setLastLoc( DiskLoc() ); // removes us from bylocation multimap
 	clientCursorsById.erase(cursorid);

@@ -34,6 +34,7 @@ public:
 	DiskLoc lastLoc() const { return _lastLoc; }
 	void setLastLoc(DiskLoc);
 	auto_ptr< set<string> > filter; // which fields query wants returned
+	Message originalMessage; // this is effectively an auto ptr for data the matcher points to.
 
 	static bool erase(CursorId id) { 
 		ClientCursor *cc = find(id);
