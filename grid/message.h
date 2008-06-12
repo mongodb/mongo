@@ -75,7 +75,7 @@ struct MsgData {
 	int operation;
 	char _data[4];
 
-	int dataLen();
+	int dataLen(); // len without header
 };
 const int MsgDataHeaderSize = sizeof(MsgData) - 4;
 inline int MsgData::dataLen() { return len - MsgDataHeaderSize; }
@@ -85,7 +85,7 @@ inline int MsgData::dataLen() { return len - MsgDataHeaderSize; }
 class Message {
 public:
 	Message() { data = 0; freeIt = false; }
-        Message( void * _data , bool _freeIt ){ data = (MsgData*)_data; freeIt = _freeIt; };
+    Message( void * _data , bool _freeIt ){ data = (MsgData*)_data; freeIt = _freeIt; };
 	~Message() { reset(); }
 
 	SockAddr from;
@@ -129,4 +129,3 @@ public:
 private:
 	bool freeIt;
 };
-

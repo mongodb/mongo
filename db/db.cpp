@@ -336,7 +336,13 @@ void jniCallback(Message& m, Message& out)
 			bool log = false;
 			curOp = m.data->operation;
 			if( m.data->operation == dbQuery ) { 
-				receivedQuery(jmp, m, ss);
+				// on a query, the Message must have m.freeIt true so that the buffer data can be 
+				// retained by cursors.  As freeIt is false, we make a copy here.
+				assert( m.data->len > 0 && m.data->len < 32000000 );
+				Message copy(malloc(m.data->len), true);
+				memcpy(copy.data, m.data, m.data->len);
+
+				receivedQuery(jmp, copy, ss);
 			}
 			else if( m.data->operation == dbInsert ) {
 				ss << "insert ";
