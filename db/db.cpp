@@ -345,7 +345,13 @@ void jniCallback(Message& m, Message& out)
 			bool log = false;
 			curOp = m.data->operation;
 			if( m.data->operation == dbQuery ) { 
-				receivedQuery(jmp, m, ss);
+				// on a query, the Message must have m.freeIt true so that the buffer data can be 
+				// retained by cursors.  As freeIt is false, we make a copy here.
+				assert( m.data->len > 0 && m.data->len < 32000000 );
+				Message copy(malloc(m.data->len), true);
+				memcpy(copy.data, m.data, m.data->len);
+
+				receivedQuery(jmp, copy, ss);
 			}
 			else if( m.data->operation == dbInsert ) {
 				ss << "insert ";
@@ -455,11 +461,16 @@ void connThread()
 				resp.setData(opReply, "i am fine");
 				dbMsgPort.reply(m, resp);
 				if( end ) {
-					cout << curTimeMillis() % 10000 << "   end msg" << endl;
-					dbMsgPort.shutdown();
-					sleepmillis(500);
-					problem() << "exiting end msg" << endl;
-					exit(EXIT_SUCCESS);
+					cout << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
+					if( dbMsgPort.farEnd.isLocalHost() ) { 
+						dbMsgPort.shutdown();
+						sleepmillis(500);
+						problem() << "exiting end msg" << endl;
+						exit(EXIT_SUCCESS);
+					}
+					else { 
+						cout << "  (not from localhost, ignoring end msg)" << endl;
+					}
 				}
 			}
 			else if( m.data->operation == dbQuery ) { 
@@ -558,7 +569,8 @@ void msg(const char *m, const char *address, int port, int extras = 0) {
 	if( !p.connect(db) )
 		return;
 
-	for( int q = 0; q < 3; q++ ) {
+	const int Loops = 1;
+	for( int q = 0; q < Loops; q++ ) {
 		Message send;
 		Message response;
 
@@ -573,11 +585,12 @@ void msg(const char *m, const char *address, int port, int extras = 0) {
 		double tm = t.micros() + 1;
 		cout << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " << 
 			((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
-		if(  q+1 < 3 ) {
-			cout << "\t\tSLEEP 8 then sending again" << endl;
+		if(  q+1 < Loops ) {
+			cout << "\t\tSLEEP 8 then sending again as a test" << endl;
 			sleepsecs(8);
 		}
 	}
+	sleepsecs(1);
 
 	p.shutdown();
 }

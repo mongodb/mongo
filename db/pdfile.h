@@ -364,9 +364,9 @@ public:
 	PhysicalDataFile* getFile(int n) { 
 		assert(this);
 
-		if( n < 0 || n >= 10000 ) {
+		if( n < 0 || n >= 8000 ) {
 			cout << "getFile(): n=" << n << endl;
-			assert( n >= 0 && n < 10000 );
+			assert( n >= 0 && n < 8000 );
 		}
 #if defined(_DEBUG)
 		if( n > 100 )

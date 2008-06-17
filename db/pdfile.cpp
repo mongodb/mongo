@@ -404,11 +404,13 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
 	int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
 	DiskLoc loc;
 	if( ExtentSize <= 0 ) {
-		if( loops > 8 ) { 
-			assert(false);
-			return 0;
+		/* not there could be a lot of looping here is db just started and 
+		   no files are open yet.  we might want to do something about that. */
+		if( loops > 8 ) {
+			assert( loops < 10000 );
+			cout << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
 		}
-		cout << "INFO: newExtent(): file full, adding a new file " << ns << endl;
+		cout << "info: newExtent(): file " << fileNo << " full, adding a new file " << ns << endl;
 		return client->addAFile()->newExtent(ns, approxSize, loops+1);
 	}
 	int offset = header->unused.getOfs();
