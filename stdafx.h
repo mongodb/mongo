@@ -119,3 +119,13 @@ inline ostream& problem() {
 extern unsigned occasion; 
 
 #define OCCASIONALLY if( ++occasion % 16 == 0 ) 
+
+#if defined(_WIN32)
+inline void our_debug_free(void *p) {
+	unsigned *u = (unsigned *) p;
+	u[0] = 0xEEEEEEEE;
+	u[1] = 0xEEEEEEEE;
+	free(p);
+}
+#define free our_debug_free
+#endif

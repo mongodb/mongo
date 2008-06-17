@@ -201,6 +201,8 @@ void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& s
 	dbMsgPort.reply(m, resp, responseTo);
 }
 
+QueryResult* emptyMoreResult(long long);
+
 void receivedGetMore(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
@@ -210,7 +212,14 @@ void receivedGetMore(AbstractMessagingPort& dbMsgPort, Message& m, stringstream&
 	long long cursorid = d.pullInt64();
 	ss << " cid:" << cursorid;
 	ss << " ntoreturn:" << ntoreturn;
-	QueryResult* msgdata = getMore(ns, ntoreturn, cursorid);
+	QueryResult* msgdata;
+	try { 
+		msgdata = getMore(ns, ntoreturn, cursorid);
+	}
+	catch( AssertionException ) { 
+		ss << " exception ";
+		msgdata = emptyMoreResult(cursorid);
+	}
 	Message resp;
 	resp.setData(msgdata, true);
 	ss << " bytes:" << resp.data->dataLen();

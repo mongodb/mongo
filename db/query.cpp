@@ -784,13 +784,23 @@ assert( debug.getN() < 5000 );
 	return qr;
 }
 
-int dump = 0;
+//int dump = 0;
+
+/* empty result for error conditions */
+QueryResult* emptyMoreResult(long long cursorid) {
+	BufBuilder b(32768);
+	b.skip(sizeof(QueryResult));
+	QueryResult *qr = (QueryResult *) b.buf();
+	qr->cursorId = cursorid;
+	qr->startingFrom = 0;
+	qr->len = b.len();
+	qr->operation = opReply;
+	qr->nReturned = 0;
+	b.decouple();
+	return qr;
+}
 
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
-
-//	cout << "getMore ns:" << ns << " ntoreturn:" << ntoreturn << " cursorid:" << 
-//		cursorid << endl;
-
 	BufBuilder b(32768);
 
 	ClientCursor *cc = ClientCursor::find(cursorid);
