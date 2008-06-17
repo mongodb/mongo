@@ -791,7 +791,7 @@ QueryResult* emptyMoreResult(long long cursorid) {
 	BufBuilder b(32768);
 	b.skip(sizeof(QueryResult));
 	QueryResult *qr = (QueryResult *) b.buf();
-	qr->cursorId = cursorid;
+	qr->cursorId = 0; // 0 indicates no more data to retrieve.
 	qr->startingFrom = 0;
 	qr->len = b.len();
 	qr->operation = opReply;
