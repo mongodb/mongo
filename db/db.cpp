@@ -286,9 +286,10 @@ public:
 
 /* versions
    114 bad memory bug fixed
+   115 replay, opLogging
 */
 void listen(int port) { 
-	const char *Version = "db version: 114 11jun2008";
+	const char *Version = "db version: 115 18jun2008";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
@@ -416,6 +417,12 @@ void jniCallback(Message& m, Message& out)
 	}
 }
 
+/* 0 = off; 1 = writes, 2 = reads, 3 = both */
+int opLogging = 0;
+ofstream oplog("oplog.bin", ios::out | ios::binary);
+#define OPWRITE if( opLogging & 1 ) oplog.write((char *) m.data, m.data->len);
+#define OPREAD if( opLogging & 2 ) oplog.write((char *) m.data, m.data->len);
+
 void connThread()
 {
 	try { 
@@ -474,9 +481,11 @@ void connThread()
 				}
 			}
 			else if( m.data->operation == dbQuery ) { 
+				OPREAD;
 				receivedQuery(dbMsgPort, m, ss);
 			}
 			else if( m.data->operation == dbInsert ) {
+				OPWRITE;
 				try { 
 					ss << "insert ";
 					receivedInsert(m, ss);
@@ -488,6 +497,7 @@ void connThread()
 				}
 			}
 			else if( m.data->operation == dbUpdate ) {
+				OPWRITE;
 				try { 
 					ss << "update ";
 					receivedUpdate(m, ss);
@@ -499,6 +509,7 @@ void connThread()
 				}
 			}
 			else if( m.data->operation == dbDelete ) {
+				OPWRITE;
 				try { 
 					ss << "remove ";
 					receivedDelete(m);
@@ -510,11 +521,13 @@ void connThread()
 				}
 			}
 			else if( m.data->operation == dbGetMore ) {
+				OPREAD;
 				log = true;
 				ss << "getmore ";
 				receivedGetMore(dbMsgPort, m, ss);
 			}
 			else if( m.data->operation == dbKillCursors ) { 
+				OPREAD;
 				try {
 					log = true;
 					ss << "killcursors ";

@@ -457,6 +457,9 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	return true;
 }
 
+extern int opLogging;
+extern ofstream oplog;
+
 // e.g.
 //   system.cmd$.find( { queryTraceLevel: 2 } );
 // 
@@ -497,9 +500,15 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			}
 		}
 		else {
-			if( strncmp(ns, "admin", p-ns) != 0 ) // admin only
+			// admin only commands.
+			if( strncmp(ns, "admin", p-ns) != 0 ) 
 				return false;
-			if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
+			if( strcmp(e.fieldName(),"opLogging") == 0 ) {
+				valid = ok = true;
+				opLogging = (int) e.number();
+				oplog.flush();
+				cout << "CMD: opLogging set to " << opLogging << endl;
+			} else if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
 				valid = ok = true;
 				queryTraceLevel = (int) e.number();
 			} else if( strcmp(e.fieldName(),"traceAll") == 0 ) { 
