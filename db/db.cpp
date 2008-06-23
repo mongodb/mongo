@@ -289,7 +289,7 @@ public:
    115 replay, opLogging
 */
 void listen(int port) { 
-	const char *Version = "db version: 115 18jun2008";
+	const char *Version = "db version: 116 23jun2008";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
@@ -418,8 +418,19 @@ void jniCallback(Message& m, Message& out)
 }
 
 /* 0 = off; 1 = writes, 2 = reads, 3 = both */
-int opLogging = 0;
-ofstream oplog("oplog.bin", ios::out | ios::binary);
+int opLogging = 1;
+//int opLogging = 0;
+struct OpLog { 
+	ofstream *f;
+	OpLog() { 
+		stringstream ss;
+		ss << "oplog." << hex << time(0);
+		string name = ss.str();
+		f = new ofstream(name.c_str(), ios::out | ios::binary);
+	}
+} _oplog;
+void flushOpLog() { _oplog.f->flush(); }
+#define oplog (*(_oplog.f))
 #define OPWRITE if( opLogging & 1 ) oplog.write((char *) m.data, m.data->len);
 #define OPREAD if( opLogging & 2 ) oplog.write((char *) m.data, m.data->len);
 
@@ -690,6 +701,9 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 
 int main(int argc, char* argv[], char *envp[] )
 {
+	if( opLogging ) 
+		cout << "WARNING: this build has oplog enabled at startup. opLogging=" << opLogging << endl;
+
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);
 #endif
@@ -778,7 +792,7 @@ int main(int argc, char* argv[], char *envp[] )
         initAndListen(port, dbpath, appsrvPath);
         
         goingAway = true;
-        return 0;
+		exit(0);
 	}
 
 	cout << "usage:\n";
@@ -801,3 +815,10 @@ int main(int argc, char* argv[], char *envp[] )
 //	return _tmain(argc, 0);
 //}
 //#endif
+
+#undef exit
+void dbexit(int rc) { 
+	flushOpLog();
+	exit(rc);
+}
+

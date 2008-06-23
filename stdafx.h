@@ -129,3 +129,6 @@ inline void our_debug_free(void *p) {
 }
 #define free our_debug_free
 #endif
+
+void dbexit(int resultcode);
+#define exit dbexit

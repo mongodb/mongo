@@ -458,7 +458,7 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 }
 
 extern int opLogging;
-extern ofstream oplog;
+void flushOpLog();
 
 // e.g.
 //   system.cmd$.find( { queryTraceLevel: 2 } );
@@ -506,7 +506,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			if( strcmp(e.fieldName(),"opLogging") == 0 ) {
 				valid = ok = true;
 				opLogging = (int) e.number();
-				oplog.flush();
+				flushOpLog();
 				cout << "CMD: opLogging set to " << opLogging << endl;
 			} else if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
 				valid = ok = true;
