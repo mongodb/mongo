@@ -6,14 +6,7 @@
 #include <map>
 #include <list>
 
-#undef yassert
-#include <boost/filesystem/convenience.hpp>
-#undef assert
-#define assert xassert
-#define yassert 1
-
 using namespace boost::filesystem;          
-
 
 //#define JNI_DEBUG 1
 

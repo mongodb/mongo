@@ -355,23 +355,27 @@ inline Bucket* DiskLoc::bucket() const {
 class Client { 
 public:
 	Client(const char *nm) : name(nm) { 
-		namespaceIndex = new NamespaceIndex();
-		namespaceIndex->init(dbpath, nm);
+		namespaceIndex.init(dbpath, nm);
 		profile = 0;
 		profileName = name + ".system.profile";
 	} 
+	~Client() { 
+		int n = files.size();
+		for( int i = 0; i < n; i++ )
+			delete files[i];
+	}
 
 	PhysicalDataFile* getFile(int n) { 
 		assert(this);
 
-		if( n < 0 || n >= 8000 ) {
+		if( n < 0 || n >= DiskLoc::MaxFiles ) {
 			cout << "getFile(): n=" << n << endl;
-			assert( n >= 0 && n < 8000 );
+			assert( n >= 0 && n < DiskLoc::MaxFiles );
 		}
-#if defined(_DEBUG)
-		if( n > 100 )
-			cout << "getFile(): n=" << n << "?" << endl;
-#endif
+		DEV { 
+			if( n > 100 )
+				cout << "getFile(): n=" << n << "?" << endl;
+		}
 		while( n >= (int) files.size() )
 			files.push_back(0);
 		PhysicalDataFile* p = files[n];
@@ -398,7 +402,7 @@ public:
 
 	vector<PhysicalDataFile*> files;
 	string name; // "alleyinsider"
-	NamespaceIndex *namespaceIndex;
+	NamespaceIndex namespaceIndex;
 	int profile; // 0=off.
 	string profileName; // "alleyinsider.system.profile"
 };
@@ -416,23 +420,62 @@ inline void setClient(const char *ns) {
 		client = it->second;
 		return;
 	}
+	problem() << "First request for database " << cl << endl;
 	Client *c = new Client(cl);
 	clients[cl] = c;
 	client = c;
 }
 
-inline NamespaceIndex* nsindex(const char *ns) { 
-#if defined(_DEBUG)
-	char buf[256];
-	nsToClient(ns, buf);
-	if( client->name != buf ) { 
-		cout << "ERROR: attempt to write to wrong database client\n";
-		cout << " ns:" << ns << '\n';
-		cout << " client->name:" << client->name << endl;
-		assert( client->name == buf );
+inline void _deleteDataFiles(const char *client) { 
+	string c = client;
+	c += '.';
+	boost::filesystem::path p(dbpath);
+	boost::filesystem::path q;
+	q = p / (c+"ns");
+	bool ok = boost::filesystem::remove(q);
+	if( ok ) 
+		cout << "removed file " << q.string() << endl;
+	int i = 0;
+	int extra = 10; // should not be necessary, this is defensive in case there are missing files
+	while( 1 ) { 
+		assert( i <= DiskLoc::MaxFiles );
+		stringstream ss;
+		ss << c << i;
+		q = p / ss.str();
+		if( boost::filesystem::remove(q) ) {
+			cout << "removed file " << q.string() << endl;
+			if( extra != 10 ) 
+				cout << "WARNING: extra == " << extra << endl;
+		}
+		else if( --extra <= 0 ) 
+			break;
+		i++;
 	}
-#endif
-	return client->namespaceIndex;
+}
+
+inline void dropDatabase(const char *ns) { 
+	char cl[256];
+	nsToClient(ns, cl);
+	problem() << "dropDatabase " << cl << endl;
+	assert( client->name == cl );
+	clients.erase(cl);
+	delete client; // closes files
+	client = 0;
+	_deleteDataFiles(cl);
+}
+
+inline NamespaceIndex* nsindex(const char *ns) { 
+	DEV { 
+		char buf[256];
+		nsToClient(ns, buf);
+		if( client->name != buf ) { 
+			cout << "ERROR: attempt to write to wrong database client\n";
+			cout << " ns:" << ns << '\n';
+			cout << " client->name:" << client->name << endl;
+			assert( client->name == buf );
+		}
+	}
+	return &client->namespaceIndex;
 }
 
 inline NamespaceDetails* nsdetails(const char *ns) { 

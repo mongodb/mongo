@@ -90,6 +90,7 @@ DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentL
 	to go in a forward direction which is important for performance. */
 	int regionlen = r->lengthWithHeaders;
 	extentLoc.set(loc.a(), r->extentOfs);
+	assert( r->extentOfs < loc.getOfs() );
 
 	DEBUGGING cout << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
 
@@ -130,7 +131,6 @@ DiskLoc NamespaceDetails::__stdAlloc(int len) {
 			int a = cur.a();
 			if( a < -1 || a >= 100000 ) { 
 				problem() << "Assertion failure - a() out of range in _alloc() " << a << endl;
-				cout << "Assertion failure - a() out of range in _alloc() " << a << '\n';
 				sayDbContext();
 				if( cur == *prev )
 					prev->Null();
@@ -160,7 +160,7 @@ DiskLoc NamespaceDetails::__stdAlloc(int len) {
 			break;
 		if( ++chain > 30 && b < MaxBucket ) {
 			// too slow, force move to next bucket to grab a big chunk
-			b++;
+			//b++;
 			chain = 0;
 			cur.Null();
 		}
@@ -170,7 +170,12 @@ DiskLoc NamespaceDetails::__stdAlloc(int len) {
 	}
 
 	/* unlink ourself from the deleted list */
-	*bestprev = bestmatch.drec()->nextDeleted;
+	{
+		DeletedRecord *bmr = bestmatch.drec();
+		*bestprev = bmr->nextDeleted;
+		bmr->nextDeleted.setInvalid(); // defensive.
+		assert(bmr->extentOfs < bestmatch.getOfs());
+	}
 
 	return bestmatch;
 }
@@ -342,9 +347,11 @@ int initialExtentSize(int len) {
 }
 
 // { ..., capped: true, size: ..., max: ... }
-bool userCreateNS(const char *ns, JSObj& j) { 
-	if( nsdetails(ns) )
+bool userCreateNS(const char *ns, JSObj& j, string& err) { 
+	if( nsdetails(ns) ) {
+		err = "collection already exists";
 		return false;
+	}
 
 	cout << j.toString() << endl;
 
@@ -384,8 +391,11 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 
 	if( fn <= 4 ) {
 		length = (64*1024*1024) << fn;
-		if( strstr(filename, "alleyinsider") && length < 1024 * 1024 * 1024 )
-			length = 1024 * 1024 * 1024;
+		if( strstr(filename, "alleyinsider") && length < 1024 * 1024 * 1024 ) {
+			DEV cout << "Warning: not making alleyinsider datafile bigger because DEV is true" << endl; 
+   		    else
+				length = 1024 * 1024 * 1024;
+		}
 	} else
 		length = 0x7ff00000;
 
@@ -401,6 +411,7 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
 	assert( approxSize >= 0 && approxSize <= 0x7ff00000 );
 
+	assert( header ); // null if file open failed
 	int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
 	DiskLoc loc;
 	if( ExtentSize <= 0 ) {

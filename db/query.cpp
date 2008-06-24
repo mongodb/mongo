@@ -131,7 +131,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 				}
 			}
 			JSObj q2 = b2.done();
-			cout << "using index " << d->indexes[i].indexNamespace() << endl;
+			DEV cout << "using index " << d->indexes[i].indexNamespace() << endl;
 			return auto_ptr<Cursor>( 
 				new BtreeCursor(d->indexes[i].head, q2, 1, true));
 		}
@@ -407,7 +407,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	return ss.str();
 }
 
-bool userCreateNS(const char *ns, JSObj& j);
+bool userCreateNS(const char *ns, JSObj& j, string& err);
 
 const int edebug=0;
 
@@ -465,7 +465,7 @@ void flushOpLog();
 // 
 // returns true if ran a cmd
 //
-inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilderForYa) { 
+inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder) { 
 
 	const char *p = strchr(ns, '.');
 	if( !p ) return false;
@@ -482,11 +482,21 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 	if( e.eoo() ) goto done;
 	if( e.type() == Code ) { 
 		valid = true;
-		ok = dbEval(jsobj, anObjBuilderForYa);
+		ok = dbEval(jsobj, anObjBuilder);
 	}
 	else if( e.type() == Number ) { 
-		if( strcmp(e.fieldName(), "profile") == 0 ) { 
-			anObjBuilderForYa.append("was", (double) client->profile);
+		if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
+			valid = true;
+			int p = (int) e.number();
+			if( p != 1 ) {
+				ok = false;
+			} else { 
+				dropDatabase(ns);
+				ok = true;
+			}
+		}
+		else if( strcmp(e.fieldName(), "profile") == 0 ) { 
+			anObjBuilder.append("was", (double) client->profile);
 			int p = (int) e.number();
 			valid = true;
 			if( p == -1 )
@@ -524,7 +534,10 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 		if( strcmp( e.fieldName(), "create") == 0 ) { 
 			valid = true;
 			string ns = us + '.' + e.valuestr();
-			ok = userCreateNS(ns.c_str(), jsobj);
+			string err;
+			ok = userCreateNS(ns.c_str(), jsobj, err);
+			if( !ok && !err.empty() )
+				anObjBuilder.append("errmsg", err.c_str());
 		}
 		else if( strcmp( e.fieldName(), "clean") == 0 ) { 
 			valid = true;
@@ -533,11 +546,11 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			cout << "CMD: clean " << dropNs << endl;
 			if( d ) { 
 				ok = true;
-				anObjBuilderForYa.append("ns", dropNs.c_str());
+				anObjBuilder.append("ns", dropNs.c_str());
 				clean(dropNs.c_str(), d);
 			}
 			else {
-				anObjBuilderForYa.append("errmsg", "ns not found");
+				anObjBuilder.append("errmsg", "ns not found");
 			}
 		}
 		else if( strcmp( e.fieldName(), "drop") == 0 ) { 
@@ -547,11 +560,11 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			cout << "CMD: clean " << dropNs << endl;
 			if( d ) { 
 				ok = true;
-				anObjBuilderForYa.append("ns", dropNs.c_str());
-				client->namespaceIndex->kill(dropNs.c_str());
+				anObjBuilder.append("ns", dropNs.c_str());
+				client->namespaceIndex.kill(dropNs.c_str());
 			}
 			else {
-				anObjBuilderForYa.append("errmsg", "ns not found");
+				anObjBuilder.append("errmsg", "ns not found");
 			}
 		}
 		else if( strcmp( e.fieldName(), "validate") == 0 ) { 
@@ -561,12 +574,12 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			cout << "CMD: validate " << toValidateNs << endl;
 			if( d ) { 
 				ok = true;
-				anObjBuilderForYa.append("ns", toValidateNs.c_str());
+				anObjBuilder.append("ns", toValidateNs.c_str());
 				string s = validateNS(toValidateNs.c_str(), d);
-				anObjBuilderForYa.append("result", s.c_str());
+				anObjBuilder.append("result", s.c_str());
 			}
 			else {
-				anObjBuilderForYa.append("errmsg", "ns not found");
+				anObjBuilder.append("errmsg", "ns not found");
 			}
 		}
 		else if( strcmp(e.fieldName(),"deleteIndexes") == 0 ) { 
@@ -584,8 +597,8 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 						if( *idxName == '*' && idxName[1] == 0 ) { 
 							ok = true;
 							cout << "  d->nIndexes was " << d->nIndexes << endl;
-							anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
-							anObjBuilderForYa.append("msg", "all indexes deleted for collection");
+							anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
+							anObjBuilder.append("msg", "all indexes deleted for collection");
 							cout << "  alpha implementation, space not reclaimed" << endl;
 							d->nIndexes = 0;
 						}
@@ -594,7 +607,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 							int x = d->findIndexByName(idxName);
 							if( x >= 0 ) { 
 								cout << "  d->nIndexes was " << d->nIndexes << endl;
-								anObjBuilderForYa.append("nIndexesWas", (double)d->nIndexes);
+								anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
 								d->nIndexes--;
 								for( int i = x; i < d->nIndexes; i++ )
 									d->indexes[i] = d->indexes[i+1];
@@ -608,31 +621,31 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 				}
 			}
 			else {
-				anObjBuilderForYa.append("errmsg", "ns not found");
+				anObjBuilder.append("errmsg", "ns not found");
 			}
 		}
 	}
 
 done:
 	if( !valid )
-		anObjBuilderForYa.append("errmsg", "no such cmd");
-	anObjBuilderForYa.append("ok", ok?1.0:0.0);
-	JSObj x = anObjBuilderForYa.done();
+		anObjBuilder.append("errmsg", "no such cmd");
+	anObjBuilder.append("ok", ok?1.0:0.0);
+	JSObj x = anObjBuilder.done();
 	b.append((void*) x.objdata(), x.objsize());
 	return true;
 }
 
-bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilderForYa) { 
+bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder) { 
 	try {
-		return _runCommands(ns, jsobj, ss, b, anObjBuilderForYa);
+		return _runCommands(ns, jsobj, ss, b, anObjBuilder);
 	}
 	catch( AssertionException ) {
 		;
 	}
 	ss << " assertion ";
-	anObjBuilderForYa.append("errmsg", "db assertion failure");
-	anObjBuilderForYa.append("ok", 0.0);
-	JSObj x = anObjBuilderForYa.done();
+	anObjBuilder.append("errmsg", "db assertion failure");
+	anObjBuilder.append("ok", 0.0);
+	JSObj x = anObjBuilder.done();
 	b.append((void*) x.objdata(), x.objsize());
 	return true;
 }

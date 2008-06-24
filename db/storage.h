@@ -21,7 +21,7 @@ class DiskLoc {
 	int fileNo; /* this will be volume, file #, etc. */
 	int ofs;
 public:
-	enum { NullOfs = -1 };
+	enum { NullOfs = -1, MaxFiles=4000 };
 	int a() const { return fileNo; }
 	DiskLoc(int a, int b) : fileNo(a), ofs(b) { 
 		assert(ofs!=0);
@@ -32,6 +32,7 @@ public:
 
 	bool isNull() const { return ofs == NullOfs; }
 	void Null() { fileNo = -1; ofs = NullOfs; }
+	void setInvalid() { fileNo = -2; }
 	void assertOk() { assert(!isNull()); }
 
 	string toString() const {

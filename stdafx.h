@@ -132,3 +132,11 @@ inline void our_debug_free(void *p) {
 
 void dbexit(int resultcode);
 #define exit dbexit
+
+#undef yassert
+#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem/operations.hpp>
+#undef assert
+#define assert xassert
+#define yassert 1
+using namespace boost::filesystem;          

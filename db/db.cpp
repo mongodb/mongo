@@ -196,7 +196,8 @@ void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& s
 			ss << " bytes:" << resp.data->dataLen();
 	}
 	else { 
-		cout << "ERROR: client is null; ns=" << ns << endl;
+		if( strstr(ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
+			cout << "ERROR: receiveQuery: client is null; ns=" << ns << endl;
 	}
 	dbMsgPort.reply(m, resp, responseTo);
 }
@@ -289,7 +290,7 @@ public:
    115 replay, opLogging
 */
 void listen(int port) { 
-	const char *Version = "db version: 116 23jun2008";
+	const char *Version = "db version: 117 24jun2008";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
@@ -367,7 +368,7 @@ void jniCallback(Message& m, Message& out)
 				receivedDelete(m);
 			}
 			else if( m.data->operation == dbGetMore ) {
-				log = true;
+				DEV log = true;
 				ss << "getmore ";
 				receivedGetMore(jmp, m, ss);
 			}
@@ -422,7 +423,8 @@ int opLogging = 1;
 //int opLogging = 0;
 struct OpLog { 
 	ofstream *f;
-	OpLog() { 
+	OpLog() : f(0) { }
+	void init() { 
 		stringstream ss;
 		ss << "oplog." << hex << time(0);
 		string name = ss.str();
@@ -556,7 +558,7 @@ void connThread()
 			}
 
 			int ms = t.millis();
-			log = log || ctr++ % 128 == 0;
+			log = log || ctr++ % 512 == 0;
 			DEV log = true;
 			if( log || ms > 100 ) {
 				ss << ' ' << t.millis() << "ms";
@@ -739,6 +741,11 @@ int main(int argc, char* argv[], char *envp[] )
 			goingAway = true;
 			return 0;
 		}
+		if( strcmp(argv[1], "zzz") == 0 ) {
+			msg(argc >= 3 ? argv[2] : "ping", 1000);
+			goingAway = true;
+			return 0;
+		}
 		if( strcmp(argv[1], "dev") == 0 ) { 
 			dbpath = "/home/dwight/db/";
 			cout << "dev mode: expect db files in " << dbpath << endl;
@@ -750,9 +757,8 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "run") == 0 ) {
-		    
+   			_oplog.init();
 		    initAndListen(port, dbpath);
-		    
 			goingAway = true;
 			return 0;
 		}
