@@ -459,7 +459,30 @@ int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj
 
 extern int dump;
 
-/* deep means we looked into arrays for a match */
+inline bool _regexMatches(RegexMatcher& rm, Element& e) { 
+	char buf[64];
+	const char *p = buf;
+	if( e.type() == String )
+		p = e.valuestr();
+	else if( e.type() == Number ) { 
+		sprintf(buf, "%f", e.number());
+	}
+	else if( e.type() == Date ) { 
+		unsigned long long d = e.date();
+		time_t t = (d/1000);
+		time_t_to_String(t, buf);
+	}
+	else
+		return false;
+	return rm.re->PartialMatch(p);
+}
+inline bool regexMatches(RegexMatcher& rm, Element& e) { 
+	return _regexMatches(rm, e);
+}
+
+/* See if an object matches the query.
+   deep - return true when meanswe looked into arrays for a match 
+*/
 bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	if( deep ) 
 		*deep = false;
@@ -472,24 +495,8 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 		Element e = jsobj.getFieldDotted(rm.fieldName);
 		if( e.eoo() )
 			return false;
-		{
-			char buf[64];
-			const char *p = buf;
-			if( e.type() == String )
-				p = e.valuestr();
-			else if( e.type() == Number ) { 
-				sprintf(buf, "%f", e.number());
-			}
-			else if( e.type() == Date ) { 
-				unsigned long long d = e.date();
-				time_t t = (d/1000);
-				time_t_to_String(t, buf);
-			}
-			else
-				return false;
-			if( !rm.re->PartialMatch(p) )
-				return false;
-		}
+		if( !regexMatches(rm, e) )
+			return false;
 	}
 
 	// check normal non-regex cases:

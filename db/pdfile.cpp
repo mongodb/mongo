@@ -132,8 +132,9 @@ DiskLoc NamespaceDetails::__stdAlloc(int len) {
 	while( 1 ) { 
 		{
 			int a = cur.a();
-			if( a < -1 || a >= 100000 ) { 
-				problem() << "Assertion failure - a() out of range in _alloc() " << a << endl;
+			if( a < -1 || a >= 100000 ) {
+				problem() << "~~ Assertion - cur out of range in _alloc() " << cur.toString() <<
+					" b:" << b << " chain:" << chain << '\n';
 				sayDbContext();
 				if( cur == *prev )
 					prev->Null();
@@ -168,6 +169,11 @@ DiskLoc NamespaceDetails::__stdAlloc(int len) {
 			cur.Null();
 		}
 		else {
+			if( r->nextDeleted.getOfs() == 0 ) {
+				problem() << "~~ Assertion - bad nextDeleted " << r->nextDeleted.toString() << 
+					" b:" << b << " chain:" << chain << ", fixing.\n";
+				r->nextDeleted.Null();
+			}
 			cur = r->nextDeleted; prev = &r->nextDeleted;
 		}
 	}
