@@ -430,7 +430,7 @@ struct OpLog {
 		string name = ss.str();
 		f = new ofstream(name.c_str(), ios::out | ios::binary);
 		if ( ! f->good() ){
-		  cerr << "couldn't open log stream" << endl;
+		  problem() << "couldn't open log stream" << endl;
 		  throw 1717;
 		}
 	}
@@ -665,9 +665,7 @@ void setupSignals() {}
 #endif
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
-
     _oplog.init();
-
 
 #if !defined(_WIN32)
 	assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
