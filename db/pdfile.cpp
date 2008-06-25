@@ -268,10 +268,9 @@ DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 
 		DiskLoc fr = firstExtent.ext()->firstRecord;
 		if( fr.isNull() ) { 
-			cout << "couldn't make room for new record in capped ns\n";
-			cout << " ns:" << ns;
-			cout << "\n len: " << len << endl;
-			assert(false);
+			cout << "couldn't make room for new record in capped ns " << ns 
+				<< " len: " << len << " extentsize:" << lastExtentSize << '\n';
+			assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
 			return DiskLoc();
 		}
 
