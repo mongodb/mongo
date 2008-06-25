@@ -24,6 +24,36 @@ struct MyStartupTests {
 	}
 } mystartupdbcpp;
 
+/* 0 = off; 1 = writes, 2 = reads, 3 = both 
+   7 = log a few reads, and all writes.
+*/
+int opLogging = 7;
+//int opLogging = 0;
+struct OpLog { 
+	ofstream *f;
+	OpLog() : f(0) { }
+	void init() { 
+		stringstream ss;
+		ss << "oplog." << hex << time(0);
+		string name = ss.str();
+		f = new ofstream(name.c_str(), ios::out | ios::binary);
+		if ( ! f->good() ){
+		  problem() << "couldn't open log stream" << endl;
+		  throw 1717;
+		}
+	}
+	void readop(char *data, int len) { 
+		bool log = (opLogging & 4) == 0;
+		OCCASIONALLY log = true;
+		if( log ) 
+			f->write(data,len);
+	}
+} _oplog;
+void flushOpLog() { _oplog.f->flush(); }
+#define oplog (*(_oplog.f))
+#define OPWRITE if( opLogging & 1 ) oplog.write((char *) m.data, m.data->len);
+#define OPREAD if( opLogging & 2 ) _oplog.readop((char *) m.data, m.data->len);
+
 /* example for
 	var zz = { x: 3, y: "foo", v: { z:5, arr: [1, 2] } }
 	zz.v.arr.prop = "zoo";
@@ -151,11 +181,22 @@ void receivedDelete(Message& m) {
 	deleteObjects(ns, pattern, flags & 1);
 }
 
-void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss) {
+void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss, bool logit) {
 	MSGID responseTo = m.data->id;
 
 	DbMessage d(m);
 	const char *ns = d.getns();
+
+	if( opLogging && logit ) { 
+		if( strstr(ns, "$cmd") ) { 
+			/* $cmd queries are "commands" and usually best treated as write operations */
+			OPWRITE;
+		}
+		else { 
+			OPREAD;
+		}
+	}
+
 	setClient(ns);
 	int ntoskip = d.pullInt();
 	int ntoreturn = d.pullInt();
@@ -352,8 +393,7 @@ void jniCallback(Message& m, Message& out)
 				assert( m.data->len > 0 && m.data->len < 32000000 );
 				Message copy(malloc(m.data->len), true);
 				memcpy(copy.data, m.data, m.data->len);
-
-				receivedQuery(jmp, copy, ss);
+				receivedQuery(jmp, copy, ss, false);
 			}
 			else if( m.data->operation == dbInsert ) {
 				ss << "insert ";
@@ -418,28 +458,6 @@ void jniCallback(Message& m, Message& out)
 	}
 }
 
-/* 0 = off; 1 = writes, 2 = reads, 3 = both */
-int opLogging = 1;
-//int opLogging = 0;
-struct OpLog { 
-	ofstream *f;
-	OpLog() : f(0) { }
-	void init() { 
-		stringstream ss;
-		ss << "oplog." << hex << time(0);
-		string name = ss.str();
-		f = new ofstream(name.c_str(), ios::out | ios::binary);
-		if ( ! f->good() ){
-		  problem() << "couldn't open log stream" << endl;
-		  throw 1717;
-		}
-	}
-} _oplog;
-void flushOpLog() { _oplog.f->flush(); }
-#define oplog (*(_oplog.f))
-#define OPWRITE if( opLogging & 1 ) oplog.write((char *) m.data, m.data->len);
-#define OPREAD if( opLogging & 2 ) oplog.write((char *) m.data, m.data->len);
-
 void connThread()
 {
 	try { 
@@ -498,8 +516,7 @@ void connThread()
 				}
 			}
 			else if( m.data->operation == dbQuery ) { 
-				OPREAD;
-				receivedQuery(dbMsgPort, m, ss);
+				receivedQuery(dbMsgPort, m, ss, true);
 			}
 			else if( m.data->operation == dbInsert ) {
 				OPWRITE;
@@ -532,7 +549,7 @@ void connThread()
 					receivedDelete(m);
 				}
 				catch( AssertionException ) { 
-					problem() << " Caught Assertion receviedDelete, continuing" << endl; 
+					problem() << " Caught Assertion receivedDelete, continuing" << endl; 
 					cout << "Caught Assertion receivedDelete, continuing" << endl; 
 					ss << " exception ";
 				}
