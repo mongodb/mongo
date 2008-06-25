@@ -574,7 +574,6 @@ string JSObj::toString() const {
 
 /* well ordered compare */
 int JSObj::woCompare(const JSObj& r) const { 
-	assert( _objdata );
 	if( isEmpty() )
 		return r.isEmpty() ? 0 : -1;
 	if( r.isEmpty() )
@@ -692,7 +691,7 @@ int JSObj::getFieldNames(set<string>& fields) {
    returns n added not counting _id unless requested.
 */
 int JSObj::addFields(JSObj& from, set<string>& fields) {
-	assert( _objdata == 0 ); /* partial implementation for now... */
+	assert( details == 0 ); /* partial implementation for now... */
 
 	JSObjBuilder b;
 
@@ -718,8 +717,8 @@ int JSObj::addFields(JSObj& from, set<string>& fields) {
 	}
 
 	if( n ) {
-		_objdata = b.decouple(_objsize);
-		iFree = true;
+		int len;
+		init( b.decouple(len), true );
 	}
 
 	return n;

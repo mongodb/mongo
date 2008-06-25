@@ -725,6 +725,19 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 
 int main(int argc, char* argv[], char *envp[] )
 {
+/*	struct { 
+		int x;
+		char ch;
+	} foo;
+	foo.x = 5;
+	foo.ch = EOO;
+
+	while( 1 ) { 
+		JSObj q((char *) &foo);
+		cout << "obj:" << q.toString() << '\n';
+	}
+*/
+
 	if( opLogging ) 
 		cout << "WARNING: this build has oplog enabled at startup. opLogging=" << opLogging << endl;
 

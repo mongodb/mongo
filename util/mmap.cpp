@@ -45,7 +45,7 @@ void* MemoryMappedFile::map(const char *filename, int length) {
 
 #if defined(_WIN32)
 	if( mapped > 500000000 ) { 
-		cout << "too much mem mapped for win32" << endl;
+		cout << "WARNING: too much mem mapped for win32" << endl;
 //		if( length > 50000000 )
 //			length = 50000000;
 	}
@@ -59,7 +59,8 @@ void* MemoryMappedFile::map(const char *filename, int length) {
 	}
 
 	view = MapViewOfFile(maphandle, FILE_MAP_ALL_ACCESS, 0, 0, 0);
-	if( view == 0 )		cout << "MapViewOfFile failed " << filename << ' ' << GetLastError() << endl;
+	if( view == 0 )
+		cout << "MapViewOfFile failed " << filename << " errno:" << GetLastError() << endl;
 
 	return view;
 }

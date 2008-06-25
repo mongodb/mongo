@@ -168,19 +168,38 @@ private:
 
 class JSObj {
 	friend class JSElemIter;
+	class Details {
+	public:
+		~Details() { _objdata = 0; }
+		const char *_objdata;
+		int _objsize;
+		int refCount; // -1 == don't free
+		bool owned() { return refCount >= 0; }
+	} *details;
+	void init(const char *data, bool ifree) { 
+		details = new Details();
+		details->_objdata = data;
+		details->_objsize = *((int*) data);
+		details->refCount = ifree ? 1 : -1;
+	}
 public:
-explicit
-	JSObj(const char *msgdata, bool ifree = false) : iFree(ifree) {
-		_objdata = msgdata;
-		_objsize = *((int*) _objdata);
+	explicit JSObj(const char *msgdata, bool ifree = false) {
+		init(msgdata, ifree);
 	}
 	JSObj(Record *r);
-	JSObj() : _objsize(0), _objdata(0), iFree(false) { }
+	JSObj() : details(0) { }
+	~JSObj() { 
+		if( details ) {
+			if( --details->refCount <= 0 )
+				delete details;
+			details = 0;
+		}
+	}
 
-	~JSObj() { if( iFree ) { free((void*)_objdata); _objdata=0; } }
-
+	/* switch the buffer's ownership to us. */
 	void iWillFree() { 
-		assert(!iFree); iFree = true; 
+		assert( !details->owned() );
+		details->refCount = 1;
 	}
 
 	string toString() const;
@@ -204,9 +223,9 @@ explicit
 	   */
 	JSObj extractFields(JSObj pattern, JSObjBuilder& b);
 
-	const char *objdata() const { return _objdata; }
-	int objsize() const { return _objsize; } // includes the embedded size field
-	bool isEmpty() const { return objsize() <= 5; }
+	const char *objdata() const { return details->_objdata; }
+	int objsize() const { return details->_objsize; } // includes the embedded size field
+	bool isEmpty() const { return details == 0 || objsize() <= 5; }
 
 	/* this is broken if elements aren't in the same order. */
 	bool operator<(const JSObj& r) const { return woCompare(r) < 0; }
@@ -216,10 +235,10 @@ explicit
 	*/
 	int woCompare(const JSObj& r) const;
 	bool woEqual(const JSObj& r) const { 
-		return _objsize==r._objsize && memcmp(_objdata,r._objdata,_objsize)==0;
+		return objsize()==r.objsize() && memcmp(objdata(),r.objdata(),objsize())==0;
 	}
 	bool operator==(const JSObj& r) const { 
-		return this->woEqual(r);*this == r; 
+		return this->woEqual(r);
 	}
 
 	Element firstElement() { 
@@ -235,27 +254,31 @@ explicit
 	}
 
 	JSObj(const JSObj& r) { 
-		_objsize = r._objsize;
-		_objdata = r._objdata;
-		iFree = r.iFree;
-		if( iFree ) { 
-			((JSObj&)r)._objdata = 0; 
-			((JSObj&)r).iFree = false; 
+		if( r.details == 0 )
+			details = 0;
+		else if( r.details->owned() ) {
+			details = r.details;
+			details->refCount++;
 		}
-
-                assert( _objsize == 0 || _objdata );
-
+		else { 
+			details = new Details(*r.details);
+		}
 	}
 	JSObj& operator=(JSObj& r) {
-		if( iFree ) free((void*)_objdata); 
-		_objsize = r._objsize;
-		_objdata = r._objdata;
-		iFree = r.iFree;
-		/* kind of like auto_ptrs here.  note we leave objsize as it was 
-		   so you'll get notified if you try to use the object, instead of just
-		   thinking it is empty.
-		   */
-		if( iFree ) { r._objdata = 0; r.iFree = false; }
+		if( details && details->owned() ) {
+			if( --details->refCount == 0 )
+				delete details;
+		}
+
+		if( r.details == 0 )
+			details = 0;
+		else if( r.details->owned() ) {
+			details = r.details;
+			details->refCount++;
+		}
+		else { 
+			details = new Details(*r.details);
+		}
 		return *this;
 	}
 
@@ -263,20 +286,15 @@ explicit
 	   by something else.  this is a useful way to get your own copy of the buffer 
 	   data (which is freed when the new jsobj destructs).
 	   */
-	JSObj copy() const;
+	JSObj copy();
 
 	int hash() const {
 		unsigned x = 0;
-		const char *p = _objdata;
-		for( int i = 0; i < _objsize; i++ )
+		const char *p = objdata();
+		for( int i = 0; i < objsize(); i++ )
 			x = x * 131 + p[i];
 		return (x & 0x7fffffff) | 0x8000000; // must be > 0
 	}
-
-	bool iFree;
-private:
-	int _objsize;
-	const char *_objdata;
 };
 
 class JSObjBuilder { 
@@ -478,11 +496,12 @@ inline JSObj Element::embeddedObject() {
 	return JSObj(value()); 
 }
 
-inline JSObj JSObj::copy() const { 
-	if( _objsize == 0 )
+inline JSObj JSObj::copy() { 
+	if( isEmpty() )
 		return *this;
-	char *p = (char*) malloc(_objsize);
-	memcpy(p, _objdata, _objsize);
+
+	char *p = (char*) malloc(objsize());
+	memcpy(p, objdata(), objsize());
 	return JSObj(p, true);
 }
 
@@ -494,11 +513,13 @@ inline JSObj Element::wrap() {
 }
 
 inline Element JSObj::findElement(const char *name) { 
-	JSElemIter it(*this);
-	while( it.more() ) {
-		Element e = it.next();
-		if( strcmp(name, e.fieldName()) == 0 ) 
-			return e;
+	if( !isEmpty() ) {
+		JSElemIter it(*this);
+		while( it.more() ) {
+			Element e = it.next();
+			if( strcmp(name, e.fieldName()) == 0 ) 
+				return e;
+		}
 	}
 	return Element();
 }

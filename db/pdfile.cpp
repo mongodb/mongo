@@ -43,6 +43,8 @@ void sayDbContext(const char *errmsg) {
 }
 
 JSObj::JSObj(Record *r) { 
+	init(r->data, false);
+/*
 	_objdata = r->data;
 	_objsize = *((int*) _objdata);
 	if( _objsize > r->netLength() ) { 
@@ -55,6 +57,7 @@ JSObj::JSObj(Record *r) {
 		assert( _objsize <= r->netLength() );
 	}
 	iFree = false;
+*/
 }
 
 /*---------------------------------------------------------------------*/ 
@@ -582,10 +585,10 @@ auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
 
 void aboutToDelete(const DiskLoc& dl);
 
-/* pull out the relevant key objects from obj, so we
+/* Pull out the relevant key objects from obj, so we
    can index them.  Note that the set is multiple elements 
    only when it's a "multikey" array.
-   keys will be left empty if key not found in the object.
+   Keys will be left empty if key not found in the object.
 */
 void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) { 
 	JSObj keyPattern = info.obj().getObjectField("key");
@@ -611,7 +614,6 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 
 		b.appendAs(e, f.fieldName());
 		JSObj o = b.doneAndDecouple();
-//		assert( o.objdata() );
 		assert( !o.isEmpty() );
 		keys.insert(o);
 	}
