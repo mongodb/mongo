@@ -535,7 +535,7 @@ void connThread()
 			}
 			else if( m.data->operation == dbGetMore ) {
 				OPREAD;
-				log = true;
+				DEV log = true;
 				ss << "getmore ";
 				receivedGetMore(dbMsgPort, m, ss);
 			}
