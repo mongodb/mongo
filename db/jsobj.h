@@ -512,4 +512,3 @@ inline void JSObjBuilder::appendElements(JSObj x) {
 		append(e);
 	}
 }
-

@@ -268,10 +268,9 @@ DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 
 		DiskLoc fr = firstExtent.ext()->firstRecord;
 		if( fr.isNull() ) { 
-			cout << "couldn't make room for new record in capped ns\n";
-			cout << " ns:" << ns;
-			cout << "\n len: " << len << endl;
-			assert(false);
+			cout << "couldn't make room for new record in capped ns " << ns 
+				<< " len: " << len << " extentsize:" << lastExtentSize << '\n';
+			assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
 			return DiskLoc();
 		}
 
@@ -598,6 +597,7 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 	if( f.type() != Array ) {
 		b.decouple();
 		key.iWillFree();
+		assert( !key.isEmpty() );
 		keys.insert(key);
 		return;
 	}
@@ -611,7 +611,8 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 
 		b.appendAs(e, f.fieldName());
 		JSObj o = b.doneAndDecouple();
-                assert( o.objdata() );
+//		assert( o.objdata() );
+		assert( !o.isEmpty() );
 		keys.insert(o);
 	}
 }
