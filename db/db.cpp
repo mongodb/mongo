@@ -429,6 +429,10 @@ struct OpLog {
 		ss << "oplog." << hex << time(0);
 		string name = ss.str();
 		f = new ofstream(name.c_str(), ios::out | ios::binary);
+		if ( ! f->good() ){
+		  cerr << "couldn't open log stream" << endl;
+		  throw 1717;
+		}
 	}
 } _oplog;
 void flushOpLog() { _oplog.f->flush(); }
@@ -662,6 +666,9 @@ void setupSignals() {}
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
 
+    _oplog.init();
+
+
 #if !defined(_WIN32)
 	assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
 #endif
@@ -757,8 +764,7 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "run") == 0 ) {
-   			_oplog.init();
-		    initAndListen(port, dbpath);
+			initAndListen(port, dbpath);
 			goingAway = true;
 			return 0;
 		}
