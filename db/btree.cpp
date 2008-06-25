@@ -59,6 +59,16 @@ int BucketBasics::fullValidate(const DiskLoc& thisLoc) {
 
 	for( int i = 0; i < n; i++ ) {
 		_KeyNode& kn = k(i);
+
+// TEMP!
+/*		if( kn.recordLoc == DiskLoc(0, 0x476878) ) { 
+			cout << "*** got target record\n  ";
+			if( kn.isUnused() ) cout << "  UNUSED!\n  ";
+			KeyNode k = keyNode(i);
+			cout << k.key.toString();
+			cout << "\n  i:" << i << endl;
+		}
+*/
 		if( kn.isUsed() ) kc++;
 		if( !kn.prevChildBucket.isNull() ) { 
 			DiskLoc left = kn.prevChildBucket;

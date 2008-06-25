@@ -355,8 +355,18 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 		int n = 0;
 		long long len = 0;
 		long long nlen = 0;
+		set<DiskLoc> recs;
 		while( c->ok() ) { 
 			n++;
+
+			if( n < 1000000 )
+				recs.insert(c->currLoc());
+
+//			if( c->currLoc() == DiskLoc(0, 0x476878) ) {
+//				cout << "************** target exists in base collection \n";
+//				cout << c->current().toString() << endl;
+//			}
+
 			Record *r = c->_current();
 			len += r->lengthWithHeaders;
 			nlen += r->netLength();
@@ -373,21 +383,33 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 		ss << endl;
 		int ndel = 0;
 		long long delSize = 0;
+		int incorrect = 0;
 		for( int i = 0; i < Buckets; i++ ) { 
 			DiskLoc loc = d->deletedList[i];
 			while( !loc.isNull() ) { 
+				if( recs.count(loc) )
+					incorrect++;
+//				if( loc == DiskLoc(0, 0x476878) ) {
+//					cout << "********* target is in deleted list b:" << i << endl;
+//				}
 				ndel++;
 				DeletedRecord *d = loc.drec();
 				delSize += d->lengthWithHeaders;
 				loc = d->nextDeleted;
 			}
 		}
-		ss << "  deleted: n: " << ndel << " size: " << delSize << endl;
+		ss << "  deleted: n: " << ndel << " size: " << delSize << '\n';
+		if( incorrect ) { 
+			ss << "  corrupt: " << incorrect << " records from datafile are in deleted list\n";
+			valid = false;
+		}
 
 		int idxn = 0;
 		try  {
 			ss << "  nIndexes:" << d->nIndexes << endl;
 			for( ; idxn < d->nIndexes; idxn++ ) {
+//TEMP!
+//cout << d->indexes[idxn].indexNamespace() << endl;
 				ss << "    " << d->indexes[idxn].indexNamespace() << " keys:" << 
 					d->indexes[idxn].head.btree()->fullValidate(d->indexes[idxn].head) << endl;
 			}
@@ -399,6 +421,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	}
 	catch(AssertionException) {
 		ss << "\n  exception during validate\n" << endl; 
+		valid = false;
 	}
 
 	if( !valid ) 
