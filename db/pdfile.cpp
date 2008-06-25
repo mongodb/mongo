@@ -597,6 +597,7 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 	if( f.type() != Array ) {
 		b.decouple();
 		key.iWillFree();
+		assert( !key.isEmpty() );
 		keys.insert(key);
 		return;
 	}
@@ -610,7 +611,8 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 
 		b.appendAs(e, f.fieldName());
 		JSObj o = b.doneAndDecouple();
-                assert( o.objdata() );
+//		assert( o.objdata() );
+		assert( !o.isEmpty() );
 		keys.insert(o);
 	}
 }
