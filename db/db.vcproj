@@ -231,6 +231,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\tests.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\util\util.cpp"
 				>
 			</File>

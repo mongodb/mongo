@@ -657,7 +657,6 @@ void pipeSigHandler( int signal ) {
 void segvhandler(int x) {
 	cout << "got SIGSEGV " << x << ", terminating :-(" << endl;
 	problem() << "got SIGSEGV " << x << ", terminating :-(" << endl;
-	exit(9);
 }
 
 void mysighandler(int x) { 
@@ -666,8 +665,7 @@ void mysighandler(int x) {
    problem() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
    {
 	   lock lk(dbMutex);
-	   cout << "exiting" << endl;
-	   problem() << "exiting" << endl;
+	   problem() << "mysighandler now exiting" << endl;
 	   exit(12);
    }
 }
@@ -722,6 +720,7 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 }
 
 //ofstream problems("dbproblems.log", ios_base::app | ios_base::out);
+int test2();
 
 int main(int argc, char* argv[], char *envp[] )
 {
@@ -747,10 +746,13 @@ int main(int argc, char* argv[], char *envp[] )
 	srand(curTimeMillis());
 
 	if( argc >= 2 ) {
-	  if( strcmp(argv[1], "quicktest") == 0 ) {
-		  quicktest();
-		  return 0;
-	  }
+		if( strcmp(argv[1], "quicktest") == 0 ) {
+			quicktest();
+			return 0;
+		}
+		if( strcmp(argv[1], "test2") == 0 ) {
+			return test2();
+		}
 		if( strcmp(argv[1], "msg") == 0 ) {
 
 		    // msg(argc >= 3 ? argv[2] : "ping");
