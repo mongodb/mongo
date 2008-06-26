@@ -476,8 +476,21 @@ inline bool _regexMatches(RegexMatcher& rm, Element& e) {
 		return false;
 	return rm.re->PartialMatch(p);
 }
-inline bool regexMatches(RegexMatcher& rm, Element& e) { 
-	return _regexMatches(rm, e);
+/* todo: internal dotted notation scans -- not done yet here. */
+inline bool regexMatches(RegexMatcher& rm, Element& e, bool *deep) { 
+	if( e.type() != Array ) 
+		return _regexMatches(rm, e);
+
+	JSElemIter ai(e.embeddedObject());
+	while( ai.more() ) { 
+		Element z = ai.next();
+		if( _regexMatches(rm, z) ) {
+			if( deep )
+				*deep = true;
+			return true;
+		}
+	}
+	return false;
 }
 
 /* See if an object matches the query.
@@ -495,7 +508,7 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 		Element e = jsobj.getFieldDotted(rm.fieldName);
 		if( e.eoo() )
 			return false;
-		if( !regexMatches(rm, e) )
+		if( !regexMatches(rm, e, deep) )
 			return false;
 	}
 
