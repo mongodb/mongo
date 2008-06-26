@@ -181,7 +181,19 @@ void receivedDelete(Message& m) {
 	deleteObjects(ns, pattern, flags & 1);
 }
 
-void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss, bool logit) {
+/* we defer response until we unlock.  don't want a blocked socket to 
+   keep things locked.
+*/
+struct DbResponse { 
+	Message *response;
+	MSGID responseTo;
+	DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt) {
+	}
+	DbResponse() { response = 0; }
+	~DbResponse() { delete response; }
+};
+
+void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit) {
 	MSGID responseTo = m.data->id;
 
 	DbMessage d(m);
@@ -230,22 +242,24 @@ void receivedQuery(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& s
 		qr->startingFrom = 0;
 		qr->nReturned = 0;
 	}
-	Message resp;
-	resp.setData(msgdata, true); // transport will free
+	Message *resp = new Message();
+	resp->setData(msgdata, true); // transport will free
+	dbresponse.response = resp;
+	dbresponse.responseTo = responseTo;
 	if( client ) { 
 		if( client->profile )
-			ss << " bytes:" << resp.data->dataLen();
+			ss << " bytes:" << resp->data->dataLen();
 	}
 	else { 
 		if( strstr(ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
 			cout << "ERROR: receiveQuery: client is null; ns=" << ns << endl;
 	}
-	dbMsgPort.reply(m, resp, responseTo);
+	//	dbMsgPort.reply(m, resp, responseTo);
 }
 
 QueryResult* emptyMoreResult(long long);
 
-void receivedGetMore(AbstractMessagingPort& dbMsgPort, Message& m, stringstream& ss) {
+void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
 	ss << ns;
@@ -262,11 +276,13 @@ void receivedGetMore(AbstractMessagingPort& dbMsgPort, Message& m, stringstream&
 		ss << " exception ";
 		msgdata = emptyMoreResult(cursorid);
 	}
-	Message resp;
-	resp.setData(msgdata, true);
-	ss << " bytes:" << resp.data->dataLen();
+	Message *resp = new Message();
+	resp->setData(msgdata, true);
+	ss << " bytes:" << resp->data->dataLen();
 	ss << " nreturned:" << msgdata->nReturned;
-	dbMsgPort.reply(m, resp);
+	dbresponse.response = resp;
+	dbresponse.responseTo = m.data->id;
+	//dbMsgPort.reply(m, resp);
 }
 
 void receivedInsert(Message& m, stringstream& ss) {
@@ -393,7 +409,9 @@ void jniCallback(Message& m, Message& out)
 				assert( m.data->len > 0 && m.data->len < 32000000 );
 				Message copy(malloc(m.data->len), true);
 				memcpy(copy.data, m.data, m.data->len);
-				receivedQuery(jmp, copy, ss, false);
+				DbResponse dbr;
+				receivedQuery(dbr, copy, ss, false);
+				jmp.reply(m, *dbr.response, dbr.responseTo);
 			}
 			else if( m.data->operation == dbInsert ) {
 				ss << "insert ";
@@ -410,7 +428,9 @@ void jniCallback(Message& m, Message& out)
 			else if( m.data->operation == dbGetMore ) {
 				DEV log = true;
 				ss << "getmore ";
-				receivedGetMore(jmp, m, ss);
+				DbResponse dbr;
+				receivedGetMore(dbr, m, ss);
+				jmp.reply(m, *dbr.response, dbr.responseTo);
 			}
 			else if( m.data->operation == dbKillCursors ) { 
 				try {
@@ -482,6 +502,7 @@ void connThread()
 		ss << buf;
 		//		ss << curTimeMillis() % 10000 << ' ';
 
+		DbResponse dbresponse;
 		{
 			lock lk(dbMutex);
 			Timer t;
@@ -499,14 +520,16 @@ void connThread()
 					" long msg received, len:" << len << 
 					" ends with: " << p + len - 10 << endl;
 				bool end = strcmp("end", p) == 0;
-				Message resp;
-				resp.setData(opReply, "i am fine");
-				dbMsgPort.reply(m, resp);
+				Message *resp = new Message();
+				resp->setData(opReply, "i am fine");
+				dbresponse.response = resp;
+				dbresponse.responseTo = m.data->id;
+				//dbMsgPort.reply(m, resp);
 				if( end ) {
 					cout << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
 					if( dbMsgPort.farEnd.isLocalHost() ) { 
 						dbMsgPort.shutdown();
-						sleepmillis(500);
+						sleepmillis(50);
 						problem() << "exiting end msg" << endl;
 						exit(EXIT_SUCCESS);
 					}
@@ -516,7 +539,7 @@ void connThread()
 				}
 			}
 			else if( m.data->operation == dbQuery ) { 
-				receivedQuery(dbMsgPort, m, ss, true);
+				receivedQuery(dbresponse, m, ss, true);
 			}
 			else if( m.data->operation == dbInsert ) {
 				OPWRITE;
@@ -558,7 +581,7 @@ void connThread()
 				OPREAD;
 				DEV log = true;
 				ss << "getmore ";
-				receivedGetMore(dbMsgPort, m, ss);
+				receivedGetMore(dbresponse, m, ss);
 			}
 			else if( m.data->operation == dbKillCursors ) { 
 				OPREAD;
@@ -591,13 +614,14 @@ void connThread()
 					profile(ss.str().c_str()+20/*skip ts*/, ms);
 				}
 			}
-		}
+		} /* end lock */
+		if( dbresponse.response ) 
+			dbMsgPort.reply(m, *dbresponse.response, dbresponse.responseTo);
 	}
 
 	}
 	catch( AssertionException ) { 
-		cout << "Caught AssertionException, terminating" << endl;
-		problem() << "Caught AssertionException, terminating" << endl;
+		problem() << "Uncaught AssertionException, terminating" << endl;
 		exit(-7);
 	}
 }
