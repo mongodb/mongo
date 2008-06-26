@@ -79,7 +79,8 @@ void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
 	d->nextDeleted = oldHead;
 }
 
-/* lenToAlloc is WITH header 
+/* 
+   lenToAlloc is WITH header 
 */
 DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
 	lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
@@ -259,9 +260,12 @@ void NamespaceDetails::compact() {
 	}
 }
 
+/* alloc with capped table handling. */
 DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 	if( !capped )
 		return __stdAlloc(len);
+
+	// capped. 
 
 	assert( len < 400000000 );
 	int passes = 0;
@@ -749,19 +753,23 @@ void DataFileMgr::update(
 {
 	NamespaceDetails *d = nsdetails(ns);
 
-	if( toupdate->netLength() < len ) {
+	if(  toupdate->netLength() < len ) {
+		// doesn't fit.  must reallocate.
+
 		if( d && d->capped ) { 
 			ss << " failing a growing update on a capped ns " << ns << endl;
 			return;
 		}
 
-		// doesn't fit.
+		d->paddingTooSmall();
 		if( client->profile )
 			ss << " moved ";
 		deleteRecord(ns, toupdate, dl);
 		insert(ns, buf, len);
 		return;
 	}
+
+	d->paddingFits();
 
 	/* has any index keys changed? */
 	{
@@ -893,6 +901,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		client->newestFile()->newExtent(ns, initialExtentSize(len));
 		d = nsdetails(ns);
 	}
+	d->paddingFits();
 
 	NamespaceDetails *tableToIndex = 0;
 
@@ -927,11 +936,18 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 
 	DiskLoc extentLoc;
 	int lenWHdr = len + Record::HeaderSize;
+	lenWHdr = (int) (lenWHdr * d->paddingFactor);
+	if( lenWHdr == 0 ) {
+		// old datafiles, backward compatible here.
+		assert( d->paddingFactor == 0 );
+		d->paddingFactor = 1.0;
+		lenWHdr = len + Record::HeaderSize;
+	}
 	DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
 	if( loc.isNull() ) {
 		// out of space
 		if( d->capped == 0 ) { // size capped doesn't grow
-			cout << "allocating new extent for " << ns << endl;
+			cout << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
 			client->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
 			loc = d->alloc(ns, lenWHdr, extentLoc);
 		}

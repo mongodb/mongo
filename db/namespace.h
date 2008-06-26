@@ -76,11 +76,14 @@ extern int bucketSizes[];
 class NamespaceDetails {
 public:
 	NamespaceDetails() { 
+		/* be sure to initialize new fields here, otherwise they will contain garbage by default.
+		*/
 		datasize = nrecords = 0;
 		lastExtentSize = 0;
 		nIndexes = 0;
 		capped = 0;
 		max = 0x7fffffff;
+		paddingFactor = 1.0;
 		memset(reserved, 0, sizeof(reserved));
 	} 
 	DiskLoc firstExtent;
@@ -93,7 +96,19 @@ public:
 	IndexDetails indexes[MaxIndexes];
 	int capped;
 	int max; // max # of objects for a capped table.
-	char reserved[256-16-4-4-8*MaxIndexes-8-8];
+	double paddingFactor; // 1.0 = no padding.
+	char reserved[256-16-4-4-8*MaxIndexes-8-8-8];
+
+	void paddingFits() { 
+		double x = paddingFactor - 0.01;
+		if( x >= 1.0 )
+			paddingFactor = x;
+	}
+	void paddingTooSmall() { 
+		double x = paddingFactor + 0.6;
+		if( x <= 2.0 )
+			paddingFactor = x;
+	}
 
 	//returns offset in indexes[]
 	int findIndexByName(const char *name) { 
@@ -112,8 +127,12 @@ public:
 		return Buckets-1;
 	}
 
+	/* allocate a new record.  lenToAlloc includes headers. */
 	DiskLoc alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc);
+
+	/* add a given record to the deleted chains for this NS */
 	void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
+
 	void dumpDeleted(set<DiskLoc> *extents = 0);
 private:
 	DiskLoc __stdAlloc(int len);

@@ -342,7 +342,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 
 	ss << "  firstExtent:" << d->firstExtent.toString() << " lastExtent:" << d->lastExtent.toString() << '\n';
 	ss << "  datasize?:" << d->datasize << " nrecords?:" << d->nrecords << " lastExtentSize:" << d->lastExtentSize << '\n';
-
+	ss << "  padding:" << d->paddingFactor << '\n';
 	try { 
 
 		{
