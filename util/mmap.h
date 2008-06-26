@@ -4,8 +4,10 @@
 
 class MemoryMappedFile {
 public:
+	static void closeAllFiles();
 	MemoryMappedFile();
-	~MemoryMappedFile();
+	~MemoryMappedFile(); /* closes the file if open */
+	void close();
 
 	/* only smart enough right now to deal with files of a fixed length. 
 	   creates if DNE

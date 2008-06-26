@@ -679,8 +679,10 @@ void pipeSigHandler( int signal ) {
 }
 
 void segvhandler(int x) {
-	cout << "got SIGSEGV " << x << ", terminating :-(" << endl;
 	problem() << "got SIGSEGV " << x << ", terminating :-(" << endl;
+	sayDbContext();
+	MemoryMappedFile::closeAllFiles();
+	flushOpLog();
 }
 
 void mysighandler(int x) { 
@@ -885,6 +887,9 @@ int main(int argc, char* argv[], char *envp[] )
 
 #undef exit
 void dbexit(int rc) { 
+	cout << "  dbexit: flushing op log and files" << endl;
 	flushOpLog();
+	MemoryMappedFile::closeAllFiles();
+	cout << "  dbexit: really exiting now" << endl;
 	exit(rc);
 }

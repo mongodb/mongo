@@ -3,15 +3,30 @@
 #include "stdafx.h"
 #include "mmap.h"
 
+set<MemoryMappedFile*> mmfiles;
+
+MemoryMappedFile::~MemoryMappedFile() { 
+	close(); 
+	mmfiles.erase(this);
+}
+
+/*static*/ 
+void MemoryMappedFile::closeAllFiles() { 
+	for( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+		(*i)->close();
+	cout << "  closeAllFiles() finished" << endl;
+}
+
 #if defined(_WIN32) 
 
 #include "windows.h"
 
 MemoryMappedFile::MemoryMappedFile() {
 	fd = 0; maphandle = 0; view = 0;
+	mmfiles.insert(this);
 }
 
-MemoryMappedFile::~MemoryMappedFile() {
+void MemoryMappedFile::close() {
 	if( view )
 		UnmapViewOfFile(view);
 	view = 0;
@@ -24,7 +39,6 @@ MemoryMappedFile::~MemoryMappedFile() {
 }
 
 std::wstring toWideString(const char *s) {
- //const std::basic_string<TCHAR> s) {
   std::basic_ostringstream<TCHAR> buf;
   buf << s;
   return buf.str();
@@ -78,15 +92,17 @@ void MemoryMappedFile::flush(bool) {
 
 MemoryMappedFile::MemoryMappedFile() {
 	fd = 0; maphandle = 0; view = 0; len = 0;
+	mmfiles.insert(this);
 }
 
-MemoryMappedFile::~MemoryMappedFile() {
+void MemoryMappedFile::close() {
+	mmfiles.erase(this);
 	if( view )
 		munmap(view, len);
 	view = 0;
 
 	if( fd )
-		close(fd);
+		::close(fd);
 	fd = 0;
 }
 
