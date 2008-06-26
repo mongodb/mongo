@@ -861,14 +861,15 @@ int main(int argc, char* argv[], char *envp[] )
 		exit(0);
 	}
 
-	cout << "usage:\n";
-	cout << "  quicktest         just check basic assertions and exit" << endl;
-	cout << "  msg [msg] [port]  send a request to the db server listening on port (or default)" << endl;
-	cout << "  msg end [port]    shut down db server listening on port (or default)" << endl;
+	cout << "10gendb usage:\n";
 	cout << "  run               run db" << endl;
-	cout << "  dev               run in dev mode (diff db loc, diff port #)" << endl;
-	cout << "  longmsg           send a long test message to the db server" << endl;
+	cout << "  msg end [port]    shut down db server listening on port (or default)" << endl;
+	cout << "  msg [msg] [port]  send a request to the db server listening on port (or default)" << endl;
 	cout << "  msglots           send a bunch of test messages, and then wait for answer on the last one" << endl;
+	cout << "  longmsg           send a long test message to the db server" << endl;
+	cout << "  quicktest         just check basic assertions and exit" << endl;
+	cout << "  test2             run test2() - see code" << endl;
+	cout << "  dev               run in dev mode (diff db loc, diff port #)" << endl;
 	cout << endl << "Alternate Usage :" << endl;
 	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl << endl;
 	
@@ -887,4 +888,3 @@ void dbexit(int rc) {
 	flushOpLog();
 	exit(rc);
 }
-
