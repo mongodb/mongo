@@ -73,11 +73,12 @@ public:
 
 extern int bucketSizes[];
 
+/* this is the "header" for a collection that has all its details.  in the .ns file.
+*/
 class NamespaceDetails {
 public:
 	NamespaceDetails() { 
-		/* be sure to initialize new fields here, otherwise they will contain garbage by default.
-		*/
+		/* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
 		datasize = nrecords = 0;
 		lastExtentSize = 0;
 		nIndexes = 0;

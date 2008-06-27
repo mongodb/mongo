@@ -330,6 +330,13 @@ public:
 		b.append(fieldName);
 		b.append(n);
 	}
+	void appendOID(const char *fieldName) { 
+		b.append((char) jstOID);
+		b.append(fieldName);
+		b.append((long long) 0);
+		b.append((unsigned) 0);
+	}
+
 	void appendDate(const char *fieldName, unsigned long long dt) { 
 		b.append((char) Date);
 		b.append(fieldName);
@@ -342,6 +349,7 @@ public:
 		b.append(str);
 	}
 
+	/* JSObj will free the buffer when it is finished. */
 	JSObj doneAndDecouple() { 
 		int l;
 		return JSObj(decouple(l), true);

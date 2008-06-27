@@ -576,7 +576,9 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 	return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
 }
 
-/* get a table scan cursor, but can be forward or reverse direction */
+/* get a table scan cursor, but can be forward or reverse direction.
+   order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
+*/
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
 	Element el = order.findElement("$natural");
 	if( el.type() != Number || el.number() >= 0 )
@@ -919,7 +921,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		}
 		tableToIndex = nsdetails(tabletoidxns);
 		if( tableToIndex == 0 ) {
-			cout << "user warning: bad add index attempt, no such table(ns):" << tabletoidxns << endl;
+			cout << "user warning: ignoring add index, no such collection:" << tabletoidxns << endl;
 			return DiskLoc();
 		}
 		if( tableToIndex->nIndexes >= MaxIndexes ) { 

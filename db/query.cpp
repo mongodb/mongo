@@ -10,6 +10,7 @@
 #include "btree.h"
 #include "../util/lruishmap.h"
 #include "javajs.h"
+#include "json.h"
 
 //ns->query->DiskLoc
 LRUishMap<JSObj,DiskLoc,5> lrutest(123);
@@ -29,6 +30,7 @@ JSObj emptyObj((char *) &emptyObject);
 
 int getGtLtOp(Element& e);
 void appendElementHandlingGtLt(JSObjBuilder& b, Element& e);
+int runCount(const char *ns, const JSObj& cmd, string& err);
 
 /* todo: _ cache query plans 
          _ use index on partial match with the query
@@ -552,9 +554,25 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 		}
 	}
 	else if( e.type() == String ) {
+		/* { count: "collectionname"[, query: <query>] } */
 		string us(ns, p-ns);
 
-		if( strcmp( e.fieldName(), "create") == 0 ) { 
+		if( strcmp( e.fieldName(), "count" ) == 0 ) { 
+			valid = true;
+			string ns = us + '.' + e.valuestr();
+			string err;
+			int n = runCount(ns.c_str(), jsobj, err);
+			int nn = n;
+			ok = true;
+			if( n < 0 ) { 
+				ok = false;
+				nn = 0;
+				if( !err.empty() )
+					anObjBuilder.append("errmsg", err.c_str());
+			}
+			anObjBuilder.append("n", (double) nn);
+		}
+		else if( strcmp( e.fieldName(), "create") == 0 ) { 
 			valid = true;
 			string ns = us + '.' + e.valuestr();
 			string err;
@@ -684,7 +702,35 @@ void killCursors(int n, long long *ids) {
 	cout << "killCursors: found " << k << " of " << n << endl;
 }
 
+// order.$natural sets natural order direction
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
+
+JSObj id_obj = fromjson("{_id:ObjId()}");
+JSObj empty_obj = fromjson("{}");
+
+/* { count: "collectionname"[, query: <query>] } 
+   returns -1 on error.
+*/
+int runCount(const char *ns, const JSObj& cmd, string& err) { 
+	NamespaceDetails *d = nsdetails(ns);
+	if( d == 0 ) {
+		err = "ns does not exist";
+		return -1;
+	}
+
+	auto_ptr<Cursor> c = getIndexCursor(ns, id_obj, empty_obj);
+	if( c.get() == 0 ) {
+		cout << "TEMP: table scan" << endl;
+		c = findTableScan(ns, empty_obj);
+	}
+	else cout << "TEMP: indexed scan" << endl;
+	int count = 0;
+	if( c->ok() ) {
+		count++;
+		while( c->advance() ) count++;
+	}
+	return count;
+}
 
 QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) 

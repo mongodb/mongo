@@ -199,6 +199,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\json.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\grid\message.cpp"
 				>
 			</File>
@@ -278,6 +282,10 @@
 			</File>
 			<File
 				RelativePath=".\jsobj.h"
+				>
+			</File>
+			<File
+				RelativePath=".\json.h"
 				>
 			</File>
 			<File

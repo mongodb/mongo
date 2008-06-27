@@ -847,13 +847,6 @@ void BtreeCursor::checkUnused() {
 		cout << "btree unused skipped:" << u << endl;
 }
 
-/*DiskLoc BtreeCursor::currLoc() {
-	assert( !bucket.isNull() );
-	_KeyNode& kn = bucket.btree()->k(keyOfs);
-	assert( kn.isUsed() );
-	return kn.recordLoc;
-}*/
-
 bool BtreeCursor::advance() { 
 	if( bucket.isNull() )
 		return false;
