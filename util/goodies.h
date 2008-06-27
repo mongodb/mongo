@@ -8,6 +8,26 @@
 #if !defined(_WIN32)
 #include <pthread.h>
 inline pthread_t GetCurrentThreadId() { return pthread_self(); }
+#include <execinfo.h>
+/* use "addr2line -CFe <exe>" to parse. */
+inline void printStackTrace() {
+	void *b[12];
+	size_t size;
+	char **strings;
+	size_t i;
+     
+	size = backtrace(b, 12);
+	strings = backtrace_symbols(b, size);
+     
+	for (i = 0; i < size; i++)
+		cout << ' ' << hex << b[i] << '\n';
+	for (i = 0; i < size; i++)
+		cout << ' ' << strings[i] << '\n';
+
+	free (strings);
+}
+#else
+inline void printStackTrace() { }
 #endif
 
 /* set to TRUE if we are exiting */

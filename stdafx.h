@@ -140,3 +140,5 @@ void dbexit(int resultcode);
 #define assert xassert
 #define yassert 1
 using namespace boost::filesystem;          
+
+#include "util/goodies.h"

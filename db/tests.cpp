@@ -8,6 +8,9 @@
 
 int test2() { 
 	cout << "test2" << endl;
+	printStackTrace();
+	if( 1 ) 
+		return 1;
 
 	MemoryMappedFile f;
 

@@ -40,6 +40,7 @@ void sayDbContext(const char *errmsg) {
 	cout << " op:" << curOp << ' ' << callDepth << endl;
 	if( client )
 		cout << " ns: " << curNs << endl;
+	printStackTrace();
 }
 
 JSObj::JSObj(Record *r) { 
