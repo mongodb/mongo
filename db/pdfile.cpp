@@ -665,6 +665,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 	}
 }
 
+/* unindex all keys in all indexes for this record. */
 void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete, const DiskLoc& dl) {
 	if( d->nIndexes == 0 ) return;
 	JSObj obj(todelete);

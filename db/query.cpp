@@ -30,7 +30,7 @@ JSObj emptyObj((char *) &emptyObject);
 
 int getGtLtOp(Element& e);
 void appendElementHandlingGtLt(JSObjBuilder& b, Element& e);
-int runCount(const char *ns, const JSObj& cmd, string& err);
+int runCount(const char *ns, JSObj& cmd, string& err);
 
 /* todo: _ cache query plans 
          _ use index on partial match with the query
@@ -711,19 +711,29 @@ JSObj empty_obj = fromjson("{}");
 /* { count: "collectionname"[, query: <query>] } 
    returns -1 on error.
 */
-int runCount(const char *ns, const JSObj& cmd, string& err) { 
+int runCount(const char *ns, JSObj& cmd, string& err) { 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) {
 		err = "ns does not exist";
 		return -1;
 	}
 
-	auto_ptr<Cursor> c = getIndexCursor(ns, id_obj, empty_obj);
+	JSObj query = cmd.getObjectField("query");
+
+	auto_ptr<Cursor> c;
+	if( query.isEmpty() ) {
+		c = getIndexCursor(ns, id_obj, empty_obj);
+	} else {
+		c = getIndexCursor(ns, query, empty_obj);
+	}
+
 	if( c.get() == 0 ) {
 		cout << "TEMP: table scan" << endl;
 		c = findTableScan(ns, empty_obj);
 	}
-	else cout << "TEMP: indexed scan" << endl;
+	else 
+		cout << "TEMP: indexed scan" << endl;
+
 	int count = 0;
 	if( c->ok() ) {
 		count++;
