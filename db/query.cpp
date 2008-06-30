@@ -339,7 +339,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	bool valid = true;
 	stringstream ss;
 	ss << "\nvalidate\n";
-	ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << endl;
+	ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << dec << endl;
 	if( d->capped )
 		ss << "  capped:" << d->capped << " max:" << d->max << '\n';
 
