@@ -168,6 +168,13 @@ public:
 		ht->put(n, details);
 	}
 
+	/* just for diagnostics */
+	size_t detailsOffset(NamespaceDetails *d) { 
+	  cout << d << ' ' << ht->nodes << endl;
+	  cout << f.viewOfs() << endl;
+	  return ((char *) d) -  (char *) ht->nodes;
+	}
+
 	NamespaceDetails* details(const char *ns) { 
 		Namespace n(ns);
 		return ht->get(n); 

@@ -339,6 +339,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	bool valid = true;
 	stringstream ss;
 	ss << "\nvalidate\n";
+	ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << endl;
 	if( d->capped )
 		ss << "  capped:" << d->capped << " max:" << d->max << '\n';
 
@@ -347,10 +348,13 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	ss << "  padding:" << d->paddingFactor << '\n';
 	try { 
 
-		{
+		try {
 			ss << "  first extent:\n";
 			d->firstExtent.ext()->dump(ss);
 			valid = valid && d->firstExtent.ext()->validates();
+		}
+		catch(...) { 
+		  ss << "\n    exception firstextent\n" << endl;
 		}
 
 		auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
@@ -388,21 +392,29 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 		int incorrect = 0;
 		for( int i = 0; i < Buckets; i++ ) { 
 			DiskLoc loc = d->deletedList[i];
-			while( !loc.isNull() ) { 
-				if( recs.count(loc) )
-					incorrect++;
-//				if( loc == DiskLoc(0, 0x476878) ) {
-//					cout << "********* target is in deleted list b:" << i << endl;
-//				}
-				ndel++;
-				DeletedRecord *d = loc.drec();
-				delSize += d->lengthWithHeaders;
-				loc = d->nextDeleted;
-			}
+			try {
+			  int k = 0;
+			  while( !loc.isNull() ) { 
+			    if( recs.count(loc) )
+			      incorrect++;
+			    ndel++;
+
+			    if( loc.questionable() ) { 
+			      ss << "    ?bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k << endl;
+			      valid = false;
+			      break;
+			    }
+
+			    DeletedRecord *d = loc.drec();
+			    delSize += d->lengthWithHeaders;
+			    loc = d->nextDeleted;
+			    k++;
+			  }
+			} catch(...) { ss <<"    ?exception in deleted chain for bucket " << i << endl; valid = false; }
 		}
 		ss << "  deleted: n: " << ndel << " size: " << delSize << '\n';
 		if( incorrect ) { 
-			ss << "  corrupt: " << incorrect << " records from datafile are in deleted list\n";
+			ss << "    ?corrupt: " << incorrect << " records from datafile are in deleted list\n";
 			valid = false;
 		}
 
@@ -410,24 +422,22 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 		try  {
 			ss << "  nIndexes:" << d->nIndexes << endl;
 			for( ; idxn < d->nIndexes; idxn++ ) {
-//TEMP!
-//cout << d->indexes[idxn].indexNamespace() << endl;
 				ss << "    " << d->indexes[idxn].indexNamespace() << " keys:" << 
 					d->indexes[idxn].head.btree()->fullValidate(d->indexes[idxn].head) << endl;
 			}
 		} 
 		catch(...) { 
-			ss << "\n  exception during index validate idxn:" << idxn << endl;
+		  ss << "\n    exception during index validate idxn:" << idxn << endl; valid=false;
 		}
 
 	}
 	catch(AssertionException) {
-		ss << "\n  exception during validate\n" << endl; 
+		ss << "\n    exception during validate\n" << endl; 
 		valid = false;
 	}
 
 	if( !valid ) 
-		ss << "  ns corrupt, requires dbchk\n";
+		ss << " ns corrupt, requires dbchk\n";
 
 	return ss.str();
 }

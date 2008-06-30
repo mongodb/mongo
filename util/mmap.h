@@ -16,6 +16,8 @@ public:
 
 	void flush(bool sync);
 
+	void* viewOfs() { return view; }
+
 private:
 	HANDLE fd;
 	HANDLE maphandle;

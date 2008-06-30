@@ -30,6 +30,12 @@ public:
 
 	DiskLoc(const DiskLoc& l) { fileNo=l.fileNo; ofs=l.ofs; }
 
+	bool questionable() { 
+	  return ofs < -1 ||
+	    fileNo < -1 ||
+	    fileNo > 20;
+	}
+
 	bool isNull() const { return ofs == NullOfs; }
 	void Null() { fileNo = -1; ofs = NullOfs; }
 	void setInvalid() { fileNo = -2; }

@@ -403,6 +403,7 @@ void jniCallback(Message& m, Message& out)
 
 			bool log = false;
 			curOp = m.data->operation;
+
 			if( m.data->operation == dbQuery ) { 
 				// on a query, the Message must have m.freeIt true so that the buffer data can be 
 				// retained by cursors.  As freeIt is false, we make a copy here.
@@ -511,6 +512,15 @@ void connThread()
 
 			bool log = false;
 			curOp = m.data->operation;
+
+			/* use this if you only want to process operations for a particular namespace.  maybe add to cmd line parms or a #define 
+			   DbMessage ddd(m);
+			   if( strncmp(ddd.getns(), "grid", 4) != 0 ) { 
+			   cout << "TEMP skip " << ddd.getns() << '\n';
+			   }
+			   else
+			*/
+
 			if( m.data->operation == dbMsg ) { 
 				ss << "msg ";
 				char *p = m.data->_data;
