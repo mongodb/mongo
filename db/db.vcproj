@@ -329,6 +329,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\repl.h"
+				>
+			</File>
+			<File
 				RelativePath=".\resource.h"
 				>
 			</File>

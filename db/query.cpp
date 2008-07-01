@@ -12,6 +12,11 @@
 #include "javajs.h"
 #include "json.h"
 
+/* We cut off further objects once we cross this threshold; thus, you might get 
+   a little bit more than this, it is a threshold rather than a limit.
+*/
+const int MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+
 //ns->query->DiskLoc
 LRUishMap<JSObj,DiskLoc,5> lrutest(123);
 
@@ -343,7 +348,13 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	if( d->capped )
 		ss << "  capped:" << d->capped << " max:" << d->max << '\n';
 
-	ss << "  firstExtent:" << d->firstExtent.toString() << " lastExtent:" << d->lastExtent.toString() << '\n';
+	ss << "  firstExtent:" << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->ns.buf << '\n';
+	ss << "  lastExtent:" << d->lastExtent.toString()    << " ns:" << d->lastExtent.ext()->ns.buf << '\n';
+	try { 
+		d->firstExtent.ext()->assertOk();
+		d->lastExtent.ext()->assertOk(); 
+	} catch(...) { valid=false; ss << " extent asserted "; }
+
 	ss << "  datasize?:" << d->datasize << " nrecords?:" << d->nrecords << " lastExtentSize:" << d->lastExtentSize << '\n';
 	ss << "  padding:" << d->paddingFactor << '\n';
 	try { 
@@ -362,25 +373,37 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 		long long len = 0;
 		long long nlen = 0;
 		set<DiskLoc> recs;
+		int outOfOrder = 0;
+		DiskLoc cl_last;
 		while( c->ok() ) { 
 			n++;
 
+			DiskLoc cl = c->currLoc();
 			if( n < 1000000 )
-				recs.insert(c->currLoc());
-
-//			if( c->currLoc() == DiskLoc(0, 0x476878) ) {
-//				cout << "************** target exists in base collection \n";
-//				cout << c->current().toString() << endl;
-//			}
+				recs.insert(cl);
+			if( d->capped ) {
+				if( cl < cl_last )
+					outOfOrder++;
+				cl_last = cl;
+			}
 
 			Record *r = c->_current();
 			len += r->lengthWithHeaders;
 			nlen += r->netLength();
 			c->advance();
 		}
+		if( d->capped ) { 
+			ss << "  capped outOfOrder:" << outOfOrder;
+			if( outOfOrder > 1 ) { 
+				valid = false;
+				ss << " ???";
+			}
+			else ss << " (OK)";
+			ss << '\n';
+		}
 		ss << "  " << n << " objects found, nobj:" << d->nrecords << "\n";
-		ss << "  " << len << " bytes record data w/headers\n";
-		ss << "  " << nlen << " bytes record data wout/headers\n";
+		ss << "  " << len << " bytes data w/headers\n";
+		ss << "  " << nlen << " bytes data wout/headers\n";
 
 		ss << "  deletedList: ";
 		for( int i = 0; i < Buckets; i++ ) { 
@@ -521,13 +544,18 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 	}
 	else if( e.type() == Number ) { 
 		if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
-			valid = true;
-			int p = (int) e.number();
-			if( p != 1 ) {
-				ok = false;
-			} else { 
-				dropDatabase(ns);
-				ok = true;
+			if( 1 ) {
+				valid = true;
+				int p = (int) e.number();
+				if( p != 1 ) {
+					ok = false;
+				} else { 
+					dropDatabase(ns);
+					ok = true;
+				}
+			}
+			else { 
+				cout << "TEMP CODE: dropdatabase commented out " << endl;
 			}
 		}
 		else if( strcmp(e.fieldName(), "profile") == 0 ) { 
@@ -836,7 +864,7 @@ assert( debug.getN() < 5000 );
 						}
 						if( ok ) {
 							n++;
-							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
+							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
 								(ntoreturn==0 && b.len()>1*1024*1024) ) {
 									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
 									if( wantMore && ntoreturn != 1 ) {
@@ -964,7 +992,7 @@ done:
 					}
 					if( ok ) {
 						n++;
-						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > 16*1024*1024)) ||
+						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
 							(ntoreturn==0 && b.len()>1*1024*1024) ) {
 								c->advance();
 								cc->pos += n;

@@ -24,6 +24,7 @@ public:
 		buf[0] = 0x7f;
 	}
 
+	bool operator==(const char *r) { return strcmp(buf, r) == 0; }
 	bool operator==(const Namespace& r) { return strcmp(buf, r.buf) == 0; }
 	int hash() const {
 		unsigned x = 0;
@@ -170,8 +171,6 @@ public:
 
 	/* just for diagnostics */
 	size_t detailsOffset(NamespaceDetails *d) { 
-	  cout << d << ' ' << ht->nodes << endl;
-	  cout << f.viewOfs() << endl;
 	  return ((char *) d) -  (char *) ht->nodes;
 	}
 

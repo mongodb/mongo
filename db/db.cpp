@@ -347,7 +347,7 @@ public:
    115 replay, opLogging
 */
 void listen(int port) { 
-	const char *Version = "db version: 118 27jun2008";
+	const char *Version = "db version: 119 30jun2008";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
@@ -510,16 +510,22 @@ void connThread()
 			client = 0;
 			curOp = 0;
 
+			int ms;
 			bool log = false;
 			curOp = m.data->operation;
 
-			/* use this if you only want to process operations for a particular namespace.  maybe add to cmd line parms or a #define 
-			   DbMessage ddd(m);
-			   if( strncmp(ddd.getns(), "grid", 4) != 0 ) { 
-			   cout << "TEMP skip " << ddd.getns() << '\n';
-			   }
-			   else
-			*/
+#if 0
+				/* use this if you only want to process operations for a particular namespace.  
+				maybe add to cmd line parms or something fancier.
+				*/
+				DbMessage ddd(m);
+				if( strncmp(ddd.getns(), "clusterstock", 12) != 0 ) { 
+					static int q;
+					if( ++q < 20 ) 
+						cout << "TEMP skip " << ddd.getns() << endl;
+					goto skip;
+				}
+#endif
 
 			if( m.data->operation == dbMsg ) { 
 				ss << "msg ";
@@ -611,19 +617,21 @@ void connThread()
 				assert(false);
 			}
 
-			int ms = t.millis();
+			ms = t.millis();
 			log = log || ctr++ % 512 == 0;
 			DEV log = true;
 			if( log || ms > 100 ) {
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;
 			}
+skip:
 			if( client && client->profile >= 1 ) { 
 				if( client->profile >= 2 || ms >= 100 ) { 
 					// profile it
 					profile(ss.str().c_str()+20/*skip ts*/, ms);
 				}
 			}
+
 		} /* end lock */
 		if( dbresponse.response ) 
 			dbMsgPort.reply(m, *dbresponse.response, dbresponse.responseTo);

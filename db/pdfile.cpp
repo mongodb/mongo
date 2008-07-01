@@ -72,6 +72,7 @@ int bucketSizes[] = {
 //NamespaceIndexMgr namespaceIndexMgr;
 
 void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) { 
+	dassert( dloc.drec() == d );
 	DEBUGGING cout << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
 	int b = bucket(d->lengthWithHeaders);
 	DiskLoc& list = deletedList[b];
@@ -262,6 +263,7 @@ void NamespaceDetails::compact() {
 }
 
 /* alloc with capped table handling. */
+int n_complaints_cap = 0;
 DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 	if( !capped )
 		return __stdAlloc(len);
@@ -273,6 +275,9 @@ DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 	DiskLoc loc;
 
 	// delete records until we have room and the max # objects limit achieved.
+	Extent *theExtent = firstExtent.ext(); // only one extent if capped.
+	dassert( theExtent->ns == ns ); 
+	theExtent->assertOk();
 	while( 1 ) {
 		if( nrecords < max ) { 
 			loc = __stdAlloc(len);
@@ -280,11 +285,16 @@ DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
 				break;
 		}
 
-		DiskLoc fr = firstExtent.ext()->firstRecord;
+		DiskLoc fr = theExtent->firstRecord;
 		if( fr.isNull() ) { 
-			cout << "couldn't make room for new record in capped ns " << ns 
-				<< " len: " << len << " extentsize:" << lastExtentSize << '\n';
-			assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
+			if( ++n_complaints_cap < 8 ) {
+				cout << "couldn't make room for new record in capped ns " << ns << '\n'
+					<< "  len: " << len << " extentsize:" << lastExtentSize << '\n';
+				cout << "  magic: " << hex << theExtent->magic << " extent->ns: " << theExtent->ns.buf << '\n';
+				cout << "  fr: " << theExtent->firstRecord.toString() << 
+					" lr: " << theExtent->lastRecord.toString() << " extent->len: " << theExtent->length << '\n';
+				assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
+			}
 			return DiskLoc();
 		}
 
@@ -584,7 +594,7 @@ auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
 	if( el.type() != Number || el.number() >= 0 )
 		return DataFileMgr::findAll(ns);
 
-	// "reverse natural order"		// "reverse natural order"
+	// "reverse natural order"
 	NamespaceDetails *d = nsdetails(ns);
 	if( !d )
 		return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
@@ -676,6 +686,8 @@ void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete, const
 
 void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK) 
 {
+	dassert( todelete == dl.rec() );
+
 	int tempextofs = todelete->extentOfs;
 
 	NamespaceDetails* d = nsdetails(ns);
@@ -755,6 +767,8 @@ void DataFileMgr::update(
 		Record *toupdate, const DiskLoc& dl,
 		const char *buf, int len, stringstream& ss) 
 {
+	dassert( toupdate == dl.rec() );
+
 	NamespaceDetails *d = nsdetails(ns);
 
 	if(  toupdate->netLength() < len ) {

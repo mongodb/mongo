@@ -37,6 +37,11 @@ void wasserted(const char *msg, const char *file, unsigned line);
 /* warning only - keeps going */
 #define wassert(_Expression) (void)( (!!(_Expression)) || (wasserted(#_Expression, __FILE__, __LINE__), 0) )
 
+/* dassert is 'debug assert' -- might want to turn off for production as these 
+   could be slow.
+*/
+#define dassert assert
+
 #include <stdio.h>
 #include <sstream>
 #include <signal.h>

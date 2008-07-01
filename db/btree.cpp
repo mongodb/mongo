@@ -244,7 +244,6 @@ void BtreeBucket::findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, in
 	DiskLoc loc = thisLoc;
 	while( 1 ) { 
 		BtreeBucket *b = loc.btree();
-//		b->dump();
 		if( !b->nextChild.isNull() ) { 
 			loc = b->nextChild;
 			continue;
@@ -347,6 +346,7 @@ found:
 
 /* note: may delete the entire bucket!  this invalid upon return sometimes. */
 void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p) { 
+	dassert( thisLoc.btree() == this );
 	assert(n>0);
 	DiskLoc left = childForPos(p);
 
@@ -403,6 +403,7 @@ inline void fix(const DiskLoc& thisLoc, const DiskLoc& child) {
 
 /* this sucks.  maybe get rid of parent ptrs. */
 void BtreeBucket::fixParentPtrs(const DiskLoc& thisLoc) { 
+	dassert( thisLoc.btree() == this );
 	fix(thisLoc, nextChild);
 	for( int i = 0; i < n; i++ )
 		fix(thisLoc, k(i).prevChildBucket);
@@ -414,6 +415,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 							 DiskLoc recordLoc, JSObj& key,
 							 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) 
 {
+	dassert( thisLoc.btree() == this );
 	if( insert_debug )
 		cout << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' ' 
 		<< lchild.toString() << ' ' << rchild.toString() << " keypos:" << keypos << endl;

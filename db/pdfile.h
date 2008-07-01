@@ -33,7 +33,6 @@ public:
 	PhysicalDataFile(int fn) : fileNo(fn) { }
 	void open(int fileNo, const char *filename);
 
-
 	Extent* newExtent(const char *ns, int approxSize, int loops = 0);
 private:
 	Extent* getExtent(DiskLoc loc);
@@ -42,8 +41,8 @@ private:
 
 	MemoryMappedFile mmf;
 	PDFHeader *header;
-int __unUsEd;
-//	int length;
+	int __unUsEd;
+	//	int length;
 	int fileNo;
 };
 
@@ -100,7 +99,7 @@ public:
 	DiskLoc getPrev(const DiskLoc& myLoc);
 };
 
-/* extents are regions where all the records within the region 
+/* extents are datafile regions where all the records within the region 
    belong to the same namespace.
 */
 class Extent {
@@ -110,7 +109,6 @@ public:
 	DiskLoc xnext, xprev; /* next/prev extent for this namespace */
 	Namespace ns; /* which namespace this extent is for.  this is just for troubleshooting really */
 	int length;   /* size of the extent, including these fields */
-	//	DiskLoc firstEmptyRegion;
 	DiskLoc firstRecord, lastRecord;
 	char extentData[4];
 
@@ -275,6 +273,7 @@ public:
 	DiskLoc curr;
 };
 
+/* used for order { $natural: -1 } */
 class ReverseCursor : public BasicCursor {
 public:
 	bool advance() { 
@@ -434,7 +433,7 @@ inline void _deleteDataFiles(const char *client) {
 	q = p / (c+"ns");
 	bool ok = boost::filesystem::remove(q);
 	if( ok ) 
-		cout << "removed file " << q.string() << endl;
+		cout << "  removed file " << q.string() << endl;
 	int i = 0;
 	int extra = 10; // should not be necessary, this is defensive in case there are missing files
 	while( 1 ) { 
@@ -443,9 +442,9 @@ inline void _deleteDataFiles(const char *client) {
 		ss << c << i;
 		q = p / ss.str();
 		if( boost::filesystem::remove(q) ) {
-			cout << "removed file " << q.string() << endl;
+			cout << "  removed file " << q.string() << endl;
 			if( extra != 10 ) 
-				cout << "WARNING: extra == " << extra << endl;
+				cout << "  WARNING: extra == " << extra << endl;
 		}
 		else if( --extra <= 0 ) 
 			break;
@@ -496,4 +495,3 @@ inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
 	assert( dl.a() != -1 );
 	return client->getFile(dl.a())->recordAt(dl);
 }
-
