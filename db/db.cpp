@@ -696,7 +696,13 @@ void pipeSigHandler( int signal ) {
   psignal( signal, "Signal Received : ");
 }
 
+int segvs = 0;
 void segvhandler(int x) {
+	if( ++segvs > 1 ) {
+		if( segvs == 2 ) 
+			cout << " got 2nd SIGSEGV" << endl;
+		return;
+	}
 	problem() << "got SIGSEGV " << x << ", terminating :-(" << endl;
 	sayDbContext();
 	MemoryMappedFile::closeAllFiles();
@@ -709,7 +715,7 @@ void mysighandler(int x) {
    problem() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
    {
 	   lock lk(dbMutex);
-	   problem() << "mysighandler now exiting" << endl;
+	   problem() << "  now exiting" << endl;
 	   exit(12);
    }
 }

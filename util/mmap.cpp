@@ -11,10 +11,17 @@ MemoryMappedFile::~MemoryMappedFile() {
 }
 
 /*static*/ 
+int closingAllFiles = 0;
 void MemoryMappedFile::closeAllFiles() { 
+	if( closingAllFiles ) {
+		cout << "warning closingAllFiles=" << closingAllFiles << endl;
+		return;
+	}
+	++closingAllFiles;
 	for( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
 		(*i)->close();
 	cout << "  closeAllFiles() finished" << endl;
+	--closingAllFiles;
 }
 
 #if defined(_WIN32) 
@@ -96,7 +103,6 @@ MemoryMappedFile::MemoryMappedFile() {
 }
 
 void MemoryMappedFile::close() {
-	mmfiles.erase(this);
 	if( view )
 		munmap(view, len);
 	view = 0;
@@ -114,7 +120,7 @@ void MemoryMappedFile::close() {
 void* MemoryMappedFile::map(const char *filename, int length) {
 	len = length;
 
-        fd = open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
+    fd = open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
 	if( !fd ) {
 		cout << "couldn't open " << filename << ' ' << errno << endl;
 		return 0;
@@ -148,6 +154,10 @@ void* MemoryMappedFile::map(const char *filename, int length) {
 	write(fd, "", 1);
 
 	view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if( view == MAP_FAILED ) { 
+		cout << "  mmap() failed for " << filename << " len:" << length << " errno:" << errno << endl;
+		return 0;
+	}
 	return view;
 }
 
