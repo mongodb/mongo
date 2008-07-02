@@ -18,6 +18,8 @@ extern int curOp;
 
 boost::mutex dbMutex;
 
+void closeAllSockets();
+
 struct MyStartupTests {
 	MyStartupTests() {
 		assert( sizeof(OID) == 12 );
@@ -705,6 +707,7 @@ void segvhandler(int x) {
 	}
 	problem() << "got SIGSEGV " << x << ", terminating :-(" << endl;
 	sayDbContext();
+	closeAllSockets();
 	MemoryMappedFile::closeAllFiles();
 	flushOpLog();
 }
@@ -913,6 +916,10 @@ int main(int argc, char* argv[], char *envp[] )
 void dbexit(int rc) { 
 	cout << "  dbexit: flushing op log and files" << endl;
 	flushOpLog();
+
+	/* must do this before unmapping mem or you may get a seg fault */
+	closeAllSockets();
+
 	MemoryMappedFile::closeAllFiles();
 	cout << "  dbexit: really exiting now" << endl;
 	exit(rc);

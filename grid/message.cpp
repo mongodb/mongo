@@ -58,9 +58,19 @@ struct MsgStart {
 	}
 } msgstart;
 
-MessagingPort::MessagingPort(int _sock, SockAddr& _far) : sock(_sock), farEnd(_far) { }
+set<MessagingPort*> ports;
+
+void closeAllSockets() { 
+	for( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
+		(*i)->shutdown();
+}
+
+MessagingPort::MessagingPort(int _sock, SockAddr& _far) : sock(_sock), farEnd(_far) { 
+	ports.insert(this);
+}
 
 MessagingPort::MessagingPort() {
+	ports.insert(this);
 	sock = -1;
 }
 
@@ -73,6 +83,7 @@ void MessagingPort::shutdown() {
 
 MessagingPort::~MessagingPort() { 
 	shutdown();
+	ports.erase(this);
 }
 
 bool MessagingPort::connect(SockAddr& _far)
