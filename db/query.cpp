@@ -154,10 +154,10 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 
 	if( strstr(ns, ".system.") ) {
 		if( strstr(ns, ".system.namespaces") ){ 
-			cout << "WARNING: delete on system namespace " << ns << endl;
+			cout << "info: delete on system namespace " << ns << '\n';
 		}
 		else if( strstr(ns, ".system.indexes") ) {
-			cout << "WARNING: delete on system namespace " << ns << endl;
+			cout << "info: delete on system namespace " << ns << '\n';
 		}
 		else { 
 			cout << "ERROR: attempt to delete in system namespace " << ns << endl;
@@ -636,14 +636,17 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			valid = true;
 			string dropNs = us + '.' + e.valuestr();
 			NamespaceDetails *d = nsdetails(dropNs.c_str());
-			cout << "CMD: clean " << dropNs << endl;
-			if( d ) { 
+			cout << "CMD: drop " << dropNs << endl;
+			if( d == 0 ) {
+				anObjBuilder.append("errmsg", "ns not found");
+			}
+			else if( d->nIndexes != 0 ) {
+				anObjBuilder.append("errmsg", "ns has indexes (not permitted on drop)");
+			}
+			else {
 				ok = true;
 				anObjBuilder.append("ns", dropNs.c_str());
 				client->namespaceIndex.kill(dropNs.c_str());
-			}
-			else {
-				anObjBuilder.append("errmsg", "ns not found");
 			}
 		}
 		else if( strcmp( e.fieldName(), "validate") == 0 ) { 
@@ -679,6 +682,8 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 							anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
 							anObjBuilder.append("msg", "all indexes deleted for collection");
 							cout << "  alpha implementation, space not reclaimed" << endl;
+							for( int i = 0; i < d->nIndexes; i++ )
+								d->indexes[i].kill();
 							d->nIndexes = 0;
 						}
 						else {
@@ -687,6 +692,13 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 							if( x >= 0 ) { 
 								cout << "  d->nIndexes was " << d->nIndexes << endl;
 								anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
+
+								/* note it is  important we remove the IndexDetails with this 
+								   call, otherwise, on recreate, the old one would be reused, and its
+								   IndexDetails::info ptr would be bad info.
+								*/
+								d->indexes[x].kill();
+
 								d->nIndexes--;
 								for( int i = x; i < d->nIndexes; i++ )
 									d->indexes[i] = d->indexes[i+1];

@@ -15,7 +15,6 @@ class Extent;
 class BtreeBucket;
 class JSObj;
 class PhysicalDataFile;
-class Bucket;
 
 class DiskLoc {
 	int fileNo; /* this will be volume, file #, etc. */
@@ -84,12 +83,15 @@ public:
 		return fileNo < b.fileNo;
 	}
 
+	/* get the "thing" associated with this disk location.
+	   it is assumed the object is what it is -- you must asure that: 
+	   think of this as an unchecked type cast.
+    */
 	JSObj obj() const;
 	Record* rec() const;
 	DeletedRecord* drec() const;
 	Extent* ext() const;
 	BtreeBucket* btree() const;
-	Bucket* bucket() const;
 
 	PhysicalDataFile& pdf() const;
 };

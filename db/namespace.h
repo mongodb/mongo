@@ -46,8 +46,14 @@ const int MaxIndexes = 10;
 class IndexDetails { 
 public:
 	DiskLoc head; /* btree head */
-	/* index info object. 
-	  { name:"nameofindex", ns:"parentnsname", key: {keypattobject} } 
+
+	/* Location of index info object. Format:
+
+ 	    { name:"nameofindex", ns:"parentnsname", key: {keypattobject} } 
+
+	   This object is in the system.indexes collection.  Note that since we 
+	   have a pointer to the object here, the object in system.indexes must 
+	   never move.
 	*/
 	DiskLoc info; 
 
@@ -70,6 +76,11 @@ public:
 		s += io.getStringField("name"); 
 		return s;
 	}
+
+	/* delete this index.  does NOT celan up the system catalog
+	   (system.indexes or system.namespaces) -- only NamespaceIndex.
+	*/
+	void kill();
 };
 
 extern int bucketSizes[];

@@ -342,11 +342,6 @@ inline BtreeBucket* DiskLoc::btree() const {
 	return (BtreeBucket*) rec()->data;
 }
 
-inline Bucket* DiskLoc::bucket() const { 
-	assert( fileNo != -1 );
-	return (Bucket*) rec()->data;
-}
-
 /*---------------------------------------------------------------------*/ 
 
 // customer, or rather a customer's database -- i guess down the line

@@ -113,7 +113,7 @@ bool MessagingPort::recv(Message& m) {
 	while( 1 ) {
 		int x = ::recv(sock, lenbuf, lft, 0);
 		if( x == 0 ) {
-			cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
+			DEV cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
 			m.reset();
 			return false;
 		}
@@ -151,7 +151,7 @@ bool MessagingPort::recv(Message& m) {
 	while( 1 ) {
 		int x = ::recv(sock, p, left, 0);
 		if( x == 0 ) {
-			cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
+			DEV cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
 			m.reset();
 			return false;
 		}

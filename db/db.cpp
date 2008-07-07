@@ -494,7 +494,7 @@ void connThread()
 		stringstream ss;
 
 		if( !dbMsgPort.recv(m) ) {
-			cout << "MessagingPort::recv(): returned false " << dbMsgPort.farEnd.toString() << endl;
+			cout << "end connection " << dbMsgPort.farEnd.toString() << endl;
 			dbMsgPort.shutdown();
 			break;
 		}

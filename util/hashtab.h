@@ -30,6 +30,7 @@ public:
 		Key k;
 		Type value;
 		bool inUse() { return hash != 0; }
+		void setUnused() { hash = 0; }
 	} *nodes;
 	int n;
 
@@ -85,8 +86,10 @@ public:
 	void kill(const Key& k) { 
 		bool found;
 		int i = _find(k, found);
-		if( i >= 0 && found )
+		if( i >= 0 && found ) {
 			nodes[i].k.kill();
+			nodes[i].setUnused();
+		}
 	}
 
 	void put(const Key& k, const Type& value) {

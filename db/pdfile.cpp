@@ -344,9 +344,17 @@ auto_ptr<Cursor> makeNamespaceCursor() {
 	return auto_ptr<Cursor>(new NamespaceCursor());
 }*/
 
-void newNamespace(const char *ns) {
+/* add a new namespace to the system catalog (<dbname>.system.namespaces).
+*/
+void addNewNamespaceToCatalog(const char *ns) {
 	cout << "New namespace: " << ns << endl;
-	if( strstr(ns, "system.namespaces") == 0 ) {
+	if( strstr(ns, "system.namespaces") ) { 
+		// system.namespaces holds all the others, so it is not explicitly listed in the catalog.
+		// TODO: fix above should not be strstr!
+		return;
+	}
+
+	{
 		JSObjBuilder b;
 		b.append("name", ns);
 		JSObj j = b.done();
@@ -370,15 +378,19 @@ int initialExtentSize(int len) {
 }
 
 // { ..., capped: true, size: ..., max: ... }
+// returns true if successful
 bool userCreateNS(const char *ns, JSObj& j, string& err) { 
 	if( nsdetails(ns) ) {
 		err = "collection already exists";
 		return false;
 	}
 
-	cout << j.toString() << endl;
+	cout << "create collection " << ns << ' ' << j.toString() << endl;
 
-	newNamespace(ns);
+	/* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
+             and then go back and set to ok : 1 after we are done.
+	*/
+	addNewNamespaceToCatalog(ns);
 
 	int ies = initialExtentSize(128);
 	Element e = j.findElement("size");
@@ -607,6 +619,16 @@ auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
 }
 
 void aboutToDelete(const DiskLoc& dl);
+
+/* delete this index.  does NOT celan up the system catalog
+   (system.indexes or system.namespaces) -- only NamespaceIndex.
+*/
+void IndexDetails::kill() { 
+	string ns = indexNamespace();
+	client->namespaceIndex.kill(ns.c_str());
+	head.setInvalid();
+	info.setInvalid();
+}
 
 /* Pull out the relevant key objects from obj, so we
    can index them.  Note that the set is multiple elements 
@@ -895,6 +917,8 @@ void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newReco
 	}
 }
 
+extern JSObj emptyObj;
+
 DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 	bool addIndex = false;
 	const char *sys = strstr(ns, "system.");
@@ -915,7 +939,10 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) {
-		newNamespace(ns);
+		addNewNamespaceToCatalog(ns);
+		/* todo: shouldn't be in the namespace catalog until after the allocations here work. 
+                 also if this is an addIndex, those checks should happen before this!
+		*/
 		client->newestFile()->newExtent(ns, initialExtentSize(len));
 		d = nsdetails(ns);
 	}
@@ -936,8 +963,15 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		}
 		tableToIndex = nsdetails(tabletoidxns);
 		if( tableToIndex == 0 ) {
-			cout << "user warning: ignoring add index, no such collection:" << tabletoidxns << endl;
-			return DiskLoc();
+			// try to create it
+			string err;
+			if( !userCreateNS(tabletoidxns, emptyObj, err) ) { 
+				cout << "ERROR: failed to create collection while adding its index. " << tabletoidxns << endl;
+				return DiskLoc();
+			}
+			tableToIndex = nsdetails(tabletoidxns);
+			cout << "info: creating collection " << tabletoidxns << " on add index\n";
+			assert( tableToIndex );
 		}
 		if( tableToIndex->nIndexes >= MaxIndexes ) { 
 			cout << "user warning: bad add index attempt, too many indexes for:" << tabletoidxns << endl;
