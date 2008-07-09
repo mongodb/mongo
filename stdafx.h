@@ -110,6 +110,7 @@ extern const char *curNs;
 extern unsigned occasion; 
 
 #define OCCASIONALLY if( ++occasion % 16 == 0 ) 
+#define RARELY if( ++occasion % 128 == 0 ) 
 
 #if defined(_WIN32)
 inline void our_debug_free(void *p) {

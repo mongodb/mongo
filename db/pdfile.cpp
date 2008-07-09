@@ -598,7 +598,7 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 		/* todo: if extent is empty, free it for reuse elsewhere. 
 		         that is a bit complicated have to clean up the freelists.
 		*/
-	    OCCASIONALLY cout << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead" << endl;
+	    RARELY cout << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
 		// find a nonempty extent
 		// it might be nice to free the whole extent here!  but have to clean up free recs then.
 		e = e->getNextExtent();

@@ -2,6 +2,8 @@
 #include "goodies.h"
 
 Nullstream nullstream;
+Logstream logstream;
+boost::mutex Logstream::mutex;
 
 unsigned occasion = 0;
 bool goingAway = false;

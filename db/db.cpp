@@ -16,7 +16,7 @@
 extern const char *dbpath;
 extern int curOp;
 
-/* only off if --nocursors which is for debugging. */
+/* only off if --nocursor which is for debugging. */
 bool useCursors = true;
 
 boost::mutex dbMutex;
@@ -352,7 +352,7 @@ public:
    115 replay, opLogging
 */
 void listen(int port) { 
-	const char *Version = "db version: 119 30jun2008";
+	const char *Version = "db version: 120 09jul2008 logging fix";
 	problem() << Version << endl;
 	cout << Version << endl;
 	pdfileInit();
