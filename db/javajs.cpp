@@ -500,7 +500,7 @@ int javajstest() {
     time_t end = time(0);
 
 	if( debug )
-		cout << "time : " << ( end - start ) << endl;
+		cout << "time : " << (unsigned) ( end - start ) << endl;
   }
   
   if ( debug ) cout << "func4 start" << endl;    

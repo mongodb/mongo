@@ -132,7 +132,9 @@ void* MemoryMappedFile::map(const char *filename, int length) {
 	/* make sure the file is the full desired length */
 	off_t filelen = lseek(fd, 0, SEEK_END);
 	if( filelen < length ) { 
-		cout << "map: file length=" << filelen << " want:" << length << endl;
+		cout << "map: file length=" << (unsigned) filelen << " want:";
+		cout << length;
+		cout << endl;
 		if( filelen != 0 ) { 
 			cout << "  failing mapping" << endl;
 			return 0;
