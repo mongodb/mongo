@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "goodies.h"
 
+Nullstream nullstream;
+
 unsigned occasion = 0;
 bool goingAway = false;
 

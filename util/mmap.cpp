@@ -80,8 +80,11 @@ void* MemoryMappedFile::map(const char *filename, int length) {
 	}
 
 	view = MapViewOfFile(maphandle, FILE_MAP_ALL_ACCESS, 0, 0, 0);
-	if( view == 0 )
-		cout << "MapViewOfFile failed " << filename << " errno:" << GetLastError() << endl;
+	if( view == 0 ) {
+		cout << "MapViewOfFile failed " << filename << " errno:";
+		cout << GetLastError();
+		cout << endl;
+	}
 
 	return view;
 }

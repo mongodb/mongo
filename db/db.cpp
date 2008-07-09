@@ -16,6 +16,9 @@
 extern const char *dbpath;
 extern int curOp;
 
+/* only off if --nocursors which is for debugging. */
+bool useCursors = true;
+
 boost::mutex dbMutex;
 
 void closeAllSockets();
@@ -882,6 +885,8 @@ int main(int argc, char* argv[], char *envp[] )
             else if (s && strcmp(s, "--appsrvpath") == 0) { 
                 appsrvPath = argv[++i];
             }
+			else if( s && strcmp(s, "--nocursors") == 0)
+				useCursors = false;
         }
         
         initAndListen(port, dbpath, appsrvPath);
@@ -900,7 +905,8 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  test2             run test2() - see code" << endl;
 	cout << "  dev               run in dev mode (diff db loc, diff port #)" << endl;
 	cout << endl << "Alternate Usage :" << endl;
-	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl << endl;
+	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
+	cout << " --nocursors" << endl << endl;
 	
 	goingAway = true;
 	return 0;

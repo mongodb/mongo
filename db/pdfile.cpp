@@ -72,6 +72,11 @@ int bucketSizes[] = {
 //NamespaceIndexMgr namespaceIndexMgr;
 
 void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) { 
+	{ 
+		// defensive code: try to make us notice if we reference a deleted record 
+		(unsigned&) (((Record *) d)->data) = 0xeeeeeeee;
+	}
+
 	dassert( dloc.drec() == d );
 	DEBUGGING cout << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
 	int b = bucket(d->lengthWithHeaders);
@@ -590,6 +595,9 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 	}
 
 	while( e->firstRecord.isNull() && !e->xnext.isNull() ) {
+		/* todo: if extent is empty, free it for reuse elsewhere. 
+		         that is a bit complicated have to clean up the freelists.
+		*/
 	    OCCASIONALLY cout << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead" << endl;
 		// find a nonempty extent
 		// it might be nice to free the whole extent here!  but have to clean up free recs then.

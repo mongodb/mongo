@@ -92,23 +92,9 @@ typedef struct _OWS {
 	char string[400];
 } *OWS;
 
-//extern ofstream problems;
-
 class Client;
 extern Client *client;
 extern const char *curNs;
-
-// not threadsafe
-inline ostream& problem() {
-	ostream& problems = cout;
-	time_t t;
-	time(&t);
-	string now(ctime(&t),0,20);
-	problems << "~ " << now;
-	if( client ) 
-		problems << curNs << ' ';
-	return problems;
-}
 
 /* for now, running on win32 means development not production -- 
    use this to log things just there.
@@ -147,3 +133,5 @@ void dbexit(int resultcode);
 using namespace boost::filesystem;          
 
 #include "util/goodies.h"
+#include "util/log.h"
+

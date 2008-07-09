@@ -21,6 +21,7 @@ const int MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 LRUishMap<JSObj,DiskLoc,5> lrutest(123);
 
 int nextCursorId = 1;
+extern bool useCursors;
 
 #pragma pack(push)
 #pragma pack(1)
@@ -881,7 +882,7 @@ assert( debug.getN() < 5000 );
 									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
 									if( wantMore && ntoreturn != 1 ) {
 										c->advance();
-										if( c->ok() ) {
+										if( c->ok() && useCursors ) {
 											// more...so save a cursor
 											ClientCursor *cc = new ClientCursor();
 											cc->c = c;
