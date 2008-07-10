@@ -354,7 +354,6 @@ public:
 void listen(int port) { 
 	const char *Version = "db version: 120 09jul2008 logging fix";
 	problem() << Version << endl;
-	cout << Version << endl;
 	pdfileInit();
 	testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections on port " << port << " ...\n" << endl;
@@ -736,6 +735,8 @@ void setupSignals() {}
 #endif
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
+	if( opLogging ) 
+		cout << "opLogging = " << opLogging << endl;
     _oplog.init();
 
 #if !defined(_WIN32)
@@ -792,9 +793,6 @@ int main(int argc, char* argv[], char *envp[] )
 		cout << "obj:" << q.toString() << '\n';
 	}
 */
-
-	if( opLogging ) 
-		cout << "WARNING: this build has oplog enabled at startup. opLogging=" << opLogging << endl;
 
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);
@@ -875,18 +873,27 @@ int main(int argc, char* argv[], char *envp[] )
         for (int i = 1; i < argc; i++)  {
     
             char *s = argv[i];
+			if( s == 0 ) continue;
             
-            if (s && strcmp(s, "--port") == 0) { 
+            if (strcmp(s, "--port") == 0) { 
                 port = atoi(argv[++i]);
             }
-            else if (s && strcmp(s, "--dbpath") == 0) { 
+            else if (strcmp(s, "--dbpath") == 0) { 
             	dbpath = argv[++i];
             }
-            else if (s && strcmp(s, "--appsrvpath") == 0) { 
+            else if (strcmp(s, "--appsrvpath") == 0) { 
                 appsrvPath = argv[++i];
             }
-			else if( s && strcmp(s, "--nocursors") == 0)
+			else if( strcmp(s, "--nocursors") == 0)
 				useCursors = false;
+			else if( strncmp(s, "--oplog", 7) == 0 ) { 
+				int x = s[7] - '0';
+				if( x < 0 || x > 7 ) { 
+					cout << "can't interpret --oplog setting" << endl;
+					exit(13);
+				}
+				opLogging = x;
+			}
         }
         
         initAndListen(port, dbpath, appsrvPath);
@@ -906,7 +913,9 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  dev               run in dev mode (diff db loc, diff port #)" << endl;
 	cout << endl << "Alternate Usage :" << endl;
 	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
-	cout << " --nocursors" << endl << endl;
+	cout << " --nocursors" << endl;
+	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
+	cout << endl;
 	
 	goingAway = true;
 	return 0;
