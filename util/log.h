@@ -24,6 +24,7 @@ class Logstream {
 	static boost::mutex mutex;
 public:
 	Logstream& operator<<(const char *x) LOGIT
+	Logstream& operator<<(char x) LOGIT
 	Logstream& operator<<(int x) LOGIT
 	Logstream& operator<<(unsigned long x) LOGIT
 	Logstream& operator<<(unsigned x) LOGIT

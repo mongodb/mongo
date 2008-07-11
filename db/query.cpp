@@ -474,8 +474,10 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	Element e = cmd.firstElement();
 	assert( e.type() == Code );
 	const char *code = e.valuestr();
-	if ( ! JavaJS )
-		JavaJS = new JavaJSImpl();
+	if ( ! JavaJS ) {
+		result.append("errmsg", "db side execution is disabled");
+		return false;
+	}
 
 	jlong f = JavaJS->functionCreate(code);
 	if( f == 0 ) { 

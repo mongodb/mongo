@@ -321,7 +321,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 			assert( where == 0 );
 			where = new Where();
 			const char *code = e.valuestr();
-			assert( JavaJS );
+			massert( "$where query, but jni is disabled", JavaJS );
 			where->scope = JavaJS->scopeCreate();
 			JavaJS->scopeSetString(where->scope, "$client", client->name.c_str());
 			where->setFunc(code);

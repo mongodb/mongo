@@ -13,10 +13,11 @@
 #include "query.h"
 #include "introspect.h"
 
+bool useJNI = true;
 extern const char *dbpath;
 extern int curOp;
 
-/* only off if --nocursor which is for debugging. */
+/* only off if --nocursors which is for debugging. */
 bool useCursors = true;
 
 boost::mutex dbMutex;
@@ -230,11 +231,9 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	}
 	catch( AssertionException ) { 
 		ss << " exception ";
-		problem() << " Caught Assertion in runQuery " << ns << endl; 
-		cout << " Caught Assertion in runQuery, continuing" << endl; 
-		cout << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << endl;
-		cout << "  ns:" << ns << endl;
-		cout << "  query:" << query.toString() << endl;
+		problem() << " Caught Assertion in runQuery ns:" << ns << endl; 
+		cout << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << '\n';
+		cout << "  query:" << query.toString() << '\n';
 		msgdata = (QueryResult*) malloc(sizeof(QueryResult));
 		QueryResult *qr = msgdata;
 		qr->_data[0] = 0;
@@ -445,7 +444,6 @@ void jniCallback(Message& m, Message& out)
 				}
 				catch( AssertionException ) { 
 					problem() << "Caught Assertion in kill cursors, continuing" << endl; 
-					cout << "Caught Assertion in kill cursors, continuing" << endl; 
 					ss << " exception ";
 				}
 			}
@@ -471,7 +469,6 @@ void jniCallback(Message& m, Message& out)
 	}
 	catch( AssertionException ) { 
 		problem() << "Caught AssertionException in jniCall()" << endl;
-		cout << "Caught AssertionException in jniCall()" << endl;
 	}
 
 	curOp = curOpOld;
@@ -569,7 +566,6 @@ void connThread()
 				}
 				catch( AssertionException ) { 
 					problem() << " Caught Assertion insert, continuing" << endl; 
-					cout << "Caught Assertion, continuing" << endl; 
 					ss << " exception ";
 				}
 			}
@@ -581,7 +577,6 @@ void connThread()
 				}
 				catch( AssertionException ) { 
 					problem() << " Caught Assertion update, continuing" << endl; 
-					cout << "Caught Assertion update, continuing" << endl; 
 					ss << " exception ";
 				}
 			}
@@ -593,7 +588,6 @@ void connThread()
 				}
 				catch( AssertionException ) { 
 					problem() << " Caught Assertion receivedDelete, continuing" << endl; 
-					cout << "Caught Assertion receivedDelete, continuing" << endl; 
 					ss << " exception ";
 				}
 			}
@@ -611,7 +605,6 @@ void connThread()
 					receivedKillCursors(m);
 				}
 				catch( AssertionException ) { 
-					cout << "Caught Assertion in kill cursors, continuing" << endl; 
 					problem() << " Caught Assertion in kill cursors, continuing" << endl; 
 					ss << " exception ";
 				}
@@ -735,7 +728,7 @@ void setupSignals() {}
 #endif
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
-	if( opLogging ) 
+  if( opLogging ) 
 		cout << "opLogging = " << opLogging << endl;
     _oplog.init();
 
@@ -768,8 +761,10 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
     cout << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
     problem() << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
 
-    JavaJS = new JavaJSImpl(appserverLoc);
-    javajstest();
+    if( useJNI ) {
+      JavaJS = new JavaJSImpl(appserverLoc);
+      javajstest();
+    }
 
 	setupSignals();
 
@@ -872,21 +867,20 @@ int main(int argc, char* argv[], char *envp[] )
 		
         for (int i = 1; i < argc; i++)  {
     
-            char *s = argv[i];
-			if( s == 0 ) continue;
-            
-            if (strcmp(s, "--port") == 0) { 
+			if( argv[i] == 0 ) continue;
+			string s = argv[i];
+
+			if( s == "--port" )
                 port = atoi(argv[++i]);
-            }
-            else if (strcmp(s, "--dbpath") == 0) { 
+			else if( s == "--nojni" )
+				useJNI = false;
+			else if( s == "--dbpath" )
             	dbpath = argv[++i];
-            }
-            else if (strcmp(s, "--appsrvpath") == 0) { 
+            else if( s == "--appsrvpath" )
                 appsrvPath = argv[++i];
-            }
-			else if( strcmp(s, "--nocursors") == 0)
+			else if( s == "--nocursors" ) 
 				useCursors = false;
-			else if( strncmp(s, "--oplog", 7) == 0 ) { 
+			else if( strncmp(s.c_str(), "--oplog", 7) == 0 ) { 
 				int x = s[7] - '0';
 				if( x < 0 || x > 7 ) { 
 					cout << "can't interpret --oplog setting" << endl;
@@ -913,7 +907,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  dev               run in dev mode (diff db loc, diff port #)" << endl;
 	cout << endl << "Alternate Usage :" << endl;
 	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
-	cout << " --nocursors" << endl;
+	cout << " --nocursors  --nojni" << endl;
 	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
 	cout << endl;
 	

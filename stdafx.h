@@ -23,6 +23,7 @@ public:
 
 void asserted(const char *msg, const char *file, unsigned line);
 void wasserted(const char *msg, const char *file, unsigned line);
+void msgasserted(const char *msg); 
 
 #ifdef assert
 #undef assert
@@ -36,6 +37,9 @@ void wasserted(const char *msg, const char *file, unsigned line);
 
 /* warning only - keeps going */
 #define wassert(_Expression) (void)( (!!(_Expression)) || (wasserted(#_Expression, __FILE__, __LINE__), 0) )
+
+// display a message, no context, and throw assertionexception
+#define massert(msg,_Expression) (void)( (!!(_Expression)) || (msgasserted(msg), 0) )
 
 /* dassert is 'debug assert' -- might want to turn off for production as these 
    could be slow.

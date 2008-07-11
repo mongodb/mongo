@@ -29,3 +29,8 @@ void asserted(const char *msg, const char *file, unsigned line) {
 	wasserted(msg, file, line);
 	throw AssertionException();
 }
+
+void msgasserted(const char *msg) {
+	cout << "Assertion: " << msg << '\n';
+	throw AssertionException();
+}
