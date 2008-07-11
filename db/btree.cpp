@@ -15,7 +15,7 @@ int insert_debug = 0;
 DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
 DiskLoc minDiskLoc(0, 1);
 
-inline KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
+KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
   prevChildBucket(k.prevChildBucket), 
   recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs()) 
 { }

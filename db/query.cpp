@@ -44,9 +44,10 @@ int runCount(const char *ns, JSObj& cmd, string& err);
    parameters
      query - the query, e.g., { name: 'joe' }
      order - order by spec, e.g., { name: 1 } 1=ASC, -1=DESC
-
+     simpleKeyMatch - set to true if the query is purely for a single key value
+                      unchanged otherwise.
 */
-auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) { 
+auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool *simpleKeyMatch = 0) { 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) return auto_ptr<Cursor>();
 
@@ -85,6 +86,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 		set<string> keyFields;
 		idxKey.getFieldNames(keyFields);
 		if( keyFields == queryFields ) {
+			bool simple = true;
 			JSObjBuilder b;
 			JSObj q = query.extractFields(idxKey, b);
 			/* regexp: only supported if form is /^text/ */
@@ -115,6 +117,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 
 				first = false;
 				if( e.type() == RegEx ) { 
+					simple = false;
 					if( *e.regexFlags() )
 						goto fail;
 					const char *re = e.regex();
@@ -140,18 +143,18 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order) {
 			}
 			JSObj q2 = b2.done();
 			DEV cout << "using index " << d->indexes[i].indexNamespace() << endl;
+			if( simple && simpleKeyMatch ) *simpleKeyMatch = true;
 			return auto_ptr<Cursor>( 
 				new BtreeCursor(d->indexes[i].head, q2, 1, true));
 		}
 	}
 
 fail:
+	DEV cout << "getIndexCursor fail" << endl;
 	return auto_ptr<Cursor>();
 }
 
 void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
-//	cout << "TEMP delete ns:" << ns << " queryobjsize:" << 
-//		pattern.objsize() << endl;
 
 	if( strstr(ns, ".system.") ) {
 		if( strstr(ns, ".system.namespaces") ){ 
@@ -176,7 +179,7 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 	int temp = 0;
 	int tempd = 0;
 
-DiskLoc _tempDelLoc;
+	DiskLoc _tempDelLoc;
 
 	while( c->ok() ) {
 		temp++;
@@ -185,7 +188,7 @@ DiskLoc _tempDelLoc;
 		DiskLoc rloc = c->currLoc();
 		c->advance(); // must advance before deleting as the next ptr will die
 		JSObj js(r);
-		//cout << "TEMP: " << js.toString() << endl;
+
 		bool deep;
 		if( !matcher.matches(js, &deep) ) {
 			if( c->tempStopOnMiss() )
@@ -773,24 +776,52 @@ int runCount(const char *ns, JSObj& cmd, string& err) {
 
 	JSObj query = cmd.getObjectField("query");
 
-	auto_ptr<Cursor> c;
-	if( query.isEmpty() ) {
-		c = getIndexCursor(ns, id_obj, empty_obj);
-	} else {
-		c = getIndexCursor(ns, query, empty_obj);
+	if( query.isEmpty() ) { 
+		// count of all objects
+		return (int) d->nrecords;
 	}
 
-	if( c.get() == 0 ) {
-		cout << "TEMP: table scan" << endl;
+	auto_ptr<Cursor> c;
+
+	bool simpleKeyToMatch = false;
+	c = getIndexCursor(ns, query, empty_obj, &simpleKeyToMatch);
+
+	if( c.get() ) {
+		if( simpleKeyToMatch ) { 
+			/* Here we only look at the btree keys to determine if a match, instead of looking 
+			   into the records, which would be much slower.
+			   */
+			int count = 0;
+			BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
+			if( c->ok() ) {
+				while( 1 ) {
+					if( !(query == bc->currKeyNode().key) )
+						break;
+					count++;
+					if( !c->advance() )
+						break;
+				}
+			}
+			return count;
+		}
+	} else {
 		c = findTableScan(ns, empty_obj);
 	}
-	else 
-		cout << "TEMP: indexed scan" << endl;
 
 	int count = 0;
-	if( c->ok() ) {
-		count++;
-		while( c->advance() ) count++;
+	auto_ptr<JSMatcher> matcher(new JSMatcher(query));
+	while( c->ok() ) {
+		JSObj js = c->current();
+		bool deep;
+		if( !matcher->matches(js, &deep) ) {
+			if( c->tempStopOnMiss() )
+				break;
+		}
+		else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+			// got a match.
+			count++;
+		}
+		c->advance();
 	}
 	return count;
 }
@@ -880,7 +911,14 @@ assert( debug.getN() < 5000 );
 						if( ok ) {
 							n++;
 							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-								(ntoreturn==0 && b.len()>1*1024*1024) ) {
+								(ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
+									/* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
+									   is only a size limit.  The idea is that on a find() where one doesn't use much results, 
+									   we don't return much, but once getmore kicks in, we start pushing significant quantities.
+
+									   The n limit (vs. size) is important when someone fetches only one small field from big 
+									   objects, which causes massive scanning server-side.
+									*/
 									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
 									if( wantMore && ntoreturn != 1 ) {
 										c->advance();
@@ -909,15 +947,6 @@ assert( debug.getN() < 5000 );
 			if( client->profile )
 				ss << "  nscanned:" << nscanned << ' ';
 		}
-		/*catch( AssertionException e ) { 
-			if( n )
-				throw e;
-			if( nCaught++ >= 1000 ) { 
-				cout << "Too many query exceptions, terminating" << endl;
-				exit(-8);
-			}
-			cout << " Assertion running query, returning an empty result" << endl;
-		}*/
 	}
 
 	QueryResult *qr = (QueryResult *) b.buf();

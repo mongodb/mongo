@@ -575,7 +575,9 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 
 /* JSObj ------------------------------------------------------------*/
 
-string JSObj::toString() const { 
+string JSObj::toString() const {
+	if( isEmpty() ) return "{}";
+
 	stringstream s;
 	s << "{ ";
 	JSElemIter i(*this);

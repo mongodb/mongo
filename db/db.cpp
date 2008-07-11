@@ -637,7 +637,7 @@ skip:
 	}
 	catch( AssertionException ) { 
 		problem() << "Uncaught AssertionException, terminating" << endl;
-		exit(-7);
+		exit(15);
 	}
 }
 
@@ -696,15 +696,19 @@ void pipeSigHandler( int signal ) {
 int segvs = 0;
 void segvhandler(int x) {
 	if( ++segvs > 1 ) {
-		if( segvs == 2 ) 
-			cout << " got 2nd SIGSEGV" << endl;
+		signal(x, SIG_DFL);
+		if( segvs == 2 ) {
+			cout << "\n\n\n got 2nd SIGSEGV" << endl;
+			sayDbContext();
+		}
 		return;
 	}
 	problem() << "got SIGSEGV " << x << ", terminating :-(" << endl;
 	sayDbContext();
-	closeAllSockets();
-	MemoryMappedFile::closeAllFiles();
-	flushOpLog();
+//	closeAllSockets();
+//	MemoryMappedFile::closeAllFiles();
+//	flushOpLog();
+	dbexit(14);
 }
 
 void mysighandler(int x) { 
@@ -776,6 +780,7 @@ int test2();
 
 int main(int argc, char* argv[], char *envp[] )
 {
+	DEV cout << "warning: DEV mode enabled\n";
 /*	struct { 
 		int x;
 		char ch;
@@ -896,7 +901,7 @@ int main(int argc, char* argv[], char *envp[] )
 		exit(0);
 	}
 
-	cout << "10gendb usage:\n";
+	cout << "Mongo db usage:\n";
 	cout << "  run               run db" << endl;
 	cout << "  msg end [port]    shut down db server listening on port (or default)" << endl;
 	cout << "  msg [msg] [port]  send a request to the db server listening on port (or default)" << endl;
