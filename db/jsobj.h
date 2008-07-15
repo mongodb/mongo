@@ -171,7 +171,11 @@ class JSObj {
 	class Details {
 	public:
         ~Details() {
-            if (refCount != -1) {
+            
+            assert(refCount <= 0);
+            
+            // note that the assert above protects owned() from lying to us.  If the assert() goes, fix this
+            if (owned()) {
                 free((void *)_objdata);
             }
             _objdata = 0;
