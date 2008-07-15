@@ -172,7 +172,7 @@ class JSObj {
 	public:
         ~Details() {
             if (refCount != -1) {
-                free(_objdata);
+                free((void *)_objdata);
             }
             _objdata = 0;
         }
