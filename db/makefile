@@ -1,9 +1,10 @@
 # makefile for our db project
 
-FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic 
+FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 
-LIB_DEPS = /opt/local/lib/libpcrecpp.a /opt/local/lib/libpcre.a
-LIB_BOOST = /opt/local/lib/libboost_thread.a /opt/local/lib/libboost_filesystem.a
+# set LIB_PREFIX in makefile.local (eg. /opt/local/lib/)
+LIB_DEPS = $(LIB_PREFIX)libpcrecpp.a $(LIB_PREFIX)libpcre.a
+LIB_BOOST = $(LIB_PREFIX)libboost_thread.a $(LIB_PREFIX)libboost_filesystem.a
 LIBS= $(LIB_DEPS)  $(LIB_BOOST) -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
