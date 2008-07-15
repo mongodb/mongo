@@ -170,7 +170,12 @@ class JSObj {
 	friend class JSElemIter;
 	class Details {
 	public:
-		~Details() { _objdata = 0; }
+        ~Details() {
+            if (refCount != -1) {
+                free(_objdata);
+            }
+            _objdata = 0;
+        }
 		const char *_objdata;
 		int _objsize;
 		int refCount; // -1 == don't free
