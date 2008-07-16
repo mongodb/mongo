@@ -155,7 +155,6 @@ fail:
 }
 
 void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
-
 	if( strstr(ns, ".system.") ) {
 		if( strstr(ns, ".system.namespaces") ){ 
 			cout << "info: delete on system namespace " << ns << '\n';
@@ -196,10 +195,10 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 		}
 		else { 
 			assert( !deep || !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
-//			cout << "  found match to delete" << endl;
 			if( !justOne )
 				c->noteLocation();
-_tempDelLoc = rloc;
+			_tempDelLoc = rloc;
+
 			theDataFileMgr.deleteRecord(ns, r, rloc);
 			tempd = temp;
 			if( justOne )

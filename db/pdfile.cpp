@@ -757,7 +757,18 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	{
 		d->nrecords--;
 		d->datasize -= todelete->netLength();
-		d->addDeletedRec((DeletedRecord*)todelete, dl);
+		/* temp: if in system.indexes, don't reuse, and zero out: we want to be 
+                 careful until validated more, as IndexDetails has pointers
+                 to this disk location.  so an incorrectly done remove would cause 
+                 a lot of problems. 
+        */
+		if( strstr(ns, ".system.indexes") ) { 
+			memset(todelete, 0, todelete->lengthWithHeaders);
+		}
+		else {
+			DEV memset(todelete->data, 0, todelete->netLength()); // attempt to notice invalid reuse.
+			d->addDeletedRec((DeletedRecord*)todelete, dl);
+		}
 	}
 }
 

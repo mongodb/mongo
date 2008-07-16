@@ -22,6 +22,10 @@ KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) :
 
 /* BucketBasics --------------------------------------------------- */
 
+int BucketBasics::Size() const { 
+	assert( _Size == BucketSize );
+	return _Size;
+}
 inline void BucketBasics::setNotPacked() { flags &= ~Packed; }
 inline void BucketBasics::setPacked() { flags |= Packed; }
 
@@ -91,10 +95,9 @@ int nDumped = 0;
 void BucketBasics::assertValid(bool force) { 
 	if( !debug && !force )
 		return;
-	wassert( n >= 0 && n < BucketSize );
+	wassert( n >= 0 && n < Size() );
 	wassert( emptySize >= 0 && emptySize < BucketSize );
 	wassert( topSize >= n && topSize <= BucketSize );
-	wassert( Size == BucketSize );
 	if( 1 ) {
 		// slow:
 		for( int i = 0; i < n-1; i++ ) {
@@ -139,12 +142,12 @@ inline void BucketBasics::markUnused(int keypos) {
 }
 
 inline int BucketBasics::totalDataSize() const {
-	return Size - (data-(char*)this);
+	return Size() - (data-(char*)this);
 }
 
 void BucketBasics::init(){
 	parent.Null(); nextChild.Null();
-	Size = BucketSize;
+	_Size = BucketSize;
 	flags = Packed;
 	n = 0;
 	emptySize = totalDataSize(); topSize = 0;
@@ -343,10 +346,18 @@ void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) {
 		assert(false);
 	}
 found:
+#if 1
+	/* as a temporary defensive measure, we zap the whole bucket, AND don't truly delete 
+       it (meaning it is ineligible for reuse).  temporary to see if it helps with some
+	   issues.
+	   */
+	memset(this, 0, Size());
+#else
 	//defensive:
 	n = -1;
 	parent.Null();
 	theDataFileMgr.deleteRecord(id.indexNamespace().c_str(), thisLoc.rec(), thisLoc);
+#endif
 }
 
 /* note: may delete the entire bucket!  this invalid upon return sometimes. */
@@ -520,7 +531,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 	r->nextChild = nextChild;
 	r->assertValid();
 //r->dump();
-	rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size, true);
+	rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size(), true);
 	if( split_debug )
 		cout << "     new rLoc:" << rLoc.toString() << endl;
 	free(r); r = 0;
@@ -541,7 +552,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 			p->pushBack(middle.recordLoc, middle.key, thisLoc);
 			p->nextChild = rLoc;
 			p->assertValid();
-			parent = idx.head = theDataFileMgr.insert(idx.indexNamespace().c_str(), p, p->Size, true);
+			parent = idx.head = theDataFileMgr.insert(idx.indexNamespace().c_str(), p, p->Size(), true);
 			if( split_debug )
 				cout << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
 			free(p);
@@ -595,7 +606,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 
 DiskLoc BtreeBucket::addHead(IndexDetails& id) {
 	BtreeBucket *p = allocTemp();
-	DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), p, p->Size, true);
+	DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), p, p->Size(), true);
 	free(p);
 	return loc;
 }

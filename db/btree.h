@@ -98,7 +98,7 @@ public:
 		ss << "    n: " << n << endl;
 		ss << "    parent: " << parent.toString() << endl;
 		ss << "    nextChild: " << parent.toString() << endl;
-		ss << "    Size: " << Size << " flags:" << flags << endl;
+		ss << "    Size: " << _Size << " flags:" << flags << endl;
 		ss << "    emptySize: " << emptySize << " topSize: " << topSize << endl;
 		return ss.str();
 	}
@@ -106,7 +106,8 @@ public:
 protected:
 	void _shape(int level, stringstream&);
 	DiskLoc nextChild; // child bucket off and to the right of the highest key.
-	int Size; // total size of this btree node in bytes. constant.
+	int _Size; // total size of this btree node in bytes. constant.
+	int Size() const;
 	int flags;
 	int emptySize; // size of the empty region
 	int topSize; // size of the data at the top of the bucket (keys are at the beginning or 'bottom')
