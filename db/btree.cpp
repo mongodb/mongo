@@ -591,6 +591,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 DiskLoc BtreeBucket::addHead(IndexDetails& id) {
 	BtreeBucket *p = allocTemp();
 	DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), p, p->Size, true);
+	free(p);
 	return loc;
 }
 
