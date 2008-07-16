@@ -113,7 +113,12 @@ void BucketBasics::assertValid(bool force) {
 				break;
 			}
 			else if( z == 0 ) { 
-				wassert( k(i).recordLoc < k(i+1).recordLoc );
+				if( !(k(i).recordLoc < k(i+1).recordLoc) ) {
+					cout << "ERROR: btree key order corrupt (recordloc's wrong).  Keys:" << endl;
+					cout << " k(" << i << "):" << keyNode(i).key.toString() << " RL:" << k(i).recordLoc.toString() << endl;
+					cout << " k(" << i+1 << "):" << keyNode(i+1).key.toString() << " RL:" << k(i+1).recordLoc.toString() << endl;
+					wassert( k(i).recordLoc < k(i+1).recordLoc );
+				}
 			}
 		}
 	}

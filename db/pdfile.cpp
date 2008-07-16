@@ -757,17 +757,6 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	{
 		d->nrecords--;
 		d->datasize -= todelete->netLength();
-///		DEBUGGING << "temp: dddelrec deleterecord " << ns << endl;
-//		if( todelete->extentOfs == 0xaca500 ) { 
-//			cout << "break\n";
-//		}
-/*
-TEMP: add deleted rec 0:aca5b0 aca500
-temp: adddelrec deleterecord admin.blog.posts
-TEMP: add deleted rec 0:b9e750 b6a500
-temp: adddelrec deleterecord admin.blog.posts
-*/
-
 		d->addDeletedRec((DeletedRecord*)todelete, dl);
 	}
 }

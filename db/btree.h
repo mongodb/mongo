@@ -18,16 +18,14 @@ struct _KeyNode {
 	void setKeyDataOfs(short s) { _kdo = s; assert(s>=0); }
 	void setKeyDataOfsSavingUse(short s) { _kdo = s; assert(s>=0); }
 	void setUnused() { 
-		/* setting ofs to 1 is the sentinel.  setInvalid sets the 
-		   fileno, that is defensive code. 
+		/* Setting ofs to odd is the sentinel for unused, as real recordLoc's are always 
+		   even numbers. 
+           Note we need to keep its value basically the same as we use the recordLoc 
+		   as part of the key in the index (to handle duplicate keys efficiently).
 		*/
-		recordLoc.setInvalid();
-		recordLoc.GETOFS() = 1; 
+		recordLoc.GETOFS() |= 1; 
 	}
-	/* & 1 for backward compatibility.  can be made "== 1" later when we increment
-	   the db data version 
-    */
-	int isUnused() { return (recordLoc.getOfs() & 1); }
+	int isUnused() { return recordLoc.getOfs() & 1; }
 	int isUsed() { return !isUnused(); }
 };
 
