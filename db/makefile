@@ -2,9 +2,9 @@
 
 FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 
-# set LIB_PREFIX in makefile.local (eg. /opt/local/lib/)
-LIB_DEPS = $(LIB_PREFIX)libpcrecpp.a $(LIB_PREFIX)libpcre.a
-LIB_BOOST = $(LIB_PREFIX)libboost_thread.a $(LIB_PREFIX)libboost_filesystem.a
+LIB_DEPS = -lpcrecpp -lpcre
+LIB_BOOST = -lboost_thread -lboost_filesystem
+
 LIBS= $(LIB_DEPS)  $(LIB_BOOST) -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
