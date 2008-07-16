@@ -480,6 +480,9 @@ void jniCallback(Message& m, Message& out)
 	}
 }
 
+/* we create one thread for each connection from an app server client.  
+   app server will open a pool of threads.
+*/
 void connThread()
 {
 	try { 

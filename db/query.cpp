@@ -829,6 +829,7 @@ int runCount(const char *ns, JSObj& cmd, string& err) {
 QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) 
 {
+	time_t t = time(0);
 	bool wantMore = true;
 	int ntoreturn = _ntoreturn;
 	if( _ntoreturn < 0 ) { 
@@ -836,10 +837,6 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		wantMore = false;
 	}
 	ss << "query " << ns << " ntoreturn:" << ntoreturn;
-	if( ntoskip ) 
-		ss << " ntoskip:" << ntoskip;
-	if( client->profile )
-		ss << "<br>query: " << jsobj.toString() << ' ';
 
 	int n = 0;
 	BufBuilder b(32768);
@@ -963,6 +960,11 @@ assert( debug.getN() < 5000 );
 	qr->nReturned = n;
 	b.decouple();
 
+	if( (client && client->profile) || time(0)-t > 5 ) {
+		if( ntoskip ) 
+			ss << " ntoskip:" << ntoskip;
+		ss << " <br>query: " << jsobj.toString() << ' ';
+	}
 	ss << " nreturned:" << n;
 	return qr;
 }
