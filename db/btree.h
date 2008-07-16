@@ -17,8 +17,16 @@ struct _KeyNode {
 	unsigned short _kdo;
 	void setKeyDataOfs(short s) { _kdo = s; assert(s>=0); }
 	void setKeyDataOfsSavingUse(short s) { _kdo = s; assert(s>=0); }
-	void setUnused() { recordLoc.GETOFS() |= 1; }
-//	void setUsed() { _kdo &= 0x7fff; }
+	void setUnused() { 
+		/* setting ofs to 1 is the sentinel.  setInvalid sets the 
+		   fileno, that is defensive code. 
+		*/
+		recordLoc.setInvalid();
+		recordLoc.GETOFS() = 1; 
+	}
+	/* & 1 for backward compatibility.  can be made "== 1" later when we increment
+	   the db data version 
+    */
 	int isUnused() { return (recordLoc.getOfs() & 1); }
 	int isUsed() { return !isUnused(); }
 };

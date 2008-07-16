@@ -170,16 +170,7 @@ class JSObj {
 	friend class JSElemIter;
 	class Details {
 	public:
-        ~Details() {
-            
-            assert(refCount <= 0);
-            
-            // note that the assert above protects owned() from lying to us.  If the assert() goes, fix this
-            if (owned()) {
-                free((void *)_objdata);
-            }
-            _objdata = 0;
-        }
+		~Details() { _objdata = 0; }
 		const char *_objdata;
 		int _objsize;
 		int refCount; // -1 == don't free
@@ -233,8 +224,8 @@ public:
 	JSObj extractFields(JSObj pattern, JSObjBuilder& b);
 
 	const char *objdata() const { return details->_objdata; }
-	int objsize() const { return details->_objsize; } // includes the embedded size field
-	bool isEmpty() const { return details == 0 || objsize() <= 5; }
+	int objsize() const { return details ? details->_objsize : 0; } // includes the embedded size field
+	bool isEmpty() const { return objsize() <= 5; }
 
 	/* this is broken if elements aren't in the same order. */
 	bool operator<(const JSObj& r) const { return woCompare(r) < 0; }
@@ -244,7 +235,9 @@ public:
 	*/
 	int woCompare(const JSObj& r) const;
 	bool woEqual(const JSObj& r) const { 
-		return objsize()==r.objsize() && memcmp(objdata(),r.objdata(),objsize())==0;
+		int os = objsize();
+		return os == r.objsize() &&
+			(os == 0 || memcmp(objdata(),r.objdata(),os)==0);
 	}
 	bool operator==(const JSObj& r) const { 
 		return this->woEqual(r);

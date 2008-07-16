@@ -717,8 +717,6 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 {
 	dassert( todelete == dl.rec() );
 
-	int tempextofs = todelete->extentOfs;
-
 	NamespaceDetails* d = nsdetails(ns);
 	if( d->capped && !cappedOK ) { 
 		cout << "failing remove on a capped ns " << ns << endl;

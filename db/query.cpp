@@ -150,7 +150,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 	}
 
 fail:
-	DEV cout << "getIndexCursor fail" << endl;
+	DEV cout << "getIndexCursor fail " << ns << '\n';
 	return auto_ptr<Cursor>();
 }
 

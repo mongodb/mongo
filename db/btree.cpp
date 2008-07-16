@@ -866,34 +866,48 @@ void BtreeCursor::noteLocation() {
 	}
 }
 
-int clctr = 0;
+/* Since the last noteLocation(), our key may have moved around, and that old cached 
+   information may thus be stale and wrong (although often it is right).  We check 
+   that here; if we have moved, we have to search back for where we were at.
 
-/* see if things moved around (deletes, splits, inserts) */
+   i.e., after operations on the index, the BtreeCursor's cached location info may 
+   be invalid.  This function ensures validity, so you should call it before using 
+   the cursor if other writers have used the database since the last noteLocation
+   call.
+*/
 void BtreeCursor::checkLocation() { 
-	try {
+	{
 		if( eof() ) 
 			return;
-		BtreeBucket *b = bucket.btree();
+		BtreeBucket *b = bucket.btree(); 
+
+		assert( !keyAtKeyOfs.isEmpty() ); 
+
+		// Note keyAt() returns an empty JSObj if keyOfs is now out of range, 
+		// which is possible as keys may have been deleted.
 		if( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
 			b->k(keyOfs).recordLoc == locAtKeyOfs ) { 
-			if( !b->k(keyOfs).isUsed() )
-				checkUnused();
-			return;
+				if( !b->k(keyOfs).isUsed() ) {
+					/* we were deleted but still exist as an unused 
+					   marker key. advance. 
+					*/
+					checkUnused();
+				}
+				return;
 		}
 	}
-	catch( AssertionException ) { 
-		cout << "Caught exception in checkLocation(), that's maybe ok" << endl;
-	}
+
+	/* normally we don't get to here.  when we do, old position is no longer
+ 	   valid and we must refind where we left off (which is expensive)
+	*/
 
 	bool found;
 	DiskLoc bold = bucket;
 
-/* TODO: Switch to keep indexdetails and do idx.head! */
-	/* didn't find, check from the top */
+	/* TODO: Switch to keep indexdetails and do idx.head! */
 	DiskLoc head = bold.btree()->getHead(bold);
 	bucket = head.btree()->locate(head, keyAtKeyOfs, keyOfs, found, locAtKeyOfs, direction);
-	if( clctr++ % 128 == 0 )
-		cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
+	RARELY cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
 	if( found )
 		checkUnused();
 }
