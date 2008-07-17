@@ -88,9 +88,9 @@ class Element {
 	friend class JSObj;
 public:
 	string toString();
-	JSType type() { return (JSType) *data; }
-	bool eoo() { return type() == EOO; }
-	int size();
+	JSType type() const { return (JSType) *data; }
+	bool eoo() const { return type() == EOO; }
+	int size() const;
 
 	// wrap this element up as a singleton object.
 	JSObj wrap();
@@ -102,26 +102,27 @@ public:
 
 	// raw data be careful:
 	const char * value() const { return (data + fieldNameSize + 1); }
-	int valuesize() { return size() - fieldNameSize - 1; } 
+	int valuesize() const { return size() - fieldNameSize - 1; } 
 
 	bool boolean() { return *value() ? true : false; }
 
-	unsigned long long date() { return *((unsigned long long*) value()); }
+	unsigned long long date() const { return *((unsigned long long*) value()); }
 	double& number() { return *((double *) value()); }
+	double number() const { return *((double *) value()); }
 	OID& oid() { return *((OID*) value()); }
 
 	// for strings
-	int valuestrsize() { 
+	int valuestrsize() const { 
 		return *((int *) value());
 	}
 
 	// for objects the size *includes* the size of the size field
-	int objsize() { 
+	int objsize() const { 
 		return *((int *) value());
 	}
 
 	// for strings.  also gives you start of the real data for an embedded object
-	const char * valuestr() { return value() + 4; }
+	const char * valuestr() const { return value() + 4; }
 
 	JSObj embeddedObject();
 
@@ -163,14 +164,24 @@ private:
 	}
 	const char *data;
 	int fieldNameSize;
-	int totalSize;
+	int totalSize; /* caches the computed size */
 };
+
+/* l and r MUST have same type when called: check that first. */
+int compareElementValues(const Element& l, const Element& r);
 
 class JSObj {
 	friend class JSElemIter;
 	class Details {
 	public:
-		~Details() { _objdata = 0; }
+        ~Details() {
+			// note refCount means two different things (thus the assert here)
+            assert(refCount <= 0);
+            if (owned()) {
+                free((void *)_objdata);
+            }
+            _objdata = 0;
+        }
 		const char *_objdata;
 		int _objsize;
 		int refCount; // -1 == don't free
@@ -424,8 +435,9 @@ class Where;
    { a : 3 } is the pattern object.
 
    GT/LT:
-   { a : { $gt
+   { a : { $gt : 3 } } 
 
+   TODO: we should rewrite the matcher to be more an AST style.
 */
 class JSMatcher : boost::noncopyable { 
 	int matchesDotted(
@@ -433,13 +445,24 @@ class JSMatcher : boost::noncopyable {
 		Element& toMatch, JSObj& obj, 
 		int compareOp, bool *deep, bool isArr = false);
 
+	struct element_lt
+	{
+		bool operator()(const Element& l, const Element& r) const
+		{
+			int x = (int) l.type() - (int) r.type();
+			if( x < 0 ) return true;
+			if( x > 0 ) return false;
+			return compareElementValues(l,r) < 0;
+		}
+	};
 public:
 	enum { 
 		Equality = 0,
 		LT = 0x1,
 		LTE = 0x3,
 		GTE = 0x6,
-		GT = 0x4 
+		GT = 0x4, 
+		opIN = 0x8 // { x : { $in : [1,2,3] } }
 	};
 
 	static int opDirection(int op) { 
@@ -458,6 +481,7 @@ public:
 private:
 	int valuesMatch(Element& l, Element& r, int op);
 
+	set<Element,element_lt> *in;
 	Where *where;
 	JSObj& jsobj;
 	vector<Element> toMatch;

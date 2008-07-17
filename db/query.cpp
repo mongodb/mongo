@@ -106,6 +106,10 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 							// compound keys with GT/LT not supported yet via index.
 							goto fail;
 						}
+						if( op >= JSMatcher::opIN ) {
+							// $in does not use an index (at least yet, should when # of elems is tiny)
+							goto fail;
+						}
 						int direction = - JSMatcher::opDirection(op);
 						return auto_ptr<Cursor>( new BtreeCursor(
 							d->indexes[i].head, 
