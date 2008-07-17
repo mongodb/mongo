@@ -103,7 +103,7 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
     ss << colon << getenv( "CLASSPATH" );
 
   string s = ss.str();
-  char * p = (char *)safemalloc( s.size() * 4 );
+  char * p = (char *)malloc( s.size() * 4 );
   strcpy( p , s.c_str() );
   char *q = p;
 #if defined(_WIN32)
@@ -288,7 +288,7 @@ JSObj JavaJSImpl::scopeGetObject( jlong id , const char * field )
 {
   int guess = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _getEnv()->NewStringUTF( field ) );
 
-  char * buf = (char *) safemalloc(guess);
+  char * buf = (char *) malloc(guess);
   jobject bb = _getEnv()->NewDirectByteBuffer( (void*)buf , guess );
   jassert( bb );
   

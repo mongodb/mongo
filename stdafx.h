@@ -140,11 +140,3 @@ using namespace boost::filesystem;
 #include "util/goodies.h"
 #include "util/log.h"
 
-inline void * safemalloc( size_t s ){
-  void * d = malloc( s );
-  if ( ! d ){
-    cerr << "malloc failed" << endl;
-    assert( 0 );
-  }
-  return d;
-}

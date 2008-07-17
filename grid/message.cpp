@@ -138,7 +138,7 @@ bool MessagingPort::recv(Message& m) {
 	}
         
 	int z = (len+1023)&0xfffffc00; assert(z>=len);
-	MsgData *md = (MsgData *) safemalloc(z);
+	MsgData *md = (MsgData *) malloc(z);
 	md->len = len;
         
 	if ( len <= 0 ){
