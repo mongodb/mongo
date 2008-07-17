@@ -510,7 +510,7 @@ inline JSObj JSObj::copy() {
 	if( isEmpty() )
 		return *this;
 
-	char *p = (char*) malloc(objsize());
+	char *p = (char*) safemalloc(objsize());
 	memcpy(p, objdata(), objsize());
 	return JSObj(p, true);
 }

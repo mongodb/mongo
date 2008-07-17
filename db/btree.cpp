@@ -404,7 +404,7 @@ bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, JSObj& key, 
 }
 
 BtreeBucket* BtreeBucket::allocTemp() { 
-	BtreeBucket *b = (BtreeBucket*) malloc(BucketSize);
+	BtreeBucket *b = (BtreeBucket*) safemalloc(BucketSize);
 	b->init();
 	return b;
 }

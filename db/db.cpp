@@ -234,7 +234,7 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 		problem() << " Caught Assertion in runQuery ns:" << ns << endl; 
 		cout << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << '\n';
 		cout << "  query:" << query.toString() << '\n';
-		msgdata = (QueryResult*) malloc(sizeof(QueryResult));
+		msgdata = (QueryResult*) safemalloc(sizeof(QueryResult));
 		QueryResult *qr = msgdata;
 		qr->_data[0] = 0;
 		qr->_data[1] = 0;
@@ -411,7 +411,7 @@ void jniCallback(Message& m, Message& out)
 				// on a query, the Message must have m.freeIt true so that the buffer data can be 
 				// retained by cursors.  As freeIt is false, we make a copy here.
 				assert( m.data->len > 0 && m.data->len < 32000000 );
-				Message copy(malloc(m.data->len), true);
+				Message copy(safemalloc(m.data->len), true);
 				memcpy(copy.data, m.data, m.data->len);
 				DbResponse dbr;
 				receivedQuery(dbr, copy, ss, false);
@@ -749,7 +749,7 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
      */
     
     if (dbPath && dbPath[strlen(dbPath)-1] != '/') {
-    	char *t = (char *) malloc(strlen(dbPath) + 2);
+    	char *t = (char *) safemalloc(strlen(dbPath) + 2);
     	
     	strcpy(t, dbPath);
     	strcat(t, "/");
