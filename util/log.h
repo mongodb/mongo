@@ -53,4 +53,3 @@ extern Logstream logstream;
 inline Logstream& problem() { return logstream.prolog(); }
 
 #define cout logstream
-

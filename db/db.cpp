@@ -930,8 +930,8 @@ int main(int argc, char* argv[], char *envp[] )
 //#endif
 
 #undef exit
-void dbexit(int rc) { 
-	cout << "  dbexit: flushing op log and files" << endl;
+void dbexit(int rc, const char *why) { 
+	cout << "  dbexit: " << why << "; flushing op log and files" << endl;
 	flushOpLog();
 
 	/* must do this before unmapping mem or you may get a seg fault */

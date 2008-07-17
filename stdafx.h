@@ -11,6 +11,25 @@ const bool debug=true;
 const bool debug=false;
 #endif
 
+#include <memory>
+
+extern void dbexit(int returnCode, const char *whyMsg = "");
+
+inline void * ourmalloc(size_t size) { 
+	void *x = malloc(size);
+	if( x == 0 ) dbexit(42, "malloc fails");
+	return x;
+}
+
+inline void * ourrealloc(void *ptr, size_t size) { 
+	void *x = realloc(ptr, size);
+	if( x == 0 ) dbexit(43, "realloc fails");
+	return x;
+}
+
+#define malloc ourmalloc
+#define realloc ourrealloc
+
 #include "targetver.h"
 
 //#include "assert.h"
@@ -126,7 +145,6 @@ inline void our_debug_free(void *p) {
 #define free our_debug_free
 #endif
 
-void dbexit(int resultcode);
 #define exit dbexit
 
 #undef yassert
