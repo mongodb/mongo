@@ -363,45 +363,59 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 		//            { a : { $in : [1,2,3] } }
 		if( e.type() == Object ) {
 			// e.g., fe == { $gt : 3 }
-			Element fe = e.embeddedObject().firstElement();
-			const char *fn = fe.fieldName();
-			if( fn[0] == '$' && fn[1] ) { 
-				if( fn[2] == 't' ) { 
-					int op = Equality;
-					if( fn[1] == 'g' ) { 
-						if( fn[3] == 0 ) op = GT;
-						else if( fn[3] == 'e' && fn[4] == 0 ) op = GTE;
+			JSElemIter j(e.embeddedObject());
+			bool ok = false;
+			while( j.more() ) {
+				Element fe = j.next();
+				if( fe.eoo() ) 
+					break;
+				// Element fe = e.embeddedObject().firstElement();
+				const char *fn = fe.fieldName();
+				if( fn[0] == '$' && fn[1] ) { 
+					if( fn[2] == 't' ) { 
+						int op = Equality;
+						if( fn[1] == 'g' ) { 
+							if( fn[3] == 0 ) op = GT;
+							else if( fn[3] == 'e' && fn[4] == 0 ) op = GTE;
+						}
+						else if( fn[1] == 'l' ) { 
+							if( fn[3] == 0 ) op = LT;
+							else if( fn[3] == 'e' && fn[4] == 0 ) op = LTE;
+						}
+						if( op && nBuilders < 8) { 
+							JSObjBuilder *b = new JSObjBuilder();
+							builders[nBuilders++] = b;
+							b->appendAs(fe, e.fieldName());
+							toMatch.push_back( b->done().firstElement() );
+							compareOp.push_back(op);
+							n++;
+							ok = true;
+						}
 					}
-					else if( fn[1] == 'l' ) { 
-						if( fn[3] == 0 ) op = LT;
-						else if( fn[3] == 'e' && fn[4] == 0 ) op = LTE;
-					}
-					if( op && nBuilders < 8) { 
-						JSObjBuilder *b = new JSObjBuilder();
-						builders[nBuilders++] = b;
-						b->appendAs(fe, e.fieldName());
-						toMatch.push_back( b->done().firstElement() );
-						compareOp.push_back(op);
+					else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 && fe.type() == Array ) {
+						// $in
+						assert( in == 0 ); // only one per query supported so far.  finish...
+						in = new set<Element,element_lt>();
+						JSElemIter i(fe.embeddedObject());
+						while( i.more() )
+							in->insert(i.next());
+						toMatch.push_back(e); // not actually used at the moment
+						compareOp.push_back(opIN);
 						n++;
-						continue;
+						ok = true;
 					}
 				}
-				else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 && fe.type() == Array ) {
-					// $in
-					assert( in == 0 ); // only one per query supported so far.  finish...
-					in = new set<Element,element_lt>();
-					JSElemIter i(fe.embeddedObject());
-					while( i.more() )
-						in->insert(i.next());
-					toMatch.push_back(e); // not actually used at the moment
-					compareOp.push_back(opIN);
-					n++;
-					continue;
+				else {
+					ok = false;
+					break;
 				}
 			}
+			if( ok ) 
+				continue;
 		}
 
 		{
+			// normal, simple case e.g. { a : "foo" }
 			toMatch.push_back(e);
 			compareOp.push_back(Equality);
 			n++;

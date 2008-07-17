@@ -110,6 +110,22 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 							// $in does not use an index (at least yet, should when # of elems is tiny)
 							goto fail;
 						}
+
+						{
+							JSElemIter k(e.embeddedObject());
+							k.next();
+							if( !k.next().eoo() ) { 
+								/* compound query like { $lt : 9, $gt : 2 } 
+								   for those our method below won't work.
+								   need more work on "stopOnMiss" in general -- may
+								   be issues with it.  so fix this to use index after
+								   that is fixed. 
+								*/
+								OCCASIONALLY cout << "finish query optimizer for lt gt compound\n";
+								goto fail;
+							}
+						}
+
 						int direction = - JSMatcher::opDirection(op);
 						return auto_ptr<Cursor>( new BtreeCursor(
 							d->indexes[i].head, 
