@@ -19,6 +19,11 @@ RUNNING
 
 Run ./db and command line options will display.
 
+COMPILER VERSIONS
+
+Mongo has been tested with GCC 4.1.2 and Visual Studio 2008.  Older versions
+of GCC may not be happy.
+
 NOTES
 
 Mongo uses the 10gen appserver and the Java Virtual Machine to execute 
