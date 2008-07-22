@@ -61,20 +61,19 @@ struct OID {
       totalSize includes itself.
 
    Data:
-     Bool: <byte>
-     EOO: nothing follows
+     Bool:      <byte>
+     EOO:       nothing follows
      Undefined: nothing follows
-     OID: an OID object
-     Number: <double>
-     String: <unsigned32 strsizewithnull><cstring>
-	 Date:   <8bytes>
-	 Regex:  <cstring regex><cstring options>
-     Object: a nested object, leading with its entire size, which terminates with EOO.
-     Array:  same as object
-     BinData:
-       <int len>
-       <byte subtype>
-       <byte[len] data>
+     OID:       an OID object
+	 Number:    <double>
+     String:    <unsigned32 strsizewithnull><cstring>
+	 Date:      <8bytes>
+	 Regex:     <cstring regex><cstring options>
+     Object:    a nested object, leading with its entire size, which terminates with EOO.
+     Array:     same as object
+	 DBRef:     <strlen> <cstring ns> <oid>
+       DBRef is a database reference: basically a collection name plus an Object ID
+     BinData:   <int len> <byte subtype> <byte[len] data>
 */
 
 /* db operation message format 
@@ -413,6 +412,11 @@ private:
 	BufBuilder b;
 };
 
+/* iterator for a JSObj 
+
+   Note each JSObj ends with an EOO element: so you will get more() on an empty 
+   object, although next().eoo() will be true.
+*/
 class JSElemIter {
 public:
 	JSElemIter(const JSObj& jso) {

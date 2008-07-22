@@ -891,6 +891,17 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		if( query.isEmpty() && order.isEmpty() )
 			query = jsobj;
 
+		/* The ElemIter will not be happy if this isn't really an object. So throw exception
+		   here when that is true.
+ 		   (Which may indicate bad data from appserver?)
+		*/
+		if( query.objsize() == 0 ) { 
+			cout << "Bad query object?\n  jsobj:";
+			cout << jsobj.toString() << "\n  query:";
+			cout << query.toString() << endl;
+			assert(false);
+		}
+
 		auto_ptr<JSMatcher> matcher(new JSMatcher(query));
 		JSMatcher &debug1 = *matcher;
 		assert( debug1.getN() < 5000 );

@@ -153,10 +153,18 @@ string Element::toString() {
 			s << '"' << valuestr() << '"';
 		}
 		break;
+	case DBRef: 
+		s << fieldName();
+		s << " : DBRef('" << valuestr() << "',";
+		{
+			OID *x = (OID *) (valuestr() + valuestrsize());
+			s << hex << x->a << x->b << dec << ')';
+		}
+		break;
 	case jstOID: 
-          s << fieldName() << " : ObjId(";
-          s << hex << oid().a << hex << oid().b << ')';
-          break;
+		s << fieldName() << " : ObjId(";
+		s << hex << oid().a << oid().b << dec << ')';
+		break;
     default:
 		s << fieldName() << ": ?type=" << type();
 		break;
