@@ -139,7 +139,7 @@ extern const char *curNs;
    use this to log things just there.
 */
 #if defined(_WIN32)
-#define DEV if( 1 ) 
+#define DEV if( 0 ) 
 #else
 #define DEV if( 0 ) 
 #endif

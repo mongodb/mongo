@@ -108,7 +108,7 @@ long long ClientCursor::allocCursorId() {
 	while( 1 ) {
 		x = (((long long)rand()) << 32);
 		x = x | ctm | 0x80000000; // OR to make sure not zero
-		if( ctm != ctmLast || ClientCursor::find(x) == 0 )
+		if( ctm != ctmLast || ClientCursor::find(x, false) == 0 )
 			break;
 	}
 	ctmLast = ctm;

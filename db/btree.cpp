@@ -114,7 +114,7 @@ void BucketBasics::assertValid(bool force) {
 	wassert( n >= 0 && n < Size() );
 	wassert( emptySize >= 0 && emptySize < BucketSize );
 	wassert( topSize >= n && topSize <= BucketSize );
-	if( 1 ) {
+	DEV {
 		// slow:
 		for( int i = 0; i < n-1; i++ ) {
 			JSObj k1 = keyNode(i).key;
@@ -640,7 +640,7 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
 		cout << "  thisLoc: " << thisLoc.toString() << endl;
 		cout << "  keyOfs: " << keyOfs << " n:" << n << " direction: " << direction << endl;
 		cout << bucketSummary() << endl;
-		assert( keyOfs >= 0 && keyOfs < n );
+		assert(false);
 	}
 	int adj = direction < 0 ? 1 : 0;
 	int ko = keyOfs + direction;

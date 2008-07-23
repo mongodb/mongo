@@ -61,10 +61,11 @@ public:
 		return false;
 	}
 
-	static ClientCursor* find(CursorId id) {
+	static ClientCursor* find(CursorId id, bool warn = true) {
 		CCById::iterator it = clientCursorsById.find(id);
 		if( it == clientCursorsById.end() ) { 
-			cout << "ClientCursor::find(): cursor not found in map " << id << '\n';
+			if( warn ) 
+				cout << "ClientCursor::find(): cursor not found in map " << id << '\n';
 			return 0;
 		}
 		return it->second;
