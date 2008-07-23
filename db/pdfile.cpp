@@ -977,7 +977,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		JSObj key = io.getObjectField("key");
 		if( name == 0 || *name == 0 || tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
 			cout << "user warning: bad add index attempt name:" << (name?name:"") << " ns:" << 
-				(tabletoidxns?tabletoidxns:"") << endl;
+				(tabletoidxns?tabletoidxns:"") << " ourns:" << ns << endl;
 			return DiskLoc();
 		}
 		tableToIndex = nsdetails(tabletoidxns);

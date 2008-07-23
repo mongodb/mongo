@@ -586,6 +586,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 	else if( e.type() == Number ) { 
 		if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
 			if( 1 ) {
+				cout << "dropDatabase " << ns << endl;
 				valid = true;
 				int p = (int) e.number();
 				if( p != 1 ) {
