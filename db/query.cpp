@@ -470,9 +470,11 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 			    ndel++;
 
 			    if( loc.questionable() ) { 
-			      ss << "    ?bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k << endl;
-			      valid = false;
-			      break;
+					if( loc.a() <= 0 || strstr(ns, "hudsonSmall") == 0 ) {
+						ss << "    ?bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k << endl;
+						valid = false;
+						break;
+					}
 			    }
 
 			    DeletedRecord *d = loc.drec();
@@ -1066,6 +1068,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 
 	if( !cc ) { 
 		DEV cout << "getMore: cursorid not found " << ns << " " << cursorid << endl;
+		cursorid = 0;
 	}
 	else {
 		start = cc->pos;
