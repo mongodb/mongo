@@ -444,7 +444,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err) {
 
 void PhysicalDataFile::open(int fn, const char *filename) {
 	int length;
-
+        
 	if( fn <= 4 ) {
 		length = (64*1024*1024) << fn;
 		if( strstr(filename, "alleyinsider") && length < 1024 * 1024 * 1024 ) {
@@ -454,8 +454,19 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 		}
 	} else
 		length = 0x7ff00000;
+        
+	assert( length >= 64*1024*1024 );
 
-	assert( length >= 64*1024*1024 && length % 4096 == 0 );
+        if( strstr(filename, "_hudsonSmall") ) {
+          int mult = 1;
+          if ( fn > 1 && fn < 1000 )
+            mult = fn;
+          length = 1024 * 512 * mult;
+          cout << "Warning : using small files for _hudsonSmall" << endl;
+        }
+
+
+	assert( length % 4096 == 0 );
 
 	assert(fn == fileNo);
 	header = (PDFHeader *) mmf.map(filename, length);
