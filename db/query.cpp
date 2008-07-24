@@ -190,20 +190,25 @@ fail:
 	return auto_ptr<Cursor>();
 }
 
-void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
-	if( strstr(ns, ".system.") ) {
-		if( strstr(ns, ".system.namespaces") ){ 
+/* ns:      namespace, e.g. <client>.<collection>
+   pattern: the "where" clause / criteria
+   justOne: stop after 1 match
+*/
+int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
+	if( strstr(ns, ".system.") && !god ) {
+		/*if( strstr(ns, ".system.namespaces") ){ 
 			cout << "info: delete on system namespace " << ns << '\n';
 		}
 		else if( strstr(ns, ".system.indexes") ) {
 			cout << "info: delete on system namespace " << ns << '\n';
 		}
-		else { 
+		else*/ { 
 			cout << "ERROR: attempt to delete in system namespace " << ns << endl;
-			return;
+			return -1;
 		}
 	}
 
+	int nDeleted = 0;
 	JSMatcher matcher(pattern);
 	JSObj order;
 	auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
@@ -236,12 +241,15 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 			_tempDelLoc = rloc;
 
 			theDataFileMgr.deleteRecord(ns, r, rloc);
+			nDeleted++;
 			tempd = temp;
 			if( justOne )
-				return;
+				break;
 			c->checkLocation();
 		}
 	}
+
+	return nDeleted;
 }
 
 struct Mod { 
@@ -676,19 +684,30 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 		}
 		else if( strcmp( e.fieldName(), "drop") == 0 ) { 
 			valid = true;
-			string dropNs = us + '.' + e.valuestr();
-			NamespaceDetails *d = nsdetails(dropNs.c_str());
-			cout << "CMD: drop " << dropNs << endl;
+			string nsToDrop = us + '.' + e.valuestr();
+			NamespaceDetails *d = nsdetails(nsToDrop.c_str());
+			cout << "CMD: drop " << nsToDrop << endl;
 			if( d == 0 ) {
 				anObjBuilder.append("errmsg", "ns not found");
 			}
 			else if( d->nIndexes != 0 ) {
+				// client is supposed to drop the indexes first
 				anObjBuilder.append("errmsg", "ns has indexes (not permitted on drop)");
 			}
 			else {
 				ok = true;
-				anObjBuilder.append("ns", dropNs.c_str());
+				anObjBuilder.append("ns", nsToDrop.c_str());
+				ClientCursor::invalidate(nsToDrop.c_str());
+				dropNS(nsToDrop);
+				/*
+				{
+					JSObjBuilder b;
+					b.append("name", dropNs.c_str());
+					JSObj cond = b.done(); // { name: "colltodropname" }
+					deleteObjects("system.namespaces", cond, false, true);
+				}
 				client->namespaceIndex.kill(dropNs.c_str());
+				*/
 			}
 		}
 		else if( strcmp( e.fieldName(), "validate") == 0 ) { 
@@ -715,7 +734,10 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			if( d ) {
 				Element f = jsobj.findElement("index");
 				if( !f.eoo() ) { 
-					// delete a specific index
+
+					ClientCursor::invalidate(toDeleteNs.c_str());
+
+					// delete a specific index or all?
 					if( f.type() == String ) { 
 						const char *idxName = f.valuestr();
 						if( *idxName == '*' && idxName[1] == 0 ) { 
@@ -745,7 +767,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 								for( int i = x; i < d->nIndexes; i++ )
 									d->indexes[i] = d->indexes[i+1];
 								ok=true;
-								cout << "  alpha implementation, space not reclaimed" << endl;
+								cout << "  alpha implementation, space not reclaimed\n";
 							} else { 
 								cout << "deleteIndexes: " << idxName << " not found" << endl;
 							}

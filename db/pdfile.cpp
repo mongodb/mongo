@@ -18,11 +18,10 @@
 
 /* 
 todo: 
-_ manage deleted records.  bucket?
-_ use deleted on inserts!
-_ quantize allocations
 _ table scans must be sequential, not next/prev pointers
-_ regex support
+_ coalesce deleted
+
+_ disallow system* manipulations from the client.
 */
 
 #include "stdafx.h"
@@ -34,6 +33,7 @@ _ regex support
 #include "btree.h"
 #include <algorithm>
 #include <list>
+#include "query.h"
 
 const char *dbpath = "/data/db/";
 
@@ -644,12 +644,41 @@ auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
 
 void aboutToDelete(const DiskLoc& dl);
 
-/* delete this index.  does NOT celan up the system catalog
+/* drop a collection/namespace */
+void dropNS(string& nsToDrop) {
+	assert( strstr(nsToDrop.c_str(), ".system.") == 0 );
+	{
+		// remove from the system catalog
+		JSObjBuilder b;
+		b.append("name", nsToDrop.c_str());
+		JSObj cond = b.done(); // { name: "colltodropname" }
+		string system_namespaces = client->name + ".system.namespaces";
+		int n = deleteObjects(system_namespaces.c_str(), cond, false, true);
+		wassert( n == 1 );
+	}
+	// remove from the catalog hashtable
+	client->namespaceIndex.kill(nsToDrop.c_str());
+}
+
+/* delete this index.  does NOT clean up the system catalog
    (system.indexes or system.namespaces) -- only NamespaceIndex.
 */
 void IndexDetails::kill() { 
-	string ns = indexNamespace();
-	client->namespaceIndex.kill(ns.c_str());
+	string ns = indexNamespace(); // e.g. foo.coll.$ts_1
+
+	{
+		// clean up in system.indexes
+		JSObjBuilder b;
+		b.append("name", indexName().c_str());
+		b.append("ns", parentNS().c_str());
+		JSObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
+		string system_indexes = client->name + ".system.indexes";
+		int n = deleteObjects(system_indexes.c_str(), cond, false, true);
+		wassert( n == 1 );
+	}
+
+	dropNS(ns);
+	//	client->namespaceIndex.kill(ns.c_str());
 	head.setInvalid();
 	info.setInvalid();
 }
@@ -661,6 +690,11 @@ void IndexDetails::kill() {
 */
 void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) { 
 	JSObj keyPattern = info.obj().getObjectField("key");
+	if( keyPattern.objsize() == 0 ) {
+		cout << keyPattern.toString() << endl;
+		cout << info.obj().toString() << endl;
+		assert(false);
+	}
 	JSObjBuilder b;
 	JSObj key = obj.extractFields(keyPattern, b);
 	if( key.isEmpty() )
@@ -976,8 +1010,9 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		tabletoidxns = io.getStringField("ns");  // table it indexes
 		JSObj key = io.getObjectField("key");
 		if( name == 0 || *name == 0 || tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
-			cout << "user warning: bad add index attempt name:" << (name?name:"") << " ns:" << 
-				(tabletoidxns?tabletoidxns:"") << " ourns:" << ns << endl;
+			cout << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" << 
+				(tabletoidxns?tabletoidxns:"") << "\n  ourns:" << ns;
+			cout << "\n  idxobj:" << io.toString() << endl;
 			return DiskLoc();
 		}
 		tableToIndex = nsdetails(tabletoidxns);
@@ -1075,4 +1110,24 @@ void DataFileMgr::init(const char *dir) {
 void pdfileInit() {
 //	namespaceIndex.init(dbpath);
 	theDataFileMgr.init(dbpath);
+}
+
+#include "clientcursor.h"
+
+void dropDatabase(const char *ns) { 
+	// ns is of the form "<dbname>.$cmd"
+	char cl[256];
+	nsToClient(ns, cl);
+	problem() << "dropDatabase " << cl << endl;
+	assert( client->name == cl );
+
+	/* important: kill all open cursors on the database */
+	string prefix(cl);
+	prefix += '.';
+	ClientCursor::invalidate(prefix.c_str());
+
+	clients.erase(cl);
+	delete client; // closes files
+	client = 0;
+	_deleteDataFiles(cl);
 }

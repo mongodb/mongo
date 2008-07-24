@@ -206,7 +206,8 @@ class JSObj {
 		details = new Details();
 		details->_objdata = data;
 		details->_objsize = *((int*) data);
-		assert( details->_objsize < 1024 * 1024 * 16 );
+		assert( details->_objsize > 0 );
+		assert( details->_objsize <= 1024 * 1024 * 16 );
 		details->refCount = ifree ? 1 : -1;
 	}
 public:

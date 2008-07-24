@@ -39,6 +39,9 @@ class Extent;
 class Record;
 class Cursor;
 
+void dropDatabase(const char *ns);
+void dropNS(string& dropNs);
+
 /*---------------------------------------------------------------------*/ 
 
 class PDFHeader;
@@ -461,17 +464,6 @@ inline void _deleteDataFiles(const char *client) {
 			break;
 		i++;
 	}
-}
-
-inline void dropDatabase(const char *ns) { 
-	char cl[256];
-	nsToClient(ns, cl);
-	problem() << "dropDatabase " << cl << endl;
-	assert( client->name == cl );
-	clients.erase(cl);
-	delete client; // closes files
-	client = 0;
-	_deleteDataFiles(cl);
 }
 
 inline NamespaceIndex* nsindex(const char *ns) { 

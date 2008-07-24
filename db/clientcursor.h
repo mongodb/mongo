@@ -52,6 +52,11 @@ public:
 	auto_ptr< set<string> > filter; // which fields query wants returned
 	Message originalMessage; // this is effectively an auto ptr for data the matcher points to.
 
+	/* Get rid of cursors for namespaces that begin with nsprefix. 
+	   Used by drop, deleteIndexes, dropDatabase.
+	*/
+	static void invalidate(const char *nsPrefix);
+
 	static bool erase(CursorId id) { 
 		ClientCursor *cc = find(id);
 		if( cc ) {
@@ -65,7 +70,7 @@ public:
 		CCById::iterator it = clientCursorsById.find(id);
 		if( it == clientCursorsById.end() ) { 
 			if( warn ) 
-				cout << "ClientCursor::find(): cursor not found in map " << id << '\n';
+				OCCASIONALLY cout << "ClientCursor::find(): cursor not found in map " << id << " (ok after a drop)\n";
 			return 0;
 		}
 		return it->second;
@@ -77,9 +82,5 @@ public:
 	   */
 	void updateLocation();
 
-//private:
-//	void addToByLocation(DiskLoc cl);
 	void cleanupByLocation(DiskLoc loc);
-//public:
-//	ClientCursor *nextAtThisLocation;
 };

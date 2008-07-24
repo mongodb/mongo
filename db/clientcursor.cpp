@@ -58,6 +58,26 @@ void removedKey(const DiskLoc& btreeLoc, int keyPos) {
 // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 }
 
+/* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which 
+         works fine as the prefix will end with '.'.  however, when used with drop and 
+		 deleteIndexes, this could take out cursors that belong to something else -- if you 
+		 drop "foo", currently, this will kill cursors for "foobar".
+*/
+void ClientCursor::invalidate(const char *nsPrefix) { 
+	vector<ClientCursor*> toDelete;
+
+	int len = strlen(nsPrefix);
+	assert( len > 0 && strchr(nsPrefix, '.') );
+	for( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
+		ClientCursor *cc = i->second;
+		if( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 )
+			toDelete.push_back(i->second);
+	}
+
+	for( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) 
+		delete (*i);
+}
+
 /* must call this on a delete so we clean up the cursors. */
 void aboutToDelete(const DiskLoc& dl) { 
 	vector<ClientCursor*> toAdvance;

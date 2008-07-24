@@ -93,6 +93,19 @@ public:
 		return s;
 	}
 
+	string indexName() { // e.g. "ts_1"
+		JSObj io = info.obj();
+		return io.getStringField("name");
+	}
+
+	/* gets not our namespace name (indexNamespace for that), 
+	   but the collection we index, its name.
+	   */
+	string parentNS() {
+		JSObj io = info.obj();
+		return io.getStringField("ns");
+	}
+
 	/* delete this index.  does NOT celan up the system catalog
 	   (system.indexes or system.namespaces) -- only NamespaceIndex.
 	*/

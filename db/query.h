@@ -89,6 +89,6 @@ QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn,
 					  stringstream&);
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss);
-void deleteObjects(const char *ns, JSObj pattern, bool justOne);
+int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god=false);
 
 #include "clientcursor.h"
