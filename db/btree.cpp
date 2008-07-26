@@ -588,6 +588,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 		cout << "     split end " << hex << thisLoc.getOfs() << dec << endl;
 }
 
+/* start a new index off, empty */
 DiskLoc BtreeBucket::addHead(IndexDetails& id) {
 	BtreeBucket *p = allocTemp();
 	DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), p, p->Size, true);
