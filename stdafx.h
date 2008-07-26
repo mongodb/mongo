@@ -3,6 +3,22 @@
 // are changed infrequently
 //
 
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #pragma once
 
 #if defined(_WIN32)
@@ -10,6 +26,25 @@ const bool debug=true;
 #else
 const bool debug=false;
 #endif
+
+#include <memory>
+
+extern void dbexit(int returnCode, const char *whyMsg = "");
+
+inline void * ourmalloc(size_t size) { 
+	void *x = malloc(size);
+	if( x == 0 ) dbexit(42, "malloc fails");
+	return x;
+}
+
+inline void * ourrealloc(void *ptr, size_t size) { 
+	void *x = realloc(ptr, size);
+	if( x == 0 ) dbexit(43, "realloc fails");
+	return x;
+}
+
+#define malloc ourmalloc
+#define realloc ourrealloc
 
 #include "targetver.h"
 
@@ -104,7 +139,7 @@ extern const char *curNs;
    use this to log things just there.
 */
 #if defined(_WIN32)
-#define DEV if( 1 ) 
+#define DEV if( 0 ) 
 #else
 #define DEV if( 0 ) 
 #endif
@@ -126,7 +161,6 @@ inline void our_debug_free(void *p) {
 #define free our_debug_free
 #endif
 
-void dbexit(int resultcode);
 #define exit dbexit
 
 #undef yassert
@@ -139,4 +173,3 @@ using namespace boost::filesystem;
 
 #include "util/goodies.h"
 #include "util/log.h"
-

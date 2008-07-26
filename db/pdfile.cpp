@@ -1,12 +1,27 @@
 // pdfile.cpp
 
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 /* 
 todo: 
-_ manage deleted records.  bucket?
-_ use deleted on inserts!
-_ quantize allocations
 _ table scans must be sequential, not next/prev pointers
-_ regex support
+_ coalesce deleted
+
+_ disallow system* manipulations from the client.
 */
 
 #include "stdafx.h"
@@ -18,6 +33,7 @@ _ regex support
 #include "btree.h"
 #include <algorithm>
 #include <list>
+#include "query.h"
 
 const char *dbpath = "/data/db/";
 
@@ -428,7 +444,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err) {
 
 void PhysicalDataFile::open(int fn, const char *filename) {
 	int length;
-
+        
 	if( fn <= 4 ) {
 		length = (64*1024*1024) << fn;
 		if( strstr(filename, "alleyinsider") && length < 1024 * 1024 * 1024 ) {
@@ -438,8 +454,19 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 		}
 	} else
 		length = 0x7ff00000;
+        
+	assert( length >= 64*1024*1024 );
 
-	assert( length >= 64*1024*1024 && length % 4096 == 0 );
+        if( strstr(filename, "_hudsonSmall") ) {
+          int mult = 1;
+          if ( fn > 1 && fn < 1000 )
+            mult = fn;
+          length = 1024 * 512 * mult;
+          cout << "Warning : using small files for _hudsonSmall" << endl;
+        }
+
+
+	assert( length % 4096 == 0 );
 
 	assert(fn == fileNo);
 	header = (PDFHeader *) mmf.map(filename, length);
@@ -628,12 +655,41 @@ auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
 
 void aboutToDelete(const DiskLoc& dl);
 
-/* delete this index.  does NOT celan up the system catalog
+/* drop a collection/namespace */
+void dropNS(string& nsToDrop) {
+	assert( strstr(nsToDrop.c_str(), ".system.") == 0 );
+	{
+		// remove from the system catalog
+		JSObjBuilder b;
+		b.append("name", nsToDrop.c_str());
+		JSObj cond = b.done(); // { name: "colltodropname" }
+		string system_namespaces = client->name + ".system.namespaces";
+		int n = deleteObjects(system_namespaces.c_str(), cond, false, true);
+		wassert( n == 1 );
+	}
+	// remove from the catalog hashtable
+	client->namespaceIndex.kill(nsToDrop.c_str());
+}
+
+/* delete this index.  does NOT clean up the system catalog
    (system.indexes or system.namespaces) -- only NamespaceIndex.
 */
 void IndexDetails::kill() { 
-	string ns = indexNamespace();
-	client->namespaceIndex.kill(ns.c_str());
+	string ns = indexNamespace(); // e.g. foo.coll.$ts_1
+
+	{
+		// clean up in system.indexes
+		JSObjBuilder b;
+		b.append("name", indexName().c_str());
+		b.append("ns", parentNS().c_str());
+		JSObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
+		string system_indexes = client->name + ".system.indexes";
+		int n = deleteObjects(system_indexes.c_str(), cond, false, true);
+		wassert( n == 1 );
+	}
+
+	dropNS(ns);
+	//	client->namespaceIndex.kill(ns.c_str());
 	head.setInvalid();
 	info.setInvalid();
 }
@@ -645,6 +701,11 @@ void IndexDetails::kill() {
 */
 void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) { 
 	JSObj keyPattern = info.obj().getObjectField("key");
+	if( keyPattern.objsize() == 0 ) {
+		cout << keyPattern.toString() << endl;
+		cout << info.obj().toString() << endl;
+		assert(false);
+	}
 	JSObjBuilder b;
 	JSObj key = obj.extractFields(keyPattern, b);
 	if( key.isEmpty() )
@@ -717,8 +778,6 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 {
 	dassert( todelete == dl.rec() );
 
-	int tempextofs = todelete->extentOfs;
-
 	NamespaceDetails* d = nsdetails(ns);
 	if( d->capped && !cappedOK ) { 
 		cout << "failing remove on a capped ns " << ns << endl;
@@ -759,18 +818,18 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	{
 		d->nrecords--;
 		d->datasize -= todelete->netLength();
-///		DEBUGGING << "temp: dddelrec deleterecord " << ns << endl;
-//		if( todelete->extentOfs == 0xaca500 ) { 
-//			cout << "break\n";
-//		}
-/*
-TEMP: add deleted rec 0:aca5b0 aca500
-temp: adddelrec deleterecord admin.blog.posts
-TEMP: add deleted rec 0:b9e750 b6a500
-temp: adddelrec deleterecord admin.blog.posts
-*/
-
-		d->addDeletedRec((DeletedRecord*)todelete, dl);
+		/* temp: if in system.indexes, don't reuse, and zero out: we want to be 
+                 careful until validated more, as IndexDetails has pointers
+                 to this disk location.  so an incorrectly done remove would cause 
+                 a lot of problems. 
+        */
+		if( strstr(ns, ".system.indexes") ) { 
+			memset(todelete, 0, todelete->lengthWithHeaders);
+		}
+		else {
+			DEV memset(todelete->data, 0, todelete->netLength()); // attempt to notice invalid reuse.
+			d->addDeletedRec((DeletedRecord*)todelete, dl);
+		}
 	}
 }
 
@@ -962,8 +1021,9 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		tabletoidxns = io.getStringField("ns");  // table it indexes
 		JSObj key = io.getObjectField("key");
 		if( name == 0 || *name == 0 || tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
-			cout << "user warning: bad add index attempt name:" << (name?name:"") << " ns:" << 
-				(tabletoidxns?tabletoidxns:"") << endl;
+			cout << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" << 
+				(tabletoidxns?tabletoidxns:"") << "\n  ourns:" << ns;
+			cout << "\n  idxobj:" << io.toString() << endl;
 			return DiskLoc();
 		}
 		tableToIndex = nsdetails(tabletoidxns);
@@ -1061,4 +1121,24 @@ void DataFileMgr::init(const char *dir) {
 void pdfileInit() {
 //	namespaceIndex.init(dbpath);
 	theDataFileMgr.init(dbpath);
+}
+
+#include "clientcursor.h"
+
+void dropDatabase(const char *ns) { 
+	// ns is of the form "<dbname>.$cmd"
+	char cl[256];
+	nsToClient(ns, cl);
+	problem() << "dropDatabase " << cl << endl;
+	assert( client->name == cl );
+
+	/* important: kill all open cursors on the database */
+	string prefix(cl);
+	prefix += '.';
+	ClientCursor::invalidate(prefix.c_str());
+
+	clients.erase(cl);
+	delete client; // closes files
+	client = 0;
+	_deleteDataFiles(cl);
 }

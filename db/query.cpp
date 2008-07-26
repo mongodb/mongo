@@ -1,5 +1,21 @@
 // query.cpp
 
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "stdafx.h"
 #include "query.h"
 #include "pdfile.h"
@@ -106,6 +122,26 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 							// compound keys with GT/LT not supported yet via index.
 							goto fail;
 						}
+						if( op >= JSMatcher::opIN ) {
+							// $in does not use an index (at least yet, should when # of elems is tiny)
+							goto fail;
+						}
+
+						{
+							JSElemIter k(e.embeddedObject());
+							k.next();
+							if( !k.next().eoo() ) { 
+								/* compound query like { $lt : 9, $gt : 2 } 
+								   for those our method below won't work.
+								   need more work on "stopOnMiss" in general -- may
+								   be issues with it.  so fix this to use index after
+								   that is fixed. 
+								*/
+								OCCASIONALLY cout << "finish query optimizer for lt gt compound\n";
+								goto fail;
+							}
+						}
+
 						int direction = - JSMatcher::opDirection(op);
 						return auto_ptr<Cursor>( new BtreeCursor(
 							d->indexes[i].head, 
@@ -150,25 +186,29 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 	}
 
 fail:
-	DEV cout << "getIndexCursor fail" << endl;
+	DEV cout << "getIndexCursor fail " << ns << '\n';
 	return auto_ptr<Cursor>();
 }
 
-void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
-
-	if( strstr(ns, ".system.") ) {
-		if( strstr(ns, ".system.namespaces") ){ 
+/* ns:      namespace, e.g. <client>.<collection>
+   pattern: the "where" clause / criteria
+   justOne: stop after 1 match
+*/
+int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
+	if( strstr(ns, ".system.") && !god ) {
+		/*if( strstr(ns, ".system.namespaces") ){ 
 			cout << "info: delete on system namespace " << ns << '\n';
 		}
 		else if( strstr(ns, ".system.indexes") ) {
 			cout << "info: delete on system namespace " << ns << '\n';
 		}
-		else { 
+		else*/ { 
 			cout << "ERROR: attempt to delete in system namespace " << ns << endl;
-			return;
+			return -1;
 		}
 	}
 
+	int nDeleted = 0;
 	JSMatcher matcher(pattern);
 	JSObj order;
 	auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
@@ -196,17 +236,20 @@ void deleteObjects(const char *ns, JSObj pattern, bool justOne) {
 		}
 		else { 
 			assert( !deep || !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
-//			cout << "  found match to delete" << endl;
 			if( !justOne )
 				c->noteLocation();
-_tempDelLoc = rloc;
+			_tempDelLoc = rloc;
+
 			theDataFileMgr.deleteRecord(ns, r, rloc);
+			nDeleted++;
 			tempd = temp;
 			if( justOne )
-				return;
+				break;
 			c->checkLocation();
 		}
 	}
+
+	return nDeleted;
 }
 
 struct Mod { 
@@ -427,9 +470,11 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 			    ndel++;
 
 			    if( loc.questionable() ) { 
-			      ss << "    ?bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k << endl;
-			      valid = false;
-			      break;
+					if( loc.a() <= 0 || strstr(ns, "hudsonSmall") == 0 ) {
+						ss << "    ?bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k << endl;
+						valid = false;
+						break;
+					}
 			    }
 
 			    DeletedRecord *d = loc.drec();
@@ -551,6 +596,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 	else if( e.type() == Number ) { 
 		if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
 			if( 1 ) {
+				cout << "dropDatabase " << ns << endl;
 				valid = true;
 				int p = (int) e.number();
 				if( p != 1 ) {
@@ -640,19 +686,30 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 		}
 		else if( strcmp( e.fieldName(), "drop") == 0 ) { 
 			valid = true;
-			string dropNs = us + '.' + e.valuestr();
-			NamespaceDetails *d = nsdetails(dropNs.c_str());
-			cout << "CMD: drop " << dropNs << endl;
+			string nsToDrop = us + '.' + e.valuestr();
+			NamespaceDetails *d = nsdetails(nsToDrop.c_str());
+			cout << "CMD: drop " << nsToDrop << endl;
 			if( d == 0 ) {
 				anObjBuilder.append("errmsg", "ns not found");
 			}
 			else if( d->nIndexes != 0 ) {
+				// client is supposed to drop the indexes first
 				anObjBuilder.append("errmsg", "ns has indexes (not permitted on drop)");
 			}
 			else {
 				ok = true;
-				anObjBuilder.append("ns", dropNs.c_str());
+				anObjBuilder.append("ns", nsToDrop.c_str());
+				ClientCursor::invalidate(nsToDrop.c_str());
+				dropNS(nsToDrop);
+				/*
+				{
+					JSObjBuilder b;
+					b.append("name", dropNs.c_str());
+					JSObj cond = b.done(); // { name: "colltodropname" }
+					deleteObjects("system.namespaces", cond, false, true);
+				}
 				client->namespaceIndex.kill(dropNs.c_str());
+				*/
 			}
 		}
 		else if( strcmp( e.fieldName(), "validate") == 0 ) { 
@@ -679,7 +736,10 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			if( d ) {
 				Element f = jsobj.findElement("index");
 				if( !f.eoo() ) { 
-					// delete a specific index
+
+					ClientCursor::invalidate(toDeleteNs.c_str());
+
+					// delete a specific index or all?
 					if( f.type() == String ) { 
 						const char *idxName = f.valuestr();
 						if( *idxName == '*' && idxName[1] == 0 ) { 
@@ -709,7 +769,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 								for( int i = x; i < d->nIndexes; i++ )
 									d->indexes[i] = d->indexes[i+1];
 								ok=true;
-								cout << "  alpha implementation, space not reclaimed" << endl;
+								cout << "  alpha implementation, space not reclaimed\n";
 							} else { 
 								cout << "deleteIndexes: " << idxName << " not found" << endl;
 							}
@@ -829,6 +889,7 @@ int runCount(const char *ns, JSObj& cmd, string& err) {
 QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss) 
 {
+	time_t t = time(0);
 	bool wantMore = true;
 	int ntoreturn = _ntoreturn;
 	if( _ntoreturn < 0 ) { 
@@ -836,10 +897,6 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		wantMore = false;
 	}
 	ss << "query " << ns << " ntoreturn:" << ntoreturn;
-	if( ntoskip ) 
-		ss << " ntoskip:" << ntoskip;
-	if( client->profile )
-		ss << "<br>query: " << jsobj.toString() << ' ';
 
 	int n = 0;
 	BufBuilder b(32768);
@@ -858,6 +915,17 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		JSObj order = jsobj.getObjectField("orderby");
 		if( query.isEmpty() && order.isEmpty() )
 			query = jsobj;
+
+		/* The ElemIter will not be happy if this isn't really an object. So throw exception
+		   here when that is true.
+ 		   (Which may indicate bad data from appserver?)
+		*/
+		if( query.objsize() == 0 ) { 
+			cout << "Bad query object?\n  jsobj:";
+			cout << jsobj.toString() << "\n  query:";
+			cout << query.toString() << endl;
+			assert(false);
+		}
 
 		auto_ptr<JSMatcher> matcher(new JSMatcher(query));
 		JSMatcher &debug1 = *matcher;
@@ -963,6 +1031,11 @@ assert( debug.getN() < 5000 );
 	qr->nReturned = n;
 	b.decouple();
 
+	if( (client && client->profile) || time(0)-t > 5 ) {
+		if( ntoskip ) 
+			ss << " ntoskip:" << ntoskip;
+		ss << " <br>query: " << jsobj.toString() << ' ';
+	}
 	ss << " nreturned:" << n;
 	return qr;
 }
@@ -995,6 +1068,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 
 	if( !cc ) { 
 		DEV cout << "getMore: cursorid not found " << ns << " " << cursorid << endl;
+		cursorid = 0;
 	}
 	else {
 		start = cc->pos;

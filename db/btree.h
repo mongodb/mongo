@@ -1,5 +1,21 @@
 // btree.h
 
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #pragma once
 
 #include "../stdafx.h"
@@ -17,9 +33,15 @@ struct _KeyNode {
 	unsigned short _kdo;
 	void setKeyDataOfs(short s) { _kdo = s; assert(s>=0); }
 	void setKeyDataOfsSavingUse(short s) { _kdo = s; assert(s>=0); }
-	void setUnused() { recordLoc.GETOFS() |= 1; }
-//	void setUsed() { _kdo &= 0x7fff; }
-	int isUnused() { return (recordLoc.getOfs() & 1); }
+	void setUnused() { 
+		/* Setting ofs to odd is the sentinel for unused, as real recordLoc's are always 
+		   even numbers. 
+           Note we need to keep its value basically the same as we use the recordLoc 
+		   as part of the key in the index (to handle duplicate keys efficiently).
+		*/
+		recordLoc.GETOFS() |= 1; 
+	}
+	int isUnused() { return recordLoc.getOfs() & 1; }
 	int isUsed() { return !isUnused(); }
 };
 
@@ -92,7 +114,7 @@ public:
 		ss << "    n: " << n << endl;
 		ss << "    parent: " << parent.toString() << endl;
 		ss << "    nextChild: " << parent.toString() << endl;
-		ss << "    Size: " << Size << " flags:" << flags << endl;
+		ss << "    Size: " << _Size << " flags:" << flags << endl;
 		ss << "    emptySize: " << emptySize << " topSize: " << topSize << endl;
 		return ss.str();
 	}
@@ -100,7 +122,8 @@ public:
 protected:
 	void _shape(int level, stringstream&);
 	DiskLoc nextChild; // child bucket off and to the right of the highest key.
-	int Size; // total size of this btree node in bytes. constant.
+	int _Size; // total size of this btree node in bytes. constant.
+	int Size() const;
 	int flags;
 	int emptySize; // size of the empty region
 	int topSize; // size of the data at the top of the bucket (keys are at the beginning or 'bottom')

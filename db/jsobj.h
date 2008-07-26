@@ -1,5 +1,21 @@
 // jsobj.h
 
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #pragma once
 
 #include "../stdafx.h"
@@ -45,20 +61,19 @@ struct OID {
       totalSize includes itself.
 
    Data:
-     Bool: <byte>
-     EOO: nothing follows
+     Bool:      <byte>
+     EOO:       nothing follows
      Undefined: nothing follows
-     OID: an OID object
-     Number: <double>
-     String: <unsigned32 strsizewithnull><cstring>
-	 Date:   <8bytes>
-	 Regex:  <cstring regex><cstring options>
-     Object: a nested object, leading with its entire size, which terminates with EOO.
-     Array:  same as object
-     BinData:
-       <int len>
-       <byte subtype>
-       <byte[len] data>
+     OID:       an OID object
+	 Number:    <double>
+     String:    <unsigned32 strsizewithnull><cstring>
+	 Date:      <8bytes>
+	 Regex:     <cstring regex><cstring options>
+     Object:    a nested object, leading with its entire size, which terminates with EOO.
+     Array:     same as object
+	 DBRef:     <strlen> <cstring ns> <oid>
+       DBRef is a database reference: basically a collection name plus an Object ID
+     BinData:   <int len> <byte subtype> <byte[len] data>
 */
 
 /* db operation message format 
@@ -88,9 +103,9 @@ class Element {
 	friend class JSObj;
 public:
 	string toString();
-	JSType type() { return (JSType) *data; }
-	bool eoo() { return type() == EOO; }
-	int size();
+	JSType type() const { return (JSType) *data; }
+	bool eoo() const { return type() == EOO; }
+	int size() const;
 
 	// wrap this element up as a singleton object.
 	JSObj wrap();
@@ -102,26 +117,27 @@ public:
 
 	// raw data be careful:
 	const char * value() const { return (data + fieldNameSize + 1); }
-	int valuesize() { return size() - fieldNameSize - 1; } 
+	int valuesize() const { return size() - fieldNameSize - 1; } 
 
 	bool boolean() { return *value() ? true : false; }
 
-	unsigned long long date() { return *((unsigned long long*) value()); }
+	unsigned long long date() const { return *((unsigned long long*) value()); }
 	double& number() { return *((double *) value()); }
+	double number() const { return *((double *) value()); }
 	OID& oid() { return *((OID*) value()); }
 
 	// for strings
-	int valuestrsize() { 
+	int valuestrsize() const { 
 		return *((int *) value());
 	}
 
 	// for objects the size *includes* the size of the size field
-	int objsize() { 
+	int objsize() const { 
 		return *((int *) value());
 	}
 
 	// for strings.  also gives you start of the real data for an embedded object
-	const char * valuestr() { return value() + 4; }
+	const char * valuestr() const { return value() + 4; }
 
 	JSObj embeddedObject();
 
@@ -163,14 +179,24 @@ private:
 	}
 	const char *data;
 	int fieldNameSize;
-	int totalSize;
+	int totalSize; /* caches the computed size */
 };
+
+/* l and r MUST have same type when called: check that first. */
+int compareElementValues(const Element& l, const Element& r);
 
 class JSObj {
 	friend class JSElemIter;
 	class Details {
 	public:
-		~Details() { _objdata = 0; }
+		~Details() {
+			// note refCount means two different things (thus the assert here)
+			assert(refCount <= 0);
+			if (owned()) {
+				free((void *)_objdata);
+			}
+			_objdata = 0;
+		}
 		const char *_objdata;
 		int _objsize;
 		int refCount; // -1 == don't free
@@ -180,6 +206,8 @@ class JSObj {
 		details = new Details();
 		details->_objdata = data;
 		details->_objsize = *((int*) data);
+		assert( details->_objsize > 0 );
+		assert( details->_objsize <= 1024 * 1024 * 16 );
 		details->refCount = ifree ? 1 : -1;
 	}
 public:
@@ -224,8 +252,8 @@ public:
 	JSObj extractFields(JSObj pattern, JSObjBuilder& b);
 
 	const char *objdata() const { return details->_objdata; }
-	int objsize() const { return details->_objsize; } // includes the embedded size field
-	bool isEmpty() const { return details == 0 || objsize() <= 5; }
+	int objsize() const { return details ? details->_objsize : 0; } // includes the embedded size field
+	bool isEmpty() const { return objsize() <= 5; }
 
 	/* this is broken if elements aren't in the same order. */
 	bool operator<(const JSObj& r) const { return woCompare(r) < 0; }
@@ -235,7 +263,9 @@ public:
 	*/
 	int woCompare(const JSObj& r) const;
 	bool woEqual(const JSObj& r) const { 
-		return objsize()==r.objsize() && memcmp(objdata(),r.objdata(),objsize())==0;
+		int os = objsize();
+		return os == r.objsize() &&
+			(os == 0 || memcmp(objdata(),r.objdata(),os)==0);
 	}
 	bool operator==(const JSObj& r) const { 
 		return this->woEqual(r);
@@ -384,6 +414,11 @@ private:
 	BufBuilder b;
 };
 
+/* iterator for a JSObj 
+
+   Note each JSObj ends with an EOO element: so you will get more() on an empty 
+   object, although next().eoo() will be true.
+*/
 class JSElemIter {
 public:
 	JSElemIter(const JSObj& jso) {
@@ -422,8 +457,9 @@ class Where;
    { a : 3 } is the pattern object.
 
    GT/LT:
-   { a : { $gt
+   { a : { $gt : 3 } } 
 
+   TODO: we should rewrite the matcher to be more an AST style.
 */
 class JSMatcher : boost::noncopyable { 
 	int matchesDotted(
@@ -431,13 +467,24 @@ class JSMatcher : boost::noncopyable {
 		Element& toMatch, JSObj& obj, 
 		int compareOp, bool *deep, bool isArr = false);
 
+	struct element_lt
+	{
+		bool operator()(const Element& l, const Element& r) const
+		{
+			int x = (int) l.type() - (int) r.type();
+			if( x < 0 ) return true;
+			if( x > 0 ) return false;
+			return compareElementValues(l,r) < 0;
+		}
+	};
 public:
 	enum { 
 		Equality = 0,
 		LT = 0x1,
 		LTE = 0x3,
 		GTE = 0x6,
-		GT = 0x4 
+		GT = 0x4, 
+		opIN = 0x8 // { x : { $in : [1,2,3] } }
 	};
 
 	static int opDirection(int op) { 
@@ -456,6 +503,7 @@ public:
 private:
 	int valuesMatch(Element& l, Element& r, int op);
 
+	set<Element,element_lt> *in;
 	Where *where;
 	JSObj& jsobj;
 	vector<Element> toMatch;

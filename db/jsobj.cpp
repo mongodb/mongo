@@ -1,5 +1,21 @@
 // jsobj.cpp
 
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
@@ -95,6 +111,7 @@ public:
 JSMatcher::~JSMatcher() { 
 	for( int i = 0; i < nBuilders; i++ )
 		delete builders[i];
+	delete in;
 	delete where;
 }
 
@@ -136,10 +153,18 @@ string Element::toString() {
 			s << '"' << valuestr() << '"';
 		}
 		break;
+	case DBRef: 
+		s << fieldName();
+		s << " : DBRef('" << valuestr() << "',";
+		{
+			OID *x = (OID *) (valuestr() + valuestrsize());
+			s << hex << x->a << x->b << dec << ')';
+		}
+		break;
 	case jstOID: 
-          s << fieldName() << " : ObjId(";
-          s << hex << oid().a << hex << oid().b << ')';
-          break;
+		s << fieldName() << " : ObjId(";
+		s << hex << oid().a << oid().b << dec << ')';
+		break;
     default:
 		s << fieldName() << ": ?type=" << type();
 		break;
@@ -147,7 +172,7 @@ string Element::toString() {
 	return s.str();
 }
 
-int Element::size() {
+int Element::size() const {
 	if( totalSize >= 0 )
 		return totalSize;
 
@@ -194,7 +219,7 @@ int Element::size() {
 			cout << "Element: bad type " << (int) type() << endl;
 			assert(false);
 	}
-	totalSize =  x + fieldNameSize;
+	((Element *) this)->totalSize =  x + fieldNameSize;
 
 	if( !eoo() ) { 
 		const char *next = data + totalSize;
@@ -214,7 +239,7 @@ int Element::size() {
 }
 
 /* must be same type! */
-inline int compareElementValues(Element& l, Element& r) {
+int compareElementValues(const Element& l, const Element& r) {
 	int f;
 	double x;
 	switch( l.type() ) {
@@ -289,15 +314,19 @@ int getGtLtOp(Element& e) {
 
 	Element fe = e.embeddedObject().firstElement();
 	const char *fn = fe.fieldName();
-	if( fn[0] == '$' && fn[1] && fn[2] == 't' ) { 
-		if( fn[1] == 'g' ) { 
-			if( fn[3] == 0 ) op = JSMatcher::GT;
-			else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::GTE;
+	if( fn[0] == '$' && fn[1] ) { 
+		if( fn[2] == 't' ) { 
+			if( fn[1] == 'g' ) { 
+				if( fn[3] == 0 ) op = JSMatcher::GT;
+				else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::GTE;
+			}
+			else if( fn[1] == 'l' ) { 
+				if( fn[3] == 0 ) op = JSMatcher::LT;
+				else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::LTE;
+			}
 		}
-		else if( fn[1] == 'l' ) { 
-			if( fn[3] == 0 ) op = JSMatcher::LT;
-			else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::LTE;
-		}
+		else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
+			op = JSMatcher::opIN;
 	}
 	return op;
 }
@@ -305,7 +334,7 @@ int getGtLtOp(Element& e) {
 #include "pdfile.h"
 
 JSMatcher::JSMatcher(JSObj &_jsobj) : 
-   where(0), jsobj(_jsobj), nRegex(0)
+   in(0), where(0), jsobj(_jsobj), nRegex(0)
 {
 	nBuilders = 0;
 
@@ -353,33 +382,64 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 		}
 
 		// greater than / less than...
-		// { a : { $gt: 3 } }
+		// e.g., e == { a : { $gt : 3 } }
+		//       or 
+		//            { a : { $in : [1,2,3] } }
 		if( e.type() == Object ) {
-			Element fe = e.embeddedObject().firstElement();
-			const char *fn = fe.fieldName();
-			if( fn[0] == '$' && fn[1] && fn[2] == 't' ) { 
-				int op = Equality;
-				if( fn[1] == 'g' ) { 
-					if( fn[3] == 0 ) op = GT;
-					else if( fn[3] == 'e' && fn[4] == 0 ) op = GTE;
+			// e.g., fe == { $gt : 3 }
+			JSElemIter j(e.embeddedObject());
+			bool ok = false;
+			while( j.more() ) {
+				Element fe = j.next();
+				if( fe.eoo() ) 
+					break;
+				// Element fe = e.embeddedObject().firstElement();
+				const char *fn = fe.fieldName();
+				if( fn[0] == '$' && fn[1] ) { 
+					if( fn[2] == 't' ) { 
+						int op = Equality;
+						if( fn[1] == 'g' ) { 
+							if( fn[3] == 0 ) op = GT;
+							else if( fn[3] == 'e' && fn[4] == 0 ) op = GTE;
+						}
+						else if( fn[1] == 'l' ) { 
+							if( fn[3] == 0 ) op = LT;
+							else if( fn[3] == 'e' && fn[4] == 0 ) op = LTE;
+						}
+						if( op && nBuilders < 8) { 
+							JSObjBuilder *b = new JSObjBuilder();
+							builders[nBuilders++] = b;
+							b->appendAs(fe, e.fieldName());
+							toMatch.push_back( b->done().firstElement() );
+							compareOp.push_back(op);
+							n++;
+							ok = true;
+						}
+					}
+					else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 && fe.type() == Array ) {
+						// $in
+						assert( in == 0 ); // only one per query supported so far.  finish...
+						in = new set<Element,element_lt>();
+						JSElemIter i(fe.embeddedObject());
+						while( i.more() )
+							in->insert(i.next());
+						toMatch.push_back(e); // not actually used at the moment
+						compareOp.push_back(opIN);
+						n++;
+						ok = true;
+					}
 				}
-				else if( fn[1] == 'l' ) { 
-					if( fn[3] == 0 ) op = LT;
-					else if( fn[3] == 'e' && fn[4] == 0 ) op = LTE;
-				}
-				if( op && nBuilders < 8) { 
-					JSObjBuilder *b = new JSObjBuilder();
-					builders[nBuilders++] = b;
-					b->appendAs(fe, e.fieldName());
-					toMatch.push_back( b->done().firstElement() );
-					compareOp.push_back(op);
-					n++;
-					continue;
+				else {
+					ok = false;
+					break;
 				}
 			}
+			if( ok ) 
+				continue;
 		}
 
 		{
+			// normal, simple case e.g. { a : "foo" }
 			toMatch.push_back(e);
 			compareOp.push_back(Equality);
 			n++;
@@ -391,15 +451,35 @@ inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) {
 	if( op == 0 ) 
 		return l.valuesEqual(r);
 
+	if( op == opIN ) {
+		// { $in : [1,2,3] }
+		return in->count(l);
+	}
+
+	/* check LT, GTE, ... */
 	if( l.type() != r.type() )
 		return false;
-
 	int c = compareElementValues(l, r);
 	int z = 1 << (c+1); 
 	return (op & z);
 }
 
-/* return value
+/* Check if a particular field matches.
+
+   fieldName - field to match "a.b" if we are reaching into an embedded object.
+   toMatch   - element we want to match.
+   obj       - database object to check against
+   compareOp - Equality, LT, GT, etc.
+   deep      - out param.  set to true/false if we scanned an array
+   isArr     - 
+
+   Special forms:
+
+     { "a.b" : 3 }             means       obj.a.b == 3
+     { a : { $lt : 3 } }       means       obj.a < 3
+	 { a : { $in : [1,2] } }   means       [1,2].contains(obj.a)
+
+   return value
    -1 mismatch
     0 missing element
     1 match
@@ -503,15 +583,6 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	/* assuming there is usually only one thing to match.  if more this
 	could be slow sometimes. */
 
-	for( int r = 0; r < nRegex; r++ ) { 
-		RegexMatcher& rm = regexs[r];
-		Element e = jsobj.getFieldDotted(rm.fieldName);
-		if( e.eoo() )
-			return false;
-		if( !regexMatches(rm, e, deep) )
-			return false;
-	}
-
 	// check normal non-regex cases:
 	for( int i = 0; i < n; i++ ) {
 		Element& m = toMatch[i]; 
@@ -524,35 +595,14 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 			return false;
 	}
 
-/*
-		Element e = jsobj.getFieldDotted(m.fieldName(), arrayElName);
-		if( !e.eoo() ) {
-			if( valuesMatch(e, m, compareOp[i]) ) {
-				goto ok;
-			}
-			else if( e.type() == Array ) {
-				JSElemIter ai(e.embeddedObject());
-				while( ai.more() ) { 
-					Element z = ai.next();
-					if( valuesMatch( z, m, compareOp[i]) ) {
-						if( deep )
-							*deep = true;
-						goto ok;
-					}
-				}
-			}
+	for( int r = 0; r < nRegex; r++ ) { 
+		RegexMatcher& rm = regexs[r];
+		Element e = jsobj.getFieldDotted(rm.fieldName);
+		if( e.eoo() )
 			return false;
-		}
-*/
-
-		/* missing.  that is ok iff we were looking for null */
-//		if( m.type() == jstNULL || m.type() == Undefined )
-//			;
-//////		else
-//			return false;
-//ok:
-//		;
-//	}
+		if( !regexMatches(rm, e, deep) )
+			return false;
+	}
 
 	if( where ) { 
 		if( where->func == 0 )
@@ -829,4 +879,3 @@ struct RXTest {
 		assert( part.PartialMatch("dwight") );
 	}
 } rxtest;
-

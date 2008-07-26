@@ -1,6 +1,22 @@
 // db.cpp : Defines the entry point for the console application.
 //
 
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "stdafx.h"
 #include "db.h"
 #include "../grid/message.h"
@@ -480,6 +496,9 @@ void jniCallback(Message& m, Message& out)
 	}
 }
 
+/* we create one thread for each connection from an app server client.  
+   app server will open a pool of threads.
+*/
 void connThread()
 {
 	try { 
@@ -927,8 +946,8 @@ int main(int argc, char* argv[], char *envp[] )
 //#endif
 
 #undef exit
-void dbexit(int rc) { 
-	cout << "  dbexit: flushing op log and files" << endl;
+void dbexit(int rc, const char *why) { 
+	cout << "  dbexit: " << why << "; flushing op log and files" << endl;
 	flushOpLog();
 
 	/* must do this before unmapping mem or you may get a seg fault */

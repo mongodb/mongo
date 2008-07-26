@@ -1,5 +1,21 @@
 // btree.cpp
 
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "stdafx.h"
 #include "btree.h"
 #include "pdfile.h"
@@ -22,6 +38,10 @@ KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) :
 
 /* BucketBasics --------------------------------------------------- */
 
+int BucketBasics::Size() const { 
+	assert( _Size == BucketSize );
+	return _Size;
+}
 inline void BucketBasics::setNotPacked() { flags &= ~Packed; }
 inline void BucketBasics::setPacked() { flags |= Packed; }
 
@@ -91,11 +111,10 @@ int nDumped = 0;
 void BucketBasics::assertValid(bool force) { 
 	if( !debug && !force )
 		return;
-	wassert( n >= 0 && n < BucketSize );
+	wassert( n >= 0 && n < Size() );
 	wassert( emptySize >= 0 && emptySize < BucketSize );
 	wassert( topSize >= n && topSize <= BucketSize );
-	wassert( Size == BucketSize );
-	if( 1 ) {
+	DEV {
 		// slow:
 		for( int i = 0; i < n-1; i++ ) {
 			JSObj k1 = keyNode(i).key;
@@ -113,7 +132,12 @@ void BucketBasics::assertValid(bool force) {
 				break;
 			}
 			else if( z == 0 ) { 
-				wassert( k(i).recordLoc < k(i+1).recordLoc );
+				if( !(k(i).recordLoc < k(i+1).recordLoc) ) {
+					cout << "ERROR: btree key order corrupt (recordloc's wrong).  Keys:" << endl;
+					cout << " k(" << i << "):" << keyNode(i).key.toString() << " RL:" << k(i).recordLoc.toString() << endl;
+					cout << " k(" << i+1 << "):" << keyNode(i+1).key.toString() << " RL:" << k(i+1).recordLoc.toString() << endl;
+					wassert( k(i).recordLoc < k(i+1).recordLoc );
+				}
 			}
 		}
 	}
@@ -134,12 +158,12 @@ inline void BucketBasics::markUnused(int keypos) {
 }
 
 inline int BucketBasics::totalDataSize() const {
-	return Size - (data-(char*)this);
+	return Size() - (data-(char*)this);
 }
 
 void BucketBasics::init(){
 	parent.Null(); nextChild.Null();
-	Size = BucketSize;
+	_Size = BucketSize;
 	flags = Packed;
 	n = 0;
 	emptySize = totalDataSize(); topSize = 0;
@@ -338,10 +362,18 @@ void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) {
 		assert(false);
 	}
 found:
+#if 1
+	/* as a temporary defensive measure, we zap the whole bucket, AND don't truly delete 
+       it (meaning it is ineligible for reuse).  temporary to see if it helps with some
+	   issues.
+	   */
+	memset(this, 0, Size());
+#else
 	//defensive:
 	n = -1;
 	parent.Null();
 	theDataFileMgr.deleteRecord(id.indexNamespace().c_str(), thisLoc.rec(), thisLoc);
+#endif
 }
 
 /* note: may delete the entire bucket!  this invalid upon return sometimes. */
@@ -515,7 +547,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 	r->nextChild = nextChild;
 	r->assertValid();
 //r->dump();
-	rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size, true);
+	rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size(), true);
 	if( split_debug )
 		cout << "     new rLoc:" << rLoc.toString() << endl;
 	free(r); r = 0;
@@ -536,7 +568,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 			p->pushBack(middle.recordLoc, middle.key, thisLoc);
 			p->nextChild = rLoc;
 			p->assertValid();
-			parent = idx.head = theDataFileMgr.insert(idx.indexNamespace().c_str(), p, p->Size, true);
+			parent = idx.head = theDataFileMgr.insert(idx.indexNamespace().c_str(), p, p->Size(), true);
 			if( split_debug )
 				cout << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
 			free(p);
@@ -591,7 +623,8 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 /* start a new index off, empty */
 DiskLoc BtreeBucket::addHead(IndexDetails& id) {
 	BtreeBucket *p = allocTemp();
-	DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), p, p->Size, true);
+	DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), p, p->Size(), true);
+	free(p);
 	return loc;
 }
 
@@ -608,7 +641,7 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
 		cout << "  thisLoc: " << thisLoc.toString() << endl;
 		cout << "  keyOfs: " << keyOfs << " n:" << n << " direction: " << direction << endl;
 		cout << bucketSummary() << endl;
-		assert( keyOfs >= 0 && keyOfs < n );
+		assert(false);
 	}
 	int adj = direction < 0 ? 1 : 0;
 	int ko = keyOfs + direction;
@@ -866,34 +899,48 @@ void BtreeCursor::noteLocation() {
 	}
 }
 
-int clctr = 0;
+/* Since the last noteLocation(), our key may have moved around, and that old cached 
+   information may thus be stale and wrong (although often it is right).  We check 
+   that here; if we have moved, we have to search back for where we were at.
 
-/* see if things moved around (deletes, splits, inserts) */
+   i.e., after operations on the index, the BtreeCursor's cached location info may 
+   be invalid.  This function ensures validity, so you should call it before using 
+   the cursor if other writers have used the database since the last noteLocation
+   call.
+*/
 void BtreeCursor::checkLocation() { 
-	try {
+	{
 		if( eof() ) 
 			return;
-		BtreeBucket *b = bucket.btree();
+		BtreeBucket *b = bucket.btree(); 
+
+		assert( !keyAtKeyOfs.isEmpty() ); 
+
+		// Note keyAt() returns an empty JSObj if keyOfs is now out of range, 
+		// which is possible as keys may have been deleted.
 		if( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
 			b->k(keyOfs).recordLoc == locAtKeyOfs ) { 
-			if( !b->k(keyOfs).isUsed() )
-				checkUnused();
-			return;
+				if( !b->k(keyOfs).isUsed() ) {
+					/* we were deleted but still exist as an unused 
+					   marker key. advance. 
+					*/
+					checkUnused();
+				}
+				return;
 		}
 	}
-	catch( AssertionException ) { 
-		cout << "Caught exception in checkLocation(), that's maybe ok" << endl;
-	}
+
+	/* normally we don't get to here.  when we do, old position is no longer
+ 	   valid and we must refind where we left off (which is expensive)
+	*/
 
 	bool found;
 	DiskLoc bold = bucket;
 
-/* TODO: Switch to keep indexdetails and do idx.head! */
-	/* didn't find, check from the top */
+	/* TODO: Switch to keep indexdetails and do idx.head! */
 	DiskLoc head = bold.btree()->getHead(bold);
 	bucket = head.btree()->locate(head, keyAtKeyOfs, keyOfs, found, locAtKeyOfs, direction);
-	if( clctr++ % 128 == 0 )
-		cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
+	RARELY cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
 	if( found )
 		checkUnused();
 }

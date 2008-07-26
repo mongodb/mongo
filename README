@@ -1,0 +1,38 @@
+Mongo Database README
+
+DOCUMENTATION
+
+http://www.10gen.com/wiki/db
+
+ORGANIZATION
+
+db/             : core database source code
+grid/           : socket messaging stuff
+util/           : util classes
+
+BUILDING
+
+cd db
+make clean && make
+
+RUNNING
+
+Run ./db and command line options will display.
+
+COMPILER VERSIONS
+
+Mongo has been tested with GCC 4.1.2 and Visual Studio 2008.  Older versions
+of GCC may not be happy.
+
+NOTES
+
+Mongo uses the 10gen appserver and the Java Virtual Machine to execute 
+user program code in the database.  This feature is optional -- if you would 
+like to run the database without these installed, run with the --nojni 
+option.  With --nojni specified, the db.eval() and $where features are no 
+longer available.
+
+Mongo uses memory mapped files.  If built as a 32 bit executable, you will 
+not be able to work with large (multi-gigabyte) databases.  However, 32 bit 
+builds should work fine with small development databases.
+

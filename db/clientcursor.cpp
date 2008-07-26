@@ -1,3 +1,19 @@
+/**
+*    Copyright (C) 2008 10gen Inc.
+*  
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*  
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*  
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 /* clientcursor.cpp
 
    ClientCursor is a wrapper that represents a cursorid from our client 
@@ -40,6 +56,26 @@ void ClientCursor::setLastLoc(DiskLoc L) {
 /* must call this when a btree node is updated */
 void removedKey(const DiskLoc& btreeLoc, int keyPos) { 
 // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+}
+
+/* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which 
+         works fine as the prefix will end with '.'.  however, when used with drop and 
+		 deleteIndexes, this could take out cursors that belong to something else -- if you 
+		 drop "foo", currently, this will kill cursors for "foobar".
+*/
+void ClientCursor::invalidate(const char *nsPrefix) { 
+	vector<ClientCursor*> toDelete;
+
+	int len = strlen(nsPrefix);
+	assert( len > 0 && strchr(nsPrefix, '.') );
+	for( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
+		ClientCursor *cc = i->second;
+		if( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 )
+			toDelete.push_back(i->second);
+	}
+
+	for( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) 
+		delete (*i);
 }
 
 /* must call this on a delete so we clean up the cursors. */
@@ -92,7 +128,7 @@ long long ClientCursor::allocCursorId() {
 	while( 1 ) {
 		x = (((long long)rand()) << 32);
 		x = x | ctm | 0x80000000; // OR to make sure not zero
-		if( ctm != ctmLast || ClientCursor::find(x) == 0 )
+		if( ctm != ctmLast || ClientCursor::find(x, false) == 0 )
 			break;
 	}
 	ctmLast = ctm;
@@ -143,4 +179,3 @@ class CursInspector : public SingleResultObjCursor {
 public:
 	CursInspector() { reg("intr.cursors"); }
 } _ciproto;
-
