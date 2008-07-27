@@ -42,10 +42,11 @@ inline void prebindOptions( int sock ){
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <netdb.h>
 inline void closesocket(int s) { close(s); }
 const int INVALID_SOCKET = -1;
 typedef int SOCKET;
-#define h_errno errno
+//#define h_errno errno
 inline int getLastError() { return errno; }
 inline void disableNagle(int sock) { 
   int x = 1;
@@ -69,6 +70,14 @@ inline void prebindOptions( int sock ){
 
 
 #endif
+
+// .empty() if err
+inline string hostbyname_nonreentrant(const char *hostname) {
+	struct hostent *h;
+	h = gethostbyname(hostname);
+	if( h == 0 ) return "";
+	return inet_ntoa( *((struct in_addr *)(h->h_addr)) );
+}
 
 struct SockAddr {
 	SockAddr() { addressSize = sizeof(sockaddr_in); memset(&sa, 0, sizeof(sa)); }
@@ -169,6 +178,7 @@ inline SockAddr::SockAddr(int sourcePort) {
 }
 
 inline SockAddr::SockAddr(const char *ip, int port) {
+	cout << "TEMP port:" << port << endl;
 	memset(sa.sin_zero, 0, sizeof(sa.sin_zero));
 	sa.sin_family = AF_INET;
 	sa.sin_port = htons(port);

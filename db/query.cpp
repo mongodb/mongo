@@ -27,6 +27,7 @@
 #include "../util/lruishmap.h"
 #include "javajs.h"
 #include "json.h"
+#include "repl.h"
 
 /* We cut off further objects once we cross this threshold; thus, you might get 
    a little bit more than this, it is a threshold rather than a limit.
@@ -661,6 +662,13 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 					anObjBuilder.append("errmsg", err.c_str());
 			}
 			anObjBuilder.append("n", (double) nn);
+		}
+		else if( strcmp( e.fieldName(), "clone") == 0 ) { 
+			valid = true;
+			string err;
+			ok = cloneFrom(e.valuestr(), err);
+			if( !err.empty() ) 
+				anObjBuilder.append("errmsg", err.c_str());
 		}
 		else if( strcmp( e.fieldName(), "create") == 0 ) { 
 			valid = true;

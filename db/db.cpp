@@ -683,10 +683,10 @@ void msg(const char *m, const char *address, int port, int extras = 0) {
 		int len = send.data->dataLen();
 
 		for( int i = 0; i < extras; i++ )
-			p.say(db, send);
+			p.say(/*db, */send);
 
 		Timer t;
-		bool ok = p.call(db, send, response);
+		bool ok = p.call(send, response);
 		double tm = t.micros() + 1;
 		cout << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " << 
 			((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
@@ -796,6 +796,7 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 
 //ofstream problems("dbproblems.log", ios_base::app | ios_base::out);
 int test2();
+void testClient();
 
 int main(int argc, char* argv[], char *envp[] )
 {
@@ -850,6 +851,10 @@ int main(int argc, char* argv[], char *envp[] )
 			msg(argc >= 3 ? argv[2] : "ping", 1000);
 			goingAway = true;
 			return 0;
+		}
+		if( strcmp( argv[1], "testclient") == 0 ) { 
+			testClient();
+			goingAway = true; return 0;
 		}
 		if( strcmp(argv[1], "zzz") == 0 ) {
 			msg(argc >= 3 ? argv[2] : "ping", 1000);

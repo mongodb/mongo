@@ -58,8 +58,8 @@ public:
 	bool recv(Message& m);
 	void reply(Message& received, Message& response, MSGID responseTo);
 	void reply(Message& received, Message& response);
-	bool call(SockAddr& to, Message& toSend, Message& response);
-	void say(SockAddr& to, Message& toSend, int responseTo = -1);
+	bool call(Message& toSend, Message& response);
+	void say(Message& toSend, int responseTo = -1);
 
 private:
 	int sock;

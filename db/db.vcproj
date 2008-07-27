@@ -187,6 +187,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\dbclient.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\introspect.cpp"
 				>
 			</File>
@@ -216,6 +220,10 @@
 			</File>
 			<File
 				RelativePath=".\query.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\repl.cpp"
 				>
 			</File>
 			<File
@@ -262,6 +270,10 @@
 			</File>
 			<File
 				RelativePath=".\db.h"
+				>
+			</File>
+			<File
+				RelativePath=".\dbclient.h"
 				>
 			</File>
 			<File

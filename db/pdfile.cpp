@@ -603,7 +603,7 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 	Extent *e = getExtent(loc);
 
 	DEBUGGING {
-		cout << "temp: listing extents for " << ns << endl;
+		cout << "listing extents for " << ns << endl;
 		DiskLoc tmp = loc;
 		set<DiskLoc> extents;
 

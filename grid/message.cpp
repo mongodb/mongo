@@ -112,7 +112,7 @@ bool MessagingPort::connect(SockAddr& _far)
 		return false;
 	}
 	if( ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize) ) { 
-		cout << "ERROR: connect(): connect() failed" << errno << endl;
+		cout << "ERROR: connect(): connect() failed " << errno << ' ' << farEnd.getPort() << endl;
 		closesocket(sock); sock = -1;
 		return false;
 	}
@@ -187,17 +187,17 @@ bool MessagingPort::recv(Message& m) {
 }
 
 void MessagingPort::reply(Message& received, Message& response) {
-	say(received.from, response, received.data->id);
+	say(/*received.from, */response, received.data->id);
 }
 
 void MessagingPort::reply(Message& received, Message& response, MSGID responseTo) {
-	say(received.from, response, responseTo);
+	say(/*received.from, */response, responseTo);
 }
 
-bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
+bool MessagingPort::call(Message& toSend, Message& response) {
 	mmm( cout << "*call()" << endl; )
 	MSGID old = toSend.data->id;
-	say(to, toSend);
+	say(/*to,*/ toSend);
 	while( 1 ) {
 		bool ok = recv(response);
 		if( !ok )
@@ -217,7 +217,7 @@ bool MessagingPort::call(SockAddr& to, Message& toSend, Message& response) {
 	return true;
 }
 
-void MessagingPort::say(SockAddr& to, Message& toSend, int responseTo) {
+void MessagingPort::say(Message& toSend, int responseTo) {
 	mmm( cout << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
 	MSGID msgid = NextMsgId;
 	++NextMsgId;
