@@ -48,8 +48,8 @@ public:
 	DBClientCursor(MessagingPort& _p, auto_ptr<Message> _m) : 
 	  p(_p), m(_m) { dataReceived(); }
 	
-	bool more();
-	JSObj next();
+	bool more(); // if true, safe to call next()
+	JSObj next(); // returns next object in the result cursor
 };
 
 class DBClientConnection : boost::noncopyable { 
@@ -60,17 +60,18 @@ public:
 	bool connect(const char *serverHostname, string& errmsg);
 
 	/* send a query to the database.
-       ns: namespace to query, format is <dbname>.<collectname>[.<collectname>]*
-       query: query to perform on the collection.  this is a JSObj (binary JSON)
+       ns:        namespace to query, format is <dbname>.<collectname>[.<collectname>]*
+       query:     query to perform on the collection.  this is a JSObj (binary JSON)
+                  You may format as 
+                    { query: { ... }, order: { ... } } 
+                  to specify a sort order.
 	   nToReturn: n to return.  0 = unlimited
-       nToSkip: start with the nth item
-	   fieldsToReturn: optional template of which fields to select. if unspecified, returns all fields
+       nToSkip:   start with the nth item
+	   fieldsToReturn: 
+                  optional template of which fields to select. if unspecified, returns all fields
 
-	   returns: cursor.
-                returns 0 if error
+	   returns:   cursor.
+                  returns 0 if error
 	*/
 	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, JSObj *fieldsToReturn = 0);
 };
-
-
-
