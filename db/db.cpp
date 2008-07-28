@@ -28,7 +28,10 @@
 #include "javajs.h"
 #include "query.h"
 #include "introspect.h"
+#include "repl.h"
 
+bool slave = false;
+bool master = false; // true means keep an op log
 bool useJNI = true;
 extern const char *dbpath;
 extern int curOp;
@@ -50,8 +53,8 @@ struct MyStartupTests {
 /* 0 = off; 1 = writes, 2 = reads, 3 = both 
    7 = log a few reads, and all writes.
 */
-int opLogging = 7;
-//int opLogging = 0;
+int opLogging = 0;
+
 struct OpLog { 
 	ofstream *f;
 	OpLog() : f(0) { }
@@ -199,9 +202,11 @@ void receivedDelete(Message& m) {
 	assert(*ns);
 	setClient(ns);
 	int flags = d.pullInt();
+	bool justOne = flags & 1;
 	assert( d.moreJSObjs() );
 	JSObj pattern = d.nextJsObj();
-	deleteObjects(ns, pattern, flags & 1);
+	if( deleteObjects(ns, pattern, justOne) )
+		logOp("d", ns, pattern, 0, &justOne);
 }
 
 /* we defer response until we unlock.  don't want a blocked socket to 
@@ -311,12 +316,12 @@ void receivedInsert(Message& m, stringstream& ss) {
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
 		JSObj js = d.nextJsObj();
-//		cout << "  temp dbinsert: got js object, size=" << js.objsize() << " ns:" << d.getns() << endl;
 		const char *ns = d.getns();
 		assert(*ns);
 		setClient(ns);
 		ss << ns;
 		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
+		logOp("i", ns, js);
 	}
 }
 
@@ -863,16 +868,6 @@ int main(int argc, char* argv[], char *envp[] )
 			goingAway = true;
 			return 0;
 		}
-		if( strcmp(argv[1], "dev") == 0 ) { 
-			dbpath = "/home/dwight/db/";
-			cout << "dev mode: expect db files in " << dbpath << endl;
-			quicktest();
-			port++;
-			cout << "listening on port " << port << endl;
-			listen(port);
-			goingAway = true;
-			return 0;
-		}
 		if( strcmp(argv[1], "run") == 0 ) {
 			initAndListen(port, dbpath);
 			goingAway = true;
@@ -905,6 +900,10 @@ int main(int argc, char* argv[], char *envp[] )
                 port = atoi(argv[++i]);
 			else if( s == "--nojni" )
 				useJNI = false;
+			else if( s == "--master" )
+				master = true;
+			else if( s == "--slave" )
+				slave = true;
 			else if( s == "--dbpath" )
             	dbpath = argv[++i];
             else if( s == "--appsrvpath" )
@@ -935,7 +934,6 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  longmsg           send a long test message to the db server" << endl;
 	cout << "  quicktest         just check basic assertions and exit" << endl;
 	cout << "  test2             run test2() - see code" << endl;
-	cout << "  dev               run in dev mode (diff db loc, diff port #)" << endl;
 	cout << endl << "Alternate Usage :" << endl;
 	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
 	cout << " --nocursors  --nojni" << endl;

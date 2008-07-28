@@ -297,9 +297,9 @@ void getMods(vector<Mod>& mods, JSObj from) {
 todo:
  smart requery find record immediately
 */
-void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
-//cout << "TEMP BAD";
-//lrutest.find(updateobj);
+inline int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
+	//cout << "TEMP BAD";
+	//lrutest.find(updateobj);
 
 	int profile = client->profile;
 
@@ -309,7 +309,7 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 	if( strstr(ns, ".system.") ) { 
 		cout << "\nERROR: attempt to update in system namespace " << ns << endl;
 		ss << " can't update system namespace ";
-		return;
+		return 0;
 	}
 
 	int nscanned = 0;
@@ -344,11 +344,11 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 					applyMods(mods, c->currLoc().obj());
 					if( profile ) 
 						ss << " fastmod ";
-					return;
+					return 2;
 				}
 
 				theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
-				return;
+				return 1;
 			}
 			c->advance();
 		}
@@ -370,11 +370,21 @@ void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 			theDataFileMgr.insert(ns, (void*) obj.objdata(), obj.objsize());
 			if( profile )
 				ss << " fastmodinsert ";
-			return;
+			return 3;
 		}
 		if( profile )
 			ss << " upsert ";
 		theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
+		return 4;
+	}
+	return 0;
+}
+/* todo: we can optimize replication by just doing insert when an upsert triggers. 
+*/
+void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
+	int rc = _updateObjects(ns, updateobj, pattern, upsert, ss);
+	if( rc ) { 
+		logOp("u", ns, updateobj, &pattern, &upsert);
 	}
 }
 
@@ -598,7 +608,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 		if( strcmp(e.fieldName(), "getoptime") == 0 ) { 
 			valid = true;
 			ok = true;
-			anObjBuilder.append("optime", OpTime::now().asDouble());
+			anObjBuilder.appendDate("optime", OpTime::now().asDate());
 		}
 		else if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
 			if( 1 ) {
@@ -680,6 +690,8 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 			string ns = us + '.' + e.valuestr();
 			string err;
 			ok = userCreateNS(ns.c_str(), jsobj, err);
+			if( ok )
+				logOp("c", ns.c_str(), jsobj);
 			if( !ok && !err.empty() )
 				anObjBuilder.append("errmsg", err.c_str());
 		}
@@ -714,6 +726,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 				anObjBuilder.append("ns", nsToDrop.c_str());
 				ClientCursor::invalidate(nsToDrop.c_str());
 				dropNS(nsToDrop);
+				logOp("c", ns, jsobj);
 				/*
 				{
 					JSObjBuilder b;
@@ -751,6 +764,7 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 				if( !f.eoo() ) { 
 
 					ClientCursor::invalidate(toDeleteNs.c_str());
+					logOp("c", ns, jsobj);
 
 					// delete a specific index or all?
 					if( f.type() == String ) { 

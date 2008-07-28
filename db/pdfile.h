@@ -78,6 +78,11 @@ public:
 	void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false);
 	static auto_ptr<Cursor> findAll(const char *ns);
 
+	/* special version of insert for transaction logging -- streamlined a bit.
+       assumes ns is capped and no indexes
+    */
+	Record* fast_oplog_insert(NamespaceDetails *d, const char *ns, int len);
+
 	static Extent* getExtent(const DiskLoc& dl);
 	static Record* getRecord(const DiskLoc& dl);
 private:

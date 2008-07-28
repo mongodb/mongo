@@ -35,8 +35,10 @@ OpTime last((unsigned) time(0), 1);
 
 OpTime OpTime::now() { 
 	unsigned t = (unsigned) time(0);
-	if( last.secs == t )
-		return OpTime(last.secs, last.i+1);
+	if( last.secs == t ) {
+		last.i++;
+		return last;
+	}
 	return OpTime(t, 1);
 }
 
@@ -117,8 +119,8 @@ Source::Source(JSObj o) {
 	uassert( !sourceName.empty() );
 	Element e = o.getField("syncedTo");
 	if( !e.eoo() ) {
-		uassert( e.type() == Number );
-		syncedTo.asDouble() = e.number();
+		uassert( e.type() == Date );
+		syncedTo.asDate() = e.date();
 	}
 }
 
@@ -126,7 +128,7 @@ JSObj Source::jsobj() {
 	JSObjBuilder b;
 	b.append("host", hostName);
 	b.append("source", sourceName);
-	b.append("syncedTo", syncedTo.asDouble());
+	b.appendDate("syncedTo", syncedTo.asDate());
 	return b.doneAndDecouple();
 }
 
@@ -141,6 +143,7 @@ void Source::updateOnDisk() {
 	stringstream ss;
 	setClient("local.sources");
 	updateObjects("local.sources", o, pattern, false, ss);
+	client = 0;
 }
 
 void Source::cleanup(vector<Source*>& v) { 
@@ -155,6 +158,7 @@ void Source::loadAll(vector<Source*>& v) {
 		v.push_back( new Source(c->current()) );
 		c->advance();
 	}
+	client = 0;
 }
 
 JSObj opTimeQuery = fromjson("{getoptime:1}");
@@ -181,10 +185,66 @@ void Source::pull() {
 		cout << "  " << o.toString() << endl;
 		return;
 	}
-	uassert( e.type() == Number );
+	uassert( e.type() == Date );
 	OpTime serverCurTime;
-	serverCurTime.asDouble() = e.number();
+	serverCurTime.asDate() = e.date();
 
+}
+
+/* -- Logging of operations -------------------------------------*/
+
+// cached copies of these...
+NamespaceDetails *localOplogMainDetails = 0;
+Client *localOplogClient = 0;
+
+/* we write to local.opload.$main:
+     { ts : ..., op: ..., ns: ..., o: ... }
+   ts: an OpTime timestamp
+   opstr: 
+     'i' = insert
+*/
+void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *o2, bool *bb) {
+	if( strncmp(ns, "local.", 6) == 0 )
+		return;
+
+	Client *oldClient = client;
+	if( localOplogMainDetails == 0 ) { 
+		setClient("local.");
+		localOplogClient = client;
+		localOplogMainDetails = nsdetails("local.oplog.$main");
+	}
+	client = localOplogClient;
+
+	/* we jump through a bunch of hoops here to avoid copying the obj buffer twice -- 
+	   instead we do a single copy to the destination position in the memory mapped file.
+    */
+
+	JSObjBuilder b;
+	b.appendDate("ts", OpTime::now().asDate());
+	b.append("op", opstr);
+	b.append("ns", ns);
+	if( bb ) 
+		b.appendBool("upsert", *bb);
+	if( o2 )
+		b.append("o2", *o2);
+	JSObj partial = b.done();
+	int posz = partial.objsize();
+	int len = posz + obj.objsize() + 1 + 2 /*o:*/;
+
+	Record *r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, "local.oplog.$main", len);
+
+	char *p = r->data;
+	memcpy(p, partial.objdata(), posz);
+	*((unsigned *)p) += obj.objsize() + 1 + 2;
+	p += posz - 1;
+	*p++ = (char) Object;
+	*p++ = 'o';
+	*p++ = 0;
+	memcpy(p, obj.objdata(), obj.objsize());
+	p += obj.objsize();
+	*p = EOO;
+
+	client = oldClient;
 }
 
 /* --------------------------------------------------------------*/
@@ -218,5 +278,23 @@ void replMainThread() {
 }
 
 void startReplication() { 
-//	boost::thread repl_thread(replMainThread);
+	if( slave ) {
+		boost::thread repl_thread(replMainThread);
+	}
+
+#if defined(_WIN32)
+// temp, remove this.
+master = true;
+#endif
+
+	if( master ) { 
+		JSObjBuilder b;
+		b.append("size", 254.0 * 1000 * 1000);
+		b.appendBool("capped", 1);
+		setClient("local.oplog.$main");
+		string err;
+		JSObj o = b.done();
+		userCreateNS("local.oplog.$main", o, err);
+		client = 0;
+	}
 }

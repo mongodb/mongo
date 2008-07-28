@@ -20,22 +20,29 @@
 
    at the slave: 
      local.sources { host: ..., source: ..., syncedTo: }
+
+   at the master:
+     local.oplog.$<source>
+     local.oplog.$main is the default
 */
 
 #pragma once
+
+extern bool slave;
+extern bool master;
 
 bool cloneFrom(const char *masterHost, string& errmsg);
 
 #pragma pack(push)
 #pragma pack(4)
 class OpTime { 
-      unsigned secs;
       unsigned i;
+      unsigned secs;
 public:
       OpTime(unsigned a, unsigned b) { secs = a; i = b; }
       OpTime() { secs = 0; i = 0; }
       static OpTime now();
-	  double& asDouble() { return *((double *) this); } 
+	  unsigned long long& asDate() { return *((unsigned long long *) this); } 
 	  bool isNull() { return secs == 0; }
 };
 #pragma pack(pop)
@@ -47,9 +54,12 @@ public:
 */
 class Source {
 public:
-	string hostName;
-	string sourceName;
+	string hostName;    // ip addr or hostname
+	string sourceName;  // a logical source name.
+
+	/* the last time point we have already synced up to. */
 	OpTime syncedTo;
+
 	static void loadAll(vector<Source*>&);
 	static void cleanup(vector<Source*>&);
 	Source(JSObj);
@@ -57,3 +67,11 @@ public:
 	void updateOnDisk();
 	JSObj jsobj(); // { host: ..., source: ..., syncedTo: }
 };
+
+/* Write operation to the log (local.oplog.$main)
+*/
+void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *patt, bool *b);
+inline void logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *patt = 0, bool *b = 0) {
+	if( master )
+		_logOp(opstr, ns, obj, patt, b);
+}

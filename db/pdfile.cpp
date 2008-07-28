@@ -1114,6 +1114,38 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	return loc;
 }
 
+Record* DataFileMgr::fast_oplog_insert(NamespaceDetails *d, const char *ns, int len) {
+	RARELY assert( d == nsdetails(ns) );
+
+	DiskLoc extentLoc;
+	int lenWHdr = len + Record::HeaderSize;
+	DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
+	if( loc.isNull() ) {
+		assert(false);
+		return 0;
+	}
+
+	Record *r = loc.rec();
+	assert( r->lengthWithHeaders >= lenWHdr );
+
+	Extent *e = r->myExtent(loc);
+	if( e->lastRecord.isNull() ) { 
+		e->firstRecord = e->lastRecord = loc;
+		r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
+	}
+	else {
+		Record *oldlast = e->lastRecord.rec();
+		r->prevOfs = e->lastRecord.getOfs();
+		r->nextOfs = DiskLoc::NullOfs;
+		oldlast->nextOfs = loc.getOfs();
+		e->lastRecord = loc;
+	}
+
+	d->nrecords++;
+
+	return r;
+}
+
 void DataFileMgr::init(const char *dir) {
 /*	string path = dir;
 	path += "temp.dat";
