@@ -247,7 +247,9 @@ public:
 
 	Element getField(const char *name); /* return has eoo() true if no match */
 
+	// returns "" if DNE or wrong type
 	const char * getStringField(const char *name);
+
 	JSObj getObjectField(const char *name);
 
 	/* makes a new JSObj with the fields specified in pattern.
@@ -382,6 +384,9 @@ public:
 		b.append(fieldName);
 		b.append((int) strlen(str)+1);
 		b.append(str);
+	}
+	void append(const char *fieldName, string str) {
+		append(fieldName, str.c_str());
 	}
 
 	/* JSObj will free the buffer when it is finished. */

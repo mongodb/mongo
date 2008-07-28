@@ -51,21 +51,21 @@ public:
 	Logstream& operator<<(const string& x) LOGIT
 	Logstream& operator<< (ostream& ( *_endl )(ostream&)) { lock lk(mutex); cout << _endl; return *this; }
 	Logstream& operator<< (ios_base& (*_hex)(ios_base&)) { lock lk(mutex); cout << _hex; return *this; }
-	Logstream& prolog() {
+	Logstream& prolog(bool withNs = false) {
 		lock lk(mutex);
 		time_t t;
 		time(&t);
 		string now(ctime(&t),0,20);
-		cout << "~ " << now;
-		if( client ) 
+		cout << now;
+		if( withNs && client ) 
 			cout << curNs << ' ';
 		return *this;
 	}
 };
-inline Logstream& endl ( Logstream& os ) { }
+inline Logstream& endl ( Logstream& os ) { return os; }
 extern Logstream logstream;
 
-// not threadsafe
-inline Logstream& problem() { return logstream.prolog(); }
+inline Logstream& problem() { return logstream.prolog(true); }
+inline Logstream& log() { return logstream.prolog(); }
 
 #define cout logstream

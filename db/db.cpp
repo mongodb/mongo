@@ -39,6 +39,7 @@ bool useCursors = true;
 boost::mutex dbMutex;
 
 void closeAllSockets();
+void startReplication();
 
 struct MyStartupTests {
 	MyStartupTests() {
@@ -367,12 +368,13 @@ public:
    115 replay, opLogging
 */
 void listen(int port) { 
-	const char *Version = "db version: 120 09jul2008 logging fix";
+	const char *Version = "db version: 121";
 	problem() << Version << endl;
 	pdfileInit();
-	testTheDb();
+	//testTheDb();
 	cout << curTimeMillis() % 10000 << " waiting for connections on port " << port << " ...\n" << endl;
 	OurListener l(port);
+	startReplication();
 	l.listen();
 }
 

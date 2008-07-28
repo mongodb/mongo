@@ -23,8 +23,26 @@
 #include "../grid/message.h"
 #include "dbclient.h"
 #include "pdfile.h"
+#include "query.h"
+#include "json.h"
 
 extern JSObj emptyObj;
+extern boost::mutex dbMutex;
+auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
+bool userCreateNS(const char *ns, JSObj& j, string& err);
+
+OpTime last((unsigned) time(0), 1);
+
+OpTime OpTime::now() { 
+	unsigned t = (unsigned) time(0);
+	if( last.secs == t )
+		return OpTime(last.secs, last.i+1);
+	return OpTime(t, 1);
+}
+
+/* Cloner -----------------------------------------------------------
+   makes copy of existing database.
+*/
 
 class Cloner: boost::noncopyable { 
 	DBClientConnection conn;
@@ -69,6 +87,11 @@ bool Cloner::go(const char *masterHost, string& errmsg) {
 		const char *name = e.valuestr();
 		if( strstr(name, ".system.") || strchr(name, '$') )
 			continue;
+		JSObj options = collection.getObjectField("options");
+		if( !options.isEmpty() ) {
+			string err;
+			userCreateNS(name, options, err);
+		}
 		copy(name);
 	}
 
@@ -83,4 +106,117 @@ bool cloneFrom(const char *masterHost, string& errmsg)
 {
 	Cloner c;
 	return c.go(masterHost, errmsg);
+}
+
+/* --------------------------------------------------------------*/
+
+Source::Source(JSObj o) {
+	hostName = o.getStringField("host");
+	sourceName = o.getStringField("source");
+	uassert( !hostName.empty() );
+	uassert( !sourceName.empty() );
+	Element e = o.getField("syncedTo");
+	if( !e.eoo() ) {
+		uassert( e.type() == Number );
+		syncedTo.asDouble() = e.number();
+	}
+}
+
+JSObj Source::jsobj() {
+	JSObjBuilder b;
+	b.append("host", hostName);
+	b.append("source", sourceName);
+	b.append("syncedTo", syncedTo.asDouble());
+	return b.doneAndDecouple();
+}
+
+void Source::updateOnDisk() { 
+	JSObjBuilder b;
+	b.append("host", hostName);
+	b.append("source", sourceName);
+	JSObj pattern = b.done();
+
+	JSObj o = jsobj();
+
+	stringstream ss;
+	setClient("local.sources");
+	updateObjects("local.sources", o, pattern, false, ss);
+}
+
+void Source::cleanup(vector<Source*>& v) { 
+	for( vector<Source*>::iterator i = v.begin(); i != v.end(); i++ )
+		delete *i;
+}
+
+void Source::loadAll(vector<Source*>& v) { 
+	setClient("local.sources");
+	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
+	while( c->ok() ) { 
+		v.push_back( new Source(c->current()) );
+		c->advance();
+	}
+}
+
+JSObj opTimeQuery = fromjson("{getoptime:1}");
+
+/* note: not yet in mutex at this point. */
+void Source::pull() { 
+	log() << "pull source " << sourceName << '@' << hostName << endl;
+
+//	if( syncedTo.isNull() ) { 
+//	}
+
+	DBClientConnection conn;
+	string errmsg;
+	if( !conn.connect(hostName.c_str(), errmsg) ) {
+		cout << "  pull: cantconn " << errmsg << endl;
+		return;
+	}
+
+	// get current mtime at the server.
+	JSObj o = conn.findOne("admin.$cmd", opTimeQuery);
+	Element e = o.findElement("optime");
+	if( e.eoo() ) {
+		cout << "  pull: failed to get curtime from master" << endl;
+		cout << "  " << o.toString() << endl;
+		return;
+	}
+	uassert( e.type() == Number );
+	OpTime serverCurTime;
+	serverCurTime.asDouble() = e.number();
+
+}
+
+/* --------------------------------------------------------------*/
+
+void replMain() { 
+	vector<Source*> sources;
+
+	{
+		lock lk(dbMutex);
+		Source::loadAll(sources);
+	}
+
+	for( vector<Source*>::iterator i = sources.begin(); i != sources.end(); i++ ) { 
+		(*i)->pull();
+	}
+
+	Source::cleanup(sources);
+}
+
+void replMainThread() { 
+	while( 1 ) { 
+		try { 
+			replMain();
+			sleepsecs(5);
+		}
+		catch( AssertionException ) { 
+			problem() << "Assertion in replMainThread(): sleeping 5 minutes before retry" << endl;
+			sleepsecs(300);
+		}
+	}
+}
+
+void startReplication() { 
+//	boost::thread repl_thread(replMainThread);
 }

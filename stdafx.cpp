@@ -46,6 +46,11 @@ void asserted(const char *msg, const char *file, unsigned line) {
 	throw AssertionException();
 }
 
+void uasserted(const char *msg, const char *file, unsigned line) { 
+	problem() << "User Assertion failure " << msg << ' ' << file << ' ' << line << endl;
+	throw AssertionException();
+}
+
 void msgasserted(const char *msg) {
 	cout << "Assertion: " << msg << '\n';
 	throw AssertionException();

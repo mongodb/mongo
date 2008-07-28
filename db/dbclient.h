@@ -74,4 +74,6 @@ public:
                   returns 0 if error
 	*/
 	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, JSObj *fieldsToReturn = 0);
+
+	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0);
 };

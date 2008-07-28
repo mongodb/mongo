@@ -32,6 +32,13 @@ void value(JSObjBuilder& b, const char *&p, string& id) {
 		p += 7;
 		b.appendOID(id.c_str());
 	}
+	else if( *p == '1' ) { 
+		b.append(id.c_str(), 1);
+		p++;
+	}
+	else { 
+		assert(false);
+	}
 }
 
 void _fromjson(JSObjBuilder& b, const char *&p) { 

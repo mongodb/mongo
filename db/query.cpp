@@ -595,7 +595,12 @@ inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuil
 		ok = dbEval(jsobj, anObjBuilder);
 	}
 	else if( e.type() == Number ) { 
-		if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
+		if( strcmp(e.fieldName(), "getoptime") == 0 ) { 
+			valid = true;
+			ok = true;
+			anObjBuilder.append("optime", OpTime::now().asDouble());
+		}
+		else if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
 			if( 1 ) {
 				cout << "dropDatabase " << ns << endl;
 				valid = true;

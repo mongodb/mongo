@@ -366,8 +366,9 @@ auto_ptr<Cursor> makeNamespaceCursor() {
 }*/
 
 /* add a new namespace to the system catalog (<dbname>.system.namespaces).
+   options: { capped : ..., size : ... }
 */
-void addNewNamespaceToCatalog(const char *ns) {
+void addNewNamespaceToCatalog(const char *ns, JSObj *options = 0) {
 	cout << "New namespace: " << ns << endl;
 	if( strstr(ns, "system.namespaces") ) { 
 		// system.namespaces holds all the others, so it is not explicitly listed in the catalog.
@@ -378,6 +379,8 @@ void addNewNamespaceToCatalog(const char *ns) {
 	{
 		JSObjBuilder b;
 		b.append("name", ns);
+		if( options )
+			b.append("options", *options);
 		JSObj j = b.done();
 		char client[256];
 		nsToClient(ns, client);
@@ -411,7 +414,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err) {
 	/* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
              and then go back and set to ok : 1 after we are done.
 	*/
-	addNewNamespaceToCatalog(ns);
+	addNewNamespaceToCatalog(ns, &j);
 
 	int ies = initialExtentSize(128);
 	Element e = j.findElement("size");
@@ -1020,7 +1023,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		const char *name = io.getStringField("name"); // name of the index
 		tabletoidxns = io.getStringField("ns");  // table it indexes
 		JSObj key = io.getObjectField("key");
-		if( name == 0 || *name == 0 || tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
+		if( *name == 0 || *tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
 			cout << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" << 
 				(tabletoidxns?tabletoidxns:"") << "\n  ourns:" << ns;
 			cout << "\n  idxobj:" << io.toString() << endl;

@@ -178,7 +178,6 @@ inline SockAddr::SockAddr(int sourcePort) {
 }
 
 inline SockAddr::SockAddr(const char *ip, int port) {
-	cout << "TEMP port:" << port << endl;
 	memset(sa.sin_zero, 0, sizeof(sa.sin_zero));
 	sa.sin_family = AF_INET;
 	sa.sin_port = htons(port);

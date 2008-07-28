@@ -21,6 +21,16 @@
 #include "../util/builder.h"
 #include "jsobj.h"
 
+JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToReturn) { 
+	auto_ptr<DBClientCursor> c = 
+		this->query(ns, query, 1, 0, fieldsToReturn);
+
+	if( !c->more() )
+		return JSObj();
+
+	return c->next().copy();
+}
+
 bool DBClientConnection::connect(const char *serverAddress, string& errmsg) { 
 	/* not reentrant! 
 	   ok as used right now (we are in a big lock), but won't be later, so fix. */
@@ -95,7 +105,7 @@ bool DBClientCursor::more() {
 	if( cursorId == 0 )
 		return false;
 
-	cout << "TEMP: requestMore" << endl;
+//	cout << "TEMP: requestMore" << endl;
 	requestMore();
 	return pos < nReturned;
 }
