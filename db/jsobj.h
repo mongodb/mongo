@@ -252,6 +252,8 @@ public:
 
 	JSObj getObjectField(const char *name);
 
+	bool getBoolField(const char *name);
+
 	/* makes a new JSObj with the fields specified in pattern.
        fields returned in the order they appear in pattern.
 	   if any field missing, you get back an empty object overall.
@@ -367,13 +369,12 @@ public:
 		b.append(fieldName);
 		b.append(n);
 	}
-	void appendOID(const char *fieldName) { 
+	void appendOID(const char *fieldName, OID *oid = 0) { 
 		b.append((char) jstOID);
 		b.append(fieldName);
-		b.append((long long) 0);
-		b.append((unsigned) 0);
+		b.append((long long) (oid ? oid->a : 0));
+		b.append((unsigned) (oid ? oid->b : 0));
 	}
-
 	void appendDate(const char *fieldName, unsigned long long dt) { 
 		b.append((char) Date);
 		b.append(fieldName);

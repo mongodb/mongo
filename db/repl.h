@@ -19,7 +19,7 @@
 /* replication data overview
 
    at the slave: 
-     local.sources { host: ..., source: ..., syncedTo: }
+     local.sources { host: ..., source: ..., syncedTo: ..., dbs: { ... } }
 
    at the master:
      local.oplog.$<source>
@@ -28,6 +28,7 @@
 
 #pragma once
 
+class DBClientConnection;
 extern bool slave;
 extern bool master;
 
@@ -44,15 +45,37 @@ public:
       static OpTime now();
 	  unsigned long long& asDate() { return *((unsigned long long *) this); } 
 	  bool isNull() { return secs == 0; }
+	  string toString() { 
+		  stringstream ss;
+		  ss << hex << secs << ':' << i;
+		  return ss.str();
+	  }
+	  bool operator==(const OpTime& r) const { 
+		  return i == r.i && secs == r.secs;
+	  }
+	  bool operator!=(const OpTime& r) const { return !(*this == r); }
+	  bool operator<(const OpTime& r) const { 
+		  if( secs != r.secs ) 
+			  return secs < r.secs;
+		  return i < r.i;
+	  }
 };
 #pragma pack(pop)
+
+struct SyncException { 
+};
 
 /* A Source is a source from which we can pull (replicate) data.
    stored in collection local.sources.
 
    Can be a group of things to replicate for several databases.
+
+      { host: ..., source: ..., syncedTo: ..., dbs: { ... } }
 */
 class Source {
+	bool resync(string db);
+	void pullOpLog(DBClientConnection&);
+	void applyOperation(JSObj& op);
 public:
 	string hostName;    // ip addr or hostname
 	string sourceName;  // a logical source name.
@@ -60,12 +83,21 @@ public:
 	/* the last time point we have already synced up to. */
 	OpTime syncedTo;
 
+	/* list of databases that we have synced. 
+	   we need this so that if we encounter a new one, we know 
+	   to go fetch the old data.
+	*/
+	set<string> dbs;
+
 	static void loadAll(vector<Source*>&);
 	static void cleanup(vector<Source*>&);
 	Source(JSObj);
-	void pull();
-	void updateOnDisk();
-	JSObj jsobj(); // { host: ..., source: ..., syncedTo: }
+	void sync();
+	void save(); // write ourself to local.sources
+
+	// make a jsobj from our member fields of the form 
+	//   { host: ..., source: ..., syncedTo: }
+	JSObj jsobj(); 
 };
 
 /* Write operation to the log (local.oplog.$main)

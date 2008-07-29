@@ -171,7 +171,6 @@ void receivedKillCursors(Message& m) {
 	assert( n >= 1 );
 	if( n > 2000 ) { 
 		problem() << "Assertion failure, receivedKillCursors, n=" << n << endl;
-		cout << "Assertion failure, receivedKillCursors, n=" << n << endl;
 		assert( n < 30000 );
 	}
 	killCursors(n, (long long *) x);
@@ -205,8 +204,8 @@ void receivedDelete(Message& m) {
 	bool justOne = flags & 1;
 	assert( d.moreJSObjs() );
 	JSObj pattern = d.nextJsObj();
-	if( deleteObjects(ns, pattern, justOne) )
-		logOp("d", ns, pattern, 0, &justOne);
+	deleteObjects(ns, pattern, justOne);
+	logOp("d", ns, pattern, 0, &justOne);
 }
 
 /* we defer response until we unlock.  don't want a blocked socket to 
@@ -254,8 +253,8 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	catch( AssertionException ) { 
 		ss << " exception ";
 		problem() << " Caught Assertion in runQuery ns:" << ns << endl; 
-		cout << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << '\n';
-		cout << "  query:" << query.toString() << '\n';
+		log() << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << '\n';
+		log() << "  query:" << query.toString() << '\n';
 		msgdata = (QueryResult*) malloc(sizeof(QueryResult));
 		QueryResult *qr = msgdata;
 		qr->_data[0] = 0;
@@ -278,7 +277,7 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	}
 	else { 
 		if( strstr(ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
-			cout << "ERROR: receiveQuery: client is null; ns=" << ns << endl;
+			log() << "ERROR: receiveQuery: client is null; ns=" << ns << endl;
 	}
 	//	dbMsgPort.reply(m, resp, responseTo);
 }
@@ -377,7 +376,7 @@ void listen(int port) {
 	problem() << Version << endl;
 	pdfileInit();
 	//testTheDb();
-	cout << curTimeMillis() % 10000 << " waiting for connections on port " << port << " ...\n" << endl;
+	log() << "waiting for connections on port " << port << " ..." << endl;
 	OurListener l(port);
 	startReplication();
 	l.listen();
@@ -519,7 +518,7 @@ void connThread()
 		stringstream ss;
 
 		if( !dbMsgPort.recv(m) ) {
-			cout << "end connection " << dbMsgPort.farEnd.toString() << endl;
+			log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
 			dbMsgPort.shutdown();
 			break;
 		}
@@ -759,7 +758,7 @@ void setupSignals() {}
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
   if( opLogging ) 
-		cout << "opLogging = " << opLogging << endl;
+		log() << "opLogging = " << opLogging << endl;
     _oplog.init();
 
 #if !defined(_WIN32)
@@ -788,8 +787,7 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 	int pid=0;
 #endif
     
-    cout << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
-    problem() << "10Gen DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
+    log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
 
     if( useJNI ) {
       JavaJS = new JavaJSImpl(appserverLoc);

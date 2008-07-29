@@ -373,7 +373,7 @@ inline BtreeBucket* DiskLoc::btree() const {
 class Client { 
 public:
 	Client(const char *nm) : name(nm) { 
-		namespaceIndex.init(dbpath, nm);
+		justCreated = namespaceIndex.init(dbpath, nm);
 		profile = 0;
 		profileName = name + ".system.profile";
 	} 
@@ -423,6 +423,7 @@ public:
 	NamespaceIndex namespaceIndex;
 	int profile; // 0=off.
 	string profileName; // "alleyinsider.system.profile"
+	bool justCreated;
 };
 
 // tempish...move to TLS or pass all the way down as a parm
@@ -438,7 +439,7 @@ inline void setClient(const char *ns) {
 		client = it->second;
 		return;
 	}
-	problem() << "First request for database " << cl << endl;
+	problem() << "first request for database " << cl << endl;
 	Client *c = new Client(cl);
 	clients[cl] = c;
 	client = c;

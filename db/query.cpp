@@ -297,7 +297,7 @@ void getMods(vector<Mod>& mods, JSObj from) {
 todo:
  smart requery find record immediately
 */
-inline int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
+int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
 	//cout << "TEMP BAD";
 	//lrutest.find(updateobj);
 
@@ -383,9 +383,7 @@ inline int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool u
 */
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
 	int rc = _updateObjects(ns, updateobj, pattern, upsert, ss);
-	if( rc ) { 
-		logOp("u", ns, updateobj, &pattern, &upsert);
-	}
+	logOp("u", ns, updateobj, &pattern, &upsert);
 }
 
 int queryTraceLevel = 0;
@@ -585,7 +583,7 @@ void flushOpLog();
 // 
 // returns true if ran a cmd
 //
-inline bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder) { 
+bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder) { 
 
 	const char *p = strchr(ns, '.');
 	if( !p ) return false;

@@ -141,7 +141,7 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
   _vmArgs->nOptions = 3;
   _vmArgs->ignoreUnrecognized = JNI_FALSE;
 
-  cerr << "Creating JVM" << endl;
+  log() << "Creating JVM" << endl;
   jint res = JNI_CreateJavaVM( &_jvm, (void**)&_mainEnv, _vmArgs );
 
   if( res ) {
@@ -163,7 +163,7 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
 
   _dbhook = findClass( "ed/db/JSHook" );
   if( _dbhook == 0 )
-    cout << "using classpath: " << q << endl;
+    log() << "using classpath: " << q << endl;
   jassert( _dbhook );
 
   {
@@ -374,8 +374,8 @@ void jasserted(const char *msg, const char *file, unsigned line) {
 const char* findEd(const char *path) {
 
 #if defined(_WIN32)
-	cout << "    WIN32 default : c:/l/ed/" << endl;
-  return "c:/l/ed";
+	log() << "    WIN32 default : c:/l/ed/" << endl;
+	return "c:/l/ed";
 #else
 
 	if (!path) {
@@ -408,8 +408,8 @@ const char * findEd(){
 	cout << "Appserver location not specified.  Searching.... " << endl;
 
 #if defined(_WIN32)
-	cout << "    WIN32 default : c:/l/ed/" << endl;
-  return "c:/l/ed";
+	log() << "    WIN32 default : c:/l/ed/" << endl;
+	return "c:/l/ed";
 #else
 
   static list<const char*> possibleEdDirs;

@@ -735,6 +735,11 @@ JSObj JSObj::extractFields(JSObj pattern, JSObjBuilder& b) {
 	return b.done();
 }
 
+bool JSObj::getBoolField(const char *name) { 
+	Element e = getField(name);
+	return e.type() == Bool ? e.boolean() : false;
+}
+
 const char * JSObj::getStringField(const char *name) { 
 	Element e = getField(name);
 	return e.type() == String ? e.valuestr() : "";

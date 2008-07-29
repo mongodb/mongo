@@ -189,10 +189,14 @@ class NamespaceIndex {
 public:
 	NamespaceIndex() { }
 
-	void init(const char *dir, const char *client) { 
+	/* returns true if we created (did not exist) during init() */
+	bool init(const char *dir, const char *client) { 
 		string path = dir;
 		path += client;
 		path += ".ns";
+
+		bool created = !boost::filesystem::exists(path); 
+
 		const int LEN = 16 * 1024 * 1024;
 		void *p = f.map(path.c_str(), LEN);
 		if( p == 0 ) { 
@@ -200,6 +204,7 @@ public:
 			exit(-3);
 		}
 		ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
+		return created;
 	}
 
 	void add(const char *ns, DiskLoc& loc) { 
