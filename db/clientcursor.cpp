@@ -78,6 +78,17 @@ void ClientCursor::invalidate(const char *nsPrefix) {
 		delete (*i);
 }
 
+/* must call when a btree bucket going away. 
+   note this is potentially slow 
+*/
+void aboutToDeleteBucket(const DiskLoc& b) { 
+	RARELY if( byLoc.size() > 70 ) { 
+		log() << "perf warning: byLoc.size=" << byLoc.size() << " in aboutToDeleteBucket\n";
+	}
+	for( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
+		i->second->c->aboutToDeleteBucket(b);
+}
+
 /* must call this on a delete so we clean up the cursors. */
 void aboutToDelete(const DiskLoc& dl) { 
 	vector<ClientCursor*> toAdvance;
@@ -114,7 +125,7 @@ void ClientCursor::updateLocation() {
 	assert( cursorid );
 	DiskLoc cl = c->currLoc();
 	if( lastLoc() == cl ) {
-		cout << "info: lastloc==curloc " << ns << '\n';
+		log() << "info: lastloc==curloc " << ns << '\n';
 		return;
 	}
 	setLastLoc(cl);

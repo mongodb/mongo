@@ -179,6 +179,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\btreecursor.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\clientcursor.cpp"
 				>
 			</File>

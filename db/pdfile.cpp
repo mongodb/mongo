@@ -49,13 +49,12 @@ extern int otherTraceLevel;
 
 void sayDbContext(const char *errmsg) { 
 	if( errmsg ) { 
-		cout << errmsg << '\n';
 		problem() << errmsg << endl;
 	}
-	cout << " client: " << (client ? client->name.c_str() : "null");
-	cout << " op:" << curOp << ' ' << callDepth << endl;
+	log() << " client: " << (client ? client->name.c_str() : "null");
+	log() << " op:" << curOp << ' ' << callDepth << '\n';
 	if( client )
-		cout << " ns: " << curNs << endl;
+		log() << " ns: " << curNs << endl;
 	printStackTrace();
 }
 
@@ -79,6 +78,9 @@ JSObj::JSObj(Record *r) {
 
 /*---------------------------------------------------------------------*/ 
 
+/* deleted lists -- linked lists of deleted records -- tehy are placed in 'buckets' of various sizes 
+   so you can look for a deleterecord about the right size.
+*/
 int bucketSizes[] = { 
 	32, 64, 128, 256, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000,
 	0x8000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000, 0x200000,
@@ -369,7 +371,7 @@ auto_ptr<Cursor> makeNamespaceCursor() {
    options: { capped : ..., size : ... }
 */
 void addNewNamespaceToCatalog(const char *ns, JSObj *options = 0) {
-	cout << "New namespace: " << ns << endl;
+	log() << "New namespace: " << ns << endl;
 	if( strstr(ns, "system.namespaces") ) { 
 		// system.namespaces holds all the others, so it is not explicitly listed in the catalog.
 		// TODO: fix above should not be strstr!
@@ -397,7 +399,7 @@ int initialExtentSize(int len) {
 		sz = 1000000000;
 	int z = ((int)sz) & 0xffffff00;
 	assert( z > len );
-	cout << "initialExtentSize(" << len << ") returns " << z << endl;
+	log() << "initialExtentSize(" << len << ") returns " << z << endl;
 	return z;
 }
 
@@ -519,9 +521,9 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
 	DEBUGGING cout << "temp: newextent adddelrec " << ns << endl;
 	details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
-	cout << "new extent size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset << dec;
-	cout << " emptyLoc:" << hex << emptyLoc.getOfs() << dec;
-	cout << ' ' << ns << endl;
+	log() << "new extent size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
+		<< " emptyLoc:" << hex << emptyLoc.getOfs() << dec
+		<< ' ' << ns << endl;
 	return e;
 }
 
@@ -964,7 +966,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 /* note there are faster ways to build an index in bulk, that can be 
    done eventually */
 void addExistingToIndex(const char *ns, IndexDetails& idx) {
-	cout << "Adding all existing records for " << ns << " to new index" << endl;
+	log() << "Adding all existing records for " << ns << " to new index" << endl;
 	int n = 0;
 	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
 	while( c->ok() ) {
@@ -973,7 +975,7 @@ void addExistingToIndex(const char *ns, IndexDetails& idx) {
 		c->advance();
 		n++;
 	};
-	cout << "  indexing complete for " << n << " records" << endl;
+	log()  << "  indexing complete for " << n << " records" << endl;
 }
 
 /* add keys to indexes for a new record */
@@ -1067,12 +1069,12 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	if( loc.isNull() ) {
 		// out of space
 		if( d->capped == 0 ) { // size capped doesn't grow
-			cout << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
+			log() << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
 			client->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
 			loc = d->alloc(ns, lenWHdr, extentLoc);
 		}
 		if( loc.isNull() ) { 
-			cout << "out of space in datafile. capped:" << d->capped << endl;
+			log() << "out of space in datafile. capped:" << d->capped << endl;
 			assert(d->capped);
 			return DiskLoc();
 		}

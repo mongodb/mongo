@@ -91,7 +91,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 				         specified!
 				*/
 				DEV cout << " using index " << d->indexes[i].indexNamespace() << '\n';
-				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i].head, reverse ? maxKey : emptyObj, reverse ? -1 : 1, false));
+				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], reverse ? maxKey : emptyObj, reverse ? -1 : 1, false));
 			}
 		}
 	}
@@ -145,7 +145,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 
 						int direction = - JSMatcher::opDirection(op);
 						return auto_ptr<Cursor>( new BtreeCursor(
-							d->indexes[i].head, 
+							d->indexes[i], 
 							direction == 1 ? emptyObj : maxKey, 
 							direction, 
 							true) );
@@ -182,7 +182,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 			DEV cout << "using index " << d->indexes[i].indexNamespace() << endl;
 			if( simple && simpleKeyMatch ) *simpleKeyMatch = true;
 			return auto_ptr<Cursor>( 
-				new BtreeCursor(d->indexes[i].head, q2, 1, true));
+				new BtreeCursor(d->indexes[i], q2, 1, true));
 		}
 	}
 
@@ -646,7 +646,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 				valid = ok = true;
 				opLogging = (int) e.number();
 				flushOpLog();
-				cout << "CMD: opLogging set to " << opLogging << endl;
+				log() << "CMD: opLogging set to " << opLogging << endl;
 			} else if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
 				valid = ok = true;
 				queryTraceLevel = (int) e.number();
@@ -697,7 +697,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 			valid = true;
 			string dropNs = us + '.' + e.valuestr();
 			NamespaceDetails *d = nsdetails(dropNs.c_str());
-			cout << "CMD: clean " << dropNs << endl;
+			log() << "CMD: clean " << dropNs << endl;
 			if( d ) { 
 				ok = true;
 				anObjBuilder.append("ns", dropNs.c_str());
@@ -711,7 +711,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 			valid = true;
 			string nsToDrop = us + '.' + e.valuestr();
 			NamespaceDetails *d = nsdetails(nsToDrop.c_str());
-			cout << "CMD: drop " << nsToDrop << endl;
+			log() << "CMD: drop " << nsToDrop << endl;
 			if( d == 0 ) {
 				anObjBuilder.append("errmsg", "ns not found");
 			}
@@ -740,7 +740,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 			valid = true;
 			string toValidateNs = us + '.' + e.valuestr();
 			NamespaceDetails *d = nsdetails(toValidateNs.c_str());
-			cout << "CMD: validate " << toValidateNs << endl;
+			log() << "CMD: validate " << toValidateNs << endl;
 			if( d ) { 
 				ok = true;
 				anObjBuilder.append("ns", toValidateNs.c_str());
@@ -756,7 +756,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 			/* note: temp implementation.  space not reclaimed! */
 			string toDeleteNs = us + '.' + e.valuestr();
 			NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
-			cout << "CMD: deleteIndexes " << toDeleteNs << endl;
+			log() << "CMD: deleteIndexes " << toDeleteNs << endl;
 			if( d ) {
 				Element f = jsobj.findElement("index");
 				if( !f.eoo() ) { 
@@ -840,7 +840,7 @@ void killCursors(int n, long long *ids) {
 		if( ClientCursor::erase(ids[i]) )
 			k++;
 	}
-	cout << "killCursors: found " << k << " of " << n << endl;
+	log() << "killCursors: found " << k << " of " << n << '\n';
 }
 
 // order.$natural sets natural order direction
@@ -1092,17 +1092,18 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 	int n = 0;
 
 	if( !cc ) { 
-		DEV cout << "getMore: cursorid not found " << ns << " " << cursorid << endl;
+		DEV log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
 		cursorid = 0;
 	}
 	else {
 		start = cc->pos;
 		Cursor *c = cc->c.get();
+		c->checkLocation();
 		while( 1 ) {
 			if( !c->ok() ) {
 done:
 				// done!  kill cursor.
-				DEV cout << "  getmore: last batch, erasing cursor " << cursorid << endl;
+				DEV log() << "  getmore: last batch, erasing cursor " << cursorid << endl;
 				bool ok = ClientCursor::erase(cursorid);
 				assert(ok);
 				cursorid = 0;

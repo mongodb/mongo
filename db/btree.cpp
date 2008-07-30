@@ -28,8 +28,6 @@ int ninserts = 0;
 extern int otherTraceLevel;
 int split_debug = 0;
 int insert_debug = 0;
-DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
-DiskLoc minDiskLoc(0, 1);
 
 KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) : 
   prevChildBucket(k.prevChildBucket), 
@@ -340,7 +338,10 @@ bool BtreeBucket::find(JSObj& key, DiskLoc recordLoc, int& pos) {
 	return false;
 }
 
+void aboutToDeleteBucket(const DiskLoc&);
 void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) { 
+	aboutToDeleteBucket(thisLoc);
+
 	assert( !isHead() );
 
 	BtreeBucket *p = parent.btree();
@@ -781,26 +782,6 @@ void BtreeBucket::dump() {
 	cout << " right:" << hex << nextChild.getOfs() << dec << endl;
 }
 
-JSObj *music = 0;
-
-void tempMusic(DiskLoc thisLoc)
-{
-	BtreeCursor c(thisLoc, *music, 1, true);
-	while( c.ok() ) { 
-		KeyNode kn = c.currKeyNode();
-		if( !kn.key.woEqual(*music) )
-			break;
-		if( kn.recordLoc.getOfs() == 0x4c8d7c0 ) {
-			cout << "*** found it" << endl;
-				//				c.bucket.btree()->dump();
-			return;
-		}
-		c.advance();
-	}
-
-	cout << "*** NOT FOUND" << endl;
-}
-
 /* todo: meaning of return code unclear clean up */
 int BtreeBucket::insert(DiskLoc thisLoc, DiskLoc recordLoc, 
 						JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
@@ -827,14 +808,6 @@ int BtreeBucket::insert(DiskLoc thisLoc, DiskLoc recordLoc,
 	int x = _insert(thisLoc, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
 	assertValid(); 
 
-/*	if( toplevel ) {
-		if( recordLoc.getOfs() == 0x4c8d7c0 ) {
-			if( key.toString() == "{ _searchIndex: \"music\" }" ) { 
-				tempMusic(thisLoc);
-			}
-		}
-	}
-*/
 	return x;
 }
 
@@ -842,113 +815,3 @@ void BtreeBucket::shape(stringstream& ss) {
 	_shape(0, ss);
 }
 
-/* - BtreeCursor --------------------------------------------------- */
-
-BtreeCursor::BtreeCursor(DiskLoc head, JSObj& k, int _direction, bool sm) : 
-    direction(_direction), stopmiss(sm) 
-{
-//otherTraceLevel = 999;
-
-	bool found;
-	if( otherTraceLevel >= 12 ) {
-		if( otherTraceLevel >= 200 ) { 
-			cout << "::BtreeCursor() qtl>200.  validating entire index." << endl;
-			head.btree()->fullValidate(head);
-		}
-		else {
-			cout << "BTreeCursor(). dumping head bucket" << endl;
-			head.btree()->dump();
-		}
-	}
-	bucket = head.btree()->locate(head, k, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
-	checkUnused();
-}
-
-int zzz = 0;
-
-/* skip unused keys. */
-void BtreeCursor::checkUnused() {
-	int u = 0;
-	while( 1 ) {
-		if( !ok() ) 
-			break;
-		BtreeBucket *b = bucket.btree();
-		_KeyNode& kn = b->k(keyOfs);
-		if( kn.isUsed() )
-			break;
-		bucket = b->advance(bucket, keyOfs, direction, "checkUnused");
-		u++;
-	}
-	if( u > 10 && ++zzz % 16 == 0 )
-		cout << "btree unused skipped:" << u << endl;
-}
-
-bool BtreeCursor::advance() { 
-	if( bucket.isNull() )
-		return false;
-	bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");
-	checkUnused();
-	return !bucket.isNull();
-}
-
-void BtreeCursor::noteLocation() {
-	if( !eof() ) {
-		JSObj o = bucket.btree()->keyAt(keyOfs).copy();
-		keyAtKeyOfs = o;
-		locAtKeyOfs = bucket.btree()->k(keyOfs).recordLoc;
-	}
-}
-
-/* Since the last noteLocation(), our key may have moved around, and that old cached 
-   information may thus be stale and wrong (although often it is right).  We check 
-   that here; if we have moved, we have to search back for where we were at.
-
-   i.e., after operations on the index, the BtreeCursor's cached location info may 
-   be invalid.  This function ensures validity, so you should call it before using 
-   the cursor if other writers have used the database since the last noteLocation
-   call.
-*/
-void BtreeCursor::checkLocation() { 
-	{
-		if( eof() ) 
-			return;
-		BtreeBucket *b = bucket.btree(); 
-
-		assert( !keyAtKeyOfs.isEmpty() ); 
-
-		// Note keyAt() returns an empty JSObj if keyOfs is now out of range, 
-		// which is possible as keys may have been deleted.
-		if( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
-			b->k(keyOfs).recordLoc == locAtKeyOfs ) { 
-				if( !b->k(keyOfs).isUsed() ) {
-					/* we were deleted but still exist as an unused 
-					   marker key. advance. 
-					*/
-					checkUnused();
-				}
-				return;
-		}
-	}
-
-	/* normally we don't get to here.  when we do, old position is no longer
- 	   valid and we must refind where we left off (which is expensive)
-	*/
-
-	bool found;
-	DiskLoc bold = bucket;
-
-	/* TODO: Switch to keep indexdetails and do idx.head! */
-	DiskLoc head = bold.btree()->getHead(bold);
-	bucket = head.btree()->locate(head, keyAtKeyOfs, keyOfs, found, locAtKeyOfs, direction);
-	RARELY cout << "  key seems to have moved in the index, refinding. found:" << found << endl;
-	if( found )
-		checkUnused();
-}
-
-/* ----------------------------------------------------------------------------- */
-
-struct BtreeUnitTest { 
-	BtreeUnitTest() { 
-		assert( minDiskLoc.compare(maxDiskLoc) < 0 );
-	}
-} btut;

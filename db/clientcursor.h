@@ -32,7 +32,6 @@ class ClientCursor;
 typedef map<CursorId, ClientCursor*> CCById;
 extern CCById clientCursorsById;
 
-
 class ClientCursor {
 	friend class CursInspector;
 	DiskLoc _lastLoc; // use getter and setter not this.

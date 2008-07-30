@@ -101,6 +101,17 @@ public:
 	DiskLoc nextDeleted;
 };
 
+/* Record is a record in a datafile.  DeletedRecord is similar but for deleted space.
+
+*11:03:20 AM) dm10gen: regarding extentOfs...
+(11:03:42 AM) dm10gen: an extent is a continugous disk area, which contains many Records and DeleteRecords
+(11:03:56 AM) dm10gen: a DiskLoc has two pieces, the fileno and ofs.  (64 bit total)
+(11:04:16 AM) dm10gen: to keep the headesr small, instead of storing a 64 bit ptr to the full extent address, we keep just the offset
+(11:04:29 AM) dm10gen: we can do this as we know the record's address, and it has the same fileNo
+(11:04:33 AM) dm10gen: see class DiskLoc for more info
+(11:04:43 AM) dm10gen: so that is how Record::myExtent() works
+(11:04:53 AM) dm10gen: on an alloc(), when we build a new Record, we must popular its extentOfs then 
+*/
 class Record {
 public:
 	enum { HeaderSize = 16 };
@@ -125,6 +136,9 @@ public:
 
 /* extents are datafile regions where all the records within the region 
    belong to the same namespace.
+
+(11:12:35 AM) dm10gen: when the extent is allocated, all its empty space is stuck into one big DeletedRecord
+(11:12:55 AM) dm10gen: and that is placed on the free list
 */
 class Extent {
 public:
@@ -241,6 +255,8 @@ public:
 	virtual JSObj current() = 0;
 	virtual DiskLoc currLoc() = 0;
 	virtual bool advance() = 0; /*true=ok*/
+
+	virtual void aboutToDeleteBucket(const DiskLoc& b) { }
 
 	/* optional to implement.  if implemented, means 'this' is a prototype */
 	virtual Cursor* clone() { return 0; }
@@ -453,7 +469,7 @@ inline void _deleteDataFiles(const char *client) {
 	q = p / (c+"ns");
 	bool ok = boost::filesystem::remove(q);
 	if( ok ) 
-		cout << "  removed file " << q.string() << endl;
+		log() << "  removed file " << q.string() << '\n';
 	int i = 0;
 	int extra = 10; // should not be necessary, this is defensive in case there are missing files
 	while( 1 ) { 
@@ -462,9 +478,9 @@ inline void _deleteDataFiles(const char *client) {
 		ss << c << i;
 		q = p / ss.str();
 		if( boost::filesystem::remove(q) ) {
-			cout << "  removed file " << q.string() << endl;
+			log() << "  removed file " << q.string() << '\n';
 			if( extra != 10 ) 
-				cout << "  WARNING: extra == " << extra << endl;
+				log() << "  _deleteDataFiles() warning: extra == " << extra << endl;
 		}
 		else if( --extra <= 0 ) 
 			break;

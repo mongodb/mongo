@@ -71,7 +71,7 @@ public:
 	   have a pointer to the object here, the object in system.indexes must 
 	   never move.
 	*/
-	DiskLoc info; 
+	DiskLoc info;
 
 	/* pull out the relevant key objects from obj, so we
        can index them.  Note that the set is multiple elements 

@@ -174,7 +174,7 @@ private:
 class BtreeCursor : public Cursor {
 	friend class BtreeBucket;
 public:
-	BtreeCursor(DiskLoc head, JSObj& startKey, int direction, bool stopmiss);
+	BtreeCursor(IndexDetails&, JSObj& startKey, int direction, bool stopmiss);
 	virtual bool ok() { return !bucket.isNull(); }
 	bool eof() { return !ok(); }
 	virtual bool advance();
@@ -193,6 +193,11 @@ public:
 		return bucket.btree()->keyNode(keyOfs);
 	}
 
+	virtual void aboutToDeleteBucket(const DiskLoc& b) { 
+		if( bucket == b )
+			keyOfs = -1;
+	}
+
 	virtual DiskLoc currLoc() { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc(); }
 	virtual Record* _current() { return currLoc().rec(); }
 	virtual JSObj current() { return JSObj(_current()); }
@@ -200,6 +205,7 @@ public:
 
 private:
 	void checkUnused();
+	IndexDetails& indexDetails;
 	DiskLoc bucket;
 	int keyOfs;
 	int direction; // 1=fwd,-1=reverse
