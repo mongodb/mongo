@@ -787,7 +787,8 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 	int pid=0;
 #endif
     
-    log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath << endl;
+    log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath 
+            <<  " master = " << master << " slave = " << slave << endl;
 
     if( useJNI ) {
       JavaJS = new JavaJSImpl(appserverLoc);
