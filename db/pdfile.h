@@ -460,6 +460,13 @@ inline void setClient(const char *ns) {
 	clients[cl] = c;
 	client = c;
 }
+/* we normally keep around a curNs ptr -- if this ns is temporary, 
+   use this instead so we don't have a bad ptr.  we could have made a copy,
+   but trying to be fast as we call setClient this for every single operation.
+*/
+inline void setClientTempNs(const char *ns) { 
+	setClient(ns); curNs = "";
+}
 
 inline void _deleteDataFiles(const char *client) { 
 	string c = client;

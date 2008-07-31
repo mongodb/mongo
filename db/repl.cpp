@@ -53,6 +53,9 @@ struct TestOpTime {
 			assert( s != t );
 			t = s;
 		}
+		OpTime q = t;
+		assert( q == t );
+		assert( !(q != t) );
 	}
 } testoptime;
 
@@ -206,13 +209,12 @@ void Source::loadAll(vector<Source*>& v) {
 JSObj opTimeQuery = fromjson("{getoptime:1}");
 
 bool Source::resync(string db) {
-	assert( client->name == db );
-
 	{
 		log() << "resync: dropping database " << db << endl;
 		string dummyns = db + ".";
+		assert( client->name == db );
 		dropDatabase(dummyns.c_str());
-		setClient(dummyns.c_str());
+		setClientTempNs(dummyns.c_str());
 	}
 
 	{
@@ -237,7 +239,7 @@ bool Source::resync(string db) {
 void Source::applyOperation(JSObj& op) { 
 	stringstream ss;
 	const char *ns = op.getStringField("ns");
-	setClient(ns);
+	setClientTempNs(ns);
 
 	if( client->justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
 	    !dbs.count(client->name) ) /* if not in dbs, we've never synced this database before, so we need everything */
@@ -381,7 +383,7 @@ void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *o2, bool *bb) 
 
 	Client *oldClient = client;
 	if( localOplogMainDetails == 0 ) { 
-		setClient("local.");
+		setClientTempNs("local.");
 		localOplogClient = client;
 		localOplogMainDetails = nsdetails("local.oplog.$main");
 	}
@@ -471,11 +473,12 @@ void startReplication() {
 
 	if( master ) {  
 		log() << "master=true" << endl;
+		lock lk(dbMutex);
 		/* create an oplog collection, if it doesn't yet exist. */
 		JSObjBuilder b;
 		b.append("size", 254.0 * 1000 * 1000);
 		b.appendBool("capped", 1);
-		setClient("local.oplog.$main");
+		setClientTempNs("local.oplog.$main");
 		string err;
 		JSObj o = b.done();
 		userCreateNS("local.oplog.$main", o, err);

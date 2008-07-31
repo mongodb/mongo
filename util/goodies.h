@@ -162,7 +162,7 @@ inline unsigned curTimeMicros() {
 	return t;
 }
 using namespace boost;
-typedef boost::mutex::scoped_lock lock;
+typedef boost::mutex::scoped_lock boostlock;
 
 // simple scoped timer
 class Timer { 
@@ -176,3 +176,28 @@ public:
 private:
 	unsigned old;
 };
+
+/*
+
+class DebugMutex : boost::noncopyable { 
+	friend class lock;
+	boost::mutex m;
+	int locked;
+public:
+	DebugMutex() : locked(0); { }
+	bool isLocked() { return locked; }
+};
+
+*/
+/*
+struct lock { 
+boostlock bl;
+	DebugMutex& m;
+	lock(DebugMutex& _m) : m(_m) {
+		do_lock();
+	}
+	~lock() { do_unlock(); }
+}
+*/
+typedef boostlock lock;
+

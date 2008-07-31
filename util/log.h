@@ -35,7 +35,7 @@ public:
 inline Nullstream& endl ( Nullstream& os ) { }
 extern Nullstream nullstream;
 
-#define LOGIT { lock lk(mutex); cout << x; return *this; }
+#define LOGIT { boostlock lk(mutex); cout << x; return *this; }
 class Logstream {
 	static boost::mutex mutex;
 public:
@@ -49,10 +49,10 @@ public:
 	Logstream& operator<<(long long x) LOGIT
 	Logstream& operator<<(unsigned long long x) LOGIT
 	Logstream& operator<<(const string& x) LOGIT
-	Logstream& operator<< (ostream& ( *_endl )(ostream&)) { lock lk(mutex); cout << _endl; return *this; }
-	Logstream& operator<< (ios_base& (*_hex)(ios_base&)) { lock lk(mutex); cout << _hex; return *this; }
+	Logstream& operator<< (ostream& ( *_endl )(ostream&)) { boostlock lk(mutex); cout << _endl; return *this; }
+	Logstream& operator<< (ios_base& (*_hex)(ios_base&)) { boostlock lk(mutex); cout << _hex; return *this; }
 	Logstream& prolog(bool withNs = false) {
-		lock lk(mutex);
+		boostlock lk(mutex);
 		time_t t;
 		time(&t);
 		string now(ctime(&t),0,20);
