@@ -33,7 +33,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err);
 int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss);
 bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder);
 
-OpTime last((unsigned) time(0), 1);
+OpTime last(0, 0);
 
 OpTime OpTime::now() { 
 	unsigned t = (unsigned) time(0);
@@ -41,8 +41,26 @@ OpTime OpTime::now() {
 		last.i++;
 		return last;
 	}
-	return OpTime(t, 1);
+	last = OpTime(t, 1);
+	return last;
 }
+
+struct TestOpTime { 
+	TestOpTime() {
+		OpTime t;
+		for( int i = 0; i < 10; i++ ) { 
+			OpTime s = OpTime::now();
+			assert( s != t );
+			t = s;
+		}
+	}
+} testoptime;
+
+int test2() { 
+	TestOpTime t;
+	return 0;
+}
+
 
 /* Cloner -----------------------------------------------------------
    makes copy of existing database.
@@ -308,7 +326,11 @@ void Source::pullOpLog(DBClientConnection& conn) {
 			assert( ts.type() == Date );
 			OpTime last = t;
 			t.asDate() = ts.date();
-			assert( last < t );
+			if( !( last < t ) ) { 
+				problem() << "sync error: last " << last.toString() << " >= t " << t.toString() << endl;
+				uassert(false);
+			}
+
 			applyOperation(op);
 			n++;
 		}

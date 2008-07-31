@@ -72,6 +72,7 @@
 // grab struct QueryResult from:
 #include "dbclient.h"
 
+// for an existing query (ie a ClientCursor), send back additional information.
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 
 // caller must free() returned QueryResult.
@@ -80,6 +81,7 @@ QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn,
 					  stringstream&);
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss);
+
 int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god=false);
 
 #include "clientcursor.h"

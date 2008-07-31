@@ -806,18 +806,6 @@ void testClient();
 int main(int argc, char* argv[], char *envp[] )
 {
 	DEV cout << "warning: DEV mode enabled\n";
-/*	struct { 
-		int x;
-		char ch;
-	} foo;
-	foo.x = 5;
-	foo.ch = EOO;
-
-	while( 1 ) { 
-		JSObj q((char *) &foo);
-		cout << "obj:" << q.toString() << '\n';
-	}
-*/
 
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);

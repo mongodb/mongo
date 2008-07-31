@@ -22,7 +22,7 @@
 #include "stdafx.h"
 #include "../util/mmap.h"
 
-int test2() { 
+int test2_old() { 
 	cout << "test2" << endl;
 	printStackTrace();
 	if( 1 ) 
