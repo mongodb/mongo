@@ -37,7 +37,7 @@ class JSObjBuilder;
 */
 enum JSType { EOO = 0, Number=1, String=2, Object=3, Array=4, BinData=5, 
               Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
-              DBRef=12, Code=13, JSTypeMax=13, MaxKey=127 };
+              DBRef=12, Code=13, Symbol=14, JSTypeMax=14, MaxKey=127 };
 
 /* subtypes of BinData.
    bdtCustom and above are ones that the JS compiler understands, but are

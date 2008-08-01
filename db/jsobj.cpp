@@ -145,6 +145,7 @@ string Element::toString() {
 			s << valuestr();
 		}
 		break;
+        case Symbol:
 	case String:
 		s << fieldName() << ": ";
 		if( valuestrsize() > 80 ) 
@@ -193,6 +194,7 @@ int Element::size() const {
 		case jstOID:
 			x = 13;
 			break;
+                case Symbol:
 		case Code:
 		case String:
 			x = valuestrsize() + 4 + 1;
@@ -263,6 +265,7 @@ int compareElementValues(const Element& l, const Element& r) {
 		case jstOID:
 			return memcmp(l.value(), r.value(), 12);
 		case Code:
+                case Symbol:
 		case String:
 			/* todo: utf version */
 			return strcmp(l.valuestr(), r.valuestr());
@@ -542,7 +545,7 @@ extern int dump;
 inline bool _regexMatches(RegexMatcher& rm, Element& e) { 
 	char buf[64];
 	const char *p = buf;
-	if( e.type() == String )
+	if( e.type() == String || e.type() == Symbol )
 		p = e.valuestr();
 	else if( e.type() == Number ) { 
 		sprintf(buf, "%f", e.number());
