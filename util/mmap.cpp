@@ -148,14 +148,14 @@ void* MemoryMappedFile::map(const char *filename, int length) {
 	/* make sure the file is the full desired length */
 	off_t filelen = lseek(fd, 0, SEEK_END);
 	if( filelen < length ) { 
-		cout << "map: file length=" << (unsigned) filelen << " want:";
-		cout << length;
-		cout << endl;
+		log() << "map: file length=" << (unsigned) filelen << " want:"
+		 << length
+		 << endl;
 		if( filelen != 0 ) { 
-			cout << "  failing mapping" << endl;
+			log() << "  failing mapping" << endl;
 			return 0;
 		}
-		cout << "  writing file to full length with zeroes..." << endl;
+		log() << "  writing file to full length with zeroes..." << endl;
 		int z = 8192;
 		char buf[z];
 		memset(buf, 0, z);
@@ -168,7 +168,7 @@ void* MemoryMappedFile::map(const char *filename, int length) {
 			write(fd, buf, z);
 			left -= z;
 		}
-		cout << "  done" << endl;
+		log() << "  done" << endl;
 	}
 
 	lseek(fd, length, SEEK_SET);
@@ -184,7 +184,7 @@ void* MemoryMappedFile::map(const char *filename, int length) {
 
 void MemoryMappedFile::flush(bool sync) {
 	if( msync(view, len, sync ? MS_SYNC : MS_ASYNC) )
-		cout << "msync error " << errno << endl;
+		problem() << "msync error " << errno << endl;
 }
 
 #endif

@@ -61,7 +61,6 @@ struct TestOpTime {
 } testoptime;
 
 int test2() { 
-	TestOpTime t;
 	return 0;
 }
 
@@ -314,7 +313,7 @@ void Source::pullOpLog(DBClientConnection& conn) {
 	}
 	else if( t != syncedTo ) { 
 		log() << "pull:   t " << t.toString() << " != syncedTo " << syncedTo.toString() << '\n';
-		log() << "    data too stale, halting replication" << endl;
+        log() << "pull:    data too stale, halting replication" << endl;
 		assert( syncedTo < t );
 		throw SyncException();
 	}

@@ -62,7 +62,7 @@ inline void disableNagle(int sock) {
 
 }
 inline void prebindOptions( int sock ){
-  log() << "doing prebind option" << endl;
+  DEV log() << "doing prebind option" << endl;
   int x = 1;
   if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x)) < 0 )
     cout << "Failed to set socket opt, SO_REUSEADDR" << endl;
