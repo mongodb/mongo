@@ -18,3 +18,19 @@
 #include "../grid/message.h"
 
 void jniCallback(Message& m, Message& out);
+
+extern boost::mutex dbMutex;
+extern int dbLocked;
+
+struct dblock { 
+    boostlock bl;
+    dblock() : bl(dbMutex) { 
+        dbLocked++;
+        assert( dbLocked == 1 );
+    }
+	~dblock() { 
+        dbLocked--;
+        assert( dbLocked == 0 );
+    }
+};
+

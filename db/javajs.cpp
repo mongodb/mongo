@@ -145,9 +145,9 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
   jint res = JNI_CreateJavaVM( &_jvm, (void**)&_mainEnv, _vmArgs );
 
   if( res ) {
-	  cout << "using classpath: " << q << endl;
-	  cerr
-		  << "res : " << res << " " 
+	  log() << "using classpath: " << q << endl;
+	  log()
+		  << " res : " << (unsigned) res << " " 
 		  << "_jvm : " << _jvm  << " " 
 		  << "_env : " << _mainEnv << " "
 		  << endl;
@@ -341,7 +341,7 @@ void JavaJSImpl::run( const char * js ){
   jassert( m );
   
   jstring s = _getEnv()->NewStringUTF( js );
-  cout << _getEnv()->CallStaticObjectMethod( c , m , s ) << endl;
+  log() << _getEnv()->CallStaticObjectMethod( c , m , s ) << endl;
 }
 
 void JavaJSImpl::printException(){
@@ -365,7 +365,7 @@ JNIEnv * JavaJSImpl::_getEnv(){
 }
 
 void jasserted(const char *msg, const char *file, unsigned line) { 
-  cout << "jassert failed " << msg << " " << file << " " << line << endl;
+  log() << "jassert failed " << msg << " " << file << " " << line << endl;
   if ( JavaJS ) JavaJS->printException();
   throw AssertionException();
 }
@@ -382,22 +382,22 @@ const char* findEd(const char *path) {
 		return findEd();
 	}
 	
-	cout << "Appserver location specified : " << path << endl;
+	log() << "Appserver location specified : " << path << endl;
 	
 	if (!path) {
-		cout << "   invalid appserver location : " << path << " : terminating - prepare for bus error" << endl;
+		log() << "   invalid appserver location : " << path << " : terminating - prepare for bus error" << endl;
 		return 0;
 	}
 	
 	DIR *testDir = opendir(path);
 
 	if (testDir) { 
-		cout << "   found directory for appserver : " << path << endl;
+		log() << "   found directory for appserver : " << path << endl;
 		closedir(testDir);
 		return path;
 	}
 	else {
-		cout << "   ERROR : not a directory for specified appserver location : " << path << " - prepare for bus error" << endl;
+		log() << "   ERROR : not a directory for specified appserver location : " << path << " - prepare for bus error" << endl;
 		return null;
 	}
 #endif
@@ -405,7 +405,7 @@ const char* findEd(const char *path) {
 
 const char * findEd(){
 
-	cout << "Appserver location not specified.  Searching.... " << endl;
+	log() << "Appserver location not specified.  Searching.... " << endl;
 
 #if defined(_WIN32)
 	log() << "    WIN32 default : c:/l/ed/" << endl;
@@ -426,11 +426,12 @@ const char * findEd(){
       continue;
     
     closedir( test );
-	cout << "   found directory for appserver : " << temp << endl;
+	log() << "   found directory for appserver : " << temp << endl;
     return temp;
   }
   
-  cout << "   ERROR : can't find directory for appserver - prepare for bus error" << endl;  
+  problem() << "ERROR : can't find directory for appserver - terminating" << endl;  
+  exit(44);
   return 0;
 #endif
 };
@@ -472,7 +473,7 @@ int javajstest() {
 
   JavaJSImpl& JavaJS = *::JavaJS;
 
-  if ( debug ) cout << "about to create scope" << endl;
+  if ( debug ) log() << "about to create scope" << endl;
   jlong scope = JavaJS.scopeCreate();
   jassert( scope );
   if ( debug ) cout << "got scope" << endl;
@@ -502,7 +503,7 @@ int javajstest() {
   
   if ( debug ) cout << "going to get object" << endl;
   JSObj obj = JavaJS.scopeGetObject( scope , "abc" );
-  if ( debug ) cout << "done gettting object" << endl;
+  if ( debug ) cout << "done getting object" << endl;
   
   if ( debug ){
     cout << "obj : " << obj.toString() << endl;

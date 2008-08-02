@@ -189,15 +189,5 @@ public:
 };
 
 */
-/*
-struct lock { 
-boostlock bl;
-	DebugMutex& m;
-	lock(DebugMutex& _m) : m(_m) {
-		do_lock();
-	}
-	~lock() { do_unlock(); }
-}
-*/
-typedef boostlock lock;
 
+//typedef boostlock lock;

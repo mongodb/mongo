@@ -40,6 +40,7 @@ extern int curOp;
 bool useCursors = true;
 
 boost::mutex dbMutex;
+int dbLocked = 0;
 
 void closeAllSockets();
 void startReplication();
@@ -531,7 +532,7 @@ void connThread()
 
 		DbResponse dbresponse;
 		{
-			lock lk(dbMutex);
+			dblock lk;
 			Timer t;
 			client = 0;
 			curOp = 0;
@@ -741,7 +742,7 @@ void mysighandler(int x) {
    cout << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
    problem() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
    {
-	   lock lk(dbMutex);
+	   dblock lk;
 	   problem() << "  now exiting" << endl;
 	   exit(12);
    }
