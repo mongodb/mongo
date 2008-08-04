@@ -34,13 +34,29 @@ JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToRe
 bool DBClientConnection::connect(const char *serverAddress, string& errmsg) { 
 	/* not reentrant! 
 	   ok as used right now (we are in a big lock), but won't be later, so fix. */
+  
+  	int port = DBPort;
+	
+
 	string ip = hostbyname_nonreentrant(serverAddress);
 	if( ip.empty() ) 
 		ip = serverAddress;
 
-	server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), DBPort));
+	int idx = ip.find( ":" );
+	if ( idx != string::npos ){
+	  cout << "port string:" << ip.substr( idx ) << endl;
+	  port = atoi( ip.substr( idx + 1 ).c_str() );
+	  ip = ip.substr( 0 , idx );
+	  ip = hostbyname_nonreentrant(ip.c_str());
+
+	}
+	if( ip.empty() ) 
+		ip = serverAddress;
+	
+	cout << "port:" << port << endl;
+	server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
 	if( !p.connect(*server) ) {
-		errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;
+	        errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;
 		return false;
 	}
 	return true;
