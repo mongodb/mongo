@@ -424,8 +424,14 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 						assert( in == 0 ); // only one per query supported so far.  finish...
 						in = new set<Element,element_lt>();
 						JSElemIter i(fe.embeddedObject());
-						while( i.more() )
-							in->insert(i.next());
+                        if( i.more() ) {
+                            while( 1 ) {
+                                Element ie = i.next();
+                                if( ie.eoo() ) 
+                                    break;
+                                in->insert(ie);
+                            }
+                        }
 						toMatch.push_back(e); // not actually used at the moment
 						compareOp.push_back(opIN);
 						n++;
@@ -456,7 +462,8 @@ inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) {
 
 	if( op == opIN ) {
 		// { $in : [1,2,3] }
-		return in->count(l);
+        int c = in->count(l);
+        return c;
 	}
 
 	/* check LT, GTE, ... */

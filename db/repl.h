@@ -45,7 +45,7 @@ public:
       static OpTime now();
 	  unsigned long long& asDate() { return *((unsigned long long *) this); } 
 	  bool isNull() { return secs == 0; }
-	  string toString() { 
+	  string toString() const { 
 		  stringstream ss;
 		  ss << hex << secs << ':' << i;
 		  return ss.str();
