@@ -76,20 +76,6 @@ struct OID {
      BinData:   <int len> <byte subtype> <byte[len] data>
 */
 
-/* db operation message format 
-
-   unsigned opid;         // arbitary; will be echoed back
-   byte operation;
-   
-   dbInsert:
-      int reserved;
-      string collection;
-      a series of JSObjects terminated with a null object (i.e., just EOO)
-   dbUpdate: see query.h
-   dbDelete: see query.h
-   dbQuery: see query.h
-*/
-
 #pragma pack(pop)
 
 /* <type><fieldName    ><value> 
