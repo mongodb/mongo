@@ -40,8 +40,7 @@ LRUishMap<JSObj,DiskLoc,5> lrutest(123);
 int nextCursorId = 1;
 extern bool useCursors;
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 struct EmptyObject {
 	EmptyObject() { len = 5; jstype = EOO; }
 	int len;

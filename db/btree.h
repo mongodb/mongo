@@ -23,8 +23,7 @@
 #include "storage.h"
 #include "pdfile.h"
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 
 struct _KeyNode {
 	DiskLoc prevChildBucket;
@@ -58,8 +57,7 @@ public:
 	JSObj key;
 };
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 
 /* this class is all about the storage management */
 class BucketBasics {

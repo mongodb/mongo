@@ -22,8 +22,7 @@
 
 class JSObj;
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 struct QueryResult : public MsgData {
 	long long cursorId;
 	int startingFrom;

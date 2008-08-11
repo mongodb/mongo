@@ -91,8 +91,7 @@ private:
 
 extern DataFileMgr theDataFileMgr;
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 
 class DeletedRecord {
 public:

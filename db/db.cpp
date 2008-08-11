@@ -646,7 +646,7 @@ void connThread()
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;
 			}
-skip:
+//skip:
 			if( client && client->profile >= 1 ) { 
 				if( client->profile >= 2 || ms >= 100 ) { 
 					// profile it

@@ -26,8 +26,7 @@
 #include "../stdafx.h"
 #include <map>
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 
 /* you should define:
 

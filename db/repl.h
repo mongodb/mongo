@@ -34,8 +34,7 @@ extern bool master;
 
 bool cloneFrom(const char *masterHost, string& errmsg);
 
-#pragma pack(push)
-#pragma pack(4)
+#pragma pack(push,4)
 class OpTime { 
       unsigned i;
       unsigned secs;

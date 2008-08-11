@@ -803,8 +803,7 @@ int JSObj::addFields(JSObj& from, set<string>& fields) {
 
 /*-- test things ----------------------------------------------------*/
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 
 struct MaxKeyData { 
 	MaxKeyData() { totsize=7; maxkey=MaxKey; name=0; eoo=EOO; }

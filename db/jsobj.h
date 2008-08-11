@@ -29,8 +29,7 @@ class JSObj;
 class Record;
 class JSObjBuilder;
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 
 /* BinData = binary data types. 
    EOO = end of object
@@ -533,8 +532,7 @@ extern JSObj maxKey;
 
 /*- just for testing -- */
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 struct JSObj1 {
 	JSObj1() {
 		totsize=sizeof(JSObj1); 
