@@ -63,10 +63,10 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	return true;
 }
 
-auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn, bool sticky) {
+auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn, bool tailable) {
 	// see query.h for the protocol we are using here.
 	BufBuilder b;
-    int opts = sticky ? Option_CursorSticky : 0;
+    int opts = tailable ? Option_CursorTailable : 0;
     b.append(opts);
 	b.append(ns);
 	b.append(nToSkip);
@@ -115,7 +115,7 @@ void DBClientCursor::dataReceived() {
         dead = true;
     if( cursorId == 0 ) {
         // only set initially: we don't want to kill it on end of data 
-        // if it's a sticky cursor
+        // if it's a tailable cursor
         cursorId = qr->cursorId;
     }
 	nReturned = qr->nReturned;

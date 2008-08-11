@@ -65,15 +65,15 @@
 
 /* the field 'options' above can have these bits set: */
 enum { 
-    /* Sticky means cursor is not closed when the last data is retrieved.  rather, the cursor "sticks"
-       on the final object's position.  you can resume using the cursor later, from where it was located, 
+    /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor makrs
+       the final object's position.  you can resume using the cursor later, from where it was located, 
        if more data were received.  Set on dbQuery and dbGetMore.
 
        like any "latent cursor", the cursor may become invalid at some point -- for example if that 
        final object it references were deleted.  Thus, you should be prepared to requery if you get back 
        ResultOption_CursorNotFound.
     */
-    Option_CursorSticky = 2
+    Option_CursorTailable = 2
 };
 
 /* db response format
