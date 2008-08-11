@@ -55,11 +55,11 @@ void Listener::listen() {
 	while( 1 ) { 
 		int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
 		if( s < 0 ) {
-			cout << "Listener: accept() returns " << s << " errno:" << errno << endl;
+			log() << "Listener: accept() returns " << s << " errno:" << errno << endl;
 			continue;
 		}
 		disableNagle(s);
-		cout << "Listener: connection accepted from " << from.toString() << endl;
+		log() << "connection accepted from " << from.toString() << endl;
 		accepted( new MessagingPort(s, from) );
 	}
 }
@@ -112,7 +112,7 @@ bool MessagingPort::connect(SockAddr& _far)
 		return false;
 	}
 	if( ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize) ) { 
-		cout << "ERROR: connect(): connect() failed " << errno << ' ' << farEnd.getPort() << endl;
+        log() << "connect(): failed errno:" << errno << ' ' << farEnd.getPort() << endl;
 		closesocket(sock); sock = -1;
 		return false;
 	}

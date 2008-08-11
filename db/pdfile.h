@@ -445,7 +445,13 @@ public:
 extern map<string,Client*> clients;
 extern Client *client;
 extern const char *curNs;
+extern int dbLocked;
 inline void setClient(const char *ns) { 
+    /* we must be in critical section at this point as these are global 
+       variables. 
+    */
+    assert( dbLocked == 1 );
+
 	char cl[256];
 	curNs = ns;
 	nsToClient(ns, cl);

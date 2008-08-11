@@ -28,6 +28,9 @@ struct QueryResult : public MsgData {
 	int startingFrom;
 	int nReturned;
 	const char *data() { return (char *) (((int *)&nReturned)+1); }
+    int resultOptions() const { 
+        return *((int *) _data);
+    }
 };
 #pragma pack(pop)
 
@@ -39,13 +42,19 @@ class DBClientCursor : boost::noncopyable {
 	int pos;
 	const char *data;
 	auto_ptr<Message> m;
+    int opts;
 	string ns;
 	int nToReturn;
+    bool dead;
 	void dataReceived();
 	void requestMore();
 public:
-	DBClientCursor(MessagingPort& _p, auto_ptr<Message> _m) : 
-	  p(_p), m(_m) { dataReceived(); }
+	DBClientCursor(MessagingPort& _p, auto_ptr<Message> _m, int _opts) : 
+	  p(_p), m(_m), opts(_opts) { 
+          dead = false;
+          cursorId = 0;
+          dataReceived(); 
+      }
 	
 	bool more(); // if true, safe to call next()
 	JSObj next(); // returns next object in the result cursor
@@ -68,11 +77,12 @@ public:
        nToSkip:   start with the nth item
 	   fieldsToReturn: 
                   optional template of which fields to select. if unspecified, returns all fields
+       sticky: see query.h sticky comments
 
 	   returns:   cursor.
                   returns 0 if error
 	*/
-	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, JSObj *fieldsToReturn = 0);
+	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, JSObj *fieldsToReturn = 0, bool sticky = false);
 
 	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0);
 };

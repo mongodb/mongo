@@ -17,9 +17,11 @@
 */
 
 #include "stdafx.h"
+#include "pdfile.h"
 #include "dbclient.h"
 #include "../util/builder.h"
 #include "jsobj.h"
+#include "query.h"
 
 JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToReturn) { 
 	auto_ptr<DBClientCursor> c = 
@@ -34,23 +36,65 @@ JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToRe
 bool DBClientConnection::connect(const char *serverAddress, string& errmsg) { 
 	/* not reentrant! 
 	   ok as used right now (we are in a big lock), but won't be later, so fix. */
+  
+  	int port = DBPort;
+
 	string ip = hostbyname_nonreentrant(serverAddress);
 	if( ip.empty() ) 
 		ip = serverAddress;
 
-	server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), DBPort));
+	int idx = ip.find( ":" );
+	if ( idx != string::npos ){
+	  cout << "port string:" << ip.substr( idx ) << endl;
+	  port = atoi( ip.substr( idx + 1 ).c_str() );
+	  ip = ip.substr( 0 , idx );
+	  ip = hostbyname_nonreentrant(ip.c_str());
+
+	}
+	if( ip.empty() ) 
+		ip = serverAddress;
+	
+	cout << "port:" << port << endl;
+	server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
 	if( !p.connect(*server) ) {
-		errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;
+	        errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;
 		return false;
 	}
 	return true;
 }
 
+auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn, bool sticky) {
+	// see query.h for the protocol we are using here.
+	BufBuilder b;
+    int opts = sticky ? Option_CursorSticky : 0;
+    b.append(opts);
+	b.append(ns);
+	b.append(nToSkip);
+	b.append(nToReturn);
+	query.appendSelfToBufBuilder(b);
+	if( fieldsToReturn )
+		fieldsToReturn->appendSelfToBufBuilder(b);
+	Message toSend;
+	toSend.setData(dbQuery, b.buf(), b.len());
+	auto_ptr<Message> response(new Message());
+	bool ok = p.call(toSend, *response);
+	if( !ok )
+		return auto_ptr<DBClientCursor>(0);
+
+	auto_ptr<DBClientCursor> c(new DBClientCursor(p, response, opts));
+	c->ns = ns;
+	c->nToReturn = nToReturn;
+
+	return c;
+}
+
+/* -- DBClientCursor ---------------------------------------------- */
+
 void DBClientCursor::requestMore() { 
 	assert( cursorId && pos == nReturned );
 
 	BufBuilder b;
-	b.append((int) 0); // reserved
+    b.append(opts);
 	b.append(ns.c_str());
 	b.append(nToReturn);
 	b.append(cursorId);
@@ -65,33 +109,15 @@ void DBClientCursor::requestMore() {
 	dataReceived();
 }
 
-auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn) {
-	// see query.h for the protocol we are using here.
-	BufBuilder b;
-	b.append((int) 0); // reserved
-	b.append(ns);
-	b.append(nToSkip);
-	b.append(nToReturn);
-	query.appendSelfToBufBuilder(b);
-	if( fieldsToReturn )
-		fieldsToReturn->appendSelfToBufBuilder(b);
-	Message toSend;
-	toSend.setData(dbQuery, b.buf(), b.len());
-	auto_ptr<Message> response(new Message());
-	bool ok = p.call(toSend, *response);
-	if( !ok )
-		return auto_ptr<DBClientCursor>(0);
-
-	auto_ptr<DBClientCursor> c(new DBClientCursor(p, response));
-	c->ns = ns;
-	c->nToReturn = nToReturn;
-
-	return c;
-}
-
 void DBClientCursor::dataReceived() { 
 	QueryResult *qr = (QueryResult *) m->data;
-	cursorId = qr->cursorId;
+    if( qr->resultOptions() & ResultOption_CursorNotFound )
+        dead = true;
+    if( cursorId == 0 ) {
+        // only set initially: we don't want to kill it on end of data 
+        // if it's a sticky cursor
+        cursorId = qr->cursorId;
+    }
 	nReturned = qr->nReturned;
 	pos = 0;
 	data = qr->data();
@@ -105,7 +131,6 @@ bool DBClientCursor::more() {
 	if( cursorId == 0 )
 		return false;
 
-//	cout << "TEMP: requestMore" << endl;
 	requestMore();
 	return pos < nReturned;
 }
@@ -117,6 +142,8 @@ JSObj DBClientCursor::next() {
 	data += o.objsize();
 	return o;
 }
+
+/* ------------------------------------------------------ */
 
 // "./db testclient" to invoke
 extern JSObj emptyObj;

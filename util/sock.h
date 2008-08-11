@@ -58,11 +58,11 @@ inline void disableNagle(int sock) {
   #endif
 
   if( setsockopt(sock, level, TCP_NODELAY, (char *) &x, sizeof(x)) )
-    cout << "ERROR: disableNagle failed" << endl; 
+    log() << "ERROR: disableNagle failed" << endl; 
 
 }
 inline void prebindOptions( int sock ){
-  cout << "doing prebind option" << endl;
+  DEV log() << "doing prebind option" << endl;
   int x = 1;
   if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x)) < 0 )
     cout << "Failed to set socket opt, SO_REUSEADDR" << endl;

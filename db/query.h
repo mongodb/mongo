@@ -23,34 +23,38 @@
 #include "jsobj.h"
 #include "storage.h"
 
-/* requests:
+/* db request message format 
 
-   dbDelete
-      int reserved=0;
+   unsigned opid;         // arbitary; will be echoed back
+   byte operation;
+   int options;
+
+   then for:
+
+   dbInsert:
+      string collection;
+      a series of JSObjects terminated with a null object (i.e., just EOO)
+   dbDelete:
       string collection;
 	  int flags=0; // 1=DeleteSingle
       JSObject query;
    dbUpdate:
-      int reserved;
       string collection;
 	  int flags; // 1=upsert
       JSObject query;
 	  JSObject objectToUpdate;
         objectToUpdate may include { $inc: <field> }.
    dbQuery:
-      int reserved;
       string collection;
 	  int nToSkip;
 	  int nToReturn; // how many you want back as the beginning of the cursor data
       JSObject query;
 	  [JSObject fieldsToReturn]
    dbGetMore:
-      int reserved;
 	  string collection; // redundant, might use for security.
       int nToReturn;
       int64 cursorID;
    dbKillCursors=2007:
-      int reserved;
       int n;
 	  int64 cursorIDs[n];
 
@@ -59,15 +63,34 @@
    Note that the update field layout is very similar layout to Query.
 */
 
+/* the field 'options' above can have these bits set: */
+enum { 
+    /* Sticky means cursor is not closed when the last data is retrieved.  rather, the cursor "sticks"
+       on the final object's position.  you can resume using the cursor later, from where it was located, 
+       if more data were received.  Set on dbQuery and dbGetMore.
+
+       like any "latent cursor", the cursor may become invalid at some point -- for example if that 
+       final object it references were deleted.  Thus, you should be prepared to requery if you get back 
+       ResultOption_CursorNotFound.
+    */
+    Option_CursorSticky = 2
+};
+
 /* db response format
 
-   Query or GetMore:
-      int reserved;
+   Query or GetMore: // see struct QueryResult
+      int resultOptions = 0;
       int64 cursorID;
       int startingFrom;
       int nReturned; // 0=infinity
       list of marshalled JSObjects;
 */
+
+/* the field 'resultOptions' above */
+enum { 
+    /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
+    ResultOption_CursorNotFound = 1
+};
 
 // grab struct QueryResult from:
 #include "dbclient.h"

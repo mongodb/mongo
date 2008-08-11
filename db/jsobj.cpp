@@ -145,6 +145,7 @@ string Element::toString() {
 			s << valuestr();
 		}
 		break;
+        case Symbol:
 	case String:
 		s << fieldName() << ": ";
 		if( valuestrsize() > 80 ) 
@@ -193,6 +194,7 @@ int Element::size() const {
 		case jstOID:
 			x = 13;
 			break;
+                case Symbol:
 		case Code:
 		case String:
 			x = valuestrsize() + 4 + 1;
@@ -263,6 +265,7 @@ int compareElementValues(const Element& l, const Element& r) {
 		case jstOID:
 			return memcmp(l.value(), r.value(), 12);
 		case Code:
+                case Symbol:
 		case String:
 			/* todo: utf version */
 			return strcmp(l.valuestr(), r.valuestr());
@@ -421,8 +424,14 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 						assert( in == 0 ); // only one per query supported so far.  finish...
 						in = new set<Element,element_lt>();
 						JSElemIter i(fe.embeddedObject());
-						while( i.more() )
-							in->insert(i.next());
+                        if( i.more() ) {
+                            while( 1 ) {
+                                Element ie = i.next();
+                                if( ie.eoo() ) 
+                                    break;
+                                in->insert(ie);
+                            }
+                        }
 						toMatch.push_back(e); // not actually used at the moment
 						compareOp.push_back(opIN);
 						n++;
@@ -453,7 +462,8 @@ inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) {
 
 	if( op == opIN ) {
 		// { $in : [1,2,3] }
-		return in->count(l);
+        int c = in->count(l);
+        return c;
 	}
 
 	/* check LT, GTE, ... */
@@ -542,7 +552,7 @@ extern int dump;
 inline bool _regexMatches(RegexMatcher& rm, Element& e) { 
 	char buf[64];
 	const char *p = buf;
-	if( e.type() == String )
+	if( e.type() == String || e.type() == Symbol )
 		p = e.valuestr();
 	else if( e.type() == Number ) { 
 		sprintf(buf, "%f", e.number());

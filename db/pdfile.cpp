@@ -411,7 +411,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err) {
 		return false;
 	}
 
-	cout << "create collection " << ns << ' ' << j.toString() << endl;
+	log() << "create collection " << ns << ' ' << j.toString() << endl;
 
 	/* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
              and then go back and set to ok : 1 after we are done.
@@ -1036,15 +1036,15 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 			// try to create it
 			string err;
 			if( !userCreateNS(tabletoidxns, emptyObj, err) ) { 
-				cout << "ERROR: failed to create collection while adding its index. " << tabletoidxns << endl;
+				problem() << "ERROR: failed to create collection while adding its index. " << tabletoidxns << endl;
 				return DiskLoc();
 			}
 			tableToIndex = nsdetails(tabletoidxns);
-			cout << "info: creating collection " << tabletoidxns << " on add index\n";
+			log() << "info: creating collection " << tabletoidxns << " on add index\n";
 			assert( tableToIndex );
 		}
 		if( tableToIndex->nIndexes >= MaxIndexes ) { 
-			cout << "user warning: bad add index attempt, too many indexes for:" << tabletoidxns << endl;
+			log() << "user warning: bad add index attempt, too many indexes for:" << tabletoidxns << endl;
 			return DiskLoc();
 		}
 		if( tableToIndex->findIndexByName(name) >= 0 ) { 

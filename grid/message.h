@@ -89,7 +89,7 @@ struct MsgData {
 	MSGID id; /* request/reply id's match... */
 	int responseTo; /* id of the message we are responding to */
 	int operation;
-	char _data[4];
+    char _data[4];
 
 	int dataLen(); // len without header
 };

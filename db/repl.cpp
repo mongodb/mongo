@@ -25,6 +25,7 @@
 #include "pdfile.h"
 #include "query.h"
 #include "json.h"
+#include "db.h"
 
 extern JSObj emptyObj;
 extern boost::mutex dbMutex;
@@ -60,7 +61,6 @@ struct TestOpTime {
 } testoptime;
 
 int test2() { 
-	TestOpTime t;
 	return 0;
 }
 
@@ -88,9 +88,10 @@ void Cloner::copy(const char *collection) {
 	}
 }
 
+extern int port;
 bool Cloner::go(const char *masterHost, string& errmsg) { 
-	if( string("localhost") == masterHost || string("127.0.0.1") == masterHost ) { 
-		errmsg = "can't clone from self";
+	if( (string("localhost") == masterHost || string("127.0.0.1") == masterHost) && port == DBPort ) { 
+		errmsg = "can't clone from self (localhost).  sources configuration may be wrong.";
 		return false;
 	}
 	if( !conn.connect(masterHost, errmsg) )
@@ -290,34 +291,42 @@ void Source::pullOpLog(DBClientConnection& conn) {
 	auto_ptr<DBClientCursor> c = 
 		conn.query(ns.c_str(), query.done());
 	if( !c->more() ) { 
-		problem() << "pull: " << ns << " empty?\n";
+		problem() << "pull:   " << ns << " empty?\n";
 		sleepsecs(3);
 		return;
 	}
 
-	JSObj j = c->next();
-	Element ts = j.findElement("ts");
+    int n = 0;
+	JSObj op = c->next();
+	Element ts = op.findElement("ts");
 	assert( ts.type() == Date );
 	OpTime t;
 	t.asDate() = ts.date();
 	bool initial = syncedTo.isNull();
 	if( initial ) { 
-		log() << "pull: initial run\n";
+		log() << "pull:   initial run\n";
+        {
+            dblock lk;
+            applyOperation(op);
+            n++;
+        }
 	}
 	else if( t != syncedTo ) { 
-		log() << "pull: t " << t.toString() << " != syncedTo " << syncedTo.toString() << '\n';
-		log() << "  data too stale, halting replication" << endl;
+		log() << "pull:   t " << t.toString() << " != syncedTo " << syncedTo.toString() << '\n';
+        log() << "pull:    data too stale, halting replication" << endl;
 		assert( syncedTo < t );
 		throw SyncException();
 	}
+    else { 
+        /* t == syncedTo, so the first op was applied previously, no need to redo it. */
+    }
 
 	// apply operations
-	int n = 0;
 	{
-		lock lk(dbMutex);
+		dblock lk;
 		while( 1 ) {
 			if( !c->more() ) {
-				log() << "pull: applied " << n << " operations" << endl;
+				log() << "pull:   applied " << n << " operations" << endl;
 				syncedTo = t;
 				save(); // note how far we are synced up to now
 				break;
@@ -343,10 +352,15 @@ void Source::pullOpLog(DBClientConnection& conn) {
 void Source::sync() { 
 	log() << "pull: from " << sourceName << '@' << hostName << endl;
 
+	if( (string("localhost") == hostName || string("127.0.0.1") == hostName) && port == DBPort ) { 
+        log() << "pull:   can't sync from self (localhost). sources configuration may be wrong." << endl;
+        return;
+    }
+
 	DBClientConnection conn;
 	string errmsg;
 	if( !conn.connect(hostName.c_str(), errmsg) ) {
-		log() << "  pull: cantconn " << errmsg << endl;
+		log() << "pull:   cantconn " << errmsg << endl;
 		return;
 	}
 
@@ -354,8 +368,8 @@ void Source::sync() {
 	JSObj o = conn.findOne("admin.$cmd", opTimeQuery);
 	Element e = o.findElement("optime");
 	if( e.eoo() ) {
-		log() << "  pull: failed to get cur optime from master" << endl;
-		log() << "  " << o.toString() << endl;
+		log() << "pull:   failed to get cur optime from master" << endl;
+		log() << "        " << o.toString() << endl;
 		return;
 	}
 	uassert( e.type() == Date );
@@ -427,7 +441,7 @@ void replMain() {
 	vector<Source*> sources;
 
 	{
-		lock lk(dbMutex);
+		dblock lk;
 		Source::loadAll(sources);
 	}
 
@@ -447,7 +461,8 @@ void replMain() {
 
 int debug_stop_repl = 0;
 
-void replMainThread() { 
+void replSlaveThread() { 
+    sleepsecs(3);
 	while( 1 ) { 
 		try { 
 			replMain();
@@ -456,24 +471,21 @@ void replMainThread() {
 			sleepsecs(5);
 		}
 		catch( AssertionException ) { 
-			problem() << "Assertion in replMainThread(): sleeping 5 minutes before retry" << endl;
+			problem() << "Assertion in replSlaveThread(): sleeping 5 minutes before retry" << endl;
 			sleepsecs(300);
 		}
 	}
 }
 
 void startReplication() { 
-#if defined(_WIN32)
-	slave=true;
-#endif
 	if( slave ) {
 		log() << "slave=true" << endl;
-		boost::thread repl_thread(replMainThread);
+		boost::thread repl_thread(replSlaveThread);
 	}
 
 	if( master ) {  
 		log() << "master=true" << endl;
-		lock lk(dbMutex);
+		dblock lk;
 		/* create an oplog collection, if it doesn't yet exist. */
 		JSObjBuilder b;
 		b.append("size", 254.0 * 1000 * 1000);

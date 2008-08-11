@@ -42,9 +42,17 @@ public:
       OpTime(unsigned a, unsigned b) { secs = a; i = b; }
       OpTime() { secs = 0; i = 0; }
       static OpTime now();
+
+	  /* We store OpTime's in the database as Javascript Date datatype -- we needed some sort of 
+	     64 bit "container" for these values.  While these are not really "Dates", that seems a 
+		 better choice for now than say, Number, which is floating point.  Note the BinData type 
+		 is perhaps the cleanest choice, lacking a true unsigned64 datatype, but BinData has a 
+		 couple bytes of overhead.
+	  */
 	  unsigned long long& asDate() { return *((unsigned long long *) this); } 
+
 	  bool isNull() { return secs == 0; }
-	  string toString() { 
+	  string toString() const { 
 		  stringstream ss;
 		  ss << hex << secs << ':' << i;
 		  return ss.str();
@@ -61,6 +69,7 @@ public:
 };
 #pragma pack(pop)
 
+/* A replication exception */
 struct SyncException { 
 };
 
