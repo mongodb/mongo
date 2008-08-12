@@ -1,0 +1,234 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 44;
+	objects = {
+
+/* Begin PBXFileReference section */
+		2EFCA54A0E5257FC0017B86A /* btree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = btree.cpp; sourceTree = "<group>"; };
+		2EFCA54B0E5257FC0017B86A /* btree.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = btree.h; sourceTree = "<group>"; };
+		2EFCA54D0E5257FC0017B86A /* btreecursor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = btreecursor.cpp; sourceTree = "<group>"; };
+		2EFCA54F0E5257FC0017B86A /* clientcursor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = clientcursor.cpp; sourceTree = "<group>"; };
+		2EFCA5500E5257FC0017B86A /* clientcursor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = clientcursor.h; sourceTree = "<group>"; };
+		2EFCA5520E5257FC0017B86A /* db.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = db.cpp; sourceTree = "<group>"; };
+		2EFCA5530E5257FC0017B86A /* db.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = db.h; sourceTree = "<group>"; };
+		2EFCA5550E5257FC0017B86A /* db.rc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = db.rc; sourceTree = "<group>"; };
+		2EFCA5580E5257FC0017B86A /* dbclient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbclient.cpp; sourceTree = "<group>"; };
+		2EFCA5590E5257FC0017B86A /* dbclient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dbclient.h; sourceTree = "<group>"; };
+		2EFCA55B0E5257FC0017B86A /* dbproblems.log */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = dbproblems.log; sourceTree = "<group>"; };
+		2EFCA55C0E5257FC0017B86A /* introspect.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = introspect.cpp; sourceTree = "<group>"; };
+		2EFCA55D0E5257FC0017B86A /* introspect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = introspect.h; sourceTree = "<group>"; };
+		2EFCA55F0E5257FC0017B86A /* javajs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = javajs.cpp; sourceTree = "<group>"; };
+		2EFCA5600E5257FC0017B86A /* javajs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = javajs.h; sourceTree = "<group>"; };
+		2EFCA5620E5257FC0017B86A /* javatest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = javatest.cpp; sourceTree = "<group>"; };
+		2EFCA5630E5257FC0017B86A /* jsobj.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobj.cpp; sourceTree = "<group>"; };
+		2EFCA5640E5257FC0017B86A /* jsobj.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jsobj.h; sourceTree = "<group>"; };
+		2EFCA5660E5257FC0017B86A /* json.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = json.cpp; sourceTree = "<group>"; };
+		2EFCA5670E5257FC0017B86A /* json.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = json.h; sourceTree = "<group>"; };
+		2EFCA5690E5257FC0017B86A /* makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = makefile; sourceTree = "<group>"; };
+		2EFCA56A0E5257FC0017B86A /* makefile.Darwin.i386 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = makefile.Darwin.i386; sourceTree = "<group>"; };
+		2EFCA56B0E5257FC0017B86A /* makefile.Linux.i686 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = makefile.Linux.i686; sourceTree = "<group>"; };
+		2EFCA56C0E5257FC0017B86A /* makefile.Linux.x86_64 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = makefile.Linux.x86_64; sourceTree = "<group>"; };
+		2EFCA56D0E5257FC0017B86A /* makefile.local */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = makefile.local; sourceTree = "<group>"; };
+		2EFCA56E0E5257FC0017B86A /* minilex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = minilex.h; sourceTree = "<group>"; };
+		2EFCA56F0E5257FC0017B86A /* namespace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = namespace.h; sourceTree = "<group>"; };
+		2EFCA5700E5257FC0017B86A /* objwrappers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = objwrappers.h; sourceTree = "<group>"; };
+		2EFCA63A0E5257FC0017B86A /* pcre.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = pcre.txt; sourceTree = "<group>"; };
+		2EFCA63B0E5257FC0017B86A /* pdfile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = pdfile.cpp; sourceTree = "<group>"; };
+		2EFCA63C0E5257FC0017B86A /* pdfile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = pdfile.h; sourceTree = "<group>"; };
+		2EFCA63E0E5257FC0017B86A /* query.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = query.cpp; sourceTree = "<group>"; };
+		2EFCA63F0E5257FC0017B86A /* query.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = query.h; sourceTree = "<group>"; };
+		2EFCA6410E5257FC0017B86A /* repl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = repl.cpp; sourceTree = "<group>"; };
+		2EFCA6420E5257FC0017B86A /* repl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = repl.h; sourceTree = "<group>"; };
+		2EFCA6440E5257FC0017B86A /* resource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = resource.h; sourceTree = "<group>"; };
+		2EFCA6450E5257FC0017B86A /* storage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = storage.h; sourceTree = "<group>"; };
+		2EFCA6460E5257FC0017B86A /* tests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tests.cpp; sourceTree = "<group>"; };
+		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		08FB7794FE84155DC02AAC07 /* mongo */ = {
+			isa = PBXGroup;
+			children = (
+				08FB7795FE84155DC02AAC07 /* Source */,
+				C6859E8C029090F304C91782 /* Documentation */,
+				1AB674ADFE9D54B511CA2CBB /* Products */,
+			);
+			name = mongo;
+			sourceTree = "<group>";
+		};
+		08FB7795FE84155DC02AAC07 /* Source */ = {
+			isa = PBXGroup;
+			children = (
+				2EFCA5490E5257FC0017B86A /* db */,
+			);
+			name = Source;
+			sourceTree = "<group>";
+		};
+		1AB674ADFE9D54B511CA2CBB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		2EFCA5490E5257FC0017B86A /* db */ = {
+			isa = PBXGroup;
+			children = (
+				2EFCA54A0E5257FC0017B86A /* btree.cpp */,
+				2EFCA54B0E5257FC0017B86A /* btree.h */,
+				2EFCA54D0E5257FC0017B86A /* btreecursor.cpp */,
+				2EFCA54F0E5257FC0017B86A /* clientcursor.cpp */,
+				2EFCA5500E5257FC0017B86A /* clientcursor.h */,
+				2EFCA5520E5257FC0017B86A /* db.cpp */,
+				2EFCA5530E5257FC0017B86A /* db.h */,
+				2EFCA5550E5257FC0017B86A /* db.rc */,
+				2EFCA5580E5257FC0017B86A /* dbclient.cpp */,
+				2EFCA5590E5257FC0017B86A /* dbclient.h */,
+				2EFCA55B0E5257FC0017B86A /* dbproblems.log */,
+				2EFCA55C0E5257FC0017B86A /* introspect.cpp */,
+				2EFCA55D0E5257FC0017B86A /* introspect.h */,
+				2EFCA55F0E5257FC0017B86A /* javajs.cpp */,
+				2EFCA5600E5257FC0017B86A /* javajs.h */,
+				2EFCA5620E5257FC0017B86A /* javatest.cpp */,
+				2EFCA5630E5257FC0017B86A /* jsobj.cpp */,
+				2EFCA5640E5257FC0017B86A /* jsobj.h */,
+				2EFCA5660E5257FC0017B86A /* json.cpp */,
+				2EFCA5670E5257FC0017B86A /* json.h */,
+				2EFCA5690E5257FC0017B86A /* makefile */,
+				2EFCA56A0E5257FC0017B86A /* makefile.Darwin.i386 */,
+				2EFCA56B0E5257FC0017B86A /* makefile.Linux.i686 */,
+				2EFCA56C0E5257FC0017B86A /* makefile.Linux.x86_64 */,
+				2EFCA56D0E5257FC0017B86A /* makefile.local */,
+				2EFCA56E0E5257FC0017B86A /* minilex.h */,
+				2EFCA56F0E5257FC0017B86A /* namespace.h */,
+				2EFCA5700E5257FC0017B86A /* objwrappers.h */,
+				2EFCA63A0E5257FC0017B86A /* pcre.txt */,
+				2EFCA63B0E5257FC0017B86A /* pdfile.cpp */,
+				2EFCA63C0E5257FC0017B86A /* pdfile.h */,
+				2EFCA63E0E5257FC0017B86A /* query.cpp */,
+				2EFCA63F0E5257FC0017B86A /* query.h */,
+				2EFCA6410E5257FC0017B86A /* repl.cpp */,
+				2EFCA6420E5257FC0017B86A /* repl.h */,
+				2EFCA6440E5257FC0017B86A /* resource.h */,
+				2EFCA6450E5257FC0017B86A /* storage.h */,
+				2EFCA6460E5257FC0017B86A /* tests.cpp */,
+			);
+			path = db;
+			sourceTree = "<group>";
+		};
+		C6859E8C029090F304C91782 /* Documentation */ = {
+			isa = PBXGroup;
+			children = (
+				C6859E8B029090EE04C91782 /* mongo.1 */,
+			);
+			name = Documentation;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXLegacyTarget section */
+		2EFCA6830E5258770017B86A /* make */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "";
+			buildConfigurationList = 2EFCA68B0E5258CA0017B86A /* Build configuration list for PBXLegacyTarget "make" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			buildWorkingDirectory = ./db;
+			dependencies = (
+			);
+			name = make;
+			passBuildSettingsInEnvironment = 1;
+			productName = make;
+		};
+/* End PBXLegacyTarget section */
+
+/* Begin PBXProject section */
+		08FB7793FE84155DC02AAC07 /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 1DEB923508733DC60010E9CD /* Build configuration list for PBXProject "mongo" */;
+			compatibilityVersion = "Xcode 3.0";
+			hasScannedForEncodings = 1;
+			mainGroup = 08FB7794FE84155DC02AAC07 /* mongo */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2EFCA6830E5258770017B86A /* make */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		1DEB923608733DC60010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				PREBINDING = NO;
+				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.5.sdk";
+			};
+			name = Debug;
+		};
+		1DEB923708733DC60010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = (
+					ppc,
+					i386,
+				);
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				PREBINDING = NO;
+				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.5.sdk";
+			};
+			name = Release;
+		};
+		2EFCA6840E5258780017B86A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = make;
+			};
+			name = Debug;
+		};
+		2EFCA6850E5258780017B86A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = make;
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1DEB923508733DC60010E9CD /* Build configuration list for PBXProject "mongo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB923608733DC60010E9CD /* Debug */,
+				1DEB923708733DC60010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2EFCA68B0E5258CA0017B86A /* Build configuration list for PBXLegacyTarget "make" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2EFCA6840E5258780017B86A /* Debug */,
+				2EFCA6850E5258780017B86A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 08FB7793FE84155DC02AAC07 /* Project object */;
+}
