@@ -91,6 +91,8 @@ auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, 
 /* -- DBClientCursor ---------------------------------------------- */
 
 void DBClientCursor::requestMore() { 
+cout << "TEMP REQUESTMORE" << endl;
+
 	assert( cursorId && pos == nReturned );
 
 	BufBuilder b;
@@ -111,8 +113,11 @@ void DBClientCursor::requestMore() {
 
 void DBClientCursor::dataReceived() { 
 	QueryResult *qr = (QueryResult *) m->data;
-    if( qr->resultOptions() & ResultOption_CursorNotFound )
-        dead = true;
+	if( qr->resultOptions() & ResultOption_CursorNotFound ) {
+		// cursor id no longer valid at the server.
+		assert( qr->cursorId == 0 );
+		cursorId = 0; // 0 indicates no longer valid (dead)
+	}
     if( cursorId == 0 ) {
         // only set initially: we don't want to kill it on end of data 
         // if it's a tailable cursor
@@ -152,11 +157,23 @@ void testClient() {
 	DBClientConnection c;
 	string err;
 	assert( c.connect("127.0.0.1", err) );
+	cout << "query foo.bar..." << endl;
 	auto_ptr<DBClientCursor> cursor = 
-		c.query("foo.bar", emptyObj);
+		c.query("foo.bar", emptyObj, 0, 0, 0, true);
 	DBClientCursor *cc = cursor.get();
-	cout << "more: " << cc->more() << endl;
-	while( cc->more() ) { 
+	while( 1 ) {
+		bool m = cc->more();
+		cout << "more: " << m << " dead:" << cc->isDead() << endl;
+		if( !m ) {
+			if( cc->isDead() )
+				cout << "cursor dead, stopping" << endl;
+			else { 
+				cout << "Sleeping 10 seconds" << endl;
+				sleepsecs(10);
+				continue;
+			}
+			break;
+		}
 		cout << cc->next().toString() << endl;
 	}
 }

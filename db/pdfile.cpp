@@ -51,8 +51,8 @@ void sayDbContext(const char *errmsg) {
 	if( errmsg ) { 
 		problem() << errmsg << endl;
 	}
-	log() << " client: " << (client ? client->name.c_str() : "null");
-	log() << " op:" << curOp << ' ' << callDepth << '\n';
+	log() << " client: " << (client ? client->name.c_str() : "null") 
+		<< " op:" << curOp << ' ' << callDepth << '\n';
 	if( client )
 		log() << " ns: " << curNs << endl;
 	printStackTrace();

@@ -20,6 +20,19 @@
 
 #include "../grid/message.h"
 
+/* the query field 'options' can have these bits set: */
+enum { 
+    /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor makrs
+       the final object's position.  you can resume using the cursor later, from where it was located, 
+       if more data were received.  Set on dbQuery and dbGetMore.
+
+       like any "latent cursor", the cursor may become invalid at some point -- for example if that 
+       final object it references were deleted.  Thus, you should be prepared to requery if you get back 
+       ResultOption_CursorNotFound.
+    */
+    Option_CursorTailable = 2
+};
+
 class JSObj;
 
 #pragma pack(push,1)
@@ -45,19 +58,25 @@ class DBClientCursor : boost::noncopyable {
     int opts;
 	string ns;
 	int nToReturn;
-    bool dead;
 	void dataReceived();
 	void requestMore();
 public:
 	DBClientCursor(MessagingPort& _p, auto_ptr<Message> _m, int _opts) : 
 	  p(_p), m(_m), opts(_opts) { 
-          dead = false;
           cursorId = 0;
           dataReceived(); 
       }
 	
 	bool more(); // if true, safe to call next()
 	JSObj next(); // returns next object in the result cursor
+
+	// cursor no longer valid -- use with tailable cursors.
+	// note you should only rely on this once more() returns false; 
+	// 'dead' may be preset yet some data still queued and locally
+	//  available from the dbclientcursor.
+	bool isDead() const { return cursorId == 0; }
+
+	bool tailable() const { return (opts & Option_CursorTailable) != 0; }
 };
 
 class DBClientConnection : boost::noncopyable { 
