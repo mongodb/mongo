@@ -31,8 +31,7 @@ const int FragMax = 1480;
 const int FragHeader = 10;
 const int MSS = FragMax - FragHeader;
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 
 struct Fragment {
 	enum { MinFragmentLen = FragHeader + 1 };

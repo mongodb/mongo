@@ -647,7 +647,7 @@ void connThread()
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;
 			}
-skip:
+//skip:
 			if( client && client->profile >= 1 ) { 
 				if( client->profile >= 2 || ms >= 100 ) { 
 					// profile it
@@ -923,6 +923,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  quicktest         just check basic assertions and exit" << endl;
 	cout << "  test2             run test2() - see code" << endl;
 	cout << endl << "Alternate Usage :" << endl;
+	cout << " --master --slave" << endl;
 	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
 	cout << " --nocursors  --nojni" << endl;
 	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;

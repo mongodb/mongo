@@ -1,4 +1,4 @@
-// java.h
+// javajs.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -15,6 +15,8 @@
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/* this file contains code to call into java (into the 10gen sandbox) from inside the database */
 
 #pragma once
 

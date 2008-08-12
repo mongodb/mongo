@@ -20,15 +20,30 @@
 
 #include "../grid/message.h"
 
+/* the query field 'options' can have these bits set: */
+enum { 
+    /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor makrs
+       the final object's position.  you can resume using the cursor later, from where it was located, 
+       if more data were received.  Set on dbQuery and dbGetMore.
+
+       like any "latent cursor", the cursor may become invalid at some point -- for example if that 
+       final object it references were deleted.  Thus, you should be prepared to requery if you get back 
+       ResultOption_CursorNotFound.
+    */
+    Option_CursorTailable = 2
+};
+
 class JSObj;
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 struct QueryResult : public MsgData {
 	long long cursorId;
 	int startingFrom;
 	int nReturned;
 	const char *data() { return (char *) (((int *)&nReturned)+1); }
+    int resultOptions() const { 
+        return *((int *) _data);
+    }
 };
 #pragma pack(pop)
 
@@ -40,16 +55,28 @@ class DBClientCursor : boost::noncopyable {
 	int pos;
 	const char *data;
 	auto_ptr<Message> m;
+    int opts;
 	string ns;
 	int nToReturn;
 	void dataReceived();
 	void requestMore();
 public:
-	DBClientCursor(MessagingPort& _p, auto_ptr<Message> _m) : 
-	  p(_p), m(_m) { dataReceived(); }
+	DBClientCursor(MessagingPort& _p, auto_ptr<Message> _m, int _opts) : 
+	  p(_p), m(_m), opts(_opts) { 
+          cursorId = 0;
+          dataReceived(); 
+      }
 	
 	bool more(); // if true, safe to call next()
 	JSObj next(); // returns next object in the result cursor
+
+	// cursor no longer valid -- use with tailable cursors.
+	// note you should only rely on this once more() returns false; 
+	// 'dead' may be preset yet some data still queued and locally
+	//  available from the dbclientcursor.
+	bool isDead() const { return cursorId == 0; }
+
+	bool tailable() const { return (opts & Option_CursorTailable) != 0; }
 };
 
 class DBClientConnection : boost::noncopyable { 
@@ -69,11 +96,12 @@ public:
        nToSkip:   start with the nth item
 	   fieldsToReturn: 
                   optional template of which fields to select. if unspecified, returns all fields
+       tailable: see query.h tailable comments
 
 	   returns:   cursor.
                   returns 0 if error
 	*/
-	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, JSObj *fieldsToReturn = 0);
+	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, JSObj *fieldsToReturn = 0, bool tailable = false);
 
 	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0);
 };

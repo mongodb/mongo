@@ -3,7 +3,6 @@
 /**
 *    Copyright (C) 2008 10gen Inc.
 *  
-*    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
 *  
@@ -110,7 +109,7 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
   }
 
 #if defined(_WIN32)
-  ss << colon << "C:\\Program Files\\Java\\jdk1.6.0_05\\lib\\tools.jar";
+  ss << colon << "C:\\Program Files\\Java\\jdk\\lib\\tools.jar";
 #else
   ss << colon << "/opt/java/lib/tools.jar";
 #endif
@@ -153,6 +152,11 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
 		  << endl;
   }
 
+  if( res ) {
+    problem() << "Couldn't create JVM res:" << (int) res << " terminating" << endl;
+    log() << "(try --nojni if you do not require that functionality)" << endl;
+    exit(22);
+  }
   jassert( res == 0 );
   jassert( _jvm > 0 );
   jassert( _mainEnv > 0 );    

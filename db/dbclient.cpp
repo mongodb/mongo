@@ -17,9 +17,11 @@
 */
 
 #include "stdafx.h"
+#include "pdfile.h"
 #include "dbclient.h"
 #include "../util/builder.h"
 #include "jsobj.h"
+#include "query.h"
 
 JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToReturn) { 
 	auto_ptr<DBClientCursor> c = 
@@ -36,7 +38,6 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	   ok as used right now (we are in a big lock), but won't be later, so fix. */
   
   	int port = DBPort;
-	
 
 	string ip = hostbyname_nonreentrant(serverAddress);
 	if( ip.empty() ) 
@@ -62,11 +63,40 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	return true;
 }
 
+auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn, bool tailable) {
+	// see query.h for the protocol we are using here.
+	BufBuilder b;
+    int opts = tailable ? Option_CursorTailable : 0;
+    b.append(opts);
+	b.append(ns);
+	b.append(nToSkip);
+	b.append(nToReturn);
+	query.appendSelfToBufBuilder(b);
+	if( fieldsToReturn )
+		fieldsToReturn->appendSelfToBufBuilder(b);
+	Message toSend;
+	toSend.setData(dbQuery, b.buf(), b.len());
+	auto_ptr<Message> response(new Message());
+	bool ok = p.call(toSend, *response);
+	if( !ok )
+		return auto_ptr<DBClientCursor>(0);
+
+	auto_ptr<DBClientCursor> c(new DBClientCursor(p, response, opts));
+	c->ns = ns;
+	c->nToReturn = nToReturn;
+
+	return c;
+}
+
+/* -- DBClientCursor ---------------------------------------------- */
+
 void DBClientCursor::requestMore() { 
+cout << "TEMP REQUESTMORE" << endl;
+
 	assert( cursorId && pos == nReturned );
 
 	BufBuilder b;
-	b.append((int) 0); // reserved
+    b.append(opts);
 	b.append(ns.c_str());
 	b.append(nToReturn);
 	b.append(cursorId);
@@ -81,33 +111,18 @@ void DBClientCursor::requestMore() {
 	dataReceived();
 }
 
-auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn) {
-	// see query.h for the protocol we are using here.
-	BufBuilder b;
-	b.append((int) 0); // reserved
-	b.append(ns);
-	b.append(nToSkip);
-	b.append(nToReturn);
-	query.appendSelfToBufBuilder(b);
-	if( fieldsToReturn )
-		fieldsToReturn->appendSelfToBufBuilder(b);
-	Message toSend;
-	toSend.setData(dbQuery, b.buf(), b.len());
-	auto_ptr<Message> response(new Message());
-	bool ok = p.call(toSend, *response);
-	if( !ok )
-		return auto_ptr<DBClientCursor>(0);
-
-	auto_ptr<DBClientCursor> c(new DBClientCursor(p, response));
-	c->ns = ns;
-	c->nToReturn = nToReturn;
-
-	return c;
-}
-
 void DBClientCursor::dataReceived() { 
 	QueryResult *qr = (QueryResult *) m->data;
-	cursorId = qr->cursorId;
+	if( qr->resultOptions() & ResultOption_CursorNotFound ) {
+		// cursor id no longer valid at the server.
+		assert( qr->cursorId == 0 );
+		cursorId = 0; // 0 indicates no longer valid (dead)
+	}
+    if( cursorId == 0 ) {
+        // only set initially: we don't want to kill it on end of data 
+        // if it's a tailable cursor
+        cursorId = qr->cursorId;
+    }
 	nReturned = qr->nReturned;
 	pos = 0;
 	data = qr->data();
@@ -121,7 +136,6 @@ bool DBClientCursor::more() {
 	if( cursorId == 0 )
 		return false;
 
-//	cout << "TEMP: requestMore" << endl;
 	requestMore();
 	return pos < nReturned;
 }
@@ -134,6 +148,8 @@ JSObj DBClientCursor::next() {
 	return o;
 }
 
+/* ------------------------------------------------------ */
+
 // "./db testclient" to invoke
 extern JSObj emptyObj;
 void testClient() {
@@ -141,11 +157,23 @@ void testClient() {
 	DBClientConnection c;
 	string err;
 	assert( c.connect("127.0.0.1", err) );
+	cout << "query foo.bar..." << endl;
 	auto_ptr<DBClientCursor> cursor = 
-		c.query("foo.bar", emptyObj);
+		c.query("foo.bar", emptyObj, 0, 0, 0, true);
 	DBClientCursor *cc = cursor.get();
-	cout << "more: " << cc->more() << endl;
-	while( cc->more() ) { 
+	while( 1 ) {
+		bool m = cc->more();
+		cout << "more: " << m << " dead:" << cc->isDead() << endl;
+		if( !m ) {
+			if( cc->isDead() )
+				cout << "cursor dead, stopping" << endl;
+			else { 
+				cout << "Sleeping 10 seconds" << endl;
+				sleepsecs(10);
+				continue;
+			}
+			break;
+		}
 		cout << cc->next().toString() << endl;
 	}
 }

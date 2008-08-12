@@ -29,8 +29,7 @@ class JSObj;
 class Record;
 class JSObjBuilder;
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 
 /* BinData = binary data types. 
    EOO = end of object
@@ -74,20 +73,6 @@ struct OID {
 	 DBRef:     <strlen> <cstring ns> <oid>
        DBRef is a database reference: basically a collection name plus an Object ID
      BinData:   <int len> <byte subtype> <byte[len] data>
-*/
-
-/* db operation message format 
-
-   unsigned opid;         // arbitary; will be echoed back
-   byte operation;
-   
-   dbInsert:
-      int reserved;
-      string collection;
-      a series of JSObjects terminated with a null object (i.e., just EOO)
-   dbUpdate: see query.h
-   dbDelete: see query.h
-   dbQuery: see query.h
 */
 
 #pragma pack(pop)
@@ -533,8 +518,7 @@ extern JSObj maxKey;
 
 /*- just for testing -- */
 
-#pragma pack(push)
-#pragma pack(1)
+#pragma pack(push,1)
 struct JSObj1 {
 	JSObj1() {
 		totsize=sizeof(JSObj1); 
