@@ -91,6 +91,8 @@ struct MsgData {
 	int operation;
     char _data[4];
 
+	int& dataAsInt() { return *((int *) _data); } 
+
 	int dataLen(); // len without header
 };
 const int MsgDataHeaderSize = sizeof(MsgData) - 4;

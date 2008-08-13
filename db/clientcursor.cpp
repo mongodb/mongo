@@ -101,10 +101,28 @@ void aboutToDelete(const DiskLoc& dl) {
 	for( vector<ClientCursor*>::iterator i = toAdvance.begin();
 		i != toAdvance.end(); ++i ) 
 	{ 
-		(*i)->c->checkLocation();
-		(*i)->c->advance();
-		wassert( (*i)->c->currLoc() != dl );
-		(*i)->updateLocation();
+		Cursor *c = (*i)->c.get();
+		DiskLoc tmp1 = c->currLoc();
+		if( tmp1 != dl ) {
+			/* this might indicate a failure to call ClientCursor::updateLocation() */
+			problem() << "warning: cursor loc does not match byLoc position!" << endl;
+		}
+		c->checkLocation();
+		if( c->tailing() ) { 
+			DEV cout << "killing cursor as we would have to advance it and it is tailable" << endl;
+			delete *i;
+			continue;
+		}
+		c->advance();
+		DiskLoc newLoc = c->currLoc();
+		if( newLoc.isNull() ) {
+			// advanced to end -- delete cursor
+			delete *i;
+		}
+		else {
+			wassert( newLoc != dl );
+			(*i)->updateLocation();
+		}
 	}
 }
 
@@ -125,7 +143,7 @@ void ClientCursor::updateLocation() {
 	assert( cursorid );
 	DiskLoc cl = c->currLoc();
 	if( lastLoc() == cl ) {
-		log() << "info: lastloc==curloc " << ns << '\n';
+		//log() << "info: lastloc==curloc " << ns << '\n';
 		return;
 	}
 	setLastLoc(cl);

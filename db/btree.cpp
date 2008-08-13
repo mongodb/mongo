@@ -639,7 +639,6 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
 	int ko = keyOfs + direction;
 	DiskLoc nextDown = childForPos(ko+adj);
 	if( !nextDown.isNull() ) { 
-//		nextDown.btree()->dump();//TEMP:
 		while( 1 ) {
 			keyOfs = direction>0 ? 0 : nextDown.btree()->n - 1;
 			DiskLoc loc= nextDown.btree()->childForPos(keyOfs + adj);

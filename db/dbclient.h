@@ -28,7 +28,7 @@ enum {
 
        like any "latent cursor", the cursor may become invalid at some point -- for example if that 
        final object it references were deleted.  Thus, you should be prepared to requery if you get back 
-       ResultOption_CursorNotFound.
+       ResultFlag_CursorNotFound.
     */
     Option_CursorTailable = 2
 };
@@ -41,9 +41,7 @@ struct QueryResult : public MsgData {
 	int startingFrom;
 	int nReturned;
 	const char *data() { return (char *) (((int *)&nReturned)+1); }
-    int resultOptions() const { 
-        return *((int *) _data);
-    }
+	int& resultFlags() { return dataAsInt(); }
 };
 #pragma pack(pop)
 

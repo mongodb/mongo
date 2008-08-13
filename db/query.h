@@ -68,17 +68,17 @@
 /* db response format
 
    Query or GetMore: // see struct QueryResult
-      int resultOptions = 0;
+      int resultFlags = 0;
       int64 cursorID;
       int startingFrom;
       int nReturned; // 0=infinity
       list of marshalled JSObjects;
 */
 
-/* the field 'resultOptions' above */
+/* the field 'resultFlags' above */
 enum { 
     /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
-    ResultOption_CursorNotFound = 1
+    ResultFlag_CursorNotFound = 1
 };
 
 // grab struct QueryResult from:
@@ -90,7 +90,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 // caller must free() returned QueryResult.
 QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn, 
 					  JSObj j, auto_ptr< set<string> > fieldFilter,
-					  stringstream&);
+					  stringstream&, int queryOptions);
 
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss);
 

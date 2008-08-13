@@ -249,7 +249,7 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	QueryResult* msgdata;
 
 	try { 
-		msgdata = runQuery(m, ns, ntoskip, ntoreturn, query, fields, ss);
+		msgdata = runQuery(m, ns, ntoskip, ntoreturn, query, fields, ss, m.data->dataAsInt());
 	}
 	catch( AssertionException ) { 
 		ss << " exception ";

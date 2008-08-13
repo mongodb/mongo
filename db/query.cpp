@@ -216,14 +216,8 @@ int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
 		c = theDataFileMgr.findAll(ns);
 
 	Cursor &tempDebug = *c;
-	int temp = 0;
-	int tempd = 0;
-
-	DiskLoc _tempDelLoc;
 
 	while( c->ok() ) {
-		temp++;
-
 		Record *r = c->_current();
 		DiskLoc rloc = c->currLoc();
 		c->advance(); // must advance before deleting as the next ptr will die
@@ -238,11 +232,9 @@ int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
 			assert( !deep || !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
 			if( !justOne )
 				c->noteLocation();
-			_tempDelLoc = rloc;
 
 			theDataFileMgr.deleteRecord(ns, r, rloc);
 			nDeleted++;
-			tempd = temp;
 			if( justOne )
 				break;
 			c->checkLocation();
@@ -911,7 +903,7 @@ int runCount(const char *ns, JSObj& cmd, string& err) {
 }
 
 QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
-					  auto_ptr< set<string> > filter, stringstream& ss) 
+					  auto_ptr< set<string> > filter, stringstream& ss, int queryOptions) 
 {
 	time_t t = time(0);
 	bool wantMore = true;
@@ -957,64 +949,56 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 
 		int nscanned = 0;
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
+		if( c.get() == 0 )
+			c = getIndexCursor(ns, query, order);
+		if( c.get() == 0 )
+			c = findTableScan(ns, order);
 
-		/*try*/{
+		while( c->ok() ) {
+			JSObj js = c->current();
+			if( queryTraceLevel >= 50 )
+				cout << " checking against:\n " << js.toString() << endl;
+			nscanned++;
+			bool deep;
 
-			if( c.get() == 0 ) {
-				c = getIndexCursor(ns, query, order);
+			if( !matcher->matches(js, &deep) ) {
+				if( c->tempStopOnMiss() )
+					break;
 			}
-			if( c.get() == 0 ) {
-				//c = theDataFileMgr.findAll(ns);
-				c = findTableScan(ns, order);
-			}
-
-			while( c->ok() ) {
-				JSObj js = c->current();
-				if( queryTraceLevel >= 50 )
-					cout << " checking against:\n " << js.toString() << endl;
-				nscanned++;
-				bool deep;
-
-JSMatcher &debug = *matcher;
-assert( debug.getN() < 5000 );
-
-				if( !matcher->matches(js, &deep) ) {
-					if( c->tempStopOnMiss() )
-						break;
+			else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+				// got a match.
+				if( ntoskip > 0 ) {
+					ntoskip--;
 				}
-				else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
-					// got a match.
-					if( ntoskip > 0 ) {
-						ntoskip--;
+				else {
+					bool ok = true;
+					assert( js.objsize() >= 0 ); //defensive for segfaults
+					if( filter.get() ) {
+						// we just want certain fields from the object.
+						JSObj x;
+						ok = x.addFields(js, *filter) > 0;
+						if( ok ) 
+							b.append((void*) x.objdata(), x.objsize());
 					}
 					else {
-						bool ok = true;
-						assert( js.objsize() >= 0 ); //defensive for segfaults
-						if( filter.get() ) {
-							// we just want certain fields from the object.
-							JSObj x;
-							ok = x.addFields(js, *filter) > 0;
-							if( ok ) 
-								b.append((void*) x.objdata(), x.objsize());
-						}
-						else {
-							b.append((void*) js.objdata(), js.objsize());
-						}
-						if( ok ) {
-							n++;
-							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-								(ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
-									/* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
-									   is only a size limit.  The idea is that on a find() where one doesn't use much results, 
-									   we don't return much, but once getmore kicks in, we start pushing significant quantities.
+						b.append((void*) js.objdata(), js.objsize());
+					}
+					if( ok ) {
+						n++;
+						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
+							(ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
+								/* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
+								   is only a size limit.  The idea is that on a find() where one doesn't use much results, 
+								   we don't return much, but once getmore kicks in, we start pushing significant quantities.
 
-									   The n limit (vs. size) is important when someone fetches only one small field from big 
-									   objects, which causes massive scanning server-side.
-									*/
-									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-									if( wantMore && ntoreturn != 1 ) {
+								   The n limit (vs. size) is important when someone fetches only one small field from big 
+								   objects, which causes massive scanning server-side.
+								*/
+								/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+								if( wantMore && ntoreturn != 1 ) {
+									if( useCursors ) {
 										c->advance();
-										if( c->ok() && useCursors ) {
+										if( c->ok() ) {
 											// more...so save a cursor
 											ClientCursor *cc = new ClientCursor();
 											cc->c = c;
@@ -1028,17 +1012,31 @@ assert( debug.getN() < 5000 );
 											cc->updateLocation();
 										}
 									}
-									break;
-							}
+								}
+								break;
 						}
 					}
 				}
-				c->advance();
 			}
-
-			if( client->profile )
-				ss << "  nscanned:" << nscanned << ' ';
+			c->advance();
 		}
+
+		if( cursorid == 0 && (queryOptions & Option_CursorTailable) && c->tailable() ) { 
+			c->setAtTail();
+			ClientCursor *cc = new ClientCursor();
+			cc->c = c;
+			cursorid = cc->cursorid;
+			DEV cout << "  query has no more but tailable, cursorid: " << cursorid << endl;
+			cc->matcher = matcher;
+			cc->ns = ns;
+			cc->pos = n;
+			cc->filter = filter;
+			cc->originalMessage = message;
+			cc->updateLocation();
+		}
+
+		if( client->profile )
+			ss << "  nscanned:" << nscanned << ' ';
 	}
 
 	QueryResult *qr = (QueryResult *) b.buf();
@@ -1087,21 +1085,27 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 
 	b.skip(sizeof(QueryResult));
 
+	int resultFlags = 0;
 	int start = 0;
 	int n = 0;
 
 	if( !cc ) { 
 		DEV log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
 		cursorid = 0;
+		resultFlags = ResultFlag_CursorNotFound;
 	}
 	else {
 		start = cc->pos;
 		Cursor *c = cc->c.get();
 		c->checkLocation();
+		c->tailResume();
 		while( 1 ) {
 			if( !c->ok() ) {
 done:
-				// done!  kill cursor.
+				if( c->tailing() ) {
+					c->setAtTail();
+					break;
+				}
 				DEV log() << "  getmore: last batch, erasing cursor " << cursorid << endl;
 				bool ok = ClientCursor::erase(cursorid);
 				assert(ok);
@@ -1138,8 +1142,10 @@ done:
 						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
 							(ntoreturn==0 && b.len()>1*1024*1024) ) {
 								c->advance();
+								if( c->tailing() && !c->ok() )
+									c->setAtTail();
 								cc->pos += n;
-								cc->updateLocation();
+								//cc->updateLocation();
 								break;
 						}
 					}
@@ -1147,14 +1153,15 @@ done:
 			}
 			c->advance();
 		}
+		cc->updateLocation();
 	}
 
 	QueryResult *qr = (QueryResult *) b.buf();
+	qr->len = b.len();
+	qr->operation = opReply;
+	qr->resultFlags() = resultFlags;
 	qr->cursorId = cursorid;
 	qr->startingFrom = start;
-	qr->len = b.len();
-	//	qr->reserved = 0;
-	qr->operation = opReply;
 	qr->nReturned = n;
 	b.decouple();
 

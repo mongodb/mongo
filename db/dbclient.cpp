@@ -91,8 +91,6 @@ auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, 
 /* -- DBClientCursor ---------------------------------------------- */
 
 void DBClientCursor::requestMore() { 
-cout << "TEMP REQUESTMORE" << endl;
-
 	assert( cursorId && pos == nReturned );
 
 	BufBuilder b;
@@ -113,7 +111,7 @@ cout << "TEMP REQUESTMORE" << endl;
 
 void DBClientCursor::dataReceived() { 
 	QueryResult *qr = (QueryResult *) m->data;
-	if( qr->resultOptions() & ResultOption_CursorNotFound ) {
+	if( qr->resultFlags() & ResultFlag_CursorNotFound ) {
 		// cursor id no longer valid at the server.
 		assert( qr->cursorId == 0 );
 		cursorId = 0; // 0 indicates no longer valid (dead)
@@ -126,7 +124,9 @@ void DBClientCursor::dataReceived() {
 	nReturned = qr->nReturned;
 	pos = 0;
 	data = qr->data();
-	assert( nReturned || cursorId == 0 );
+	/* this assert would fire the way we currently work:
+	    assert( nReturned || cursorId == 0 );
+    */
 }
 
 bool DBClientCursor::more() { 

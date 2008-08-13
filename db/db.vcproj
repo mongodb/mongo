@@ -273,6 +273,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\cursor.h"
+				>
+			</File>
+			<File
 				RelativePath=".\db.h"
 				>
 			</File>
