@@ -82,8 +82,10 @@ struct SyncException {
 */
 class Source {
 	bool resync(string db);
-	void pullOpLog(DBClientConnection&);
+	void pullOpLog();
 	void applyOperation(JSObj& op);
+
+	auto_ptr<DBClientConnection> conn;
 public:
 	string hostName;    // ip addr or hostname
 	string sourceName;  // a logical source name.
@@ -100,8 +102,9 @@ public:
 	static void loadAll(vector<Source*>&);
 	static void cleanup(vector<Source*>&);
 	Source(JSObj);
-	void sync();
+	bool sync();
 	void save(); // write ourself to local.sources
+	void resetConnection() { conn = auto_ptr<DBClientConnection>(0); }
 
 	// make a jsobj from our member fields of the form 
 	//   { host: ..., source: ..., syncedTo: }

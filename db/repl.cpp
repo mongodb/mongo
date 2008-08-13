@@ -280,7 +280,7 @@ void Source::applyOperation(JSObj& op) {
 }
 
 /* note: not yet in mutex at this point. */
-void Source::pullOpLog(DBClientConnection& conn) { 
+void Source::pullOpLog() { 
 	JSObjBuilder q;
 	q.appendDate("$gte", syncedTo.asDate());
 	JSObjBuilder query;
@@ -289,7 +289,7 @@ void Source::pullOpLog(DBClientConnection& conn) {
 
 	string ns = string("local.oplog.$") + sourceName;
 	auto_ptr<DBClientCursor> c = 
-		conn.query(ns.c_str(), query.done());
+		conn->query(ns.c_str(), query.done());
 	if( !c->more() ) { 
 		problem() << "pull:   " << ns << " empty?\n";
 		sleepsecs(3);
@@ -348,35 +348,42 @@ void Source::pullOpLog(DBClientConnection& conn) {
 	}
 }
 
-/* note: not yet in mutex at this point. */
-void Source::sync() { 
+/* note: not yet in mutex at this point. 
+   returns true if everything happy.  return false if you want to reconnect.
+*/
+bool Source::sync() { 
 	log() << "pull: from " << sourceName << '@' << hostName << endl;
 
 	if( (string("localhost") == hostName || string("127.0.0.1") == hostName) && port == DBPort ) { 
         log() << "pull:   can't sync from self (localhost). sources configuration may be wrong." << endl;
-        return;
+		sleepsecs(5);
+        return false;
     }
 
-	DBClientConnection conn;
-	string errmsg;
-	if( !conn.connect(hostName.c_str(), errmsg) ) {
-		log() << "pull:   cantconn " << errmsg << endl;
-		return;
+	if( conn.get() == 0 ) {
+		conn = auto_ptr<DBClientConnection>(new DBClientConnection());
+		string errmsg;
+		if( !conn->connect(hostName.c_str(), errmsg) ) {
+			resetConnection();
+			log() << "pull:   cantconn " << errmsg << endl;
+			return false;
+		}
 	}
 
 	// get current mtime at the server.
-	JSObj o = conn.findOne("admin.$cmd", opTimeQuery);
+	JSObj o = conn->findOne("admin.$cmd", opTimeQuery);
 	Element e = o.findElement("optime");
 	if( e.eoo() ) {
 		log() << "pull:   failed to get cur optime from master" << endl;
 		log() << "        " << o.toString() << endl;
-		return;
+		return false;
 	}
 	uassert( e.type() == Date );
 	OpTime serverCurTime;
 	serverCurTime.asDate() = e.date();
 
-	pullOpLog(conn);
+	pullOpLog();
+	return true;
 }
 
 /* -- Logging of operations -------------------------------------*/
@@ -448,12 +455,18 @@ void replMain() {
 	if( sources.empty() )
 		sleepsecs(20);
 
-	try {
-		for( vector<Source*>::iterator i = sources.begin(); i != sources.end(); i++ )
-			(*i)->sync();
-	}
-	catch( SyncException ) {
-		sleepsecs(300);
+	for( vector<Source*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
+		Source *s = *i;
+		bool ok = false;
+		try {
+			ok = s->sync();
+		}
+		catch( SyncException ) {
+			log() << "caught SyncException, sleeping 5 minutes" << endl;
+			sleepsecs(300);
+		}
+		if( !ok ) 
+			s->resetConnection();
 	}
 
 	Source::cleanup(sources);
