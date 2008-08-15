@@ -197,14 +197,37 @@ void Source::cleanup(vector<Source*>& v) {
 		delete *i;
 }
 
+static void addSourceToList(vector<Source*>&v, Source& s, vector<Source*>&old) { 
+	for( vector<Source*>::iterator i = old.begin(); i != old.end();  ) {
+		if( s == **i ) {
+			v.push_back(*i);
+			old.erase(i);
+			return;
+		}
+		i++;
+	}
+
+	v.push_back( new Source(s) );
+}
+
+/* we reuse our existing objects so that we can keep our existing connection 
+   and cursor in effect. 
+*/
 void Source::loadAll(vector<Source*>& v) { 
+	vector<Source *> old = v;
+    v.erase(v.begin(), v.end());
+
 	setClient("local.sources");
 	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
 	while( c->ok() ) { 
-		v.push_back( new Source(c->current()) );
+		Source tmp(c->current());	
+		addSourceToList(v, tmp, old);
 		c->advance();
 	}
 	client = 0;
+
+    for( vector<Source*>::iterator i = old.begin(); i != old.end(); i++ )
+        delete *i;
 }
 
 JSObj opTimeQuery = fromjson("{getoptime:1}");
@@ -370,6 +393,7 @@ bool Source::sync() {
 		}
 	}
 
+/*
 	// get current mtime at the server.
 	JSObj o = conn->findOne("admin.$cmd", opTimeQuery);
 	Element e = o.findElement("optime");
@@ -381,7 +405,7 @@ bool Source::sync() {
 	uassert( e.type() == Date );
 	OpTime serverCurTime;
 	serverCurTime.asDate() = e.date();
-
+*/
 	pullOpLog();
 	return true;
 }
@@ -444,29 +468,43 @@ void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *o2, bool *bb) 
 
 /* --------------------------------------------------------------*/
 
+/*
+TODO:
+_ source has autoptr to the cursor
+_ reuse that cursor when we can
+*/
+
 void replMain() { 
 	vector<Source*> sources;
 
-	{
-		dblock lk;
-		Source::loadAll(sources);
-	}
-
-	if( sources.empty() )
-		sleepsecs(20);
-
-	for( vector<Source*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
-		Source *s = *i;
-		bool ok = false;
-		try {
-			ok = s->sync();
+	while( 1 ) { 
+		{	
+			dblock lk;
+			Source::loadAll(sources);
 		}
-		catch( SyncException ) {
-			log() << "caught SyncException, sleeping 5 minutes" << endl;
-			sleepsecs(300);
+		
+		if( sources.empty() )
+			sleepsecs(20);
+		
+		for( vector<Source*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
+			Source *s = *i;	
+			bool ok = false;	
+			try {
+				ok = s->sync();
+			}
+			catch( SyncException ) {
+				log() << "caught SyncException, sleeping 1 minutes" << endl;
+				sleepsecs(60);
+			}
+            catch( AssertionException ) { 
+                log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
+                sleepsecs(60);
+            }
+			if( !ok ) 
+				s->resetConnection();
 		}
-		if( !ok ) 
-			s->resetConnection();
+
+        sleepsecs(3);
 	}
 
 	Source::cleanup(sources);

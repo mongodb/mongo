@@ -109,6 +109,10 @@ public:
 	// make a jsobj from our member fields of the form 
 	//   { host: ..., source: ..., syncedTo: }
 	JSObj jsobj(); 
+	
+	bool operator==(const Source&r) const { 
+		return hostName == r.hostName && sourceName == r.sourceName; 
+	}
 };
 
 /* Write operation to the log (local.oplog.$main)
