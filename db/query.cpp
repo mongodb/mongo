@@ -1153,7 +1153,8 @@ done:
 			}
 			c->advance();
 		}
-		cc->updateLocation();
+        if( cc ) 
+            cc->updateLocation();
 	}
 
 	QueryResult *qr = (QueryResult *) b.buf();
