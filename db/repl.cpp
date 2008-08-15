@@ -274,18 +274,25 @@ void Source::applyOperation(JSObj& op) {
 
 	const char *opType = op.getStringField("op");
 	JSObj o = op.getObjectField("o");
-	if( *opType == 'i' ) { 
-		// do upserts for inserts as we might get replayed more than once
-		OID *oid = o.getOID();
-		if( oid == 0 ) {
-			_updateObjects(ns, o, o, true, ss);
-		}
-		else { 
-			JSObjBuilder b;
-			b.appendOID("_id", oid);
-			_updateObjects(ns, o, b.done(), true, ss);
-		}
-		// theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
+	if( *opType == 'i' ) {
+        const char *p = strchr(ns, '.');
+        if( p && strcmp(p, ".system.indexes") == 0 ) { 
+            // updates aren't allowed for indexes -- so we will do a regular insert. if index already 
+            // exists, that is ok.
+            theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
+        }
+        else { 
+            // do upserts for inserts as we might get replayed more than once
+            OID *oid = o.getOID();
+            if( oid == 0 ) {
+                _updateObjects(ns, o, o, true, ss);
+            }
+            else { 
+                JSObjBuilder b;
+                b.appendOID("_id", oid);
+                _updateObjects(ns, o, b.done(), true, ss);
+            }
+        }
 	}
 	else if( *opType == 'u' ) { 
 		_updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), ss);
