@@ -54,7 +54,7 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	if( ip.empty() ) 
 		ip = serverAddress;
 	
-	cout << "port:" << port << endl;
+	//cout << "port:" << port << endl;
 	server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
 	if( !p.connect(*server) ) {
 	        errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;

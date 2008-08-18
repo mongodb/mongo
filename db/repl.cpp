@@ -320,6 +320,12 @@ void Source::pullOpLog() {
 	string ns = string("local.oplog.$") + sourceName;
 	auto_ptr<DBClientCursor> c = 
 		conn->query(ns.c_str(), query.done());
+    if( c.get() == 0 ) { 
+        problem() << "pull:   dbclient::query returns null (conn closed?)" << endl;
+        resetConnection();
+        sleepsecs(3);
+        return;
+    }
 	if( !c->more() ) { 
 		problem() << "pull:   " << ns << " empty?\n";
 		sleepsecs(3);
@@ -396,6 +402,7 @@ bool Source::sync() {
 		if( !conn->connect(hostName.c_str(), errmsg) ) {
 			resetConnection();
 			log() << "pull:   cantconn " << errmsg << endl;
+            sleepsecs(1);
 			return false;
 		}
 	}
