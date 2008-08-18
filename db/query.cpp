@@ -245,50 +245,72 @@ int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
 }
 
 struct Mod { 
+	enum Op { INC, SET } op;
 	const char *fieldName;
-	double n;
+	double *n;
+	static void getMods(vector<Mod>& mods, JSObj from);
+	static void applyMods(vector<Mod>& mods, JSObj obj);
 };
 
-void applyMods(vector<Mod>& mods, JSObj obj) { 
+void Mod::applyMods(vector<Mod>& mods, JSObj obj) { 
 	for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) { 
 		Mod& m = *i;
 		Element e = obj.findElement(m.fieldName);
 		if( e.type() == Number ) {
-			e.number() += m.n;
+			if( m.op == INC )
+				*m.n = e.number() += *m.n;
+			else
+				e.number() = *m.n; // $set or $SET
 		}
 	}
 }
 
 /* get special operations like $inc 
    { $inc: { a:1, b:1 } }
+   { $set: { a:77 } }
+   NOTE: MODIFIES source from object!
 */
-void getMods(vector<Mod>& mods, JSObj from) { 
+void Mod::getMods(vector<Mod>& mods, JSObj from) { 
 	JSElemIter it(from);
 	while( it.more() ) {
 		Element e = it.next();
-		if( strcmp(e.fieldName(), "$inc") == 0 && e.type() == Object ) {
+		const char *fn = e.fieldName();
+		if( *fn == '$' && e.type() == Object && 
+			fn[4] == 0 ) {
 			JSObj j = e.embeddedObject();
 			JSElemIter jt(j);
+			Op op = Mod::SET;
+			if( strcmp("$inc",fn) == 0 ) {
+				op = Mod::INC;
+				// we rename to $SET instead of $set so that on an op like
+				//   { $set: {x:1}, $inc: {y:1} }
+				// we don't get two "$set" fields which isn't allowed
+				strcpy((char *) fn, "$SET");
+			}
 			while( jt.more() ) { 
 				Element f = jt.next();
 				if( f.eoo() )
 					break;
 				Mod m;
+				m.op = op;
 				m.fieldName = f.fieldName();
 				if( f.type() == Number ) {
-					m.n = f.number();
-					mods.push_back(m);
+					m.n = &f.number();
+					mods.push_back( m );
 				} 
 			}
 		}
 	}
 }
 
-/*
-todo:
- smart requery find record immediately
+/* todo:
+     _ smart requery find record immediately
+   returns:  
+     2: we did applyMods() but didn't logOp()
+	 5: we did applyMods() and did logOp() (so don't do it again) 
+     (clean these up later...)
 */
-int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
+int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss, bool logop=false) {
 	//cout << "TEMP BAD";
 	//lrutest.find(updateobj);
 
@@ -329,12 +351,19 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 
 				/* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
 				   regular ones at the moment. */
-				if( updateobj.firstElement().fieldName()[0] == '$' ) {
+				const char *firstField = updateobj.firstElement().fieldName();
+				if( firstField[0] == '$' ) {
 					vector<Mod> mods;
-					getMods(mods, updateobj);
-					applyMods(mods, c->currLoc().obj());
+					Mod::getMods(mods, updateobj);
+					Mod::applyMods(mods, c->currLoc().obj());
 					if( profile ) 
 						ss << " fastmod ";
+					if( logop ) {
+						if( mods.size() ) { 
+							logOp("u", ns, updateobj, &pattern, &upsert);
+							return 5;
+						}
+					}
 					return 2;
 				}
 
@@ -352,11 +381,11 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 		if( updateobj.firstElement().fieldName()[0] == '$' ) {
 			/* upsert of an $inc. build a default */
 			vector<Mod> mods;
-			getMods(mods, updateobj);
+			Mod::getMods(mods, updateobj);
 			JSObjBuilder b;
 			b.appendElements(pattern);
 			for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
-				b.append(i->fieldName, i->n);
+				b.append(i->fieldName, *i->n);
 			JSObj obj = b.done();
 			theDataFileMgr.insert(ns, (void*) obj.objdata(), obj.objsize());
 			if( profile )
@@ -373,8 +402,9 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 /* todo: we can optimize replication by just doing insert when an upsert triggers. 
 */
 void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
-	int rc = _updateObjects(ns, updateobj, pattern, upsert, ss);
-	logOp("u", ns, updateobj, &pattern, &upsert);
+	int rc = _updateObjects(ns, updateobj, pattern, upsert, ss, true);
+	if( rc != 5 )
+		logOp("u", ns, updateobj, &pattern, &upsert);
 }
 
 int queryTraceLevel = 0;

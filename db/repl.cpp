@@ -31,7 +31,7 @@ extern JSObj emptyObj;
 extern boost::mutex dbMutex;
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
 bool userCreateNS(const char *ns, JSObj& j, string& err);
-int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss);
+int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss, bool logOp=false);
 bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder);
 
 OpTime last(0, 0);
@@ -144,7 +144,9 @@ Source::Source(JSObj o) {
 	Element e = o.getField("syncedTo");
 	if( !e.eoo() ) {
 		uassert( e.type() == Date );
-		syncedTo.asDate() = e.date();
+		OpTime tmp( e.date() );
+		syncedTo = tmp;
+		//syncedTo.asDate() = e.date();
 	}
 
 	JSObj dbsObj = o.getObjectField("dbs");
@@ -336,8 +338,7 @@ void Source::pullOpLog() {
 	JSObj op = c->next();
 	Element ts = op.findElement("ts");
 	assert( ts.type() == Date );
-	OpTime t;
-	t.asDate() = ts.date();
+	OpTime t( ts.date() );
 	bool initial = syncedTo.isNull();
 	if( initial ) { 
 		log() << "pull:   initial run\n";
@@ -372,7 +373,8 @@ void Source::pullOpLog() {
 			ts = op.findElement("ts");
 			assert( ts.type() == Date );
 			OpTime last = t;
-			t.asDate() = ts.date();
+			OpTime tmp( ts.date() );
+			t = tmp;
 			if( !( last < t ) ) { 
 				problem() << "sync error: last " << last.toString() << " >= t " << t.toString() << endl;
 				uassert(false);

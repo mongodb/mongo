@@ -36,12 +36,15 @@ bool cloneFrom(const char *masterHost, string& errmsg);
 
 #pragma pack(push,4)
 class OpTime { 
-      unsigned i;
-      unsigned secs;
+	unsigned i;
+	unsigned secs;
 public:
-      OpTime(unsigned a, unsigned b) { secs = a; i = b; }
-      OpTime() { secs = 0; i = 0; }
-      static OpTime now();
+	OpTime(unsigned long long date) { 
+		reinterpret_cast<unsigned long long&>(*this) = date;
+	}
+	OpTime(unsigned a, unsigned b) { secs = a; i = b; }
+	OpTime() { secs = 0; i = 0; }
+	static OpTime now();
 
 	  /* We store OpTime's in the database as Javascript Date datatype -- we needed some sort of 
 	     64 bit "container" for these values.  While these are not really "Dates", that seems a 
@@ -49,7 +52,8 @@ public:
 		 is perhaps the cleanest choice, lacking a true unsigned64 datatype, but BinData has a 
 		 couple bytes of overhead.
 	  */
-	  unsigned long long& asDate() { return *((unsigned long long *) this); } 
+	  unsigned long long asDate() const { return *((unsigned long long *) &i); } 
+//	  unsigned long long& asDate() { return *((unsigned long long *) &i); } 
 
 	  bool isNull() { return secs == 0; }
 	  string toString() const { 

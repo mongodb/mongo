@@ -43,7 +43,7 @@
 	  int flags; // 1=upsert
       JSObject query;
 	  JSObject objectToUpdate;
-        objectToUpdate may include { $inc: <field> }.
+        objectToUpdate may include { $inc: <field> } or { $set: ... }, see struct Mod.
    dbQuery:
       string collection;
 	  int nToSkip;
