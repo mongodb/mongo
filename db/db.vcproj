@@ -361,6 +361,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\scanandorder.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\sock.h"
 				>
 			</File>

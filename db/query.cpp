@@ -28,6 +28,7 @@
 #include "javajs.h"
 #include "json.h"
 #include "repl.h"
+#include "scanandorder.h"
 
 /* We cut off further objects once we cross this threshold; thus, you might get 
    a little bit more than this, it is a threshold rather than a limit.
@@ -63,7 +64,7 @@ int runCount(const char *ns, JSObj& cmd, string& err);
      simpleKeyMatch - set to true if the query is purely for a single key value
                       unchanged otherwise.
 */
-auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool *simpleKeyMatch = 0) { 
+auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0) { 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) return auto_ptr<Cursor>();
 
@@ -90,6 +91,8 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 				         specified!
 				*/
 				DEV cout << " using index " << d->indexes[i].indexNamespace() << '\n';
+				if( isSorted )
+					*isSorted = true;
 				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], reverse ? maxKey : emptyObj, reverse ? -1 : 1, false));
 			}
 		}
@@ -940,7 +943,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 	time_t t = time(0);
 	bool wantMore = true;
 	int ntoreturn = _ntoreturn;
-	if( _ntoreturn < 0 ) { 
+	if( _ntoreturn < 0 ) {
 		ntoreturn = -_ntoreturn;
 		wantMore = false;
 	}
@@ -979,12 +982,23 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		JSMatcher &debug1 = *matcher;
 		assert( debug1.getN() < 5000 );
 
+		bool isSorted = false;
 		int nscanned = 0;
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
 		if( c.get() == 0 )
-			c = getIndexCursor(ns, query, order);
+			c = getIndexCursor(ns, query, order, 0, &isSorted);
 		if( c.get() == 0 )
 			c = findTableScan(ns, order);
+
+		auto_ptr<ScanAndOrder> so;
+		bool ordering = false;
+		if( !order.isEmpty() && !isSorted ) {
+			ordering = true;
+			ss << " scanAndOrder ";
+			so = auto_ptr<ScanAndOrder>(new ScanAndOrder());
+			wantMore = false;
+			//			scanAndOrder(b, c.get(), order, ntoreturn);
+		}
 
 		while( c->ok() ) {
 			JSObj js = c->current();
@@ -1005,7 +1019,9 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 				else {
 					bool ok = true;
 					assert( js.objsize() >= 0 ); //defensive for segfaults
-					if( filter.get() ) {
+					/*if( ordering )
+						so->add(js);
+					else*/ if( filter.get() ) {
 						// we just want certain fields from the object.
 						JSObj x;
 						ok = x.addFields(js, *filter) > 0;
