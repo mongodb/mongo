@@ -34,6 +34,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err);
 int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss, bool logOp=false);
 bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder);
 bool cloneFrom(const char *masterHost, string& errmsg);
+void ensureHaveIdIndex(const char *ns);
 
 OpTime last(0, 0);
 
@@ -229,11 +230,13 @@ void Source::applyOperation(JSObj& op) {
             else { 
                 JSObjBuilder b;
                 b.appendOID("_id", oid);
+				RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
                 _updateObjects(ns, o, b.done(), true, ss);
             }
         }
 	}
 	else if( *opType == 'u' ) { 
+		RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
 		_updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), ss);
 	}
 	else if( *opType == 'd' ) { 

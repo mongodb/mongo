@@ -987,6 +987,26 @@ void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newReco
 }
 
 extern JSObj emptyObj;
+extern JSObj id_obj; // = fromjson("{_id:ObjId()}");
+
+void ensureHaveIdIndex(const char *ns) { 
+	NamespaceDetails *d = nsdetails(ns);
+	if( d == 0 || (d->flags & NamespaceDetails::Flag_HaveIdIndex) ) 
+		return;
+
+	d->flags |= NamespaceDetails::Flag_HaveIdIndex;
+
+	string system_indexes = client->name + ".system.indexes";
+
+	JSObjBuilder b;
+	b.append("name", "id_");
+	b.append("ns", ns);
+	b.append("key", id_obj);
+	JSObj o = b.done();
+
+	/* edge case: note the insert could fail if we have hit maxindexes already */
+	theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
+}
 
 DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
 	bool addIndex = false;

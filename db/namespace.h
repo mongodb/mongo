@@ -125,6 +125,7 @@ public:
 		capped = 0;
 		max = 0x7fffffff;
 		paddingFactor = 1.0;
+		flags = 0;
 		memset(reserved, 0, sizeof(reserved));
 	} 
 	DiskLoc firstExtent;
@@ -138,7 +139,14 @@ public:
 	int capped;
 	int max; // max # of objects for a capped table.
 	double paddingFactor; // 1.0 = no padding.
-	char reserved[256-16-4-4-8*MaxIndexes-8-8-8];
+	int flags;
+	char reserved[256-16-4-4-8*MaxIndexes-8-8-8-4];
+
+	enum { 
+		Flag_HaveIdIndex = 1 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
+	};
+
+	void aboutToDeleteAnIndex() { flags &= ~Flag_HaveIdIndex; }
 
 	void paddingFits() { 
 		double x = paddingFactor - 0.01;

@@ -782,6 +782,8 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 				Element f = jsobj.findElement("index");
 				if( !f.eoo() ) { 
 
+					d->aboutToDeleteAnIndex();
+
 					ClientCursor::invalidate(toDeleteNs.c_str());
 					logOp("c", ns, jsobj);
 
