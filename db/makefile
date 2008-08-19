@@ -1,5 +1,5 @@
 # makefile for our db project
-
+ 
 FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 
 LIB_DEPS = -lpcrecpp -lpcre
@@ -9,7 +9,7 @@ LIBS= $(LIB_DEPS)  $(LIB_BOOST) -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o dbclient.o btreecursor.o
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o dbclient.o btreecursor.o cloner.o
 
 # ../grid/protorecv.o ../grid/protosend.o
 

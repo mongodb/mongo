@@ -377,7 +377,7 @@ void listen(int port) {
 	problem() << Version << endl;
 	pdfileInit();
 	//testTheDb();
-	log() << "waiting for connections on port " << port << " ..." << endl;
+	log() << "waiting for connections on port " << port << "..." << endl;
 	OurListener l(port);
 	startReplication();
 	l.listen();

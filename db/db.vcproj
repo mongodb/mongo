@@ -187,6 +187,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\cloner.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\db.cpp"
 				>
 			</File>

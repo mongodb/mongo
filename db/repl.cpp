@@ -27,12 +27,13 @@
 #include "json.h"
 #include "db.h"
 
-extern JSObj emptyObj;
+extern int port;
 extern boost::mutex dbMutex;
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
 bool userCreateNS(const char *ns, JSObj& j, string& err);
 int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss, bool logOp=false);
 bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder);
+bool cloneFrom(const char *masterHost, string& errmsg);
 
 OpTime last(0, 0);
 
@@ -62,76 +63,6 @@ struct TestOpTime {
 
 int test2() { 
 	return 0;
-}
-
-
-/* Cloner -----------------------------------------------------------
-   makes copy of existing database.
-*/
-
-class Cloner: boost::noncopyable { 
-	DBClientConnection conn;
-	void copy(const char *collection);
-public:
-	Cloner() { }
-	bool go(const char *masterHost, string& errmsg);
-};
-
-void Cloner::copy(const char *collection) {
-
-
-	auto_ptr<DBClientCursor> c( conn.query(collection, emptyObj) );
-	assert( c.get() );
-	while( c->more() ) { 
-		JSObj js = c->next();
-		theDataFileMgr.insert(collection, (void*) js.objdata(), js.objsize());
-	}
-}
-
-extern int port;
-bool Cloner::go(const char *masterHost, string& errmsg) { 
-	if( (string("localhost") == masterHost || string("127.0.0.1") == masterHost) && port == DBPort ) { 
-		errmsg = "can't clone from self (localhost).  sources configuration may be wrong.";
-		return false;
-	}
-	if( !conn.connect(masterHost, errmsg) )
-		return false;
-
-	string ns = client->name + ".system.namespaces";
-
-	auto_ptr<DBClientCursor> c( conn.query(ns.c_str(), emptyObj) );
-	if( c.get() == 0 ) {
-		errmsg = "query failed system.namespaces";
-		return false;
-	}
-
-	while( c->more() ) { 
-		JSObj collection = c->next();
-		Element e = collection.findElement("name");
-		assert( !e.eoo() );
-		assert( e.type() == String );
-		const char *name = e.valuestr();
-		if( strstr(name, ".system.") || strchr(name, '$') )
-			continue;
-		JSObj options = collection.getObjectField("options");
-		if( !options.isEmpty() ) {
-			string err;
-			userCreateNS(name, options, err);
-		}
-		copy(name);
-	}
-
-	// now build the indexes
-	string system_indexes = client->name + ".system.indexes";
-	copy(system_indexes.c_str());
-
-	return true;
-}
-
-bool cloneFrom(const char *masterHost, string& errmsg)
-{
-	Cloner c;
-	return c.go(masterHost, errmsg);
 }
 
 /* --------------------------------------------------------------*/
@@ -245,9 +176,10 @@ bool Source::resync(string db) {
 
 	{
 		log() << "resync: cloning database " << db << endl;
-		Cloner c;
+		//Cloner c;
 		string errmsg;
-		bool ok = c.go(hostName.c_str(), errmsg);
+		bool ok = cloneFrom(hostName.c_str(), errmsg);
+		//bool ok = c.go(hostName.c_str(), errmsg);
 		if( !ok ) { 
 			problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
 			throw SyncException();
@@ -313,23 +245,38 @@ void Source::applyOperation(JSObj& op) {
 
 /* note: not yet in mutex at this point. */
 void Source::pullOpLog() { 
-	JSObjBuilder q;
-	q.appendDate("$gte", syncedTo.asDate());
-	JSObjBuilder query;
-	query.append("ts", q.done());
-	// query = { ts: { $gte: syncedTo } }
-
 	string ns = string("local.oplog.$") + sourceName;
-	auto_ptr<DBClientCursor> c = 
-		conn->query(ns.c_str(), query.done());
-    if( c.get() == 0 ) { 
+
+	bool tailing = true;
+	DBClientCursor *c = cursor.get();
+	if( c && c->isDead() ) { 
+		log() << "pull:   old cursor isDead, initiating a new one\n";
+		c = 0;
+	}
+
+	if( c == 0 ) {
+		JSObjBuilder q;
+		q.appendDate("$gte", syncedTo.asDate());
+		JSObjBuilder query;
+		query.append("ts", q.done());
+		// query = { ts: { $gte: syncedTo } }
+
+		cursor = conn->query( ns.c_str(), query.done(), 0, 0, 0, true );
+		c = cursor.get();
+		tailing = false;
+	}
+
+    if( c == 0 ) { 
         problem() << "pull:   dbclient::query returns null (conn closed?)" << endl;
         resetConnection();
         sleepsecs(3);
         return;
     }
 	if( !c->more() ) { 
-		problem() << "pull:   " << ns << " empty?\n";
+		if( tailing ) 
+			log() << "pull:   " << ns << " no new activity\n";
+		else
+			problem() << "pull:   " << ns << " empty?\n";
 		sleepsecs(3);
 		return;
 	}
@@ -340,8 +287,13 @@ void Source::pullOpLog() {
 	assert( ts.type() == Date );
 	OpTime t( ts.date() );
 	bool initial = syncedTo.isNull();
-	if( initial ) { 
-		log() << "pull:   initial run\n";
+	if( initial || tailing ) { 
+		if( tailing ) { 
+			assert( syncedTo < t );
+		} 
+		else {
+			log() << "pull:   initial run\n";
+		}
         {
             dblock lk;
             applyOperation(op);
@@ -390,7 +342,7 @@ void Source::pullOpLog() {
    returns true if everything happy.  return false if you want to reconnect.
 */
 bool Source::sync() { 
-	log() << "pull: from " << sourceName << '@' << hostName << endl;
+	log() << "pull: " << sourceName << '@' << hostName << endl;
 
 	if( (string("localhost") == hostName || string("127.0.0.1") == hostName) && port == DBPort ) { 
         log() << "pull:   can't sync from self (localhost). sources configuration may be wrong." << endl;

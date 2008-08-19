@@ -29,6 +29,7 @@
 #pragma once
 
 class DBClientConnection;
+class DBClientCursor;
 extern bool slave;
 extern bool master;
 
@@ -90,6 +91,7 @@ class Source {
 	void applyOperation(JSObj& op);
 
 	auto_ptr<DBClientConnection> conn;
+	auto_ptr<DBClientCursor> cursor;
 public:
 	string hostName;    // ip addr or hostname
 	string sourceName;  // a logical source name.
@@ -111,7 +113,7 @@ public:
 	void resetConnection() { conn = auto_ptr<DBClientConnection>(0); }
 
 	// make a jsobj from our member fields of the form 
-	//   { host: ..., source: ..., syncedTo: }
+	//   { host: ..., source: ..., syncedTo: ... }
 	JSObj jsobj(); 
 	
 	bool operator==(const Source&r) const { 
