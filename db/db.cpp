@@ -839,26 +839,22 @@ int main(int argc, char* argv[], char *envp[] )
 		    
 		    msg(m, "127.0.0.1", thePort);
 		    
-			goingAway = true;
 			return 0;
 		}
 		if( strcmp(argv[1], "msglots") == 0 ) {
 			msg(argc >= 3 ? argv[2] : "ping", 1000);
-			goingAway = true;
 			return 0;
 		}
 		if( strcmp( argv[1], "testclient") == 0 ) { 
 			testClient();
-			goingAway = true; return 0;
+			return 0;
 		}
 		if( strcmp(argv[1], "zzz") == 0 ) {
 			msg(argc >= 3 ? argv[2] : "ping", 1000);
-			goingAway = true;
 			return 0;
 		}
 		if( strcmp(argv[1], "run") == 0 ) {
 			initAndListen(port, dbpath);
-			goingAway = true;
 			return 0;
 		}
 		if( strcmp(argv[1], "longmsg") == 0 ) {
@@ -868,7 +864,6 @@ int main(int argc, char* argv[], char *envp[] )
 			buf[799998] = 'b';
 			buf[0] = 'c';
 			msg(buf);
-			goingAway = true;
 			return 0;
 		}
 
@@ -910,7 +905,6 @@ int main(int argc, char* argv[], char *envp[] )
         
         initAndListen(port, dbpath, appsrvPath);
         
-        goingAway = true;
 		exit(0);
 	}
 
@@ -929,7 +923,6 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
 	cout << endl;
 	
-	goingAway = true;
 	return 0;
 }
 

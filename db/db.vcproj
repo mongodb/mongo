@@ -349,10 +349,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\grid\protoimpl.h"
-				>
-			</File>
-			<File
 				RelativePath=".\query.h"
 				>
 			</File>

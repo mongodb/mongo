@@ -187,6 +187,11 @@ bool Source::resync(string db) {
 	}
 
 	log() << "resync: done " << db << endl;
+
+	/* add the db to our dbs array which we will write back to local.sources.
+	   note we are not in a consistent state until the oplog gets applied, 
+	   which happens next when this returns.
+	   */
 	dbs.insert(db);
 	return true;
 }

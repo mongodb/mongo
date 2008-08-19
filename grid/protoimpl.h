@@ -18,6 +18,8 @@
 
 #pragma once
 
+#error deprecated
+
 /* packet dumping level of detail. */
 const bool dumpPackets = false; // this must be true to get anything at all
 const bool dumpIP = false; // output the ip address
