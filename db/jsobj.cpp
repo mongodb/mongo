@@ -745,6 +745,21 @@ JSObj JSObj::extractFields(JSObj pattern, JSObjBuilder& b) {
 	return b.done();
 }
 
+JSObj JSObj::extractFields(JSObj& pattern) { 
+	JSObjBuilder b(32); // scanandorder.h can make a zillion of these, so we start the allocation very small
+	JSElemIter i(pattern);
+	while( i.more() ) {
+		Element e = i.next();
+		if( e.eoo() )
+			break;
+		Element x = getField(e.fieldName());
+		if( x.eoo() )
+			return JSObj();
+		b.append(x);
+	}
+	return b.doneAndDecouple();
+}
+
 bool JSObj::getBoolField(const char *name) { 
 	Element e = getField(name);
 	return e.type() == Bool ? e.boolean() : false;

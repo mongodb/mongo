@@ -995,7 +995,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		if( !order.isEmpty() && !isSorted ) {
 			ordering = true;
 			ss << " scanAndOrder ";
-			so = auto_ptr<ScanAndOrder>(new ScanAndOrder());
+			so = auto_ptr<ScanAndOrder>(new ScanAndOrder(ntoreturn,order));
 			wantMore = false;
 			//			scanAndOrder(b, c.get(), order, ntoreturn);
 		}
@@ -1017,59 +1017,55 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 					ntoskip--;
 				}
 				else {
-					bool ok = true;
 					assert( js.objsize() >= 0 ); //defensive for segfaults
-					/*if( ordering )
+					if( ordering ) {
+						// note: no cursors for non-indexed, ordered results.  results must be fairly small.
 						so->add(js);
-					else*/ if( filter.get() ) {
-						// we just want certain fields from the object.
-						JSObj x;
-						ok = x.addFields(js, *filter) > 0;
-						if( ok ) 
-							b.append((void*) x.objdata(), x.objsize());
-					}
-					else {
-						b.append((void*) js.objdata(), js.objsize());
-					}
-					if( ok ) {
-						n++;
-						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-							(ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
-								/* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
-								   is only a size limit.  The idea is that on a find() where one doesn't use much results, 
-								   we don't return much, but once getmore kicks in, we start pushing significant quantities.
+					} else { 
+						bool ok = fillQueryResultFromObj(b, filter.get(), js);
+						if( ok ) n++;
+						if( ok ) {
+							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
+								(ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
+									/* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
+									is only a size limit.  The idea is that on a find() where one doesn't use much results, 
+									we don't return much, but once getmore kicks in, we start pushing significant quantities.
 
-								   The n limit (vs. size) is important when someone fetches only one small field from big 
-								   objects, which causes massive scanning server-side.
-								*/
-								/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-								if( wantMore && ntoreturn != 1 ) {
-									if( useCursors ) {
-										c->advance();
-										if( c->ok() ) {
-											// more...so save a cursor
-											ClientCursor *cc = new ClientCursor();
-											cc->c = c;
-											cursorid = cc->cursorid;
-											DEV cout << "  query has more, cursorid: " << cursorid << endl;
-											cc->matcher = matcher;
-											cc->ns = ns;
-											cc->pos = n;
-											cc->filter = filter;
-											cc->originalMessage = message;
-											cc->updateLocation();
+									The n limit (vs. size) is important when someone fetches only one small field from big 
+									objects, which causes massive scanning server-side.
+									*/
+									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+									if( wantMore && ntoreturn != 1 ) {
+										if( useCursors ) {
+											c->advance();
+											if( c->ok() ) {
+												// more...so save a cursor
+												ClientCursor *cc = new ClientCursor();
+												cc->c = c;
+												cursorid = cc->cursorid;
+												DEV cout << "  query has more, cursorid: " << cursorid << endl;
+												cc->matcher = matcher;
+												cc->ns = ns;
+												cc->pos = n;
+												cc->filter = filter;
+												cc->originalMessage = message;
+												cc->updateLocation();
+											}
 										}
 									}
-								}
-								break;
+									break;
+							}
 						}
 					}
 				}
 			}
 			c->advance();
-		}
+		} // end while
 
-		if( cursorid == 0 && (queryOptions & Option_CursorTailable) && c->tailable() ) { 
+		if( ordering ) { 
+			so->fill(b, filter.get(), n);
+		}
+		else if( cursorid == 0 && (queryOptions & Option_CursorTailable) && c->tailable() ) { 
 			c->setAtTail();
 			ClientCursor *cc = new ClientCursor();
 			cc->c = c;
@@ -1175,16 +1171,7 @@ done:
 					//cout << "  but it's a dup \n";
 				}
 				else {
-					bool ok = true;
-					if( cc->filter.get() ) {
-						JSObj x;
-						ok = x.addFields(js, *cc->filter) > 0;
-						if( ok ) 
-							b.append((void*) x.objdata(), x.objsize());
-					}
-					else {
-						b.append((void*) js.objdata(), js.objsize());
-					}
+					bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
 					if( ok ) {
 						n++;
 						if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||

@@ -184,7 +184,7 @@ class JSObj {
 		}
 		const char *_objdata;
 		int _objsize;
-		int refCount; // -1 == don't free
+		int refCount; // -1 == don't free (we don't "own" the buffer)
 		bool owned() { return refCount >= 0; }
 	} *details;
 	void init(const char *data, bool ifree) { 
@@ -243,7 +243,8 @@ public:
        fields returned in the order they appear in pattern.
 	   if any field missing, you get back an empty object overall.
 	   */
-	JSObj extractFields(JSObj pattern, JSObjBuilder& b);
+	JSObj extractFields(JSObj pattern, JSObjBuilder& b); // this version, builder owns the returned obj buffer
+	JSObj extractFields(JSObj &pattern);
 
 	const char *objdata() const { return details->_objdata; }
 	int objsize() const { return details ? details->_objsize : 0; } // includes the embedded size field
@@ -288,7 +289,7 @@ public:
 			details = new Details(*r.details);
 		}
 	}
-	JSObj& operator=(JSObj& r) {
+	JSObj& operator=(const JSObj& r) {
 		if( details && details->owned() ) {
 			if( --details->refCount == 0 )
 				delete details;
@@ -323,7 +324,7 @@ public:
 
 class JSObjBuilder { 
 public:
-	JSObjBuilder() { b.skip(4); /*leave room for size field*/ }
+	JSObjBuilder(int initsize=512) : b(initsize) { b.skip(4); /*leave room for size field*/ }
 
 	/* add all the fields from the object specified to this object */
 	void appendElements(JSObj x);
