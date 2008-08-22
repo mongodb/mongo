@@ -378,8 +378,14 @@ void jasserted(const char *msg, const char *file, unsigned line) {
 const char* findEd(const char *path) {
 
 #if defined(_WIN32)
-	log() << "    WIN32 default : c:/l/ed/" << endl;
-	return "c:/l/ed";
+
+	if (!path) {
+		path = findEd();
+	}
+
+	// @TODO check validity
+
+	return path;
 #else
 
 	if (!path) {
