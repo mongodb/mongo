@@ -767,16 +767,25 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 #endif
 
     /*
-     * ensure that the dbpath ends w/ '/' as that's key in preventing things like 
-     *    /data/dbadmin.ns
+     * ensure that the dbpath ends with a path delim if not supplied
+     * @TODO - the following is embarassing - not sure of there's a clean way to
+     * find the platform delim
      */
+
+	char endchar = '/';
+	char *endstr = "/";
+
+#if defined(_WIN32)
+    endchar = '\\';
+    endstr = "\\";
+#endif
     
-    if (dbPath && dbPath[strlen(dbPath)-1] != '/') {
+    if (dbPath && dbPath[strlen(dbPath)-1] != endchar) {
     	char *t = (char *) malloc(strlen(dbPath) + 2);
-    	
-    	strcpy(t, dbPath);
-    	strcat(t, "/");
-    	dbPath = t;
+
+        strcpy(t, dbPath);
+        strcat(t, endstr);
+        dbPath = t;
     }
 
     dbpath = dbPath;
