@@ -641,6 +641,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 					ok = false;
 				} else { 
 					dropDatabase(ns);
+//finish                    logOp("c", ns, jsobj);
 					ok = true;
 				}
 			}

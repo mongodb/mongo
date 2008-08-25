@@ -54,9 +54,8 @@ void ClientCursor::setLastLoc(DiskLoc L) {
 /* ------------------------------------------- */
 
 /* must call this when a btree node is updated */
-void removedKey(const DiskLoc& btreeLoc, int keyPos) { 
-// TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-}
+//void removedKey(const DiskLoc& btreeLoc, int keyPos) { 
+//}
 
 /* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which 
          works fine as the prefix will end with '.'.  however, when used with drop and 

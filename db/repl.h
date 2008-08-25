@@ -122,6 +122,10 @@ public:
 };
 
 /* Write operation to the log (local.oplog.$main)
+   "i" insert
+   "u" update
+   "d" delete
+   "c" db cmd
 */
 void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *patt, bool *b);
 inline void logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *patt = 0, bool *b = 0) {
