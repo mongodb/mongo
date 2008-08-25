@@ -95,6 +95,7 @@ class Source {
 public:
 	string hostName;    // ip addr or hostname
 	string sourceName;  // a logical source name.
+	string only; // only a certain db. note that in the sources collection, this may not be changed once you start replicating.
 
 	/* the last time point we have already synced up to. */
 	OpTime syncedTo;

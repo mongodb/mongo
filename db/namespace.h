@@ -273,6 +273,7 @@ extern NamespaceIndexMgr namespaceIndexMgr;
 */
 
 // "client.a.b.c" -> "client"
+const int MaxClientLen = 256;
 inline void nsToClient(const char *ns, char *client) { 
 	const char *p = ns;
 	char *q = client;
@@ -285,7 +286,10 @@ inline void nsToClient(const char *ns, char *client) {
 		*q++ = *p++;
 	}
 	*q = 0;
-	assert(q-client<256);
+	if(q-client>=MaxClientLen) {
+		problem() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
+		dbexit(60);
+	}
 }
 
 /*

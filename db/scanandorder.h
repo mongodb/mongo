@@ -84,7 +84,7 @@ public:
 		JSObj k = order.getKeyFromObject(o);
 		if( (int) best.size() < limit ) {
 			approxSize += k.objsize();
-			uassert( approxSize < 1 * 1024 * 1024 );
+			uassert( "too much key data for sort() with no index", approxSize < 1 * 1024 * 1024 );
 			_add(k, o);
 			return;
 		}
@@ -111,7 +111,7 @@ public:
                 nFilled++;
 				if( nFilled >= limit )
 					goto done;
-				uassert( b.len() < 4000000 ); // appserver limit
+				uassert( "too much data for sort() with no index", b.len() < 4000000 ); // appserver limit
 			}
 		}
 done:
