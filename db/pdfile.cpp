@@ -47,6 +47,9 @@ int callDepth = 0;
 
 extern int otherTraceLevel;
 
+/* this is a good place to set a breakpoint when debugging, as lots of warning things
+   (assert, wassert) call it.
+*/
 void sayDbContext(const char *errmsg) { 
 	if( errmsg ) { 
 		problem() << errmsg << endl;

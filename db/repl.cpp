@@ -69,13 +69,14 @@ int test2() {
 /* --------------------------------------------------------------*/
 
 Source::Source(JSObj o) {
+	only = o.getStringField("only");
 	hostName = o.getStringField("host");
 	sourceName = o.getStringField("source");
-	uassert( !hostName.empty() );
-	uassert( !sourceName.empty() );
+	uassert( "'host' field not set in sources collection object", !hostName.empty() );
+	uassert( "'source' field not set in sources collection object", !sourceName.empty() );
 	Element e = o.getField("syncedTo");
 	if( !e.eoo() ) {
-		uassert( e.type() == Date );
+		uassert( "bad sources 'syncedTo' field value", e.type() == Date );
 		OpTime tmp( e.date() );
 		syncedTo = tmp;
 		//syncedTo.asDate() = e.date();
@@ -98,6 +99,8 @@ JSObj Source::jsobj() {
 	JSObjBuilder b;
 	b.append("host", hostName);
 	b.append("source", sourceName);
+	if( !only.empty() )
+		b.append("only", only);
 	b.appendDate("syncedTo", syncedTo.asDate());
 
 	JSObjBuilder dbs_builder;
@@ -198,11 +201,17 @@ bool Source::resync(string db) {
 }
 
 /* { ts: ..., op: <optype>, ns: ..., o: <obj> , o2: <extraobj>, b: <boolflag> } 
-   You must lock dbMutex before calling.
 */
-void Source::applyOperation(JSObj& op) { 
-	stringstream ss;
+void Source::applyOperation(JSObj& op) {
+	char clientName[MaxClientLen];
 	const char *ns = op.getStringField("ns");
+	nsToClient(ns, clientName);
+
+	if( !only.empty() && only != clientName )
+		return;
+
+	dblock lk;
+
 	setClientTempNs(ns);
 
 	if( client->justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
@@ -212,6 +221,7 @@ void Source::applyOperation(JSObj& op) {
 		client->justCreated = false;
 	}
 
+	stringstream ss;
 	const char *opType = op.getStringField("op");
 	JSObj o = op.getObjectField("o");
 	if( *opType == 'i' ) {
@@ -303,7 +313,6 @@ void Source::pullOpLog() {
 			log() << "pull:   initial run\n";
 		}
         {
-            dblock lk;
             applyOperation(op);
             n++;
         }
@@ -320,11 +329,11 @@ void Source::pullOpLog() {
 
 	// apply operations
 	{
-		dblock lk;
 		while( 1 ) {
 			if( !c->more() ) {
 				log() << "pull:   applied " << n << " operations" << endl;
 				syncedTo = t;
+				dblock lk;
 				save(); // note how far we are synced up to now
 				break;
 			}
@@ -337,7 +346,7 @@ void Source::pullOpLog() {
 			t = tmp;
 			if( !( last < t ) ) { 
 				problem() << "sync error: last " << last.toString() << " >= t " << t.toString() << endl;
-				uassert(false);
+				uassert("bad 'ts' value in sources", false);
 			}
 
 			applyOperation(op);
@@ -489,7 +498,7 @@ void replMain() {
 int debug_stop_repl = 0;
 
 void replSlaveThread() { 
-    sleepsecs(3);
+    sleepsecs(30);
 	while( 1 ) { 
 		try { 
 			replMain();

@@ -58,7 +58,7 @@ public:
 
 void asserted(const char *msg, const char *file, unsigned line);
 void wasserted(const char *msg, const char *file, unsigned line);
-void uasserted(const char *msg, const char *file, unsigned line);
+void uasserted(const char *msg);
 void msgasserted(const char *msg); 
 
 #ifdef assert
@@ -68,7 +68,8 @@ void msgasserted(const char *msg);
 #define assert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 /* "user assert".  if asserts, user did something wrong, not our code */
-#define uassert(_Expression) (void)( (!!(_Expression)) || (uasserted(#_Expression, __FILE__, __LINE__), 0) )
+//#define uassert(_Expression) (void)( (!!(_Expression)) || (uasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define uassert(msg,_Expression) (void)( (!!(_Expression)) || (uasserted(msg), 0) )
 
 #define xassert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
 

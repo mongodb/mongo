@@ -46,8 +46,8 @@ void asserted(const char *msg, const char *file, unsigned line) {
 	throw AssertionException();
 }
 
-void uasserted(const char *msg, const char *file, unsigned line) { 
-	problem() << "User Assertion failure " << msg << ' ' << file << ' ' << line << endl;
+void uasserted(const char *msg) { 
+	problem() << "User Assertion " << msg << endl;
 	throw AssertionException();
 }
 
