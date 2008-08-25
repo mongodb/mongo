@@ -995,7 +995,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		if( !order.isEmpty() && !isSorted ) {
 			ordering = true;
 			ss << " scanAndOrder ";
-			so = auto_ptr<ScanAndOrder>(new ScanAndOrder(ntoreturn,order));
+			so = auto_ptr<ScanAndOrder>(new ScanAndOrder(ntoskip, ntoreturn,order));
 			wantMore = false;
 			//			scanAndOrder(b, c.get(), order, ntoreturn);
 		}
@@ -1013,51 +1013,49 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			}
 			else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
 				// got a match.
-				if( ntoskip > 0 ) {
-					ntoskip--;
-				}
-				else {
-					assert( js.objsize() >= 0 ); //defensive for segfaults
-					if( ordering ) {
-						// note: no cursors for non-indexed, ordered results.  results must be fairly small.
-						so->add(js);
-					} else { 
-						bool ok = fillQueryResultFromObj(b, filter.get(), js);
-						if( ok ) n++;
-						if( ok ) {
-							if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-								(ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
-									/* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
-									is only a size limit.  The idea is that on a find() where one doesn't use much results, 
-									we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                assert( js.objsize() >= 0 ); //defensive for segfaults
+                if( ordering ) {
+                    // note: no cursors for non-indexed, ordered results.  results must be fairly small.
+                    so->add(js);
+                }
+                else if( ntoskip > 0 ) {
+                    ntoskip--;
+                } else { 
+                    bool ok = fillQueryResultFromObj(b, filter.get(), js);
+                    if( ok ) n++;
+                    if( ok ) {
+                        if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
+                            (ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
+                                /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
+                                is only a size limit.  The idea is that on a find() where one doesn't use much results, 
+                                we don't return much, but once getmore kicks in, we start pushing significant quantities.
 
-									The n limit (vs. size) is important when someone fetches only one small field from big 
-									objects, which causes massive scanning server-side.
-									*/
-									/* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-									if( wantMore && ntoreturn != 1 ) {
-										if( useCursors ) {
-											c->advance();
-											if( c->ok() ) {
-												// more...so save a cursor
-												ClientCursor *cc = new ClientCursor();
-												cc->c = c;
-												cursorid = cc->cursorid;
-												DEV cout << "  query has more, cursorid: " << cursorid << endl;
-												cc->matcher = matcher;
-												cc->ns = ns;
-												cc->pos = n;
-												cc->filter = filter;
-												cc->originalMessage = message;
-												cc->updateLocation();
-											}
-										}
-									}
-									break;
-							}
-						}
-					}
-				}
+                                The n limit (vs. size) is important when someone fetches only one small field from big 
+                                objects, which causes massive scanning server-side.
+                                */
+                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                                if( wantMore && ntoreturn != 1 ) {
+                                    if( useCursors ) {
+                                        c->advance();
+                                        if( c->ok() ) {
+                                            // more...so save a cursor
+                                            ClientCursor *cc = new ClientCursor();
+                                            cc->c = c;
+                                            cursorid = cc->cursorid;
+                                            DEV cout << "  query has more, cursorid: " << cursorid << endl;
+                                            cc->matcher = matcher;
+                                            cc->ns = ns;
+                                            cc->pos = n;
+                                            cc->filter = filter;
+                                            cc->originalMessage = message;
+                                            cc->updateLocation();
+                                        }
+                                    }
+                                }
+                                break;
+                        }
+                    }
+                }
 			}
 			c->advance();
 		} // end while

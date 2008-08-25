@@ -46,6 +46,7 @@ inline bool fillQueryResultFromObj(BufBuilder& b, set<string> *filter, JSObj& js
 typedef multimap<JSObj,JSObj> BestMap;
 class ScanAndOrder { 
 	BestMap best;
+    int startFrom;
 	int limit;   // max to send back.
 	KeyType order;
 	int dir;
@@ -66,8 +67,9 @@ class ScanAndOrder {
 	}
 
 public:
-	ScanAndOrder(int _limit, JSObj _order) : order(_order) {
-		limit = _limit > 0 ? _limit : 0x7fffffff;
+	ScanAndOrder(int _startFrom, int _limit, JSObj _order) : 
+      startFrom(_startFrom), order(_order) {
+		limit = _limit > 0 ? _limit + startFrom : 0x7fffffff;
 		approxSize = 0;
 
 		// todo: do order right for compound keys.  this is temp.
@@ -99,17 +101,21 @@ public:
 	template<class T>
 	void _fill(BufBuilder& b, set<string> *filter, int& nout, T begin, T end) { 
 		int n = 0;
+        int nFilled = 0;
 		for( T i = begin; i != end; i++ ) {
+            n++;
+            if( n <= startFrom )
+                continue;
 			JSObj& o = i->second;
 			if( fillQueryResultFromObj(b, filter, o) ) { 
-				n++;
-				if( n >= limit )
+                nFilled++;
+				if( nFilled >= limit )
 					goto done;
 				uassert( b.len() < 4000000 ); // appserver limit
 			}
 		}
 done:
-		nout = n;
+		nout = nFilled;
 	}
 
 	/* scanning complete. stick the query result in b for n objects. */
