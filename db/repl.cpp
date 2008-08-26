@@ -68,7 +68,7 @@ int test2() {
 
 /* --------------------------------------------------------------*/
 
-Source::Source(JSObj o) {
+Source::Source(JSObj o) : nClonedThisPass(0) {
 	only = o.getStringField("only");
 	hostName = o.getStringField("host");
 	sourceName = o.getStringField("source");
@@ -210,13 +210,23 @@ void Source::applyOperation(JSObj& op) {
 	if( !only.empty() && only != clientName )
 		return;
 
-	dblock lk;
+	bool newDb = dbs.count(clientName) == 0;
+	if( newDb && nClonedThisPass ) { 
+		/* we only clone one database per pass, even if a lot need done.  This helps us 
+		   avoid overflowing the master's transaction log by doing too much work before going 
+		   back to read more transactions. (Imagine a scenario of slave startup where we try to 
+		   clone 100 databases in one pass.)
+		*/
+		return;
+	}
 
+	dblock lk;
 	setClientTempNs(ns);
 
 	if( client->justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
-	    !dbs.count(client->name) ) /* if not in dbs, we've never synced this database before, so we need everything */
+	    newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
 	{
+		nClonedThisPass++;
 		resync(client->name);
 		client->justCreated = false;
 	}
@@ -360,6 +370,7 @@ void Source::pullOpLog() {
 */
 bool Source::sync() { 
 	log() << "pull: " << sourceName << '@' << hostName << endl;
+	nClonedThisPass = 0;
 
 	if( (string("localhost") == hostName || string("127.0.0.1") == hostName) && port == DBPort ) { 
         log() << "pull:   can't sync from self (localhost). sources configuration may be wrong." << endl;

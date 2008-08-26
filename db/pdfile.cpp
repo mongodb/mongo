@@ -402,7 +402,7 @@ int initialExtentSize(int len) {
 		sz = 1000000000;
 	int z = ((int)sz) & 0xffffff00;
 	assert( z > len );
-	log() << "initialExtentSize(" << len << ") returns " << z << endl;
+	DEV log() << "initialExtentSize(" << len << ") returns " << z << endl;
 	return z;
 }
 
@@ -478,7 +478,7 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 
 	assert(fn == fileNo);
 	header = (PDFHeader *) mmf.map(filename, length);
-	assert(header);
+	uassert("can't map file memory", header);
 	header->init(fileNo, length);
 }
 

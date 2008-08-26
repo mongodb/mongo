@@ -106,6 +106,8 @@ public:
 	*/
 	set<string> dbs;
 
+	int nClonedThisPass;
+
 	static void loadAll(vector<Source*>&);
 	static void cleanup(vector<Source*>&);
 	Source(JSObj);
