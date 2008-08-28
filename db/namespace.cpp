@@ -311,6 +311,10 @@ NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
 	return *t;
 }
 
+void NamespaceDetailsTransient::computeIndexKeys() {
+	NamespaceDetails *d = nsdetails(ns.c_str());
+//FINISH
+}
 
 /* ------------------------------------------------------------------------- */
 

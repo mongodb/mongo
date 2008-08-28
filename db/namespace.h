@@ -212,10 +212,18 @@ class NamespaceDetailsTransient : boost::noncopyable {
 	void computeIndexKeys();
 public:
 	NamespaceDetailsTransient(const char *_ns) : ns(_ns) { haveIndexKeys=false; /*lazy load them*/ }
+
+	/* get set of index keys for this namespace.  handy to quickly check if a given 
+	   field is indexed (Note it might be a seconary component of a compound index.) 
+	*/
+
+//TODO USE THIS IN $INC
+
 	set<string>& indexKeys() { 
 		if( !haveIndexKeys ) { computeIndexKeys(); haveIndexKeys=true; }
 		return allIndexKeys;
 	}
+
 	void addedIndex() { haveIndexKeys=false; }
 private:
 	static map<const char *,NamespaceDetailsTransient*> map;
