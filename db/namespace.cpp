@@ -1,4 +1,4 @@
-//namespacedetails.cpp
+// namespacedetails.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -313,7 +313,11 @@ NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
 
 void NamespaceDetailsTransient::computeIndexKeys() {
 	NamespaceDetails *d = nsdetails(ns.c_str());
-//FINISH
+    for( int i = 0; i < d->nIndexes; i++ ) {
+//        set<string> fields;
+        d->indexes[i].key().getFieldNames(allIndexKeys);
+//        allIndexKeys.insert(fields.begin(),fields.end());
+    }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -323,7 +327,7 @@ void NamespaceDetailsTransient::computeIndexKeys() {
 */
 void addNewNamespaceToCatalog(const char *ns, JSObj *options = 0) {
 	log() << "New namespace: " << ns << endl;
-	if( strstr(ns, "system.namespaces") ) { 
+	if( strstr(ns, "system.namespaces``") ) { 
 		// system.namespaces holds all the others, so it is not explicitly listed in the catalog.
 		// TODO: fix above should not be strstr!
 		return;

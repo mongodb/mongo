@@ -79,6 +79,13 @@ public:
 	*/
 	void getKeysFromObject(JSObj& obj, set<JSObj>& keys);
 
+    /* get the key pattern for this object. 
+       e.g., { lastname:1, firstname:1 }
+    */
+    JSObj key() { 
+        return info.obj().getObjectField("key");
+    }
+
     // returns name of this index's storage area
 	// client.table.$index
 	string indexNamespace() { 
@@ -216,15 +223,12 @@ public:
 	/* get set of index keys for this namespace.  handy to quickly check if a given 
 	   field is indexed (Note it might be a seconary component of a compound index.) 
 	*/
-
-//TODO USE THIS IN $INC
-
-	set<string>& indexKeys() { 
-		if( !haveIndexKeys ) { computeIndexKeys(); haveIndexKeys=true; }
+	set<string>& indexKeys() {
+		if( !haveIndexKeys ) { haveIndexKeys=true; computeIndexKeys(); }
 		return allIndexKeys;
 	}
 
-	void addedIndex() { haveIndexKeys=false; }
+    void addedIndex() { haveIndexKeys=false; }
 private:
 	static map<const char *,NamespaceDetailsTransient*> map;
 public:

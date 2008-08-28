@@ -223,6 +223,8 @@ public:
 	string toString() const;
 	/* note: addFields always adds _id even if not specified */
 	int addFields(JSObj& from, set<string>& fields); /* returns n added */
+
+    /* adds the field names to the fields set.  does NOT clear it (appends). */
 	int getFieldNames(set<string>& fields);
 
 	/* return has eoo() true if no match 

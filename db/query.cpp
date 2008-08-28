@@ -358,6 +358,14 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 				if( firstField[0] == '$' ) {
 					vector<Mod> mods;
 					Mod::getMods(mods, updateobj);
+                    NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
+                    set<string>& idxKeys = ndt.indexKeys();
+                    for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) { 
+                        if( idxKeys.count(i->fieldName) ) {
+                            assert(false);
+                        }
+                    }
+
 					Mod::applyMods(mods, c->currLoc().obj());
 					if( profile ) 
 						ss << " fastmod ";
