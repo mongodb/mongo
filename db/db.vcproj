@@ -223,6 +223,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\namespace.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\pdfile.cpp"
 				>
 			</File>

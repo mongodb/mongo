@@ -146,7 +146,13 @@ public:
 		Flag_HaveIdIndex = 1 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
 	};
 
+	/* you MUST call when adding an index.  see pdfile.cpp */
+	void addingIndex(const char *thisns, IndexDetails& details);
+
 	void aboutToDeleteAnIndex() { flags &= ~Flag_HaveIdIndex; }
+
+	/* returns index of the first index in which the field is present. -1 if not present. */
+	int fieldIsIndexed(const char *fieldName);
 
 	void paddingFits() { 
 		double x = paddingFactor - 0.01;
@@ -191,6 +197,35 @@ private:
 
 #pragma pack(pop)
 
+/* these are things we know / compute about a namespace that are transient -- things 
+   we don't actually store in the .ns file.  so mainly caching of frequently used 
+   information.
+
+   CAUTION: Are you maintaining this properly on a collection drop()?  A dropdatabase()?  Be careful.
+            The current field "allIndexKeys" may have too many keys in it on such an occurrence;
+            as currently used that does not cause anything terrible to happen.
+*/
+class NamespaceDetailsTransient : boost::noncopyable {
+	string ns;
+	bool haveIndexKeys;
+	set<string> allIndexKeys;
+	void computeIndexKeys();
+public:
+	NamespaceDetailsTransient(const char *_ns) : ns(_ns) { haveIndexKeys=false; /*lazy load them*/ }
+	set<string>& indexKeys() { 
+		if( !haveIndexKeys ) { computeIndexKeys(); haveIndexKeys=true; }
+		return allIndexKeys;
+	}
+	void addedIndex() { haveIndexKeys=false; }
+private:
+	static map<const char *,NamespaceDetailsTransient*> map;
+public:
+	static NamespaceDetailsTransient& get(const char *ns);
+};
+
+/* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog" 
+   if you will: at least the core parts.  (Additional info in system.* collections.)
+*/
 class NamespaceIndex {
 	friend class NamespaceCursor;
 public:
@@ -252,26 +287,6 @@ private:
 
 extern const char *dbpath;
 
-/*
-class NamespaceIndexMgr { 
-public:
-	NamespaceIndexMgr() { }
-	NamespaceIndex* get(const char *client) { 
-		map<string,NamespaceIndex*>::iterator it = m.find(client);
-		if( it != m.end() )
-			return it->second;
-		NamespaceIndex *ni = new NamespaceIndex();
-		ni->init(dbpath, client);
-		m[client] = ni;
-		return ni;
-	}
-private:
-	map<string,NamespaceIndex*> m;
-};
-
-extern NamespaceIndexMgr namespaceIndexMgr;
-*/
-
 // "client.a.b.c" -> "client"
 const int MaxClientLen = 256;
 inline void nsToClient(const char *ns, char *client) { 
@@ -292,16 +307,3 @@ inline void nsToClient(const char *ns, char *client) {
 	}
 }
 
-/*
-inline NamespaceIndex* nsindex(const char *ns) { 
-	char client[256];
-	nsToClient(ns, client);
-	return namespaceIndexMgr.get(client);
-}
-
-inline NamespaceDetails* nsdetails(const char *ns) { 
-	return nsindex(ns)->details(ns);
-}
-*/
-
-//auto_ptr<Cursor> makeNamespaceCursor();
