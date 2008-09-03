@@ -362,7 +362,7 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
                     set<string>& idxKeys = ndt.indexKeys();
                     for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) { 
                         if( idxKeys.count(i->fieldName) ) {
-                            assert(false);
+                            uassert("can't $inc/$set an indexed field", false);
                         }
                     }
 

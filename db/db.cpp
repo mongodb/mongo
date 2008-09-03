@@ -44,6 +44,7 @@ int dbLocked = 0;
 
 void closeAllSockets();
 void startReplication();
+void pairWith(const char *remoteEnd);
 
 struct MyStartupTests {
 	MyStartupTests() {
@@ -896,6 +897,9 @@ int main(int argc, char* argv[], char *envp[] )
 				master = true;
 			else if( s == "--slave" )
 				slave = true;
+			else if( s == "--pairwith" ) { 
+				pairWith( argv[++i] );
+			}
 			else if( s == "--dbpath" )
             	dbpath = argv[++i];
             else if( s == "--appsrvpath" )
@@ -930,6 +934,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
 	cout << " --nocursors  --nojni" << endl;
 	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
+	cout << " --pairwith <server:port>" << endl;
 	cout << endl;
 	
 	return 0;

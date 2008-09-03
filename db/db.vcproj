@@ -361,6 +361,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\replset.h"
+				>
+			</File>
+			<File
 				RelativePath=".\resource.h"
 				>
 			</File>

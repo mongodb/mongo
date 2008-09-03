@@ -191,3 +191,11 @@ public:
 */
 
 //typedef boostlock lock;
+
+inline bool endsWith(const char *p, const char *suffix) { 
+	int a = strlen(p);
+	int b = strlen(suffix);
+	if( b > a ) return false;
+	return strcmp(p + a - b, suffix) == 0;
+}
+

@@ -209,7 +209,11 @@ public:
 
 	static int headerSize() { return sizeof(PDFHeader) - 4; }
 
-	bool uninitialized() { if( version == 0 ) return true; assert(version == VERSION); return false; }
+	bool uninitialized() { 
+		if( version == 0 ) return true; 
+		assert(version == VERSION); 
+		return false; 
+	}
 
 	Record* getRecord(DiskLoc dl) {
 		int ofs = dl.getOfs();

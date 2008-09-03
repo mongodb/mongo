@@ -68,7 +68,7 @@ int test2() {
 
 /* --------------------------------------------------------------*/
 
-Source::Source(JSObj o) : nClonedThisPass(0) {
+ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
 	only = o.getStringField("only");
 	hostName = o.getStringField("host");
 	sourceName = o.getStringField("source");
@@ -95,7 +95,7 @@ Source::Source(JSObj o) : nClonedThisPass(0) {
 }
 
 /* Turn our C++ Source object into a JSObj */
-JSObj Source::jsobj() {
+JSObj ReplSource::jsobj() {
 	JSObjBuilder b;
 	b.append("host", hostName);
 	b.append("source", sourceName);
@@ -112,7 +112,7 @@ JSObj Source::jsobj() {
 	return b.doneAndDecouple();
 }
 
-void Source::save() { 
+void ReplSource::save() { 
 	JSObjBuilder b;
 	b.append("host", hostName);
 	b.append("source", sourceName);
@@ -129,13 +129,13 @@ void Source::save() {
 	client = 0;
 }
 
-void Source::cleanup(vector<Source*>& v) { 
-	for( vector<Source*>::iterator i = v.begin(); i != v.end(); i++ )
+void ReplSource::cleanup(vector<ReplSource*>& v) { 
+	for( vector<ReplSource*>::iterator i = v.begin(); i != v.end(); i++ )
 		delete *i;
 }
 
-static void addSourceToList(vector<Source*>&v, Source& s, vector<Source*>&old) { 
-	for( vector<Source*>::iterator i = old.begin(); i != old.end();  ) {
+static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, vector<ReplSource*>&old) { 
+	for( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
 		if( s == **i ) {
 			v.push_back(*i);
 			old.erase(i);
@@ -144,32 +144,32 @@ static void addSourceToList(vector<Source*>&v, Source& s, vector<Source*>&old) {
 		i++;
 	}
 
-	v.push_back( new Source(s) );
+	v.push_back( new ReplSource(s) );
 }
 
 /* we reuse our existing objects so that we can keep our existing connection 
    and cursor in effect. 
 */
-void Source::loadAll(vector<Source*>& v) { 
-	vector<Source *> old = v;
+void ReplSource::loadAll(vector<ReplSource*>& v) { 
+	vector<ReplSource *> old = v;
     v.erase(v.begin(), v.end());
 
 	setClient("local.sources");
 	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
 	while( c->ok() ) { 
-		Source tmp(c->current());	
+		ReplSource tmp(c->current());	
 		addSourceToList(v, tmp, old);
 		c->advance();
 	}
 	client = 0;
 
-    for( vector<Source*>::iterator i = old.begin(); i != old.end(); i++ )
+    for( vector<ReplSource*>::iterator i = old.begin(); i != old.end(); i++ )
         delete *i;
 }
 
 JSObj opTimeQuery = fromjson("{getoptime:1}");
 
-bool Source::resync(string db) {
+bool ReplSource::resync(string db) {
 	{
 		log() << "resync: dropping database " << db << endl;
 		string dummyns = db + ".";
@@ -200,9 +200,11 @@ bool Source::resync(string db) {
 	return true;
 }
 
-/* { ts: ..., op: <optype>, ns: ..., o: <obj> , o2: <extraobj>, b: <boolflag> } 
+/* local.$oplog.main is of the form:
+     { ts: ..., op: <optype>, ns: ..., o: <obj> , o2: <extraobj>, b: <boolflag> } 
+     ...
 */
-void Source::applyOperation(JSObj& op) {
+void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 	char clientName[MaxClientLen];
 	const char *ns = op.getStringField("ns");
 	nsToClient(ns, clientName);
@@ -234,45 +236,53 @@ void Source::applyOperation(JSObj& op) {
 	stringstream ss;
 	const char *opType = op.getStringField("op");
 	JSObj o = op.getObjectField("o");
-	if( *opType == 'i' ) {
-        const char *p = strchr(ns, '.');
-        if( p && strcmp(p, ".system.indexes") == 0 ) { 
-            // updates aren't allowed for indexes -- so we will do a regular insert. if index already 
-            // exists, that is ok.
-            theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
-        }
-        else { 
-            // do upserts for inserts as we might get replayed more than once
-            OID *oid = o.getOID();
-            if( oid == 0 ) {
-                _updateObjects(ns, o, o, true, ss);
-            }
-            else { 
-                JSObjBuilder b;
-                b.appendOID("_id", oid);
-				RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
-                _updateObjects(ns, o, b.done(), true, ss);
-            }
-        }
+	try { 
+		if( *opType == 'i' ) {
+			const char *p = strchr(ns, '.');
+			if( p && strcmp(p, ".system.indexes") == 0 ) { 
+				// updates aren't allowed for indexes -- so we will do a regular insert. if index already 
+				// exists, that is ok.
+				theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
+			}
+			else { 
+				// do upserts for inserts as we might get replayed more than once
+				OID *oid = o.getOID();
+				if( oid == 0 ) {
+					_updateObjects(ns, o, o, true, ss);
+				}
+				else { 
+					JSObjBuilder b;
+					b.appendOID("_id", oid);
+					RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
+					_updateObjects(ns, o, b.done(), true, ss);
+				}
+			}
+		}
+		else if( *opType == 'u' ) { 
+			RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
+			_updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), ss);
+		}
+		else if( *opType == 'd' ) { 
+			if( opType[1] == 0 )
+				deleteObjects(ns, o, op.getBoolField("b"));
+			else
+				assert( opType[1] == 'b' ); // "db" advertisement
+		}
+		else { 
+			BufBuilder bb;
+			JSObjBuilder ob;
+			assert( *opType == 'c' );
+			_runCommands(ns, o, ss, bb, ob);
+		}
 	}
-	else if( *opType == 'u' ) { 
-		RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
-		_updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), ss);
-	}
-	else if( *opType == 'd' ) { 
-		deleteObjects(ns, o, op.getBoolField("b"));
-	}
-	else { 
-		BufBuilder bb;
-		JSObjBuilder ob;
-		assert( *opType == 'c' );
-		_runCommands(ns, o, ss, bb, ob);
+	catch( UserAssertionException e ) { 
+		log() << "sync: caught user assertion " << e.msg << '\n';
 	}
 	client = 0;
 }
 
 /* note: not yet in mutex at this point. */
-void Source::pullOpLog() { 
+void ReplSource::sync_pullOpLog() { 
 	string ns = string("local.oplog.$") + sourceName;
 
 	bool tailing = true;
@@ -323,7 +333,7 @@ void Source::pullOpLog() {
 			log() << "pull:   initial run\n";
 		}
         {
-            applyOperation(op);
+            sync_pullOpLog_applyOperation(op);
             n++;
         }
 	}
@@ -359,7 +369,7 @@ void Source::pullOpLog() {
 				uassert("bad 'ts' value in sources", false);
 			}
 
-			applyOperation(op);
+			sync_pullOpLog_applyOperation(op);
 			n++;
 		}
 	}
@@ -368,7 +378,7 @@ void Source::pullOpLog() {
 /* note: not yet in mutex at this point. 
    returns true if everything happy.  return false if you want to reconnect.
 */
-bool Source::sync() { 
+bool ReplSource::sync() { 
 	log() << "pull: " << sourceName << '@' << hostName << endl;
 	nClonedThisPass = 0;
 
@@ -402,7 +412,7 @@ bool Source::sync() {
 	OpTime serverCurTime;
 	serverCurTime.asDate() = e.date();
 */
-	pullOpLog();
+	sync_pullOpLog();
 	return true;
 }
 
@@ -416,7 +426,13 @@ Client *localOplogClient = 0;
      { ts : ..., op: ..., ns: ..., o: ... }
    ts: an OpTime timestamp
    op: 
-     'i' = insert
+    "i" insert
+    "u" update
+    "d" delete
+    "c" db cmd
+   bb:
+     if not null, specifies a boolean to pass along to the other side as b: param.
+     used for "justOne" or "upsert" flags on 'd', 'u'
 */
 void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *o2, bool *bb) {
 	if( strncmp(ns, "local.", 6) == 0 )
@@ -471,19 +487,19 @@ _ reuse that cursor when we can
 */
 
 void replMain() { 
-	vector<Source*> sources;
+	vector<ReplSource*> sources;
 
 	while( 1 ) { 
 		{	
 			dblock lk;
-			Source::loadAll(sources);
+			ReplSource::loadAll(sources);
 		}
 		
 		if( sources.empty() )
 			sleepsecs(20);
 		
-		for( vector<Source*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
-			Source *s = *i;	
+		for( vector<ReplSource*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
+			ReplSource *s = *i;	
 			bool ok = false;	
 			try {
 				ok = s->sync();
@@ -503,7 +519,7 @@ void replMain() {
         sleepsecs(3);
 	}
 
-	Source::cleanup(sources);
+	ReplSource::cleanup(sources);
 }
 
 int debug_stop_repl = 0;
@@ -524,23 +540,75 @@ void replSlaveThread() {
 	}
 }
 
+/* used to verify that slave knows what databases we have */
+void logOurDbsPresence() { 
+	path dbs(dbpath);
+    directory_iterator end;
+    directory_iterator i(dbs);
+
+	dblock lk;
+
+	int k = 0;
+    while( i != end ) {
+      path p = *i;
+	  string f = p.leaf();
+	  if( endsWith(f.c_str(), ".ns") ) {
+		  /* note: we keep trailing "." so that when slave calls setClient(ns) everything is happy; e.g., 
+		           valid namespaces must always have a dot, even though here it is just a placeholder not 
+				   a real one
+				   */
+		  string dbname = string(f.c_str(), f.size() - 2);
+		  if( dbname != "local." )
+			  logOp("db", dbname.c_str(), emptyObj);
+	  }
+      i++;
+    }
+}
+
+/* we have to log the db presence periodically as that "advertisement" will roll out of the log
+   as it is of finite length.  also as we only do one db cloning per pass, we could skip over a bunch of 
+   advertisements and thus need to see them again later.  so this mechanism can actually be very slow to 
+   work, and should be improved.
+*/
+void replMasterThread() { 
+    sleepsecs(15);
+	while( 1 ) {
+		logOurDbsPresence();
+		sleepsecs(60 * 10);
+	}
+}
+
+#include "replset.h"
+
+ReplSet *replSet = 0;
+
 void startReplication() { 
 	if( slave ) {
 		log() << "slave=true" << endl;
 		boost::thread repl_thread(replSlaveThread);
 	}
 
-	if( master ) {  
+	if( master || replSet ) {
 		log() << "master=true" << endl;
-		dblock lk;
-		/* create an oplog collection, if it doesn't yet exist. */
-		JSObjBuilder b;
-		b.append("size", 254.0 * 1000 * 1000);
-		b.appendBool("capped", 1);
-		setClientTempNs("local.oplog.$main");
-		string err;
-		JSObj o = b.done();
-		userCreateNS("local.oplog.$main", o, err);
-		client = 0;
+		{
+			dblock lk;
+			/* create an oplog collection, if it doesn't yet exist. */
+			JSObjBuilder b;
+			b.append("size", 254.0 * 1000 * 1000);
+			b.appendBool("capped", 1);
+			setClientTempNs("local.oplog.$main");
+			string err;
+			JSObj o = b.done();
+			userCreateNS("local.oplog.$main", o, err);
+			client = 0;
+		}
+
+		boost::thread mt(replMasterThread);
 	}
+}
+
+/* called from main at server startup */
+void pairWith(const char *remoteEnd) {
+	replSet = new ReplSet(remoteEnd);
+//	uassert("not done yet!", false);
 }

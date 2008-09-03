@@ -41,14 +41,14 @@ void wasserted(const char *msg, const char *file, unsigned line) {
 	sayDbContext();
 }
 
-void asserted(const char *msg, const char *file, unsigned line) { 
+void asserted(const char *msg, const char *file, unsigned line) {
 	wasserted(msg, file, line);
 	throw AssertionException();
 }
 
 void uasserted(const char *msg) { 
 	problem() << "User Assertion " << msg << endl;
-	throw AssertionException();
+	throw UserAssertionException(msg);
 }
 
 void msgasserted(const char *msg) {

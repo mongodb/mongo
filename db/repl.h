@@ -85,10 +85,10 @@ struct SyncException {
 
       { host: ..., source: ..., syncedTo: ..., dbs: { ... } }
 */
-class Source {
+class ReplSource {
 	bool resync(string db);
-	void pullOpLog();
-	void applyOperation(JSObj& op);
+	void sync_pullOpLog();
+	void sync_pullOpLog_applyOperation(JSObj& op);
 
 	auto_ptr<DBClientConnection> conn;
 	auto_ptr<DBClientCursor> cursor;
@@ -108,9 +108,9 @@ public:
 
 	int nClonedThisPass;
 
-	static void loadAll(vector<Source*>&);
-	static void cleanup(vector<Source*>&);
-	Source(JSObj);
+	static void loadAll(vector<ReplSource*>&);
+	static void cleanup(vector<ReplSource*>&);
+	ReplSource(JSObj);
 	bool sync();
 	void save(); // write ourself to local.sources
 	void resetConnection() { conn = auto_ptr<DBClientConnection>(0); }
@@ -119,7 +119,7 @@ public:
 	//   { host: ..., source: ..., syncedTo: ... }
 	JSObj jsobj(); 
 	
-	bool operator==(const Source&r) const { 
+	bool operator==(const ReplSource&r) const { 
 		return hostName == r.hostName && sourceName == r.sourceName; 
 	}
 };
@@ -129,6 +129,7 @@ public:
    "u" update
    "d" delete
    "c" db cmd
+   "db" declares presence of a database (ns is set to the db name + '.')
 */
 void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *patt, bool *b);
 inline void logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *patt = 0, bool *b = 0) {

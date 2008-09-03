@@ -64,5 +64,9 @@ struct UtilTest {
 		assert( !isPrime(6) );
 		assert( nextPrime(4) == 5 );
 		assert( nextPrime(8) == 11 );
+
+		assert( endsWith("abcde", "de") );
+		assert( !endsWith("abcde", "dasdfasdfashkfde") );
+
 	}
 } utilTest;

@@ -53,7 +53,16 @@ inline void * ourrealloc(void *ptr, size_t size) {
 // you can catch these
 class AssertionException { 
 public:
-	AssertionException() { }
+	const char *msg;
+	AssertionException() { msg = ""; }
+	virtual bool isUserAssertion() { return false; }
+};
+
+/* we use the same mechanism for bad things the user does -- which are really just errors */
+class UserAssertionException : public AssertionException { 
+public:
+	UserAssertionException(const char *_msg) { msg = _msg; }
+	virtual bool isUserAssertion() { return true; }
 };
 
 void asserted(const char *msg, const char *file, unsigned line);

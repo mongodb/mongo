@@ -152,15 +152,13 @@ void PhysicalDataFile::open(int fn, const char *filename) {
         
 	assert( length >= 64*1024*1024 );
 
-        if( strstr(filename, "_hudsonSmall") ) {
-          int mult = 1;
-          if ( fn > 1 && fn < 1000 )
-            mult = fn;
-          length = 1024 * 512 * mult;
-          cout << "Warning : using small files for _hudsonSmall" << endl;
-        }
-
-
+	if( strstr(filename, "_hudsonSmall") ) {
+		int mult = 1;
+		if ( fn > 1 && fn < 1000 )
+			mult = fn;
+		length = 1024 * 512 * mult;
+		cout << "Warning : using small files for _hudsonSmall" << endl;
+	}
 	assert( length % 4096 == 0 );
 
 	assert(fn == fileNo);
@@ -826,6 +824,9 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	return loc;
 }
 
+/* special version of insert for transaction logging -- streamlined a bit.
+   assumes ns is capped and no indexes
+*/
 Record* DataFileMgr::fast_oplog_insert(NamespaceDetails *d, const char *ns, int len) {
 	RARELY assert( d == nsdetails(ns) );
 
