@@ -1098,7 +1098,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 	qr->len = b.len();
 	ss << " reslen:" << b.len();
 	//	qr->channel = 0;
-	qr->operation = opReply;
+	qr->setOperation(opReply);
 	qr->cursorId = cursorid;
 	qr->startingFrom = 0;
 	qr->nReturned = n;
@@ -1123,7 +1123,7 @@ QueryResult* emptyMoreResult(long long cursorid) {
 	qr->cursorId = 0; // 0 indicates no more data to retrieve.
 	qr->startingFrom = 0;
 	qr->len = b.len();
-	qr->operation = opReply;
+	qr->setOperation(opReply);
 	qr->nReturned = 0;
 	b.decouple();
 	return qr;
@@ -1201,7 +1201,7 @@ done:
 
 	QueryResult *qr = (QueryResult *) b.buf();
 	qr->len = b.len();
-	qr->operation = opReply;
+	qr->setOperation(opReply);
 	qr->resultFlags() = resultFlags;
 	qr->cursorId = cursorid;
 	qr->startingFrom = start;

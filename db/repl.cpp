@@ -36,6 +36,10 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 bool cloneFrom(const char *masterHost, string& errmsg);
 void ensureHaveIdIndex(const char *ns);
 
+#include "replset.h"
+
+ReplSet *replSetPair = 0;
+
 OpTime last(0, 0);
 
 OpTime OpTime::now() { 
@@ -67,6 +71,11 @@ int test2() {
 }
 
 /* --------------------------------------------------------------*/
+
+ReplSource::ReplSource() {
+	nClonedThisPass = 0; 
+	sourceName = "main";
+}
 
 ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
 	only = o.getStringField("only");
@@ -154,14 +163,24 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 	vector<ReplSource *> old = v;
     v.erase(v.begin(), v.end());
 
+	bool gotPairWith = false;
 	setClient("local.sources");
 	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
 	while( c->ok() ) { 
-		ReplSource tmp(c->current());	
+		ReplSource tmp(c->current());
+		if( replSetPair && tmp.hostName == replSetPair->remote && tmp.sourceName == "main" )
+			gotPairWith = true;
 		addSourceToList(v, tmp, old);
 		c->advance();
 	}
 	client = 0;
+
+	if( !gotPairWith && replSetPair ) {
+		/* add the --pairwith server */
+		ReplSource *s = new ReplSource();
+		s->hostName = replSetPair->remote;
+		v.push_back(s);
+	}
 
     for( vector<ReplSource*>::iterator i = old.begin(); i != old.end(); i++ )
         delete *i;
@@ -558,8 +577,9 @@ void logOurDbsPresence() {
 				   a real one
 				   */
 		  string dbname = string(f.c_str(), f.size() - 2);
-		  if( dbname != "local." )
+		  if( dbname != "local." ) {
 			  logOp("db", dbname.c_str(), emptyObj);
+		  }
 	  }
       i++;
     }
@@ -578,18 +598,18 @@ void replMasterThread() {
 	}
 }
 
-#include "replset.h"
-
-ReplSet *replSet = 0;
-
 void startReplication() { 
-	if( slave ) {
-		log() << "slave=true" << endl;
+	if( slave || replSetPair ) {
+		if( slave )
+			log() << "slave=true" << endl;
+		slave = true;
 		boost::thread repl_thread(replSlaveThread);
 	}
 
-	if( master || replSet ) {
-		log() << "master=true" << endl;
+	if( master || replSetPair ) {
+		if( master )
+			log() << "master=true" << endl;
+		master = true;
 		{
 			dblock lk;
 			/* create an oplog collection, if it doesn't yet exist. */
@@ -609,6 +629,5 @@ void startReplication() {
 
 /* called from main at server startup */
 void pairWith(const char *remoteEnd) {
-	replSet = new ReplSet(remoteEnd);
-//	uassert("not done yet!", false);
+	replSetPair = new ReplSet(remoteEnd);
 }

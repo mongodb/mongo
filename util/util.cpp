@@ -68,5 +68,7 @@ struct UtilTest {
 		assert( endsWith("abcde", "de") );
 		assert( !endsWith("abcde", "dasdfasdfashkfde") );
 
+		assert( swapEndian(0x01020304) == 0x04030201 );
+
 	}
 } utilTest;

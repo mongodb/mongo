@@ -121,6 +121,7 @@ bool MessagingPort::connect(SockAddr& _far)
 }
 
 bool MessagingPort::recv(Message& m) {
+again:
 	mmm( cout << "*  recv() sock:" << this->sock << endl; )
 	int len = -1;
 
@@ -146,9 +147,17 @@ bool MessagingPort::recv(Message& m) {
 		assert( lft > 0 );
 	}
 
-//	assert( x == 4 );
-
 	if( len < 0 || len > 16000000 ) { 
+		if( len == 0xffffffff ) { 
+			// Endian check from the client, after connecting, to see what mode server is running in.
+			unsigned foo = 0x10203040;
+			int x = ::send(sock, (char *) &foo, 4, 0);
+			if( x <= 0 ) { 
+				cout << "MessagingPort endian send() error " << errno << ' ' << farEnd.toString() << endl;
+				return false;
+			}
+			goto again;
+		}
 		cout << "bad recv() len: " << len << '\n';
 		return false;
 	}

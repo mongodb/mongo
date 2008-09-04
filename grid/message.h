@@ -72,12 +72,10 @@ public:
 
 enum Operations { 
 	opReply = 1,     /* reply. responseTo is set. */
-
 	dbMsg = 1000,    /* generic msg command followed by a string */
-
 	dbUpdate = 2001, /* update object */
 	dbInsert = 2002,
-//	dbGetByOID = 2003,
+	//dbGetByOID = 2003,
 	dbQuery = 2004,
 	dbGetMore = 2005,
 	dbDelete = 2006,
@@ -88,7 +86,9 @@ struct MsgData {
 	int len; /* len of the msg, including this field */
 	MSGID id; /* request/reply id's match... */
 	int responseTo; /* id of the message we are responding to */
-	int operation;
+	int _operation;
+	int operation() const { return _operation; }
+	void setOperation(int o) { _operation = o; }
     char _data[4];
 
 	int& dataAsInt() { return *((int *) _data); } 
@@ -138,8 +138,8 @@ public:
 		int dataLen = len + sizeof(MsgData) - 4;
 		MsgData *d = (MsgData *) malloc(dataLen);
 		memcpy(d->_data, msgdata, len);
-		d->len = dataLen;
-		d->operation = operation;
+		d->len = fixEndian(dataLen);
+		d->setOperation(operation);
 		freeIt= true;
 		data = d;
 	}

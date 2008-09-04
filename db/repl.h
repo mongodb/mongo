@@ -92,6 +92,8 @@ class ReplSource {
 
 	auto_ptr<DBClientConnection> conn;
 	auto_ptr<DBClientCursor> cursor;
+
+	ReplSource();
 public:
 	string hostName;    // ip addr or hostname
 	string sourceName;  // a logical source name.

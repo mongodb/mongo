@@ -264,7 +264,7 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 		qr->_data[2] = 0;
 		qr->_data[3] = 0;
 		qr->len = sizeof(QueryResult);
-		qr->operation = opReply;
+		qr->setOperation(opReply);
 		qr->cursorId = 0;
 		qr->startingFrom = 0;
 		qr->nReturned = 0;
@@ -429,9 +429,9 @@ void jniCallback(Message& m, Message& out)
 			Timer t;
 
 			bool log = false;
-			curOp = m.data->operation;
+			curOp = m.data->operation();
 
-			if( m.data->operation == dbQuery ) { 
+			if( m.data->operation() == dbQuery ) { 
 				// on a query, the Message must have m.freeIt true so that the buffer data can be 
 				// retained by cursors.  As freeIt is false, we make a copy here.
 				assert( m.data->len > 0 && m.data->len < 32000000 );
@@ -441,26 +441,26 @@ void jniCallback(Message& m, Message& out)
 				receivedQuery(dbr, copy, ss, false);
 				jmp.reply(m, *dbr.response, dbr.responseTo);
 			}
-			else if( m.data->operation == dbInsert ) {
+			else if( m.data->operation() == dbInsert ) {
 				ss << "insert ";
 				receivedInsert(m, ss);
 			}
-			else if( m.data->operation == dbUpdate ) {
+			else if( m.data->operation() == dbUpdate ) {
 				ss << "update ";
 				receivedUpdate(m, ss);
 			}
-			else if( m.data->operation == dbDelete ) {
+			else if( m.data->operation() == dbDelete ) {
 				ss << "remove ";
 				receivedDelete(m);
 			}
-			else if( m.data->operation == dbGetMore ) {
+			else if( m.data->operation() == dbGetMore ) {
 				DEV log = true;
 				ss << "getmore ";
 				DbResponse dbr;
 				receivedGetMore(dbr, m, ss);
 				jmp.reply(m, *dbr.response, dbr.responseTo);
 			}
-			else if( m.data->operation == dbKillCursors ) { 
+			else if( m.data->operation() == dbKillCursors ) { 
 				try {
 					log = true;
 					ss << "killcursors ";
@@ -472,7 +472,7 @@ void jniCallback(Message& m, Message& out)
 				}
 			}
 			else {
-				cout << "    jnicall: operation isn't supported: " << m.data->operation << endl;
+				cout << "    jnicall: operation isn't supported: " << m.data->operation() << endl;
 				assert(false);
 			}
 
@@ -540,7 +540,7 @@ void connThread()
 
 			int ms;
 			bool log = false;
-			curOp = m.data->operation;
+			curOp = m.data->operation();
 
 #if 0
 				/* use this if you only want to process operations for a particular namespace.  
@@ -555,7 +555,7 @@ void connThread()
 				}
 #endif
 
-			if( m.data->operation == dbMsg ) { 
+			if( m.data->operation() == dbMsg ) { 
 				ss << "msg ";
 				char *p = m.data->_data;
 				int len = strlen(p);
@@ -582,10 +582,10 @@ void connThread()
 					}
 				}
 			}
-			else if( m.data->operation == dbQuery ) { 
+			else if( m.data->operation() == dbQuery ) { 
 				receivedQuery(dbresponse, m, ss, true);
 			}
-			else if( m.data->operation == dbInsert ) {
+			else if( m.data->operation() == dbInsert ) {
 				OPWRITE;
 				try { 
 					ss << "insert ";
@@ -596,7 +596,7 @@ void connThread()
 					ss << " exception ";
 				}
 			}
-			else if( m.data->operation == dbUpdate ) {
+			else if( m.data->operation() == dbUpdate ) {
 				OPWRITE;
 				try { 
 					ss << "update ";
@@ -607,7 +607,7 @@ void connThread()
 					ss << " exception ";
 				}
 			}
-			else if( m.data->operation == dbDelete ) {
+			else if( m.data->operation() == dbDelete ) {
 				OPWRITE;
 				try { 
 					ss << "remove ";
@@ -618,13 +618,13 @@ void connThread()
 					ss << " exception ";
 				}
 			}
-			else if( m.data->operation == dbGetMore ) {
+			else if( m.data->operation() == dbGetMore ) {
 				OPREAD;
 				DEV log = true;
 				ss << "getmore ";
 				receivedGetMore(dbresponse, m, ss);
 			}
-			else if( m.data->operation == dbKillCursors ) { 
+			else if( m.data->operation() == dbKillCursors ) { 
 				OPREAD;
 				try {
 					log = true;
@@ -637,7 +637,7 @@ void connThread()
 				}
 			}
 			else {
-				cout << "    operation isn't supported: " << m.data->operation << endl;
+				cout << "    operation isn't supported: " << m.data->operation() << endl;
 				assert(false);
 			}
 

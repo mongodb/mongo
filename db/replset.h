@@ -32,12 +32,14 @@ class ReplSet {
 public:
 	int remotePort;
 	string remoteHost;
+	string remote; // host:port if port specified.
 
 	ReplSet(const char *remoteEnd);
 
 };
 
 ReplSet::ReplSet(const char *remoteEnd) {
+	remote = remoteEnd;
 	remotePort = DBPort;
 	remoteHost = remoteEnd;
 	const char *p = strchr(remoteEnd, ':');
@@ -45,5 +47,7 @@ ReplSet::ReplSet(const char *remoteEnd) {
 		remoteHost = string(remoteEnd, p-remoteEnd);
 		remotePort = atoi(p+1);
 		uassert("bad port #", remotePort > 0 && remotePort < 0x10000 );
+		if( remotePort == DBPort )
+			remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
 	}
 }
