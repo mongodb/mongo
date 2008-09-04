@@ -112,7 +112,7 @@ bool MessagingPort::connect(SockAddr& _far)
 		return false;
 	}
 	if( ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize) ) { 
-        log() << "connect(): failed errno:" << errno << ' ' << farEnd.getPort() << endl;
+//        log() << "connect(): failed errno:" << errno << ' ' << farEnd.getPort() << endl;
 		closesocket(sock); sock = -1;
 		return false;
 	}

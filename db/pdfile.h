@@ -384,7 +384,7 @@ inline void setClient(const char *ns) {
 		client = it->second;
 		return;
 	}
-	problem() << "first request for database " << cl << endl;
+	log() << "first operation for database " << cl << endl;
 	Client *c = new Client(cl);
 	clients[cl] = c;
 	client = c;

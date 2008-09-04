@@ -374,7 +374,7 @@ public:
    115 replay, opLogging
 */
 void listen(int port) { 
-	const char *Version = "db version: 121";
+	const char *Version = "db version: 122";
 	problem() << Version << endl;
 	pdfileInit();
 	//testTheDb();

@@ -74,10 +74,12 @@ int test2() {
 
 ReplSource::ReplSource() {
 	nClonedThisPass = 0; 
+	paired = false;
 	sourceName = "main";
 }
 
 ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
+	paired = false;
 	only = o.getStringField("only");
 	hostName = o.getStringField("host");
 	sourceName = o.getStringField("source");
@@ -133,8 +135,8 @@ void ReplSource::save() {
 	setClient("local.sources");
 	//cout << o.toString() << endl;
 	//cout << pattern.toString() << endl;
-	int u = _updateObjects("local.sources", o, pattern, false, ss);
-	assert( u == 1 );
+	int u = _updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, ss);
+	assert( u == 1 || u == 4 );
 	client = 0;
 }
 
@@ -178,6 +180,7 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 	if( !gotPairWith && replSetPair ) {
 		/* add the --pairwith server */
 		ReplSource *s = new ReplSource();
+		s->paired = true;
 		s->hostName = replSetPair->remote;
 		v.push_back(s);
 	}
@@ -247,9 +250,21 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 	if( client->justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
 	    newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
 	{
-		nClonedThisPass++;
-		resync(client->name);
-		client->justCreated = false;
+		if( paired && !client->justCreated ) { 
+			/* the other half of our pair has some operations. yet we already had a db on our 
+			   disk even though the db in question is not listed in the source.  this is normal 
+			   near the beginning of paired operation. 
+
+			   todo: we should echo back an optime on the initial cloning, and then we know 
+			   we are safely in sync, and if we get here without that, we can then error out.
+			   */
+			log() << "TEMP: pair: assuming we have the historical image for: " << clientName << endl;
+		}
+		else { 
+			nClonedThisPass++;
+			resync(client->name);
+			client->justCreated = false;
+		}
 	}
 
 	stringstream ss;

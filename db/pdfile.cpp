@@ -181,7 +181,7 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
 			assert( loops < 10000 );
 			cout << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
 		}
-		cout << "info: newExtent(): file " << fileNo << " full, adding a new file " << ns << endl;
+		log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
 		return client->addAFile()->newExtent(ns, approxSize, loops+1);
 	}
 	int offset = header->unused.getOfs();
@@ -209,9 +209,8 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
 	DEBUGGING cout << "temp: newextent adddelrec " << ns << endl;
 	details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
-	log() << "new extent size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
-		<< " emptyLoc:" << hex << emptyLoc.getOfs() << dec
-		<< ' ' << ns << endl;
+	log() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
+		<< " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
 	return e;
 }
 
