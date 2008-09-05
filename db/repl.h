@@ -93,6 +93,8 @@ class ReplSource {
 	auto_ptr<DBClientConnection> conn;
 	auto_ptr<DBClientCursor> cursor;
 
+	set<string> addDbNextPass;
+
 	ReplSource();
 public:
 	bool paired; // --pair in use

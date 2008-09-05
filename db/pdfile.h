@@ -311,7 +311,7 @@ inline BtreeBucket* DiskLoc::btree() const {
 // there might be more than one for a cust, we'll see.
 class Client { 
 public:
-	Client(const char *nm) : name(nm) { 
+	Client(const char *nm, bool& justCreated) : name(nm) { 
 		justCreated = namespaceIndex.init(dbpath, nm);
 		profile = 0;
 		profileName = name + ".system.profile";
@@ -362,7 +362,6 @@ public:
 	NamespaceIndex namespaceIndex;
 	int profile; // 0=off.
 	string profileName; // "alleyinsider.system.profile"
-	bool justCreated;
 };
 
 // tempish...move to TLS or pass all the way down as a parm
@@ -370,7 +369,8 @@ extern map<string,Client*> clients;
 extern Client *client;
 extern const char *curNs;
 extern int dbLocked;
-inline void setClient(const char *ns) { 
+/* returns true if the database ("client") did not exist, and it was created on this call */
+inline bool setClient(const char *ns) { 
     /* we must be in critical section at this point as these are global 
        variables. 
     */
@@ -382,19 +382,23 @@ inline void setClient(const char *ns) {
 	map<string,Client*>::iterator it = clients.find(cl);
 	if( it != clients.end() ) {
 		client = it->second;
-		return;
+		return false;
 	}
 	log() << "first operation for database " << cl << endl;
-	Client *c = new Client(cl);
+	bool justCreated;
+	Client *c = new Client(cl, justCreated);
 	clients[cl] = c;
 	client = c;
+	return justCreated;
 }
 /* we normally keep around a curNs ptr -- if this ns is temporary, 
    use this instead so we don't have a bad ptr.  we could have made a copy,
    but trying to be fast as we call setClient this for every single operation.
 */
-inline void setClientTempNs(const char *ns) { 
-	setClient(ns); curNs = "";
+inline bool setClientTempNs(const char *ns) { 
+	bool jc = setClient(ns); 
+	curNs = "";
+	return jc;
 }
 
 inline void _deleteDataFiles(const char *client) { 

@@ -225,6 +225,7 @@ bool ReplSource::resync(string db) {
 /* local.$oplog.main is of the form:
      { ts: ..., op: <optype>, ns: ..., o: <obj> , o2: <extraobj>, b: <boolflag> } 
      ...
+   see logOp() comments.
 */
 void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 	char clientName[MaxClientLen];
@@ -241,16 +242,17 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 		   back to read more transactions. (Imagine a scenario of slave startup where we try to 
 		   clone 100 databases in one pass.)
 		*/
+		addDbNextPass.insert(clientName);
 		return;
 	}
 
 	dblock lk;
-	setClientTempNs(ns);
+	bool justCreated = setClientTempNs(ns);
 
-	if( client->justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
+	if( justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
 	    newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
 	{
-		if( paired && !client->justCreated ) { 
+		if( paired && !justCreated ) { 
 			/* the other half of our pair has some operations. yet we already had a db on our 
 			   disk even though the db in question is not listed in the source.  this is normal 
 			   near the beginning of paired operation. 
@@ -258,13 +260,15 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 			   todo: we should echo back an optime on the initial cloning, and then we know 
 			   we are safely in sync, and if we get here without that, we can then error out.
 			   */
-			log() << "TEMP: pair: assuming we have the historical image for: " << clientName << endl;
+			log() << "TEMP: pair: assuming we have the historical image for: " << 
+				clientName << ". add extra checks here." << endl;
+			dbs.insert(clientName);
 		}
 		else { 
 			nClonedThisPass++;
 			resync(client->name);
-			client->justCreated = false;
 		}
+		addDbNextPass.erase(clientName);
 	}
 
 	stringstream ss;
@@ -344,11 +348,24 @@ void ReplSource::sync_pullOpLog() {
         sleepsecs(3);
         return;
     }
+
+	// show any deferred database creates from a previous pass
+	{
+		set<string>::iterator i = addDbNextPass.begin();
+		if( i != addDbNextPass.end() ) { 
+			JSObjBuilder b;
+			b.append("ns", *i + '.');
+			b.append("op", "db");
+			JSObj op = b.done();
+			sync_pullOpLog_applyOperation(op);
+		}
+	}
+
 	if( !c->more() ) { 
 		if( tailing ) 
 			log() << "pull:   " << ns << " no new activity\n";
 		else
-			problem() << "pull:   " << ns << " empty?\n";
+			log() << "pull:   " << ns << " oplog is empty\n";
 		sleepsecs(3);
 		return;
 	}
@@ -559,7 +576,7 @@ void replMain() {
 int debug_stop_repl = 0;
 
 void replSlaveThread() { 
-    sleepsecs(30);
+    sleepsecs(1);
 	while( 1 ) { 
 		try { 
 			replMain();

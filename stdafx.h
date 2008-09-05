@@ -87,7 +87,11 @@ void msgasserted(const char *msg);
 /* warning only - keeps going */
 #define wassert(_Expression) (void)( (!!(_Expression)) || (wasserted(#_Expression, __FILE__, __LINE__), 0) )
 
-// display a message, no context, and throw assertionexception
+/* display a message, no context, and throw assertionexception
+
+   easy way to throw an exception and log something without our stack trace 
+   display happening.
+*/
 #define massert(msg,_Expression) (void)( (!!(_Expression)) || (msgasserted(msg), 0) )
 
 /* dassert is 'debug assert' -- might want to turn off for production as these 

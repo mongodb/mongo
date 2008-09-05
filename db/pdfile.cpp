@@ -209,7 +209,7 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
 	DEBUGGING cout << "temp: newextent adddelrec " << ns << endl;
 	details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
-	log() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
+	DEV log() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
 		<< " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
 	return e;
 }
@@ -776,7 +776,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	if( loc.isNull() ) {
 		// out of space
 		if( d->capped == 0 ) { // size capped doesn't grow
-			log() << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
+			DEV log() << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
 			client->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
 			loc = d->alloc(ns, lenWHdr, extentLoc);
 		}
@@ -796,6 +796,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
 	}
 	else {
+
 		Record *oldlast = e->lastRecord.rec();
 		r->prevOfs = e->lastRecord.getOfs();
 		r->nextOfs = DiskLoc::NullOfs;

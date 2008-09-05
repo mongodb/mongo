@@ -103,7 +103,7 @@ void DBClientCursor::requestMore() {
 	toSend.setData(dbGetMore, b.buf(), b.len());
 	auto_ptr<Message> response(new Message());
 	bool ok = p.call(toSend, *response);
-	assert( ok );
+	massert("dbclient error communicating with server", ok);
 
 	m = response;
 	dataReceived();
