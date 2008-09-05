@@ -1,5 +1,13 @@
 // repl.cpp
 
+/* TODO
+
+   PAIRING
+    _ better concurrency; ie don't block if connection to slave blocks
+    _ on a syncexception, don't allow going back to master state?
+
+*/
+
 /**
 *    Copyright (C) 2008 10gen Inc.
 *  
@@ -38,7 +46,7 @@ void ensureHaveIdIndex(const char *ns);
 
 #include "replset.h"
 
-ReplSet *replSetPair = 0;
+ReplPair *replPair = 0;
 
 OpTime last(0, 0);
 
@@ -170,18 +178,18 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
 	while( c->ok() ) { 
 		ReplSource tmp(c->current());
-		if( replSetPair && tmp.hostName == replSetPair->remote && tmp.sourceName == "main" )
+		if( replPair && tmp.hostName == replPair->remote && tmp.sourceName == "main" )
 			gotPairWith = true;
 		addSourceToList(v, tmp, old);
 		c->advance();
 	}
 	client = 0;
 
-	if( !gotPairWith && replSetPair ) {
+	if( !gotPairWith && replPair ) {
 		/* add the --pairwith server */
 		ReplSource *s = new ReplSource();
 		s->paired = true;
-		s->hostName = replSetPair->remote;
+		s->hostName = replPair->remote;
 		v.push_back(s);
 	}
 
@@ -631,14 +639,14 @@ void replMasterThread() {
 }
 
 void startReplication() { 
-	if( slave || replSetPair ) {
+	if( slave || replPair ) {
 		if( slave )
 			log() << "slave=true" << endl;
 		slave = true;
 		boost::thread repl_thread(replSlaveThread);
 	}
 
-	if( master || replSetPair ) {
+	if( master || replPair ) {
 		if( master )
 			log() << "master=true" << endl;
 		master = true;
@@ -661,5 +669,5 @@ void startReplication() {
 
 /* called from main at server startup */
 void pairWith(const char *remoteEnd) {
-	replSetPair = new ReplSet(remoteEnd);
+	replPair = new ReplPair(remoteEnd);
 }

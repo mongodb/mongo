@@ -16,7 +16,7 @@
 
 #pragma once
 
-/* ReplSet is a pair of db servers replicating to one another and cooperating.
+/* ReplPair is a pair of db servers replicating to one another and cooperating.
 
    Only one member of the pair is active at a time; so this is a smart master/slave
    configuration basically.
@@ -27,18 +27,18 @@
    a set of 3...
 */
 
-class ReplSet { 
+class ReplPair { 
 
 public:
 	int remotePort;
 	string remoteHost;
 	string remote; // host:port if port specified.
 
-	ReplSet(const char *remoteEnd);
+	ReplPair(const char *remoteEnd);
 
 };
 
-ReplSet::ReplSet(const char *remoteEnd) {
+ReplPair::ReplPair(const char *remoteEnd) {
 	remote = remoteEnd;
 	remotePort = DBPort;
 	remoteHost = remoteEnd;
