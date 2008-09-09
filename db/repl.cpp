@@ -3,7 +3,6 @@
 /* TODO
 
    PAIRING
-    _ better concurrency; ie don't block if connection to slave blocks
     _ on a syncexception, don't allow going back to master state?
 
 */

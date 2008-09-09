@@ -16,6 +16,9 @@
 
 #include "stdafx.h"
 #include "goodies.h"
+#include "unittest.h"
+
+vector<UnitTest*> UnitTest::tests;
 
 Nullstream nullstream;
 Logstream logstream;
@@ -43,8 +46,8 @@ int nextPrime(int n) {
 	return n;
 }
 
-struct UtilTest { 
-	UtilTest() { 
+struct UtilTest : public UnitTest { 
+	void run() { 
 		assert( WrappingInt(0) <= WrappingInt(0) );
 		assert( WrappingInt(0) <= WrappingInt(1) );
 		assert( !(WrappingInt(1) <= WrappingInt(0)) );

@@ -36,7 +36,7 @@ void MemoryMappedFile::closeAllFiles() {
 	++closingAllFiles;
 	for( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
 		(*i)->close();
-	cout << "  closeAllFiles() finished" << endl;
+	log() << "  closeAllFiles() finished" << endl;
 	--closingAllFiles;
 }
 

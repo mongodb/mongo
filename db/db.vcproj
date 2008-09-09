@@ -191,6 +191,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\commands.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\db.cpp"
 				>
 			</File>
@@ -386,6 +390,10 @@
 			</File>
 			<File
 				RelativePath=".\storage.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\unittest.h"
 				>
 			</File>
 		</Filter>

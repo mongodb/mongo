@@ -10,11 +10,9 @@ DBGRID_LIBS = $(LIB_BOOST) -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o dbclient.o btreecursor.o cloner.o namespace.o
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o
 
-DBGRID_OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/util.o dbclient.o ../dbgrid/dbgrid.o
-
-# ../grid/protorecv.o ../grid/protosend.o
+DBGRID_OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o dbclient.o ../dbgrid/dbgrid.o
 
 GPP = g++
 

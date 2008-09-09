@@ -29,6 +29,7 @@
 #include "query.h"
 #include "introspect.h"
 #include "repl.h"
+#include "../util/unittest.h"
 
 bool slave = false;
 bool master = false; // true means keep an op log
@@ -740,8 +741,7 @@ void segvhandler(int x) {
 
 void mysighandler(int x) { 
    signal(x, SIG_IGN); 
-   cout << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
-   problem() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+   log() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
    {
 	   dblock lk;
 	   problem() << "  now exiting" << endl;
@@ -760,25 +760,25 @@ void setupSignals() {}
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
   if( opLogging ) 
-		log() << "opLogging = " << opLogging << endl;
-    _oplog.init();
+    log() << "opLogging = " << opLogging << endl;
+  _oplog.init();
 
 #if !defined(_WIN32)
-	assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
+  assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
 #endif
 
-    /*
-     * ensure that the dbpath ends with a path delim if not supplied
-     * @TODO - the following is embarassing - not sure of there's a clean way to
-     * find the platform delim
-     */
-
-	char endchar = '/';
-	char *endstr = "/";
+  /*
+   * ensure that the dbpath ends with a path delim if not supplied
+   * @TODO - the following is embarassing - not sure of there's a clean way to
+   * find the platform delim
+   */
+  
+  char endchar = '/';
+  const char *endstr = "/";
 
 #if defined(_WIN32)
-    endchar = '\\';
-    endstr = "\\";
+  endchar = '\\';
+  endstr = "\\";
 #endif
     
     if (dbPath && dbPath[strlen(dbPath)-1] != endchar) {
@@ -823,6 +823,8 @@ int main(int argc, char* argv[], char *envp[] )
     signal(SIGPIPE, pipeSigHandler);
 #endif
 	srand(curTimeMillis());
+
+	UnitTest::runTests();
 
 	if( argc >= 2 ) {
 		if( strcmp(argv[1], "quicktest") == 0 ) {
@@ -948,13 +950,13 @@ int main(int argc, char* argv[], char *envp[] )
 
 #undef exit
 void dbexit(int rc, const char *why) { 
-	cout << "  dbexit: " << why << "; flushing op log and files" << endl;
+	log() << "  dbexit: " << why << "; flushing op log and files" << endl;
 	flushOpLog();
 
 	/* must do this before unmapping mem or you may get a seg fault */
 	closeAllSockets();
 
 	MemoryMappedFile::closeAllFiles();
-	cout << "  dbexit: really exiting now" << endl;
+	log() << "  dbexit: really exiting now" << endl;
 	exit(rc);
 }
