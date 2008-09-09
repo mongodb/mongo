@@ -760,25 +760,25 @@ void setupSignals() {}
 
 void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
   if( opLogging ) 
-		log() << "opLogging = " << opLogging << endl;
-    _oplog.init();
+    log() << "opLogging = " << opLogging << endl;
+  _oplog.init();
 
 #if !defined(_WIN32)
-	assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
+  assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
 #endif
 
-    /*
-     * ensure that the dbpath ends with a path delim if not supplied
-     * @TODO - the following is embarassing - not sure of there's a clean way to
-     * find the platform delim
-     */
-
-	char endchar = '/';
-	char *endstr = "/";
+  /*
+   * ensure that the dbpath ends with a path delim if not supplied
+   * @TODO - the following is embarassing - not sure of there's a clean way to
+   * find the platform delim
+   */
+  
+  char endchar = '/';
+  const char *endstr = "/";
 
 #if defined(_WIN32)
-    endchar = '\\';
-    endstr = "\\";
+  endchar = '\\';
+  endstr = "\\";
 #endif
     
     if (dbPath && dbPath[strlen(dbPath)-1] != endchar) {
