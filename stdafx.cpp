@@ -23,18 +23,20 @@
 // TODO: reference any additional headers you need in STDAFX.H
 // and not in this file
 
+/*
 struct MyAsserts {
 	MyAsserts() {
 
 	}
 } myassertsstdafx;
+*/
 
 #undef assert
 
 #undef yassert
 #include "assert.h"
 
-void sayDbContext(const char *p = 0);
+void sayDbContext(const char *errmsg = 0);
 
 void wasserted(const char *msg, const char *file, unsigned line) { 
 	problem() << "Assertion failure " << msg << ' ' << file << ' ' << line << endl;
@@ -55,3 +57,4 @@ void msgasserted(const char *msg) {
 	cout << "Assertion: " << msg << '\n';
 	throw AssertionException();
 }
+

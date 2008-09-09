@@ -215,6 +215,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\matcher.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\grid\message.cpp"
 				>
 			</File>
@@ -403,10 +407,6 @@
 			Name="misc"
 			>
 			<File
-				RelativePath=".\how_to_build.txt"
-				>
-			</File>
-			<File
 				RelativePath=".\makefile"
 				>
 			</File>
@@ -424,14 +424,6 @@
 			</File>
 			<File
 				RelativePath="..\pcre-7.4\pcrecpp.h"
-				>
-			</File>
-			<File
-				RelativePath=".\testdb.js"
-				>
-			</File>
-			<File
-				RelativePath=".\todo.txt"
 				>
 			</File>
 		</Filter>

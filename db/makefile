@@ -5,11 +5,14 @@ FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/loca
 LIB_DEPS = -lpcrecpp -lpcre
 LIB_BOOST = -lboost_thread -lboost_filesystem
 
-LIBS= $(LIB_DEPS)  $(LIB_BOOST) -lstdc++
+LIBS= $(LIB_DEPS) $(LIB_BOOST) -lstdc++
+DBGRID_LIBS = $(LIB_BOOST) -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
 
 OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o dbclient.o btreecursor.o cloner.o namespace.o
+
+DBGRID_OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/util.o dbclient.o ../dbgrid/dbgrid.o
 
 # ../grid/protorecv.o ../grid/protosend.o
 
@@ -41,6 +44,9 @@ _REQ_GPP_VER = 4.2
 db: $(OBJS) db.o  
 	$(GPP) $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(JVM_LIBS)
 #	-./db quicktest
+
+dbgrid: $(DBGRID_OBJS) ../dbgrid/dbgrid.o
+	$(GPP) $(FLAGS) -o $@ $(DBGRID_OBJS) $(DBGRID_LIBS)
     
 javatest: javatest.o $(OBJS)
 	$(GPP) $(FLAGS) -o $@ javatest.o $(OBJS) $(LIBS) $(JVM_LIBS)
