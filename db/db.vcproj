@@ -289,6 +289,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\commands.h"
+				>
+			</File>
+			<File
 				RelativePath=".\cursor.h"
 				>
 			</File>

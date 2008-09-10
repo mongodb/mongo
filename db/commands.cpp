@@ -3,7 +3,6 @@
  */
 
 /**
-*    Copyright (C) 2008 10gen Inc.
 *  
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,6 +29,7 @@
 #include "javajs.h"
 #include "json.h"
 #include "repl.h"
+#include "commands.h"
 
 extern int queryTraceLevel;
 extern int otherTraceLevel;
@@ -39,6 +39,8 @@ void flushOpLog();
 int runCount(const char *ns, JSObj& cmd, string& err);
 
 const int edebug=0;
+
+map<string,Command*> Command::commands;
 
 bool dbEval(JSObj& cmd, JSObjBuilder& result) { 
 	Element e = cmd.firstElement();
@@ -220,6 +222,58 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	return ss.str();
 }
 
+class CmdGetOpTime : public Command { 
+public:
+    CmdGetOpTime() : Command("getoptime") { }
+    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        result.appendDate("optime", OpTime::now().asDate());
+        return true;
+    }
+} cmdgetoptime;
+
+/*
+class Cmd : public Command { 
+public:
+    Cmd() : Command("") { }
+    bool adminOnly() { return true; }
+    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        return true;
+    }
+} cmd;
+*/
+
+class CmdOpLogging : public Command { 
+public:
+    CmdOpLogging() : Command("opLogging") { }
+    bool adminOnly() { return true; }
+    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        opLogging = (int) cmdObj.findElement("opLogging").number();
+        flushOpLog();
+        log() << "CMD: opLogging set to " << opLogging << endl;
+        return true;
+    }
+} cmdoplogging;
+
+class CmdQueryTraceLevel : public Command { 
+public:
+    CmdQueryTraceLevel() : Command("queryTraceLevel") { }
+    bool adminOnly() { return true; }
+    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        queryTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
+        return true;
+    }
+} cmdquerytracelevel;
+
+class Cmd : public Command { 
+public:
+    Cmd() : Command("traceAll") { }
+    bool adminOnly() { return true; }
+    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        queryTraceLevel = otherTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
+        return true;
+    }
+} cmdtraceall;
+
 // e.g.
 //   system.cmd$.find( { queryTraceLevel: 2 } );
 // 
@@ -239,18 +293,33 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 	Element e;
 	e = jsobj.firstElement();
 
-	if( e.eoo() ) goto done;
-	if( e.type() == Code ) { 
+    map<string,Command*>::iterator i;
+
+	if( e.eoo() ) 
+        ;
+    /* check for properly registered command objects.  Note that all the commands below should be 
+       migrated over to the command object format.
+       */
+    else if( (i = Command::commands.find(e.fieldName())) != Command::commands.end() ) { 
+        valid = true;
+        string errmsg;
+        Command *c = i->second;
+        if( c->adminOnly() && strncmp(ns, "admin", p-ns) != 0 ) {
+            ok = false;
+			errmsg = "access denied";
+        }
+        else {
+            ok = c->run(ns, jsobj, errmsg, anObjBuilder);
+        }
+        if( !ok ) 
+            anObjBuilder.append("errmsg", errmsg);
+    }
+	else if( e.type() == Code ) { 
 		valid = true;
 		ok = dbEval(jsobj, anObjBuilder);
 	}
 	else if( e.type() == Number ) { 
-		if( strcmp(e.fieldName(), "getoptime") == 0 ) { 
-			valid = true;
-			ok = true;
-			anObjBuilder.appendDate("optime", OpTime::now().asDate());
-		}
-		else if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
+        if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
 			if( 1 ) {
 				cout << "dropDatabase " << ns << endl;
 				valid = true;
@@ -279,24 +348,6 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 			}
 			else {
 				ok = false;
-			}
-		}
-		else {
-			// admin only commands.
-			if( strncmp(ns, "admin", p-ns) != 0 ) 
-				return false;
-			if( strcmp(e.fieldName(),"opLogging") == 0 ) {
-				valid = ok = true;
-				opLogging = (int) e.number();
-				flushOpLog();
-				log() << "CMD: opLogging set to " << opLogging << endl;
-			} else if( strcmp(e.fieldName(),"queryTraceLevel") == 0 ) {
-				valid = ok = true;
-				queryTraceLevel = (int) e.number();
-			} else if( strcmp(e.fieldName(),"traceAll") == 0 ) { 
-				valid = ok = true;
-				queryTraceLevel = (int) e.number();
-				otherTraceLevel = (int) e.number();
 			}
 		}
 	}
@@ -453,7 +504,6 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 		}
 	}
 
-done:
 	if( !valid )
 		anObjBuilder.append("errmsg", "no such cmd");
 	anObjBuilder.append("ok", ok?1.0:0.0);
