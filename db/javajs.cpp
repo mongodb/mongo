@@ -246,7 +246,7 @@ jboolean JavaJSImpl::scopeReset( jlong id ){
 }
 
 void JavaJSImpl::scopeFree( jlong id ){
-  _getEnv()->CallStaticVoidMethod( _dbhook , _scopeFree );
+  _getEnv()->CallStaticVoidMethod( _dbhook , _scopeFree , id );
 }
 
 // scope setters
