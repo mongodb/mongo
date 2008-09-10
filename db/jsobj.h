@@ -64,15 +64,17 @@ struct OID {
      EOO:       nothing follows
      Undefined: nothing follows
      OID:       an OID object
-	 Number:    <double>
+     Number:    <double>
      String:    <unsigned32 strsizewithnull><cstring>
-	 Date:      <8bytes>
-	 Regex:     <cstring regex><cstring options>
+     Date:      <8bytes>
+     Regex:     <cstring regex><cstring options>
      Object:    a nested object, leading with its entire size, which terminates with EOO.
      Array:     same as object
-	 DBRef:     <strlen> <cstring ns> <oid>
-       DBRef is a database reference: basically a collection name plus an Object ID
+     DBRef:     <strlen> <cstring ns> <oid>
+                DBRef is a database reference: basically a collection name plus an Object ID
      BinData:   <int len> <byte subtype> <byte[len] data>
+     Code:      a function (not a closure): same format as String.
+     Symbol:    a language symbol (say a python symbol).  same format as String.
 */
 
 #pragma pack(pop)
