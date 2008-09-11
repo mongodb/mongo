@@ -55,6 +55,7 @@ class AssertionException {
 public:
     string msg; 
 	AssertionException() { }
+    virtual bool severe() { return true; }
 	virtual bool isUserAssertion() { return false; }
     virtual string toString() { return msg; }
 };
@@ -63,8 +64,16 @@ public:
 class UserAssertionException : public AssertionException { 
 public:
 	UserAssertionException(const char *_msg) { msg = _msg; }
+    virtual bool severe() { return false; }
 	virtual bool isUserAssertion() { return true; }
     virtual string toString() { return "userassert:" + msg; }
+};
+
+class MsgAssertionException : public AssertionException { 
+public:
+	MsgAssertionException(const char *_msg) { msg = _msg; }
+    virtual bool severe() { return false; }
+    virtual string toString() { return "massert:" + msg; }
 };
 
 void asserted(const char *msg, const char *file, unsigned line);

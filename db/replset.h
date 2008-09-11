@@ -30,15 +30,24 @@ extern int port;
 */
 
 class ReplPair { 
-
 public:
+    enum { 
+        State_CantArb = -3,
+        State_Confused = -2,
+        State_Negotiating = -1,
+        State_Slave = 0,
+        State_Master = 1
+    };
+
     int state;
+    string info; // commentary about our current state
+    string arbHost;  // "-" for no arbiter.  "host[:port]"
 	int remotePort;
 	string remoteHost;
 	string remote; // host:port if port specified.
     int date; // -1 not yet set; 0=slave; 1=master
 
-	ReplPair(const char *remoteEnd);
+	ReplPair(const char *remoteEnd, const char *arbiter);
 
     bool dominant(const string& myname) { 
         if( myname == remoteHost )
@@ -46,25 +55,30 @@ public:
         return myname > remoteHost;
     }
 
-    void setMaster(int n) { 
+    void setMaster(int n, const char *_comment = "") { 
+        info = _comment;
         if( n == state ) 
             return;
         log() << "pair: setting master=" << n << " was " << state << '\n';
         state = n;
     }
 
+    /* negotiate with our peer who is master */
     void negotiate(DBClientConnection *conn);
+
+    /* peer unreachable, try our arbitrator */
+    void arbitrate();
 };
 
 extern ReplPair *replPair;
 
 /* we should not allow most operations when not the master */
 inline bool isMaster() { 
-    return replPair == 0 || replPair->state == 1 || 
+    return replPair == 0 || replPair->state == ReplPair::State_Master || 
         client->name == "local"; // local is always allowed
 }
 
-inline ReplPair::ReplPair(const char *remoteEnd) {
+inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {
     state = -1;
 	remote = remoteEnd;
 	remotePort = DBPort;
@@ -77,4 +91,7 @@ inline ReplPair::ReplPair(const char *remoteEnd) {
 		if( remotePort == DBPort )
 			remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
 	}
+
+    arbHost = arb;
+    uassert("arbiter parm is empty", !arbHost.empty());
 }

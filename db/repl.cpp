@@ -45,21 +45,52 @@ void ensureHaveIdIndex(const char *ns);
 
 #include "replset.h"
 
+/* --- ReplPair -------------------------------- */
+
 ReplPair *replPair = 0;
+
+JSObj ismasterobj = fromjson("{ismaster:1}");
+
+/* peer unreachable, try our arbitrator */
+void ReplPair::arbitrate() {
+    if( arbHost == "-" ) { 
+        // no arbiter. we are up, let's assume he is down and network is not partitioned.
+        setMaster(State_Master, "remote unreachable");
+        return;
+    }
+
+    auto_ptr<DBClientConnection> conn( new DBClientConnection() );
+    string errmsg;
+    if( !conn->connect(arbHost.c_str(), errmsg) ) {
+        setMaster(State_CantArb, "can't connect to arb");
+        return;
+    }
+
+    JSObj res = conn->findOne("admin.$cmd", ismasterobj);
+    if( res.isEmpty() ) { 
+        setMaster(State_CantArb, "can't arb 2");
+        return;
+    }
+
+    setMaster(State_Master, "remote down, arbitrator reached");
+}
+
+/* --------------------------------------------- */
 
 class CmdIsMaster : public Command { 
 public:
     CmdIsMaster() : Command("ismaster") { }
 
     virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
-        int x = -2;
         if( replPair ) {
-            x = replPair->state;
-            result.append("ismaster", x);
+            int x = replPair->state;
+            result.append("ismaster", replPair->state);
             result.append("remote", replPair->remote);
+            if( !replPair->info.empty() )
+                result.append("info", replPair->info);
         }
         else { 
-            result.append("ismaster", x);
+            result.append("ismaster", 1);
             result.append("msg", "not paired");
         }
 
@@ -137,6 +168,7 @@ void ReplPair::negotiate(DBClientConnection *conn) {
     JSObj res = conn->findOne("admin.$cmd", cmd);
     if( res.getIntField("ok") != 1 ) { 
         problem() << "negotiate fails: " << res.toString() << '\n';
+        setMaster(State_Confused);
         return;
     }
     int x = res.getIntField("you_are");
@@ -422,7 +454,7 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 			_runCommands(ns, o, ss, bb, ob);
 		}
 	}
-	catch( UserAssertionException e ) { 
+	catch( UserAssertionException& e ) { 
 		log() << "sync: caught user assertion " << e.msg << '\n';
 	}
 	client = 0;
@@ -555,12 +587,12 @@ bool ReplSource::sync() {
 		conn = auto_ptr<DBClientConnection>(new DBClientConnection());
 		string errmsg;
 		if( !conn->connect(hostName.c_str(), errmsg) ) {
-            if( replPair && paired ) {
-                assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
-                replPair->setMaster(1);
-            }
 			resetConnection();
 			log() << "pull:   cantconn " << errmsg << endl;
+            if( replPair && paired ) {
+                assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
+                replPair->arbitrate();
+            }
             sleepsecs(1);
 			return false;
 		}
@@ -658,6 +690,7 @@ _ reuse that cursor when we can
 
 void replMain() { 
 	vector<ReplSource*> sources;
+    bool first = true;
 
 	while( 1 ) { 
 		{	
@@ -665,8 +698,10 @@ void replMain() {
 			ReplSource::loadAll(sources);
 		}
 		
-		if( sources.empty() )
+		if( !first && sources.empty() )
 			sleepsecs(20);
+
+        first=false;
 		
 		for( vector<ReplSource*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
 			ReplSource *s = *i;	
@@ -674,13 +709,18 @@ void replMain() {
 			try {
 				ok = s->sync();
 			}
-			catch( SyncException ) {
-				log() << "caught SyncException, sleeping 1 minutes" << endl;
-				sleepsecs(60);
+			catch( SyncException& ) {
+				log() << "caught SyncException, sleeping 10 secs" << endl;
+				sleepsecs(10);
 			}
-            catch( AssertionException ) { 
-                log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
-                sleepsecs(60);
+            catch( AssertionException& e ) { 
+                if( e.severe() ) {
+                    log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
+                    sleepsecs(60);
+                }
+                else { 
+                    log() << e.toString() << '\n';
+                }
             }
 			if( !ok ) 
 				s->resetConnection();
@@ -703,7 +743,7 @@ void replSlaveThread() {
 				break;
 			sleepsecs(5);
 		}
-		catch( AssertionException ) { 
+		catch( AssertionException& ) { 
 			problem() << "Assertion in replSlaveThread(): sleeping 5 minutes before retry" << endl;
 			sleepsecs(300);
 		}
@@ -779,6 +819,6 @@ void startReplication() {
 }
 
 /* called from main at server startup */
-void pairWith(const char *remoteEnd) {
-	replPair = new ReplPair(remoteEnd);
+void pairWith(const char *remoteEnd, const char *arb) {
+	replPair = new ReplPair(remoteEnd, arb);
 }

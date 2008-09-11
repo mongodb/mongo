@@ -442,7 +442,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 		try {
 			ok = id.head.btree()->unindex(id.head, id, j, dl);
 		}
-		catch(AssertionException) { 
+		catch(AssertionException&) { 
 			problem() << "Assertion failure: _unindex failed " << id.indexNamespace() << endl;
 			cout << "Assertion failure: _unindex failed" << '\n';
 			cout << "  obj:" << obj.toString() << '\n';
@@ -590,7 +590,7 @@ void DataFileMgr::update(
 					try {  
 						idx.head.btree()->unindex(idx.head, idx, *removed[i], dl);
 					}
-					catch(AssertionException) { 
+					catch(AssertionException&) { 
 						ss << " exception update unindex ";
 						problem() << " caught assertion update unindex " << idxns.c_str() << endl;
 					}
@@ -604,7 +604,7 @@ void DataFileMgr::update(
 							idx.head, 
 							dl, *added[i], false, idx, true);
 					}
-					catch(AssertionException) {
+					catch(AssertionException&) {
 						ss << " exception update index "; 
 						cout << " caught assertion update index " << idxns.c_str() << '\n';
 						problem() << " caught assertion update index " << idxns.c_str() << endl;
@@ -644,7 +644,7 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 			idx.head.btree()->insert(idx.head, newRecordLoc,
 				(JSObj&) *i, false, idx, true);
 		}
-		catch(AssertionException) { 
+		catch(AssertionException&) { 
 			problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;
 		}
 	}

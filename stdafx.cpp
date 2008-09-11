@@ -54,6 +54,6 @@ void uasserted(const char *msg) {
 }
 
 void msgasserted(const char *msg) {
-	cout << "Assertion: " << msg << '\n';
-	throw AssertionException();
+	log() << "Assertion: " << msg << '\n';
+	throw MsgAssertionException(msg);
 }
