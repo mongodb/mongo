@@ -19,6 +19,8 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
+#include <limits>
+
 
 Element nullElement;
 
@@ -365,6 +367,11 @@ JSObj JSObj::extractFields(JSObj& pattern) {
 		b.append(x);
 	}
 	return b.doneAndDecouple();
+}
+
+int JSObj::getIntField(const char *name) { 
+	Element e = getField(name);
+	return e.type() == Number ? (int) e.number() : INT_MIN;
 }
 
 bool JSObj::getBoolField(const char *name) { 

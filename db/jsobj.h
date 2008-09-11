@@ -241,6 +241,8 @@ public:
 
 	JSObj getObjectField(const char *name);
 
+    int getIntField(const char *name); // INT_MIN if not present
+
 	bool getBoolField(const char *name);
 
 	/* makes a new JSObj with the fields specified in pattern.

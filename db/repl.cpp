@@ -33,6 +33,7 @@
 #include "query.h"
 #include "json.h"
 #include "db.h"
+#include "commands.h"
 
 extern int port;
 extern boost::mutex dbMutex;
@@ -46,6 +47,103 @@ void ensureHaveIdIndex(const char *ns);
 #include "replset.h"
 
 ReplPair *replPair = 0;
+
+class CmdIsMaster : public Command { 
+public:
+    CmdIsMaster() : Command("ismaster") { }
+
+    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        int x = -2;
+        if( replPair ) {
+            x = replPair->state;
+        }
+        else { 
+            result.append("msg", "not paired");
+        }
+        result.append("ismaster", x);
+        return true;
+    }
+} cmdismaster;
+
+/* negotiate who is master
+
+   -1=not set (probably means we just booted)
+    0=was slave
+    1=was master
+
+   remote,local -> new remote,local
+   !1,1  -> 0,1
+   1,!1  -> 1,0
+   -1,-1 -> dominant->1, nondom->0
+   0,0   -> dominant->1, nondom->0
+   1,1   -> dominant->1, nondom->0    
+  
+   { negotiatemaster:1, i_was:<state>, your_name:<hostname> }
+   returns:
+   { ok:1, you_are:..., i_am:... }  
+*/
+class CmdNegotiateMaster : public Command { 
+public:
+    CmdNegotiateMaster() : Command("negotiatemaster") { }
+
+    virtual bool adminOnly() { return true; }
+
+    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        if( replPair == 0 ) { 
+            problem() << "got negotiatemaster cmd but we are not in paired mode." << endl;
+            errmsg = "not paired";
+            return false;
+        }
+
+        int was = cmdObj.getIntField("i_was");
+        string myname = cmdObj.getStringField("your_name");
+        if( myname.empty() || was < -1 ) {
+            errmsg = "your_name/i_was not specified";
+            return false;
+        }
+
+        int me, you;
+        if( was == replPair->state ) { 
+            if( replPair->dominant(myname) ) {
+                me=1;you=0;
+            }
+            else {
+                me=0;you=1;
+            }
+        }
+        else if( was == 1 ) { 
+            me=0;you=1;
+        }
+        else { 
+            me=1;you=0;
+        }
+
+        replPair->state = me;
+        result.append("you_are", you);
+        result.append("i_am", me);
+
+        return true;
+    }
+} cmdnegotiatemaster;
+
+void ReplPair::negotiate(DBClientConnection *conn) { 
+    JSObjBuilder b;
+    b.append("negotiatemaster",1);
+    b.append("i_was", state);
+    b.append("your_name", remoteHost);
+    JSObj cmd = b.done();
+    JSObj res = conn->findOne("admin.$cmd", cmd);
+    if( res.getIntField("ok") != 1 ) { 
+        problem() << "negotiate fails: " << res.toString() << '\n';
+        return;
+    }
+    int x = res.getIntField("you_are");
+    if( x != 0 && x != 1 ) { 
+        problem() << "negotiate: bad you_are value " << res.toString() << endl;
+        return;
+    }
+    setMaster(x);
+}
 
 OpTime last(0, 0);
 
@@ -177,8 +275,10 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
 	while( c->ok() ) { 
 		ReplSource tmp(c->current());
-		if( replPair && tmp.hostName == replPair->remote && tmp.sourceName == "main" )
+        if( replPair && tmp.hostName == replPair->remote && tmp.sourceName == "main" ) {
 			gotPairWith = true;
+            tmp.paired = true;
+        }
 		addSourceToList(v, tmp, old);
 		c->advance();
 	}
@@ -450,12 +550,19 @@ bool ReplSource::sync() {
 		conn = auto_ptr<DBClientConnection>(new DBClientConnection());
 		string errmsg;
 		if( !conn->connect(hostName.c_str(), errmsg) ) {
+            if( replPair && paired ) {
+                assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
+                replPair->setMaster(1);
+            }
 			resetConnection();
 			log() << "pull:   cantconn " << errmsg << endl;
             sleepsecs(1);
 			return false;
 		}
 	}
+
+    if( paired ) 
+        replPair->negotiate(conn.get());
 
 /*
 	// get current mtime at the server.

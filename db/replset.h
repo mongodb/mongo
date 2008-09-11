@@ -30,15 +30,32 @@
 class ReplPair { 
 
 public:
+    int state;
 	int remotePort;
 	string remoteHost;
 	string remote; // host:port if port specified.
+    int date; // -1 not yet set; 0=slave; 1=master
 
 	ReplPair(const char *remoteEnd);
 
+    bool dominant(const string& myname) { 
+        if( myname == remoteHost )
+            return port > remotePort;
+        return myname > remoteHost;
+    }
+
+    void setMaster(int n) { 
+        if( n == state ) 
+            return;
+        log() << "pair: setting master=" << n << " was " << state << '\n';
+        state = n;
+    }
+
+    void negotiate(DBClientConnection *conn);
 };
 
 ReplPair::ReplPair(const char *remoteEnd) {
+    state = -1;
 	remote = remoteEnd;
 	remotePort = DBPort;
 	remoteHost = remoteEnd;
