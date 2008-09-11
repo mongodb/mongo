@@ -16,6 +16,8 @@
 
 #pragma once
 
+extern int port;
+
 /* ReplPair is a pair of db servers replicating to one another and cooperating.
 
    Only one member of the pair is active at a time; so this is a smart master/slave
@@ -54,7 +56,12 @@ public:
     void negotiate(DBClientConnection *conn);
 };
 
-ReplPair::ReplPair(const char *remoteEnd) {
+extern ReplPair *replPair;
+
+/* we should not allow most operations when not the master */
+inline bool isMaster() { return replPair == 0 || replPair->state == 1; }
+
+inline ReplPair::ReplPair(const char *remoteEnd) {
     state = -1;
 	remote = remoteEnd;
 	remotePort = DBPort;

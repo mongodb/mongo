@@ -28,6 +28,7 @@
 #include "javajs.h"
 #include "json.h"
 #include "repl.h"
+#include "replset.h"
 #include "scanandorder.h"
 
 /* We cut off further objects once we cross this threshold; thus, you might get 
@@ -418,8 +419,9 @@ bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, 
 	try {
 		return _runCommands(ns, jsobj, ss, b, anObjBuilder);
 	}
-	catch( AssertionException ) {
-		;
+	catch( AssertionException e ) {
+        if( !e.msg.empty() ) 
+            anObjBuilder.append("assertion", e.msg);
 	}
 	ss << " assertion ";
 	anObjBuilder.append("errmsg", "db assertion failure");
@@ -532,6 +534,8 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		n = 1;
 	}
 	else {
+
+        uassert("not master", isMaster());
 
 		JSObj query = jsobj.getObjectField("query");
 		JSObj order = jsobj.getObjectField("orderby");

@@ -253,22 +253,33 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	try { 
 		msgdata = runQuery(m, ns, ntoskip, ntoreturn, query, fields, ss, m.data->dataAsInt());
 	}
-	catch( AssertionException ) { 
+	catch( AssertionException e ) { 
 		ss << " exception ";
-		problem() << " Caught Assertion in runQuery ns:" << ns << endl; 
+		problem() << " Caught Assertion in runQuery ns:" << ns << ' ' << e.toString() << '\n';
 		log() << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << '\n';
-		log() << "  query:" << query.toString() << '\n';
-		msgdata = (QueryResult*) malloc(sizeof(QueryResult));
+		log() << "  query:" << query.toString() << endl;
+
+        JSObjBuilder err;
+        err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
+        JSObj errObj = err.done();
+
+        BufBuilder b;
+        b.skip(sizeof(QueryResult));
+        b.append((void*) errObj.objdata(), errObj.objsize());
+
+        msgdata = (QueryResult *) b.buf();
+        b.decouple();
 		QueryResult *qr = msgdata;
 		qr->_data[0] = 0;
 		qr->_data[1] = 0;
 		qr->_data[2] = 0;
 		qr->_data[3] = 0;
-		qr->len = sizeof(QueryResult);
+		qr->len = b.len();
 		qr->setOperation(opReply);
 		qr->cursorId = 0;
 		qr->startingFrom = 0;
-		qr->nReturned = 0;
+		qr->nReturned = 1;
+
 	}
 	Message *resp = new Message();
 	resp->setData(msgdata, true); // transport will free

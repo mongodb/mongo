@@ -35,7 +35,6 @@
 #include "db.h"
 #include "commands.h"
 
-extern int port;
 extern boost::mutex dbMutex;
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
 bool userCreateNS(const char *ns, JSObj& j, string& err);
