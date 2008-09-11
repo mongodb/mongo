@@ -58,10 +58,17 @@ struct MyStartupTests {
 */
 int opLogging = 0;
 
+// turn on or off the oplog.* files which the db can generate.
+// these files are for diagnostic purposes and are unrelated to 
+// local.oplog.$main used by replication.
+// 
+#define OPLOG if( 0 ) 
+
 struct OpLog { 
 	ofstream *f;
 	OpLog() : f(0) { }
 	void init() { 
+        OPLOG {
 		stringstream ss;
 		ss << "oplog." << hex << time(0);
 		string name = ss.str();
@@ -70,17 +77,26 @@ struct OpLog {
 		  problem() << "couldn't open log stream" << endl;
 		  throw 1717;
 		}
+        }
 	}
+    void flush() { 
+        OPLOG f->flush();
+    }
+    void write(char *data,int len) { 
+        OPLOG f->write(data,len);
+    }
 	void readop(char *data, int len) { 
+        OPLOG {
 		bool log = (opLogging & 4) == 0;
 		OCCASIONALLY log = true;
 		if( log ) 
 			f->write(data,len);
+        }
 	}
 } _oplog;
-void flushOpLog() { _oplog.f->flush(); }
-#define oplog (*(_oplog.f))
-#define OPWRITE if( opLogging & 1 ) oplog.write((char *) m.data, m.data->len);
+void flushOpLog() { _oplog.flush(); }
+//#define oplog (*(_oplog.f))
+#define OPWRITE if( opLogging & 1 ) _oplog.write((char *) m.data, m.data->len);
 #define OPREAD if( opLogging & 2 ) _oplog.readop((char *) m.data, m.data->len);
 
 /* example for

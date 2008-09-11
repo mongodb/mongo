@@ -43,15 +43,40 @@ void pipeSigHandler( int signal ) {
 void setupSignals() {}
 #endif
 
+void usage() { 
+    cout << "Mongo dbgrid usage:\n";
+    cout << " --port <portno>\n";
+    cout << endl;
+}
+
+int port = 0;
+
+void start() { 
+}
+
 int main(int argc, char* argv[], char *envp[] ) { 
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);
 #endif
 
+    for (int i = 1; i < argc; i++)  {
+        if( argv[i] == 0 ) continue;
+        string s = argv[i];
+        if( s == "--port" ) { 
+            port = atoi(argv[++i]);
+        }
+    }
+
+    bool ok = port != 0;
+
+    if( !ok ) {
+        usage();
+        return 1;
+    }
+
 	log() << "dbgrid starting" << endl;
-
 	UnitTest::runTests();
-
+    start();
 	dbexit(0);
 	return 0;
 }

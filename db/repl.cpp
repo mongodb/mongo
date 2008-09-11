@@ -51,7 +51,7 @@ ReplPair *replPair = 0;
 
 JSObj ismasterobj = fromjson("{ismaster:1}");
 
-/* peer unreachable, try our arbitrator */
+/* peer unreachable, try our arbiter */
 void ReplPair::arbitrate() {
     if( arbHost == "-" ) { 
         // no arbiter. we are up, let's assume he is down and network is not partitioned.
@@ -72,7 +72,7 @@ void ReplPair::arbitrate() {
         return;
     }
 
-    setMaster(State_Master, "remote down, arbitrator reached");
+    setMaster(State_Master, "remote down, arbiter reached");
 }
 
 /* --------------------------------------------- */
