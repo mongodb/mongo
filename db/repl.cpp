@@ -55,11 +55,14 @@ public:
         int x = -2;
         if( replPair ) {
             x = replPair->state;
+            result.append("ismaster", x);
+            result.append("remote", replPair->remote);
         }
         else { 
+            result.append("ismaster", x);
             result.append("msg", "not paired");
         }
-        result.append("ismaster", x);
+
         return true;
     }
 } cmdismaster;
