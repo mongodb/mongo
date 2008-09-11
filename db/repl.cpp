@@ -443,7 +443,7 @@ void ReplSource::sync_pullOpLog() {
 		query.append("ts", q.done());
 		// query = { ts: { $gte: syncedTo } }
 
-		cursor = conn->query( ns.c_str(), query.done(), 0, 0, 0, true );
+		cursor = conn->query( ns.c_str(), query.done(), 0, 0, 0, Option_CursorTailable );
 		c = cursor.get();
 		tailing = false;
 	}
@@ -469,7 +469,7 @@ void ReplSource::sync_pullOpLog() {
 
 	if( !c->more() ) { 
 		if( tailing ) 
-			log() << "pull:   " << ns << " no new activity\n";
+			; //log() << "pull:   " << ns << " no new activity\n";
 		else
 			log() << "pull:   " << ns << " oplog is empty\n";
 		sleepsecs(3);
@@ -479,7 +479,10 @@ void ReplSource::sync_pullOpLog() {
     int n = 0;
 	JSObj op = c->next();
 	Element ts = op.findElement("ts");
-	assert( ts.type() == Date );
+    if( ts.type() != Date ) { 
+        problem() << "pull: bad object read from remote oplog: " << op.toString() << '\n';
+        assert(false);
+    }
 	OpTime t( ts.date() );
 	bool initial = syncedTo.isNull();
 	if( initial || tailing ) { 

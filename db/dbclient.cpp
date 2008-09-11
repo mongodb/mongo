@@ -23,9 +23,11 @@
 #include "jsobj.h"
 #include "query.h"
 
-JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToReturn) { 
+JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToReturn, int queryOptions) { 
 	auto_ptr<DBClientCursor> c = 
-		this->query(ns, query, 1, 0, fieldsToReturn);
+		this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
+
+    massert( "DBClientConnection::findOne: transport error", c.get() );
 
 	if( !c->more() )
 		return JSObj();
@@ -63,10 +65,11 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	return true;
 }
 
-auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn, bool tailable) {
+auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn, int queryOptions) {
 	// see query.h for the protocol we are using here.
 	BufBuilder b;
-    int opts = tailable ? Option_CursorTailable : 0;
+    int opts = queryOptions;
+    assert( (opts&Option_ALLMASK) == opts );
     b.append(opts);
 	b.append(ns);
 	b.append(nToSkip);
@@ -159,7 +162,7 @@ void testClient() {
 	assert( c.connect("127.0.0.1", err) );
 	cout << "query foo.bar..." << endl;
 	auto_ptr<DBClientCursor> cursor = 
-		c.query("foo.bar", emptyObj, 0, 0, 0, true);
+		c.query("foo.bar", emptyObj, 0, 0, 0, Option_CursorTailable);
 	DBClientCursor *cc = cursor.get();
 	while( 1 ) {
 		bool m = cc->more();

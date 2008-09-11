@@ -59,7 +59,10 @@ public:
 extern ReplPair *replPair;
 
 /* we should not allow most operations when not the master */
-inline bool isMaster() { return replPair == 0 || replPair->state == 1; }
+inline bool isMaster() { 
+    return replPair == 0 || replPair->state == 1 || 
+        client->name == "local"; // local is always allowed
+}
 
 inline ReplPair::ReplPair(const char *remoteEnd) {
     state = -1;

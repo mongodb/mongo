@@ -22,7 +22,7 @@
 
 /* the query field 'options' can have these bits set: */
 enum { 
-    /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor makrs
+    /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
        the final object's position.  you can resume using the cursor later, from where it was located, 
        if more data were received.  Set on dbQuery and dbGetMore.
 
@@ -30,7 +30,13 @@ enum {
        final object it references were deleted.  Thus, you should be prepared to requery if you get back 
        ResultFlag_CursorNotFound.
     */
-    Option_CursorTailable = 2
+    Option_CursorTailable = 2,
+
+    /* allow query of replica slave.  normally these return an error except for namespace "local".
+    */
+    Option_SlaveOk = 4,
+
+    Option_ALLMASK = 6
 };
 
 class JSObj;
@@ -66,7 +72,19 @@ public:
       }
 	
 	bool more(); // if true, safe to call next()
-	JSObj next(); // returns next object in the result cursor
+
+    /* returns next object in the result cursor.
+       on an error at the remote server, you will get back:
+         { $err: <string> }
+       if you do not want to handle that yourself, call nextSafe().
+    */
+	JSObj next(); 
+
+    JSObj nextSafe() { 
+        JSObj o = next();
+        Element e = o.firstElement();
+        assert( strcmp(e.fieldName(), "$err") != 0 );
+    }
 
 	// cursor no longer valid -- use with tailable cursors.
 	// note you should only rely on this once more() returns false; 
@@ -85,22 +103,22 @@ public:
 	bool connect(const char *serverHostname, string& errmsg);
 
 	/* send a query to the database.
-       ns:        namespace to query, format is <dbname>.<collectname>[.<collectname>]*
-       query:     query to perform on the collection.  this is a JSObj (binary JSON)
-                  You may format as 
-                    { query: { ... }, order: { ... } } 
-                  to specify a sort order.
-	   nToReturn: n to return.  0 = unlimited
-       nToSkip:   start with the nth item
+       ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
+       query:         query to perform on the collection.  this is a JSObj (binary JSON)
+                      You may format as 
+                        { query: { ... }, order: { ... } } 
+                      to specify a sort order.
+	   nToReturn:     n to return.  0 = unlimited
+       nToSkip:       start with the nth item
 	   fieldsToReturn: 
-                  optional template of which fields to select. if unspecified, returns all fields
-       tailable: see query.h tailable comments
+                      optional template of which fields to select. if unspecified, returns all fields
+       queryOptions:  see options enum at top of this file
 
-	   returns:   cursor.
-                  returns 0 if error
+	   returns:       cursor.
+                      0 if error (connection failure)
 	*/
 	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, 
-		JSObj *fieldsToReturn = 0, bool tailable = false);
+		JSObj *fieldsToReturn = 0, int queryOptions = 0);
 
-	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0);
+	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0, int queryOptions = 0);
 };

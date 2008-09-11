@@ -535,7 +535,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 	}
 	else {
 
-        uassert("not master", isMaster());
+        uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
 
 		JSObj query = jsobj.getObjectField("query");
 		JSObj order = jsobj.getObjectField("orderby");

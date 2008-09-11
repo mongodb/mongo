@@ -57,4 +57,3 @@ void msgasserted(const char *msg) {
 	cout << "Assertion: " << msg << '\n';
 	throw AssertionException();
 }
-
