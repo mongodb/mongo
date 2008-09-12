@@ -40,7 +40,6 @@ auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
 bool userCreateNS(const char *ns, JSObj& j, string& err);
 int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss, bool logOp=false);
 bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder);
-bool cloneFrom(const char *masterHost, string& errmsg);
 void ensureHaveIdIndex(const char *ns);
 
 #include "replset.h"
@@ -345,7 +344,7 @@ bool ReplSource::resync(string db) {
 		log() << "resync: cloning database " << db << endl;
 		//Cloner c;
 		string errmsg;
-		bool ok = cloneFrom(hostName.c_str(), errmsg);
+		bool ok = cloneFrom(hostName.c_str(), errmsg, client->name);
 		//bool ok = c.go(hostName.c_str(), errmsg);
 		if( !ok ) { 
 			problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;

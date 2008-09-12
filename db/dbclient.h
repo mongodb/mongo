@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../grid/message.h"
+#include "jsobj.h"
 
 /* the query field 'options' can have these bits set: */
 enum { 

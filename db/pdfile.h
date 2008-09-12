@@ -391,7 +391,8 @@ inline bool setClient(const char *ns) {
 	client = c;
 	return justCreated;
 }
-/* we normally keep around a curNs ptr -- if this ns is temporary, 
+
+/* We normally keep around a curNs ptr -- if this ns is temporary, 
    use this instead so we don't have a bad ptr.  we could have made a copy,
    but trying to be fast as we call setClient this for every single operation.
 */

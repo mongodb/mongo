@@ -17,7 +17,9 @@
 */
 
 #include "stdafx.h"
+#include "../grid/message.h"
 #include "../util/unittest.h"
+#include "database.h"
 
 const char *curNs = "";
 Client *client = 0;
@@ -50,8 +52,53 @@ void usage() {
 }
 
 int port = 0;
+MessagingPort *grab = 0;
+void processRequest(Message&, MessagingPort&);
+
+void _dbGridConnThread() {
+	MessagingPort& dbMsgPort = *grab;
+	grab = 0;
+	Message m;
+	while( 1 ) { 
+		m.reset();
+
+		if( !dbMsgPort.recv(m) ) {
+			log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
+			dbMsgPort.shutdown();
+			break;
+		}
+
+        processRequest(m, dbMsgPort);
+	}
+
+}
+ 
+void dbGridConnThread() { 
+    try { 
+        _dbGridConnThread();
+    } catch( ... ) { 
+        problem() << "uncaught exception in dbgridconnthread, terminating" << endl;
+        dbexit(15);
+    }
+}
+
+class DbGridListener : public Listener { 
+public:
+	DbGridListener(int p) : Listener(p) { }
+	virtual void accepted(MessagingPort *mp) {
+		assert( grab == 0 );
+		grab = mp;
+		boost::thread thr(dbGridConnThread);
+		while( grab )
+			sleepmillis(1);
+	}
+};
 
 void start() { 
+    Database::load();
+    log() << "waiting for connections on port " << port << "..." << endl;
+	DbGridListener l(port);
+	l.listen();
 }
 
 int main(int argc, char* argv[], char *envp[] ) { 

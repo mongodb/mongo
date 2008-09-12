@@ -174,7 +174,15 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\database.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\dbgrid.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\request.cpp"
 				>
 			</File>
 		</Filter>
@@ -183,6 +191,10 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath=".\database.h"
+				>
+			</File>
 			<File
 				RelativePath="..\util\goodies.h"
 				>
