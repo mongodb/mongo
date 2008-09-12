@@ -22,6 +22,7 @@
 #include "../util/builder.h"
 #include "jsobj.h"
 #include "query.h"
+#include "commands.h"
 
 extern int port;
 bool userCreateNS(const char *ns, JSObj& j, string& err);
@@ -87,3 +88,16 @@ bool cloneFrom(const char *masterHost, string& errmsg)
 	Cloner c;
 	return c.go(masterHost, errmsg);
 }
+
+class CmdClone : public Command { 
+public:
+    CmdClone() : Command("clone") { }
+
+    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        string from = cmdObj.getStringField("clone");
+        if( from.empty() ) 
+            return false;
+        return cloneFrom(from.c_str(), errmsg);
+    }
+} cmdclone;
+

@@ -40,7 +40,14 @@ int runCount(const char *ns, JSObj& cmd, string& err);
 
 const int edebug=0;
 
-map<string,Command*> Command::commands;
+static map<string,Command*> *commands;
+
+Command::Command(const char *_name) : name(_name) { 
+    // register ourself.
+    if( commands == 0 )
+        commands = new map<string,Command*>;
+    (*commands)[name] = this;
+}
 
 bool dbEval(JSObj& cmd, JSObjBuilder& result) { 
 	Element e = cmd.firstElement();
@@ -300,7 +307,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
     /* check for properly registered command objects.  Note that all the commands below should be 
        migrated over to the command object format.
        */
-    else if( (i = Command::commands.find(e.fieldName())) != Command::commands.end() ) { 
+    else if( (i = commands->find(e.fieldName())) != commands->end() ) { 
         valid = true;
         string errmsg;
         Command *c = i->second;
@@ -369,13 +376,6 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 					anObjBuilder.append("errmsg", err.c_str());
 			}
 			anObjBuilder.append("n", (double) nn);
-		}
-		else if( strcmp( e.fieldName(), "clone") == 0 ) { 
-			valid = true;
-			string err;
-			ok = cloneFrom(e.valuestr(), err);
-			if( !err.empty() ) 
-				anObjBuilder.append("errmsg", err.c_str());
 		}
 		else if( strcmp( e.fieldName(), "create") == 0 ) { 
 			valid = true;

@@ -31,10 +31,5 @@ public:
     /* return true if only the admin ns has privileges to run this command. */
     virtual bool adminOnly() { return false; }
 
-    static map<string,Command*> commands;
-
-    Command(const char *_name) : name(_name) { 
-        // register ourself.
-        commands[name] = this;
-    }
+    Command(const char *_name);
 };
