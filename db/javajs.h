@@ -53,6 +53,7 @@ class JavaJSImpl {
   
   jlong scopeCreate();
   int scopeInit( jlong id , JSObj * obj );
+  int scopeSetThis( jlong id , JSObj * obj );
   jboolean scopeReset( jlong id );
   void scopeFree( jlong id );
 
@@ -119,6 +120,7 @@ class JavaJSImpl {
   
   jmethodID _scopeCreate;
   jmethodID _scopeInit;
+  jmethodID _scopeSetThis;
   jmethodID _scopeReset;
   jmethodID _scopeFree;
 
@@ -148,6 +150,11 @@ class Scope {
   Scope() { s = JavaJS->scopeCreate(); }
   ~Scope() { JavaJS->scopeFree(s); s = 0; }
   void reset() { JavaJS->scopeReset(s); }
+
+  void init( const char * data ){
+    JSObj o( data , 0 );
+    JavaJS->scopeInit( s , & o );
+  }
   
   double getNumber(const char *field) { return JavaJS->scopeGetNumber(s,field); }
   string getString(const char *field) { return JavaJS->scopeGetString(s,field); }

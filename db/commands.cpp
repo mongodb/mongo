@@ -44,13 +44,14 @@ map<string,Command*> Command::commands;
 
 bool dbEval(JSObj& cmd, JSObjBuilder& result) { 
 	Element e = cmd.firstElement();
-	assert( e.type() == Code );
-	const char *code = e.valuestr();
+	assert( e.type() == Code || e.type() == CodeWScope );
+	const char *code = e.type() == Code ? e.valuestr() : e.codeWScopeCode();
+
 	if ( ! JavaJS ) {
 		result.append("errmsg", "db side execution is disabled");
 		return false;
 	}
-
+	
 	jlong f = JavaJS->functionCreate(code);
 	if( f == 0 ) { 
 		result.append("errmsg", "compile failed");
@@ -58,6 +59,8 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	}
 
 	Scope s;
+	if ( e.type() == CodeWScope )
+	  s.init( e.codeWScopeScopeData() );
 	s.setString("$client", client->name.c_str());
 	Element args = cmd.findElement("args");
 	if( args.type() == Array ) {
@@ -314,7 +317,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
         if( !ok ) 
             anObjBuilder.append("errmsg", errmsg);
     }
-	else if( e.type() == Code ) { 
+    else if( e.type() == Code || e.type() == CodeWScope ) { 
 		valid = true;
 		ok = dbEval(jsobj, anObjBuilder);
 	}

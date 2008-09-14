@@ -181,6 +181,7 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
 
   _scopeCreate = _mainEnv->GetStaticMethodID( _dbhook , "scopeCreate" , "()J" );
   _scopeInit = _mainEnv->GetStaticMethodID( _dbhook , "scopeInit" , "(JLjava/nio/ByteBuffer;)Z" );
+  _scopeSetThis = _mainEnv->GetStaticMethodID( _dbhook , "scopeSetThis" , "(JLjava/nio/ByteBuffer;)Z" );
   _scopeReset = _mainEnv->GetStaticMethodID( _dbhook , "scopeReset" , "(J)Z" );
   _scopeFree = _mainEnv->GetStaticMethodID( _dbhook , "scopeFree" , "(J)V" );
 
@@ -201,6 +202,7 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
 
   jassert( _scopeCreate );  
   jassert( _scopeInit );
+  jassert( _scopeSetThis );
   jassert( _scopeReset );
   jassert( _scopeFree );
 
@@ -288,6 +290,16 @@ int JavaJSImpl::scopeInit( jlong id , JSObj * obj ){
   jassert( bb );
 
   return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeInit , id , bb );
+}
+
+int JavaJSImpl::scopeSetThis( jlong id , JSObj * obj ){
+  if ( ! obj )
+    return 0;
+
+  jobject bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
+  jassert( bb );
+
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetThis , id , bb );
 }
 
 // scope getters

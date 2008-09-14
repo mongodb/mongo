@@ -127,6 +127,12 @@ public:
 	// for strings.  also gives you start of the real data for an embedded object
 	const char * valuestr() const { return value() + 4; }
 
+	const char * codeWScopeCode() const { return value() + 8; }
+	const char * codeWScopeScopeData() const { 
+	  // TODO fix
+	  return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;
+	}
+	
 	JSObj embeddedObject();
 
 	const char *regex() { assert(type() == RegEx); return value(); }

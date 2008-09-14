@@ -144,9 +144,8 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 			JavaJS->scopeSetString(where->scope, "$client", client->name.c_str());
 			
 			if ( e.type() == CodeWScope ){
-			  const char *code = (e.value() + 8);
-			  where->setFunc(code);
-			  where->jsScope = new JSObj( code + strlen( code ) + 1 , 0 );
+			  where->setFunc( e.codeWScopeCode() );
+			  where->jsScope = new JSObj( e.codeWScopeScopeData() , 0 );
 			}
 			else {
 			  const char *code = e.valuestr();
@@ -416,9 +415,9 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 		
 		if( 1 || jsobj.objsize() < 200 || where->fullObject ) {
 		  if ( where->jsScope ){
-		    cout << "jsScope->objsize " << where->jsScope->objsize() << endl;
 		    JavaJS->scopeInit( where->scope , where->jsScope );
 		  }
+		  JavaJS->scopeSetThis(where->scope, &jsobj);		  
 		  JavaJS->scopeSetObject(where->scope, "obj", &jsobj);		  
 		} 
 		else {
