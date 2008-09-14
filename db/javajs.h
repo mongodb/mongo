@@ -52,6 +52,7 @@ class JavaJSImpl {
   ~JavaJSImpl();
   
   jlong scopeCreate();
+  int scopeInit( jlong id , JSObj * obj );
   jboolean scopeReset( jlong id );
   void scopeFree( jlong id );
 
@@ -117,6 +118,7 @@ class JavaJSImpl {
   jclass _dbjni;
   
   jmethodID _scopeCreate;
+  jmethodID _scopeInit;
   jmethodID _scopeReset;
   jmethodID _scopeFree;
 
