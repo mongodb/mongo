@@ -831,6 +831,11 @@ int main(int argc, char* argv[], char *envp[] )
 			quicktest();
 			return 0;
 		}
+		if( strcmp(argv[1], "javatest") == 0 ) {
+                        JavaJS = new JavaJSImpl();
+			javajstest();
+			return 0;
+		}
 		if( strcmp(argv[1], "test2") == 0 ) {
 			return test2();
 		}
