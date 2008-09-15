@@ -34,3 +34,36 @@ struct dblock {
     }
 };
 
+/* a scoped release of a mutex temporarily -- like a scopedlock but reversed. 
+*/
+struct temprelease {
+    boost::mutex& m;
+    temprelease(boost::mutex& _m) : m(_m) { 
+        boost::detail::thread::lock_ops<boost::mutex>::unlock(m);
+    }
+    ~temprelease() { 
+        boost::detail::thread::lock_ops<boost::mutex>::lock(m);
+    }
+};
+
+#include "pdfile.h"
+
+struct dbtemprelease {
+    string clientname;
+    dbtemprelease() {
+        if( client ) 
+            clientname = client->name;
+        dbLocked--;
+        assert( dbLocked == 0 );
+        boost::detail::thread::lock_ops<boost::mutex>::unlock(dbMutex);
+    }
+    ~dbtemprelease() { 
+        boost::detail::thread::lock_ops<boost::mutex>::lock(dbMutex);
+        dbLocked++;
+        assert( dbLocked == 1 );
+        if( clientname.empty() )
+            client = 0;
+        else
+            setClient(clientname.c_str());
+    }
+};

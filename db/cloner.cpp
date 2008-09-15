@@ -23,6 +23,7 @@
 #include "jsobj.h"
 #include "query.h"
 #include "commands.h"
+#include "db.h"
 
 extern int port;
 bool userCreateNS(const char *ns, JSObj& j, string& err);
@@ -36,9 +37,20 @@ public:
 };
 
 void Cloner::copy(const char *from_collection, const char *to_collection) {
-	auto_ptr<DBClientCursor> c( conn.query(from_collection, emptyObj) );
+//    cout << "COPY: " << from_collection << " -> " << to_collection << endl;
+//    cout << "      client: " << client->name << endl;
+    auto_ptr<DBClientCursor> c;
+    {
+        dbtemprelease r;
+        c = auto_ptr<DBClientCursor>( conn.query(from_collection, emptyObj) );
+    }
 	assert( c.get() );
-	while( c->more() ) { 
+    while( 1 ) {
+        {
+            dbtemprelease r;
+            if( !c->more() )
+                break;
+        }
 		JSObj js = c->next();
 		theDataFileMgr.insert(to_collection, (void*) js.objdata(), js.objsize());
 	}
@@ -54,32 +66,46 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) {
             return false;
         }
 	}
-	if( !conn.connect(masterHost, errmsg) )
-		return false;
-
+    /* todo: we can put thesee releases inside dbclient or a dbclient specialization.
+       or just wait until we get rid of global lcok anyway. 
+       */
 	string ns = fromdb + ".system.namespaces";
-
-	auto_ptr<DBClientCursor> c( conn.query(ns.c_str(), emptyObj) );
+	auto_ptr<DBClientCursor> c;
+    {
+        dbtemprelease r;
+        if( !conn.connect(masterHost, errmsg) )
+            return false;
+        c = auto_ptr<DBClientCursor>( conn.query(ns.c_str(), emptyObj) );
+    }
 	if( c.get() == 0 ) {
 		errmsg = "query failed " + ns;
 		return false;
 	}
 
-	while( c->more() ) { 
+    while( 1 ) {
+        {
+            dbtemprelease r;
+            if( !c->more() )
+                break;
+        }
 		JSObj collection = c->next();
 		Element e = collection.findElement("name");
 		assert( !e.eoo() );
 		assert( e.type() == String );
 		const char *from_name = e.valuestr();
-		if( strstr(from_name, ".system.") || strchr(from_name, '$') )
+        if( strstr(from_name, ".system.") || strchr(from_name, '$') ) {
+//            cout << "TEMP: skip " << from_name << endl;
 			continue;
+        }
 		JSObj options = collection.getObjectField("options");
         /* change name "<fromdb>.collection" -> <todb>.collection */
         const char *p = strchr(from_name, '.');
         assert(p);
         string to_name = todb + p;
-		if( !options.isEmpty() ) {
+		//if( !options.isEmpty() ) {
+        {
 			string err;
+//            cout << "TEMP: usercreatens " << to_name << " client:" << client->name << endl;
 			userCreateNS(to_name.c_str(), options, err);
 		}
 		copy(from_name, to_name.c_str());
@@ -130,8 +156,7 @@ public:
             errmsg = "parms missing - {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
             return false;
         }
-        string temp = todb + ".";
-        setClient(temp.c_str());
+        setClient(todb.c_str());
         bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb);
         client = 0;
         return res;

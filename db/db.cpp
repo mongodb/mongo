@@ -970,14 +970,16 @@ int main(int argc, char* argv[], char *envp[] )
 	return 0;
 }
 
-//#if !defined(_WIN32)
-//int main( int argc, char *argv[], char *envp[] ) {
-//	return _tmain(argc, 0);
-//}
-//#endif
+void foo() { 
+  boost::mutex z;
+  boost::detail::thread::lock_ops<boost::mutex>::lock(z);
+  cout << "inside lock" << endl;
+  boost::detail::thread::lock_ops<boost::mutex>::unlock(z);
+}
 
 #undef exit
 void dbexit(int rc, const char *why) { 
+  foo();
 	log() << "  dbexit: " << why << "; flushing op log and files" << endl;
 	flushOpLog();
 
@@ -988,3 +990,4 @@ void dbexit(int rc, const char *why) {
 	log() << "  dbexit: really exiting now" << endl;
 	exit(rc);
 }
+
