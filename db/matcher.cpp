@@ -66,10 +66,12 @@ MiniLex minilex;
 
 class Where { 
 public:
-	Where() { codeCopy = 0; }
+        Where() { codeCopy = 0; jsScope = 0; }
 	~Where() {
 		JavaJS->scopeFree(scope);
 		delete codeCopy;
+		if ( jsScope )
+		  delete jsScope;
 		scope = 0; func = 0; codeCopy = 0;
 	}
 	jlong scope, func;
@@ -78,7 +80,8 @@ public:
 	bool fullObject;
 	int nFields;
 	char *codeCopy;
-
+        JSObj *jsScope;
+  
 	void setFunc(const char *code) {
 		codeCopy = new char[strlen(code)+1];
 		strcpy(codeCopy,code);
@@ -124,23 +127,31 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
    in(0), where(0), jsobj(_jsobj), nRegex(0)
 {
 	nBuilders = 0;
-
+	
 	JSElemIter i(jsobj);
 	n = 0;
 	while( i.more() ) {
 		Element e = i.next();
 		if( e.eoo() )
 			break;
-
-		if( e.type() == Code && strcmp(e.fieldName(), "$where")==0 ) { 
+		
+		if( ( e.type() == CodeWScope || e.type() == Code ) && strcmp(e.fieldName(), "$where")==0 ) { 
 			// $where: function()...
 			assert( where == 0 );
 			where = new Where();
-			const char *code = e.valuestr();
 			massert( "$where query, but jni is disabled", JavaJS );
 			where->scope = JavaJS->scopeCreate();
 			JavaJS->scopeSetString(where->scope, "$client", client->name.c_str());
-			where->setFunc(code);
+			
+			if ( e.type() == CodeWScope ){
+			  where->setFunc( e.codeWScopeCode() );
+			  where->jsScope = new JSObj( e.codeWScopeScopeData() , 0 );
+			}
+			else {
+			  const char *code = e.valuestr();
+			  where->setFunc(code);
+			}
+			
 			continue;
 		}
 
@@ -401,9 +412,15 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	if( where ) { 
 		if( where->func == 0 )
 			return false; // didn't compile
-		if( jsobj.objsize() < 200 || where->fullObject ) {
-			JavaJS->scopeSetObject(where->scope, "obj", &jsobj);
-		} else {
+		
+		if( 1 || jsobj.objsize() < 200 || where->fullObject ) {
+		  if ( where->jsScope ){
+		    JavaJS->scopeInit( where->scope , where->jsScope );
+		  }
+		  JavaJS->scopeSetThis(where->scope, &jsobj);		  
+		  JavaJS->scopeSetObject(where->scope, "obj", &jsobj);		  
+		} 
+		else {
 			JSObjBuilder b;
 			where->buildSubset(jsobj, b);
 			JSObj temp = b.done();

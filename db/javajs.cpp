@@ -180,6 +180,8 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
   jassert( _dbjni );
 
   _scopeCreate = _mainEnv->GetStaticMethodID( _dbhook , "scopeCreate" , "()J" );
+  _scopeInit = _mainEnv->GetStaticMethodID( _dbhook , "scopeInit" , "(JLjava/nio/ByteBuffer;)Z" );
+  _scopeSetThis = _mainEnv->GetStaticMethodID( _dbhook , "scopeSetThis" , "(JLjava/nio/ByteBuffer;)Z" );
   _scopeReset = _mainEnv->GetStaticMethodID( _dbhook , "scopeReset" , "(J)Z" );
   _scopeFree = _mainEnv->GetStaticMethodID( _dbhook , "scopeFree" , "(J)V" );
 
@@ -199,6 +201,8 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
   _invoke = _mainEnv->GetStaticMethodID( _dbhook , "invoke" , "(JJ)I" );
 
   jassert( _scopeCreate );  
+  jassert( _scopeInit );
+  jassert( _scopeSetThis );
   jassert( _scopeReset );
   jassert( _scopeFree );
 
@@ -276,6 +280,26 @@ int JavaJSImpl::scopeSetObject( jlong id , const char * field , JSObj * obj ){
   }
 
   return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetObject , id , _getEnv()->NewStringUTF( field ) , bb );
+}
+
+int JavaJSImpl::scopeInit( jlong id , JSObj * obj ){
+  if ( ! obj )
+    return 0;
+
+  jobject bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
+  jassert( bb );
+
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeInit , id , bb );
+}
+
+int JavaJSImpl::scopeSetThis( jlong id , JSObj * obj ){
+  if ( ! obj )
+    return 0;
+
+  jobject bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
+  jassert( bb );
+
+  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetThis , id , bb );
 }
 
 // scope getters
@@ -540,7 +564,7 @@ int javajstest() {
   
   if ( debug ) cout << "func5 start" << endl;
   jassert( JavaJS.scopeSetObject( scope , "c" , &obj ) );
-  jlong func5 = JavaJS.functionCreate( "assert( 517 == c.foo );" );
+  jlong func5 = JavaJS.functionCreate( "assert.eq( 517 , c.foo );" );
   jassert( func5 );
   jassert( ! JavaJS.invoke( scope , func5 ) );
   if ( debug ) cout << "func5 done" << endl;
