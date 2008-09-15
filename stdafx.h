@@ -48,21 +48,32 @@ inline void * ourrealloc(void *ptr, size_t size) {
 
 #include "targetver.h"
 
-//#include "assert.h"
-
+#include <string>
+using namespace std;
 // you can catch these
 class AssertionException { 
 public:
-	const char *msg;
-	AssertionException() { msg = ""; }
+    string msg; 
+	AssertionException() { }
+    virtual bool severe() { return true; }
 	virtual bool isUserAssertion() { return false; }
+    virtual string toString() { return msg; }
 };
 
 /* we use the same mechanism for bad things the user does -- which are really just errors */
 class UserAssertionException : public AssertionException { 
 public:
 	UserAssertionException(const char *_msg) { msg = _msg; }
+    virtual bool severe() { return false; }
 	virtual bool isUserAssertion() { return true; }
+    virtual string toString() { return "userassert:" + msg; }
+};
+
+class MsgAssertionException : public AssertionException { 
+public:
+	MsgAssertionException(const char *_msg) { msg = _msg; }
+    virtual bool severe() { return false; }
+    virtual string toString() { return "massert:" + msg; }
 };
 
 void asserted(const char *msg, const char *file, unsigned line);
@@ -107,13 +118,11 @@ typedef char _TCHAR;
 
 #include <iostream>
 #include <fstream>
-using namespace std;
-
 #include "time.h"
 #include <map>
-#include <string>
 #include <vector>
 #include <set>
+//using namespace std;
 
 #if !defined(_WIN32)
 typedef int HANDLE;

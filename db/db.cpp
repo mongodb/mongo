@@ -45,7 +45,7 @@ int dbLocked = 0;
 
 void closeAllSockets();
 void startReplication();
-void pairWith(const char *remoteEnd);
+void pairWith(const char *remoteEnd, const char *arb);
 
 struct MyStartupTests {
 	MyStartupTests() {
@@ -58,10 +58,17 @@ struct MyStartupTests {
 */
 int opLogging = 0;
 
+// turn on or off the oplog.* files which the db can generate.
+// these files are for diagnostic purposes and are unrelated to 
+// local.oplog.$main used by replication.
+// 
+#define OPLOG if( 0 ) 
+
 struct OpLog { 
 	ofstream *f;
 	OpLog() : f(0) { }
 	void init() { 
+        OPLOG {
 		stringstream ss;
 		ss << "oplog." << hex << time(0);
 		string name = ss.str();
@@ -70,17 +77,26 @@ struct OpLog {
 		  problem() << "couldn't open log stream" << endl;
 		  throw 1717;
 		}
+        }
 	}
+    void flush() { 
+        OPLOG f->flush();
+    }
+    void write(char *data,int len) { 
+        OPLOG f->write(data,len);
+    }
 	void readop(char *data, int len) { 
+        OPLOG {
 		bool log = (opLogging & 4) == 0;
 		OCCASIONALLY log = true;
 		if( log ) 
 			f->write(data,len);
+        }
 	}
 } _oplog;
-void flushOpLog() { _oplog.f->flush(); }
-#define oplog (*(_oplog.f))
-#define OPWRITE if( opLogging & 1 ) oplog.write((char *) m.data, m.data->len);
+void flushOpLog() { _oplog.flush(); }
+//#define oplog (*(_oplog.f))
+#define OPWRITE if( opLogging & 1 ) _oplog.write((char *) m.data, m.data->len);
 #define OPREAD if( opLogging & 2 ) _oplog.readop((char *) m.data, m.data->len);
 
 /* example for
@@ -253,22 +269,33 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	try { 
 		msgdata = runQuery(m, ns, ntoskip, ntoreturn, query, fields, ss, m.data->dataAsInt());
 	}
-	catch( AssertionException ) { 
+	catch( AssertionException& e ) { 
 		ss << " exception ";
-		problem() << " Caught Assertion in runQuery ns:" << ns << endl; 
+		problem() << " Caught Assertion in runQuery ns:" << ns << ' ' << e.toString() << '\n';
 		log() << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << '\n';
-		log() << "  query:" << query.toString() << '\n';
-		msgdata = (QueryResult*) malloc(sizeof(QueryResult));
+		log() << "  query:" << query.toString() << endl;
+
+        JSObjBuilder err;
+        err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
+        JSObj errObj = err.done();
+
+        BufBuilder b;
+        b.skip(sizeof(QueryResult));
+        b.append((void*) errObj.objdata(), errObj.objsize());
+
+        msgdata = (QueryResult *) b.buf();
+        b.decouple();
 		QueryResult *qr = msgdata;
 		qr->_data[0] = 0;
 		qr->_data[1] = 0;
 		qr->_data[2] = 0;
 		qr->_data[3] = 0;
-		qr->len = sizeof(QueryResult);
+		qr->len = b.len();
 		qr->setOperation(opReply);
 		qr->cursorId = 0;
 		qr->startingFrom = 0;
-		qr->nReturned = 0;
+		qr->nReturned = 1;
+
 	}
 	Message *resp = new Message();
 	resp->setData(msgdata, true); // transport will free
@@ -300,8 +327,8 @@ void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort,
 	try { 
 		msgdata = getMore(ns, ntoreturn, cursorid);
 	}
-	catch( AssertionException ) { 
-		ss << " exception ";
+	catch( AssertionException& e ) { 
+		ss << " exception " + e.toString();
 		msgdata = emptyMoreResult(cursorid);
 	}
 	Message *resp = new Message();
@@ -467,7 +494,7 @@ void jniCallback(Message& m, Message& out)
 					ss << "killcursors ";
 					receivedKillCursors(m);
 				}
-				catch( AssertionException ) { 
+				catch( AssertionException& ) { 
 					problem() << "Caught Assertion in kill cursors, continuing" << endl; 
 					ss << " exception ";
 				}
@@ -492,7 +519,7 @@ void jniCallback(Message& m, Message& out)
 		}
 
 	}
-	catch( AssertionException ) { 
+	catch( AssertionException& ) { 
 		problem() << "Caught AssertionException in jniCall()" << endl;
 	}
 
@@ -592,9 +619,9 @@ void connThread()
 					ss << "insert ";
 					receivedInsert(m, ss);
 				}
-				catch( AssertionException ) { 
-					problem() << " Caught Assertion insert, continuing" << endl; 
-					ss << " exception ";
+				catch( AssertionException& e ) { 
+					problem() << " Caught Assertion insert, continuing\n";
+					ss << " exception " + e.toString();
 				}
 			}
 			else if( m.data->operation() == dbUpdate ) {
@@ -603,9 +630,9 @@ void connThread()
 					ss << "update ";
 					receivedUpdate(m, ss);
 				}
-				catch( AssertionException ) { 
+				catch( AssertionException& e ) { 
 					problem() << " Caught Assertion update, continuing" << endl; 
-					ss << " exception ";
+					ss << " exception " + e.toString();
 				}
 			}
 			else if( m.data->operation() == dbDelete ) {
@@ -614,9 +641,9 @@ void connThread()
 					ss << "remove ";
 					receivedDelete(m);
 				}
-				catch( AssertionException ) { 
+				catch( AssertionException& e ) { 
 					problem() << " Caught Assertion receivedDelete, continuing" << endl; 
-					ss << " exception ";
+					ss << " exception " + e.toString();
 				}
 			}
 			else if( m.data->operation() == dbGetMore ) {
@@ -632,9 +659,9 @@ void connThread()
 					ss << "killcursors ";
 					receivedKillCursors(m);
 				}
-				catch( AssertionException ) { 
+				catch( AssertionException& e ) { 
 					problem() << " Caught Assertion in kill cursors, continuing" << endl; 
-					ss << " exception ";
+					ss << " exception " + e.toString();
 				}
 			}
 			else {
@@ -663,7 +690,7 @@ void connThread()
 	}
 
 	}
-	catch( AssertionException ) { 
+	catch( AssertionException& ) { 
 		problem() << "Uncaught AssertionException, terminating" << endl;
 		exit(15);
 	}
@@ -905,7 +932,8 @@ int main(int argc, char* argv[], char *envp[] )
 			else if( s == "--slave" )
 				slave = true;
 			else if( s == "--pairwith" ) { 
-				pairWith( argv[++i] );
+				pairWith( argv[i+1], argv[i+2] );
+                i += 2;
 			}
 			else if( s == "--dbpath" )
             	dbpath = argv[++i];
@@ -941,7 +969,7 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
 	cout << " --nocursors  --nojni" << endl;
 	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-	cout << " --pairwith <server:port>" << endl;
+	cout << " --pairwith <server:port> <arbiter>" << endl;
 	cout << endl;
 	
 	return 0;

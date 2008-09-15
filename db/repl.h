@@ -33,7 +33,7 @@ class DBClientCursor;
 extern bool slave;
 extern bool master;
 
-bool cloneFrom(const char *masterHost, string& errmsg);
+bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb);
 
 #pragma pack(push,4)
 class OpTime { 
@@ -98,7 +98,7 @@ class ReplSource {
 	ReplSource();
 public:
 	bool paired; // --pair in use
-	string hostName;    // ip addr or hostname
+	string hostName;    // ip addr or hostname plus optionally, ":<port>" 
 	string sourceName;  // a logical source name.
 	string only; // only a certain db. note that in the sources collection, this may not be changed once you start replicating.
 
@@ -118,7 +118,10 @@ public:
 	ReplSource(JSObj);
 	bool sync();
 	void save(); // write ourself to local.sources
-	void resetConnection() { conn = auto_ptr<DBClientConnection>(0); }
+	void resetConnection() { 
+        conn = auto_ptr<DBClientConnection>(0); 
+        cursor = auto_ptr<DBClientCursor>(0);
+    }
 
 	// make a jsobj from our member fields of the form 
 	//   { host: ..., source: ..., syncedTo: ... }

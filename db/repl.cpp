@@ -33,19 +33,150 @@
 #include "query.h"
 #include "json.h"
 #include "db.h"
+#include "commands.h"
 
-extern int port;
 extern boost::mutex dbMutex;
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
 bool userCreateNS(const char *ns, JSObj& j, string& err);
 int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss, bool logOp=false);
 bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder);
-bool cloneFrom(const char *masterHost, string& errmsg);
 void ensureHaveIdIndex(const char *ns);
 
 #include "replset.h"
 
+/* --- ReplPair -------------------------------- */
+
 ReplPair *replPair = 0;
+
+JSObj ismasterobj = fromjson("{ismaster:1}");
+
+/* peer unreachable, try our arbiter */
+void ReplPair::arbitrate() {
+    if( arbHost == "-" ) { 
+        // no arbiter. we are up, let's assume he is down and network is not partitioned.
+        setMaster(State_Master, "remote unreachable");
+        return;
+    }
+
+    auto_ptr<DBClientConnection> conn( new DBClientConnection() );
+    string errmsg;
+    if( !conn->connect(arbHost.c_str(), errmsg) ) {
+        setMaster(State_CantArb, "can't connect to arb");
+        return;
+    }
+
+    JSObj res = conn->findOne("admin.$cmd", ismasterobj);
+    if( res.isEmpty() ) { 
+        setMaster(State_CantArb, "can't arb 2");
+        return;
+    }
+
+    setMaster(State_Master, "remote down, arbiter reached");
+}
+
+/* --------------------------------------------- */
+
+class CmdIsMaster : public Command { 
+public:
+    CmdIsMaster() : Command("ismaster") { }
+
+    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        if( replPair ) {
+            int x = replPair->state;
+            result.append("ismaster", replPair->state);
+            result.append("remote", replPair->remote);
+            if( !replPair->info.empty() )
+                result.append("info", replPair->info);
+        }
+        else { 
+            result.append("ismaster", 1);
+            result.append("msg", "not paired");
+        }
+
+        return true;
+    }
+} cmdismaster;
+
+/* negotiate who is master
+
+   -1=not set (probably means we just booted)
+    0=was slave
+    1=was master
+
+   remote,local -> new remote,local
+   !1,1  -> 0,1
+   1,!1  -> 1,0
+   -1,-1 -> dominant->1, nondom->0
+   0,0   -> dominant->1, nondom->0
+   1,1   -> dominant->1, nondom->0    
+  
+   { negotiatemaster:1, i_was:<state>, your_name:<hostname> }
+   returns:
+   { ok:1, you_are:..., i_am:... }  
+*/
+class CmdNegotiateMaster : public Command { 
+public:
+    CmdNegotiateMaster() : Command("negotiatemaster") { }
+
+    virtual bool adminOnly() { return true; }
+
+    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+        if( replPair == 0 ) { 
+            problem() << "got negotiatemaster cmd but we are not in paired mode." << endl;
+            errmsg = "not paired";
+            return false;
+        }
+
+        int was = cmdObj.getIntField("i_was");
+        string myname = cmdObj.getStringField("your_name");
+        if( myname.empty() || was < -1 ) {
+            errmsg = "your_name/i_was not specified";
+            return false;
+        }
+
+        int me, you;
+        if( was == replPair->state ) { 
+            if( replPair->dominant(myname) ) {
+                me=1;you=0;
+            }
+            else {
+                me=0;you=1;
+            }
+        }
+        else if( was == 1 ) { 
+            me=0;you=1;
+        }
+        else { 
+            me=1;you=0;
+        }
+
+        replPair->state = me;
+        result.append("you_are", you);
+        result.append("i_am", me);
+
+        return true;
+    }
+} cmdnegotiatemaster;
+
+void ReplPair::negotiate(DBClientConnection *conn) { 
+    JSObjBuilder b;
+    b.append("negotiatemaster",1);
+    b.append("i_was", state);
+    b.append("your_name", remoteHost);
+    JSObj cmd = b.done();
+    JSObj res = conn->findOne("admin.$cmd", cmd);
+    if( res.getIntField("ok") != 1 ) { 
+        problem() << "negotiate fails: " << res.toString() << '\n';
+        setMaster(State_Confused);
+        return;
+    }
+    int x = res.getIntField("you_are");
+    if( x != 0 && x != 1 ) { 
+        problem() << "negotiate: bad you_are value " << res.toString() << endl;
+        return;
+    }
+    setMaster(x);
+}
 
 OpTime last(0, 0);
 
@@ -177,8 +308,10 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
 	while( c->ok() ) { 
 		ReplSource tmp(c->current());
-		if( replPair && tmp.hostName == replPair->remote && tmp.sourceName == "main" )
+        if( replPair && tmp.hostName == replPair->remote && tmp.sourceName == "main" ) {
 			gotPairWith = true;
+            tmp.paired = true;
+        }
 		addSourceToList(v, tmp, old);
 		c->advance();
 	}
@@ -211,7 +344,7 @@ bool ReplSource::resync(string db) {
 		log() << "resync: cloning database " << db << endl;
 		//Cloner c;
 		string errmsg;
-		bool ok = cloneFrom(hostName.c_str(), errmsg);
+		bool ok = cloneFrom(hostName.c_str(), errmsg, client->name);
 		//bool ok = c.go(hostName.c_str(), errmsg);
 		if( !ok ) { 
 			problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
@@ -320,7 +453,7 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 			_runCommands(ns, o, ss, bb, ob);
 		}
 	}
-	catch( UserAssertionException e ) { 
+	catch( UserAssertionException& e ) { 
 		log() << "sync: caught user assertion " << e.msg << '\n';
 	}
 	client = 0;
@@ -344,7 +477,7 @@ void ReplSource::sync_pullOpLog() {
 		query.append("ts", q.done());
 		// query = { ts: { $gte: syncedTo } }
 
-		cursor = conn->query( ns.c_str(), query.done(), 0, 0, 0, true );
+		cursor = conn->query( ns.c_str(), query.done(), 0, 0, 0, Option_CursorTailable );
 		c = cursor.get();
 		tailing = false;
 	}
@@ -370,7 +503,7 @@ void ReplSource::sync_pullOpLog() {
 
 	if( !c->more() ) { 
 		if( tailing ) 
-			log() << "pull:   " << ns << " no new activity\n";
+			; //log() << "pull:   " << ns << " no new activity\n";
 		else
 			log() << "pull:   " << ns << " oplog is empty\n";
 		sleepsecs(3);
@@ -380,7 +513,10 @@ void ReplSource::sync_pullOpLog() {
     int n = 0;
 	JSObj op = c->next();
 	Element ts = op.findElement("ts");
-	assert( ts.type() == Date );
+    if( ts.type() != Date ) { 
+        problem() << "pull: bad object read from remote oplog: " << op.toString() << '\n';
+        assert(false);
+    }
 	OpTime t( ts.date() );
 	bool initial = syncedTo.isNull();
 	if( initial || tailing ) { 
@@ -452,10 +588,17 @@ bool ReplSource::sync() {
 		if( !conn->connect(hostName.c_str(), errmsg) ) {
 			resetConnection();
 			log() << "pull:   cantconn " << errmsg << endl;
+            if( replPair && paired ) {
+                assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
+                replPair->arbitrate();
+            }
             sleepsecs(1);
 			return false;
 		}
 	}
+
+    if( paired ) 
+        replPair->negotiate(conn.get());
 
 /*
 	// get current mtime at the server.
@@ -546,6 +689,7 @@ _ reuse that cursor when we can
 
 void replMain() { 
 	vector<ReplSource*> sources;
+    bool first = true;
 
 	while( 1 ) { 
 		{	
@@ -553,8 +697,10 @@ void replMain() {
 			ReplSource::loadAll(sources);
 		}
 		
-		if( sources.empty() )
+		if( !first && sources.empty() )
 			sleepsecs(20);
+
+        first=false;
 		
 		for( vector<ReplSource*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
 			ReplSource *s = *i;	
@@ -562,13 +708,18 @@ void replMain() {
 			try {
 				ok = s->sync();
 			}
-			catch( SyncException ) {
-				log() << "caught SyncException, sleeping 1 minutes" << endl;
-				sleepsecs(60);
+			catch( SyncException& ) {
+				log() << "caught SyncException, sleeping 10 secs" << endl;
+				sleepsecs(10);
 			}
-            catch( AssertionException ) { 
-                log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
-                sleepsecs(60);
+            catch( AssertionException& e ) { 
+                if( e.severe() ) {
+                    log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
+                    sleepsecs(60);
+                }
+                else { 
+                    log() << e.toString() << '\n';
+                }
             }
 			if( !ok ) 
 				s->resetConnection();
@@ -591,7 +742,7 @@ void replSlaveThread() {
 				break;
 			sleepsecs(5);
 		}
-		catch( AssertionException ) { 
+		catch( AssertionException& ) { 
 			problem() << "Assertion in replSlaveThread(): sleeping 5 minutes before retry" << endl;
 			sleepsecs(300);
 		}
@@ -667,6 +818,6 @@ void startReplication() {
 }
 
 /* called from main at server startup */
-void pairWith(const char *remoteEnd) {
-	replPair = new ReplPair(remoteEnd);
+void pairWith(const char *remoteEnd, const char *arb) {
+	replPair = new ReplPair(remoteEnd, arb);
 }
