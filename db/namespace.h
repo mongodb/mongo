@@ -305,11 +305,8 @@ inline void nsToClient(const char *ns, char *client) {
 	const char *p = ns;
 	char *q = client;
 	while( *p != '.' ) { 
-		if( *p == 0 ) { 
-			assert(false);
-			*client = 0;
-			return;
-		}
+		if( *p == 0 ) 
+            break;
 		*q++ = *p++;
 	}
 	*q = 0;

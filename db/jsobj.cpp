@@ -106,6 +106,10 @@ int Element::size() const {
 		case String:
 			x = valuestrsize() + 4 + 1;
 			break;
+	        case CodeWScope:
+			x = objsize() + 1;
+			break;
+			
         case DBRef:
           x = valuestrsize() + 4 + 12 + 1;
           break;

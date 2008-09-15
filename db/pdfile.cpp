@@ -106,7 +106,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err) {
 	/* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
              and then go back and set to ok : 1 after we are done.
 	*/
-	addNewNamespaceToCatalog(ns, &j);
+    addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
 
 	int ies = initialExtentSize(128);
 	Element e = j.findElement("size");

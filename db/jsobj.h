@@ -36,7 +36,7 @@ class JSObjBuilder;
 */
 enum JSType { EOO = 0, Number=1, String=2, Object=3, Array=4, BinData=5, 
               Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
-              DBRef=12, Code=13, Symbol=14, JSTypeMax=14, MaxKey=127 };
+              DBRef=12, Code=13, Symbol=14, CodeWScope=15 , JSTypeMax=15, MaxKey=127 };
 
 /* subtypes of BinData.
    bdtCustom and above are ones that the JS compiler understands, but are
@@ -75,6 +75,7 @@ struct OID {
      BinData:   <int len> <byte subtype> <byte[len] data>
      Code:      a function (not a closure): same format as String.
      Symbol:    a language symbol (say a python symbol).  same format as String.
+     Code With Scope: <total size><String><Object>
 */
 
 #pragma pack(pop)
@@ -126,6 +127,12 @@ public:
 	// for strings.  also gives you start of the real data for an embedded object
 	const char * valuestr() const { return value() + 4; }
 
+	const char * codeWScopeCode() const { return value() + 8; }
+	const char * codeWScopeScopeData() const { 
+	  // TODO fix
+	  return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;
+	}
+	
 	JSObj embeddedObject();
 
 	const char *regex() { assert(type() == RegEx); return value(); }
