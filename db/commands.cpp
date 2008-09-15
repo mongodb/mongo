@@ -331,7 +331,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 	else if( e.type() == Number ) { 
         if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
 			if( 1 ) {
-				cout << "dropDatabase " << ns << endl;
+				log() << "dropDatabase " << ns << endl;
 				valid = true;
 				int p = (int) e.number();
 				if( p != 1 ) {

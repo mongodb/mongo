@@ -263,6 +263,18 @@ public:
 	int objsize() const { return details ? details->_objsize : 0; } // includes the embedded size field
 	bool isEmpty() const { return objsize() <= 5; }
 
+    void dump() { 
+        cout << hex;
+        const char *p = objdata();
+        for( int i = 0; i < objsize(); i++ ) { 
+            cout << i << '\t' << (unsigned) *p;
+            if( *p >= 'A' && *p <= 'z' )
+                cout << '\t' << *p;
+            cout << endl;
+            p++;
+        }
+    }
+
 	/* this is broken if elements aren't in the same order. */
 	bool operator<(const JSObj& r) const { return woCompare(r) < 0; }
 
@@ -342,7 +354,10 @@ public:
 	/* add all the fields from the object specified to this object */
 	void appendElements(JSObj x);
 
-	void append(Element& e) { b.append((void*) e.rawdata(), e.size()); }
+	void append(Element& e) { 
+        assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+        b.append((void*) e.rawdata(), e.size()); 
+    }
 
 	/* append an element but with a new name */
 	void appendAs(Element& e, const char *as) { 

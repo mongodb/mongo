@@ -705,7 +705,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		}
 		if( strstr(ns, ".system.") ) { 
 			if( strstr(ns, ".system.indexes") )
-				addIndex = true;
+                addIndex = true;
 			else if( !god ) { 
 				cout << "ERROR: attempt to insert in system namespace " << ns << endl;
 				return DiskLoc();
@@ -726,27 +726,33 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 
 	NamespaceDetails *tableToIndex = 0;
 
-	const char *tabletoidxns = 0;
+    string tabletoidxns;
 	if( addIndex ) { 
 		JSObj io((const char *) buf);
 		const char *name = io.getStringField("name"); // name of the index
 		tabletoidxns = io.getStringField("ns");  // table it indexes
+
+        if( client->name != nsToClient(tabletoidxns.c_str()) ) { 
+            uassert("bad table to index name on add index attempt", false);
+            return DiskLoc();
+        }
+
 		JSObj key = io.getObjectField("key");
-		if( *name == 0 || *tabletoidxns == 0 || key.isEmpty() || key.objsize() > 2048 ) { 
+		if( *name == 0 || tabletoidxns.empty() || key.isEmpty() || key.objsize() > 2048 ) { 
 			cout << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" << 
-				(tabletoidxns?tabletoidxns:"") << "\n  ourns:" << ns;
+				tabletoidxns << "\n  ourns:" << ns;
 			cout << "\n  idxobj:" << io.toString() << endl;
 			return DiskLoc();
 		}
-		tableToIndex = nsdetails(tabletoidxns);
+		tableToIndex = nsdetails(tabletoidxns.c_str());
 		if( tableToIndex == 0 ) {
 			// try to create it
 			string err;
-			if( !userCreateNS(tabletoidxns, emptyObj, err) ) { 
+			if( !userCreateNS(tabletoidxns.c_str(), emptyObj, err) ) { 
 				problem() << "ERROR: failed to create collection while adding its index. " << tabletoidxns << endl;
 				return DiskLoc();
 			}
-			tableToIndex = nsdetails(tabletoidxns);
+			tableToIndex = nsdetails(tabletoidxns.c_str());
 			log() << "info: creating collection " << tabletoidxns << " on add index\n";
 			assert( tableToIndex );
 		}
@@ -811,9 +817,9 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		IndexDetails& idxinfo = tableToIndex->indexes[tableToIndex->nIndexes];
 		idxinfo.info = loc;
 		idxinfo.head = BtreeBucket::addHead(idxinfo);
-		tableToIndex->addingIndex(tabletoidxns, idxinfo);
+		tableToIndex->addingIndex(tabletoidxns.c_str(), idxinfo);
 		/* todo: index existing records here */
-		addExistingToIndex(tabletoidxns, idxinfo);
+		addExistingToIndex(tabletoidxns.c_str(), idxinfo);
 	}
 
 	/* add this record to our indexes */

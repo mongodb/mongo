@@ -315,4 +315,8 @@ inline void nsToClient(const char *ns, char *client) {
 		dbexit(60);
 	}
 }
-
+inline string nsToClient(const char *ns) {
+    char buf[MaxClientLen];
+    nsToClient(ns, buf);
+    return buf;
+}

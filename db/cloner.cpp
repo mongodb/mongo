@@ -30,15 +30,46 @@ bool userCreateNS(const char *ns, JSObj& j, string& err);
 
 class Cloner: boost::noncopyable { 
 	DBClientConnection conn;
-	void copy(const char *from_ns, const char *to_ns);
+	void copy(const char *from_ns, const char *to_ns, bool isindex = false);
 public:
 	Cloner() { }
 	bool go(const char *masterHost, string& errmsg, const string& fromdb);
 };
 
-void Cloner::copy(const char *from_collection, const char *to_collection) {
-//    cout << "COPY: " << from_collection << " -> " << to_collection << endl;
-//    cout << "      client: " << client->name << endl;
+/* for index info object:
+     { "name" : "name_1" , "ns" : "foo.index3" , "key" :  { "name" : 1.0 } }
+   we need to fix up the value in the "ns" parameter.
+*/
+JSObj fixindex(JSObj o) { 
+    JSObjBuilder b;
+    JSElemIter i(o);
+    while( i.more() ) { 
+        Element e = i.next();
+        if( e.eoo() )
+            break;
+        if( string("ns") == e.fieldName() ) {
+            uassert("bad ns field for index during dbcopy", e.type() == String);
+            const char *p = strchr(e.valuestr(), '.');
+            uassert("bad ns field for index during dbcopy [2]", p);
+            string newname = client->name + p;
+            b.append("ns", newname);
+        }
+        else
+            b.append(e);
+    }
+    JSObj res= b.doneAndDecouple();
+
+/*    if( mod ) {
+    cout << "before: " << o.toString() << endl;
+    o.dump();
+    cout << "after:  " << res.toString() << endl;
+    res.dump();
+    }*/
+
+    return res;
+}
+
+void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex) {
     auto_ptr<DBClientCursor> c;
     {
         dbtemprelease r;
@@ -51,14 +82,20 @@ void Cloner::copy(const char *from_collection, const char *to_collection) {
             if( !c->more() )
                 break;
         }
-		JSObj js = c->next();
+        JSObj tmp = c->next();
+        JSObj js = tmp;
+        if( isindex )
+            js = fixindex(tmp);
 		theDataFileMgr.insert(to_collection, (void*) js.objdata(), js.objsize());
 	}
 }
 
 bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) { 
     string todb = client->name;
-	if( (string("localhost") == masterHost || string("127.0.0.1") == masterHost) && port == DBPort ) { 
+    stringstream a,b;
+    a << "localhost:" << port;
+    b << "127.0.0.1:" << port;
+	if( a.str() == masterHost || b.str() == masterHost ) { 
         if( fromdb == todb ) {
             // guard against an "infinite" loop
             /* if you are replicating, the local.sources config may be wrong if you get this */
@@ -94,18 +131,18 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) {
 		assert( e.type() == String );
 		const char *from_name = e.valuestr();
         if( strstr(from_name, ".system.") || strchr(from_name, '$') ) {
-//            cout << "TEMP: skip " << from_name << endl;
 			continue;
         }
 		JSObj options = collection.getObjectField("options");
+
         /* change name "<fromdb>.collection" -> <todb>.collection */
         const char *p = strchr(from_name, '.');
         assert(p);
         string to_name = todb + p;
-		//if( !options.isEmpty() ) {
+
+		//if( !options.isEmpty() )
         {
 			string err;
-//            cout << "TEMP: usercreatens " << to_name << " client:" << client->name << endl;
 			userCreateNS(to_name.c_str(), options, err);
 		}
 		copy(from_name, to_name.c_str());
@@ -114,7 +151,7 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) {
 	// now build the indexes
 	string system_indexes_from = fromdb + ".system.indexes";
 	string system_indexes_to = todb + ".system.indexes";
-	copy(system_indexes_from.c_str(), system_indexes_to.c_str());
+	copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true);
 
 	return true;
 }
@@ -150,6 +187,12 @@ public:
 
     virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
         string fromhost = cmdObj.getStringField("fromhost");
+        if( fromhost.empty() ) { 
+            /* copy from self */
+            stringstream ss;
+            ss << "localhost:" << port;
+            fromhost = ss.str();
+        }
         string fromdb = cmdObj.getStringField("fromdb");
         string todb = cmdObj.getStringField("todb");
         if( fromhost.empty() || todb.empty() || fromdb.empty() ) {

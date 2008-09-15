@@ -1,4 +1,4 @@
-// database.h
+// cbgrid/database.h
 
 /* we create a database object for each client database 
 */
