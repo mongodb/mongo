@@ -79,6 +79,26 @@ JavaJSImpl::JavaJSImpl() {
 	JavaJSImpl(null);
 }
 
+#if defined(_WIN32)
+const char SYSTEM_COLON = ';';
+#else
+const char SYSTEM_COLON = ':';
+#endif
+
+
+void _addClassPath( const char * ed , stringstream & ss , const char * subdir ){
+  path includeDir(ed);
+  includeDir /= subdir;
+  directory_iterator end;
+  directory_iterator i(includeDir);
+  while( i != end ) {
+    path p = *i;
+    ss << SYSTEM_COLON << p.string();
+    i++;
+  }
+}
+
+
 JavaJSImpl::JavaJSImpl(const char *appserverPath){
   _jvm = 0; 
   _mainEnv = 0;
@@ -87,35 +107,21 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath){
   const char * ed = findEd(appserverPath);
   stringstream ss;
 
-#if defined(_WIN32)
-  char colon = ';';
-#else
-  char colon = ':';
-#endif
-
   ss << "-Djava.class.path=.";
-  ss << colon << ed << "/build/";
-  
-  {
-    path includeDir(ed);
-    includeDir /= "include";
-    directory_iterator end;
-    directory_iterator i(includeDir);
-    while( i != end ) {
-      path p = *i;
-      ss << colon << p.string();
-      i++;
-    }
-  }
+  ss << SYSTEM_COLON << ed << "/build/";
+
+  _addClassPath( ed , ss , "include" );
+  _addClassPath( ed , ss , "include/jython/" );
+  _addClassPath( ed , ss , "include/jython/javalib" );
 
 #if defined(_WIN32)
-  ss << colon << "C:\\Program Files\\Java\\jdk\\lib\\tools.jar";
+  ss << SYSTEM_COLON << "C:\\Program Files\\Java\\jdk\\lib\\tools.jar";
 #else
-  ss << colon << "/opt/java/lib/tools.jar";
+  ss << SYSTEM_COLON << "/opt/java/lib/tools.jar";
 #endif
 
   if( getenv( "CLASSPATH" ) )
-    ss << colon << getenv( "CLASSPATH" );
+    ss << SYSTEM_COLON << getenv( "CLASSPATH" );
 
   string s = ss.str();
   char * p = (char *)malloc( s.size() * 4 );
