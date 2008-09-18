@@ -300,7 +300,7 @@ int JavaJSImpl::scopeSetObject( jlong id , const char * field , JSObj * obj ){
   _getEnv()->DeleteLocalRef( s1 );
   if ( bb )
     _getEnv()->DeleteLocalRef( bb );
-
+  
   return res;  
 }
 
@@ -310,18 +310,22 @@ int JavaJSImpl::scopeInit( jlong id , JSObj * obj ){
 
   jobject bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
   jassert( bb );
-
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeInit , id , bb );
+  
+  int res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeInit , id , bb );
+  _getEnv()->DeleteLocalRef( bb );
+  return res;
 }
 
 int JavaJSImpl::scopeSetThis( jlong id , JSObj * obj ){
   if ( ! obj )
     return 0;
-
+  
   jobject bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
   jassert( bb );
 
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetThis , id , bb );
+  int res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetThis , id , bb );
+  _getEnv()->DeleteLocalRef( bb );
+  return res;
 }
 
 // scope getters
