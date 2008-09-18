@@ -393,7 +393,11 @@ JNIEnv * JavaJSImpl::_getEnv(){
     return env;
 
   int res = _jvm->AttachCurrentThread( (void**)&env , (void*)&_vmArgs );
-  jassert( res == 0 );
+  if( res ) {
+    cout << "ERROR javajs attachcurrentthread fails res:" << res << '\n';
+    assert(false);
+  }
+
   _envs->reset( env );
   return env;
 }
