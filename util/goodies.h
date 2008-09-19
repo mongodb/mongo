@@ -36,7 +36,8 @@ inline void printStackTrace() {
 	strings = backtrace_symbols(b, size);
      
 	for (i = 0; i < size; i++)
-		cout << ' ' << hex << b[i] << '\n';
+		cout << hex << b[i] << ' ';
+    cout << '\n';
 	for (i = 0; i < size; i++)
 		cout << ' ' << strings[i] << '\n';
 

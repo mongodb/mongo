@@ -60,41 +60,41 @@ typedef hash_map<const char*, int, hash<const char *>, eq_str > strhashmap;
 
 #endif
 
-#include "minilex.h"
-
-MiniLex minilex;
+//#include "minilex.h"
+//MiniLex minilex;
 
 class Where { 
 public:
-        Where() { codeCopy = 0; jsScope = 0; }
+    Where() { /*codeCopy = 0;*/ jsScope = 0; }
 	~Where() {
 		JavaJS->scopeFree(scope);
-		delete codeCopy;
+//		delete codeCopy;
 		if ( jsScope )
 		  delete jsScope;
-		scope = 0; func = 0; codeCopy = 0;
-	}
-	jlong scope, func;
-	strhashmap fields;
-//	map<string,int> fields;
-	bool fullObject;
-	int nFields;
-	char *codeCopy;
-        JSObj *jsScope;
-  
-	void setFunc(const char *code) {
-		codeCopy = new char[strlen(code)+1];
-		strcpy(codeCopy,code);
-		func = JavaJS->functionCreate( code );
-		minilex.grabVariables(codeCopy, fields);
-		// if user references db, eg db.foo.save(obj), 
-		// we make sure we have the whole thing.
-		fullObject = fields.count("fullObject") +
-			fields.count("db") > 0;
-		nFields = fields.size();
+		scope = 0; func = 0; //codeCopy = 0;
 	}
 
-	void buildSubset(JSObj& src, JSObjBuilder& dst) { 
+	jlong scope, func;
+//	strhashmap fields;
+//	map<string,int> fields;
+//	bool fullObject;
+//	int nFields;
+//	char *codeCopy;
+    JSObj *jsScope;
+  
+	void setFunc(const char *code) {
+		//codeCopy = new char[strlen(code)+1];
+		//strcpy(codeCopy,code);
+		func = JavaJS->functionCreate( code );
+		//minilex.grabVariables(codeCopy, fields);
+		// if user references db, eg db.foo.save(obj), 
+		// we make sure we have the whole thing.
+		//fullObject = fields.count("fullObject") +
+		//	fields.count("db") > 0;
+		//nFields = fields.size();
+	}
+
+/*	void buildSubset(JSObj& src, JSObjBuilder& dst) { 
 		JSElemIter it(src);
 		int n = 0;
 		if( !it.more() ) return;
@@ -111,7 +111,7 @@ public:
 					break;
 			}
 		}
-	}
+	}*/
 };
 
 JSMatcher::~JSMatcher() { 
@@ -413,19 +413,20 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 		if( where->func == 0 )
 			return false; // didn't compile
 		
-		if( 1 || jsobj.objsize() < 200 || where->fullObject ) {
+		/**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */ 
+        {
 		  if ( where->jsScope ){
 		    JavaJS->scopeInit( where->scope , where->jsScope );
 		  }
 		  JavaJS->scopeSetThis(where->scope, &jsobj);		  
 		  JavaJS->scopeSetObject(where->scope, "obj", &jsobj);		  
 		} 
-		else {
+		/*else {
 			JSObjBuilder b;
 			where->buildSubset(jsobj, b);
 			JSObj temp = b.done();
 			JavaJS->scopeSetObject(where->scope, "obj", &temp);
-		}
+		}*/
 		if( JavaJS->invoke(where->scope, where->func) )
 			return false;
 		return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
