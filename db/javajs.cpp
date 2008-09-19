@@ -266,26 +266,42 @@ void JavaJSImpl::scopeFree( jlong id ){
 // scope setters
 
 int JavaJSImpl::scopeSetBoolean( jlong id , const char * field , jboolean val ) {
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
+  jstring fieldString = _getEnv()->NewStringUTF( field );
+  int res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , fieldString  , val );
+  _getEnv()->DeleteLocalRef( fieldString );
+  return res;
 }
 
 int JavaJSImpl::scopeSetNumber( jlong id , const char * field , double val ){
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , _getEnv()->NewStringUTF( field ) , val );
+  jstring fieldString = _getEnv()->NewStringUTF( field );
+  int res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetNumber , id , fieldString , val );
+  _getEnv()->DeleteLocalRef( fieldString );
+  return res;
 }
 
 int JavaJSImpl::scopeSetString( jlong id , const char * field , const char * val ){
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetString , id , _getEnv()->NewStringUTF( field ) , _getEnv()->NewStringUTF( val ) );
+  jstring s1 = _getEnv()->NewStringUTF( field );
+  jstring s2 = _getEnv()->NewStringUTF( val );
+  int res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetString , id , s1 , s2 );
+  _getEnv()->DeleteLocalRef( s1 );
+  _getEnv()->DeleteLocalRef( s2 );
+  return res;
 }
 
 int JavaJSImpl::scopeSetObject( jlong id , const char * field , JSObj * obj ){
   jobject bb = 0;
   if ( obj ){
-    //cout << "from c : " << obj->toString() << endl;
     bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
     jassert( bb );
   }
-
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetObject , id , _getEnv()->NewStringUTF( field ) , bb );
+  
+  jstring s1 = _getEnv()->NewStringUTF( field );  
+  int res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetObject , id , s1 , bb );
+  _getEnv()->DeleteLocalRef( s1 );
+  if ( bb )
+    _getEnv()->DeleteLocalRef( bb );
+  
+  return res;  
 }
 
 int JavaJSImpl::scopeInit( jlong id , JSObj * obj ){
@@ -294,36 +310,52 @@ int JavaJSImpl::scopeInit( jlong id , JSObj * obj ){
 
   jobject bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
   jassert( bb );
-
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeInit , id , bb );
+  
+  int res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeInit , id , bb );
+  _getEnv()->DeleteLocalRef( bb );
+  return res;
 }
 
 int JavaJSImpl::scopeSetThis( jlong id , JSObj * obj ){
   if ( ! obj )
     return 0;
-
+  
   jobject bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
   jassert( bb );
 
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetThis , id , bb );
+  int res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeSetThis , id , bb );
+  _getEnv()->DeleteLocalRef( bb );
+  return res;
 }
 
 // scope getters
 
 char JavaJSImpl::scopeGetType( jlong id , const char * field ){
-  return _getEnv()->CallStaticByteMethod( _dbhook , _scopeGetType , id , _getEnv()->NewStringUTF( field ) );
+  jstring s1 = _getEnv()->NewStringUTF( field );  
+  int res =_getEnv()->CallStaticByteMethod( _dbhook , _scopeGetType , id , s1 );
+  _getEnv()->DeleteLocalRef( s1 );
+  return res;  
 }
 
 double JavaJSImpl::scopeGetNumber( jlong id , const char * field ){
-  return _getEnv()->CallStaticDoubleMethod( _dbhook , _scopeGetNumber , id , _getEnv()->NewStringUTF( field ) );
+  jstring s1 = _getEnv()->NewStringUTF( field );  
+  double res = _getEnv()->CallStaticDoubleMethod( _dbhook , _scopeGetNumber , id , s1 );
+  _getEnv()->DeleteLocalRef( s1 );
+  return res;  
 }
 
 jboolean JavaJSImpl::scopeGetBoolean( jlong id , const char * field ){
-  return _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , _getEnv()->NewStringUTF( field ) );
+  jstring s1 = _getEnv()->NewStringUTF( field );  
+  jboolean res = _getEnv()->CallStaticBooleanMethod( _dbhook , _scopeGetBoolean , id , s1 );
+  _getEnv()->DeleteLocalRef( s1 );
+  return res;  
 }
 
 string JavaJSImpl::scopeGetString( jlong id , const char * field ) {
-  jstring s = (jstring)_getEnv()->CallStaticObjectMethod( _dbhook , _scopeGetString , id , _getEnv()->NewStringUTF( field ) );
+  jstring s1 = _getEnv()->NewStringUTF( field );  
+  jstring s = (jstring)_getEnv()->CallStaticObjectMethod( _dbhook , _scopeGetString , id , s1 );
+  _getEnv()->DeleteLocalRef( s1 );
+  
   if ( ! s )
     return "";
   
@@ -336,13 +368,16 @@ string JavaJSImpl::scopeGetString( jlong id , const char * field ) {
 #ifdef J_USE_OBJ
 JSObj JavaJSImpl::scopeGetObject( jlong id , const char * field ) 
 {
+  jstring s1 = _getEnv()->NewStringUTF( field );  
   int guess = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _getEnv()->NewStringUTF( field ) );
+  _getEnv()->DeleteLocalRef( s1 );
 
   char * buf = (char *) malloc(guess);
   jobject bb = _getEnv()->NewDirectByteBuffer( (void*)buf , guess );
   jassert( bb );
   
   int len = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _getEnv()->NewStringUTF( field ) , bb );
+  _getEnv()->DeleteLocalRef( bb );
   //cout << "len : " << len << endl;
   jassert( len > 0 && len < guess ); 
 
@@ -358,6 +393,7 @@ jlong JavaJSImpl::functionCreate( const char * code ){
   jstring s = _getEnv()->NewStringUTF( code );  
   jassert( s );
   jlong id = _getEnv()->CallStaticLongMethod( _dbhook , _functionCreate , s );
+  _getEnv()->DeleteLocalRef( s );
   return id;
 }
  
@@ -376,6 +412,7 @@ void JavaJSImpl::run( const char * js ){
   
   jstring s = _getEnv()->NewStringUTF( js );
   log() << _getEnv()->CallStaticObjectMethod( c , m , s ) << endl;
+  _getEnv()->DeleteLocalRef( s );
 }
 
 void JavaJSImpl::printException(){
@@ -393,7 +430,11 @@ JNIEnv * JavaJSImpl::_getEnv(){
     return env;
 
   int res = _jvm->AttachCurrentThread( (void**)&env , (void*)&_vmArgs );
-  jassert( res == 0 );
+  if( res ) {
+    cout << "ERROR javajs attachcurrentthread fails res:" << res << '\n';
+    assert(false);
+  }
+
   _envs->reset( env );
   return env;
 }
