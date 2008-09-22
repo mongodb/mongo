@@ -498,6 +498,8 @@ const char * findEd(){
     possibleEdDirs.push_back( "../../ed/ed/" ); // this one for dwight dev box
     possibleEdDirs.push_back( "../ed/" );
     possibleEdDirs.push_back( "../../ed/" );
+    possibleEdDirs.push_back( "../babble/" );
+    possibleEdDirs.push_back( "../../babble/" );
   }
 
   for ( list<const char*>::iterator i = possibleEdDirs.begin() ; i != possibleEdDirs.end(); i++ ){
