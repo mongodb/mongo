@@ -23,7 +23,9 @@
    us up.  The app's main() function should call runTests.
 */
 struct UnitTest { 
-	UnitTest() { registerTest(this); }
+	UnitTest() { 
+        registerTest(this); 
+    }
 
 	// assert if fails
 	virtual void run() = 0;
