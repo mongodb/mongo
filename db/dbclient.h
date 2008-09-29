@@ -52,9 +52,10 @@ struct QueryResult : public MsgData {
 };
 #pragma pack(pop)
 
+class DBClientConnection;
 class DBClientCursor : boost::noncopyable { 
 	friend class DBClientConnection;
-    DBClientConnection *conn;
+	DBClientConnection *conn;
 	MessagingPort& p;
 	long long cursorId;
 	int nReturned;
