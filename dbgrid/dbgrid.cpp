@@ -20,6 +20,7 @@
 #include "../grid/message.h"
 #include "../util/unittest.h"
 #include "database.h"
+#include "connpool.h"
 
 const char *curNs = "";
 Client *client = 0;
@@ -96,6 +97,28 @@ public:
 
 void start() { 
     Database::load();
+
+/*
+    try {
+cout << "TEMP" << endl;
+{ 
+    ScopedDbConnection c("localhost");
+    cout << c.conn().findOne("dwight.bar", emptyObj).toString() << endl;
+    c.done();
+    cout << "OK1" << endl;
+}
+{ 
+    ScopedDbConnection c("localhost");
+    c.conn().findOne("dwight.bar", emptyObj);
+    c.done();
+    cout << "OK1" << endl;
+}
+cout << "OK2" << endl;
+    } catch(...) { 
+cout << "exception" << endl;
+    }
+*/
+
     log() << "waiting for connections on port " << port << "..." << endl;
 	DbGridListener l(port);
 	l.listen();

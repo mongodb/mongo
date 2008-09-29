@@ -54,6 +54,7 @@ struct QueryResult : public MsgData {
 
 class DBClientCursor : boost::noncopyable { 
 	friend class DBClientConnection;
+    DBClientConnection *conn;
 	MessagingPort& p;
 	long long cursorId;
 	int nReturned;
@@ -65,13 +66,15 @@ class DBClientCursor : boost::noncopyable {
 	int nToReturn;
 	void dataReceived();
 	void requestMore();
-public:
-	DBClientCursor(MessagingPort& _p, auto_ptr<Message> _m, int _opts) : 
-	  p(_p), m(_m), opts(_opts) { 
+
+	DBClientCursor(DBClientConnection *_conn, MessagingPort& _p, auto_ptr<Message> _m, int _opts) : 
+      conn(_conn), p(_p), m(_m), opts(_opts) { 
           cursorId = 0;
           dataReceived(); 
       }
-	
+
+public:
+
 	bool more(); // if true, safe to call next()
 
     /* returns next object in the result cursor.
@@ -97,10 +100,13 @@ public:
 };
 
 class DBClientConnection : boost::noncopyable { 
+    friend class DBClientCursor; 
 	MessagingPort p;
 	auto_ptr<SockAddr> server;
+    bool failed; // true if some sort of fatal error has ever happened
 public:
-	DBClientConnection() { }
+    bool isFailed() const { return failed; }
+    DBClientConnection() : failed(false) { }
 	bool connect(const char *serverHostname, string& errmsg);
 
 	/* send a query to the database.

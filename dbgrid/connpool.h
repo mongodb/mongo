@@ -26,10 +26,12 @@ struct PoolForHost {
 };
 
 class DBConnectionPool { 
+    boost::mutex poolMutex;
     map<string,PoolForHost*> pools;
 public:
     DBClientConnection *get(const string& host);
     void release(const string& host, DBClientConnection *c) { 
+        boostlock L(poolMutex);
         pools[host]->pool.push(c);
     }
 };
@@ -46,5 +48,23 @@ public:
     ScopedDbConnection(const string& _host) : 
       host(_host), _conn( pool.get(_host) ) { }
 
-    ~ScopedDbConnection() { pool.release(host, _conn); }
+    void done() { 
+        if( _conn->isFailed() ) 
+            delete _conn;
+        else
+            pool.release(host, _conn);
+        _conn = 0;
+    }
+
+    ~ScopedDbConnection() {
+        if( _conn ) { 
+            /* you are supposed to call done().  if you did that, correctly, we 
+               only get here if an exception was thrown.  in such a scenario, we can't 
+               be sure we fully read all expected data of a reply on the socket.  so 
+               we don't try to reuse the connection.
+               */
+            cout << "~ScopedDBConnection: _conn != null\n";
+            delete _conn;
+        }
+    }
 };

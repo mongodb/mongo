@@ -21,7 +21,11 @@
 #include "stdafx.h"
 #include "connpool.h"
 
+DBConnectionPool pool;
+
 DBClientConnection* DBConnectionPool::get(const string& host) { 
+    boostlock L(poolMutex);
+
     PoolForHost *&p = pools[host];
     if( p == 0 )
         p = new PoolForHost();

@@ -59,7 +59,8 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	//cout << "port:" << port << endl;
 	server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
 	if( !p.connect(*server) ) {
-	        errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;
+        errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;
+        failed = true;
 		return false;
 	}
 	return true;
@@ -80,14 +81,14 @@ auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, 
 	Message toSend;
 	toSend.setData(dbQuery, b.buf(), b.len());
 	auto_ptr<Message> response(new Message());
-	bool ok = p.call(toSend, *response);
-	if( !ok )
+    if( !p.call(toSend, *response) ) {
+        failed = true;
 		return auto_ptr<DBClientCursor>(0);
+    }
 
-	auto_ptr<DBClientCursor> c(new DBClientCursor(p, response, opts));
+	auto_ptr<DBClientCursor> c(new DBClientCursor(this, p, response, opts));
 	c->ns = ns;
 	c->nToReturn = nToReturn;
-
 	return c;
 }
 
@@ -105,8 +106,10 @@ void DBClientCursor::requestMore() {
 	Message toSend;
 	toSend.setData(dbGetMore, b.buf(), b.len());
 	auto_ptr<Message> response(new Message());
-	bool ok = p.call(toSend, *response);
-	massert("dbclient error communicating with server", ok);
+    if( !p.call(toSend, *response) ) {
+        conn->failed = true;
+        massert("dbclient error communicating with server", false);
+    }
 
 	m = response;
 	dataReceived();
