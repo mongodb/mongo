@@ -316,6 +316,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\dbmessage.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\goodies.h"
 				>
 			</File>

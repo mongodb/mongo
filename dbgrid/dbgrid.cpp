@@ -112,6 +112,10 @@ int main(int argc, char* argv[], char *envp[] ) {
         if( s == "--port" ) { 
             port = atoi(argv[++i]);
         }
+        else { 
+            cout << "unexpected cmd line option: " << s << endl;
+            return 3;
+        }
     }
 
     bool ok = port != 0;

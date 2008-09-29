@@ -30,6 +30,7 @@
 #include "introspect.h"
 #include "repl.h"
 #include "../util/unittest.h"
+#include "dbmessage.h"
 
 bool slave = false;
 bool master = false; // true means keep an op log
@@ -114,73 +115,6 @@ void quicktest() {
 }
 
 void pdfileInit();
-
-class DbMessage {
-public:
-	DbMessage(Message& _m) : m(_m) {
-		theEnd = _m.data->_data + _m.data->dataLen();
-		int *r = (int *) _m.data->_data;
-		reserved = *r;
-		r++;
-		data = (const char *) r;
-		nextjsobj = data;
-	}
-
-	const char * getns() { return data; }
-	void getns(Namespace& ns) {
-		ns = data;
-	}
-
-	int pullInt() {
-		if( nextjsobj == data )
-			nextjsobj += strlen(data) + 1; // skip namespace
-		int i = *((int *)nextjsobj);
-		nextjsobj += 4;
-		return i;
-	}
-	long long pullInt64() {
-		if( nextjsobj == data )
-			nextjsobj += strlen(data) + 1; // skip namespace
-		long long i = *((long long *)nextjsobj);
-		nextjsobj += 8;
-		return i;
-	}
-
-	OID* getOID() {
-		return (OID *) (data + strlen(data) + 1); // skip namespace
-	}
-
-	void getQueryStuff(const char *&query, int& ntoreturn) {
-		int *i = (int *) (data + strlen(data) + 1);
-		ntoreturn = *i;
-		i++;
-		query = (const char *) i;
-	}
-
-	/* for insert and update msgs */
-	bool moreJSObjs() { return nextjsobj != 0; }
-	JSObj nextJsObj() {
-		if( nextjsobj == data )
-			nextjsobj += strlen(data) + 1; // skip namespace
-		JSObj js(nextjsobj);
-                assert( js.objsize() < ( theEnd - data ) );
-		if( js.objsize() <= 0 )
-			nextjsobj = null;
-		else {
-			nextjsobj += js.objsize();
-			if( nextjsobj >= theEnd )
-				nextjsobj = 0;
-		}
-		return js;
-	}
-
-private:
-	Message& m;
-	int reserved;
-	const char *data;
-	const char *nextjsobj;
-	const char *theEnd;
-};
 
 void killCursors(int n, long long *ids);
 void receivedKillCursors(Message& m) {

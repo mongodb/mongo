@@ -1,5 +1,5 @@
 # makefile for our db project
- 
+
 FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 
 LIB_DEPS = -lpcrecpp -lpcre
@@ -12,7 +12,7 @@ JVM_LIBS = -L/opt/java/lib/
 
 OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o
 
-DBGRID_OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../dbgrid/database.o
+DBGRID_OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../dbgrid/database.o ../dbgrid/connpool.o
 
 GPP = g++
 

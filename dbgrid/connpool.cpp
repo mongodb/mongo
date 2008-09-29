@@ -1,4 +1,4 @@
-// dbgrid/request.cpp
+// connpool.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -16,31 +16,26 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+// _ todo: reconnect?
+
 #include "stdafx.h"
-#include "../grid/message.h"
-#include "../db/dbmessage.h"
 #include "connpool.h"
 
-void writeOp(int op, Message& m, MessagingPort& p) {
-	DbMessage d(m);
-    const char *ns = d.getns();
-
-
-
-	while( d.moreJSObjs() ) {
-		JSObj js = d.nextJsObj();
-		const char *ns = d.getns();
-		assert(*ns);
-//
-//		setClient(ns);
-//		ss << ns;
-//		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
-//		logOp("i", ns, js);
-	}
-
-}
-
-void processRequest(Message& m, MessagingPort& p) {
-    int op = m.data->operation();
-    writeOp(op, m, p);
+DBClientConnection* DBConnectionPool::get(const string& host) { 
+    PoolForHost *&p = pools[host];
+    if( p == 0 )
+        p = new PoolForHost();
+    if( p->pool.empty() ) {
+        string errmsg;
+        DBClientConnection *c = new DBClientConnection();
+        if( !c->connect(host.c_str(), errmsg) ) { 
+            delete c;
+            uassert("dbconnectionpool: connect failed", false);
+            return 0;
+        }
+        return c;
+    }
+    DBClientConnection *c = p->pool.front();
+    p->pool.pop();
+    return c;
 }
