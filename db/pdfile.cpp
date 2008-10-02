@@ -787,7 +787,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 			loc = d->alloc(ns, lenWHdr, extentLoc);
 		}
 		if( loc.isNull() ) { 
-			log() << "out of space in datafile. capped:" << d->capped << endl;
+			log() << "out of space in datafile " << ns << " capped:" << d->capped << endl;
 			assert(d->capped);
 			return DiskLoc();
 		}

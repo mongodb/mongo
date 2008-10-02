@@ -138,12 +138,12 @@ int Element::size() const {
 		const char *next = data + totalSize;
 		if( *next < 0 || *next > JSTypeMax ) { 
 			// bad type.  
-			cout << "*********************************************\n";
-			cout << "Bad data or size in Element::size()" << endl;
-			cout << "bad type:" << (int) *next << endl;
-			cout << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << endl;
+			cout << "***\n";
+			cout << "Bad data or size in Element::size()\n";
+			cout << "bad type:" << (int) *next << '\n';
+			cout << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << '\n';
 			cout << "lastrec:" << endl;
-			dumpmemory(data, totalSize + 15);
+			//dumpmemory(data, totalSize + 15);
 			assert(false);
 		}
 	}

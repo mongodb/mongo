@@ -83,6 +83,18 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
                 break;
         }
         JSObj tmp = c->next();
+
+        /* assure object is valid.  note this will slow us down a good bit. 
+           (a validate() instead of toString would be slightly faster)
+        */
+        try { 
+            tmp.toString();
+        }
+        catch(...) { 
+            cout << "skipping bad object from " << from_collection << '\n';
+            continue;
+        }
+
         JSObj js = tmp;
         if( isindex )
             js = fixindex(tmp);
