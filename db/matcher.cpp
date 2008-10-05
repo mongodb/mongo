@@ -410,8 +410,10 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 	}
 
 	if( where ) { 
-		if( where->func == 0 )
-			return false; // didn't compile
+	  if( where->func == 0 ) {
+	    uassert("compile failure", false);
+	    return false; // didn't compile
+	  }
 		
 		/**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */ 
         {
@@ -427,8 +429,10 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 			JSObj temp = b.done();
 			JavaJS->scopeSetObject(where->scope, "obj", &temp);
 		}*/
-		if( JavaJS->invoke(where->scope, where->func) )
-			return false;
+	if( JavaJS->invoke(where->scope, where->func) ) {
+	  uassert("error in invocation of $where function", false);
+	  return false;
+	}
 		return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
 	}
 
