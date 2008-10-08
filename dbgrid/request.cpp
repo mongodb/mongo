@@ -22,22 +22,21 @@
 #include "connpool.h"
 
 void writeOp(int op, Message& m, MessagingPort& p) {
-	DbMessage d(m);
+  DbMessage d(m);
+  const char *ns = d.getns();
+
+
+
+  while( d.moreJSObjs() ) {
+    JSObj js = d.nextJsObj();
     const char *ns = d.getns();
-
-
-
-	while( d.moreJSObjs() ) {
-		JSObj js = d.nextJsObj();
-		const char *ns = d.getns();
-		assert(*ns);
-//
-//		setClient(ns);
-//		ss << ns;
-//		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
-//		logOp("i", ns, js);
-	}
-
+    assert(*ns);
+    //
+    //		setClient(ns);
+    //		ss << ns;
+    //		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
+    //		logOp("i", ns, js);
+  }
 }
 
 void processRequest(Message& m, MessagingPort& p) {
