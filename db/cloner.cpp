@@ -84,14 +84,9 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
         }
         JSObj tmp = c->next();
 
-        /* assure object is valid.  note this will slow us down a good bit. 
-           (a validate() instead of toString would be slightly faster)
-        */
-        try { 
-            tmp.toString();
-        }
-        catch(...) { 
-            cout << "skipping bad object from " << from_collection << '\n';
+        /* assure object is valid.  note this will slow us down a good bit. */
+        if( !tmp.valid() ) {
+            cout << "skipping corrupt object from " << from_collection << '\n';
             continue;
         }
 

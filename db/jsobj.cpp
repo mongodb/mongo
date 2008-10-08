@@ -267,6 +267,17 @@ string JSObj::toString() const {
 	return s.str();
 }
 
+// todo: can be a little faster if we don't use toString() here.
+bool JSObj::valid() const { 
+    try { 
+        toString();
+    }
+    catch(...) { 
+        return false;
+    }
+    return true;
+}
+
 /* well ordered compare */
 int JSObj::woCompare(const JSObj& r) const { 
 	if( isEmpty() )

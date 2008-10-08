@@ -345,6 +345,9 @@ public:
 			x = x * 131 + p[i];
 		return (x & 0x7fffffff) | 0x8000000; // must be > 0
 	}
+
+    // true unless corrupt
+    bool valid() const;
 };
 
 class JSObjBuilder { 
