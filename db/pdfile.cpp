@@ -150,6 +150,10 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 	} else
 		length = 0x7ff00000;
         
+        if ( sizeof( int* ) == 4 && fn > 4 )
+		length = 512 * 1024 * 1024;
+		
+
 	assert( length >= 64*1024*1024 );
 
 	if( strstr(filename, "_hudsonSmall") ) {
