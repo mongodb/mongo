@@ -150,6 +150,10 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 	} else
 		length = 0x7ff00000;
         
+        if ( sizeof( int* ) == 4 && fn > 4 )
+		length = 512 * 1024 * 1024;
+		
+
 	assert( length >= 64*1024*1024 );
 
 	if( strstr(filename, "_hudsonSmall") ) {
@@ -392,7 +396,7 @@ void IndexDetails::kill() {
    Keys will be left empty if key not found in the object.
 */
 void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) { 
-	JSObj keyPattern = info.obj().getObjectField("key");
+    JSObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 } 
 	if( keyPattern.objsize() == 0 ) {
 		cout << keyPattern.toString() << endl;
 		cout << info.obj().toString() << endl;
@@ -640,7 +644,6 @@ void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) {
 	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
 		assert( !newRecordLoc.isNull() );
 		try {
-//			DEBUGGING << "temp index: " << newRecordLoc.toString() << obj.toString() << endl;
 			idx.head.btree()->insert(idx.head, newRecordLoc,
 				(JSObj&) *i, false, idx, true);
 		}
