@@ -265,6 +265,8 @@ inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) {
 	if( l.type() != r.type() )
 		return false;
 	int c = compareElementValues(l, r);
+	if( c < -1 ) c = -1;
+	if( c > 1 ) c = 1;
 	int z = 1 << (c+1); 
 	return (op & z);
 }
