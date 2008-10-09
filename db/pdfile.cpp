@@ -415,7 +415,6 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 		return;
 	}
 	JSObj arr = f.embeddedObject();
-//	cout << arr.toString() << endl;
 	JSElemIter i(arr);
 	while( i.more() ) { 
 		Element e = i.next();

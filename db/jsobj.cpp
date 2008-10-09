@@ -364,7 +364,7 @@ JSObj JSObj::extractFields(JSObj pattern, JSObjBuilder& b) {
 		Element e = i.next();
 		if( e.eoo() )
 			break;
-		Element x = getField(e.fieldName());
+		Element x = getFieldDotted(e.fieldName());
 		if( x.eoo() )
 			return JSObj();
 		b.append(x);
