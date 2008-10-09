@@ -312,6 +312,18 @@ int JSObj::woCompare(const JSObj& r) const {
 	return -1;
 } 
 
+Element JSObj::getField(const char *name) {
+	JSElemIter i(*this);
+	while( i.more() ) {
+		Element e = i.next();
+		if( e.eoo() )
+			break;
+		if( strcmp(e.fieldName(), name) == 0 )
+			return e;
+	}
+	return nullElement;
+}
+
 /* return has eoo() true if no match 
    supports "." notation to reach into embedded objects
 */
@@ -325,6 +337,8 @@ Element JSObj::getFieldDotted(const char *name) {
 		}
 	}
 
+    return getField(name);
+/*
 	JSElemIter i(*this);
 	while( i.more() ) {
 		Element e = i.next();
@@ -334,18 +348,7 @@ Element JSObj::getFieldDotted(const char *name) {
 			return e;
 	}
 	return nullElement;
-}
-
-Element JSObj::getField(const char *name) {
-	JSElemIter i(*this);
-	while( i.more() ) {
-		Element e = i.next();
-		if( e.eoo() )
-			break;
-		if( strcmp(e.fieldName(), name) == 0 )
-			return e;
-	}
-	return nullElement;
+*/
 }
 
 /* makes a new JSObj with the fields specified in pattern.
@@ -376,7 +379,7 @@ JSObj JSObj::extractFields(JSObj& pattern) {
 		Element e = i.next();
 		if( e.eoo() )
 			break;
-		Element x = getField(e.fieldName());
+		Element x = getFieldDotted(e.fieldName());
 		if( x.eoo() )
 			return JSObj();
 		b.append(x);
