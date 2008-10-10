@@ -200,12 +200,19 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 						if( fn[1] == 'g' ) { 
 							if( fn[3] == 0 ) op = GT;
 							else if( fn[3] == 'e' && fn[4] == 0 ) op = GTE;
+							else
+							  uassert("invalid $operator", false);
 						}
 						else if( fn[1] == 'l' ) { 
 							if( fn[3] == 0 ) op = LT;
 							else if( fn[3] == 'e' && fn[4] == 0 ) op = LTE;
+							else
+							  uassert("invalid $operator", false);
 						}
-						if( op && nBuilders < 8) { 
+						else
+						  uassert("invalid $operator", false);
+						if( op ) {
+						  uassert("too many items to match in query", nBuilders < 8);
 							JSObjBuilder *b = new JSObjBuilder();
 							builders[nBuilders++] = b;
 							b->appendAs(fe, e.fieldName());
@@ -237,6 +244,8 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 						n++;
 						ok = true;
 					}
+					else
+					  uassert("invalid $operator", false);
 				}
 				else {
 					ok = false;
