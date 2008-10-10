@@ -224,7 +224,18 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 					}
                     else if( fn[2] == 'e' ) { 
                         if( fn[1] == 'n' && fn[3] == 0 ) { 
+                            // $ne
+                            uassert("too many items to match in query", nBuilders < 8);
+							JSObjBuilder *b = new JSObjBuilder();
+							builders[nBuilders++] = b;
+							b->appendAs(fe, e.fieldName());
+							toMatch.push_back( b->done().firstElement() );
+							compareOp.push_back(NE);
+							n++;
+							ok = true;
                         }
+                        else
+                            uassert("invalid $operator", false);
                     }
 					else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 && fe.type() == Array ) {
 						// $in
@@ -268,6 +279,9 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) { 
 	if( op == 0 ) 
 		return l.valuesEqual(r);
+
+    if( op == NE )
+        return !l.valuesEqual(r);
 
 	if( op == opIN ) {
 		// { $in : [1,2,3] }
