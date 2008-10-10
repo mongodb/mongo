@@ -280,8 +280,9 @@ inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) {
 	if( op == 0 ) 
 		return l.valuesEqual(r);
 
-    if( op == NE )
+    if( op == NE ) {
         return !l.valuesEqual(r);
+    }
 
 	if( op == opIN ) {
 		// { $in : [1,2,3] }
@@ -367,7 +368,8 @@ int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj
 		}
 	}
 	else if( e.eoo() ) { 
-		return 0;
+        // 0 indicatse "missing element"
+        return 0;
 	}
 	return -1;
 }
@@ -420,14 +422,21 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 
 	// check normal non-regex cases:
 	for( int i = 0; i < n; i++ ) {
-		Element& m = toMatch[i]; 
+		Element& m = toMatch[i];
+        // -1=mismatch. 0=missing element. 1=match 
 		int cmp = matchesDotted(toMatch[i].fieldName(), toMatch[i], jsobj, compareOp[i], deep);
 
-		/* missing is ok iff we were looking for null */
 		if( cmp < 0 ) 
 			return false;
-		if( cmp == 0 && (m.type() != jstNULL && m.type() != Undefined ) )
-			return false;
+        if( cmp == 0 ) {
+            /* missing is ok iff we were looking for null */
+            if( m.type() == jstNULL || m.type() == Undefined ) {
+                if( compareOp[i] == NE ) {
+                    return false;
+                }
+            } else
+                return false;
+        }
 	}
 
 	for( int r = 0; r < nRegex; r++ ) { 
