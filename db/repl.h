@@ -40,6 +40,7 @@ class OpTime {
 	unsigned i;
 	unsigned secs;
 public:
+    unsigned getSecs() const { return secs; }
 	OpTime(unsigned long long date) { 
 		reinterpret_cast<unsigned long long&>(*this) = date;
 	}
@@ -84,6 +85,9 @@ struct SyncException {
    Can be a group of things to replicate for several databases.
 
       { host: ..., source: ..., syncedTo: ..., dbs: { ... } }
+
+   'source' defaults to 'main'; support for multiple source names is 
+   not done (always use main for now).
 */
 class ReplSource {
 	bool resync(string db);

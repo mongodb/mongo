@@ -134,8 +134,8 @@ void receivedUpdate(Message& m, stringstream& ss) {
 	const char *ns = d.getns();
 	assert(*ns);
 	setClient(ns);
-	if( client->profile )
-		ss << ns << ' ';
+	//if( client->profile )
+    ss << ns << ' ';
 	int flags = d.pullInt();
 	JSObj query = d.nextJsObj();
 
@@ -918,7 +918,6 @@ void foo() {
 
 #undef exit
 void dbexit(int rc, const char *why) { 
-  foo();
 	log() << "  dbexit: " << why << "; flushing op log and files" << endl;
 	flushOpLog();
 

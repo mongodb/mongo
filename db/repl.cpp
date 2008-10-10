@@ -221,6 +221,8 @@ ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
 	only = o.getStringField("only");
 	hostName = o.getStringField("host");
 	sourceName = o.getStringField("source");
+    if( sourceName.empty() )
+        sourceName = "main";
 	uassert( "'host' field not set in sources collection object", !hostName.empty() );
 	uassert( "'source' field not set in sources collection object", !sourceName.empty() );
 	Element e = o.getField("syncedTo");
@@ -533,7 +535,8 @@ void ReplSource::sync_pullOpLog() {
 	}
 	else if( t != syncedTo ) { 
 		log() << "pull:   t " << t.toString() << " != syncedTo " << syncedTo.toString() << '\n';
-        log() << "pull:    data too stale, halting replication" << endl;
+        log() << "pull:   time diff: " << (t.getSecs() - syncedTo.getSecs()) << "sec\n";
+        log() << "pull:   data too stale, halting replication" << endl;
 		assert( syncedTo < t );
 		throw SyncException();
 	}
