@@ -239,6 +239,10 @@ int getGtLtOp(Element& e) {
 				else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::LTE;
 			}
 		}
+        else if( fn[2] == 'e' ) {
+            if( fn[1] == 'n' && fn[3] == 0 )
+                op = JSMatcher::NE;
+        }
 		else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
 			op = JSMatcher::opIN;
 	}

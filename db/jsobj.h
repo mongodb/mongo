@@ -487,6 +487,9 @@ class Where;
    GT/LT:
    { a : { $gt : 3 } } 
 
+   Not equal:
+   { a : { $ne : 3 } } 
+
    TODO: we should rewrite the matcher to be more an AST style.
 */
 class JSMatcher : boost::noncopyable { 
@@ -512,7 +515,8 @@ public:
 		LTE = 0x3,
 		GTE = 0x6,
 		GT = 0x4, 
-		opIN = 0x8 // { x : { $in : [1,2,3] } }
+		opIN = 0x8, // { x : { $in : [1,2,3] } }
+        NE = 0x9
 	};
 
 	static int opDirection(int op) { 

@@ -193,6 +193,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 					break;
 				// Element fe = e.embeddedObject().firstElement();
 				const char *fn = fe.fieldName();
+                /* TODO: use getGtLtOp() here.  this code repeats ourself */
 				if( fn[0] == '$' && fn[1] ) { 
 					if( fn[2] == 't' ) { 
 						int op = Equality;
@@ -214,6 +215,10 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 							ok = true;
 						}
 					}
+                    else if( fn[2] == 'e' ) { 
+                        if( fn[1] == 'n' && fn[3] == 0 ) { 
+                        }
+                    }
 					else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 && fe.type() == Array ) {
 						// $in
 						assert( in == 0 ); // only one per query supported so far.  finish...
