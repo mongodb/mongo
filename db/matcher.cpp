@@ -127,7 +127,6 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
    in(0), where(0), jsobj(_jsobj), nRegex(0)
 {
 	nBuilders = 0;
-	
 	JSElemIter i(jsobj);
 	n = 0;
 	while( i.more() ) {

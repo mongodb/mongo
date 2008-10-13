@@ -37,7 +37,8 @@ class JSObjBuilder;
 enum JSType { EOO = 0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5, 
               Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
               DBRef=12, Code=13, Symbol=14, CodeWScope=15 , 
-              NumberInt = 16, JSTypeMax=16, 
+              NumberInt = 16, 
+              JSTypeMax=16, 
               MaxKey=127
 
 };
@@ -160,7 +161,9 @@ public:
 	/* like operator== but doesn't check the fieldname,
 	   just the value.
 	   */
-	bool valuesEqual(Element& r) { 
+    bool valuesEqual(Element& r) {
+        if( isNumber() )
+            return number() == r.number() && r.isNumber();
 		bool match= valuesize() == r.valuesize() && 
 			memcmp(value(),r.value(),valuesize()) == 0;
 		return match;
