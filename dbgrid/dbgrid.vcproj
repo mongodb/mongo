@@ -187,6 +187,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\gridconfig.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\request.cpp"
 				>
 			</File>
@@ -206,6 +210,10 @@
 			</File>
 			<File
 				RelativePath="..\util\goodies.h"
+				>
+			</File>
+			<File
+				RelativePath=".\gridconfig.h"
 				>
 			</File>
 			<File

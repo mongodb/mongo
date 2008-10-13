@@ -79,7 +79,6 @@ void dbGridConnThread() {
     try { 
         _dbGridConnThread();
     } catch( ... ) { 
-        /* todo: don't terminate; maybe close the socket. */
         problem() << "uncaught exception in dbgridconnthread, closing connection" << endl;
         delete p;
     }
