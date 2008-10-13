@@ -213,18 +213,15 @@ int test2() {
 ReplSource::ReplSource() {
 	nClonedThisPass = 0; 
 	paired = false;
-	sourceName = "main";
 }
 
 ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
 	paired = false;
 	only = o.getStringField("only");
 	hostName = o.getStringField("host");
-	sourceName = o.getStringField("source");
-    if( sourceName.empty() )
-        sourceName = "main";
+	_sourceName = o.getStringField("source");
 	uassert( "'host' field not set in sources collection object", !hostName.empty() );
-	uassert( "'source' field not set in sources collection object", !sourceName.empty() );
+    uassert( "only source='main' allowed for now with replication", sourceName() == "main" );
 	Element e = o.getField("syncedTo");
 	if( !e.eoo() ) {
 		uassert( "bad sources 'syncedTo' field value", e.type() == Date );
@@ -249,7 +246,7 @@ ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
 JSObj ReplSource::jsobj() {
 	JSObjBuilder b;
 	b.append("host", hostName);
-	b.append("source", sourceName);
+	b.append("source", sourceName());
 	if( !only.empty() )
 		b.append("only", only);
 	b.appendDate("syncedTo", syncedTo.asDate());
@@ -265,16 +262,17 @@ JSObj ReplSource::jsobj() {
 
 void ReplSource::save() { 
 	JSObjBuilder b;
+    assert( !hostName.empty() );
 	b.append("host", hostName);
-	b.append("source", sourceName);
+    // todo: finish allowing multiple source configs.
+    // this line doesn't work right when source is null, if that is allowed as it is now:
+    //b.append("source", _sourceName);
 	JSObj pattern = b.done();
 
 	JSObj o = jsobj();
 
 	stringstream ss;
 	setClient("local.sources");
-	//cout << o.toString() << endl;
-	//cout << pattern.toString() << endl;
 	int u = _updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, ss);
 	assert( u == 1 || u == 4 );
 	client = 0;
@@ -310,7 +308,7 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
 	while( c->ok() ) { 
 		ReplSource tmp(c->current());
-        if( replPair && tmp.hostName == replPair->remote && tmp.sourceName == "main" ) {
+        if( replPair && tmp.hostName == replPair->remote && tmp.sourceName() == "main" ) {
 			gotPairWith = true;
             tmp.paired = true;
         }
@@ -463,7 +461,7 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 
 /* note: not yet in mutex at this point. */
 void ReplSource::sync_pullOpLog() { 
-	string ns = string("local.oplog.$") + sourceName;
+	string ns = string("local.oplog.$") + sourceName();
 
 	bool tailing = true;
 	DBClientCursor *c = cursor.get();
@@ -576,7 +574,7 @@ void ReplSource::sync_pullOpLog() {
    returns true if everything happy.  return false if you want to reconnect.
 */
 bool ReplSource::sync() { 
-	log() << "pull: " << sourceName << '@' << hostName << endl;
+	log() << "pull: " << sourceName() << '@' << hostName << endl;
 	nClonedThisPass = 0;
 
 	if( (string("localhost") == hostName || string("127.0.0.1") == hostName) && port == DBPort ) { 

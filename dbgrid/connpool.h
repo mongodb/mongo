@@ -38,6 +38,9 @@ public:
 
 extern DBConnectionPool pool;
 
+/* create these to get a connection from the pool.  then on exceptions things
+   clean up nicely.
+*/
 class ScopedDbConnection { 
     const string host; 
     DBClientConnection *_conn;

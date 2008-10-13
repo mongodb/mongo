@@ -21,11 +21,18 @@
 #include "../db/dbmessage.h"
 #include "connpool.h"
 
-void writeOp(int op, Message& m, MessagingPort& p) {
+void queryOp(Message& m, MessagingPort& p) {
   DbMessage d(m);
   const char *ns = d.getns();
 
+  cout << "TEMP: " << ns << endl;
 
+  ScopedDbConnection c("localhost");
+}
+
+void writeOp(int op, Message& m, MessagingPort& p) {
+  DbMessage d(m);
+  const char *ns = d.getns();
 
   while( d.moreJSObjs() ) {
     JSObj js = d.nextJsObj();
@@ -41,5 +48,9 @@ void writeOp(int op, Message& m, MessagingPort& p) {
 
 void processRequest(Message& m, MessagingPort& p) {
     int op = m.data->operation();
-    writeOp(op, m, p);
+    if( op == dbQuery ) { 
+    }
+    else {
+        writeOp(op, m, p);
+    }
 }

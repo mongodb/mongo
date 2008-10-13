@@ -74,12 +74,14 @@ void _dbGridConnThread() {
 
 }
  
-void dbGridConnThread() { 
+void dbGridConnThread() {
+    MessagingPort *p = grab;
     try { 
         _dbGridConnThread();
     } catch( ... ) { 
-        problem() << "uncaught exception in dbgridconnthread, terminating" << endl;
-        dbexit(15);
+        /* todo: don't terminate; maybe close the socket. */
+        problem() << "uncaught exception in dbgridconnthread, closing connection" << endl;
+        delete p;
     }
 }
 

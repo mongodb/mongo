@@ -103,7 +103,8 @@ class ReplSource {
 public:
 	bool paired; // --pair in use
 	string hostName;    // ip addr or hostname plus optionally, ":<port>" 
-	string sourceName;  // a logical source name.
+	string _sourceName;  // a logical source name.
+    string sourceName() const { return _sourceName.empty() ? "main" : _sourceName; }
 	string only; // only a certain db. note that in the sources collection, this may not be changed once you start replicating.
 
 	/* the last time point we have already synced up to. */
@@ -132,7 +133,7 @@ public:
 	JSObj jsobj(); 
 	
 	bool operator==(const ReplSource&r) const { 
-		return hostName == r.hostName && sourceName == r.sourceName; 
+		return hostName == r.hostName && sourceName() == r.sourceName(); 
 	}
 };
 

@@ -36,7 +36,7 @@ JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToRe
 }
 
 bool DBClientConnection::connect(const char *serverAddress, string& errmsg) { 
-	/* not reentrant! 
+	/* TODO not reentrant! 
 	   ok as used right now (we are in a big lock), but won't be later, so fix. */
   
   	int port = DBPort;
