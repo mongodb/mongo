@@ -36,8 +36,8 @@ class JSObjBuilder;
 */
 enum JSType { EOO = 0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5, 
               Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
-              DBRef=12, Code=13, Symbol=14, CodeWScope=15 , JSTypeMax=15, 
-              NumberInt = 16,
+              DBRef=12, Code=13, Symbol=14, CodeWScope=15 , 
+              NumberInt = 16, JSTypeMax=16, 
               MaxKey=127
 
 };
