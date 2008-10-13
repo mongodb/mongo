@@ -27,7 +27,15 @@ void queryOp(Message& m, MessagingPort& p) {
 
   cout << "TEMP: " << ns << endl;
 
-  ScopedDbConnection c("localhost");
+  ScopedDbConnection dbcon("localhost");
+  DBClientConnection &c = dbcon.conn();
+
+  Message response;
+  bool ok = c.port().call(m, response);
+  uassert("dbgrid: error calling dbd", ok);
+//p.reply
+
+  dbcon.done();
 }
 
 void writeOp(int op, Message& m, MessagingPort& p) {
@@ -49,6 +57,7 @@ void writeOp(int op, Message& m, MessagingPort& p) {
 void processRequest(Message& m, MessagingPort& p) {
     int op = m.data->operation();
     if( op == dbQuery ) { 
+        queryOp(m,p);
     }
     else {
         writeOp(op, m, p);

@@ -207,7 +207,10 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 		ss << " exception ";
 		problem() << " Caught Assertion in runQuery ns:" << ns << ' ' << e.toString() << '\n';
 		log() << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << '\n';
-		log() << "  query:" << query.toString() << endl;
+        if( query.valid() )
+            log() << "  query:" << query.toString() << endl;
+        else
+            log() << "  query object is not valid!" << endl;
 
         JSObjBuilder err;
         err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);

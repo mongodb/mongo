@@ -106,6 +106,7 @@ class DBClientConnection : boost::noncopyable {
 	auto_ptr<SockAddr> server;
     bool failed; // true if some sort of fatal error has ever happened
 public:
+    MessagingPort& port() { return p; }
     bool isFailed() const { return failed; }
     DBClientConnection() : failed(false) { }
 	bool connect(const char *serverHostname, string& errmsg);
