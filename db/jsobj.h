@@ -34,10 +34,12 @@ class JSObjBuilder;
 /* BinData = binary data types. 
    EOO = end of object
 */
-enum JSType { EOO = 0, Number=1, String=2, Object=3, Array=4, BinData=5, 
+enum JSType { EOO = 0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5, 
               Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
-              DBRef=12, Code=13, Symbol=14, CodeWScope=15 , JSTypeMax=15, MaxKey=127,
-              IntegerNumber = 0x80
+              DBRef=12, Code=13, Symbol=14, CodeWScope=15 , JSTypeMax=15, 
+              NumberInt = 16,
+              MaxKey=127
+
 };
 
 /* subtypes of BinData.
@@ -66,7 +68,8 @@ struct OID {
      EOO:       nothing follows
      Undefined: nothing follows
      OID:       an OID object
-     Number:    <double>
+     NumberDouble: <double>
+     NumberInt: <int32>
      String:    <unsigned32 strsizewithnull><cstring>
      Date:      <8bytes>
      Regex:     <cstring regex><cstring options>
@@ -93,7 +96,8 @@ class Element {
 	friend class JSObj;
 public:
 	string toString();
-	JSType type() const { return (JSType) (((int)*data)&0x7f); }
+    JSType type() const { return (JSType) *data; }
+    bool isNumber() const { return type() == NumberDouble || type() == NumberInt; }
 	bool eoo() const { return type() == EOO; }
 	int size() const;
 
@@ -112,8 +116,18 @@ public:
 	bool boolean() { return *value() ? true : false; }
 
 	unsigned long long date() const { return *((unsigned long long*) value()); }
-	double& number() { return *((double *) value()); }
-	double number() const { return *((double *) value()); }
+  	//double& number() { return *((double *) value()); }
+
+    void setNumber(double d) { 
+        if( type() == NumberDouble ) *((double *) value()) = d;
+        else if( type() == NumberInt ) *((int *) value()) = (int) d;
+    }
+
+	double number() const { 
+        if( type() == NumberDouble ) return *((double *) value()); 
+        if( type() == NumberInt ) return *((int *) value()); 
+        return 0;
+    }
 	OID& oid() { return *((OID*) value()); }
 
 	// for strings
@@ -384,7 +398,7 @@ public:
 		b.append((char) (val?1:0));
 	}
 	void append(const char *fieldName, double n) { 
-		b.append((char) Number);
+		b.append((char) NumberDouble);
 		b.append(fieldName);
 		b.append(n);
 	}
@@ -560,7 +574,7 @@ extern JSObj maxKey;
 struct JSObj1 {
 	JSObj1() {
 		totsize=sizeof(JSObj1); 
-		n = Number; strcpy_s(nname, 5, "abcd"); N = 3.1;
+		n = NumberDouble; strcpy_s(nname, 5, "abcd"); N = 3.1;
 		s = String; strcpy_s(sname, 7, "abcdef"); slen = 10; 
 		strcpy_s(sval, 10, "123456789"); eoo = EOO;
 	}

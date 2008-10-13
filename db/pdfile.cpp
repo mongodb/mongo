@@ -110,7 +110,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err) {
 
 	int ies = initialExtentSize(128);
 	Element e = j.findElement("size");
-	if( e.type() == Number ) {
+	if( e.isNumber() ) {
 		ies = (int) e.number();
 		ies += 256;
 		ies &= 0xffffff00;
@@ -125,7 +125,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err) {
 	if( e.type() == Bool && e.boolean() ) {
 		d->capped = 1;
 		e = j.findElement("max");
-		if( e.type() == Number ) { 
+		if( e.isNumber() ) { 
 			int mx = (int) e.number();
 			if( mx > 0 )
 				d->max = mx;
@@ -333,8 +333,8 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
    order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
 */
 auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
-	Element el = order.findElement("$natural");
-	if( el.type() != Number || el.number() >= 0 )
+	Element el = order.findElement("$natural"); // e.g., { $natural : -1 } 
+	if( el.number() >= 0 )
 		return DataFileMgr::findAll(ns);
 
 	// "reverse natural order"

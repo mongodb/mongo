@@ -76,7 +76,7 @@ public:
     // todo: do order right for compound keys.  this is temp.
     dir = 1;
     Element e = order.pattern.firstElement();
-    if( e.type() == Number && e.number() < 0 ) {
+    if( e.number() < 0 ) {
       dir = -1;
     }
   }

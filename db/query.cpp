@@ -74,7 +74,6 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 			idxKey.getFieldNames(keyFields);
 			if( keyFields == orderFields ) {
 				bool reverse = 
-					order.firstElement().type() == Number && 
 					order.firstElement().number() < 0;
 				JSObjBuilder b;
 				/* todo: start with the right key, not just beginning of index, when query is also
@@ -241,7 +240,14 @@ int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
 struct Mod { 
 	enum Op { INC, SET } op;
 	const char *fieldName;
-	double *n;
+    double *ndouble;
+    int *nint;
+    void setn(double n) { 
+        if( ndouble ) *ndouble = n;
+        else *nint = (int) n;
+    }
+    double getn() { return ndouble ? *ndouble : *nint; }
+    int type;
 	static void getMods(vector<Mod>& mods, JSObj from);
 	static void applyMods(vector<Mod>& mods, JSObj obj);
 };
@@ -250,11 +256,14 @@ void Mod::applyMods(vector<Mod>& mods, JSObj obj) {
 	for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) { 
 		Mod& m = *i;
 		Element e = obj.findElement(m.fieldName);
-		if( e.type() == Number ) {
-			if( m.op == INC )
-				*m.n = e.number() += *m.n;
-			else
-				e.number() = *m.n; // $set or $SET
+		if( e.isNumber() ) {
+            if( m.op == INC ) {
+                e.setNumber( e.number() + m.getn() );
+                m.setn( e.number() );
+				// *m.n = e.number() += *m.n;
+            } else {
+                e.setNumber( m.getn() ); // $set or $SET
+            }
 		}
 	}
 }
@@ -288,8 +297,15 @@ void Mod::getMods(vector<Mod>& mods, JSObj from) {
 				Mod m;
 				m.op = op;
 				m.fieldName = f.fieldName();
-				if( f.type() == Number ) {
-					m.n = &f.number();
+                if( f.isNumber() ) {
+                    if( f.type() == NumberDouble ) {
+                        m.ndouble = (double *) f.value();
+                        m.nint = 0;
+                    }
+                    else { 
+                        m.ndouble = 0;
+                        m.nint = (int *) f.value();
+                    }
 					mods.push_back( m );
 				} 
 			}
@@ -387,7 +403,7 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 			JSObjBuilder b;
 			b.appendElements(pattern);
 			for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
-				b.append(i->fieldName, *i->n);
+				b.append(i->fieldName, i->getn());
 			JSObj obj = b.done();
 			theDataFileMgr.insert(ns, (void*) obj.objdata(), obj.objsize());
 			if( profile )

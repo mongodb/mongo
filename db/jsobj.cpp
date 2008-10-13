@@ -31,7 +31,8 @@ string Element::toString() {
 		return "EOO";
     case Date:
 		s << fieldName() << ": Date(" << hex << date() << ')'; break;
-	case Number:
+	case NumberDouble:
+	case NumberInt:
 		s << fieldName() << ": " << number(); break;
 	case Bool: 
 		s << fieldName() << ": " << boolean() ? "true" : "false"; break;
@@ -94,8 +95,11 @@ int Element::size() const {
 		case Bool:
 			x = 2;
 			break;
+        case NumberInt:
+            x = 5;
+            break;
 		case Date:
-		case Number:
+		case NumberDouble:
 			x = 9;
 			break;
 		case jstOID:
@@ -169,7 +173,8 @@ int compareElementValues(const Element& l, const Element& r) {
 			if( l.date() < r.date() )
 				return -1;
 			return l.date() == r.date() ? 0 : 1;
-		case Number:
+		case NumberInt:
+		case NumberDouble:
 			x = l.number() - r.number();
 			if( x < 0 ) return -1;
 			return x == 0 ? 0 : 1;
@@ -393,7 +398,7 @@ JSObj JSObj::extractFields(JSObj& pattern) {
 
 int JSObj::getIntField(const char *name) { 
 	Element e = getField(name);
-	return e.type() == Number ? (int) e.number() : INT_MIN;
+	return e.isNumber() ? (int) e.number() : INT_MIN;
 }
 
 bool JSObj::getBoolField(const char *name) { 

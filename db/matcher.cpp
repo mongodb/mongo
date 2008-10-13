@@ -381,7 +381,7 @@ inline bool _regexMatches(RegexMatcher& rm, Element& e) {
 	const char *p = buf;
 	if( e.type() == String || e.type() == Symbol )
 		p = e.valuestr();
-	else if( e.type() == Number ) { 
+    else if( e.isNumber() ) { 
 		sprintf(buf, "%f", e.number());
 	}
 	else if( e.type() == Date ) { 

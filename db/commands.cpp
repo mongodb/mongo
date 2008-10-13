@@ -89,7 +89,7 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	int type = s.type("return");
 	if( type == Object || type == Array )
 		result.append("retval", s.getObject("return"));
-	else if( type == Number ) 
+	else if( type == NumberDouble ) 
 		result.append("retval", s.getNumber("return"));
 	else if( type == String )
 		result.append("retval", s.getString("return").c_str());
@@ -328,7 +328,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 		valid = true;
 		ok = dbEval(jsobj, anObjBuilder);
 	}
-	else if( e.type() == Number ) { 
+    else if( e.isNumber() ) { 
         if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
 			if( 1 ) {
 				log() << "dropDatabase " << ns << endl;
