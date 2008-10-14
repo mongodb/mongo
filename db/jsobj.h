@@ -483,6 +483,19 @@ private:
 	const char *theend;
 };
 
+/* iterator a JSObj which is an array, in array order. 
+class JSArrayIter {
+public:
+	JSElemIter(const JSObj& jso) {
+...
+	}
+	bool more() { return ... } 
+	Element next() {
+...
+	}
+};
+*/
+
 #include <pcrecpp.h> 
 
 class RegexMatcher { 

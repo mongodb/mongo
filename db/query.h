@@ -47,7 +47,7 @@
    dbQuery:
       string collection;
 	  int nToSkip;
-	  int nToReturn; // how many you want back as the beginning of the cursor data
+	  int nToReturn; // how many you want back as the beginning of the cursor data (0=no limit)
       JSObject query;
 	  [JSObject fieldsToReturn]
    dbGetMore:
@@ -71,7 +71,7 @@
       int resultFlags = 0;
       int64 cursorID;
       int startingFrom;
-      int nReturned; // 0=infinity
+      int nReturned;
       list of marshalled JSObjects;
 */
 

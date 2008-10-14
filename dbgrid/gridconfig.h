@@ -26,7 +26,9 @@
 class GridDB {
 public:
     enum { Port = 30000 };
+    GridDB();
 };
+extern GridDB gridDB;
 
 /* Machine is the concept of a host that runs the db process.
 */

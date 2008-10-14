@@ -19,6 +19,16 @@
 #include "stdafx.h"
 #include "sock.h"
 
+static boost::mutex sock_mutex;
+// .empty() if err
+string hostbyname(const char *hostname) {
+    boostlock lk(sock_mutex);
+	struct hostent *h;
+	h = gethostbyname(hostname);
+	if( h == 0 ) return "";
+	return inet_ntoa( *((struct in_addr *)(h->h_addr)) );
+}
+
 void sendtest() { 
 	cout << "sendtest\n"; 
 	SockAddr me(27016);

@@ -41,7 +41,7 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
   
   	int port = DBPort;
 
-	string ip = hostbyname_nonreentrant(serverAddress);
+	string ip = hostbyname(serverAddress);
 	if( ip.empty() ) 
 		ip = serverAddress;
 
@@ -50,7 +50,7 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	  //cout << "port string:" << ip.substr( idx ) << endl;
 	  port = atoi( ip.substr( idx + 1 ).c_str() );
 	  ip = ip.substr( 0 , idx );
-	  ip = hostbyname_nonreentrant(ip.c_str());
+	  ip = hostbyname(ip.c_str());
 
 	}
 	if( ip.empty() ) 

@@ -527,6 +527,28 @@ int runCount(const char *ns, JSObj& cmd, string& err) {
 	return count;
 }
 
+/* [ { a : 1 } , { b : 1 } ] -> { a : 1, b : 1 } 
+*/
+inline JSObj transformOrderFromArrayFormat(JSObj order) { 
+    /* note: this is slow, but that is ok as order will have very few pieces */
+    JSObjBuilder b;
+    char p[2] = "0";
+
+    while( 1 ) {
+        JSObj j = order.getObjectField(p);
+        if( j.isEmpty() ) 
+            break;
+        Element e = j.firstElement();
+        uassert("bad order array", !e.eoo());
+        uassert("bad order array [2]", e.isNumber());
+        b.append(e);
+        (*p)++;
+        uassert("too many ordering elements", *p <= '9');
+    }
+
+    return b.doneAndDecouple();
+}
+
 QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss, int queryOptions) 
 {
@@ -555,7 +577,15 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
         uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
 
 		JSObj query = jsobj.getObjectField("query");
-		JSObj order = jsobj.getObjectField("orderby");
+        JSObj order;
+        {
+            Element e = jsobj.findElement("orderby");
+            if( !e.eoo() ) {
+                order = e.embeddedObject();
+                if( e.type() == Array ) 
+                    order = transformOrderFromArrayFormat(order);
+            }
+        }
 		if( query.isEmpty() && order.isEmpty() )
 			query = jsobj;
 

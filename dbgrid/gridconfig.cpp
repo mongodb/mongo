@@ -23,3 +23,6 @@
 #include "connpool.h"
 #include "gridconfig.h"
 
+GridDB::GridDB() { 
+
+}

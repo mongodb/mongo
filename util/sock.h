@@ -72,12 +72,7 @@ inline void prebindOptions( int sock ){
 #endif
 
 // .empty() if err
-inline string hostbyname_nonreentrant(const char *hostname) {
-	struct hostent *h;
-	h = gethostbyname(hostname);
-	if( h == 0 ) return "";
-	return inet_ntoa( *((struct in_addr *)(h->h_addr)) );
-}
+string hostbyname(const char *hostname);
 
 struct SockAddr {
 	SockAddr() { addressSize = sizeof(sockaddr_in); memset(&sa, 0, sizeof(sa)); }
