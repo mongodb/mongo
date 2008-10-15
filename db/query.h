@@ -33,7 +33,7 @@
 
    dbInsert:
       string collection;
-      a series of JSObjects terminated with a null object (i.e., just EOO)
+      a series of JSObjects 
    dbDelete:
       string collection;
 	  int flags=0; // 1=DeleteSingle
