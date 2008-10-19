@@ -255,6 +255,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\json.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\grid\message.cpp"
 				>
 			</File>

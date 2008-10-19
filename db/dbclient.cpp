@@ -22,6 +22,19 @@
 #include "../util/builder.h"
 #include "jsobj.h"
 #include "query.h"
+#include "json.h"
+
+/* --- dbclientcommands --- */
+
+JSObj ismastercmdobj = fromjson("{ismaster:1}");
+
+JSObj DBClientCommands::cmdIsMaster(bool& isMaster) {
+    JSObj o = findOne("admin", ismastercmdobj);
+    isMaster = (o.getIntField("ismaster") == 1);
+    return o;
+}
+
+/* --- dbclientconnection --- */
 
 JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToReturn, int queryOptions) { 
 	auto_ptr<DBClientCursor> c = 
@@ -191,6 +204,11 @@ again:
 	auto_ptr<DBClientCursor> cursor = 
 		c.query("foo.bar", emptyObj, 0, 0, 0, Option_CursorTailable);
 	DBClientCursor *cc = cursor.get();
+    if( cc == 0 ) { 
+        cout << "query() returned 0, sleeping 10 secs" << endl;
+        sleepsecs(10);
+        goto again;
+    }
 	while( 1 ) {
 		bool m;
         try { 
@@ -212,4 +230,49 @@ again:
 		}
 		cout << cc->next().toString() << endl;
 	}
+}
+
+/* --- class dbclientpaired --- */
+
+DBClientPaired::DBClientPaired() : 
+  left(true), right(true)
+{ 
+    master = NotSetL;
+}
+
+void DBClientPaired::checkMaster() { 
+    if( master > NotSetR ) 
+        return;
+
+    int x = master;
+    for( int pass = 0; pass < 2; pass++ ) {
+        DBClientConnection& c = x == 0 ? left : right;
+        x = x^1;
+        try { 
+
+        }
+        catch(AssertionException&) { 
+        }
+    }
+}
+
+bool DBClientPaired::connect(const char *serverHostname1, const char *serverHostname2) { 
+    string errmsg;
+    bool l = left.connect(serverHostname1, errmsg);
+    bool r = right.connect(serverHostname2, errmsg);
+    master = l ? NotSetL : NotSetR;
+    checkMaster();
+    return l || r;
+}
+
+auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, JSObj b, int c, int d, 
+                                               JSObj *e, int f) 
+{
+    checkMaster();
+    return auto_ptr<DBClientCursor>(0);
+}
+
+JSObj DBClientPaired::findOne(const char *a, JSObj b, JSObj *c, int d) {
+    checkMaster();
+    return JSObj();
 }

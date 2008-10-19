@@ -48,8 +48,6 @@ void ensureHaveIdIndex(const char *ns);
 
 ReplPair *replPair = 0;
 
-JSObj ismasterobj = fromjson("{ismaster:1}");
-
 /* peer unreachable, try our arbiter */
 void ReplPair::arbitrate() {
     if( arbHost == "-" ) { 
@@ -65,7 +63,9 @@ void ReplPair::arbitrate() {
         return;
     }
 
-    JSObj res = conn->findOne("admin.$cmd", ismasterobj);
+    bool is_master;
+    JSObj res = conn->cmdIsMaster(is_master);
+        /*findOne("admin.$cmd", ismasterobj);*/
     if( res.isEmpty() ) { 
         setMaster(State_CantArb, "can't arb 2");
         return;
