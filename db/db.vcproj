@@ -202,7 +202,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\dbclient.cpp"
+				RelativePath="..\client\dbclient.cpp"
 				>
 			</File>
 			<File
@@ -312,10 +312,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\dbclient.h"
-				>
-			</File>
-			<File
 				RelativePath=".\dbmessage.h"
 				>
 			</File>
@@ -361,6 +357,10 @@
 			</File>
 			<File
 				RelativePath="..\util\mmap.h"
+				>
+			</File>
+			<File
+				RelativePath="..\client\model.h"
 				>
 			</File>
 			<File

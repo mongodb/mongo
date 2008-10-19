@@ -18,7 +18,7 @@
 
 #include "stdafx.h"
 #include "pdfile.h"
-#include "dbclient.h"
+#include "../client/dbclient.h"
 #include "../util/builder.h"
 #include "jsobj.h"
 #include "query.h"

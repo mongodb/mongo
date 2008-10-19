@@ -17,12 +17,12 @@
 */
 
 #include "stdafx.h"
-#include "pdfile.h"
+#include "../db/pdfile.h"
 #include "dbclient.h"
 #include "../util/builder.h"
-#include "jsobj.h"
-#include "query.h"
-#include "json.h"
+#include "../db/jsobj.h"
+#include "../db/query.h"
+#include "../db/json.h"
 
 /* --- dbclientcommands --- */
 

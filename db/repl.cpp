@@ -28,7 +28,7 @@
 #include "../util/goodies.h"
 #include "repl.h"
 #include "../grid/message.h"
-#include "dbclient.h"
+#include "../client/dbclient.h"
 #include "pdfile.h"
 #include "query.h"
 #include "json.h"
