@@ -167,7 +167,7 @@ again:
 	md->len = len;
         
 	if ( len <= 0 ){
-		log() << "got a length of 0, something is wrong" << endl;
+		cout << "got a length of " << len << ", something is wrong" << endl;
 		return false;
 	}
 
