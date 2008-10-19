@@ -33,20 +33,20 @@ void Listener::listen() {
 	SockAddr me(port);
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	if( sock == INVALID_SOCKET ) {
-		cout << "ERROR: listen(): invalid socket? " << errno << endl;
+		log() << "ERROR: listen(): invalid socket? " << errno << endl;
 		return;
 	}
 	prebindOptions( sock );
 	if( bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) { 
-		cout << "listen(): bind() failed errno:" << errno << endl;
+		log() << "listen(): bind() failed errno:" << errno << endl;
 		if( errno == 98 )
-			cout << "98 == addr already in use" << endl;
+			log() << "98 == addr already in use" << endl;
 		closesocket(sock);
 		return;
 	}
 
 	if( ::listen(sock, 128) != 0 ) { 
-		cout << "listen(): listen() failed " << errno << endl;
+		log() << "listen(): listen() failed " << errno << endl;
 		closesocket(sock);
 		return;
 	}
@@ -108,7 +108,7 @@ bool MessagingPort::connect(SockAddr& _far)
 
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 	if( sock == INVALID_SOCKET ) {
-		cout << "ERROR: connect(): invalid socket? " << errno << endl;
+		log() << "ERROR: connect(): invalid socket? " << errno << endl;
 		return false;
 	}
 	if( ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize) ) { 
@@ -130,12 +130,12 @@ again:
 	while( 1 ) {
 		int x = ::recv(sock, lenbuf, lft, 0);
 		if( x == 0 ) {
-			DEV cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
+			DEV cout << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
 			m.reset();
 			return false;
 		}
 		if( x < 0 ) { 
-			cout << "MessagingPort::recv(): recv() error " << errno << ' ' << farEnd.toString()<<endl;
+            log() << "MessagingPort recv() error " << errno << ' ' << farEnd.toString()<<endl;
 			m.reset();
 			return false;
 		}
@@ -143,7 +143,7 @@ again:
 		if( lft == 0 )
 			break;
 		lenbuf += x;
-		cout << "MessagingPort::recv(): got " << x << " bytes wanted 4, lft=" << lft << endl;
+		log() << "MessagingPort recv() got " << x << " bytes wanted 4, lft=" << lft << endl;
 		assert( lft > 0 );
 	}
 
@@ -153,12 +153,12 @@ again:
 			unsigned foo = 0x10203040;
 			int x = ::send(sock, (char *) &foo, 4, 0);
 			if( x <= 0 ) { 
-				cout << "MessagingPort endian send() error " << errno << ' ' << farEnd.toString() << endl;
+				log() << "MessagingPort endian send() error " << errno << ' ' << farEnd.toString() << endl;
 				return false;
 			}
 			goto again;
 		}
-		cout << "bad recv() len: " << len << '\n';
+		log() << "bad recv() len: " << len << '\n';
 		return false;
 	}
         
@@ -167,7 +167,7 @@ again:
 	md->len = len;
         
 	if ( len <= 0 ){
-		cout << "got a length of 0, something is wrong" << endl;
+		log() << "got a length of 0, something is wrong" << endl;
 		return false;
 	}
 
@@ -181,7 +181,7 @@ again:
 			return false;
 		}
 		if( x < 0 ) { 
-			cout << "MessagingPort::recv(): recv() error " << errno << ' ' << farEnd.toString() << endl;
+			log() << "MessagingPort recv() error " << errno << ' ' << farEnd.toString() << endl;
 			m.reset();
 			return false;
 		}
@@ -234,6 +234,6 @@ void MessagingPort::say(Message& toSend, int responseTo) {
 	toSend.data->responseTo = responseTo;
 	int x = ::send(sock, (char *) toSend.data, toSend.data->len, 0);
 	if( x <= 0 ) { 
-		cout << "MessagingPort::say: send() error " << errno << ' ' << farEnd.toString() << endl;
+        log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
 	}
 }

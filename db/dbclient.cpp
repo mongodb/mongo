@@ -29,7 +29,7 @@
 JSObj ismastercmdobj = fromjson("{ismaster:1}");
 
 JSObj DBClientCommands::cmdIsMaster(bool& isMaster) {
-    JSObj o = findOne("admin", ismastercmdobj);
+    JSObj o = findOne("admin.$cmd", ismastercmdobj);
     isMaster = (o.getIntField("ismaster") == 1);
     return o;
 }
@@ -164,6 +164,18 @@ void DBClientCursor::dataReceived() {
 	nReturned = qr->nReturned;
 	pos = 0;
 	data = qr->data();
+
+    /* check for errors.  the only one we really care about at 
+       this stage is "not master" */
+    if( conn->clientPaired && nReturned ) {
+        JSObj o(data);
+        Element e = o.firstElement();
+        if( strcmp(e.fieldName(), "$err") == 0 && 
+            e.type() == String && strncmp(e.valuestr(), "not master", 10) == 0 ) {
+                conn->clientPaired->isntMaster();
+        }
+    }
+
 	/* this assert would fire the way we currently work:
 	    assert( nReturned || cursorId == 0 );
     */
@@ -194,10 +206,16 @@ JSObj DBClientCursor::next() {
 extern JSObj emptyObj;
 void testClient() {
 	cout << "testClient()" << endl;
-	DBClientConnection c(true);
+//	DBClientConnection c(true);
+    DBClientPaired c;
 	string err;
-    if( !c.connect("10.211.55.2", err) ) {
+    if( !c.connect("10.211.55.2", "1.2.3.4") ) {
+//    if( !c.connect("10.211.55.2", err) ) {
         cout << "testClient: connect() failed" << endl;
+    }
+    else { 
+        // temp:
+        cout << "test query returns: " << c.findOne("foo.bar", fromjson("{}")).toString() << endl;
     }
 again:
 	cout << "query foo.bar..." << endl;
@@ -240,20 +258,49 @@ DBClientPaired::DBClientPaired() :
     master = NotSetL;
 }
 
-void DBClientPaired::checkMaster() { 
-    if( master > NotSetR ) 
-        return;
-
-    int x = master;
-    for( int pass = 0; pass < 2; pass++ ) {
-        DBClientConnection& c = x == 0 ? left : right;
-        x = x^1;
-        try { 
-
+/* find which server, the left or right, is currently master mode */
+void DBClientPaired::_checkMaster() {
+    for( int retry = 0; retry < 2; retry++ ) {
+        int x = master;
+        for( int pass = 0; pass < 2; pass++ ) {
+            DBClientConnection& c = x == 0 ? left : right;
+            try {
+                bool im;
+                JSObj o = c.cmdIsMaster(im);
+                if( retry ) 
+                    log() << "checkmaster: " << c.toString() << ' ' << o.toString() << '\n';
+                if( im ) {
+                    master = (State) (x + 2);
+                    return;
+                }
+            }
+            catch(AssertionException&) {
+                if( retry ) 
+                    log() << "checkmaster: caught exception " << c.toString() << '\n';
+            }
+            x = x^1;
         }
-        catch(AssertionException&) { 
-        }
+        sleepsecs(1);
     }
+
+    uassert("checkmaster: no master found", false);
+}
+
+inline DBClientConnection& DBClientPaired::checkMaster() { 
+    if( master > NotSetR ) {
+        // a master is selected.  let's just make sure connection didn't die
+        DBClientConnection& c = master == Left ? left : right;
+        if( !c.isFailed() )
+            return c;
+        // after a failure, on the next checkMaster, start with the other 
+        // server -- presumably it took over. (not critical which we check first, 
+        // just will make the failover slightly faster if we guess right)
+        master = master == Left ? NotSetR : NotSetL;
+    }
+
+    _checkMaster();
+    assert( master > NotSetR );
+    return master == Left ? left : right;
 }
 
 bool DBClientPaired::connect(const char *serverHostname1, const char *serverHostname2) { 
@@ -261,18 +308,21 @@ bool DBClientPaired::connect(const char *serverHostname1, const char *serverHost
     bool l = left.connect(serverHostname1, errmsg);
     bool r = right.connect(serverHostname2, errmsg);
     master = l ? NotSetL : NotSetR;
-    checkMaster();
-    return l || r;
+    if( !l && !r ) // it would be ok to fall through, but checkMaster will then try an immediate reconnect which is slow
+        return false;
+    try { checkMaster(); }
+    catch(UserAssertionException&) { 
+        return false;
+    }
+    return true;
 }
 
 auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, JSObj b, int c, int d, 
                                                JSObj *e, int f) 
 {
-    checkMaster();
-    return auto_ptr<DBClientCursor>(0);
+    return checkMaster().query(a,b,c,d,e,f);
 }
 
 JSObj DBClientPaired::findOne(const char *a, JSObj b, JSObj *c, int d) {
-    checkMaster();
-    return JSObj();
+    return checkMaster().findOne(a,b,c,d);
 }

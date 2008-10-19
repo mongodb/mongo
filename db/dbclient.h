@@ -122,8 +122,11 @@ public:
     JSObj cmdIsMaster(bool& isMaster);
 };
 
+class DBClientPaired;
+
 class DBClientConnection : public DBClientCommands { 
     friend class DBClientCursor; 
+    DBClientPaired *clientPaired;
 	auto_ptr<MessagingPort> p;
 	auto_ptr<SockAddr> server;
     bool failed; // true if some sort of fatal error has ever happened
@@ -132,9 +135,11 @@ class DBClientConnection : public DBClientCommands {
     string serverAddress; // remember for reconnects
     void checkConnection();
 public:
+    string toString() const { return serverAddress; }
     MessagingPort& port() { return *p.get(); }
     bool isFailed() const { return failed; }
-    DBClientConnection(bool _autoReconnect=false) : failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
+    DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) : 
+      clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
 
     /* Returns false if fails to connect.
        If autoReconnect is true, you can try to use the DBClientConnection even when
@@ -169,30 +174,40 @@ public:
    checking for which is master, and do failover automatically.
 */
 class DBClientPaired : public DBClientCommands { 
+    friend class DBClientCursor;
     DBClientConnection left,right;
-    enum { 
+    enum State { 
         NotSetL=0, 
         NotSetR=1,
         Left, Right
     } master;
 
-    void checkMaster();
+    void _checkMaster();
+    DBClientConnection& checkMaster();
+
+    /* notification that we got a "not master" error. 
+    */
+    void isntMaster() { 
+        master == Left ? NotSetR : NotSetL; 
+    }
 public:
     DBClientPaired();
 
-    /* Returns false is neither member of the pair were reachable, although, 
+    /* Returns false is neither member of the pair were reachable, or neither is 
+       master, although, 
        when false returned, you can still try to use this connection object, it will 
        try reconnects.
        */
 	bool connect(const char *serverHostname1, const char *serverHostname2);
 
+    /* throws userassertion "no master found" */
     virtual 
 	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, 
 		JSObj *fieldsToReturn = 0, int queryOptions = 0);
 
+    /* throws userassertion "no master found" */
     virtual
 	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0, int queryOptions = 0);
 };
-
 
 
