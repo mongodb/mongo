@@ -102,13 +102,17 @@ public:
 
 class DBClientConnection : boost::noncopyable { 
     friend class DBClientCursor; 
-	MessagingPort p;
+	auto_ptr<MessagingPort> p;
 	auto_ptr<SockAddr> server;
     bool failed; // true if some sort of fatal error has ever happened
+    bool autoReconnect;
+    time_t lastReconnectTry;
+    string serverAddress; // remember for reconnects
+    void checkConnection();
 public:
-    MessagingPort& port() { return p; }
+    MessagingPort& port() { return *p.get(); }
     bool isFailed() const { return failed; }
-    DBClientConnection() : failed(false) { }
+    DBClientConnection(bool _autoReconnect=false) : failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
 	bool connect(const char *serverHostname, string& errmsg);
 
 	/* send a query to the database.

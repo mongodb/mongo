@@ -21,8 +21,34 @@
 #include "../util/unittest.h"
 #include "database.h"
 #include "connpool.h"
+#include "../db/pdfile.h"
 #include "gridconfig.h"
 
-GridDB::GridDB() { 
+static boost::mutex loc_mutex;
+static boost::mutex griddb_mutex;
+GridDB gridDB;
+GridConfig gridConfig;
 
+GridDB::GridDB() { 
+}
+
+GridConfig::GridConfig() { 
+}
+
+/*threadsafe*/
+Machine* GridConfig::owner(const char *ns, JSObj& objOrKey) {
+    {
+        boostlock lk(loc_mutex);
+
+        ObjLocs::iterator i = loc.find(ns);
+        if( i != loc.end() ) { 
+            return i->second;
+        }
+        i = loc.find(nsToClient(ns));
+        if( i != loc.end() ) { 
+            return i->second;
+        }
+    }
+
+    return 0;
 }

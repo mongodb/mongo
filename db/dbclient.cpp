@@ -35,13 +35,11 @@ JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToRe
 	return c->next().copy();
 }
 
-bool DBClientConnection::connect(const char *serverAddress, string& errmsg) { 
-	/* TODO not reentrant! 
-	   ok as used right now (we are in a big lock), but won't be later, so fix. */
-  
-  	int port = DBPort;
+bool DBClientConnection::connect(const char *_serverAddress, string& errmsg) { 
+    serverAddress = _serverAddress;
 
-	string ip = hostbyname(serverAddress);
+  	int port = DBPort;
+	string ip = hostbyname(_serverAddress);
 	if( ip.empty() ) 
 		ip = serverAddress;
 
@@ -56,9 +54,11 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	if( ip.empty() ) 
 		ip = serverAddress;
 	
-	//cout << "port:" << port << endl;
+    // we keep around SockAddr for connection life -- maybe MessagingPort
+    // requires that?
 	server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
-	if( !p.connect(*server) ) {
+    p = auto_ptr<MessagingPort>(new MessagingPort());
+	if( !p->connect(*server) ) {
         errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;
         failed = true;
 		return false;
@@ -66,7 +66,28 @@ bool DBClientConnection::connect(const char *serverAddress, string& errmsg) {
 	return true;
 }
 
+void DBClientConnection::checkConnection() { 
+    if( !failed ) 
+        return;
+    if( lastReconnectTry && time(0)-lastReconnectTry < 2 )
+        return;
+    if( !autoReconnect )
+        return;
+
+    lastReconnectTry = time(0);
+    log() << "trying reconnect to " << serverAddress << endl;
+    string errmsg;
+    string tmp = serverAddress;
+    failed = false;
+    if( !connect(tmp.c_str(), errmsg) )
+        log() << "reconnect " << serverAddress << " failed " << errmsg << endl;
+    else
+        log() << "reconnect " << serverAddress << " ok" << endl;
+}
+
 auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn, int queryOptions) {
+    checkConnection();
+
 	// see query.h for the protocol we are using here.
 	BufBuilder b;
     int opts = queryOptions;
@@ -81,12 +102,12 @@ auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, 
 	Message toSend;
 	toSend.setData(dbQuery, b.buf(), b.len());
 	auto_ptr<Message> response(new Message());
-    if( !p.call(toSend, *response) ) {
+    if( !p->call(toSend, *response) ) {
         failed = true;
 		return auto_ptr<DBClientCursor>(0);
     }
 
-	auto_ptr<DBClientCursor> c(new DBClientCursor(this, p, response, opts));
+	auto_ptr<DBClientCursor> c(new DBClientCursor(this, *p.get(), response, opts));
 	c->ns = ns;
 	c->nToReturn = nToReturn;
 	return c;
@@ -160,15 +181,24 @@ JSObj DBClientCursor::next() {
 extern JSObj emptyObj;
 void testClient() {
 	cout << "testClient()" << endl;
-	DBClientConnection c;
+	DBClientConnection c(true);
 	string err;
-	assert( c.connect("127.0.0.1", err) );
+    if( !c.connect("10.211.55.2", err) ) {
+        cout << "testClient: connect() failed" << endl;
+    }
+again:
 	cout << "query foo.bar..." << endl;
 	auto_ptr<DBClientCursor> cursor = 
 		c.query("foo.bar", emptyObj, 0, 0, 0, Option_CursorTailable);
 	DBClientCursor *cc = cursor.get();
 	while( 1 ) {
-		bool m = cc->more();
+		bool m;
+        try { 
+            m = cc->more();
+        } catch(AssertionException&) { 
+            cout << "more() asserted, sleeping 10 sec" << endl;
+            goto again;
+        }
 		cout << "more: " << m << " dead:" << cc->isDead() << endl;
 		if( !m ) {
 			if( cc->isDead() )

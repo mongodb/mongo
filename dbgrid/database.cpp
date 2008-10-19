@@ -16,6 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* DEPRECATED DELETE */
+
+
 #include "stdafx.h"
 #include "database.h"
 #include "../db/dbclient.h"

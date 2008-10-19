@@ -28,7 +28,6 @@ public:
     enum { Port = 30000 };
     GridDB();
 };
-extern GridDB gridDB;
 
 /* Machine is the concept of a host that runs the db process.
 */
@@ -37,3 +36,20 @@ public:
     enum { Port = 27018 /* standard port # for dbs that are downstream of a dbgrid */
     };
 };
+
+typedef map<string,Machine*> ObjLocs;
+
+class GridConfig { 
+    ObjLocs loc;
+public:
+    /* return which machine "owns" the object in question -- ie which partition 
+       we should go to. 
+       
+       threadsafe.
+    */
+    Machine* owner(const char *ns, JSObj& objOrKey);
+
+    GridConfig();
+};
+
+extern GridConfig gridConfig;
