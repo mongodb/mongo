@@ -179,10 +179,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\database.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\dbgrid.cpp"
 				>
 			</File>
@@ -247,11 +243,15 @@
 			Name="Shared Source Files"
 			>
 			<File
-				RelativePath="..\db\dbclient.cpp"
+				RelativePath="..\client\dbclient.cpp"
 				>
 			</File>
 			<File
 				RelativePath="..\db\jsobj.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\db\json.cpp"
 				>
 			</File>
 			<File

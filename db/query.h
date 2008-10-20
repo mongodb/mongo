@@ -82,7 +82,7 @@ enum {
 };
 
 // grab struct QueryResult from:
-#include "dbclient.h"
+#include "../client/dbclient.h"
 
 // for an existing query (ie a ClientCursor), send back additional information.
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);

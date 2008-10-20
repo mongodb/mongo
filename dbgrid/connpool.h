@@ -19,7 +19,7 @@
 #pragma once
 
 #include <queue>
-#include "../db/dbclient.h"
+#include "../client/dbclient.h"
 
 struct PoolForHost { 
     queue<DBClientConnection*> pool;

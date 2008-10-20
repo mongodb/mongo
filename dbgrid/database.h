@@ -1,5 +1,7 @@
 // cbgrid/database.h
 
+/* DEPRECATED DELETE */
+
 /* we create a database object for each client database 
 */
 class Database { 

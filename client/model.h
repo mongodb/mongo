@@ -1,4 +1,4 @@
-// database.cpp
+// model.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -16,14 +16,22 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* DEPRECATED DELETE */
+#pragma once
 
+#include "dbclient.h"
 
-#include "stdafx.h"
-#include "database.h"
-#include "../db/dbclient.h"
+class Model { 
+public:
+    Model() { }
+    virtual ~Model() { }
 
-boost::mutex Database::mutex;
+    virtual const char * getNS() = 0;
 
-void Database::load() { 
-}
+    /* define this as you see fit if you are using the default conn() implementation */
+    static DBClientCommands *globalConn;
+
+    /* you can override this if you need to do fancier connection management */
+    virtual DBClientCommands* conn() {
+        return globalConn;
+    }
+};

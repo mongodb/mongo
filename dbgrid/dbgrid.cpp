@@ -19,8 +19,8 @@
 #include "stdafx.h"
 #include "../grid/message.h"
 #include "../util/unittest.h"
-#include "database.h"
 #include "connpool.h"
+#include "gridconfig.h"
 
 const char *curNs = "";
 Client *client = 0;
@@ -97,8 +97,7 @@ public:
 };
 
 void start() { 
-    Database::load();
-
+    gridDB.init();
 /*
     try {
 cout << "TEMP" << endl;

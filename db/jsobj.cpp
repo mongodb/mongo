@@ -322,14 +322,16 @@ int JSObj::woCompare(const JSObj& r) const {
 } 
 
 Element JSObj::getField(const char *name) {
-	JSElemIter i(*this);
-	while( i.more() ) {
-		Element e = i.next();
-		if( e.eoo() )
-			break;
-		if( strcmp(e.fieldName(), name) == 0 )
-			return e;
-	}
+    if( details ) {
+        JSElemIter i(*this);
+        while( i.more() ) {
+            Element e = i.next();
+            if( e.eoo() )
+                break;
+            if( strcmp(e.fieldName(), name) == 0 )
+                return e;
+        }
+    }
 	return nullElement;
 }
 

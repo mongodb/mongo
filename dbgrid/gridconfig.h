@@ -23,10 +23,15 @@
 
 #pragma once
 
+#include "../client/dbclient.h"
+#include "../client/model.h"
+
 class GridDB {
+    DBClientPaired conn;
 public:
-    enum { Port = 30000 };
+    enum { Port = 27016 }; /* standard port # for a grid db */
     GridDB();
+    void init();
 };
 extern GridDB gridDB;
 
@@ -34,6 +39,29 @@ extern GridDB gridDB;
 */
 class Machine { 
 public:
-    enum { Port = 27018 /* standard port # for dbs that are downstream of a dbgrid */
+    enum { Port = 27018 /* default port # for dbs that are downstream of a dbgrid */
     };
 };
+
+typedef map<string,Machine*> ObjLocs;
+
+/* top level grid configuration */
+class ClientConfig : public Model { 
+};
+
+class GridConfig { 
+    ObjLocs loc;
+
+    Machine* fetchOwner(string& client, const char *ns, JSObj& objOrKey);
+public:
+    /* return which machine "owns" the object in question -- ie which partition 
+       we should go to. 
+       
+       threadsafe.
+    */
+    Machine* owner(const char *ns, JSObj& objOrKey);
+
+    GridConfig();
+};
+
+extern GridConfig gridConfig;
