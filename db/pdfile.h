@@ -307,8 +307,8 @@ inline BtreeBucket* DiskLoc::btree() const {
 
 /*---------------------------------------------------------------------*/ 
 
-// customer, or rather a customer's database -- i guess down the line
-// there might be more than one for a cust, we'll see.
+// A Client is a psuedonym for a database. 
+
 class Client { 
 public:
 	Client(const char *nm, bool& justCreated) : name(nm) { 
