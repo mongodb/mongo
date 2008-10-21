@@ -22,9 +22,9 @@
 #include <limits>
 
 
-Element nullElement;
+BSONElement nullElement;
 
-string Element::toString() { 
+string BSONElement::toString() { 
 	stringstream s;
 	switch( type() ) {
     case EOO:
@@ -81,7 +81,7 @@ string Element::toString() {
 	return s.str();
 }
 
-int Element::size() const {
+int BSONElement::size() const {
 	if( totalSize >= 0 )
 		return totalSize;
 
@@ -133,17 +133,17 @@ int Element::size() const {
 			}
 			break;
 		default:
-			cout << "Element: bad type " << (int) type() << endl;
+			cout << "BSONElement: bad type " << (int) type() << endl;
 			assert(false);
 	}
-	((Element *) this)->totalSize =  x + fieldNameSize;
+	((BSONElement *) this)->totalSize =  x + fieldNameSize;
 
 	if( !eoo() ) { 
 		const char *next = data + totalSize;
 		if( *next < 0 || *next > JSTypeMax ) { 
 			// bad type.  
 			cout << "***\n";
-			cout << "Bad data or size in Element::size()\n";
+			cout << "Bad data or size in BSONElement::size()\n";
 			cout << "bad type:" << (int) *next << '\n';
 			cout << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << '\n';
 			cout << "lastrec:" << endl;
@@ -156,7 +156,7 @@ int Element::size() const {
 }
 
 /* must be same type! */
-int compareElementValues(const Element& l, const Element& r) {
+int compareElementValues(const BSONElement& l, const BSONElement& r) {
 	int f;
 	double x;
 	switch( l.type() ) {
@@ -214,9 +214,9 @@ int compareElementValues(const Element& l, const Element& r) {
 //   a : 3
 // else we just append the element.
 //
-void appendElementHandlingGtLt(JSObjBuilder& b, Element& e) { 
+void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e) { 
 	if( e.type() == Object ) {
-		Element fe = e.embeddedObject().firstElement();
+		BSONElement fe = e.embeddedObject().firstElement();
 		const char *fn = fe.fieldName();
 		if( fn[0] == '$' && fn[1] && fn[2] == 't' ) { 
 			b.appendAs(fe, e.fieldName());
@@ -226,12 +226,12 @@ void appendElementHandlingGtLt(JSObjBuilder& b, Element& e) {
 	b.append(e);
 }
 
-int getGtLtOp(Element& e) { 
+int getGtLtOp(BSONElement& e) { 
 	int op = JSMatcher::Equality;
 	if( e.type() != Object ) 
 		return op;
 
-	Element fe = e.embeddedObject().firstElement();
+	BSONElement fe = e.embeddedObject().firstElement();
 	const char *fn = fe.fieldName();
 	if( fn[0] == '$' && fn[1] ) { 
 		if( fn[2] == 't' ) { 
@@ -255,15 +255,15 @@ int getGtLtOp(Element& e) {
 }
 
 
-/* JSObj ------------------------------------------------------------*/
+/* BSONObj ------------------------------------------------------------*/
 
-string JSObj::toString() const {
+string BSONObj::toString() const {
 	if( isEmpty() ) return "{}";
 
 	stringstream s;
 	s << "{ ";
-	JSElemIter i(*this);
-	Element e = i.next();
+	BSONObjIterator i(*this);
+	BSONElement e = i.next();
 	if( !e.eoo() )
 	while( 1 ) { 
 		s << e.toString();
@@ -277,7 +277,7 @@ string JSObj::toString() const {
 }
 
 // todo: can be a little faster if we don't use toString() here.
-bool JSObj::valid() const { 
+bool BSONObj::valid() const { 
     try { 
         toString();
     }
@@ -288,19 +288,19 @@ bool JSObj::valid() const {
 }
 
 /* well ordered compare */
-int JSObj::woCompare(const JSObj& r) const { 
+int BSONObj::woCompare(const BSONObj& r) const { 
 	if( isEmpty() )
 		return r.isEmpty() ? 0 : -1;
 	if( r.isEmpty() )
 		return 1;
 
-	JSElemIter i(*this);
-	JSElemIter j(r);
+	BSONObjIterator i(*this);
+	BSONObjIterator j(r);
 	while( 1 ) { 
 		// so far, equal...
 
-		Element l = i.next();
-		Element r = j.next();
+		BSONElement l = i.next();
+		BSONElement r = j.next();
 
 		if( l == r ) {
 			if( l.eoo() )
@@ -321,11 +321,11 @@ int JSObj::woCompare(const JSObj& r) const {
 	return -1;
 } 
 
-Element JSObj::getField(const char *name) {
+BSONElement BSONObj::getField(const char *name) {
     if( details ) {
-        JSElemIter i(*this);
+        BSONObjIterator i(*this);
         while( i.more() ) {
-            Element e = i.next();
+            BSONElement e = i.next();
             if( e.eoo() )
                 break;
             if( strcmp(e.fieldName(), name) == 0 )
@@ -338,21 +338,21 @@ Element JSObj::getField(const char *name) {
 /* return has eoo() true if no match 
    supports "." notation to reach into embedded objects
 */
-Element JSObj::getFieldDotted(const char *name) {
+BSONElement BSONObj::getFieldDotted(const char *name) {
 	{
 		const char *p = strchr(name, '.');
 		if( p ) { 
 			string left(name, p-name);
-			JSObj sub = getObjectField(left.c_str());
+			BSONObj sub = getObjectField(left.c_str());
 			return sub.isEmpty() ? nullElement : sub.getFieldDotted(p+1);
 		}
 	}
 
     return getField(name);
 /*
-	JSElemIter i(*this);
+	BSONObjIterator i(*this);
 	while( i.more() ) {
-		Element e = i.next();
+		BSONElement e = i.next();
 		if( e.eoo() )
 			break;
 		if( strcmp(e.fieldName(), name) == 0 )
@@ -362,68 +362,69 @@ Element JSObj::getFieldDotted(const char *name) {
 */
 }
 
-/* makes a new JSObj with the fields specified in pattern.
+/* makes a new BSONObj with the fields specified in pattern.
    fields returned in the order they appear in pattern.
    if any field missing, you get back an empty object overall.
 
    n^2 implementation bad if pattern and object have lots 
    of fields - normally pattern doesn't so should be fine.
 */
-JSObj JSObj::extractFields(JSObj pattern, JSObjBuilder& b) { 
-	JSElemIter i(pattern);
+BSONObj BSONObj::extractFields(BSONObj pattern, BSONObjBuilder& b) { 
+	BSONObjIterator i(pattern);
 	while( i.more() ) {
-		Element e = i.next();
+		BSONElement e = i.next();
 		if( e.eoo() )
 			break;
-		Element x = getFieldDotted(e.fieldName());
+		BSONElement x = getFieldDotted(e.fieldName());
 		if( x.eoo() )
-			return JSObj();
+			return BSONObj();
 		b.append(x);
 	}
 	return b.done();
 }
 
-JSObj JSObj::extractFields(JSObj& pattern) { 
-	JSObjBuilder b(32); // scanandorder.h can make a zillion of these, so we start the allocation very small
-	JSElemIter i(pattern);
+BSONObj BSONObj::extractFields(BSONObj& pattern) { 
+	BSONObjBuilder b(32); // scanandorder.h can make a zillion of these, so we start the allocation very small
+	BSONObjIterator i(pattern);
 	while( i.more() ) {
-		Element e = i.next();
+		BSONElement e = i.next();
 		if( e.eoo() )
 			break;
-		Element x = getFieldDotted(e.fieldName());
+		BSONElement x = getFieldDotted(e.fieldName());
 		if( x.eoo() )
-			return JSObj();
+			return BSONObj();
 		b.append(x);
 	}
 	return b.doneAndDecouple();
 }
 
-int JSObj::getIntField(const char *name) { 
-	Element e = getField(name);
+int BSONObj::getIntField(const char *name) { 
+	BSONElement e = getField(name);
 	return e.isNumber() ? (int) e.number() : INT_MIN;
 }
 
-bool JSObj::getBoolField(const char *name) { 
-	Element e = getField(name);
+bool BSONObj::getBoolField(const char *name) { 
+	BSONElement e = getField(name);
 	return e.type() == Bool ? e.boolean() : false;
 }
 
-const char * JSObj::getStringField(const char *name) { 
-	Element e = getField(name);
+const char * BSONObj::getStringField(const char *name) { 
+	BSONElement e = getField(name);
 	return e.type() == String ? e.valuestr() : "";
 }
 
-JSObj JSObj::getObjectField(const char *name) { 
-	Element e = getField(name);
-	JSType t = e.type();
-	return t == Object || t == Array ? e.embeddedObject() : JSObj();
+BSONObj BSONObj::getObjectField(const char *name) { 
+	BSONElement e = getField(name);
+	BSONType t = e.type();
+	return t == Object || t == Array ? e.embeddedObject() : BSONObj();
 }
 
-int JSObj::getFieldNames(set<string>& fields) {
+/* grab names of all the fields in this object */
+int BSONObj::getFieldNames(set<string>& fields) {
 	int n = 0;
-	JSElemIter i(*this);
+	BSONObjIterator i(*this);
 	while( i.more() ) {
-		Element e = i.next();
+		BSONElement e = i.next();
 		if( e.eoo() )
 			break;
 		fields.insert(e.fieldName());
@@ -435,17 +436,17 @@ int JSObj::getFieldNames(set<string>& fields) {
 /* note: addFields always adds _id even if not specified 
    returns n added not counting _id unless requested.
 */
-int JSObj::addFields(JSObj& from, set<string>& fields) {
+int BSONObj::addFields(BSONObj& from, set<string>& fields) {
 	assert( details == 0 ); /* partial implementation for now... */
 
-	JSObjBuilder b;
+	BSONObjBuilder b;
 
 	int N = fields.size();
 	int n = 0;
-	JSElemIter i(from);
+	BSONObjIterator i(from);
 	bool gotId = false;
 	while( i.more() ) {
-		Element e = i.next();
+		BSONElement e = i.next();
 		const char *fname = e.fieldName();
 		if( fields.count(fname) ) {
 			b.append(e);
@@ -479,7 +480,7 @@ struct MaxKeyData {
 	char name;
 	char eoo;
 } maxkeydata;
-JSObj maxKey((const char *) &maxkeydata);
+BSONObj maxKey((const char *) &maxkeydata);
 
 struct JSObj0 {
 	JSObj0() { totsize = 5; eoo = EOO; }
@@ -488,7 +489,7 @@ struct JSObj0 {
 } js0;
 #pragma pack(pop)
 
-Element::Element() { 
+BSONElement::BSONElement() { 
 	data = &js0.eoo;
 	fieldNameSize = 0;
 	totalSize = -1;
@@ -502,5 +503,5 @@ struct EmptyObject {
 } emptyObject;
 #pragma pack(pop)
 
-JSObj emptyObj((char *) &emptyObject);
+BSONObj emptyObj((char *) &emptyObject);
 

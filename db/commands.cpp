@@ -34,9 +34,9 @@
 extern int queryTraceLevel;
 extern int otherTraceLevel;
 extern int opLogging;
-bool userCreateNS(const char *ns, JSObj& j, string& err);
+bool userCreateNS(const char *ns, BSONObj& j, string& err);
 void flushOpLog();
-int runCount(const char *ns, JSObj& cmd, string& err);
+int runCount(const char *ns, BSONObj& cmd, string& err);
 
 const int edebug=0;
 
@@ -49,8 +49,8 @@ Command::Command(const char *_name) : name(_name) {
     (*commands)[name] = this;
 }
 
-bool dbEval(JSObj& cmd, JSObjBuilder& result) { 
-	Element e = cmd.firstElement();
+bool dbEval(BSONObj& cmd, BSONObjBuilder& result) { 
+	BSONElement e = cmd.firstElement();
 	assert( e.type() == Code || e.type() == CodeWScope );
 	const char *code = e.type() == Code ? e.valuestr() : e.codeWScopeCode();
 
@@ -69,9 +69,9 @@ bool dbEval(JSObj& cmd, JSObjBuilder& result) {
 	if ( e.type() == CodeWScope )
 	  s.init( e.codeWScopeScopeData() );
 	s.setString("$client", client->name.c_str());
-	Element args = cmd.findElement("args");
+	BSONElement args = cmd.findElement("args");
 	if( args.type() == Array ) {
-		JSObj eo = args.embeddedObject();
+		BSONObj eo = args.embeddedObject();
 		if( edebug ) {
 			cout << "args:" << eo.toString() << endl;
 			cout << "code:\n" << code << endl;
@@ -235,7 +235,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 class CmdGetOpTime : public Command { 
 public:
     CmdGetOpTime() : Command("getoptime") { }
-    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         result.appendDate("optime", OpTime::now().asDate());
         return true;
     }
@@ -246,7 +246,7 @@ class Cmd : public Command {
 public:
     Cmd() : Command("") { }
     bool adminOnly() { return true; }
-    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         return true;
     }
 } cmd;
@@ -256,7 +256,7 @@ class CmdOpLogging : public Command {
 public:
     CmdOpLogging() : Command("opLogging") { }
     bool adminOnly() { return true; }
-    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         opLogging = (int) cmdObj.findElement("opLogging").number();
         flushOpLog();
         log() << "CMD: opLogging set to " << opLogging << endl;
@@ -268,7 +268,7 @@ class CmdQueryTraceLevel : public Command {
 public:
     CmdQueryTraceLevel() : Command("queryTraceLevel") { }
     bool adminOnly() { return true; }
-    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         queryTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
         return true;
     }
@@ -278,7 +278,7 @@ class Cmd : public Command {
 public:
     Cmd() : Command("traceAll") { }
     bool adminOnly() { return true; }
-    bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         queryTraceLevel = otherTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
         return true;
     }
@@ -289,7 +289,7 @@ public:
 // 
 // returns true if ran a cmd
 //
-bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder) { 
+bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder) { 
 
 	const char *p = strchr(ns, '.');
 	if( !p ) return false;
@@ -300,7 +300,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 
 	//cout << jsobj.toString() << endl;
 
-	Element e;
+	BSONElement e;
 	e = jsobj.firstElement();
 
     map<string,Command*>::iterator i;
@@ -424,9 +424,9 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 				logOp("c", ns, jsobj);
 				/*
 				{
-					JSObjBuilder b;
+					BSONObjBuilder b;
 					b.append("name", dropNs.c_str());
-					JSObj cond = b.done(); // { name: "colltodropname" }
+					BSONObj cond = b.done(); // { name: "colltodropname" }
 					deleteObjects("system.namespaces", cond, false, true);
 				}
 				client->namespaceIndex.kill(dropNs.c_str());
@@ -455,7 +455,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 			NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
 			log() << "CMD: deleteIndexes " << toDeleteNs << endl;
 			if( d ) {
-				Element f = jsobj.findElement("index");
+				BSONElement f = jsobj.findElement("index");
 				if( !f.eoo() ) { 
 
 					d->aboutToDeleteAnIndex();
@@ -510,7 +510,7 @@ bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b,
 	if( !valid )
 		anObjBuilder.append("errmsg", "no such cmd");
 	anObjBuilder.append("ok", ok?1.0:0.0);
-	JSObj x = anObjBuilder.done();
+	BSONObj x = anObjBuilder.done();
 	b.append((void*) x.objdata(), x.objsize());
 	return true;
 }

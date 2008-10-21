@@ -46,7 +46,7 @@ int curOp = -2;
 int callDepth = 0;
 
 extern int otherTraceLevel;
-void addNewNamespaceToCatalog(const char *ns, JSObj *options = 0);
+void addNewNamespaceToCatalog(const char *ns, BSONObj *options = 0);
 
 /* this is a good place to set a breakpoint when debugging, as lots of warning things
    (assert, wassert) call it.
@@ -62,7 +62,7 @@ void sayDbContext(const char *errmsg) {
 	printStackTrace();
 }
 
-JSObj::JSObj(Record *r) { 
+BSONObj::BSONObj(Record *r) { 
 	init(r->data, false);
 /*
 	_objdata = r->data;
@@ -95,7 +95,7 @@ int initialExtentSize(int len) {
 
 // { ..., capped: true, size: ..., max: ... }
 // returns true if successful
-bool userCreateNS(const char *ns, JSObj& j, string& err) { 
+bool userCreateNS(const char *ns, BSONObj& j, string& err) { 
 	if( nsdetails(ns) ) {
 		err = "collection already exists";
 		return false;
@@ -109,7 +109,7 @@ bool userCreateNS(const char *ns, JSObj& j, string& err) {
     addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
 
 	int ies = initialExtentSize(128);
-	Element e = j.findElement("size");
+	BSONElement e = j.findElement("size");
 	if( e.isNumber() ) {
 		ies = (int) e.number();
 		ies += 256;
@@ -332,8 +332,8 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 /* get a table scan cursor, but can be forward or reverse direction.
    order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
 */
-auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order) {
-	Element el = order.findElement("$natural"); // e.g., { $natural : -1 } 
+auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order) {
+	BSONElement el = order.findElement("$natural"); // e.g., { $natural : -1 } 
 	if( el.number() >= 0 )
 		return DataFileMgr::findAll(ns);
 
@@ -356,9 +356,9 @@ void dropNS(string& nsToDrop) {
 	assert( strstr(nsToDrop.c_str(), ".system.") == 0 );
 	{
 		// remove from the system catalog
-		JSObjBuilder b;
+		BSONObjBuilder b;
 		b.append("name", nsToDrop.c_str());
-		JSObj cond = b.done(); // { name: "colltodropname" }
+		BSONObj cond = b.done(); // { name: "colltodropname" }
 		string system_namespaces = client->name + ".system.namespaces";
 		int n = deleteObjects(system_namespaces.c_str(), cond, false, true);
 		wassert( n == 1 );
@@ -375,10 +375,10 @@ void IndexDetails::kill() {
 
 	{
 		// clean up in system.indexes
-		JSObjBuilder b;
+		BSONObjBuilder b;
 		b.append("name", indexName().c_str());
 		b.append("ns", parentNS().c_str());
-		JSObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
+		BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
 		string system_indexes = client->name + ".system.indexes";
 		int n = deleteObjects(system_indexes.c_str(), cond, false, true);
 		wassert( n == 1 );
@@ -395,18 +395,18 @@ void IndexDetails::kill() {
    only when it's a "multikey" array.
    Keys will be left empty if key not found in the object.
 */
-void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) { 
-    JSObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 } 
+void IndexDetails::getKeysFromObject(BSONObj& obj, set<BSONObj>& keys) { 
+    BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 } 
 	if( keyPattern.objsize() == 0 ) {
 		cout << keyPattern.toString() << endl;
 		cout << info.obj().toString() << endl;
 		assert(false);
 	}
-	JSObjBuilder b;
-	JSObj key = obj.extractFields(keyPattern, b);
+	BSONObjBuilder b;
+	BSONObj key = obj.extractFields(keyPattern, b);
 	if( key.isEmpty() )
 		return;
-	Element f = key.firstElement();
+	BSONElement f = key.firstElement();
 	if( f.type() != Array ) {
 		b.decouple();
 		key.iWillFree();
@@ -414,15 +414,15 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 		keys.insert(key);
 		return;
 	}
-	JSObj arr = f.embeddedObject();
-	JSElemIter i(arr);
+	BSONObj arr = f.embeddedObject();
+	BSONObjIterator i(arr);
 	while( i.more() ) { 
-		Element e = i.next();
+		BSONElement e = i.next();
 		if( e.eoo() ) break;
-		JSObjBuilder b;
+		BSONObjBuilder b;
 
 		b.appendAs(e, f.fieldName());
-		JSObj o = b.doneAndDecouple();
+		BSONObj o = b.doneAndDecouple();
 		assert( !o.isEmpty() );
 		keys.insert(o);
 	}
@@ -430,11 +430,11 @@ void IndexDetails::getKeysFromObject(JSObj& obj, set<JSObj>& keys) {
 
 int nUnindexes = 0;
 
-void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc& dl) { 
-	set<JSObj> keys;
+void _unindexRecord(const char *ns, IndexDetails& id, BSONObj& obj, const DiskLoc& dl) { 
+	set<BSONObj> keys;
 	id.getKeysFromObject(obj, keys);
-	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
-		JSObj j = *i;
+	for( set<BSONObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
+		BSONObj j = *i;
 //		cout << "UNINDEX: j:" << j.toString() << " head:" << id.head.toString() << dl.toString() << endl;
 		if( otherTraceLevel >= 5 ) {
 			cout << "_unindexRecord() " << obj.toString();
@@ -463,7 +463,7 @@ void _unindexRecord(const char *ns, IndexDetails& id, JSObj& obj, const DiskLoc&
 /* unindex all keys in all indexes for this record. */
 void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete, const DiskLoc& dl) {
 	if( d->nIndexes == 0 ) return;
-	JSObj obj(todelete);
+	BSONObj obj(todelete);
 	for( int i = 0; i < d->nIndexes; i++ ) { 
 		_unindexRecord(ns, d->indexes[i], obj, dl);
 	}
@@ -528,17 +528,17 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
 	}
 }
 
-void setDifference(set<JSObj>& l, set<JSObj>& r, vector<JSObj*> &diff) { 
-	set<JSObj>::iterator i = l.begin();
-	set<JSObj>::iterator j = r.begin();
+void setDifference(set<BSONObj>& l, set<BSONObj>& r, vector<BSONObj*> &diff) { 
+	set<BSONObj>::iterator i = l.begin();
+	set<BSONObj>::iterator j = r.begin();
 	while( 1 ) { 
 		if( i == l.end() )
 			break;
 		while( j != r.end() && *j < *i )
 			j++;
 		if( j == r.end() || !i->woEqual(*j) ) {
-			const JSObj *jo = &*i;
-			diff.push_back( (JSObj *) jo );
+			const BSONObj *jo = &*i;
+			diff.push_back( (BSONObj *) jo );
 		}
 		i++;
 	}
@@ -576,17 +576,17 @@ void DataFileMgr::update(
 	{
 		NamespaceDetails *d = nsdetails(ns);
 		if( d->nIndexes ) {
-			JSObj newObj(buf);
-			JSObj oldObj = dl.obj();
+			BSONObj newObj(buf);
+			BSONObj oldObj = dl.obj();
 			for( int i = 0; i < d->nIndexes; i++ ) {
 				IndexDetails& idx = d->indexes[i];
-				JSObj idxKey = idx.info.obj().getObjectField("key");
+				BSONObj idxKey = idx.info.obj().getObjectField("key");
 
-				set<JSObj> oldkeys;
-				set<JSObj> newkeys;
+				set<BSONObj> oldkeys;
+				set<BSONObj> newkeys;
 				idx.getKeysFromObject(oldObj, oldkeys);
 				idx.getKeysFromObject(newObj, newkeys);
-				vector<JSObj*> removed;
+				vector<BSONObj*> removed;
 				setDifference(oldkeys, newkeys, removed);
 				string idxns = idx.indexNamespace();
 				for( unsigned i = 0; i < removed.size(); i++ ) {
@@ -598,7 +598,7 @@ void DataFileMgr::update(
 						problem() << " caught assertion update unindex " << idxns.c_str() << endl;
 					}
 				}
-				vector<JSObj*> added;
+				vector<BSONObj*> added;
 				setDifference(newkeys, oldkeys, added);
 				assert( !dl.isNull() );
 				for( unsigned i = 0; i < added.size(); i++ ) { 
@@ -636,15 +636,15 @@ int followupExtentSize(int len, int lastExtentLen) {
 int deb=0;
 
 /* add keys to indexes for a new record */
-void  _indexRecord(IndexDetails& idx, JSObj& obj, DiskLoc newRecordLoc) { 
+void  _indexRecord(IndexDetails& idx, BSONObj& obj, DiskLoc newRecordLoc) { 
 
-	set<JSObj> keys;
+	set<BSONObj> keys;
 	idx.getKeysFromObject(obj, keys);
-	for( set<JSObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
+	for( set<BSONObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
 		assert( !newRecordLoc.isNull() );
 		try {
 			idx.head.btree()->insert(idx.head, newRecordLoc,
-				(JSObj&) *i, false, idx, true);
+				(BSONObj&) *i, false, idx, true);
 		}
 		catch(AssertionException&) { 
 			problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;
@@ -659,7 +659,7 @@ void addExistingToIndex(const char *ns, IndexDetails& idx) {
 	int n = 0;
 	auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
 	while( c->ok() ) {
-		JSObj js = c->current();
+		BSONObj js = c->current();
 		_indexRecord(idx, js, c->currLoc());
 		c->advance();
 		n++;
@@ -669,14 +669,14 @@ void addExistingToIndex(const char *ns, IndexDetails& idx) {
 
 /* add keys to indexes for a new record */
 void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) { 
-	JSObj obj((const char *)buf);
+	BSONObj obj((const char *)buf);
 	for( int i = 0; i < d->nIndexes; i++ ) { 
 		_indexRecord(d->indexes[i], obj, newRecordLoc);
 	}
 }
 
-extern JSObj emptyObj;
-extern JSObj id_obj; // = fromjson("{_id:ObjId()}");
+extern BSONObj emptyObj;
+extern BSONObj id_obj; // = fromjson("{_id:ObjId()}");
 
 void ensureHaveIdIndex(const char *ns) { 
 	NamespaceDetails *d = nsdetails(ns);
@@ -687,11 +687,11 @@ void ensureHaveIdIndex(const char *ns) {
 
 	string system_indexes = client->name + ".system.indexes";
 
-	JSObjBuilder b;
+	BSONObjBuilder b;
 	b.append("name", "id_");
 	b.append("ns", ns);
 	b.append("key", id_obj);
-	JSObj o = b.done();
+	BSONObj o = b.done();
 
 	/* edge case: note the insert could fail if we have hit maxindexes already */
 	theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
@@ -730,7 +730,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 
     string tabletoidxns;
 	if( addIndex ) { 
-		JSObj io((const char *) buf);
+		BSONObj io((const char *) buf);
 		const char *name = io.getStringField("name"); // name of the index
 		tabletoidxns = io.getStringField("ns");  // table it indexes
 
@@ -739,7 +739,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
             return DiskLoc();
         }
 
-		JSObj key = io.getObjectField("key");
+		BSONObj key = io.getObjectField("key");
 		if( *name == 0 || tabletoidxns.empty() || key.isEmpty() || key.objsize() > 2048 ) { 
 			cout << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" << 
 				tabletoidxns << "\n  ourns:" << ns;

@@ -26,24 +26,24 @@
 
 /* --- dbclientcommands --- */
 
-JSObj ismastercmdobj = fromjson("{ismaster:1}");
+BSONObj ismastercmdobj = fromjson("{ismaster:1}");
 
-JSObj DBClientCommands::cmdIsMaster(bool& isMaster) {
-    JSObj o = findOne("admin.$cmd", ismastercmdobj);
+BSONObj DBClientCommands::cmdIsMaster(bool& isMaster) {
+    BSONObj o = findOne("admin.$cmd", ismastercmdobj);
     isMaster = (o.getIntField("ismaster") == 1);
     return o;
 }
 
 /* --- dbclientconnection --- */
 
-JSObj DBClientConnection::findOne(const char *ns, JSObj query, JSObj *fieldsToReturn, int queryOptions) { 
+BSONObj DBClientConnection::findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn, int queryOptions) { 
 	auto_ptr<DBClientCursor> c = 
 		this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
     massert( "DBClientConnection::findOne: transport error", c.get() );
 
 	if( !c->more() )
-		return JSObj();
+		return BSONObj();
 
 	return c->next().copy();
 }
@@ -98,7 +98,7 @@ void DBClientConnection::checkConnection() {
         log() << "reconnect " << serverAddress << " ok" << endl;
 }
 
-auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, JSObj query, int nToReturn, int nToSkip, JSObj *fieldsToReturn, int queryOptions) {
+auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions) {
     checkConnection();
 
 	// see query.h for the protocol we are using here.
@@ -168,8 +168,8 @@ void DBClientCursor::dataReceived() {
     /* check for errors.  the only one we really care about at 
        this stage is "not master" */
     if( conn->clientPaired && nReturned ) {
-        JSObj o(data);
-        Element e = o.firstElement();
+        BSONObj o(data);
+        BSONElement e = o.firstElement();
         if( strcmp(e.fieldName(), "$err") == 0 && 
             e.type() == String && strncmp(e.valuestr(), "not master", 10) == 0 ) {
                 conn->clientPaired->isntMaster();
@@ -192,10 +192,10 @@ bool DBClientCursor::more() {
 	return pos < nReturned;
 }
 
-JSObj DBClientCursor::next() {
+BSONObj DBClientCursor::next() {
 	assert( more() );
 	pos++;
-	JSObj o(data);
+	BSONObj o(data);
 	data += o.objsize();
 	return o;
 }
@@ -203,7 +203,7 @@ JSObj DBClientCursor::next() {
 /* ------------------------------------------------------ */
 
 // "./db testclient" to invoke
-extern JSObj emptyObj;
+extern BSONObj emptyObj;
 void testClient() {
 	cout << "testClient()" << endl;
 //	DBClientConnection c(true);
@@ -266,7 +266,7 @@ void DBClientPaired::_checkMaster() {
             DBClientConnection& c = x == 0 ? left : right;
             try {
                 bool im;
-                JSObj o = c.cmdIsMaster(im);
+                BSONObj o = c.cmdIsMaster(im);
                 if( retry ) 
                     log() << "checkmaster: " << c.toString() << ' ' << o.toString() << '\n';
                 if( im ) {
@@ -317,12 +317,12 @@ bool DBClientPaired::connect(const char *serverHostname1, const char *serverHost
     return true;
 }
 
-auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, JSObj b, int c, int d, 
-                                               JSObj *e, int f) 
+auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, BSONObj b, int c, int d, 
+                                               BSONObj *e, int f) 
 {
     return checkMaster().query(a,b,c,d,e,f);
 }
 
-JSObj DBClientPaired::findOne(const char *a, JSObj b, JSObj *c, int d) {
+BSONObj DBClientPaired::findOne(const char *a, BSONObj b, BSONObj *c, int d) {
     return checkMaster().findOne(a,b,c,d);
 }

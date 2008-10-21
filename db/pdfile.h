@@ -289,8 +289,8 @@ inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
 inline Record* DiskLoc::rec() const {
 	return DataFileMgr::getRecord(*this);
 }
-inline JSObj DiskLoc::obj() const {
-	return JSObj(rec());
+inline BSONObj DiskLoc::obj() const {
+	return BSONObj(rec());
 }
 inline DeletedRecord* DiskLoc::drec() const {
 	assert( fileNo != -1 );

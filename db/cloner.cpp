@@ -26,7 +26,7 @@
 #include "db.h"
 
 extern int port;
-bool userCreateNS(const char *ns, JSObj& j, string& err);
+bool userCreateNS(const char *ns, BSONObj& j, string& err);
 
 class Cloner: boost::noncopyable { 
 	DBClientConnection conn;
@@ -40,11 +40,11 @@ public:
      { "name" : "name_1" , "ns" : "foo.index3" , "key" :  { "name" : 1.0 } }
    we need to fix up the value in the "ns" parameter.
 */
-JSObj fixindex(JSObj o) { 
-    JSObjBuilder b;
-    JSElemIter i(o);
+BSONObj fixindex(BSONObj o) { 
+    BSONObjBuilder b;
+    BSONObjIterator i(o);
     while( i.more() ) { 
-        Element e = i.next();
+        BSONElement e = i.next();
         if( e.eoo() )
             break;
         if( string("ns") == e.fieldName() ) {
@@ -57,7 +57,7 @@ JSObj fixindex(JSObj o) {
         else
             b.append(e);
     }
-    JSObj res= b.doneAndDecouple();
+    BSONObj res= b.doneAndDecouple();
 
 /*    if( mod ) {
     cout << "before: " << o.toString() << endl;
@@ -82,7 +82,7 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
             if( !c->more() )
                 break;
         }
-        JSObj tmp = c->next();
+        BSONObj tmp = c->next();
 
         /* assure object is valid.  note this will slow us down a good bit. */
         if( !tmp.valid() ) {
@@ -90,7 +90,7 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
             continue;
         }
 
-        JSObj js = tmp;
+        BSONObj js = tmp;
         if( isindex )
             js = fixindex(tmp);
 		theDataFileMgr.insert(to_collection, (void*) js.objdata(), js.objsize());
@@ -132,15 +132,15 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) {
             if( !c->more() )
                 break;
         }
-		JSObj collection = c->next();
-		Element e = collection.findElement("name");
+		BSONObj collection = c->next();
+		BSONElement e = collection.findElement("name");
 		assert( !e.eoo() );
 		assert( e.type() == String );
 		const char *from_name = e.valuestr();
         if( strstr(from_name, ".system.") || strchr(from_name, '$') ) {
 			continue;
         }
-		JSObj options = collection.getObjectField("options");
+		BSONObj options = collection.getObjectField("options");
 
         /* change name "<fromdb>.collection" -> <todb>.collection */
         const char *p = strchr(from_name, '.');
@@ -176,7 +176,7 @@ class CmdClone : public Command {
 public:
     CmdClone() : Command("clone") { }
 
-    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         string from = cmdObj.getStringField("clone");
         if( from.empty() ) 
             return false;
@@ -192,7 +192,7 @@ public:
     CmdCopyDb() : Command("copydb") { }
     virtual bool adminOnly() { return true; }
 
-    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         string fromhost = cmdObj.getStringField("fromhost");
         if( fromhost.empty() ) { 
             /* copy from self */

@@ -137,11 +137,11 @@ void receivedUpdate(Message& m, stringstream& ss) {
 	//if( client->profile )
     ss << ns << ' ';
 	int flags = d.pullInt();
-	JSObj query = d.nextJsObj();
+	BSONObj query = d.nextJsObj();
 
 	assert( d.moreJSObjs() );
 	assert( query.objsize() < m.data->dataLen() );
-	JSObj toupdate = d.nextJsObj();
+	BSONObj toupdate = d.nextJsObj();
 
 	assert( toupdate.objsize() < m.data->dataLen() );
 	assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
@@ -156,7 +156,7 @@ void receivedDelete(Message& m) {
 	int flags = d.pullInt();
 	bool justOne = flags & 1;
 	assert( d.moreJSObjs() );
-	JSObj pattern = d.nextJsObj();
+	BSONObj pattern = d.nextJsObj();
 	deleteObjects(ns, pattern, justOne);
 	logOp("d", ns, pattern, 0, &justOne);
 }
@@ -177,10 +177,10 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	MSGID responseTo = m.data->id;
 
 	DbMessage d(m);
-	const char *ns = d.getns();
+    QueryMessage q(d);
 
 	if( opLogging && logit ) { 
-		if( strstr(ns, "$cmd") ) { 
+		if( strstr(q.ns, "$cmd") ) { 
 			/* $cmd queries are "commands" and usually best treated as write operations */
 			OPWRITE;
 		}
@@ -189,32 +189,24 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 		}
 	}
 
-	setClient(ns);
-	int ntoskip = d.pullInt();
-	int ntoreturn = d.pullInt();
-	JSObj query = d.nextJsObj();
-	auto_ptr< set<string> > fields;
-	if( d.moreJSObjs() ) { 
-		fields = auto_ptr< set<string> >(new set<string>());
-		d.nextJsObj().getFieldNames(*fields);
-	}
+	setClient(q.ns);
 	QueryResult* msgdata;
 
 	try { 
-		msgdata = runQuery(m, ns, ntoskip, ntoreturn, query, fields, ss, m.data->dataAsInt());
+		msgdata = runQuery(m, q.ns, q.ntoskip, q.ntoreturn, q.query, q.fields, ss, q.queryOptions);
 	}
 	catch( AssertionException& e ) { 
 		ss << " exception ";
-		problem() << " Caught Assertion in runQuery ns:" << ns << ' ' << e.toString() << '\n';
-		log() << "  ntoskip:" << ntoskip << " ntoreturn:" << ntoreturn << '\n';
-        if( query.valid() )
-            log() << "  query:" << query.toString() << endl;
+		problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
+		log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
+        if( q.query.valid() )
+            log() << "  query:" << q.query.toString() << endl;
         else
             log() << "  query object is not valid!" << endl;
 
-        JSObjBuilder err;
+        BSONObjBuilder err;
         err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
-        JSObj errObj = err.done();
+        BSONObj errObj = err.done();
 
         BufBuilder b;
         b.skip(sizeof(QueryResult));
@@ -243,8 +235,8 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 			ss << " bytes:" << resp->data->dataLen();
 	}
 	else { 
-		if( strstr(ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
-			log() << "ERROR: receiveQuery: client is null; ns=" << ns << endl;
+		if( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
+			log() << "ERROR: receiveQuery: client is null; ns=" << q.ns << endl;
 	}
 	//	dbMsgPort.reply(m, resp, responseTo);
 }
@@ -281,7 +273,7 @@ void receivedInsert(Message& m, stringstream& ss) {
 //	cout << "GOT MSG id:" << m.data->id << endl;
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
-		JSObj js = d.nextJsObj();
+		BSONObj js = d.nextJsObj();
 		const char *ns = d.getns();
 		assert(*ns);
 		setClient(ns);
@@ -300,7 +292,7 @@ void testTheDb() {
 	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
 	theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
 
-	JSObj j1((const char *) &js1);
+	BSONObj j1((const char *) &js1);
 	deleteObjects("sys.unittest.delete", j1, false);
 	theDataFileMgr.insert("sys.unittest.delete", &js1, sizeof(js1));
 	deleteObjects("sys.unittest.delete", j1, false);

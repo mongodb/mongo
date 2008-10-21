@@ -40,7 +40,7 @@ enum {
     Option_ALLMASK = 6
 };
 
-class JSObj;
+class BSONObj;
 
 #pragma pack(push,1)
 struct QueryResult : public MsgData {
@@ -83,11 +83,11 @@ public:
          { $err: <string> }
        if you do not want to handle that yourself, call nextSafe().
     */
-	JSObj next(); 
+	BSONObj next(); 
 
-    JSObj nextSafe() { 
-        JSObj o = next();
-        Element e = o.firstElement();
+    BSONObj nextSafe() { 
+        BSONObj o = next();
+        BSONElement e = o.firstElement();
         assert( strcmp(e.fieldName(), "$err") != 0 );
     }
 
@@ -103,11 +103,11 @@ public:
 class DBClientInterface : boost::noncopyable { 
 public:
     virtual 
-	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, 
-		JSObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+	auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0, 
+		BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
     virtual
-	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+	BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 };
 
 /* db "commands" 
@@ -116,10 +116,10 @@ public:
 class DBClientCommands : public DBClientInterface { 
 public:
     /* returns true in isMaster parm if this db is the master instance.  
-       JSObj contains more details e.g.: 
+       BSONObj contains more details e.g.: 
          { "ismaster" : 1.0 , "msg" : "not paired" , "ok" : 1.0  }
          */
-    JSObj cmdIsMaster(bool& isMaster);
+    BSONObj cmdIsMaster(bool& isMaster);
 };
 
 class DBClientPaired;
@@ -149,7 +149,7 @@ public:
 
 	/* send a query to the database.
        ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
-       query:         query to perform on the collection.  this is a JSObj (binary JSON)
+       query:         query to perform on the collection.  this is a BSONObj (binary JSON)
                       You may format as 
                         { query: { ... }, order: { ... } } 
                       to specify a sort order.
@@ -163,11 +163,11 @@ public:
                       0 if error (connection failure)
 	*/
     /*throws AssertionException*/
-	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, 
-		JSObj *fieldsToReturn = 0, int queryOptions = 0);
+	auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0, 
+		BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
     /*throws AssertionException*/
-	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0, int queryOptions = 0);
+	BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 };
 
 /* Use this class to connect to a replica pair of servers.  The class will manage 
@@ -202,12 +202,12 @@ public:
 
     /* throws userassertion "no master found" */
     virtual 
-	auto_ptr<DBClientCursor> query(const char *ns, JSObj query, int nToReturn = 0, int nToSkip = 0, 
-		JSObj *fieldsToReturn = 0, int queryOptions = 0);
+	auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0, 
+		BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
     /* throws userassertion "no master found" */
     virtual
-	JSObj findOne(const char *ns, JSObj query, JSObj *fieldsToReturn = 0, int queryOptions = 0);
+	BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 };
 
 

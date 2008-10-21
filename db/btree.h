@@ -54,7 +54,7 @@ public:
 	KeyNode(BucketBasics& bb, _KeyNode &k);
 	DiskLoc& prevChildBucket;
 	DiskLoc& recordLoc;
-	JSObj key;
+	BSONObj key;
 };
 
 #pragma pack(push,1)
@@ -84,8 +84,8 @@ protected:
 	/* returns false if node is full and must be split 
 	   keypos is where to insert -- inserted after that key #.  so keypos=0 is the leftmost one.
 	*/
-	bool basicInsert(int keypos, const DiskLoc& recordLoc, JSObj& key);
-	void pushBack(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevChild);
+	bool basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key);
+	void pushBack(const DiskLoc& recordLoc, BSONObj& key, DiskLoc prevChild);
 	void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs. 
 
 	/* !Packed means there is deleted fragment space within the bucket.
@@ -138,14 +138,14 @@ public:
 
 	static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
 	int insert(DiskLoc thisLoc, DiskLoc recordLoc, 
-		JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel);
+		BSONObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel);
 
-	bool unindex(const DiskLoc& thisLoc, IndexDetails& id, JSObj& key, const DiskLoc& recordLoc);
+	bool unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc);
 
 	/* locate may return an "unused" key that is just a marker.  so be careful.
   	   looks for a key:recordloc pair.
 	*/
-	DiskLoc locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, DiskLoc recordLoc, int direction=1);
+	DiskLoc locate(const DiskLoc& thisLoc, BSONObj& key, int& pos, bool& found, DiskLoc recordLoc, int direction=1);
 
 	/* advance one key position in the index: */
 	DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
@@ -157,22 +157,22 @@ private:
 	void fixParentPtrs(const DiskLoc& thisLoc);
 	void delBucket(const DiskLoc& thisLoc, IndexDetails&);
 	void delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p);
-	JSObj keyAt(int keyOfs) { return keyOfs >= n ? JSObj() : keyNode(keyOfs).key; }
+	BSONObj keyAt(int keyOfs) { return keyOfs >= n ? BSONObj() : keyNode(keyOfs).key; }
 	static BtreeBucket* allocTemp(); /* caller must release with free() */
 	void insertHere(DiskLoc thisLoc, int keypos, 
-		DiskLoc recordLoc, JSObj& key,
+		DiskLoc recordLoc, BSONObj& key,
 		DiskLoc lchild, DiskLoc rchild, IndexDetails&);
 	int _insert(DiskLoc thisLoc, DiskLoc recordLoc, 
-		JSObj& key, bool dupsAllowed,
+		BSONObj& key, bool dupsAllowed,
 		DiskLoc lChild, DiskLoc rChild, IndexDetails&);
-	bool find(JSObj& key, DiskLoc recordLoc, int& pos);
+	bool find(BSONObj& key, DiskLoc recordLoc, int& pos);
 	static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
 };
 
 class BtreeCursor : public Cursor {
 	friend class BtreeBucket;
 public:
-	BtreeCursor(IndexDetails&, JSObj& startKey, int direction, bool stopmiss);
+	BtreeCursor(IndexDetails&, BSONObj& startKey, int direction, bool stopmiss);
 	virtual bool ok() { return !bucket.isNull(); }
 	bool eof() { return !ok(); }
 	virtual bool advance();
@@ -198,7 +198,7 @@ public:
 
 	virtual DiskLoc currLoc() { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc(); }
 	virtual Record* _current() { return currLoc().rec(); }
-	virtual JSObj current() { return JSObj(_current()); }
+	virtual BSONObj current() { return BSONObj(_current()); }
 	virtual const char * toString() { return "BtreeCursor"; }
 
 private:
@@ -208,7 +208,7 @@ private:
 	int keyOfs;
 	int direction; // 1=fwd,-1=reverse
 	bool stopmiss;
-	JSObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
+	BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
 	DiskLoc locAtKeyOfs;
 };
 

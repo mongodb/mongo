@@ -26,7 +26,7 @@ public:
 	virtual bool ok() = 0;
 	bool eof() { return !ok(); }
 	virtual Record* _current() = 0;
-	virtual JSObj current() = 0;
+	virtual BSONObj current() = 0;
 	virtual DiskLoc currLoc() = 0;
 	virtual bool advance() = 0; /*true=ok*/
 
@@ -86,9 +86,9 @@ public:
 		assert( ok() );
 		return curr.rec();
 	}
-	JSObj current() { 
+	BSONObj current() { 
 		Record *r = _current();
-		JSObj j(r);
+		BSONObj j(r);
 		return j;
 	}
 	virtual DiskLoc currLoc() { return curr; }

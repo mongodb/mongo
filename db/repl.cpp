@@ -36,10 +36,10 @@
 #include "commands.h"
 
 extern boost::mutex dbMutex;
-auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
-bool userCreateNS(const char *ns, JSObj& j, string& err);
-int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss, bool logOp=false);
-bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder);
+auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order);
+bool userCreateNS(const char *ns, BSONObj& j, string& err);
+int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
+bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder);
 void ensureHaveIdIndex(const char *ns);
 
 #include "replset.h"
@@ -64,7 +64,7 @@ void ReplPair::arbitrate() {
     }
 
     bool is_master;
-    JSObj res = conn->cmdIsMaster(is_master);
+    BSONObj res = conn->cmdIsMaster(is_master);
         /*findOne("admin.$cmd", ismasterobj);*/
     if( res.isEmpty() ) { 
         setMaster(State_CantArb, "can't arb 2");
@@ -80,7 +80,7 @@ class CmdIsMaster : public Command {
 public:
     CmdIsMaster() : Command("ismaster") { }
 
-    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         if( replPair ) {
             int x = replPair->state;
             result.append("ismaster", replPair->state);
@@ -120,7 +120,7 @@ public:
 
     virtual bool adminOnly() { return true; }
 
-    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) {
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
         if( replPair == 0 ) { 
             problem() << "got negotiatemaster cmd but we are not in paired mode." << endl;
             errmsg = "not paired";
@@ -159,12 +159,12 @@ public:
 } cmdnegotiatemaster;
 
 void ReplPair::negotiate(DBClientConnection *conn) { 
-    JSObjBuilder b;
+    BSONObjBuilder b;
     b.append("negotiatemaster",1);
     b.append("i_was", state);
     b.append("your_name", remoteHost);
-    JSObj cmd = b.done();
-    JSObj res = conn->findOne("admin.$cmd", cmd);
+    BSONObj cmd = b.done();
+    BSONObj res = conn->findOne("admin.$cmd", cmd);
     if( res.getIntField("ok") != 1 ) { 
         problem() << "negotiate fails: " << res.toString() << '\n';
         setMaster(State_Confused);
@@ -215,14 +215,14 @@ ReplSource::ReplSource() {
 	paired = false;
 }
 
-ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
+ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
 	paired = false;
 	only = o.getStringField("only");
 	hostName = o.getStringField("host");
 	_sourceName = o.getStringField("source");
 	uassert( "'host' field not set in sources collection object", !hostName.empty() );
     uassert( "only source='main' allowed for now with replication", sourceName() == "main" );
-	Element e = o.getField("syncedTo");
+	BSONElement e = o.getField("syncedTo");
 	if( !e.eoo() ) {
 		uassert( "bad sources 'syncedTo' field value", e.type() == Date );
 		OpTime tmp( e.date() );
@@ -230,11 +230,11 @@ ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
 		//syncedTo.asDate() = e.date();
 	}
 
-	JSObj dbsObj = o.getObjectField("dbs");
+	BSONObj dbsObj = o.getObjectField("dbs");
 	if( !dbsObj.isEmpty() ) {
-		JSElemIter i(dbsObj);
+		BSONObjIterator i(dbsObj);
 		while( 1 ) { 
-			Element e = i.next();
+			BSONElement e = i.next();
 			if( e.eoo() ) 
 				break;
 			dbs.insert( e.fieldName() );
@@ -242,16 +242,16 @@ ReplSource::ReplSource(JSObj o) : nClonedThisPass(0) {
 	}
 }
 
-/* Turn our C++ Source object into a JSObj */
-JSObj ReplSource::jsobj() {
-	JSObjBuilder b;
+/* Turn our C++ Source object into a BSONObj */
+BSONObj ReplSource::jsobj() {
+	BSONObjBuilder b;
 	b.append("host", hostName);
 	b.append("source", sourceName());
 	if( !only.empty() )
 		b.append("only", only);
 	b.appendDate("syncedTo", syncedTo.asDate());
 
-	JSObjBuilder dbs_builder;
+	BSONObjBuilder dbs_builder;
 	for( set<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
 		dbs_builder.appendBool(i->c_str(), 1);
 	}
@@ -261,15 +261,15 @@ JSObj ReplSource::jsobj() {
 }
 
 void ReplSource::save() { 
-	JSObjBuilder b;
+	BSONObjBuilder b;
     assert( !hostName.empty() );
 	b.append("host", hostName);
     // todo: finish allowing multiple source configs.
     // this line doesn't work right when source is null, if that is allowed as it is now:
     //b.append("source", _sourceName);
-	JSObj pattern = b.done();
+	BSONObj pattern = b.done();
 
-	JSObj o = jsobj();
+	BSONObj o = jsobj();
 
 	stringstream ss;
 	setClient("local.sources");
@@ -329,7 +329,7 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
         delete *i;
 }
 
-JSObj opTimeQuery = fromjson("{getoptime:1}");
+BSONObj opTimeQuery = fromjson("{getoptime:1}");
 
 bool ReplSource::resync(string db) {
 	{
@@ -367,7 +367,7 @@ bool ReplSource::resync(string db) {
      ...
    see logOp() comments.
 */
-void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
+void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 	char clientName[MaxClientLen];
 	const char *ns = op.getStringField("ns");
 	nsToClient(ns, clientName);
@@ -413,7 +413,7 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 
 	stringstream ss;
 	const char *opType = op.getStringField("op");
-	JSObj o = op.getObjectField("o");
+	BSONObj o = op.getObjectField("o");
 	try { 
 		if( *opType == 'i' ) {
 			const char *p = strchr(ns, '.');
@@ -429,7 +429,7 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 					_updateObjects(ns, o, o, true, ss);
 				}
 				else { 
-					JSObjBuilder b;
+					BSONObjBuilder b;
 					b.appendOID("_id", oid);
 					RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
 					_updateObjects(ns, o, b.done(), true, ss);
@@ -448,7 +448,7 @@ void ReplSource::sync_pullOpLog_applyOperation(JSObj& op) {
 		}
 		else { 
 			BufBuilder bb;
-			JSObjBuilder ob;
+			BSONObjBuilder ob;
 			assert( *opType == 'c' );
 			_runCommands(ns, o, ss, bb, ob);
 		}
@@ -471,9 +471,9 @@ void ReplSource::sync_pullOpLog() {
 	}
 
 	if( c == 0 ) {
-		JSObjBuilder q;
+		BSONObjBuilder q;
 		q.appendDate("$gte", syncedTo.asDate());
-		JSObjBuilder query;
+		BSONObjBuilder query;
 		query.append("ts", q.done());
 		// query = { ts: { $gte: syncedTo } }
 
@@ -493,10 +493,10 @@ void ReplSource::sync_pullOpLog() {
 	{
 		set<string>::iterator i = addDbNextPass.begin();
 		if( i != addDbNextPass.end() ) { 
-			JSObjBuilder b;
+			BSONObjBuilder b;
 			b.append("ns", *i + '.');
 			b.append("op", "db");
-			JSObj op = b.done();
+			BSONObj op = b.done();
 			sync_pullOpLog_applyOperation(op);
 		}
 	}
@@ -511,8 +511,8 @@ void ReplSource::sync_pullOpLog() {
 	}
 
     int n = 0;
-	JSObj op = c->next();
-	Element ts = op.findElement("ts");
+	BSONObj op = c->next();
+	BSONElement ts = op.findElement("ts");
     if( ts.type() != Date ) { 
         problem() << "pull: bad object read from remote oplog: " << op.toString() << '\n';
         assert(false);
@@ -553,7 +553,7 @@ void ReplSource::sync_pullOpLog() {
 				break;
 			}
 			/* todo: get out of the mutex for the next()? */
-			JSObj op = c->next();
+			BSONObj op = c->next();
 			ts = op.findElement("ts");
 			assert( ts.type() == Date );
 			OpTime last = t;
@@ -603,8 +603,8 @@ bool ReplSource::sync() {
 
 /*
 	// get current mtime at the server.
-	JSObj o = conn->findOne("admin.$cmd", opTimeQuery);
-	Element e = o.findElement("optime");
+	BSONObj o = conn->findOne("admin.$cmd", opTimeQuery);
+	BSONElement e = o.findElement("optime");
 	if( e.eoo() ) {
 		log() << "pull:   failed to get cur optime from master" << endl;
 		log() << "        " << o.toString() << endl;
@@ -636,7 +636,7 @@ Client *localOplogClient = 0;
      if not null, specifies a boolean to pass along to the other side as b: param.
      used for "justOne" or "upsert" flags on 'd', 'u'
 */
-void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *o2, bool *bb) {
+void _logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *o2, bool *bb) {
 	if( strncmp(ns, "local.", 6) == 0 )
 		return;
 
@@ -652,7 +652,7 @@ void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *o2, bool *bb) 
 	   instead we do a single copy to the destination position in the memory mapped file.
     */
 
-	JSObjBuilder b;
+	BSONObjBuilder b;
 	b.appendDate("ts", OpTime::now().asDate());
 	b.append("op", opstr);
 	b.append("ns", ns);
@@ -660,7 +660,7 @@ void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *o2, bool *bb) 
 		b.appendBool("b", *bb);
 	if( o2 )
 		b.append("o2", *o2);
-	JSObj partial = b.done();
+	BSONObj partial = b.done();
 	int posz = partial.objsize();
 	int len = posz + obj.objsize() + 1 + 2 /*o:*/;
 
@@ -804,12 +804,12 @@ void startReplication() {
 		{
 			dblock lk;
 			/* create an oplog collection, if it doesn't yet exist. */
-			JSObjBuilder b;
+			BSONObjBuilder b;
 			b.append("size", 254.0 * 1000 * 1000);
 			b.appendBool("capped", 1);
 			setClientTempNs("local.oplog.$main");
 			string err;
-			JSObj o = b.done();
+			BSONObj o = b.done();
 			userCreateNS("local.oplog.$main", o, err);
 			client = 0;
 		}

@@ -25,16 +25,16 @@
 
 #include <set>
 
-class JSObj;
+class BSONObj;
 class Record;
-class JSObjBuilder;
+class BSONObjBuilder;
 
 #pragma pack(push,1)
 
 /* BinData = binary data types. 
    EOO = end of object
 */
-enum JSType { EOO = 0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5, 
+enum BSONType { EOO = 0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5, 
               Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
               DBRef=12, Code=13, Symbol=14, CodeWScope=15 , 
               NumberInt = 16, 
@@ -61,7 +61,7 @@ struct OID {
 
 /* marshalled js object format:
 
-   <unsigned totalSize> {<byte JSType><cstring FieldName><Data>}* EOO
+   <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
       totalSize includes itself.
 
    Data:
@@ -92,18 +92,18 @@ struct OID {
                         value()
    type()
 */
-class Element {
-	friend class JSElemIter;
-	friend class JSObj;
+class BSONElement {
+	friend class BSONObjIterator;
+	friend class BSONObj;
 public:
 	string toString();
-    JSType type() const { return (JSType) *data; }
+    BSONType type() const { return (BSONType) *data; }
     bool isNumber() const { return type() == NumberDouble || type() == NumberInt; }
 	bool eoo() const { return type() == EOO; }
 	int size() const;
 
 	// wrap this element up as a singleton object.
-	JSObj wrap();
+	BSONObj wrap();
 
 	const char * fieldName() { 
 		if( eoo() ) return ""; // no fieldname for it.
@@ -150,7 +150,7 @@ public:
 	  return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;
 	}
 	
-	JSObj embeddedObject();
+	BSONObj embeddedObject();
 
 	const char *regex() { assert(type() == RegEx); return value(); }
 	const char *regexFlags() { 
@@ -161,7 +161,7 @@ public:
 	/* like operator== but doesn't check the fieldname,
 	   just the value.
 	   */
-    bool valuesEqual(Element& r) {
+    bool valuesEqual(BSONElement& r) {
         if( isNumber() )
             return number() == r.number() && r.isNumber();
 		bool match= valuesize() == r.valuesize() && 
@@ -170,7 +170,7 @@ public:
 		// todo: make "0" == 0.0, undefined==null
 	}
 
-	bool operator==(Element& r) { 
+	bool operator==(BSONElement& r) { 
 		if( strcmp(fieldName(), r.fieldName()) != 0 )
 			return false;
 		return valuesEqual(r);
@@ -183,10 +183,10 @@ public:
 
 	const char * rawdata() { return data; }
 
-	Element();
+	BSONElement();
 
 private:
-	Element(const char *d) : data(d) {
+	BSONElement(const char *d) : data(d) {
 		fieldNameSize = eoo() ? 0 : strlen(fieldName()) + 1;
 		totalSize = -1;
 	}
@@ -196,10 +196,10 @@ private:
 };
 
 /* l and r MUST have same type when called: check that first. */
-int compareElementValues(const Element& l, const Element& r);
+int compareElementValues(const BSONElement& l, const BSONElement& r);
 
-class JSObj {
-	friend class JSElemIter;
+class BSONObj {
+	friend class BSONObjIterator;
 	class Details {
 	public:
 		~Details() {
@@ -224,12 +224,12 @@ class JSObj {
 		details->refCount = ifree ? 1 : -1;
 	}
 public:
-	explicit JSObj(const char *msgdata, bool ifree = false) {
+	explicit BSONObj(const char *msgdata, bool ifree = false) {
 		init(msgdata, ifree);
 	}
-	JSObj(Record *r);
-	JSObj() : details(0) { }
-	~JSObj() { 
+	BSONObj(Record *r);
+	BSONObj() : details(0) { }
+	~BSONObj() { 
 		if( details ) {
 			if( --details->refCount <= 0 )
 				delete details;
@@ -250,7 +250,7 @@ public:
 
 	string toString() const;
 	/* note: addFields always adds _id even if not specified */
-	int addFields(JSObj& from, set<string>& fields); /* returns n added */
+	int addFields(BSONObj& from, set<string>& fields); /* returns n added */
 
     /* adds the field names to the fields set.  does NOT clear it (appends). */
 	int getFieldNames(set<string>& fields);
@@ -258,25 +258,25 @@ public:
 	/* return has eoo() true if no match 
 	   supports "." notation to reach into embedded objects
 	*/
-	Element getFieldDotted(const char *name); 
+	BSONElement getFieldDotted(const char *name); 
 
-	Element getField(const char *name); /* return has eoo() true if no match */
+	BSONElement getField(const char *name); /* return has eoo() true if no match */
 
 	// returns "" if DNE or wrong type
 	const char * getStringField(const char *name);
 
-	JSObj getObjectField(const char *name);
+	BSONObj getObjectField(const char *name);
 
     int getIntField(const char *name); // INT_MIN if not present
 
 	bool getBoolField(const char *name);
 
-	/* makes a new JSObj with the fields specified in pattern.
+	/* makes a new BSONObj with the fields specified in pattern.
        fields returned in the order they appear in pattern.
 	   if any field missing, you get back an empty object overall.
 	   */
-	JSObj extractFields(JSObj pattern, JSObjBuilder& b); // this version, builder owns the returned obj buffer
-	JSObj extractFields(JSObj &pattern);
+	BSONObj extractFields(BSONObj pattern, BSONObjBuilder& b); // this version, builder owns the returned obj buffer
+	BSONObj extractFields(BSONObj &pattern);
 
 	const char *objdata() const { return details->_objdata; }
 	int objsize() const { return details ? details->_objsize : 0; } // includes the embedded size field
@@ -295,34 +295,34 @@ public:
     }
 
 	/* this is broken if elements aren't in the same order. */
-	bool operator<(const JSObj& r) const { return woCompare(r) < 0; }
+	bool operator<(const BSONObj& r) const { return woCompare(r) < 0; }
 
 	/* -1: l<r. 0:l==r. 1:l>r 
 	   wo='well ordered'.  fields must be in same order in each object.
 	*/
-	int woCompare(const JSObj& r) const;
-	bool woEqual(const JSObj& r) const { 
+	int woCompare(const BSONObj& r) const;
+	bool woEqual(const BSONObj& r) const { 
 		int os = objsize();
 		return os == r.objsize() &&
 			(os == 0 || memcmp(objdata(),r.objdata(),os)==0);
 	}
-	bool operator==(const JSObj& r) const { 
+	bool operator==(const BSONObj& r) const { 
 		return this->woEqual(r);
 	}
 
-	Element firstElement() { 
-		return Element(objdata() + 4);
+	BSONElement firstElement() { 
+		return BSONElement(objdata() + 4);
 	}
-	Element findElement(const char *name);
+	BSONElement findElement(const char *name);
 
 	OID* getOID() {
-		Element e = firstElement();
+		BSONElement e = firstElement();
 		if( e.type() != jstOID )
 			return 0;
 		return &e.oid();
 	}
 
-	JSObj(const JSObj& r) { 
+	BSONObj(const BSONObj& r) { 
 		if( r.details == 0 )
 			details = 0;
 		else if( r.details->owned() ) {
@@ -333,7 +333,7 @@ public:
 			details = new Details(*r.details);
 		}
 	}
-	JSObj& operator=(const JSObj& r) {
+	BSONObj& operator=(const BSONObj& r) {
 		if( details && details->owned() ) {
 			if( --details->refCount == 0 )
 				delete details;
@@ -355,7 +355,7 @@ public:
 	   by something else.  this is a useful way to get your own copy of the buffer 
 	   data (which is freed when the new jsobj destructs).
 	   */
-	JSObj copy();
+	BSONObj copy();
 
 	int hash() const {
 		unsigned x = 0;
@@ -369,27 +369,27 @@ public:
     bool valid() const;
 };
 
-class JSObjBuilder { 
+class BSONObjBuilder { 
 public:
-	JSObjBuilder(int initsize=512) : b(initsize) { b.skip(4); /*leave room for size field*/ }
+	BSONObjBuilder(int initsize=512) : b(initsize) { b.skip(4); /*leave room for size field*/ }
 
 	/* add all the fields from the object specified to this object */
-	void appendElements(JSObj x);
+	void appendElements(BSONObj x);
 
-	void append(Element& e) { 
+	void append(BSONElement& e) { 
         assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
         b.append((void*) e.rawdata(), e.size()); 
     }
 
 	/* append an element but with a new name */
-	void appendAs(Element& e, const char *as) { 
+	void appendAs(BSONElement& e, const char *as) { 
 		b.append((char) e.type());
 		b.append(as);
 		b.append((void *) e.value(), e.valuesize());
 	}
 
 	/* add a subobject as a member */
-	void append(const char *fieldName, JSObj subObj) { 
+	void append(const char *fieldName, BSONObj subObj) { 
 		b.append((char) Object);
 		b.append(fieldName);
 		b.append((void *) subObj.objdata(), subObj.objsize());
@@ -426,18 +426,18 @@ public:
 		append(fieldName, str.c_str());
 	}
 
-	/* JSObj will free the buffer when it is finished. */
-	JSObj doneAndDecouple() { 
+	/* BSONObj will free the buffer when it is finished. */
+	BSONObj doneAndDecouple() { 
 		int l;
-		return JSObj(decouple(l), true);
+		return BSONObj(decouple(l), true);
 	}
 
 	/* this version, jsobjbuilder still frees the jsobj
 	when the builder goes out of scope.  use it this way
 	by default, that's simplest.
 	*/
-	JSObj done() { 
-		return JSObj(_done());
+	BSONObj done() { 
+		return BSONObj(_done());
 	}
 
 	/* assume ownership of the buffer - you must then free it (with free()) */
@@ -461,20 +461,20 @@ private:
 	BufBuilder b;
 };
 
-/* iterator for a JSObj 
+/* iterator for a BSONObj 
 
-   Note each JSObj ends with an EOO element: so you will get more() on an empty 
+   Note each BSONObj ends with an EOO element: so you will get more() on an empty 
    object, although next().eoo() will be true.
 */
-class JSElemIter {
+class BSONObjIterator {
 public:
-	JSElemIter(const JSObj& jso) {
+	BSONObjIterator(const BSONObj& jso) {
 		pos = jso.objdata() + 4;
 		theend = jso.objdata() + jso.objsize();
 	}
 	bool more() { return pos < theend; }
-	Element next() {
-		Element e(pos);
+	BSONElement next() {
+		BSONElement e(pos);
 		pos += e.size();
 		return e;
 	}
@@ -483,14 +483,14 @@ private:
 	const char *theend;
 };
 
-/* iterator a JSObj which is an array, in array order. 
+/* iterator a BSONObj which is an array, in array order. 
 class JSArrayIter {
 public:
-	JSElemIter(const JSObj& jso) {
+	BSONObjIterator(const BSONObj& jso) {
 ...
 	}
 	bool more() { return ... } 
-	Element next() {
+	BSONElement next() {
 ...
 	}
 };
@@ -527,12 +527,12 @@ class Where;
 class JSMatcher : boost::noncopyable { 
 	int matchesDotted(
 		const char *fieldName, 
-		Element& toMatch, JSObj& obj, 
+		BSONElement& toMatch, BSONObj& obj, 
 		int compareOp, bool *deep, bool isArr = false);
 
 	struct element_lt
 	{
-		bool operator()(const Element& l, const Element& r) const
+		bool operator()(const BSONElement& l, const BSONElement& r) const
 		{
 			int x = (int) l.type() - (int) r.type();
 			if( x < 0 ) return true;
@@ -555,22 +555,22 @@ public:
 		return op <= LTE ? -1 : 1;
 	}
 
-	JSMatcher(JSObj& pattern);
+	JSMatcher(BSONObj& pattern);
 
 	~JSMatcher();
 
 	/* deep means we looked into arrays for a match */
-	bool matches(JSObj& j, bool *deep = 0);
+	bool matches(BSONObj& j, bool *deep = 0);
 
 	int getN() { return n; }
 
 private:
-	int valuesMatch(Element& l, Element& r, int op);
+	int valuesMatch(BSONElement& l, BSONElement& r, int op);
 
-	set<Element,element_lt> *in;
+	set<BSONElement,element_lt> *in;
 	Where *where;
-	JSObj& jsobj;
-	vector<Element> toMatch;
+	BSONObj& jsobj;
+	vector<BSONElement> toMatch;
 	vector<int> compareOp;
 	int n;
 
@@ -578,11 +578,11 @@ private:
 	int nRegex;
 
 	// so we delete the mem when we're done:
-	JSObjBuilder *builders[8];
+	BSONObjBuilder *builders[8];
 	int nBuilders;
 };
 
-extern JSObj maxKey;
+extern BSONObj maxKey;
 
 /*- just for testing -- */
 
@@ -610,47 +610,47 @@ struct JSObj1 {
 #pragma pack(pop)
 extern JSObj1 js1;
 
-inline JSObj Element::embeddedObject() { 
+inline BSONObj BSONElement::embeddedObject() { 
 	assert( type()==Object || type()==Array ); 
-	return JSObj(value()); 
+	return BSONObj(value()); 
 }
 
-inline JSObj JSObj::copy() { 
+inline BSONObj BSONObj::copy() { 
 	if( isEmpty() )
 		return *this;
 
 	char *p = (char*) malloc(objsize());
 	memcpy(p, objdata(), objsize());
-	return JSObj(p, true);
+	return BSONObj(p, true);
 }
 
 // wrap this element up as a singleton object.
-inline JSObj Element::wrap() { 
-	JSObjBuilder b;
+inline BSONObj BSONElement::wrap() { 
+	BSONObjBuilder b;
 	b.append(*this);
 	return b.doneAndDecouple();
 }
 
-inline Element JSObj::findElement(const char *name) { 
+inline BSONElement BSONObj::findElement(const char *name) { 
 	if( !isEmpty() ) {
-		JSElemIter it(*this);
+		BSONObjIterator it(*this);
 		while( it.more() ) {
-			Element e = it.next();
+			BSONElement e = it.next();
 			if( strcmp(name, e.fieldName()) == 0 ) 
 				return e;
 		}
 	}
-	return Element();
+	return BSONElement();
 }
 
 /* add all the fields from the object specified to this object */
-inline void JSObjBuilder::appendElements(JSObj x) { 
-	JSElemIter it(x);
+inline void BSONObjBuilder::appendElements(BSONObj x) { 
+	BSONObjIterator it(x);
 	while( it.more() ) {
-		Element e = it.next();
+		BSONElement e = it.next();
 		if( e.eoo() ) break;
 		append(e);
 	}
 }
 
-extern JSObj emptyObj;
+extern BSONObj emptyObj;

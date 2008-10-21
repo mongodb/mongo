@@ -292,7 +292,7 @@ void NamespaceDetails::addingIndex(const char *thisns, IndexDetails& details) {
 int NamespaceDetails::fieldIsIndexed(const char *fieldName) {
 	for( int i = 0; i < nIndexes; i++ ) {
 		IndexDetails& idx = indexes[i];
-		JSObj idxKey = idx.info.obj().getObjectField("key"); // e.g., { ts : -1 }
+		BSONObj idxKey = idx.info.obj().getObjectField("key"); // e.g., { ts : -1 }
 		if( !idxKey.findElement(fieldName).eoo() )
 			return i;
 	}
@@ -325,7 +325,7 @@ void NamespaceDetailsTransient::computeIndexKeys() {
 /* add a new namespace to the system catalog (<dbname>.system.namespaces).
    options: { capped : ..., size : ... }
 */
-void addNewNamespaceToCatalog(const char *ns, JSObj *options = 0) {
+void addNewNamespaceToCatalog(const char *ns, BSONObj *options = 0) {
 	OCCASIONALLY log() << "New namespace: " << ns << '\n';
 	if( strstr(ns, "system.namespaces") ) { 
 		// system.namespaces holds all the others, so it is not explicitly listed in the catalog.
@@ -334,11 +334,11 @@ void addNewNamespaceToCatalog(const char *ns, JSObj *options = 0) {
 	}
 
 	{
-		JSObjBuilder b;
+		BSONObjBuilder b;
 		b.append("name", ns);
 		if( options )
 			b.append("options", *options);
-		JSObj j = b.done();
+		BSONObj j = b.done();
 		char client[256];
 		nsToClient(ns, client);
 		string s = client;

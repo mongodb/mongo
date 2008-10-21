@@ -45,11 +45,11 @@ void SingleResultObjCursor::reg(const char *as) {
 void profile(const char *str,
 			 int millis)
 {
-	JSObjBuilder b;
+	BSONObjBuilder b;
 	b.appendDate("ts", jsTime());
 	b.append("info", str);
 	b.append("millis", (double) millis);
-	JSObj p = b.done();
+	BSONObj p = b.done();
 	theDataFileMgr.insert(client->profileName.c_str(), 
 		p.objdata(), p.objsize(), true);
 }

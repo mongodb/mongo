@@ -28,7 +28,7 @@ auto_ptr<Cursor> getSpecialCursor(const char *ns);
 class SingleResultObjCursor : public Cursor {
 	int i;
 protected:
-	JSObjBuilder b;
+	BSONObjBuilder b;
 	void reg(const char *as); /* register as a certain namespace */
 public:
 	SingleResultObjCursor() { i = 0; }
@@ -38,7 +38,7 @@ public:
 
 	virtual void fill() = 0;
 
-	virtual JSObj current() {
+	virtual BSONObj current() {
 		assert(i == 0);
 		fill();
 		return b.done();

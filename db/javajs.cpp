@@ -288,7 +288,7 @@ int JavaJSImpl::scopeSetString( jlong id , const char * field , const char * val
   return res;
 }
 
-int JavaJSImpl::scopeSetObject( jlong id , const char * field , JSObj * obj ){
+int JavaJSImpl::scopeSetObject( jlong id , const char * field , BSONObj * obj ){
   jobject bb = 0;
   if ( obj ){
     bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
@@ -304,7 +304,7 @@ int JavaJSImpl::scopeSetObject( jlong id , const char * field , JSObj * obj ){
   return res;  
 }
 
-int JavaJSImpl::scopeInit( jlong id , JSObj * obj ){
+int JavaJSImpl::scopeInit( jlong id , BSONObj * obj ){
   if ( ! obj )
     return 0;
 
@@ -316,7 +316,7 @@ int JavaJSImpl::scopeInit( jlong id , JSObj * obj ){
   return res;
 }
 
-int JavaJSImpl::scopeSetThis( jlong id , JSObj * obj ){
+int JavaJSImpl::scopeSetThis( jlong id , BSONObj * obj ){
   if ( ! obj )
     return 0;
   
@@ -366,7 +366,7 @@ string JavaJSImpl::scopeGetString( jlong id , const char * field ) {
 }
 
 #ifdef J_USE_OBJ
-JSObj JavaJSImpl::scopeGetObject( jlong id , const char * field ) 
+BSONObj JavaJSImpl::scopeGetObject( jlong id , const char * field ) 
 {
   jstring s1 = _getEnv()->NewStringUTF( field );  
   int guess = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _getEnv()->NewStringUTF( field ) );
@@ -381,7 +381,7 @@ JSObj JavaJSImpl::scopeGetObject( jlong id , const char * field )
   //cout << "len : " << len << endl;
   jassert( len > 0 && len < guess ); 
 
-  JSObj obj(buf, true);
+  BSONObj obj(buf, true);
   assert( obj.objsize() <= guess );
   return obj;
 }
@@ -585,7 +585,7 @@ int javajstest() {
 #ifdef J_USE_OBJ  
   
   if ( debug ) cout << "going to get object" << endl;
-  JSObj obj = JavaJS.scopeGetObject( scope , "abc" );
+  BSONObj obj = JavaJS.scopeGetObject( scope , "abc" );
   if ( debug ) cout << "done getting object" << endl;
   
   if ( debug ){

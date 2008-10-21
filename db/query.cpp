@@ -37,13 +37,13 @@
 const int MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 
 //ns->query->DiskLoc
-LRUishMap<JSObj,DiskLoc,5> lrutest(123);
+LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
 
 int nextCursorId = 1;
 extern bool useCursors;
 
-int getGtLtOp(Element& e);
-void appendElementHandlingGtLt(JSObjBuilder& b, Element& e);
+int getGtLtOp(BSONElement& e);
+void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e);
 
 /* todo: _ cache query plans 
          _ use index on partial match with the query
@@ -54,7 +54,7 @@ void appendElementHandlingGtLt(JSObjBuilder& b, Element& e);
      simpleKeyMatch - set to true if the query is purely for a single key value
                       unchanged otherwise.
 */
-auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0) { 
+auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0) { 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) return auto_ptr<Cursor>();
 
@@ -67,15 +67,15 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 		order.getFieldNames(orderFields);
 		// order by
 		for(int i = 0; i < d->nIndexes; i++ ) { 
-			JSObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
+			BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
 			assert( strcmp(ns, idxInfo.getStringField("ns")) == 0 );
-			JSObj idxKey = idxInfo.getObjectField("key");
+			BSONObj idxKey = idxInfo.getObjectField("key");
 			set<string> keyFields;
 			idxKey.getFieldNames(keyFields);
 			if( keyFields == orderFields ) {
 				bool reverse = 
 					order.firstElement().number() < 0;
-				JSObjBuilder b;
+				BSONObjBuilder b;
 				/* todo: start with the right key, not just beginning of index, when query is also
 				         specified!
 				*/
@@ -89,20 +89,20 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 
 	// regular query without order by
 	for(int i = 0; i < d->nIndexes; i++ ) { 
-		JSObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
-		JSObj idxKey = idxInfo.getObjectField("key");
+		BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
+		BSONObj idxKey = idxInfo.getObjectField("key");
 		set<string> keyFields;
 		idxKey.getFieldNames(keyFields);
 		if( keyFields == queryFields ) {
 			bool simple = true;
-			JSObjBuilder b;
-			JSObj q = query.extractFields(idxKey, b);
+			BSONObjBuilder b;
+			BSONObj q = query.extractFields(idxKey, b);
 			/* regexp: only supported if form is /^text/ */
-			JSObjBuilder b2;
-			JSElemIter it(q);
+			BSONObjBuilder b2;
+			BSONObjIterator it(q);
 			bool first = true;
 			while( it.more() ) {
-				Element e = it.next();
+				BSONElement e = it.next();
 				if( e.eoo() )
 					break;
 
@@ -121,7 +121,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 						}
 
 						{
-							JSElemIter k(e.embeddedObject());
+							BSONObjIterator k(e.embeddedObject());
 							k.next();
 							if( !k.next().eoo() ) { 
 								/* compound query like { $lt : 9, $gt : 2 } 
@@ -170,7 +170,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, JSObj& query, JSObj& order, bool
 					//appendElementHandlingGtLt(b2, e);
 				}
 			}
-			JSObj q2 = b2.done();
+			BSONObj q2 = b2.done();
 			DEV cout << "using index " << d->indexes[i].indexNamespace() << endl;
 			if( simple && simpleKeyMatch ) *simpleKeyMatch = true;
 			return auto_ptr<Cursor>( 
@@ -187,7 +187,7 @@ fail:
    pattern: the "where" clause / criteria
    justOne: stop after 1 match
 */
-int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
+int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
 	if( strstr(ns, ".system.") && !god ) {
 		/*if( strstr(ns, ".system.namespaces") ){ 
 			cout << "info: delete on system namespace " << ns << '\n';
@@ -203,7 +203,7 @@ int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
 
 	int nDeleted = 0;
 	JSMatcher matcher(pattern);
-	JSObj order;
+	BSONObj order;
 	auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
 	if( c.get() == 0 )
 		c = theDataFileMgr.findAll(ns);
@@ -214,7 +214,7 @@ int deleteObjects(const char *ns, JSObj pattern, bool justOne, bool god) {
 		Record *r = c->_current();
 		DiskLoc rloc = c->currLoc();
 		c->advance(); // must advance before deleting as the next ptr will die
-		JSObj js(r);
+		BSONObj js(r);
 
 		bool deep;
 		if( !matcher.matches(js, &deep) ) {
@@ -248,14 +248,14 @@ struct Mod {
     }
     double getn() { return ndouble ? *ndouble : *nint; }
     int type;
-	static void getMods(vector<Mod>& mods, JSObj from);
-	static void applyMods(vector<Mod>& mods, JSObj obj);
+	static void getMods(vector<Mod>& mods, BSONObj from);
+	static void applyMods(vector<Mod>& mods, BSONObj obj);
 };
 
-void Mod::applyMods(vector<Mod>& mods, JSObj obj) { 
+void Mod::applyMods(vector<Mod>& mods, BSONObj obj) { 
 	for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) { 
 		Mod& m = *i;
-		Element e = obj.findElement(m.fieldName);
+		BSONElement e = obj.findElement(m.fieldName);
 		if( e.isNumber() ) {
             if( m.op == INC ) {
                 e.setNumber( e.number() + m.getn() );
@@ -273,15 +273,15 @@ void Mod::applyMods(vector<Mod>& mods, JSObj obj) {
    { $set: { a:77 } }
    NOTE: MODIFIES source from object!
 */
-void Mod::getMods(vector<Mod>& mods, JSObj from) { 
-	JSElemIter it(from);
+void Mod::getMods(vector<Mod>& mods, BSONObj from) { 
+	BSONObjIterator it(from);
 	while( it.more() ) {
-		Element e = it.next();
+		BSONElement e = it.next();
 		const char *fn = e.fieldName();
 		if( *fn == '$' && e.type() == Object && 
 			fn[4] == 0 ) {
-			JSObj j = e.embeddedObject();
-			JSElemIter jt(j);
+			BSONObj j = e.embeddedObject();
+			BSONObjIterator jt(j);
 			Op op = Mod::SET;
 			if( strcmp("$inc",fn) == 0 ) {
 				op = Mod::INC;
@@ -291,7 +291,7 @@ void Mod::getMods(vector<Mod>& mods, JSObj from) {
 				strcpy((char *) fn, "$SET");
 			}
 			while( jt.more() ) { 
-				Element f = jt.next();
+				BSONElement f = jt.next();
 				if( f.eoo() )
 					break;
 				Mod m;
@@ -320,7 +320,7 @@ void Mod::getMods(vector<Mod>& mods, JSObj from) {
 	 5: we did applyMods() and did logOp() (so don't do it again) 
      (clean these up later...)
 */
-int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss, bool logop=false) {
+int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
 	//cout << "TEMP BAD";
 	//lrutest.find(updateobj);
 
@@ -338,14 +338,14 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 	int nscanned = 0;
 	{
 		JSMatcher matcher(pattern);
-		JSObj order;
+		BSONObj order;
 		auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
 		if( c.get() == 0 )
 			c = theDataFileMgr.findAll(ns);
 		while( c->ok() ) {
 			Record *r = c->_current();
 			nscanned++;
-			JSObj js(r);
+			BSONObj js(r);
 			if( !matcher.matches(js) ) {
 				if( c->tempStopOnMiss() )
 					break;
@@ -400,11 +400,11 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 			/* upsert of an $inc. build a default */
 			vector<Mod> mods;
 			Mod::getMods(mods, updateobj);
-			JSObjBuilder b;
+			BSONObjBuilder b;
 			b.appendElements(pattern);
 			for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
 				b.append(i->fieldName, i->getn());
-			JSObj obj = b.done();
+			BSONObj obj = b.done();
 			theDataFileMgr.insert(ns, (void*) obj.objdata(), obj.objsize());
 			if( profile )
 				ss << " fastmodinsert ";
@@ -419,7 +419,7 @@ int _updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, 
 }
 /* todo: we can optimize replication by just doing insert when an upsert triggers. 
 */
-void updateObjects(const char *ns, JSObj updateobj, JSObj pattern, bool upsert, stringstream& ss) {
+void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss) {
 	int rc = _updateObjects(ns, updateobj, pattern, upsert, ss, true);
 	if( rc != 5 )
 		logOp("u", ns, updateobj, &pattern, &upsert);
@@ -430,9 +430,9 @@ int otherTraceLevel = 0;
 
 int initialExtentSize(int len);
 
-bool _runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder);
+bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder);
 
-bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, JSObjBuilder& anObjBuilder) { 
+bool runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder) { 
 	try {
 		return _runCommands(ns, jsobj, ss, b, anObjBuilder);
 	}
@@ -443,7 +443,7 @@ bool runCommands(const char *ns, JSObj& jsobj, stringstream& ss, BufBuilder &b, 
 	ss << " assertion ";
 	anObjBuilder.append("errmsg", "db assertion failure");
 	anObjBuilder.append("ok", 0.0);
-	JSObj x = anObjBuilder.done();
+	BSONObj x = anObjBuilder.done();
 	b.append((void*) x.objdata(), x.objsize());
 	return true;
 }
@@ -460,22 +460,22 @@ void killCursors(int n, long long *ids) {
 }
 
 // order.$natural sets natural order direction
-auto_ptr<Cursor> findTableScan(const char *ns, JSObj& order);
+auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order);
 
-JSObj id_obj = fromjson("{_id:ObjId()}");
-JSObj empty_obj = fromjson("{}");
+BSONObj id_obj = fromjson("{_id:ObjId()}");
+BSONObj empty_obj = fromjson("{}");
 
 /* { count: "collectionname"[, query: <query>] } 
    returns -1 on error.
 */
-int runCount(const char *ns, JSObj& cmd, string& err) { 
+int runCount(const char *ns, BSONObj& cmd, string& err) { 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) {
 		err = "ns does not exist";
 		return -1;
 	}
 
-	JSObj query = cmd.getObjectField("query");
+	BSONObj query = cmd.getObjectField("query");
 
 	if( query.isEmpty() ) { 
 		// count of all objects
@@ -512,7 +512,7 @@ int runCount(const char *ns, JSObj& cmd, string& err) {
 	int count = 0;
 	auto_ptr<JSMatcher> matcher(new JSMatcher(query));
 	while( c->ok() ) {
-		JSObj js = c->current();
+		BSONObj js = c->current();
 		bool deep;
 		if( !matcher->matches(js, &deep) ) {
 			if( c->tempStopOnMiss() )
@@ -529,16 +529,16 @@ int runCount(const char *ns, JSObj& cmd, string& err) {
 
 /* [ { a : 1 } , { b : 1 } ] -> { a : 1, b : 1 } 
 */
-inline JSObj transformOrderFromArrayFormat(JSObj order) { 
+inline BSONObj transformOrderFromArrayFormat(BSONObj order) { 
     /* note: this is slow, but that is ok as order will have very few pieces */
-    JSObjBuilder b;
+    BSONObjBuilder b;
     char p[2] = "0";
 
     while( 1 ) {
-        JSObj j = order.getObjectField(p);
+        BSONObj j = order.getObjectField(p);
         if( j.isEmpty() ) 
             break;
-        Element e = j.firstElement();
+        BSONElement e = j.firstElement();
         uassert("bad order array", !e.eoo());
         uassert("bad order array [2]", e.isNumber());
         b.append(e);
@@ -549,7 +549,7 @@ inline JSObj transformOrderFromArrayFormat(JSObj order) {
     return b.doneAndDecouple();
 }
 
-QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, JSObj jsobj, 
+QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, BSONObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss, int queryOptions) 
 {
 	time_t t = time(0);
@@ -563,7 +563,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 
 	int n = 0;
 	BufBuilder b(32768);
-	JSObjBuilder cmdResBuf;
+	BSONObjBuilder cmdResBuf;
 	long long cursorid = 0;
 
 	b.skip(sizeof(QueryResult));
@@ -576,10 +576,10 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 
         uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
 
-		JSObj query = jsobj.getObjectField("query");
-        JSObj order;
+		BSONObj query = jsobj.getObjectField("query");
+        BSONObj order;
         {
-            Element e = jsobj.findElement("orderby");
+            BSONElement e = jsobj.findElement("orderby");
             if( !e.eoo() ) {
                 order = e.embeddedObject();
                 if( e.type() == Array ) 
@@ -623,7 +623,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		}
 
 		while( c->ok() ) {
-			JSObj js = c->current();
+			BSONObj js = c->current();
 			if( queryTraceLevel >= 50 )
 				cout << " checking against:\n " << js.toString() << endl;
 			nscanned++;
@@ -777,7 +777,7 @@ done:
 				cc = 0;
 				break;
 			}
-			JSObj js = c->current();
+			BSONObj js = c->current();
 
 			bool deep;
 

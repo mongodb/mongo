@@ -92,7 +92,7 @@ struct SyncException {
 class ReplSource {
 	bool resync(string db);
 	void sync_pullOpLog();
-	void sync_pullOpLog_applyOperation(JSObj& op);
+	void sync_pullOpLog_applyOperation(BSONObj& op);
 
 	auto_ptr<DBClientConnection> conn;
 	auto_ptr<DBClientCursor> cursor;
@@ -120,7 +120,7 @@ public:
 
 	static void loadAll(vector<ReplSource*>&);
 	static void cleanup(vector<ReplSource*>&);
-	ReplSource(JSObj);
+	ReplSource(BSONObj);
 	bool sync();
 	void save(); // write ourself to local.sources
 	void resetConnection() { 
@@ -130,7 +130,7 @@ public:
 
 	// make a jsobj from our member fields of the form 
 	//   { host: ..., source: ..., syncedTo: ... }
-	JSObj jsobj(); 
+	BSONObj jsobj(); 
 	
 	bool operator==(const ReplSource&r) const { 
 		return hostName == r.hostName && sourceName() == r.sourceName(); 
@@ -144,8 +144,8 @@ public:
    "c" db cmd
    "db" declares presence of a database (ns is set to the db name + '.')
 */
-void _logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *patt, bool *b);
-inline void logOp(const char *opstr, const char *ns, JSObj& obj, JSObj *patt = 0, bool *b = 0) {
+void _logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt, bool *b);
+inline void logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt = 0, bool *b = 0) {
 	if( master )
 		_logOp(opstr, ns, obj, patt, b);
 }

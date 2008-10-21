@@ -21,4 +21,4 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 
-JSObj fromjson(const char *str);
+BSONObj fromjson(const char *str);

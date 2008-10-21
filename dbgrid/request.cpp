@@ -57,7 +57,9 @@ void queryOp(Message& m, MessagingPort& p) {
   DbMessage d(m);
   const char *ns = d.getns();
 
-  cout << "TEMP: " << ns << endl;
+  cout << "TEMPns: " << ns << endl;
+
+
 
   ScopedDbConnection dbcon(tempHost);
   DBClientConnection &c = dbcon.conn();
@@ -82,7 +84,7 @@ void writeOp(int op, Message& m, MessagingPort& p) {
   dbcon.done();
 /*
   while( d.moreJSObjs() ) {
-    JSObj js = d.nextJsObj();
+    BSONObj js = d.nextJsObj();
     const char *ns = d.getns();
     assert(*ns);
   }

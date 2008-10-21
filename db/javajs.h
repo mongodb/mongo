@@ -43,7 +43,7 @@ int javajstest();
 const char * findEd();
 const char * findEd(const char *);
 
-class JSObj;
+class BSONObj;
 
 class JavaJSImpl {
  public:
@@ -52,20 +52,20 @@ class JavaJSImpl {
   ~JavaJSImpl();
   
   jlong scopeCreate();
-  int scopeInit( jlong id , JSObj * obj );
-  int scopeSetThis( jlong id , JSObj * obj );
+  int scopeInit( jlong id , BSONObj * obj );
+  int scopeSetThis( jlong id , BSONObj * obj );
   jboolean scopeReset( jlong id );
   void scopeFree( jlong id );
 
   double scopeGetNumber( jlong id , const char * field );
   string scopeGetString( jlong id , const char * field );
   jboolean scopeGetBoolean( jlong id , const char * field );
-  JSObj scopeGetObject( jlong id , const char * field );
+  BSONObj scopeGetObject( jlong id , const char * field );
   char scopeGetType( jlong id , const char * field );
 
   int scopeSetNumber( jlong id , const char * field , double val );
   int scopeSetString( jlong id , const char * field , const char * val );
-  int scopeSetObject( jlong id , const char * field , JSObj * obj );
+  int scopeSetObject( jlong id , const char * field , BSONObj * obj );
   int scopeSetBoolean( jlong id , const char * field , jboolean val );
 
   jlong functionCreate( const char * code );
@@ -152,19 +152,19 @@ class Scope {
   void reset() { JavaJS->scopeReset(s); }
 
   void init( const char * data ){
-    JSObj o( data , 0 );
+    BSONObj o( data , 0 );
     JavaJS->scopeInit( s , & o );
   }
   
   double getNumber(const char *field) { return JavaJS->scopeGetNumber(s,field); }
   string getString(const char *field) { return JavaJS->scopeGetString(s,field); }
   jboolean getBoolean(const char *field) { return JavaJS->scopeGetBoolean(s,field); }
-  JSObj getObject(const char *field ) { return JavaJS->scopeGetObject(s,field); }
+  BSONObj getObject(const char *field ) { return JavaJS->scopeGetObject(s,field); }
   int type(const char *field ) { return JavaJS->scopeGetType(s,field); }
   
   void setNumber(const char *field, double val ) { JavaJS->scopeSetNumber(s,field,val); }
   void setString(const char *field, const char * val ) { JavaJS->scopeSetString(s,field,val); }
-  void setObject(const char *field, JSObj& obj ) { JavaJS->scopeSetObject(s,field,&obj); }
+  void setObject(const char *field, BSONObj& obj ) { JavaJS->scopeSetObject(s,field,&obj); }
   void setBoolean(const char *field, jboolean val ) { JavaJS->scopeSetBoolean(s,field,val); }
   
   int invoke(jlong function) { return JavaJS->invoke(s,function); }

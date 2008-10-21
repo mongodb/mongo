@@ -26,7 +26,7 @@ public:
        implement this...
        return value is true if succeeded.  if false, set errmsg text.
     */
-    virtual bool run(const char *ns, JSObj& cmdObj, string& errmsg, JSObjBuilder& result) = 0;
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) = 0;
 
     /* return true if only the admin ns has privileges to run this command. */
     virtual bool adminOnly() { return false; }

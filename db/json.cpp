@@ -27,7 +27,7 @@ void skipWhite(const char *&p) {
 		p++;
 }
 
-void value(JSObjBuilder& b, const char *&p, string& id) { 
+void value(BSONObjBuilder& b, const char *&p, string& id) { 
 	if( strncmp(p, "ObjId()", 7) == 0 ) {
 		p += 7;
 		b.appendOID(id.c_str());
@@ -41,7 +41,7 @@ void value(JSObjBuilder& b, const char *&p, string& id) {
 	}
 }
 
-void _fromjson(JSObjBuilder& b, const char *&p) { 
+void _fromjson(BSONObjBuilder& b, const char *&p) { 
 	while( 1 ) { 
 		skipWhite(p);
 		if( *p == 0 )
@@ -62,8 +62,8 @@ void _fromjson(JSObjBuilder& b, const char *&p) {
 	}
 }
 
-JSObj fromjson(const char *str) { 
-	JSObjBuilder b;
+BSONObj fromjson(const char *str) { 
+	BSONObjBuilder b;
 	_fromjson(b,str);
 	return b.doneAndDecouple();
 }

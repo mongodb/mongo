@@ -18,6 +18,9 @@
 #include "jsobj.h"
 #include "namespace.h"
 
+/* For the client/server protocol, these objects represent the various messages 
+   transmitted over the connection.
+*/
 class DbMessage {
 public:
 	DbMessage(Message& _m) : m(_m) {
@@ -62,10 +65,10 @@ public:
 
 	/* for insert and update msgs */
 	bool moreJSObjs() { return nextjsobj != 0; }
-	JSObj nextJsObj() {
+	BSONObj nextJsObj() {
 		if( nextjsobj == data )
 			nextjsobj += strlen(data) + 1; // skip namespace
-		JSObj js(nextjsobj);
+		BSONObj js(nextjsobj);
                 assert( js.objsize() < ( theEnd - data ) );
 		if( js.objsize() <= 0 )
 			nextjsobj = null;
@@ -77,10 +80,35 @@ public:
 		return js;
 	}
 
+    Message& msg() { return m; }
+
 private:
 	Message& m;
 	int reserved;
 	const char *data;
 	const char *nextjsobj;
 	const char *theEnd;
+};
+
+/* a request to run a query, received from the client */
+class QueryMessage { 
+public:
+    const char *ns;
+    int ntoskip;
+    int ntoreturn;
+    int queryOptions;
+    BSONObj query;
+	auto_ptr< set<string> > fields;
+
+    QueryMessage(DbMessage& d) { 
+        ns = d.getns();
+        ntoskip = d.pullInt();
+        ntoreturn = d.pullInt();
+        query = d.nextJsObj();
+        if( d.moreJSObjs() ) { 
+            fields = auto_ptr< set<string> >(new set<string>());
+            d.nextJsObj().getFieldNames(*fields);
+        }
+        queryOptions = d.msg().data->dataAsInt();
+    }
 };

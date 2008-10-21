@@ -25,7 +25,7 @@ extern int otherTraceLevel;
 DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
 DiskLoc minDiskLoc(0, 1);
 
-BtreeCursor::BtreeCursor(IndexDetails& _id, JSObj& k, int _direction, bool sm) : 
+BtreeCursor::BtreeCursor(IndexDetails& _id, BSONObj& k, int _direction, bool sm) : 
     indexDetails(_id),
     direction(_direction), stopmiss(sm) 
 {
@@ -74,7 +74,7 @@ bool BtreeCursor::advance() {
 
 void BtreeCursor::noteLocation() {
 	if( !eof() ) {
-		JSObj o = bucket.btree()->keyAt(keyOfs).copy();
+		BSONObj o = bucket.btree()->keyAt(keyOfs).copy();
 		keyAtKeyOfs = o;
 		locAtKeyOfs = bucket.btree()->k(keyOfs).recordLoc;
 	}
@@ -98,7 +98,7 @@ void BtreeCursor::checkLocation() {
 
 		assert( !keyAtKeyOfs.isEmpty() ); 
 
-		// Note keyAt() returns an empty JSObj if keyOfs is now out of range, 
+		// Note keyAt() returns an empty BSONObj if keyOfs is now out of range, 
 		// which is possible as keys may have been deleted.
 		if( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
 			b->k(keyOfs).recordLoc == locAtKeyOfs ) { 

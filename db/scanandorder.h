@@ -11,15 +11,15 @@
 
 class KeyType : boost::noncopyable {
 public:
-	JSObj pattern; // e.g., { ts : -1 }
+	BSONObj pattern; // e.g., { ts : -1 }
 public:
-	KeyType(JSObj _keyPattern) {
+	KeyType(BSONObj _keyPattern) {
 		pattern = _keyPattern;
 		assert( !pattern.isEmpty() );
 	}
 
 	// returns the key value for o
-	JSObj getKeyFromObject(JSObj o) { 
+	BSONObj getKeyFromObject(BSONObj o) { 
 		return o.extractFields(pattern);
 	}
 };
@@ -30,9 +30,9 @@ public:
    _ response size limit from runquery; push it up a bit.
 */
 
-inline bool fillQueryResultFromObj(BufBuilder& b, set<string> *filter, JSObj& js) { 
+inline bool fillQueryResultFromObj(BufBuilder& b, set<string> *filter, BSONObj& js) { 
 	if( filter ) {
-		JSObj x;
+		BSONObj x;
 		bool ok = x.addFields(js, *filter) > 0;
 		if( ok ) 
 			b.append((void*) x.objdata(), x.objsize());
@@ -43,7 +43,7 @@ inline bool fillQueryResultFromObj(BufBuilder& b, set<string> *filter, JSObj& js
 	return true;
 }
 
-typedef multimap<JSObj,JSObj> BestMap;
+typedef multimap<BSONObj,BSONObj> BestMap;
 class ScanAndOrder { 
   BestMap best; // key -> full object
   int startFrom;
@@ -52,13 +52,13 @@ class ScanAndOrder {
   int dir;
   unsigned approxSize;
   
-  void _add(JSObj& k, JSObj o) { 
+  void _add(BSONObj& k, BSONObj o) { 
     best.insert(make_pair(k,o));
   }
   
   // T may be iterator or reverse_iterator
-  void _addIfBetter(JSObj& k, JSObj o, BestMap::iterator i) {
-    const JSObj& worstBestKey = i->first;
+  void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i) {
+    const BSONObj& worstBestKey = i->first;
     int c = worstBestKey.woCompare(k);
     if( (c<0 && dir<0) || (c>0&&dir>0) ) {
       // k is better, 'upgrade'
@@ -68,21 +68,21 @@ class ScanAndOrder {
   }
 
 public:
- ScanAndOrder(int _startFrom, int _limit, JSObj _order) : 
+ ScanAndOrder(int _startFrom, int _limit, BSONObj _order) : 
   startFrom(_startFrom), order(_order) {
     limit = _limit > 0 ? _limit + startFrom : 0x7fffffff;
     approxSize = 0;
     
     // todo: do order right for compound keys.  this is temp.
     dir = 1;
-    Element e = order.pattern.firstElement();
+    BSONElement e = order.pattern.firstElement();
     if( e.number() < 0 ) {
       dir = -1;
     }
   }
   
-  void add(JSObj o) { 
-    JSObj k = order.getKeyFromObject(o);
+  void add(BSONObj o) { 
+    BSONObj k = order.getKeyFromObject(o);
     if( (int) best.size() < limit ) {
       approxSize += k.objsize();
       uassert( "too much key data for sort() with no index", approxSize < 1 * 1024 * 1024 );
@@ -107,7 +107,7 @@ public:
       n++;
       if( n <= startFrom )
 	continue;
-      JSObj& o = i->second;
+      BSONObj& o = i->second;
       if( fillQueryResultFromObj(b, filter, o) ) { 
 	nFilled++;
 	if( nFilled >= limit )

@@ -80,7 +80,7 @@ public:
 //	bool fullObject;
 //	int nFields;
 //	char *codeCopy;
-    JSObj *jsScope;
+    BSONObj *jsScope;
   
 	void setFunc(const char *code) {
 		//codeCopy = new char[strlen(code)+1];
@@ -94,12 +94,12 @@ public:
 		//nFields = fields.size();
 	}
 
-/*	void buildSubset(JSObj& src, JSObjBuilder& dst) { 
-		JSElemIter it(src);
+/*	void buildSubset(BSONObj& src, BSONObjBuilder& dst) { 
+		BSONObjIterator it(src);
 		int n = 0;
 		if( !it.more() ) return;
 		while( 1 ) {
-			Element e = it.next();
+			BSONElement e = it.next();
 			if( e.eoo() )
 				break;
 			if( //n == 0 && 
@@ -123,14 +123,14 @@ JSMatcher::~JSMatcher() {
 
 #include "pdfile.h"
 
-JSMatcher::JSMatcher(JSObj &_jsobj) : 
+JSMatcher::JSMatcher(BSONObj &_jsobj) : 
    in(0), where(0), jsobj(_jsobj), nRegex(0)
 {
 	nBuilders = 0;
-	JSElemIter i(jsobj);
+	BSONObjIterator i(jsobj);
 	n = 0;
 	while( i.more() ) {
-		Element e = i.next();
+		BSONElement e = i.next();
 		if( e.eoo() )
 			break;
 		
@@ -144,7 +144,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 			
 			if ( e.type() == CodeWScope ){
 			  where->setFunc( e.codeWScopeCode() );
-			  where->jsScope = new JSObj( e.codeWScopeScopeData() , 0 );
+			  where->jsScope = new BSONObj( e.codeWScopeScopeData() , 0 );
 			}
 			else {
 			  const char *code = e.valuestr();
@@ -184,13 +184,13 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 		//            { a : { $in : [1,2,3] } }
 		if( e.type() == Object ) {
 			// e.g., fe == { $gt : 3 }
-			JSElemIter j(e.embeddedObject());
+			BSONObjIterator j(e.embeddedObject());
 			bool ok = false;
 			while( j.more() ) {
-				Element fe = j.next();
+				BSONElement fe = j.next();
 				if( fe.eoo() ) 
 					break;
-				// Element fe = e.embeddedObject().firstElement();
+				// BSONElement fe = e.embeddedObject().firstElement();
 				const char *fn = fe.fieldName();
                 /* TODO: use getGtLtOp() here.  this code repeats ourself */
 				if( fn[0] == '$' && fn[1] ) { 
@@ -212,7 +212,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 						  uassert("invalid $operator", false);
 						if( op ) {
 						  uassert("too many items to match in query", nBuilders < 8);
-							JSObjBuilder *b = new JSObjBuilder();
+							BSONObjBuilder *b = new BSONObjBuilder();
 							builders[nBuilders++] = b;
 							b->appendAs(fe, e.fieldName());
 							toMatch.push_back( b->done().firstElement() );
@@ -225,7 +225,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
                         if( fn[1] == 'n' && fn[3] == 0 ) { 
                             // $ne
                             uassert("too many items to match in query", nBuilders < 8);
-							JSObjBuilder *b = new JSObjBuilder();
+							BSONObjBuilder *b = new BSONObjBuilder();
 							builders[nBuilders++] = b;
 							b->appendAs(fe, e.fieldName());
 							toMatch.push_back( b->done().firstElement() );
@@ -239,11 +239,11 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 					else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 && fe.type() == Array ) {
 						// $in
 						assert( in == 0 ); // only one per query supported so far.  finish...
-						in = new set<Element,element_lt>();
-						JSElemIter i(fe.embeddedObject());
+						in = new set<BSONElement,element_lt>();
+						BSONObjIterator i(fe.embeddedObject());
                         if( i.more() ) {
                             while( 1 ) {
-                                Element ie = i.next();
+                                BSONElement ie = i.next();
                                 if( ie.eoo() ) 
                                     break;
                                 in->insert(ie);
@@ -275,7 +275,7 @@ JSMatcher::JSMatcher(JSObj &_jsobj) :
 	}
 }
 
-inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) { 
+inline int JSMatcher::valuesMatch(BSONElement& l, BSONElement& r, int op) { 
 	if( op == 0 ) 
 		return l.valuesEqual(r);
 
@@ -319,32 +319,32 @@ inline int JSMatcher::valuesMatch(Element& l, Element& r, int op) {
     0 missing element
     1 match
 */
-int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj, int compareOp, bool *deep, bool isArr) { 
+int JSMatcher::matchesDotted(const char *fieldName, BSONElement& toMatch, BSONObj& obj, int compareOp, bool *deep, bool isArr) { 
 	{
 		const char *p = strchr(fieldName, '.');
 		if( p ) { 
 			string left(fieldName, p-fieldName);
 
-			Element e = obj.getField(left.c_str());
+			BSONElement e = obj.getField(left.c_str());
 			if( e.eoo() )
 				return 0;
 			if( e.type() != Object && e.type() != Array )
 				return -1;
 
-			JSObj eo = e.embeddedObject();
+			BSONObj eo = e.embeddedObject();
 			return matchesDotted(p+1, toMatch, eo, compareOp, deep, e.type() == Array);
 		}
 	}
 
-	Element e = obj.getField(fieldName);
+	BSONElement e = obj.getField(fieldName);
 
 	if( valuesMatch(e, toMatch, compareOp) ) {
 		return 1;
 	}
 	else if( e.type() == Array ) {
-		JSElemIter ai(e.embeddedObject());
+		BSONObjIterator ai(e.embeddedObject());
 		while( ai.more() ) { 
-			Element z = ai.next();
+			BSONElement z = ai.next();
 			if( valuesMatch( z, toMatch, compareOp) ) {
 				if( deep )
 					*deep = true;
@@ -353,11 +353,11 @@ int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj
 		}
 	}
 	else if( isArr ) { 
-		JSElemIter ai(obj);
+		BSONObjIterator ai(obj);
 		while( ai.more() ) { 
-			Element z = ai.next();
+			BSONElement z = ai.next();
 			if( z.type() == Object ) {
-				JSObj eo = z.embeddedObject();
+				BSONObj eo = z.embeddedObject();
 				int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep);
 				if( cmp > 0 ) { 
 					if( deep ) *deep = true;
@@ -375,7 +375,7 @@ int JSMatcher::matchesDotted(const char *fieldName, Element& toMatch, JSObj& obj
 
 extern int dump;
 
-inline bool _regexMatches(RegexMatcher& rm, Element& e) { 
+inline bool _regexMatches(RegexMatcher& rm, BSONElement& e) { 
 	char buf[64];
 	const char *p = buf;
 	if( e.type() == String || e.type() == Symbol )
@@ -393,13 +393,13 @@ inline bool _regexMatches(RegexMatcher& rm, Element& e) {
 	return rm.re->PartialMatch(p);
 }
 /* todo: internal dotted notation scans -- not done yet here. */
-inline bool regexMatches(RegexMatcher& rm, Element& e, bool *deep) { 
+inline bool regexMatches(RegexMatcher& rm, BSONElement& e, bool *deep) { 
 	if( e.type() != Array ) 
 		return _regexMatches(rm, e);
 
-	JSElemIter ai(e.embeddedObject());
+	BSONObjIterator ai(e.embeddedObject());
 	while( ai.more() ) { 
-		Element z = ai.next();
+		BSONElement z = ai.next();
 		if( _regexMatches(rm, z) ) {
 			if( deep )
 				*deep = true;
@@ -412,7 +412,7 @@ inline bool regexMatches(RegexMatcher& rm, Element& e, bool *deep) {
 /* See if an object matches the query.
    deep - return true when meanswe looked into arrays for a match 
 */
-bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
+bool JSMatcher::matches(BSONObj& jsobj, bool *deep) {
 	if( deep ) 
 		*deep = false;
 
@@ -421,7 +421,7 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 
 	// check normal non-regex cases:
 	for( int i = 0; i < n; i++ ) {
-		Element& m = toMatch[i];
+		BSONElement& m = toMatch[i];
         // -1=mismatch. 0=missing element. 1=match 
 		int cmp = matchesDotted(toMatch[i].fieldName(), toMatch[i], jsobj, compareOp[i], deep);
 
@@ -440,7 +440,7 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 
 	for( int r = 0; r < nRegex; r++ ) { 
 		RegexMatcher& rm = regexs[r];
-		Element e = jsobj.getFieldDotted(rm.fieldName);
+		BSONElement e = jsobj.getFieldDotted(rm.fieldName);
 		if( e.eoo() )
 			return false;
 		if( !regexMatches(rm, e, deep) )
@@ -462,9 +462,9 @@ bool JSMatcher::matches(JSObj& jsobj, bool *deep) {
 		  JavaJS->scopeSetObject(where->scope, "obj", &jsobj);		  
 		} 
 		/*else {
-			JSObjBuilder b;
+			BSONObjBuilder b;
 			where->buildSubset(jsobj, b);
-			JSObj temp = b.done();
+			BSONObj temp = b.done();
 			JavaJS->scopeSetObject(where->scope, "obj", &temp);
 		}*/
 	if( JavaJS->invoke(where->scope, where->func) ) {
@@ -497,8 +497,8 @@ struct JSObj2 {
 struct JSUnitTest : public UnitTest {
 	void run() {
 
-		JSObj j1((const char *) &js1);
-		JSObj j2((const char *) &js2);
+		BSONObj j1((const char *) &js1);
+		BSONObj j2((const char *) &js2);
 		cout << "j1:" << j1.toString() << endl;
 		cout << "j2:" << j2.toString() << endl;
 		JSMatcher m(j2);
@@ -511,8 +511,8 @@ struct JSUnitTest : public UnitTest {
 		assert( !n.matches(j2) );
 
 cout << "temp1" << endl;
-		JSObj j0 = emptyObj;
-//		JSObj j0((const char *) &js0);
+		BSONObj j0 = emptyObj;
+//		BSONObj j0((const char *) &js0);
 		JSMatcher p(j0);
 		assert( p.matches(j1) );
 		assert( p.matches(j2) );

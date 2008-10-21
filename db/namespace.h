@@ -77,19 +77,19 @@ public:
 	   only when it's a "multikey" array.
        keys will be left empty if key not found in the object.
 	*/
-	void getKeysFromObject(JSObj& obj, set<JSObj>& keys);
+	void getKeysFromObject(BSONObj& obj, set<BSONObj>& keys);
 
     /* get the key pattern for this object. 
        e.g., { lastname:1, firstname:1 }
     */
-    JSObj key() { 
+    BSONObj key() { 
         return info.obj().getObjectField("key");
     }
 
     // returns name of this index's storage area
 	// client.table.$index
 	string indexNamespace() { 
-		JSObj io = info.obj();
+		BSONObj io = info.obj();
 		string s;
 		s.reserve(128);
 		s = io.getStringField("ns");
@@ -100,7 +100,7 @@ public:
 	}
 
 	string indexName() { // e.g. "ts_1"
-		JSObj io = info.obj();
+		BSONObj io = info.obj();
 		return io.getStringField("name");
 	}
 
@@ -108,7 +108,7 @@ public:
 	   but the collection we index, its name.
 	   */
 	string parentNS() {
-		JSObj io = info.obj();
+		BSONObj io = info.obj();
 		return io.getStringField("ns");
 	}
 

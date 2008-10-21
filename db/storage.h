@@ -28,7 +28,7 @@ class Record;
 class DeletedRecord;
 class Extent;
 class BtreeBucket;
-class JSObj;
+class BSONObj;
 class PhysicalDataFile;
 
 class DiskLoc {
@@ -102,7 +102,7 @@ public:
 	   it is assumed the object is what it is -- you must asure that: 
 	   think of this as an unchecked type cast.
     */
-	JSObj obj() const;
+	BSONObj obj() const;
 	Record* rec() const;
 	DeletedRecord* drec() const;
 	Extent* ext() const;

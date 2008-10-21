@@ -52,14 +52,14 @@ class ClientConfig : public Model {
 class GridConfig { 
     ObjLocs loc;
 
-    Machine* fetchOwner(string& client, const char *ns, JSObj& objOrKey);
+    Machine* fetchOwner(string& client, const char *ns, BSONObj& objOrKey);
 public:
     /* return which machine "owns" the object in question -- ie which partition 
        we should go to. 
        
        threadsafe.
     */
-    Machine* owner(const char *ns, JSObj& objOrKey);
+    Machine* owner(const char *ns, BSONObj& objOrKey);
 
     GridConfig();
 };

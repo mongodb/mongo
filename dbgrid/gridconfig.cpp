@@ -99,12 +99,12 @@ void GridDB::init() {
 GridConfig::GridConfig() { 
 }
 
-Machine* GridConfig::fetchOwner(string& client, const char *ns, JSObj& objOrKey) { 
+Machine* GridConfig::fetchOwner(string& client, const char *ns, BSONObj& objOrKey) { 
     return 0;
 }
 
 /*threadsafe*/
-Machine* GridConfig::owner(const char *ns, JSObj& objOrKey) {
+Machine* GridConfig::owner(const char *ns, BSONObj& objOrKey) {
     string client;
     {
         boostlock lk(loc_mutex);

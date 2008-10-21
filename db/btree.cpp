@@ -106,8 +106,8 @@ void BucketBasics::assertValid(bool force) {
 	DEV {
 		// slow:
 		for( int i = 0; i < n-1; i++ ) {
-			JSObj k1 = keyNode(i).key;
-			JSObj k2 = keyNode(i+1).key;
+			BSONObj k1 = keyNode(i).key;
+			BSONObj k2 = keyNode(i+1).key;
 			int z = k1.woCompare(k2); //OK
 			if( z > 0 ) {
 				cout << "ERROR: btree key order corrupt.  Keys:" << endl;
@@ -133,8 +133,8 @@ void BucketBasics::assertValid(bool force) {
 	else {
 		//faster:
 		if( n > 1 ) {
-			JSObj k1 = keyNode(0).key;
-			JSObj k2 = keyNode(n-1).key;
+			BSONObj k1 = keyNode(0).key;
+			BSONObj k2 = keyNode(n-1).key;
 			int z = k1.woCompare(k2);
 			wassert( z <= 0 );
 		}
@@ -182,7 +182,7 @@ void BucketBasics::_delKeyAtPos(int keypos) {
 }
 
 /* add a key.  must be > all existing.  be careful to set next ptr right. */
-void BucketBasics::pushBack(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevChild) { 
+void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, DiskLoc prevChild) { 
 	int bytesNeeded = key.objsize() + sizeof(_KeyNode);
 	assert( bytesNeeded <= emptySize );
 	assert( n == 0 || keyNode(n-1).key.woCompare(key) <= 0 );
@@ -195,7 +195,7 @@ void BucketBasics::pushBack(const DiskLoc& recordLoc, JSObj& key, DiskLoc prevCh
 	memcpy(p, key.objdata(), key.objsize());
 }
 
-bool BucketBasics::basicInsert(int keypos, const DiskLoc& recordLoc, JSObj& key) {
+bool BucketBasics::basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key) {
 	assert( keypos >= 0 && keypos <= n );
 	int bytesNeeded = key.objsize() + sizeof(_KeyNode);
 	if( bytesNeeded > emptySize ) { 
@@ -275,7 +275,7 @@ void BtreeBucket::findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, in
    returns n if it goes after the last existing key.
    note result might be Unused!
 */
-bool BtreeBucket::find(JSObj& key, DiskLoc recordLoc, int& pos) { 
+bool BtreeBucket::find(BSONObj& key, DiskLoc recordLoc, int& pos) { 
 	/* binary search for this key */
 	int l=0; int h=n-1;
 	while( l <= h ) { 
@@ -319,7 +319,7 @@ bool BtreeBucket::find(JSObj& key, DiskLoc recordLoc, int& pos) {
 	// not found
 	pos = l;
 	if( pos != n ) {
-		JSObj keyatpos = keyNode(pos).key;
+		BSONObj keyatpos = keyNode(pos).key;
 		wassert( key.woCompare(keyatpos) <= 0 );
 		if( pos > 0 ) { 
 			wassert( keyNode(pos-1).key.woCompare(key) <= 0 );
@@ -395,7 +395,7 @@ void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p) {
 int verbose = 0;
 int qqq = 0;
 
-bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, JSObj& key, const DiskLoc& recordLoc ) {
+bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc ) {
 	if( key.objsize() > KeyMax ) {
 		problem() << "unindex: key too large to index, skipping " << id.indexNamespace() << ' ' << key.toString() << endl;
 		return false;
@@ -436,7 +436,7 @@ void BtreeBucket::fixParentPtrs(const DiskLoc& thisLoc) {
 /* keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
 */
 void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos, 
-							 DiskLoc recordLoc, JSObj& key,
+							 DiskLoc recordLoc, BSONObj& key,
 							 DiskLoc lchild, DiskLoc rchild, IndexDetails& idx) 
 {
 	dassert( thisLoc.btree() == this );
@@ -676,7 +676,7 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
 	return DiskLoc();
 }
 
-DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& found, DiskLoc recordLoc, int direction) { 
+DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, BSONObj& key, int& pos, bool& found, DiskLoc recordLoc, int direction) { 
 	int p;
 	found = find(key, recordLoc, p);
 	if( found ) {
@@ -702,7 +702,7 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, JSObj& key, int& pos, bool& 
 
 /* thisloc is the location of this bucket object.  you must pass that in. */
 int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc, 
-						JSObj& key, bool dupsAllowed,
+						BSONObj& key, bool dupsAllowed,
 						DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) { 
 	if( key.objsize() > KeyMax ) { 
 		problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << idx.indexNamespace() << endl;
@@ -774,7 +774,7 @@ void BtreeBucket::dump() {
 
 /* todo: meaning of return code unclear clean up */
 int BtreeBucket::insert(DiskLoc thisLoc, DiskLoc recordLoc, 
-						JSObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
+						BSONObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel) 
 {
 	if( toplevel ) {
 		if( key.objsize() > KeyMax ) { 
