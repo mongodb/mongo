@@ -1,4 +1,10 @@
-// jsobj.h
+/* jsobj.h
+
+   BSONObj and its helpers
+
+   "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
+   represented in JSON (plus a few extensions useful for databases & other languages).
+*/
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -21,7 +27,6 @@
 #include "../stdafx.h"
 #include "../util/builder.h"
 #include "boost/utility.hpp"
-//#include "javajs.h"
 
 #include <set>
 
@@ -49,7 +54,7 @@ enum BSONType { EOO = 0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5,
 */
 enum BinDataType { Function=1, ByteArray=2, bdtCustom=128 };
 
-/*	Object id's are optional for JSObjects.  
+/*	Object id's are optional for BSONObjects.  
 	When present they should be the first object member added.
 */
 struct OID { 
@@ -144,6 +149,10 @@ public:
 	// for strings.  also gives you start of the real data for an embedded object
 	const char * valuestr() const { return value() + 4; }
 
+    const char *valuestrsafe() const { 
+        return type() == String ? valuestr() : ""; 
+    }
+
 	const char * codeWScopeCode() const { return value() + 8; }
 	const char * codeWScopeScopeData() const { 
 	  // TODO fix
@@ -151,6 +160,9 @@ public:
 	}
 	
 	BSONObj embeddedObject();
+
+    /* uassert if not an object */
+	BSONObj embeddedObjectUserCheck();
 
 	const char *regex() { assert(type() == RegEx); return value(); }
 	const char *regexFlags() { 
@@ -609,6 +621,11 @@ struct JSObj1 {
 };
 #pragma pack(pop)
 extern JSObj1 js1;
+
+inline BSONObj BSONElement::embeddedObjectUserCheck() { 
+    uassert( "invalid parameter: expected an object", type()==Object || type()==Array ); 
+	return BSONObj(value()); 
+}
 
 inline BSONObj BSONElement::embeddedObject() { 
 	assert( type()==Object || type()==Array ); 

@@ -100,6 +100,7 @@ public:
     BSONObj query;
 	auto_ptr< set<string> > fields;
 
+    /* parses the message into the above fields */
     QueryMessage(DbMessage& d) { 
         ns = d.getns();
         ntoskip = d.pullInt();

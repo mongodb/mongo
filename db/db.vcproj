@@ -206,6 +206,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\dbcommands.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\dbeval.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\introspect.cpp"
 				>
 			</File>
@@ -365,10 +373,6 @@
 			</File>
 			<File
 				RelativePath=".\namespace.h"
-				>
-			</File>
-			<File
-				RelativePath=".\objwrappers.h"
 				>
 			</File>
 			<File

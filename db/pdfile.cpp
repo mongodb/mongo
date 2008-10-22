@@ -29,7 +29,6 @@ _ disallow system* manipulations from the client.
 #include "db.h"
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
-#include "objwrappers.h"
 #include "btree.h"
 #include <algorithm>
 #include <list>

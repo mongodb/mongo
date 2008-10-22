@@ -17,7 +17,11 @@
 
 #pragma once
 
+class BSONObj;
+class BSONObjBuilder;
+
 // db "commands" (sent via db.$cmd.findOne(...))
+// subclass to make a command.
 class Command { 
 public:
     string name;

@@ -180,7 +180,7 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
     QueryMessage q(d);
 
 	if( opLogging && logit ) { 
-		if( strstr(q.ns, "$cmd") ) { 
+		if( strstr(q.ns, ".$cmd") ) { 
 			/* $cmd queries are "commands" and usually best treated as write operations */
 			OPWRITE;
 		}

@@ -581,7 +581,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
         {
             BSONElement e = jsobj.findElement("orderby");
             if( !e.eoo() ) {
-                order = e.embeddedObject();
+                order = e.embeddedObjectUserCheck();
                 if( e.type() == Array ) 
                     order = transformOrderFromArrayFormat(order);
             }

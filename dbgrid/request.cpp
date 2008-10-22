@@ -53,13 +53,49 @@ void getMore(Message& m, MessagingPort& p) {
   dbcon.done();
 }
 
+bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
+
+#include "../db/commands.h"
+
+class IsDbGridCmd : public Command { 
+public:
+    IsDbGridCmd() : Command("isdbgrid") { }
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+        result.append("isdbgrid", 1);
+        return true;
+    }
+} isdbgridcmd; 
+
 void queryOp(Message& m, MessagingPort& p) {
   DbMessage d(m);
-  const char *ns = d.getns();
+  QueryMessage q(d);
 
-  cout << "TEMPns: " << ns << endl;
+  cout << "TEMPns: " << q.ns << endl;
 
-
+  if( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
+      BSONObjBuilder builder;
+      if( runCommandAgainstRegistered(q.ns, q.query, builder) ) { 
+          BufBuilder b(32768);
+          b.skip(sizeof(QueryResult));
+          BSONObj x = builder.done();
+          b.append((void*) x.objdata(), x.objsize());
+          QueryResult *qr = (QueryResult *) b.buf();
+          qr->_data[0] = 0;
+          qr->_data[1] = 0;
+          qr->_data[2] = 0;
+          qr->_data[3] = 0;
+          qr->len = b.len();
+          qr->setOperation(opReply);
+          qr->cursorId = 0;
+          qr->startingFrom = 0;
+          qr->nReturned = 1;
+          b.decouple();
+          Message *resp = new Message();
+          resp->setData(qr, true); // transport will free
+          p.reply(m, *resp, m.data->id);
+          return;
+      }
+  }
 
   ScopedDbConnection dbcon(tempHost);
   DBClientConnection &c = dbcon.conn();

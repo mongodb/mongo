@@ -197,6 +197,10 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath="..\db\commands.h"
+				>
+			</File>
+			<File
 				RelativePath=".\connpool.h"
 				>
 			</File>
@@ -205,11 +209,23 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\dbmessage.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\goodies.h"
 				>
 			</File>
 			<File
 				RelativePath=".\gridconfig.h"
+				>
+			</File>
+			<File
+				RelativePath="..\db\jsobj.h"
+				>
+			</File>
+			<File
+				RelativePath="..\db\json.h"
 				>
 			</File>
 			<File
@@ -242,6 +258,10 @@
 		<Filter
 			Name="Shared Source Files"
 			>
+			<File
+				RelativePath="..\db\commands.cpp"
+				>
+			</File>
 			<File
 				RelativePath="..\client\dbclient.cpp"
 				>
