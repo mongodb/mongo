@@ -23,6 +23,7 @@
 #include "message.h"
 #include <time.h>
 #include "../util/goodies.h"
+#include <fcntl.h>
 
 // if you want trace output:
 #define mmm(x)
@@ -111,11 +112,29 @@ bool MessagingPort::connect(SockAddr& _far)
 		log() << "ERROR: connect(): invalid socket? " << errno << endl;
 		return false;
 	}
-	if( ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize) ) { 
-//        log() << "connect(): failed errno:" << errno << ' ' << farEnd.getPort() << endl;
+
+#if 0
+    long fl = fcntl(sock, F_GETFL, 0);
+    assert( fl >= 0 );
+    fl |= O_NONBLOCK;
+    fcntl(sock, F_SETFL, fl);
+
+    int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
+    if( res ) { 
+        if( errno == EINPROGRESS )
+        //log() << "connect(): failed errno:" << errno << ' ' << farEnd.getPort() << endl;
 		closesocket(sock); sock = -1;
 		return false;
 	}
+
+#else
+    int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
+    if( res ) { 
+		closesocket(sock); sock = -1;
+		return false;
+	}
+#endif
+
 	disableNagle(sock);
 	return true;
 }

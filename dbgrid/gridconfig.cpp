@@ -23,110 +23,40 @@
 #include "connpool.h"
 #include "../db/pdfile.h"
 #include "gridconfig.h"
+#include "../client/model.h"
 
-static boost::mutex loc_mutex;
-static boost::mutex griddb_mutex;
-GridDB gridDB;
-GridConfig gridConfig;
+/* --- Machine --- */
 
-GridDB::GridDB() { }
+map<string, Machine*> Machine::machines;
 
-void GridDB::init() {
-    char buf[256];
-    int ec = gethostname(buf, 127);
-    if( ec || *buf == 0 ) { 
-        log() << "can't get this server's hostname errno:" << ec << endl;
-        sleepsecs(5);
-        exit(16);
-    }
+/* --- GridConfig --- */
 
-    const int DEBUG = 1;
-    if( DEBUG ) {
-        cout << "TEMPZ DEBUG mode on not for production" << endl;
-        strcpy(buf, "iad-sb-n13.10gen.cc");
-    }
+//static boost::mutex loc_mutex;
+Grid grid;
 
-    char *p = strchr(buf, '-');
-    if( p ) 
-        p = strchr(p+1, '-');
-    if( !p ) {
-        log() << "can't parse server's hostname, expect <acode>-<loc>-n<nodenum>, got: " << buf << endl;
-        sleepsecs(5);
-        exit(17);
-    }
-    p[1] = 0;
-
-    stringstream sl, sr;
-    sl << buf << "grid-l";
-    sr << buf << "grid-r"; 
-    string hostLeft = sl.str();
-    string hostRight = sr.str();
-    sl << ":" << Port;
-    sr << ":" << Port;
-    string left = sl.str();
-    string right = sr.str();
-
-    if( DEBUG ) { 
-        left = "10.211.55.4:27017";
-        right = "10.211.55.4:27018";
-    }
-    else
-    /* this loop is not really necessary, we we print out if we can't connect 
-       but it gives much prettier error msg this way if the config is totally 
-       wrong so worthwhile. 
-       */
-    while( 1 ) {
-        if( hostbyname(hostLeft.c_str()).empty() ) { 
-            log() << "can't resolve DNS for " << hostLeft << ", sleeping and then trying again" << endl;
-            sleepsecs(15);
-            continue;
+ClientConfig* GridConfig::getClientConfig(string client) { 
+    ClientConfig*& cc = clients[client];
+    if( cc == 0 ) { 
+        cc = new ClientConfig();
+        if( !cc->loadByName(client.c_str()) ) { 
+            log() << "couldn't find client " << client << " in grid db" << endl;
+            // note here that cc->primary == 0.
         }
-        if( hostbyname(hostRight.c_str()).empty() ) { 
-            log() << "can't resolve DNS for " << hostRight << ", sleeping and then trying again" << endl;
-            sleepsecs(15);
-            continue;
-        }
-        break;
     }
-
-    log() << "connecting to griddb " << left << ' ' << right << endl;
-
-    bool ok = conn.connect(left.c_str(),right.c_str());
-    if( !ok ) 
-        log() << "  griddb connect failure at startup (will retry)" << endl;
+    return cc;
 }
 
-GridConfig::GridConfig() { 
-}
+/* --- Grid --- */
 
-Machine* GridConfig::fetchOwner(string& client, const char *ns, BSONObj& objOrKey) { 
+Machine* Grid::owner(const char *ns, BSONObj& objOrKey) {
+    ClientConfig *cc = gc.getClientConfig( nsToClient(ns) );
+    if( cc == 0 )
+        return 0;
+
+    if( !cc->partitioned ) { 
+        return cc->primary;
+    }
+
+    uassert("not implemented 100", false);
     return 0;
 }
-
-/*threadsafe*/
-Machine* GridConfig::owner(const char *ns, BSONObj& objOrKey) {
-    string client;
-    {
-        boostlock lk(loc_mutex);
-        ObjLocs::iterator i = loc.find(ns);
-        if( i != loc.end() ) { 
-            return i->second;
-        }
-        i = loc.find(client=nsToClient(ns));
-        if( i != loc.end() ) { 
-            return i->second;
-        }
-    }
-
-    return fetchOwner(client, ns, objOrKey);
-}
-
-/*
-
-fetch client info
- -> specifies general homes
-fetch ns info
- -> defines ranges
-fetch range data
-
-*/

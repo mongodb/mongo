@@ -135,6 +135,12 @@ class DBClientConnection : public DBClientCommands {
     string serverAddress; // remember for reconnects
     void checkConnection();
 public:
+    string toStringLong() const { 
+        stringstream ss;
+        ss << serverAddress;
+        if( failed ) ss << " failed";
+        return ss.str();
+    }
     string toString() const { return serverAddress; }
     MessagingPort& port() { return *p.get(); }
     bool isFailed() const { return failed; }
@@ -208,6 +214,8 @@ public:
     /* throws userassertion "no master found" */
     virtual
 	BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+
+    string toString();
 };
 
 

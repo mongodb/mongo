@@ -1,6 +1,7 @@
 # makefile for our db project
 
 FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
+FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 
 LIB_DEPS = -lpcrecpp -lpcre
 LIB_BOOST = -lboost_thread -lboost_filesystem
@@ -12,7 +13,7 @@ JVM_LIBS = -L/opt/java/lib/
 
 OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o ../client/dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o dbcommands.o dbeval.o
 
-DBGRID_OBJS=../stdafx.o json.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o ../client/dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../dbgrid/connpool.o ../dbgrid/gridconfig.o commands.o
+DBGRID_OBJS=../stdafx.o json.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o ../client/dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../dbgrid/connpool.o ../dbgrid/gridconfig.o commands.o ../dbgrid/dbgrid_commands.o ../dbgrid/griddb.o ../client/model.o
 
 GPP = g++
 

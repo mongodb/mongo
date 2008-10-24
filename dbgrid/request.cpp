@@ -55,26 +55,15 @@ void getMore(Message& m, MessagingPort& p) {
 
 bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
 
-#include "../db/commands.h"
-
-class IsDbGridCmd : public Command { 
-public:
-    IsDbGridCmd() : Command("isdbgrid") { }
-    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
-        result.append("isdbgrid", 1);
-        return true;
-    }
-} isdbgridcmd; 
-
 void queryOp(Message& m, MessagingPort& p) {
   DbMessage d(m);
   QueryMessage q(d);
 
-  cout << "TEMPns: " << q.ns << endl;
-
   if( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
       BSONObjBuilder builder;
-      if( runCommandAgainstRegistered(q.ns, q.query, builder) ) { 
+      cout << q.query.toString() << endl;
+      bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
+      if( ok ) { 
           BufBuilder b(32768);
           b.skip(sizeof(QueryResult));
           BSONObj x = builder.done();

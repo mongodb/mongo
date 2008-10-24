@@ -183,7 +183,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\dbgrid_commands.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\gridconfig.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\griddb.cpp"
 				>
 			</File>
 			<File
@@ -226,6 +234,10 @@
 			</File>
 			<File
 				RelativePath="..\db\json.h"
+				>
+			</File>
+			<File
+				RelativePath="..\client\model.h"
 				>
 			</File>
 			<File
@@ -276,6 +288,10 @@
 			</File>
 			<File
 				RelativePath="..\grid\message.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\client\model.cpp"
 				>
 			</File>
 			<File

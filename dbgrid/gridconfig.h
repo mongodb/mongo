@@ -27,41 +27,84 @@
 #include "../client/model.h"
 
 class GridDB {
-    DBClientPaired conn;
 public:
+    DBClientPaired conn;
     enum { Port = 27016 }; /* standard port # for a grid db */
     GridDB();
     void init();
+    string toString() { return conn.toString(); }
 };
 extern GridDB gridDB;
 
 /* Machine is the concept of a host that runs the db process.
 */
 class Machine { 
+    static map<string, Machine*> machines;
+    string name;
 public:
-    enum { Port = 27018 /* default port # for dbs that are downstream of a dbgrid */
+    string getName() const { return name; }
+
+    Machine(string _name) : name(_name) { }
+
+    enum { 
+        Port = 27018 /* default port # for dbs that are downstream of a dbgrid */
     };
+
+    static Machine* get(string name) { 
+        map<string,Machine*>::iterator i = machines.find(name);
+        if( i != machines.end() )
+            return i->second;
+        return machines[name] = new Machine(name);
+    }
 };
 
-typedef map<string,Machine*> ObjLocs;
+//typedef map<string,Machine*> ObjLocs;
 
 /* top level grid configuration */
 class ClientConfig : public Model { 
+public:
+    string name; // e.g. "alleyinsider"
+    Machine *primary;
+    bool partitioned;
+
+    ClientConfig() : primary(0), partitioned(false) { }
+
+    virtual const char * getNS() { return "grid.db.client"; }
+    virtual void serialize(BSONObjBuilder& to) {
+        to.append("name", name);
+        to.appendBool("partitioned", partitioned);
+        if( primary ) 
+            to.append("primary", primary->getName());
+    }
+    virtual void unserialize(BSONObj& from) { 
+        name = from.getStringField("name");
+        partitioned = from.getBoolField("partitioned");
+        string p = from.getStringField("primary");
+        if( !p.empty() )
+            primary = Machine::get(p);
+    }
+
+    bool loadByName(const char *nm) { 
+        BSONObjBuilder b;
+        b.append("name", nm);
+        BSONObj q = b.done();
+        return load(q);
+    }
 };
 
 class GridConfig { 
-    ObjLocs loc;
+    map<string,ClientConfig*> clients;
+public:
+    ClientConfig* getClientConfig(string client);
+};
 
-    Machine* fetchOwner(string& client, const char *ns, BSONObj& objOrKey);
+class Grid { 
+    GridConfig gc;
 public:
     /* return which machine "owns" the object in question -- ie which partition 
        we should go to. 
-       
-       threadsafe.
-    */
+           */
     Machine* owner(const char *ns, BSONObj& objOrKey);
-
-    GridConfig();
 };
 
-extern GridConfig gridConfig;
+extern Grid grid;

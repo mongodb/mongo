@@ -20,18 +20,35 @@
 
 #include "dbclient.h"
 
+/* Model is a base class for defining objects which are serializable to the Mongo
+   database via the client driver.
+
+   *Definition*
+   Your serializable class should inherit from Model and implement the abstract methods 
+   below.
+
+   *Loading*
+   To load, first construct an (empty) objet.  Then call load().  Do not load an object 
+   more than once.
+*/
+
 class Model { 
 public:
     Model() { }
     virtual ~Model() { }
 
     virtual const char * getNS() = 0;
+    virtual void serialize(BSONObjBuilder& to) = 0;
+    virtual void unserialize(BSONObj& from) = 0;
 
-    /* define this as you see fit if you are using the default conn() implementation */
+    /* Define this as you see fit if you are using the default conn() implementation. */
     static DBClientCommands *globalConn;
 
-    /* you can override this if you need to do fancier connection management */
+    /* Override this if you need to do fancier connection management than simply using globalConn. */
     virtual DBClientCommands* conn() {
         return globalConn;
     }
+
+    /* true if successful */
+    bool load(BSONObj& query);
 };

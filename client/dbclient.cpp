@@ -252,6 +252,14 @@ again:
 
 /* --- class dbclientpaired --- */
 
+string DBClientPaired::toString() { 
+    stringstream ss;
+    ss << "state: " << master << '\n';
+    ss << "left:  " << left.toStringLong() << '\n';
+    ss << "right: " << right.toStringLong() << '\n';
+    return ss.str();
+}
+
 DBClientPaired::DBClientPaired() : 
   left(true), right(true)
 { 
