@@ -205,6 +205,10 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath="..\util\background.h"
+				>
+			</File>
+			<File
 				RelativePath="..\db\commands.h"
 				>
 			</File>
@@ -237,10 +241,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\client\model.h"
-				>
-			</File>
-			<File
 				RelativePath="..\stdafx.h"
 				>
 			</File>
@@ -268,14 +268,34 @@
 			</File>
 		</Filter>
 		<Filter
-			Name="Shared Source Files"
+			Name="client"
 			>
 			<File
-				RelativePath="..\db\commands.cpp"
+				RelativePath="..\client\dbclient.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\client\dbclient.cpp"
+				RelativePath="..\client\dbclient.h"
+				>
+			</File>
+			<File
+				RelativePath="..\client\model.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\client\model.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="Shared Source Files"
+			>
+			<File
+				RelativePath="..\util\background.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\db\commands.cpp"
 				>
 			</File>
 			<File
@@ -288,10 +308,6 @@
 			</File>
 			<File
 				RelativePath="..\grid\message.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\client\model.cpp"
 				>
 			</File>
 			<File

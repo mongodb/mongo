@@ -71,6 +71,7 @@ bool DBClientConnection::connect(const char *_serverAddress, string& errmsg) {
     // requires that?
 	server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
     p = auto_ptr<MessagingPort>(new MessagingPort());
+
 	if( !p->connect(*server) ) {
         errmsg = string("couldn't connect to server ") + serverAddress + ' ' + ip;
         failed = true;

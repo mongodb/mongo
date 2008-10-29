@@ -60,7 +60,7 @@ public:
 
 //typedef map<string,Machine*> ObjLocs;
 
-/* top level grid configuration */
+/* top level grid configuration for an entire database */
 class ClientConfig : public Model { 
 public:
     string name; // e.g. "alleyinsider"

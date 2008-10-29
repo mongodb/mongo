@@ -55,46 +55,40 @@ void getMore(Message& m, MessagingPort& p) {
 
 bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
 
+/* got query operation from a client */
 void queryOp(Message& m, MessagingPort& p) {
   DbMessage d(m);
   QueryMessage q(d);
-
-  if( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
-      BSONObjBuilder builder;
-      cout << q.query.toString() << endl;
-      bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
-      if( ok ) { 
-          BufBuilder b(32768);
-          b.skip(sizeof(QueryResult));
-          BSONObj x = builder.done();
-          b.append((void*) x.objdata(), x.objsize());
-          QueryResult *qr = (QueryResult *) b.buf();
-          qr->_data[0] = 0;
-          qr->_data[1] = 0;
-          qr->_data[2] = 0;
-          qr->_data[3] = 0;
-          qr->len = b.len();
-          qr->setOperation(opReply);
-          qr->cursorId = 0;
-          qr->startingFrom = 0;
-          qr->nReturned = 1;
-          b.decouple();
-          Message *resp = new Message();
-          resp->setData(qr, true); // transport will free
-          p.reply(m, *resp, m.data->id);
-          return;
+  bool lateAssert = false;
+  try { 
+      if( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
+          BSONObjBuilder builder;
+          cout << q.query.toString() << endl;
+          bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
+          if( ok ) { 
+              BSONObj x = builder.done();
+              replyToQuery(p, m, x);
+              return;
+          }
       }
+
+      ScopedDbConnection dbcon(tempHost);
+      DBClientConnection &c = dbcon.conn();
+      Message response;
+      bool ok = c.port().call(m, response);
+      uassert("dbgrid: error calling db", ok);
+      lateAssert = true;
+      p.reply(m, response, m.data->id);
+      dbcon.done();
   }
-
-  ScopedDbConnection dbcon(tempHost);
-  DBClientConnection &c = dbcon.conn();
-
-  Message response;
-  bool ok = c.port().call(m, response);
-  uassert("dbgrid: error calling db", ok);
-  p.reply(m, response, m.data->id);
-
-  dbcon.done();
+  catch( AssertionException& e ) { 
+      assert( !lateAssert );
+      BSONObjBuilder err;
+      err.append("$err", e.msg.empty() ? "dbgrid assertion during query" : e.msg);
+      BSONObj errObj = err.done();
+      replyToQuery(p, m, errObj);
+      return;
+  }
 }
 
 void writeOp(int op, Message& m, MessagingPort& p) {

@@ -128,6 +128,9 @@ bool MessagingPort::connect(SockAddr& _far)
 	}
 
 #else
+
+    boost::thread t;
+
     int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
     if( res ) { 
 		closesocket(sock); sock = -1;

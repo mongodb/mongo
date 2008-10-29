@@ -212,6 +212,8 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
         b.skip(sizeof(QueryResult));
         b.append((void*) errObj.objdata(), errObj.objsize());
 
+        // todo: call replyToQuery() from here instead of this.  needs a little tweaking
+        // though to do that.
         msgdata = (QueryResult *) b.buf();
         b.decouple();
 		QueryResult *qr = msgdata;

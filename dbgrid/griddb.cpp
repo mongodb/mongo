@@ -24,6 +24,7 @@
 #include "../db/pdfile.h"
 #include "gridconfig.h"
 #include "../client/model.h"
+#include "../util/background.h"
 
 static boost::mutex griddb_mutex;
 GridDB gridDB;

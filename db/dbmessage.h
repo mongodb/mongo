@@ -18,9 +18,10 @@
 #include "jsobj.h"
 #include "namespace.h"
 
-/* For the client/server protocol, these objects represent the various messages 
-   transmitted over the connection.
+/* For the client/server protocol, these objects and functions encapsulate 
+   the various messages transmitted over the connection.
 */
+
 class DbMessage {
 public:
 	DbMessage(Message& _m) : m(_m) {
@@ -113,3 +114,39 @@ public:
         queryOptions = d.msg().data->dataAsInt();
     }
 };
+
+#include "../client/dbclient.h" 
+
+inline void replyToQuery(MessagingPort& p, Message& requestMsg,
+                         void *data, int size,
+                         int nReturned, int startingFrom = 0, 
+                         long long cursorId = 0
+                         ) { 
+    BufBuilder b(32768);
+    b.skip(sizeof(QueryResult));
+    b.append(data, size);
+    QueryResult *qr = (QueryResult *) b.buf();
+    qr->_data[0] = 0;
+    qr->_data[1] = 0;
+    qr->_data[2] = 0;
+    qr->_data[3] = 0;
+    qr->len = b.len();
+    qr->setOperation(opReply);
+    qr->cursorId = cursorId;
+    qr->startingFrom = startingFrom;
+    qr->nReturned = 1;
+    b.decouple();
+    Message *resp = new Message();
+    resp->setData(qr, true); // transport will free
+    p.reply(requestMsg, *resp, requestMsg.data->id);
+}
+
+//#include "bsonobj.h"
+
+inline void replyToQuery(MessagingPort& p, Message& requestMsg,
+                         BSONObj& responseObj) 
+{
+    replyToQuery(
+        p, requestMsg, 
+        (void *) responseObj.objdata(), responseObj.objsize(), 1);
+}

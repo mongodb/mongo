@@ -64,6 +64,7 @@ public:
 class UserAssertionException : public AssertionException { 
 public:
 	UserAssertionException(const char *_msg) { msg = _msg; }
+	UserAssertionException(string _msg) { msg = _msg; }
     virtual bool severe() { return false; }
 	virtual bool isUserAssertion() { return true; }
     virtual string toString() { return "userassert:" + msg; }

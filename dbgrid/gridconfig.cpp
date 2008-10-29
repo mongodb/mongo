@@ -50,13 +50,17 @@ ClientConfig* GridConfig::getClientConfig(string client) {
 
 Machine* Grid::owner(const char *ns, BSONObj& objOrKey) {
     ClientConfig *cc = gc.getClientConfig( nsToClient(ns) );
-    if( cc == 0 )
-        return 0;
+    if( cc == 0 ) {
+        throw UserAssertionException(
+            string("dbgrid: no config for db for ") + ns);
+    }
 
     if( !cc->partitioned ) { 
+        if( !cc->primary )
+            throw UserAssertionException(string("dbgrid: no primary for ")+ns);
         return cc->primary;
     }
 
-    uassert("not implemented 100", false);
+    uassert("dbgrid: not implemented 100", false);
     return 0;
 }
