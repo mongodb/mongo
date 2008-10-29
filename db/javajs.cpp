@@ -90,11 +90,18 @@ void _addClassPath( const char * ed , stringstream & ss , const char * subdir ){
   path includeDir(ed);
   includeDir /= subdir;
   directory_iterator end;
-  directory_iterator i(includeDir);
-  while( i != end ) {
-    path p = *i;
-    ss << SYSTEM_COLON << p.string();
-    i++;
+  try { 
+      directory_iterator i(includeDir);
+      while( i != end ) {
+          path p = *i;
+          ss << SYSTEM_COLON << p.string();
+          i++;
+      }
+  }
+  catch(...) { 
+      problem() << "exception looking for ed class path includeDir: " << includeDir.string() << endl;
+      sleepsecs(3);
+      dbexit(116);
   }
 }
 
