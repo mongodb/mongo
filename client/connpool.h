@@ -19,7 +19,7 @@
 #pragma once
 
 #include <queue>
-#include "../client/dbclient.h"
+#include "dbclient.h"
 
 struct PoolForHost { 
     queue<DBClientConnection*> pool;
@@ -29,6 +29,8 @@ class DBConnectionPool {
     boost::mutex poolMutex;
     map<string,PoolForHost*> pools;
 public:
+
+    /* generally, use ScopedDbConnection and do not call these directly */
     DBClientConnection *get(const string& host);
     void release(const string& host, DBClientConnection *c) { 
         boostlock L(poolMutex);
@@ -38,7 +40,7 @@ public:
 
 extern DBConnectionPool pool;
 
-/* create these to get a connection from the pool.  then on exceptions things
+/* Use to get a connection from the pool.  On exceptions things
    clean up nicely.
 */
 class ScopedDbConnection { 
@@ -51,6 +53,9 @@ public:
     ScopedDbConnection(const string& _host) : 
       host(_host), _conn( pool.get(_host) ) { }
 
+    /* Call this when you are done with the ocnnection. 
+         Why?  See note in the destructor below.
+    */
     void done() { 
         if( _conn->isFailed() ) 
             delete _conn;
@@ -64,7 +69,7 @@ public:
             /* you are supposed to call done().  if you did that, correctly, we 
                only get here if an exception was thrown.  in such a scenario, we can't 
                be sure we fully read all expected data of a reply on the socket.  so 
-               we don't try to reuse the connection.
+               we don't try to reuse the connection.  The cout is just informational.
                */
             cout << "~ScopedDBConnection: _conn != null\n";
             delete _conn;

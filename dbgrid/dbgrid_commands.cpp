@@ -32,7 +32,7 @@
 #include "stdafx.h"
 #include "../grid/message.h"
 #include "../db/dbmessage.h"
-#include "connpool.h"
+#include "../client/connpool.h"
 #include "../db/commands.h"
 #include "gridconfig.h"
 
