@@ -20,7 +20,7 @@
 #include "../grid/message.h"
 #include "../util/unittest.h"
 #include "database.h"
-#include "connpool.h"
+#include "../client/connpool.h"
 #include "../db/pdfile.h"
 #include "gridconfig.h"
 #include "../client/model.h"

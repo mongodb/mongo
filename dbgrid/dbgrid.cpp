@@ -19,7 +19,7 @@
 #include "stdafx.h"
 #include "../grid/message.h"
 #include "../util/unittest.h"
-#include "connpool.h"
+#include "../client/connpool.h"
 #include "gridconfig.h"
 
 const char *curNs = "";

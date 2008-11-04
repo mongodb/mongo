@@ -175,10 +175,6 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\connpool.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\dbgrid.cpp"
 				>
 			</File>
@@ -204,18 +200,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
-			<File
-				RelativePath="..\util\background.h"
-				>
-			</File>
-			<File
-				RelativePath="..\db\commands.h"
-				>
-			</File>
-			<File
-				RelativePath=".\connpool.h"
-				>
-			</File>
 			<File
 				RelativePath=".\database.h"
 				>
@@ -244,6 +228,18 @@
 				RelativePath="..\stdafx.h"
 				>
 			</File>
+			<Filter
+				Name="Header Shared"
+				>
+				<File
+					RelativePath="..\util\background.h"
+					>
+				</File>
+				<File
+					RelativePath="..\db\commands.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Resource Files"
@@ -270,6 +266,14 @@
 		<Filter
 			Name="client"
 			>
+			<File
+				RelativePath="..\client\connpool.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\client\connpool.h"
+				>
+			</File>
 			<File
 				RelativePath="..\client\dbclient.cpp"
 				>
