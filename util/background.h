@@ -27,6 +27,7 @@
 
 class BackgroundJob { 
 protected:
+    /* define this to do your work! */
     virtual void run() = 0;
 
 public:
@@ -48,6 +49,8 @@ public:
 
     // wait for completion.  this spins with sleep() so not terribly efficient.
     // returns true if did not time out.
+    //
+    // note you can call wait() more than once if the first call times out.
     bool wait(int msMax = 0); 
 
 private:

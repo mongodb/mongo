@@ -331,8 +331,11 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
 /* get a table scan cursor, but can be forward or reverse direction.
    order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
 */
-auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order) {
+auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted) {
 	BSONElement el = order.findElement("$natural"); // e.g., { $natural : -1 } 
+    if( !el.eoo() && isSorted ) 
+        *isSorted = true;
+
 	if( el.number() >= 0 )
 		return DataFileMgr::findAll(ns);
 

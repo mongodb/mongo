@@ -36,7 +36,7 @@
 #include "commands.h"
 
 extern boost::mutex dbMutex;
-auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order);
+auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
 bool userCreateNS(const char *ns, BSONObj& j, string& err);
 int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
 bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder);

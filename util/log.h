@@ -39,6 +39,7 @@ extern Nullstream nullstream;
 class Logstream {
 	static boost::mutex mutex;
 public:
+    void flush() { boostlock lk(mutex); cout.flush(); }
 	Logstream& operator<<(const char *x) LOGIT
 	Logstream& operator<<(char x) LOGIT
 	Logstream& operator<<(int x) LOGIT

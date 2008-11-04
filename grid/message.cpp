@@ -103,6 +103,18 @@ MessagingPort::~MessagingPort() {
 	ports.erase(this);
 }
 
+#include "../util/background.h"
+
+class ConnectBG : public BackgroundJob { 
+public:
+    int sock;
+    int res;
+    SockAddr farEnd;
+    void run() {
+        res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
+    }
+};
+
 bool MessagingPort::connect(SockAddr& _far)
 {
 	farEnd = _far;
@@ -127,16 +139,26 @@ bool MessagingPort::connect(SockAddr& _far)
 		return false;
 	}
 
-#else
-
-    boost::thread t;
-
-    int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
-    if( res ) { 
-		closesocket(sock); sock = -1;
-		return false;
-	}
 #endif
+
+    ConnectBG bg;
+    bg.sock = sock;
+    bg.farEnd = farEnd;
+    bg.go();
+
+    // int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
+    if( bg.wait(5000) ) {
+        if( bg.res ) { 
+            closesocket(sock); sock = -1;
+            return false;
+        }
+    }
+    else { 
+        // time out the connect
+        closesocket(sock); sock = -1;
+        bg.wait(); // so bg stays in scope until bg thread terminates
+        return false;
+    }
 
 	disableNagle(sock);
 	return true;

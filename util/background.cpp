@@ -24,12 +24,14 @@ boost::mutex BackgroundJob::mutex;
 /* static */ 
 void BackgroundJob::thr() { 
     assert( grab );
-    assert( grab->state == NotStarted );
-    grab->state = Running;
-    grab->run();
-    grab->state = Done;
-    if( grab->deleteSelf )
-        delete grab;
+    BackgroundJob *us = grab;
+    assert( us->state == NotStarted );
+    us->state = Running;
+    grab = 0;
+    us->run();
+    us->state = Done;
+    if( us->deleteSelf )
+        delete us;
 }
 
 BackgroundJob& BackgroundJob::go() {

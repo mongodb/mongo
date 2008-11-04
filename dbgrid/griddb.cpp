@@ -70,8 +70,8 @@ void GridDB::init() {
     string right = sr.str();
 
     if( DEBUG ) { 
-        left = "iad-sb-n7.10gen.cc";
-        right = "iad-sb-n7.10gen.cc";
+        left = "1.2.3.4"; //"iad-sb-n7.10gen.cc";
+        right = "1.2.3.4"; //"iad-sb-n7.10gen.cc";
     }
     else
     /* this loop is not really necessary, we we print out if we can't connect 
@@ -92,9 +92,14 @@ void GridDB::init() {
         break;
     }
 
-    log() << "connecting to griddb " << left << ' ' << right << "..." << endl;
+    Logstream& l = log();
+    (l << "connecting to griddb L:" << left << " R:" << right << "...").flush();
 
     bool ok = conn.connect(left.c_str(),right.c_str());
-    if( !ok ) 
+    if( !ok ) {
+        l << '\n';
         log() << "  griddb connect failure at startup (will retry)" << endl;
+    } else {
+        l << "ok" << endl;
+    }
 }

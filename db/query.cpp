@@ -460,7 +460,7 @@ void killCursors(int n, long long *ids) {
 }
 
 // order.$natural sets natural order direction
-auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order);
+auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
 
 BSONObj id_obj = fromjson("{_id:ObjId()}");
 BSONObj empty_obj = fromjson("{}");
@@ -610,7 +610,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		if( c.get() == 0 )
 			c = getIndexCursor(ns, query, order, 0, &isSorted);
 		if( c.get() == 0 )
-			c = findTableScan(ns, order);
+			c = findTableScan(ns, order, &isSorted);
 
 		auto_ptr<ScanAndOrder> so;
 		bool ordering = false;

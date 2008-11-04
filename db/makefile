@@ -11,9 +11,9 @@ DBGRID_LIBS = $(LIB_BOOST) -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o ../client/dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o dbcommands.o dbeval.o
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o ../client/dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o dbcommands.o dbeval.o ../util/background.o
 
-DBGRID_OBJS=../stdafx.o json.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o ../client/dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../dbgrid/connpool.o ../dbgrid/gridconfig.o commands.o ../dbgrid/dbgrid_commands.o ../dbgrid/griddb.o ../client/model.o
+DBGRID_OBJS=../stdafx.o json.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o ../client/dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../dbgrid/connpool.o ../dbgrid/gridconfig.o commands.o ../dbgrid/dbgrid_commands.o ../dbgrid/griddb.o ../client/model.o ../util/background.o
 
 GPP = g++
 
