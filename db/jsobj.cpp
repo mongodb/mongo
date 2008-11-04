@@ -369,13 +369,26 @@ BSONElement BSONObj::getFieldDotted(const char *name) {
    n^2 implementation bad if pattern and object have lots 
    of fields - normally pattern doesn't so should be fine.
 */
-BSONObj BSONObj::extractFields(BSONObj pattern, BSONObjBuilder& b) { 
+BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b) { 
 	BSONObjIterator i(pattern);
 	while( i.more() ) {
 		BSONElement e = i.next();
 		if( e.eoo() )
 			break;
 		BSONElement x = getFieldDotted(e.fieldName());
+		if( x.eoo() )
+			return BSONObj();
+		b.append(x);
+	}
+	return b.done();
+}
+BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern, BSONObjBuilder& b) { 
+	BSONObjIterator i(pattern);
+	while( i.more() ) {
+		BSONElement e = i.next();
+		if( e.eoo() )
+			break;
+		BSONElement x = getField(e.fieldName());
 		if( x.eoo() )
 			return BSONObj();
 		b.append(x);

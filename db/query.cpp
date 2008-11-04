@@ -96,7 +96,8 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 		if( keyFields == queryFields ) {
 			bool simple = true;
 			BSONObjBuilder b;
-			BSONObj q = query.extractFields(idxKey, b);
+			BSONObj q = query.extractFieldsUnDotted(idxKey, b);
+            assert(q.objsize() != 0); // guard against a seg fault if details is 0
 			/* regexp: only supported if form is /^text/ */
 			BSONObjBuilder b2;
 			BSONObjIterator it(q);
@@ -607,6 +608,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		bool isSorted = false;
 		int nscanned = 0;
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
+
 		if( c.get() == 0 )
 			c = getIndexCursor(ns, query, order, 0, &isSorted);
 		if( c.get() == 0 )

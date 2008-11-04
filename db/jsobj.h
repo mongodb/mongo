@@ -287,7 +287,8 @@ public:
        fields returned in the order they appear in pattern.
 	   if any field missing, you get back an empty object overall.
 	   */
-	BSONObj extractFields(BSONObj pattern, BSONObjBuilder& b); // this version, builder owns the returned obj buffer
+	BSONObj extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b); // this version, builder owns the returned obj buffer
+    BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern, BSONObjBuilder& b);
 	BSONObj extractFields(BSONObj &pattern);
 
 	const char *objdata() const { return details->_objdata; }

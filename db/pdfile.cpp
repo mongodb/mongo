@@ -405,7 +405,7 @@ void IndexDetails::getKeysFromObject(BSONObj& obj, set<BSONObj>& keys) {
 		assert(false);
 	}
 	BSONObjBuilder b;
-	BSONObj key = obj.extractFields(keyPattern, b);
+	BSONObj key = obj.extractFieldsDotted(keyPattern, b);
 	if( key.isEmpty() )
 		return;
 	BSONElement f = key.firstElement();
