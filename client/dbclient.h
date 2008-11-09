@@ -113,7 +113,7 @@ public:
 /* db "commands" 
      basically just invocations of connection.$cmd.findOne({...});
 */
-class DBClientCommands : public DBClientInterface { 
+class DBClientWithCommands : public DBClientInterface { 
 public:
     /* returns true in isMaster parm if this db is the master instance.  
        BSONObj contains more details e.g.: 
@@ -124,7 +124,7 @@ public:
 
 class DBClientPaired;
 
-class DBClientConnection : public DBClientCommands { 
+class DBClientConnection : public DBClientWithCommands { 
     friend class DBClientCursor; 
     DBClientPaired *clientPaired;
 	auto_ptr<MessagingPort> p;
@@ -179,7 +179,7 @@ public:
 /* Use this class to connect to a replica pair of servers.  The class will manage 
    checking for which is master, and do failover automatically.
 */
-class DBClientPaired : public DBClientCommands { 
+class DBClientPaired : public DBClientWithCommands { 
     friend class DBClientCursor;
     DBClientConnection left,right;
     enum State { 

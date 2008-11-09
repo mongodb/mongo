@@ -187,11 +187,15 @@
 				>
 			</File>
 			<File
-				RelativePath=".\griddb.cpp"
+				RelativePath=".\griddatabase.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\request.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\shard.cpp"
 				>
 			</File>
 		</Filter>
@@ -201,31 +205,15 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\database.h"
-				>
-			</File>
-			<File
-				RelativePath="..\db\dbmessage.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\goodies.h"
-				>
-			</File>
-			<File
 				RelativePath=".\gridconfig.h"
 				>
 			</File>
 			<File
-				RelativePath="..\db\jsobj.h"
+				RelativePath=".\griddatabase.h"
 				>
 			</File>
 			<File
-				RelativePath="..\db\json.h"
-				>
-			</File>
-			<File
-				RelativePath="..\stdafx.h"
+				RelativePath=".\shard.h"
 				>
 			</File>
 			<Filter
@@ -237,6 +225,26 @@
 				</File>
 				<File
 					RelativePath="..\db\commands.h"
+					>
+				</File>
+				<File
+					RelativePath="..\db\dbmessage.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\goodies.h"
+					>
+				</File>
+				<File
+					RelativePath="..\db\jsobj.h"
+					>
+				</File>
+				<File
+					RelativePath="..\db\json.h"
+					>
+				</File>
+				<File
+					RelativePath="..\stdafx.h"
 					>
 				</File>
 			</Filter>

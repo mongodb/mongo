@@ -28,7 +28,7 @@
 
 BSONObj ismastercmdobj = fromjson("{ismaster:1}");
 
-BSONObj DBClientCommands::cmdIsMaster(bool& isMaster) {
+BSONObj DBClientWithCommands::cmdIsMaster(bool& isMaster) {
     BSONObj o = findOne("admin.$cmd", ismastercmdobj);
     isMaster = (o.getIntField("ismaster") == 1);
     return o;

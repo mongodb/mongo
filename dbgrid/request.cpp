@@ -1,4 +1,7 @@
-// dbgrid/request.cpp
+/* dbgrid/request.cpp
+
+   Top level handling of requests (operations such as query, insert, ...)
+*/
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -17,6 +20,9 @@
 */
 
 /* TODO
+   _ GridD
+
+
    _ concurrency control.
      _ connection pool
      _ hostbyname_nonreentrant() problem
