@@ -37,6 +37,7 @@ bool master = false; // true means keep an op log
 bool useJNI = true;
 extern const char *dbpath;
 extern int curOp;
+
 extern string dashDashSource;
 
 /* only off if --nocursors which is for debugging. */

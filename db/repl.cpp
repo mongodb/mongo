@@ -249,13 +249,17 @@ BSONObj ReplSource::jsobj() {
 	b.append("source", sourceName());
 	if( !only.empty() )
 		b.append("only", only);
-	b.appendDate("syncedTo", syncedTo.asDate());
+    if( !syncedTo.isNull() )
+        b.appendDate("syncedTo", syncedTo.asDate());
 
 	BSONObjBuilder dbs_builder;
+    int n = 0;
 	for( set<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
+        n++;
 		dbs_builder.appendBool(i->c_str(), 1);
 	}
-	b.append("dbs", dbs_builder.done());
+    if( n ) 
+        b.append("dbs", dbs_builder.done());
 
 	return b.doneAndDecouple();
 }
@@ -286,13 +290,6 @@ void ReplSource::cleanup(vector<ReplSource*>& v) {
 string dashDashSource;
 
 static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, vector<ReplSource*>&old) { 
-    if( !dashDashSource.empty() && s.hostName != dashDashSource ) { 
-        problem() << "--source " << dashDashSource << " != " << s.hostName << " from local.sources collection" << endl;
-        log() << "terminating after 30 seconds" << endl;
-        sleepsecs(30);
-        dbexit(18);
-    }
-
 	for( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
 		if( s == **i ) {
 			v.push_back(*i);
@@ -313,6 +310,34 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
     v.erase(v.begin(), v.end());
 
 	bool gotPairWith = false;
+
+    if( !dashDashSource.empty() ) {
+        setClient("local.sources");
+        // --source <host> specified.
+        // check that no items are in sources other than that
+        // add if missing
+        auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
+        int n = 0;
+        while( c->ok() ) { 
+            n++;
+            ReplSource tmp(c->current());
+            if( tmp.hostName != dashDashSource ) { 
+                problem() << "--source " << dashDashSource << " != " << tmp.hostName << " from local.sources collection" << endl;
+                log() << "terminating after 30 seconds" << endl;
+                sleepsecs(30);
+                dbexit(18);
+            }
+            c->advance();
+        }
+        uassert( "local.sources collection corrupt?", n<2 );
+        if( n == 0 ) { 
+            // source missing.  add.
+            ReplSource s;
+            s.hostName = dashDashSource;
+            s.save();
+        }
+    }
+
 	setClient("local.sources");
 	auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
 	while( c->ok() ) { 
