@@ -1,4 +1,9 @@
-// database.cpp
+/* griddatabase.h
+
+   The grid database is where we get:
+   - name of each shard
+   - "home" shard for each client
+*/
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -16,14 +21,19 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* DEPRECATED DELETE */
+#pragma once
 
+#include "shard.h"
 
-#include "stdafx.h"
-#include "database.h"
-#include "../db/dbclient.h"
+class GridDatabase {
+public:
+    DBClientPaired conn;
+    enum { Port = 27016 }; /* standard port # for a grid db */
+    GridDatabase();
+    string toString() { return conn.toString(); }
 
-boost::mutex Database::mutex;
+    /* call at startup, this will initiate connection to the grid db */
+    void init();
+};
+extern GridDatabase gridDatabase;
 
-void Database::load() { 
-}

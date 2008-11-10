@@ -42,10 +42,10 @@ public:
     virtual void unserialize(BSONObj& from) = 0;
 
     /* Define this as you see fit if you are using the default conn() implementation. */
-    static DBClientCommands *globalConn;
+    static DBClientWithCommands *globalConn;
 
     /* Override this if you need to do fancier connection management than simply using globalConn. */
-    virtual DBClientCommands* conn() {
+    virtual DBClientWithCommands* conn() {
         return globalConn;
     }
 

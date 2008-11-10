@@ -97,7 +97,7 @@ public:
 };
 
 void start() { 
-    gridDB.init();
+    gridDatabase.init();
 /*
     try {
 cout << "TEMP" << endl;

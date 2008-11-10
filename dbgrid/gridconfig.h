@@ -25,16 +25,7 @@
 
 #include "../client/dbclient.h"
 #include "../client/model.h"
-
-class GridDB {
-public:
-    DBClientPaired conn;
-    enum { Port = 27016 }; /* standard port # for a grid db */
-    GridDB();
-    void init();
-    string toString() { return conn.toString(); }
-};
-extern GridDB gridDB;
+#include "griddatabase.h"
 
 /* Machine is the concept of a host that runs the db process.
 */

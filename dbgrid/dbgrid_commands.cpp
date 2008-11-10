@@ -44,7 +44,7 @@ class NetStatCmd : public Command {
 public:
     NetStatCmd() : Command("netstat") { }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
-        result.append("griddb", gridDB.toString());
+        result.append("griddb", gridDatabase.toString());
         result.append("isdbgrid", 1);
         return true;
     }

@@ -19,7 +19,6 @@
 #include "stdafx.h"
 #include "../grid/message.h"
 #include "../util/unittest.h"
-#include "database.h"
 #include "../client/connpool.h"
 #include "../db/pdfile.h"
 #include "gridconfig.h"

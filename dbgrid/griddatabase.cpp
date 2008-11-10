@@ -19,21 +19,20 @@
 #include "stdafx.h"
 #include "../grid/message.h"
 #include "../util/unittest.h"
-#include "database.h"
 #include "../client/connpool.h"
 #include "../db/pdfile.h"
-#include "gridconfig.h"
 #include "../client/model.h"
 #include "../util/background.h"
+#include "griddatabase.h"
 
 static boost::mutex griddb_mutex;
-GridDB gridDB;
-DBClientCommands *Model::globalConn = &gridDB.conn;
+GridDatabase gridDatabase;
+DBClientWithCommands *Model::globalConn = &gridDatabase.conn;
 string ourHostname;
 
-GridDB::GridDB() { }
+GridDatabase::GridDatabase() { }
 
-void GridDB::init() {
+void GridDatabase::init() {
     char buf[256];
     int ec = gethostname(buf, 127);
     if( ec || *buf == 0 ) { 
