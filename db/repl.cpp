@@ -283,7 +283,16 @@ void ReplSource::cleanup(vector<ReplSource*>& v) {
 		delete *i;
 }
 
+string dashDashSource;
+
 static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, vector<ReplSource*>&old) { 
+    if( !dashDashSource.empty() && s.hostName != dashDashSource ) { 
+        problem() << "--source " << dashDashSource << " != " << s.hostName << " from local.sources collection" << endl;
+        log() << "terminating after 30 seconds" << endl;
+        sleepsecs(30);
+        dbexit(18);
+    }
+
 	for( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
 		if( s == **i ) {
 			v.push_back(*i);

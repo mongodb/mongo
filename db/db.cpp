@@ -37,6 +37,7 @@ bool master = false; // true means keep an op log
 bool useJNI = true;
 extern const char *dbpath;
 extern int curOp;
+extern string dashDashSource;
 
 /* only off if --nocursors which is for debugging. */
 bool useCursors = true;
@@ -862,6 +863,10 @@ int main(int argc, char* argv[], char *envp[] )
 				master = true;
 			else if( s == "--slave" )
 				slave = true;
+			else if( s == "--source" ) { 
+                /* specifies what the source in local.sources should be */
+                dashDashSource = argv[++i];
+			}
 			else if( s == "--pairwith" ) { 
 				pairWith( argv[i+1], argv[i+2] );
                 i += 2;
@@ -895,11 +900,14 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  longmsg           send a long test message to the db server" << endl;
 	cout << "  quicktest         just check basic assertions and exit" << endl;
 	cout << "  test2             run test2() - see code" << endl;
-	cout << endl << "Alternate Usage :" << endl;
-	cout << " --master --slave" << endl;
+	cout << "\nOptions:" << endl;
 	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
 	cout << " --nocursors  --nojni" << endl;
 	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
+    cout << "\nReplication:" << endl;
+	cout << " --master\n";
+    cout << " --slave" << endl;
+    cout << " --source <server:port>" << endl;
 	cout << " --pairwith <server:port> <arbiter>" << endl;
 	cout << endl;
 	
