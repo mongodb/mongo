@@ -553,7 +553,7 @@ inline BSONObj transformOrderFromArrayFormat(BSONObj order) {
 QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, BSONObj jsobj, 
 					  auto_ptr< set<string> > filter, stringstream& ss, int queryOptions) 
 {
-	time_t t = time(0);
+    Timer t;
 	bool wantMore = true;
 	int ntoreturn = _ntoreturn;
 	if( _ntoreturn < 0 ) {
@@ -719,7 +719,8 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 	qr->nReturned = n;
 	b.decouple();
 
-	if( (client && client->profile) || time(0)-t > 5 ) {
+    int duration = t.millis();
+	if( (client && client->profile) || duration >= 100 ) {
 		if( ntoskip ) 
 			ss << " ntoskip:" << ntoskip;
 		ss << " <br>query: " << jsobj.toString() << ' ';
