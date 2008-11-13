@@ -29,6 +29,7 @@ static boost::mutex griddb_mutex;
 GridDatabase gridDatabase;
 DBClientWithCommands *Model::globalConn = &gridDatabase.conn;
 string ourHostname;
+extern string dashDashGridDb;
 
 GridDatabase::GridDatabase() { }
 
@@ -42,37 +43,55 @@ void GridDatabase::init() {
     }
     ourHostname = buf;
 
-    const int DEBUG = 1;
-    if( DEBUG ) {
-        cout << "TEMPZ DEBUG mode on not for production" << endl;
-        strcpy(buf, "iad-sb-n13.10gen.cc");
+    if( dashDashGridDb.empty() ) {
+        char *p = strchr(buf, '-');
+        if( p ) 
+            p = strchr(p+1, '-');
+        if( !p ) {
+            log() << "can't parse server's hostname, expect <city>-<locname>-n<nodenum>, got: " << buf << endl;
+            sleepsecs(5);
+            exit(17);
+        }
+        p[1] = 0;
     }
 
-    char *p = strchr(buf, '-');
-    if( p ) 
-        p = strchr(p+1, '-');
-    if( !p ) {
-        log() << "can't parse server's hostname, expect <acode>-<loc>-n<nodenum>, got: " << buf << endl;
-        sleepsecs(5);
-        exit(17);
-    }
-    p[1] = 0;
+    string left, right; // with :port#
+    string hostLeft, hostRight;
 
-    stringstream sl, sr;
-    sl << buf << "grid-l";
-    sr << buf << "grid-r"; 
-    string hostLeft = sl.str();
-    string hostRight = sr.str();
-    sl << ":" << Port;
-    sr << ":" << Port;
-    string left = sl.str();
-    string right = sr.str();
-
-    if( DEBUG ) { 
-        left = "1.2.3.4"; //"iad-sb-n7.10gen.cc";
-        right = "1.2.3.4"; //"iad-sb-n7.10gen.cc";
+    if( dashDashGridDb.empty() ) {
+        stringstream sl, sr;
+        sl << buf << "grid-l";
+        sr << buf << "grid-r"; 
+        hostLeft = sl.str();
+        hostRight = sr.str();
+        sl << ":" << Port;
+        sr << ":" << Port;
+        left = sl.str();
+        right = sr.str();
     }
-    else
+    else { 
+        stringstream sl, sr;
+        sl << dashDashGridDb;
+        sr << dashDashGridDb;
+        if( !isdigit(dashDashGridDb[0]) ) { 
+            sl << "-l";
+            sr << "-r";
+        }
+        else { 
+            /* ip address specified, so "-l" / "-r" not meaningful 
+               silly though that we put it on both sides -- to be fixed.
+            */
+        }
+        hostLeft = sl.str();
+        hostRight = sr.str();
+        sl << ":" << Port;
+        sr << ":" << Port;
+        left = sl.str();
+        right = sr.str();
+    }
+
+
+    if( !isdigit(left[0]) )
     /* this loop is not really necessary, we we print out if we can't connect 
        but it gives much prettier error msg this way if the config is totally 
        wrong so worthwhile. 

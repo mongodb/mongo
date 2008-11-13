@@ -25,6 +25,10 @@
 #include "../client/dbclient.h"
 #include "../client/model.h"
 
+/* grid.shards
+     { name: 'hostname'
+     }
+*/
 class Shard : public Model { 
 public:
     string name; // hostname (less -l, -r)

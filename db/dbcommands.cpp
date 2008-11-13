@@ -263,11 +263,7 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
         if( !ok ) 
             anObjBuilder.append("errmsg", errmsg);
     }
-    /*else if( e.type() == Code || e.type() == CodeWScope ) { 
-		valid = true;
-		ok = dbEval(jsobj, anObjBuilder);
-	}
-    */else if( e.isNumber() ) { 
+    else if( e.isNumber() ) { 
         if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
 			if( 1 ) {
 				log() << "dropDatabase " << ns << endl;

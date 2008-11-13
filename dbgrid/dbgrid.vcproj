@@ -198,6 +198,58 @@
 				RelativePath=".\shard.cpp"
 				>
 			</File>
+			<Filter
+				Name="Shared Source Files"
+				>
+				<File
+					RelativePath="..\util\background.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\commands.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\jsobj.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\json.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\grid\message.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\sock.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\stdafx.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="1"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="1"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\util\util.cpp"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -296,58 +348,6 @@
 			</File>
 			<File
 				RelativePath="..\client\model.h"
-				>
-			</File>
-		</Filter>
-		<Filter
-			Name="Shared Source Files"
-			>
-			<File
-				RelativePath="..\util\background.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\db\commands.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\db\jsobj.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\db\json.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\grid\message.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\util\sock.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\stdafx.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="1"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="1"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\util\util.cpp"
 				>
 			</File>
 		</Filter>

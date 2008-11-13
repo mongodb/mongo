@@ -75,7 +75,9 @@ struct MsgStart {
 	}
 } msgstart;
 
-set<MessagingPort*> ports;
+// we "new" this so it guaranteed to still be around when other automatic global vars 
+// are being destructed during termination.
+set<MessagingPort*>& ports = *(new set<MessagingPort*>());
 
 void closeAllSockets() { 
 	for( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )

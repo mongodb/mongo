@@ -22,6 +22,8 @@
 #include "../client/connpool.h"
 #include "gridconfig.h"
 
+string dashDashGridDb;
+int port = 27017;
 const char *curNs = "";
 Client *client = 0;
 
@@ -47,12 +49,14 @@ void setupSignals() {}
 #endif
 
 void usage() { 
-    cout << "Mongo dbgrid usage:\n";
+    cout << "Mongo dbgrid usage:\n\n";
     cout << " --port <portno>\n";
+    cout << " --griddb <griddbname>\n\n";
+    cout << "If not explicitly specified, griddbname is infered by replacing \"-n<n>\"\n";
+    cout << "in our hostname with \"-grid\".\n";
     cout << endl;
 }
 
-int port = 0;
 MessagingPort *grab = 0;
 void processRequest(Message&, MessagingPort&);
 
@@ -135,8 +139,12 @@ int main(int argc, char* argv[], char *envp[] ) {
         if( s == "--port" ) { 
             port = atoi(argv[++i]);
         }
+        else if( s == "--griddb" ) { 
+            dashDashGridDb = argv[++i];
+            i++;
+        }
         else { 
-            cout << "unexpected cmd line option: " << s << endl;
+            usage();
             return 3;
         }
     }
