@@ -96,7 +96,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 
         // keyFields: e.g. { "name" }
         bool match = keyFields == queryFields;
-        if( !match && queryFields.size() > 1 && simpleKeyMatch == 0 && keyFields.size() == 1 ) { 
+        if( 0 && !match && queryFields.size() > 1 && simpleKeyMatch == 0 && keyFields.size() == 1 ) { 
             // TEMP
             string s = *(keyFields.begin());
             match = queryFields.count(s) == 1;
