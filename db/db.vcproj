@@ -234,10 +234,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\grid\message.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\namespace.cpp"
 				>
 			</File>
@@ -247,6 +243,10 @@
 			</File>
 			<File
 				RelativePath=".\query.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\queryoptimizer.cpp"
 				>
 			</File>
 			<File
@@ -282,6 +282,10 @@
 				>
 				<File
 					RelativePath="..\util\background.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\grid\message.cpp"
 					>
 				</File>
 				<File
@@ -393,6 +397,10 @@
 			</File>
 			<File
 				RelativePath=".\query.h"
+				>
+			</File>
+			<File
+				RelativePath=".\queryoptimizer.h"
 				>
 			</File>
 			<File

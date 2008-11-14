@@ -309,6 +309,8 @@ inline BtreeBucket* DiskLoc::btree() const {
 
 // A Client is a psuedonym for a database. 
 
+#include "queryoptimizer.h"
+
 class Client { 
 public:
 	Client(const char *nm, bool& justCreated) : name(nm) { 
@@ -362,6 +364,7 @@ public:
 	NamespaceIndex namespaceIndex;
 	int profile; // 0=off.
 	string profileName; // "alleyinsider.system.profile"
+    QueryOptimizer optimizer;
 };
 
 // tempish...move to TLS or pass all the way down as a parm

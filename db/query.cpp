@@ -537,7 +537,8 @@ int runCount(const char *ns, BSONObj& cmd, string& err) {
 	return count;
 }
 
-/* [ { a : 1 } , { b : 1 } ] -> { a : 1, b : 1 } 
+/* This is for languages whose "objects" are not well ordered (JSON is well ordered).
+   [ { a : ... } , { b : ... } ] -> { a : ..., b : ... } 
 */
 inline BSONObj transformOrderFromArrayFormat(BSONObj order) { 
     /* note: this is slow, but that is ok as order will have very few pieces */
@@ -586,7 +587,16 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 
         uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
 
-		BSONObj query = jsobj.getObjectField("query");
+        bool explain = false;
+        bool _gotquery = false;
+		BSONObj query;// = jsobj.getObjectField("query");
+        {
+            BSONElement e = jsobj.findElement("query");
+            if( !e.eoo() && (e.type() == Object || e.type() == Array) ) {
+                query = e.embeddedObject();
+                _gotquery = true;
+            }
+        }
         BSONObj order;
         {
             BSONElement e = jsobj.findElement("orderby");
@@ -596,8 +606,11 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
                     order = transformOrderFromArrayFormat(order);
             }
         }
-		if( query.isEmpty() && order.isEmpty() )
+		if( !_gotquery && order.isEmpty() )
 			query = jsobj;
+        else {
+            explain = jsobj.getBoolField("$explain");
+        }
 
 		/* The ElemIter will not be happy if this isn't really an object. So throw exception
 		   here when that is true.
@@ -607,7 +620,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			cout << "Bad query object?\n  jsobj:";
 			cout << jsobj.toString() << "\n  query:";
 			cout << query.toString() << endl;
-			assert(false);
+            uassert("bad query object", false);
 		}
 
 		auto_ptr<JSMatcher> matcher(new JSMatcher(query));
@@ -635,8 +648,8 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 
 		while( c->ok() ) {
 			BSONObj js = c->current();
-			if( queryTraceLevel >= 50 )
-				cout << " checking against:\n " << js.toString() << endl;
+			//if( queryTraceLevel >= 50 )
+			//	cout << " checking against:\n " << js.toString() << endl;
 			nscanned++;
 			bool deep;
 
@@ -654,38 +667,43 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
                 else if( ntoskip > 0 ) {
                     ntoskip--;
                 } else { 
-                    bool ok = fillQueryResultFromObj(b, filter.get(), js);
-                    if( ok ) n++;
-                    if( ok ) {
-                        if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-                            (ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
-                                /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
-                                is only a size limit.  The idea is that on a find() where one doesn't use much results, 
-                                we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                    if( explain ) {
+                        n++;
+                    }
+                    else {
+                        bool ok = fillQueryResultFromObj(b, filter.get(), js);
+                        if( ok ) n++;
+                        if( ok ) {
+                            if( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
+                                (ntoreturn==0 && (b.len()>1*1024*1024 || n>=101)) ) {
+                                    /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there 
+                                    is only a size limit.  The idea is that on a find() where one doesn't use much results, 
+                                    we don't return much, but once getmore kicks in, we start pushing significant quantities.
 
-                                The n limit (vs. size) is important when someone fetches only one small field from big 
-                                objects, which causes massive scanning server-side.
-                                */
-                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                                if( wantMore && ntoreturn != 1 ) {
-                                    if( useCursors ) {
-                                        c->advance();
-                                        if( c->ok() ) {
-                                            // more...so save a cursor
-                                            ClientCursor *cc = new ClientCursor();
-                                            cc->c = c;
-                                            cursorid = cc->cursorid;
-                                            DEV cout << "  query has more, cursorid: " << cursorid << endl;
-                                            cc->matcher = matcher;
-                                            cc->ns = ns;
-                                            cc->pos = n;
-                                            cc->filter = filter;
-                                            cc->originalMessage = message;
-                                            cc->updateLocation();
+                                    The n limit (vs. size) is important when someone fetches only one small field from big 
+                                    objects, which causes massive scanning server-side.
+                                    */
+                                    /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                                    if( wantMore && ntoreturn != 1 ) {
+                                        if( useCursors ) {
+                                            c->advance();
+                                            if( c->ok() ) {
+                                                // more...so save a cursor
+                                                ClientCursor *cc = new ClientCursor();
+                                                cc->c = c;
+                                                cursorid = cc->cursorid;
+                                                DEV cout << "  query has more, cursorid: " << cursorid << endl;
+                                                cc->matcher = matcher;
+                                                cc->ns = ns;
+                                                cc->pos = n;
+                                                cc->filter = filter;
+                                                cc->originalMessage = message;
+                                                cc->updateLocation();
+                                            }
                                         }
                                     }
-                                }
-                                break;
+                                    break;
+                            }
                         }
                     }
                 }
@@ -693,8 +711,17 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			c->advance();
 		} // end while
 
-		if( ordering ) { 
-			so->fill(b, filter.get(), n);
+        if( explain ) {
+            BSONObjBuilder builder;
+            builder.append("cursor", c->toString());
+            builder.append("nscanned", nscanned);
+            builder.append("n", n);
+            if( ordering ) 
+                builder.append("scanAndOrder", true);
+            BSONObj obj = builder.done();
+            fillQueryResultFromObj(b, 0, obj);
+        } else if( ordering ) { 
+            so->fill(b, filter.get(), n);
 		}
 		else if( cursorid == 0 && (queryOptions & Option_CursorTailable) && c->tailable() ) { 
 			c->setAtTail();
