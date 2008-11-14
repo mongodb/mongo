@@ -90,7 +90,7 @@ void queryOp(Message& m, MessagingPort& p) {
   catch( AssertionException& e ) { 
       assert( !lateAssert );
       BSONObjBuilder err;
-      err.append("$err", e.msg.empty() ? "dbgrid assertion during query" : e.msg);
+      err.append("$err", string("dbgrid ") + (e.msg.empty() ? "dbgrid assertion during query" : e.msg));
       BSONObj errObj = err.done();
       replyToQuery(p, m, errObj);
       return;

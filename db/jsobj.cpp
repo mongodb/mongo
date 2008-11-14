@@ -31,6 +31,13 @@ string BSONElement::toString() {
 		return "EOO";
     case Date:
 		s << fieldName() << ": Date(" << hex << date() << ')'; break;
+    case RegEx:
+        {
+            s << fieldName() << ": /" << regex() << '/'; 
+            const char *p = regexFlags();
+            if( p ) s << p;
+        }
+        break;
 	case NumberDouble:
 	case NumberInt:
 		s << fieldName() << ": " << number(); break;

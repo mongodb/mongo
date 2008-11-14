@@ -53,12 +53,20 @@ public:
     ScopedDbConnection(const string& _host) : 
       host(_host), _conn( pool.get(_host) ) { }
 
+    /* Force closure of the connection.  You should call this if you leave it in 
+       a bad state.  Destructor will do this too, but it is verbose.
+    */
+    void kill() { 
+        delete _conn;
+        _conn = 0;
+    }
+
     /* Call this when you are done with the ocnnection. 
          Why?  See note in the destructor below.
     */
     void done() { 
         if( _conn->isFailed() ) 
-            delete _conn;
+            kill();
         else
             pool.release(host, _conn);
         _conn = 0;
@@ -72,7 +80,7 @@ public:
                we don't try to reuse the connection.  The cout is just informational.
                */
             cout << "~ScopedDBConnection: _conn != null\n";
-            delete _conn;
+            kill();
         }
     }
 };
