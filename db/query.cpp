@@ -93,7 +93,16 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 		BSONObj idxKey = idxInfo.getObjectField("key");
 		set<string> keyFields;
 		idxKey.getFieldNames(keyFields);
-		if( keyFields == queryFields ) {
+
+        // keyFields: e.g. { "name" }
+        bool match = keyFields == queryFields;
+        if( !match && queryFields.size() > 1 && simpleKeyMatch == 0 && keyFields.size() == 1 ) { 
+            // TEMP
+            string s = *(keyFields.begin());
+            match = queryFields.count(s) == 1;
+        }
+
+        if( match ) {
 			bool simple = true;
 			BSONObjBuilder b;
 			BSONObj q = query.extractFieldsUnDotted(idxKey, b);
