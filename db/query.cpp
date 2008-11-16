@@ -564,6 +564,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 					  auto_ptr< set<string> > filter, stringstream& ss, int queryOptions) 
 {
     Timer t;
+    int nscanned = 0;
 	bool wantMore = true;
 	int ntoreturn = _ntoreturn;
 	if( _ntoreturn < 0 ) {
@@ -628,7 +629,6 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		assert( debug1.getN() < 5000 );
 
 		bool isSorted = false;
-		int nscanned = 0;
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
 
 		if( c.get() == 0 )
@@ -720,6 +720,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
                 builder.append("scanAndOrder", true);
             BSONObj obj = builder.done();
             fillQueryResultFromObj(b, 0, obj);
+            n = 1;
         } else if( ordering ) { 
             so->fill(b, filter.get(), n);
 		}
@@ -736,9 +737,6 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			cc->originalMessage = message;
 			cc->updateLocation();
 		}
-
-		if( client->profile )
-			ss << "  nscanned:" << nscanned << ' ';
 	}
 
 	QueryResult *qr = (QueryResult *) b.buf();
@@ -757,9 +755,12 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 
     int duration = t.millis();
 	if( (client && client->profile) || duration >= 100 ) {
+        ss << " nscanned:" << nscanned << ' ';
 		if( ntoskip ) 
 			ss << " ntoskip:" << ntoskip;
-		ss << " <br>query: " << jsobj.toString() << ' ';
+        if( client && client->profile )
+            ss << " <br>query: ";
+        ss << jsobj.toString() << ' ';
 	}
 	ss << " nreturned:" << n;
 	return qr;
