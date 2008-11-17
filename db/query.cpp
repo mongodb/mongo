@@ -739,6 +739,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
             builder.append("n", ordering ? so->size() : n);
             if( ordering ) 
                 builder.append("scanAndOrder", true);
+            builder.append("millis", t.millis());
             BSONObj obj = builder.done();
             fillQueryResultFromObj(b, 0, obj);
             n = 1;
