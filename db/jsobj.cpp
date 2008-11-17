@@ -389,7 +389,8 @@ BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b) {
 	}
 	return b.done();
 }
-BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern, BSONObjBuilder& b) { 
+BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) { 
+    BSONObjBuilder b;
 	BSONObjIterator i(pattern);
 	while( i.more() ) {
 		BSONElement e = i.next();
@@ -400,7 +401,7 @@ BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern, BSONObjBuilder& b) {
 			return BSONObj();
 		b.append(x);
 	}
-	return b.done();
+	return b.doneAndDecouple();
 }
 
 BSONObj BSONObj::extractFields(BSONObj& pattern) { 
@@ -437,6 +438,18 @@ BSONObj BSONObj::getObjectField(const char *name) {
 	BSONElement e = getField(name);
 	BSONType t = e.type();
 	return t == Object || t == Array ? e.embeddedObject() : BSONObj();
+}
+
+int BSONObj::nFields() {
+    int n = 0;
+	BSONObjIterator i(*this);
+	while( i.more() ) {
+		BSONElement e = i.next();
+		if( e.eoo() )
+			break;
+		n++;
+	}
+	return n;
 }
 
 /* grab names of all the fields in this object */

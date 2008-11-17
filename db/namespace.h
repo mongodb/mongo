@@ -72,6 +72,18 @@ public:
 	*/
 	DiskLoc info;
 
+    /* extract key value from the query object 
+       e.g., if key() == { x : 1 },
+             { x : 70, y : 3 } -> { x : 70 }
+       handles our embedded dot notation too.
+    */
+    BSONObj getKeyFromQuery(BSONObj& query) { 
+        BSONObj k = key();
+        BSONObj res = query.extractFieldsUnDotted(k);
+        assert(res.objsize() != 0); // guard against a seg fault if details is 0
+        return res;
+    }
+
 	/* pull out the relevant key objects from obj, so we
        can index them.  Note that the set is multiple elements 
 	   only when it's a "multikey" array.

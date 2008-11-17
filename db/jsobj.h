@@ -264,6 +264,11 @@ public:
 	/* note: addFields always adds _id even if not specified */
 	int addFields(BSONObj& from, set<string>& fields); /* returns n added */
 
+    /* returns # of top level fields in the object
+       note: iterates to count the fields 
+    */
+    int nFields();
+
     /* adds the field names to the fields set.  does NOT clear it (appends). */
 	int getFieldNames(set<string>& fields);
 
@@ -288,7 +293,7 @@ public:
 	   if any field missing, you get back an empty object overall.
 	   */
 	BSONObj extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b); // this version, builder owns the returned obj buffer
-    BSONObj extractFieldsUnDotted(BSONObj pattern, BSONObjBuilder& b);
+    BSONObj extractFieldsUnDotted(BSONObj pattern);
 	BSONObj extractFields(BSONObj &pattern);
 
 	const char *objdata() const { return details->_objdata; }
@@ -456,7 +461,7 @@ public:
 	/* assume ownership of the buffer - you must then free it (with free()) */
 	char* decouple(int& l) {
 		char *x = _done();
-                assert( x );
+        assert( x );
 		l = b.len();
 		b.decouple();
 		return x;

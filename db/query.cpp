@@ -54,7 +54,7 @@ void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e);
      simpleKeyMatch - set to true if the query is purely for a single key value
                       unchanged otherwise.
 */
-auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0) { 
+auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0, string *hint = 0) { 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) return auto_ptr<Cursor>();
 
@@ -87,6 +87,25 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 		}
 	}
 
+    if( hint && !hint->empty() ) { 
+        /* todo: more work needed.  doesn't handle $lt & $gt for example.
+                 waiting for query optimizer rewrite (see queryoptimizer.h) before finishing the work.
+        */
+        for(int i = 0; i < d->nIndexes; i++ ) { 
+            IndexDetails& ii = d->indexes[i];
+            if( ii.indexName() == *hint ) {
+                BSONObj startKey = ii.getKeyFromQuery(query);
+                int direction = 1;
+                bool stopMiss = true;
+                if( simpleKeyMatch ) 
+                    *simpleKeyMatch = query.nFields() == startKey.nFields();
+                if( isSorted ) *isSorted = false;
+                return auto_ptr<Cursor>( 
+                    new BtreeCursor(ii, startKey, direction, stopMiss));
+            }
+        }
+    }
+
 	// regular query without order by
 	for(int i = 0; i < d->nIndexes; i++ ) { 
 		BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
@@ -104,8 +123,8 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 
         if( match ) {
 			bool simple = true;
-			BSONObjBuilder b;
-			BSONObj q = query.extractFieldsUnDotted(idxKey, b);
+			//BSONObjBuilder b;
+			BSONObj q = query.extractFieldsUnDotted(idxKey);
             assert(q.objsize() != 0); // guard against a seg fault if details is 0
 			/* regexp: only supported if form is /^text/ */
 			BSONObjBuilder b2;
@@ -588,6 +607,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 
         uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
 
+        string hint;
         bool explain = false;
         bool _gotquery = false;
 		BSONObj query;// = jsobj.getObjectField("query");
@@ -611,6 +631,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			query = jsobj;
         else {
             explain = jsobj.getBoolField("$explain");
+            hint = jsobj.getStringField("$hint");
         }
 
 		/* The ElemIter will not be happy if this isn't really an object. So throw exception
@@ -632,7 +653,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
 
 		if( c.get() == 0 )
-			c = getIndexCursor(ns, query, order, 0, &isSorted);
+			c = getIndexCursor(ns, query, order, 0, &isSorted, &hint);
 		if( c.get() == 0 )
 			c = findTableScan(ns, order, &isSorted);
 

@@ -200,7 +200,10 @@ public:
 	virtual Record* _current() { return currLoc().rec(); }
 	virtual BSONObj current() { return BSONObj(_current()); }
 	virtual string toString() { 
-        return string("BtreeCursor ") + indexDetails.indexName(); 
+        string s = string("BtreeCursor ") + indexDetails.indexName(); 
+        if( direction < 0 ) s += " reverse";
+        if( stopmiss ) s += " stopmiss";
+        return s;
     }
 
 private:
