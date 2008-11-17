@@ -690,6 +690,8 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
                 } else { 
                     if( explain ) {
                         n++;
+                        if( n >= ntoreturn && !wantMore )
+                            break; // .limit() was used, show just that much.
                     }
                     else {
                         bool ok = fillQueryResultFromObj(b, filter.get(), js);
