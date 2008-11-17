@@ -98,6 +98,8 @@ public:
       dir = -1;
     }
   }
+
+  int size() const { return best.size(); }
   
   void add(BSONObj o) { 
     BSONObj k = order.getKeyFromObject(o);

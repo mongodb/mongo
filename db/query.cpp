@@ -58,9 +58,24 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 	NamespaceDetails *d = nsdetails(ns);
 	if( d == 0 ) return auto_ptr<Cursor>();
 
-	// queryFields, e.g. { 'name' }
-	set<string> queryFields;
-	query.getFieldNames(queryFields);
+    if( hint && !hint->empty() ) { 
+        /* todo: more work needed.  doesn't handle $lt & $gt for example.
+                 waiting for query optimizer rewrite (see queryoptimizer.h) before finishing the work.
+        */
+        for(int i = 0; i < d->nIndexes; i++ ) { 
+            IndexDetails& ii = d->indexes[i];
+            if( ii.indexName() == *hint ) {
+                BSONObj startKey = ii.getKeyFromQuery(query);
+                int direction = 1;
+                bool stopMiss = true;
+                if( simpleKeyMatch ) 
+                    *simpleKeyMatch = query.nFields() == startKey.nFields();
+                if( isSorted ) *isSorted = false;
+                return auto_ptr<Cursor>( 
+                    new BtreeCursor(ii, startKey, direction, stopMiss));
+            }
+        }
+    }
 
 	if( !order.isEmpty() ) {
 		set<string> orderFields;
@@ -87,24 +102,9 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 		}
 	}
 
-    if( hint && !hint->empty() ) { 
-        /* todo: more work needed.  doesn't handle $lt & $gt for example.
-                 waiting for query optimizer rewrite (see queryoptimizer.h) before finishing the work.
-        */
-        for(int i = 0; i < d->nIndexes; i++ ) { 
-            IndexDetails& ii = d->indexes[i];
-            if( ii.indexName() == *hint ) {
-                BSONObj startKey = ii.getKeyFromQuery(query);
-                int direction = 1;
-                bool stopMiss = true;
-                if( simpleKeyMatch ) 
-                    *simpleKeyMatch = query.nFields() == startKey.nFields();
-                if( isSorted ) *isSorted = false;
-                return auto_ptr<Cursor>( 
-                    new BtreeCursor(ii, startKey, direction, stopMiss));
-            }
-        }
-    }
+	// queryFields, e.g. { 'name' }
+	set<string> queryFields;
+	query.getFieldNames(queryFields);
 
 	// regular query without order by
 	for(int i = 0; i < d->nIndexes; i++ ) { 
@@ -736,7 +736,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
             BSONObjBuilder builder;
             builder.append("cursor", c->toString());
             builder.append("nscanned", nscanned);
-            builder.append("n", n);
+            builder.append("n", ordering ? so->size() : n);
             if( ordering ) 
                 builder.append("scanAndOrder", true);
             BSONObj obj = builder.done();
