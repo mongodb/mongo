@@ -49,7 +49,7 @@ public:
 		return false;
 	}
 
-	virtual const char * toString() { return "SingleResultObjCursor"; }
+	virtual string toString() { return "SingleResultObjCursor"; }
 
 };
 

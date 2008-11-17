@@ -57,7 +57,7 @@ public:
 	/* called before query getmore block is iterated */
 	virtual void checkLocation() { } 
 
-	virtual const char * toString() { return "abstract?"; }
+	virtual string toString() { return "abstract?"; }
 
 	/* used for multikey index traversal to avoid sending back dups. see JSMatcher::matches() */
 	set<DiskLoc> dups;
@@ -104,7 +104,7 @@ public:
 
 	BasicCursor(DiskLoc dl) : curr(dl) { init(); }
 	BasicCursor() { init(); }
-	virtual const char * toString() { return "BasicCursor"; }
+	virtual string toString() { return "BasicCursor"; }
 
 	virtual void tailResume() { 
 		if( state == TailPoint ) { 
@@ -142,6 +142,6 @@ public:
 
 	ReverseCursor(DiskLoc dl) : BasicCursor(dl) { }
 	ReverseCursor() { }
-	virtual const char * toString() { return "ReverseCursor"; }
+	virtual string toString() { return "ReverseCursor"; }
 };
 

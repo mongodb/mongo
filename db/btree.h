@@ -199,7 +199,7 @@ public:
 	virtual DiskLoc currLoc() { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc(); }
 	virtual Record* _current() { return currLoc().rec(); }
 	virtual BSONObj current() { return BSONObj(_current()); }
-	virtual const char * toString() { 
+	virtual string toString() { 
         return string("BtreeCursor ") + indexDetails.indexName(); 
     }
 
