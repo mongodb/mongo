@@ -28,6 +28,9 @@ const bool debug=false;
 #endif
 
 #include <memory>
+#include "stdlib.h"
+#include "string.h"
+#include "limits.h"
 
 extern void dbexit(int returnCode, const char *whyMsg = "");
 

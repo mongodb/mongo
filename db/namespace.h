@@ -230,7 +230,7 @@ public:
 
     void addedIndex() { haveIndexKeys=false; }
 private:
-	static map<const char *,NamespaceDetailsTransient*> map;
+        static std::map<const char *,NamespaceDetailsTransient*> map;
 public:
 	static NamespaceDetailsTransient& get(const char *ns);
 };
