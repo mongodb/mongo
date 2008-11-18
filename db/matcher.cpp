@@ -499,18 +499,14 @@ struct JSUnitTest : public UnitTest {
 
 		BSONObj j1((const char *) &js1);
 		BSONObj j2((const char *) &js2);
-		cout << "j1:" << j1.toString() << endl;
-		cout << "j2:" << j2.toString() << endl;
 		JSMatcher m(j2);
 		assert( m.matches(j1) );
 		js2.sval[0] = 'z';
 		assert( !m.matches(j1) );
 		JSMatcher n(j1);
 		assert( n.matches(j1) );
-		cout << "j2:" << j2.toString() << endl;
 		assert( !n.matches(j2) );
 
-cout << "temp1" << endl;
 		BSONObj j0 = emptyObj;
 //		BSONObj j0((const char *) &js0);
 		JSMatcher p(j0);
@@ -522,6 +518,10 @@ cout << "temp1" << endl;
 #pragma pack(pop)
 
 struct RXTest : public UnitTest { 
+
+    RXTest() { 
+    }
+
 	void run() { 
 		/*
 		static const boost::regex e("(\\d{4}[- ]){3}\\d{4}");
@@ -541,4 +541,3 @@ struct RXTest : public UnitTest {
 		assert( part.PartialMatch("dwight") );
 	}
 } rxtest;
-

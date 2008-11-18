@@ -18,7 +18,7 @@
 #include "goodies.h"
 #include "unittest.h"
 
-vector<UnitTest*> UnitTest::tests;
+vector<UnitTest*> *UnitTest::tests = 0;
 
 Nullstream nullstream;
 Logstream logstream;

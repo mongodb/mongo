@@ -30,12 +30,17 @@ struct UnitTest {
 	// assert if fails
 	virtual void run() = 0;
 
-	static vector<UnitTest*> tests;
+	static vector<UnitTest*> *tests;
 
-	static void registerTest(UnitTest *t) { tests.push_back(t); }
+	static void registerTest(UnitTest *t) { 
+        if( tests == 0 )
+            tests = new vector<UnitTest*>();
+        tests->push_back(t); 
+    }
 
 	static void runTests() { 
-		for( vector<UnitTest*>::iterator i = tests.begin(); i != tests.end(); i++ ) { 
+		for( vector<UnitTest*>::iterator i = tests->begin(); i != tests->end(); i++ ) { 
+           (*i)->run();
 		}
 	}
 };
