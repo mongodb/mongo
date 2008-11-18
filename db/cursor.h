@@ -47,7 +47,7 @@ public:
 	/* optional to implement.  if implemented, means 'this' is a prototype */
 	virtual Cursor* clone() { return 0; }
 
-	virtual bool tempStopOnMiss() { return false; }
+    virtual BSONObj indexKeyPattern() { return BSONObj(); }
 
 	/* called after every query block is iterated -- i.e. between getMore() blocks
 	   so you can note where we are, if necessary.

@@ -332,6 +332,7 @@ public:
 		return BSONElement(objdata() + 4);
 	}
 	BSONElement findElement(const char *name);
+	bool hasElement(const char *name);
 
 	OID* getOID() {
 		BSONElement e = firstElement();
@@ -516,89 +517,7 @@ public:
 
 #include <pcrecpp.h> 
 
-class RegexMatcher { 
-public:
-	const char *fieldName;
-	pcrecpp::RE *re;
-	RegexMatcher() { re = 0; }
-	~RegexMatcher() { delete re; }
-};
-
-// SQL where clause equivalent
-class Where; 
-
-/* For when a js object is a query pattern. 
-
-   e.g.
-       db.foo.find( { a : 3 } );
-
-   { a : 3 } is the pattern object.
-
-   GT/LT:
-   { a : { $gt : 3 } } 
-
-   Not equal:
-   { a : { $ne : 3 } } 
-
-   TODO: we should rewrite the matcher to be more an AST style.
-*/
-class JSMatcher : boost::noncopyable { 
-	int matchesDotted(
-		const char *fieldName, 
-		BSONElement& toMatch, BSONObj& obj, 
-		int compareOp, bool *deep, bool isArr = false);
-
-	struct element_lt
-	{
-		bool operator()(const BSONElement& l, const BSONElement& r) const
-		{
-			int x = (int) l.type() - (int) r.type();
-			if( x < 0 ) return true;
-			if( x > 0 ) return false;
-			return compareElementValues(l,r) < 0;
-		}
-	};
-public:
-	enum { 
-		Equality = 0,
-		LT = 0x1,
-		LTE = 0x3,
-		GTE = 0x6,
-		GT = 0x4, 
-		opIN = 0x8, // { x : { $in : [1,2,3] } }
-        NE = 0x9
-	};
-
-	static int opDirection(int op) { 
-		return op <= LTE ? -1 : 1;
-	}
-
-	JSMatcher(BSONObj& pattern);
-
-	~JSMatcher();
-
-	/* deep means we looked into arrays for a match */
-	bool matches(BSONObj& j, bool *deep = 0);
-
-	int getN() { return n; }
-
-private:
-	int valuesMatch(BSONElement& l, BSONElement& r, int op);
-
-	set<BSONElement,element_lt> *in;
-	Where *where;
-	BSONObj& jsobj;
-	vector<BSONElement> toMatch;
-	vector<int> compareOp;
-	int n;
-
-	RegexMatcher regexs[4];
-	int nRegex;
-
-	// so we delete the mem when we're done:
-	BSONObjBuilder *builders[8];
-	int nBuilders;
-};
+#include "matcher.h"
 
 extern BSONObj maxKey;
 
@@ -652,6 +571,18 @@ inline BSONObj BSONElement::wrap() {
 	BSONObjBuilder b;
 	b.append(*this);
 	return b.doneAndDecouple();
+}
+
+inline bool BSONObj::hasElement(const char *name) { 
+	if( !isEmpty() ) {
+		BSONObjIterator it(*this);
+		while( it.more() ) {
+			BSONElement e = it.next();
+			if( strcmp(name, e.fieldName()) == 0 ) 
+				return true;
+		}
+	}
+    return false;
 }
 
 inline BSONElement BSONObj::findElement(const char *name) { 

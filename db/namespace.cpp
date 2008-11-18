@@ -314,7 +314,7 @@ void NamespaceDetailsTransient::computeIndexKeys() {
 	NamespaceDetails *d = nsdetails(ns.c_str());
     for( int i = 0; i < d->nIndexes; i++ ) {
 //        set<string> fields;
-        d->indexes[i].key().getFieldNames(allIndexKeys);
+        d->indexes[i].keyPattern().getFieldNames(allIndexKeys);
 //        allIndexKeys.insert(fields.begin(),fields.end());
     }
 }

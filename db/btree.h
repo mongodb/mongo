@@ -171,12 +171,13 @@ private:
 
 class BtreeCursor : public Cursor {
 	friend class BtreeBucket;
+//    BSONObj query; // the query we are working on in association with the cursor -- see noMoreMatches()
 public:
-	BtreeCursor(IndexDetails&, BSONObj& startKey, int direction, bool stopmiss);
+	BtreeCursor(IndexDetails&, BSONObj& startKey, int direction, BSONObj& query);
 	virtual bool ok() { return !bucket.isNull(); }
 	bool eof() { return !ok(); }
 	virtual bool advance();
-	virtual bool tempStopOnMiss() { return stopmiss; }
+
 	virtual void noteLocation(); // updates keyAtKeyOfs...
 	virtual void checkLocation();
 
@@ -190,6 +191,11 @@ public:
 		assert( !bucket.isNull() );
 		return bucket.btree()->keyNode(keyOfs);
 	}
+    BSONObj currKey() { return currKeyNode().key; }
+
+    virtual BSONObj indexKeyPattern() { 
+        return indexDetails.keyPattern();
+    }
 
 	virtual void aboutToDeleteBucket(const DiskLoc& b) { 
 		if( bucket == b )
@@ -202,7 +208,7 @@ public:
 	virtual string toString() { 
         string s = string("BtreeCursor ") + indexDetails.indexName(); 
         if( direction < 0 ) s += " reverse";
-        if( stopmiss ) s += " stopmiss";
+        //if( stopmiss ) s += " stopmiss";
         return s;
     }
 
@@ -212,7 +218,6 @@ private:
 	DiskLoc bucket;
 	int keyOfs;
 	int direction; // 1=fwd,-1=reverse
-	bool stopmiss;
 	BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
 	DiskLoc locAtKeyOfs;
 };

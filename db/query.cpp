@@ -67,12 +67,11 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
             if( ii.indexName() == *hint ) {
                 BSONObj startKey = ii.getKeyFromQuery(query);
                 int direction = 1;
-                bool stopMiss = true;
                 if( simpleKeyMatch ) 
                     *simpleKeyMatch = query.nFields() == startKey.nFields();
                 if( isSorted ) *isSorted = false;
                 return auto_ptr<Cursor>( 
-                    new BtreeCursor(ii, startKey, direction, stopMiss));
+                    new BtreeCursor(ii, startKey, direction, query));
             }
         }
     }
@@ -97,7 +96,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 				DEV cout << " using index " << d->indexes[i].indexNamespace() << '\n';
 				if( isSorted )
 					*isSorted = true;
-				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], reverse ? maxKey : emptyObj, reverse ? -1 : 1, false));
+				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], reverse ? maxKey : emptyObj, reverse ? -1 : 1, query));
 			}
 		}
 	}
@@ -168,8 +167,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 						return auto_ptr<Cursor>( new BtreeCursor(
 							d->indexes[i], 
 							direction == 1 ? emptyObj : maxKey, 
-							direction, 
-							true) );
+							direction, query) );
 					}
 				}
 
@@ -203,7 +201,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 			DEV cout << "using index " << d->indexes[i].indexNamespace() << endl;
 			if( simple && simpleKeyMatch ) *simpleKeyMatch = true;
 			return auto_ptr<Cursor>( 
-				new BtreeCursor(d->indexes[i], q2, 1, true));
+				new BtreeCursor(d->indexes[i], q2, 1, query));
 		}
 	}
 
@@ -231,26 +229,29 @@ int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
 	}
 
 	int nDeleted = 0;
-	JSMatcher matcher(pattern);
 	BSONObj order;
 	auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
 	if( c.get() == 0 )
 		c = theDataFileMgr.findAll(ns);
+    JSMatcher matcher(pattern, c->indexKeyPattern());
 
 	Cursor &tempDebug = *c;
 
 	while( c->ok() ) {
 		Record *r = c->_current();
 		DiskLoc rloc = c->currLoc();
-		c->advance(); // must advance before deleting as the next ptr will die
 		BSONObj js(r);
 
 		bool deep;
-		if( !matcher.matches(js, &deep) ) {
-			if( c->tempStopOnMiss() )
-				break;
+        bool indexMatches;
+		if( !matcher.matches(js, indexMatches, &deep) ) {
+            if( !indexMatches )
+                break;
+            c->advance(); // advance must be after noMoreMatches() because it uses currKey()
 		}
-		else { 
+        else { 
+            c->advance(); // must advance before deleting as the next ptr will die
+
 			assert( !deep || !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
 			if( !justOne )
 				c->noteLocation();
@@ -366,18 +367,19 @@ int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upse
 
 	int nscanned = 0;
 	{
-		JSMatcher matcher(pattern);
 		BSONObj order;
 		auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
 		if( c.get() == 0 )
 			c = theDataFileMgr.findAll(ns);
+		JSMatcher matcher(pattern, c->indexKeyPattern());
 		while( c->ok() ) {
 			Record *r = c->_current();
 			nscanned++;
 			BSONObj js(r);
-			if( !matcher.matches(js) ) {
-				if( c->tempStopOnMiss() )
-					break;
+            bool indexMatches;
+			if( !matcher.matches(js, indexMatches) ) {
+                if( !indexMatches )
+                    break;
 			}
 			else {
 				/* note: we only update one row and quit.  if you do multiple later, 
@@ -539,13 +541,14 @@ int runCount(const char *ns, BSONObj& cmd, string& err) {
 	}
 
 	int count = 0;
-	auto_ptr<JSMatcher> matcher(new JSMatcher(query));
+	auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
 	while( c->ok() ) {
 		BSONObj js = c->current();
 		bool deep;
-		if( !matcher->matches(js, &deep) ) {
-			if( c->tempStopOnMiss() )
-				break;
+        bool indexMatches;
+		if( !matcher->matches(js, indexMatches, &deep) ) {
+            if( !indexMatches ) 
+                break;
 		}
 		else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
 			// got a match.
@@ -645,10 +648,6 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
             uassert("bad query object", false);
 		}
 
-		auto_ptr<JSMatcher> matcher(new JSMatcher(query));
-		JSMatcher &debug1 = *matcher;
-		assert( debug1.getN() < 5000 );
-
 		bool isSorted = false;
 		auto_ptr<Cursor> c = getSpecialCursor(ns);
 
@@ -656,6 +655,10 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			c = getIndexCursor(ns, query, order, 0, &isSorted, &hint);
 		if( c.get() == 0 )
 			c = findTableScan(ns, order, &isSorted);
+
+		auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
+		JSMatcher &debug1 = *matcher;
+		assert( debug1.getN() < 1000 );
 
 		auto_ptr<ScanAndOrder> so;
 		bool ordering = false;
@@ -673,10 +676,10 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			//	cout << " checking against:\n " << js.toString() << endl;
 			nscanned++;
 			bool deep;
-
-			if( !matcher->matches(js, &deep) ) {
-				if( c->tempStopOnMiss() )
-					break;
+            bool indexMatches;
+			if( !matcher->matches(js, indexMatches, &deep) ) {
+                if( !indexMatches )
+                    break;
 			}
 			else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
 				// got a match.
@@ -716,6 +719,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
                                                 cc->c = c;
                                                 cursorid = cc->cursorid;
                                                 DEV cout << "  query has more, cursorid: " << cursorid << endl;
+                                                //cc->pattern = query;
                                                 cc->matcher = matcher;
                                                 cc->ns = ns;
                                                 cc->pos = n;
@@ -754,6 +758,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			cc->c = c;
 			cursorid = cc->cursorid;
 			DEV cout << "  query has no more but tailable, cursorid: " << cursorid << endl;
+            //cc->pattern = query;
 			cc->matcher = matcher;
 			cc->ns = ns;
 			cc->pos = n;
@@ -844,9 +849,9 @@ done:
 			BSONObj js = c->current();
 
 			bool deep;
-
-			if( !cc->matcher->matches(js, &deep) ) {
-				if( c->tempStopOnMiss() )
+            bool indexMatches;
+			if( !cc->matcher->matches(js, indexMatches, &deep) ) {
+                if( !indexMatches )
 					goto done;
 			} 
 			else { 

@@ -78,7 +78,7 @@ public:
        handles our embedded dot notation too.
     */
     BSONObj getKeyFromQuery(BSONObj& query) { 
-        BSONObj k = key();
+        BSONObj k = keyPattern();
         BSONObj res = query.extractFieldsUnDotted(k);
         assert(res.objsize() != 0); // guard against a seg fault if details is 0
         return res;
@@ -94,7 +94,7 @@ public:
     /* get the key pattern for this object. 
        e.g., { lastname:1, firstname:1 }
     */
-    BSONObj key() { 
+    BSONObj keyPattern() { 
         return info.obj().getObjectField("key");
     }
 

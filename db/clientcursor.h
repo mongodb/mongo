@@ -43,6 +43,7 @@ public:
 	~ClientCursor();
 	const CursorId cursorid;
 	string ns;
+    //BSONObj pattern; // the query object
 	auto_ptr<JSMatcher> matcher;
 	auto_ptr<Cursor> c;
 	int pos;

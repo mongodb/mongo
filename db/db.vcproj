@@ -368,6 +368,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\matcher.h"
+				>
+			</File>
+			<File
 				RelativePath="..\grid\message.h"
 				>
 			</File>

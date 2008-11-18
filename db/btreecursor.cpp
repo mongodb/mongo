@@ -25,9 +25,10 @@ extern int otherTraceLevel;
 DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
 DiskLoc minDiskLoc(0, 1);
 
-BtreeCursor::BtreeCursor(IndexDetails& _id, BSONObj& k, int _direction, bool sm) : 
+BtreeCursor::BtreeCursor(IndexDetails& _id, BSONObj& k, int _direction, BSONObj& _query) : 
+//    query(_query),
     indexDetails(_id),
-    direction(_direction), stopmiss(sm) 
+    direction(_direction)
 {
 //otherTraceLevel = 999;
 
