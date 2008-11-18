@@ -495,7 +495,7 @@ bool JSMatcher::matches(BSONObj& jsobj, bool& indexMatches, bool *deep) {
         return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
     }
 
-    return true;
+    return ok;
 }
 
 struct JSObj1 js1;
