@@ -208,7 +208,6 @@ public:
 	virtual string toString() { 
         string s = string("BtreeCursor ") + indexDetails.indexName(); 
         if( direction < 0 ) s += " reverse";
-        //if( stopmiss ) s += " stopmiss";
         return s;
     }
 

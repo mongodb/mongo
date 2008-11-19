@@ -537,7 +537,7 @@ void ReplSource::sync_pullOpLog() {
 
 	if( !c->more() ) { 
 		if( tailing ) 
-			; //log() << "pull:   " << ns << " no new activity\n";
+			; //log() << "pull:   " <<OpT ns << " no new activity\n";
 		else
 			log() << "pull:   " << ns << " oplog is empty\n";
 		sleepsecs(3);
@@ -551,11 +551,11 @@ void ReplSource::sync_pullOpLog() {
         problem() << "pull: bad object read from remote oplog: " << op.toString() << '\n';
         assert(false);
     }
-	OpTime t( ts.date() );
+	OpTime nextOpTime( ts.date() );
 	bool initial = syncedTo.isNull();
 	if( initial || tailing ) { 
 		if( tailing ) { 
-			assert( syncedTo < t );
+			assert( syncedTo < nextOpTime );
 		} 
 		else {
 			log() << "pull:   initial run\n";
@@ -565,11 +565,19 @@ void ReplSource::sync_pullOpLog() {
             n++;
         }
 	}
-	else if( t != syncedTo ) { 
-		log() << "pull:   t " << t.toString() << " != syncedTo " << syncedTo.toString() << '\n';
-        log() << "pull:   time diff: " << (t.getSecs() - syncedTo.getSecs()) << "sec\n";
+	else if( nextOpTime != syncedTo ) { 
+        Logstream& l = log();
+		l << "pull:   nextOpTime " << nextOpTime.toString() << ' ';
+        if( nextOpTime < syncedTo ) 
+            l << "<??";
+        else
+            l << ">";
+
+        l << " syncedTo " << syncedTo.toString() << '\n';
+        log() << "pull:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
+        log() << "pull:   tailing: " << tailing << '\n';
         log() << "pull:   data too stale, halting replication" << endl;
-		assert( syncedTo < t );
+		assert( syncedTo < nextOpTime );
 		throw SyncException();
 	}
     else { 
@@ -581,7 +589,7 @@ void ReplSource::sync_pullOpLog() {
 		while( 1 ) {
 			if( !c->more() ) {
 				log() << "pull:   applied " << n << " operations" << endl;
-				syncedTo = t;
+				syncedTo = nextOpTime;
 				dblock lk;
 				save(); // note how far we are synced up to now
 				break;
@@ -590,11 +598,11 @@ void ReplSource::sync_pullOpLog() {
 			BSONObj op = c->next();
 			ts = op.findElement("ts");
 			assert( ts.type() == Date );
-			OpTime last = t;
+			OpTime last = nextOpTime;
 			OpTime tmp( ts.date() );
-			t = tmp;
-			if( !( last < t ) ) { 
-				problem() << "sync error: last " << last.toString() << " >= t " << t.toString() << endl;
+			nextOpTime = tmp;
+			if( !( last < nextOpTime ) ) { 
+				problem() << "sync error: last " << last.toString() << " >= nextOpTime " << nextOpTime.toString() << endl;
 				uassert("bad 'ts' value in sources", false);
 			}
 
