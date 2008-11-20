@@ -18,6 +18,8 @@ __wt_read(ENV_INTERNAL *env, WT_FH *fh, u_int32_t block_number,
 {
 	ssize_t bytes_to_read, bytes_read;
 	int ret;
+
+	WT_STAT(fh->read_count);
 	
 	bytes_to_read = (ssize_t)WT_BLOCKS_TO_BYTES(blocks);
 	bytes_read = pread(fh->fd, buf,
@@ -42,6 +44,7 @@ __wt_write(ENV_INTERNAL *env, WT_FH *fh, u_int32_t block_number,
 	ssize_t bytes_to_write, bytes_written;
 	int ret;
 	
+	WT_STAT(fh->write_count);
 	bytes_to_write = (ssize_t)WT_BLOCKS_TO_BYTES(blocks);
 	bytes_written = pwrite(fh->fd, buf,
 	    (ssize_t)WT_BLOCKS_TO_BYTES(blocks),
