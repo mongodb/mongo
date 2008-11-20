@@ -1,7 +1,8 @@
 /*-
  * See the file LICENSE for redistribution information.
  *
- * Copyright (c) 2008 WiredTiger Software.  All rights reserved.
+ * Copyright (c) 2008 WiredTiger Software.
+ *	All rights reserved.
  *
  * $Id$
  */
