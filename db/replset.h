@@ -72,10 +72,13 @@ public:
 
 extern ReplPair *replPair;
 
-/* we should not allow most operations when not the master */
+/* we should not allow most operations when not the master 
+   also we report not master if we are "dead"
+*/
 inline bool isMaster() { 
-    return replPair == 0 || replPair->state == ReplPair::State_Master || 
-        client->name == "local"; // local is always allowed
+    if( replPair == 0 ) return true;
+    if( client->dead ) return client->name == "local";
+    return replPair->state == ReplPair::State_Master;
 }
 
 inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {
@@ -92,6 +95,7 @@ inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {
 			remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
 	}
 
+    uassert("arbiter parm is missing, use '-' for none", arb);
     arbHost = arb;
     uassert("arbiter parm is empty", !arbHost.empty());
 }

@@ -81,11 +81,17 @@ public:
     CmdIsMaster() : Command("ismaster") { }
 
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
-        if( replPair ) {
+        if( client->dead ) {
+            result.append("ismaster", 0.0);
+            if( replPair ) 
+                result.append("remote", replPair->remote);
+            result.append("info", "dead");
+        }
+        else if( replPair ) {
             int x = replPair->state;
             result.append("ismaster", replPair->state);
             result.append("remote", replPair->remote);
-            if( !replPair->info.empty() )
+            if( replPair->info.empty() )
                 result.append("info", replPair->info);
         }
         else { 
@@ -422,21 +428,23 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 
 	dblock lk;
 	bool justCreated = setClientTempNs(ns);
+    if( client->dead )
+        return;
 
 	if( justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
 	    newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
 	{
 		if( paired && !justCreated ) { 
 			/* the other half of our pair has some operations. yet we already had a db on our 
-			   disk even though the db in question is not listed in the source.  this is normal 
-			   near the beginning of paired operation. 
-
-			   todo: we should echo back an optime on the initial cloning, and then we know 
-			   we are safely in sync, and if we get here without that, we can then error out.
+			   disk even though the db in question is not listed in the source.
 			   */
+            client->dead = true;
+            problem() << "pair: historical image missing for " << clientName << ", marking this database 'dead'" << endl;
+/*
 			log() << "TEMP: pair: assuming we have the historical image for: " << 
 				clientName << ". add extra checks here." << endl;
 			dbs.insert(clientName);
+*/
 		}
 		else { 
 			nClonedThisPass++;
