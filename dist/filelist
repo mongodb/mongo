@@ -1,0 +1,6 @@
+# srcfiles --
+#	List of source files for WiredTiger.
+#
+# $Id$
+
+os_posix/rw.c

@@ -1,0 +1,82 @@
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008 WiredTiger Software.  All rights reserved.
+ *
+ * $Id$
+ */
+
+#ifndef	__WIREDTIGER_H_
+#define	__WIREDTIGER_H_
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+/*******************************************
+ * Version information.
+ *******************************************/
+#define	WIREDTIGER_VERSION_MAJOR	@WIREDTIGER_VERSION_MAJOR@
+#define	WIREDTIGER_VERSION_MINOR	@WIREDTIGER_VERSION_MINOR@
+#define	WIREDTIGER_VERSION_PATCH	@WIREDTIGER_VERSION_PATCH@
+#define	WIREDTIGER_VERSION_STRING	@WIREDTIGER_VERSION_STRING@
+
+/*******************************************
+ * Required includes.
+ *******************************************/
+@wiredtiger_includes_decl@
+
+/*******************************************
+ * Portable type names.
+ *******************************************/
+@int8_decl@
+@u_int8_decl@
+@int16_decl@
+@u_int16_decl@
+@int32_decl@
+@u_int32_decl@
+@int64_decl@
+@u_int64_decl@
+@uintmax_t_decl@
+@uintptr_t_decl@
+
+/*******************************************
+ * Forward declarations
+ *******************************************/
+struct __db_internal;	typedef struct __db_internal DB_INTERNAL;
+struct __dbc_internal;	typedef struct __dbc_internal DBC_INTERNAL;
+struct __env_internal;	typedef struct __env_internal ENV_INTERNAL;
+
+/*******************************************
+ * Key/data structure -- a Data-Base Thang.
+ *******************************************/
+typedef struct {
+	void	*data;			/* data */
+	size_t	 size;			/* data length */
+} DBT;
+
+/*******************************************
+ * Database handle.
+ *******************************************/
+typedef struct {
+	DB_INTERNAL *dbint;		/* Internal handle. */
+} DB;
+
+/*******************************************
+ * Cursor handle.
+ *******************************************/
+typedef struct {
+	DBC_INTERNAL *dbcint;		/* Internal handle. */
+} DBC;
+
+/*******************************************
+ * Database environment handle.
+ *******************************************/
+typedef struct {
+	ENV_INTERNAL *envint;		/* Internal handle. */
+} DB_ENV;
+
+#if defined(__cplusplus)
+}
+#endif
+#endif /* __WIREDTIGER_H_ */

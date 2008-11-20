@@ -1,0 +1,4 @@
+lib_LIBRARIES= libwiredtiger.a
+include_HEADERS= wiredtiger.h
+
+INCLUDES= -I../inc_posix

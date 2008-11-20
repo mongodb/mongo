@@ -1,0 +1,93 @@
+#! /bin/sh
+#
+# Copyright (c) 2008 WiredTiger Software.
+#	All rights reserved.
+#
+# $Id$
+
+t=/tmp/__configure.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+# There's a cleanup function so we can easily clean out the directory.
+clean()
+{
+	test -f Makefile && make distclean
+	rm -rf \
+	    aclocal.m4 autom4te.cache config.hin \
+	    config.hin~ configure Makefile.am Makefile.in
+}
+
+while :
+	do case "$1" in
+	-c)
+		clean
+		exit 0;;
+	*)
+		break;;
+	esac
+done
+
+# Cleanup
+clean
+
+# Initialize standard automake files.
+cp ../LICENSE COPYING
+cat << END > ChangeLog
+To view release and installation documentation, load the distribution
+file docs/index.html into your web browser.
+END
+cp ../README INSTALL
+cat << END > NEWS
+To view release and installation documentation, load the distribution
+file docs/index.html into your web browser.
+END
+cp ../README README
+
+# Build Makefile.am
+srcfiles=../dist/srcfiles
+set_sources()
+{
+	echo
+	echo "libwiredtiger_a_SOURCES=\\"
+	sed -e '/^[a-z]/! d' \
+	    -e 's/.*/	..\/&\\/' \
+	    -e '$s/\\$//' < $srcfiles
+}
+
+set_vpath()
+{
+	echo
+	echo "VPATH=\\"
+	sed -e '/^[a-z]/! d' \
+	    -e 's/\(.*\)\/.*/\1/' < $srcfiles |
+	sort -u |
+	sed -e 's/.*/	..\/&\\/' \
+	    -e '$s/\\$//'
+}
+
+(cat Make.base; set_vpath; set_sources) > Makefile.am
+
+# Build aclocal.m4.
+aclocal -I aclocal
+
+# Create header file config.in.
+autoheader
+
+# Configure.
+autoconf
+
+# Edit version information we couldn't pre-compute.
+. ../dist/RELEASE
+sed -e "s/__EDIT_WIREDTIGER_VERSION_MAJOR__/$WIREDTIGER_VERSION_MAJOR/g" \
+    -e "s/__EDIT_WIREDTIGER_VERSION_MINOR__/$WIREDTIGER_VERSION_MINOR/g" \
+    -e "s/__EDIT_WIREDTIGER_VERSION_PATCH__/$WIREDTIGER_VERSION_PATCH/g" \
+    -e "s/__EDIT_WIREDTIGER_VERSION_STRING__/$WIREDTIGER_VERSION_STRING/g" \
+    -e "s/__EDIT_WIREDTIGER_VERSION_UNIQUE_NAME__/$WIREDTIGER_VERSION_UNIQUE_NAME/g" \
+    -e "s/__EDIT_WIREDTIGER_VERSION__/$WIREDTIGER_VERSION/g" configure > $t
+cp $t configure
+
+# Build make files.
+automake --add-missing
+
+# Cleanup
+rm -rf autom4te.cache config.hin~

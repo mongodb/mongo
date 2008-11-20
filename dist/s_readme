@@ -1,0 +1,33 @@
+#! /bin/sh
+#
+# $Id$
+
+t=/tmp/__t
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+. RELEASE
+cat << END_TEXT > $t
+$WIREDTIGER_VERSION_STRING
+ 
+This is version $WIREDTIGER_VERSION_MAJOR.$WIREDTIGER_VERSION_MINOR.$WIREDTIGER_VERSION_PATCH of WiredTiger.
+
+To view release and installation documentation, load the distribution
+file docs/index.html into your web browser.
+
+To build in a POSIX environment (for example, Linux or other UNIX-like
+system), change directory to build_posix and enter:
+
+	./configure
+	make
+
+To install in the standard POSIX environment locations, enter:
+
+	make install
+
+For more information on installation locations, see the WiredTiger
+documentation.
+END_TEXT
+
+f=../README
+cmp $t $f > /dev/null 2>&1 ||
+    (echo "Building $f" && rm -f $f && cp $t $f && chmod 444 $f)
