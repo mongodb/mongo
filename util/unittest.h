@@ -18,9 +18,12 @@
 
 #pragma once
 
-/* the idea here is to let all initialization of global variables (classes inheriting from UnitTest)
+/* The idea here is to let all initialization of global variables (classes inheriting from UnitTest)
    complete before we run the tests -- otherwise order of initilization being arbitrary may mess 
-   us up.  The app's main() function should call runTests.
+   us up.  The app's main() function should call runTests().
+
+   To define a unit test, inherit from this and implement run. instantiate one object for the new class
+   as a global.
 */
 struct UnitTest { 
 	UnitTest() { 

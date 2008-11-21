@@ -20,7 +20,7 @@
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include <limits>
-
+#include "../util/unittest.h"
 
 BSONElement nullElement;
 
@@ -538,3 +538,15 @@ struct EmptyObject {
 
 BSONObj emptyObj((char *) &emptyObject);
 
+struct BsonUnitTest : public UnitTest { 
+	void run() { 
+        BSONObjBuilder A,B;
+        A.appendInt("x", 2);
+        B.append("x", 2.0);
+        BSONObj a = A.done();
+        BSONObj b = B.done();
+        assert( !(a==b) ); // comments on operator==
+        int c = a.woCompare(b);
+        assert( c == 0 );
+    }
+} bsonut;

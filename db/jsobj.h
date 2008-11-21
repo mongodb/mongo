@@ -312,17 +312,22 @@ public:
         }
     }
 
-	/* this is broken if elements aren't in the same order. */
 	bool operator<(const BSONObj& r) const { return woCompare(r) < 0; }
 
 	/* -1: l<r. 0:l==r. 1:l>r 
 	   wo='well ordered'.  fields must be in same order in each object.
 	*/
 	int woCompare(const BSONObj& r) const;
+
+    /* note this is "shallow equality" -- ints and doubles won't match.  for a 
+       deep equality test use woCompare (which is slower).
+    */
 	bool woEqual(const BSONObj& r) const { 
 		int os = objsize();
-		return os == r.objsize() &&
-			(os == 0 || memcmp(objdata(),r.objdata(),os)==0);
+        if( os == r.objsize() ) {
+            return (os == 0 || memcmp(objdata(),r.objdata(),os)==0);
+        }
+        return false;
 	}
 	bool operator==(const BSONObj& r) const { 
 		return this->woEqual(r);
@@ -419,6 +424,11 @@ public:
 		b.append(fieldName);
 		b.append((char) (val?1:0));
 	}
+    void appendInt(const char *fieldName, int n) { 
+		b.append((char) NumberInt);
+		b.append(fieldName);
+		b.append(n);
+    }
 	void append(const char *fieldName, double n) { 
 		b.append((char) NumberDouble);
 		b.append(fieldName);
