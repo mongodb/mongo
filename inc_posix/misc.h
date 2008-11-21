@@ -15,7 +15,7 @@ extern "C" {
  * Database file offsets are multiples of 512B and stored internally in 32-bit
  * variables.
  */
-#define	WT_BLOCK_SIZE			512
+#define	WT_BLOCK_SIZE			(512)
 #define	WT_BLOCKS_TO_BYTES(blocks)	(blocks) * WT_BLOCK_SIZE
 
 /*
