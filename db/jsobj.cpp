@@ -315,9 +315,15 @@ int BSONObj::woCompare(const BSONObj& r) const {
 			continue;
 		}
 
-		int x = (int) l.type() - (int) r.type();
-		if( x != 0 )
-			return x;
+        int lt = (int) l.type();
+        int rt = (int) r.type();
+		int x = lt - rt;
+        if( x != 0 ) {
+            if( (lt==NumberInt&&rt==NumberDouble) || (lt==NumberDouble&&rt==NumberInt) )
+                ;
+            else
+                return x;
+        }
 		x = strcmp(l.fieldName(), r.fieldName());
 		if( x != 0 )
 			return x;
@@ -540,13 +546,17 @@ BSONObj emptyObj((char *) &emptyObject);
 
 struct BsonUnitTest : public UnitTest { 
 	void run() { 
-        BSONObjBuilder A,B;
+        BSONObjBuilder A,B,C;
         A.appendInt("x", 2);
         B.append("x", 2.0);
+        C.append("x", 2.1);
         BSONObj a = A.done();
         BSONObj b = B.done();
+        BSONObj c = C.done();
         assert( !(a==b) ); // comments on operator==
-        int c = a.woCompare(b);
-        assert( c == 0 );
+        int cmp = a.woCompare(b);
+        assert( cmp == 0 );
+        cmp = a.woCompare(c);
+        assert( cmp < 0 );
     }
 } bsonut;
