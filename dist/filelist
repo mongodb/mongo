@@ -3,4 +3,7 @@
 #
 # $Id$
 
-os_posix/rw.c
+db/db_method.c
+env/env_method.c
+os_posix/os_alloc.c
+os_posix/os_rw.c
