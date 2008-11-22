@@ -14,7 +14,7 @@
  *	Read a file handle.
  */
 int
-__wt_read(ENV_INTERNAL *env, WT_FH *fh, u_int32_t block_number,
+__wt_read(IENV *ienv, WT_FH *fh, u_int32_t block_number,
     u_int32_t blocks, void *buf, ssize_t *bytes_read_ret)
 {
 	ssize_t bytes_to_read, bytes_read;
@@ -31,7 +31,7 @@ __wt_read(ENV_INTERNAL *env, WT_FH *fh, u_int32_t block_number,
 		return (0);
 	}
 	*bytes_read_ret = 0;
-	return (-1);
+	return (WT_ERROR);
 }
 
 /*
@@ -39,7 +39,7 @@ __wt_read(ENV_INTERNAL *env, WT_FH *fh, u_int32_t block_number,
  *	Write a file handle.
  */
 int
-__wt_write(ENV_INTERNAL *env, WT_FH *fh, u_int32_t block_number,
+__wt_write(IENV *ienv, WT_FH *fh, u_int32_t block_number,
     u_int32_t blocks, void *buf, ssize_t *bytes_written_ret)
 {
 	ssize_t bytes_to_write, bytes_written;
@@ -55,5 +55,5 @@ __wt_write(ENV_INTERNAL *env, WT_FH *fh, u_int32_t block_number,
 		return (0);
 	}
 	*bytes_written_ret = 0;
-	return (-1);
+	return (WT_ERROR);
 }
