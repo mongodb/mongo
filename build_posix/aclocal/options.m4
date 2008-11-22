@@ -6,12 +6,14 @@
 # Optional configuration.
 AC_DEFUN([AM_OPTIONS], [
 
+AH_TEMPLATE(HAVE_DEBUG, [Define to 1 if configuring debugging build.])
 AC_MSG_CHECKING(if --enable-debug option specified)
 AC_ARG_ENABLE(debug,
 	[AC_HELP_STRING([--enable-debug],
 	    [Configure a debug version.])], r=set, r=notset)
 case "$r" in
-set)	db_cv_enable_debug=yes;;
+set)	AC_DEFINE(HAVE_DEBUG)
+	db_cv_enable_debug=yes;;
 notset)	db_cv_enable_debug=no;;
 esac
 AC_MSG_RESULT($db_cv_enable_debug)
