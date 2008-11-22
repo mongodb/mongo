@@ -1,0 +1,12 @@
+# $Id$
+#
+# This file lists all of the #define interface flags used by the WiredTiger
+# library.   It's processed by the s_api_defines script to create a list of
+# masks, ensuring the names and values never collide.
+#
+# The format of the api_defines file:
+#	Method/Function/API
+#	<tab>	Flag
+
+Db
+	WT_ENV_IS_PRIVATE		# ENV is DB handle private.
