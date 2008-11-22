@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 /*******************************************
- * Version information.
+ * Version information
  *******************************************/
 #define	WIREDTIGER_VERSION_MAJOR	@WIREDTIGER_VERSION_MAJOR@
 #define	WIREDTIGER_VERSION_MINOR	@WIREDTIGER_VERSION_MINOR@
@@ -22,12 +22,12 @@ extern "C" {
 #define	WIREDTIGER_VERSION_STRING	@WIREDTIGER_VERSION_STRING@
 
 /*******************************************
- * Required includes.
+ * Required includes
  *******************************************/
 @wiredtiger_includes_decl@
 
 /*******************************************
- * Portable type names.
+ * Portable type names
  *******************************************/
 @int8_decl@
 @u_int8_decl@
@@ -43,38 +43,70 @@ extern "C" {
 /*******************************************
  * Forward declarations
  *******************************************/
-struct __db_internal;	typedef struct __db_internal DB_INTERNAL;
-struct __dbc_internal;	typedef struct __dbc_internal DBC_INTERNAL;
-struct __env_internal;	typedef struct __env_internal ENV_INTERNAL;
+struct __db;	typedef struct __db DB;
+struct __dbc;	typedef struct __dbc DBC;
+struct __dbt;	typedef struct __dbt DBT;
+struct __env;	typedef struct __env ENV;
+struct __idb;	typedef struct __idb IDB;
+struct __idbc;	typedef struct __idbc IDBC;
+struct __ienv;	typedef struct __ienv IENV;
 
 /*******************************************
- * Key/data structure -- a Data-Base Thang.
+ * Errors
  *******************************************/
-typedef struct {
+/*
+ * User-visible error return codes.
+ *  0 == success
+ * >0 == hard error
+ * <0 == unexpected outcome
+ *
+ * !!!
+ * We don't want our error returns to conflict with any other package, so
+ * try and use an uncommon range, specifically, -31,800 to -31,999.
+ */
+#define	WT_ERROR	(-31800)
+
+/*******************************************
+ * Key/data structure -- a Data-Base Thang
+ *******************************************/
+struct __dbt {
 	void	*data;			/* data */
 	size_t	 size;			/* data length */
-} DBT;
+};
 
 /*******************************************
- * Database handle.
+ * Database handle
  *******************************************/
-typedef struct {
-	DB_INTERNAL *dbint;		/* Internal handle. */
-} DB;
+struct __db {
+	IDB *idb;			/* Private object */
+
+	ENV *env;			/* Enclosing environment */
+	IENV *ienv;			/* Private environment object */
+
+	int (*destroy)(DB *, u_int32_t);
+
+	u_int32_t flags;
+};
 
 /*******************************************
- * Cursor handle.
+ * Cursor handle
  *******************************************/
-typedef struct {
-	DBC_INTERNAL *dbcint;		/* Internal handle. */
-} DBC;
+struct __dbc {
+	IDBC *idbc;			/* Private object */
+
+	u_int32_t flags;
+};
 
 /*******************************************
- * Database environment handle.
+ * Database environment handle
  *******************************************/
-typedef struct {
-	ENV_INTERNAL *envint;		/* Internal handle. */
-} DB_ENV;
+struct __env {
+	IENV *ienv;			/* Private object */
+
+	int (*destroy)(ENV *, u_int32_t);
+
+	u_int32_t flags;
+};
 
 #if defined(__cplusplus)
 }
