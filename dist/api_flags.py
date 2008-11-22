@@ -66,5 +66,5 @@ for f in sorted(flag_cnt.iteritems(),\
 # Print out the flag masks in hex.
 #	Assumes tab stops set to 8 characters.
 for f in sorted(flag_cnt.iteritems()):
-	print "%s%s%#010x" %\
-	    (f[0], "\t" * max(1, 6 - len(f[0]) / 8), flag_bit[f[0]])
+	print "#define\t%s%s%#010x" %\
+	    (f[0], "\t" * max(1, 5 - len(f[0]) / 8), flag_bit[f[0]])
