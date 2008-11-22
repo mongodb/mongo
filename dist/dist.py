@@ -10,8 +10,7 @@ import re, sys
 #	List the source files in filelist.
 def source_files():
 	file_re = re.compile(r'^\w(\w|/)*/((\w|.)*)')
-	input = open('filelist', 'r')
-	for line in input:
+	for line in open('filelist', 'r'):
 		if file_re.match(line):
 			print "%s" % file_re.match(line).group(2)
 
@@ -20,8 +19,7 @@ def source_files():
 def directory_files():
 	dir_re = re.compile(r'^(\w(\w|/)*)/((\w|.)*)')
 	dirs = {}
-	input = open('filelist', 'r')
-	for line in input:
+	for line in open('filelist', 'r'):
 		if dir_re.match(line):
 			dirs[dir_re.match(line).group(1)] = 1
 	for i in dirs.keys():
