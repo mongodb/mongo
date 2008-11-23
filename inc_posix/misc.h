@@ -60,7 +60,7 @@ typedef	u_int64_t	wt_stat_t;
 /* A distinguished byte pattern to overwrite memory we are done using. */
 #define	OVERWRITE_BYTE	0xab
 
-#ifdef HAVE_DEBUG
+#ifdef HAVE_DIAGNOSTIC
 #define WT_ASSERT(ienv, e)						\
 	((e) ? (void)0 : __wt_assert(ienv, #e, __FILE__, __LINE__))
 #else
