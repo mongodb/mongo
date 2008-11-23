@@ -8,5 +8,27 @@
 #	Method/Function/API
 #	<tab>	Flag
 
-Db
-	WT_ENV_IS_PRIVATE		# ENV is DB handle private.
+#############################################
+# Objects
+#############################################
+ENV					# Public ENV handle
+
+IENV					# Private ENV handle
+	ENV_SET_ERRFILE			# Application set error message stream
+
+DB					# Public DB handle
+
+IDB					# Private DB handle
+	ENV_IS_PRIVATE			# ENV is DB handle private.
+
+
+#############################################
+# Methods and functions
+#############################################
+wt_env_create				# No flags.
+
+Env.destroy				# No flags.
+
+wt_db_create				# No flags.
+
+Db.Destroy				# No flags.
