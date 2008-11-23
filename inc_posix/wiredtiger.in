@@ -83,18 +83,25 @@ struct __db {
 	ENV *env;			/* Enclosing environment */
 	IENV *ienv;			/* Private environment object */
 
+	char *file_name;		/* Database file name */
+
 					/* Error callback */
 	void (*errcall)(const DB *, const char *);
 	FILE		*errfile;	/* Error message file stream */
 	const char	*errpfx;	/* Error message prefix */
 
-	int  (*destroy)(DB *, u_int32_t);
+	/* Getters/setters */
 	void (*get_errcall)(DB *, void (**)(const DB *, const char *));
 	void (*get_errfile)(DB *, FILE **);
 	void (*get_errpfx)(DB *, const char **);
 	void (*set_errcall)(DB *, void (*)(const DB *, const char *));
 	void (*set_errfile)(DB *, FILE *);
 	void (*set_errpfx)(DB *, const char *);
+
+	/* Methods */
+	int  (*destroy)(DB *, u_int32_t);
+	void (*err)(DB *, int, const char *, ...);
+	void (*errx)(DB *, const char *, ...);
 
 	u_int32_t flags;
 };
@@ -119,13 +126,18 @@ struct __env {
 	FILE		*errfile;	/* Error message file stream */
 	const char	*errpfx;	/* Error message prefix */
 
-	int  (*destroy)(ENV *, u_int32_t);
+	/* Getters/setters */
 	void (*get_errcall)(ENV *, void (**)(const ENV *, const char *));
 	void (*get_errfile)(ENV *, FILE **);
 	void (*get_errpfx)(ENV *, const char **);
 	void (*set_errcall)(ENV *, void (*)(const ENV *, const char *));
 	void (*set_errfile)(ENV *, FILE *);
 	void (*set_errpfx)(ENV *, const char *);
+
+	/* Methods */
+	int  (*destroy)(ENV *, u_int32_t);
+	void (*err)(ENV *, int, const char *, ...);
+	void (*errx)(ENV *, const char *, ...);
 
 	u_int32_t flags;
 };

@@ -40,8 +40,7 @@ wt_env_create(ENV **envp, u_int32_t flags)
 	env->ienv = ienv;
 	ienv->env = env;
 
-	/* Initialize handle methods. */
-	env->destroy = __wt_env_destroy;
+	/* Initialize getter/setters. */
 	env->get_errcall = __wt_env_get_errcall;
 	env->get_errfile = __wt_env_get_errfile;
 	env->get_errpfx = __wt_env_get_errpfx;
@@ -49,13 +48,18 @@ wt_env_create(ENV **envp, u_int32_t flags)
 	env->set_errfile = __wt_env_set_errfile;
 	env->set_errpfx = __wt_env_set_errpfx;
 
+	/* Initialize handle methods. */
+	env->destroy = __wt_env_destroy;
+	env->err = __wt_env_err;
+	env->errx = __wt_env_errx;
+
 	*envp = env;
 	return (0);
 }
 
 /*
  * __wt_env_destroy --
- *	ENV->destroy method (ENV destructor).
+ *	Env.destroy method (ENV destructor).
  */
 int
 __wt_env_destroy(ENV *env, u_int32_t flags)
@@ -81,7 +85,7 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 
 /*
  * __wt_env_get_errcall --
- *	ENV->get_errcall.
+ *	Env.get_errcall.
  */
 void
 __wt_env_get_errcall(ENV *env, void (**cbp)(const ENV *, const char *))
@@ -91,7 +95,7 @@ __wt_env_get_errcall(ENV *env, void (**cbp)(const ENV *, const char *))
 
 /*
  * __wt_env_set_errcall --
- *	ENV->set_errcall.
+ *	Env.set_errcall.
  */
 void
 __wt_env_set_errcall(ENV *env, void (*cb)(const ENV *, const char *))
@@ -101,7 +105,7 @@ __wt_env_set_errcall(ENV *env, void (*cb)(const ENV *, const char *))
 
 /*
  * __wt_env_get_errfile --
- *	ENV->get_errfile.
+ *	Env.get_errfile.
  */
 void
 __wt_env_get_errfile(ENV *env, FILE **fpp)
@@ -111,7 +115,7 @@ __wt_env_get_errfile(ENV *env, FILE **fpp)
 
 /*
  * __wt_env_set_errfile --
- *	ENV->set_errfile.
+ *	Env.set_errfile.
  */
 void
 __wt_env_set_errfile(ENV *env, FILE *fp)
@@ -121,7 +125,7 @@ __wt_env_set_errfile(ENV *env, FILE *fp)
 
 /*
  * __wt_env_get_errpfx --
- *	ENV->get_errpfx.
+ *	Env.get_errpfx.
  */
 void
 __wt_env_get_errpfx(ENV *env, const char **pfxp)
@@ -131,7 +135,7 @@ __wt_env_get_errpfx(ENV *env, const char **pfxp)
 
 /*
  * __wt_env_set_errpfx --
- *	ENV->set_errpfx.
+ *	Env.set_errpfx.
  */
 void
 __wt_env_set_errpfx(ENV *env, const char *pfx)

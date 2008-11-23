@@ -47,8 +47,7 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	db->env = env;
 	db->ienv = ienv;
 
-	/* Initialize handle methods. */
-	db->destroy = __wt_db_destroy;
+	/* Initialize getter/setters. */
 	db->get_errcall = __wt_db_get_errcall;
 	db->get_errfile = __wt_db_get_errfile;
 	db->get_errpfx = __wt_db_get_errpfx;
@@ -56,13 +55,18 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	db->set_errfile = __wt_db_set_errfile;
 	db->set_errpfx = __wt_db_set_errpfx;
 
+	/* Initialize handle methods. */
+	db->destroy = __wt_db_destroy;
+	db->err = __wt_db_err;
+	db->errx = __wt_db_errx;
+
 	*dbp = db;
 	return (0);
 }
 
 /*
  * __wt_db_destroy --
- *	DB->destroy method (DB destructor).
+ *	Db.destroy method (DB destructor).
  */
 int
 __wt_db_destroy(DB *db, u_int32_t flags)
@@ -90,7 +94,7 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 
 /*
  * __wt_db_get_errcall --
- *	DB->get_errcall.
+ *	Db.get_errcall.
  */
 void
 __wt_db_get_errcall(DB *db, void (**cbp)(const DB *, const char *))
@@ -100,7 +104,7 @@ __wt_db_get_errcall(DB *db, void (**cbp)(const DB *, const char *))
 
 /*
  * __wt_db_set_errcall --
- *	DB->set_errcall.
+ *	Db.set_errcall.
  */
 void
 __wt_db_set_errcall(DB *db, void (*cb)(const DB *, const char *))
@@ -110,7 +114,7 @@ __wt_db_set_errcall(DB *db, void (*cb)(const DB *, const char *))
 
 /*
  * __wt_db_get_errfile --
- *	DB->get_errfile.
+ *	Db.get_errfile.
  */
 void
 __wt_db_get_errfile(DB *db, FILE **fpp)
@@ -120,7 +124,7 @@ __wt_db_get_errfile(DB *db, FILE **fpp)
 
 /*
  * __wt_db_set_errfile --
- *	DB->set_errfile.
+ *	Db.set_errfile.
  */
 void
 __wt_db_set_errfile(DB *db, FILE *fp)
@@ -130,7 +134,7 @@ __wt_db_set_errfile(DB *db, FILE *fp)
 
 /*
  * __wt_db_get_errpfx --
- *	DB->get_errpfx.
+ *	Db.get_errpfx.
  */
 void
 __wt_db_get_errpfx(DB *db, const char **pfxp)
@@ -140,7 +144,7 @@ __wt_db_get_errpfx(DB *db, const char **pfxp)
 
 /*
  * __wt_db_set_errpfx --
- *	DB->set_errpfx.
+ *	Db.set_errpfx.
  */
 void
 __wt_db_set_errpfx(DB *db, const char *pfx)
