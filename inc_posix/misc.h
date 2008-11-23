@@ -19,6 +19,17 @@ extern "C" {
 #define	WT_BLOCKS_TO_BYTES(blocks)	(blocks) * WT_BLOCK_SIZE
 
 /*
+ * Standard flag checking at every API function.
+ */
+#define	API_FLAG_CHK(ienv, name, f, mask)				\
+	if ((f) & ~(mask))						\
+		return (__wt_api_flags(ienv, name));
+
+#define	API_FLAG_CHK_NOTFATAL(ienv, name, f, mask)			\
+	if ((f) & ~(mask))						\
+		(void)__wt_api_flags(ienv, name);
+
+/*
  * Flag set, clear and test.  They come in 2 flavors: F_XXX (manipulates
  * a field named "flags" in the structure referenced by its argument),
  * and LF_XXX (manipulates a local variable named "flags").
@@ -48,6 +59,13 @@ typedef	u_int64_t	wt_stat_t;
 
 /* A distinguished byte pattern to overwrite memory we are done using. */
 #define	OVERWRITE_BYTE	0xab
+
+#ifdef HAVE_DEBUG
+#define WT_ASSERT(ienv, e)						\
+	((e) ? (void)0 : __wt_assert(ienv, #e, __FILE__, __LINE__))
+#else
+#define WT_ASSERT(ienv, e)
+#endif
 
 #if defined(__cplusplus)
 }
