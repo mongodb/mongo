@@ -19,12 +19,14 @@ extern "C" {
 /*******************************************
  * WiredTiger system include files.
  *******************************************/
+#include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 /*******************************************
  * Everything without the heft to have its own file.
  *******************************************/
-#include <laundry.h>
+#include <misc.h>
 
 /*******************************************
  * Internal forward declarations.
@@ -37,7 +39,6 @@ struct __wt_fh_t;	typedef struct __wt_fh_t WT_FH;
 struct __idb {
 	DB *db;					/* Public object */
 
-#define	DB_ENV_IS_PRIVATE 0x01
 	u_int32_t flags;
 };
 
