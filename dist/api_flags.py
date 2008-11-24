@@ -69,7 +69,8 @@ for f in sorted(flag_cnt.iteritems(),\
 #	Assumes tab stops set to 8 characters.
 for f in sorted(flag_cnt.iteritems()):
 	print "#define\tWT_%s%s%#010x" %\
-	    (f[0], "\t" * max(1, 5 - len(f[0]) / 8), flag_bit[f[0]])
+	    (f[0],\
+	    "\t" * max(1, 6 - (len(f[0]) + len('WT_')) / 8), flag_bit[f[0]])
 
 # Print out the API masks in hex.
 #	Assumes tab stops set to 8 characters.
@@ -77,4 +78,4 @@ print ""
 for f in sorted(method_mask.iteritems()):
 	print "#define\tWT_APIMASK_%s%s%#010x" %\
 	    (f[0].upper().replace('.', '_'),\
-	    "\t" * max(1, 5 - len(f[0]) / 8), f[1])
+	    "\t" * max(1, 6 - (len(f[0]) + len('WT_APIMASK_')) / 8), f[1])
