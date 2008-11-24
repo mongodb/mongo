@@ -33,7 +33,7 @@
 
 const int edebug=0;
 
-bool dbEval(BSONObj& cmd, BSONObjBuilder& result, string& errmsg) { 
+bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg) { 
 	BSONElement e = cmd.firstElement();
 	assert( e.type() == Code || e.type() == CodeWScope );
 	const char *code = e.type() == Code ? e.valuestr() : e.codeWScopeCode();
@@ -63,7 +63,17 @@ bool dbEval(BSONObj& cmd, BSONObjBuilder& result, string& errmsg) {
 		s.setObject("args", eo);
 	}
 
-	int res = s.invoke(f);
+	int res;
+    {
+        Timer t;
+        res = s.invoke(f);
+        int m = t.millis();
+        if( m > 100 ) { 
+            problem() << "dbeval time: " << m << "ms " << ns << endl;
+            OCCASIONALLY log() << code << endl;
+            else if( m >= 1000 ) log() << code << endl;
+        }
+    }
 	if( res ) {
 		result.append("errno", (double) res);
 		errmsg = "invoke failed";
@@ -88,6 +98,6 @@ class CmdEval : public Command {
 public:
     CmdEval() : Command("$eval") { }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
-        return dbEval(cmdObj, result, errmsg);
+        return dbEval(ns, cmdObj, result, errmsg);
     }
 } cmdeval;
