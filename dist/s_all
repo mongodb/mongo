@@ -7,16 +7,16 @@
 t=/tmp/__wt.$$
 trap 'rm -f $t dist.pyc; exit 0' 0 1 2 3 13 15
 
-sh ./s_prototypes			# Build prototypes include file
-sh ./s_readme				# Build README file
-sh ./s_tags				# Build tags files
-
-(					# Build API flags include file.
-echo
-echo
-echo '/* DO NOT EDIT: automatically built by api_defines.py. */'
-python api_defines.py
-) > $t
+python api_defines.py > $t		# Build API flags include file
 f=../inc_posix/flags.in
 cmp $t $f > /dev/null 2>&1 ||
     (echo "Building $f" && rm -f $f && cp $t $f && chmod 444 $f)
+
+python getset.py > $t			# Build getter/setter source file
+f=../support/getset.c
+cmp $t $f > /dev/null 2>&1 ||
+    (echo "Building $f" && rm -f $f && cp $t $f && chmod 444 $f)
+
+sh ./s_prototypes			# Build prototypes include file
+sh ./s_readme				# Build README file
+sh ./s_tags				# Build tags files

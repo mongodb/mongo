@@ -14,6 +14,8 @@
 
 import re, sys
 
+print '\n\n/* DO NOT EDIT: automatically built by api_defines.py. */'
+
 # method_re matches a method name, that is, a line starting with alphanumeric
 # characters, possibly including a '.'.
 method_re = re.compile(r'^([\w.]+)')
