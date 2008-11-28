@@ -12,15 +12,19 @@
 #
 #	handle<tab>
 #	field<tab> 
+#	conditions<tab>
+#		open   -- can't be called after the handle's open method
+#		verify -- call a subroutine to OK the argument
 #	type
 #
 # In the type field @H is replaced by the handle, and @S is replaced by
 # the "store" type.
 
-db	errcall		void (*@S)(const @H *, const char *)
-db	errfile		FILE *@S
-db	errpfx		const char *@S
-db	pagesize	u_int32_t @S
-env	errcall		void (*@S)(const @H *, const char *)
-env	errfile		FILE *@S
-env	errpfx		const char *@S
+db	-	errcall, void (*@S)(const @H *, const char *)
+db	-	errfile, FILE *@S
+db	-	errpfx, const char *@S
+db	verify	maxitemsize, u_int32_t @S
+db	verify	pagesize, u_int32_t @S	fragsize, u_int32_t @S, extentsize, u_int32_t @S
+env	-	errcall, void (*@S)(const @H *, const char *)
+env	-	errfile, FILE *@S
+env	-	errpfx, const char *@S
