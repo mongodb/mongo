@@ -330,6 +330,8 @@ public:
 	}
 };
 
+void webServerThread();
+
 /* versions
    114 bad memory bug fixed
    115 replay, opLogging
@@ -342,6 +344,7 @@ void listen(int port) {
 	log() << "waiting for connections on port " << port << "..." << endl;
 	OurListener l(port);
 	startReplication();
+    boost::thread thr(webServerThread);
 	l.listen();
 }
 
