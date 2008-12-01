@@ -52,6 +52,8 @@ string BSONElement::toString() {
 		s << fieldName() << ": null"; break;
 	case MaxKey:
 		s << fieldName() << ": MaxKey"; break;
+    case CodeWScope:
+        s << fieldName() << ": codewscope"; break;
 	case Code:
 		s << fieldName() << ": ";
 		if( valuestrsize() > 80 ) 
@@ -60,7 +62,7 @@ string BSONElement::toString() {
 			s << valuestr();
 		}
 		break;
-        case Symbol:
+    case Symbol:
 	case String:
 		s << fieldName() << ": ";
 		if( valuestrsize() > 80 ) 
