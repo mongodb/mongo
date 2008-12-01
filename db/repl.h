@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "../client/dbclient.h"
+
 class DBClientConnection;
 class DBClientCursor;
 extern bool slave;

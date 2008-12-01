@@ -214,6 +214,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\dbwebserver.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\introspect.cpp"
 				>
 			</File>
@@ -289,6 +293,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\miniwebserver.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\util\mmap.cpp"
 					>
 				</File>
@@ -312,10 +320,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\util\builder.h"
-				>
-			</File>
-			<File
 				RelativePath=".\clientcursor.h"
 				>
 			</File>
@@ -336,14 +340,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\util\goodies.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\hashtab.h"
-				>
-			</File>
-			<File
 				RelativePath=".\introspect.h"
 				>
 			</File>
@@ -360,14 +356,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\util\log.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\lruishmap.h"
-				>
-			</File>
-			<File
 				RelativePath=".\matcher.h"
 				>
 			</File>
@@ -377,10 +365,6 @@
 			</File>
 			<File
 				RelativePath=".\minilex.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\mmap.h"
 				>
 			</File>
 			<File
@@ -424,10 +408,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\util\sock.h"
-				>
-			</File>
-			<File
 				RelativePath="..\stdafx.h"
 				>
 			</File>
@@ -435,10 +415,46 @@
 				RelativePath=".\storage.h"
 				>
 			</File>
-			<File
-				RelativePath="..\util\unittest.h"
+			<Filter
+				Name="util"
 				>
-			</File>
+				<File
+					RelativePath="..\util\builder.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\goodies.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\hashtab.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\log.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\lruishmap.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\miniwebserver.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\mmap.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\sock.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\unittest.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Resource Files"

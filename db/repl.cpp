@@ -48,6 +48,9 @@ void ensureHaveIdIndex(const char *ns);
 
 ReplPair *replPair = 0;
 
+/* output by the web console */
+string replInfo = "no repl yet";
+
 /* peer unreachable, try our arbiter */
 void ReplPair::arbitrate() {
     if( arbHost == "-" ) { 
