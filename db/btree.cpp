@@ -528,13 +528,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 		cout << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
 	for( int i = mid+1; i < n; i++ ) {
 		KeyNode kn = keyNode(i);
-		if( i == keypos ) {
-			// slip in the new one
-			r->pushBack(recordLoc, key, kn.prevChildBucket);
-			r->pushBack(kn.recordLoc, kn.key, rchild);
-		}
-		else
-			r->pushBack(kn.recordLoc, kn.key, kn.prevChildBucket);
+		r->pushBack(kn.recordLoc, kn.key, kn.prevChildBucket);
 	}
 	r->nextChild = nextChild;
 	r->assertValid();
@@ -583,8 +577,6 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 
 	}
 
-	// mark on left that we no longer have anything from midpoint on.
-    bool highest = keypos == n;
 	truncateTo(mid);  // note this may trash middle.key!  thus we had to promote it before finishing up here.
 
 	// add our new key, there is room now
@@ -598,8 +590,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 				cout << "  keypos<mid, insertHere() the new key" << endl;
 			insertHere(thisLoc, keypos, recordLoc, key, lchild, rchild, idx);
 //dump();
-		} else if( highest ) {
-			// else handled above already.
+		} else {
 			int kp = keypos-mid-1; assert(kp>=0);
 			rLoc.btree()->insertHere(rLoc, kp, recordLoc, key, lchild, rchild, idx);
 // set a bp here.
@@ -692,12 +683,11 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, BSONObj& key, int& pos, bool
 			return l;
 	}
 
-	if( direction == -1 && p == n && n ) { 
-		p--;
-	}
-
 	pos = p;
-	return pos == n ? DiskLoc() /*theend*/ : thisLoc;
+	if ( direction < 0 )
+	  return --pos == -1 ? DiskLoc() /*theend*/ : thisLoc;
+	else
+	  return pos == n ? DiskLoc() /*theend*/ : thisLoc;
 }
 
 /* thisloc is the location of this bucket object.  you must pass that in. */
