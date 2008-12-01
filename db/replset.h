@@ -47,6 +47,16 @@ public:
 	string remote; // host:port if port specified.
     int date; // -1 not yet set; 0=slave; 1=master
 
+    string getInfo() {
+        stringstream ss;
+        ss << "  state:  " << state << '\n';
+        ss << "  info:   " << info << '\n';
+        ss << "  arbhost:" << arbHost << '\n';
+        ss << "  remote: " << remoteHost << ':' << remotePort << '\n';
+        ss << "  date:   " << date << '\n';
+        return ss.str();
+    }
+
 	ReplPair(const char *remoteEnd, const char *arbiter);
 
     bool dominant(const string& myname) { 

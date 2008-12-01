@@ -221,3 +221,4 @@ inline unsigned long fixEndian(unsigned long x) { return x; }
 #else
 inline unsigned long fixEndian(unsigned long x) { return swapEndian(x); }
 #endif
+

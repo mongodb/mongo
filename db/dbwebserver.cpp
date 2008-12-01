@@ -19,12 +19,37 @@
 #include "stdafx.h"
 #include "../util/miniwebserver.h"
 #include "db.h"
+#include "repl.h"
+#include "replset.h"
 
 extern int port;
+extern string replInfo;
 
 class DbWebServer : public MiniWebServer { 
 public:
-    void doLockedStuff(stringstream& ss) { }
+    void doLockedStuff(stringstream& ss) { 
+        dblock lk;
+        ss << "# clients: " << clients.size() << '\n';
+        if( client ) { 
+            ss << "curclient: " << client->name;
+            if( client->dead )
+                ss << " DEAD";
+            ss << '\n';
+        }
+        ss << "\nreplication\n";
+        ss << "master: " << master << '\n';
+        ss << "slave:  " << slave << '\n';
+        if( replPair ) { 
+            ss << "replpair:\n";
+            ss << replPair->getInfo();
+        }
+        ss << replInfo << '\n';
+    }
+
+    void doUnlockedStuff(stringstream& ss) { 
+        ss << "port:      " << port << '\n';
+        ss << "dblocked:  " << dbLocked << " (initial)\n";
+    }
 
     virtual void doRequest(
         const char *rq, // the full request
@@ -39,12 +64,12 @@ public:
         stringstream ss;
         ss << "<html><head><title>db</title></head><body>db<p>\n<pre>";
 
-        ss << "port:     " << port << '\n';
-        ss << "dblocked: " << dbLocked << " (initial)\n";
+        doUnlockedStuff(ss);
 
         int n = 2000;
         while( 1 ) {
             if( !dbLocked ) { 
+                ss << '\n';
                 doLockedStuff(ss);
                 break;
             }
