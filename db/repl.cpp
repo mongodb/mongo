@@ -44,6 +44,9 @@ void ensureHaveIdIndex(const char *ns);
 
 #include "replset.h"
 
+#define debugrepl(z) cout << "debugrepl " << z << '\n'
+//define debugrepl 
+
 /* --- ReplPair -------------------------------- */
 
 ReplPair *replPair = 0;
@@ -507,6 +510,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 /* note: not yet in mutex at this point. */
 void ReplSource::sync_pullOpLog() { 
 	string ns = string("local.oplog.$") + sourceName();
+    debugrepl( "sync_pullOpLog " << ns );
 
 	bool tailing = true;
 	DBClientCursor *c = cursor.get();
@@ -516,16 +520,21 @@ void ReplSource::sync_pullOpLog() {
 	}
 
 	if( c == 0 ) {
+		// queryObj = { ts: { $gte: syncedTo } }
 		BSONObjBuilder q;
 		q.appendDate("$gte", syncedTo.asDate());
 		BSONObjBuilder query;
 		query.append("ts", q.done());
-		// query = { ts: { $gte: syncedTo } }
+        BSONObj queryObj = query.done();
 
-		cursor = conn->query( ns.c_str(), query.done(), 0, 0, 0, Option_CursorTailable );
+        debugrepl( ns << ".find(" << queryObj.toString() << ')' );
+		cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable );
 		c = cursor.get();
 		tailing = false;
 	}
+    else { 
+        debugrepl( "tailing=true" );
+    }
 
     if( c == 0 ) { 
         problem() << "pull:   dbclient::query returns null (conn closed?)" << endl;
@@ -547,9 +556,9 @@ void ReplSource::sync_pullOpLog() {
 	}
 
 	if( !c->more() ) { 
-		if( tailing ) 
-			; //log() << "pull:   " <<OpT ns << " no new activity\n";
-		else
+        if( tailing ) {
+            debugrepl( "tailing & no new activity" );
+        } else
 			log() << "pull:   " << ns << " oplog is empty\n";
 		sleepsecs(3);
 		return;
@@ -563,6 +572,7 @@ void ReplSource::sync_pullOpLog() {
         assert(false);
     }
 	OpTime nextOpTime( ts.date() );
+    debugrepl( "first op time received: " << nextOpTime.toString() );
 	bool initial = syncedTo.isNull();
 	if( initial || tailing ) { 
 		if( tailing ) { 
@@ -601,6 +611,7 @@ void ReplSource::sync_pullOpLog() {
 			if( !c->more() ) {
 				log() << "pull:   applied " << n << " operations" << endl;
 				syncedTo = nextOpTime;
+                debugrepl( "end sync_pullOpLog syncedTo: " << syncedTo.toString() );
 				dblock lk;
 				save(); // note how far we are synced up to now
 				break;
