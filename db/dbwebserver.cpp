@@ -32,11 +32,9 @@ public:
         ss << "# clients: " << clients.size() << '\n';
         if( client ) { 
             ss << "curclient: " << client->name;
-            if( client->dead )
-                ss << " DEAD";
             ss << '\n';
         }
-        ss << "\nreplication\n";
+        ss << "\n<b>replication</b>\n";
         ss << "master: " << master << '\n';
         ss << "slave:  " << slave << '\n';
         if( replPair ) { 
@@ -49,6 +47,8 @@ public:
     void doUnlockedStuff(stringstream& ss) { 
         ss << "port:      " << port << '\n';
         ss << "dblocked:  " << dbLocked << " (initial)\n";
+        if( allDead ) 
+            ss << "<b>replication allDead=" << allDead << "</b>\n";
     }
 
     virtual void doRequest(
@@ -62,7 +62,7 @@ public:
     {
         responseCode = 200;
         stringstream ss;
-        ss << "<html><head><title>db</title></head><body>db<p>\n<pre>";
+        ss << "<html><head><title>db</title></head><body><h2>db</h2><p>\n<pre>";
 
         doUnlockedStuff(ss);
 

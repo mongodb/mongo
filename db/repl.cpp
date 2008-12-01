@@ -42,6 +42,11 @@ int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upse
 bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder);
 void ensureHaveIdIndex(const char *ns);
 
+/* "dead" means something really bad happened like replication falling completely out of sync. 
+   when non-null, we are dead and the string is informational
+*/
+const char *allDead = 0;
+
 #include "replset.h"
 
 #define debugrepl(z) cout << "debugrepl " << z << '\n'
@@ -87,11 +92,11 @@ public:
     CmdIsMaster() : Command("ismaster") { }
 
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
-        if( client->dead ) {
+        if( allDead ) { 
             result.append("ismaster", 0.0);
             if( replPair ) 
                 result.append("remote", replPair->remote);
-            result.append("info", "dead");
+            result.append("info", allDead);
         }
         else if( replPair ) {
             int x = replPair->state;
@@ -434,23 +439,33 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 
 	dblock lk;
 	bool justCreated = setClientTempNs(ns);
-    if( client->dead )
-        return;
+    if( allDead ) 
+		throw SyncException();
+
+    // operation type -- see logOp() comments for types
+	const char *opType = op.getStringField("op");
 
 	if( justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
 	    newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
 	{
 		if( paired && !justCreated ) { 
-			/* the other half of our pair has some operations. yet we already had a db on our 
-			   disk even though the db in question is not listed in the source.
-			   */
-            client->dead = true;
-            problem() << "pair: historical image missing for " << clientName << ", marking this database 'dead'" << endl;
-/*
-			log() << "TEMP: pair: assuming we have the historical image for: " << 
-				clientName << ". add extra checks here." << endl;
-			dbs.insert(clientName);
-*/
+            if( strcmp(opType,"db") == 0 && strcmp(ns, "admin.") == 0 ) { 
+                // "admin" is a special namespace we use for priviledged commands -- ok if it exists first on 
+                // either side
+            }
+            else {
+                /* the other half of our pair has some operations. yet we already had a db on our 
+                disk even though the db in question is not listed in the source.
+                */
+                allDead = "pair: historical image missing for a db";
+                problem() << "pair: historical image missing for " << clientName << ", setting allDead=true" << endl;
+                log() << "op:" << op.toString() << endl;
+                /*
+                log() << "TEMP: pair: assuming we have the historical image for: " << 
+                clientName << ". add extra checks here." << endl;
+                dbs.insert(clientName);
+                */
+            }
 		}
 		else { 
 			nClonedThisPass++;
@@ -460,7 +475,6 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 	}
 
 	stringstream ss;
-	const char *opType = op.getStringField("op");
 	BSONObj o = op.getObjectField("o");
 	try { 
 		if( *opType == 'i' ) {
@@ -598,6 +612,7 @@ void ReplSource::sync_pullOpLog() {
         log() << "pull:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
         log() << "pull:   tailing: " << tailing << '\n';
         log() << "pull:   data too stale, halting replication" << endl;
+        allDead = "data too stale halted replication";
 		assert( syncedTo < nextOpTime );
 		throw SyncException();
 	}
@@ -696,6 +711,7 @@ Client *localOplogClient = 0;
     "u" update
     "d" delete
     "c" db cmd
+    "db" declares presence of a database (ns is set to the db name + '.')
    bb:
      if not null, specifies a boolean to pass along to the other side as b: param.
      used for "justOne" or "upsert" flags on 'd', 'u'

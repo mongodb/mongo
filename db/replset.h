@@ -17,6 +17,7 @@
 #pragma once
 
 extern int port;
+extern const char *allDead;
 
 /* ReplPair is a pair of db servers replicating to one another and cooperating.
 
@@ -49,11 +50,16 @@ public:
 
     string getInfo() {
         stringstream ss;
-        ss << "  state:  " << state << '\n';
-        ss << "  info:   " << info << '\n';
-        ss << "  arbhost:" << arbHost << '\n';
-        ss << "  remote: " << remoteHost << ':' << remotePort << '\n';
-        ss << "  date:   " << date << '\n';
+        ss << "  state:   ";
+        if( state == 1 ) ss << "1 State_Master";
+        else if( state == 0 ) ss << "- State_Slave";
+        else
+            ss << "<b>" << state << "</b>";
+        ss << '\n';
+        ss << "  info:    " << info << '\n';
+        ss << "  arbhost: " << arbHost << '\n';
+        ss << "  remote:  " << remoteHost << ':' << remotePort << '\n';
+        ss << "  date:    " << date << '\n';
         return ss.str();
     }
 
@@ -82,13 +88,23 @@ public:
 
 extern ReplPair *replPair;
 
-/* we should not allow most operations when not the master 
-   also we report not master if we are "dead"
+/* note we always return true for the "local" namespace.
+
+   we should not allow most operations when not the master 
+   also we report not master if we are "dead".
+
+   See also CmdIsMaster.
+
 */
 inline bool isMaster() { 
-    if( replPair == 0 ) return true;
-    if( client->dead ) return client->name == "local";
-    return replPair->state == ReplPair::State_Master;
+    if( allDead ) { 
+        return client->name == "local";
+    }
+
+    if( replPair == 0 || replPair->state == ReplPair::State_Master ) 
+        return true;
+
+    return client->name == "local";
 }
 
 inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {

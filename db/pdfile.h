@@ -314,7 +314,6 @@ inline BtreeBucket* DiskLoc::btree() const {
 class Client { 
 public:
 	Client(const char *nm, bool& justCreated) : name(nm) { 
-        dead=false;
 		justCreated = namespaceIndex.init(dbpath, nm);
 		profile = 0;
 		profileName = name + ".system.profile";
@@ -360,7 +359,6 @@ public:
 		return getFile(n);
 	}
 
-    bool dead;
 	vector<PhysicalDataFile*> files;
 	string name; // "alleyinsider"
 	NamespaceIndex namespaceIndex;
