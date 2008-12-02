@@ -3,7 +3,7 @@
 FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 #FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 
-LIB_DEPS = -lpcrecpp -lpcre
+LIB_DEPS = -lpcrecpp -lpcre -lunittest
 LIB_BOOST = -lboost_thread -lboost_filesystem
 
 LIBS= $(LIB_DEPS) $(LIB_BOOST) -lstdc++
@@ -11,9 +11,11 @@ DBGRID_LIBS = $(LIB_BOOST) -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o ../client/dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o dbcommands.o dbeval.o ../util/background.o ../util/miniwebserver.o dbwebserver.o
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o ../client/dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o dbcommands.o dbeval.o ../util/background.o ../util/miniwebserver.o dbwebserver.o instance.o
 
 DBGRID_OBJS=../stdafx.o json.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o ../client/dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../client/connpool.o ../dbgrid/gridconfig.o commands.o ../dbgrid/dbgrid_commands.o ../dbgrid/griddatabase.o ../client/model.o ../util/background.o ../dbgrid/shard.o
+
+DBTEST_OBJS= $(OBJS) ../dbtests/dbtests.o ../dbtests/btreetests.o
 
 GPP = g++
 
@@ -42,7 +44,9 @@ _REQ_GPP_VER = 4.2
 
 db: $(OBJS) db.o  
 	$(GPP) $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(JVM_LIBS)
-#	-./db quicktest
+
+dbtests: $(DBTEST_OBJS)
+	$(GPP) $(FLAGS) -o $@ $(DBTEST_OBJS) $(LIBS) $(JVM_LIBS)
 
 dbgrid: $(DBGRID_OBJS) ../dbgrid/dbgrid.o
 	$(GPP) $(FLAGS) -o $@ $(DBGRID_OBJS) $(DBGRID_LIBS)
