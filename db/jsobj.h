@@ -525,8 +525,6 @@ public:
 };
 */
 
-#include <pcrecpp.h> 
-
 #include "matcher.h"
 
 extern BSONObj maxKey;

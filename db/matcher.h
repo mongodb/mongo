@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <pcrecpp.h> 
+
 class RegexMatcher { 
 public:
 	const char *fieldName;
