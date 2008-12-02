@@ -901,6 +901,7 @@ void replMasterThread() {
 		logOurDbsPresence();
 		sleepsecs(60 * 10);
 	}
+
 }
 
 void startReplication() { 
@@ -919,7 +920,11 @@ void startReplication() {
 			dblock lk;
 			/* create an oplog collection, if it doesn't yet exist. */
 			BSONObjBuilder b;
-			b.append("size", 254.0 * 1000 * 1000);
+
+            double sz = 50.0 * 1000 * 1000;
+            if( sizeof(int *) >= 8 )
+                sz = 990.0 * 1000 * 1000;
+			b.append("size", sz);
 			b.appendBool("capped", 1);
 			setClientTempNs("local.oplog.$main");
 			string err;

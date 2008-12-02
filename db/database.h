@@ -62,6 +62,18 @@ public:
 		return getFile(n);
 	}
 
+    PhysicalDataFile* suitableFile(int sizeNeeded) { 
+        PhysicalDataFile* f = newestFile();
+        for( int i = 0; i < 8; i++ ) {
+            if( f->getHeader()->unusedLength >= sizeNeeded ) 
+                break;
+            f = addAFile();
+            if( f->getHeader()->fileLength > 1500000000 ) // this is as big as they get so might as well stop
+                break;
+        }
+        return f;
+    }
+
 	PhysicalDataFile* newestFile() { 
 		int n = (int) files.size();
 		if( n > 0 ) n--;

@@ -116,7 +116,7 @@ bool userCreateNS(const char *ns, BSONObj& j, string& err) {
 		if( ies > 1024 * 1024 * 1024 + 256 ) return false;
 	}
 
-	database->newestFile()->newExtent(ns, ies);
+	database->suitableFile(ies)->newExtent(ns, ies);
 	NamespaceDetails *d = nsdetails(ns);
 	assert(d);
 

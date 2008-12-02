@@ -53,6 +53,7 @@ public:
 	void open(int fileNo, const char *filename);
 
 	Extent* newExtent(const char *ns, int approxSize, int loops = 0);
+    PDFHeader *getHeader() { return header; }
 private:
 	Extent* getExtent(DiskLoc loc);
 	Extent* _getExtent(DiskLoc loc);
