@@ -145,7 +145,7 @@ JSMatcher::JSMatcher(BSONObj &_jsobj, BSONObj indexKeyPattern) :
 			where = new Where();
 			uassert( "$where query, but jni is disabled", JavaJS );
 			where->scope = JavaJS->scopeCreate();
-			JavaJS->scopeSetString(where->scope, "$client", client->name.c_str());
+			JavaJS->scopeSetString(where->scope, "$database", database->name.c_str());
 			
 			if ( e.type() == CodeWScope ){
 			  where->setFunc( e.codeWScopeCode() );

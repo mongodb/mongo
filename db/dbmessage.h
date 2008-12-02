@@ -18,7 +18,7 @@
 #include "jsobj.h"
 #include "namespace.h"
 
-/* For the client/server protocol, these objects and functions encapsulate 
+/* For the database/server protocol, these objects and functions encapsulate 
    the various messages transmitted over the connection.
 */
 
@@ -91,7 +91,7 @@ private:
 	const char *theEnd;
 };
 
-/* a request to run a query, received from the client */
+/* a request to run a query, received from the database */
 class QueryMessage { 
 public:
     const char *ns;

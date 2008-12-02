@@ -1,4 +1,4 @@
-// dbclient.cpp - connect to a Mongo database as a client, from C++
+// dbclient.cpp - connect to a Mongo database as a database, from C++
 
 /**
 *    Copyright (C) 2008 10gen Inc.

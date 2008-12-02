@@ -51,8 +51,8 @@ struct temprelease {
 struct dbtemprelease {
     string clientname;
     dbtemprelease() {
-        if( client ) 
-            clientname = client->name;
+        if( database ) 
+            clientname = database->name;
         dbLocked--;
         assert( dbLocked == 0 );
         boost::detail::thread::lock_ops<boost::mutex>::unlock(dbMutex);
@@ -62,7 +62,7 @@ struct dbtemprelease {
         dbLocked++;
         assert( dbLocked == 1 );
         if( clientname.empty() )
-            client = 0;
+            database = 0;
         else
             setClient(clientname.c_str());
     }

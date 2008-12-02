@@ -2,7 +2,7 @@
 
    The grid database is where we get:
    - name of each shard
-   - "home" shard for each client
+   - "home" shard for each database
 */
 
 /**

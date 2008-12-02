@@ -50,6 +50,6 @@ void profile(const char *str,
 	b.append("info", str);
 	b.append("millis", (double) millis);
 	BSONObj p = b.done();
-	theDataFileMgr.insert(client->profileName.c_str(), 
+	theDataFileMgr.insert(database->profileName.c_str(), 
 		p.objdata(), p.objsize(), true);
 }

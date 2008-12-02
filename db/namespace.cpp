@@ -37,6 +37,33 @@ int bucketSizes[] = {
 
 //NamespaceIndexMgr namespaceIndexMgr;
 
+	/* returns true if we created (did not exist) during init() */
+bool NamespaceIndex::init(const char *dir, const char *database) { 
+    string path = dir;
+    path += database;
+    path += ".ns";
+
+    bool created = !boost::filesystem::exists(path); 
+
+    /* if someone manually deleted the datafiels for a database, 
+       we need to be sure to clear any cached info for the database in 
+       local.*.  
+    */
+    if( string("local") != database ) {
+        DBInfo i(database);
+        i.dbDropped();
+    }
+
+    const int LEN = 16 * 1024 * 1024;
+    void *p = f.map(path.c_str(), LEN);
+    if( p == 0 ) { 
+        problem() << "couldn't open namespace.idx " << path.c_str() << " terminating" << endl;
+        exit(-3);
+    }
+    ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
+    return created;
+}
+
 void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) { 
 	{ 
 		// defensive code: try to make us notice if we reference a deleted record 
@@ -338,9 +365,9 @@ void addNewNamespaceToCatalog(const char *ns, BSONObj *options = 0) {
 		if( options )
 			b.append("options", *options);
 		BSONObj j = b.done();
-		char client[256];
-		nsToClient(ns, client);
-		string s = client;
+		char database[256];
+		nsToClient(ns, database);
+		string s = database;
 		s += ".system.namespaces";
 		theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
 	}

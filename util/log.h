@@ -58,7 +58,7 @@ public:
 		time(&t);
 		string now(ctime(&t),0,20);
 		cout << now;
-		if( withNs && client ) 
+		if( withNs && database ) 
 			cout << curNs << ' ';
 		return *this;
 	}

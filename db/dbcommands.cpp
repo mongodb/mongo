@@ -282,14 +282,14 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 			}
 		}
 		else if( strcmp(e.fieldName(), "profile") == 0 ) { 
-			anObjBuilder.append("was", (double) client->profile);
+			anObjBuilder.append("was", (double) database->profile);
 			int p = (int) e.number();
 			valid = true;
 			if( p == -1 )
 				ok = true;
 			else if( p >= 0 && p <= 2 ) { 
 				ok = true;
-				client->profile = p;
+				database->profile = p;
 			}
 			else {
 				ok = false;
@@ -348,7 +348,7 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 				anObjBuilder.append("errmsg", "ns not found");
 			}
 			else if( d->nIndexes != 0 ) {
-				// client is supposed to drop the indexes first
+				// database is supposed to drop the indexes first
 				anObjBuilder.append("errmsg", "ns has indexes (not permitted on drop)");
 			}
 			else {
@@ -364,7 +364,7 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 					BSONObj cond = b.done(); // { name: "colltodropname" }
 					deleteObjects("system.namespaces", cond, false, true);
 				}
-				client->namespaceIndex.kill(dropNs.c_str());
+				database->namespaceIndex.kill(dropNs.c_str());
 				*/
 			}
 		}

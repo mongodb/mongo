@@ -162,8 +162,8 @@ typedef struct _OWS {
 	char string[400];
 } *OWS;
 
-class Client;
-extern Client *client;
+class Database;
+extern Database *database;
 extern const char *curNs;
 
 /* for now, running on win32 means development not production -- 

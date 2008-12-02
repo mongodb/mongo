@@ -221,7 +221,7 @@ typedef struct pcre_extra {
 
 /* The structure for passing out data via the pcre_callout_function. We use a
 structure so that new fields can be added on the end in future versions,
-without changing the API of the function, thereby allowing old clients to work
+without changing the API of the function, thereby allowing old databases to work
 without modification. */
 
 typedef struct pcre_callout_block {

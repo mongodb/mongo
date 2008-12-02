@@ -99,7 +99,7 @@ public:
     }
 
     // returns name of this index's storage area
-	// client.table.$index
+	// database.table.$index
 	string indexNamespace() { 
 		BSONObj io = info.obj();
 		string s;
@@ -256,22 +256,7 @@ public:
 	NamespaceIndex() { }
 
 	/* returns true if we created (did not exist) during init() */
-	bool init(const char *dir, const char *client) { 
-		string path = dir;
-		path += client;
-		path += ".ns";
-
-		bool created = !boost::filesystem::exists(path); 
-
-		const int LEN = 16 * 1024 * 1024;
-		void *p = f.map(path.c_str(), LEN);
-		if( p == 0 ) { 
-			problem() << "couldn't open namespace.idx " << path.c_str() << " terminating" << endl;
-			exit(-3);
-		}
-		ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
-		return created;
-	}
+	bool init(const char *dir, const char *database);
 
 	void add(const char *ns, DiskLoc& loc) { 
 		Namespace n(ns);
@@ -311,18 +296,18 @@ private:
 
 extern const char *dbpath;
 
-// "client.a.b.c" -> "client"
+// "database.a.b.c" -> "database"
 const int MaxClientLen = 256;
-inline void nsToClient(const char *ns, char *client) { 
+inline void nsToClient(const char *ns, char *database) { 
 	const char *p = ns;
-	char *q = client;
+	char *q = database;
 	while( *p != '.' ) { 
 		if( *p == 0 ) 
             break;
 		*q++ = *p++;
 	}
 	*q = 0;
-	if(q-client>=MaxClientLen) {
+	if(q-database>=MaxClientLen) {
 		problem() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
 		dbexit(60);
 	}

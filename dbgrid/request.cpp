@@ -61,7 +61,7 @@ void getMore(Message& m, MessagingPort& p) {
 
 bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
 
-/* got query operation from a client */
+/* got query operation from a database */
 void queryOp(Message& m, MessagingPort& p) {
   DbMessage d(m);
   QueryMessage q(d);

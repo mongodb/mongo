@@ -51,7 +51,7 @@ BSONObj fixindex(BSONObj o) {
             uassert("bad ns field for index during dbcopy", e.type() == String);
             const char *p = strchr(e.valuestr(), '.');
             uassert("bad ns field for index during dbcopy [2]", p);
-            string newname = client->name + p;
+            string newname = database->name + p;
             b.append("ns", newname);
         }
         else
@@ -98,7 +98,7 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
 }
 
 bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) { 
-    string todb = client->name;
+    string todb = database->name;
     stringstream a,b;
     a << "localhost:" << port;
     b << "127.0.0.1:" << port;
@@ -180,7 +180,7 @@ public:
         string from = cmdObj.getStringField("clone");
         if( from.empty() ) 
             return false;
-        return cloneFrom(from.c_str(), errmsg, client->name);
+        return cloneFrom(from.c_str(), errmsg, database->name);
     }
 } cmdclone;
 
@@ -208,7 +208,7 @@ public:
         }
         setClient(todb.c_str());
         bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb);
-        client = 0;
+        database = 0;
         return res;
     }
 } cmdcopydb;

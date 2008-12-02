@@ -195,7 +195,7 @@ again:
 
 	if( len < 0 || len > 16000000 ) { 
 		if( len == 0xffffffff ) { 
-			// Endian check from the client, after connecting, to see what mode server is running in.
+			// Endian check from the database, after connecting, to see what mode server is running in.
 			unsigned foo = 0x10203040;
 			int x = ::send(sock, (char *) &foo, 4, 0);
 			if( x <= 0 ) { 

@@ -136,7 +136,7 @@ void receivedUpdate(Message& m, stringstream& ss) {
 	const char *ns = d.getns();
 	assert(*ns);
 	setClient(ns);
-	//if( client->profile )
+	//if( database->profile )
     ss << ns << ' ';
 	int flags = d.pullInt();
 	BSONObj query = d.nextJsObj();
@@ -234,13 +234,13 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	resp->setData(msgdata, true); // transport will free
 	dbresponse.response = resp;
 	dbresponse.responseTo = responseTo;
-	if( client ) { 
-		if( client->profile )
+	if( database ) { 
+		if( database->profile )
 			ss << " bytes:" << resp->data->dataLen();
 	}
 	else { 
 		if( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
-			log() << "ERROR: receiveQuery: client is null; ns=" << q.ns << endl;
+			log() << "ERROR: receiveQuery: database is null; ns=" << q.ns << endl;
 	}
 	//	dbMsgPort.reply(m, resp, responseTo);
 }
@@ -310,7 +310,7 @@ void testTheDb() {
 	}
 	cout << endl;
 
-	client = 0;
+	database = 0;
 }
 
 int port = DBPort;
@@ -375,7 +375,7 @@ public:
 */
 void jniCallback(Message& m, Message& out)
 {
-	Client *clientOld = client;
+	Database *clientOld = database;
 
 	JniMessagingPort jmp(out);
 	callDepth++;
@@ -446,8 +446,8 @@ void jniCallback(Message& m, Message& out)
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;
 			}
-			if( client && client->profile >= 1 ) { 
-				if( client->profile >= 2 || ms >= 100 ) { 
+			if( database && database->profile >= 1 ) { 
+				if( database->profile >= 2 || ms >= 100 ) { 
 					// profile it
 					profile(ss.str().c_str()+20/*skip ts*/, ms);
 				}
@@ -462,13 +462,13 @@ void jniCallback(Message& m, Message& out)
 	curOp = curOpOld;
 	callDepth--;
 
-	if( client != clientOld ) { 
-		client = clientOld;
+	if( database != clientOld ) { 
+		database = clientOld;
 		wassert(false);
 	}
 }
 
-/* we create one thread for each connection from an app server client.  
+/* we create one thread for each connection from an app server database.  
    app server will open a pool of threads.
 */
 void connThread()
@@ -499,7 +499,7 @@ void connThread()
 		{
 			dblock lk;
 			Timer t;
-			client = 0;
+			database = 0;
 			curOp = 0;
 
 			int ms;
@@ -613,8 +613,8 @@ void connThread()
 				cout << ss.str().c_str() << endl;
 			}
 //skip:
-			if( client && client->profile >= 1 ) { 
-				if( client->profile >= 2 || ms >= 100 ) { 
+			if( database && database->profile >= 1 ) { 
+				if( database->profile >= 2 || ms >= 100 ) { 
 					// profile it
 					profile(ss.str().c_str()+20/*skip ts*/, ms);
 				}

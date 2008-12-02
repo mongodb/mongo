@@ -17,9 +17,9 @@
 /* pdfile.h
 
    Files:
-     client.ns - namespace index
-     client.1  - data files
-     client.2 
+     database.ns - namespace index
+     database.1  - data files
+     database.2 
      ...
 */
 
@@ -307,106 +307,11 @@ inline BtreeBucket* DiskLoc::btree() const {
 
 /*---------------------------------------------------------------------*/ 
 
-// A Client is a psuedonym for a database. 
-
 #include "queryoptimizer.h"
+#include "database.h"
 
-class Client { 
-public:
-	Client(const char *nm, bool& justCreated) : name(nm) { 
-		justCreated = namespaceIndex.init(dbpath, nm);
-		profile = 0;
-		profileName = name + ".system.profile";
-	} 
-	~Client() { 
-		int n = files.size();
-		for( int i = 0; i < n; i++ )
-			delete files[i];
-	}
-
-	PhysicalDataFile* getFile(int n) { 
-		assert(this);
-
-		if( n < 0 || n >= DiskLoc::MaxFiles ) {
-			cout << "getFile(): n=" << n << endl;
-			assert( n >= 0 && n < DiskLoc::MaxFiles );
-		}
-		DEV { 
-			if( n > 100 )
-				cout << "getFile(): n=" << n << "?" << endl;
-		}
-		while( n >= (int) files.size() )
-			files.push_back(0);
-		PhysicalDataFile* p = files[n];
-		if( p == 0 ) {
-			p = new PhysicalDataFile(n);
-			files[n] = p;
-			stringstream out;
-			out << dbpath << name << '.' << n;
-			p->open(n, out.str().c_str());
-		}
-		return p;
-	}
-
-	PhysicalDataFile* addAFile() {
-		int n = (int) files.size();
-		return getFile(n);
-	}
-
-	PhysicalDataFile* newestFile() { 
-		int n = (int) files.size();
-		if( n > 0 ) n--;
-		return getFile(n);
-	}
-
-	vector<PhysicalDataFile*> files;
-	string name; // "alleyinsider"
-	NamespaceIndex namespaceIndex;
-	int profile; // 0=off.
-	string profileName; // "alleyinsider.system.profile"
-    QueryOptimizer optimizer;
-};
-
-// tempish...move to TLS or pass all the way down as a parm
-extern map<string,Client*> clients;
-extern Client *client;
-extern const char *curNs;
-extern int dbLocked;
-/* returns true if the database ("client") did not exist, and it was created on this call */
-inline bool setClient(const char *ns) { 
-    /* we must be in critical section at this point as these are global 
-       variables. 
-    */
-    assert( dbLocked == 1 );
-
-	char cl[256];
-	curNs = ns;
-	nsToClient(ns, cl);
-	map<string,Client*>::iterator it = clients.find(cl);
-	if( it != clients.end() ) {
-		client = it->second;
-		return false;
-	}
-	log() << "first operation for database " << cl << endl;
-	bool justCreated;
-	Client *c = new Client(cl, justCreated);
-	clients[cl] = c;
-	client = c;
-	return justCreated;
-}
-
-/* We normally keep around a curNs ptr -- if this ns is temporary, 
-   use this instead so we don't have a bad ptr.  we could have made a copy,
-   but trying to be fast as we call setClient this for every single operation.
-*/
-inline bool setClientTempNs(const char *ns) { 
-	bool jc = setClient(ns); 
-	curNs = "";
-	return jc;
-}
-
-inline void _deleteDataFiles(const char *client) { 
-	string c = client;
+inline void _deleteDataFiles(const char *database) { 
+	string c = database;
 	c += '.';
 	boost::filesystem::path p(dbpath);
 	boost::filesystem::path q;
@@ -436,14 +341,14 @@ inline NamespaceIndex* nsindex(const char *ns) {
 	DEV { 
 		char buf[256];
 		nsToClient(ns, buf);
-		if( client->name != buf ) { 
-			cout << "ERROR: attempt to write to wrong database client\n";
+		if( database->name != buf ) { 
+			cout << "ERROR: attempt to write to wrong database database\n";
 			cout << " ns:" << ns << '\n';
-			cout << " client->name:" << client->name << endl;
-			assert( client->name == buf );
+			cout << " database->name:" << database->name << endl;
+			assert( database->name == buf );
 		}
 	}
-	return &client->namespaceIndex;
+	return &database->namespaceIndex;
 }
 
 inline NamespaceDetails* nsdetails(const char *ns) { 
@@ -452,15 +357,15 @@ inline NamespaceDetails* nsdetails(const char *ns) {
 
 inline PhysicalDataFile& DiskLoc::pdf() const { 
 	assert( fileNo != -1 );
-	return *client->getFile(fileNo);
+	return *database->getFile(fileNo);
 }
 
 inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
 	assert( dl.a() != -1 );
-	return client->getFile(dl.a())->getExtent(dl);
+	return database->getFile(dl.a())->getExtent(dl);
 }
 
 inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
 	assert( dl.a() != -1 );
-	return client->getFile(dl.a())->recordAt(dl);
+	return database->getFile(dl.a())->recordAt(dl);
 }

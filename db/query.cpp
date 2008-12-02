@@ -210,7 +210,7 @@ fail:
 	return auto_ptr<Cursor>();
 }
 
-/* ns:      namespace, e.g. <client>.<collection>
+/* ns:      namespace, e.g. <database>.<collection>
    pattern: the "where" clause / criteria
    justOne: stop after 1 match
 */
@@ -354,7 +354,7 @@ int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upse
 	//cout << "TEMP BAD";
 	//lrutest.find(updateobj);
 
-	int profile = client->profile;
+	int profile = database->profile;
 
 	//	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" << 
 	//		pattern.objsize();
@@ -783,11 +783,11 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 	b.decouple();
 
     int duration = t.millis();
-	if( (client && client->profile) || duration >= 100 ) {
+	if( (database && database->profile) || duration >= 100 ) {
         ss << " nscanned:" << nscanned << ' ';
 		if( ntoskip ) 
 			ss << " ntoskip:" << ntoskip;
-        if( client && client->profile )
+        if( database && database->profile )
             ss << " <br>query: ";
         ss << jsobj.toString() << ' ';
 	}

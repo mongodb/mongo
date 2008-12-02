@@ -21,7 +21,7 @@ todo:
 _ table scans must be sequential, not next/prev pointers
 _ coalesce deleted
 
-_ disallow system* manipulations from the client.
+_ disallow system* manipulations from the database.
 */
 
 #include "stdafx.h"
@@ -37,8 +37,8 @@ _ disallow system* manipulations from the client.
 const char *dbpath = "/data/db/";
 
 DataFileMgr theDataFileMgr;
-map<string,Client*> clients;
-Client *client;
+map<string,Database*> databases;
+Database *database;
 const char *curNs = "";
 int MAGIC = 0x1000;
 int curOp = -2;
@@ -54,9 +54,9 @@ void sayDbContext(const char *errmsg) {
 	if( errmsg ) { 
 		problem() << errmsg << endl;
 	}
-	log() << " client: " << (client ? client->name.c_str() : "null") 
+	log() << " database: " << (database ? database->name.c_str() : "null") 
 		<< " op:" << curOp << ' ' << callDepth << '\n';
-	if( client )
+	if( database )
 		log() << " ns: " << curNs << endl;
 	printStackTrace();
 }
@@ -116,7 +116,7 @@ bool userCreateNS(const char *ns, BSONObj& j, string& err) {
 		if( ies > 1024 * 1024 * 1024 + 256 ) return false;
 	}
 
-	client->newestFile()->newExtent(ns, ies);
+	database->newestFile()->newExtent(ns, ies);
 	NamespaceDetails *d = nsdetails(ns);
 	assert(d);
 
@@ -185,7 +185,7 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
 			cout << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
 		}
 		log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
-		return client->addAFile()->newExtent(ns, approxSize, loops+1);
+		return database->addAFile()->newExtent(ns, approxSize, loops+1);
 	}
 	int offset = header->unused.getOfs();
 	header->unused.setOfs( fileNo, offset + ExtentSize );
@@ -361,12 +361,12 @@ void dropNS(string& nsToDrop) {
 		BSONObjBuilder b;
 		b.append("name", nsToDrop.c_str());
 		BSONObj cond = b.done(); // { name: "colltodropname" }
-		string system_namespaces = client->name + ".system.namespaces";
+		string system_namespaces = database->name + ".system.namespaces";
 		int n = deleteObjects(system_namespaces.c_str(), cond, false, true);
 		wassert( n == 1 );
 	}
 	// remove from the catalog hashtable
-	client->namespaceIndex.kill(nsToDrop.c_str());
+	database->namespaceIndex.kill(nsToDrop.c_str());
 }
 
 /* delete this index.  does NOT clean up the system catalog
@@ -381,13 +381,13 @@ void IndexDetails::kill() {
 		b.append("name", indexName().c_str());
 		b.append("ns", parentNS().c_str());
 		BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
-		string system_indexes = client->name + ".system.indexes";
+		string system_indexes = database->name + ".system.indexes";
 		int n = deleteObjects(system_indexes.c_str(), cond, false, true);
 		wassert( n == 1 );
 	}
 
 	dropNS(ns);
-	//	client->namespaceIndex.kill(ns.c_str());
+	//	database->namespaceIndex.kill(ns.c_str());
 	head.setInvalid();
 	info.setInvalid();
 }
@@ -565,7 +565,7 @@ void DataFileMgr::update(
 		}
 
 		d->paddingTooSmall();
-		if( client->profile )
+		if( database->profile )
 			ss << " moved ";
 		deleteRecord(ns, toupdate, dl);
 		insert(ns, buf, len);
@@ -615,7 +615,7 @@ void DataFileMgr::update(
 						problem() << " caught assertion update index " << idxns.c_str() << endl;
 					}
 				}
-				if( client->profile )
+				if( database->profile )
 					ss << "<br>" << added.size() << " key updates ";
 
 			}
@@ -687,7 +687,7 @@ void ensureHaveIdIndex(const char *ns) {
 
 	d->flags |= NamespaceDetails::Flag_HaveIdIndex;
 
-	string system_indexes = client->name + ".system.indexes";
+	string system_indexes = database->name + ".system.indexes";
 
 	BSONObjBuilder b;
 	b.append("name", "id_");
@@ -704,7 +704,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 	const char *sys = strstr(ns, "system.");
 	if( sys ) { 
 		if( sys == ns ) {
-			cout << "ERROR: attempt to insert for invalid client 'system': " << ns << endl;
+			cout << "ERROR: attempt to insert for invalid database 'system': " << ns << endl;
 			return DiskLoc();
 		}
 		if( strstr(ns, ".system.") ) { 
@@ -723,7 +723,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		/* todo: shouldn't be in the namespace catalog until after the allocations here work. 
                  also if this is an addIndex, those checks should happen before this!
 		*/
-		client->newestFile()->newExtent(ns, initialExtentSize(len));
+		database->newestFile()->newExtent(ns, initialExtentSize(len));
 		d = nsdetails(ns);
 	}
 	d->paddingFits();
@@ -736,7 +736,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		const char *name = io.getStringField("name"); // name of the index
 		tabletoidxns = io.getStringField("ns");  // table it indexes
 
-        if( client->name != nsToClient(tabletoidxns.c_str()) ) { 
+        if( database->name != nsToClient(tabletoidxns.c_str()) ) { 
             uassert("bad table to index name on add index attempt", false);
             return DiskLoc();
         }
@@ -770,7 +770,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		}
 		//indexFullNS = tabletoidxns; 
 		//indexFullNS += ".$";
-		//indexFullNS += name; // client.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
+		//indexFullNS += name; // database.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
 	}
 
 	DiskLoc extentLoc;
@@ -787,7 +787,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		// out of space
 		if( d->capped == 0 ) { // size capped doesn't grow
 			DEV log() << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
-			client->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
+			database->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
 			loc = d->alloc(ns, lenWHdr, extentLoc);
 		}
 		if( loc.isNull() ) { 
@@ -888,15 +888,21 @@ void dropDatabase(const char *ns) {
 	char cl[256];
 	nsToClient(ns, cl);
 	problem() << "dropDatabase " << cl << endl;
-	assert( client->name == cl );
+	assert( database->name == cl );
+
+    /* reset haveLogged in local.dbinfo */
+    if( string("local") != cl ) {
+        DBInfo i(cl);
+        i.dbDropped();
+    }
 
 	/* important: kill all open cursors on the database */
 	string prefix(cl);
 	prefix += '.';
 	ClientCursor::invalidate(prefix.c_str());
 
-	clients.erase(cl);
-	delete client; // closes files
-	client = 0;
+	databases.erase(cl);
+	delete database; // closes files
+	database = 0;
 	_deleteDataFiles(cl);
 }

@@ -25,7 +25,7 @@
 string dashDashGridDb;
 int port = 27017;
 const char *curNs = "";
-Client *client = 0;
+Database *database = 0;
 
 /* this is a good place to set a breakpoint when debugging, as lots of warning things
    (assert, wassert) call it.

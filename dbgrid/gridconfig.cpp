@@ -33,12 +33,12 @@ map<string, Machine*> Machine::machines;
 //static boost::mutex loc_mutex;
 Grid grid;
 
-ClientConfig* GridConfig::getClientConfig(string client) { 
-    ClientConfig*& cc = clients[client];
+ClientConfig* GridConfig::getClientConfig(string database) { 
+    ClientConfig*& cc = databases[database];
     if( cc == 0 ) { 
         cc = new ClientConfig();
-        if( !cc->loadByName(client.c_str()) ) { 
-            log() << "couldn't find client " << client << " in grid db" << endl;
+        if( !cc->loadByName(database.c_str()) ) { 
+            log() << "couldn't find database " << database << " in grid db" << endl;
             // note here that cc->primary == 0.
         }
     }

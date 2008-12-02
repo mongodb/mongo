@@ -25,13 +25,15 @@
 extern int port;
 extern string replInfo;
 
+time_t started = time(0);
+
 class DbWebServer : public MiniWebServer { 
 public:
     void doLockedStuff(stringstream& ss) { 
         dblock lk;
-        ss << "# clients: " << clients.size() << '\n';
-        if( client ) { 
-            ss << "curclient: " << client->name;
+        ss << "# databases: " << databases.size() << '\n';
+        if( database ) { 
+            ss << "curclient: " << database->name;
             ss << '\n';
         }
         ss << "\n<b>replication</b>\n";
@@ -47,6 +49,7 @@ public:
     void doUnlockedStuff(stringstream& ss) { 
         ss << "port:      " << port << '\n';
         ss << "dblocked:  " << dbLocked << " (initial)\n";
+        ss << "uptime:    " << time(0)-started << " seconds\n";
         if( allDead ) 
             ss << "<b>replication allDead=" << allDead << "</b>\n";
     }
