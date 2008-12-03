@@ -222,6 +222,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\instance.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\introspect.cpp"
 				>
 			</File>
