@@ -60,7 +60,7 @@ int main( int argc, char** argv ) {
   }
   argc -= offset;
 
-  if ( dbpathSpec[ dbpathSpec.length() ] != '/' )
+  if ( dbpathSpec[ dbpathSpec.length() - 1 ] != '/' )
     dbpathSpec += "/";
   dbpath = dbpathSpec.c_str();
 
