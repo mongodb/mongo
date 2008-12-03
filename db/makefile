@@ -3,11 +3,12 @@
 FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 #FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
 
-LIB_DEPS = -lpcrecpp -lpcre -lunittest
+LIB_DEPS = -lpcrecpp -lpcre
 LIB_BOOST = -lboost_thread -lboost_filesystem
 
 LIBS= $(LIB_DEPS) $(LIB_BOOST) -lstdc++
 DBGRID_LIBS = $(LIB_BOOST) -lstdc++
+DBTEST_LIBS= $(LIBS) -lunittest
 
 JVM_LIBS = -L/opt/java/lib/
 
@@ -46,7 +47,7 @@ db: $(OBJS) db.o
 	$(GPP) $(FLAGS) -o $@ $(OBJS) db.o $(LIBS) $(JVM_LIBS)
 
 dbtests: $(DBTEST_OBJS)
-	$(GPP) $(FLAGS) -o $@ $(DBTEST_OBJS) $(LIBS) $(JVM_LIBS)
+	$(GPP) $(FLAGS) -o $@ $(DBTEST_OBJS) $(DBTEST_LIBS) $(JVM_LIBS)
 
 dbgrid: $(DBGRID_OBJS) ../dbgrid/dbgrid.o
 	$(GPP) $(FLAGS) -o $@ $(DBGRID_OBJS) $(DBGRID_LIBS)
