@@ -17,19 +17,10 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stdafx.h"
 #include "db.h"
-#include "../grid/message.h"
-#include "../util/mmap.h"
-#include "../util/hashtab.h"
-#include "../util/goodies.h"
-#include "pdfile.h"
-#include "jsobj.h"
-#include "javajs.h"
 #include "query.h"
 #include "introspect.h"
 #include "repl.h"
-#include "../util/unittest.h"
 #include "dbmessage.h"
 #include "instance.h"
 
