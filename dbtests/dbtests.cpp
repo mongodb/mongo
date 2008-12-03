@@ -17,6 +17,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "stdafx.h"
+
 #include "dbtests.h"
 
 #include <unittest/Registry.hpp>
@@ -24,10 +26,43 @@
 using namespace std;
 
 extern const char* dbpath;
+string dbpathSpec = "/tmp/unittest/";
 
-// Maybe unit tests deserve a separate binary?
+void usage() {
+  string instructions =
+    "dbtests usage:\n"
+    "  -help           show this message\n"
+    "  -dbpath <path>  configure db data path for this test run\n"
+    "                  (default is /tmp/unittest/)\n"
+    "  -debug          run tests with verbose output\n"
+    "  -list           list available test suites\n"
+    "  <suite>         run the specified test suite only";
+  cout << instructions << endl;
+}
+
 int main( int argc, char** argv ) {
-  dbpath = "/tmp/unittest/";
+
+  int offset = 0;
+  for( int i = 1; i < argc; ++i ) {
+    if ( argv[ i ] == string( "-dbpath" ) ) {
+      if ( i == argc - 1 ) {
+	usage();
+	exit( -1 );
+      }
+      dbpathSpec = argv[ ++i ];
+      offset += 2;
+    } else if ( argv[ i ] == string( "-help" ) ) {
+      usage();
+      exit( 0 );
+    } else if ( offset ) {
+      argv[ i - offset ] = argv[ i ];
+    }
+  }
+  argc -= offset;
+
+  if ( dbpathSpec[ dbpathSpec.length() ] != '/' )
+    dbpathSpec += "/";
+  dbpath = dbpathSpec.c_str();
 
   UnitTest::Registry tests;
 
@@ -35,4 +70,3 @@ int main( int argc, char** argv ) {
 
   return tests.run( argc, argv );
 }
-
