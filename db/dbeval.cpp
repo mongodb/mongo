@@ -52,7 +52,7 @@ bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg
 	Scope s;
 	if ( e.type() == CodeWScope )
 	  s.init( e.codeWScopeScopeData() );
-	s.setString("$client", client->name.c_str());
+	s.setString("$client", database->name.c_str());
 	BSONElement args = cmd.findElement("args");
 	if( args.type() == Array ) {
 		BSONObj eo = args.embeddedObject();

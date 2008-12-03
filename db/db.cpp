@@ -85,7 +85,7 @@ void testTheDb() {
 	}
 	cout << endl;
 
-	client = 0;
+	database = 0;
 }
 
 MessagingPort *grab = 0;
@@ -134,7 +134,7 @@ public:
 	Message & container;
 };
 
-/* we create one thread for each connection from an app server client.  
+/* we create one thread for each connection from an app server database.  
    app server will open a pool of threads.
 */
 void connThread()
@@ -165,7 +165,7 @@ void connThread()
 		{
 			dblock lk;
 			Timer t;
-			client = 0;
+			database = 0;
 			curOp = 0;
 
 			int ms;
@@ -279,8 +279,8 @@ void connThread()
 				cout << ss.str().c_str() << endl;
 			}
 //skip:
-			if( client && client->profile >= 1 ) { 
-				if( client->profile >= 2 || ms >= 100 ) { 
+			if( database && database->profile >= 1 ) { 
+				if( database->profile >= 2 || ms >= 100 ) { 
 					// profile it
 					profile(ss.str().c_str()+20/*skip ts*/, ms);
 				}

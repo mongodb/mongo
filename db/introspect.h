@@ -54,7 +54,7 @@ public:
 };
 
 /* --- profiling -------------------------------------------- 
-   do when client->profile is set
+   do when database->profile is set
 */
 
 void profile(const char *str,

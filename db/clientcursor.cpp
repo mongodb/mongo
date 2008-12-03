@@ -16,7 +16,7 @@
 
 /* clientcursor.cpp
 
-   ClientCursor is a wrapper that represents a cursorid from our client 
+   ClientCursor is a wrapper that represents a cursorid from our database 
    application's perspective.
 
    Cursor -- and its derived classes -- are our internal cursors.

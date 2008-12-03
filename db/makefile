@@ -11,7 +11,7 @@ DBGRID_LIBS = $(LIB_BOOST) -lstdc++
 
 JVM_LIBS = -L/opt/java/lib/
 
-OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o ../client/dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o dbcommands.o dbeval.o ../util/background.o ../util/miniwebserver.o dbwebserver.o instance.o
+OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.o jsobj.o introspect.o btree.o clientcursor.o ../util/util.o javajs.o tests.o json.o repl.o ../client/dbclient.o btreecursor.o cloner.o namespace.o commands.o matcher.o dbcommands.o dbeval.o ../util/background.o ../util/miniwebserver.o dbwebserver.o dbinfo.o instance.o
 
 DBGRID_OBJS=../stdafx.o json.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o ../client/dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../client/connpool.o ../dbgrid/gridconfig.o commands.o ../dbgrid/dbgrid_commands.o ../dbgrid/griddatabase.o ../client/model.o ../util/background.o ../dbgrid/shard.o
 
@@ -57,9 +57,10 @@ javatest: javatest.o $(OBJS)
 javatest2: javatest.o javajs.o
 	$(GPP) $(FLAGS) -o javatest2 javatest.o javajs.o $(LIBS) $(JVM_LIBS)
 
+# FIXME Currently dbgrid, javatests{,2} binaries not cleaned.
 clean:
-	-rm -f $(OBJS) db.o
-	-rm -f db
+	-rm -f $(OBJS) db.o $(DBTEST_OBJS)
+	-rm -f db dbtests
 	-rm -f *.o
 
 cleandb:

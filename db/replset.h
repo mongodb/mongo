@@ -46,20 +46,20 @@ public:
 	int remotePort;
 	string remoteHost;
 	string remote; // host:port if port specified.
-    int date; // -1 not yet set; 0=slave; 1=master
+//    int date; // -1 not yet set; 0=slave; 1=master
 
     string getInfo() {
         stringstream ss;
         ss << "  state:   ";
-        if( state == 1 ) ss << "1 State_Master";
-        else if( state == 0 ) ss << "- State_Slave";
+        if( state == 1 ) ss << "1 State_Master ";
+        else if( state == 0 ) ss << "0 State_Slave";
         else
             ss << "<b>" << state << "</b>";
         ss << '\n';
         ss << "  info:    " << info << '\n';
         ss << "  arbhost: " << arbHost << '\n';
         ss << "  remote:  " << remoteHost << ':' << remotePort << '\n';
-        ss << "  date:    " << date << '\n';
+//        ss << "  date:    " << date << '\n';
         return ss.str();
     }
 
@@ -98,13 +98,13 @@ extern ReplPair *replPair;
 */
 inline bool isMaster() { 
     if( allDead ) { 
-        return client->name == "local";
+        return database->name == "local";
     }
 
     if( replPair == 0 || replPair->state == ReplPair::State_Master ) 
         return true;
 
-    return client->name == "local";
+    return database->name == "local";
 }
 
 inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {

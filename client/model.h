@@ -21,7 +21,7 @@
 #include "dbclient.h"
 
 /* Model is a base class for defining objects which are serializable to the Mongo
-   database via the client driver.
+   database via the database driver.
 
    *Definition*
    Your serializable class should inherit from Model and implement the abstract methods 

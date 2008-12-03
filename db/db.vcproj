@@ -214,6 +214,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\dbinfo.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\dbwebserver.cpp"
 				>
 			</File>
@@ -332,7 +336,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\database.h"
+				>
+			</File>
+			<File
 				RelativePath=".\db.h"
+				>
+			</File>
+			<File
+				RelativePath=".\dbinfo.h"
 				>
 			</File>
 			<File

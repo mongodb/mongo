@@ -498,8 +498,12 @@ private:
 class BSONObjIterator {
 public:
 	BSONObjIterator(const BSONObj& jso) {
+        int sz = jso.objsize();
+        if( sz == 0 ) { 
+            pos = theend = 0; return;
+        }
 		pos = jso.objdata() + 4;
-		theend = jso.objdata() + jso.objsize();
+		theend = jso.objdata() + sz;
 	}
 	bool more() { return pos < theend; }
 	BSONElement next() {

@@ -296,7 +296,7 @@ void ReplSource::save() {
 	setClient("local.sources");
 	int u = _updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, ss);
 	assert( u == 1 || u == 4 );
-	client = 0;
+	database = 0;
 }
 
 void ReplSource::cleanup(vector<ReplSource*>& v) { 
@@ -366,7 +366,7 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 		addSourceToList(v, tmp, old);
 		c->advance();
 	}
-	client = 0;
+	database = 0;
 
 	if( !gotPairWith && replPair ) {
 		/* add the --pairwith server */
@@ -386,7 +386,7 @@ bool ReplSource::resync(string db) {
 	{
 		log() << "resync: dropping database " << db << endl;
 		string dummyns = db + ".";
-		assert( client->name == db );
+		assert( database->name == db );
 		dropDatabase(dummyns.c_str());
 		setClientTempNs(dummyns.c_str());
 	}
@@ -395,7 +395,7 @@ bool ReplSource::resync(string db) {
 		log() << "resync: cloning database " << db << endl;
 		//Cloner c;
 		string errmsg;
-		bool ok = cloneFrom(hostName.c_str(), errmsg, client->name);
+		bool ok = cloneFrom(hostName.c_str(), errmsg, database->name);
 		//bool ok = c.go(hostName.c_str(), errmsg);
 		if( !ok ) { 
 			problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
@@ -439,8 +439,10 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 
 	dblock lk;
 	bool justCreated = setClientTempNs(ns);
-    if( allDead ) 
+    if( allDead ) {
+        log() << "allDead, throwing SyncException\n";
 		throw SyncException();
+    }
 
     // operation type -- see logOp() comments for types
 	const char *opType = op.getStringField("op");
@@ -448,7 +450,15 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 	if( justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
 	    newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
 	{
-		if( paired && !justCreated ) { 
+        if( op.getBoolField("first") ) { 
+            log() << "pull: got {first:true} op ns:" << ns << '\n';
+            /* this is the first thing in the oplog ever, so we don't need to resync(). */
+            if( newDb )
+                dbs.insert(clientName);
+            else 
+                problem() << "warning: justCreated && !newDb in repl " << op.toString() << endl;
+        }
+		else if( paired && !justCreated ) { 
             if( strcmp(opType,"db") == 0 && strcmp(ns, "admin.") == 0 ) { 
                 // "admin" is a special namespace we use for priviledged commands -- ok if it exists first on 
                 // either side
@@ -469,7 +479,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 		}
 		else { 
 			nClonedThisPass++;
-			resync(client->name);
+			resync(database->name);
 		}
 		addDbNextPass.erase(clientName);
 	}
@@ -518,7 +528,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 	catch( UserAssertionException& e ) { 
 		log() << "sync: caught user assertion " << e.msg << '\n';
 	}
-	client = 0;
+	database = 0;
 }
 
 /* note: not yet in mutex at this point. */
@@ -701,7 +711,7 @@ bool ReplSource::sync() {
 
 // cached copies of these...
 NamespaceDetails *localOplogMainDetails = 0;
-Client *localOplogClient = 0;
+Database *localOplogClient = 0;
 
 /* we write to local.opload.$main:
      { ts : ..., op: ..., ns: ..., o: ... }
@@ -715,18 +725,16 @@ Client *localOplogClient = 0;
    bb:
      if not null, specifies a boolean to pass along to the other side as b: param.
      used for "justOne" or "upsert" flags on 'd', 'u'
+   first: true
+     when set, indicates this is the first thing we have logged for this database.
+     thus, the slave does not need to copy down all the data when it sees this.
 */
 void _logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *o2, bool *bb) {
 	if( strncmp(ns, "local.", 6) == 0 )
 		return;
 
-	Client *oldClient = client;
-	if( localOplogMainDetails == 0 ) { 
-		setClientTempNs("local.");
-		localOplogClient = client;
-		localOplogMainDetails = nsdetails("local.oplog.$main");
-	}
-	client = localOplogClient;
+	Database *oldClient = database;
+    bool haveLogged = database && database->haveLogged();
 
 	/* we jump through a bunch of hoops here to avoid copying the obj buffer twice -- 
 	   instead we do a single copy to the destination position in the memory mapped file.
@@ -740,9 +748,21 @@ void _logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *o2, bool *
 		b.appendBool("b", *bb);
 	if( o2 )
 		b.append("o2", *o2);
+    if( !haveLogged ) {
+        b.appendBool("first", true);
+        if( database ) // null on dropDatabase()'s logging.
+            database->setHaveLogged();
+    }
 	BSONObj partial = b.done();
 	int posz = partial.objsize();
 	int len = posz + obj.objsize() + 1 + 2 /*o:*/;
+
+	if( localOplogMainDetails == 0 ) { 
+		setClientTempNs("local.");
+		localOplogClient = database;
+		localOplogMainDetails = nsdetails("local.oplog.$main");
+	}
+	database = localOplogClient;
 
 	Record *r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, "local.oplog.$main", len);
 
@@ -757,7 +777,10 @@ void _logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *o2, bool *
 	p += obj.objsize();
 	*p = EOO;
 
-	client = oldClient;
+    //BSONObj temp(r);
+    //cout << "temp:" << temp.toString() << endl;
+
+	database = oldClient;
 }
 
 /* --------------------------------------------------------------*/
@@ -849,11 +872,14 @@ void logOurDbsPresence() {
 				   */
 		  string dbname = string(f.c_str(), f.size() - 2);
 		  if( dbname != "local." ) {
+              setClientTempNs(dbname.c_str());
 			  logOp("db", dbname.c_str(), emptyObj);
 		  }
 	  }
       i++;
     }
+
+    database = 0;
 }
 
 /* we have to log the db presence periodically as that "advertisement" will roll out of the log
@@ -863,10 +889,19 @@ void logOurDbsPresence() {
 */
 void replMasterThread() { 
     sleepsecs(15);
+    logOurDbsPresence();
+
+    // if you are testing, you might finish test and shutdown in less than 10 
+    // minutes yet not have done something in first 15 -- this is to exercise 
+    // this code some.
+    sleepsecs(90);  
+    logOurDbsPresence();       
+
 	while( 1 ) {
 		logOurDbsPresence();
 		sleepsecs(60 * 10);
 	}
+
 }
 
 void startReplication() { 
@@ -885,13 +920,17 @@ void startReplication() {
 			dblock lk;
 			/* create an oplog collection, if it doesn't yet exist. */
 			BSONObjBuilder b;
-			b.append("size", 254.0 * 1000 * 1000);
+
+            double sz = 50.0 * 1000 * 1000;
+            if( sizeof(int *) >= 8 )
+                sz = 990.0 * 1000 * 1000;
+			b.append("size", sz);
 			b.appendBool("capped", 1);
 			setClientTempNs("local.oplog.$main");
 			string err;
 			BSONObj o = b.done();
 			userCreateNS("local.oplog.$main", o, err);
-			client = 0;
+			database = 0;
 		}
 
 		boost::thread mt(replMasterThread);

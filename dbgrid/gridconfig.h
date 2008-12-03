@@ -60,7 +60,7 @@ public:
 
     ClientConfig() : primary(0), partitioned(false) { }
 
-    virtual const char * getNS() { return "grid.db.client"; }
+    virtual const char * getNS() { return "grid.db.database"; }
     virtual void serialize(BSONObjBuilder& to) {
         to.append("name", name);
         to.appendBool("partitioned", partitioned);
@@ -84,9 +84,9 @@ public:
 };
 
 class GridConfig { 
-    map<string,ClientConfig*> clients;
+    map<string,ClientConfig*> databases;
 public:
-    ClientConfig* getClientConfig(string client);
+    ClientConfig* getClientConfig(string database);
 };
 
 class Grid { 

@@ -36,7 +36,7 @@ public:
     bool simpleKeyMatch;
 };
 
-/* We put these objects inside the Client objects: that way later if we want to do 
+/* We put these objects inside the Database objects: that way later if we want to do 
    stats, it's in the right place.
 */
 class QueryOptimizer { 
