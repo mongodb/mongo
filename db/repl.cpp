@@ -37,7 +37,6 @@
 
 extern boost::mutex dbMutex;
 auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
-bool userCreateNS(const char *ns, BSONObj& j, string& err);
 int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
 bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder);
 void ensureHaveIdIndex(const char *ns);
@@ -393,10 +392,8 @@ bool ReplSource::resync(string db) {
 
 	{
 		log() << "resync: cloning database " << db << endl;
-		//Cloner c;
 		string errmsg;
-		bool ok = cloneFrom(hostName.c_str(), errmsg, database->name);
-		//bool ok = c.go(hostName.c_str(), errmsg);
+		bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false);
 		if( !ok ) { 
 			problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
 			throw SyncException();
@@ -929,7 +926,7 @@ void startReplication() {
 			setClientTempNs("local.oplog.$main");
 			string err;
 			BSONObj o = b.done();
-			userCreateNS("local.oplog.$main", o, err);
+			userCreateNS("local.oplog.$main", o, err, false);
 			database = 0;
 		}
 

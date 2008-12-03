@@ -300,6 +300,9 @@ public:
 	int objsize() const { return details ? details->_objsize : 0; } // includes the embedded size field
 	bool isEmpty() const { return objsize() <= 5; }
 
+    /* sigh...details == 0 is such a pain we have to eliminate that possibility */
+    void validateEmpty();
+
     void dump() { 
         cout << hex;
         const char *p = objdata();
@@ -620,3 +623,9 @@ inline void BSONObjBuilder::appendElements(BSONObj x) {
 }
 
 extern BSONObj emptyObj;
+
+inline void BSONObj::validateEmpty() { 
+    if( details == 0 )
+        *this = emptyObj;
+}
+

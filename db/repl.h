@@ -35,7 +35,7 @@ class DBClientCursor;
 extern bool slave;
 extern bool master;
 
-bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb);
+bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication);
 
 #pragma pack(push,4)
 class OpTime { 
