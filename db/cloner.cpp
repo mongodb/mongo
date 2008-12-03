@@ -94,7 +94,7 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
         if( isindex )
             js = fixindex(tmp);
 		theDataFileMgr.insert(to_collection, (void*) js.objdata(), js.objsize());
-	}
+    }
 }
 
 bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) { 
