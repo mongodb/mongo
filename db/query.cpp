@@ -96,6 +96,37 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 				DEV cout << " using index " << d->indexes[i].indexNamespace() << '\n';
 				if( isSorted )
 					*isSorted = true;
+
+				// Initialize cursor using query, in the following simple cases.
+				// (quick fix for bug 1079 )
+				if ( orderFields.size() == 1 ) {
+				  string field = *orderFields.begin();
+				  BSONElement e = query.getField( field.c_str() );
+				  if ( !e.eoo() && e.type() != RegEx ) {
+				    int op = getGtLtOp( e );
+				    if ( ( op == JSMatcher::Equality ) ||
+					 ( ( op == JSMatcher::LT || op == JSMatcher::LTE ) && reverse ) ||
+					 ( ( op == JSMatcher::GT || op == JSMatcher::GTE ) && !reverse ) ) {
+				      BSONObjBuilder b;
+				      if ( op == JSMatcher::Equality ) {
+					b.append( e );
+				      } else {
+					BSONElement ee = e.embeddedObject().firstElement();
+					b.appendAs( ee, e.fieldName() );
+				      }
+				      BSONObj q = b.doneAndDecouple();
+				      auto_ptr<Cursor> c( new BtreeCursor(d->indexes[i], q, reverse ? -1 : 1, query) );
+				      if ( op == JSMatcher::GT || op == JSMatcher::LT )
+					for( ; c->ok(); c->advance() ) {
+					  BSONElement f = c->current().getField( field.c_str() );
+					  if ( f.eoo() || !( q.firstElement() == f ) )
+					    break;
+					}
+				      return c;
+				    }
+				  }
+				}
+
 				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], reverse ? maxKey : emptyObj, reverse ? -1 : 1, query));
 			}
 		}
