@@ -142,6 +142,17 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
         }
 		BSONObj collection = c->next();
 		BSONElement e = collection.findElement("name");
+        if( e.eoo() ) { 
+            string s = "bad system.namespaces object " + e.toString();
+
+            /* temp
+            cout << masterHost << endl;
+            cout << ns << endl;
+            cout << e.toString() << endl;
+            exit(1);*/
+
+            massert(s.c_str(), false);
+        }
 		assert( !e.eoo() );
 		assert( e.type() == String );
 		const char *from_name = e.valuestr();

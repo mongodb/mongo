@@ -51,7 +51,17 @@ public:
         ss << "uptime:    " << time(0)-started << " seconds\n";
         if( allDead ) 
             ss << "<b>replication allDead=" << allDead << "</b>\n";
-        ss << "replInfo:  " << replInfo << '\n';
+        ss << "\nassertions:\n";
+        for( int i = 0; i < 4; i++ ) {
+            if( lastAssert[i].isSet() ) {
+                ss << "<b>";
+                if( i == 3 ) ss << "usererr";
+                else ss << i;
+                ss << "</b>" << ' ' << lastAssert[i].toString();
+            }
+        }
+
+        ss << "\nreplInfo:  " << replInfo << '\n';
     }
 
     virtual void doRequest(

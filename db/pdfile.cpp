@@ -48,6 +48,17 @@ int callDepth = 0;
 extern int otherTraceLevel;
 void addNewNamespaceToCatalog(const char *ns, BSONObj *options = 0);
 
+string getDbContext() { 
+    stringstream ss;
+    if( database ) {
+        ss << database->name << ' ';
+        if( curNs ) 
+            ss << curNs << ' ';
+    }
+    ss<< "op:" << curOp << ' ' << callDepth;
+    return ss.str();
+}
+
 /* this is a good place to set a breakpoint when debugging, as lots of warning things
    (assert, wassert) call it.
 */
@@ -55,10 +66,7 @@ void sayDbContext(const char *errmsg) {
 	if( errmsg ) { 
 		problem() << errmsg << endl;
 	}
-	log() << " database: " << (database ? database->name.c_str() : "null") 
-		<< " op:" << curOp << ' ' << callDepth << '\n';
-	if( database )
-		log() << " ns: " << curNs << endl;
+    log() << ' ' << getDbContext() << '\n';
 	printStackTrace();
 }
 

@@ -27,6 +27,10 @@ int port = 27017;
 const char *curNs = "";
 Database *database = 0;
 
+string getDbContext() { 
+    return "?";
+}
+
 /* this is a good place to set a breakpoint when debugging, as lots of warning things
    (assert, wassert) call it.
 */

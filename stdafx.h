@@ -52,7 +52,37 @@ inline void * ourrealloc(void *ptr, size_t size) {
 #include "targetver.h"
 
 #include <string>
+#include "time.h"
+
 using namespace std;
+
+/* these are manipulated outside of mutexes, so be careful */
+struct Assertion { 
+    Assertion() { 
+        msg[0] = msg[127] = 0;
+        context[0] = context[127] = 0;
+        file = "";
+        line = 0;
+        when = 0;
+    }
+    char msg[128];
+    char context[128];
+    const char *file;
+    unsigned line;
+    time_t when;
+    void set(const char *m, const char *ctxt, const char *f, unsigned l) { 
+        strncpy(msg, m, 127);
+        strncpy(context, ctxt, 127);
+        file = f; line = l;
+        when = time(0);
+    }
+    string toString();
+    bool isSet() { return when != 0; }
+};
+
+/* last assert of diff types: regular, assert, msgassert, uassert: */
+extern Assertion lastAssert[4];
+
 // you can catch these
 class AssertionException { 
 public:
@@ -122,7 +152,6 @@ typedef char _TCHAR;
 
 #include <iostream>
 #include <fstream>
-#include "time.h"
 #include <map>
 #include <vector>
 #include <set>

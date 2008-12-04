@@ -23,37 +23,48 @@
 // TODO: reference any additional headers you need in STDAFX.H
 // and not in this file
 
-/*
-struct MyAsserts {
-	MyAsserts() {
-
-	}
-} myassertsstdafx;
-*/
+Assertion lastAssert[4];
 
 #undef assert
 
 #undef yassert
 #include "assert.h"
 
+string getDbContext();
 void sayDbContext(const char *errmsg = 0);
 
+/* "warning" assert -- safe to continue, so we don't throw exception. */
 void wasserted(const char *msg, const char *file, unsigned line) { 
 	problem() << "Assertion failure " << msg << ' ' << file << ' ' << line << endl;
 	sayDbContext();
+    lastAssert[1].set(msg, getDbContext().c_str(), file, line);
 }
 
 void asserted(const char *msg, const char *file, unsigned line) {
-	wasserted(msg, file, line);
+	problem() << "Assertion failure " << msg << ' ' << file << ' ' << line << endl;
+	sayDbContext();
+    lastAssert[0].set(msg, getDbContext().c_str(), file, line);
 	throw AssertionException();
 }
 
 void uasserted(const char *msg) { 
 	problem() << "User Assertion " << msg << endl;
+    lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
 	throw UserAssertionException(msg);
 }
 
 void msgasserted(const char *msg) {
 	log() << "Assertion: " << msg << '\n';
+    lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
 	throw MsgAssertionException(msg);
+}
+
+string Assertion::toString() { 
+    stringstream ss;
+    ss << msg << '\n';
+    if( *context )
+        ss << context << '\n';
+    if( *file )
+        ss << file << ' ' << line << '\n';
+    return ss.str();
 }
