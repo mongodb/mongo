@@ -67,6 +67,11 @@ struct __ienv;	typedef struct __ienv IENV;
 #define	WT_ERROR	(-31800)
 
 /*******************************************
+ * Exported types
+ *******************************************/
+typedef u_int64_t wt_recno_t;		/* logical record numbers */
+
+/*******************************************
  * Key/data structure -- a Data-Base Thang
  *******************************************/
 struct __dbt {
@@ -83,25 +88,35 @@ struct __db {
 	ENV *env;			/* Enclosing environment */
 	IENV *ienv;			/* Private environment object */
 
-	char *file_name;		/* Database file name */
-
 					/* Error callback */
 	void (*errcall)(const DB *, const char *);
 	FILE		*errfile;	/* Error message file stream */
 	const char	*errpfx;	/* Error message prefix */
 
+	u_int32_t	pagesize;	/* Page size */
+	u_int32_t	extentsize;	/* Extent size */
+
+	u_int32_t	maxitemsize;	/* Maximum key size */
+
 	/* Getters/setters */
+	int  (*set_errcall)(DB *, void (*)(const DB *, const char *));
 	void (*get_errcall)(DB *, void (**)(const DB *, const char *));
+	int  (*set_errfile)(DB *, FILE *);
 	void (*get_errfile)(DB *, FILE **);
+	int  (*set_errpfx)(DB *, const char *);
 	void (*get_errpfx)(DB *, const char **);
-	void (*set_errcall)(DB *, void (*)(const DB *, const char *));
-	void (*set_errfile)(DB *, FILE *);
-	void (*set_errpfx)(DB *, const char *);
+	int  (*set_maxitemsize)(DB *, u_int32_t);
+	void (*get_maxitemsize)(DB *, u_int32_t *);
+	void (*get_pagesize)(DB *, u_int32_t *, u_int32_t *);
+	int  (*set_pagesize)(DB *, u_int32_t, u_int32_t);
 
 	/* Methods */
+	int  (*bulk_load)(DB *, int (*)(DB *, DBT **, DBT **));
 	int  (*destroy)(DB *, u_int32_t);
+	int  (*dump)(DB *, FILE *, u_int32_t);
 	void (*err)(DB *, int, const char *, ...);
 	void (*errx)(DB *, const char *, ...);
+	int  (*open)(DB *, const char *, mode_t, u_int32_t);
 
 	u_int32_t flags;
 };
@@ -126,13 +141,17 @@ struct __env {
 	FILE		*errfile;	/* Error message file stream */
 	const char	*errpfx;	/* Error message prefix */
 
+	u_int32_t	 verbose;	/* Verbose flags */
+
 	/* Getters/setters */
+	int  (*set_errcall)(ENV *, void (*)(const ENV *, const char *));
 	void (*get_errcall)(ENV *, void (**)(const ENV *, const char *));
+	int  (*set_errfile)(ENV *, FILE *);
 	void (*get_errfile)(ENV *, FILE **);
+	int  (*set_errpfx)(ENV *, const char *);
 	void (*get_errpfx)(ENV *, const char **);
-	void (*set_errcall)(ENV *, void (*)(const ENV *, const char *));
-	void (*set_errfile)(ENV *, FILE *);
-	void (*set_errpfx)(ENV *, const char *);
+	int  (*set_verbose)(ENV *, u_int32_t);
+	void (*get_verbose)(ENV *, u_int32_t *);
 
 	/* Methods */
 	int  (*destroy)(ENV *, u_int32_t);
@@ -141,6 +160,13 @@ struct __env {
 
 	u_int32_t flags;
 };
+
+/*******************************************
+ * Prototypes.
+ *******************************************/
+int	 wt_db_create(DB **, ENV *, u_int32_t);
+int	 wt_env_create(ENV **, u_int32_t);
+char	*wt_strerror(int);
 
 #if defined(__cplusplus)
 }
