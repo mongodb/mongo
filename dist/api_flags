@@ -2,33 +2,48 @@
 #
 # This file lists all of the #define interface flags used by the WiredTiger
 # library.   It's processed by the s_api_defines script to create a list of
-# masks, ensuring the names and values never collide.
+# masks, ensuring the names and values never collide
 #
 # The format of the api_defines file:
 #	Method/Function/API
 #	<tab>	Flag
 
 #############################################
-# Objects
+# Environment handles, methods and functions
 #############################################
-ENV					# Public ENV handle
+ENV					# Public handle
 
-IENV					# Private ENV handle
-	ENV_SET_ERRFILE			# Application set error message stream
+IENV					# Private handle
 
-DB					# Public DB handle
+wt_db_create				# No flags
 
-IDB					# Private DB handle
-	ENV_IS_PRIVATE			# ENV is DB handle private.
+Db.destroy				# No flags
 
+Db.dump
+	PRINTABLES
+
+Db.open
+	CREATE
 
 #############################################
-# Methods and functions
+# DB handles, methods and functions
 #############################################
-wt_env_create				# No flags.
+DB					# Public handle
+	MAXKEY_NOTSET
+	PRIVATE_ENV
 
-Env.destroy				# No flags.
+IDB					# Private handle
+	CREATE
 
-wt_db_create				# No flags.
 
-Db.Destroy				# No flags.
+wt_env_create
+
+Env.destroy
+
+Env.verbose
+	VERB_FILEOPS
+	VERB_FILEOPS_ALL
+
+#############################################
+# Internal functions
+#############################################
