@@ -102,6 +102,8 @@ extern map<string,Database*> databases;
 extern Database *database;
 extern const char *curNs;
 extern int dbLocked;
+extern bool master;
+
 /* returns true if the database ("database") did not exist, and it was created on this call */
 inline bool setClient(const char *ns) { 
     /* we must be in critical section at this point as these are global 
@@ -117,7 +119,14 @@ inline bool setClient(const char *ns) {
 		database = it->second;
 		return false;
 	}
-	log() << "first operation for database " << cl << endl;
+
+    // when master for replication, we advertise all the db's, and that 
+    // looks like a 'first operation'. so that breaks this log message's 
+    // meaningfulness.  instead of fixing (which would be better), we just
+    // stop showing for now.
+    if( !master )
+        log() << "first operation for database " << cl << endl;
+
 	bool justCreated;
 	Database *c = new Database(cl, justCreated);
 	databases[cl] = c;

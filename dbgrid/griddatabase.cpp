@@ -34,14 +34,15 @@ extern string dashDashGridDb;
 GridDatabase::GridDatabase() { }
 
 void GridDatabase::init() {
-    char buf[256];
-    int ec = gethostname(buf, 127);
-    if( ec || *buf == 0 ) { 
-        log() << "can't get this server's hostname errno:" << ec << endl;
+    string hn = getHostName();
+    if( hn.empty() ) { 
         sleepsecs(5);
         exit(16);
     }
-    ourHostname = buf;
+    ourHostname = hn;
+
+    char buf[256];
+    strcpy(buf, hn.c_str());
 
     if( dashDashGridDb.empty() ) {
         char *p = strchr(buf, '-');

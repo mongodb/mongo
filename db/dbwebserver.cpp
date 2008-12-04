@@ -23,7 +23,7 @@
 #include "replset.h"
 
 extern int port;
-extern string replInfo;
+extern const char *replInfo;
 
 time_t started = time(0);
 
@@ -43,7 +43,6 @@ public:
             ss << "replpair:\n";
             ss << replPair->getInfo();
         }
-        ss << replInfo << '\n';
     }
 
     void doUnlockedStuff(stringstream& ss) { 
@@ -52,6 +51,7 @@ public:
         ss << "uptime:    " << time(0)-started << " seconds\n";
         if( allDead ) 
             ss << "<b>replication allDead=" << allDead << "</b>\n";
+        ss << "replInfo:  " << replInfo << '\n';
     }
 
     virtual void doRequest(
@@ -65,7 +65,15 @@ public:
     {
         responseCode = 200;
         stringstream ss;
-        ss << "<html><head><title>db</title></head><body><h2>db</h2><p>\n<pre>";
+        ss << "<html><head><title>";
+
+        string dbname;
+        {
+            stringstream z;
+            z << "db " << getHostName() << ':' << port << ' ';
+            dbname = z.str();
+        }
+        ss << dbname << "</title></head><body><h2>" << dbname << "</h2><p>\n<pre>";
 
         doUnlockedStuff(ss);
 

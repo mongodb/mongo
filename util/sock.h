@@ -190,3 +190,15 @@ inline SockAddr::SockAddr(const char *ip, int port) {
 	sa.sin_addr.s_addr = inet_addr(ip);
 	addressSize = sizeof(sa);
 }
+
+inline string getHostName() { 
+    char buf[256];
+    int ec = gethostname(buf, 127);
+    if( ec || *buf == 0 ) { 
+        log() << "can't get this server's hostname errno:" << ec << endl;
+        return "";
+    }
+    return buf;
+}
+
+

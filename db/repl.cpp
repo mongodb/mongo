@@ -56,10 +56,16 @@ const char *allDead = 0;
 ReplPair *replPair = 0;
 
 /* output by the web console */
-string replInfo = "no repl yet";
+const char *replInfo = "";
+struct ReplInfo { 
+    ReplInfo(const char *msg) { replInfo = msg; }
+    ~ReplInfo() { replInfo = "?"; }
+};
 
 /* peer unreachable, try our arbiter */
 void ReplPair::arbitrate() {
+    ReplInfo r("arbitrate");
+
     if( arbHost == "-" ) { 
         // no arbiter. we are up, let's assume he is down and network is not partitioned.
         setMaster(State_Master, "remote unreachable");
@@ -392,6 +398,7 @@ bool ReplSource::resync(string db) {
 
 	{
 		log() << "resync: cloning database " << db << endl;
+		ReplInfo r("resync: cloning a database");
 		string errmsg;
 		bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false);
 		if( !ok ) { 
@@ -619,7 +626,7 @@ void ReplSource::sync_pullOpLog() {
         log() << "pull:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
         log() << "pull:   tailing: " << tailing << '\n';
         log() << "pull:   data too stale, halting replication" << endl;
-        allDead = "data too stale halted replication";
+        replInfo = allDead = "data too stale halted replication";
 		assert( syncedTo < nextOpTime );
 		throw SyncException();
 	}
@@ -660,6 +667,8 @@ void ReplSource::sync_pullOpLog() {
    returns true if everything happy.  return false if you want to reconnect.
 */
 bool ReplSource::sync() { 
+    ReplInfo r("sync");
+
 	log() << "pull: " << sourceName() << '@' << hostName << endl;
 	nClonedThisPass = 0;
 
@@ -672,6 +681,7 @@ bool ReplSource::sync() {
 	if( conn.get() == 0 ) {
 		conn = auto_ptr<DBClientConnection>(new DBClientConnection());
 		string errmsg;
+        ReplInfo r("trying to connect to sync source");
 		if( !conn->connect(hostName.c_str(), errmsg) ) {
 			resetConnection();
 			log() << "pull:   cantconn " << errmsg << endl;
@@ -679,7 +689,10 @@ bool ReplSource::sync() {
                 assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
                 replPair->arbitrate();
             }
-            sleepsecs(1);
+            {
+                ReplInfo r("can't connect to sync source, sleeping");
+                sleepsecs(1);
+            }
 			return false;
 		}
 	}
@@ -794,6 +807,7 @@ void replMain() {
 
 	while( 1 ) { 
 		{	
+            ReplInfo r("replMain load sources");
 			dblock lk;
 			ReplSource::loadAll(sources);
 		}
@@ -810,23 +824,28 @@ void replMain() {
 				ok = s->sync();
 			}
 			catch( SyncException& ) {
+                replInfo = "caught SyncException";
 				log() << "caught SyncException, sleeping 10 secs" << endl;
 				sleepsecs(10);
 			}
             catch( AssertionException& e ) { 
                 if( e.severe() ) {
+                    ReplInfo r("replMain caught AssertionException, sleeping 1 minutes");
                     log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
                     sleepsecs(60);
                 }
                 else { 
                     log() << e.toString() << '\n';
                 }
+                replInfo = "replMain caught AssertionException";
             }
 			if( !ok ) 
 				s->resetConnection();
 		}
-
-        sleepsecs(3);
+        {
+            ReplInfo r("replMain: sleep 3 before next pass");
+            sleepsecs(3);
+        }
 	}
 
 	ReplSource::cleanup(sources);
@@ -844,6 +863,7 @@ void replSlaveThread() {
 			sleepsecs(5);
 		}
 		catch( AssertionException& ) { 
+			ReplInfo r("Assertion in replSlaveThread(): sleeping 5 minutes before retry");
 			problem() << "Assertion in replSlaveThread(): sleeping 5 minutes before retry" << endl;
 			sleepsecs(300);
 		}
