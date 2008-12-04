@@ -49,7 +49,7 @@ __wt_malloc(IENV *ienv, size_t bytes_to_allocate, void *retp)
 	if ((p = malloc(bytes_to_allocate)) == NULL)
 		return (WT_ERROR);
 
-#ifdef HAVE_DEBUG
+#ifdef HAVE_DIAGNOSTIC
 	memset(p, OVERWRITE_BYTE, bytes_to_allocate);
 #endif
 
