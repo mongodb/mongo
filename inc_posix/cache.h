@@ -19,53 +19,66 @@ extern "C" {
 /*******************************************
  * WiredTiger system include files.
  *******************************************/
+#include <sys/stat.h>
+
+#include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
 /*******************************************
- * Everything without the heft to have its own file.
- *******************************************/
-#include <misc.h>
-
-/*******************************************
  * Internal forward declarations.
  *******************************************/
-struct __wt_fh_t;	typedef struct __wt_fh_t WT_FH;
-
-/*******************************************
- * Internal versions of the database handle structure.
- *******************************************/
-struct __idb {
-	DB *db;					/* Public object */
-
-	u_int32_t flags;
-};
-
-/*******************************************
- * Internal versions of the cursor handle structure.
- *******************************************/
-struct __idbc {
-	DBC *dbc;				/* Public object */
-
-	u_int32_t flags;
-};
-
-/*******************************************
- * Internal versions of the cursor database environment handle structure.
- *******************************************/
-struct __ienv {
-	ENV *env;				/* Public object */
-
-	u_int32_t flags;
-};
+struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
+struct __wt_fh;			typedef struct __wt_fh WT_FH;
+struct __wt_item;		typedef struct __wt_item WT_ITEM;
+struct __wt_item_int;		typedef struct __wt_item_int WT_ITEM_INT;
+struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
+struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
+struct __wt_page;		typedef struct __wt_page WT_PAGE;
+struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
+struct __wt_page_inmem;		typedef struct __wt_page_inmem WT_PAGE_INMEM;
 
 /*******************************************
  * Internal include files.
  *******************************************/
+#include "misc.h"
 #include "queue.h"
 #include "fh.h"
-#include "layout.h"
+#include "btree.h"
+
+/*******************************************
+ * Database handle information that doesn't persist.
+ *******************************************/
+struct __idb {
+	DB *db;				/* Public object */
+
+	char *file_name;		/* Database file name */
+	mode_t mode;			/* Database file create mode */
+
+	WT_BTREE *btree;		/* Enclosed btree */
+
+	u_int32_t flags;
+};
+
+/*******************************************
+ * Cursor handle information that doesn't persist.
+ *******************************************/
+struct __idbc {
+	DBC *dbc;			/* Public object */
+
+	u_int32_t flags;
+};
+
+/*******************************************
+ * Environment handle information that doesn't persist.
+ *******************************************/
+struct __ienv {
+	ENV *env;			/* Public object */
+
+	u_int32_t flags;
+};
 
 #include "extern.h"
 
