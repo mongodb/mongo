@@ -70,3 +70,74 @@ __wt_errfile(FILE *fp,
 	(void)fprintf(fp, "\n");
 	(void)fflush(fp);
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_assert --
+ *	Internal version of assert function.
+ */
+void
+__wt_assert(
+    IENV *ienv, const char *check, const char *file_name, int line_number)
+{
+	__wt_env_errx(ienv->env,
+	    "assertion failure: %s/%d: \"%s\"", file_name, line_number, check);
+
+	__wt_abort(ienv);
+	/* NOTREACHED */
+}
+#endif
+
+/*
+ * __wt_api_flags --
+ *	Print a standard error message when an API function is passed illegal
+ *	flags.
+ */
+int
+__wt_api_flags(IENV *ienv, const char *name)
+{
+	__wt_env_errx(ienv->env, "%s: illegal API flag specified", name);
+	return (WT_ERROR);
+}
+
+/*
+ * __wt_database_format --
+ *	Print a standard error message when a database format error is
+ *	suddenly discovered.
+ */
+int
+__wt_database_format(DB *db)
+{
+	__wt_db_errx(db, "the database is corrupted; use the Db.salvage"
+	    " method or the db_salvage utility to repair the database");
+	return (WT_ERROR);
+}
+
+/*
+ * wt_strerror --
+ *	Return a string for any error value.
+ */
+char *
+wt_strerror(int error)
+{
+	static char errbuf[64];
+	char *p;
+
+	if (error == 0)
+		return ("Successful return: 0");
+	switch (error) {
+	case WT_ERROR:
+		return ("WT_ERROR: Non-specific error");
+	default:
+		if (error > 0 && (p = strerror(error)) != NULL)
+			return (p);
+		break;
+	}
+
+	/* 
+	 * !!!
+	 * Not thread-safe, but this is never supposed to happen.
+	 */
+	(void)snprintf(errbuf, sizeof(errbuf), "Unknown error: %d", error);
+	return (errbuf);
+}
