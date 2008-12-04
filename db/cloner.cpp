@@ -24,21 +24,22 @@
 #include "query.h"
 #include "commands.h"
 #include "db.h"
+#include "repl.h"
 
 extern int port;
-bool userCreateNS(const char *ns, BSONObj& j, string& err);
 
 class Cloner: boost::noncopyable { 
 	DBClientConnection conn;
 	void copy(const char *from_ns, const char *to_ns, bool isindex = false);
 public:
 	Cloner() { }
-	bool go(const char *masterHost, string& errmsg, const string& fromdb);
+	bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl);
 };
 
 /* for index info object:
      { "name" : "name_1" , "ns" : "foo.index3" , "key" :  { "name" : 1.0 } }
-   we need to fix up the value in the "ns" parameter.
+   we need to fix up the value in the "ns" parameter so that the name prefix is correct on a 
+   copy to a new name.
 */
 BSONObj fixindex(BSONObj o) { 
     BSONObjBuilder b;
@@ -69,6 +70,9 @@ BSONObj fixindex(BSONObj o) {
     return res;
 }
 
+/* copy the specified collection 
+   isindex - if true, this is system.indexes collection.
+*/
 void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex) {
     auto_ptr<DBClientCursor> c;
     {
@@ -91,13 +95,17 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
         }
 
         BSONObj js = tmp;
-        if( isindex )
+        if( isindex ) {
+            assert( strstr(from_collection, "system.indexes") );
             js = fixindex(tmp);
+        }
+
 		theDataFileMgr.insert(to_collection, (void*) js.objdata(), js.objsize());
+		logOp("i", to_collection, js);
     }
 }
 
-bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) { 
+bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl) { 
     string todb = database->name;
     stringstream a,b;
     a << "localhost:" << port;
@@ -150,7 +158,7 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) {
 		//if( !options.isEmpty() )
         {
 			string err;
-			userCreateNS(to_name.c_str(), options, err);
+			userCreateNS(to_name.c_str(), options, err, logForRepl);
 		}
 		copy(from_name, to_name.c_str());
 	}
@@ -163,10 +171,10 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb) {
 	return true;
 }
 
-bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb)
+bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication)
 {
 	Cloner c;
-	return c.go(masterHost, errmsg, fromdb);
+	return c.go(masterHost, errmsg, fromdb, logForReplication);
 }
 
 /* Usage:
@@ -180,7 +188,10 @@ public:
         string from = cmdObj.getStringField("clone");
         if( from.empty() ) 
             return false;
-        return cloneFrom(from.c_str(), errmsg, database->name);
+        /* replication note: we must logOp() not the command, but the cloned data -- if the slave
+           were to clone it would get a different point-in-time and not match.
+           */
+        return cloneFrom(from.c_str(), errmsg, database->name, true);
     }
 } cmdclone;
 
@@ -207,9 +218,8 @@ public:
             return false;
         }
         setClient(todb.c_str());
-        bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb);
+        bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, true);
         database = 0;
         return res;
     }
 } cmdcopydb;
-

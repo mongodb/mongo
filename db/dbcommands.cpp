@@ -31,7 +31,6 @@
 extern int queryTraceLevel;
 extern int otherTraceLevel;
 extern int opLogging;
-bool userCreateNS(const char *ns, BSONObj& j, string& err);
 void flushOpLog();
 int runCount(const char *ns, BSONObj& cmd, string& err);
 
@@ -319,9 +318,7 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 			valid = true;
 			string ns = us + '.' + e.valuestr();
 			string err;
-			ok = userCreateNS(ns.c_str(), jsobj, err);
-			if( ok )
-				logOp("c", ns.c_str(), jsobj);
+			ok = userCreateNS(ns.c_str(), jsobj, err, true);
 			if( !ok && !err.empty() )
 				anObjBuilder.append("errmsg", err.c_str());
 		}

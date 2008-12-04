@@ -33,6 +33,7 @@ _ disallow system* manipulations from the database.
 #include <algorithm>
 #include <list>
 #include "query.h"
+#include "repl.h"
 
 const char *dbpath = "/data/db/";
 
@@ -92,9 +93,7 @@ int initialExtentSize(int len) {
 	return z;
 }
 
-// { ..., capped: true, size: ..., max: ... }
-// returns true if successful
-bool userCreateNS(const char *ns, BSONObj& j, string& err) { 
+bool _userCreateNS(const char *ns, BSONObj& j, string& err) { 
 	if( nsdetails(ns) ) {
 		err = "collection already exists";
 		return false;
@@ -132,6 +131,16 @@ bool userCreateNS(const char *ns, BSONObj& j, string& err) {
 	}
 
 	return true;
+}
+
+// { ..., capped: true, size: ..., max: ... }
+// returns true if successful
+bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication) { 
+    j.validateEmpty();
+    bool ok = _userCreateNS(ns, j, err);
+    if( logForReplication && ok ) 
+        logOp("c", ns, j);
+    return ok;
 }
 
 /*---------------------------------------------------------------------*/ 
@@ -752,7 +761,7 @@ DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) 
 		if( tableToIndex == 0 ) {
 			// try to create it
 			string err;
-			if( !userCreateNS(tabletoidxns.c_str(), emptyObj, err) ) { 
+			if( !userCreateNS(tabletoidxns.c_str(), emptyObj, err, false) ) { 
 				problem() << "ERROR: failed to create collection while adding its index. " << tabletoidxns << endl;
 				return DiskLoc();
 			}

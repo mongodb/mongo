@@ -40,7 +40,8 @@ class Record;
 class Cursor;
 
 void dropDatabase(const char *ns);
-void dropNS(string& dropNs);
+void dropNS(string& dropNs);;
+bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
 
 /*---------------------------------------------------------------------*/ 
 
