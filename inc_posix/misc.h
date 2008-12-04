@@ -11,28 +11,31 @@
 extern "C" {
 #endif
 
-/*
- * Database file offsets are multiples of 512B and stored internally in 32-bit
- * variables.
- */
-#define	WT_BLOCK_SIZE			(512)
-#define	WT_BLOCKS_TO_BYTES(blocks)	(blocks) * WT_BLOCK_SIZE
+/* Align a number to a specified power-of-2. */
+#define	WT_ALIGN(n, v)							\
+	(((n) + (v) - 1) & ~(((uintmax_t)(v)) - 1))
 
 /*
- * Standard flag checking at every API function.
+ * Flag checking for API functions.
  */
-#define	API_FLAG_CHK(ienv, name, f, mask)				\
+#define	DB_FLAG_CHK(idb, name, f, mask)					\
+	if ((f) & ~(mask))						\
+		return (__wt_api_flags(idb->ienv, name));
+#define	DB_FLAG_CHK_NOTFATAL(idb, name, f, mask, ret)			\
+	if ((f) & ~(mask))						\
+		(ret) = __wt_api_flags(idb->ienv, name);
+#define	ENV_FLAG_CHK(ienv, name, f, mask)				\
 	if ((f) & ~(mask))						\
 		return (__wt_api_flags(ienv, name));
-
-#define	API_FLAG_CHK_NOTFATAL(ienv, name, f, mask)			\
+#define	ENV_FLAG_CHK_NOTFATAL(ienv, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
-		(void)__wt_api_flags(ienv, name);
+		(ret) = __wt_api_flags(ienv, name);
 
 /*
- * Flag set, clear and test.  They come in 2 flavors: F_XXX (manipulates
- * a field named "flags" in the structure referenced by its argument),
- * and LF_XXX (manipulates a local variable named "flags").
+ * Flag set, clear and test.  They come in 3 flavors: F_XXX (handles a
+ * field named "flags" in the structure referenced by its argument),
+ * LF_XXX (handles a local variable named "flags"), and FLD_XXX (handles
+ * any variable, anywhere.
  */
 #define	F_CLR(p, mask)		(p)->flags &= ~(mask)
 #define	F_ISSET(p, mask)	((p)->flags & (mask))
@@ -41,6 +44,10 @@ extern "C" {
 #define	LF_CLR(mask)		((flags) &= ~(mask))
 #define	LF_ISSET(mask)		((flags) & (mask))
 #define	LF_SET(mask)		((flags) |= (mask))
+
+#define	FLD_CLR(field, mask)	((field) &= ~(mask))
+#define	FLD_ISSET(field, mask)	((field) & (mask))
+#define	FLD_SET(field, mask)	((field) |= (mask))
 
 /*
  * Statistics are optional to minimize our footprint.
