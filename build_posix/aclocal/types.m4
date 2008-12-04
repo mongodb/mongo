@@ -49,6 +49,7 @@ AC_DEFUN([AM_TYPES], [
 	# as the list of includes directly included by wiredtiger.h.
 	std_includes="
 #include <sys/types.h>
+#include <stdint.h>
 #include <stdio.h>"
 	AC_SUBST(wiredtiger_includes_decl)
 	wiredtiger_includes_decl="$std_includes"
