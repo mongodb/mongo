@@ -15,8 +15,9 @@
 	/* Application-specified callback function. */			\
 	va_start(__ap, fmt);						\
 	if ((db)->errcall != NULL)					\
-		__wt_errcall((db)->errcall, (db),			\
-		    (db)->errpfx, (db)->file_name, error, fmt, __ap);	\
+		__wt_errcall((db)->errcall, (db), (db)->errpfx,		\
+		    (db)->idb == NULL ? NULL : (db)->idb->file_name,	\
+		    error, fmt, __ap);					\
 	va_end(__ap);							\
 									\
 	/*								\
@@ -27,8 +28,9 @@
 			return;						\
 									\
 	va_start(__ap, fmt);						\
-	__wt_errfile((db)->errfile,					\
-	    (db)->errpfx, (db)->file_name, error, fmt, __ap);		\
+	__wt_errfile((db)->errfile, (db)->errpfx,			\
+	    (db)->idb == NULL ? NULL : (db)->idb->file_name,		\
+	    error, fmt, __ap);						\
 	va_end(__ap);							\
 }
 
