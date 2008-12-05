@@ -27,10 +27,55 @@ extern const char *replInfo;
 
 time_t started = time(0);
 
+/*
+    string toString() { 
+        stringstream ss;
+        unsigned long long dt = last - start;
+        ss << dt/1000;
+        ss << '\t';
+        ss << timeLocked/1000 << '\t';
+        if( dt )
+            ss << (timeLocked*100)/dt << '%';
+        return ss.str();
+    }
+*/
+
+struct Timing { 
+    Timing() { last = start = timeLocked = 0; }
+    unsigned long long last, start, timeLocked;
+};
+Timing tlast;
+const int NStats = 32;
+string lockStats[NStats];
+unsigned q = 0;
+
+void statsThread() {
+    while( 1 ) { 
+        sleepsecs(4);
+        dblock lk;
+        q = (q+1)%NStats;
+        Timing timing;
+        dbMutexInfo.timingInfo(timing.start, timing.last, timing.timeLocked);
+        if( tlast.start ) { 
+            unsigned long long elapsed = timing.last - tlast.last;
+            unsigned long long locked = timing.timeLocked - tlast.timeLocked;
+            {
+                stringstream ss;
+                ss << elapsed / 1000 << '\t';
+                ss << locked / 1000 << '\t';
+                if( elapsed )
+                    ss << (locked*100)/elapsed << '%';
+                lockStats[q] = ss.str();
+            }
+        }
+        tlast = timing;
+    }
+}
+
 class DbWebServer : public MiniWebServer { 
 public:
+    // caller locks
     void doLockedStuff(stringstream& ss) { 
-        dblock lk;
         ss << "# databases: " << databases.size() << '\n';
         if( database ) { 
             ss << "curclient: " << database->name;
@@ -43,11 +88,20 @@ public:
             ss << "replpair:\n";
             ss << replPair->getInfo();
         }
+
+        ss << "\n<b>dt\ttlocked</b>\n";
+        unsigned i = q;
+        while( 1 ) { 
+            ss << lockStats[i] << '\n';
+            i = (i-1)%NStats;
+            if( i == q )
+                break;
+        }
     }
 
     void doUnlockedStuff(stringstream& ss) { 
         ss << "port:      " << port << '\n';
-        ss << "dblocked:  " << dbLocked << " (initial)\n";
+        ss << "dblocked:  " << dbMutexInfo.isLocked() << " (initial)\n";
         ss << "uptime:    " << time(0)-started << " seconds\n";
         if( allDead ) 
             ss << "<b>replication allDead=" << allDead << "</b>\n";
@@ -88,15 +142,19 @@ public:
         doUnlockedStuff(ss);
 
         int n = 2000;
+                    Timer t;
         while( 1 ) {
-            if( !dbLocked ) { 
-                ss << '\n';
-                doLockedStuff(ss);
+            if( !dbMutexInfo.isLocked() ) { 
+                {
+                    dblock lk;
+                    ss << "time to get dblock: " << t.millis() << "ms\n";
+                    doLockedStuff(ss);
+                }
                 break;
             }
             sleepmillis(1);
             if( --n < 0 ) {
-                ss << "\ntimed out getting dblock\n";
+                ss << "\n<b>timed out getting dblock</b>\n";
                 break;
             }
         }
@@ -107,6 +165,7 @@ public:
 };
 
 void webServerThread() {
+    boost::thread thr(statsThread);
     DbWebServer mini;
     if( mini.init(port+1000) )
         mini.run();

@@ -91,10 +91,11 @@ public:
         assert( strcmp(e.fieldName(), "$err") != 0 );
     }
 
-	// cursor no longer valid -- use with tailable cursors.
-	// note you should only rely on this once more() returns false; 
-	// 'dead' may be preset yet some data still queued and locally
-	//  available from the dbclientcursor.
+	/* cursor no longer valid -- use with tailable cursors.
+	   note you should only rely on this once more() returns false; 
+       'dead' may be preset yet some data still queued and locally
+       available from the dbclientcursor.
+    */
 	bool isDead() const { return cursorId == 0; }
 
 	bool tailable() const { return (opts & Option_CursorTailable) != 0; }
@@ -118,7 +119,7 @@ public:
     /* returns true in isMaster parm if this db is the master instance.  
        BSONObj contains more details e.g.: 
          { "ismaster" : 1.0 , "msg" : "not paired" , "ok" : 1.0  }
-         */
+    */
     BSONObj cmdIsMaster(bool& isMaster);
 };
 

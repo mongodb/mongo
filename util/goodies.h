@@ -147,20 +147,28 @@ inline unsigned curTimeMillis() {
 	unsigned t = xt.nsec / 1000000;
 	return (xt.sec & 0xfffff) * 1000 + t;
 }
+
 inline unsigned long long jsTime() {
 	boost::xtime xt;
 	boost::xtime_get(&xt, boost::TIME_UTC);
 	unsigned long long t = xt.nsec / 1000000;
 	return ((unsigned long long) xt.sec * 1000) + t;
 }
+
+inline unsigned long long curTimeMicros64() {
+	boost::xtime xt;
+	boost::xtime_get(&xt, boost::TIME_UTC);
+	unsigned long long t = xt.nsec / 1000;
+	return (((unsigned long long) xt.sec) * 1000000) + t;
+}
+
 // measures up to 1024 seconds.  or, 512 seconds with tdiff that is...
 inline unsigned curTimeMicros() {
 	boost::xtime xt;
 	boost::xtime_get(&xt, boost::TIME_UTC);
 	unsigned t = xt.nsec / 1000;
 	unsigned secs = xt.sec % 1024;
-	t = secs*1000000 + t;
-	return t;
+	return secs*1000000 + t;
 }
 using namespace boost;
 typedef boost::mutex::scoped_lock boostlock;
@@ -168,12 +176,17 @@ typedef boost::mutex::scoped_lock boostlock;
 // simple scoped timer
 class Timer { 
 public:
-	Timer() { old = curTimeMicros(); }
+	Timer() { reset(); }
 	int millis() { return micros() / 1000; }
-	int micros() { 
+  	int micros() { 
 		unsigned n = curTimeMicros();
 		return tdiff(old, n); 
 	}
+	int micros(unsigned& n) { // returns cur time in addition to timer result
+		n = curTimeMicros();
+		return tdiff(old, n); 
+	}
+    void reset() { old = curTimeMicros(); }
 private:
 	unsigned old;
 };

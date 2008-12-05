@@ -27,6 +27,7 @@
 #include "json.h"
 #include "repl.h"
 #include "commands.h"
+#include "db.h"
 
 extern int queryTraceLevel;
 extern int otherTraceLevel;
@@ -166,10 +167,25 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	return ss.str();
 }
 
-/* just to check if the db has asserted */
-class CmdAsserts : public Command { 
+class CmdTimeInfo : public Command { 
 public:
-    CmdAsserts() : Command("assertinfo") {} 
+    CmdTimeInfo() : Command("timeinfo") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        unsigned long long last, start, timeLocked;
+        dbMutexInfo.timingInfo(start, last, timeLocked);
+        double tt = (double) last-start;
+        double tl = (double) timeLocked;
+        result.append("totalTime", tt);
+        result.append("lockTime", tl);
+        result.append("ratio", tl/tt);
+        return true;
+    }
+} cmdTimeInfo;
+
+/* just to check if the db has asserted */
+class CmdAssertInfo : public Command { 
+public:
+    CmdAssertInfo() : Command("assertinfo") {} 
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         result.appendBool("dbasserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet());
         result.appendBool("asserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet() || lastAssert[3].isSet());
