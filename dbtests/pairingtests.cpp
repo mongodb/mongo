@@ -167,7 +167,8 @@ namespace PairingTests {
   class DirectConnectBase {
   protected:
     static void negotiate( ReplPair &a, ReplPair &b ) {
-      a.negotiate( auto_ptr< DBClientConnection >( new DirectDBClientConnection( &b ) ).get() );      
+      auto_ptr< DBClientConnection > c( new DirectDBClientConnection( &b ) );
+      a.negotiate( c.get() );      
     }
   };
 
