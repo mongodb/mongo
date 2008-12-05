@@ -80,7 +80,14 @@ struct Assertion {
     bool isSet() { return when != 0; }
 };
 
-/* last assert of diff types: regular, assert, msgassert, uassert: */
+enum { 
+    AssertRegular = 0, 
+    AssertW = 1,
+    AssertMsg = 2,
+    AssertUser = 3
+};
+
+/* last assert of diff types: regular, wassert, msgassert, uassert: */
 extern Assertion lastAssert[4];
 
 // you can catch these

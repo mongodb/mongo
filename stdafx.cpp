@@ -60,6 +60,9 @@ void msgasserted(const char *msg) {
 }
 
 string Assertion::toString() { 
+    if( !isSet() )
+        return "";
+
     stringstream ss;
     ss << msg << '\n';
     if( *context )

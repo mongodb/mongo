@@ -166,6 +166,21 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	return ss.str();
 }
 
+/* just to check if the db has asserted */
+class CmdAsserts : public Command { 
+public:
+    CmdAsserts() : Command("assertinfo") {} 
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        result.appendBool("dbasserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet());
+        result.appendBool("asserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet() || lastAssert[3].isSet());
+        result.append("assert", lastAssert[AssertRegular].toString());
+        result.append("assertw", lastAssert[AssertW].toString());
+        result.append("assertmsg", lastAssert[AssertMsg].toString());
+        result.append("assertuser", lastAssert[AssertUser].toString());
+        return true;
+    }
+} cmdAsserts;
+
 class CmdGetOpTime : public Command { 
 public:
     CmdGetOpTime() : Command("getoptime") { }
