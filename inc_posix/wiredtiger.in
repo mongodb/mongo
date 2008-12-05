@@ -93,22 +93,22 @@ struct __db {
 	FILE		*errfile;	/* Error message file stream */
 	const char	*errpfx;	/* Error message prefix */
 
+	u_int32_t	maxitemsize;	/* Maximum on-page item size */
+	u_int32_t	fragsize;	/* Fragment size */
 	u_int32_t	pagesize;	/* Page size */
 	u_int32_t	extentsize;	/* Extent size */
-
-	u_int32_t	maxitemsize;	/* Maximum key size */
+	u_int32_t	frags_per_page;	/* Fragments per page */
 
 	/* Getters/setters */
-	int  (*set_errcall)(DB *, void (*)(const DB *, const char *));
 	void (*get_errcall)(DB *, void (**)(const DB *, const char *));
-	int  (*set_errfile)(DB *, FILE *);
 	void (*get_errfile)(DB *, FILE **);
-	int  (*set_errpfx)(DB *, const char *);
 	void (*get_errpfx)(DB *, const char **);
-	int  (*set_maxitemsize)(DB *, u_int32_t);
-	void (*get_maxitemsize)(DB *, u_int32_t *);
-	void (*get_pagesize)(DB *, u_int32_t *, u_int32_t *);
-	int  (*set_pagesize)(DB *, u_int32_t, u_int32_t);
+	void (*get_pagesize)
+		(DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
+	int  (*set_errcall)(DB *, void (*)(const DB *, const char *));
+	int  (*set_errfile)(DB *, FILE *);
+	int  (*set_errpfx)(DB *, const char *);
+	int  (*set_pagesize)(DB *, u_int32_t, u_int32_t, u_int32_t, u_int32_t);
 
 	/* Methods */
 	int  (*bulk_load)(DB *, int (*)(DB *, DBT **, DBT **));
