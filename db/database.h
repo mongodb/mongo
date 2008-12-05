@@ -16,6 +16,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#pragma once
+
 /* Database represents a database database 
    Each database database has its own set of files -- dbname.ns, dbname.0, dbname.1, ...
 */
@@ -97,52 +99,3 @@ private:
     bool _haveLogged; 
 };
 
-// tempish...move to TLS or pass all the way down as a parm
-extern map<string,Database*> databases;
-extern Database *database;
-extern const char *curNs;
-extern int dbLocked;
-extern bool master;
-
-/* returns true if the database ("database") did not exist, and it was created on this call */
-inline bool setClient(const char *ns) { 
-    /* we must be in critical section at this point as these are global 
-       variables. 
-    */
-    assert( dbLocked == 1 );
-
-	char cl[256];
-	curNs = ns;
-	nsToClient(ns, cl);
-	map<string,Database*>::iterator it = databases.find(cl);
-	if( it != databases.end() ) {
-		database = it->second;
-		return false;
-	}
-
-    // when master for replication, we advertise all the db's, and that 
-    // looks like a 'first operation'. so that breaks this log message's 
-    // meaningfulness.  instead of fixing (which would be better), we just
-    // stop showing for now.
-    if( !master )
-        log() << "first operation for database " << cl << endl;
-
-	bool justCreated;
-	Database *c = new Database(cl, justCreated);
-	databases[cl] = c;
-	database = c;
-    database->finishInit();
-	return justCreated;
-}
-
-/* We normally keep around a curNs ptr -- if this ns is temporary, 
-   use this instead so we don't have a bad ptr.  we could have made a copy,
-   but trying to be fast as we call setClient this for every single operation.
-*/
-inline bool setClientTempNs(const char *ns) { 
-	bool jc = setClient(ns); 
-	curNs = "";
-	return jc;
-}
-
-#include "dbinfo.h"

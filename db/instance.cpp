@@ -30,7 +30,8 @@ bool master = false; // true means keep an op log
 extern int curOp;
 
 boost::mutex dbMutex;
-int dbLocked = 0;
+MutexInfo dbMutexInfo;
+//int dbLocked = 0;
 
 int port = DBPort;
 /* 0 = off; 1 = writes, 2 = reads, 3 = both 
