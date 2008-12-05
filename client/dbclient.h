@@ -119,6 +119,7 @@ public:
        BSONObj contains more details e.g.: 
          { "ismaster" : 1.0 , "msg" : "not paired" , "ok" : 1.0  }
          */
+  virtual
     BSONObj cmdIsMaster(bool& isMaster);
 };
 
@@ -151,7 +152,8 @@ public:
        If autoReconnect is true, you can try to use the DBClientConnection even when
        false was returned -- it will try to connect again.
     */
-    bool connect(const char *serverHostname, string& errmsg);
+    virtual
+      bool connect(const char *serverHostname, string& errmsg);
 
 	/* send a query to the database.
        ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
@@ -173,7 +175,8 @@ public:
 		BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
     /*throws AssertionException*/
-	BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+	virtual
+	  BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 };
 
 /* Use this class to connect to a replica pair of servers.  The class will manage 

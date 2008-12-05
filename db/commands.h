@@ -41,3 +41,5 @@ public:
 
     Command(const char *_name);
 };
+
+bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
