@@ -14,11 +14,10 @@
  *	Read a file handle.
  */
 int
-__wt_read(IENV *ienv,
-    WT_FH *fh, u_int32_t block_number, u_int32_t blocks, void *buf)
+__wt_read(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 {
 	ENV *env;
-	ssize_t bytes_to_read, bytes_read;
+	ssize_t bytes_read;
 	int ret;
 
 	env = ienv->env;
@@ -26,14 +25,10 @@ __wt_read(IENV *ienv,
 	WT_STAT(fh->read_count);
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
 		__wt_env_errx(env,
-		    "fileops: %s: read %lu 512B blocks at block %lu",
-		    fh->name, (u_long)blocks, (u_long)block_number);
+		    "fileops: %s: read %lu bytes at offset %lu",
+		    fh->name, (u_long)bytes, (u_long)offset);
 	
-	bytes_to_read = (ssize_t)WT_BLOCKS_TO_BYTES(blocks);
-	bytes_read = pread(fh->fd, buf,
-	    (ssize_t)WT_BLOCKS_TO_BYTES(blocks),
-	    (off_t)WT_BLOCKS_TO_BYTES(block_number));
-	if (bytes_to_read == bytes_read)
+	if ((bytes_read = pread(fh->fd, buf, bytes, offset)) == bytes)
 		return (0);
 
 	__wt_env_err(env, errno, "Read error; file %s", fh->name);
@@ -45,11 +40,10 @@ __wt_read(IENV *ienv,
  *	Write a file handle.
  */
 int
-__wt_write(IENV *ienv,
-    WT_FH *fh, u_int32_t block_number, u_int32_t blocks, void *buf)
+__wt_write(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 {
 	ENV *env;
-	ssize_t bytes_to_write, bytes_written;
+	ssize_t bytes_written;
 	int ret;
 
 	env = ienv->env;
@@ -57,14 +51,10 @@ __wt_write(IENV *ienv,
 	WT_STAT(fh->write_count);
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
 		__wt_env_errx(env,
-		    "fileops: %s: write %lu 512B blocks at block %lu",
-		    fh->name, (u_long)blocks, (u_long)block_number);
+		    "fileops: %s: write %lu bytes at offset %lu",
+		    fh->name, (u_long)bytes, (u_long)offset);
 
-	bytes_to_write = (ssize_t)WT_BLOCKS_TO_BYTES(blocks);
-	bytes_written = pwrite(fh->fd, buf,
-	    (ssize_t)WT_BLOCKS_TO_BYTES(blocks),
-	    (off_t)WT_BLOCKS_TO_BYTES(block_number));
-	if (bytes_to_write == bytes_written)
+	if ((bytes_written = pwrite(fh->fd, buf, bytes, offset)) == bytes)
 		return (0);
 
 	__wt_env_err(env, errno, "Write error; file %s", fh->name);

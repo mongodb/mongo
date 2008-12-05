@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 int
-__wt_filesize(IENV *ienv, WT_FH *fh, u_int32_t *blocks)
+__wt_filesize(IENV *ienv, WT_FH *fh, off_t *sizep)
 {
 	ENV *env;
 	struct stat sb;
@@ -26,6 +26,6 @@ __wt_filesize(IENV *ienv, WT_FH *fh, u_int32_t *blocks)
 		return (WT_ERROR);
 	}
 
-	*blocks = sb.st_blocks;		/* Return count of 512B blocks. */
+	*sizep = sb.st_size;		/* Return size in bytes. */
 	return (0);
 }
