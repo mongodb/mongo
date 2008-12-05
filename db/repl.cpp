@@ -38,7 +38,7 @@
 extern boost::mutex dbMutex;
 auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
 int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
-bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder);
+bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl);
 void ensureHaveIdIndex(const char *ns);
 
 /* "dead" means something really bad happened like replication falling completely out of sync. 
@@ -96,7 +96,7 @@ class CmdIsMaster : public Command {
 public:
     CmdIsMaster() : Command("ismaster") { }
 
-    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
         if( allDead ) { 
             result.append("ismaster", 0.0);
             if( replPair ) 
@@ -142,7 +142,7 @@ public:
 
     virtual bool adminOnly() { return true; }
 
-    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         if( replPair == 0 ) { 
             problem() << "got negotiatemaster cmd but we are not in paired mode." << endl;
             errmsg = "not paired";
@@ -526,7 +526,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 			BufBuilder bb;
 			BSONObjBuilder ob;
 			assert( *opType == 'c' );
-			_runCommands(ns, o, ss, bb, ob);
+			_runCommands(ns, o, ss, bb, ob, true);
 		}
 	}
 	catch( UserAssertionException& e ) { 

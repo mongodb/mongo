@@ -492,11 +492,11 @@ int otherTraceLevel = 0;
 
 int initialExtentSize(int len);
 
-bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder);
+bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl);
 
-bool runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder) { 
+bool runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl) { 
 	try {
-		return _runCommands(ns, jsobj, ss, b, anObjBuilder);
+		return _runCommands(ns, jsobj, ss, b, anObjBuilder, fromRepl);
 	}
 	catch( AssertionException e ) {
         if( !e.msg.empty() ) 
@@ -634,7 +634,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 	b.skip(sizeof(QueryResult));
 
 	/* we assume you are using findOne() for running a cmd... */
-	if( ntoreturn == 1 && runCommands(ns, jsobj, ss, b, cmdResBuf) ) { 
+	if( ntoreturn == 1 && runCommands(ns, jsobj, ss, b, cmdResBuf, false) ) { 
 		n = 1;
 	}
 	else {

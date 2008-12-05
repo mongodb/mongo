@@ -57,7 +57,7 @@ bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder&
 			errmsg = "access denied";
         }
         else {
-            ok = c->run(ns, jsobj, errmsg, anObjBuilder);
+            ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
         }
         if( !ok ) 
             anObjBuilder.append("errmsg", errmsg);

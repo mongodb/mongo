@@ -30,7 +30,7 @@ extern int port;
 
 class Cloner: boost::noncopyable { 
 	DBClientConnection conn;
-	void copy(const char *from_ns, const char *to_ns, bool isindex = false);
+	void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl);
 public:
 	Cloner() { }
 	bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl);
@@ -73,7 +73,7 @@ BSONObj fixindex(BSONObj o) {
 /* copy the specified collection 
    isindex - if true, this is system.indexes collection.
 */
-void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex) {
+void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl) {
     auto_ptr<DBClientCursor> c;
     {
         dbtemprelease r;
@@ -101,7 +101,8 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
         }
 
 		theDataFileMgr.insert(to_collection, (void*) js.objdata(), js.objsize());
-		logOp("i", to_collection, js);
+        if( logForRepl )
+            logOp("i", to_collection, js);
     }
 }
 
@@ -171,13 +172,13 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
 			string err;
 			userCreateNS(to_name.c_str(), options, err, logForRepl);
 		}
-		copy(from_name, to_name.c_str());
+		copy(from_name, to_name.c_str(), false, logForRepl);
 	}
 
 	// now build the indexes
 	string system_indexes_from = fromdb + ".system.indexes";
 	string system_indexes_to = todb + ".system.indexes";
-	copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true);
+	copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl);
 
 	return true;
 }
@@ -195,14 +196,14 @@ class CmdClone : public Command {
 public:
     CmdClone() : Command("clone") { }
 
-    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         string from = cmdObj.getStringField("clone");
         if( from.empty() ) 
             return false;
         /* replication note: we must logOp() not the command, but the cloned data -- if the slave
            were to clone it would get a different point-in-time and not match.
            */
-        return cloneFrom(from.c_str(), errmsg, database->name, true);
+        return cloneFrom(from.c_str(), errmsg, database->name, /*logForReplication=*/!fromRepl);
     }
 } cmdclone;
 
@@ -214,7 +215,7 @@ public:
     CmdCopyDb() : Command("copydb") { }
     virtual bool adminOnly() { return true; }
 
-    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         string fromhost = cmdObj.getStringField("fromhost");
         if( fromhost.empty() ) { 
             /* copy from self */
@@ -229,7 +230,7 @@ public:
             return false;
         }
         setClient(todb.c_str());
-        bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, true);
+        bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl);
         database = 0;
         return res;
     }

@@ -28,9 +28,13 @@ public:
 
     /* run the given command 
        implement this...
+
+       fromRepl - command is being invoked as part of replication syncing.  In this situation you 
+                  normally do not want to log the command to the local oplog.
+
        return value is true if succeeded.  if false, set errmsg text.
     */
-    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) = 0;
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
 
     /* return true if only the admin ns has privileges to run this command. */
     virtual bool adminOnly() { return false; }

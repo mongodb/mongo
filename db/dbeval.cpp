@@ -97,7 +97,7 @@ bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg
 class CmdEval : public Command { 
 public:
     CmdEval() : Command("$eval") { }
-    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         return dbEval(ns, cmdObj, result, errmsg);
     }
 } cmdeval;

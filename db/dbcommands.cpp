@@ -169,7 +169,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 class CmdGetOpTime : public Command { 
 public:
     CmdGetOpTime() : Command("getoptime") { }
-    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         result.appendDate("optime", OpTime::now().asDate());
         return true;
     }
@@ -190,7 +190,7 @@ class CmdOpLogging : public Command {
 public:
     CmdOpLogging() : Command("opLogging") { }
     bool adminOnly() { return true; }
-    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         opLogging = (int) cmdObj.findElement("opLogging").number();
         flushOpLog();
         log() << "CMD: opLogging set to " << opLogging << endl;
@@ -202,7 +202,7 @@ class CmdQueryTraceLevel : public Command {
 public:
     CmdQueryTraceLevel() : Command("queryTraceLevel") { }
     bool adminOnly() { return true; }
-    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         queryTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
         return true;
     }
@@ -212,7 +212,7 @@ class Cmd : public Command {
 public:
     Cmd() : Command("traceAll") { }
     bool adminOnly() { return true; }
-    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         queryTraceLevel = otherTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
         return true;
     }
@@ -220,14 +220,14 @@ public:
 
 extern map<string,Command*> *commands;
 
-// TODO make these all command objects -- legacy stuff here
-//
-// e.g.
-//   system.cmd$.find( { queryTraceLevel: 2 } );
-// 
-// returns true if ran a cmd
-//
-bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder) { 
+/* TODO make these all command objects -- legacy stuff here
+
+   usage:
+     abc.$cmd.findOne( { ismaster:1 } );
+
+   returns true if ran a cmd
+*/
+bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl) { 
 
 	const char *p = strchr(ns, '.');
 	if( !p ) return false;
@@ -235,8 +235,6 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 
 	bool ok = false;
 	bool valid = false;
-
-	//cout << jsobj.toString() << endl;
 
 	BSONElement e;
 	e = jsobj.firstElement();
@@ -257,7 +255,7 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 			errmsg = "access denied";
         }
         else {
-            ok = c->run(ns, jsobj, errmsg, anObjBuilder);
+            ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
         }
         if( !ok ) 
             anObjBuilder.append("errmsg", errmsg);
@@ -272,7 +270,8 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 					ok = false;
 				} else { 
 					dropDatabase(ns);
-					logOp("c", ns, jsobj);
+                    if( !fromRepl ) 
+                        logOp("c", ns, jsobj);
 					ok = true;
 				}
 			}
@@ -353,7 +352,8 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 				anObjBuilder.append("ns", nsToDrop.c_str());
 				ClientCursor::invalidate(nsToDrop.c_str());
 				dropNS(nsToDrop);
-				logOp("c", ns, jsobj);
+                if( !fromRepl ) 
+                    logOp("c", ns, jsobj);
 				/*
 				{
 					BSONObjBuilder b;
@@ -393,7 +393,8 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 					d->aboutToDeleteAnIndex();
 
 					ClientCursor::invalidate(toDeleteNs.c_str());
-					logOp("c", ns, jsobj);
+                    if( !fromRepl ) 
+                        logOp("c", ns, jsobj);
 
 					// delete a specific index or all?
 					if( f.type() == String ) { 
