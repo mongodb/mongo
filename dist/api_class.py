@@ -11,7 +11,8 @@
 # The fields of each line of the getset file:
 #
 #	handle<tab>conditions<tab>
-#		verify -- call a subroutine to OK the argument
+#		default -- a value of 0 means don't change the value
+#		 verify -- call a subroutine to OK the argument
 #	<tab>field<tab>type
 #	...
 #
@@ -32,8 +33,8 @@ db	-
 	errfile	FILE *@S
 db	-
 	errpfx	const char *@S
-db	verify
-	maxitemsize	u_int32_t @S
-db	verify
+db	default,verify
 	pagesize	u_int32_t @S
+	fragsize	u_int32_t @S
 	extentsize	u_int32_t @S
+	maxitemsize	u_int32_t @S

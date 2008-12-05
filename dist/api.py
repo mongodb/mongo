@@ -16,17 +16,13 @@ def output():
 	    '(\n\t' +\
 	    handle.upper() +\
 	    ' *handle'
-	argcnt = 1
 	for l in list:
 		s += ',\n\t' +\
-		    l.split('\t')[1].replace('@S', '*store' + str(argcnt) + 'p')
-		argcnt += 1
+		    l.split('\t')[1].replace('@S', '*' + l.split('\t')[0] + 'p')
 	s = s + ')\n{\n'
-	argcnt = 1;
 	for l in list:
-		s += '\t*store' + str(argcnt) + 'p = ' +\
+		s += '\t*' + l.split('\t')[0] + 'p = ' +\
 		    'handle->' + l.split('\t')[0] + ';\n'
-		argcnt += 1
 	s = s + '}\n'
 	print s
 
@@ -36,38 +32,46 @@ def output():
 	    '(\n\t' +\
 	    handle.upper() +\
 	    ' *handle'
-	argcnt = 1
 	for l in list:
 		s += ',\n\t' +\
-		    l.split('\t')[1].replace('@S', 'store' + str(argcnt))
-		argcnt += 1
+		    l.split('\t')[1].replace('@S', l.split('\t')[0])
 	s += ')\n{\n'
-	argcnt = 1;
+
+	# Verify needs a local return variable.
+	if condition.count('verify'):
+		s += '\tint ret;\n\n'
+
+	# Default means any values that aren't set (that are set to 0)
+	# should be loaded from the existing values before calling the
+	# verification routine.
+	#
+	# XXX
+	# This is ugly -- it supports Db.set_pagesize and nothing else,
+	# we may need to re-think this in the future.
+	if condition.count('default'):
+		for l in list:
+			s += '\tif (' + l.split('\t')[0] +\
+			    ' == 0)\n\t\t' + l.split('\t')[0] +\
+			    ' = handle->' + l.split('\t')[0] + ';\n'
+		s += '\n'
 
 	# Verify means we call a standard verification routine because
 	# there are constraints or side-effects on setting the value.
 	if condition.count('verify'):
-		s += '\tint ret;\n\n' +\
-		    '\tif ((ret = __wt_' +\
+		s += '\tif ((ret = __wt_' +\
 		    handle +\
 		    '_set_' +\
 		    list[0].split('\t')[0] +\
-		    '_verify(handle, '
+		    '_verify(\n\t    handle'
 
-		argcnt = 1
 		for l in list:
-			if argcnt > 1:
-				s += ', '
-			s += 'store' + str(argcnt)
-			argcnt += 1
+			s += ', ' + l.split('\t')[0]
 		s += ')) != 0)\n\t\treturn (ret);\n\n'
 
 
-	argcnt = 1
 	for l in list:
 		s += '\thandle->' + l.split('\t')[0] +\
-		     ' = store' + str(argcnt) + ';\n'
-		argcnt += 1
+		     ' = ' + l.split('\t')[0] + ';\n'
 	s += '\treturn (0);\n}\n'
 	print s
 

@@ -55,7 +55,9 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	if (ret != 0)
 		goto err;
 
-	__wt_db_config_default(db);
+	if ((ret = __wt_db_config_default(db)) != 0)
+		goto err;
+
 	__wt_db_config_methods(db);
 
 	*dbp = db;
@@ -153,18 +155,18 @@ __wt_idb_destroy(DB *db, int refresh)
  * __wt_db_config_default --
  *	Set default configuration for a just-created DB handle.
  */
-void
+int
 __wt_db_config_default(DB *db)
 {
-	db->pagesize = WT_DEFAULT_PAGE_SIZE;
-	db->extentsize = WT_DEFAULT_EXTENT_SIZE;
+	int ret;
 
-	/*
-	 * The page must hold at least 4 keys, otherwise the whole Btree
-	 * thing breaks down because we can't split.
-	 */
-	db->maxitemsize = WT_DATA_SPACE(WT_DEFAULT_PAGE_SIZE) / 4;
-	F_SET(db, WT_MAXKEY_NOTSET);
+	if ((ret = __wt_db_set_pagesize(db,
+	    WT_PAGE_DEFAULT_SIZE,
+	    WT_FRAG_DEFAULT_SIZE,
+	    WT_EXTENT_DEFAULT_SIZE, 0)) != 0)
+		return (ret);
+
+	return (0);
 }
 
 /*
@@ -178,12 +180,10 @@ __wt_db_config_methods(DB *db)
 	db->get_errcall = __wt_db_get_errcall;
 	db->get_errfile = __wt_db_get_errfile;
 	db->get_errpfx = __wt_db_get_errpfx;
-	db->get_maxitemsize = __wt_db_get_maxitemsize;
 	db->get_pagesize = __wt_db_get_pagesize;
 	db->set_errcall = __wt_db_set_errcall;
 	db->set_errfile = __wt_db_set_errfile;
 	db->set_errpfx = __wt_db_set_errpfx;
-	db->set_maxitemsize = __wt_db_set_maxitemsize;
 	db->set_pagesize = __wt_db_set_pagesize;
 
 	/* Initialize handle methods. */
@@ -216,15 +216,14 @@ __wt_db_config_fatal(DB *db)
 	    (void (*)(DB *, void (**)(const DB *, const char *)))__wt_db_fatal;
 	db->get_errfile = (void (*)(DB *, FILE **))__wt_db_fatal;
 	db->get_errpfx = (void (*)(DB *, const char **))__wt_db_fatal;
-	db->get_maxitemsize = (void (*)(DB *, u_int32_t *))__wt_db_fatal;
-	db->get_pagesize =
-	    (void (*)(DB *, u_int32_t *, u_int32_t *))__wt_db_fatal;
+	db->get_pagesize = (void (*)(DB *,
+	    u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *))__wt_db_fatal;
 	db->set_errcall =
 	    (int  (*)(DB *, void (*)(const DB *, const char *)))__wt_db_fatal;
 	db->set_errfile = (int  (*)(DB *, FILE *))__wt_db_fatal;
 	db->set_errpfx = (int  (*)(DB *, const char *))__wt_db_fatal;
-	db->set_maxitemsize = (int  (*)(DB *, u_int32_t))__wt_db_fatal;
-	db->set_pagesize = (int  (*)(DB *, u_int32_t, u_int32_t))__wt_db_fatal;
+	db->set_pagesize = (int  (*)
+	    (DB *, u_int32_t, u_int32_t, u_int32_t, u_int32_t))__wt_db_fatal;
 
 	/* Initialize handle methods (except for destroy). */
 	db->bulk_load =
