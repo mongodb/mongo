@@ -19,30 +19,46 @@ struct __wt_btree {
 
 	WT_FH *fh;				/* Backing file handle */
 
-	u_int32_t blocks;			/* 512B blocks in the file */
+	u_int32_t frags;			/* Fragments in the file */
 };
 
 /*
- * File offsets are multiples of 512B and stored internally in 32-bit unsigned
- * variables.  We separate file offsets from logical page numbers so we can
- * allocate other than page-size chunks from the file, for example, allocating
- * space for overflow key or data items.
+ * We only have 32-bits to hold file locations, so all file locations are
+ * stored in counts of "fragments" (making a "fragment" the smallest unit
+ * of allocation from the underlying file).  To simplify the bookkeeping,
+ * the database page size must be a multiple of the fragment size, and the
+ * database extent size must be a multiple of the page size.  The minimum
+ * fragment size is 512B, so the minimum maximum database size is 2TB, and
+ * the maximum maximum (assuming we could pass file offsets that large,
+ * which we can't), is 4EB.   In short, nobody will ever complain this
+ * code can't build a database sufficiently large for whatever the hell it
+ * is they want to do.
  */
-#define	WT_BLOCK_SIZE			(512)
-#define	WT_BLOCKS_TO_BYTES(blocks)	((blocks) * WT_BLOCK_SIZE)
-#define	WT_BYTES_TO_BLOCKS(bytes)					\
-	(((bytes) + (WT_BLOCK_SIZE - 1)) / WT_BLOCK_SIZE)
-#define	WT_PGNO_TO_BLOCKS(db, pgno)					\
-	((db)->pagesize / WT_BLOCK_SIZE) * (pgno)
+#define	WT_FRAG_MINIMUM_SIZE		(512)		/* 512B */
+#define	WT_FRAG_DEFAULT_SIZE		(2048)		/* 2KB */
+#define	WT_PAGE_DEFAULT_SIZE		(32768)		/* 32KB */
+#define	WT_EXTENT_DEFAULT_SIZE		(10485760)	/* 10MB */
 
-#define	WT_DEFAULT_PAGE_SIZE		32768	/* 32KB */
-#define	WT_DEFAULT_EXTENT_SIZE		10485760/* 10MB */
+/* Convert a file address into a byte offset. */
+#define	WT_FRAGS_TO_BYTES(db, frags)					\
+	((size_t)(frags) * (db)->fragsize)
+/* Return the number of fragments needed to hold N bytes. */
+#define	WT_BYTES_TO_FRAGS(db, bytes)					\
+	((bytes) / (db)->fragsize)
+
+/* Return the fragments needed for an overflow item. */
+#define	WT_OVERFLOW_BYTES_TO_FRAGS(db, len, frags) {			\
+	off_t __bytes;							\
+	 __bytes = (len) + sizeof(WT_PAGE_HDR);				\
+	 __bytes = WT_ALIGN(__bytes, (db)->fragsize);			\
+	 (frags) = WT_BYTES_TO_FRAGS(db, __bytes);			\
+}
 
 /*
- * Block 0 of the file is the btree root, and the invalid page address.
+ * Block 0 of the file is the btree root, and the invalid address.
  */
 #define	WT_BTREE_ROOT	0
-#define	WT_PGNO_INVALID	0
+#define	WT_ADDR_INVALID	0
 
 /*
  * Each page of the Btree has an associated, in-memory structure that
@@ -50,7 +66,7 @@ struct __wt_btree {
  * Berkeley DB moved.)
  */
 struct __wt_page_inmem {
-	u_int32_t pgno;				/* File block address */
+	u_int32_t addr;				/* File block address */
 
 	u_int32_t space_avail;			/* Available page memory */
 
@@ -78,6 +94,7 @@ struct __wt_page_hdr {
 #define	WT_PAGE_BTREE_ROOT	1	/* Btree root page */
 #define	WT_PAGE_BTREE_INTERNAL	2	/* Btree internal page */
 #define	WT_PAGE_BTREE_LEAF	3	/* Btree leaf page */
+#define	WT_PAGE_BTREE_OVERFLOW	4	/* Btree overflow page */
 	u_int16_t type;			/* 08-09: page type */
 
 	u_int16_t flags;		/* 10-11: page flags */
@@ -85,18 +102,18 @@ struct __wt_page_hdr {
 	u_int32_t checksum;		/* 12-15: checksum */
 	u_int32_t entries;		/* 16-19: number of items */
 
-	u_int32_t prevpg;		/* 20-23: previous page */
-	u_int32_t nextpg;		/* 24-27: next page */
+	u_int32_t prevaddr;		/* 20-23: previous page */
+	u_int32_t nextaddr;		/* 24-27: next page */
 };
 #define	WT_HDR_SIZE		28
+#define	WT_PAGE_DATA(hdr)	((u_int8_t *)(hdr) + WT_HDR_SIZE)
 
 #define	WT_DATA_SPACE(pgsize)		((pgsize) - sizeof(WT_PAGE_HDR))
 
 /*
  * After the header, there is a list of items in sorted order.  On btree
  * leaf pages, they are paired, key/data items.   On btree internal pages,
- * they are key items.   After the item, is a variable length chunk of
- * data.
+ * they are key items.
  */
 struct __wt_item {
 	u_int32_t len;			/* Data length, in bytes */
@@ -106,6 +123,10 @@ struct __wt_item {
 #define	WT_ITEM_STANDARD	3
 	u_int8_t  type;			/* Data type */
 	u_int8_t  unused[3];		/* Spacer to force alignment */
+
+	/*
+	 * A variable length chunk of data.
+	 */
 };
 
 /*
@@ -122,8 +143,13 @@ struct __wt_item {
  */
 struct __wt_item_int {
 	u_int32_t  len;			/* Data length, in bytes */
+
 	u_int32_t  child;		/* Child page number */
 	wt_recno_t records;		/* Subtree record count */
+
+	/*
+	 * A variable length chunk of data.
+	 */
 };
 
 /*
@@ -131,9 +157,10 @@ struct __wt_item_int {
  * structure.
  */
 struct __wt_item_ovfl {
-	u_int32_t pgno;			/* Overflow page number */
+	u_int32_t addr;			/* Overflow page number */
+	u_int32_t len;			/* Overflow length */
 }; 
-	
+
 #if defined(__cplusplus)
 }
 #endif
