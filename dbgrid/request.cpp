@@ -37,6 +37,7 @@
 
 #include "stdafx.h"
 #include "../grid/message.h"
+#include "../db/commands.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 
@@ -58,8 +59,6 @@ void getMore(Message& m, MessagingPort& p) {
 
   dbcon.done();
 }
-
-bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
 
 /* got query operation from a database */
 void queryOp(Message& m, MessagingPort& p) {

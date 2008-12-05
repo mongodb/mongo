@@ -72,7 +72,7 @@ void ReplPair::arbitrate() {
         return;
     }
 
-    auto_ptr<DBClientConnection> conn( new DBClientConnection() );
+    auto_ptr<DBClientConnection> conn( newClientConnection() );
     string errmsg;
     if( !conn->connect(arbHost.c_str(), errmsg) ) {
         setMaster(State_CantArb, "can't connect to arb");

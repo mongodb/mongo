@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include "db.h"
+#include "../client/dbclient.h"
+
 extern int port;
 extern const char *allDead;
 
@@ -84,6 +87,11 @@ public:
 
     /* peer unreachable, try our arbitrator */
     void arbitrate();
+
+    virtual
+      DBClientConnection *newClientConnection() {
+      return new DBClientConnection();
+    }
 };
 
 extern ReplPair *replPair;
