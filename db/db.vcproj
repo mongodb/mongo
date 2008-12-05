@@ -214,6 +214,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\dbhelpers.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\dbinfo.cpp"
 				>
 			</File>
@@ -345,6 +349,10 @@
 			</File>
 			<File
 				RelativePath=".\db.h"
+				>
+			</File>
+			<File
+				RelativePath=".\dbhelpers.h"
 				>
 			</File>
 			<File

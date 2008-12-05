@@ -54,6 +54,7 @@ void setupSignals() {}
 
 void usage() { 
     cout << "Mongo dbgrid usage:\n\n";
+    cout << " run (run with default settings)\n";
     cout << " --port <portno>\n";
     cout << " --griddb <griddbname>\n\n";
     cout << "If not explicitly specified, griddbname is infered by replacing \"-n<n>\"\n";
@@ -137,6 +138,11 @@ int main(int argc, char* argv[], char *envp[] ) {
     signal(SIGPIPE, pipeSigHandler);
 #endif
 
+    if( argc <= 1 ) { 
+        usage();
+        return 3;
+    }
+
     for (int i = 1; i < argc; i++)  {
         if( argv[i] == 0 ) continue;
         string s = argv[i];
@@ -147,6 +153,8 @@ int main(int argc, char* argv[], char *envp[] ) {
             dashDashGridDb = argv[++i];
             i++;
         }
+        else if( s == "run" ) 
+            ;
         else { 
             usage();
             return 3;
@@ -160,7 +168,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 1;
     }
 
-	log() << "dbgrid starting" << endl;
+	log() << "dbgrid starting (--help for usage)" << endl;
 	UnitTest::runTests();
     start();
 	dbexit(0);
