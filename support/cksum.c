@@ -19,7 +19,7 @@
  *	http://www.cl.cam.ac.uk/research/srg/bluebook/21/crc/node6.html#SECTION00060000000000000000
  */
 u_int32_t
-__wt_cksum(void *chunk, u_int32_t blocks)
+__wt_cksum(void *chunk, size_t len)
 {
 	#if 0
 	/*
@@ -116,7 +116,7 @@ __wt_cksum(void *chunk, u_int32_t blocks)
 		0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668,
 		0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 	};
-	u_int32_t len, result;
+	u_int32_t result;
 	u_int8_t *data, octet;
 	int i;
 
@@ -126,7 +126,7 @@ __wt_cksum(void *chunk, u_int32_t blocks)
 	result |= *data++ << 8;
 	result |= *data++;
 	result = ~result;
-	len = WT_BLOCKS_TO_BYTES(blocks) - 4;
+	len -= 4;
 
 	for (i = 0; i < len; ++i)
 		result = (result << 8 | *data++) ^ crctab[result >> 24];
