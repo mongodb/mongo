@@ -10,6 +10,7 @@
 *.pch 
 db/Debug
 db/db
+db/dbtests
 db/oplog*
 db/.gdb*
 log
