@@ -318,14 +318,12 @@ int BSONObj::woCompare(const BSONObj& r) const {
 		}
 
         int lt = (int) l.type();
+        if( lt == NumberInt ) lt = NumberDouble;
         int rt = (int) r.type();
+        if( rt == NumberInt ) rt = NumberDouble;
 		int x = lt - rt;
-        if( x != 0 ) {
-            if( (lt==NumberInt&&rt==NumberDouble) || (lt==NumberDouble&&rt==NumberInt) )
-                ;
-            else
-                return x;
-        }
+        if( x != 0 )
+            return x;
 		x = strcmp(l.fieldName(), r.fieldName());
 		if( x != 0 )
 			return x;

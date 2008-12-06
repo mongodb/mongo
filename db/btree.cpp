@@ -136,7 +136,14 @@ void BucketBasics::assertValid(bool force) {
 			BSONObj k1 = keyNode(0).key;
 			BSONObj k2 = keyNode(n-1).key;
 			int z = k1.woCompare(k2);
-			wassert( z <= 0 );
+			//wassert( z <= 0 );
+            if( z > 0 ) { 
+                problem() << "btree keys out of order" << '\n';
+                ONCE { 
+                    ((BtreeBucket *) this)->dump();
+                }
+                assert(false);
+            }
 		}
 	}
 }
