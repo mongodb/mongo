@@ -82,7 +82,7 @@ void ReplPair::arbitrate() {
     bool is_master;
     BSONObj res = conn->cmdIsMaster(is_master);
         /*findOne("admin.$cmd", ismasterobj);*/
-    if( res.isEmpty() ) { 
+    if( res.isEmpty() ) {
         setMaster(State_CantArb, "can't arb 2");
         return;
     }

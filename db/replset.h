@@ -89,7 +89,7 @@ public:
     void arbitrate();
 
     virtual
-      DBClientConnection *newClientConnection() {
+      DBClientConnection *newClientConnection() const {
       return new DBClientConnection();
     }
 };
