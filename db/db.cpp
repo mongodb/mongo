@@ -27,7 +27,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 
-bool objcheck = false;
+extern bool objcheck;
 bool useJNI = true;
 
 /* only off if --nocursors which is for debugging. */

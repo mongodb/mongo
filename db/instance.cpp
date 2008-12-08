@@ -190,7 +190,7 @@ void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort,
 	//dbMsgPort.reply(m, resp);
 }
 
-extern bool objcheck;
+bool objcheck = false;
 
 void receivedInsert(Message& m, stringstream& ss) {
 	DbMessage d(m);
