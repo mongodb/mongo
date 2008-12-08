@@ -27,6 +27,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 
+bool objcheck = false;
 bool useJNI = true;
 
 /* only off if --nocursors which is for debugging. */
@@ -534,6 +535,8 @@ int main(int argc, char* argv[], char *envp[] )
 				master = true;
 			else if( s == "--slave" )
 				slave = true;
+            else if( s == "--objcheck" ) 
+                objcheck = true;
 			else if( s == "--source" ) { 
                 /* specifies what the source in local.sources should be */
                 dashDashSource = argv[++i];
@@ -572,7 +575,10 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  quicktest         just check basic assertions and exit" << endl;
 	cout << "  test2             run test2() - see code" << endl;
 	cout << "\nOptions:" << endl;
-	cout << " --port <portno>  --dbpath <root> --appsrvpath <root of appsrv>" << endl;
+    cout << " --objcheck         inspect client data for validity on receipt\n";
+	cout << " --port <portno>\n";
+    cout << " --dbpath <root>\n";
+    cout << " --appsrvpath <root of appsrv>" << endl;
 	cout << " --nocursors  --nojni" << endl;
 	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     cout << "\nReplication:" << endl;

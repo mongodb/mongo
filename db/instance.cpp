@@ -190,8 +190,9 @@ void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort,
 	//dbMsgPort.reply(m, resp);
 }
 
+extern bool objcheck;
+
 void receivedInsert(Message& m, stringstream& ss) {
-//	cout << "GOT MSG id:" << m.data->id << endl;
 	DbMessage d(m);
 	while( d.moreJSObjs() ) {
 		BSONObj js = d.nextJsObj();
@@ -199,6 +200,12 @@ void receivedInsert(Message& m, stringstream& ss) {
 		assert(*ns);
 		setClient(ns);
 		ss << ns;
+
+        if( objcheck && !js.valid() ) {
+            problem() << "insert error ns: " << ns << '\n';
+            uassert("insert: bad object from client", false);
+        }
+
 		theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
 		logOp("i", ns, js);
 	}
