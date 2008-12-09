@@ -458,10 +458,12 @@ public:
 	void append(const char *fieldName, string str) {
 		append(fieldName, str.c_str());
 	}
+	// Append an element that is less than all other keys.
 	void appendMinKey( const char *fieldName ) {
  		b.append( (char) MinKey );
 		b.append( fieldName );
 	}
+	// Append an element that is greater than all other keys.
 	void appendMaxKey( const char *fieldName ) {
  		b.append( (char) MaxKey );
 		b.append( fieldName );

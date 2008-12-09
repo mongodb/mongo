@@ -215,7 +215,7 @@ public:
 
 private:
 	void findExtremeKeys( const BSONObj &query );
-	static set< string > getFields( const BSONObj &key ); 
+	static void getFields( const BSONObj &key, set< string > &fields ); 
 	static void appendKeyElement( BSONObjBuilder &builder,
 								 const BSONElement &element,
 								 const char *fieldName,

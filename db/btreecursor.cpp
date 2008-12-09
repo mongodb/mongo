@@ -54,10 +54,14 @@ BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, BS
 	checkUnused();
 }
 
+// Given a query, find the lowest and highest keys along our index that could
+// potentially match the query.  These lowest and highest keys will be mapped
+// to startKey and endKey based on the value of direction.
 void BtreeCursor::findExtremeKeys( const BSONObj &query ) {	
 	BSONObjBuilder startBuilder;
 	BSONObjBuilder endBuilder;
-	set<string> fields = getFields( indexDetails.keyPattern() );
+	set< string >fields;
+	getFields( indexDetails.keyPattern(), fields );
 	for( set<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
 		const char * field = i->c_str();
 		BSONElement k = indexDetails.keyPattern().getFieldDotted( field );
@@ -85,8 +89,8 @@ void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
 	endKey = endBuilder.doneAndDecouple();
 }
 
-set< string > BtreeCursor::getFields( const BSONObj &key ) {
-	set< string > fields;
+// Expand all field names in key to use dotted notation.
+void BtreeCursor::getFields( const BSONObj &key, set< string > &fields ) {
 	BSONObjIterator i( key );
 	while( 1 ) {
 		BSONElement k = i.next();
@@ -94,7 +98,8 @@ set< string > BtreeCursor::getFields( const BSONObj &key ) {
 			break;
 		bool addedSubfield = false;
 		if( k.type() == Object ) {
-			set< string > subFields = getFields( k.embeddedObject() );
+			set< string > subFields;
+			getFields( k.embeddedObject(), subFields );
 			for( set< string >::iterator i = subFields.begin(); i != subFields.end(); ++i ) {
 				addedSubfield = true;
 				fields.insert( k.fieldName() + string( "." ) + *i );
@@ -103,9 +108,9 @@ set< string > BtreeCursor::getFields( const BSONObj &key ) {
 		if ( !addedSubfield )
 			fields.insert( k.fieldName() );
 	}
-	return fields;
 }
 
+// If element is non-null, append it to builder; otherwise append min or max.
 void BtreeCursor::appendKeyElement( BSONObjBuilder &builder,
 								   const BSONElement &element,
 								   const char *fieldName,
@@ -136,12 +141,14 @@ void BtreeCursor::checkUnused() {
 		OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
 }
 
+// Return a value in the set {-1, 0, 1} to represent the sign of parameter i.
 int sgn( int i ) {
 	if( i == 0 )
 		return 0;
 	return i > 0 ? 1 : -1;
 }
 
+// Check if the current key is beyond endKey.
 void BtreeCursor::checkEnd() {
 	if ( bucket.isNull() )
 		return;	
