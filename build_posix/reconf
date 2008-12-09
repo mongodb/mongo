@@ -15,7 +15,7 @@ clean()
 	rm -rf \
 	    ChangeLog COPYING INSTALL Makefile.am Makefile.in NEWS \
 	    README aclocal.m4 autom4te.cache config.hin config.hin~ \
-	    configure
+	    configure mklog
 }
 
 while :
