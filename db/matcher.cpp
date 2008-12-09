@@ -407,23 +407,14 @@ inline bool regexMatches(RegexMatcher& rm, BSONElement& e, bool *deep) {
 	return false;
 }
 
-#define FAILURE(inIndex) { \
-  ok=false; \
-  if( inIndex ) { indexMatches=false; return false; } \
-  if( !checkInIndex ) return false; }
-
 /* See if an object matches the query.
    deep - return true when means we looked into arrays for a match 
-   indexMatches - true if the index we are using, its fields match, even if other stuff doesn't.
 
    Wondering if it would be worth having 
      if( !inIndex && !ok ) continue;
    in each loop to bypass those checks.  probably not worth checking as usually we are ok.
 */
-bool JSMatcher::matches(BSONObj& jsobj, bool& indexMatches, bool *deep) {
-    indexMatches = true;
-    bool ok = true;
-
+bool JSMatcher::matches(BSONObj& jsobj, bool *deep) {
 	if( deep ) 
 		*deep = false;
 
@@ -437,17 +428,16 @@ bool JSMatcher::matches(BSONObj& jsobj, bool& indexMatches, bool *deep) {
         // -1=mismatch. 0=missing element. 1=match 
 		int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, deep);
 
-        bool res = true;
 		if( cmp < 0 )
-            FAILURE(bm.inIndex)
+			return false;
         if( cmp == 0 ) {
             /* missing is ok iff we were looking for null */
             if( m.type() == jstNULL || m.type() == Undefined ) {
                 if( bm.compareOp == NE ) {
-                    FAILURE(bm.inIndex)
+                    return false;
                 }
             } else {
-                FAILURE(bm.inIndex)
+				return false;
             }
         }
 	}
@@ -456,19 +446,12 @@ bool JSMatcher::matches(BSONObj& jsobj, bool& indexMatches, bool *deep) {
 		RegexMatcher& rm = regexs[r];
 		BSONElement e = jsobj.getFieldDotted(rm.fieldName);
 		if( e.eoo() )
-            FAILURE(rm.inIndex)
+			return false;
 		if( !regexMatches(rm, e, deep) )
-            FAILURE(rm.inIndex)
+			return false;
 	}
 
     if( where ) { 
-        if( !ok ) {
-            /* we had already mismatched and were just looking for an index mismatch. 
-               as $where doesn't support inIndex yet, no need to keep going here.
-            */
-            return false;
-        }
-
         if( where->func == 0 ) {
             uassert("$where compile error", false);
             return false; // didn't compile
@@ -495,7 +478,7 @@ bool JSMatcher::matches(BSONObj& jsobj, bool& indexMatches, bool *deep) {
         return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
     }
 
-    return ok;
+    return true;
 }
 
 struct JSObj1 js1;
@@ -518,22 +501,21 @@ struct JSObj2 {
 struct JSUnitTest : public UnitTest {
 	void run() {
 
-        bool im;//indexMatches
 		BSONObj j1((const char *) &js1);
 		BSONObj j2((const char *) &js2);
 		JSMatcher m(j2, BSONObj());
-		assert( m.matches(j1,im) );
+		assert( m.matches(j1) );
 		js2.sval[0] = 'z';
-		assert( !m.matches(j1,im) );
+		assert( !m.matches(j1) );
 		JSMatcher n(j1, BSONObj());
-		assert( n.matches(j1,im) );
-		assert( !n.matches(j2,im) );
+		assert( n.matches(j1) );
+		assert( !n.matches(j2) );
 
 		BSONObj j0 = emptyObj;
 //		BSONObj j0((const char *) &js0);
 		JSMatcher p(j0, BSONObj());
-		assert( p.matches(j1,im) );
-		assert( p.matches(j2,im) );
+		assert( p.matches(j1) );
+		assert( p.matches(j2) );
 	}
 } jsunittest;
 

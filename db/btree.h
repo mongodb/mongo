@@ -171,9 +171,11 @@ private:
 
 class BtreeCursor : public Cursor {
 	friend class BtreeBucket;
+	BSONObj startKey;
+	BSONObj endKey;
 //    BSONObj query; // the query we are working on in association with the cursor -- see noMoreMatches()
 public:
-	BtreeCursor(IndexDetails&, BSONObj& startKey, int direction, BSONObj& query);
+	BtreeCursor(IndexDetails&, const BSONObj& startKey, int direction, BSONObj& query);
 	virtual bool ok() { return !bucket.isNull(); }
 	bool eof() { return !ok(); }
 	virtual bool advance();
@@ -212,7 +214,14 @@ public:
     }
 
 private:
+	void findExtremeKeys( const BSONObj &query );
+	static set< string > getFields( const BSONObj &key ); 
+	static void appendKeyElement( BSONObjBuilder &builder,
+								 const BSONElement &element,
+								 const char *fieldName,
+								 bool defaultMin ); 
 	void checkUnused();
+	void checkEnd();
 	IndexDetails& indexDetails;
 	DiskLoc bucket;
 	int keyOfs;

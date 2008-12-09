@@ -42,7 +42,6 @@ LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
 int nextCursorId = 1;
 extern bool useCursors;
 
-int getGtLtOp(BSONElement& e);
 void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e);
 
 /* todo: _ cache query plans 
@@ -97,37 +96,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 				if( isSorted )
 					*isSorted = true;
 
-				// Initialize cursor using query, in the following simple cases.
-				// (quick fix for bug 1079 )
-				if ( orderFields.size() == 1 ) {
-				  string field = *orderFields.begin();
-				  BSONElement e = query.getField( field.c_str() );
-				  if ( !e.eoo() && e.type() != RegEx ) {
-				    int op = getGtLtOp( e );
-				    if ( ( op == JSMatcher::Equality ) ||
-					 ( ( op == JSMatcher::LT || op == JSMatcher::LTE ) && reverse ) ||
-					 ( ( op == JSMatcher::GT || op == JSMatcher::GTE ) && !reverse ) ) {
-				      BSONObjBuilder b;
-				      if ( op == JSMatcher::Equality ) {
-					b.append( e );
-				      } else {
-					BSONElement ee = e.embeddedObject().firstElement();
-					b.appendAs( ee, e.fieldName() );
-				      }
-				      BSONObj q = b.doneAndDecouple();
-				      auto_ptr<Cursor> c( new BtreeCursor(d->indexes[i], q, reverse ? -1 : 1, query) );
-				      if ( op == JSMatcher::GT || op == JSMatcher::LT )
-					for( ; c->ok(); c->advance() ) {
-					  BSONElement f = c->current().getField( field.c_str() );
-					  if ( f.eoo() || !( q.firstElement() == f ) )
-					    break;
-					}
-				      return c;
-				    }
-				  }
-				}
-
-				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], reverse ? maxKey : emptyObj, reverse ? -1 : 1, query));
+				return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], BSONObj(), reverse ? -1 : 1, query));
 			}
 		}
 	}
@@ -197,7 +166,7 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 						int direction = - JSMatcher::opDirection(op);
 						return auto_ptr<Cursor>( new BtreeCursor(
 							d->indexes[i], 
-							direction == 1 ? emptyObj : maxKey, 
+							BSONObj(), 
 							direction, query) );
 					}
 				}
@@ -274,10 +243,7 @@ int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
 		BSONObj js(r);
 
 		bool deep;
-        bool indexMatches;
-		if( !matcher.matches(js, indexMatches, &deep) ) {
-            if( !indexMatches )
-                break;
+		if( !matcher.matches(js, &deep) ) {
             c->advance(); // advance must be after noMoreMatches() because it uses currKey()
 		}
         else { 
@@ -407,10 +373,7 @@ int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upse
 			Record *r = c->_current();
 			nscanned++;
 			BSONObj js(r);
-            bool indexMatches;
-			if( !matcher.matches(js, indexMatches) ) {
-                if( !indexMatches )
-                    break;
+			if( !matcher.matches(js) ) {
 			}
 			else {
 				/* note: we only update one row and quit.  if you do multiple later, 
@@ -576,11 +539,8 @@ int runCount(const char *ns, BSONObj& cmd, string& err) {
 	while( c->ok() ) {
 		BSONObj js = c->current();
 		bool deep;
-        bool indexMatches;
-		if( !matcher->matches(js, indexMatches, &deep) ) {
-            if( !indexMatches ) 
-                break;
-		}
+		if( !matcher->matches(js, &deep) ) {
+ 		}
 		else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
 			// got a match.
 			count++;
@@ -707,10 +667,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
 			//	cout << " checking against:\n " << js.toString() << endl;
 			nscanned++;
 			bool deep;
-            bool indexMatches;
-			if( !matcher->matches(js, indexMatches, &deep) ) {
-                if( !indexMatches )
-                    break;
+			if( !matcher->matches(js, &deep) ) {
 			}
 			else if( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
 				// got a match.
@@ -880,10 +837,7 @@ done:
 			BSONObj js = c->current();
 
 			bool deep;
-            bool indexMatches;
-			if( !cc->matcher->matches(js, indexMatches, &deep) ) {
-                if( !indexMatches )
-					goto done;
+			if( !cc->matcher->matches(js, &deep) ) {
 			} 
 			else { 
 				//cout << "matches " << c->currLoc().toString() << ' ' << deep << '\n';

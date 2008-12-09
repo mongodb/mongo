@@ -19,13 +19,14 @@
 #include "stdafx.h"
 #include "btree.h"
 #include "pdfile.h"
+#include "jsobj.h"
 
 extern int otherTraceLevel;
 
 DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
 DiskLoc minDiskLoc(0, 1);
 
-BtreeCursor::BtreeCursor(IndexDetails& _id, BSONObj& k, int _direction, BSONObj& _query) : 
+BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, BSONObj& _query) : 
 //    query(_query),
     indexDetails(_id),
     direction(_direction)
@@ -43,9 +44,79 @@ BtreeCursor::BtreeCursor(IndexDetails& _id, BSONObj& k, int _direction, BSONObj&
 			indexDetails.head.btree()->dump();
 		}
 	}
+	
+	findExtremeKeys( _query );
+	if( !k.isEmpty() )
+		startKey = k;
+	
 	bucket = indexDetails.head.btree()->
-		locate(indexDetails.head, k, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
+		locate(indexDetails.head, startKey, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
 	checkUnused();
+}
+
+void BtreeCursor::findExtremeKeys( const BSONObj &query ) {	
+	BSONObjBuilder startBuilder;
+	BSONObjBuilder endBuilder;
+	set<string> fields = getFields( indexDetails.keyPattern() );
+	for( set<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
+		const char * field = i->c_str();
+		BSONElement k = indexDetails.keyPattern().getFieldDotted( field );
+		bool forward = ( ( k.number() > 0 ? 1 : -1 ) * direction > 0 );
+		BSONElement startElement;
+		BSONElement endElement;
+		BSONElement e = query.getFieldDotted( field );
+		if ( !e.eoo() && e.type() != RegEx ) {
+			int op = getGtLtOp( e );
+			bool someLt = ( op == JSMatcher::LT || op == JSMatcher::LTE );
+			bool someGt = ( op == JSMatcher::GT || op == JSMatcher::GTE );
+			if ( op == JSMatcher::Equality )
+				startElement = endElement =	e;
+			else if ( ( someLt && forward ) ||
+					 ( someGt && !forward ) )
+				endElement = e.embeddedObject().firstElement();
+			else if ( ( someLt && !forward ) ||
+					 ( someGt && forward ) )
+				startElement = e.embeddedObject().firstElement();
+		}
+		appendKeyElement( startBuilder, startElement, field, forward );
+		appendKeyElement( endBuilder, endElement, field, !forward );
+	}
+	startKey = startBuilder.doneAndDecouple();
+	endKey = endBuilder.doneAndDecouple();
+}
+
+set< string > BtreeCursor::getFields( const BSONObj &key ) {
+	set< string > fields;
+	BSONObjIterator i( key );
+	while( 1 ) {
+		BSONElement k = i.next();
+		if( k.eoo() )
+			break;
+		bool addedSubfield = false;
+		if( k.type() == Object ) {
+			set< string > subFields = getFields( k.embeddedObject() );
+			for( set< string >::iterator i = subFields.begin(); i != subFields.end(); ++i ) {
+				addedSubfield = true;
+				fields.insert( k.fieldName() + string( "." ) + *i );
+			}
+		}
+		if ( !addedSubfield )
+			fields.insert( k.fieldName() );
+	}
+	return fields;
+}
+
+void BtreeCursor::appendKeyElement( BSONObjBuilder &builder,
+								   const BSONElement &element,
+								   const char *fieldName,
+								   bool defaultMin ) {
+	if( !( element == BSONElement() ) )
+		builder.appendAs( element, fieldName );
+	else
+		if( defaultMin )
+			builder.appendMinKey( fieldName );
+		else
+			builder.appendMaxKey( fieldName );
 }
 
 /* skip unused keys. */
@@ -65,11 +136,27 @@ void BtreeCursor::checkUnused() {
 		OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
 }
 
+int sgn( int i ) {
+	if( i == 0 )
+		return 0;
+	return i > 0 ? 1 : -1;
+}
+
+void BtreeCursor::checkEnd() {
+	if ( bucket.isNull() )
+		return;	
+	int res = endKey.woCompare( currKey() );
+	int cmp = sgn( endKey.woCompare( currKey() ) );
+	if ( cmp != 0 && cmp != direction )
+		bucket = DiskLoc();
+}
+
 bool BtreeCursor::advance() { 
 	if( bucket.isNull() )
 		return false;
 	bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");
 	checkUnused();
+	checkEnd();
 	return !bucket.isNull();
 }
 

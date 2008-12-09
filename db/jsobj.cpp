@@ -52,6 +52,8 @@ string BSONElement::toString() {
 		s << fieldName() << ": null"; break;
 	case MaxKey:
 		s << fieldName() << ": MaxKey"; break;
+	case MinKey:
+		s << fieldName() << ": MinKey"; break;
     case CodeWScope:
         s << fieldName() << ": codewscope"; break;
 	case Code:
@@ -100,6 +102,7 @@ int BSONElement::size() const {
 		case Undefined:
 		case jstNULL:
 		case MaxKey:
+		case MinKey:
 			break;
 		case Bool:
 			x = 2;
@@ -149,7 +152,7 @@ int BSONElement::size() const {
 
 	if( !eoo() ) { 
 		const char *next = data + totalSize;
-		if( *next < 0 || *next > JSTypeMax ) { 
+		if( *next < MinKey || ( *next > JSTypeMax && *next != MaxKey ) ) { 
 			// bad type.  
 			cout << "***\n";
 			cout << "Bad data or size in BSONElement::size()\n";
@@ -173,6 +176,7 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
 		case Undefined:
 		case jstNULL:
 		case MaxKey:
+		case MinKey:
 			f = l.type() - r.type();
 			if( f<0 ) return -1;
 			return f==0 ? 0 : 1;
@@ -321,6 +325,7 @@ int BSONObj::woCompare(const BSONObj& r) const {
         if( lt == NumberInt ) lt = NumberDouble;
         int rt = (int) r.type();
         if( rt == NumberInt ) rt = NumberDouble;
+
 		int x = lt - rt;
         if( x != 0 )
             return x;
@@ -334,7 +339,7 @@ int BSONObj::woCompare(const BSONObj& r) const {
 	return -1;
 } 
 
-BSONElement BSONObj::getField(const char *name) {
+BSONElement BSONObj::getField(const char *name) const {
     if( details ) {
         BSONObjIterator i(*this);
         while( i.more() ) {
@@ -351,8 +356,9 @@ BSONElement BSONObj::getField(const char *name) {
 /* return has eoo() true if no match 
    supports "." notation to reach into embedded objects
 */
-BSONElement BSONObj::getFieldDotted(const char *name) {
-	{
+BSONElement BSONObj::getFieldDotted(const char *name) const {
+	BSONElement e = getField( name );
+	if( e.eoo() ) {
 		const char *p = strchr(name, '.');
 		if( p ) { 
 			string left(name, p-name);
@@ -361,7 +367,7 @@ BSONElement BSONObj::getFieldDotted(const char *name) {
 		}
 	}
 
-    return getField(name);
+    return e;
 /*
 	BSONObjIterator i(*this);
 	while( i.more() ) {
@@ -440,7 +446,7 @@ const char * BSONObj::getStringField(const char *name) {
 	return e.type() == String ? e.valuestr() : "";
 }
 
-BSONObj BSONObj::getObjectField(const char *name) { 
+BSONObj BSONObj::getObjectField(const char *name) const { 
 	BSONElement e = getField(name);
 	BSONType t = e.type();
 	return t == Object || t == Array ? e.embeddedObject() : BSONObj();

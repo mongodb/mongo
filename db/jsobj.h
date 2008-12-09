@@ -39,7 +39,7 @@ class BSONObjBuilder;
 /* BinData = binary data types. 
    EOO = end of object
 */
-enum BSONType { EOO = 0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5, 
+enum BSONType {MinKey=-1, EOO=0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5, 
               Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
               DBRef=12, Code=13, Symbol=14, CodeWScope=15 , 
               NumberInt = 16, 
@@ -110,7 +110,7 @@ public:
 	// wrap this element up as a singleton object.
 	BSONObj wrap();
 
-	const char * fieldName() { 
+	const char * fieldName() const { 
 		if( eoo() ) return ""; // no fieldname for it.
 		return data + 1; 
 	}
@@ -173,7 +173,7 @@ public:
 	/* like operator== but doesn't check the fieldname,
 	   just the value.
 	   */
-    bool valuesEqual(BSONElement& r) {
+    bool valuesEqual(const BSONElement& r) const {
         if( isNumber() )
             return number() == r.number() && r.isNumber();
 		bool match= valuesize() == r.valuesize() && 
@@ -182,7 +182,7 @@ public:
 		// todo: make "0" == 0.0, undefined==null
 	}
 
-	bool operator==(BSONElement& r) { 
+	bool operator==(const BSONElement& r) const { 
 		if( strcmp(fieldName(), r.fieldName()) != 0 )
 			return false;
 		return valuesEqual(r);
@@ -209,7 +209,8 @@ private:
 
 /* l and r MUST have same type when called: check that first. */
 int compareElementValues(const BSONElement& l, const BSONElement& r);
-
+int getGtLtOp(BSONElement& e);
+		
 class BSONObj {
 	friend class BSONObjIterator;
 	class Details {
@@ -275,14 +276,14 @@ public:
 	/* return has eoo() true if no match 
 	   supports "." notation to reach into embedded objects
 	*/
-	BSONElement getFieldDotted(const char *name); 
+	BSONElement getFieldDotted(const char *name) const; 
 
-	BSONElement getField(const char *name); /* return has eoo() true if no match */
+	BSONElement getField(const char *name) const; /* return has eoo() true if no match */
 
 	// returns "" if DNE or wrong type
 	const char * getStringField(const char *name);
 
-	BSONObj getObjectField(const char *name);
+	BSONObj getObjectField(const char *name) const;
 
     int getIntField(const char *name); // INT_MIN if not present
 
@@ -317,7 +318,7 @@ public:
 
 	bool operator<(const BSONObj& r) const { return woCompare(r) < 0; }
 
-	/* -1: l<r. 0:l==r. 1:l>r 
+	/* <0: l<r. 0:l==r. >0:l>r 
 	   wo='well ordered'.  fields must be in same order in each object.
 	*/
 	int woCompare(const BSONObj& r) const;
@@ -409,7 +410,7 @@ public:
     }
 
 	/* append an element but with a new name */
-	void appendAs(BSONElement& e, const char *as) { 
+	void appendAs(const BSONElement& e, const char *as) { 
 		b.append((char) e.type());
 		b.append(as);
 		b.append((void *) e.value(), e.valuesize());
@@ -457,7 +458,15 @@ public:
 	void append(const char *fieldName, string str) {
 		append(fieldName, str.c_str());
 	}
-
+	void appendMinKey( const char *fieldName ) {
+ 		b.append( (char) MinKey );
+		b.append( fieldName );
+	}
+	void appendMaxKey( const char *fieldName ) {
+ 		b.append( (char) MaxKey );
+		b.append( fieldName );
+	}
+	
 	/* BSONObj will free the buffer when it is finished. */
 	BSONObj doneAndDecouple() { 
 		int l;
@@ -534,8 +543,8 @@ public:
 
 #include "matcher.h"
 
-extern BSONObj maxKey;
-
+extern BSONObj maxKey;		
+		
 /*- just for testing -- */
 
 #pragma pack(push,1)
@@ -623,7 +632,7 @@ inline void BSONObjBuilder::appendElements(BSONObj x) {
 }
 
 extern BSONObj emptyObj;
-
+		
 inline void BSONObj::validateEmpty() { 
     if( details == 0 )
         *this = emptyObj;

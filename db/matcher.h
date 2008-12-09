@@ -91,10 +91,9 @@ public:
 
 	~JSMatcher();
 
-	/* indexMatches - true if indexKeyPattern matched ok.
-       deep - means we looked into arrays for a match 
+	/* deep - means we looked into arrays for a match 
     */
-	bool matches(BSONObj& j, bool& indexMatches, bool *deep = 0);
+	bool matches(BSONObj& j, bool *deep = 0);
 
 	int getN() { return n; }
 
