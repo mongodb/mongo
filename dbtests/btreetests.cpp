@@ -17,7 +17,6 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "db.h"
 #include "../db/btree.h"
 #include "../db/db.h"
 
