@@ -167,10 +167,7 @@ public:
 		}
 		
 		int me, you;
-		if( replPair->state == M ) { 
-			me=M;you=S;
-		}
-		else if( was == M ) { 
+		if( replPair->state != M && was == M ) { 
 			me=S;you=M;
 		}
 		else { 
