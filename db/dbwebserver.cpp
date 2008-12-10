@@ -51,24 +51,28 @@ unsigned q = 0;
 
 void statsThread() {
     while( 1 ) { 
-        sleepsecs(4);
-        dblock lk;
-        q = (q+1)%NStats;
-        Timing timing;
-        dbMutexInfo.timingInfo(timing.start, timing.last, timing.timeLocked);
-        if( tlast.start ) { 
-            unsigned long long elapsed = timing.last - tlast.last;
-            unsigned long long locked = timing.timeLocked - tlast.timeLocked;
-            {
-                stringstream ss;
-                ss << elapsed / 1000 << '\t';
-                ss << locked / 1000 << '\t';
-                if( elapsed )
-                    ss << (locked*100)/elapsed << '%';
-                lockStats[q] = ss.str();
+        {
+            dblock lk;
+            q = (q+1)%NStats;
+            Timing timing;
+            dbMutexInfo.timingInfo(timing.start, timing.last, timing.timeLocked);
+            if( tlast.last ) { 
+                unsigned long long elapsed = timing.last - tlast.last;
+                unsigned long long locked = timing.timeLocked - tlast.timeLocked;
+                {
+                    stringstream ss;
+                    ss << elapsed / 1000 << '\t';
+                    ss << locked / 1000 << '\t';
+                    if( elapsed )
+                        ss << (locked*100)/elapsed << '%';
+                    string s = ss.str();
+                    log() << "cpu: " << s << '\n';
+                    lockStats[q] = s;
+                }
             }
+            tlast = timing;
         }
-        tlast = timing;
+        sleepsecs(4);
     }
 }
 

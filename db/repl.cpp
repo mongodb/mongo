@@ -936,7 +936,19 @@ void replMasterThread() {
 
 }
 
+void tempThread() { 
+    while( 1 ) { 
+        cout << dbMutexInfo.isLocked() << endl;
+        sleepmillis(100);
+    }
+}
+
 void startReplication() { 
+    /* this was just to see if anything locks for longer than it should -- we need to be careful 
+       not to be locked when trying to connect() or query() the other side.
+       */
+    //boost::thread tempt(tempThread);
+
 	if( slave || replPair ) {
 		if( slave )
 			log() << "slave=true" << endl;
