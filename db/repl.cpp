@@ -400,7 +400,7 @@ bool ReplSource::resync(string db) {
 		log() << "resync: cloning database " << db << endl;
 		ReplInfo r("resync: cloning a database");
 		string errmsg;
-		bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false);
+		bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false, /*slaveok*/ true);
 		if( !ok ) { 
 			problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
 			throw SyncException();
@@ -556,7 +556,7 @@ void ReplSource::sync_pullOpLog() {
         BSONObj queryObj = query.done();
 
         debugrepl( ns << ".find(" << queryObj.toString() << ')' );
-		cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable );
+		cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable | Option_SlaveOk );
 		c = cursor.get();
 		tailing = false;
 	}
@@ -596,8 +596,15 @@ void ReplSource::sync_pullOpLog() {
 	BSONObj op = c->next();
 	BSONElement ts = op.findElement("ts");
     if( ts.type() != Date ) { 
-        problem() << "pull: bad object read from remote oplog: " << op.toString() << '\n';
-        assert(false);
+        string err = op.getStringField("$err");
+        if( !err.empty() ) {
+            problem() << "pull: $err reading remote oplog: " + err << '\n';
+            massert( "got $err reading remote oplog", false );
+        }
+        else { 
+            problem() << "pull: bad object read from remote oplog: " << op.toString() << '\n';
+            massert("pull: bad object read from remote oplog", false);
+        }
     }
 	OpTime nextOpTime( ts.date() );
     debugrepl( "first op time received: " << nextOpTime.toString() );

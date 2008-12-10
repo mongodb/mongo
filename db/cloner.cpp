@@ -30,10 +30,13 @@ extern int port;
 
 class Cloner: boost::noncopyable { 
 	DBClientConnection conn;
-	void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl);
+	void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl, bool slaveOk);
 public:
 	Cloner() { }
-	bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl);
+
+    /* slaveOk - if true it is ok if the source of the data is !ismaster.  
+    */
+	bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk);
 };
 
 /* for index info object:
@@ -73,11 +76,11 @@ BSONObj fixindex(BSONObj o) {
 /* copy the specified collection 
    isindex - if true, this is system.indexes collection.
 */
-void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl) {
+void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool slaveOk) {
     auto_ptr<DBClientCursor> c;
     {
         dbtemprelease r;
-        c = auto_ptr<DBClientCursor>( conn.query(from_collection, emptyObj) );
+        c = auto_ptr<DBClientCursor>( conn.query(from_collection, emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0) );\
     }
 	assert( c.get() );
     while( 1 ) {
@@ -106,7 +109,7 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
     }
 }
 
-bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl) { 
+bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOK) { 
     string todb = database->name;
     stringstream a,b;
     a << "localhost:" << port;
@@ -128,7 +131,7 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
         dbtemprelease r;
         if( !conn.connect(masterHost, errmsg) )
             return false;
-        c = auto_ptr<DBClientCursor>( conn.query(ns.c_str(), emptyObj) );
+        c = auto_ptr<DBClientCursor>( conn.query(ns.c_str(), emptyObj, 0, 0, 0, slaveOK ? Option_SlaveOk : 0) );
     }
 	if( c.get() == 0 ) {
 		errmsg = "query failed " + ns;
@@ -144,7 +147,7 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
 		BSONObj collection = c->next();
 		BSONElement e = collection.findElement("name");
         if( e.eoo() ) { 
-            string s = "bad system.namespaces object " + e.toString();
+            string s = "bad system.namespaces object " + collection.toString();
 
             /* temp
             cout << masterHost << endl;
@@ -172,21 +175,21 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
 			string err;
 			userCreateNS(to_name.c_str(), options, err, logForRepl);
 		}
-		copy(from_name, to_name.c_str(), false, logForRepl);
+		copy(from_name, to_name.c_str(), false, logForRepl, slaveOK);
 	}
 
 	// now build the indexes
 	string system_indexes_from = fromdb + ".system.indexes";
 	string system_indexes_to = todb + ".system.indexes";
-	copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl);
+	copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, slaveOK);
 
 	return true;
 }
 
-bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication)
+bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, bool slaveOk)
 {
 	Cloner c;
-	return c.go(masterHost, errmsg, fromdb, logForReplication);
+	return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk);
 }
 
 /* Usage:
@@ -203,7 +206,7 @@ public:
         /* replication note: we must logOp() not the command, but the cloned data -- if the slave
            were to clone it would get a different point-in-time and not match.
            */
-        return cloneFrom(from.c_str(), errmsg, database->name, /*logForReplication=*/!fromRepl);
+        return cloneFrom(from.c_str(), errmsg, database->name, /*logForReplication=*/!fromRepl, /*slaveok*/false);
     }
 } cmdclone;
 
@@ -230,7 +233,7 @@ public:
             return false;
         }
         setClient(todb.c_str());
-        bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl);
+        bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false);
         database = 0;
         return res;
     }
