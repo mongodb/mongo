@@ -156,20 +156,25 @@ public:
             return false;
         }
 
+		int N = ReplPair::State_Negotiating;
+		int M = ReplPair::State_Master;
+		int S = ReplPair::State_Slave;
+		
+		if( !replPair->dominant( myname ) ) {
+			result.append( "you_are", N );
+			result.append( "i_am", N );
+			return true;
+		}
+		
         int me, you;
         if( was == replPair->state ) { 
-            if( replPair->dominant(myname) ) {
-                me=1;you=0;
-            }
-            else {
-                me=0;you=1;
-            }
+			me=M;you=S;
         }
-        else if( was == 1 ) { 
-            me=0;you=1;
+        else if( was == M ) { 
+            me=S;you=M;
         }
         else { 
-            me=1;you=0;
+            me=M;you=S;
         }
 
         replPair->state = me;
@@ -193,11 +198,14 @@ void ReplPair::negotiate(DBClientConnection *conn) {
         return;
     }
     int x = res.getIntField("you_are");
-    if( x != 0 && x != 1 ) { 
+	// State_Negotiating means the remote node is not dominant and cannot
+	// choose who is master.
+    if( x != State_Slave && x != State_Master && x != State_Negotiating ) { 
         problem() << "negotiate: bad you_are value " << res.toString() << endl;
         return;
     }
-    setMaster(x);
+	if( x != State_Negotiating )
+		setMaster(x);
 }
 
 OpTime last(0, 0);
