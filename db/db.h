@@ -51,14 +51,23 @@ extern boost::mutex dbMutex;
 extern MutexInfo dbMutexInfo;
 //extern int dbLocked;
 
-struct dblock { 
-    boostlock bl;
-    dblock() : bl(dbMutex) { 
-        dbMutexInfo.entered();
-    }
-	~dblock() { 
-        dbMutexInfo.leaving();
-    }
+struct lock {
+	boostlock bl_;
+	MutexInfo& info_;
+	lock( boost::mutex &mutex, MutexInfo &info ) :
+		bl_( mutex ),
+		info_( info ) {
+		info_.entered();
+	}
+	~lock() {
+		info_.leaving();
+	}
+};
+
+struct dblock : public lock {
+	dblock() :
+		lock( dbMutex, dbMutexInfo ) {
+	}
 };
 
 /* a scoped release of a mutex temporarily -- like a scopedlock but reversed. 
