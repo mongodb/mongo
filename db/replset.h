@@ -74,11 +74,15 @@ public:
         return myname > remoteHost;
     }
 
+	void setMasterLocked( int n, const char *_comment = "" ) {
+		dblock p;
+		setMaster( n, _comment );
+	}
+	
     void setMaster(int n, const char *_comment = "") { 
         info = _comment;
-        if( n == state ) 
-            return;
-        log() << "pair: setting master=" << n << " was " << state << '\n';
+        if( n != state )
+			log() << "pair: setting master=" << n << " was " << state << '\n';
         state = n;
     }
 

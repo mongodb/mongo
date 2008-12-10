@@ -68,14 +68,14 @@ void ReplPair::arbitrate() {
 
     if( arbHost == "-" ) { 
         // no arbiter. we are up, let's assume he is down and network is not partitioned.
-        setMaster(State_Master, "remote unreachable");
+        setMasterLocked(State_Master, "remote unreachable");
         return;
     }
 
     auto_ptr<DBClientConnection> conn( newClientConnection() );
     string errmsg;
     if( !conn->connect(arbHost.c_str(), errmsg) ) {
-        setMaster(State_CantArb, "can't connect to arb");
+        setMasterLocked(State_CantArb, "can't connect to arb");
         return;
     }
 
@@ -83,11 +83,11 @@ void ReplPair::arbitrate() {
     BSONObj res = conn->cmdIsMaster(is_master);
         /*findOne("admin.$cmd", ismasterobj);*/
     if( res.isEmpty() ) {
-        setMaster(State_CantArb, "can't arb 2");
+        setMasterLocked(State_CantArb, "can't arb 2");
         return;
     }
 
-    setMaster(State_Master, "remote down, arbiter reached");
+    setMasterLocked(State_Master, "remote down, arbiter reached");
 }
 
 /* --------------------------------------------- */
@@ -166,18 +166,18 @@ public:
 			return true;
 		}
 		
-        int me, you;
-        if( was == replPair->state ) { 
+		int me, you;
+		if( replPair->state == M ) { 
 			me=M;you=S;
-        }
-        else if( was == M ) { 
-            me=S;you=M;
-        }
-        else { 
-            me=M;you=S;
-        }
+		}
+		else if( was == M ) { 
+			me=S;you=M;
+		}
+		else { 
+			me=M;you=S;
+		}
+		replPair->setMaster( me, "CmdNegotiateMaster::run()" );
 
-        replPair->state = me;
         result.append("you_are", you);
         result.append("i_am", me);
 
@@ -194,7 +194,7 @@ void ReplPair::negotiate(DBClientConnection *conn) {
     BSONObj res = conn->findOne("admin.$cmd", cmd);
     if( res.getIntField("ok") != 1 ) { 
         problem() << "negotiate fails: " << res.toString() << '\n';
-        setMaster(State_Confused);
+        setMasterLocked(State_Confused);
         return;
     }
     int x = res.getIntField("you_are");
@@ -204,8 +204,11 @@ void ReplPair::negotiate(DBClientConnection *conn) {
         problem() << "negotiate: bad you_are value " << res.toString() << endl;
         return;
     }
-	if( x != State_Negotiating )
+	if( x != State_Negotiating ) {
+		// Don't actually have to lock here, since we only get here if not the
+		// dominant node.
 		setMaster(x);
+	}
 }
 
 OpTime last(0, 0);
