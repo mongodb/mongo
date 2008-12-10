@@ -65,7 +65,10 @@ void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
 	for( set<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
 		const char * field = i->c_str();
 		BSONElement k = indexDetails.keyPattern().getFieldDotted( field );
-		bool forward = ( ( k.number() > 0 ? 1 : -1 ) * direction > 0 );
+		int number = 1;
+		if( k.type() == NumberDouble || k.type() == NumberInt )
+			number = k.number();
+		bool forward = ( ( number > 0 ? 1 : -1 ) * direction > 0 );
 		BSONElement startElement;
 		BSONElement endElement;
 		BSONElement e = query.getFieldDotted( field );
