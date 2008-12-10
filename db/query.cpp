@@ -822,7 +822,6 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 		c->tailResume();
 		while( 1 ) {
 			if( !c->ok() ) {
-done:
 				if( c->tailing() ) {
 					c->setAtTail();
 					break;

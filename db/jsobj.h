@@ -103,7 +103,6 @@ class BSONElement {
 public:
 	string toString();
     BSONType type() const { return (BSONType) *data; }
-    bool isNumber() const { return type() == NumberDouble || type() == NumberInt; }
 	bool eoo() const { return type() == EOO; }
 	int size() const;
 
@@ -124,11 +123,11 @@ public:
 	unsigned long long date() const { return *((unsigned long long*) value()); }
   	//double& number() { return *((double *) value()); }
 
+    bool isNumber() const { return type() == NumberDouble || type() == NumberInt; }
     void setNumber(double d) { 
         if( type() == NumberDouble ) *((double *) value()) = d;
         else if( type() == NumberInt ) *((int *) value()) = (int) d;
     }
-
 	double number() const { 
         if( type() == NumberDouble ) return *((double *) value()); 
         if( type() == NumberInt ) return *((int *) value()); 
