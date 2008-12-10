@@ -41,8 +41,8 @@ time_t started = time(0);
 */
 
 struct Timing { 
-    Timing() { last = start = timeLocked = 0; }
-    unsigned long long last, start, timeLocked;
+    Timing() { start = timeLocked = 0; }
+    unsigned long long start, timeLocked;
 };
 Timing tlast;
 const int NStats = 32;
@@ -50,28 +50,33 @@ string lockStats[NStats];
 unsigned q = 0;
 
 void statsThread() {
+    unsigned long long timeLastPass = 0;
     while( 1 ) { 
         {
+            Timer lktm;
             dblock lk;
             q = (q+1)%NStats;
             Timing timing;
-            dbMutexInfo.timingInfo(timing.start, timing.last, timing.timeLocked);
-            if( tlast.last ) { 
-                unsigned long long elapsed = timing.last - tlast.last;
-                unsigned long long locked = timing.timeLocked - tlast.timeLocked;
+            dbMutexInfo.timingInfo(timing.start, timing.timeLocked);
+            unsigned long long now = curTimeMicros64();
+            if( timeLastPass ) { 
+                unsigned long long dt = now - timeLastPass;
+                unsigned long long dlocked = timing.timeLocked - tlast.timeLocked;
                 {
                     stringstream ss;
-                    ss << elapsed / 1000 << '\t';
-                    ss << locked / 1000 << '\t';
-                    if( elapsed )
-                        ss << (locked*100)/elapsed << '%';
+                    ss << dt / 1000 << '\t';
+                    ss << dlocked / 1000 << '\t';
+                    if( dt )
+                        ss << (dlocked*100)/dt << '%';
                     string s = ss.str();
                     log() << "cpu: " << s << '\n';
                     lockStats[q] = s;
                 }
             }
+            timeLastPass = now;
             tlast = timing;
         }
+        unsigned long long q = curTimeMicros64();
         sleepsecs(4);
     }
 }

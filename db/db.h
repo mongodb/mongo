@@ -22,13 +22,12 @@
 void jniCallback(Message& m, Message& out);
 
 class MutexInfo { 
-    unsigned long long start, last, enter, timeLocked; // all in microseconds
+    unsigned long long start, enter, timeLocked; // all in microseconds
     int locked;
 
 public:
     MutexInfo() : locked(0) { 
-        start = last = curTimeMicros64();
-        last = 0;
+        start = curTimeMicros64();
     }
     void entered() { 
         enter = curTimeMicros64();
@@ -38,12 +37,11 @@ public:
     void leaving() { 
         locked--;
         assert( locked == 0 );
-        last = curTimeMicros64();
-        timeLocked += last - enter;
+        timeLocked += curTimeMicros64() - enter;
     }
     int isLocked() const { return locked; }
-    void timingInfo(unsigned long long &s, unsigned long long &l, unsigned long long &tl) { 
-        s = start; l = last; tl = timeLocked;
+    void timingInfo(unsigned long long &s, unsigned long long &tl) { 
+        s = start; tl = timeLocked;
     }
 };
 

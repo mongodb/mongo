@@ -172,7 +172,8 @@ public:
     CmdTimeInfo() : Command("timeinfo") {}
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         unsigned long long last, start, timeLocked;
-        dbMutexInfo.timingInfo(start, last, timeLocked);
+        dbMutexInfo.timingInfo(start, timeLocked);
+        last = curTimeMicros64();
         double tt = (double) last-start;
         double tl = (double) timeLocked;
         result.append("totalTime", tt);

@@ -832,11 +832,13 @@ void replMain() {
 
         first=false;
 		
+        bool sleep = true;
 		for( vector<ReplSource*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
 			ReplSource *s = *i;	
 			bool ok = false;	
 			try {
 				ok = s->sync();
+                sleep = !s->haveMoreDbsToSync();
 			}
 			catch( SyncException& ) {
                 replInfo = "caught SyncException";
@@ -857,9 +859,12 @@ void replMain() {
 			if( !ok ) 
 				s->resetConnection();
 		}
-        {
+        if( sleep ) {
             ReplInfo r("replMain: sleep 3 before next pass");
             sleepsecs(3);
+        }
+        else { 
+            sleepmillis(100);
         }
 	}
 

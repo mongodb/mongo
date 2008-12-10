@@ -137,6 +137,8 @@ public:
 	bool operator==(const ReplSource&r) const { 
 		return hostName == r.hostName && sourceName() == r.sourceName(); 
 	}
+
+    bool haveMoreDbsToSync() const { return !addDbNextPass.empty(); }
 };
 
 /* Write operation to the log (local.oplog.$main)
