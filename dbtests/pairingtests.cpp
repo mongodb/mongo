@@ -187,21 +187,24 @@ namespace PairingTests {
 	class Negotiate : public DirectConnectBase {
 	public:
 		void run() {
-			checkNegotiation( "a", "-", ReplPair::State_Negotiating, ReplPair::State_Master,
-							 "b", "-", ReplPair::State_Negotiating, ReplPair::State_Slave );
+			checkNegotiation( "a", "-", ReplPair::State_Negotiating, ReplPair::State_Negotiating,
+							 "b", "-", ReplPair::State_Negotiating, ReplPair::State_Negotiating );
 			checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Slave,
 							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Master );
 			
-			checkNegotiation( "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave,
-							 "b", "-", ReplPair::State_Master, ReplPair::State_Master );
 			checkNegotiation( "b", "-", ReplPair::State_Master, ReplPair::State_Master,
 							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave );
+
+			// No change when negotiate() called on a.
+			checkNegotiation( "a", "-", ReplPair::State_Master, ReplPair::State_Master,
+							 "b", "-", ReplPair::State_Master, ReplPair::State_Master );
+			// Resolve Master - Master.
+			checkNegotiation( "b", "-", ReplPair::State_Master, ReplPair::State_Slave,
+							 "a", "-", ReplPair::State_Master, ReplPair::State_Master );
 			
-			checkNegotiation( "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave,
-							 "b", "-", ReplPair::State_Slave, ReplPair::State_Master );
 			// FIXME Move from negotiating to master?
-			checkNegotiation( "a", "-", ReplPair::State_Slave, ReplPair::State_Slave,
-							 "b", "-", ReplPair::State_Negotiating, ReplPair::State_Master );
+			checkNegotiation( "b", "-", ReplPair::State_Slave, ReplPair::State_Slave,
+							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Master );
 		}
 	private:
 		void checkNegotiation( const char *host1, const char *arb1, int state1, int newState1,
