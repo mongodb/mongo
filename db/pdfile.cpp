@@ -415,7 +415,7 @@ void IndexDetails::kill() {
    Keys will be left empty if key not found in the object.
 */
 void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) const {
-    BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 } 
+    BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 }
 	if( keyPattern.objsize() == 0 ) {
 		cout << keyPattern.toString() << endl;
 		cout << info.obj().toString() << endl;
@@ -425,22 +425,43 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 	BSONObj key = obj.extractFieldsDotted(keyPattern, b);
 	if( key.isEmpty() )
 		return;
-	BSONElement f = key.firstElement();
-	if( f.type() != Array ) {
+	BSONObjIterator keyIter( key );
+	BSONElement arrayElt;
+	int arrayPos = -1;
+	for( int i = 0; keyIter.more(); ++i ) {
+		BSONElement e = keyIter.next();
+		if( e.eoo() ) break;
+		if( e.type() == Array ) {
+			uassert( "Index cannot be created on parallel arrays.",
+					arrayPos == -1 );
+			arrayPos = i;
+			arrayElt = e;
+		}
+	}
+	if( arrayPos == -1 ) {
 		b.decouple();
 		key.iWillFree();
 		assert( !key.isEmpty() );
 		keys.insert(key);
 		return;
 	}
-	BSONObj arr = f.embeddedObject();
-	BSONObjIterator i(arr);
-	while( i.more() ) { 
-		BSONElement e = i.next();
+	BSONObj arr = arrayElt.embeddedObject();
+	BSONObjIterator arrIter(arr);
+	while( arrIter.more() ) { 
+		BSONElement e = arrIter.next();
 		if( e.eoo() ) break;
-		BSONObjBuilder b;
 
-		b.appendAs(e, f.fieldName());
+		BSONObjBuilder b;
+		BSONObjIterator keyIter( key );
+		for( int i = 0; keyIter.more(); ++i ) {
+			BSONElement f = keyIter.next();
+			if ( f.eoo() ) break;
+			if ( i != arrayPos )
+				b.append( f );
+			else
+				b.appendAs( e, arrayElt.fieldName() );
+		}
+		
 		BSONObj o = b.doneAndDecouple();
 		assert( !o.isEmpty() );
 		keys.insert(o);
