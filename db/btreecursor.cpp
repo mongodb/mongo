@@ -67,27 +67,41 @@ void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
 		BSONElement k = indexDetails.keyPattern().getFieldDotted( field );
 		int number = (int) k.number(); // returns 0.0 if not numeric
 		bool forward = ( ( number >= 0 ? 1 : -1 ) * direction > 0 );
-		BSONElement startElement;
-		BSONElement endElement;
+		BSONElement lowest = minKey.firstElement();
+		BSONElement highest = maxKey.firstElement();
 		BSONElement e = query.getFieldDotted( field );
 		if ( !e.eoo() && e.type() != RegEx ) {
-			int op = getGtLtOp( e );
-			bool someLt = ( op == JSMatcher::LT || op == JSMatcher::LTE );
-			bool someGt = ( op == JSMatcher::GT || op == JSMatcher::GTE );
-			if ( op == JSMatcher::Equality )
-				startElement = endElement =	e;
-			else if ( ( someLt && forward ) ||
-					 ( someGt && !forward ) )
-				endElement = e.embeddedObject().firstElement();
-			else if ( ( someLt && !forward ) ||
-					 ( someGt && forward ) )
-				startElement = e.embeddedObject().firstElement();
+			if ( getGtLtOp( e ) == JSMatcher::Equality )
+				lowest = highest = e;
+			else
+				findExtremeInequalityValues( e, lowest, highest );
 		}
-		appendKeyElement( startBuilder, startElement, field, forward );
-		appendKeyElement( endBuilder, endElement, field, !forward );
+		startBuilder.appendAs( forward ? lowest : highest, field );
+		endBuilder.appendAs( forward ? highest : lowest, field );
 	}
 	startKey = startBuilder.doneAndDecouple();
 	endKey = endBuilder.doneAndDecouple();
+}
+
+// Find lowest and highest possible key values given all $gt, $gte, $lt, and
+// $lte elements in e.  The values of lowest and highest should be
+// preinitialized, for example to minKey.firstElement() and maxKey.firstElement().
+void BtreeCursor::findExtremeInequalityValues( const BSONElement &e,
+  										 BSONElement &lowest,
+										 BSONElement &highest ) {
+	BSONObjIterator i( e.embeddedObject() );
+	while( 1 ) {
+		BSONElement s = i.next();
+		if ( s.eoo() )
+			break;
+		int op = s.getGtLtOp();
+		if ( ( op == JSMatcher::LT || op == JSMatcher::LTE ) &&
+			( s.woCompare( highest, false ) < 0 ) )
+			highest = s;
+		else if ( ( op == JSMatcher::GT || op == JSMatcher::GTE ) &&
+				 ( s.woCompare( lowest, false ) > 0 ) )
+			lowest = s;
+	}
 }
 
 // Expand all field names in key to use dotted notation.
@@ -109,20 +123,6 @@ void BtreeCursor::getFields( const BSONObj &key, set< string > &fields ) {
 		if ( !addedSubfield )
 			fields.insert( k.fieldName() );
 	}
-}
-
-// If element is non-null, append it to builder; otherwise append min or max.
-void BtreeCursor::appendKeyElement( BSONObjBuilder &builder,
-								   const BSONElement &element,
-								   const char *fieldName,
-								   bool defaultMin ) {
-	if( !( element == BSONElement() ) )
-		builder.appendAs( element, fieldName );
-	else
-		if( defaultMin )
-			builder.appendMinKey( fieldName );
-		else
-			builder.appendMaxKey( fieldName );
 }
 
 /* skip unused keys. */

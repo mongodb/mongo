@@ -101,7 +101,7 @@ class BSONElement {
 	friend class BSONObjIterator;
 	friend class BSONObj;
 public:
-	string toString();
+	string toString() const;
     BSONType type() const { return (BSONType) *data; }
 	bool eoo() const { return type() == EOO; }
 	int size() const;
@@ -118,7 +118,7 @@ public:
 	const char * value() const { return (data + fieldNameSize + 1); }
 	int valuesize() const { return size() - fieldNameSize - 1; } 
 
-	bool boolean() { return *value() ? true : false; }
+	bool boolean() const { return *value() ? true : false; }
 
 	unsigned long long date() const { return *((unsigned long long*) value()); }
   	//double& number() { return *((double *) value()); }
@@ -133,7 +133,7 @@ public:
         if( type() == NumberInt ) return *((int *) value()); 
         return 0;
     }
-	OID& oid() { return *((OID*) value()); }
+	OID& oid() const { return *((OID*) value()); }
 
 	// for strings
 	int valuestrsize() const { 
@@ -158,13 +158,13 @@ public:
 	  return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;
 	}
 	
-	BSONObj embeddedObject();
+	BSONObj embeddedObject() const;
 
     /* uassert if not an object */
 	BSONObj embeddedObjectUserCheck();
 
-	const char *regex() { assert(type() == RegEx); return value(); }
-	const char *regexFlags() { 
+	const char *regex() const { assert(type() == RegEx); return value(); }
+	const char *regexFlags() const { 
 		const char *p = regex();
 		return p + strlen(p) + 1;
 	}
@@ -192,8 +192,17 @@ public:
 */
 	}
 
+	
+	/* <0: l<r. 0:l==r. >0:l>r 
+	 order by type, field name, and field value.
+	 If considerFieldName is true, pay attention to the field name.
+	 */
+	int woCompare( const BSONElement &e, bool considerFieldName = true ) const;
+	
 	const char * rawdata() { return data; }
 
+	int getGtLtOp() const;
+	
 	BSONElement();
 
 private:
@@ -544,7 +553,8 @@ public:
 
 #include "matcher.h"
 
-extern BSONObj maxKey;		
+extern BSONObj maxKey;
+extern BSONObj minKey;
 		
 /*- just for testing -- */
 
@@ -577,7 +587,7 @@ inline BSONObj BSONElement::embeddedObjectUserCheck() {
 	return BSONObj(value()); 
 }
 
-inline BSONObj BSONElement::embeddedObject() { 
+inline BSONObj BSONElement::embeddedObject() const { 
 	assert( type()==Object || type()==Array ); 
 	return BSONObj(value()); 
 }

@@ -215,11 +215,10 @@ public:
 
 private:
 	void findExtremeKeys( const BSONObj &query );
+	void findExtremeInequalityValues( const BSONElement &e,
+									 BSONElement &lowest,
+									 BSONElement &highest );
 	static void getFields( const BSONObj &key, set< string > &fields ); 
-	static void appendKeyElement( BSONObjBuilder &builder,
-								 const BSONElement &element,
-								 const char *fieldName,
-								 bool defaultMin ); 
 	void checkUnused();
 	void checkEnd();
 	IndexDetails& indexDetails;
