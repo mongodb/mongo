@@ -24,7 +24,7 @@
 
 BSONElement nullElement;
 
-string BSONElement::toString() { 
+string BSONElement::toString() const { 
 	stringstream s;
 	switch( type() ) {
     case EOO:
@@ -167,6 +167,48 @@ int BSONElement::size() const {
 	return totalSize;
 }
 
+int BSONElement::getGtLtOp() const {
+	const char *fn = fieldName();
+	if( fn[0] == '$' && fn[1] ) { 
+		if( fn[2] == 't' ) { 
+			if( fn[1] == 'g' ) { 
+				if( fn[3] == 0 ) return JSMatcher::GT;
+				else if( fn[3] == 'e' && fn[4] == 0 ) return JSMatcher::GTE;
+			}
+			else if( fn[1] == 'l' ) { 
+				if( fn[3] == 0 ) return JSMatcher::LT;
+				else if( fn[3] == 'e' && fn[4] == 0 ) return JSMatcher::LTE;
+			}
+		}
+        else if( fn[2] == 'e' ) {
+            if( fn[1] == 'n' && fn[3] == 0 )
+                return JSMatcher::NE;
+        }
+		else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
+			return JSMatcher::opIN;
+	}
+	return JSMatcher::Equality;
+}
+
+int BSONElement::woCompare( const BSONElement &e,
+						   bool considerFieldName ) const {
+	int lt = (int) type();
+	if( lt == NumberInt ) lt = NumberDouble;
+	int rt = (int) e.type();
+	if( rt == NumberInt ) rt = NumberDouble;
+	
+	int x = lt - rt;
+	if( x != 0 )
+		return x;
+	if( considerFieldName ) {
+		x = strcmp(fieldName(), e.fieldName());
+		if( x != 0 )
+			return x;
+	}
+	x = compareElementValues(*this, e);
+	return x;	
+}
+
 /* must be same type! */
 int compareElementValues(const BSONElement& l, const BSONElement& r) {
 	int f;
@@ -240,31 +282,11 @@ void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e) {
 }
 
 int getGtLtOp(BSONElement& e) { 
-	int op = JSMatcher::Equality;
 	if( e.type() != Object ) 
-		return op;
+		return JSMatcher::Equality;
 
 	BSONElement fe = e.embeddedObject().firstElement();
-	const char *fn = fe.fieldName();
-	if( fn[0] == '$' && fn[1] ) { 
-		if( fn[2] == 't' ) { 
-			if( fn[1] == 'g' ) { 
-				if( fn[3] == 0 ) op = JSMatcher::GT;
-				else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::GTE;
-			}
-			else if( fn[1] == 'l' ) { 
-				if( fn[3] == 0 ) op = JSMatcher::LT;
-				else if( fn[3] == 'e' && fn[4] == 0 ) op = JSMatcher::LTE;
-			}
-		}
-        else if( fn[2] == 'e' ) {
-            if( fn[1] == 'n' && fn[3] == 0 )
-                op = JSMatcher::NE;
-        }
-		else if( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
-			op = JSMatcher::opIN;
-	}
-	return op;
+	return fe.getGtLtOp();
 }
 
 
@@ -314,27 +336,12 @@ int BSONObj::woCompare(const BSONObj& r) const {
 
 		BSONElement l = i.next();
 		BSONElement r = j.next();
-
-		if( l == r ) {
-			if( l.eoo() )
-				return 0;
-			continue;
-		}
-
-        int lt = (int) l.type();
-        if( lt == NumberInt ) lt = NumberDouble;
-        int rt = (int) r.type();
-        if( rt == NumberInt ) rt = NumberDouble;
-
-		int x = lt - rt;
-        if( x != 0 )
-            return x;
-		x = strcmp(l.fieldName(), r.fieldName());
-		if( x != 0 )
+		if ( l.eoo() )
+			return 0;
+		
+		int x = l.woCompare( r );
+		if ( x != 0 )
 			return x;
-		x = compareElementValues(l, r);
-		assert(x != 0);
-		return x;
 	}
 	return -1;
 } 
@@ -526,6 +533,15 @@ struct MaxKeyData {
 	char eoo;
 } maxkeydata;
 BSONObj maxKey((const char *) &maxkeydata);
+
+struct MinKeyData { 
+	MinKeyData() { totsize=7; minkey=MinKey; name=0; eoo=EOO; }
+	int totsize;
+	char minkey;
+	char name;
+	char eoo;
+} minkeydata;
+BSONObj minKey((const char *) &minkeydata);
 
 struct JSObj0 {
 	JSObj0() { totsize = 5; eoo = EOO; }
