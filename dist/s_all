@@ -12,10 +12,7 @@ f=../inc_posix/flags.in
 cmp $t $f > /dev/null 2>&1 ||
     (echo "Building $f" && rm -f $f && cp $t $f && chmod 444 $f)
 
-python getset.py > $t			# Build getter/setter source file
-f=../support/getset.c
-cmp $t $f > /dev/null 2>&1 ||
-    (echo "Building $f" && rm -f $f && cp $t $f && chmod 444 $f)
+python getset.py			# Build API
 
 sh ./s_prototypes			# Build prototypes include file
 sh ./s_readme				# Build README file

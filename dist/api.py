@@ -7,76 +7,171 @@
 #
 # Read the getset file and output C for the get/set pairs.
 
-import re, string, sys
+import filecmp, os, re, shutil, string, sys
 
-def output():
-	# Output the getter
-	s = 'void\n__wt_' + handle + '_get_' +\
-	    list[0].split('\t')[0] +\
-	    '(\n\t' +\
-	    handle.upper() +\
-	    ' *handle'
+# compare_srcfile --
+#	Compare two files, and if they differ, update the source file.
+def compare_srcfile(tmp, src):
+	if not os.path.isfile(src) or \
+	    not filecmp.cmp(tmp, src, False):
+		print 'Updating ' + src
+		shutil.copyfile(tmp, src)
+
+# handle_methods --
+#	Standalone method code for the API.
+def handle_methods():
+	global db_config, db_header, db_lockout
+	global env_config, env_header, env_lockout
+
+	if condition.count('voidmethod'):
+		rettype = 'void'
+	else:
+		rettype = 'int'
+	field = list[0].split('\t')[0]
+
+	# Store the handle's standalone methods into the XXX_header string. 
+	s = '\t' +\
+	    rettype + ' (*' + field + ')(\n\t    ' + handle.upper() + ' *, '
+	for l in list:
+		s += l.split('\t')[1].replace('@S', '*')
+	s += ');\n'
+	if handle.count('env'):
+		env_header += s
+	else:
+		db_header += s
+
+	# Store the initialization of the handle's standalone methods in the
+	# XXX_config string.
+	s = '\t' + handle +\
+	    '->' + field + ' = __wt_' + handle + '_' + field + ';\n'
+	if handle.count('env'):
+		env_config += s
+	else:
+		db_config += s
+
+	# Store the lockout of the handle's standalone methods in the
+	# XXX_lockout string.  Note that we skip the destroy method,
+	# it's the only legal one.
+	if not field.count('destroy'):
+		if handle.count('env'):
+			func = '__wt_env_lockout_err'
+		else:
+			func = '__wt_db_lockout_err'
+		s = '\t' + handle + '->' + field +\
+		    ' = (' + rettype + ' (*)\n\t    (' + handle.upper() + ' *'
+		for l in list:
+			s += ', ' + l.split('\t')[1].replace(' @S', '')
+		s += '))' + func + ';\n'
+		if handle.count('env'):
+			env_lockout += s
+		else:
+			db_lockout += s
+
+# handle_getset --
+#	Getter/setter code for the API.
+def handle_getset():
+	global db_config, db_header, db_lockout
+	global env_config, env_header, env_lockout
+
+	field = list[0].split('\t')[0]
+
+	# Store the handle's getter/setter variables and methods into the
+	# XXX_header string.
+	s = ''
+	for l in list:
+		s += '\t' +\
+		    l.split('\t')[1].replace('@S', l.split('\t')[0]) + ';\n'
+	s += '\tvoid (*get_' + field + ')(\n\t    ' + handle.upper() + ' *'
+	for l in list:
+		s += ', ' + l.split('\t')[1].replace('@S', '*')
+	s += ');\n'
+	s += '\tint (*set_' + field + ')(\n\t    ' + handle.upper() + ' *'
+	for l in list:
+		s += ', ' + l.split('\t')[1].replace('@S', '')
+	s += ');\n\n'
+	if handle.count('env'):
+		env_header += s
+	else:
+		db_header += s
+
+	# Store the initialization of the handle's getter/setter methods in the
+	# XXX_config string.
+	s = '\t' + handle +\
+	    '->get_' + field + ' = __wt_' + handle + '_get_' + field + ';\n'
+	s += s.replace('get_', 'set_')
+	if handle.count('env'):
+		env_config += s
+	else:
+		db_config += s
+
+	# Store the lockout of the handle's getter/setter methods in the
+	# XXX_lockout string.
+	if handle.count('env'):
+		func = '__wt_env_lockout_err'
+	else:
+		func = '__wt_db_lockout_err'
+	s = '\t' + handle +\
+	    '->get_' + field + ' = (void (*)\n\t    (' + handle.upper() + ' *'
+	for l in list:
+		s += ', ' + l.split('\t')[1].replace('@S', '')
+	s += '))' + func + ';\n'
+	s = '\t' + handle +\
+	    '->set_' + field + ' = (int (*)\n\t    (' + handle.upper() + ' *'
+	for l in list:
+		s += ', ' + l.split('\t')[1].replace('@S', '')
+	s += '))' + func + ';\n'
+	if handle.count('env'):
+		env_lockout += s
+	else:
+		db_lockout += s
+
+	# Output the getter function.
+	s = 'void\n__wt_' +\
+	    handle + '_get_' + field + '(\n\t' + handle.upper() + ' *handle'
 	for l in list:
 		s += ',\n\t' +\
 		    l.split('\t')[1].replace('@S', '*' + l.split('\t')[0] + 'p')
-	s = s + ')\n{\n'
+	s += ')\n{\n'
 	for l in list:
 		s += '\t*' + l.split('\t')[0] + 'p = ' +\
 		    'handle->' + l.split('\t')[0] + ';\n'
-	s = s + '}\n'
-	print s
+	s += '}\n\n'
+	tfile.write(s)
 
-	# Output the setter
-	s = 'int\n__wt_' + handle + '_set_' +\
-	    list[0].split('\t')[0] +\
-	    '(\n\t' +\
-	    handle.upper() +\
-	    ' *handle'
+	# Output the setter function.
+	s = 'int\n__wt_' +\
+	    handle + '_set_' + field + '(\n\t' + handle.upper() + ' *handle'
 	for l in list:
-		s += ',\n\t' +\
-		    l.split('\t')[1].replace('@S', l.split('\t')[0])
+		s += ',\n\t' + l.split('\t')[1].replace('@S', l.split('\t')[0])
 	s += ')\n{\n'
-
-	# Verify needs a local return variable.
-	if condition.count('verify'):
-		s += '\tint ret;\n\n'
-
-	# Default means any values that aren't set (that are set to 0)
-	# should be loaded from the existing values before calling the
-	# verification routine.
-	#
-	# XXX
-	# This is ugly -- it supports Db.set_pagesize and nothing else,
-	# we may need to re-think this in the future.
-	if condition.count('default'):
-		for l in list:
-			s += '\tif (' + l.split('\t')[0] +\
-			    ' == 0)\n\t\t' + l.split('\t')[0] +\
-			    ' = handle->' + l.split('\t')[0] + ';\n'
-		s += '\n'
 
 	# Verify means we call a standard verification routine because
 	# there are constraints or side-effects on setting the value.
 	if condition.count('verify'):
+		s += '\tint ret;\n\n'
 		s += '\tif ((ret = __wt_' +\
-		    handle +\
-		    '_set_' +\
-		    list[0].split('\t')[0] +\
-		    '_verify(\n\t    handle'
-
+		    handle + '_set_' + field + '_verify(\n\t    handle'
 		for l in list:
-			s += ', ' + l.split('\t')[0]
+			s += ', &' + l.split('\t')[0]
 		s += ')) != 0)\n\t\treturn (ret);\n\n'
 
-
 	for l in list:
-		s += '\thandle->' + l.split('\t')[0] +\
-		     ' = ' + l.split('\t')[0] + ';\n'
-	s += '\treturn (0);\n}\n'
-	print s
+		s += '\thandle->' +\
+		    l.split('\t')[0] + ' = ' + l.split('\t')[0] + ';\n'
+	s += '\treturn (0);\n}\n\n'
+	tfile.write(s)
 
-print '/* DO NOT EDIT: automatically built by getset.py. */'
-print '#include "wt_internal.h"'
+db_config = ''					# Env method init
+db_header = ''					# Db handle structure
+db_lockout = ''					# Db lockout function
+env_config = ''					# Db method init
+env_header = ''					# Env handle structure
+env_lockout = ''				# Env lockout function
+
+tmp_file = '__tmp_api'
+tfile = open(tmp_file, 'w')
+tfile.write('/* DO NOT EDIT: automatically built by getset.py. */\n\n')
+tfile.write('#include "wt_internal.h"\n\n')
 
 setter_re = re.compile(r'^[a-z]')
 field_re = re.compile(r'^\t[a-z]')
@@ -84,13 +179,60 @@ list = []
 for line in open('getset', 'r'):
 	if setter_re.match(line):
 		if list:
-			output()
+			if condition.count('getset'):
+				handle_getset()
+			if condition.count('method'):
+				handle_methods()
 			list=[]
 		s = line.split('\t')
 		handle = s[0]
 		condition = s[1]
 	elif field_re.match(line):
 		list.append(string.strip(line))
-
 if list:
-	output()
+	if condition.count('getset'):
+		handle_getset()
+	if condition.count('method'):
+		handle_methods()
+
+# Write out the configuration initialization and lockout functions.
+tfile.write('void\n__wt_env_config_methods(ENV *env)\n{\n');
+tfile.write(env_config)
+tfile.write('}\n\n')
+tfile.write('void\n__wt_env_config_methods_lockout(ENV *env)\n{\n');
+tfile.write(env_lockout)
+tfile.write('}\n\n')
+tfile.write('void\n__wt_db_config_methods(DB *db)\n{\n');
+tfile.write(db_config)
+tfile.write('}\n\n')
+tfile.write('void\n__wt_db_config_methods_lockout(DB *db)\n{\n');
+tfile.write(db_lockout)
+tfile.write('}\n')
+	
+# Update the automatically generated function sources.
+tfile.close()
+compare_srcfile(tmp_file, '../support/getset.c')
+
+# Update the wiredtiger.in file with Env and Db handle information.
+tfile = open(tmp_file, 'w')
+skip = 0
+for line in open('../inc_posix/wiredtiger.in', 'r'):
+	if skip:
+		if line.count('Env handle api section: END') or \
+		    line.count('Db handle api section: END'):
+			tfile.write('\t/*\n' + line)
+			skip = 0
+	else:
+		tfile.write(line)
+	if line.count('Env handle api section: BEGIN'):
+		skip = 1
+		tfile.write('\t */\n')
+		tfile.write(env_header)
+	elif line.count('Db handle api section: BEGIN'):
+		skip = 1
+		tfile.write('\t */\n')
+		tfile.write(db_header)
+tfile.close()
+compare_srcfile(tmp_file, '../inc_posix/wiredtiger.in')
+
+os.remove(tmp_file)

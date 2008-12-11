@@ -10,25 +10,43 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_db_set_btree_compare_int_verify --
+ *	Verify an argument to the Db.set_btree_compare_int setter.
+ */
+int
+__wt_db_set_btree_compare_int_verify(DB *db, int *bytesp)
+{
+	int bytes;
+
+	bytes = *bytesp;
+	if (bytes >= 0 && bytes <= 8) {
+		db->btree_compare = __wt_btree_compare_int;
+		return (0);
+	}
+
+	__wt_db_errx(db,
+	    "The number of bytes must be an integral value between 1 and 8");
+	return (WT_ERROR);
+}
+
+/*
  * __wt_db_set_pagesize_verify --
  *	Verify an argument to the Db.set_pagesize setter.
  */
 int
-__wt_db_set_pagesize_verify(DB *db, u_int32_t pagesize,
-    u_int32_t fragsize, u_int32_t extentsize, u_int32_t maxitemsize)
+__wt_db_set_pagesize_verify(DB *db, u_int32_t *pagesizep,
+    u_int32_t *fragsizep, u_int32_t *extentsizep, u_int32_t *maxitemsizep)
 {
+	u_int32_t pagesize, fragsize, extentsize, maxitemsize;
+
 	/* Copy in defaults, if not being set. */
-	if (pagesize == 0)
-		pagesize = db->pagesize;
-	if (fragsize == 0)
-		fragsize = db->fragsize;
-	if (extentsize == 0)
-		extentsize = db->extentsize;
-	if (maxitemsize == 0) {
-		maxitemsize = db->maxitemsize;
-		if (maxitemsize == 0)
+	pagesize = *pagesizep == 0 ? db->pagesize : *pagesizep;
+	fragsize = *fragsizep == 0 ? db->fragsize : *fragsizep;
+	extentsize = *extentsizep == 0 ? db->extentsize : *extentsizep;
+	maxitemsize = *maxitemsizep == 0 ? db->maxitemsize : *maxitemsizep;
+	if ((maxitemsize = *maxitemsizep) == 0)
+		if ((maxitemsize = db->maxitemsize) == 0)
 			maxitemsize = WT_DATA_SPACE(pagesize) / 4;
-	}
 
 	if (fragsize % WT_FRAG_MINIMUM_SIZE != 0) {
 		__wt_db_errx(db,
@@ -60,10 +78,11 @@ __wt_db_set_pagesize_verify(DB *db, u_int32_t pagesize,
 		return (WT_ERROR);
 	}
 
-	db->maxitemsize = maxitemsize;
-	db->fragsize = fragsize;
-	db->pagesize = pagesize;
-	db->extentsize = extentsize;
+	*pagesizep = pagesize;
+	*fragsizep = fragsize;
+	*extentsizep = extentsize;
+	*maxitemsizep = maxitemsize;
+
 	db->frags_per_page = pagesize / fragsize;
 
 	return (0);

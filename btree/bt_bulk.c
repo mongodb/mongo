@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_bulk_load --
+ * __wt_db_bulk_load --
  *	Db.bulk_load method.
  */
 int
-__wt_bt_bulk_load(DB *db, int (*cb)(DB *, DBT **, DBT **))
+__wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 {
 	DBT *key, *data;
 	IENV *ienv;
@@ -30,6 +30,10 @@ __wt_bt_bulk_load(DB *db, int (*cb)(DB *, DBT **, DBT **))
 	bt = db->idb->btree;
 	addr = WT_ADDR_INVALID;
 	hdr = NULL;
+
+	DB_FLAG_CHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
+	WT_ASSERT(ienv, !LF_ISSET(WT_DUPLICATES));
+	WT_ASSERT(ienv, LF_ISSET(WT_SORTED_INPUT));
 
 	memset(&key_item, 0, sizeof(key_item));
 	memset(&data_item, 0, sizeof(data_item));

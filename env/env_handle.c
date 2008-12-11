@@ -137,7 +137,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	 * and free functions, no other functions may be called.
 	 */
 	if (__wt_calloc(NULL, 1, sizeof(IDB), &ienv) != 0)
-		__wt_env_config_fatal(env);
+		__wt_env_config_methods_lockout(env);
 	else {
 		env->ienv = ienv;
 		ienv->env = env;
@@ -153,58 +153,11 @@ __wt_env_config_default(ENV *env)
 {
 }
 
-/*
- * __wt_env_config_methods --
- *	Set default methods for just-created ENV handle.
- */
-void
-__wt_env_config_methods(ENV *env)
-{
-	/* Initialize getter/setters. */
-	env->get_errcall = __wt_env_get_errcall;
-	env->get_errfile = __wt_env_get_errfile;
-	env->get_errpfx = __wt_env_get_errpfx;
-	env->get_verbose = __wt_env_get_verbose;
-	env->set_errcall = __wt_env_set_errcall;
-	env->set_errfile = __wt_env_set_errfile;
-	env->set_errpfx = __wt_env_set_errpfx;
-	env->set_verbose = __wt_env_set_verbose;
-
-	/* Initialize handle methods. */
-	env->destroy = __wt_env_destroy;
-	env->err = __wt_env_err;
-	env->errx = __wt_env_errx;
-}
-
 int
-__wt_env_fatal(ENV *env)
+__wt_env_lockout_err(ENV *env)
 {
 	__wt_env_errx(env,
-	    "This DB handle has failed for some reason, and can no longer"
-	    " be used; the only method permitted on it is Db.destroy");
+	    "This Env handle has failed for some reason, and can no longer"
+	    " be used; the only method permitted on it is Env.destroy");
 	return (WT_ERROR);
-}
-
-/*
- * __wt_env_config_fatal --
- *	Set fatal methods for a ENV handle.
- */
-void
-__wt_env_config_fatal(ENV *env)
-{
-	/* Initialize getter/setters. */
-	env->get_errcall = (void (*)
-	    (ENV *, void (**)(const ENV *, const char *)))__wt_env_fatal;
-	env->get_errfile = (void (*)(ENV *, FILE **))__wt_env_fatal;
-	env->get_errpfx = (void (*)(ENV *, const char **))__wt_env_fatal;
-	env->get_verbose = (void (*)(ENV *, u_int32_t *))__wt_env_fatal;
-	env->set_errcall =
-	    (int (*)(ENV *, void (*)(const ENV *, const char *)))__wt_env_fatal;
-	env->set_errfile = (int  (*)(ENV *, FILE *))__wt_env_fatal;
-	env->set_errpfx = (int  (*)(ENV *, const char *))__wt_env_fatal;
-	env->set_verbose = (int  (*)(ENV *, u_int32_t))__wt_env_fatal;
-
-	/* Initialize handle methods (except for destroy). */
-	env->err = (void (*)(ENV *, int, const char *, ...))__wt_env_fatal;
-	env->errx = (void (*)(ENV *, const char *, ...))__wt_env_fatal;
 }

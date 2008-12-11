@@ -88,35 +88,67 @@ struct __db {
 	ENV *env;			/* Enclosing environment */
 	IENV *ienv;			/* Private environment object */
 
-					/* Error callback */
+	u_int32_t frags_per_page;	/* Fragments per database page */
+
+	/*
+	 * DO NOT EDIT: automatically built by getset.py.
+	 * Db handle api section: BEGIN
+	 */
+	int (*btree_compare)(DB *, const DBT *, const DBT *);
+	void (*get_btree_compare)(
+	    DB *, int (**)(DB *, const DBT *, const DBT *));
+	int (*set_btree_compare)(
+	    DB *, int (*)(DB *, const DBT *, const DBT *));
+
+	int btree_compare_int;
+	void (*get_btree_compare_int)(
+	    DB *, int *);
+	int (*set_btree_compare_int)(
+	    DB *, int );
+
 	void (*errcall)(const DB *, const char *);
-	FILE		*errfile;	/* Error message file stream */
-	const char	*errpfx;	/* Error message prefix */
+	void (*get_errcall)(
+	    DB *, void (**)(const DB *, const char *));
+	int (*set_errcall)(
+	    DB *, void (*)(const DB *, const char *));
 
-	u_int32_t	maxitemsize;	/* Maximum on-page item size */
-	u_int32_t	fragsize;	/* Fragment size */
-	u_int32_t	pagesize;	/* Page size */
-	u_int32_t	extentsize;	/* Extent size */
-	u_int32_t	frags_per_page;	/* Fragments per page */
+	FILE *errfile;
+	void (*get_errfile)(
+	    DB *, FILE **);
+	int (*set_errfile)(
+	    DB *, FILE *);
 
-	/* Getters/setters */
-	void (*get_errcall)(DB *, void (**)(const DB *, const char *));
-	void (*get_errfile)(DB *, FILE **);
-	void (*get_errpfx)(DB *, const char **);
-	void (*get_pagesize)
-		(DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
-	int  (*set_errcall)(DB *, void (*)(const DB *, const char *));
-	int  (*set_errfile)(DB *, FILE *);
-	int  (*set_errpfx)(DB *, const char *);
-	int  (*set_pagesize)(DB *, u_int32_t, u_int32_t, u_int32_t, u_int32_t);
+	const char *errpfx;
+	void (*get_errpfx)(
+	    DB *, const char **);
+	int (*set_errpfx)(
+	    DB *, const char *);
 
-	/* Methods */
-	int  (*bulk_load)(DB *, int (*)(DB *, DBT **, DBT **));
-	int  (*destroy)(DB *, u_int32_t);
-	int  (*dump)(DB *, FILE *, u_int32_t);
-	void (*err)(DB *, int, const char *, ...);
-	void (*errx)(DB *, const char *, ...);
-	int  (*open)(DB *, const char *, mode_t, u_int32_t);
+	u_int32_t pagesize;
+	u_int32_t fragsize;
+	u_int32_t extentsize;
+	u_int32_t maxitemsize;
+	void (*get_pagesize)(
+	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
+	int (*set_pagesize)(
+	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
+
+	int (*bulk_load)(
+	    DB *, u_int32_t, int (*)(DB *, DBT **, DBT **));
+	int (*destroy)(
+	    DB *, u_int32_t);
+	int (*dump)(
+	    DB *, FILE *, u_int32_t);
+	void (*err)(
+	    DB *, int, const char *, ...);
+	void (*errx)(
+	    DB *, const char *, ...);
+	int (*open)(
+	    DB *, const char *, mode_t, u_int32_t);
+	/*
+	 * Db handle api section: END
+	 * DO NOT EDIT: automatically built by getset.py.
+	 */
 
 	u_int32_t flags;
 };
@@ -136,27 +168,44 @@ struct __dbc {
 struct __env {
 	IENV *ienv;			/* Private object */
 
-					/* Error callback */
+	/*
+	 * DO NOT EDIT: automatically built by getset.py.
+	 * Env handle api section: BEGIN
+	 */
 	void (*errcall)(const ENV *, const char *);
-	FILE		*errfile;	/* Error message file stream */
-	const char	*errpfx;	/* Error message prefix */
+	void (*get_errcall)(
+	    ENV *, void (**)(const ENV *, const char *));
+	int (*set_errcall)(
+	    ENV *, void (*)(const ENV *, const char *));
 
-	u_int32_t	 verbose;	/* Verbose flags */
+	FILE *errfile;
+	void (*get_errfile)(
+	    ENV *, FILE **);
+	int (*set_errfile)(
+	    ENV *, FILE *);
 
-	/* Getters/setters */
-	int  (*set_errcall)(ENV *, void (*)(const ENV *, const char *));
-	void (*get_errcall)(ENV *, void (**)(const ENV *, const char *));
-	int  (*set_errfile)(ENV *, FILE *);
-	void (*get_errfile)(ENV *, FILE **);
-	int  (*set_errpfx)(ENV *, const char *);
-	void (*get_errpfx)(ENV *, const char **);
-	int  (*set_verbose)(ENV *, u_int32_t);
-	void (*get_verbose)(ENV *, u_int32_t *);
+	const char *errpfx;
+	void (*get_errpfx)(
+	    ENV *, const char **);
+	int (*set_errpfx)(
+	    ENV *, const char *);
 
-	/* Methods */
-	int  (*destroy)(ENV *, u_int32_t);
-	void (*err)(ENV *, int, const char *, ...);
-	void (*errx)(ENV *, const char *, ...);
+	u_int32_t verbose;
+	void (*get_verbose)(
+	    ENV *, u_int32_t *);
+	int (*set_verbose)(
+	    ENV *, u_int32_t );
+
+	int (*destroy)(
+	    ENV *, u_int32_t);
+	void (*err)(
+	    ENV *, int, const char *, ...);
+	void (*errx)(
+	    ENV *, const char *, ...);
+	/*
+	 * Env handle api section: END
+	 * DO NOT EDIT: automatically built by getset.py.
+	 */
 
 	u_int32_t flags;
 };

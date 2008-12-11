@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_dump --
+ * __wt_db_dump --
  *	Dump the database.
  */
 int
-__wt_bt_dump(DB *db, FILE *stream, u_int32_t flags)
+__wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 {
 	WT_BTREE *bt;
 	WT_ITEM *item;
