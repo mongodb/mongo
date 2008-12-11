@@ -91,7 +91,7 @@ struct __db {
 	u_int32_t frags_per_page;	/* Fragments per database page */
 
 	/*
-	 * DO NOT EDIT: automatically built by getset.py.
+	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * Db handle api section: BEGIN
 	 */
 	int (*btree_compare)(DB *, const DBT *, const DBT *);
@@ -147,7 +147,7 @@ struct __db {
 	    DB *, const char *, mode_t, u_int32_t);
 	/*
 	 * Db handle api section: END
-	 * DO NOT EDIT: automatically built by getset.py.
+	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 
 	u_int32_t flags;
@@ -169,7 +169,7 @@ struct __env {
 	IENV *ienv;			/* Private object */
 
 	/*
-	 * DO NOT EDIT: automatically built by getset.py.
+	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * Env handle api section: BEGIN
 	 */
 	void (*errcall)(const ENV *, const char *);
@@ -204,7 +204,7 @@ struct __env {
 	    ENV *, const char *, ...);
 	/*
 	 * Env handle api section: END
-	 * DO NOT EDIT: automatically built by getset.py.
+	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 
 	u_int32_t flags;
@@ -216,6 +216,39 @@ struct __env {
 int	 wt_db_create(DB **, ENV *, u_int32_t);
 int	 wt_env_create(ENV **, u_int32_t);
 char	*wt_strerror(int);
+
+/*******************************************
+ * API flags
+ *******************************************/
+/*
+ * DO NOT EDIT: automatically built by dist/api.py.
+ * API flags section: BEGIN
+ */
+#define	WT_CREATE					0x00000001
+#define	WT_DUPLICATES					0x00000002
+#define	WT_MAXKEY_NOTSET				0x00000002
+#define	WT_PRINTABLES					0x00000001
+#define	WT_PRIVATE_ENV					0x00000001
+#define	WT_SORTED_INPUT					0x00000001
+#define	WT_VERB_FILEOPS					0x00000002
+#define	WT_VERB_FILEOPS_ALL				0x00000001
+
+#define	WT_APIMASK_DB					0x00000003
+#define	WT_APIMASK_DB_BULK_LOAD				0x00000003
+#define	WT_APIMASK_DB_DESTROY				0x00000000
+#define	WT_APIMASK_DB_DUMP				0x00000001
+#define	WT_APIMASK_DB_OPEN				0x00000001
+#define	WT_APIMASK_ENV					0x00000000
+#define	WT_APIMASK_ENV_DESTROY				0x00000000
+#define	WT_APIMASK_ENV_VERBOSE				0x00000003
+#define	WT_APIMASK_IDB					0x00000001
+#define	WT_APIMASK_IENV					0x00000000
+#define	WT_APIMASK_WT_DB_CREATE				0x00000000
+#define	WT_APIMASK_WT_ENV_CREATE			0x00000000
+/*
+ * API flags section: END
+ * DO NOT EDIT: automatically built by dist/api.py.
+ */
 
 #if defined(__cplusplus)
 }
