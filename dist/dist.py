@@ -4,7 +4,8 @@
 #	All rights reserved.
 #
 # $Id$
-import re, sys
+
+import filecmp, os, re, shutil
 
 # source_files --
 #	List the source files in filelist.
@@ -24,3 +25,11 @@ def directory_files():
 			dirs[dir_re.match(line).group(1)] = 1
 	for i in dirs.keys():
 		print "%s" % i
+
+# compare_srcfile --
+#	Compare two files, and if they differ, update the source file.
+def compare_srcfile(tmp, src):
+	if not os.path.isfile(src) or \
+	    not filecmp.cmp(tmp, src, False):
+		print 'Updating ' + src
+		shutil.copyfile(tmp, src)
