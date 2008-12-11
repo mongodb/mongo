@@ -83,7 +83,5 @@ __wt_db_set_pagesize_verify(DB *db, u_int32_t *pagesizep,
 	*extentsizep = extentsize;
 	*maxitemsizep = maxitemsize;
 
-	db->frags_per_page = pagesize / fragsize;
-
 	return (0);
 }
