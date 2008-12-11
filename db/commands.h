@@ -36,8 +36,20 @@ public:
     */
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
 
-    /* return true if only the admin ns has privileges to run this command. */
+    /* Return true if only the admin ns has privileges to run this command. */
     virtual bool adminOnly() { return false; }
+
+    /* Return true if slaves of a replication pair are allowed to execute the command 
+       (the command directly from a client -- if fromRepl, always allowed).
+    */
+    virtual bool slaveOk() = 0;
+
+    /* Override and return true to if true,log the operation (logOp()) to the replication log.  
+       (not done if fromRepl of course)
+
+       Note if run() returns false, we do NOT log.
+    */
+    virtual bool logTheOp() { return false; }
 
     Command(const char *_name);
 };

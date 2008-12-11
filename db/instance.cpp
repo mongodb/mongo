@@ -191,6 +191,7 @@ void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort,
 }
 
 bool objcheck = false;
+bool quiet = false;
 
 void receivedInsert(Message& m, stringstream& ss) {
 	DbMessage d(m);

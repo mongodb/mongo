@@ -35,6 +35,7 @@
 #include "db.h"
 #include "commands.h"
 
+extern bool quiet;
 extern boost::mutex dbMutex;
 auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
 int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
@@ -94,8 +95,8 @@ void ReplPair::arbitrate() {
 
 class CmdIsMaster : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     CmdIsMaster() : Command("ismaster") { }
-
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
         if( allDead ) { 
             result.append("ismaster", 0.0);
@@ -139,7 +140,7 @@ public:
 class CmdNegotiateMaster : public Command { 
 public:
     CmdNegotiateMaster() : Command("negotiatemaster") { }
-
+    virtual bool slaveOk() { return true; }
     virtual bool adminOnly() { return true; }
 
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
@@ -683,8 +684,8 @@ void ReplSource::sync_pullOpLog() {
 */
 bool ReplSource::sync() { 
     ReplInfo r("sync");
-
-	log() << "pull: " << sourceName() << '@' << hostName << endl;
+    if( !quiet ) 
+        log() << "pull: " << sourceName() << '@' << hostName << endl;
 	nClonedThisPass = 0;
 
 	if( (string("localhost") == hostName || string("127.0.0.1") == hostName) && port == DBPort ) { 
