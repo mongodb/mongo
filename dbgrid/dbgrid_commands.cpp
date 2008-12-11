@@ -42,6 +42,7 @@ namespace dbgrid_cmds {
 
 class NetStatCmd : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     NetStatCmd() : Command("netstat") { }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         result.append("griddb", gridDatabase.toString());
@@ -52,6 +53,7 @@ public:
 
 class IsDbGridCmd : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     IsDbGridCmd() : Command("isdbgrid") { }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         result.append("isdbgrid", 1);
@@ -62,8 +64,8 @@ public:
 
 class CmdIsMaster : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     CmdIsMaster() : Command("ismaster") { }
-
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         result.append("ismaster", 0.0);
         result.append("msg", "isdbgrid");

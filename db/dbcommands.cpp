@@ -26,6 +26,7 @@
 #include "../util/lruishmap.h"
 #include "json.h"
 #include "repl.h"
+#include "replset.h"
 #include "commands.h"
 #include "db.h"
 
@@ -167,8 +168,48 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 	return ss.str();
 }
 
+class CmdDropDatabase : public Command { 
+public:
+    virtual bool logTheOp() { return true; }
+    virtual bool slaveOk() { return false; }
+    CmdDropDatabase() : Command("dropDatabase") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        BSONElement e = cmdObj.findElement("dropDatabase");
+        log() << "dropDatabase " << ns << endl;
+        int p = (int) e.number();
+        if( p != 1 )
+            return false;
+        dropDatabase(ns);
+        return true;
+    }
+} cmdDropDatabase;
+
+/* set db profiling level 
+   todo: how do we handle profiling information put in the db with replication? 
+         sensibly or not?
+*/
+class CmdProfile : public Command { 
+public:
+    virtual bool slaveOk() { return true; }
+    CmdProfile() : Command("profile") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        BSONElement e = cmdObj.findElement("profile");
+        result.append("was", (double) database->profile);
+        int p = (int) e.number();
+        bool ok = false;
+        if( p == -1 )
+            ok = true;
+        else if( p >= 0 && p <= 2 ) { 
+            ok = true;
+            database->profile = p;
+        }
+        return ok;
+    }
+} cmdProfile;
+
 class CmdTimeInfo : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     CmdTimeInfo() : Command("timeinfo") {}
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         unsigned long long last, start, timeLocked;
@@ -186,6 +227,7 @@ public:
 /* just to check if the db has asserted */
 class CmdAssertInfo : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     CmdAssertInfo() : Command("assertinfo") {} 
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         result.appendBool("dbasserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet());
@@ -200,6 +242,7 @@ public:
 
 class CmdGetOpTime : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     CmdGetOpTime() : Command("getoptime") { }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         result.appendDate("optime", OpTime::now().asDate());
@@ -220,6 +263,7 @@ public:
 
 class CmdOpLogging : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     CmdOpLogging() : Command("opLogging") { }
     bool adminOnly() { return true; }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
@@ -232,6 +276,7 @@ public:
 
 class CmdQueryTraceLevel : public Command { 
 public:
+    virtual bool slaveOk() { return true; }
     CmdQueryTraceLevel() : Command("queryTraceLevel") { }
     bool adminOnly() { return true; }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
@@ -240,15 +285,81 @@ public:
     }
 } cmdquerytracelevel;
 
-class Cmd : public Command { 
+class CmdTraceAll : public Command { 
 public:
-    Cmd() : Command("traceAll") { }
+    virtual bool slaveOk() { return true; }
+    CmdTraceAll() : Command("traceAll") { }
     bool adminOnly() { return true; }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         queryTraceLevel = otherTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
         return true;
     }
 } cmdtraceall;
+
+class CmdDeleteIndexes : public Command {
+public:
+    virtual bool logTheOp() { return true; }
+    virtual bool slaveOk() { return false; }
+    CmdDeleteIndexes() : Command("deleteIndexes") { }
+    bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
+        /* note: temp implementation.  space not reclaimed! */
+        BSONElement e = jsobj.findElement(name.c_str());
+        string toDeleteNs = database->name + '.' + e.valuestr();
+        NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
+        log() << "CMD: deleteIndexes " << toDeleteNs << endl;
+        if( d ) {
+            BSONElement f = jsobj.findElement("index");
+            if( !f.eoo() ) { 
+
+                d->aboutToDeleteAnIndex();
+
+                ClientCursor::invalidate(toDeleteNs.c_str());
+
+                // delete a specific index or all?
+                if( f.type() == String ) { 
+                    const char *idxName = f.valuestr();
+                    if( *idxName == '*' && idxName[1] == 0 ) { 
+                        log() << "  d->nIndexes was " << d->nIndexes << '\n';
+                        anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
+                        anObjBuilder.append("msg", "all indexes deleted for collection");
+                        for( int i = 0; i < d->nIndexes; i++ )
+                            d->indexes[i].kill();
+                        d->nIndexes = 0;
+                        log() << "  alpha implementation, space not reclaimed" << endl;
+                    }
+                    else {
+                        // delete just one index
+                        int x = d->findIndexByName(idxName);
+                        if( x >= 0 ) { 
+                            cout << "  d->nIndexes was " << d->nIndexes << endl;
+                            anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
+
+                            /* note it is  important we remove the IndexDetails with this 
+                            call, otherwise, on recreate, the old one would be reused, and its
+                            IndexDetails::info ptr would be bad info.
+                            */
+                            d->indexes[x].kill();
+
+                            d->nIndexes--;
+                            for( int i = x; i < d->nIndexes; i++ )
+                                d->indexes[i] = d->indexes[i+1];
+                            log() << "deleteIndexes: alpha implementation, space not reclaimed\n";
+                        } else { 
+                            log() << "deleteIndexes: " << idxName << " not found" << endl;
+                            errmsg = "index not found";
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            errmsg = "ns not found";
+            return false;
+        }
+        return true; 
+    }
+} cmdDeleteIndexes;
 
 extern map<string,Command*> *commands;
 
@@ -282,50 +393,23 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
         valid = true;
         string errmsg;
         Command *c = i->second;
-        if( c->adminOnly() && strncmp(ns, "admin", p-ns) != 0 ) {
+        if( c->adminOnly() && !fromRepl && strncmp(ns, "admin", p-ns) != 0 ) {
             ok = false;
 			errmsg = "access denied";
         }
+        else if( !isMaster() && !c->slaveOk() ) { 
+            /* todo: allow if Option_SlaveOk was set on the query */
+            ok = false;
+            errmsg = "not master";
+        }
         else {
             ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
+            if( ok && c->logTheOp() && !fromRepl )
+                logOp("c", ns, jsobj);
         }
         if( !ok ) 
             anObjBuilder.append("errmsg", errmsg);
     }
-    else if( e.isNumber() ) { 
-        if( strcmp(e.fieldName(), "dropDatabase") == 0 ) { 
-			if( 1 ) {
-				log() << "dropDatabase " << ns << endl;
-				valid = true;
-				int p = (int) e.number();
-				if( p != 1 ) {
-					ok = false;
-				} else { 
-					dropDatabase(ns);
-                    if( !fromRepl ) 
-                        logOp("c", ns, jsobj);
-					ok = true;
-				}
-			}
-			else { 
-				cout << "TEMP CODE: dropdatabase commented out " << endl;
-			}
-		}
-		else if( strcmp(e.fieldName(), "profile") == 0 ) { 
-			anObjBuilder.append("was", (double) database->profile);
-			int p = (int) e.number();
-			valid = true;
-			if( p == -1 )
-				ok = true;
-			else if( p >= 0 && p <= 2 ) { 
-				ok = true;
-				database->profile = p;
-			}
-			else {
-				ok = false;
-			}
-		}
-	}
 	else if( e.type() == String ) {
 		/* { count: "collectionname"[, query: <query>] } */
 		string us(ns, p-ns);
@@ -346,6 +430,7 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 			anObjBuilder.append("n", (double) nn);
 		}
 		else if( strcmp( e.fieldName(), "create") == 0 ) { 
+            // create a collection
 			valid = true;
 			string ns = us + '.' + e.valuestr();
 			string err;
@@ -407,64 +492,6 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 				anObjBuilder.append("ns", toValidateNs.c_str());
 				string s = validateNS(toValidateNs.c_str(), d);
 				anObjBuilder.append("result", s.c_str());
-			}
-			else {
-				anObjBuilder.append("errmsg", "ns not found");
-			}
-		}
-		else if( strcmp(e.fieldName(),"deleteIndexes") == 0 ) { 
-			valid = true;
-			/* note: temp implementation.  space not reclaimed! */
-			string toDeleteNs = us + '.' + e.valuestr();
-			NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
-			log() << "CMD: deleteIndexes " << toDeleteNs << endl;
-			if( d ) {
-				BSONElement f = jsobj.findElement("index");
-				if( !f.eoo() ) { 
-
-					d->aboutToDeleteAnIndex();
-
-					ClientCursor::invalidate(toDeleteNs.c_str());
-                    if( !fromRepl ) 
-                        logOp("c", ns, jsobj);
-
-					// delete a specific index or all?
-					if( f.type() == String ) { 
-						const char *idxName = f.valuestr();
-						if( *idxName == '*' && idxName[1] == 0 ) { 
-							ok = true;
-							log() << "  d->nIndexes was " << d->nIndexes << '\n';
-							anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
-							anObjBuilder.append("msg", "all indexes deleted for collection");
-							for( int i = 0; i < d->nIndexes; i++ )
-								d->indexes[i].kill();
-							d->nIndexes = 0;
-							log() << "  alpha implementation, space not reclaimed" << endl;
-						}
-						else {
-							// delete just one index
-							int x = d->findIndexByName(idxName);
-							if( x >= 0 ) { 
-								cout << "  d->nIndexes was " << d->nIndexes << endl;
-								anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
-
-								/* note it is  important we remove the IndexDetails with this 
-								   call, otherwise, on recreate, the old one would be reused, and its
-								   IndexDetails::info ptr would be bad info.
-								*/
-								d->indexes[x].kill();
-
-								d->nIndexes--;
-								for( int i = x; i < d->nIndexes; i++ )
-									d->indexes[i] = d->indexes[i+1];
-								ok=true;
-								cout << "  alpha implementation, space not reclaimed\n";
-							} else { 
-								cout << "deleteIndexes: " << idxName << " not found" << endl;
-							}
-						}
-					}
-				}
 			}
 			else {
 				anObjBuilder.append("errmsg", "ns not found");

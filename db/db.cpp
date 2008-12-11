@@ -27,7 +27,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 
-extern bool objcheck;
+extern bool objcheck, quiet;
 bool useJNI = true;
 
 /* only off if --nocursors which is for debugging. */
@@ -274,13 +274,12 @@ void connThread()
 			}
 
 			ms = t.millis();
-			log = log || ctr++ % 512 == 0;
+			log = log || (ctr++ % 512 == 0 && !quiet);
 			DEV log = true;
 			if( log || ms > 100 ) {
 				ss << ' ' << t.millis() << "ms";
 				cout << ss.str().c_str() << endl;
 			}
-//skip:
 			if( database && database->profile >= 1 ) { 
 				if( database->profile >= 2 || ms >= 100 ) { 
 					// profile it
@@ -535,6 +534,10 @@ int main(int argc, char* argv[], char *envp[] )
 				master = true;
 			else if( s == "--slave" )
 				slave = true;
+            else if( s == "--help" || s == "-?" || s == "--?" )
+                goto usage;
+            else if( s == "--quiet" ) 
+                quiet = true;
             else if( s == "--objcheck" ) 
                 objcheck = true;
 			else if( s == "--source" ) { 
@@ -566,6 +569,7 @@ int main(int argc, char* argv[], char *envp[] )
 		exit(0);
 	}
 
+usage:
 	cout << "Mongo db usage:\n";
 	cout << "  run               run db" << endl;
 	cout << "  msg end [port]    shut down db server listening on port (or default)" << endl;
@@ -575,6 +579,8 @@ int main(int argc, char* argv[], char *envp[] )
 	cout << "  quicktest         just check basic assertions and exit" << endl;
 	cout << "  test2             run test2() - see code" << endl;
 	cout << "\nOptions:" << endl;
+    cout << " --help             show this usage information\n";
+    cout << " --quiet            quieter output (no cpu outputs)\n";
     cout << " --objcheck         inspect client data for validity on receipt\n";
 	cout << " --port <portno>\n";
     cout << " --dbpath <root>\n";

@@ -197,8 +197,8 @@ bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, boo
 */
 class CmdClone : public Command { 
 public:
+    virtual bool slaveOk() { return false; }
     CmdClone() : Command("clone") { }
-
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         string from = cmdObj.getStringField("clone");
         if( from.empty() ) 
@@ -217,7 +217,7 @@ class CmdCopyDb : public Command {
 public:
     CmdCopyDb() : Command("copydb") { }
     virtual bool adminOnly() { return true; }
-
+    virtual bool slaveOk() { return false; }
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         string fromhost = cmdObj.getStringField("fromhost");
         if( fromhost.empty() ) { 
