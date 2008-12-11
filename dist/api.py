@@ -5,17 +5,11 @@
 #
 # $Id$
 #
-# Read the getset file and output C for the get/set pairs.
+# Read the api file and output C for the Db/Env structures, getter/setter
+# functions, and other API initialization.
 
-import filecmp, os, re, shutil, string, sys
-
-# compare_srcfile --
-#	Compare two files, and if they differ, update the source file.
-def compare_srcfile(tmp, src):
-	if not os.path.isfile(src) or \
-	    not filecmp.cmp(tmp, src, False):
-		print 'Updating ' + src
-		shutil.copyfile(tmp, src)
+import os, re, string
+from dist import compare_srcfile
 
 # handle_methods --
 #	Standalone method code for the API.
@@ -170,13 +164,13 @@ env_lockout = ''				# Env lockout function
 
 tmp_file = '__tmp_api'
 tfile = open(tmp_file, 'w')
-tfile.write('/* DO NOT EDIT: automatically built by getset.py. */\n\n')
+tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
 tfile.write('#include "wt_internal.h"\n\n')
 
 setter_re = re.compile(r'^[a-z]')
 field_re = re.compile(r'^\t[a-z]')
 list = []
-for line in open('getset', 'r'):
+for line in open('api', 'r'):
 	if setter_re.match(line):
 		if list:
 			if condition.count('getset'):
