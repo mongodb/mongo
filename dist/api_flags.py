@@ -12,9 +12,8 @@
 #	Name (usually a method name)
 #	<tab>	Flag
 
-import re, sys
-
-print '\n\n/* DO NOT EDIT: automatically built by api_defines.py. */'
+import os, re, sys
+from dist import compare_srcfile
 
 # method_re matches a method name, that is, a line starting with alphanumeric
 # characters, possibly including a '.'.
@@ -67,15 +66,36 @@ for f in sorted(flag_cnt.iteritems(),\
 
 # Print out the flag masks in hex.
 #	Assumes tab stops set to 8 characters.
+flag_info = ''
 for f in sorted(flag_cnt.iteritems()):
-	print "#define\tWT_%s%s%#010x" %\
+	flag_info += "#define\tWT_%s%s%#010x\n" %\
 	    (f[0],\
 	    "\t" * max(1, 6 - (len(f[0]) + len('WT_')) / 8), flag_bit[f[0]])
 
 # Print out the API masks in hex.
 #	Assumes tab stops set to 8 characters.
-print ""
+flag_info += '\n'
 for f in sorted(method_mask.iteritems()):
-	print "#define\tWT_APIMASK_%s%s%#010x" %\
+	flag_info += "#define\tWT_APIMASK_%s%s%#010x\n" %\
 	    (f[0].upper().replace('.', '_'),\
 	    "\t" * max(1, 6 - (len(f[0]) + len('WT_APIMASK_')) / 8), f[1])
+
+# Update the wiredtiger.in file with the flags information.
+tmp_file = '__tmp_api'
+tfile = open(tmp_file, 'w')
+skip = 0
+for line in open('../inc_posix/wiredtiger.in', 'r'):
+	if skip:
+		if line.count('API flags section: END'):
+			tfile.write('/*\n' + line)
+			skip = 0
+	else:
+		tfile.write(line)
+	if line.count('API flags section: BEGIN'):
+		skip = 1
+		tfile.write(' */\n')
+		tfile.write(flag_info)
+tfile.close()
+compare_srcfile(tmp_file, '../inc_posix/wiredtiger.in')
+
+os.remove(tmp_file)
