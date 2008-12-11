@@ -68,8 +68,8 @@ namespace NamespaceTests {
 		class Create : public Base {
 		public:
 			void run() {
-				ASSERT_EQUALS( id().indexName(), "testIndex" );
-				ASSERT_EQUALS( id().parentNS(), ns() );
+				ASSERT_EQUALS( "testIndex", id().indexName() );
+				ASSERT_EQUALS( ns(), id().parentNS() );
 				// check equal
 				ASSERT( !id().keyPattern().woCompare( key() ) );
 			}
@@ -84,7 +84,7 @@ namespace NamespaceTests {
 				e.append( "a", 5 );
 				set< BSONObj > keys;
 				id().getKeysFromObject( b.done(), keys );
-				ASSERT_EQUALS( keys.size(), 1 );
+				ASSERT_EQUALS( 1, keys.size() );
 				ASSERT( !keys.begin()->woCompare( e.done() ) );
 			}
 		};
@@ -99,12 +99,12 @@ namespace NamespaceTests {
 				a.append( "c", "foo" );
 				set< BSONObj > keys;
 				id().getKeysFromObject( a.done(), keys );
-				ASSERT_EQUALS( keys.size(), 1 );
+				ASSERT_EQUALS( 1, keys.size() );
 				// FIXME Why doesn't woCompare expand sub elements?
 				// ASSERT( !keys.begin()->woCompare( e.done() ) );
-				ASSERT_EQUALS( keys.begin()->firstElement().fieldName(), string( "a" ) );
-				ASSERT_EQUALS( keys.begin()->firstElement().embeddedObject().firstElement().fieldName(), string( "b" ) );
-				ASSERT_EQUALS( keys.begin()->firstElement().embeddedObject().firstElement().number(), 4 );
+				ASSERT_EQUALS( string( "a" ), keys.begin()->firstElement().fieldName() );
+				ASSERT_EQUALS( string( "b" ), keys.begin()->firstElement().embeddedObject().firstElement().fieldName() );
+				ASSERT_EQUALS( 4, keys.begin()->firstElement().embeddedObject().firstElement().number() );
 			}
 		private:
 			virtual BSONObj key() const { return aDotB(); }
@@ -122,11 +122,11 @@ namespace NamespaceTests {
 				
 				set< BSONObj > keys;
 				id().getKeysFromObject( b.done(), keys );
-				ASSERT_EQUALS( keys.size(), 3 );
+				ASSERT_EQUALS( 3, keys.size() );
 				int j = 1;
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
-					ASSERT_EQUALS( i->firstElement().fieldName(), string( "a" ) );
-					ASSERT_EQUALS( i->firstElement().number(), j );
+					ASSERT_EQUALS( string( "a" ), i->firstElement().fieldName() );
+					ASSERT_EQUALS( j, i->firstElement().number() );
 				}
 			}
 		};
@@ -145,12 +145,12 @@ namespace NamespaceTests {
 				
 				set< BSONObj > keys;
 				id().getKeysFromObject( c.done(), keys );
-				ASSERT_EQUALS( keys.size(), 3 );
+				ASSERT_EQUALS( 3, keys.size() );
 				int j = 1;
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
-					ASSERT_EQUALS( i->firstElement().fieldName(), string( "a" ) );
-					ASSERT_EQUALS( i->firstElement().embeddedObject().firstElement().fieldName(), string( "a" ) );
-					ASSERT_EQUALS( i->firstElement().embeddedObject().firstElement().number(), j );
+					ASSERT_EQUALS( string( "a" ), i->firstElement().fieldName() );
+					ASSERT_EQUALS( string( "a" ), i->firstElement().embeddedObject().firstElement().fieldName() );
+					ASSERT_EQUALS( j, i->firstElement().embeddedObject().firstElement().number() );
 				}
 			}
 		private:
