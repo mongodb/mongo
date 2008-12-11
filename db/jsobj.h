@@ -301,7 +301,7 @@ public:
        fields returned in the order they appear in pattern.
 	   if any field missing, you get back an empty object overall.
 	   */
-	BSONObj extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b); // this version, builder owns the returned obj buffer
+	BSONObj extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b) const; // this version, builder owns the returned obj buffer
     BSONObj extractFieldsUnDotted(BSONObj pattern);
 	BSONObj extractFields(BSONObj &pattern);
 
@@ -345,7 +345,7 @@ public:
 		return this->woEqual(r);
 	}
 
-	BSONElement firstElement() { 
+	BSONElement firstElement() const { 
 		return BSONElement(objdata() + 4);
 	}
 	BSONElement findElement(const char *name);
@@ -475,6 +475,20 @@ public:
 	void appendMaxKey( const char *fieldName ) {
  		b.append( (char) MaxKey );
 		b.append( fieldName );
+	}
+	
+	template < class T >
+	void append( const char *fieldName, const vector< T >& vals ) {
+		BSONObjBuilder arrBuilder;
+		for( int i = 0; i < vals.size(); ++i ) {
+			stringstream o;
+			o << i;
+			arrBuilder.append( o.str().c_str(), vals[ i ] );
+		}
+		BSONObj arr = arrBuilder.done();
+		b.append( (char) Array );
+		b.append( fieldName );
+		b.append( (void *) arr.objdata(), arr.objsize() );
 	}
 	
 	/* BSONObj will free the buffer when it is finished. */

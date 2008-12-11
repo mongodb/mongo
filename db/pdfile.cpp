@@ -414,7 +414,7 @@ void IndexDetails::kill() {
    only when it's a "multikey" array.
    Keys will be left empty if key not found in the object.
 */
-void IndexDetails::getKeysFromObject(BSONObj& obj, set<BSONObj>& keys) { 
+void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) const {
     BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 } 
 	if( keyPattern.objsize() == 0 ) {
 		cout << keyPattern.toString() << endl;

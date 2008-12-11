@@ -17,23 +17,160 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Where IndexDetails defined.
+#include "../db/namespace.h"
+
+#include "../db/db.h"
+#include "../db/json.h"
+
 #include "dbtests.h"
 
-namespace IndexDetailsTests {
-	class Create {
-	public:
-		void run() {
-		}
-	};
+namespace NamespaceTests {
+	namespace IndexDetailsTests {
+		class Base {
+		public:
+			Base() {
+				dblock lk;
+				setClient( ns() );
+				BSONObjBuilder builder;
+				builder.append( "ns", ns() );
+				builder.append( "name", "testIndex" );
+				builder.append( "key", key() );
+				BSONObj bobj = builder.done();
+				id_.info = theDataFileMgr.insert( ns(), bobj.objdata(), bobj.objsize() );
+				// head not needed for current tests
+				// idx_.head = BtreeBucket::addHead( id_ );			
+			}
+			~Base() {
+				// FIXME cleanup all btree buckets.
+				theDataFileMgr.deleteRecord( ns(), id_.info.rec(), id_.info );
+				ASSERT( theDataFileMgr.findAll( ns() )->eof() );
+			}
+		protected:
+			static const char* ns() { return "sys.unittest.indexdetailstests"; }
+			const IndexDetails& id() { return id_; }
+			virtual BSONObj key() const {
+				BSONObjBuilder k;
+				k.append( "a", 1 );
+				return k.doneAndDecouple();
+			}
+			BSONObj aDotB() const {
+				BSONObjBuilder a;
+				BSONObjBuilder b;
+				b.append( "b", 1 );
+				a.append( "a", b.done() );
+				return a.doneAndDecouple();
+			}
+		private:
+			IndexDetails id_;
+		};
+		
+		class Create : public Base {
+		public:
+			void run() {
+				ASSERT_EQUALS( id().indexName(), "testIndex" );
+				ASSERT_EQUALS( id().parentNS(), ns() );
+				// check equal
+				ASSERT( !id().keyPattern().woCompare( key() ) );
+			}
+		};
+		
+		class GetKeysFromObjectSimple : public Base {
+		public:
+			void run() {
+				BSONObjBuilder b, e;
+				b.append( "b", 4 );
+				b.append( "a", 5 );
+				e.append( "a", 5 );
+				set< BSONObj > keys;
+				id().getKeysFromObject( b.done(), keys );
+				ASSERT_EQUALS( keys.size(), 1 );
+				ASSERT( !keys.begin()->woCompare( e.done() ) );
+			}
+		};
+		
+		class GetKeysFromObjectDotted : public Base {
+		public:
+			void run() {
+				BSONObjBuilder a, e, b;
+				b.append( "b", 4 );
+				a.append( "a", b.done() );
+				e.append( "a", b.done() );
+				a.append( "c", "foo" );
+				set< BSONObj > keys;
+				id().getKeysFromObject( a.done(), keys );
+				ASSERT_EQUALS( keys.size(), 1 );
+				// FIXME Why doesn't woCompare expand sub elements?
+				// ASSERT( !keys.begin()->woCompare( e.done() ) );
+				ASSERT_EQUALS( keys.begin()->firstElement().fieldName(), string( "a" ) );
+				ASSERT_EQUALS( keys.begin()->firstElement().embeddedObject().firstElement().fieldName(), string( "b" ) );
+				ASSERT_EQUALS( keys.begin()->firstElement().embeddedObject().firstElement().number(), 4 );
+			}
+		private:
+			virtual BSONObj key() const { return aDotB(); }
+		};
+		
+		class GetKeysFromArraySimple : public Base {
+		public:
+			void run() {
+				vector< int > a;
+				a.push_back( 1 );
+				a.push_back( 2 );
+				a.push_back( 3 );
+				BSONObjBuilder b;
+				b.append( "a", a );
+				
+				set< BSONObj > keys;
+				id().getKeysFromObject( b.done(), keys );
+				ASSERT_EQUALS( keys.size(), 3 );
+				int j = 1;
+				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+					ASSERT_EQUALS( i->firstElement().fieldName(), string( "a" ) );
+					ASSERT_EQUALS( i->firstElement().number(), j );
+				}
+			}
+		};
+		
+		class GetKeysFromSecondLevelArray : public Base {
+		public:
+			void run() {
+				vector< int > a;
+				a.push_back( 1 );
+				a.push_back( 2 );
+				a.push_back( 3 );
+				BSONObjBuilder b;
+				b.append( "b", a );
+				BSONObjBuilder c;
+				c.append( "a", b.done() );
+				
+				set< BSONObj > keys;
+				id().getKeysFromObject( c.done(), keys );
+				ASSERT_EQUALS( keys.size(), 3 );
+				int j = 1;
+				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+					ASSERT_EQUALS( i->firstElement().fieldName(), string( "a" ) );
+					ASSERT_EQUALS( i->firstElement().embeddedObject().firstElement().fieldName(), string( "a" ) );
+					ASSERT_EQUALS( i->firstElement().embeddedObject().firstElement().number(), j );
+				}
+			}
+		private:
+			virtual BSONObj key() const { return aDotB(); }
+		};
+	} // namespace IndexDetailsTests
 	
 	class All : public UnitTest::Suite {
 	public:
 		All() {
-			add< Create >();
+			add< IndexDetailsTests::Create >();
+			add< IndexDetailsTests::GetKeysFromObjectSimple >();
+			add< IndexDetailsTests::GetKeysFromObjectDotted >();
+			add< IndexDetailsTests::GetKeysFromArraySimple >();
+			// Not working yet
+			//add< IndexDetailsTests::GetKeysFromSecondLevelArray >();
 		}
 	};
 }
 
-UnitTest::TestPtr indexDetailsTests() {
-	return UnitTest::createSuite< IndexDetailsTests::All >();
+UnitTest::TestPtr namespaceTests() {
+	return UnitTest::createSuite< NamespaceTests::All >();
 }

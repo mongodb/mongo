@@ -18,6 +18,11 @@
 
 #pragma once
 
+#include "stdafx.h"
+
+#include "jsobj.h"
+#include "storage.h"
+
 #include "../util/hashtab.h"
 #include "../util/mmap.h"
 
@@ -89,12 +94,12 @@ public:
 	   only when it's a "multikey" array.
        keys will be left empty if key not found in the object.
 	*/
-	void getKeysFromObject(BSONObj& obj, set<BSONObj>& keys);
+	void getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) const;
 
     /* get the key pattern for this object. 
        e.g., { lastname:1, firstname:1 }
     */
-    BSONObj keyPattern() { 
+    BSONObj keyPattern() const { 
         return info.obj().getObjectField("key");
     }
 
@@ -111,7 +116,7 @@ public:
 		return s;
 	}
 
-	string indexName() { // e.g. "ts_1"
+	string indexName() const { // e.g. "ts_1"
 		BSONObj io = info.obj();
 		return io.getStringField("name");
 	}
@@ -119,7 +124,7 @@ public:
 	/* gets not our namespace name (indexNamespace for that), 
 	   but the collection we index, its name.
 	   */
-	string parentNS() {
+	string parentNS() const {
 		BSONObj io = info.obj();
 		return io.getStringField("ns");
 	}

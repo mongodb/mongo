@@ -67,7 +67,7 @@ int main( int argc, char** argv ) {
 	UnitTest::Registry tests;
 	
 	tests.add( btreeTests(), "btree" );
-	tests.add( indexDetailsTests(), "indexdetails" );
+	tests.add( namespaceTests(), "namespace" );
 	tests.add( pairingTests(), "pairing" );
 	
 	return tests.run( argc, argv );
