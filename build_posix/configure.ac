@@ -23,6 +23,6 @@ AM_OPTIONS
 
 AC_CONFIG_FILES([
 	Makefile
-	wiredtiger.h:../inc_posix/wiredtiger.in:../inc_posix/flags.in
+	wiredtiger.h:../inc_posix/wiredtiger.in
 	wt_internal.h:../inc_posix/wt_internal.in])
 AC_OUTPUT
