@@ -18,12 +18,12 @@ extern "C" {
 /*
  * Flag checking for API functions.
  */
-#define	DB_FLAG_CHK(idb, name, f, mask)					\
+#define	DB_FLAG_CHK(db, name, f, mask)					\
 	if ((f) & ~(mask))						\
-		return (__wt_api_flags(idb->ienv, name));
-#define	DB_FLAG_CHK_NOTFATAL(idb, name, f, mask, ret)			\
+		return (__wt_api_flags((db)->ienv, name));
+#define	DB_FLAG_CHK_NOTFATAL(db, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
-		(ret) = __wt_api_flags(idb->ienv, name);
+		(ret) = __wt_api_flags((db)->ienv, name);
 #define	ENV_FLAG_CHK(ienv, name, f, mask)				\
 	if ((f) & ~(mask))						\
 		return (__wt_api_flags(ienv, name));
