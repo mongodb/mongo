@@ -56,10 +56,10 @@ namespace PairingTests {
 							 int remotePort,
 							 const string &arbHost ) {
 				ASSERT( rp.state == ReplPair::State_Negotiating );
-				ASSERT_EQUALS( rp.remote, remote );
-				ASSERT_EQUALS( rp.remoteHost, remoteHost );
-				ASSERT_EQUALS( rp.remotePort, remotePort );
-				ASSERT_EQUALS( rp.arbHost, arbHost );
+				ASSERT_EQUALS( remote, rp.remote );
+				ASSERT_EQUALS( remoteHost, rp.remoteHost );
+				ASSERT_EQUALS( remotePort, rp.remotePort );
+				ASSERT_EQUALS( arbHost, rp.arbHost );
 			}
 		};
 		
@@ -87,7 +87,7 @@ namespace PairingTests {
 				ReplPair rp( "a", "b" );
 				rp.setMaster( ReplPair::State_CantArb, "foo" );
 				ASSERT( rp.state == ReplPair::State_CantArb );
-				ASSERT_EQUALS( rp.info, "foo" );
+				ASSERT_EQUALS( "foo", rp.info );
 				rp.setMaster( ReplPair::State_Confused, "foo" );
 				ASSERT( rp.state == ReplPair::State_Confused );
 			}

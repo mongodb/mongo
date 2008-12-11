@@ -55,7 +55,7 @@ namespace BtreeTests {
 			ASSERT( bt() );
 			ASSERT( bt()->isHead() );
 			bt()->assertValid( true );
-			ASSERT_EQUALS( bt()->fullValidate( dl() ), nKeys );
+			ASSERT_EQUALS( nKeys, bt()->fullValidate( dl() ) );
 		}
 		void insert( BSONObj &key ) {
 			bt()->insert( dl(), recordLoc(), key, true, id(), true );
@@ -76,9 +76,9 @@ namespace BtreeTests {
 			bool found;
 			DiskLoc location =
 			bt()->locate( dl(), key, pos, found, recordLoc(), direction );
-			ASSERT_EQUALS( found, expectedFound );
+			ASSERT_EQUALS( expectedFound, found );
 			ASSERT( location == expectedLocation );
-			ASSERT_EQUALS( pos, expectedPos );
+			ASSERT_EQUALS( expectedPos, pos );
 		}
 	private:
 		IndexDetails idx_;

@@ -395,7 +395,7 @@ BSONElement BSONObj::getFieldDotted(const char *name) const {
    n^2 implementation bad if pattern and object have lots 
    of fields - normally pattern doesn't so should be fine.
 */
-BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b) { 
+BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b) const { 
 	BSONObjIterator i(pattern);
 	while( i.more() ) {
 		BSONElement e = i.next();
