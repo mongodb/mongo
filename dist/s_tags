@@ -24,9 +24,7 @@ chmod 444 tags
 
 # Link to the tags file from standard build and source directories.
 dirs="build_posix `python -c\
-    'import sys;\
-     sys.path.append("../dist");\
-     from dist import directory_files;\
+     'from dist import directory_files;\
      directory_files();'`"
 for i in $dirs; do
 	(cd ../$i && rm -f tags && ln -s ../dist/tags .)
