@@ -42,9 +42,14 @@ struct __wt_btree {
 /* Convert a file address into a byte offset. */
 #define	WT_FRAGS_TO_BYTES(db, frags)					\
 	((size_t)(frags) * (db)->fragsize)
+
 /* Return the number of fragments needed to hold N bytes. */
 #define	WT_BYTES_TO_FRAGS(db, bytes)					\
 	((bytes) / (db)->fragsize)
+
+/* Return the number of fragments for a database page. */
+#define	WT_FRAGS_PER_PAGE(db)						\
+	WT_BYTES_TO_FRAGS(db, (db)->pagesize)
 
 /* Return the fragments needed for an overflow item. */
 #define	WT_OVERFLOW_BYTES_TO_FRAGS(db, len, frags) {			\
@@ -62,8 +67,8 @@ struct __wt_btree {
 
 /*
  * Each page of the Btree has an associated, in-memory structure that
- * describes it.  (This is where the page index found in DB 1.85 and 
- * Berkeley DB moved.)
+ * describes it.  (This is where the on-page index array found in DB
+ * 1.85 and Berkeley DB moved.)
  */
 struct __wt_page_inmem {
 	u_int32_t addr;				/* File block address */
@@ -78,10 +83,10 @@ struct __wt_page_inmem {
 };
 
 /*
- * All database pages have a common header.  There is no version number, and
- * the page type and/or flags value must be revised to accommodate a change
- * in the page layout.  (The page type and flags come early in the header to
- * make this simpler.)
+ * All database pages have a common header.  There is no version number or
+ * mode bits, and the page type and/or flags value will likely be modified
+ * if any changes are made to the page layout.  (The page type and flags
+ * come early in the header to make this simpler.)
  */
 struct __wt_page_hdr {
 	/* An LSN is 8 bytes: 4 bytes of file number, 4 bytes of file offset. */
@@ -105,23 +110,45 @@ struct __wt_page_hdr {
 	u_int32_t prevaddr;		/* 20-23: previous page */
 	u_int32_t nextaddr;		/* 24-27: next page */
 };
-#define	WT_HDR_SIZE		28
-#define	WT_PAGE_DATA(hdr)	((u_int8_t *)(hdr) + WT_HDR_SIZE)
 
+/*
+ * WT_HDR_SIZE is the expected headr size -- we check this when we startup
+ * to make sure the compiler hasn't inserted padding (which would break
+ * the world).
+ */
+#define	WT_HDR_SIZE		28
+
+/*
+ * WT_PAGE_DATA is the first data byte on the page.
+ * WT_DATA_SPACE is the total bytes of data space on the page.
+ */
+#define	WT_PAGE_DATA(hdr)		((u_int8_t *)(hdr) + WT_HDR_SIZE)
 #define	WT_DATA_SPACE(pgsize)		((pgsize) - sizeof(WT_PAGE_HDR))
 
 /*
- * After the header, there is a list of items in sorted order.  On btree
- * leaf pages, they are paired, key/data items.   On btree internal pages,
- * they are key items.
+ * After the header, there is a list of WT_ITEMs in sorted order.
+ *
+ * Internal pages contain single key items (which may be overflow items).
+ *
+ * Leaf pages contain paired key/data items or a single duplicate data items
+ * (which may be overflow items).
  */
 struct __wt_item {
-	u_int32_t len;			/* Data length, in bytes */
+	u_int32_t len;			/* Trailing data length, in bytes */
 
-#define	WT_ITEM_INTERNAL	1
-#define	WT_ITEM_OVERFLOW	2
-#define	WT_ITEM_STANDARD	3
+	/*
+	 * We encode lots of cases here.   It's not really necessary, but we
+	 * have all the name-space we can use, and we can do a better job of
+	 * salvaging a page if we know what types we have.
+	 */ 
+#define	WT_ITEM_KEY		1	/* Leaf/internal page key item */
+#define	WT_ITEM_DATA		2	/* Leaf page data item */
+#define	WT_ITEM_KEY_OVFL	3	/* Leaf/internal page overflow key */
+#define	WT_ITEM_DATA_OVFL	4	/* Leaf/internal page overflow data */
+#define	WT_ITEM_DUPLICATE	5	/* Leaf page duplicate data */
+#define	WT_ITEM_DUPLICATE_OVFL	6	/* Leaf page duplicate data overflow */
 	u_int8_t  type;			/* Data type */
+
 	u_int8_t  unused[3];		/* Spacer to force alignment */
 
 	/*

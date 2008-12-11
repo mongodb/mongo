@@ -59,7 +59,12 @@ __wt_bt_page_verify(DB *db, u_int32_t addr, void *page)
 		    p += WT_ITEM_SPACE_REQ(item->len), --i) {
 			item = (WT_ITEM *)p;
 			switch (item->type) {
-			case WT_ITEM_STANDARD:
+			case WT_ITEM_KEY:
+			case WT_ITEM_DATA:
+			case WT_ITEM_KEY_OVFL:
+			case WT_ITEM_DATA_OVFL:
+			case WT_ITEM_DUPLICATE:
+			case WT_ITEM_DUPLICATE_OVFL:
 				break;
 			default:
 				__wt_db_errx(db,

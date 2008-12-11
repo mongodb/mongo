@@ -39,6 +39,7 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	memset(&data_item, 0, sizeof(data_item));
 
 	while ((ret = cb(db, &key, &data)) == 0) {
+		/* Create overflow objects if the key or data won't fit. */
 		if (key->size > db->maxitemsize) {
 			key_ovfl.len = key->size;
 			if ((ret =
@@ -46,9 +47,9 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 				goto err;
 			key->data = &key_ovfl;
 			key->size = sizeof(key_ovfl);
-			key_item.type = WT_ITEM_OVERFLOW;
+			key_item.type = WT_ITEM_KEY_OVFL;
 		} else
-			key_item.type = WT_ITEM_STANDARD;
+			key_item.type = WT_ITEM_KEY;
 		if (data->size > db->maxitemsize) {
 			data_ovfl.len = data->size;
 			if ((ret =
@@ -56,9 +57,9 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 				goto err;
 			data->data = &data_ovfl;
 			data->size = sizeof(data_ovfl);
-			data_item.type = WT_ITEM_OVERFLOW;
+			data_item.type = WT_ITEM_DATA_OVFL;
 		} else
-			data_item.type = WT_ITEM_STANDARD;
+			data_item.type = WT_ITEM_DATA;
 
 		/* 
 		 * If there's insufficient space available, allocate a space
@@ -69,7 +70,7 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 		    WT_ITEM_SPACE_REQ(data->size) > space_avail)) {
 			/* Allocate a new page. */
 			if ((ret = __wt_bt_falloc(bt,
-			    db->frags_per_page, &next_hdr, &next_addr)) != 0)
+			    WT_FRAGS_PER_PAGE(db), &next_hdr, &next_addr)) != 0)
 				goto err;
 			next_hdr->type = WT_PAGE_BTREE_LEAF;
 			next_hdr->prevaddr = addr;
@@ -79,7 +80,7 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 			if (hdr != NULL) {
 				hdr->nextaddr = next_addr;
 				if ((ret = __wt_bt_fwrite(bt,
-				    addr, db->frags_per_page, hdr)) != 0)
+				    addr, WT_FRAGS_PER_PAGE(db), hdr)) != 0)
 					goto err;
 			}
 
@@ -108,7 +109,7 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 
 	/* Write any partially-filled page. */
 	if (ret == 1 && hdr != NULL)
-		ret = __wt_bt_fwrite(bt, addr, db->frags_per_page, hdr);
+		ret = __wt_bt_fwrite(bt, addr, WT_FRAGS_PER_PAGE(db), hdr);
 
 	return (ret);
 

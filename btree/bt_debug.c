@@ -33,7 +33,7 @@ __wt_bt_dump_pgno(DB *db, u_int32_t addr, char *ofile)
 
 	bt = db->idb->btree;
 
-	if ((ret = __wt_bt_fread(bt, addr, db->frags_per_page, &hdr)) != 0)
+	if ((ret = __wt_bt_fread(bt, addr, WT_FRAGS_PER_PAGE(db), &hdr)) != 0)
 		return (ret);
 
 	ret = __wt_bt_dump_page(db, hdr, ofile);
@@ -82,13 +82,12 @@ __wt_bt_dump_page(DB *db, WT_PAGE_HDR *hdr, char *ofile)
 		    (u_long)item->len, __wt_bt_item_type(item->type));
 
 		switch (item->type) {
-		case WT_ITEM_STANDARD:
+		case WT_ITEM_KEY:
+		case WT_ITEM_DATA:
 			fprintf(fp, "\t{");
-			__wt_bt_print(
-			    p + sizeof(WT_ITEM), item->len, fp);
+			__wt_bt_print(p + sizeof(WT_ITEM), item->len, fp);
 			fprintf(fp, "}\n");
 			p += WT_ITEM_SPACE_REQ(item->len);
-
 			break;
 		default:
 			return (__wt_database_format(db));
@@ -137,12 +136,18 @@ const char *
 __wt_bt_item_type(u_int32_t type)
 {
 	switch (type) {
-	case WT_ITEM_INTERNAL:
+	case WT_ITEM_KEY:
 		return ("internal");
-	case WT_ITEM_OVERFLOW:
-		return ("overflow");
-	case WT_ITEM_STANDARD:
-		return ("standard");
+	case WT_ITEM_DATA:
+		return ("data");
+	case WT_ITEM_KEY_OVFL:
+		return ("key-ovfl");
+	case WT_ITEM_DATA_OVFL:
+		return ("data-ovfl");
+	case WT_ITEM_DUPLICATE:
+		return ("duplicate");
+	case WT_ITEM_DUPLICATE_OVFL:
+		return ("duplicate-ovfl");
 	default:
 		break;
 	}

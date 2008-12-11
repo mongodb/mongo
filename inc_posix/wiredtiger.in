@@ -88,8 +88,6 @@ struct __db {
 	ENV *env;			/* Enclosing environment */
 	IENV *ienv;			/* Private environment object */
 
-	u_int32_t frags_per_page;	/* Fragments per database page */
-
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * Db handle api section: BEGIN

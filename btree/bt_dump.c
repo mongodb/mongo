@@ -34,17 +34,19 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 
 	for (addr = WT_BTREE_ROOT;;) {
 		if ((ret =
-		    __wt_bt_fread(bt, addr, db->frags_per_page, &hdr)) != 0)
+		    __wt_bt_fread(bt, addr, WT_FRAGS_PER_PAGE(db), &hdr)) != 0)
 			return (ret);
 		for (p = (u_int8_t *)hdr + WT_HDR_SIZE,
 		    i = hdr->entries; i > 0; --i) {
 			item = (WT_ITEM *)p;
 			switch (item->type) {
-			case WT_ITEM_STANDARD:
+			case WT_ITEM_KEY:
+			case WT_ITEM_DATA:
 				func(p + sizeof(WT_ITEM), item->len, stream);
 				p += WT_ITEM_SPACE_REQ(item->len);
 				break;
-			case WT_ITEM_OVERFLOW:
+			case WT_ITEM_KEY_OVFL:
+			case WT_ITEM_DATA_OVFL:
 				ovfl = (WT_ITEM_OVFL *)
 				    ((u_int8_t *)item + sizeof(WT_ITEM));
 				WT_OVERFLOW_BYTES_TO_FRAGS(
