@@ -174,7 +174,7 @@ public:
     virtual bool slaveOk() { return false; }
     CmdDropDatabase() : Command("dropDatabase") {}
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        BSONElement e = cmdObj.findElement("dropDatabase");
+        BSONElement e = cmdObj.findElement(name);
         log() << "dropDatabase " << ns << endl;
         int p = (int) e.number();
         if( p != 1 )
@@ -193,7 +193,7 @@ public:
     virtual bool slaveOk() { return true; }
     CmdProfile() : Command("profile") {}
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        BSONElement e = cmdObj.findElement("profile");
+        BSONElement e = cmdObj.findElement(name);
         result.append("was", (double) database->profile);
         int p = (int) e.number();
         bool ok = false;
@@ -267,12 +267,39 @@ public:
     CmdOpLogging() : Command("opLogging") { }
     bool adminOnly() { return true; }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-        opLogging = (int) cmdObj.findElement("opLogging").number();
+        opLogging = (int) cmdObj.findElement(name).number();
         flushOpLog();
         log() << "CMD: opLogging set to " << opLogging << endl;
         return true;
     }
 } cmdoplogging;
+
+/* drop collection */
+class CmdDrop : public Command { 
+public:
+    CmdDrop() : Command("drop") { }
+    virtual bool logTheOp() { return true; }
+    virtual bool slaveOk() { return false; }
+    virtual bool adminOnly() { return false; }
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        string nsToDrop = database->name + '.' + cmdObj.findElement(name).valuestr();
+        NamespaceDetails *d = nsdetails(nsToDrop.c_str());
+        log() << "CMD: drop " << nsToDrop << endl;
+        if( d == 0 ) {
+            errmsg = "ns not found";
+            return false;
+        }
+		if( d->nIndexes != 0 ) {
+            // client helper function is supposed to drop the indexes first
+            errmsg = "ns has indexes (not permitted on drop)";
+            return false;
+        }
+        result.append("ns", nsToDrop.c_str());
+        ClientCursor::invalidate(nsToDrop.c_str());
+        dropNS(nsToDrop);
+        return true;
+    }
+} cmdDrop;
 
 class CmdQueryTraceLevel : public Command { 
 public:
@@ -280,7 +307,7 @@ public:
     CmdQueryTraceLevel() : Command("queryTraceLevel") { }
     bool adminOnly() { return true; }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-        queryTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
+        queryTraceLevel = (int) cmdObj.findElement(name).number();
         return true;
     }
 } cmdquerytracelevel;
@@ -291,10 +318,51 @@ public:
     CmdTraceAll() : Command("traceAll") { }
     bool adminOnly() { return true; }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-        queryTraceLevel = otherTraceLevel = (int) cmdObj.findElement(name.c_str()).number();
+        queryTraceLevel = otherTraceLevel = (int) cmdObj.findElement(name).number();
         return true;
     }
 } cmdtraceall;
+
+/* select count(*) */
+class CmdCount : public Command { 
+public:
+    CmdCount() : Command("count") { }
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return false; }
+    virtual bool adminOnly() { return false; }
+    virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        string ns = database->name + '.' + cmdObj.findElement(name).valuestr();
+        string err;
+        int n = runCount(ns.c_str(), cmdObj, err);
+        int nn = n;
+        bool ok = true;
+        if( n < 0 ) { 
+            ok = false;
+            nn = 0;
+            if( !err.empty() )
+                errmsg = err;
+        }
+        result.append("n", (double) nn);
+        return ok;
+    }
+} cmdCount;
+
+/* create collection */
+class CmdCreate : public Command { 
+public:
+    CmdCreate() : Command("create") { }
+    virtual bool logTheOp() { return true; }
+    virtual bool slaveOk() { return false; }
+    virtual bool adminOnly() { return false; }
+    virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        string ns = database->name + '.' + cmdObj.findElement(name).valuestr();
+        string err;
+        bool ok = userCreateNS(ns.c_str(), cmdObj, err, true);
+        if( !ok && !err.empty() )
+            errmsg = err;
+        return ok;
+    }
+} cmdCreate;
 
 class CmdDeleteIndexes : public Command {
 public:
@@ -397,7 +465,7 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
             ok = false;
 			errmsg = "access denied";
         }
-        else if( !isMaster() && !c->slaveOk() ) { 
+        else if( !isMaster() && !c->slaveOk() && !fromRepl ) { 
             /* todo: allow if Option_SlaveOk was set on the query */
             ok = false;
             errmsg = "not master";
@@ -414,31 +482,8 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 		/* { count: "collectionname"[, query: <query>] } */
 		string us(ns, p-ns);
 
-		if( strcmp( e.fieldName(), "count" ) == 0 ) { 
-			valid = true;
-			string ns = us + '.' + e.valuestr();
-			string err;
-			int n = runCount(ns.c_str(), jsobj, err);
-			int nn = n;
-			ok = true;
-			if( n < 0 ) { 
-				ok = false;
-				nn = 0;
-				if( !err.empty() )
-					anObjBuilder.append("errmsg", err.c_str());
-			}
-			anObjBuilder.append("n", (double) nn);
-		}
-		else if( strcmp( e.fieldName(), "create") == 0 ) { 
-            // create a collection
-			valid = true;
-			string ns = us + '.' + e.valuestr();
-			string err;
-			ok = userCreateNS(ns.c_str(), jsobj, err, true);
-			if( !ok && !err.empty() )
-				anObjBuilder.append("errmsg", err.c_str());
-		}
-		else if( strcmp( e.fieldName(), "clean") == 0 ) { 
+        /* we allow clean and validate on slaves */
+		if( strcmp( e.fieldName(), "clean") == 0 ) { 
 			valid = true;
 			string dropNs = us + '.' + e.valuestr();
 			NamespaceDetails *d = nsdetails(dropNs.c_str());
@@ -450,36 +495,6 @@ bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &
 			}
 			else {
 				anObjBuilder.append("errmsg", "ns not found");
-			}
-		}
-		else if( strcmp( e.fieldName(), "drop") == 0 ) { 
-			valid = true;
-			string nsToDrop = us + '.' + e.valuestr();
-			NamespaceDetails *d = nsdetails(nsToDrop.c_str());
-			log() << "CMD: drop " << nsToDrop << endl;
-			if( d == 0 ) {
-				anObjBuilder.append("errmsg", "ns not found");
-			}
-			else if( d->nIndexes != 0 ) {
-				// database is supposed to drop the indexes first
-				anObjBuilder.append("errmsg", "ns has indexes (not permitted on drop)");
-			}
-			else {
-				ok = true;
-				anObjBuilder.append("ns", nsToDrop.c_str());
-				ClientCursor::invalidate(nsToDrop.c_str());
-				dropNS(nsToDrop);
-                if( !fromRepl ) 
-                    logOp("c", ns, jsobj);
-				/*
-				{
-					BSONObjBuilder b;
-					b.append("name", dropNs.c_str());
-					BSONObj cond = b.done(); // { name: "colltodropname" }
-					deleteObjects("system.namespaces", cond, false, true);
-				}
-				database->namespaceIndex.kill(dropNs.c_str());
-				*/
 			}
 		}
 		else if( strcmp( e.fieldName(), "validate") == 0 ) { 
