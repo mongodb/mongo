@@ -20,4 +20,5 @@
 #include <unittest/UnitTest.hpp>
 
 UnitTest::TestPtr btreeTests();
+UnitTest::TestPtr indexDetailsTests();
 UnitTest::TestPtr pairingTests();
