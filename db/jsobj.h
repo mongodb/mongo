@@ -480,17 +480,18 @@ public:
 	template < class T >
 	void append( const char *fieldName, const vector< T >& vals ) {
 		BSONObjBuilder arrBuilder;
-		for( int i = 0; i < vals.size(); ++i ) {
-			stringstream o;
-			o << i;
-			arrBuilder.append( o.str().c_str(), vals[ i ] );
-		}
-		BSONObj arr = arrBuilder.done();
-		b.append( (char) Array );
-		b.append( fieldName );
-		b.append( (void *) arr.objdata(), arr.objsize() );
+		for( int i = 0; i < vals.size(); ++i )
+			arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
+		marshalArray( fieldName, arrBuilder.done() );
 	}
 	
+	void appendIntArray( const char *fieldName, const vector< int >& vals ) {
+		BSONObjBuilder arrBuilder;
+		for( int i = 0; i < vals.size(); ++i )
+			arrBuilder.appendInt( numStr( i ).c_str(), vals[ i ] );
+		marshalArray( fieldName, arrBuilder.done() );
+	}
+
 	/* BSONObj will free the buffer when it is finished. */
 	BSONObj doneAndDecouple() { 
 		int l;
@@ -516,6 +517,19 @@ public:
 	void decouple() { b.decouple(); } // post done() call version.  be sure jsobj frees...
 
 private:
+	// Append the provided arr object as an array.
+	void marshalArray( const char *fieldName, const BSONObj &arr ) {
+		b.append( (char) Array );
+		b.append( fieldName );
+		b.append( (void *) arr.objdata(), arr.objsize() );
+	}
+
+	string numStr( int i ) const {
+		stringstream o;
+		o << i;
+		return o.str();
+	}
+	
 	char* _done() { 
 		b.append((char) EOO);
 		char *data = b.buf();

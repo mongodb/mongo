@@ -242,6 +242,7 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
 			return strcmp(l.valuestr(), r.valuestr());
 		case Object:
 		case Array:
+			return l.embeddedObject().woCompare( r.embeddedObject() );
 		case DBRef:
 			{
 				int lsz = l.valuesize();

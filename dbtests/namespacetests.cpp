@@ -117,9 +117,6 @@ namespace NamespaceTests {
 				set< BSONObj > keys;
 				id().getKeysFromObject( a.done(), keys );
 				ASSERT_EQUALS( 1, keys.size() );
-				// FIXME Why doesn't woCompare expand sub elements?
-				// ASSERT( !keys.begin()->woCompare( e.done() ) );
-				cout << "first key: " << keys.begin()->toString() << endl;
 				ASSERT_EQUALS( string( "b" ), keys.begin()->firstElement().fieldName() );
 				ASSERT_EQUALS( 4, keys.begin()->firstElement().number() );
 			}
@@ -204,7 +201,6 @@ namespace NamespaceTests {
 				
 				set< BSONObj > keys;
 				id().getKeysFromObject( a.done(), keys );
-				cout << "key: " << keys.begin()->toString() << endl;
 				ASSERT_EQUALS( 3, keys.size() );
 				int j = 1;
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {

@@ -16,7 +16,6 @@
 		934223860EF16D7000608550 /* btreetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = btreetests.cpp; sourceTree = "<group>"; };
 		934223880EF16D7000608550 /* dbtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbtests.cpp; sourceTree = "<group>"; };
 		934223890EF16D7000608550 /* dbtests.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dbtests.h; sourceTree = "<group>"; };
-		9342238B0EF16D7000608550 /* indexdetailstests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = indexdetailstests.cpp; sourceTree = "<group>"; };
 		9342238C0EF16D7000608550 /* mockdbclient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mockdbclient.h; sourceTree = "<group>"; };
 		9342238D0EF16D7000608550 /* pairingtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = pairingtests.cpp; sourceTree = "<group>"; };
 		934223900EF16DB400608550 /* btree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = btree.cpp; sourceTree = "<group>"; };
@@ -69,6 +68,8 @@
 		934223C70EF16DB400608550 /* scanandorder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = scanandorder.h; sourceTree = "<group>"; };
 		934223C80EF16DB400608550 /* storage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = storage.h; sourceTree = "<group>"; };
 		934223C90EF16DB400608550 /* tests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tests.cpp; sourceTree = "<group>"; };
+		93D0C1520EF1D377005253B7 /* jsobjtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobjtests.cpp; sourceTree = "<group>"; };
+		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -116,10 +117,11 @@
 		934223850EF16D7000608550 /* dbtests */ = {
 			isa = PBXGroup;
 			children = (
+				93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */,
+				93D0C1520EF1D377005253B7 /* jsobjtests.cpp */,
 				934223860EF16D7000608550 /* btreetests.cpp */,
 				934223880EF16D7000608550 /* dbtests.cpp */,
 				934223890EF16D7000608550 /* dbtests.h */,
-				9342238B0EF16D7000608550 /* indexdetailstests.cpp */,
 				9342238C0EF16D7000608550 /* mockdbclient.h */,
 				9342238D0EF16D7000608550 /* pairingtests.cpp */,
 			);

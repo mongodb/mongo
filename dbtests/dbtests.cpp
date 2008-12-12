@@ -67,6 +67,7 @@ int main( int argc, char** argv ) {
 	UnitTest::Registry tests;
 	
 	tests.add( btreeTests(), "btree" );
+	tests.add( jsobjTests(), "jsobj" );
 	tests.add( namespaceTests(), "namespace" );
 	tests.add( pairingTests(), "pairing" );
 	

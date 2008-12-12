@@ -20,5 +20,6 @@
 #include <unittest/UnitTest.hpp>
 
 UnitTest::TestPtr btreeTests();
+UnitTest::TestPtr jsobjTests();
 UnitTest::TestPtr namespaceTests();
 UnitTest::TestPtr pairingTests();
