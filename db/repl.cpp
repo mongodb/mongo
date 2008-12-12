@@ -68,6 +68,15 @@ struct ReplInfo {
     ~ReplInfo() { replInfo = "?"; }
 };
 
+void ReplPair::setMaster(int n, const char *_comment ) { 
+	if ( n == State_Master && !seemCaughtUp )
+		return;
+	info = _comment;
+	if( n != state )
+		log() << "pair: setting master=" << n << " was " << state << '\n';
+	state = n;
+}
+
 /* peer unreachable, try our arbiter */
 void ReplPair::arbitrate() {
     ReplInfo r("arbitrate");
@@ -173,7 +182,7 @@ public:
 		}
 		
 		int me, you;
-		if( replPair->state != M && was == M ) { 
+		if( !seemCaughtUp || ( replPair->state != M && was == M ) ) { 
 			me=S;you=M;
 		}
 		else { 

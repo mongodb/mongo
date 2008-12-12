@@ -79,12 +79,7 @@ public:
 		setMaster( n, _comment );
 	}
 	
-    void setMaster(int n, const char *_comment = "") { 
-        info = _comment;
-        if( n != state )
-			log() << "pair: setting master=" << n << " was " << state << '\n';
-        state = n;
-    }
+    void setMaster(int n, const char *_comment = "");
 
     /* negotiate with our peer who is master */
     void negotiate(DBClientConnection *conn);

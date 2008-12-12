@@ -22,9 +22,15 @@
 #include "dbtests.h"
 #include "mockdbclient.h"
 
+extern bool seemCaughtUp;
+
 namespace PairingTests {
+	struct Base {
+		Base() { seemCaughtUp = true; }
+	};
+	
 	namespace ReplPairTests {
-		class Create {
+		class Create : public Base {
 		public:
 			void run() {
 				ReplPair rp1( "foo", "bar" );
@@ -63,7 +69,7 @@ namespace PairingTests {
 			}
 		};
 		
-		class Dominant {
+		class Dominant : public Base {
 		public:
 			Dominant() : oldPort_( port ) {
 				port = 10;
@@ -93,7 +99,7 @@ namespace PairingTests {
 			}
 		};
 		
-		class Negotiate {
+		class Negotiate : public Base {
 		public:
 			void run() {
 				ReplPair rp( "a", "b" );
@@ -125,7 +131,7 @@ namespace PairingTests {
 			}
 		};
 		
-		class Arbitrate {
+		class Arbitrate : public Base {
 		public:
 			void run() {
 				ReplPair rp1( "a", "-" );
@@ -164,17 +170,17 @@ namespace PairingTests {
 		};
 	} // namespace ReplPairTests
 	
-	class DirectConnectBase {
+	class DirectConnectBase : public Base {
 	protected:
-		static void negotiate( ReplPair &a, ReplPair &b ) {
-			auto_ptr< DBClientConnection > c( new DirectDBClientConnection( &b ) );
+		void negotiate( ReplPair &a, ReplPair &b ) {
+			auto_ptr< DBClientConnection > c( new DirectDBClientConnection( &b, cc() ) );
 			a.negotiate( c.get() );      
 		}
 		class DirectConnectionReplPair : public ReplPair {
 		public:
 			DirectConnectionReplPair( ReplPair *dest ) :
-				ReplPair( "a", "c" ),
-				dest_( dest ) {
+			ReplPair( "a", "c" ),
+			dest_( dest ) {
 			}
 			virtual DBClientConnection *newClientConnection() const {
 				return new DirectDBClientConnection( dest_ );
@@ -182,11 +188,23 @@ namespace PairingTests {
 		private:
 			ReplPair *dest_;
 		};
+		virtual DirectDBClientConnection::ConnectionCallback *cc() { return 0; }
+		void checkNegotiation( const char *host1, const char *arb1, int state1, int newState1,
+							  const char *host2, const char *arb2, int state2, int newState2 ) {
+			ReplPair one( host1, arb1 );
+			one.state = state1;
+			ReplPair two( host2, arb2 );
+			two.state = state2;
+			negotiate( one, two );
+			ASSERT( one.state == newState1 );
+			ASSERT( two.state == newState2 );
+		}
 	};
 	
 	class Negotiate : public DirectConnectBase {
 	public:
 		void run() {
+			seemCaughtUp = true;
 			checkNegotiation( "a", "-", ReplPair::State_Negotiating, ReplPair::State_Negotiating,
 							 "b", "-", ReplPair::State_Negotiating, ReplPair::State_Negotiating );
 			checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Slave,
@@ -206,16 +224,46 @@ namespace PairingTests {
 			checkNegotiation( "b", "-", ReplPair::State_Slave, ReplPair::State_Slave,
 							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Master );
 		}
+	};
+
+	class NegotiateWithCatchup : public DirectConnectBase {
+	public:
+		void run() {
+			// a caught up, b not
+			seemCaughtUp = false;
+			checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Slave,
+							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Master );
+			// b caught up, a not
+			seemCaughtUp = true;
+			checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Master,
+							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave );
+
+			// a caught up, b not
+			seemCaughtUp = false;
+			checkNegotiation( "b", "-", ReplPair::State_Slave, ReplPair::State_Slave,
+							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Master );
+			// b caught up, a not
+			seemCaughtUp = true;
+			checkNegotiation( "b", "-", ReplPair::State_Slave, ReplPair::State_Master,
+							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave );
+		}
 	private:
-		void checkNegotiation( const char *host1, const char *arb1, int state1, int newState1,
-							  const char *host2, const char *arb2, int state2, int newState2 ) {
-			ReplPair one( host1, arb1 );
-			one.state = state1;
-			ReplPair two( host2, arb2 );
-			two.state = state2;
-			negotiate( one, two );
-			ASSERT( one.state == newState1 );
-			ASSERT( two.state == newState2 );
+		class NegateCatchup : public DirectDBClientConnection::ConnectionCallback {
+			virtual void beforeCommand() { seemCaughtUp = !seemCaughtUp; }
+			virtual void afterCommand() { seemCaughtUp = !seemCaughtUp; }
+		};
+		virtual DirectDBClientConnection::ConnectionCallback *cc() {
+			return &cc_;
+		}
+		NegateCatchup cc_;
+	};
+	
+	class NobodyCaughtUp : public DirectConnectBase {
+	public:
+		void run() {
+			seemCaughtUp = false;
+			checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Negotiating,
+							 "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave );
 		}
 	};
 	
@@ -226,6 +274,11 @@ namespace PairingTests {
 			DirectConnectionReplPair m( &arb );
 			m.arbitrate();
 			ASSERT( m.state == ReplPair::State_Master );
+			
+			seemCaughtUp = false;
+			m.state = ReplPair::State_Negotiating;
+			m.arbitrate();
+			ASSERT( m.state == ReplPair::State_Negotiating );
 		}
 	};
 	
@@ -238,6 +291,8 @@ namespace PairingTests {
 			add< ReplPairTests::Negotiate >();
 			add< ReplPairTests::Arbitrate >();
 			add< Negotiate >();
+			add< NegotiateWithCatchup >();
+			add< NobodyCaughtUp >();
 			add< Arbitrate >();
 		}
 	};

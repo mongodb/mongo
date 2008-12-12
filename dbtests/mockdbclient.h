@@ -47,12 +47,20 @@ private:
 
 class DirectDBClientConnection : public DBClientConnection {
 public:
-	DirectDBClientConnection( ReplPair *rp ) : rp_( rp ) {
+	struct ConnectionCallback {
+		virtual void beforeCommand() {}
+		virtual void afterCommand() {}
+	};
+	DirectDBClientConnection( ReplPair *rp, ConnectionCallback *cc = 0 ) :
+	rp_( rp ),
+	cc_( cc ) {
 	}
 	virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+		if( cc_ ) cc_->beforeCommand();
 		SetGlobalReplPair s( rp_ );
 		BSONObjBuilder result;
 		result.append( "ok", runCommandAgainstRegistered( "admin.$cmd", query, result ) ? 1.0 : 0.0 );
+		if ( cc_ ) cc_->afterCommand();
 		return result.doneAndDecouple();
 	}
 	virtual bool connect( const char *serverHostname, string& errmsg ) {
@@ -60,6 +68,7 @@ public:
 	}
 private:
 	ReplPair *rp_;
+	ConnectionCallback *cc_;
 	class SetGlobalReplPair {
 	public:
 		SetGlobalReplPair( ReplPair *rp ) {
