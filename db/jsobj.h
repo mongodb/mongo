@@ -349,6 +349,7 @@ public:
 		return BSONElement(objdata() + 4);
 	}
 	BSONElement findElement(const char *name);
+    BSONElement findElement(string name) { return findElement(name.c_str()); }
 	bool hasElement(const char *name);
 
 	OID* getOID() {
