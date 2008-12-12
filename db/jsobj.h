@@ -481,14 +481,14 @@ public:
 	template < class T >
 	void append( const char *fieldName, const vector< T >& vals ) {
 		BSONObjBuilder arrBuilder;
-		for( int i = 0; i < vals.size(); ++i )
+		for( unsigned int i = 0; i < vals.size(); ++i )
 			arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
 		marshalArray( fieldName, arrBuilder.done() );
 	}
 	
 	void appendIntArray( const char *fieldName, const vector< int >& vals ) {
 		BSONObjBuilder arrBuilder;
-		for( int i = 0; i < vals.size(); ++i )
+		for( unsigned int i = 0; i < vals.size(); ++i )
 			arrBuilder.appendInt( numStr( i ).c_str(), vals[ i ] );
 		marshalArray( fieldName, arrBuilder.done() );
 	}

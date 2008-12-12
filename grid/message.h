@@ -85,7 +85,7 @@ enum Operations {
 struct MsgData {
 	int len; /* len of the msg, including this field */
 	MSGID id; /* request/reply id's match... */
-	int responseTo; /* id of the message we are responding to */
+	MSGID responseTo; /* id of the message we are responding to */
 	int _operation;
 	int operation() const { return _operation; }
 	void setOperation(int o) { _operation = o; }

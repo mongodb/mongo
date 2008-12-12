@@ -1,7 +1,7 @@
 # makefile for our db project
 
-FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
-#FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0  -I .. -Isrc/p -I/src/p/db -L/usr/local/lib -L/usr/lib -rdynamic
+FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O3 -Wsign-compare -I .. -L/usr/local/lib -L/usr/lib -rdynamic
+#FLAGS= ${CFLAGS} -fPIC -ggdb -pthread -O0 -Wsign-compare -I .. -L/usr/local/lib -L/usr/lib -rdynamic
 
 LIB_DEPS = -lpcrecpp -lpcre
 LIB_BOOST = -lboost_thread -lboost_filesystem

@@ -52,7 +52,7 @@ bool BackgroundJob::wait(int msMax) {
         sleepmillis(ms);
         if( ms < 1000 ) 
             ms = ms * 2;
-        if( msMax && (jsTime()-start>msMax) )
+        if( msMax && ( int( jsTime() - start ) > msMax) )
             return false;
     }
     return true;
