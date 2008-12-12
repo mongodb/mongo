@@ -95,20 +95,56 @@ struct __wt_page_hdr {
 		u_int32_t offset;	/* 04-07: File offset */
 	} lsn;
 
+	/*
+	 * The type declares the purpose of the page and how to move through
+	 * the page.  We could compress the types (some of them have almost
+	 * identical characteristics), but we have plenty of name space and
+	 * the additional information makes salvage easier.
+	 *
+	 * WT_PAGE_OVFL:
+	 *	A flat chunk of data.   The u.datalen field is the length
+	 *	of the data.  This is used for overflow key and data items.
+	 * WT_PAGE_ROOT:
+	 * WT_PAGE_INT:
+	 * WT_PAGE_LEAF:
+	 *	The root, internal and leaf pages of the main btree (the
+	 *	root is always page WT_BTREE_ROOT).  The u.entries field
+	 *	is the number of entries on the page.
+	 * WT_PAGE_DUP_ROOT:
+	 * WT_PAGE_DUP_INT:
+	 * WT_PAGE_DUP_LEAF:
+	 *	The root, internal and leaf pages of an off-page duplicates
+	 *	btree.  The u.entries field is the number of entries on the
+	 *	page.
+	 */
 #define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_BTREE_ROOT	1	/* Btree root page */
-#define	WT_PAGE_BTREE_INTERNAL	2	/* Btree internal page */
-#define	WT_PAGE_BTREE_LEAF	3	/* Btree leaf page */
-#define	WT_PAGE_BTREE_OVERFLOW	4	/* Btree overflow page */
-	u_int16_t type;			/* 08-09: page type */
+#define	WT_PAGE_OVFL		1	/* Overflow page */
+#define	WT_PAGE_ROOT		2	/* Primary btree root page */
+#define	WT_PAGE_INT		3	/* Primary btree internal page */
+#define	WT_PAGE_LEAF		4	/* Primary btree leaf page */
+#define	WT_PAGE_DUP_ROOT	5	/* Off-page dup btree root page */
+#define	WT_PAGE_DUP_INT		6	/* Off-page dup btree internal page */
+#define	WT_PAGE_DUP_LEAF	7	/* Off-page dup btree leaf page */
+	u_int8_t type;			/* 08: page index type */
 
-	u_int16_t flags;		/* 10-11: page flags */
+	u_int8_t unused[3];		/* 09-11: unused padding */
 
 	u_int32_t checksum;		/* 12-15: checksum */
-	u_int32_t entries;		/* 16-19: number of items */
 
-	u_int32_t prevaddr;		/* 20-23: previous page */
-	u_int32_t nextaddr;		/* 24-27: next page */
+	union {
+		u_int32_t datalen;	/* 16-19: data length */
+		u_int32_t entries;	/* 16-19: number of items */
+	} u;
+
+	/*
+	 * Parent, forward and reverse page links.  Pages are linked at their
+	 * level, that is, all the main btree leaf pages are linked, each set
+	 * of off-page duplicate leaf pages are linked, and each level of
+	 * internal pages are linked.
+	 */
+	u_int32_t paraddr;		/* 20-23: parent page */
+	u_int32_t prevaddr;		/* 24-27: previous page */
+	u_int32_t nextaddr;		/* 28-31: next page */
 };
 
 /*
@@ -116,7 +152,7 @@ struct __wt_page_hdr {
  * to make sure the compiler hasn't inserted padding (which would break
  * the world).
  */
-#define	WT_HDR_SIZE		28
+#define	WT_HDR_SIZE		32
 
 /*
  * WT_PAGE_DATA is the first data byte on the page.
@@ -128,26 +164,30 @@ struct __wt_page_hdr {
 /*
  * After the header, there is a list of WT_ITEMs in sorted order.
  *
- * Internal pages contain single key items (which may be overflow items).
+ * Internal pages are lists of single key items (which may be overflow items).
  *
  * Leaf pages contain paired key/data items or a single duplicate data items
  * (which may be overflow items).
+ *
+ * Off-page duplicate pages are lists of single data items (which may be
+ * overflow items).
  */
 struct __wt_item {
 	u_int32_t len;			/* Trailing data length, in bytes */
 
 	/*
-	 * We encode lots of cases here.   It's not really necessary, but we
-	 * have all the name-space we can use, and we can do a better job of
-	 * salvaging a page if we know what types we have.
-	 */ 
+	 * Item type.  There are 3 basic types (keys, data, and duplicate
+	 * data), but each can appear as an overflow item.  We could use
+	 * a bit flag, but we have plenty of name space and avoiding the
+	 * bit operation is faster/cleaner.
+	 */
 #define	WT_ITEM_KEY		1	/* Leaf/internal page key item */
 #define	WT_ITEM_DATA		2	/* Leaf page data item */
-#define	WT_ITEM_KEY_OVFL	3	/* Leaf/internal page overflow key */
-#define	WT_ITEM_DATA_OVFL	4	/* Leaf/internal page overflow data */
-#define	WT_ITEM_DUPLICATE	5	/* Leaf page duplicate data */
-#define	WT_ITEM_DUPLICATE_OVFL	6	/* Leaf page duplicate data overflow */
-	u_int8_t  type;			/* Data type */
+#define	WT_ITEM_DUP		3	/* Duplicate data item */
+#define	WT_ITEM_KEY_OVFL	4	/* Leaf/internal page key item */
+#define	WT_ITEM_DATA_OVFL	5	/* Leaf/duplicate page data item */
+#define	WT_ITEM_DUP_OVFL	6	/* Leaf page duplicate data */
+	u_int8_t  type;
 
 	u_int8_t  unused[3];		/* Spacer to force alignment */
 
@@ -155,6 +195,9 @@ struct __wt_item {
 	 * A variable length chunk of data.
 	 */
 };
+
+/* WT_ITEM_BYTE is the first data byte for the item. */
+#define	WT_ITEM_BYTE(item)		((u_int8_t *)(item) + sizeof(WT_ITEM))
 
 /*
  * The number of bytes required to store an item of len bytes.  Align the
@@ -171,7 +214,7 @@ struct __wt_item {
 struct __wt_item_int {
 	u_int32_t  len;			/* Data length, in bytes */
 
-	u_int32_t  child;		/* Child page number */
+	u_int32_t  addr;		/* Child fragment */
 	wt_recno_t records;		/* Subtree record count */
 
 	/*
@@ -180,11 +223,19 @@ struct __wt_item_int {
 };
 
 /*
+ * Btree off-page duplicates reference another page, and so the data is
+ * another structure.
+ */
+struct __wt_item_tree {
+	u_int32_t  addr;		/* Off-page root fragment */
+};
+
+/*
  * Btree overflow items reference another page, and so the data is another
  * structure.
  */
 struct __wt_item_ovfl {
-	u_int32_t addr;			/* Overflow page number */
+	u_int32_t addr;			/* Overflow fragment */
 	u_int32_t len;			/* Overflow length */
 }; 
 
