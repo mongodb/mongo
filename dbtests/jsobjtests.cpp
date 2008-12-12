@@ -74,6 +74,8 @@ namespace JsobjTests {
 			void run() {
 				ASSERT( basic( "a", basic( "b", 1 ) ).woCompare
 					   ( basic( "a", basic( "b", 1.0 ) ) ) == 0 );
+				ASSERT( basic( "a", basic( "b", 1 ) ).woCompare
+					   ( basic( "a", basic( "b", 2 ) ) ) < 0 );
 			}
 		};
 		
@@ -87,6 +89,11 @@ namespace JsobjTests {
 				d.push_back( 1 );
 				d.push_back( 2 );
 				ASSERT( basic( "a", i ).woCompare( basic( "a", d ) ) == 0 );
+
+				vector< int > j;
+				j.push_back( 1 );
+				j.push_back( 3 );
+				ASSERT( basic( "a", i ).woCompare( basic( "a", j ) ) < 0 );
 			}
 		};
 	} // namespace BSONObjTests
