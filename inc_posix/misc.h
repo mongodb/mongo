@@ -38,16 +38,22 @@ extern "C" {
  * any variable, anywhere.
  */
 #define	F_CLR(p, mask)		(p)->flags &= ~(mask)
-#define	F_ISSET(p, mask)	((p)->flags & (mask))
+#define	F_ISSET(p, mask)	((p)->flags & (mask) ? 1 : 0)
 #define	F_SET(p, mask)		(p)->flags |= (mask)
 
 #define	LF_CLR(mask)		((flags) &= ~(mask))
-#define	LF_ISSET(mask)		((flags) & (mask))
+#define	LF_ISSET(mask)		((flags) & (mask) ? 1 : 0)
 #define	LF_SET(mask)		((flags) |= (mask))
 
 #define	FLD_CLR(field, mask)	((field) &= ~(mask))
-#define	FLD_ISSET(field, mask)	((field) & (mask))
+#define	FLD_ISSET(field, mask)	((field) & (mask) ? 1 : 0)
 #define	FLD_SET(field, mask)	((field) |= (mask))
+
+/*
+ * Clear a chunk of memory.
+ */
+#define	WT_CLEAR(s)							\
+	memset(&(s), 0, sizeof(s))
 
 /*
  * Statistics are optional to minimize our footprint.
