@@ -19,7 +19,7 @@ __wt_bt_page_verify(DB *db, u_int32_t addr, void *page)
 	IENV *ienv;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
-	u_int32_t checksum, i;
+	u_int32_t i;
 	u_int8_t *p;
 	int ret;
 
@@ -27,10 +27,13 @@ __wt_bt_page_verify(DB *db, u_int32_t addr, void *page)
 	ret = 0;
 
 	switch (hdr->type) {
-	case WT_PAGE_BTREE_ROOT:
-	case WT_PAGE_BTREE_INTERNAL:
-	case WT_PAGE_BTREE_LEAF:
-	case WT_PAGE_BTREE_OVERFLOW:
+	case WT_PAGE_OVFL:
+	case WT_PAGE_ROOT:
+	case WT_PAGE_INT:
+	case WT_PAGE_LEAF:
+	case WT_PAGE_DUP_ROOT:
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
 		break;
 	default:
 		__wt_db_errx(db,
@@ -39,32 +42,25 @@ __wt_bt_page_verify(DB *db, u_int32_t addr, void *page)
 		ret = WT_ERROR;
 	}
 
-	if (hdr->flags != 0) {
-		__wt_db_errx(db,
-		    "page at address %lu has an invalid flag value of %lu",
-		    (u_long)addr, (u_long)hdr->flags);
-		ret = WT_ERROR;
-	}
-
-	if (hdr->entries == 0) {
+	if (hdr->type != WT_PAGE_OVFL && hdr->u.entries == 0) {
 		__wt_db_errx(db,
 		    "page at addr %lu has no entries", (u_long)addr);
 		ret = WT_ERROR;
 	}
 
 	switch (hdr->type) {
-	case WT_PAGE_BTREE_LEAF:
-		for (p = (u_int8_t *)hdr + WT_HDR_SIZE, i = 0;
-		    i < hdr->entries;
+	case WT_PAGE_LEAF:
+		for (p = WT_PAGE_DATA(hdr), i = 0;
+		    i < hdr->u.entries;
 		    p += WT_ITEM_SPACE_REQ(item->len), --i) {
 			item = (WT_ITEM *)p;
 			switch (item->type) {
 			case WT_ITEM_KEY:
 			case WT_ITEM_DATA:
+			case WT_ITEM_DUP:
 			case WT_ITEM_KEY_OVFL:
 			case WT_ITEM_DATA_OVFL:
-			case WT_ITEM_DUPLICATE:
-			case WT_ITEM_DUPLICATE_OVFL:
+			case WT_ITEM_DUP_OVFL:
 				break;
 			default:
 				__wt_db_errx(db,
@@ -81,6 +77,13 @@ __wt_bt_page_verify(DB *db, u_int32_t addr, void *page)
 				ret = WT_ERROR;
 			}
 		}
+	}
+
+	if (hdr->unused[0] != 0 ||
+	    hdr->unused[1] != 0 || hdr->unused[2] != 0) {
+		__wt_db_errx(db,
+		    "header unused fields not zero'd", (u_long)addr);
+		ret = WT_ERROR;
 	}
 
 	return (ret);

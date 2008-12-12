@@ -9,6 +9,9 @@
 
 #include "wt_internal.h"
 
+static const char *__wt_bt_hdr_type(u_int32_t);
+static const char *__wt_bt_item_type(u_int32_t);
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_bt_force_load --
@@ -67,31 +70,28 @@ __wt_bt_dump_page(DB *db, WT_PAGE_HDR *hdr, char *ofile)
 			return (WT_ERROR);
 
 	fprintf(fp, "======\n");
+	fprintf(fp, "{\n\t%s: ", __wt_bt_hdr_type(hdr->type));
+	if (hdr->type == WT_PAGE_OVFL)
+		fprintf(fp, "%lu bytes", (u_long)hdr->u.datalen);
+	else
+		fprintf(fp, "%lu entries", (u_long)hdr->u.entries);
 	fprintf(fp,
-	    "hdr {\n\tlsn %lu/%lu, type %s, flags %s,\n\tchecksum %lx,"
-	    " entries %lu, prevaddr %lu, nextaddr %lu\n}\n",
-	    hdr->lsn.fileno, hdr->lsn.offset, __wt_bt_hdr_type(hdr->type),
-	    __wt_bt_hdr_flags(hdr->flags), (u_long)hdr->checksum,
-	    (u_long)hdr->entries, (u_long)hdr->prevaddr, (u_long)hdr->nextaddr);
+	    "\n\tlsn %lu/%lu, checksum %lx, "
+	    "paraddr %lu, prevaddr %lu, nextaddr %lu\n}\n",
+	    (u_long)hdr->lsn.fileno, (u_long)hdr->lsn.offset,
+	    (u_long)hdr->checksum,
+	    (u_long)hdr->paraddr, (u_long)hdr->prevaddr, (u_long)hdr->nextaddr);
 
-	for (p = (u_int8_t *)hdr + WT_HDR_SIZE, i = 1; i <= hdr->entries; ++i) {
+	if (hdr->type == WT_PAGE_OVFL)
+		return (0);
+
+	for (p = WT_PAGE_DATA(hdr), i = 1; i <= hdr->u.entries; ++i) {
 		item = (WT_ITEM *)p;
-
-		fprintf(fp, "%8lu: %lu { len %lu, type %s }\n",
-		    (u_long)i, (u_long)(p - (u_int8_t *)hdr),
-		    (u_long)item->len, __wt_bt_item_type(item->type));
-
-		switch (item->type) {
-		case WT_ITEM_KEY:
-		case WT_ITEM_DATA:
-			fprintf(fp, "\t{");
-			__wt_bt_print(p + sizeof(WT_ITEM), item->len, fp);
-			fprintf(fp, "}\n");
-			p += WT_ITEM_SPACE_REQ(item->len);
-			break;
-		default:
-			return (__wt_database_format(db));
-		}
+		fprintf(fp, "%8lu: {type %s; len %lu; off %lu}\n",
+		    (u_long)i, __wt_bt_item_type(item->type),
+		    (u_long)item->len, (u_long)(p - (u_int8_t *)hdr));
+		__wt_bt_dump_item(item, fp);
+		p += WT_ITEM_SPACE_REQ(item->len);
 	}
 
 err:	if (ofile != NULL)
@@ -100,54 +100,72 @@ err:	if (ofile != NULL)
 	return (ret);
 }
 
-const char *
+/*
+ * __wt_bt_dump_item --
+ *	Dump a single item.
+ */
+void
+__wt_bt_dump_item(WT_ITEM *item, FILE *fp)
+{
+	if (fp == NULL)
+		fp = stdout;
+
+	switch (item->type) {
+	case WT_ITEM_KEY:
+	case WT_ITEM_DATA:
+	case WT_ITEM_DUP:
+		fprintf(fp, "\t{");
+		__wt_bt_print(WT_ITEM_BYTE(item), item->len, fp);
+		fprintf(fp, "}\n");
+		break;
+	default:
+		fprintf(fp, "\t{unsupported type}\n");
+		break;
+	}
+}
+
+static const char *
 __wt_bt_hdr_type(u_int32_t type)
 {
 	switch (type) {
 	case WT_PAGE_INVALID:
 		return ("invalid");
-	case WT_PAGE_BTREE_ROOT:
-		return ("btree-root");
-	case WT_PAGE_BTREE_INTERNAL:
-		return ("btree-internal");
-	case WT_PAGE_BTREE_LEAF:
-		return ("btree-leaf");
-	case WT_PAGE_BTREE_OVERFLOW:
-		return ("btree-overflow");
+	case WT_PAGE_OVFL:
+		return ("overflow");
+	case WT_PAGE_ROOT:
+		return ("primary root");
+	case WT_PAGE_INT:
+		return ("primary internal");
+	case WT_PAGE_LEAF:
+		return ("primary leaf");
+	case WT_PAGE_DUP_ROOT:
+		return ("off-page duplicate root");
+	case WT_PAGE_DUP_INT:
+		return ("off-page duplicate internal");
+	case WT_PAGE_DUP_LEAF:
+		return ("off-page duplicate leaf");
 	default:
 		break;
 	}
 	return ("unknown");
 }
 
-const char *
-__wt_bt_hdr_flags(u_int32_t flags)
-{
-	switch (flags) {
-	case 0:
-		return ("none");
-	default:
-		break;
-	}
-	return ("unknown");
-}
-
-const char *
+static const char *
 __wt_bt_item_type(u_int32_t type)
 {
 	switch (type) {
 	case WT_ITEM_KEY:
-		return ("internal");
+		return ("key");
 	case WT_ITEM_DATA:
 		return ("data");
-	case WT_ITEM_KEY_OVFL:
-		return ("key-ovfl");
-	case WT_ITEM_DATA_OVFL:
-		return ("data-ovfl");
-	case WT_ITEM_DUPLICATE:
+	case WT_ITEM_DUP:
 		return ("duplicate");
-	case WT_ITEM_DUPLICATE_OVFL:
-		return ("duplicate-ovfl");
+	case WT_ITEM_KEY_OVFL:
+		return ("key-overflow");
+	case WT_ITEM_DATA_OVFL:
+		return ("data-overflow");
+	case WT_ITEM_DUP_OVFL:
+		return ("duplicate-overflow");
 	default:
 		break;
 	}

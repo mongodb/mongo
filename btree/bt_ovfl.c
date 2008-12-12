@@ -31,11 +31,11 @@ __wt_bt_ovfl_load(DB *db, DBT *dbt, u_int32_t *addrp)
 		return (ret);
 
 	/* Initialize the returned space. */
-	hdr->type = WT_PAGE_BTREE_OVERFLOW;
-	hdr->entries = 1;
+	hdr->type = WT_PAGE_OVFL;
+	hdr->u.datalen = dbt->size;
 
 	/* Copy the DBT into place. */
-	memcpy((u_int8_t *)hdr + WT_HDR_SIZE, dbt->data, dbt->size);
+	memcpy(WT_PAGE_DATA(hdr), dbt->data, dbt->size);
 
 	/* Write the overflow item back to the file. */
 	if ((ret = __wt_bt_fwrite(bt, addr, frags, hdr)) != 0)
