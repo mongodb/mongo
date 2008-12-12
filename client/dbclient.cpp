@@ -56,7 +56,7 @@ bool DBClientConnection::connect(const char *_serverAddress, string& errmsg) {
 	if( ip.empty() ) 
 		ip = serverAddress;
 
-	int idx = ip.find( ":" );
+	unsigned int idx = ip.find( ":" );
 	if ( idx != string::npos ){
 	  //cout << "port string:" << ip.substr( idx ) << endl;
 	  port = atoi( ip.substr( idx + 1 ).c_str() );
