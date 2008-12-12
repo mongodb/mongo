@@ -47,6 +47,11 @@ void ensureHaveIdIndex(const char *ns);
 */
 const char *allDead = 0;
 
+/* This is set to true if we have EVER been up to date -- this way a new pair member 
+   which is a replacement won't go online as master until we have initially fully synced.
+*/
+bool seemCaughtUp = false;
+
 #include "replset.h"
 
 #define debugrepl(z) cout << "debugrepl " << z << '\n'
@@ -828,8 +833,12 @@ void replMain() {
 			ReplSource::loadAll(sources);
 		}
 		
-		if( !first && sources.empty() )
+        if( !first && sources.empty() ) {
+            /* replication is not configured yet (for --slave) in local.sources.  Poll for config it
+               every 20 seconds.
+               */
 			sleepsecs(20);
+        }
 
         first=false;
 		
@@ -839,7 +848,11 @@ void replMain() {
 			bool ok = false;	
 			try {
 				ok = s->sync();
-                sleep = !s->haveMoreDbsToSync();
+                bool moreToSync = s->haveMoreDbsToSync();
+                sleep = !moreToSync;
+                if( !moreToSync && !s->syncedTo.isNull() ) {
+                    seemCaughtUp = true;
+                }
 			}
 			catch( SyncException& ) {
                 replInfo = "caught SyncException";
@@ -956,21 +969,20 @@ void startReplication() {
     //boost::thread tempt(tempThread);
 
 	if( slave || replPair ) {
-		if( slave )
+		if( slave && !quiet )
 			log() << "slave=true" << endl;
 		slave = true;
 		boost::thread repl_thread(replSlaveThread);
 	}
 
 	if( master || replPair ) {
-		if( master )
+		if( master && !quiet )
 			log() << "master=true" << endl;
 		master = true;
 		{
 			dblock lk;
 			/* create an oplog collection, if it doesn't yet exist. */
 			BSONObjBuilder b;
-
             double sz = 50.0 * 1000 * 1000;
             if( sizeof(int *) >= 8 )
                 sz = 990.0 * 1000 * 1000;

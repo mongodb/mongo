@@ -24,6 +24,7 @@
 
 extern int port;
 extern const char *replInfo;
+extern bool seemCaughtUp;
 
 time_t started = time(0);
 
@@ -127,6 +128,7 @@ public:
         }
 
         ss << "\nreplInfo:  " << replInfo << '\n';
+        ss <<   "seemCaughtUp: " << seemCaughtUp << '\n';
     }
 
     virtual void doRequest(
