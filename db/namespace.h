@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "stdafx.h"
+#include "../stdafx.h"
 
 #include "jsobj.h"
 #include "storage.h"
