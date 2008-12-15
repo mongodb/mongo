@@ -438,11 +438,21 @@ extern map<string,Command*> *commands;
 
    returns true if ran a cmd
 */
-bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl) { 
-
+bool _runCommands(const char *ns, BSONObj& _cmdobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl) { 
 	const char *p = strchr(ns, '.');
 	if( !p ) return false;
 	if( strcmp(p, ".$cmd") != 0 ) return false;
+
+    BSONObj jsobj;
+    {
+        BSONElement e = _cmdobj.firstElement();
+        if( e.type() == Object && string("query") == e.fieldName() ) { 
+            jsobj = e.embeddedObject();
+        }
+        else {
+            jsobj = _cmdobj;
+        }
+    }
 
 	bool ok = false;
 	bool valid = false;
