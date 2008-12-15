@@ -192,8 +192,16 @@ public:
             errmsg = "timeout waiting for sync() to finish";
             return false;
         }
-
         {
+            vector<ReplSource*> sources;
+            ReplSource::loadAll(sources);
+            if( sources.size() != 1 ) { 
+                errmsg = "local.sources.count() != 1, cannot replace peer";
+                return false;
+            }
+        }
+        {
+            emptyCollection("local.sources");
             BSONObj o = fromjson("{replacepeer:1}");
             putSingleton("local.pair.startup", o);
         }
@@ -515,6 +523,7 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 		ReplSource *s = new ReplSource();
 		s->paired = true;
 		s->hostName = replPair->remote;
+        s->replacing = replacePeer;
 		v.push_back(s);
 	}
 
