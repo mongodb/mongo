@@ -93,7 +93,7 @@ struct SyncException {
 */
 class ReplSource {
 	bool resync(string db);
-	void sync_pullOpLog();
+	bool sync_pullOpLog();
 	void sync_pullOpLog_applyOperation(BSONObj& op);
 
 	auto_ptr<DBClientConnection> conn;
@@ -103,6 +103,7 @@ class ReplSource {
 
 	ReplSource();
 public:
+    bool replacing; // in "replace mode" -- see CmdReplacePeer
 	bool paired; // --pair in use
 	string hostName;    // ip addr or hostname plus optionally, ":<port>" 
 	string _sourceName;  // a logical source name.

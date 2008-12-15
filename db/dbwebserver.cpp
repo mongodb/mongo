@@ -24,7 +24,8 @@
 
 extern int port;
 extern const char *replInfo;
-extern bool seemCaughtUp;
+
+bool getInitialSyncCompleted();
 
 time_t started = time(0);
 
@@ -100,6 +101,11 @@ public:
             ss << "replpair:\n";
             ss << replPair->getInfo();
         }
+        bool seemCaughtUp = getInitialSyncCompleted();
+        if( !seemCaughtUp ) ss << "<b>";
+        ss <<   "initialSyncCompleted: " << seemCaughtUp;
+        if( !seemCaughtUp ) ss << "</b>";
+        ss << '\n';
 
         ss << "\n<b>dt\ttlocked</b>\n";
         unsigned i = q;
@@ -128,7 +134,6 @@ public:
         }
 
         ss << "\nreplInfo:  " << replInfo << '\n';
-        ss <<   "seemCaughtUp: " << seemCaughtUp << '\n';
     }
 
     virtual void doRequest(
