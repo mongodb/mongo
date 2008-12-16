@@ -23,6 +23,17 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* Collections we use:
+
+   local.sources         - indicates what sources we pull from as a "slave", and the last update of each
+   local.oplog.$main     - our op log as "master"
+   local.dbinfo.<dbname> - as master, have we already logged events to the oplog for this database?
+                           { haveLogged : true }
+   local.pair.startup    - can contain a special value indicating for a pair that we have the master copy.
+                           used when replacing other half of the pair which has permanently failed.
+   local.pair.sync       - { initialsynccomplete: 1 } 
+*/
+
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
@@ -33,6 +44,7 @@
 #include "query.h"
 #include "json.h"
 #include "db.h"
+#include "dbhelpers.h"
 #include "commands.h"
 
 extern bool quiet;
@@ -42,6 +54,14 @@ int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upse
 bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl);
 void ensureHaveIdIndex(const char *ns);
 
+/* if 1 sync() is running */
+int syncing = 0;
+
+/* if true replace our peer in a replication pair -- don't worry about if his 
+   local.oplog.$main is empty.
+*/
+bool replacePeer = false;
+
 /* "dead" means something really bad happened like replication falling completely out of sync. 
    when non-null, we are dead and the string is informational
 */
@@ -50,7 +70,39 @@ const char *allDead = 0;
 /* This is set to true if we have EVER been up to date -- this way a new pair member 
    which is a replacement won't go online as master until we have initially fully synced.
 */
-bool seemCaughtUp = false;
+class PairSync { 
+    int initialsynccomplete;
+public:
+    PairSync() { initialsynccomplete = -1; }
+
+    /* call before using the class.  from dbmutex */ 
+    void init() {
+        BSONObj o;
+        initialsynccomplete = 0;
+        if( getSingleton("local.pair.sync", o) )
+            initialsynccomplete = 1;
+    }
+
+    bool initialSyncCompleted() { 
+        return initialsynccomplete != 0; 
+    }
+
+    void setInitialSyncCompleted() { 
+        BSONObj o = fromjson("{initialsynccomplete:1}");
+        putSingleton("local.pair.sync", o);
+        initialsynccomplete = 1;
+    }
+
+    void setInitialSyncCompletedLocking() { 
+        if( initialsynccomplete == 1 ) 
+            return;
+        dblock lk;
+        BSONObj o = fromjson("{initialsynccomplete:1}");
+        putSingleton("local.pair.sync", o);
+        initialsynccomplete = 1;
+    }
+} pairSync;
+bool getInitialSyncCompleted() { return pairSync.initialSyncCompleted(); }
 
 #include "replset.h"
 
@@ -69,10 +121,10 @@ struct ReplInfo {
 };
 
 void ReplPair::setMaster(int n, const char *_comment ) { 
-	if ( n == State_Master && !seemCaughtUp )
+	if ( n == State_Master && !pairSync.initialSyncCompleted() )
 		return;
 	info = _comment;
-	if( n != state )
+	if( n != state && !quiet )
 		log() << "pair: setting master=" << n << " was " << state << '\n';
 	state = n;
 }
@@ -106,6 +158,59 @@ void ReplPair::arbitrate() {
 }
 
 /* --------------------------------------------- */
+
+class CmdReplacePeer : public Command { 
+public:
+    virtual bool slaveOk() { return true; }
+    virtual bool adminOnly() { return true; }
+    virtual bool logTheOp() { return false; }
+    CmdReplacePeer() : Command("replacepeer") { }
+    virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        if( replPair == 0 ) { 
+            errmsg = "not paired";
+            return false;
+        } 
+        if( !pairSync.initialSyncCompleted() ) {
+            errmsg = "not caught up cannot replace peer"; 
+            return false;
+        }
+        if( syncing < 0 ) { 
+            errmsg = "replacepeer already invoked";
+            return false;
+        }
+        Timer t;
+        while( 1 ) {
+            if( syncing == 0 || t.millis() > 20000 )
+                break;
+            {
+                dbtemprelease t;
+                sleepmillis(10);
+            }
+        }
+        if( syncing ) { 
+            assert( syncing > 0 );
+            errmsg = "timeout waiting for sync() to finish";
+            return false;
+        }
+        {
+            vector<ReplSource*> sources;
+            ReplSource::loadAll(sources);
+            if( sources.size() != 1 ) { 
+                errmsg = "local.sources.count() != 1, cannot replace peer";
+                return false;
+            }
+        }
+        {
+            emptyCollection("local.sources");
+            BSONObj o = fromjson("{replacepeer:1}");
+            putSingleton("local.pair.startup", o);
+        }
+        syncing = -1;
+        allDead = "replacepeer invoked -- adjust local.sources hostname then restart this db process";
+        result.append("info", "adjust local.sources hostname; db restart now required");
+        return true;
+    }
+} cmdReplacePeer;
 
 class CmdIsMaster : public Command { 
 public:
@@ -182,7 +287,7 @@ public:
 		}
 		
 		int me, you;
-		if( !seemCaughtUp || ( replPair->state != M && was == M ) ) { 
+		if( !pairSync.initialSyncCompleted() || ( replPair->state != M && was == M ) ) { 
 			me=S;you=M;
 		}
 		else { 
@@ -256,11 +361,13 @@ int test2() {
 /* --------------------------------------------------------------*/
 
 ReplSource::ReplSource() {
+    replacing = false;
 	nClonedThisPass = 0; 
 	paired = false;
 }
 
 ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
+    replacing = false;
 	paired = false;
 	only = o.getStringField("only");
 	hostName = o.getStringField("host");
@@ -325,6 +432,16 @@ void ReplSource::save() {
 	int u = _updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, ss);
 	assert( u == 1 || u == 4 );
 	database = 0;
+
+    if( replacing ) {
+        /* if we were in "replace" mode, we now have synced up with the replacement, 
+           so turn that off.
+           */
+        replacing = false;
+        wassert( replacePeer );
+        replacePeer = false;
+        emptyCollection("local.pair.startup");
+    }
 }
 
 void ReplSource::cleanup(vector<ReplSource*>& v) { 
@@ -390,6 +507,11 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
         if( replPair && tmp.hostName == replPair->remote && tmp.sourceName() == "main" ) {
 			gotPairWith = true;
             tmp.paired = true;
+            if( replacePeer ) {
+                // peer was replaced -- start back at the beginning.
+                tmp.syncedTo = OpTime();
+                tmp.replacing = true;
+            }
         }
 		addSourceToList(v, tmp, old);
 		c->advance();
@@ -401,6 +523,7 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
 		ReplSource *s = new ReplSource();
 		s->paired = true;
 		s->hostName = replPair->remote;
+        s->replacing = replacePeer;
 		v.push_back(s);
 	}
 
@@ -477,7 +600,9 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 	if( justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
 	    newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
 	{
-        if( op.getBoolField("first") ) { 
+        if( op.getBoolField("first") && 
+            pairSync.initialSyncCompleted() /*<- when false, we are a replacement volume for a pair and need a full sync */
+            ) { 
             log() << "pull: got {first:true} op ns:" << ns << '\n';
             /* this is the first thing in the oplog ever, so we don't need to resync(). */
             if( newDb )
@@ -508,7 +633,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 			nClonedThisPass++;
 			resync(database->name);
 		}
-		addDbNextPass.erase(clientName);
+        addDbNextPass.erase(clientName);
 	}
 
 	stringstream ss;
@@ -559,7 +684,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 }
 
 /* note: not yet in mutex at this point. */
-void ReplSource::sync_pullOpLog() { 
+bool ReplSource::sync_pullOpLog() { 
 	string ns = string("local.oplog.$") + sourceName();
     debugrepl( "sync_pullOpLog " << ns );
 
@@ -591,7 +716,7 @@ void ReplSource::sync_pullOpLog() {
         problem() << "pull:   dbclient::query returns null (conn closed?)" << endl;
         resetConnection();
         sleepsecs(3);
-        return;
+        return false;
     }
 
 	// show any deferred database creates from a previous pass
@@ -612,7 +737,7 @@ void ReplSource::sync_pullOpLog() {
         } else
 			log() << "pull:   " << ns << " oplog is empty\n";
 		sleepsecs(3);
-		return;
+		return true;
 	}
 
     int n = 0;
@@ -691,6 +816,8 @@ void ReplSource::sync_pullOpLog() {
 			n++;
 		}
 	}
+
+    return true;
 }
 
 /* note: not yet in mutex at this point. 
@@ -743,8 +870,7 @@ bool ReplSource::sync() {
 	OpTime serverCurTime;
 	serverCurTime.asDate() = e.date();
 */
-	sync_pullOpLog();
-	return true;
+	return sync_pullOpLog();
 }
 
 /* -- Logging of operations -------------------------------------*/
@@ -831,73 +957,105 @@ _ source has autoptr to the cursor
 _ reuse that cursor when we can
 */
 
+/* returns: # of seconds to sleep before next pass */
+int _replMain(vector<ReplSource*>& sources) { 
+    {	
+        ReplInfo r("replMain load sources");
+        dblock lk;
+        ReplSource::loadAll(sources);
+    }
+		
+    if( sources.empty() ) {
+        /* replication is not configured yet (for --slave) in local.sources.  Poll for config it
+        every 20 seconds.
+        */
+        return 20;
+    }
+
+    bool sleep = true;
+    for( vector<ReplSource*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
+        ReplSource *s = *i;	
+        bool ok = false;	
+        try {
+            ok = s->sync();
+            bool moreToSync = s->haveMoreDbsToSync();
+            sleep = !moreToSync;
+            if( ok && !moreToSync /*&& !s->syncedTo.isNull()*/ ) {
+                pairSync.setInitialSyncCompletedLocking();
+            }
+        }
+        catch( SyncException& ) {
+            log() << "caught SyncException, sleeping 10 secs" << endl;
+            return 10;
+        }
+        catch( AssertionException& e ) { 
+            if( e.severe() ) {
+                log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
+                return 60;
+            }
+            else { 
+                log() << e.toString() << '\n';
+            }
+            replInfo = "replMain caught AssertionException";
+        }
+        if( !ok ) 
+            s->resetConnection();
+    }
+    if( sleep ) {
+        return 3;
+    }
+    return 0;
+}
+
 void replMain() { 
 	vector<ReplSource*> sources;
-    bool first = true;
-
-	while( 1 ) { 
-		{	
-            ReplInfo r("replMain load sources");
-			dblock lk;
-			ReplSource::loadAll(sources);
-		}
-		
-        if( !first && sources.empty() ) {
-            /* replication is not configured yet (for --slave) in local.sources.  Poll for config it
-               every 20 seconds.
-               */
-			sleepsecs(20);
+    while( 1 ) { 
+        int s = 0;
+        {
+            dblock lk;
+            if( allDead ) 
+                break;
+            assert( syncing == 0 );
+            syncing++;
         }
-
-        first=false;
-		
-        bool sleep = true;
-		for( vector<ReplSource*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
-			ReplSource *s = *i;	
-			bool ok = false;	
-			try {
-				ok = s->sync();
-                bool moreToSync = s->haveMoreDbsToSync();
-                sleep = !moreToSync;
-                if( !moreToSync && !s->syncedTo.isNull() ) {
-                    seemCaughtUp = true;
-                }
-			}
-			catch( SyncException& ) {
-                replInfo = "caught SyncException";
-				log() << "caught SyncException, sleeping 10 secs" << endl;
-				sleepsecs(10);
-			}
-            catch( AssertionException& e ) { 
-                if( e.severe() ) {
-                    ReplInfo r("replMain caught AssertionException, sleeping 1 minutes");
-                    log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
-                    sleepsecs(60);
-                }
-                else { 
-                    log() << e.toString() << '\n';
-                }
-                replInfo = "replMain caught AssertionException";
-            }
-			if( !ok ) 
-				s->resetConnection();
-		}
-        if( sleep ) {
-            ReplInfo r("replMain: sleep 3 before next pass");
-            sleepsecs(3);
+        try { 
+            s = _replMain(sources);
+        } catch(...) { 
+            cout << "TEMP: caught exception in _replMain" << endl;
+        } 
+        {
+            dblock lk;
+            assert( syncing == 1 );
+            syncing--;
         }
-        else { 
-            sleepmillis(100);
+        if( s ) {
+            stringstream ss;
+            ss << "replMain: sleep " << s << " before next pass";
+            string msg = ss.str();
+            ReplInfo r(msg.c_str());
+            sleepsecs(s);
         }
-	}
+    }
 
-	ReplSource::cleanup(sources);
+//    assert(false);
+//	ReplSource::cleanup(sources);
 }
 
 int debug_stop_repl = 0;
 
 void replSlaveThread() { 
     sleepsecs(1);
+
+    {
+        dblock lk;
+        BSONObj obj;
+        if( getSingleton("local.pair.startup", obj) ) { 
+            // should be: {replacepeer:1}
+            replacePeer = true;
+            pairSync.setInitialSyncCompleted(); // we are the half that has all the data
+        }
+    }
+
 	while( 1 ) { 
 		try { 
 			replMain();
@@ -976,6 +1134,11 @@ void startReplication() {
        not to be locked when trying to connect() or query() the other side.
        */
     //boost::thread tempt(tempThread);
+
+    {
+        dblock lk;
+        pairSync.init();
+    }
 
 	if( slave || replPair ) {
 		if( slave && !quiet )

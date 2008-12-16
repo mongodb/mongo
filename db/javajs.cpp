@@ -493,10 +493,8 @@ const char* findEd(const char *path) {
 
 const char * findEd(){
 
-	log() << "Appserver location not specified.  Searching.... " << endl;
-
 #if defined(_WIN32)
-	log() << "    WIN32 default : c:/l/ed/" << endl;
+	log() << "Appserver location will be WIN32 default : c:/l/ed/" << endl;
 	return "c:/l/ed";
 #else
 
@@ -516,7 +514,7 @@ const char * findEd(){
       continue;
     
     closedir( test );
-	log() << "   found directory for appserver : " << temp << endl;
+	log() << "Found directory for appserver : " << temp << endl;
     return temp;
   }
   

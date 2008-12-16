@@ -42,3 +42,8 @@ void putSingleton(const char *ns, BSONObj obj) {
     stringstream ss;
     updateObjects(ns, obj, /*pattern=*/emptyObj, /*upsert=*/true, ss);
 }
+
+void emptyCollection(const char *ns) { 
+    DBContext context(ns);
+    deleteObjects(ns, emptyObj, false);
+}
