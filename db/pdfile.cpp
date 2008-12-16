@@ -969,7 +969,7 @@ void _renameForBackup( const char *database, const Path &tmpPath ) {
 			boost::filesystem::rename( p, tmpPath_ / ( p.leaf() + ".bak" ) );
 			return true;
 		}
-		virtual const char * op() const { "renaming"; }
+		virtual const char * op() const { return "renaming"; }
 	} renamer( tmpPath );
 	_applyOpToDataFiles( database, renamer );
 }
@@ -983,7 +983,7 @@ void _replaceWithRecovered( const char *database, const char *tmpPathString ) {
 			boost::filesystem::rename( p, dbpath / p.leaf() );
 			return true;
 		}
-		virtual const char * op() const { "renaming"; }
+		virtual const char * op() const { return "renaming"; }
 	} renamer;
 	_applyOpToDataFiles( database, renamer, tmpPathString );
 }

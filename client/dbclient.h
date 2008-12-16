@@ -89,6 +89,7 @@ public:
         BSONObj o = next();
         BSONElement e = o.firstElement();
         assert( strcmp(e.fieldName(), "$err") != 0 );
+		return o;
     }
 
 	/* cursor no longer valid -- use with tailable cursors.
