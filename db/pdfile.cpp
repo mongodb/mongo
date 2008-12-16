@@ -35,6 +35,8 @@ _ disallow system* manipulations from the database.
 #include "query.h"
 #include "repl.h"
 
+extern int port;
+
 const char *dbpath = "/data/db/";
 
 DataFileMgr theDataFileMgr;
@@ -908,9 +910,10 @@ Record* DataFileMgr::fast_oplog_insert(NamespaceDetails *d, const char *ns, int 
 }
 
 void DataFileMgr::init(const char *dir) {
-/*	string path = dir;
-	path += "temp.dat";
-	temp.open(path.c_str(), 64 * 1024 * 1024);
+/*	boost::filesystem::path path( dir );
+	path /= "temp.dat";
+	string pathString = path.string();
+	temp.open(pathString.c_str(), 64 * 1024 * 1024);
 */
 }
 
@@ -921,6 +924,25 @@ void pdfileInit() {
 
 #include "clientcursor.h"
 
+// shared functionality for removing references to a database
+// does not delete the files on disk
+void _dropDatabase( const char *cl, const char *path = dbpath ) {
+    /* reset haveLogged in local.dbinfo */
+    if( string("local") != cl ) {
+        DBInfo i(cl);
+        i.dbDropped();
+    }
+	
+	/* important: kill all open cursors on the database */
+	string prefix(cl);
+	prefix += '.';
+	ClientCursor::invalidate(prefix.c_str());
+	
+	eraseDatabase( cl, path );
+	delete database; // closes files
+	database = 0;
+}
+
 void dropDatabase(const char *ns) { 
 	// ns is of the form "<dbname>.$cmd"
 	char cl[256];
@@ -928,19 +950,99 @@ void dropDatabase(const char *ns) {
 	problem() << "dropDatabase " << cl << endl;
 	assert( database->name == cl );
 
-    /* reset haveLogged in local.dbinfo */
-    if( string("local") != cl ) {
-        DBInfo i(cl);
-        i.dbDropped();
-    }
+	_dropDatabase( cl );
+	_deleteDataFiles(cl);	
+}
 
-	/* important: kill all open cursors on the database */
-	string prefix(cl);
-	prefix += '.';
-	ClientCursor::invalidate(prefix.c_str());
+typedef boost::filesystem::path Path;
 
-	databases.erase(cl);
-	delete database; // closes files
-	database = 0;
-	_deleteDataFiles(cl);
+// back up original database files to 'temp' dir
+void _renameForBackup( const char *database, const Path &tmpPath ) {
+	class Renamer : public FileOp {
+	public:
+		Renamer( const Path &tmpPath ) : tmpPath_( tmpPath ) {}
+	private:
+		const boost::filesystem::path &tmpPath_;
+		virtual bool apply( const Path &p ) {
+			if ( !boost::filesystem::exists( p ) )
+				return false;
+			boost::filesystem::rename( p, tmpPath_ / ( p.leaf() + ".bak" ) );
+			return true;
+		}
+		virtual const char * op() const { "renaming"; }
+	} renamer( tmpPath );
+	_applyOpToDataFiles( database, renamer );
+}
+
+// move temp files to standard data dir
+void _replaceWithRecovered( const char *database, const char *tmpPathString ) {
+	class : public FileOp {
+		virtual bool apply( const Path &p ) {
+			if ( !boost::filesystem::exists( p ) )
+				return false;
+			boost::filesystem::rename( p, dbpath / p.leaf() );
+			return true;
+		}
+		virtual const char * op() const { "renaming"; }
+	} renamer;
+	_applyOpToDataFiles( database, renamer, tmpPathString );
+}
+
+// generate a directory name for storing temp data files
+Path uniqueTmpPath() {
+	Path dbPath = Path( dbpath );
+	Path tmpPath;
+	int i = 0;
+	bool exists;
+	do {
+		stringstream ss;
+		ss << "tmp_repairDatabase_" << i++;
+		tmpPath = dbPath / ss.str();
+		BOOST_CHECK_EXCEPTION( exists = boost::filesystem::exists( tmpPath ) );
+	} while( exists );
+	return tmpPath;
+}
+
+bool repairDatabase( const char *ns, bool preserveClonedFilesOnFailure,
+					bool backupOriginalFiles ) { 
+	stringstream ss;
+	ss << "localhost:" << port;
+	string localhost = ss.str();
+
+	// ns is of the form "<dbname>.$cmd"
+	char dbName[256];
+	nsToClient(ns, dbName);
+	problem() << "repairDatabase " << dbName << endl;
+	assert( database->name == dbName );
+
+	Path tmpPath = uniqueTmpPath();
+	BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( tmpPath ) );
+	string tmpPathString = tmpPath.native_directory_string();
+	assert( setClient( dbName, tmpPathString.c_str() ) );
+	
+	string errmsg;
+	bool res = cloneFrom(localhost.c_str(), errmsg, dbName, /*logForReplication=*/false, /*slaveok*/false);
+	_dropDatabase( dbName, tmpPathString.c_str() );
+
+	if ( !res ) {
+		problem() << "clone failed" << dbName << endl;
+		if ( !preserveClonedFilesOnFailure )
+			BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( tmpPath ) );
+		return false;
+	}
+
+	assert( !setClientTempNs( dbName ) );
+	_dropDatabase( dbName );
+	
+	if( backupOriginalFiles )
+		_renameForBackup( dbName, tmpPath );
+	else
+		_deleteDataFiles( dbName );
+	
+	_replaceWithRecovered( dbName, tmpPathString.c_str() );
+
+	if ( !backupOriginalFiles )
+		BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( tmpPath ) );
+	
+	return true;
 }

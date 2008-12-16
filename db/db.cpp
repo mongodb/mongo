@@ -397,30 +397,6 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
   assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
 #endif
 
-  /*
-   * ensure that the dbpath ends with a path delim if not supplied
-   * @TODO - the following is embarassing - not sure of there's a clean way to
-   * find the platform delim
-   */
-  
-  char endchar = '/';
-  const char *endstr = "/";
-
-#if defined(_WIN32)
-  endchar = '\\';
-  endstr = "\\";
-#endif
-    
-    if (dbPath && dbPath[strlen(dbPath)-1] != endchar) {
-    	char *t = (char *) malloc(strlen(dbPath) + 2);
-
-        strcpy(t, dbPath);
-        strcat(t, endstr);
-        dbPath = t;
-    }
-
-    dbpath = dbPath;
-
 #if !defined(_WIN32)
     pid_t pid = 0;
     pid = getpid();

@@ -88,35 +88,48 @@ extern Database *database;
 extern const char *curNs;
 extern bool master;
 
+inline string getKey( const char *ns, const char *path ) {
+	char cl[256];
+	nsToClient(ns, cl);
+	return string( cl ) + ":" + path;
+}
+
 /* returns true if the database ("database") did not exist, and it was created on this call */
-inline bool setClient(const char *ns) { 
+inline bool setClient(const char *ns, const char *path=dbpath) { 
     /* we must be in critical section at this point as these are global 
        variables. 
     */
     assert( dbMutexInfo.isLocked() );
 
-	char cl[256];
 	curNs = ns;
-	nsToClient(ns, cl);
-	map<string,Database*>::iterator it = databases.find(cl);
+	string key = getKey( ns, path );
+	map<string,Database*>::iterator it = databases.find(key);
 	if( it != databases.end() ) {
 		database = it->second;
 		return false;
 	}
-
+	
     // when master for replication, we advertise all the db's, and that 
     // looks like a 'first operation'. so that breaks this log message's 
     // meaningfulness.  instead of fixing (which would be better), we just
     // stop showing for now.
     if( !master )
-        log() << "first operation for database " << cl << endl;
+        log() << "first operation for database " << key << endl;
 
+	char cl[256];
+	nsToClient(ns, cl);
 	bool justCreated;
-	Database *c = new Database(cl, justCreated);
-	databases[cl] = c;
+	Database *c = new Database(cl, justCreated, path);
+	databases[key] = c;
 	database = c;
     database->finishInit();
+	
 	return justCreated;
+}
+
+inline void eraseDatabase( const char *ns, const char *path=dbpath ) {
+	string key = getKey( ns, path );
+	databases.erase( key );
 }
 
 /* We normally keep around a curNs ptr -- if this ns is temporary, 
@@ -131,9 +144,12 @@ inline bool setClientTempNs(const char *ns) {
 
 struct dbtemprelease {
     string clientname;
+	string clientpath;
     dbtemprelease() {
-        if( database ) 
+        if( database ) {
             clientname = database->name;
+			clientpath = database->path;
+		}
         dbMutexInfo.leaving();
         boost::detail::thread::lock_ops<boost::mutex>::unlock(dbMutex);
     }
@@ -143,7 +159,7 @@ struct dbtemprelease {
         if( clientname.empty() )
             database = 0;
         else
-            setClient(clientname.c_str());
+            setClient(clientname.c_str(), clientpath.c_str());
     }
 };
 

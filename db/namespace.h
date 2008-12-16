@@ -277,7 +277,7 @@ public:
 
 	NamespaceDetails* details(const char *ns) { 
 		Namespace n(ns);
-		return ht->get(n); 
+		return ht->get(n);
 	}
 
 	void kill(const char *ns) {

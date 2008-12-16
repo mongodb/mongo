@@ -39,13 +39,12 @@ int bucketSizes[] = {
 
 	/* returns true if we created (did not exist) during init() */
 bool NamespaceIndex::init(const char *dir, const char *database) { 
-    string path = dir;
-    path += database;
-    path += ".ns";
+	boost::filesystem::path path( dir );
+    path /= string( database ) + ".ns";
 
     bool created = !boost::filesystem::exists(path); 
-
-    /* if someone manually deleted the datafiels for a database, 
+	
+    /* if someone manually deleted the datafiles for a database, 
        we need to be sure to clear any cached info for the database in 
        local.*.  
     */
@@ -55,9 +54,10 @@ bool NamespaceIndex::init(const char *dir, const char *database) {
     }
 
     const int LEN = 16 * 1024 * 1024;
-    void *p = f.map(path.c_str(), LEN);
+	string pathString = path.string();
+    void *p = f.map(pathString.c_str(), LEN);
     if( p == 0 ) { 
-        problem() << "couldn't open namespace.idx " << path.c_str() << " terminating" << endl;
+        problem() << "couldn't open namespace.idx " << pathString << " terminating" << endl;
         exit(-3);
     }
     ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");

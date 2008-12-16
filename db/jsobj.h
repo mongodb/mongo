@@ -118,6 +118,7 @@ public:
 	const char * value() const { return (data + fieldNameSize + 1); }
 	int valuesize() const { return size() - fieldNameSize - 1; } 
 
+	bool isBoolean() const { return type() == Bool; }
 	bool boolean() const { return *value() ? true : false; }
 
 	unsigned long long date() const { return *((unsigned long long*) value()); }

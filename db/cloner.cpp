@@ -77,7 +77,7 @@ BSONObj fixindex(BSONObj o) {
    isindex - if true, this is system.indexes collection.
 */
 void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool slaveOk) {
-    auto_ptr<DBClientCursor> c;
+	auto_ptr<DBClientCursor> c;
     {
         dbtemprelease r;
         c = auto_ptr<DBClientCursor>( conn.query(from_collection, emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0) );\
@@ -110,12 +110,12 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
 }
 
 bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOK) { 
-    string todb = database->name;
+	string todb = database->name;
     stringstream a,b;
     a << "localhost:" << port;
     b << "127.0.0.1:" << port;
 	if( a.str() == masterHost || b.str() == masterHost ) { 
-        if( fromdb == todb ) {
+        if( fromdb == todb && database->path == dbpath ) {
             // guard against an "infinite" loop
             /* if you are replicating, the local.sources config may be wrong if you get this */
             errmsg = "can't clone from self (localhost).";
@@ -123,7 +123,7 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
         }
 	}
     /* todo: we can put thesee releases inside dbclient or a dbclient specialization.
-       or just wait until we get rid of global lcok anyway. 
+       or just wait until we get rid of global lock anyway. 
        */
 	string ns = fromdb + ".system.namespaces";
 	auto_ptr<DBClientCursor> c;
