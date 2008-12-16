@@ -24,6 +24,7 @@
 
 class Database { 
 public:
+	string path;
 	Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
 	name(nm),
 	path(_path) { 
@@ -57,7 +58,7 @@ public:
 			stringstream ss;
 			ss << name << '.' << n;
 			boost::filesystem::path fullName;
-			fullName = path / ss.str();
+			fullName = boost::filesystem::path(path) / ss.str();
 			string fullNameString = fullName.string();
 			p->open(n, fullNameString.c_str() );
 		}
@@ -95,7 +96,6 @@ public:
 	int profile; // 0=off.
 	string profileName; // "alleyinsider.system.profile"
     QueryOptimizer optimizer;
-	string path;
 
     bool haveLogged() { return _haveLogged; }
     void setHaveLogged();

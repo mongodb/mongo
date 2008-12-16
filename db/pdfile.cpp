@@ -980,7 +980,7 @@ void _replaceWithRecovered( const char *database, const char *tmpPathString ) {
 		virtual bool apply( const Path &p ) {
 			if ( !boost::filesystem::exists( p ) )
 				return false;
-			boost::filesystem::rename( p, dbpath / p.leaf() );
+            boost::filesystem::rename( p, boost::filesystem::path(dbpath) / p.leaf() );
 			return true;
 		}
 		virtual const char * op() const { return "renaming"; }
