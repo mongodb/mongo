@@ -186,8 +186,8 @@ public:
 
 class CmdRepairDatabase : public Command { 
 public:
-    virtual bool logTheOp() { return true; }
-    virtual bool slaveOk() { return false; }
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
     CmdRepairDatabase() : Command("repairDatabase") {}
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         BSONElement e = cmdObj.findElement(name);
