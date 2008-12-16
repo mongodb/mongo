@@ -99,7 +99,7 @@ void smain() {
   RecvAddr.sin_port = htons(Port);
   RecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-  bind(RecvSocket, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr));
+  ::bind(RecvSocket, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr));
 
   //-----------------------------------------------
   // Call the recvfrom function to receive datagrams
@@ -155,7 +155,7 @@ void xmain() {
   RecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
   SockAddr a(Port);
-  bind(RecvSocket, (SOCKADDR *) &a.sa, a.addressSize);
+  ::bind(RecvSocket, (SOCKADDR *) &a.sa, a.addressSize);
 //  bind(RecvSocket, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr));
 
   SockAddr b;
@@ -185,3 +185,5 @@ void xmain() {
 }
 
 #endif
+
+

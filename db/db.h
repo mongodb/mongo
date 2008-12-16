@@ -73,10 +73,18 @@ struct dblock : public lock {
 struct temprelease {
     boost::mutex& m;
     temprelease(boost::mutex& _m) : m(_m) { 
+#if BOOST_VERSION >= 103500
+        m.unlock();
+#else
         boost::detail::thread::lock_ops<boost::mutex>::unlock(m);
+#endif
     }
     ~temprelease() { 
+#if BOOST_VERSION >= 103500
+        m.lock();
+#else
         boost::detail::thread::lock_ops<boost::mutex>::lock(m);
+#endif
     }
 };
 
@@ -135,10 +143,18 @@ struct dbtemprelease {
         if( database ) 
             clientname = database->name;
         dbMutexInfo.leaving();
+#if BOOST_VERSION >= 103500
+        dbMutex.unlock();
+#else
         boost::detail::thread::lock_ops<boost::mutex>::unlock(dbMutex);
+#endif
     }
     ~dbtemprelease() { 
+#if BOOST_VERSION >= 103500
+        dbMutex.lock();
+#else
         boost::detail::thread::lock_ops<boost::mutex>::lock(dbMutex);
+#endif
         dbMutexInfo.entered();
         if( clientname.empty() )
             database = 0;

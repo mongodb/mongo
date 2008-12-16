@@ -23,8 +23,8 @@
 #include "goodies.h"
 
 #if defined(_WIN32)
-#include <winsock2.h>
-#include <ws2tcpip.h>
+//#include <winsock2.h>
+//#include <ws2tcpip.h>
 typedef int socklen_t;
 inline int getLastError() { return WSAGetLastError(); }
 inline void disableNagle(int sock) { 
@@ -158,7 +158,7 @@ inline bool UDPConnection::init(const SockAddr& myAddr) {
 		return false;
 	}
 	//cout << sizeof(sockaddr_in) << ' ' << myAddr.addressSize << endl;
-	if( bind(sock, (sockaddr *) &myAddr.sa, myAddr.addressSize) != 0 ) { 
+    if( ::bind(sock, (sockaddr *) &myAddr.sa, myAddr.addressSize) != 0 ) { 
 		cout << "udp init failed" << endl;
 		closesocket(sock);
 		sock = 0;

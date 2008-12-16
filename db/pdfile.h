@@ -318,9 +318,7 @@ inline void _deleteDataFiles(const char *database) {
 	boost::filesystem::path p(dbpath);
 	boost::filesystem::path q;
 	q = p / (c+"ns");
-	bool ok = boost::filesystem::remove(q);
-	if( ok ) 
-		log() << "  removed file " << q.string() << '\n';
+	boost::filesystem::remove(q);
 	int i = 0;
 	int extra = 10; // should not be necessary, this is defensive in case there are missing files
 	while( 1 ) { 
@@ -328,7 +326,8 @@ inline void _deleteDataFiles(const char *database) {
 		stringstream ss;
 		ss << c << i;
 		q = p / ss.str();
-		if( boost::filesystem::remove(q) ) {
+        if( exists(q) ) {
+            boost::filesystem::remove(q);
 			log() << "  removed file " << q.string() << '\n';
 			if( extra != 10 ) 
 				log() << "  _deleteDataFiles() warning: extra == " << extra << endl;

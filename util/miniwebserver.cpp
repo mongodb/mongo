@@ -32,7 +32,7 @@ bool MiniWebServer::init(int port) {
 		return false;
 	}
 	prebindOptions( sock );
-	if( bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) { 
+    if( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) { 
         log() << "MiniWebServer: bind() failed port:" << port << " errno:" << errno << endl;
 		if( errno == 98 )
 			log() << "98 == addr already in use" << endl;

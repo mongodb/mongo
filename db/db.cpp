@@ -597,9 +597,3 @@ usage:
 	return 0;
 }
 
-void foo() { 
-  boost::mutex z;
-  boost::detail::thread::lock_ops<boost::mutex>::lock(z);
-  cout << "inside lock" << endl;
-  boost::detail::thread::lock_ops<boost::mutex>::unlock(z);
-}
