@@ -32,7 +32,7 @@ public:
 	Nullstream& operator<< (ostream& ( *endl )(ostream&)) { return *this; }
 	Nullstream& operator<< (ios_base& (*hex)(ios_base&)) { return *this; }
 };
-inline Nullstream& endl ( Nullstream& os ) { }
+inline Nullstream& endl ( Nullstream& os ) { return os; }
 extern Nullstream nullstream;
 
 #define LOGIT { boostlock lk(mutex); cout << x; return *this; }
