@@ -40,6 +40,7 @@ class Record;
 class Cursor;
 
 void dropDatabase(const char *ns);
+bool repairDatabase(const char *ns, bool preserveClonedFilesOnFailure, bool backupOriginalFiles);
 void dropNS(string& dropNs);;
 bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
 
@@ -312,13 +313,32 @@ inline BtreeBucket* DiskLoc::btree() const {
 #include "queryoptimizer.h"
 #include "database.h"
 
-inline void _deleteDataFiles(const char *database) { 
+#define BOOST_CHECK_EXCEPTION( expression ) \
+	try { \
+		expression; \
+	} catch ( const std::exception &e ) { \
+		problem() << e.what() << endl; \
+		assert( false ); \
+	} catch ( ... ) { \
+		assert( false ); \
+	}
+
+class FileOp {
+public:
+	virtual bool apply( const boost::filesystem::path &p ) = 0;
+	virtual const char * op() const = 0;
+};
+
+inline void _applyOpToDataFiles( const char *database, FileOp &fo, const char *path = dbpath ) {
 	string c = database;
 	c += '.';
-	boost::filesystem::path p(dbpath);
+	boost::filesystem::path p(path);
 	boost::filesystem::path q;
 	q = p / (c+"ns");
-	boost::filesystem::remove(q);
+	bool ok;
+	BOOST_CHECK_EXCEPTION( ok = fo.apply( q ) );
+	if( ok ) 
+		log() << fo.op() << " file " << q.string() << '\n';
 	int i = 0;
 	int extra = 10; // should not be necessary, this is defensive in case there are missing files
 	while( 1 ) { 
@@ -326,16 +346,26 @@ inline void _deleteDataFiles(const char *database) {
 		stringstream ss;
 		ss << c << i;
 		q = p / ss.str();
-        if( exists(q) ) {
-            boost::filesystem::remove(q);
-			log() << "  removed file " << q.string() << '\n';
+		BOOST_CHECK_EXCEPTION( ok = fo.apply(q) );
+		if( ok ) {
+			log() << fo.op() << " file " << q.string() << '\n';
 			if( extra != 10 ) 
-				log() << "  _deleteDataFiles() warning: extra == " << extra << endl;
+				log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;
 		}
 		else if( --extra <= 0 ) 
 			break;
 		i++;
-	}
+	}	
+}
+
+inline void _deleteDataFiles(const char *database) { 
+	class : public FileOp {
+		virtual bool apply( const boost::filesystem::path &p ) {
+			return boost::filesystem::remove( p );
+		}
+		virtual const char * op() const { return "remove"; }
+	} deleter;
+	_applyOpToDataFiles( database, deleter );
 }
 
 inline NamespaceIndex* nsindex(const char *ns) { 

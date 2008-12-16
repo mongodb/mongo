@@ -24,8 +24,11 @@
 
 class Database { 
 public:
-	Database(const char *nm, bool& justCreated) : name(nm) { 
-		justCreated = namespaceIndex.init(dbpath, nm);
+	string path;
+	Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
+	name(nm),
+	path(_path) { 
+		justCreated = namespaceIndex.init(_path, nm);
 		profile = 0;
 		profileName = name + ".system.profile";
 	} 
@@ -52,9 +55,12 @@ public:
 		if( p == 0 ) {
 			p = new PhysicalDataFile(n);
 			files[n] = p;
-			stringstream out;
-			out << dbpath << name << '.' << n;
-			p->open(n, out.str().c_str());
+			stringstream ss;
+			ss << name << '.' << n;
+			boost::filesystem::path fullName;
+			fullName = boost::filesystem::path(path) / ss.str();
+			string fullNameString = fullName.string();
+			p->open(n, fullNameString.c_str() );
 		}
 		return p;
 	}

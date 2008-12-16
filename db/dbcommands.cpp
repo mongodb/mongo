@@ -184,6 +184,25 @@ public:
     }
 } cmdDropDatabase;
 
+class CmdRepairDatabase : public Command { 
+public:
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
+    CmdRepairDatabase() : Command("repairDatabase") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        BSONElement e = cmdObj.findElement(name);
+        log() << "repairDatabase " << ns << endl;
+        int p = (int) e.number();
+        if( p != 1 )
+            return false;
+		e = cmdObj.findElement( "preserveClonedFilesOnFailure" );
+		bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
+		e = cmdObj.findElement( "backupOriginalFiles" );
+		bool backupOriginalFiles = e.isBoolean() && e.boolean();
+        return repairDatabase( ns, preserveClonedFilesOnFailure, backupOriginalFiles );
+    }
+} cmdRepairDatabase;
+
 /* set db profiling level 
    todo: how do we handle profiling information put in the db with replication? 
          sensibly or not?
