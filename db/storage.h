@@ -89,14 +89,9 @@ public:
 		int x = fileNo - b.fileNo;
 		if( x ) 
 			return x;
-		if( ofs == b.ofs ) return 0;
-		return ofs < b.ofs ? -1 : 1;
+        return ofs - b.ofs;
 	}
-	bool operator<(const DiskLoc& b) const { 
-		if( fileNo == b.fileNo )
-			return ofs < b.ofs;
-		return fileNo < b.fileNo;
-	}
+    bool operator<(const DiskLoc& b) const { return compare(b) < 0; }
 
 	/* get the "thing" associated with this disk location.
 	   it is assumed the object is what it is -- you must asure that: 
