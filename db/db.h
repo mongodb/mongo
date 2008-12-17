@@ -68,6 +68,8 @@ struct dblock : public lock {
 	}
 };
 
+#include "boost/version.hpp"
+
 /* a scoped release of a mutex temporarily -- like a scopedlock but reversed. 
 */
 struct temprelease {
