@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_build_verify --
+ * __wt_db_build_verify --
  *	Verify the Btree build itself.
  */
 int
-__wt_bt_build_verify(IENV *ienv)
+__wt_db_build_verify(IENV *ienv)
 {
 	ENV *env;
 

@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_page_alloc --
+ * __wt_db_page_alloc --
  *	Allocate and initialize a new in-memory Btree page.
  */
 int
-__wt_bt_page_alloc(DB *db, WT_PAGE_INMEM **ipp)
+__wt_db_page_alloc(DB *db, WT_PAGE_INMEM **ipp)
 {
 	IENV *ienv;
 	WT_PAGE_INMEM *ip;
@@ -54,11 +54,11 @@ err:	__wt_free(ienv, p);
 }
 
 /*
- * __wt_bt_page_free --
+ * __wt_db_page_free --
  *	Free an in-memory Btree page.
  */
 int
-__wt_bt_page_free(DB *db, WT_PAGE_INMEM *ip)
+__wt_db_page_free(DB *db, WT_PAGE_INMEM *ip)
 {
 	IENV *ienv;
 

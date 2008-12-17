@@ -31,7 +31,7 @@ __wt_bt_open(DB *db)
 	bt->db = db;
 
 	/* Open the underlying database file. */
-	if ((ret = __wt_bt_fopen(bt)) != 0)
+	if ((ret = __wt_db_fopen(bt)) != 0)
 		goto err;
 
 	idb->btree = bt;

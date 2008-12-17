@@ -10,12 +10,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_ovfl_load --
+ * __wt_db_ovfl_write --
  *	Store an overflow item in the database, returning the starting
  *	page.
  */
 int
-__wt_bt_ovfl_load(DB *db, DBT *dbt, u_int32_t *addrp)
+__wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 {
 	WT_BTREE *bt;
 	WT_PAGE_HDR *hdr;
@@ -27,7 +27,7 @@ __wt_bt_ovfl_load(DB *db, DBT *dbt, u_int32_t *addrp)
 
 	/* Allocate a chunk of file space. */
 	WT_OVERFLOW_BYTES_TO_FRAGS(db, dbt->size, frags);
-	if ((ret = __wt_bt_falloc(bt, frags, &hdr, &addr)) != 0)
+	if ((ret = __wt_db_falloc(bt, frags, &hdr, &addr)) != 0)
 		return (ret);
 
 	/* Initialize the returned space. */
@@ -35,10 +35,10 @@ __wt_bt_ovfl_load(DB *db, DBT *dbt, u_int32_t *addrp)
 	hdr->u.datalen = dbt->size;
 
 	/* Copy the DBT into place. */
-	memcpy(WT_PAGE_DATA(hdr), dbt->data, dbt->size);
+	memcpy(WT_PAGE_BYTE(hdr), dbt->data, dbt->size);
 
 	/* Write the overflow item back to the file. */
-	if ((ret = __wt_bt_fwrite(bt, addr, frags, hdr)) != 0)
+	if ((ret = __wt_db_fwrite(bt, addr, frags, hdr)) != 0)
 		return (ret);
 
 	*addrp = addr;

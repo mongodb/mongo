@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_fopen --
+ * __wt_db_fopen --
  *	Open an underlying file.
  */
 int
-__wt_bt_fopen(WT_BTREE *bt)
+__wt_db_fopen(WT_BTREE *bt)
 {
 	DB *db;
 	IDB *idb;
@@ -48,11 +48,11 @@ err:	(void)__wt_close(ienv, bt->fh);
 }
 
 /*
- * __wt_bt_fclose --
+ * __wt_db_fclose --
  *	Close an underlying file.
  */
 int
-__wt_bt_fclose(WT_BTREE *bt)
+__wt_db_fclose(WT_BTREE *bt)
 {
 	IENV *ienv;
 	int ret;
@@ -63,11 +63,11 @@ __wt_bt_fclose(WT_BTREE *bt)
 }
 
 /*
- * __wt_bt_falloc --
+ * __wt_db_falloc --
  *	Allocate a chunk of a file.
  */
 int
-__wt_bt_falloc(WT_BTREE *bt, u_int32_t frags, void *retp, u_int32_t *addrp)
+__wt_db_falloc(WT_BTREE *bt, u_int32_t frags, void *retp, u_int32_t *addrp)
 {
 	DB *db;
 	IENV *ienv;
@@ -99,11 +99,11 @@ __wt_bt_falloc(WT_BTREE *bt, u_int32_t frags, void *retp, u_int32_t *addrp)
 }
 
 /*
- * __wt_bt_fread --
+ * __wt_db_fread --
  *	Read a chunk of a file.
  */
 int
-__wt_bt_fread(
+__wt_db_fread(
     WT_BTREE *bt, u_int32_t addr, u_int32_t frags, WT_PAGE_HDR **hdrp)
 {
 	DB *db;
@@ -138,7 +138,7 @@ __wt_bt_fread(
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_bt_page_verify(db, addr, hdr)) != 0)
+	if ((ret = __wt_db_page_verify(db, addr, hdr)) != 0)
 		goto err;
 #endif
 
@@ -150,11 +150,11 @@ err:	__wt_free(ienv, hdr);
 }
 
 /*
- * __wt_bt_fwrite --
+ * __wt_db_fwrite --
  *	Write a chunk of a file.
  */
 int
-__wt_bt_fwrite(
+__wt_db_fwrite(
     WT_BTREE *bt, u_int32_t addr, u_int32_t frags, WT_PAGE_HDR *hdr)
 {
 	DB *db;
@@ -167,7 +167,7 @@ __wt_bt_fwrite(
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_bt_page_verify(db, addr, hdr)) != 0)
+	if ((ret = __wt_db_page_verify(db, addr, hdr)) != 0)
 		return (ret);
 #endif
 
@@ -183,11 +183,11 @@ __wt_bt_fwrite(
 }
 
 /*
- * __wt_bt_fdiscard --
+ * __wt_db_fdiscard --
  *	Discard a page of a file.
  */
 int
-__wt_bt_fdiscard(WT_BTREE *bt, u_int32_t addr, WT_PAGE_HDR *hdr)
+__wt_db_fdiscard(WT_BTREE *bt, u_int32_t addr, WT_PAGE_HDR *hdr)
 {
 	DB *db;
 	IENV *ienv;
@@ -198,7 +198,7 @@ __wt_bt_fdiscard(WT_BTREE *bt, u_int32_t addr, WT_PAGE_HDR *hdr)
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_bt_page_verify(db, addr, hdr)) != 0)
+	if ((ret = __wt_db_page_verify(db, addr, hdr)) != 0)
 		return (ret);
 #endif
 

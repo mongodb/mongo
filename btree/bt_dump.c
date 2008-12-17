@@ -9,10 +9,18 @@
 
 #include "wt_internal.h"
 
-static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
-static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
+static void __wt_db_hexprint(u_int8_t *, u_int32_t, FILE *);
+static void __wt_db_print_nl(u_int8_t *, u_int32_t, FILE *);
 static  int __wt_dup_ahead(DB *, u_int8_t *, int *);
 static  int __wt_ovfl_key_copy(DB *, u_int8_t *, size_t, DBT *);
+
+/* Check if the next page entry is part of a duplicate data set. */
+#define	WT_DUP_AHEAD(p, len, yesno) {					\
+	WT_ITEM *__item = (WT_ITEM *)((p) + WT_ITEM_SPACE_REQ(len));	\
+	(yesno) = __item->type == WT_ITEM_DUP ||			\
+	    __item->type == WT_ITEM_DUP_OVFL ||				\
+	    __item->type == WT_ITEM_OFFPAGE ? 1 : 0;			\
+}
 
 /*
  * __wt_db_dump --
@@ -21,110 +29,129 @@ static  int __wt_ovfl_key_copy(DB *, u_int8_t *, size_t, DBT *);
 int
 __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 {
-	DBT last_ovfl_key;
+	DBT last_key_ovfl, last_key_std, *last_key;
+	IENV *ienv;
 	WT_BTREE *bt;
-	WT_ITEM *item, *next_item, *last_key_item;
+	WT_ITEM *item, *next_item;
+	WT_ITEM_OFFP *offp;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE_HDR *hdr, *ovfl_hdr;
 	u_int32_t addr, frags, i;
 	u_int8_t *p, *next;
-	int need_key_copy, ret;
+	int dup_ahead, ret;
 	void (*func)(u_int8_t *, u_int32_t, FILE *);
-
-	bt = db->idb->btree;
 
 	DB_FLAG_CHK(db, "Db.dump", flags, WT_APIMASK_DB_DUMP);
 
-	WT_CLEAR(last_ovfl_key);
+	ienv = db->ienv;
+	bt = db->idb->btree;
 	ret = 0;
-	func = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;
+	func = flags == WT_PRINTABLES ? __wt_db_print_nl : __wt_db_hexprint;
+
+	WT_CLEAR(last_key_std);
+	WT_CLEAR(last_key_ovfl);
 
 	/* TRAVERSE TO FIRST LEAF PAGE */
 
 	for (addr = WT_BTREE_ROOT;;) {
 		if ((ret =
-		    __wt_bt_fread(bt, addr, WT_FRAGS_PER_PAGE(db), &hdr)) != 0)
+		    __wt_db_fread(bt, addr, WT_FRAGS_PER_PAGE(db), &hdr)) != 0)
 			return (ret);
 
-		for (p = WT_PAGE_DATA(hdr), i = hdr->u.entries; i > 0; --i) {
+		for (p = WT_PAGE_BYTE(hdr), i = hdr->u.entries; i > 0; --i) {
 			item = (WT_ITEM *)p;
 			switch (item->type) {
 			case WT_ITEM_KEY:
-				last_key_item = item;
-				/* FALLTHROUGH */
+				last_key_std.data = WT_ITEM_BYTE(item);
+				last_key_std.size = item->len;
+				last_key = &last_key_std;
+				/*
+				 * If we're about to dump an off-page duplicate
+				 * set, don't write the key here, we'll write
+				 * it in the off-page dump routine.
+				 */
+				WT_DUP_AHEAD(p, item->len, dup_ahead);
+				if (!dup_ahead)
+					func(WT_ITEM_BYTE(item),
+					    item->len, stream);
+				break;
 			case WT_ITEM_DATA:
 				func(p + sizeof(WT_ITEM), item->len, stream);
-				p += WT_ITEM_SPACE_REQ(item->len);
+				break;
+			case WT_ITEM_DUP:
+				func(last_key->data, last_key->size, stream);
+				func(p + sizeof(WT_ITEM), item->len, stream);
 				break;
 			case WT_ITEM_KEY_OVFL:
 				/*
 				 * If the overflow key has duplicate records,
 				 * we'll need a copy of the key for display on
 				 * each of those records.  Look ahead and see
-				 * if duplicate data items follow the first
-				 * data item.
+				 * if it's a set of duplicates.
 				 */
-				last_key_item = NULL;
-				need_key_copy = 0;
-				if (i > 2 && (ret =
-				    __wt_dup_ahead(db, p, &need_key_copy)) != 0)
-					goto err;
-
+				WT_DUP_AHEAD(p,
+				    sizeof(WT_ITEM_OVFL), dup_ahead);
 				/* FALLTHROUGH */
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
-				ovfl = (WT_ITEM_OVFL *)
-				    ((u_int8_t *)item + sizeof(WT_ITEM));
+				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 				WT_OVERFLOW_BYTES_TO_FRAGS(
 				    db, ovfl->len, frags);
-				if ((ret = __wt_bt_fread(bt,
+				if ((ret = __wt_db_fread(bt,
 				    ovfl->addr, frags, &ovfl_hdr)) != 0)
 					goto err;
 
 				/*
-				 * Save a copy of this overflow key if it's
-				 * needed for later duplicate data items.
+				 * If we're already in a duplicate set, dump
+				 * the key.
 				 */
-				if (need_key_copy) {
+				if (item->type == WT_ITEM_DUP_OVFL)
+					func(last_key->data,
+					    last_key->size, stream);
+
+				/*
+				 * If we're starting a new duplicate set with
+				 * an overflow key, save a copy of the key for
+				 * later display.  Otherwise, dump this item.
+				 */
+				if (dup_ahead) {
 					if ((ret = __wt_ovfl_key_copy(db,
-					    WT_PAGE_DATA(ovfl_hdr), ovfl->len,
-					    &last_ovfl_key)) != 0)
+					    WT_PAGE_BYTE(ovfl_hdr), ovfl->len,
+					    &last_key_ovfl)) != 0)
 						goto err;
-					need_key_copy = 0;
-				}
+					last_key = &last_key_ovfl;
+					dup_ahead = 0;
+				} else
+					func(WT_PAGE_BYTE(ovfl_hdr),
+					    ovfl->len, stream);
 
-				func(WT_PAGE_DATA(ovfl_hdr), ovfl->len, stream);
-
-				if ((ret = __wt_bt_fdiscard(
+				if ((ret = __wt_db_fdiscard(
 				    bt, ovfl->addr, ovfl_hdr)) != 0)
 					goto err;
-				p += WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OVFL));
 				break;
-			case WT_ITEM_DUP:
-				/* Display the previous key. */
-				if (last_key_item == NULL)
-					func(last_ovfl_key.data,
-					    last_ovfl_key.size, stream);
-				else
-					func((u_int8_t *)last_key_item +
-					    sizeof(WT_ITEM),
-					    last_key_item->len, stream);
-					
-				/* Display the data item. */
-				func(p + sizeof(WT_ITEM), item->len, stream);
-				p += WT_ITEM_SPACE_REQ(item->len);
+			case WT_ITEM_OFFPAGE:
+				offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+				if ((ret = __wt_db_dump_offpage(db,
+				    last_key, offp->addr, stream, func)) != 0)
+					goto err;
 				break;
 			default:
 				return (__wt_database_format(db));
 			}
+
+			p += WT_ITEM_SPACE_REQ(item->len);
 		}
 
 		addr = hdr->nextaddr;
-		if ((ret = __wt_bt_fdiscard(bt, addr, hdr)) != 0)
+		if ((ret = __wt_db_fdiscard(bt, addr, hdr)) != 0)
 			return (ret);
 		if (addr == WT_ADDR_INVALID)
 			break;
 	}
+
+	/* Discard any space allocated to hold an overflow key. */
+	if (last_key_ovfl.data != NULL)
+		__wt_free(ienv, last_key_ovfl.data);
 
 
 	if (0) {
@@ -134,30 +161,68 @@ err:		ret = WT_ERROR;
 }
 
 /*
- * __wt_dup_ahead --
- *	Check to see if there's a duplicate data item coming up.
+ * __wt_db_dump_offpage --
+ *	Dump a set of off-page duplicates.
  */
-static int
-__wt_dup_ahead(DB *db, u_int8_t *p, int *yesnop)
+int
+__wt_db_dump_offpage(DB *db, DBT *key,
+    u_int32_t addr, FILE *stream, void (*func)(u_int8_t *, u_int32_t, FILE *))
 {
+	WT_BTREE *bt;
 	WT_ITEM *item;
-	
-	p += WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OVFL));
-	item = (WT_ITEM *)p;
-	switch (item->type) {
-	case WT_ITEM_DATA:
-		p += WT_ITEM_SPACE_REQ(item->len);
-		break;
-	case WT_ITEM_DATA_OVFL:
-		p += WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OVFL));
-		break;
-	default:
-		return (__wt_database_format(db));
+	WT_ITEM_OVFL *ovfl;
+	WT_PAGE_HDR *hdr, *ovfl_hdr;
+	u_int32_t frags, i, next_addr;
+	u_int8_t *p;
+	int ret;
+
+	bt = db->idb->btree;
+
+	hdr = NULL;
+	do {
+		if ((ret =
+		    __wt_db_fread(bt, addr, WT_FRAGS_PER_PAGE(db), &hdr)) != 0)
+			goto err;
+
+		for (p = WT_PAGE_BYTE(hdr), i = hdr->u.entries; i > 0; --i) {
+			func(key->data, key->size, stream);
+			item = (WT_ITEM *)p;
+			switch (item->type) {
+			case WT_ITEM_DUP:
+				func(p + sizeof(WT_ITEM), item->len, stream);
+				break;
+			case WT_ITEM_DUP_OVFL:
+				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
+				WT_OVERFLOW_BYTES_TO_FRAGS(
+				    db, ovfl->len, frags);
+				if ((ret = __wt_db_fread(bt,
+				    ovfl->addr, frags, &ovfl_hdr)) != 0)
+					goto err;
+				func(WT_PAGE_BYTE(ovfl_hdr), ovfl->len, stream);
+				if ((ret = __wt_db_fdiscard(
+				    bt, ovfl->addr, ovfl_hdr)) != 0)
+					goto err;
+				break;
+			default:
+				return (__wt_database_format(db));
+			}
+			p += WT_ITEM_SPACE_REQ(item->len);
+		}
+
+		next_addr = hdr->nextaddr;
+		if ((ret = __wt_db_fdiscard(bt, addr, hdr)) != 0) {
+			hdr = NULL;
+			goto err;
+		}
+		addr = next_addr;
+	} while (addr != WT_ADDR_INVALID);
+
+	if (0) {
+err:		ret = WT_ERROR;
+		if (hdr != NULL)
+			(void)__wt_db_fdiscard(bt, addr, hdr);
 	}
-	item = (WT_ITEM *)p;
-	*yesnop =
-	    item->type == WT_ITEM_DUP || item->type == WT_ITEM_DUP_OVFL ? 1 : 0;
-	return (0);
+	return (ret);
 }
 
 /*
@@ -182,26 +247,26 @@ __wt_ovfl_key_copy(DB *db, u_int8_t *data, size_t len, DBT *copy)
 static const char hex[] = "0123456789abcdef";
 
 /*
- * __wt_bt_print_nl --
+ * __wt_db_print_nl --
  *	Output a single key/data entry in printable characters, where possible.
  *	In addition, terminate with a <newline> character, unless the entry is
  *	itself terminated with a <newline> character.
  */
 static void
-__wt_bt_print_nl(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_db_print_nl(u_int8_t *data, u_int32_t len, FILE *stream)
 {
 	if (data[len - 1] == '\n')
 		--len;
-	__wt_bt_print(data, len, stream);
+	__wt_db_print(data, len, stream);
 	fprintf(stream, "\n");
 }
 
 /*
- * __wt_bt_print --
+ * __wt_db_print --
  *	Output a single key/data entry in printable characters, where possible.
  */
 void
-__wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_db_print(u_int8_t *data, u_int32_t len, FILE *stream)
 {
 	int ch;
 
@@ -216,11 +281,11 @@ __wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream)
 }
 
 /*
- * __wt_bt_hexprint --
+ * __wt_db_hexprint --
  *	Output a single key/data entry in hex.
  */
 static void
-__wt_bt_hexprint(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_db_hexprint(u_int8_t *data, u_int32_t len, FILE *stream)
 {
 	for (; len > 0; --len, ++data)
 		fprintf(stream, "%x%x",
