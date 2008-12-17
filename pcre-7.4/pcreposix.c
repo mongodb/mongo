@@ -53,6 +53,7 @@ they are set for an application (using these functions) if they have not
 previously been set. */
 
 #if defined(_WIN32) && !defined(PCRE_STATIC)
+#error why are we here?
 #  define PCREPOSIX_EXP_DECL extern __declspec(dllexport)
 #  define PCREPOSIX_EXP_DEFN __declspec(dllexport)
 #endif
