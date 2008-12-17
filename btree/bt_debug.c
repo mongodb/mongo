@@ -9,9 +9,6 @@
 
 #include "wt_internal.h"
 
-static const char *__wt_db_hdr_type(u_int32_t);
-static const char *__wt_db_item_type(u_int32_t);
-
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_db_force_load --
@@ -45,6 +42,9 @@ __wt_db_dump_db(DB *db, char *ofile)
 		if ((ret =
 		    __wt_db_fread(bt, addr, WT_FRAGS_PER_PAGE(db), &hdr)) != 0)
 			break;
+
+		fprintf(fp, "====== %lu\n",  (u_long)addr);
+
 		if ((ret = __wt_db_dump_page(db, hdr, NULL, fp)) != 0)
 			break;
 
@@ -104,14 +104,12 @@ __wt_db_dump_page(DB *db, WT_PAGE_HDR *hdr, char *ofile, FILE *fp)
 	} else if (fp == NULL)
 		fp = stdout;
 
-	fprintf(fp, "======\n");
-	fprintf(fp, "{\n\t%s: ", __wt_db_hdr_type(hdr->type));
+	fprintf(fp, "{\n%s: ", __wt_db_hdr_type(hdr->type));
 	if (hdr->type == WT_PAGE_OVFL)
 		fprintf(fp, "%lu bytes", (u_long)hdr->u.datalen);
 	else
 		fprintf(fp, "%lu entries", (u_long)hdr->u.entries);
-	fprintf(fp,
-	    "\n\tlsn %lu/%lu, checksum %lx, "
+	fprintf(fp, "\nlsn %lu/%lu, checksum %lx, "
 	    "prntaddr %lu, prevaddr %lu, nextaddr %lu\n}\n",
 	    (u_long)hdr->lsn.fileno, (u_long)hdr->lsn.offset,
 	    (u_long)hdr->checksum, (u_long)hdr->prntaddr,
@@ -161,11 +159,6 @@ __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_DUP:
 		__wt_db_print(WT_ITEM_BYTE(item), item->len, fp);
 		break;
-	case WT_ITEM_OFFPAGE:
-		item_offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-		fprintf(fp, "addr: %lu, records %lu",
-		    (u_long)item_offp->addr, (u_long)item_offp->records);
-		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
@@ -177,6 +170,11 @@ __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 			__wt_db_print(WT_PAGE_BYTE(hdr), item->len, fp);
 			(void)__wt_db_fdiscard(bt, addr, hdr);
 		}
+		break;
+	case WT_ITEM_DUP_OFFPAGE:
+		item_offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+		fprintf(fp, "addr: %lu, records %lu",
+		    (u_long)item_offp->addr, (u_long)item_offp->records);
 		break;
 	default:
 		fprintf(fp, "unsupported type");
@@ -197,55 +195,5 @@ __wt_db_dump_dbt(DBT *dbt, FILE *fp)
 	fprintf(fp, "{");
 	__wt_db_print(dbt->data, dbt->size, fp);
 	fprintf(fp, "}\n");
-}
-
-static const char *
-__wt_db_hdr_type(u_int32_t type)
-{
-	switch (type) {
-	case WT_PAGE_INVALID:
-		return ("invalid");
-	case WT_PAGE_OVFL:
-		return ("overflow");
-	case WT_PAGE_ROOT:
-		return ("primary root");
-	case WT_PAGE_INT:
-		return ("primary internal");
-	case WT_PAGE_LEAF:
-		return ("primary leaf");
-	case WT_PAGE_DUP_ROOT:
-		return ("off-page duplicate root");
-	case WT_PAGE_DUP_INT:
-		return ("off-page duplicate internal");
-	case WT_PAGE_DUP_LEAF:
-		return ("off-page duplicate leaf");
-	default:
-		break;
-	}
-	return ("unknown");
-}
-
-static const char *
-__wt_db_item_type(u_int32_t type)
-{
-	switch (type) {
-	case WT_ITEM_KEY:
-		return ("key");
-	case WT_ITEM_DATA:
-		return ("data");
-	case WT_ITEM_DUP:
-		return ("duplicate");
-	case WT_ITEM_KEY_OVFL:
-		return ("key-overflow");
-	case WT_ITEM_DATA_OVFL:
-		return ("data-overflow");
-	case WT_ITEM_DUP_OVFL:
-		return ("duplicate-overflow");
-	case WT_ITEM_OFFPAGE:
-		return ("offpage");
-	default:
-		break;
-	}
-	return ("unknown");
 }
 #endif
