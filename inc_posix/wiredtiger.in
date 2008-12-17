@@ -77,6 +77,10 @@ typedef u_int64_t wt_recno_t;		/* logical record numbers */
 struct __dbt {
 	void	*data;			/* data */
 	size_t	 size;			/* data length */
+
+	size_t	 alloc_size;		/* bytes allocated for data */
+
+	u_int32_t flags;
 };
 
 /*******************************************
@@ -103,6 +107,12 @@ struct __db {
 	    DB *, int *);
 	int (*set_btree_compare_int)(
 	    DB *, int );
+
+	int (*dup_compare)(DB *, const DBT *, const DBT *);
+	void (*get_dup_compare)(
+	    DB *, int (**)(DB *, const DBT *, const DBT *));
+	int (*set_dup_compare)(
+	    DB *, int (*)(DB *, const DBT *, const DBT *));
 
 	void (*errcall)(const DB *, const char *);
 	void (*get_errcall)(
@@ -223,6 +233,7 @@ char	*wt_strerror(int);
  * API flags section: BEGIN
  */
 #define	WT_CREATE					0x00000001
+#define	WT_DATA_DUPLICATES_CHECK			0x00000004
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MAXKEY_NOTSET				0x00000002
 #define	WT_PRINTABLES					0x00000001
@@ -232,10 +243,11 @@ char	*wt_strerror(int);
 #define	WT_VERB_FILEOPS_ALL				0x00000001
 
 #define	WT_APIMASK_DB					0x00000003
-#define	WT_APIMASK_DB_BULK_LOAD				0x00000003
+#define	WT_APIMASK_DB_BULK_LOAD				0x00000007
 #define	WT_APIMASK_DB_DESTROY				0x00000000
 #define	WT_APIMASK_DB_DUMP				0x00000001
 #define	WT_APIMASK_DB_OPEN				0x00000001
+#define	WT_APIMASK_DBT					0x00000000
 #define	WT_APIMASK_ENV					0x00000000
 #define	WT_APIMASK_ENV_DESTROY				0x00000000
 #define	WT_APIMASK_ENV_VERBOSE				0x00000003
