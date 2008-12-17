@@ -444,7 +444,7 @@ __wt_dup_offpage(DB *db,
 
 	/* Write the caller's on-page object. */
 	data_item.len = sizeof(WT_ITEM_OFFP);
-	data_item.type = WT_ITEM_OFFPAGE;
+	data_item.type = WT_ITEM_DUP_OFFPAGE;
 	offpage_item.addr = root_addr;
 	offpage_item.records = dup_count;
 	p = (u_int8_t *)dup_first;

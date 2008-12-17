@@ -19,7 +19,7 @@ static  int __wt_ovfl_key_copy(DB *, u_int8_t *, size_t, DBT *);
 	WT_ITEM *__item = (WT_ITEM *)((p) + WT_ITEM_SPACE_REQ(len));	\
 	(yesno) = __item->type == WT_ITEM_DUP ||			\
 	    __item->type == WT_ITEM_DUP_OVFL ||				\
-	    __item->type == WT_ITEM_OFFPAGE ? 1 : 0;			\
+	    __item->type == WT_ITEM_DUP_OFFPAGE ? 1 : 0;		\
 }
 
 /*
@@ -129,7 +129,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 				    bt, ovfl->addr, ovfl_hdr)) != 0)
 					goto err;
 				break;
-			case WT_ITEM_OFFPAGE:
+			case WT_ITEM_DUP_OFFPAGE:
 				offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
 				if ((ret = __wt_db_dump_offpage(db,
 				    last_key, offp->addr, stream, func)) != 0)
