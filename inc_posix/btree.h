@@ -180,21 +180,39 @@ struct __wt_item {
 	u_int32_t len;			/* Trailing data length, in bytes */
 
 	/*
-	 * Item type.  There are 3 basic types (keys, data, and duplicate
-	 * data), but each can appear as an overflow item.  We could use
-	 * a bit flag, but we have plenty of name space and avoiding the
-	 * bit operation is faster/cleaner.
+	 * Item type.  There are 3 basic types: keys, data items and duplicate
+	 * data items, each of which has an overflow form.  Each of the items
+	 * is followed by additional information, which varies by type: a data
+	 * or dup item is followed by a set of bytes, a WT_ITEM_OVFL structure
+	 * follows an overflow item, and so on.
+	 *
+	 * On internal (primary or duplicate) pages, there are pairs of items:
+	 * a WT_ITEM_INT followed by a single WT_ITEM_KEY or WT_ITEM_KEY_OVFL.
+	 *
+	 * On primary leaf pages, there is either a WT_ITEM_KEY followed by a
+	 * single WT_ITEM_DATA, WT_ITEM_DATA_OVFL or WT_ITEM_DUP_OFFPAGE item,
+	 * or a WT_ITEM_KEY followed by some number of either WT_ITEM_DUP or
+	 * WT_ITEM_DUP_OVFL items.
+	 *
+	 * On duplicate leaf pages, there are WT_ITEM_DUP or WT_ITEM_DUP_OVFL
+	 * items.
+	 *
+	 * Again, we could compress the values (and/or use a separate flag to
+	 * indicate overflow), but it's simpler this way if only because we
+	 * don't have to use the page type to figure out what "WT_ITEM_KEY"
+	 * really means.
 	 */
-#define	WT_ITEM_KEY		1	/* Leaf/internal page key item */
-#define	WT_ITEM_DATA		2	/* Leaf page data item */
-#define	WT_ITEM_DUP		3	/* Duplicate data item */
-#define	WT_ITEM_KEY_OVFL	4	/* Leaf/internal page key item */
-#define	WT_ITEM_DATA_OVFL	5	/* Leaf/duplicate page data item */
-#define	WT_ITEM_DUP_OVFL	6	/* Leaf page duplicate data */
-#define	WT_ITEM_OFFPAGE		7	/* Offpage duplicates tree */
+#define	WT_ITEM_KEY		1	/* Leaf/internal page key */
+#define	WT_ITEM_KEY_OVFL	2	/* Leaf/internal page overflow key */
+#define	WT_ITEM_DATA		3	/* Leaf page data item */
+#define	WT_ITEM_DATA_OVFL	4	/* Leaf page overflow data item */
+#define	WT_ITEM_DUP		5	/* Duplicate data item */
+#define	WT_ITEM_DUP_OVFL	6	/* Duplicate overflow data item */
+#define	WT_ITEM_INT		7	/* Internal page item */
+#define	WT_ITEM_DUP_OFFPAGE	8	/* Offpage duplicates tree */
 	u_int8_t  type;
 
-	u_int8_t  unused[3];		/* Spacer to force alignment */
+	u_int8_t  unused[3];		/* Spacer to force 4-byte alignment */
 
 	/*
 	 * A variable length chunk of data.
@@ -221,10 +239,6 @@ struct __wt_item_int {
 
 	u_int32_t  addr;		/* Subtree address */
 	wt_recno_t records;		/* Subtree record count */
-
-	/*
-	 * A variable length chunk of data.
-	 */
 };
 
 /*
