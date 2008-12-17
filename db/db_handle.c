@@ -166,7 +166,7 @@ __wt_db_config_default(DB *db)
 	    WT_EXTENT_DEFAULT_SIZE, 0)) != 0)
 		return (ret);
 
-	db->btree_compare = __wt_btree_compare;
+	db->btree_compare = db->dup_compare = __wt_lex_compare;
 
 	return (0);
 }
