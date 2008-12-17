@@ -44,8 +44,10 @@ struct __wt_page_inmem;		typedef struct __wt_page_inmem WT_PAGE_INMEM;
 /*******************************************
  * Internal include files.
  *******************************************/
-#include "misc.h"
-#include "queue.h"
+#include "queue.h"			/* External */
+#include "bitstring.h"
+
+#include "misc.h"			/* Internal */
 #include "fh.h"
 #include "btree.h"
 
