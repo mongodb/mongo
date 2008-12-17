@@ -21,12 +21,12 @@ __wt_env_build_verify(IENV *ienv)
 	/*
 	 * Check the build & compiler itself before going further.
 	 */
-	if ((ret = __wt_bt_build_verify(ienv)) != 0)
+	if ((ret = __wt_db_build_verify(ienv)) != 0)
 		return (ret);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Load debug code the compiler might optimize out. */
-	if ((ret = __wt_bt_force_load()) != 0)
+	if ((ret = __wt_db_force_load()) != 0)
 		return (ret);
 #endif
 
