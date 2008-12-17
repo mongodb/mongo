@@ -312,7 +312,7 @@ __wt_dup_offpage(DB *db,
     DBT *lastkey, WT_ITEM *dup_first, u_int8_t *last_byte_after,
     u_int32_t dup_count, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 {
-	DBT *key, *data, *lastdata, lastdata_ovfl;
+	DBT *key, *data;
 	IENV *ienv;
 	WT_BTREE *bt;
 	WT_ITEM data_item;
@@ -393,29 +393,8 @@ __wt_dup_offpage(DB *db,
 			break;
 		}
 
-		/* Check for duplicate duplicates -- not currently supported. */
-		if (LF_ISSET(WT_DATA_DUPLICATES_CHECK) &&
-		    lastdata->size == data->size &&
-		    db->dup_compare(db, lastdata, data) == 0) {
-			__wt_db_errx(db,
-			    "identical duplicate data items are not supported");
-			goto err;
-		}
-
 		/* Create overflow objects if the data won't fit. */
 		if (data->size > db->maxitemsize) {
-			/*
-			 * If checking for duplicates: we'll need a copy of
-			 * the data item for comparison with the next one.
-			 * It's an overflow object, so we can't just use the
-			 * on-page memory.
-			 */
-			if (LF_ISSET(WT_DATA_DUPLICATES_CHECK)) {
-				lastdata = &lastdata_ovfl;
-				if ((ret = __wt_ovfl_copy(
-				    ienv, data, lastdata)) != 0)
-					goto err;
-			}
 			data_local.len = data->size;
 			if ((ret = __wt_db_ovfl_write(
 			    db, data, &data_local.addr)) != 0)
