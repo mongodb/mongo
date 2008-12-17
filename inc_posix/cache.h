@@ -34,6 +34,7 @@ struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_item_int;		typedef struct __wt_item_int WT_ITEM_INT;
+struct __wt_item_offp;		typedef struct __wt_item_offp WT_ITEM_OFFP;
 struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
 struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
