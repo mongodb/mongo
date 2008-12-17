@@ -142,7 +142,7 @@ struct __wt_page_hdr {
 	 * of off-page duplicate leaf pages are linked, and each level of
 	 * internal pages are linked.
 	 */
-	u_int32_t paraddr;		/* 20-23: parent page */
+	u_int32_t prntaddr;		/* 20-23: parent page */
 	u_int32_t prevaddr;		/* 24-27: previous page */
 	u_int32_t nextaddr;		/* 28-31: next page */
 };
@@ -151,6 +151,10 @@ struct __wt_page_hdr {
  * WT_HDR_SIZE is the expected headr size -- we check this when we startup
  * to make sure the compiler hasn't inserted padding (which would break
  * the world).
+ *
+ * The header size must be aligned on a 4-byte boundary -- data is written
+ * immediately after the header, and the first byte of each chunk must be
+ * aligned.
  */
 #define	WT_HDR_SIZE		32
 
@@ -158,7 +162,7 @@ struct __wt_page_hdr {
  * WT_PAGE_DATA is the first data byte on the page.
  * WT_DATA_SPACE is the total bytes of data space on the page.
  */
-#define	WT_PAGE_DATA(hdr)		((u_int8_t *)(hdr) + WT_HDR_SIZE)
+#define	WT_PAGE_BYTE(hdr)		((u_int8_t *)(hdr) + WT_HDR_SIZE)
 #define	WT_DATA_SPACE(pgsize)		((pgsize) - sizeof(WT_PAGE_HDR))
 
 /*
@@ -187,6 +191,7 @@ struct __wt_item {
 #define	WT_ITEM_KEY_OVFL	4	/* Leaf/internal page key item */
 #define	WT_ITEM_DATA_OVFL	5	/* Leaf/duplicate page data item */
 #define	WT_ITEM_DUP_OVFL	6	/* Leaf page duplicate data */
+#define	WT_ITEM_OFFPAGE		7	/* Offpage duplicates tree */
 	u_int8_t  type;
 
 	u_int8_t  unused[3];		/* Spacer to force alignment */
@@ -200,9 +205,9 @@ struct __wt_item {
 #define	WT_ITEM_BYTE(item)		((u_int8_t *)(item) + sizeof(WT_ITEM))
 
 /*
- * The number of bytes required to store an item of len bytes.  Align the
- * entry and the data itself to a 4-byte boundary so we can directly access
- * the item on the page.
+ * The number of bytes required to store a WT_ITEM followed by len additional
+ * bytes.  Align the entry and the data itself to a 4-byte boundary so it's
+ * possible to directly access the item on the page.
  */
 #define	WT_ITEM_SPACE_REQ(len)						\
 	WT_ALIGN(sizeof(WT_ITEM) + (len), sizeof(u_int32_t))
@@ -214,7 +219,7 @@ struct __wt_item {
 struct __wt_item_int {
 	u_int32_t  len;			/* Data length, in bytes */
 
-	u_int32_t  addr;		/* Child fragment */
+	u_int32_t  addr;		/* Subtree address */
 	wt_recno_t records;		/* Subtree record count */
 
 	/*
@@ -226,8 +231,9 @@ struct __wt_item_int {
  * Btree off-page duplicates reference another page, and so the data is
  * another structure.
  */
-struct __wt_item_tree {
-	u_int32_t  addr;		/* Off-page root fragment */
+struct __wt_item_offp {
+	u_int32_t  addr;		/* Off-page address */
+	wt_recno_t records;		/* Off-page record count */
 };
 
 /*
@@ -235,8 +241,8 @@ struct __wt_item_tree {
  * structure.
  */
 struct __wt_item_ovfl {
-	u_int32_t addr;			/* Overflow fragment */
 	u_int32_t len;			/* Overflow length */
+	u_int32_t addr;			/* Overflow address */
 }; 
 
 #if defined(__cplusplus)
