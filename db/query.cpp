@@ -235,8 +235,6 @@ int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
 		c = theDataFileMgr.findAll(ns);
     JSMatcher matcher(pattern, c->indexKeyPattern());
 
-	Cursor &tempDebug = *c;
-
 	while( c->ok() ) {
 		Record *r = c->_current();
 		DiskLoc rloc = c->currLoc();

@@ -80,7 +80,6 @@ void statsThread() {
             timeLastPass = now;
             tlast = timing;
         }
-        unsigned long long q = curTimeMicros64();
         sleepsecs(4);
     }
 }

@@ -155,7 +155,6 @@ int sgn( int i ) {
 void BtreeCursor::checkEnd() {
 	if ( bucket.isNull() )
 		return;	
-	int res = endKey.woCompare( currKey() );
 	int cmp = sgn( endKey.woCompare( currKey() ) );
 	if ( cmp != 0 && cmp != direction )
 		bucket = DiskLoc();

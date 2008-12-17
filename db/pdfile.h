@@ -335,7 +335,7 @@ inline void _applyOpToDataFiles( const char *database, FileOp &fo, const char *p
 	boost::filesystem::path p(path);
 	boost::filesystem::path q;
 	q = p / (c+"ns");
-	bool ok;
+	bool ok = false;
 	BOOST_CHECK_EXCEPTION( ok = fo.apply( q ) );
 	if( ok ) 
 		log() << fo.op() << " file " << q.string() << '\n';

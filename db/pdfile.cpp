@@ -993,7 +993,7 @@ Path uniqueTmpPath() {
 	Path dbPath = Path( dbpath );
 	Path tmpPath;
 	int i = 0;
-	bool exists;
+	bool exists = false;
 	do {
 		stringstream ss;
 		ss << "tmp_repairDatabase_" << i++;

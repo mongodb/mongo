@@ -224,7 +224,6 @@ public:
             result.append("info", allDead);
         }
         else if( replPair ) {
-            int x = replPair->state;
             result.append("ismaster", replPair->state);
             result.append("remote", replPair->remote);
             if( replPair->info.empty() )
@@ -1079,7 +1078,6 @@ void logOurDbsPresence() {
 
 	dblock lk;
 
-	int k = 0;
     while( i != end ) {
       path p = *i;
 	  string f = p.leaf();

@@ -37,7 +37,7 @@ using namespace boost::filesystem;
 
 #ifdef J_USE_OBJ
 #include "jsobj.h"
-#pragma message("warning: including jsobj.h")
+#warning including jsobj.h
 #endif
 
 #include "../grid/message.h"
