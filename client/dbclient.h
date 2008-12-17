@@ -199,7 +199,7 @@ class DBClientPaired : public DBClientWithCommands {
     /* notification that we got a "not master" error. 
     */
     void isntMaster() { 
-        master == Left ? NotSetR : NotSetL; 
+        master = ( ( master == Left ) ? NotSetR : NotSetL ); 
     }
 public:
     DBClientPaired();

@@ -82,7 +82,7 @@ void testTheDb() {
 
 	auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
 	while( c->ok() ) {
-		Record* r = c->_current();
+		c->_current();
 		c->advance();
 	}
 	cout << endl;

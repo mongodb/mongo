@@ -24,7 +24,6 @@
 
 class Database { 
 public:
-	string path;
 	Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
 	name(nm),
 	path(_path) { 
@@ -92,6 +91,7 @@ public:
 
 	vector<PhysicalDataFile*> files;
 	string name; // "alleyinsider"
+	string path;
 	NamespaceIndex namespaceIndex;
 	int profile; // 0=off.
 	string profileName; // "alleyinsider.system.profile"

@@ -42,7 +42,7 @@ string BSONElement::toString() const {
 	case NumberInt:
 		s << fieldName() << ": " << number(); break;
 	case Bool: 
-		s << fieldName() << ": " << boolean() ? "true" : "false"; break;
+		s << fieldName() << ": " << ( boolean() ? "true" : "false" ); break;
 	case Object:
 	case Array:
 		s << fieldName() << ": " << embeddedObject().toString(); break;

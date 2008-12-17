@@ -576,7 +576,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 				cout << "    promoting middle key " << middle.key.toString() << endl;
 			parent.btree()->_insert(parent, middle.recordLoc, middle.key, false, thisLoc, rLoc, idx);
 		}
-		BtreeBucket *br = rLoc.btree();
+//BtreeBucket *br = rLoc.btree();
 //br->dump();
 
 //parent.btree()->dump();
@@ -789,8 +789,6 @@ int BtreeBucket::insert(DiskLoc thisLoc, DiskLoc recordLoc,
 		}
 		*/
 	}
-
-	bool chk = false;
 
 	int x = _insert(thisLoc, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
 	assertValid(); 
