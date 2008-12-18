@@ -60,26 +60,30 @@ struct __wt_btree {
 }
 
 /*
- * Block 0 of the file is the btree root, and the invalid address.
+ * The first possible address is 0 (well, duh -- it's just strange to
+ * see an address of 0 hard-coded in).
+ *
+ * The invalid address is the largest possible offset, which isn't a
+ * possible fragment address.
  */
-#define	WT_BTREE_ROOT	0
-#define	WT_ADDR_INVALID	0
+#define	WT_ADDR_FIRST_PAGE	0
+#define	WT_ADDR_INVALID		UINT32_MAX
 
 /*
  * Each page of the Btree has an associated, in-memory structure that
  * describes it.  (This is where the on-page index array found in DB
  * 1.85 and Berkeley DB moved.)
  */
-struct __wt_page_inmem {
-	u_int32_t addr;				/* File block address */
+struct __wt_page {
+	u_int32_t    addr;			/* File block address */
+	WT_PAGE_HDR *hdr;			/* The actual page */
 
+	u_int8_t *p;				/* First free byte address */
 	u_int32_t space_avail;			/* Available page memory */
 
 	u_int8_t **indx;			/* Array of page references */
 	u_int32_t indx_count;			/* Entries in indx */
 	u_int32_t indx_size;			/* Size of indx array */
-
-	WT_PAGE_HDR *page;			/* The actual page. */
 };
 
 /*
@@ -97,34 +101,26 @@ struct __wt_page_hdr {
 
 	/*
 	 * The type declares the purpose of the page and how to move through
-	 * the page.  We could compress the types (some of them have almost
-	 * identical characteristics), but we have plenty of name space and
-	 * the additional information makes salvage easier.
+	 * the page.
 	 *
+	 * WT_PAGE_INT:
+	 * WT_PAGE_LEAF:
+	 *	The internal and leaf pages of the main btree.  The u.entries
+	 *	field is the number of entries on the page.
+	 * WT_PAGE_DUP_INT:
+	 * WT_PAGE_DUP_LEAF:
+	 *	The internal and leaf pages of an off-page duplicates btree.
+	 *	The u.entries field is the number of entries on the page.
 	 * WT_PAGE_OVFL:
 	 *	A flat chunk of data.   The u.datalen field is the length
 	 *	of the data.  This is used for overflow key and data items.
-	 * WT_PAGE_ROOT:
-	 * WT_PAGE_INT:
-	 * WT_PAGE_LEAF:
-	 *	The root, internal and leaf pages of the main btree (the
-	 *	root is always page WT_BTREE_ROOT).  The u.entries field
-	 *	is the number of entries on the page.
-	 * WT_PAGE_DUP_ROOT:
-	 * WT_PAGE_DUP_INT:
-	 * WT_PAGE_DUP_LEAF:
-	 *	The root, internal and leaf pages of an off-page duplicates
-	 *	btree.  The u.entries field is the number of entries on the
-	 *	page.
 	 */
 #define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_OVFL		1	/* Overflow page */
-#define	WT_PAGE_ROOT		2	/* Primary btree root page */
-#define	WT_PAGE_INT		3	/* Primary btree internal page */
-#define	WT_PAGE_LEAF		4	/* Primary btree leaf page */
-#define	WT_PAGE_DUP_ROOT	5	/* Off-page dup btree root page */
-#define	WT_PAGE_DUP_INT		6	/* Off-page dup btree internal page */
-#define	WT_PAGE_DUP_LEAF	7	/* Off-page dup btree leaf page */
+#define	WT_PAGE_INT		1	/* Primary btree internal page */
+#define	WT_PAGE_LEAF		2	/* Primary btree leaf page */
+#define	WT_PAGE_DUP_INT		3	/* Off-page dup btree internal page */
+#define	WT_PAGE_DUP_LEAF	4	/* Off-page dup btree leaf page */
+#define	WT_PAGE_OVFL		5	/* Overflow page */
 	u_int8_t type;			/* 08: page index type */
 
 	u_int8_t unused[3];		/* 09-11: unused padding */
@@ -208,8 +204,7 @@ struct __wt_item {
 #define	WT_ITEM_DATA_OVFL	4	/* Leaf page overflow data item */
 #define	WT_ITEM_DUP		5	/* Duplicate data item */
 #define	WT_ITEM_DUP_OVFL	6	/* Duplicate overflow data item */
-#define	WT_ITEM_INT		7	/* Internal page item */
-#define	WT_ITEM_DUP_OFFPAGE	8	/* Offpage duplicates tree */
+#define	WT_ITEM_OFFPAGE		7	/* Offpage reference */
 	u_int8_t  type;
 
 	u_int8_t  unused[3];		/* Spacer to force 4-byte alignment */
@@ -231,23 +226,11 @@ struct __wt_item {
 	WT_ALIGN(sizeof(WT_ITEM) + (len), sizeof(u_int32_t))
 
 /*
- * Btree internal items reference another page, and so the data is another
- * structure.
- */
-struct __wt_item_int {
-	u_int32_t  len;			/* Data length, in bytes */
-
-	u_int32_t  addr;		/* Subtree address */
-	wt_recno_t records;		/* Subtree record count */
-};
-
-/*
- * Btree off-page duplicates reference another page, and so the data is
- * another structure.
+ * Btree internal items and off-page duplicates reference another page.
  */
 struct __wt_item_offp {
-	u_int32_t  addr;		/* Off-page address */
-	wt_recno_t records;		/* Off-page record count */
+	u_int32_t  addr;		/* Subtree address */
+	wt_recno_t records;		/* Subtree record count */
 };
 
 /*
