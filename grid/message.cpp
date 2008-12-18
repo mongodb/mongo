@@ -249,7 +249,7 @@ void MessagingPort::reply(Message& received, Message& response, MSGID responseTo
 	say(/*received.from, */response, responseTo);
 }
 
-bool MessagingPort::call(const Message& toSend, Message& response) {
+bool MessagingPort::call(Message& toSend, Message& response) {
 	mmm( cout << "*call()" << endl; )
 	MSGID old = toSend.data->id;
 	say(/*to,*/ toSend);
@@ -272,7 +272,7 @@ bool MessagingPort::call(const Message& toSend, Message& response) {
 	return true;
 }
 
-void MessagingPort::say(const Message& toSend, int responseTo) {
+void MessagingPort::say(Message& toSend, int responseTo) {
 	mmm( cout << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
 	MSGID msgid = NextMsgId;
 	++NextMsgId;
