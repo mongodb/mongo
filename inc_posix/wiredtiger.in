@@ -143,6 +143,8 @@ struct __db {
 
 	int (*bulk_load)(
 	    DB *, u_int32_t, int (*)(DB *, DBT **, DBT **));
+	int (*close)(
+	    DB *, u_int32_t);
 	int (*destroy)(
 	    DB *, u_int32_t);
 	int (*dump)(
@@ -233,7 +235,7 @@ char	*wt_strerror(int);
  * API flags section: BEGIN
  */
 #define	WT_CREATE					0x00000001
-#define	WT_DATA_DUPLICATES_CHECK			0x00000004
+#define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MAXKEY_NOTSET				0x00000002
 #define	WT_PRINTABLES					0x00000001
@@ -243,9 +245,10 @@ char	*wt_strerror(int);
 #define	WT_VERB_FILEOPS_ALL				0x00000001
 
 #define	WT_APIMASK_DB					0x00000003
-#define	WT_APIMASK_DB_BULK_LOAD				0x00000007
+#define	WT_APIMASK_DB_BULK_LOAD				0x00000003
+#define	WT_APIMASK_DB_CLOSE				0x00000000
 #define	WT_APIMASK_DB_DESTROY				0x00000000
-#define	WT_APIMASK_DB_DUMP				0x00000001
+#define	WT_APIMASK_DB_DUMP				0x00000003
 #define	WT_APIMASK_DB_OPEN				0x00000001
 #define	WT_APIMASK_DBT					0x00000000
 #define	WT_APIMASK_ENV					0x00000000
