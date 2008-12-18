@@ -26,6 +26,7 @@
 #include "query.h"
 #include "introspect.h"
 #include <time.h>
+#include "db.h"
 
 /* TODO: FIX cleanup of clientCursors when hit the end. (ntoreturn insufficient) */
 
@@ -35,6 +36,9 @@ CCById clientCursorsById;
 
 typedef multimap<DiskLoc, ClientCursor*> ByLoc;
 ByLoc byLoc;
+unsigned byLocSize() { 
+    return byLoc.size();
+}
 
 void ClientCursor::setLastLoc(DiskLoc L) { 
 	if( L == _lastLoc ) 
@@ -90,12 +94,23 @@ void aboutToDeleteBucket(const DiskLoc& b) {
 
 /* must call this on a delete so we clean up the cursors. */
 void aboutToDelete(const DiskLoc& dl) { 
+    ByLoc::iterator j = byLoc.lower_bound(dl);
+    ByLoc::iterator stop = byLoc.upper_bound(dl);
+    if( j == stop ) 
+        return;
+
+    assert( dbMutexInfo.isLocked() );
 	vector<ClientCursor*> toAdvance;
 
-	for( ByLoc::iterator i = byLoc.lower_bound(dl); 
-		i != byLoc.upper_bound(dl); ++i ) { 
-			toAdvance.push_back(i->second);
+    while( 1 ) {
+        toAdvance.push_back(j->second);
+        WIN assert( j->first == dl ); 
+        ++j;
+        if( j == stop ) 
+            break;
 	}
+
+    wassert( toAdvance.size() < 5000 );
 
 	for( vector<ClientCursor*>::iterator i = toAdvance.begin();
 		i != toAdvance.end(); ++i ) 

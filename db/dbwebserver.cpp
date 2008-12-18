@@ -84,6 +84,15 @@ void statsThread() {
     }
 }
 
+unsigned byLocSize();
+
+bool _bold;
+string bold(bool x) { 
+    _bold = x;
+    return x ? "<b>" : "";
+}
+string bold() { return _bold ? "</b>" : ""; }
+
 class DbWebServer : public MiniWebServer { 
 public:
     // caller locks
@@ -93,6 +102,7 @@ public:
             ss << "curclient: " << database->name;
             ss << '\n';
         }
+        ss << bold(byLocSize()>10000) << "Cursors byLoc.size(): " << byLocSize() << bold() << '\n';
         ss << "\n<b>replication</b>\n";
         ss << "master: " << master << '\n';
         ss << "slave:  " << slave << '\n';
