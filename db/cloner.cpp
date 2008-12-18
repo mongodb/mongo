@@ -129,8 +129,8 @@ auto_ptr< DBClientCursor > Cloner::createCursor( bool masterSameProcess, const c
 	} else {
 		c = auto_ptr<DBClientCursor>( new DBClientCursor( new DirectConnector(), ns,
 														   emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 ) );
+		c->init();
 	}
-	c->init();
 	return c;
 }
 
