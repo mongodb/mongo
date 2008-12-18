@@ -24,13 +24,16 @@
 #include "query.h"
 #include "commands.h"
 #include "db.h"
+#include "instance.h"
 #include "repl.h"
 
 extern int port;
 
 class Cloner: boost::noncopyable { 
 	DBClientConnection conn;
-	void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl, bool slaveOk);
+	void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
+			  bool masterSameProcess, bool slaveOk);
+	auto_ptr<DBClientCursor> createCursor(bool masterSameProcess, const char *ns, bool slaveOk);
 public:
 	Cloner() { }
 
@@ -76,11 +79,11 @@ BSONObj fixindex(BSONObj o) {
 /* copy the specified collection 
    isindex - if true, this is system.indexes collection.
 */
-void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool slaveOk) {
+void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk) {
 	auto_ptr<DBClientCursor> c;
     {
         dbtemprelease r;
-        c = auto_ptr<DBClientCursor>( conn.query(from_collection, emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0) );\
+        c = createCursor( masterSameProcess, from_collection, slaveOk );
     }
 	assert( c.get() );
     while( 1 ) {
@@ -109,12 +112,35 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
     }
 }
 
-bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOK) { 
+class DirectConnector : public DBClientCursor::Connector {
+	virtual bool send( Message &toSend, Message &response, bool assertOk=true ) {
+		DbResponse dbResponse;
+		assembleResponse( toSend, dbResponse );
+		assert( dbResponse.response );
+		response = *dbResponse.response;
+		return true;
+	}
+};
+
+auto_ptr< DBClientCursor > Cloner::createCursor( bool masterSameProcess, const char *ns, bool slaveOk ) {
+	auto_ptr< DBClientCursor > c;
+	if ( !masterSameProcess ) {
+		c = auto_ptr<DBClientCursor>( conn.query(ns, emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0) );
+	} else {
+		c = auto_ptr<DBClientCursor>( new DBClientCursor( new DirectConnector(), ns,
+														   emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 ) );
+	}
+	c->init();
+	return c;
+}
+
+bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk) { 
 	string todb = database->name;
     stringstream a,b;
     a << "localhost:" << port;
     b << "127.0.0.1:" << port;
-	if( a.str() == masterHost || b.str() == masterHost ) { 
+	bool masterSameProcess = ( a.str() == masterHost || b.str() == masterHost );
+	if( masterSameProcess ) { 
         if( fromdb == todb && database->path == dbpath ) {
             // guard against an "infinite" loop
             /* if you are replicating, the local.sources config may be wrong if you get this */
@@ -129,9 +155,10 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
 	auto_ptr<DBClientCursor> c;
     {
         dbtemprelease r;
-        if( !conn.connect(masterHost, errmsg) )
-            return false;
-        c = auto_ptr<DBClientCursor>( conn.query(ns.c_str(), emptyObj, 0, 0, 0, slaveOK ? Option_SlaveOk : 0) );
+		if ( !masterSameProcess )
+			if( !conn.connect(masterHost, errmsg) )
+				return false;
+		c = createCursor( masterSameProcess, ns.c_str(), slaveOk );
     }
 	if( c.get() == 0 ) {
 		errmsg = "query failed " + ns;
@@ -175,13 +202,13 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
 			string err;
 			userCreateNS(to_name.c_str(), options, err, logForRepl);
 		}
-		copy(from_name, to_name.c_str(), false, logForRepl, slaveOK);
+		copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk);
 	}
 
 	// now build the indexes
 	string system_indexes_from = fromdb + ".system.indexes";
 	string system_indexes_to = todb + ".system.indexes";
-	copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, slaveOK);
+	copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, masterSameProcess, slaveOk);
 
 	return true;
 }

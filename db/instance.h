@@ -73,6 +73,8 @@ struct DbResponse {
 	~DbResponse() { delete response; }
 };
 
+bool assembleResponse( Message &m, DbResponse &dbresponse );
+
 void receivedKillCursors(Message& m);
 void receivedUpdate(Message& m, stringstream& ss);
 void receivedDelete(Message& m);

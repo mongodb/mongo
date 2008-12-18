@@ -99,9 +99,21 @@ void DBClientConnection::checkConnection() {
         log() << "reconnect " << serverAddress << " ok" << endl;
 }
 
-auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions) {
+auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, BSONObj query, int nToReturn,
+												   int nToSkip, BSONObj *fieldsToReturn, int queryOptions) {
     checkConnection();
 
+	auto_ptr<DBClientCursor> c( new DBClientCursor( new CursorConnector( this ),
+												   ns, query, nToReturn, nToSkip,
+												   fieldsToReturn, queryOptions ) );
+	if( c->init() )
+		return c;
+	return auto_ptr< DBClientCursor >( 0 );
+}
+
+/* -- DBClientCursor ---------------------------------------------- */
+
+void assembleRequest( const char *ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
 	// see query.h for the protocol we are using here.
 	BufBuilder b;
     int opts = queryOptions;
@@ -113,38 +125,55 @@ auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, BSONObj query
 	query.appendSelfToBufBuilder(b);
 	if( fieldsToReturn )
 		fieldsToReturn->appendSelfToBufBuilder(b);
-	Message toSend;
 	toSend.setData(dbQuery, b.buf(), b.len());
-	auto_ptr<Message> response(new Message());
-    if( !p->call(toSend, *response) ) {
-        failed = true;
-		return auto_ptr<DBClientCursor>(0);
-    }
-
-	auto_ptr<DBClientCursor> c(new DBClientCursor(this, *p.get(), response, opts));
-	c->ns = ns;
-	c->nToReturn = nToReturn;
-	return c;
 }
 
-/* -- DBClientCursor ---------------------------------------------- */
+bool DBClientConnection::CursorConnector::send( Message &toSend, Message &response, bool assertOk ) {
+    if( !conn->port().call(toSend, response) ) {
+        conn->failed = true;
+		if( assertOk )
+			massert("dbclient error communicating with server", false);
+		return false;
+    }
+	return true;
+}
+
+void DBClientConnection::CursorConnector::checkResponse( const char *data, int nReturned ) {
+    /* check for errors.  the only one we really care about at 
+	 this stage is "not master" */
+    if( conn->clientPaired && nReturned ) {
+        BSONObj o(data);
+        BSONElement e = o.firstElement();
+        if( strcmp(e.fieldName(), "$err") == 0 && 
+		   e.type() == String && strncmp(e.valuestr(), "not master", 10) == 0 ) {
+			conn->clientPaired->isntMaster();
+        }
+    }
+}
+
+bool DBClientCursor::init() {
+	Message toSend;
+	assembleRequest( ns, query, nToReturn, nToSkip, fieldsToReturn, opts, toSend );
+	if( !connector->send( toSend, *m, false ) )
+		return false;
+	
+	dataReceived();
+	return true;
+}
 
 void DBClientCursor::requestMore() { 
 	assert( cursorId && pos == nReturned );
 
 	BufBuilder b;
     b.append(opts);
-	b.append(ns.c_str());
+	b.append(ns);
 	b.append(nToReturn);
 	b.append(cursorId);
 
 	Message toSend;
 	toSend.setData(dbGetMore, b.buf(), b.len());
 	auto_ptr<Message> response(new Message());
-    if( !p.call(toSend, *response) ) {
-        conn->failed = true;
-        massert("dbclient error communicating with server", false);
-    }
+	connector->send( toSend, *response );
 
 	m = response;
 	dataReceived();
@@ -166,17 +195,7 @@ void DBClientCursor::dataReceived() {
 	pos = 0;
 	data = qr->data();
 
-    /* check for errors.  the only one we really care about at 
-       this stage is "not master" */
-    if( conn->clientPaired && nReturned ) {
-        BSONObj o(data);
-        BSONElement e = o.firstElement();
-        if( strcmp(e.fieldName(), "$err") == 0 && 
-            e.type() == String && strncmp(e.valuestr(), "not master", 10) == 0 ) {
-                conn->clientPaired->isntMaster();
-        }
-    }
-
+	connector->checkResponse( data, nReturned );
 	/* this assert would fire the way we currently work:
 	    assert( nReturned || cursorId == 0 );
     */

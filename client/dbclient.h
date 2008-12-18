@@ -52,30 +52,8 @@ struct QueryResult : public MsgData {
 };
 #pragma pack(pop)
 
-class DBClientConnection;
 class DBClientCursor : boost::noncopyable { 
-	friend class DBClientConnection;
-	DBClientConnection *conn;
-	MessagingPort& p;
-	long long cursorId;
-	int nReturned;
-	int pos;
-	const char *data;
-	auto_ptr<Message> m;
-    int opts;
-	string ns;
-	int nToReturn;
-	void dataReceived();
-	void requestMore();
-
-	DBClientCursor(DBClientConnection *_conn, MessagingPort& _p, auto_ptr<Message> _m, int _opts) : 
-      conn(_conn), p(_p), m(_m), opts(_opts) { 
-          cursorId = 0;
-          dataReceived(); 
-      }
-
 public:
-
 	bool more(); // if true, safe to call next()
 
     /* returns next object in the result cursor.
@@ -100,6 +78,44 @@ public:
 	bool isDead() const { return cursorId == 0; }
 
 	bool tailable() const { return (opts & Option_CursorTailable) != 0; }
+
+	bool init();
+	
+	class Connector {
+	public:
+		virtual bool send( Message &toSend, Message &response, bool assertOk=true ) = 0;
+		virtual void checkResponse( const char *data, int nReturned ) {}
+	};
+		
+	DBClientCursor( Connector *_connector, const char * _ns, BSONObj _query, int _nToReturn,
+				   int _nToSkip, BSONObj *_fieldsToReturn, int queryOptions ) :
+	connector(_connector),
+	ns(_ns),
+	query(_query),
+	nToReturn(_nToReturn),
+	nToSkip(_nToSkip),
+	fieldsToReturn(_fieldsToReturn),
+	opts(queryOptions),
+	m(new Message()) {
+		cursorId = 0;
+	}
+
+private:
+	auto_ptr< Connector > connector;
+	const char * ns;
+	BSONObj query;
+	int nToReturn;
+	int nToSkip;
+	BSONObj *fieldsToReturn;
+    int opts;
+	auto_ptr<Message> m;
+	
+	long long cursorId;
+	int nReturned;
+	int pos;
+	const char *data;
+	void dataReceived();
+	void requestMore();	
 };
 
 class DBClientInterface : boost::noncopyable { 
@@ -128,7 +144,6 @@ public:
 class DBClientPaired;
 
 class DBClientConnection : public DBClientWithCommands { 
-    friend class DBClientCursor; 
     DBClientPaired *clientPaired;
 	auto_ptr<MessagingPort> p;
 	auto_ptr<SockAddr> server;
@@ -174,18 +189,27 @@ public:
 	*/
     /*throws AssertionException*/
 	auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0, 
-		BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+								   BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
     /*throws AssertionException*/
 	virtual
 	  BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+private:
+	class CursorConnector : public DBClientCursor::Connector {
+		DBClientConnection *conn;
+		virtual bool send( Message &toSend, Message &response, bool assertOk = true );
+		virtual void checkResponse( const char *data, int nReturned );
+	public:
+		CursorConnector( DBClientConnection *_conn ) :
+		conn( _conn ) {
+		}
+	};
 };
 
 /* Use this class to connect to a replica pair of servers.  The class will manage 
    checking for which is master, and do failover automatically.
 */
 class DBClientPaired : public DBClientWithCommands { 
-    friend class DBClientCursor;
     DBClientConnection left,right;
     enum State { 
         NotSetL=0, 
@@ -196,11 +220,6 @@ class DBClientPaired : public DBClientWithCommands {
     void _checkMaster();
     DBClientConnection& checkMaster();
 
-    /* notification that we got a "not master" error. 
-    */
-    void isntMaster() { 
-        master = ( ( master == Left ) ? NotSetR : NotSetL ); 
-    }
 public:
     DBClientPaired();
 
@@ -221,6 +240,12 @@ public:
 	BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
     string toString();
+	
+	/* notification that we got a "not master" error. 
+	 */
+    void isntMaster() { 
+        master = ( ( master == Left ) ? NotSetR : NotSetL ); 
+    }	
 };
 
 
