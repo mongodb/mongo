@@ -34,10 +34,8 @@ __wt_db_page_verify(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
 			ret = WT_ERROR;
 		}
 		/* FALLTHROUGH */
-	case WT_PAGE_ROOT:
 	case WT_PAGE_INT:
 	case WT_PAGE_LEAF:
-	case WT_PAGE_DUP_ROOT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 		break;
@@ -112,8 +110,7 @@ __wt_db_item_walk(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
 	last_key = &_c;
 
 	/* Set the comparison function. */
-	if (hdr->type == WT_PAGE_DUP_ROOT ||
-	    hdr->type == WT_PAGE_DUP_INT ||
+	if (hdr->type == WT_PAGE_DUP_INT ||
 	    hdr->type == WT_PAGE_DUP_LEAF)
 		func = db->dup_compare;
 	else
@@ -132,18 +129,20 @@ __wt_db_item_walk(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
 		switch (item->type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
+			if (hdr->type != WT_PAGE_LEAF &&
+			    hdr->type != WT_PAGE_INT)
+				goto item_vs_page;
+			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DUP_OFFPAGE:
-			if (hdr->type != WT_PAGE_ROOT &&
-			    hdr->type != WT_PAGE_LEAF)
+		case WT_ITEM_OFFPAGE:
+			if (hdr->type != WT_PAGE_LEAF &&
+			    hdr->type != WT_PAGE_INT)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
-			if (hdr->type != WT_PAGE_ROOT &&
-			    hdr->type != WT_PAGE_LEAF &&
-			    hdr->type != WT_PAGE_DUP_ROOT &&
+			if (hdr->type != WT_PAGE_LEAF &&
 			    hdr->type != WT_PAGE_DUP_INT &&
 			    hdr->type != WT_PAGE_DUP_LEAF) {
 item_vs_page:			__wt_db_errx(db,
@@ -154,11 +153,6 @@ item_vs_page:			__wt_db_errx(db,
 				    __wt_db_hdr_type(hdr->type));
 				goto err;
 			}
-			break;
-		case WT_ITEM_INT:
-			if (hdr->type != WT_PAGE_ROOT &&
-			    hdr->type != WT_PAGE_INT)
-				goto item_vs_page;
 			break;
 		default:
 			goto item_type;
@@ -177,11 +171,7 @@ item_vs_page:			__wt_db_errx(db,
 			if (item->len != sizeof(WT_ITEM_OVFL))
 				goto item_len;
 			break;
-		case WT_ITEM_INT:
-			if (item->len != sizeof(WT_ITEM_INT))
-				goto item_len;
-			break;
-		case WT_ITEM_DUP_OFFPAGE:
+		case WT_ITEM_OFFPAGE:
 			if (item->len != sizeof(WT_ITEM_OFFP)) {
 item_len:			__wt_db_errx(db,
 				    "item %lu on page at addr %lu has an "
@@ -214,8 +204,7 @@ eop:			__wt_db_errx(db,
 		}
 
 		/* Some items aren't sorted on the page. */
-		if (item->type == WT_ITEM_INT ||
-		    item->type == WT_ITEM_DATA ||
+		if (item->type == WT_ITEM_DATA ||
 		    item->type == WT_ITEM_DATA_OVFL)
 			continue;
 
@@ -225,7 +214,7 @@ eop:			__wt_db_errx(db,
 		 * dups in the off-page dup set against the data items on this
 		 * page.
 		 */
-		if (item->type == WT_ITEM_DUP_OFFPAGE)
+		if (item->type == WT_ITEM_OFFPAGE)
 			continue;
 
 		/* Get a DBT that represents this item. */

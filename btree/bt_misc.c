@@ -52,14 +52,10 @@ __wt_db_hdr_type(u_int32_t type)
 		return ("invalid");
 	case WT_PAGE_OVFL:
 		return ("overflow");
-	case WT_PAGE_ROOT:
-		return ("primary root");
 	case WT_PAGE_INT:
 		return ("primary internal");
 	case WT_PAGE_LEAF:
 		return ("primary leaf");
-	case WT_PAGE_DUP_ROOT:
-		return ("off-page duplicate root");
 	case WT_PAGE_DUP_INT:
 		return ("off-page duplicate internal");
 	case WT_PAGE_DUP_LEAF:
@@ -90,8 +86,8 @@ __wt_db_item_type(u_int32_t type)
 		return ("data-overflow");
 	case WT_ITEM_DUP_OVFL:
 		return ("duplicate-overflow");
-	case WT_ITEM_DUP_OFFPAGE:
-		return ("duplicate-offpage");
+	case WT_ITEM_OFFPAGE:
+		return ("offpage");
 	default:
 		break;
 	}
