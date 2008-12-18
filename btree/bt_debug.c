@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static void __wt_db_dump_item_data (DB *, WT_ITEM *, FILE *);
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_db_force_load --
@@ -21,13 +23,12 @@ __wt_db_force_load()
 }
 
 /*
- * __wt_db_dump_db --
+ * __wt_db_dump_debug --
  *	Dump a database in debugging mode.
  */
 int
-__wt_db_dump_db(DB *db, char *ofile)
+__wt_db_dump_debug(DB *db, FILE *stream)
 {
-	FILE *fp;
 	WT_BTREE *bt;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr;
@@ -35,17 +36,14 @@ __wt_db_dump_db(DB *db, char *ofile)
 
 	bt = db->idb->btree;
 
-	if ((fp = fopen(ofile, "w")) == NULL)
-		return (WT_ERROR);
-
-	for (addr = WT_BTREE_ROOT;;) {
+	for (addr = WT_ADDR_FIRST_PAGE;;) {
 		if ((ret =
 		    __wt_db_fread(bt, addr, WT_FRAGS_PER_PAGE(db), &hdr)) != 0)
 			break;
 
-		fprintf(fp, "====== %lu\n",  (u_long)addr);
+		fprintf(stream, "====== %lu\n",  (u_long)addr);
 
-		if ((ret = __wt_db_dump_page(db, hdr, NULL, fp)) != 0)
+		if ((ret = __wt_db_dump_page(db, hdr, NULL, stream)) != 0)
 			break;
 
 		addr = hdr->nextaddr;
@@ -55,7 +53,6 @@ __wt_db_dump_db(DB *db, char *ofile)
 			break;
 	}
 
-	(void)fclose(fp);
 	return (ret);
 }
 
@@ -120,10 +117,11 @@ __wt_db_dump_page(DB *db, WT_PAGE_HDR *hdr, char *ofile, FILE *fp)
 
 	for (p = WT_PAGE_BYTE(hdr), i = 1; i <= hdr->u.entries; ++i) {
 		item = (WT_ITEM *)p;
-		fprintf(fp, "%6lu: {type %s; len %lu; off %lu}\n",
+		fprintf(fp, "%6lu: {type %s; len %lu; off %lu}\n\t{",
 		    (u_long)i, __wt_db_item_type(item->type),
 		    (u_long)item->len, (u_long)(p - (u_int8_t *)hdr));
-		__wt_db_dump_item(db, item, fp);
+		__wt_db_dump_item_data(db, item, fp);
+		fprintf(fp, "}\n");
 		p += WT_ITEM_SPACE_REQ(item->len);
 	}
 
@@ -140,6 +138,24 @@ __wt_db_dump_page(DB *db, WT_PAGE_HDR *hdr, char *ofile, FILE *fp)
 void
 __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 {
+	if (fp == NULL)
+		fp = stdout;
+
+	fprintf(fp, "%s {", __wt_db_item_type(item->type));
+
+	__wt_db_dump_item_data(db, item, fp);
+
+	fprintf(fp, "}\n");
+}
+
+
+/*
+ * __wt_db_dump_item_data --
+ *	Dump an item's data.
+ */
+static void
+__wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
+{
 	WT_BTREE *bt;
 	WT_ITEM_OVFL *item_ovfl;
 	WT_ITEM_OFFP *item_offp;
@@ -147,11 +163,6 @@ __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 	u_int32_t addr, frags;
 
 	bt = db->idb->btree;
-
-	if (fp == NULL)
-		fp = stdout;
-
-	fprintf(fp, "\t%s {", __wt_db_item_type(item->type));
 
 	switch (item->type) {
 	case WT_ITEM_KEY:
@@ -163,15 +174,15 @@ __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
 		item_ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-		fprintf(fp, "addr: %lu, len %lu\n",
+		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)item_ovfl->addr, (u_long)item_ovfl->len);
 		WT_OVERFLOW_BYTES_TO_FRAGS(db, item_ovfl->len, frags);
 		if (__wt_db_fread(bt, item_ovfl->addr, frags, &hdr) == 0) {
-			__wt_db_print(WT_PAGE_BYTE(hdr), item->len, fp);
+			__wt_db_print(WT_PAGE_BYTE(hdr), item_ovfl->len, fp);
 			(void)__wt_db_fdiscard(bt, addr, hdr);
 		}
 		break;
-	case WT_ITEM_DUP_OFFPAGE:
+	case WT_ITEM_OFFPAGE:
 		item_offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
 		fprintf(fp, "addr: %lu, records %lu",
 		    (u_long)item_offp->addr, (u_long)item_offp->records);
@@ -180,7 +191,6 @@ __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 		fprintf(fp, "unsupported type");
 		break;
 	}
-	fprintf(fp, "}\n");
 }
 
 /*
