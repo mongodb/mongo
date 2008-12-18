@@ -14,10 +14,10 @@
  *	Allocate and initialize a new in-memory Btree page.
  */
 int
-__wt_db_page_alloc(DB *db, WT_PAGE_INMEM **ipp)
+__wt_db_page_alloc(DB *db, WT_PAGE **ipp)
 {
 	IENV *ienv;
-	WT_PAGE_INMEM *ip;
+	WT_PAGE *ip;
 	int ret;
 	void *p;
 
@@ -26,13 +26,13 @@ __wt_db_page_alloc(DB *db, WT_PAGE_INMEM **ipp)
 	/*
 	 * Allocate memory for the page and in-memory structures; put the page
 	 * first so it's appropriately aligned for direct I/O, followed by the
-	 * WT_PAGE_INMEM structure.
+	 * WT_PAGE structure.
 	 */
 	if ((ret = __wt_calloc(
-	    ienv, 1, (size_t)db->pagesize + sizeof(WT_PAGE_INMEM), &p)) != 0)
+	    ienv, 1, (size_t)db->pagesize + sizeof(WT_PAGE), &p)) != 0)
 		return (ret);
 
-	ip = (WT_PAGE_INMEM *)((u_int8_t *)p + db->pagesize);
+	ip = (WT_PAGE*)((u_int8_t *)p + db->pagesize);
 
 	/*
 	 * We allocate a pointer for every 30 bytes (or, in other words, assume
@@ -44,7 +44,7 @@ __wt_db_page_alloc(DB *db, WT_PAGE_INMEM **ipp)
 		goto err;
 
 	ip->space_avail = db->pagesize - sizeof(WT_PAGE_HDR);
-	ip->page = p;
+	ip->hdr = p;
 
 	*ipp = ip;
 	return (0);
@@ -58,7 +58,7 @@ err:	__wt_free(ienv, p);
  *	Free an in-memory Btree page.
  */
 int
-__wt_db_page_free(DB *db, WT_PAGE_INMEM *ip)
+__wt_db_page_free(DB *db, WT_PAGE *ip)
 {
 	IENV *ienv;
 
@@ -66,6 +66,6 @@ __wt_db_page_free(DB *db, WT_PAGE_INMEM *ip)
 	 * The page comes first in the memory chunk to get better alignment,
 	 * so it's what we free.
 	 */
-	__wt_free(ienv, ip->page);
+	__wt_free(ienv, ip->hdr);
 	return (0);
 }
