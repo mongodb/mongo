@@ -16,6 +16,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#pragma once
+
 /* this is an "accessor" class to data held in local.dbinfo.<dbname>
 
    system.dbinfo contains:

@@ -115,6 +115,7 @@ void pdfileInit();
 void listen(int port) { 
 	const char *Version = "db version: 122";
 	problem() << Version << endl;
+	problem() << "pdfile version " << VERSION << "." << VERSION_MINOR << endl;
 	pdfileInit();
 	//testTheDb();
 	log() << "waiting for connections on port " << port << "..." << endl;
@@ -270,7 +271,30 @@ void setupSignals() {
 void setupSignals() {}
 #endif
 
-void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
+
+void repairDatabases() {
+	dblock lk;
+	boost::filesystem::path path( dbpath );
+	for( boost::filesystem::directory_iterator i( path );
+		i != boost::filesystem::directory_iterator(); ++i ) {
+		string fileName = i->leaf();
+		if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" ) {
+			string dbName = fileName.substr( 0, fileName.length() - 3 );
+			assert( !setClientTempNs( dbName.c_str() ) );
+			PhysicalDataFile *p = database->getFile( 0 );
+			PDFHeader *h = p->getHeader();
+			if ( !h->currentVersion() ) {
+				// QUESTION: Repair even if file format is higher version than code?
+				cout << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << endl;
+				repairDatabase( dbName.c_str() );
+			} else {
+				closeClient( dbName.c_str() );
+			}
+		}
+	}
+}
+
+void initAndListen(int listenPort, const char *appserverLoc = null) { 
   if( opLogging ) 
     log() << "opLogging = " << opLogging << endl;
   _oplog.init();
@@ -295,6 +319,8 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
     }
 
 	setupSignals();
+	
+	repairDatabases();
 
     listen(listenPort);    
 }
@@ -422,7 +448,7 @@ int main(int argc, char* argv[], char *envp[] )
 			}
         }
         
-        initAndListen(port, dbpath, appsrvPath);
+        initAndListen(port, appsrvPath);
         
 		exit(0);
 	}

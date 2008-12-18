@@ -188,6 +188,23 @@ void receivedKillCursors(Message& m) {
 	killCursors(n, (long long *) x);
 }
 
+void closeClient( const char *cl, const char *path ) {
+    /* reset haveLogged in local.dbinfo */
+    if( string("local") != cl ) {
+        DBInfo i(cl);
+        i.dbDropped();
+    }
+	
+	/* important: kill all open cursors on the database */
+	string prefix(cl);
+	prefix += '.';
+	ClientCursor::invalidate(prefix.c_str());
+	
+	eraseDatabase( cl, path );
+	delete database; // closes files
+	database = 0;
+}
+
 void receivedUpdate(Message& m, stringstream& ss) {
 	DbMessage d(m);
 	const char *ns = d.getns();
