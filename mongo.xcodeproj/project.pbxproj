@@ -54,7 +54,6 @@
 		934223B90EF16DB400608550 /* minilex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = minilex.h; sourceTree = "<group>"; };
 		934223BA0EF16DB400608550 /* namespace.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespace.cpp; sourceTree = "<group>"; };
 		934223BB0EF16DB400608550 /* namespace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = namespace.h; sourceTree = "<group>"; };
-		934223BC0EF16DB400608550 /* pcre.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = pcre.txt; sourceTree = "<group>"; };
 		934223BD0EF16DB400608550 /* pdfile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = pdfile.cpp; sourceTree = "<group>"; };
 		934223BE0EF16DB400608550 /* pdfile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = pdfile.h; sourceTree = "<group>"; };
 		934223BF0EF16DB400608550 /* query.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = query.cpp; sourceTree = "<group>"; };
@@ -68,6 +67,32 @@
 		934223C70EF16DB400608550 /* scanandorder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = scanandorder.h; sourceTree = "<group>"; };
 		934223C80EF16DB400608550 /* storage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = storage.h; sourceTree = "<group>"; };
 		934223C90EF16DB400608550 /* tests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tests.cpp; sourceTree = "<group>"; };
+		934DD8690EFAD21900459CC1 /* dbgrid.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbgrid.cpp; sourceTree = "<group>"; };
+		934DD86B0EFAD21900459CC1 /* dbgrid_commands.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbgrid_commands.cpp; sourceTree = "<group>"; };
+		934DD86C0EFAD21900459CC1 /* gridconfig.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = gridconfig.cpp; sourceTree = "<group>"; };
+		934DD86D0EFAD21900459CC1 /* gridconfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gridconfig.h; sourceTree = "<group>"; };
+		934DD86E0EFAD21900459CC1 /* griddatabase.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = griddatabase.cpp; sourceTree = "<group>"; };
+		934DD86F0EFAD21900459CC1 /* griddatabase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = griddatabase.h; sourceTree = "<group>"; };
+		934DD8700EFAD21900459CC1 /* request.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = request.cpp; sourceTree = "<group>"; };
+		934DD8710EFAD21900459CC1 /* shard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = shard.cpp; sourceTree = "<group>"; };
+		934DD8720EFAD21900459CC1 /* shard.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = shard.h; sourceTree = "<group>"; };
+		934DD8760EFAD22900459CC1 /* message.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = message.cpp; sourceTree = "<group>"; };
+		934DD8770EFAD22900459CC1 /* message.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = message.h; sourceTree = "<group>"; };
+		934DD87C0EFAD23B00459CC1 /* background.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = background.cpp; sourceTree = "<group>"; };
+		934DD87D0EFAD23B00459CC1 /* background.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = background.h; sourceTree = "<group>"; };
+		934DD87F0EFAD23B00459CC1 /* builder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = builder.h; sourceTree = "<group>"; };
+		934DD8800EFAD23B00459CC1 /* goodies.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = goodies.h; sourceTree = "<group>"; };
+		934DD8810EFAD23B00459CC1 /* hashtab.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashtab.h; sourceTree = "<group>"; };
+		934DD8820EFAD23B00459CC1 /* log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = log.h; sourceTree = "<group>"; };
+		934DD8830EFAD23B00459CC1 /* lruishmap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lruishmap.h; sourceTree = "<group>"; };
+		934DD8840EFAD23B00459CC1 /* miniwebserver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = miniwebserver.cpp; sourceTree = "<group>"; };
+		934DD8850EFAD23B00459CC1 /* miniwebserver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = miniwebserver.h; sourceTree = "<group>"; };
+		934DD8870EFAD23B00459CC1 /* mmap.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = mmap.cpp; sourceTree = "<group>"; };
+		934DD8880EFAD23B00459CC1 /* mmap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mmap.h; sourceTree = "<group>"; };
+		934DD88A0EFAD23B00459CC1 /* sock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = sock.cpp; sourceTree = "<group>"; };
+		934DD88B0EFAD23B00459CC1 /* sock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = sock.h; sourceTree = "<group>"; };
+		934DD88D0EFAD23B00459CC1 /* unittest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = unittest.h; sourceTree = "<group>"; };
+		934DD88E0EFAD23B00459CC1 /* util.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = util.cpp; sourceTree = "<group>"; };
 		93D0C1520EF1D377005253B7 /* jsobjtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobjtests.cpp; sourceTree = "<group>"; };
 		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
@@ -89,7 +114,10 @@
 			children = (
 				9342232A0EF16D4F00608550 /* client */,
 				9342238F0EF16DB400608550 /* db */,
+				934DD8680EFAD21900459CC1 /* dbgrid */,
 				934223850EF16D7000608550 /* dbtests */,
+				934DD8750EFAD22900459CC1 /* grid */,
+				934DD87B0EFAD23B00459CC1 /* util */,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -167,7 +195,6 @@
 				934223B90EF16DB400608550 /* minilex.h */,
 				934223BA0EF16DB400608550 /* namespace.cpp */,
 				934223BB0EF16DB400608550 /* namespace.h */,
-				934223BC0EF16DB400608550 /* pcre.txt */,
 				934223BD0EF16DB400608550 /* pdfile.cpp */,
 				934223BE0EF16DB400608550 /* pdfile.h */,
 				934223BF0EF16DB400608550 /* query.cpp */,
@@ -183,6 +210,53 @@
 				934223C90EF16DB400608550 /* tests.cpp */,
 			);
 			path = db;
+			sourceTree = "<group>";
+		};
+		934DD8680EFAD21900459CC1 /* dbgrid */ = {
+			isa = PBXGroup;
+			children = (
+				934DD8690EFAD21900459CC1 /* dbgrid.cpp */,
+				934DD86B0EFAD21900459CC1 /* dbgrid_commands.cpp */,
+				934DD86C0EFAD21900459CC1 /* gridconfig.cpp */,
+				934DD86D0EFAD21900459CC1 /* gridconfig.h */,
+				934DD86E0EFAD21900459CC1 /* griddatabase.cpp */,
+				934DD86F0EFAD21900459CC1 /* griddatabase.h */,
+				934DD8700EFAD21900459CC1 /* request.cpp */,
+				934DD8710EFAD21900459CC1 /* shard.cpp */,
+				934DD8720EFAD21900459CC1 /* shard.h */,
+			);
+			path = dbgrid;
+			sourceTree = "<group>";
+		};
+		934DD8750EFAD22900459CC1 /* grid */ = {
+			isa = PBXGroup;
+			children = (
+				934DD8760EFAD22900459CC1 /* message.cpp */,
+				934DD8770EFAD22900459CC1 /* message.h */,
+			);
+			path = grid;
+			sourceTree = "<group>";
+		};
+		934DD87B0EFAD23B00459CC1 /* util */ = {
+			isa = PBXGroup;
+			children = (
+				934DD87C0EFAD23B00459CC1 /* background.cpp */,
+				934DD87D0EFAD23B00459CC1 /* background.h */,
+				934DD87F0EFAD23B00459CC1 /* builder.h */,
+				934DD8800EFAD23B00459CC1 /* goodies.h */,
+				934DD8810EFAD23B00459CC1 /* hashtab.h */,
+				934DD8820EFAD23B00459CC1 /* log.h */,
+				934DD8830EFAD23B00459CC1 /* lruishmap.h */,
+				934DD8840EFAD23B00459CC1 /* miniwebserver.cpp */,
+				934DD8850EFAD23B00459CC1 /* miniwebserver.h */,
+				934DD8870EFAD23B00459CC1 /* mmap.cpp */,
+				934DD8880EFAD23B00459CC1 /* mmap.h */,
+				934DD88A0EFAD23B00459CC1 /* sock.cpp */,
+				934DD88B0EFAD23B00459CC1 /* sock.h */,
+				934DD88D0EFAD23B00459CC1 /* unittest.h */,
+				934DD88E0EFAD23B00459CC1 /* util.cpp */,
+			);
+			path = util;
 			sourceTree = "<group>";
 		};
 		C6859E8C029090F304C91782 /* Documentation */ = {
