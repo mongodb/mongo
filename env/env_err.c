@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-#define	WT_ERR(env, error, fmt) {					\
+#define	WT_ENV_ERR(env, error, fmt) {					\
 	va_list __ap;							\
 									\
 	/* Application-specified callback function. */			\
@@ -39,7 +39,7 @@
 void
 __wt_env_err(ENV *env, int error, const char *fmt, ...)
 {
-	WT_ERR(env, error, fmt);
+	WT_ENV_ERR(env, error, fmt);
 }
 
 /*
@@ -49,5 +49,5 @@ __wt_env_err(ENV *env, int error, const char *fmt, ...)
 void
 __wt_env_errx(ENV *env, const char *fmt, ...)
 {
-	WT_ERR(env, 0, fmt);
+	WT_ENV_ERR(env, 0, fmt);
 }

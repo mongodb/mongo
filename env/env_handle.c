@@ -92,7 +92,7 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 	 */
 	__wt_ienv_destroy(env, 0);
 
-	(void)memset(env, OVERWRITE_BYTE, sizeof(env));
+	memset(env, OVERWRITE_BYTE, sizeof(env));
 	__wt_free(NULL, env);
 
 	return (ret);
