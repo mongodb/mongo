@@ -18,13 +18,14 @@ __wt_calloc(IENV *ienv, size_t number, size_t size, void *retp)
 {
 	void *p;
 
-	LINTQUIET(ienv);
-
-	/*
+	/*lint -esym(715,ienv)
+	 *
+	 * The IENV * argument isn't used, but routines at this layer
+	 * are always passed one.
+	 *
 	 * !!!
 	 * This function MUST handle a NULL IENV structure reference.
 	 */
-
 	if ((p = calloc(number, size)) == NULL)
 		return (WT_ERROR);
 
@@ -52,7 +53,7 @@ __wt_malloc(IENV *ienv, size_t bytes_to_allocate, void *retp)
 		return (WT_ERROR);
 
 #ifdef HAVE_DIAGNOSTIC
-	(void)memset(p, OVERWRITE_BYTE, bytes_to_allocate);
+	memset(p, OVERWRITE_BYTE, bytes_to_allocate);
 #endif
 
 	*(void **)retp = p;
@@ -103,7 +104,7 @@ __wt_strdup(IENV *ienv, const char *str, void *retp)
 	if ((ret = __wt_malloc(ienv, len, &p)) != 0)
 		return (ret);
 
-	(void)memcpy(p, str, len);
+	memcpy(p, str, len);
 
 	*(void **)retp = p;
 	return (0);
@@ -116,12 +117,14 @@ __wt_strdup(IENV *ienv, const char *str, void *retp)
 void
 __wt_free(IENV *ienv, void *p)
 {
-	/*
+	/*lint -esym(715,ienv)
+	 *
+	 * The IENV * argument isn't used, but routines at this layer
+	 * are always passed one.
+	 *
 	 * !!!
 	 * This function MUST handle a NULL IENV structure reference.
 	 */
-	LINTQUIET(ienv);
-
 	if (p != NULL)			/* ANSI C free semantics */
 		free(p);
 }

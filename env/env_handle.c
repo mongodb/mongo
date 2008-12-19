@@ -154,7 +154,10 @@ __wt_ienv_destroy(ENV *env, int refresh)
 void
 __wt_env_config_default(ENV *env)
 {
-	LINTQUIET(env);
+	/*lint -esym(715,env)
+	 *
+	 * The ENV * argument isn't yet used, this routine is a stub.
+	 */
 }
 
 int

@@ -13,7 +13,7 @@ extern "C" {
 
 /* Align a number to a specified power-of-2. */
 #define	WT_ALIGN(n, v)							\
-	(((n) + (v) - 1) & ~(((uintmax_t)(v)) - 1))
+	(((n) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
 
 /*
  * Flag checking for API functions.

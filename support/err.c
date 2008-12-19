@@ -30,6 +30,7 @@ __wt_errcall(void *cb, void *handle,
 
 	len = 0;
 	separator = 0;
+	s[0] = '\0';
 	if (pfx1 != NULL) {
 		len += (size_t)snprintf(s + len, sizeof(s) - len, "%s", pfx1);
 		separator = 1;
@@ -47,6 +48,10 @@ __wt_errcall(void *cb, void *handle,
 		(void)snprintf(
 		    s + len, sizeof(s) - len, ": %s", wt_strerror(error));
 
+	/*lint -e611
+	 *
+	 * lint worries about this cast.
+	 */
 	((void (*)(void *, const char *))cb)(handle, s);
 }
 

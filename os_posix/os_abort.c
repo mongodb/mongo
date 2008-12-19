@@ -16,8 +16,11 @@
 void
 __wt_abort(IENV *ienv)
 {
-	LINTQUIET(ienv);
-
+	/*lint -esym(715,ienv)
+	 *
+	 * ienv isn't referenced, but this layer always takes an ienv
+	 * argument.
+	 */
 	abort();
 	/* NOTREACHED */
 }
