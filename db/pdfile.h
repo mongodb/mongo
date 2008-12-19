@@ -27,7 +27,7 @@
 
 // see version, versionMinor, below.
 const int VERSION = 4;
-const int VERSION_MINOR = 1;
+const int VERSION_MINOR = 2;
 
 #include "../stdafx.h"
 #include "../util/mmap.h"

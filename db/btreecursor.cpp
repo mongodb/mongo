@@ -51,6 +51,7 @@ BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, BS
 	
 	bucket = indexDetails.head.btree()->
 		locate(indexDetails.head, startKey, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
+
 	checkUnused();
 }
 
@@ -78,8 +79,8 @@ void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
 			else
 				findExtremeInequalityValues( e, lowest, highest );
 		}
-		startBuilder.appendAs( forward ? lowest : highest, field );
-		endBuilder.appendAs( forward ? highest : lowest, field );
+		startBuilder.appendAs( forward ? lowest : highest, "" );
+		endBuilder.appendAs( forward ? highest : lowest, "" );
 	}
 	startKey = startBuilder.doneAndDecouple();
 	endKey = endBuilder.doneAndDecouple();
@@ -154,7 +155,7 @@ int sgn( int i ) {
 // Check if the current key is beyond endKey.
 void BtreeCursor::checkEnd() {
 	if ( bucket.isNull() )
-		return;	
+		return;
 	int cmp = sgn( endKey.woCompare( currKey() ) );
 	if ( cmp != 0 && cmp != direction )
 		bucket = DiskLoc();

@@ -330,7 +330,7 @@ public:
 	/* <0: l<r. 0:l==r. >0:l>r 
 	   wo='well ordered'.  fields must be in same order in each object.
 	*/
-	int woCompare(const BSONObj& r) const;
+	int woCompare(const BSONObj& r, bool considerFieldName=true) const;
 
     /* note this is "shallow equality" -- ints and doubles won't match.  for a 
        deep equality test use woCompare (which is slower).
@@ -344,6 +344,9 @@ public:
 	}
 	bool operator==(const BSONObj& r) const { 
 		return this->woEqual(r);
+	}
+	bool operator!=(const BSONObj& r) const {
+		return !operator==( r );
 	}
 
 	BSONElement firstElement() const { 
@@ -404,9 +407,10 @@ public:
 	}
 
     // true unless corrupt
-    bool valid() const;
+	bool valid() const;
 };
-
+ostream& operator<<( ostream &s, const BSONObj &o );
+		
 class BSONObjBuilder { 
 public:
 	BSONObjBuilder(int initsize=512) : b(initsize) { b.skip(4); /*leave room for size field*/ }

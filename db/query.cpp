@@ -89,9 +89,6 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
 				bool reverse = 
 					order.firstElement().number() < 0;
 				BSONObjBuilder b;
-				/* todo: start with the right key, not just beginning of index, when query is also
-				         specified!
-				*/
 				DEV cout << " using index " << d->indexes[i].indexNamespace() << '\n';
 				if( isSorted )
 					*isSorted = true;
@@ -517,13 +514,13 @@ int runCount(const char *ns, BSONObj& cmd, string& err) {
 			   */
 			int count = 0;
 			BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
-			if( c->ok() ) {
-				while( 1 ) {
-					if( !(query == bc->currKeyNode().key) )
+			if( c->ok() && !query.woCompare( bc->currKeyNode().key, false ) ) {
+				BSONObj firstMatch = bc->currKeyNode().key;
+				count++;
+				while ( c->advance() ) {
+					if( firstMatch != bc->currKeyNode().key )
 						break;
 					count++;
-					if( !c->advance() )
-						break;
 				}
 			}
 			return count;

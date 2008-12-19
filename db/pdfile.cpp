@@ -432,7 +432,8 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 	int arrayPos = -1;
 	for( int i = 0; keyIter.more(); ++i ) {
 		BSONElement e = keyIter.next();
-		if( e.eoo() ) break;
+		if( e.eoo() )
+			break;
 		if( e.type() == Array ) {
 			uassert( "Index cannot be created on parallel arrays.",
 					arrayPos == -1 );
@@ -441,27 +442,36 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 		}
 	}
 	if( arrayPos == -1 ) {
-		b.decouple();
-		key.iWillFree();
-		assert( !key.isEmpty() );
-		keys.insert(key);
+		BSONObjBuilder b;
+		BSONObjIterator keyIter( key );
+		while( keyIter.more() ) {
+			BSONElement f = keyIter.next();
+			if ( f.eoo() )
+				break;
+			b.append( f );
+		}
+		BSONObj o = b.doneAndDecouple();
+		assert( !o.isEmpty() );
+		keys.insert(o);
 		return;
 	}
 	BSONObj arr = arrayElt.embeddedObject();
 	BSONObjIterator arrIter(arr);
 	while( arrIter.more() ) { 
 		BSONElement e = arrIter.next();
-		if( e.eoo() ) break;
+		if( e.eoo() )
+			break;
 
 		BSONObjBuilder b;
 		BSONObjIterator keyIter( key );
 		for( int i = 0; keyIter.more(); ++i ) {
 			BSONElement f = keyIter.next();
-			if ( f.eoo() ) break;
+			if ( f.eoo() )
+				break;
 			if ( i != arrayPos )
 				b.append( f );
 			else
-				b.appendAs( e, arrayElt.fieldName() );
+				b.appendAs( e, "" );
 		}
 		
 		BSONObj o = b.doneAndDecouple();
