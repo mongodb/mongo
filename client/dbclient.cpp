@@ -113,13 +113,13 @@ auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, BSONObj query
 
 /* -- DBClientCursor ---------------------------------------------- */
 
-void assembleRequest( const char *ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
+void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
 	// see query.h for the protocol we are using here.
 	BufBuilder b;
     int opts = queryOptions;
     assert( (opts&Option_ALLMASK) == opts );
     b.append(opts);
-	b.append(ns);
+	b.append(ns.c_str());
 	b.append(nToSkip);
 	b.append(nToReturn);
 	query.appendSelfToBufBuilder(b);
@@ -166,7 +166,7 @@ void DBClientCursor::requestMore() {
 
 	BufBuilder b;
     b.append(opts);
-	b.append(ns);
+	b.append(ns.c_str());
 	b.append(nToReturn);
 	b.append(cursorId);
 

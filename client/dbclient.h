@@ -102,7 +102,7 @@ public:
 
 private:
 	auto_ptr< Connector > connector;
-	const char * ns;
+	string ns;
 	BSONObj query;
 	int nToReturn;
 	int nToSkip;
