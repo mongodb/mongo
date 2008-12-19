@@ -16,7 +16,7 @@
 int
 wt_env_create(ENV **envp, u_int32_t flags)
 {
-	static int build_verified;
+	static int build_verified = 0;
 	ENV *env;
 	IENV *ienv;
 	int ret;
@@ -26,7 +26,7 @@ wt_env_create(ENV **envp, u_int32_t flags)
 	 * real work.   The very first time, check the build itself.
 	 */
 	if (!build_verified) {
-		if ((ret = __wt_env_build_verify(ienv)) != 0)
+		if ((ret = __wt_env_build_verify()) != 0)
 			return (ret);
 		build_verified = 1;
 	}
@@ -92,7 +92,7 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 	 */
 	__wt_ienv_destroy(env, 0);
 
-	memset(env, OVERWRITE_BYTE, sizeof(env));
+	(void)memset(env, OVERWRITE_BYTE, sizeof(env));
 	__wt_free(NULL, env);
 
 	return (ret);
@@ -112,6 +112,9 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	/* Free the actual structure. */
 	__wt_free(NULL, ienv);
 	env->ienv = NULL;
+
+	if (!refresh)
+		return;
 
 	/*
 	 * Allocate a new IENV structure on request.
@@ -151,6 +154,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
 void
 __wt_env_config_default(ENV *env)
 {
+	LINTQUIET(env);
 }
 
 int

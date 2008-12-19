@@ -9,8 +9,6 @@
 
 #include "wt_internal.h"
 
-#define	__QUOTIENT	0x04c11db7
-
 /*
  * __wt_cksum --
  *	Return a checksum for a chunk of memory.
@@ -25,6 +23,7 @@ __wt_cksum(void *chunk, size_t len)
 	/*
 	 * Code to generate the crctab.
 	 */
+	#define	__QUOTIENT	0x04c11db7
 	int
 	main()
 	{
@@ -116,9 +115,9 @@ __wt_cksum(void *chunk, size_t len)
 		0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668,
 		0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 	};
+	size_t i;
 	u_int32_t result;
-	u_int8_t *data, octet;
-	int i;
+	u_int8_t *data;
 
 	data = chunk;
 	result = *data++ << 24;

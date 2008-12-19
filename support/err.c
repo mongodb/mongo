@@ -31,20 +31,21 @@ __wt_errcall(void *cb, void *handle,
 	len = 0;
 	separator = 0;
 	if (pfx1 != NULL) {
-		len += snprintf(s + len, sizeof(s) - len, "%s", pfx1);
+		len += (size_t)snprintf(s + len, sizeof(s) - len, "%s", pfx1);
 		separator = 1;
 	}
 	if (pfx2 != NULL && len < sizeof(s) - 1) {
-		len += snprintf(s + len, sizeof(s) - len,
+		len += (size_t)snprintf(s + len, sizeof(s) - len,
 		    "%s%s", separator ? ": " : "", pfx2);
 		separator = 1;
 	}
 	if (separator && len < sizeof(s) - 1)
-		len += snprintf(s + len, sizeof(s) - len, ": ");
+		len += (size_t)snprintf(s + len, sizeof(s) - len, ": ");
 	if (len < sizeof(s) - 1)
-		len += vsnprintf(s + len, sizeof(s) - len, fmt, ap);
+		len += (size_t)vsnprintf(s + len, sizeof(s) - len, fmt, ap);
 	if (error != 0 && len < sizeof(s) - 1)
-		snprintf(s + len, sizeof(s) - len, ": %s", wt_strerror(error));
+		(void)snprintf(
+		    s + len, sizeof(s) - len, ": %s", wt_strerror(error));
 
 	((void (*)(void *, const char *))cb)(handle, s);
 }

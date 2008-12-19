@@ -16,6 +16,8 @@
 void
 __wt_abort(IENV *ienv)
 {
+	LINTQUIET(ienv);
+
 	abort();
 	/* NOTREACHED */
 }

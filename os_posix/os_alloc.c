@@ -18,6 +18,8 @@ __wt_calloc(IENV *ienv, size_t number, size_t size, void *retp)
 {
 	void *p;
 
+	LINTQUIET(ienv);
+
 	/*
 	 * !!!
 	 * This function MUST handle a NULL IENV structure reference.
@@ -50,7 +52,7 @@ __wt_malloc(IENV *ienv, size_t bytes_to_allocate, void *retp)
 		return (WT_ERROR);
 
 #ifdef HAVE_DIAGNOSTIC
-	memset(p, OVERWRITE_BYTE, bytes_to_allocate);
+	(void)memset(p, OVERWRITE_BYTE, bytes_to_allocate);
 #endif
 
 	*(void **)retp = p;
@@ -101,7 +103,7 @@ __wt_strdup(IENV *ienv, const char *str, void *retp)
 	if ((ret = __wt_malloc(ienv, len, &p)) != 0)
 		return (ret);
 
-	memcpy(p, str, len);
+	(void)memcpy(p, str, len);
 
 	*(void **)retp = p;
 	return (0);
@@ -118,6 +120,7 @@ __wt_free(IENV *ienv, void *p)
 	 * !!!
 	 * This function MUST handle a NULL IENV structure reference.
 	 */
+	LINTQUIET(ienv);
 
 	if (p != NULL)			/* ANSI C free semantics */
 		free(p);

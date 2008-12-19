@@ -14,14 +14,14 @@
  *	Verify the build itself.
  */
 int
-__wt_env_build_verify(IENV *ienv)
+__wt_env_build_verify(void)
 {
 	int ret;
 
 	/*
 	 * Check the build & compiler itself before going further.
 	 */
-	if ((ret = __wt_db_build_verify(ienv)) != 0)
+	if ((ret = __wt_db_build_verify()) != 0)
 		return (ret);
 
 #ifdef HAVE_DIAGNOSTIC

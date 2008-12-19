@@ -36,6 +36,6 @@ __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 	
 	return (0);
 
-err:	(void)__wt_idb_destroy(db, 1);
-	return (WT_ERROR);
+err:	__wt_idb_destroy(db, 1);
+	return (ret);
 }

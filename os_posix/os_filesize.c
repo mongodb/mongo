@@ -12,16 +12,15 @@
 int
 __wt_filesize(IENV *ienv, WT_FH *fh, off_t *sizep)
 {
-	ENV *env;
 	struct stat sb;
-	int ret;
+	ENV *env;
 
 	env = ienv->env;
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS | WT_VERB_FILEOPS_ALL))
 		__wt_env_errx(env, "fileops: %s: fstat", fh->name);
 
-	if ((ret = fstat(fh->fd, &sb)) == -1) {
+	if (fstat(fh->fd, &sb) == -1) {
 		__wt_env_err(env, errno, "%s: fstat", fh->name);
 		return (WT_ERROR);
 	}

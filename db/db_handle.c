@@ -95,7 +95,7 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 	is_private = F_ISSET(db, WT_PRIVATE_ENV);
 
 	/* Discard the underlying IDB structure. */
-	__wt_idb_destroy(db, 0);
+	__wt_idb_destroy(db);
 
 	/* Free the DB structure. */
 	(void)memset(db, OVERWRITE_BYTE, sizeof(db));
@@ -112,7 +112,7 @@ __wt_db_destroy(DB *db, u_int32_t flags)
  *	Destroy the DB's underlying IDB structure.
  */
 void
-__wt_idb_destroy(DB *db, int refresh)
+__wt_idb_destroy(DB *db)
 {
 	IDB *idb;
 	IENV *ienv;
@@ -126,9 +126,6 @@ __wt_idb_destroy(DB *db, int refresh)
 	/* Free the actual structure. */
 	__wt_free(ienv, db->idb);
 	db->idb = NULL;
-
-	if (!refresh)
-		return;
 
 	/*
 	 * Allocate a new IDB structure on request.
