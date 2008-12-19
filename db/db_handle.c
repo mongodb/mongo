@@ -13,6 +13,7 @@
  * wt_db_create --
  *	DB constructor.
  */
+int
 wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 {
 	IENV *ienv;
@@ -68,7 +69,7 @@ err:	if (idb != NULL)
 	if (db != NULL)
 		__wt_free(ienv, db);
 	if (env != NULL && F_ISSET(env, WT_PRIVATE_ENV))
-		env->destroy(env, 0);
+		(void)env->destroy(env, 0);
 	return (ret);
 }
 
@@ -97,7 +98,7 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 	__wt_idb_destroy(db, 0);
 
 	/* Free the DB structure. */
-	memset(db, OVERWRITE_BYTE, sizeof(db));
+	(void)memset(db, OVERWRITE_BYTE, sizeof(db));
 	__wt_free(ienv, db);
 
 	if (is_private)
@@ -125,6 +126,9 @@ __wt_idb_destroy(DB *db, int refresh)
 	/* Free the actual structure. */
 	__wt_free(ienv, db->idb);
 	db->idb = NULL;
+
+	if (!refresh)
+		return;
 
 	/*
 	 * Allocate a new IDB structure on request.
