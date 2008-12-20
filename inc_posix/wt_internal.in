@@ -20,12 +20,15 @@ extern "C" {
  * WiredTiger system include files.
  *******************************************/
 #include <sys/stat.h>
+#include <sys/uio.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /*******************************************
  * Internal forward declarations.
@@ -37,6 +40,7 @@ struct __wt_item_offp;		typedef struct __wt_item_offp WT_ITEM_OFFP;
 struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
 struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
+struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 
 /*******************************************
