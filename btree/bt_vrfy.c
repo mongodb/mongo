@@ -51,14 +51,8 @@ __wt_db_page_verify(DB *db, WT_PAGE *page)
 		return (WT_ERROR);
 	}
 
-	if (hdr->mem_off != 0 && hdr->mem_off != 1) {
-		__wt_db_errx(db,
-		    "page at addr %lu has illegal memory offset field",
-		    (u_long)addr);
-		return (WT_ERROR);
-	}
-
-	if (hdr->unused[0] != '\0' || hdr->unused[1] != '\0') {
+	if (hdr->unused[0] != '\0' ||
+	    hdr->unused[1] != '\0' || hdr->unused[2] != '\0') {
 		__wt_db_errx(db,
 		    "page at addr %lu has non-zero unused header fields",
 		    (u_long)addr);
