@@ -41,11 +41,11 @@ struct __wt_btree {
 
 /* Convert a file address into a byte offset. */
 #define	WT_FRAGS_TO_BYTES(db, frags)					\
-	((size_t)(frags) * (db)->fragsize)
+	((off_t)(frags) * (db)->fragsize)
 
 /* Return the number of fragments needed to hold N bytes. */
 #define	WT_BYTES_TO_FRAGS(db, bytes)					\
-	((bytes) / (db)->fragsize)
+	((u_int32_t)((bytes) / (db)->fragsize))
 
 /* Return the number of fragments for a database page. */
 #define	WT_FRAGS_PER_PAGE(db)						\
@@ -76,15 +76,43 @@ struct __wt_btree {
  */
 struct __wt_page {
 	u_int32_t    addr;			/* File block address */
+	u_int32_t    frags;			/* Number of fragments */
 	WT_PAGE_HDR *hdr;			/* The actual page */
 
-	u_int8_t *p;				/* First free byte address */
+	u_int8_t *first_data;			/* First data byte address */
+	u_int8_t *first_free;			/* First free byte address */
 	u_int32_t space_avail;			/* Available page memory */
 
 	u_int8_t **indx;			/* Array of page references */
 	u_int32_t indx_count;			/* Entries in indx */
 	u_int32_t indx_size;			/* Size of indx array */
 };
+
+/*
+ * The database itself needs a chunk of memory that describes it.   Here's
+ * the structure.
+ */
+struct __wt_page_desc {
+#define	WT_BTREE_MAGIC		0x120897
+	u_int32_t magic;		/* 00-03: Magic number */
+#define	WT_BTREE_MAJOR_VERSION	1
+	u_int32_t majorv;		/* 04-07: Major version */
+#define	WT_BTREE_MINOR_VERSION	1
+	u_int32_t minorv;		/* 08-11: Minor version */
+	u_int32_t pagesize;		/* 16-19: Page size */
+	u_int32_t root;			/* 20-23: Root fragment */
+	u_int32_t free;			/* 24-27: Freelist fragment */
+	u_int64_t base_recno;		/* 28-31: Base record number */
+	u_int32_t unused[8];		/* 32-63: Spare */
+};
+/*
+ * WT_DESC_SIZE is the expected WT_DESC size --  we check this on startup
+ * to make sure the compiler hasn't inserted padding (which would break
+ * the world).
+ *
+ * The size must be a multiple of a 4-byte boundary.
+ */
+#define	WT_DESC_SIZE		64
 
 /*
  * All database pages have a common header.  There is no version number or
@@ -95,8 +123,8 @@ struct __wt_page {
 struct __wt_page_hdr {
 	/* An LSN is 8 bytes: 4 bytes of file number, 4 bytes of file offset. */
 	struct __wt_lsn {
-		u_int32_t fileno;	/* 00-03: File number */
-		u_int32_t offset;	/* 04-07: File offset */
+		u_int32_t f;		/* 00-03: File number */
+		u_int32_t o;		/* 04-07: File offset */
 	} lsn;
 
 	/*
@@ -142,24 +170,20 @@ struct __wt_page_hdr {
 	u_int32_t prevaddr;		/* 24-27: previous page */
 	u_int32_t nextaddr;		/* 28-31: next page */
 };
-
 /*
- * WT_HDR_SIZE is the expected headr size -- we check this when we startup
+ * WT_HDR_SIZE is the expected WT_HDR size --  we check this on startup
  * to make sure the compiler hasn't inserted padding (which would break
- * the world).
- *
- * The header size must be aligned on a 4-byte boundary -- data is written
- * immediately after the header, and the first byte of each chunk must be
- * aligned.
+ * the world).  The size must be a multiple of a 4-byte boundary.
  */
 #define	WT_HDR_SIZE		32
 
 /*
- * WT_PAGE_DATA is the first data byte on the page.
- * WT_DATA_SPACE is the total bytes of data space on the page.
+ * WT_PAGE_BYTE is the first usable data byte on the page.  Note the correction
+ * for page addr of 0, the first fragment.
  */
-#define	WT_PAGE_BYTE(hdr)		((u_int8_t *)(hdr) + WT_HDR_SIZE)
-#define	WT_DATA_SPACE(pgsize)		((pgsize) - sizeof(WT_PAGE_HDR))
+#define	WT_PAGE_BYTE(page)						\
+	(((u_int8_t *)(page)->hdr) +					\
+	WT_HDR_SIZE + ((page)->addr == 0 ? WT_DESC_SIZE : 0))
 
 /*
  * After the header, there is a list of WT_ITEMs in sorted order.

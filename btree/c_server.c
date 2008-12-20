@@ -39,7 +39,7 @@ __wt_db_fopen(WT_BTREE *bt)
 	 * of a fragment failed, pretend it all failed, and truncate the
 	 * file.
 	 */
-	bt->frags = size / db->fragsize;
+	bt->frags = (u_int32_t)(size / db->fragsize);
 
 	return (0);
 
@@ -55,7 +55,6 @@ int
 __wt_db_fclose(WT_BTREE *bt)
 {
 	IENV *ienv;
-	int ret;
 
 	ienv = bt->db->ienv;
 
@@ -67,15 +66,17 @@ __wt_db_fclose(WT_BTREE *bt)
  *	Allocate a chunk of a file.
  */
 int
-__wt_db_falloc(WT_BTREE *bt, u_int32_t frags, void *retp, u_int32_t *addrp)
+__wt_db_falloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 {
-	DB *db;
 	IENV *ienv;
+	WT_BTREE *bt;
+	WT_PAGE *page;
 	int ret;
-	void *p;
 
-	db = bt->db;
 	ienv = db->ienv;
+	bt = db->idb->btree;
+
+	*pagep = NULL;
 
 	if (UINT32_MAX - bt->frags < frags) {
 		__wt_db_errx(db,
@@ -85,17 +86,35 @@ __wt_db_falloc(WT_BTREE *bt, u_int32_t frags, void *retp, u_int32_t *addrp)
 	}
 
 	/*
-	 * Allocate the memory to hold it -- clear the memory, as code
+	 * Allocate memory for the in-memory page information.  It's a separate
+	 * allocation call from the page because we hope to interact gracefully
+	 * with the underlying heap memory allocator.
+	 */
+	if ((ret = __wt_calloc(ienv, 1, sizeof(WT_PAGE), &page)) != 0)
+		return (ret);
+
+	/*
+	 * Allocate the memory to hold the page -- clear the memory, as code
 	 * depends on values in the page being zero.
 	 */
-	if ((ret = __wt_calloc(ienv, 1, WT_FRAGS_TO_BYTES(db, frags), &p)) != 0)
-		return (WT_ERROR);
-	*(void **)retp = p;
+	if ((ret = __wt_calloc(
+	    ienv, 1, (size_t)WT_FRAGS_TO_BYTES(db, frags), &page->hdr)) != 0)
+		goto err;
 
-	*addrp = bt->frags;
+	page->addr = bt->frags;
 	bt->frags += frags;
+	page->frags = frags;
 
+	/* Initialize the rest of the in-memory page structure. */
+	__wt_page_inmem(db, page, 1);
+
+	*pagep = page;
 	return (0);
+
+err:	if (page->hdr != NULL)
+		__wt_free(ienv, page->hdr);
+	__wt_free(ienv, page);
+	return (ret);
 }
 
 /*
@@ -103,27 +122,29 @@ __wt_db_falloc(WT_BTREE *bt, u_int32_t frags, void *retp, u_int32_t *addrp)
  *	Read a chunk of a file.
  */
 int
-__wt_db_fread(
-    WT_BTREE *bt, u_int32_t addr, u_int32_t frags, WT_PAGE_HDR **hdrp)
+__wt_db_fread(DB *db, u_int32_t addr, u_int32_t frags, WT_PAGE **pagep)
 {
-	DB *db;
 	IENV *ienv;
+	WT_BTREE *bt;
+	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	size_t bytes;
 	u_int32_t checksum;
 	int ret;
 
-	db = bt->db;
 	ienv = db->ienv;
+	bt = db->idb->btree;
+
+	*pagep = page = NULL;
 
 	/* Allocate the memory to hold it. */
-	bytes = WT_FRAGS_TO_BYTES(db, frags);
+	bytes = (size_t)WT_FRAGS_TO_BYTES(db, frags);
 	if ((ret = __wt_malloc(ienv, bytes, &hdr)) != 0)
 		return (ret);
 
 	/* Read the page. */
 	if ((ret = __wt_read(ienv,
-	    bt->fh, (off_t)WT_FRAGS_TO_BYTES(db, addr), bytes, hdr)) != 0)
+	    bt->fh, WT_FRAGS_TO_BYTES(db, addr), bytes, hdr)) != 0)
 		goto err;
 
 	/* Verify the checksum. */
@@ -136,16 +157,27 @@ __wt_db_fread(
 		goto err;
 	}
 
+	/* Allocate an in-memory page structure. */
+	if ((ret = __wt_calloc(ienv, 1, sizeof(WT_PAGE), &page)) != 0)
+		goto err;
+
+	page->addr = addr;
+	page->frags = frags;
+	page->hdr = hdr;
+	__wt_page_inmem(db, page, 0);
+
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, addr, hdr)) != 0)
+	if ((ret = __wt_db_page_verify(db, page)) != 0)
 		goto err;
 #endif
 
-	*hdrp = hdr;
+	*pagep = page;
 	return (0);
 
-err:	__wt_free(ienv, hdr);
+err:	if (page != NULL)
+		__wt_free(ienv, page);
+	__wt_free(ienv, hdr);
 	return (ret);
 }
 
@@ -154,32 +186,33 @@ err:	__wt_free(ienv, hdr);
  *	Write a chunk of a file.
  */
 int
-__wt_db_fwrite(
-    WT_BTREE *bt, u_int32_t addr, u_int32_t frags, WT_PAGE_HDR *hdr)
+__wt_db_fwrite(DB *db, WT_PAGE *page)
 {
-	DB *db;
 	IENV *ienv;
+	WT_BTREE *bt;
+	WT_PAGE_HDR *hdr;
 	size_t bytes;
 	int ret;
 
-	db = bt->db;
 	ienv = db->ienv;
+	bt = db->idb->btree;
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, addr, hdr)) != 0)
+	if ((ret = __wt_db_page_verify(db, page)) != 0)
 		return (ret);
 #endif
 
-	bytes = WT_FRAGS_TO_BYTES(db, frags);
+	bytes = (size_t)WT_FRAGS_TO_BYTES(db, page->frags);
 
 	/* Update the checksum. */
+	hdr = page->hdr;
 	hdr->checksum = 0;
 	hdr->checksum = __wt_cksum(hdr, bytes);
 
 	/* Write the page. */
-	return (__wt_write(
-	    ienv, bt->fh, (off_t)WT_FRAGS_TO_BYTES(db, addr), bytes, hdr));
+	return (__wt_write(ienv, bt->fh,
+	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr));
 }
 
 /*
@@ -187,21 +220,20 @@ __wt_db_fwrite(
  *	Discard a page of a file.
  */
 int
-__wt_db_fdiscard(WT_BTREE *bt, u_int32_t addr, WT_PAGE_HDR *hdr)
+__wt_db_fdiscard(DB *db, WT_PAGE *page)
 {
-	DB *db;
 	IENV *ienv;
 	int ret;
 
-	db = bt->db;
 	ienv = db->ienv;
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, addr, hdr)) != 0)
+	if ((ret = __wt_db_page_verify(db, page)) != 0)
 		return (ret);
 #endif
 
-	__wt_free(ienv, hdr);
+	__wt_free(ienv, page->hdr);
+	__wt_free(ienv, page);
 	return (0);
 }
