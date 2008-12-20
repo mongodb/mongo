@@ -10,62 +10,45 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_page_alloc --
- *	Allocate and initialize a new in-memory Btree page.
+ * __wt_page_inmem --
+ *	Initialize in-memory page structure
  */
-int
-__wt_db_page_alloc(DB *db, WT_PAGE **ipp)
+void
+__wt_page_inmem(DB *db, WT_PAGE *page, int is_alloc)
 {
-	IENV *ienv;
-	WT_PAGE *ip;
-	int ret;
-	void *p;
+	WT_ITEM *item;
+	u_int32_t i;
 
-	ienv = db->ienv;
+	if (is_alloc) {
+		/*
+		 * Initialize a WT_PAGE structure for a newly created database.
+		 *
+		 * Fragment 0 has a special property -- the first 64 bytes
+		 * past the header holds the database's meta-data information.
+		 */
+		page->first_free = page->first_data = WT_PAGE_BYTE(page);
+		page->space_avail = db->pagesize -
+		    (u_int32_t)(page->first_free - (u_int8_t *)page->hdr);
 
-	/*
-	 * Allocate memory for the page and in-memory structures; put the page
-	 * first so it's appropriately aligned for direct I/O, followed by the
-	 * WT_PAGE structure.
-	 */
-	if ((ret = __wt_calloc(
-	    ienv, 1, (size_t)db->pagesize + sizeof(WT_PAGE), &p)) != 0)
-		return (ret);
-
-	ip = (WT_PAGE*)((u_int8_t *)p + db->pagesize);
-
-	/*
-	 * We allocate a pointer for every 30 bytes (or, in other words, assume
-	 * a newly created page contains roughly 30B key and data items.
-	 */
-	ip->indx_size = db->pagesize / 30;
-	if ((ret = __wt_calloc(
-	    ienv, (size_t)ip->indx_size, sizeof(u_int8_t *), &ip->indx)) != 0)
-		goto err;
-
-	ip->space_avail = db->pagesize - sizeof(WT_PAGE_HDR);
-	ip->hdr = p;
-
-	*ipp = ip;
-	return (0);
-
-err:	__wt_free(ienv, p);
-	return (WT_ERROR);
-}
-
-/*
- * __wt_db_page_free --
- *	Free an in-memory Btree page.
- */
-int
-__wt_db_page_free(DB *db, WT_PAGE *ip)
-{
-	IENV *ienv;
-
-	/*
-	 * The page comes first in the memory chunk to get better alignment,
-	 * so it's what we free.
-	 */
-	__wt_free(ienv, ip->hdr);
-	return (0);
+		if (page->addr == 0)
+			__wt_db_desc_init(db, page);
+	} else if (page->hdr->type == WT_PAGE_OVFL)
+			return;
+	else {
+		/*
+		 * Walk the page looking for the end of the page.  Once we have
+		 * the first free byte on the page we can figure out how much
+		 * space is available.
+		 */
+		page->first_data = WT_PAGE_BYTE(page);
+		for (item = (WT_ITEM *)page->first_data,
+		    i = page->hdr->u.entries;
+		    i > 0;
+		    item = (WT_ITEM *)
+		    ((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len)), --i)
+			;
+		page->first_free = (u_int8_t *)item;
+		page->space_avail = db->pagesize -
+		    (u_int32_t)(page->first_free - (u_int8_t *)page->hdr);
+	}
 }

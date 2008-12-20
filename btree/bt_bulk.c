@@ -9,9 +9,9 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_promote(DB *, WT_PAGE *, WT_PAGE_HDR *, u_int32_t, DBT *);
-static int __wt_dup_offpage(DB *, DBT **, DBT **, DBT *, WT_ITEM *,
-	u_int8_t *, u_int32_t, u_int32_t, int (*)(DB *, DBT **, DBT **));
+static int __wt_db_promote(DB *, WT_PAGE **, WT_PAGE *, DBT *);
+static int __wt_dup_offpage(DB *, WT_PAGE *, DBT **, DBT **,
+    DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
 static int __wt_ovfl_copy(IENV *, DBT *, DBT *);
 
 /*
@@ -24,31 +24,38 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	enum { FIRST_PAGE, SECOND_PAGE, SUBSEQUENT_PAGES } bulk_state;
 	DBT *key, *data, *lastkey, lastkey_std, lastkey_ovfl, tmpkey;
 	IENV *ienv;
-	WT_BTREE *bt;
 	WT_ITEM *item, key_item, data_item, *dup_key, *dup_data;
 	WT_ITEM_OVFL key_ovfl, data_ovfl, tmp_ovfl;
-	WT_PAGE parent;
-	WT_PAGE_HDR *hdr, *next_hdr;
-	u_int32_t addr, dup_count, dup_space, len, next_addr, space_avail;
-	u_int8_t *p;
+	WT_PAGE *page, *parent, *next;
+	u_int32_t dup_count, dup_space, len;
 	int ret, tret;
 
 	ienv = db->ienv;
-	bt = db->idb->btree;
+
+	DB_FLAG_CHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
+	WT_ASSERT(ienv, LF_ISSET(WT_SORTED_INPUT));
 
 	bulk_state = FIRST_PAGE;
-	addr = WT_ADDR_INVALID;
+	page = parent = NULL;
 	dup_space = dup_count = 0;
+
+	/*lint -esym(530,dup_key) */
+	/*lint -esym(530,dup_data)
+	 *
+	 * LINT complains dup_key and dup_data may be used before being set --
+	 * that's not true, we set/check dup_count before accessing dup_key
+	 * or dup_data.
+	 */
+	/*lint -esym(613,page)
+	 * LINT complains page may be used before being set -- that's not
+	 * correct, bulk_state is set to FIRST_PAGE until page is initialized.
+	 */
 
 	lastkey = &lastkey_std;
 	WT_CLEAR(lastkey_std);
 	WT_CLEAR(lastkey_ovfl);
 	WT_CLEAR(key_item);
 	WT_CLEAR(data_item);
-	WT_CLEAR(parent);
-
-	DB_FLAG_CHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
-	WT_ASSERT(ienv, LF_ISSET(WT_SORTED_INPUT));
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key->size == 0) {
@@ -134,14 +141,19 @@ skip_read:
 		 */
 		if (bulk_state == FIRST_PAGE ||
 		    (key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
-		    WT_ITEM_SPACE_REQ(data->size) > space_avail) {
-			if ((ret = __wt_db_falloc(bt,
-			    WT_FRAGS_PER_PAGE(db), &next_hdr, &next_addr)) != 0)
+		    WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
+			if ((ret = __wt_db_falloc(
+			    db, WT_FRAGS_PER_PAGE(db), &next)) != 0)
 				goto err;
-			next_hdr->type = WT_PAGE_LEAF;
-			next_hdr->prevaddr = addr;
-			next_hdr->nextaddr =
-			    next_hdr->prntaddr = WT_ADDR_INVALID;
+			next->hdr->type = WT_PAGE_LEAF;
+			next->hdr->nextaddr =
+			    next->hdr->prntaddr = WT_ADDR_INVALID;
+			if (page == NULL)
+				next->hdr->prevaddr = WT_ADDR_INVALID;
+			else {
+				next->hdr->prevaddr = page->addr;
+				page->hdr->nextaddr = next->addr;
+			}
 
 			/*
 			 * If in the middle of loading a set of duplicates, but
@@ -160,19 +172,20 @@ skip_read:
 				 * Set and re-set the page entry count -- we're
 				 * moving a single key PLUS the duplicate set.
 				 */
-				hdr->u.entries -= (dup_count + 1);
-				next_hdr->u.entries += (dup_count + 1);
-
-				/* Move the duplicate set. */
-				len = p - (u_int8_t *)dup_key;
-				memcpy(WT_PAGE_BYTE(next_hdr), dup_key, len);
+				page->hdr->u.entries -= (dup_count + 1);
+				next->hdr->u.entries += (dup_count + 1);
 
 				/*
-				 * Reset the next available page byte, and the
-				 * space available.
+				 * Move the duplicate set and adjust the page
+				 * information for "next" -- we don't have to
+				 * fix up "page", we're never going to use it
+				 * again.
 				 */
-				p = WT_PAGE_BYTE(next_hdr) + len;
-				space_avail = WT_DATA_SPACE(db->pagesize) - len;
+				len = (u_int32_t)
+				    (page->first_free - (u_int8_t *)dup_key);
+				memcpy(next->first_free, dup_key, len);
+				next->first_free += len;
+				next->space_avail -= len;
 
 				/*
 				 * We'll never have to move this dup set to
@@ -184,9 +197,9 @@ skip_read:
 				 * entry on the page, where the first entry
 				 * is the dup set's key.
 				 */
-				dup_key = (WT_ITEM *)WT_PAGE_BYTE(next_hdr);
-				dup_data = (WT_ITEM *)
-				    ((u_int8_t *)dup_key +
+				dup_key = (WT_ITEM *)next->first_data;
+				dup_data =
+				    (WT_ITEM *)(next->first_data +
 				    WT_ITEM_SPACE_REQ(dup_key->len));
 
 				/*
@@ -199,17 +212,18 @@ skip_read:
 					    WT_ITEM_BYTE(dup_key);
 					lastkey_std.size = dup_key->len;
 				}
-			} else {
-				p = WT_PAGE_BYTE(next_hdr);
-				space_avail = WT_DATA_SPACE(db->pagesize);
 			}
 
 			/*
-			 * If this is the first page, there's nothing to do.
+			 * If this is the first page, there's nothing to do,
+			 * the only page in the database is a leaf page.
+			 *
 			 * If this is the second page, create an internal page
 			 * and promote a key from the first page plus the
-			 * current key.  If this is a subsequent page, promote
-			 * the current key.
+			 * current key.
+			 *
+			 * If this is a subsequent page, promote the current
+			 * key.
 			 *
 			 * If this is the second or subsequent page, write the
 			 * previous page.
@@ -225,7 +239,7 @@ skip_read:
 				 * of course.
 				 */
 				WT_CLEAR(tmpkey);
-				item = (WT_ITEM *)WT_PAGE_BYTE(hdr);
+				item = (WT_ITEM *)page->first_data;
 				switch (item->type) {
 				case WT_ITEM_KEY:
 					tmpkey.data = WT_ITEM_BYTE(item);
@@ -243,33 +257,33 @@ skip_read:
 					(void)__wt_database_format(db);
 					goto err;
 				}
-				if ((ret = __wt_db_promote(db, &parent,
-				    hdr, addr, &tmpkey)) != 0)
+				if ((ret = __wt_db_promote(
+				    db, &parent, page, &tmpkey)) != 0)
 					goto err;
 				bulk_state = SUBSEQUENT_PAGES;
 				/* FALLTHROUGH */
 			case SUBSEQUENT_PAGES:
-				if ((ret = __wt_db_promote(db, &parent,
-				    next_hdr, next_addr, lastkey)) != 0)
+				if ((ret = __wt_db_promote(
+				    db, &parent, next, key)) != 0)
 					goto err;
 
-				hdr->nextaddr = next_addr;
-				if ((ret = __wt_db_fwrite(bt,
-				    addr, WT_FRAGS_PER_PAGE(db), hdr)) != 0)
+				if ((ret = __wt_db_fwrite(db, page)) != 0)
 					goto err;
+				break;
 			}
 
-			hdr = next_hdr;
-			addr = next_addr;
+			/* Switch to the next page. */
+			page = next;
 		}
 
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
-			++hdr->u.entries;
+			++page->hdr->u.entries;
 			key_item.len = key->size;
-			space_avail -= WT_ITEM_SPACE_REQ(key->size);
-			memcpy(p, &key_item, sizeof(key_item));
-			memcpy(p + sizeof(key_item), key->data, key->size);
+			memcpy(page->first_free, &key_item, sizeof(key_item));
+			memcpy(page->first_free +
+			    sizeof(key_item), key->data, key->size);
+			page->space_avail -= WT_ITEM_SPACE_REQ(key->size);
 
 			/*
 			 * If duplicates: we'll need a copy of the key for
@@ -285,20 +299,22 @@ skip_read:
 			if (LF_ISSET(WT_DUPLICATES)) {
 				if (key_item.type != WT_ITEM_KEY_OVFL) {
 					lastkey = &lastkey_std;
-					lastkey_std.data = WT_ITEM_BYTE(p);
+					lastkey_std.data =
+					    WT_ITEM_BYTE(page->first_free);
 					lastkey_std.size = key->size;
 				}
-				dup_key = (WT_ITEM *)p;
+				dup_key = (WT_ITEM *)page->first_free;
 			}
-			p += WT_ITEM_SPACE_REQ(key->size);
+			page->first_free += WT_ITEM_SPACE_REQ(key->size);
 		}
 
 		/* Copy the data item onto the page. */
-		++hdr->u.entries;
-		space_avail -= WT_ITEM_SPACE_REQ(data->size);
+		++page->hdr->u.entries;
 		data_item.len = data->size;
-		memcpy(p, &data_item, sizeof(data_item));
-		memcpy(p + sizeof(data_item), data->data, data->size);
+		memcpy(page->first_free, &data_item, sizeof(data_item));
+		memcpy(page->first_free +
+		    sizeof(data_item), data->data, data->size);
+		page->space_avail -= WT_ITEM_SPACE_REQ(data->size);
 
 		/*
 		 * If duplicates: if this isn't a duplicate data item, save
@@ -312,10 +328,9 @@ skip_read:
 		    data_item.type != WT_ITEM_DUP_OVFL) {
 			dup_count = 1;
 			dup_space = data->size;
-			dup_data = (WT_ITEM *)p;
+			dup_data = (WT_ITEM *)page->first_free;
 		}
-
-		p += WT_ITEM_SPACE_REQ(data->size);
+		page->first_free += WT_ITEM_SPACE_REQ(data->size);
 
 		/*
 		 * If duplicates: check to see if the duplicate set crosses
@@ -335,23 +350,9 @@ skip_read:
 			 * Move the duplicate set offpage and read in the
 			 * rest of the duplicate set.
 			 */
-			if ((ret = __wt_dup_offpage(db,
-			    &key, &data, lastkey,
-			    dup_data, p, dup_count, flags, cb)) != 0)
+			if ((ret = __wt_dup_offpage(db, page, &key,
+			    &data, lastkey, dup_data, dup_count, cb)) != 0)
 				goto err;
-
-			/*
-			 * Reset the local page information; the duplicate set
-			 * has been replaced by a single WT_ITEM_OFFP structure,
-			 * that is, we've moved dup_count - 1 entries.
-			 */
-			hdr->u.entries -= (dup_count - 1);
-
-			/* Reset the next byte available and total space. */
-			p = (u_int8_t *)dup_data;
-			p += WT_ITEM_SPACE_REQ(dup_data->len);
-			space_avail = db->pagesize -
-			    ((u_int8_t *)p - (u_int8_t *)hdr);
 
 			/* Restart our dup counters. */
 			dup_count = dup_space = 0;
@@ -361,16 +362,16 @@ skip_read:
 	}
 
 	/* A ret of 1 just means we've reached the end of the input. */
-	if (ret == 1)
+	if (ret == 1) {
 		ret = 0;
 
-	/* Write any partially-filled page and parent. */
-	if (hdr != NULL && (tret = __wt_db_fwrite(
-	    bt, addr, WT_FRAGS_PER_PAGE(db), hdr)) != 0)
-		ret = tret;
-	if (parent.hdr != NULL && (tret = __wt_db_fwrite(
-	    bt, parent.addr, WT_FRAGS_PER_PAGE(db), parent.hdr)) != 0)
-		ret = tret;
+		/* Write any partially-filled page and parent. */
+		if (page != NULL && (tret = __wt_db_fwrite(db, page)) != 0)
+			ret = tret;
+		if (parent != NULL &&
+		    (tret = __wt_db_fwrite(db, parent)) != 0 && ret == 0)
+			ret = tret;
+	}
 
 	if (0) {
 err:		ret = WT_ERROR;
@@ -387,21 +388,17 @@ err:		ret = WT_ERROR;
  *	then load the rest of the duplicate set.
  */
 static int
-__wt_dup_offpage(DB *db,
-    DBT **keyp, DBT **datap,
-    DBT *lastkey, WT_ITEM *dup_first, u_int8_t *last_byte_after,
-    u_int32_t dup_count, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
+__wt_dup_offpage(DB *db, WT_PAGE *leaf_page,
+    DBT **keyp, DBT **datap, DBT *lastkey, WT_ITEM *dup_data,
+    u_int32_t dup_count, int (*cb)(DB *, DBT **, DBT **))
 {
 	enum { SECOND_PAGE, SUBSEQUENT_PAGES } bulk_state;
 	DBT *key, *data, tmpkey;
-	IENV *ienv;
-	WT_BTREE *bt;
 	WT_ITEM data_item, *item;
 	WT_ITEM_OFFP offpage_item;
 	WT_ITEM_OVFL data_local, tmp_ovfl;
-	WT_PAGE parent;
-	WT_PAGE_HDR *hdr, *next_hdr;
-	u_int32_t addr, next_addr, root_addr, space_avail;
+	WT_PAGE *next, *parent, *page;
+	u_int32_t len;
 	u_int8_t *p;
 	int ret, tret;
 
@@ -417,6 +414,8 @@ __wt_dup_offpage(DB *db,
 	 * return.  The arguments are complex enough that it's worth describing
 	 * them:
 	 *
+	 * leaf_page --
+	 *	The caller's PAGE, which we have to fix up.
 	 * keyp/datap --
 	 *	The key and data pairs the application is filling in -- we
 	 *	get them passed to us because we get additional key/data
@@ -425,48 +424,56 @@ __wt_dup_offpage(DB *db,
 	 * lastkey --
 	 *	The last key pushed onto the caller's page -- we use this to
 	 *	compare against future keys we read.
-	 * dup_first --
+	 * dup_data --
 	 *	On-page reference to the first duplicate data item in the set.
-	 * last_byte_after --
-	 *	On-page reference to the first byte after the last duplicate
-	 *	data item in the set.
 	 * dup_count --
 	 *	Count of duplicates in the set.
-	 * flags --
-	 *	User's bulk-load method flags.
 	 * cb --
 	 *	User's callback function.
 	 */
-	ienv = db->ienv;
-	bt = db->idb->btree;
-
 	bulk_state = SECOND_PAGE;
+	parent = NULL;
 	ret = 0;
 
-	WT_CLEAR(data_item);
-	WT_CLEAR(parent);
-
 	/* Allocate and initialize a new page. */
-	if ((ret =
-	    __wt_db_falloc(bt, WT_FRAGS_PER_PAGE(db), &hdr, &root_addr)) != 0)
+	if ((ret = __wt_db_falloc(db, WT_FRAGS_PER_PAGE(db), &page)) != 0)
 		return (ret);
-	hdr->type = WT_PAGE_DUP_LEAF;
-	hdr->u.entries = dup_count;
+	page->hdr->type = WT_PAGE_DUP_LEAF;
+	page->hdr->u.entries = dup_count;
+	page->hdr->prntaddr = leaf_page->addr;
+	page->hdr->nextaddr = page->hdr->prevaddr = WT_ADDR_INVALID;
 
-	/* Copy the duplicate data set into place. */
-	memcpy(WT_PAGE_BYTE(hdr),
-	    dup_first, last_byte_after - (u_int8_t *)dup_first);
+	/* Copy the duplicate data set into place, and set page information. */
+	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
+	memcpy(page->first_free, dup_data, (size_t)len);
+	page->first_free = WT_PAGE_BYTE(page) + len;
+	page->space_avail = db->pagesize -
+	    (u_int32_t)((page->first_free - (u_int8_t *)page->hdr));
 
-	/* Promote the key to our parent. */
-	if ((ret = __wt_db_promote(db, &parent, hdr, root_addr, lastkey)) != 0)
-		goto err;
-
-	/* Set up our local page information. */
-	p = WT_PAGE_BYTE(hdr) + (last_byte_after - (u_int8_t *)dup_first);
-	space_avail = db->pagesize - ((u_int8_t *)p - (u_int8_t *)hdr);
+	/*
+	 * Clean up the caller's page.  Replace the duplicate set with a single
+	 * WT_ITEM_OFFP structure, that is, we've moved dup_count - 1 entries.
+	 */
+	/*lint -esym(613,leaf_page)
+	 * LINT complains leafpage may be used before being set -- that's not
+	 * correct, we aren't called with an NULL page.
+	 */
+	WT_CLEAR(data_item);
+	data_item.len = sizeof(WT_ITEM_OFFP);
+	data_item.type = WT_ITEM_OFFPAGE;
+	offpage_item.addr = page->addr;
+	offpage_item.records = dup_count;
+	p = (u_int8_t *)dup_data;
+	memcpy(p, &data_item, sizeof(data_item));
+	memcpy(p + sizeof(data_item), &offpage_item, sizeof(offpage_item));
+	leaf_page->hdr->u.entries -= (dup_count - 1);
+	leaf_page->first_free =
+	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(dup_data->len);
+	leaf_page->space_avail = db->pagesize -
+	    (u_int32_t)(leaf_page->first_free - (u_int8_t *)leaf_page->hdr);
 
 	/* Read in new duplicate records until the key changes. */
-	for (addr = root_addr; (ret = cb(db, &key, &data)) == 0;) {
+	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key->size == 0) {
 			__wt_db_errx(db, "zero-length keys are not supported");
 			goto err;
@@ -493,28 +500,29 @@ __wt_dup_offpage(DB *db,
 			data_item.type = WT_ITEM_DUP;
 
 		/* 
-		 * If there's insufficient space available, allocate a space
-		 * from the backing file and connect it to the in-memory tree.
+		 * If there's insufficient space available, allocate a new
+		 * page.
 		 */
-		if (WT_ITEM_SPACE_REQ(data->size) > space_avail) {
-			/* Allocate a new page. */
-			if ((ret = __wt_db_falloc(bt,
-			    WT_FRAGS_PER_PAGE(db), &next_hdr, &next_addr)) != 0)
+		if (WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
+			if ((ret = __wt_db_falloc(
+			    db, WT_FRAGS_PER_PAGE(db), &next)) != 0)
 				goto err;
-			next_hdr->type = WT_PAGE_DUP_LEAF;
-			next_hdr->prevaddr = addr;
-			next_hdr->nextaddr =
-			    next_hdr->prntaddr = WT_ADDR_INVALID;
+			next->hdr->type = WT_PAGE_DUP_LEAF;
+			next->hdr->nextaddr =
+			    next->hdr->prntaddr = WT_ADDR_INVALID;
+			next->hdr->prevaddr = page->addr;
+			page->hdr->nextaddr = next->addr;
 
 			/*
-			 * Because we start by allocating a new page and moving
-			 * the duplicate set onto it, we only have two states
-			 * here -- when we allocate the second page, and when
-			 * we allocate subsequent pages.  If this is the second
-			 * page, create an internal page and promote a data
-			 * item from the first page plus the current data item.
+			 * If this is the second page, create an internal page
+			 * and promote a key from the first page plus the
+			 * current key.
+			 *
 			 * If this is a subsequent page, promote the current
-			 * data item.
+			 * key.
+			 *
+			 * If this is the second or subsequent page, write the
+			 * previous page.
 			 */
 			switch (bulk_state) {
 			case SECOND_PAGE:
@@ -524,7 +532,7 @@ __wt_dup_offpage(DB *db,
 				 * of course.
 				 */
 				WT_CLEAR(tmpkey);
-				item = (WT_ITEM *)WT_PAGE_BYTE(hdr);
+				item = (WT_ITEM *)WT_PAGE_BYTE(page);
 				switch (item->type) {
 				case WT_ITEM_DUP:
 					tmpkey.data = WT_ITEM_BYTE(item);
@@ -542,60 +550,45 @@ __wt_dup_offpage(DB *db,
 					(void)__wt_database_format(db);
 					goto err;
 				}
-				if ((ret = __wt_db_promote(db, &parent,
-				    hdr, addr, &tmpkey)) != 0)
+				if ((ret = __wt_db_promote(
+				    db, &parent, page, &tmpkey)) != 0)
 					goto err;
 				bulk_state = SUBSEQUENT_PAGES;
 				/* FALLTHROUGH */
 			case SUBSEQUENT_PAGES:
-				if ((ret = __wt_db_promote(db, &parent,
-				    next_hdr, next_addr, data)) != 0)
+				if ((ret = __wt_db_promote(
+				    db, &parent, next, data)) != 0)
+					goto err;
+
+				if ((ret = __wt_db_fwrite(db, page)) != 0)
 					goto err;
 				break;
 			}
 
-			/* Write the last filled page. */
-			hdr->nextaddr = next_addr;
-			if ((ret = __wt_db_fwrite(bt,
-			    addr, WT_FRAGS_PER_PAGE(db), hdr)) != 0)
-				goto err;
-
-			space_avail = WT_DATA_SPACE(db->pagesize);
-			hdr = next_hdr;
-			addr = next_addr;
-			p = WT_PAGE_BYTE(hdr);
+			/* Switch to the next page. */
+			page = next;
 		}
 
-		++dup_count;
-		++hdr->u.entries;
-
 		/* Copy the data item onto the page. */
-		space_avail -= WT_ITEM_SPACE_REQ(data->size);
+		++dup_count;
+		++page->hdr->u.entries;
 		data_item.len = data->size;
-		memcpy(p, &data_item, sizeof(data_item));
-		memcpy(p + sizeof(data_item), data->data, data->size);
-		p += WT_ITEM_SPACE_REQ(data->size);
+		memcpy(page->first_free, &data_item, sizeof(data_item));
+		memcpy(page->first_free +
+		    sizeof(data_item), data->data, data->size);
+		page->space_avail -= WT_ITEM_SPACE_REQ(data->size);
+		page->first_free += WT_ITEM_SPACE_REQ(data->size);
 	}
 
 	/*
 	 * Write last page and parent -- ret values of 1 and 0 are both "OK",
-	 * the ret value of 1 just means we reached the end of the bulk input.
+	 * the ret value of 1 means we reached the end of the bulk input.
 	 */
-	if ((tret = __wt_db_fwrite(
-	    bt, addr, WT_FRAGS_PER_PAGE(db), hdr)) != 0 && ret == 1 || ret == 0)
+	if ((ret == 0 || ret == 1) && (tret = __wt_db_fwrite(db, page)) != 0)
 		ret = tret;
-	if ((tret = __wt_db_fwrite(bt, parent.addr,
-	    WT_FRAGS_PER_PAGE(db), parent.hdr)) != 0 && ret == 1 || ret == 0)
+	if (parent != NULL &&
+	    (ret == 0 || ret == 1) && (tret = __wt_db_fwrite(db, parent)) != 0)
 		ret = tret;
-
-	/* Write the caller's on-page object. */
-	data_item.len = sizeof(WT_ITEM_OFFP);
-	data_item.type = WT_ITEM_OFFPAGE;
-	offpage_item.addr = root_addr;
-	offpage_item.records = dup_count;
-	p = (u_int8_t *)dup_first;
-	memcpy(p, &data_item, sizeof(data_item));
-	memcpy(p + sizeof(data_item), &offpage_item, sizeof(offpage_item));
 
 	if (0) {
 err:		ret = WT_ERROR;
@@ -608,17 +601,15 @@ err:		ret = WT_ERROR;
  *	Promote the first item on a page to the parent.
  */
 static int
-__wt_db_promote(DB *db,
-    WT_PAGE *parent, WT_PAGE_HDR *hdr, u_int32_t addr, DBT *key)
+__wt_db_promote(DB *db, WT_PAGE **parentp, WT_PAGE *page, DBT *key)
 {
-	WT_BTREE *bt;
 	WT_ITEM item;
 	WT_ITEM_OFFP offp;
 	WT_ITEM_OVFL key_ovfl;
-	WT_PAGE palloc;
+	WT_PAGE *palloc, *parent;
 	int ret;
 
-	bt = db->idb->btree;
+	parent = *parentp;
 
 	WT_CLEAR(item);
 	WT_CLEAR(key_ovfl);
@@ -627,30 +618,32 @@ __wt_db_promote(DB *db,
 	 * If we don't already have a parent page, or if a new item pair won't
 	 * fit on the current page, allocate a new one.
 	 */
-	if (parent->hdr == NULL) {
-split:		WT_CLEAR(palloc);
-		if ((ret = __wt_db_falloc(bt,
-		    WT_FRAGS_PER_PAGE(db), &palloc.hdr, &palloc.addr)) != 0)
-			return (WT_ERROR);
-		palloc.hdr->type = WT_PAGE_INT;
-		palloc.hdr->prevaddr = parent->addr;
-		palloc.hdr->nextaddr = palloc.hdr->prntaddr = WT_ADDR_INVALID;
-		palloc.space_avail = WT_DATA_SPACE(db->pagesize);
-		palloc.p = WT_PAGE_BYTE(palloc.hdr);
+	if (parent == NULL) {
+split:		if ((ret =
+		    __wt_db_falloc(db, WT_FRAGS_PER_PAGE(db), &palloc)) != 0)
+			return (ret);
+		palloc->hdr->type = WT_PAGE_INT;
+		palloc->hdr->prevaddr =
+		    parent == NULL ? WT_ADDR_INVALID : parent->addr;
+		palloc->hdr->nextaddr = palloc->hdr->prntaddr = WT_ADDR_INVALID;
 
 		/* Write any previous parent page. */
-		if (parent->hdr != NULL) {
-			parent->hdr->nextaddr = palloc.addr;
-			if ((ret = __wt_db_fwrite(bt, parent->addr,
-			    WT_FRAGS_PER_PAGE(db), parent->hdr)) != 0)
-				return (WT_ERROR);
+		if (parent != NULL) {
+			parent->hdr->nextaddr = palloc->addr;
+			if ((ret = __wt_db_fwrite(db, parent)) != 0)
+				return (ret);
 		}
 
 		/* Swap pages. */
-		*parent = palloc;
+		parent = palloc;
 	}
 
-	/* See if both chunks will fit.  If they don't, we have to split. */
+	/*
+	 * See if both chunks will fit.  If they don't, we have to split.
+	 *
+	 * Lint thinks that key might be NULL -- it better not be.
+	 */
+	WT_ASSERT(db->ienv, key != NULL);
 	if (parent->space_avail <
 	    WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP)) +
 	    WT_ITEM_SPACE_REQ(
@@ -674,29 +667,32 @@ split:		WT_CLEAR(palloc);
 
 	/* Store the key. */
 	++parent->hdr->u.entries;
-	memcpy(parent->p, &item, sizeof(item));
-	memcpy(parent->p + sizeof(item), key->data, key->size);
-	parent->p += WT_ITEM_SPACE_REQ(key->size);
+	memcpy(parent->first_free, &item, sizeof(item));
+	memcpy(parent->first_free + sizeof(item), key->data, key->size);
+	parent->first_free += WT_ITEM_SPACE_REQ(key->size);
 	parent->space_avail -= WT_ITEM_SPACE_REQ(key->size);
 
 	/* Create the internal page reference. */
 	item.type = WT_ITEM_OFFPAGE;
 	item.len = sizeof(WT_ITEM_OFFP);
-	offp.addr = addr;
+	offp.addr = page->addr;
 	offp.records = 0;
 
 	/* Store the internal page reference. */
 	++parent->hdr->u.entries;
-	memcpy(parent->p, &item, sizeof(item));
-	memcpy(parent->p + sizeof(item), &offp, sizeof(offp));
-	parent->p += WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
+	memcpy(parent->first_free, &item, sizeof(item));
+	memcpy(parent->first_free + sizeof(item), &offp, sizeof(offp));
+	parent->first_free += WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
 	parent->space_avail -= WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
 
 	/*
 	 * Update our caller -- may already be set, but re-setting isn't
 	 * a problem.
 	 */
-	hdr->prntaddr = parent->addr;
+	page->hdr->prntaddr = parent->addr;
+
+	/* Return the last parent page. */
+	*parentp = parent;
 
 	return (0);
 }

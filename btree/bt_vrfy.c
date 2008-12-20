@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_item_walk(DB *, u_int32_t addr, WT_PAGE_HDR *);
+static int __wt_db_item_walk(DB *, WT_PAGE *);
 static int __wt_ovfl_item_copy(DB *, WT_ITEM_OVFL *, DBT *);
 
 /*
@@ -17,9 +17,14 @@ static int __wt_ovfl_item_copy(DB *, WT_ITEM_OVFL *, DBT *);
  *	Verify a single Btree page.
  */
 int
-__wt_db_page_verify(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
+__wt_db_page_verify(DB *db, WT_PAGE *page)
 {
+	WT_PAGE_HDR *hdr;
+	u_int32_t addr;
 	int ret;
+
+	hdr = page->hdr;
+	addr = page->addr;
 
 	/*
 	 * FUTURE:
@@ -41,15 +46,22 @@ __wt_db_page_verify(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
 		break;
 	default:
 		__wt_db_errx(db,
-		    "page at address %lu has an invalid type of %lu",
+		    "page at addr %lu has an invalid type of %lu",
 		    (u_long)addr, (u_long)hdr->type);
 		return (WT_ERROR);
 	}
 
-	if (hdr->unused[0] != '\0' ||
-	    hdr->unused[1] != '\0' || hdr->unused[2] != '\0') {
+	if (hdr->mem_off != 0 && hdr->mem_off != 1) {
 		__wt_db_errx(db,
-		    "page at address %lu has non-zero unused header fields");
+		    "page at addr %lu has illegal memory offset field",
+		    (u_long)addr);
+		return (WT_ERROR);
+	}
+
+	if (hdr->unused[0] != '\0' || hdr->unused[1] != '\0') {
+		__wt_db_errx(db,
+		    "page at addr %lu has non-zero unused header fields",
+		    (u_long)addr);
 		return (WT_ERROR);
 	}
 
@@ -63,7 +75,7 @@ __wt_db_page_verify(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
 	 * make sure we can read them without danger.
 	 */
 	if (hdr->type != WT_PAGE_OVFL &&
-	    (ret = __wt_db_item_walk(db, addr, hdr)) != 0)
+	    (ret = __wt_db_item_walk(db, page)) != 0)
 		return (ret);
 
 	return (0);
@@ -74,7 +86,7 @@ __wt_db_page_verify(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
  *	Walk the items on a page and verify them.
  */
 static int
-__wt_db_item_walk(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
+__wt_db_item_walk(DB *db, WT_PAGE *page)
 {
 	struct {
 		u_int32_t indx;			/* Item number */
@@ -85,11 +97,14 @@ __wt_db_item_walk(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
 	} *current, *last_data, *last_key, *swap_tmp, _a, _b, _c;
 	IENV *ienv;
 	WT_ITEM *item;
-	u_int8_t *p, *end;
-	u_int32_t i;
+	WT_PAGE_HDR *hdr;
+	u_int8_t *end;
+	u_int32_t addr, i;
 	int (*func)(DB *, const DBT *, const DBT *), ret;
 
 	ienv = db->ienv;
+	hdr = page->hdr;
+	addr = page->addr;
 	ret = 0;
 
 	/*
@@ -116,14 +131,14 @@ __wt_db_item_walk(DB *db, u_int32_t addr, WT_PAGE_HDR *hdr)
 	else
 		func = db->btree_compare;
 
-	p = WT_PAGE_BYTE(hdr);
 	end = (u_int8_t *)hdr + db->pagesize;
-	for (i = 1;
-	    i <= hdr->u.entries; ++i, p += WT_ITEM_SPACE_REQ(item->len)) {
+	for (item = (WT_ITEM *)page->first_data, i = 1;
+	    i <= hdr->u.entries;
+	    item = (WT_ITEM *)
+	    ((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len)), ++i) {
 		/* Check if this item is entirely on the page. */
-		if (p + sizeof(WT_ITEM) > end)
+		if ((u_int8_t *)item + sizeof(WT_ITEM) > end)
 			goto eop;
-		item = (WT_ITEM *)p;
 
 		/* Check the item's type. */
 		switch (item->type) {
@@ -185,8 +200,7 @@ item_len:			__wt_db_errx(db,
 		}
 
 		/* Check the unused fields. */
-		if (item->unused[0] != 0 ||
-		    item->unused[1] != 0 || item->unused[2] != 0) {
+		if (item->unused[0] != 0 || item->unused[1] != 0) {
 			__wt_db_errx(db,
 			    "item %lu on page at addr %lu has non-zero "
 			    "unused item fields", 
@@ -195,7 +209,7 @@ item_len:			__wt_db_errx(db,
 		}
 
 		/* Check if the item's data is entirely on the page. */
-		if (p + WT_ITEM_SPACE_REQ(item->len) > end) {
+		if ((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len) > end) {
 eop:			__wt_db_errx(db,
 			    "item %lu on page at addr %lu extends past the end "
 			    " of the page",
@@ -223,7 +237,7 @@ eop:			__wt_db_errx(db,
 		case WT_ITEM_DUP:
 			current->indx = i;
 			current->item = &current->item_std;
-			current->item_std.data = WT_ITEM_BYTE(p);
+			current->item_std.data = WT_ITEM_BYTE(item);
 			current->item_std.size = item->len;
 			break;
 		case WT_ITEM_KEY_OVFL:
@@ -299,17 +313,15 @@ err:		ret = WT_ERROR;
 static int
 __wt_ovfl_item_copy(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 {
-	WT_PAGE_HDR *ovfl_hdr;
-	WT_BTREE *bt;
+	WT_PAGE *ovfl_page;
 	u_int32_t frags, len;
 	int ret, tret;
 
-	bt = db->idb->btree;
 	ret = 0;
 
 	len = ovfl->len;
 	WT_OVERFLOW_BYTES_TO_FRAGS(db, len, frags);
-	if ((ret = __wt_db_fread(bt, ovfl->addr, frags, &ovfl_hdr)) != 0)
+	if ((ret = __wt_db_fread(db, ovfl->addr, frags, &ovfl_page)) != 0)
 		return (ret);
 
 	if (copy->data == NULL || copy->alloc_size < len) {
@@ -317,10 +329,9 @@ __wt_ovfl_item_copy(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 			goto err;
 		copy->alloc_size = len;
 	}
-	memcpy(copy->data, WT_PAGE_BYTE(ovfl_hdr), copy->size = len);
+	memcpy(copy->data, WT_PAGE_BYTE(ovfl_page), copy->size = len);
 
-err:	if ((tret =
-	    __wt_db_fdiscard(bt, ovfl->addr, ovfl_hdr)) != 0 && ret == 0)
+err:	if ((tret = __wt_db_fdiscard(db, ovfl_page)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
