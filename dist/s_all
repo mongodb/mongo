@@ -6,7 +6,7 @@
 
 trap 'rm -f __tmp_api dist.pyc; exit 0' 0 1 2 3 13 15
 
-python api_defines.py			# Build API flags include file
+python api_flags.py			# Build API flags include file
 python api.py				# Build API
 
 sh ./s_prototypes			# Build prototypes include file

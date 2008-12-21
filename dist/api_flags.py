@@ -5,10 +5,10 @@
 #
 # $Id$
 
-# Read the api_defines file and output a C header file using the minimum
+# Read the api_flags file and output a C header file using the minimum
 # number of distinct bits to ensure flags don't collide.
 #
-# The format of the api_defines file:
+# The format of the api_flags file:
 #	Name (usually a method name)
 #	<tab>	Flag
 
@@ -26,8 +26,8 @@ flag_re = re.compile(r'^\s+(\w+)')
 flag_cnt = {}		# Dictionary [flag] : [reference count]
 flag_methods = {}	# Dictionary [flag] : [method ...]
 method_mask = {}	# Dictionary [method] : [used flag mask]
-# Read the api_defines file, building a list of flags for each method.
-for line in open('api_defines', 'r'):
+# Read the api_flags file, building a list of flags for each method.
+for line in open('api_flags', 'r'):
 	if method_re.match(line):
 		method = method_re.match(line).group(1)
 		method_mask[method] = 0x0
@@ -54,7 +54,7 @@ for f in sorted(flag_cnt.iteritems(),\
 		mask &= ~method_mask[m]
 	if mask == 0:
 		print >> sys.stderr,\
-		    "api_defines: ran out of flags at %s method" % m
+		    "api_flags: ran out of flags at %s method" % m
 		sys.exit(1)
 	for b in bits:
 		if mask & b:
