@@ -11,39 +11,45 @@
 #############################################
 # Environment handles, methods and functions
 #############################################
-ENV					# Public handle
+Env					# Public handle
 
-IENV					# Private handle
-
-wt_db_create				# No flags
-
-Db.destroy				# No flags
-
-Db.dump
-	PRINTABLES
-
-Db.open
-	CREATE
-
-#############################################
-# DB handles, methods and functions
-#############################################
-DB					# Public handle
-	MAXKEY_NOTSET
-	PRIVATE_ENV
-
-IDB					# Private handle
-	CREATE
-
+IEnv					# Private handle
 
 wt_env_create
 
 Env.destroy
 
 Env.verbose
-	VERB_FILEOPS
-	VERB_FILEOPS_ALL
+	VERB_FILEOPS			# Verbose, major file operations
+	VERB_FILEOPS_ALL		# Verbose, all file operations
+#############################################
+# DB handles, methods and functions
+#############################################
+Db					# Public handle
+	MAXKEY_NOTSET			# Application never set a maxkey size
+	PRIVATE_ENV			# Application never created an Env
+
+IDb					# Private handle
+	CREATE				# Create any backing files
+
+wt_db_create
+
+Db.bulk_load
+	DUPLICATES			# Load contains duplicates
+	SORTED_INPUT			# Load input is in sorted order
+
+Db.close
+
+Db.destroy
+
+Db.dump
+	DEBUG				# Debugging format
+	PRINTABLES			# Display printable characters
+
+Db.open
+	CREATE				# Create any backing files
 
 #############################################
-# Internal functions
+# Other.
 #############################################
+Dbt
