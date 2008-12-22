@@ -27,28 +27,67 @@ __wt_db_force_load(void)
  *	Dump a database in debugging mode.
  */
 int
-__wt_db_dump_debug(DB *db, FILE *stream)
+__wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 {
+	WT_BTREE *bt;
 	WT_PAGE *page;
-	u_int32_t addr;
-	int ret;
+	u_int32_t addr, checksum, frags;
+	int do_close, ret, tret;
+
+	bt = db->idb->btree;
+
+	/* Optionally dump to a file, else to a stream, default to stdout. */
+	do_close = 0;
+	if (ofile != NULL) {
+		if ((fp = fopen(ofile, "w")) == NULL)
+			return (WT_ERROR);
+		do_close = 1;
+	} else if (fp == NULL)
+		fp = stdout;
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
+		/*
+		 * Read a database page of information.   The one nasty case
+		 * is if it turns out to be an overflow page.  In which case,
+		 * find out how bit it really is, and then re-read the right
+		 * size.
+		 */
+		frags = WT_FRAGS_PER_PAGE(db);
 		if ((ret =
-		    __wt_db_fread(db, addr, WT_FRAGS_PER_PAGE(db), &page)) != 0)
+		    __wt_db_fread(db, addr, frags, &page, WT_NO_CHECKSUM)) != 0)
 			break;
+		if (page->hdr->type == WT_PAGE_OVFL) {
+			frags = WT_BYTES_TO_FRAGS(db, page->hdr->u.datalen);
+			 if ((ret = __wt_db_fdiscard(db, page)) != 0)
+				break;
+			if ((ret = __wt_db_fread(
+			    db, addr, frags, &page, WT_NO_CHECKSUM)) != 0)
+				break;
+		}
 
-		fprintf(stream, "====== %lu\n",  (u_long)addr);
+		/*
+		 * We skipped verifying the checksum because dump reads blocks
+		 * we can't identify.  Once we have a block we believe in, then
+		 * verify the checksum.
+		 */
+		checksum = page->hdr->checksum;
+		page->hdr->checksum = 0;
+		if (checksum == __wt_cksum(page->hdr,
+		    (u_int32_t)WT_FRAGS_TO_BYTES(db, frags)))
+			ret = __wt_db_dump_page(db, page, NULL, fp);
+		else
+			ret = __wt_cksum_err(db, addr);
 
-		if ((ret = __wt_db_dump_page(db, page, NULL, stream)) != 0)
-			break;
+		if ((tret = __wt_db_fdiscard(db, page)) != 0 && ret == 0)
+			ret = tret;
 
-		addr = page->hdr->nextaddr;
-		 if ((ret = __wt_db_fdiscard(db, page)) != 0)
-			 break;
-		if (addr == WT_ADDR_INVALID)
+		addr += frags;
+		if (ret != 0 || addr >= bt->frags)
 			break;
 	}
+
+	if (do_close)
+		(void)fclose(fp);
 
 	return (ret);
 }
@@ -63,7 +102,8 @@ __wt_db_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	WT_PAGE *page;
 	int ret, tret;
 
-	if ((ret = __wt_db_fread(db, addr, WT_FRAGS_PER_PAGE(db), &page)) != 0)
+	if ((ret =
+	    __wt_db_fread(db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 		return (ret);
 
 	ret = __wt_db_dump_page(db, page, ofile, fp);
@@ -87,8 +127,6 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 	u_int8_t *p;
 	int do_close;
 
-	hdr = page->hdr;
-
 	/* Optionally dump to a file, else to a stream, default to stdout. */
 	do_close = 0;
 	if (ofile != NULL) {
@@ -98,16 +136,34 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 	} else if (fp == NULL)
 		fp = stdout;
 
-	fprintf(fp, "{\n%s: ", __wt_db_hdr_type(hdr->type));
+	fprintf(fp, "fragments: %lu-%lu {\n",
+	    (u_long)page->addr, (u_long)page->addr + page->frags);
+
+	hdr = page->hdr;
+	fprintf(fp, "%s: ", __wt_db_hdr_type(hdr->type));
 	if (hdr->type == WT_PAGE_OVFL)
 		fprintf(fp, "%lu bytes", (u_long)hdr->u.datalen);
 	else
 		fprintf(fp, "%lu entries", (u_long)hdr->u.entries);
-	fprintf(fp, "\nlsn %lu/%lu, checksum %lx, "
-	    "prntaddr %lu, prevaddr %lu, nextaddr %lu\n}\n",
-	    (u_long)hdr->lsn.f, (u_long)hdr->lsn.o,
-	    (u_long)hdr->checksum, (u_long)hdr->prntaddr,
-	    (u_long)hdr->prevaddr, (u_long)hdr->nextaddr);
+	fprintf(fp, ", lsn %lu/%lu\n", (u_long)hdr->lsn.f, (u_long)hdr->lsn.o);
+	if (hdr->prntaddr == WT_ADDR_INVALID)
+		fprintf(fp, "prntaddr (none), ");
+	else
+		fprintf(fp, "prntaddr %lu, ", (u_long)hdr->prntaddr);
+	if (hdr->prevaddr == WT_ADDR_INVALID)
+		fprintf(fp, "prevaddr (none), ");
+	else
+		fprintf(fp, "prevaddr %lu, ", (u_long)hdr->prevaddr);
+	if (hdr->nextaddr == WT_ADDR_INVALID)
+		fprintf(fp, "nextaddr (none)");
+	else
+		fprintf(fp, "nextaddr %lu", (u_long)hdr->nextaddr);
+
+	fprintf(fp, "\nfirst-data %#lx, first-free %#lx, space avail: %lu\n",
+	    (u_long)page->first_data,
+	    (u_long)page->first_free, (u_long)page->space_avail);
+
+	fprintf(fp, "}\n");
 
 	if (hdr->type == WT_PAGE_OVFL)
 		return (0);
@@ -121,6 +177,7 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		fprintf(fp, "}\n");
 		p += WT_ITEM_SPACE_REQ(item->len);
 	}
+	fprintf(fp, "\n");
 
 	if (do_close)
 		(void)fclose(fp);
@@ -171,7 +228,7 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)item_ovfl->addr, (u_long)item_ovfl->len);
 		WT_OVERFLOW_BYTES_TO_FRAGS(db, item_ovfl->len, frags);
-		if (__wt_db_fread(db, item_ovfl->addr, frags, &page) == 0) {
+		if (__wt_db_fread(db, item_ovfl->addr, frags, &page, 0) == 0) {
 			__wt_db_print(WT_PAGE_BYTE(page), item_ovfl->len, fp);
 			(void)__wt_db_fdiscard(db, page);
 		}
