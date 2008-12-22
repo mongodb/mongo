@@ -123,8 +123,10 @@ inline bool setClient(const char *ns, const char *path=dbpath) {
     // looks like a 'first operation'. so that breaks this log message's 
     // meaningfulness.  instead of fixing (which would be better), we just
     // stop showing for now.
-    if( !master )
-        log() << "first operation for database " << key << endl;
+	// 2008-12-22 We now open every database on startup, so this log is
+	// no longer helpful.  Commenting.
+//    if( !master )
+//        log() << "first operation for database " << key << endl;
 
 	char cl[256];
 	nsToClient(ns, cl);
