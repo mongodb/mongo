@@ -47,6 +47,134 @@ bool useCursors = true;
 void closeAllSockets();
 void flushOpLog() { _oplog.flush(); }
 
+int ctr = 0;
+bool quiet = false;
+
+// Returns false when request includes 'end'
+bool assembleResponse( Message &m, DbResponse &dbresponse ) {
+	dblock lk;
+	
+	stringstream ss;
+	char buf[64];
+	time_t_to_String(time(0), buf);
+	buf[20] = 0; // don't want the year
+	ss << buf;
+	//		ss << curTimeMillis() % 10000 << ' ';
+	
+	Timer t;
+	database = 0;
+	curOp = 0;
+	
+	int ms;
+	bool log = false;
+	curOp = m.data->operation();
+	
+#if 0
+	/* use this if you only want to process operations for a particular namespace.  
+	 maybe add to cmd line parms or something fancier.
+	 */
+	DbMessage ddd(m);
+	if( strncmp(ddd.getns(), "clusterstock", 12) != 0 ) { 
+		static int q;
+		if( ++q < 20 ) 
+			cout << "TEMP skip " << ddd.getns() << endl;
+		goto skip;
+	}
+#endif
+	
+	if( m.data->operation() == dbMsg ) { 
+		ss << "msg ";
+		char *p = m.data->_data;
+		int len = strlen(p);
+		if( len > 400 ) 
+			cout << curTimeMillis() % 10000 << 
+			" long msg received, len:" << len << 
+			" ends with: " << p + len - 10 << endl;
+		bool end = strcmp("end", p) == 0;
+		Message *resp = new Message();
+		resp->setData(opReply, "i am fine");
+		dbresponse.response = resp;
+		dbresponse.responseTo = m.data->id;
+		//dbMsgPort.reply(m, resp);
+		if( end )
+			return false;
+	}
+	else if( m.data->operation() == dbQuery ) { 
+		receivedQuery(dbresponse, m, ss, true);
+	}
+	else if( m.data->operation() == dbInsert ) {
+		OPWRITE;
+		try { 
+			ss << "insert ";
+			receivedInsert(m, ss);
+		}
+		catch( AssertionException& e ) { 
+			problem() << " Caught Assertion insert, continuing\n";
+			ss << " exception " + e.toString();
+		}
+	}
+	else if( m.data->operation() == dbUpdate ) {
+		OPWRITE;
+		try { 
+			ss << "update ";
+			receivedUpdate(m, ss);
+		}
+		catch( AssertionException& e ) { 
+			problem() << " Caught Assertion update, continuing" << endl; 
+			ss << " exception " + e.toString();
+		}
+	}
+	else if( m.data->operation() == dbDelete ) {
+		OPWRITE;
+		try { 
+			ss << "remove ";
+			receivedDelete(m);
+		}
+		catch( AssertionException& e ) { 
+			problem() << " Caught Assertion receivedDelete, continuing" << endl; 
+			ss << " exception " + e.toString();
+		}
+	}
+	else if( m.data->operation() == dbGetMore ) {
+		OPREAD;
+		DEV log = true;
+		ss << "getmore ";
+		receivedGetMore(dbresponse, m, ss);
+	}
+	else if( m.data->operation() == dbKillCursors ) { 
+		OPREAD;
+		try {
+			log = true;
+			ss << "killcursors ";
+			receivedKillCursors(m);
+		}
+		catch( AssertionException& e ) { 
+			problem() << " Caught Assertion in kill cursors, continuing" << endl; 
+			ss << " exception " + e.toString();
+		}
+	}
+	else {
+		cout << "    operation isn't supported: " << m.data->operation() << endl;
+		assert(false);
+	}
+	
+	ms = t.millis();
+	log = log || (ctr++ % 512 == 0 && !quiet);
+	DEV log = true;
+	if( log || ms > 100 ) {
+		ss << ' ' << t.millis() << "ms";
+		cout << ss.str().c_str() << endl;
+	}
+	if( database && database->profile >= 1 ) { 
+		if( database->profile >= 2 || ms >= 100 ) { 
+			// profile it
+			profile(ss.str().c_str()+20/*skip ts*/, ms);
+		}
+	}
+	
+	return true;
+}
+
 void killCursors(int n, long long *ids);
 void receivedKillCursors(Message& m) {
 	int *x = (int *) m.data->_data;
@@ -58,6 +186,23 @@ void receivedKillCursors(Message& m) {
 		assert( n < 30000 );
 	}
 	killCursors(n, (long long *) x);
+}
+
+void closeClient( const char *cl, const char *path ) {
+    /* reset haveLogged in local.dbinfo */
+    if( string("local") != cl ) {
+        DBInfo i(cl);
+        i.dbDropped();
+    }
+	
+	/* important: kill all open cursors on the database */
+	string prefix(cl);
+	prefix += '.';
+	ClientCursor::invalidate(prefix.c_str());
+	
+	eraseDatabase( cl, path );
+	delete database; // closes files
+	database = 0;
 }
 
 void receivedUpdate(Message& m, stringstream& ss) {
@@ -191,7 +336,6 @@ void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort,
 }
 
 bool objcheck = false;
-bool quiet = false;
 
 void receivedInsert(Message& m, stringstream& ss) {
 	DbMessage d(m);
@@ -212,7 +356,6 @@ void receivedInsert(Message& m, stringstream& ss) {
 	}
 }
 
-int ctr = 0;
 extern int callDepth;
 
 class JniMessagingPort : public AbstractMessagingPort { 

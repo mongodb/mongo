@@ -137,6 +137,10 @@ inline bool setClient(const char *ns, const char *path=dbpath) {
 	return justCreated;
 }
 
+// shared functionality for removing references to a database from this program instance
+// does not delete the files on disk
+void closeClient( const char *cl, const char *path = dbpath );
+
 inline void eraseDatabase( const char *ns, const char *path=dbpath ) {
 	string key = getKey( ns, path );
 	databases.erase( key );

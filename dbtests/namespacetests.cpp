@@ -86,7 +86,7 @@ namespace NamespaceTests {
 				ASSERT_EQUALS( "testIndex", id().indexName() );
 				ASSERT_EQUALS( ns(), id().parentNS() );
 				// check equal
-				ASSERT( !id().keyPattern().woCompare( key() ) );
+				ASSERT_EQUALS( key(), id().keyPattern() );
 			}
 		};
 		
@@ -97,11 +97,11 @@ namespace NamespaceTests {
 				BSONObjBuilder b, e;
 				b.append( "b", 4 );
 				b.append( "a", 5 );
-				e.append( "a", 5 );
+				e.append( "", 5 );
 				set< BSONObj > keys;
 				id().getKeysFromObject( b.done(), keys );
 				ASSERT_EQUALS( 1, keys.size() );
-				ASSERT( !keys.begin()->woCompare( e.done() ) );
+				ASSERT_EQUALS( e.done(), *keys.begin() );
 			}
 		};
 		
@@ -112,13 +112,12 @@ namespace NamespaceTests {
 				BSONObjBuilder a, e, b;
 				b.append( "b", 4 );
 				a.append( "a", b.done() );
-				e.append( "a", b.done() );
 				a.append( "c", "foo" );
+				e.append( "", 4 );
 				set< BSONObj > keys;
 				id().getKeysFromObject( a.done(), keys );
 				ASSERT_EQUALS( 1, keys.size() );
-				ASSERT_EQUALS( string( "b" ), keys.begin()->firstElement().fieldName() );
-				ASSERT_EQUALS( 4, keys.begin()->firstElement().number() );
+				ASSERT_EQUALS( e.done(), *keys.begin() );
 			}
 		private:
 			virtual BSONObj key() const { return aDotB(); }
@@ -136,8 +135,9 @@ namespace NamespaceTests {
 				ASSERT_EQUALS( 3, keys.size() );
 				int j = 1;
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
-					ASSERT_EQUALS( string( "a" ), i->firstElement().fieldName() );
-					ASSERT_EQUALS( j, i->firstElement().number() );
+					BSONObjBuilder b;
+					b.append( "", j );
+					ASSERT_EQUALS( b.done(), *i );
 				}
 			}
 		};
@@ -155,9 +155,10 @@ namespace NamespaceTests {
 				ASSERT_EQUALS( 3, keys.size() );
 				int j = 1;
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
-					ASSERT_EQUALS( string( "a" ), i->firstElement().fieldName() );
-					ASSERT_EQUALS( j, i->firstElement().number() );
-					ASSERT_EQUALS( 2, i->getField( "b" ).number() );
+					BSONObjBuilder b;
+					b.append( "", j );
+					b.append( "", 2 );
+					ASSERT_EQUALS( b.done(), *i );
 				}
 			}
 		private:
@@ -177,8 +178,10 @@ namespace NamespaceTests {
 				ASSERT_EQUALS( 3, keys.size() );
 				int j = 1;
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
-					ASSERT_EQUALS( string( "first" ), i->firstElement().fieldName() );
-					ASSERT_EQUALS( j, i->getField( "a" ).number() );
+					BSONObjBuilder b;
+					b.append( "", 5 );
+					b.append( "", j );
+					ASSERT_EQUALS( b.done(), *i );
 				}
 			}
 		private:
@@ -204,8 +207,9 @@ namespace NamespaceTests {
 				ASSERT_EQUALS( 3, keys.size() );
 				int j = 1;
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
-					ASSERT_EQUALS( string( "b" ), i->firstElement().fieldName() );
-					ASSERT_EQUALS( j, i->firstElement().number() );
+					BSONObjBuilder b;
+					b.append( "", j );
+					ASSERT_EQUALS( b.done(), *i );
 				}
 			}
 		private:

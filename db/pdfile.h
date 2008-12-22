@@ -27,6 +27,7 @@
 
 // see version, versionMinor, below.
 const int VERSION = 4;
+const int VERSION_MINOR = 2;
 
 #include "../stdafx.h"
 #include "../util/mmap.h"
@@ -40,7 +41,7 @@ class Record;
 class Cursor;
 
 void dropDatabase(const char *ns);
-bool repairDatabase(const char *ns, bool preserveClonedFilesOnFailure, bool backupOriginalFiles);
+bool repairDatabase(const char *ns, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 void dropNS(string& dropNs);;
 bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
 
@@ -212,9 +213,12 @@ public:
 
 	static int headerSize() { return sizeof(PDFHeader) - 4; }
 
+	bool currentVersion() const {
+		return ( version == VERSION ) && ( versionMinor == VERSION_MINOR );
+	}
+	
 	bool uninitialized() { 
 		if( version == 0 ) return true; 
-		assert(version == VERSION); 
 		return false; 
 	}
 
@@ -230,11 +234,11 @@ public:
 			assert( headerSize() == 8192 );
 			fileLength = filelength;
 			version = VERSION;
-			versionMinor = 0;
+			versionMinor = VERSION_MINOR;
 			unused.setOfs( fileno, headerSize() );
 			assert( (data-(char*)this) == headerSize() );
 			unusedLength = fileLength - headerSize() - 16;
-			memcpy(data+unusedLength, "      \nthe end\n", 16); 
+			memcpy(data+unusedLength, "      \nthe end\n", 16);
 		}
 	}
 };

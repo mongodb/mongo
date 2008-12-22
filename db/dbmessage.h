@@ -24,7 +24,7 @@
 
 class DbMessage {
 public:
-	DbMessage(Message& _m) : m(_m) {
+	DbMessage(const Message& _m) : m(_m) {
 		theEnd = _m.data->_data + _m.data->dataLen();
 		int *r = (int *) _m.data->_data;
 		reserved = *r;
@@ -81,10 +81,10 @@ public:
 		return js;
 	}
 
-    Message& msg() { return m; }
+    const Message& msg() { return m; }
 
 private:
-	Message& m;
+	const Message& m;
 	int reserved;
 	const char *data;
 	const char *nextjsobj;

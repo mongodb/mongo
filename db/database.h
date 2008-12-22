@@ -27,6 +27,7 @@ public:
 	Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
 	name(nm),
 	path(_path) { 
+		assert( !string( nm ).empty() );
 		justCreated = namespaceIndex.init(_path, nm);
 		profile = 0;
 		profileName = name + ".system.profile";

@@ -432,7 +432,8 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 	int arrayPos = -1;
 	for( int i = 0; keyIter.more(); ++i ) {
 		BSONElement e = keyIter.next();
-		if( e.eoo() ) break;
+		if( e.eoo() )
+			break;
 		if( e.type() == Array ) {
 			uassert( "Index cannot be created on parallel arrays.",
 					arrayPos == -1 );
@@ -441,27 +442,36 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 		}
 	}
 	if( arrayPos == -1 ) {
-		b.decouple();
-		key.iWillFree();
-		assert( !key.isEmpty() );
-		keys.insert(key);
+		BSONObjBuilder b;
+		BSONObjIterator keyIter( key );
+		while( keyIter.more() ) {
+			BSONElement f = keyIter.next();
+			if ( f.eoo() )
+				break;
+			b.append( f );
+		}
+		BSONObj o = b.doneAndDecouple();
+		assert( !o.isEmpty() );
+		keys.insert(o);
 		return;
 	}
 	BSONObj arr = arrayElt.embeddedObject();
 	BSONObjIterator arrIter(arr);
 	while( arrIter.more() ) { 
 		BSONElement e = arrIter.next();
-		if( e.eoo() ) break;
+		if( e.eoo() )
+			break;
 
 		BSONObjBuilder b;
 		BSONObjIterator keyIter( key );
 		for( int i = 0; keyIter.more(); ++i ) {
 			BSONElement f = keyIter.next();
-			if ( f.eoo() ) break;
+			if ( f.eoo() )
+				break;
 			if ( i != arrayPos )
 				b.append( f );
 			else
-				b.appendAs( e, arrayElt.fieldName() );
+				b.appendAs( e, "" );
 		}
 		
 		BSONObj o = b.doneAndDecouple();
@@ -924,25 +934,6 @@ void pdfileInit() {
 
 #include "clientcursor.h"
 
-// shared functionality for removing references to a database
-// does not delete the files on disk
-void _dropDatabase( const char *cl, const char *path = dbpath ) {
-    /* reset haveLogged in local.dbinfo */
-    if( string("local") != cl ) {
-        DBInfo i(cl);
-        i.dbDropped();
-    }
-	
-	/* important: kill all open cursors on the database */
-	string prefix(cl);
-	prefix += '.';
-	ClientCursor::invalidate(prefix.c_str());
-	
-	eraseDatabase( cl, path );
-	delete database; // closes files
-	database = 0;
-}
-
 void dropDatabase(const char *ns) { 
 	// ns is of the form "<dbname>.$cmd"
 	char cl[256];
@@ -950,7 +941,7 @@ void dropDatabase(const char *ns) {
 	problem() << "dropDatabase " << cl << endl;
 	assert( database->name == cl );
 
-	_dropDatabase( cl );
+	closeClient( cl );
 	_deleteDataFiles(cl);	
 }
 
@@ -1022,17 +1013,17 @@ bool repairDatabase( const char *ns, bool preserveClonedFilesOnFailure,
 	
 	string errmsg;
 	bool res = cloneFrom(localhost.c_str(), errmsg, dbName, /*logForReplication=*/false, /*slaveok*/false);
-	_dropDatabase( dbName, tmpPathString.c_str() );
+	closeClient( dbName, tmpPathString.c_str() );
 
 	if ( !res ) {
-		problem() << "clone failed" << dbName << endl;
+		problem() << "clone failed for " << dbName << endl;
 		if ( !preserveClonedFilesOnFailure )
 			BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( tmpPath ) );
 		return false;
 	}
 
 	assert( !setClientTempNs( dbName ) );
-	_dropDatabase( dbName );
+	closeClient( dbName );
 	
 	if( backupOriginalFiles )
 		_renameForBackup( dbName, tmpPath );

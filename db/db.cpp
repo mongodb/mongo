@@ -115,6 +115,7 @@ void pdfileInit();
 void listen(int port) { 
 	const char *Version = "db version: 122";
 	problem() << Version << endl;
+	problem() << "pdfile version " << VERSION << "." << VERSION_MINOR << endl;
 	pdfileInit();
 	//testTheDb();
 	log() << "waiting for connections on port " << port << "..." << endl;
@@ -149,7 +150,6 @@ void connThread()
 	Message m;
 	while( 1 ) { 
 		m.reset();
-		stringstream ss;
 
 		if( !dbMsgPort.recv(m) ) {
 			log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
@@ -157,137 +157,20 @@ void connThread()
 			break;
 		}
 
-		char buf[64];
-		time_t_to_String(time(0), buf);
-		buf[20] = 0; // don't want the year
-		ss << buf;
-		//		ss << curTimeMillis() % 10000 << ' ';
-
 		DbResponse dbresponse;
-		{
-			dblock lk;
-			Timer t;
-			database = 0;
-			curOp = 0;
-
-			int ms;
-			bool log = false;
-			curOp = m.data->operation();
-
-#if 0
-				/* use this if you only want to process operations for a particular namespace.  
-				maybe add to cmd line parms or something fancier.
-				*/
-				DbMessage ddd(m);
-				if( strncmp(ddd.getns(), "clusterstock", 12) != 0 ) { 
-					static int q;
-					if( ++q < 20 ) 
-						cout << "TEMP skip " << ddd.getns() << endl;
-					goto skip;
-				}
-#endif
-
-			if( m.data->operation() == dbMsg ) { 
-				ss << "msg ";
-				char *p = m.data->_data;
-				int len = strlen(p);
-				if( len > 400 ) 
-					cout << curTimeMillis() % 10000 << 
-					" long msg received, len:" << len << 
-					" ends with: " << p + len - 10 << endl;
-				bool end = strcmp("end", p) == 0;
-				Message *resp = new Message();
-				resp->setData(opReply, "i am fine");
-				dbresponse.response = resp;
-				dbresponse.responseTo = m.data->id;
-				//dbMsgPort.reply(m, resp);
-				if( end ) {
-					cout << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
-					if( dbMsgPort.farEnd.isLocalHost() ) { 
-						dbMsgPort.shutdown();
-						sleepmillis(50);
-						problem() << "exiting end msg" << endl;
-						exit(EXIT_SUCCESS);
-					}
-					else { 
-						cout << "  (not from localhost, ignoring end msg)" << endl;
-					}
-				}
+		if( !assembleResponse( m, dbresponse ) ) {
+			cout << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
+			if( dbMsgPort.farEnd.isLocalHost() ) { 
+				dbMsgPort.shutdown();
+				sleepmillis(50);
+				problem() << "exiting end msg" << endl;
+				exit(EXIT_SUCCESS);
 			}
-			else if( m.data->operation() == dbQuery ) { 
-				receivedQuery(dbresponse, m, ss, true);
+			else { 
+				cout << "  (not from localhost, ignoring end msg)" << endl;
 			}
-			else if( m.data->operation() == dbInsert ) {
-				OPWRITE;
-				try { 
-					ss << "insert ";
-					receivedInsert(m, ss);
-				}
-				catch( AssertionException& e ) { 
-					problem() << " Caught Assertion insert, continuing\n";
-					ss << " exception " + e.toString();
-				}
-			}
-			else if( m.data->operation() == dbUpdate ) {
-				OPWRITE;
-				try { 
-					ss << "update ";
-					receivedUpdate(m, ss);
-				}
-				catch( AssertionException& e ) { 
-					problem() << " Caught Assertion update, continuing" << endl; 
-					ss << " exception " + e.toString();
-				}
-			}
-			else if( m.data->operation() == dbDelete ) {
-				OPWRITE;
-				try { 
-					ss << "remove ";
-					receivedDelete(m);
-				}
-				catch( AssertionException& e ) { 
-					problem() << " Caught Assertion receivedDelete, continuing" << endl; 
-					ss << " exception " + e.toString();
-				}
-			}
-			else if( m.data->operation() == dbGetMore ) {
-				OPREAD;
-				DEV log = true;
-				ss << "getmore ";
-				receivedGetMore(dbresponse, m, ss);
-			}
-			else if( m.data->operation() == dbKillCursors ) { 
-				OPREAD;
-				try {
-					log = true;
-					ss << "killcursors ";
-					receivedKillCursors(m);
-				}
-				catch( AssertionException& e ) { 
-					problem() << " Caught Assertion in kill cursors, continuing" << endl; 
-					ss << " exception " + e.toString();
-				}
-			}
-			else {
-				cout << "    operation isn't supported: " << m.data->operation() << endl;
-				assert(false);
-			}
-
-			ms = t.millis();
-			log = log || (ctr++ % 512 == 0 && !quiet);
-			DEV log = true;
-			if( log || ms > 100 ) {
-				ss << ' ' << t.millis() << "ms";
-				cout << ss.str().c_str() << endl;
-			}
-			if( database && database->profile >= 1 ) { 
-				if( database->profile >= 2 || ms >= 100 ) { 
-					// profile it
-					profile(ss.str().c_str()+20/*skip ts*/, ms);
-				}
-			}
-
-		} /* end lock */
+		}
+		
 		if( dbresponse.response ) 
 			dbMsgPort.reply(m, *dbresponse.response, dbresponse.responseTo);
 	}
@@ -388,7 +271,30 @@ void setupSignals() {
 void setupSignals() {}
 #endif
 
-void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc = null) { 
+
+void repairDatabases() {
+	dblock lk;
+	boost::filesystem::path path( dbpath );
+	for( boost::filesystem::directory_iterator i( path );
+		i != boost::filesystem::directory_iterator(); ++i ) {
+		string fileName = i->leaf();
+		if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" ) {
+			string dbName = fileName.substr( 0, fileName.length() - 3 );
+			assert( !setClientTempNs( dbName.c_str() ) );
+			PhysicalDataFile *p = database->getFile( 0 );
+			PDFHeader *h = p->getHeader();
+			if ( !h->currentVersion() ) {
+				// QUESTION: Repair even if file format is higher version than code?
+				cout << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << endl;
+				repairDatabase( dbName.c_str() );
+			} else {
+				closeClient( dbName.c_str() );
+			}
+		}
+	}
+}
+
+void initAndListen(int listenPort, const char *appserverLoc = null) { 
   if( opLogging ) 
     log() << "opLogging = " << opLogging << endl;
   _oplog.init();
@@ -415,6 +321,8 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
 #endif
 
 	setupSignals();
+	
+	repairDatabases();
 
     listen(listenPort);    
 }
@@ -555,7 +463,7 @@ int main(int argc, char* argv[], char *envp[] )
 			}
         }
         
-        initAndListen(port, dbpath, appsrvPath);
+        initAndListen(port, appsrvPath);
         
 		exit(0);
 	}

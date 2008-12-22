@@ -324,7 +324,7 @@ bool BSONObj::valid() const {
 }
 
 /* well ordered compare */
-int BSONObj::woCompare(const BSONObj& r) const { 
+int BSONObj::woCompare(const BSONObj& r, bool considerFieldName) const { 
 	if( isEmpty() )
 		return r.isEmpty() ? 0 : -1;
 	if( r.isEmpty() )
@@ -340,7 +340,7 @@ int BSONObj::woCompare(const BSONObj& r) const {
 		if ( l.eoo() )
 			return 0;
 		
-		int x = l.woCompare( r );
+		int x = l.woCompare( r, considerFieldName );
 		if ( x != 0 )
 			return x;
 	}
@@ -405,7 +405,7 @@ BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b) const {
 		BSONElement x = getFieldDotted(e.fieldName());
 		if( x.eoo() )
 			return BSONObj();
-		b.append(x);
+		b.appendAs(x, "");
 	}
 	return b.done();
 }
@@ -419,7 +419,7 @@ BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) {
 		BSONElement x = getField(e.fieldName());
 		if( x.eoo() )
 			return BSONObj();
-		b.append(x);
+		b.appendAs(x, "");
 	}
 	return b.doneAndDecouple();
 }
@@ -521,6 +521,10 @@ int BSONObj::addFields(BSONObj& from, set<string>& fields) {
 	}
 
 	return n;
+}
+
+ostream& operator<<( ostream &s, const BSONObj &o ) {
+	return s << o.toString();
 }
 
 /*-- test things ----------------------------------------------------*/
