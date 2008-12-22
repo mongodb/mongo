@@ -43,6 +43,7 @@ bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg
 		return false;
 	}
 	
+#if !defined(NOJNI)
 	jlong f = JavaJS->functionCreate(code);
 	if( f == 0 ) { 
 		errmsg = "compile failed";
@@ -90,7 +91,7 @@ bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg
 	else if( type == Bool ) {
 		result.appendBool("retval", s.getBoolean("return"));
 	}
-
+#endif
 	return true;
 }
 
