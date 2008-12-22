@@ -298,7 +298,7 @@ void initAndListen(int listenPort, const char *appserverLoc = null) {
   if( opLogging ) 
     log() << "opLogging = " << opLogging << endl;
   _oplog.init();
-
+	
 #if !defined(_WIN32)
   assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
 #endif
@@ -385,7 +385,7 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "run") == 0 ) {
-			initAndListen(port, dbpath);
+			initAndListen(port);
 			return 0;
 		}
 		if( strcmp(argv[1], "longmsg") == 0 ) {
