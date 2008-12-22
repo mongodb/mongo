@@ -122,15 +122,17 @@ err:	if (page->hdr != NULL)
  *	Read a chunk of a file.
  */
 int
-__wt_db_fread(DB *db, u_int32_t addr, u_int32_t frags, WT_PAGE **pagep)
+__wt_db_fread(DB *db,
+    u_int32_t addr, u_int32_t frags, WT_PAGE **pagep, u_int32_t flags)
 {
 	IENV *ienv;
 	WT_BTREE *bt;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	size_t bytes;
-	u_int32_t checksum;
 	int ret;
+
+	DB_FLAG_CHK(db, "__wt_db_fread", flags, WT_APIMASK_DB_FREAD);
 
 	ienv = db->ienv;
 	bt = db->idb->btree;
@@ -148,13 +150,13 @@ __wt_db_fread(DB *db, u_int32_t addr, u_int32_t frags, WT_PAGE **pagep)
 		goto err;
 
 	/* Verify the checksum. */
-	checksum = hdr->checksum;
-	hdr->checksum = 0;
-	if (checksum != __wt_cksum(hdr, bytes)) {
-		__wt_db_errx(db,
-		    "Block %lu was read and had a checksum error",
-		    (u_long)bytes);
-		goto err;
+	if (!LF_ISSET(WT_NO_CHECKSUM)) {
+		u_int32_t checksum = hdr->checksum;
+		hdr->checksum = 0;
+		if (checksum != __wt_cksum(hdr, bytes)) {
+			ret = __wt_cksum_err(db, addr);
+			goto err;
+		}
 	}
 
 	/* Allocate an in-memory page structure. */
@@ -168,7 +170,7 @@ __wt_db_fread(DB *db, u_int32_t addr, u_int32_t frags, WT_PAGE **pagep)
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, page)) != 0)
+	if ((ret = __wt_db_page_verify(db, page, NULL)) != 0)
 		goto err;
 #endif
 
@@ -199,7 +201,7 @@ __wt_db_fwrite(DB *db, WT_PAGE *page)
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, page)) != 0)
+	if ((ret = __wt_db_page_verify(db, page, NULL)) != 0)
 		return (ret);
 #endif
 
@@ -229,7 +231,7 @@ __wt_db_fdiscard(DB *db, WT_PAGE *page)
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, page)) != 0)
+	if ((ret = __wt_db_page_verify(db, page, NULL)) != 0)
 		return (ret);
 #endif
 
