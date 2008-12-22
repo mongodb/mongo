@@ -25,7 +25,7 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 
 	/* Read in the overflow record. */
 	WT_OVERFLOW_BYTES_TO_FRAGS(db, from->len, frags);
-	if ((ret = __wt_db_fread(db, from->addr, frags, &ovfl_page)) != 0)
+	if ((ret = __wt_db_fread(db, from->addr, frags, &ovfl_page, 0)) != 0)
 		return (ret);
 
 	/*
@@ -57,8 +57,6 @@ __wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 	u_int32_t frags;
 	int ret;
 
-	*addrp = WT_ADDR_INVALID;
-
 	/* Allocate a chunk of file space. */
 	WT_OVERFLOW_BYTES_TO_FRAGS(db, dbt->size, frags);
 	if ((ret = __wt_db_falloc(db, frags, &page)) != 0)
@@ -67,6 +65,8 @@ __wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 	/* Initialize the page and copy the overflow item in. */
 	page->hdr->type = WT_PAGE_OVFL;
 	page->hdr->u.datalen = dbt->size;
+	page->hdr->prntaddr =
+	    page->hdr->prevaddr = page->hdr->nextaddr = WT_ADDR_INVALID;
 	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
 
 	/* The caller wants the addr. */
