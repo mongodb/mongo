@@ -42,7 +42,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	DB_FLAG_CHK(db, "Db.dump", flags, WT_APIMASK_DB_DUMP);
 
 	if (LF_ISSET(WT_DEBUG))
-		return (__wt_db_dump_debug(db, stream));
+		return (__wt_db_dump_debug(db, NULL, stream));
 
 	ienv = db->ienv;
 	dup_ahead = ret = 0;
@@ -59,8 +59,8 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	/* TRAVERSE TO FIRST LEAF PAGE */
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		if ((ret =
-		    __wt_db_fread(db, addr, WT_FRAGS_PER_PAGE(db), &page)) != 0)
+		if ((ret = __wt_db_fread(
+		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 			return (ret);
 
 		for (item = (WT_ITEM *)page->first_data,
@@ -104,7 +104,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 				WT_OVERFLOW_BYTES_TO_FRAGS(
 				    db, ovfl->len, frags);
 				if ((ret = __wt_db_fread(db,
-				    ovfl->addr, frags, &ovfl_page)) != 0)
+				    ovfl->addr, frags, &ovfl_page, 0)) != 0)
 					goto err;
 
 				/*
@@ -178,8 +178,8 @@ __wt_db_dump_offpage(DB *db, DBT *key,
 	int ret;
 
 	do {
-		if ((ret =
-		    __wt_db_fread(db, addr, WT_FRAGS_PER_PAGE(db), &page)) != 0)
+		if ((ret = __wt_db_fread(
+		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 			goto err;
 
 		for (item = (WT_ITEM *)page->first_data,
@@ -196,7 +196,7 @@ __wt_db_dump_offpage(DB *db, DBT *key,
 				WT_OVERFLOW_BYTES_TO_FRAGS(
 				    db, ovfl->len, frags);
 				if ((ret = __wt_db_fread(db,
-				    ovfl->addr, frags, &ovfl_page)) != 0)
+				    ovfl->addr, frags, &ovfl_page, 0)) != 0)
 					goto err;
 				func(
 				    WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
