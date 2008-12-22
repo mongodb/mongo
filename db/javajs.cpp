@@ -75,6 +75,8 @@ extern "C" void tss_cleanup_implemented(void) {
 
 JavaJSImpl * JavaJS = 0;
 
+#if !defined(NOJNI)
+
 void myJNIClean( JNIEnv * env ){
   JavaJS->detach( env );
 }
@@ -656,4 +658,6 @@ int javajstest() {
 
 #if defined(_MAIN)
 int main() { return javajstest(); }
+#endif
+
 #endif

@@ -65,53 +65,25 @@ typedef hash_map<const char*, int, hash<const char *>, eq_str > strhashmap;
 
 class Where { 
 public:
-    Where() { /*codeCopy = 0;*/ jsScope = 0; }
+    Where() { jsScope = 0; }
 	~Where() {
+#if !defined(NOJNI)
 		JavaJS->scopeFree(scope);
-//		delete codeCopy;
+#endif
 		if ( jsScope )
 		  delete jsScope;
-		scope = 0; func = 0; //codeCopy = 0;
+		scope = 0; func = 0;
 	}
 
 	jlong scope, func;
-//	strhashmap fields;
-//	map<string,int> fields;
-//	bool fullObject;
-//	int nFields;
-//	char *codeCopy;
     BSONObj *jsScope;
   
 	void setFunc(const char *code) {
-		//codeCopy = new char[strlen(code)+1];
-		//strcpy(codeCopy,code);
+#if !defined(NOJNI)
 		func = JavaJS->functionCreate( code );
-		//minilex.grabVariables(codeCopy, fields);
-		// if user references db, eg db.foo.save(obj), 
-		// we make sure we have the whole thing.
-		//fullObject = fields.count("fullObject") +
-		//	fields.count("db") > 0;
-		//nFields = fields.size();
+#endif
 	}
 
-/*	void buildSubset(BSONObj& src, BSONObjBuilder& dst) { 
-		BSONObjIterator it(src);
-		int n = 0;
-		if( !it.more() ) return;
-		while( 1 ) {
-			BSONElement e = it.next();
-			if( e.eoo() )
-				break;
-			if( //n == 0 && 
-				fields.find(e.fieldName()) != fields.end()
-				//fields.count(e.fieldName())
-				) {
-				dst.append(e);
-				if( ++n >= nFields )
-					break;
-			}
-		}
-	}*/
 };
 
 JSMatcher::~JSMatcher() { 
@@ -144,6 +116,7 @@ JSMatcher::JSMatcher(BSONObj &_jsobj, BSONObj indexKeyPattern) :
 			uassert( "$where occurs twice?", where == 0 );
 			where = new Where();
 			uassert( "$where query, but jni is disabled", JavaJS );
+#if !defined(NOJNI)
 			where->scope = JavaJS->scopeCreate();
 			JavaJS->scopeSetString(where->scope, "$client", database->name.c_str());
 			
@@ -155,7 +128,7 @@ JSMatcher::JSMatcher(BSONObj &_jsobj, BSONObj indexKeyPattern) :
 			  const char *code = e.valuestr();
 			  where->setFunc(code);
 			}
-			
+#endif
 			continue;
 		}
 
@@ -456,7 +429,7 @@ bool JSMatcher::matches(BSONObj& jsobj, bool *deep) {
             uassert("$where compile error", false);
             return false; // didn't compile
         }
-		
+#if !defined(NOJNI)		
         /**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */ 
         {
             if ( where->jsScope ){
@@ -476,6 +449,9 @@ bool JSMatcher::matches(BSONObj& jsobj, bool *deep) {
             return false;
         }
         return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
+#else
+        return false;
+#endif
     }
 
     return true;

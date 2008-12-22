@@ -407,10 +407,12 @@ void initAndListen(int listenPort, const char *dbPath, const char *appserverLoc 
     log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath 
             <<  " master = " << master << " slave = " << slave << endl;
 
+#if !defined(NOJNI)
     if( useJNI ) {
       JavaJS = new JavaJSImpl(appserverLoc);
       javajstest();
     }
+#endif
 
 	setupSignals();
 
@@ -423,6 +425,15 @@ void testClient();
 
 int main(int argc, char* argv[], char *envp[] )
 {
+    {
+        unsigned x = 0x12345678;
+        unsigned char& b = (unsigned char&) x;
+        if( b != 0x78 ) { 
+            cout << "big endian cpus not yet supported" << endl;
+            return 33;
+        }
+    }
+
 	DEV cout << "warning: DEV mode enabled\n";
 
 #if !defined(_WIN32)
@@ -438,8 +449,12 @@ int main(int argc, char* argv[], char *envp[] )
 			return 0;
 		}
 		if( strcmp(argv[1], "javatest") == 0 ) {
-                        JavaJS = new JavaJSImpl();
-			javajstest();
+#if !defined(NOJNI)
+            JavaJS = new JavaJSImpl();
+            javajstest();
+#else
+            cout << "NOJNI build cannot test" << endl;
+#endif
 			return 0;
 		}
 		if( strcmp(argv[1], "test2") == 0 ) {
@@ -546,7 +561,11 @@ int main(int argc, char* argv[], char *envp[] )
 	}
 
 usage:
-	cout << "Mongo db usage:\n";
+	cout << "Mongo db ";
+#if defined(NOJNI)
+    cout << "[nojni build] ";
+#endif
+    cout << "usage:\n";
 	cout << "  run               run db" << endl;
 	cout << "  msg end [port]    shut down db server listening on port (or default)" << endl;
 	cout << "  msg [msg] [port]  send a request to the db server listening on port (or default)" << endl;
