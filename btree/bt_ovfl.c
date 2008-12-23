@@ -25,7 +25,7 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 
 	/* Read in the overflow record. */
 	WT_OVERFLOW_BYTES_TO_FRAGS(db, from->len, frags);
-	if ((ret = __wt_db_fread(db, from->addr, frags, &ovfl_page, 0)) != 0)
+	if ((ret = __wt_db_page_in(db, from->addr, frags, &ovfl_page, 0)) != 0)
 		return (ret);
 
 	/*
@@ -39,7 +39,7 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 	copy->len = from->len;
 
 	/* Discard the overflow record. */
-	if ((tret = __wt_db_fdiscard(db, ovfl_page)) != 0 && ret == 0)
+	if ((tret = __wt_db_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -59,7 +59,7 @@ __wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 
 	/* Allocate a chunk of file space. */
 	WT_OVERFLOW_BYTES_TO_FRAGS(db, dbt->size, frags);
-	if ((ret = __wt_db_falloc(db, frags, &page)) != 0)
+	if ((ret = __wt_db_page_alloc(db, frags, &page)) != 0)
 		return (ret);
 
 	/* Initialize the page and copy the overflow item in. */
@@ -73,5 +73,5 @@ __wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 	*addrp = page->addr;
 
 	/* Write the overflow item back to the file. */
-	return (__wt_db_fwrite(db, page));
+	return (__wt_db_page_out(db, page, WT_MODIFIED));
 }
