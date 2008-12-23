@@ -21,6 +21,7 @@ f()
 	    "-e801" \
 	    "-e818" \
 	    "-e826" \
+	    "-function(exit,__wt_assert)" \
 	    "-wlib(0)" \
 	     "-i." "-i../inc_posix" "-i/usr/include" $1
 }
