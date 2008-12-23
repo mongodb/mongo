@@ -107,19 +107,6 @@ __wt_api_flags(IENV *ienv, const char *name)
 }
 
 /*
- * __wt_cksum_err --
- *	Print a standard error message on a checksum error.
- */
-int
-__wt_cksum_err(DB *db, u_int32_t addr)
-{
-	__wt_db_errx(db,
-	    "Fragment %lu was read and had a checksum error",
-	    (u_long)addr);
-	return (WT_ERROR);
-}
-
-/*
  * __wt_database_format --
  *	Print a standard error message when a database format error is
  *	suddenly discovered.
