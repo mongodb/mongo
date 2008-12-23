@@ -20,6 +20,15 @@ struct __wt_btree {
 	WT_FH *fh;				/* Backing file handle */
 
 	u_int32_t frags;			/* Fragments in the file */
+
+	/*
+	 * Each in-memoyr page is threaded on two queues: a hash queue
+	 * based on its fragment addr, and an LRU list.
+	 */
+#define	WT_HASHSIZE	128
+#define	WT_HASH(addr)	(addr % WT_HASHSIZE)	/* Page hash and LRU queues */
+	TAILQ_HEAD(__wt_page_hqh, __wt_page) hhq[WT_HASHSIZE];
+	TAILQ_HEAD(__wt_page_hlru, __wt_page) hlru;
 };
 
 /*
@@ -45,17 +54,16 @@ struct __wt_btree {
 
 /* Return the number of fragments needed to hold N bytes. */
 #define	WT_BYTES_TO_FRAGS(db, bytes)					\
-	((u_int32_t)((bytes) / (db)->fragsize))
+	((u_int32_t)(((bytes) + ((db)->fragsize - 1)) / (db)->fragsize))
 
 /* Return the number of fragments for a database page. */
 #define	WT_FRAGS_PER_PAGE(db)						\
-	WT_BYTES_TO_FRAGS(db, (db)->pagesize)
+	((db)->pagesize / (db)->fragsize)
 
 /* Return the fragments needed for an overflow item. */
 #define	WT_OVERFLOW_BYTES_TO_FRAGS(db, len, frags) {			\
 	off_t __bytes;							\
 	 __bytes = (len) + sizeof(WT_PAGE_HDR);				\
-	 __bytes = WT_ALIGN(__bytes, (db)->fragsize);			\
 	 (frags) = WT_BYTES_TO_FRAGS(db, __bytes);			\
 }
 
@@ -77,7 +85,12 @@ struct __wt_btree {
 struct __wt_page {
 	u_int32_t    addr;			/* File block address */
 	u_int32_t    frags;			/* Number of fragments */
-	WT_PAGE_HDR *hdr;			/* The actual page */
+	WT_PAGE_HDR *hdr;			/* The on-disk page */
+
+	WT_PAGE	*parent;			/* Parent page */
+
+	TAILQ_ENTRY(__wt_page) hq;		/* Hash queue */
+	TAILQ_ENTRY(__wt_page) lq;		/* LRU queue */
 
 	u_int8_t *first_data;			/* First data byte address */
 	u_int8_t *first_free;			/* First free byte address */
@@ -86,6 +99,8 @@ struct __wt_page {
 	u_int8_t **indx;			/* Array of page references */
 	u_int32_t indx_count;			/* Entries in indx */
 	u_int32_t indx_size;			/* Size of indx array */
+
+	u_int32_t flags;
 };
 
 /*
@@ -100,8 +115,8 @@ struct __wt_page_desc {
 #define	WT_BTREE_MINOR_VERSION	1
 	u_int32_t minorv;		/* 08-11: Minor version */
 	u_int32_t pagesize;		/* 16-19: Page size */
-	u_int32_t root;			/* 20-23: Root fragment */
-	u_int32_t free;			/* 24-27: Freelist fragment */
+	u_int32_t root_addr;		/* 20-23: Root fragment */
+	u_int32_t free_addr;		/* 24-27: Freelist fragment */
 	u_int64_t base_recno;		/* 28-31: Base record number */
 	u_int32_t unused[8];		/* 32-63: Spare */
 };
