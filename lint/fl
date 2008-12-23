@@ -25,6 +25,8 @@ f()
 	    "-libdir(.)" \
 	    "-libdir(../inc_posix)" \
 	    "+libh(bitstring.h)" \
+	    "+libh(queue.h)" \
+	    "+libh(wiredtiger_config.h)" \
 	    "-wlib(0)" \
 	     "-i." "-i../inc_posix" "-i/usr/include" $1
 }

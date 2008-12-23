@@ -2,9 +2,25 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 
 --- Module:   ../btree/btree_bulk.c (C)
 
+--- Module:   ../btree/btree_close.c (C)
+
 --- Module:   ../btree/btree_cmp.c (C)
 
 --- Module:   ../btree/btree_debug.c (C)
+
+    --- Wrap-up for Module: ../btree/btree_debug.c
+
+Warning 528: Symbol '__wt_db_dump_addr(struct __db *, unsigned int, char *,
+    struct __sFILE *)' (line 93, file ../btree/btree_debug.c) not referenced
+../btree/btree_debug.c  93  Info 830: Location cited in prior message
+Warning 528: Symbol '__wt_db_dump_dbt(struct __dbt *, struct __sFILE *)' (line
+    246, file ../btree/btree_debug.c) not referenced
+../btree/btree_debug.c  246  Info 830: Location cited in prior message
+Warning 528: Symbol '__wt_db_dump_item(struct __db *, struct __wt_item *,
+    struct __sFILE *)' (line 186, file ../btree/btree_debug.c) not referenced
+../btree/btree_debug.c  186  Info 830: Location cited in prior message
+
+--- Module:   ../btree/btree_desc.c (C)
 
 --- Module:   ../btree/btree_dump.c (C)
 
@@ -19,6 +35,59 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/btree_page.c (C)
 
 --- Module:   ../btree/btree_vrfy.c (C)
+                                                                         _
+#...  register bitstr_t *_name = (fragbits); register int _start = (addr), _sto
+			bit_nset(fragbits, addr, addr + (page->frags - 1));
+../btree/btree_vrfy.c  158  Info 713: Loss of precision (initialization)
+    (unsigned int to int)
+                                                                         _
+#... s); register int _start = (addr), _stop = (addr + (page->frags - 1)); regi
+			bit_nset(fragbits, addr, addr + (page->frags - 1));
+../btree/btree_vrfy.c  158  Info 713: Loss of precision (initialization)
+    (unsigned int to int)
+                                                                         _
+#... ddr + (page->frags - 1)); register int _startbyte = _bit_byte(_start); reg
+			bit_nset(fragbits, addr, addr + (page->frags - 1));
+../btree/btree_vrfy.c  158  Info 702: Shift right of signed quantity (int)
+                                                                         _
+#... rtbyte = _bit_byte(_start); register int _stopbyte = _bit_byte(_stop); if 
+			bit_nset(fragbits, addr, addr + (page->frags - 1));
+../btree/btree_vrfy.c  158  Info 702: Shift right of signed quantity (int)
+                                                                         _
+#... (_stop&0x7)))); } else { _name[_startbyte] |= 0xff << ((_start)&0x7); whil
+			bit_nset(fragbits, addr, addr + (page->frags - 1));
+../btree/btree_vrfy.c  158  Info 734: Loss of precision (assignment) (15 bits
+    to 8 bits)
+                                                 _
+#... s); register int _byte, _nbits = (bt->frags); register int _stopbyte = _bi
+		bit_ffc(fragbits, bt->frags, &ffc);
+../btree/btree_vrfy.c  490  Info 713: Loss of precision (initialization)
+    (unsigned int to int)
+                                                 _
+#... egister int _stopbyte = _bit_byte(_nbits - 1), _value = -1; if (_nbits > 0
+		bit_ffc(fragbits, bt->frags, &ffc);
+../btree/btree_vrfy.c  490  Info 702: Shift right of signed quantity (int)
+                                                 _
+#... != 0xff) { bitstr_t _lb; _value = _byte << 3; for (_lb = _name[_byte]; (_l
+		bit_ffc(fragbits, bt->frags, &ffc);
+../btree/btree_vrfy.c  490  Info 701: Shift left of signed quantity (int)
+                                                 _
+#... _name[_byte]; (_lb&0x1); ++_value, _lb >>= 1); break; } if (_value >= bt->
+		bit_ffc(fragbits, bt->frags, &ffc);
+../btree/btree_vrfy.c  490  Info 722: Suspicious use of ;
+                                                 _
+#... _lb >>= 1); break; } if (_value >= bt->frags) _value = -1; *(&ffc) = _valu
+		bit_ffc(fragbits, bt->frags, &ffc);
+../btree/btree_vrfy.c  490  Warning 574: Signed-unsigned mix with relational
+                                                 _
+#... _lb >>= 1); break; } if (_value >= bt->frags) _value = -1; *(&ffc) = _valu
+		bit_ffc(fragbits, bt->frags, &ffc);
+../btree/btree_vrfy.c  490  Info 737: Loss of sign in promotion from int to
+    unsigned int
+                                             _
+#...                ((fragbits)[_bit_byte(ffc)] |= _bit_mask(ffc))
+			bit_set(fragbits, ffc);
+../btree/btree_vrfy.c  492  Info 702: Shift right of signed quantity (int)
 
 --- Module:   ../db/db_close.c (C)
 
@@ -55,3 +124,130 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../support/err.c (C)
 
 --- Module:   ../support/getset.c (C)
+
+--- Global Wrap-up
+
+Info 756: global typedef 'WT_LSN' (line 42, file ./wt_internal.h) not
+    referenced
+./wt_internal.h  42  Info 830: Location cited in prior message
+Info 759: header declaration for symbol '__wt_env_open(struct __env *, const
+    char *, unsigned short, unsigned int)' defined at (line 17, file
+    ../env/env_open.c) could be moved from header to module
+../env/env_open.c  17  Info 830: Location cited in prior message
+Info 765: external '__wt_env_open(struct __env *, const char *, unsigned short,
+    unsigned int)' (line 17, file ../env/env_open.c) could be made static
+../env/env_open.c  17  Info 830: Location cited in prior message
+Info 714: Symbol '__wt_env_open(struct __env *, const char *, unsigned short,
+    unsigned int)' (line 17, file ../env/env_open.c) not referenced
+../env/env_open.c  17  Info 830: Location cited in prior message
+Info 759: header declaration for symbol 'wt_strerror(int)' defined at (line
+    126, file ../support/err.c) could be moved from header to module
+../support/err.c  126  Info 830: Location cited in prior message
+Info 765: external 'wt_strerror(int)' (line 126, file ../support/err.c) could
+    be made static
+../support/err.c  126  Info 830: Location cited in prior message
+Info 759: header declaration for symbol 'wt_db_create(struct __db **, struct
+    __env *, unsigned int)' defined at (line 19, file ../db/db_method.c) could
+    be moved from header to module
+../db/db_method.c  19  Info 830: Location cited in prior message
+Info 765: external 'wt_db_create(struct __db **, struct __env *, unsigned int)'
+    (line 19, file ../db/db_method.c) could be made static
+../db/db_method.c  19  Info 830: Location cited in prior message
+Info 714: Symbol 'wt_db_create(struct __db **, struct __env *, unsigned int)'
+    (line 19, file ../db/db_method.c) not referenced
+../db/db_method.c  19  Info 830: Location cited in prior message
+Info 755: global macro 'LF_CLR' (line 44, file ../inc_posix/misc.h) not
+    referenced
+../inc_posix/misc.h  44  Info 830: Location cited in prior message
+Info 755: global macro 'LF_SET' (line 46, file ../inc_posix/misc.h) not
+    referenced
+../inc_posix/misc.h  46  Info 830: Location cited in prior message
+Info 755: global macro 'FLD_CLR' (line 48, file ../inc_posix/misc.h) not
+    referenced
+../inc_posix/misc.h  48  Info 830: Location cited in prior message
+Info 755: global macro 'FLD_SET' (line 50, file ../inc_posix/misc.h) not
+    referenced
+../inc_posix/misc.h  50  Info 830: Location cited in prior message
+Info 755: global macro 'WIREDTIGER_VERSION_MAJOR' (line 19, file
+    /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  19  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WIREDTIGER_VERSION_MINOR' (line 20, file
+    /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  20  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WIREDTIGER_VERSION_PATCH' (line 21, file
+    /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  21  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WIREDTIGER_VERSION_STRING' (line 22, file
+    /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  22  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WT_MAXKEY_NOTSET' (line 245, file /a/bostic/wiredtiger/build_posix/wiredtiger.h)
+    not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  245  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WT_APIMASK_DB' (line 255, file /a/bostic/wiredtiger/build_posix/wiredtiger.h)
+    not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  255  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WT_APIMASK_DBT' (line 262, file /a/bostic/wiredtiger/build_posix/wiredtiger.h)
+    not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  262  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WT_APIMASK_ENV' (line 263, file /a/bostic/wiredtiger/build_posix/wiredtiger.h)
+    not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  263  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WT_APIMASK_IDB' (line 266, file /a/bostic/wiredtiger/build_posix/wiredtiger.h)
+    not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  266  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WT_APIMASK_IENV' (line 267, file /a/bostic/wiredtiger/build_posix/wiredtiger.h)
+    not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  267  Info 830: Location cited in
+    prior message
+Info 755: global macro 'WT_APIMASK_WT_PAGE' (line 268, file
+    /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  268  Info 830: Location cited in
+    prior message
+Info 768: global struct member '__dbt::flags' (line 86, file
+    /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  86  Info 830: Location cited in
+    prior message
+Info 768: global struct member '__dbc::idbc' (line 175, file
+    /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  175  Info 830: Location cited in
+    prior message
+Info 768: global struct member '__dbc::flags' (line 177, file
+    /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
+/a/bostic/wiredtiger/build_posix/wiredtiger.h  177  Info 830: Location cited in
+    prior message
+Info 768: global struct member 'tqe_next' (line 20, file ../inc_posix/fh.h) not
+    referenced
+../inc_posix/fh.h  20  Info 830: Location cited in prior message
+Info 768: global struct member 'tqe_prev' (line 20, file ../inc_posix/fh.h) not
+    referenced
+../inc_posix/fh.h  20  Info 830: Location cited in prior message
+Info 768: global struct member '__wt_fh::q' (line 20, file ../inc_posix/fh.h)
+    not referenced
+../inc_posix/fh.h  20  Info 830: Location cited in prior message
+Info 768: global struct member '__wt_page::indx' (line 99, file
+    ../inc_posix/btree.h) not referenced
+../inc_posix/btree.h  99  Info 830: Location cited in prior message
+Info 768: global struct member '__wt_page::indx_count' (line 100, file
+    ../inc_posix/btree.h) not referenced
+../inc_posix/btree.h  100  Info 830: Location cited in prior message
+Info 768: global struct member '__wt_page::indx_size' (line 101, file
+    ../inc_posix/btree.h) not referenced
+../inc_posix/btree.h  101  Info 830: Location cited in prior message
+Info 768: global struct member '__idbc::dbc' (line 76, file ./wt_internal.h)
+    not referenced
+./wt_internal.h  76  Info 830: Location cited in prior message
+Info 768: global struct member '__idbc::flags' (line 78, file ./wt_internal.h)
+    not referenced
+./wt_internal.h  78  Info 830: Location cited in prior message
+Info 768: global struct member '__ienv::flags' (line 87, file ./wt_internal.h)
+    not referenced
+./wt_internal.h  87  Info 830: Location cited in prior message
