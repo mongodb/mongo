@@ -52,8 +52,9 @@ typedef	unsigned char bitstr_t;
 	(((nbits) + 7) >> 3)
 
 				/* allocate a bitstring */
-#define	bit_alloc(nbits) \
-	(bitstr_t *)calloc((size_t)bitstr_size(nbits), sizeof(bitstr_t))
+#define	bit_alloc(ienv, nbits, retp) \
+	__wt_calloc( \
+	    (ienv), (size_t)bitstr_size(nbits), sizeof(bitstr_t), (retp))
 
 				/* allocate a bitstring on the stack */
 #define	bit_decl(name, nbits) \
