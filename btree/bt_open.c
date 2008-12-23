@@ -19,7 +19,7 @@ __wt_bt_open(DB *db)
 	IDB *idb;
 	WT_BTREE *bt;
 	IENV *ienv;
-	int ret;
+	int i, ret;
 
 	ienv = db->ienv;
 	idb = db->idb;
@@ -30,8 +30,12 @@ __wt_bt_open(DB *db)
 		return (ret);
 	bt->db = db;
 
+	TAILQ_INIT(&bt->hlru);
+	for (i = 0; i < WT_HASHSIZE; ++i)
+		TAILQ_INIT(&bt->hhq[i]);
+
 	/* Open the underlying database file. */
-	if ((ret = __wt_db_fopen(bt)) != 0)
+	if ((ret = __wt_db_page_open(bt)) != 0)
 		goto err;
 
 	idb->btree = bt;
