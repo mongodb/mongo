@@ -9,12 +9,14 @@
 
 #include "wt_internal.h"
 
+static int __wt_db_page_discard(DB *, WT_PAGE *);
+
 /*
- * __wt_db_fopen --
+ * __wt_db_page_open --
  *	Open an underlying file.
  */
 int
-__wt_db_fopen(WT_BTREE *bt)
+__wt_db_page_open(WT_BTREE *bt)
 {
 	DB *db;
 	IDB *idb;
@@ -48,25 +50,39 @@ err:	(void)__wt_close(ienv, bt->fh);
 }
 
 /*
- * __wt_db_fclose --
+ * __wt_db_page_close --
  *	Close an underlying file.
  */
 int
-__wt_db_fclose(WT_BTREE *bt)
+__wt_db_page_close(DB *db)
 {
+	WT_BTREE *bt;
 	IENV *ienv;
+	WT_PAGE *page;
+	int ret, tret;
 
-	ienv = bt->db->ienv;
+	ienv = db->ienv;
+	bt = db->idb->btree;
+	ret = 0;
+
+	while ((page = TAILQ_FIRST(&bt->hlru)) != NULL) {
+		if (F_ISSET(page, WT_MODIFIED) &&
+		    (tret = __wt_db_page_out(db, page, WT_MODIFIED)) != 0 &&
+		    ret == 0)
+			ret = tret;
+		if ((tret = __wt_db_page_discard(db, page)) != 0 && ret == 0)
+			ret = tret;
+	}
 
 	return (__wt_close(ienv, bt->fh));
 }
 
 /*
- * __wt_db_falloc --
- *	Allocate a chunk of a file.
+ * __wt_db_page_alloc --
+ *	Allocate fragments from a file.
  */
 int
-__wt_db_falloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
+__wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 {
 	IENV *ienv;
 	WT_BTREE *bt;
@@ -108,6 +124,9 @@ __wt_db_falloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	/* Initialize the rest of the in-memory page structure. */
 	__wt_page_inmem(db, page, 1);
 
+	TAILQ_INSERT_HEAD(&bt->hhq[WT_HASH(page->addr)], page, hq);
+	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+
 	*pagep = page;
 	return (0);
 
@@ -118,28 +137,43 @@ err:	if (page->hdr != NULL)
 }
 
 /*
- * __wt_db_fread --
- *	Read a chunk of a file.
+ * __wt_db_page_in --
+ *	Read fragments from a file.
  */
 int
-__wt_db_fread(DB *db,
+__wt_db_page_in(DB *db,
     u_int32_t addr, u_int32_t frags, WT_PAGE **pagep, u_int32_t flags)
 {
 	IENV *ienv;
 	WT_BTREE *bt;
+	WT_PAGE_HQH *hashq;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	size_t bytes;
 	int ret;
 
-	DB_FLAG_CHK(db, "__wt_db_fread", flags, WT_APIMASK_DB_FREAD);
+	DB_FLAG_CHK(db, "__wt_db_page_in", flags, WT_APIMASK_DB_FILE_READ);
 
 	ienv = db->ienv;
 	bt = db->idb->btree;
 
-	*pagep = page = NULL;
+	*pagep = NULL;
 
-	/* Allocate the memory to hold it. */
+	/* Check for the page in the cache. */
+	hashq = &bt->hhq[WT_HASH(addr)];
+	TAILQ_FOREACH(page, hashq, hq)
+		if (page->addr == addr)
+			break;
+	if (page != NULL) {
+		TAILQ_REMOVE(hashq, page, hq);
+		TAILQ_REMOVE(&bt->hlru, page, lq);
+		TAILQ_INSERT_HEAD(hashq, page, hq);
+		TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+		*pagep = page;
+		return (0);
+	}
+
+	/* Allocate the memory to hold a new page. */
 	bytes = (size_t)WT_FRAGS_TO_BYTES(db, frags);
 	if ((ret = __wt_malloc(ienv, bytes, &hdr)) != 0)
 		return (ret);
@@ -154,7 +188,10 @@ __wt_db_fread(DB *db,
 		u_int32_t checksum = hdr->checksum;
 		hdr->checksum = 0;
 		if (checksum != __wt_cksum(hdr, bytes)) {
-			ret = __wt_cksum_err(db, addr);
+			__wt_db_errx(db,
+			    "fragment %lu was read and had a checksum error",
+			    (u_long)addr);
+			ret = WT_ERROR;
 			goto err;
 		}
 	}
@@ -168,9 +205,13 @@ __wt_db_fread(DB *db,
 	page->hdr = hdr;
 	__wt_page_inmem(db, page, 0);
 
+	/* Insert at the head of the hash queue and the tail of LRU queue. */
+	TAILQ_INSERT_HEAD(hashq, page, hq);
+	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, page, NULL)) != 0)
+	if ((ret = __wt_db_verify_page(db, page, NULL)) != 0)
 		goto err;
 #endif
 
@@ -184,16 +225,79 @@ err:	if (page != NULL)
 }
 
 /*
- * __wt_db_fwrite --
+ * __wt_db_page_out --
  *	Write a chunk of a file.
  */
 int
-__wt_db_fwrite(DB *db, WT_PAGE *page)
+__wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 {
 	IENV *ienv;
 	WT_BTREE *bt;
 	WT_PAGE_HDR *hdr;
+	WT_PAGE_HQH *hashq;
 	size_t bytes;
+	int ret;
+
+	ienv = db->ienv;
+	bt = db->idb->btree;
+
+	DB_FLAG_CHK(db, "__wt_db_page_out", flags, WT_APIMASK_DB_FILE_WRITE);
+
+#ifdef HAVE_DIAGNOSTIC
+	/* Verify the page. */
+	if ((ret = __wt_db_verify_page(db, page, NULL)) != 0)
+		return (ret);
+#endif
+
+	/*
+	 * If the page is dirty, set the modified flag, unless we're going to
+	 * write it now.  If we're writing it now, clear the modified flag.
+	 * In any case, re-insert the page at the head of the hash queue and
+	 * at the tail of the LRU queue.
+	 */
+	if (LF_ISSET(WT_MODIFIED))
+		F_SET(page, WT_MODIFIED);
+	if (LF_ISSET(WT_MODIFIED_FLUSH))
+		F_CLR(page, WT_MODIFIED);
+
+	hashq = &bt->hhq[WT_HASH(page->addr)];
+	TAILQ_REMOVE(hashq, page, hq);
+	TAILQ_INSERT_HEAD(hashq, page, hq);
+	TAILQ_REMOVE(&bt->hlru, page, lq);
+	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+
+	if (!LF_ISSET(WT_MODIFIED_FLUSH))
+		return (0);
+
+	/*
+	 * If the page is dirty, but we don't need to flush it, mark it dirty
+	 * and continue.
+	 */
+	if (!LF_ISSET(WT_MODIFIED_FLUSH)) {
+		F_SET(page, WT_MODIFIED);
+		return (0);
+	}
+
+	/* Otherwise, update the checksum and write the page now. */
+	bytes = (size_t)WT_FRAGS_TO_BYTES(db, page->frags);
+
+	hdr = page->hdr;
+	hdr->checksum = 0;
+	hdr->checksum = __wt_cksum(hdr, bytes);
+
+	return (__wt_write(ienv, bt->fh,
+	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr));
+}
+
+/*
+ * __wt_db_page_discard --
+ *	Discard a page of a file.
+ */
+static int
+__wt_db_page_discard(DB *db, WT_PAGE *page)
+{
+	IENV *ienv;
+	WT_BTREE *bt;
 	int ret;
 
 	ienv = db->ienv;
@@ -201,39 +305,11 @@ __wt_db_fwrite(DB *db, WT_PAGE *page)
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, page, NULL)) != 0)
+	if ((ret = __wt_db_verify_page(db, page, NULL)) != 0)
 		return (ret);
 #endif
-
-	bytes = (size_t)WT_FRAGS_TO_BYTES(db, page->frags);
-
-	/* Update the checksum. */
-	hdr = page->hdr;
-	hdr->checksum = 0;
-	hdr->checksum = __wt_cksum(hdr, bytes);
-
-	/* Write the page. */
-	return (__wt_write(ienv, bt->fh,
-	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr));
-}
-
-/*
- * __wt_db_fdiscard --
- *	Discard a page of a file.
- */
-int
-__wt_db_fdiscard(DB *db, WT_PAGE *page)
-{
-	IENV *ienv;
-	int ret;
-
-	ienv = db->ienv;
-
-#ifdef HAVE_DIAGNOSTIC
-	/* Verify the page. */
-	if ((ret = __wt_db_page_verify(db, page, NULL)) != 0)
-		return (ret);
-#endif
+	TAILQ_REMOVE(&bt->hhq[WT_HASH(page->addr)], page, hq);
+	TAILQ_REMOVE(&bt->hlru, page, lq);
 
 	__wt_free(ienv, page->hdr);
 	__wt_free(ienv, page);
