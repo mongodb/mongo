@@ -38,6 +38,24 @@ __wt_db_build_verify(void)
 }
 
 /*
+ * __wt_first_offp_addr --
+ *	In a couple of places in the code, we're trying to walk down the
+ *	internal pages from the root, and we need to get the address off
+ *	the first WT_ITEM_OFFP on the page.
+ */
+void
+__wt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp)
+{
+	WT_ITEM *item;
+	WT_ITEM_OFFP *offp;
+
+	item = (WT_ITEM *)WT_PAGE_BYTE(page);
+	item = (WT_ITEM *)((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len));
+	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+	*addrp = offp->addr;
+}
+
+/*
  * __wt_db_hdr_type --
  *	Return a string representing the page type.
  */
@@ -54,9 +72,9 @@ __wt_db_hdr_type(u_int32_t type)
 	case WT_PAGE_LEAF:
 		return ("primary leaf");
 	case WT_PAGE_DUP_INT:
-		return ("off-page duplicate internal");
+		return ("duplicate internal");
 	case WT_PAGE_DUP_LEAF:
-		return ("off-page duplicate leaf");
+		return ("duplicate leaf");
 	default:
 		break;
 	}

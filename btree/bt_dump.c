@@ -9,9 +9,11 @@
 
 #include "wt_internal.h"
 
+static int  __wt_db_dump_offpage(DB *, DBT *,
+    u_int32_t, FILE *, void (*)(u_int8_t *, u_int32_t, FILE *));
 static void __wt_db_hexprint(u_int8_t *, u_int32_t, FILE *);
 static void __wt_db_print_nl(u_int8_t *, u_int32_t, FILE *);
-static  int __wt_ovfl_key_copy(DB *, u_int8_t *, size_t, DBT *);
+static int  __wt_ovfl_key_copy(DB *, u_int8_t *, size_t, DBT *);
 
 /* Check if the next page entry is part of a duplicate data set. */
 #define	WT_DUP_AHEAD(item, yesno) {				\
@@ -59,7 +61,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	/* TRAVERSE TO FIRST LEAF PAGE */
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		if ((ret = __wt_db_fread(
+		if ((ret = __wt_db_page_in(
 		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 			return (ret);
 
@@ -103,7 +105,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 				WT_OVERFLOW_BYTES_TO_FRAGS(
 				    db, ovfl->len, frags);
-				if ((ret = __wt_db_fread(db,
+				if ((ret = __wt_db_page_in(db,
 				    ovfl->addr, frags, &ovfl_page, 0)) != 0)
 					goto err;
 
@@ -132,7 +134,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 					    ovfl->len, stream);
 
 				if ((ret =
-				    __wt_db_fdiscard(db, ovfl_page)) != 0)
+				    __wt_db_page_out(db, ovfl_page, 0)) != 0)
 					goto err;
 				break;
 			case WT_ITEM_OFFPAGE:
@@ -146,7 +148,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 			}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_db_fdiscard(db, page)) != 0)
+		if ((ret = __wt_db_page_out(db, page, 0)) != 0)
 			return (ret);
 		if (addr == WT_ADDR_INVALID)
 			break;
@@ -167,7 +169,7 @@ err:		ret = WT_ERROR;
  * __wt_db_dump_offpage --
  *	Dump a set of off-page duplicates.
  */
-int
+static int
 __wt_db_dump_offpage(DB *db, DBT *key,
     u_int32_t addr, FILE *stream, void (*func)(u_int8_t *, u_int32_t, FILE *))
 {
@@ -177,11 +179,23 @@ __wt_db_dump_offpage(DB *db, DBT *key,
 	u_int32_t frags, i, next_addr;
 	int ret;
 
-	do {
-		if ((ret = __wt_db_fread(
+	page = NULL;
+
+	/* Walk the tree to the first leaf page. */
+	for (;;) {
+		if ((ret = __wt_db_page_in(
 		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 			goto err;
+		if (page->hdr->type == WT_PAGE_DUP_LEAF)
+			break;
+		__wt_first_offp_addr(page, &addr);
+		if ((ret = __wt_db_page_out(db, page, 0)) != 0) {
+			page = NULL;
+			goto err;
+		}
+	}
 
+	for (;;) {
 		for (item = (WT_ITEM *)page->first_data,
 		    i = page->hdr->u.entries; i > 0;
 		    item = (WT_ITEM *)
@@ -195,13 +209,13 @@ __wt_db_dump_offpage(DB *db, DBT *key,
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 				WT_OVERFLOW_BYTES_TO_FRAGS(
 				    db, ovfl->len, frags);
-				if ((ret = __wt_db_fread(db,
+				if ((ret = __wt_db_page_in(db,
 				    ovfl->addr, frags, &ovfl_page, 0)) != 0)
 					goto err;
 				func(
 				    WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
 				if ((ret =
-				    __wt_db_fdiscard(db, ovfl_page)) != 0)
+				    __wt_db_page_out(db, ovfl_page, 0)) != 0)
 					goto err;
 				break;
 			default:
@@ -210,17 +224,22 @@ __wt_db_dump_offpage(DB *db, DBT *key,
 		}
 
 		next_addr = page->hdr->nextaddr;
-		if ((ret = __wt_db_fdiscard(db, page)) != 0) {
+		if ((ret = __wt_db_page_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
-		addr = next_addr;
-	} while (addr != WT_ADDR_INVALID);
+		if ((addr = next_addr) == WT_ADDR_INVALID)
+			break;
+
+		if ((ret = __wt_db_page_in(
+		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+			goto err;
+	}
 
 	if (0) {
 err:		ret = WT_ERROR;
 		if (page != NULL)
-			(void)__wt_db_fdiscard(db, page);
+			(void)__wt_db_page_out(db, page, 0);
 	}
 	return (ret);
 }
