@@ -9,7 +9,11 @@
 
 #include "wt_internal.h"
 
+static int  __wt_db_dump_addr(DB *, u_int32_t, char *, FILE *);
+static void __wt_db_dump_dbt(DBT *, FILE *);
+static void __wt_db_dump_item(DB *, WT_ITEM *, FILE *);
 static void __wt_db_dump_item_data (DB *, WT_ITEM *, FILE *);
+static int  __wt_db_dump_page(DB *, WT_PAGE *, char *, FILE *);
 
 #ifdef HAVE_DIAGNOSTIC
 /*
@@ -31,7 +35,7 @@ __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 {
 	WT_BTREE *bt;
 	WT_PAGE *page;
-	u_int32_t addr, checksum, frags;
+	u_int32_t addr, frags;
 	int do_close, ret, tret;
 
 	bt = db->idb->btree;
@@ -53,32 +57,21 @@ __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 		 * size.
 		 */
 		frags = WT_FRAGS_PER_PAGE(db);
-		if ((ret =
-		    __wt_db_fread(db, addr, frags, &page, WT_NO_CHECKSUM)) != 0)
+		if ((ret = __wt_db_page_in(
+		    db, addr, frags, &page, WT_NO_CHECKSUM)) != 0)
 			break;
 		if (page->hdr->type == WT_PAGE_OVFL) {
 			frags = WT_BYTES_TO_FRAGS(db, page->hdr->u.datalen);
-			 if ((ret = __wt_db_fdiscard(db, page)) != 0)
+			 if ((ret = __wt_db_page_out(db, page, 0)) != 0)
 				break;
-			if ((ret = __wt_db_fread(
+			if ((ret = __wt_db_page_in(
 			    db, addr, frags, &page, WT_NO_CHECKSUM)) != 0)
 				break;
 		}
 
-		/*
-		 * We skipped verifying the checksum because dump reads blocks
-		 * we can't identify.  Once we have a block we believe in, then
-		 * verify the checksum.
-		 */
-		checksum = page->hdr->checksum;
-		page->hdr->checksum = 0;
-		if (checksum == __wt_cksum(page->hdr,
-		    (u_int32_t)WT_FRAGS_TO_BYTES(db, frags)))
-			ret = __wt_db_dump_page(db, page, NULL, fp);
-		else
-			ret = __wt_cksum_err(db, addr);
+		ret = __wt_db_dump_page(db, page, NULL, fp);
 
-		if ((tret = __wt_db_fdiscard(db, page)) != 0 && ret == 0)
+		if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
 			ret = tret;
 
 		addr += frags;
@@ -96,19 +89,19 @@ __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
  * __wt_db_dump_addr --
  *	Dump a single page in debugging mode.
  */
-int
+static int
 __wt_db_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 {
 	WT_PAGE *page;
 	int ret, tret;
 
 	if ((ret =
-	    __wt_db_fread(db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+	    __wt_db_page_in(db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 		return (ret);
 
 	ret = __wt_db_dump_page(db, page, ofile, fp);
 
-	if ((tret = __wt_db_fdiscard(db, page)) != 0 && ret == 0)
+	if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -118,7 +111,7 @@ __wt_db_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
  * __wt_db_dump_page --
  *	Dump a single page in debugging mode.
  */
-int
+static int
 __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	WT_ITEM *item;
@@ -137,7 +130,7 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		fp = stdout;
 
 	fprintf(fp, "fragments: %lu-%lu {\n",
-	    (u_long)page->addr, (u_long)page->addr + page->frags);
+	    (u_long)page->addr, (u_long)page->addr + (page->frags - 1));
 
 	hdr = page->hdr;
 	fprintf(fp, "%s: ", __wt_db_hdr_type(hdr->type));
@@ -189,7 +182,7 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
  * __wt_db_dump_item --
  *	Dump a single item.
  */
-void
+static void
 __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 {
 	if (fp == NULL)
@@ -228,9 +221,10 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)item_ovfl->addr, (u_long)item_ovfl->len);
 		WT_OVERFLOW_BYTES_TO_FRAGS(db, item_ovfl->len, frags);
-		if (__wt_db_fread(db, item_ovfl->addr, frags, &page, 0) == 0) {
+		if (__wt_db_page_in(
+		    db, item_ovfl->addr, frags, &page, 0) == 0) {
 			__wt_db_print(WT_PAGE_BYTE(page), item_ovfl->len, fp);
-			(void)__wt_db_fdiscard(db, page);
+			(void)__wt_db_page_out(db, page, 0);
 		}
 		break;
 	case WT_ITEM_OFFPAGE:
@@ -248,7 +242,7 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
  * __wt_db_dump_dbt --
  *	Dump a single DBT.
  */
-void
+static void
 __wt_db_dump_dbt(DBT *dbt, FILE *fp)
 {
 	if (fp == NULL)
