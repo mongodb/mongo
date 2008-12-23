@@ -120,7 +120,13 @@ def handle_getset():
 		db_lockout += s
 
 	# Output the getter function.
-	s = 'void\n__wt_' +\
+	s = 'static void __wt_' +\
+	    handle + '_get_' + field + '(\n\t' + handle.upper() + ' *'
+	for l in list:
+		s += ',\n\t' + \
+		    l.split('\t')[1].replace('@S', '*')
+	s += ');\n'
+	s += 'static void\n__wt_' +\
 	    handle + '_get_' + field + '(\n\t' + handle.upper() + ' *handle'
 	for l in list:
 		s += ',\n\t' +\
@@ -133,7 +139,12 @@ def handle_getset():
 	tfile.write(s)
 
 	# Output the setter function.
-	s = 'int\n__wt_' +\
+	s = 'static int __wt_' +\
+	    handle + '_set_' + field + '(\n\t' + handle.upper() + ' *'
+	for l in list:
+		s += ',\n\t' + l.split('\t')[1].replace('@S', '')
+	s += ');\n'
+	s += 'static int\n__wt_' +\
 	    handle + '_set_' + field + '(\n\t' + handle.upper() + ' *handle'
 	for l in list:
 		s += ',\n\t' + l.split('\t')[1].replace('@S', l.split('\t')[0])
