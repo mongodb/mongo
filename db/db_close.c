@@ -18,5 +18,6 @@ __wt_db_close(DB *db, u_int32_t flags)
 {
 	DB_FLAG_CHK(db, "Db.close", flags, WT_APIMASK_DB_CLOSE);
 
-	return (0);
+	/* Close the underlying Btree. */
+	return (__wt_bt_close(db));
 }
