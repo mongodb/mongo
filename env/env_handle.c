@@ -9,6 +9,9 @@
 
 #include "wt_internal.h"
 
+static void __wt_env_config_default(ENV *);
+static void __wt_ienv_destroy(ENV *, int);
+
 /*
  * wt_env_create --
  *	ENV constructor.
@@ -102,7 +105,7 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
  * __wt_ienv_destroy --
  *	Destroy the ENV's underlying IENV structure.
  */
-void
+static void
 __wt_ienv_destroy(ENV *env, int refresh)
 {
 	IENV *ienv;
@@ -151,7 +154,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
  * __wt_env_config_default --
  *	Set default configuration for a just-created ENV handle.
  */
-void
+static void
 __wt_env_config_default(ENV *env)
 {
 	/*lint -esym(715,env)

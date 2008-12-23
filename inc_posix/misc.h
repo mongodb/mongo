@@ -37,9 +37,9 @@ extern "C" {
  * LF_XXX (handles a local variable named "flags"), and FLD_XXX (handles
  * any variable, anywhere.
  */
-#define	F_CLR(p, mask)		(p)->flags &= ~(mask)
+#define	F_CLR(p, mask)		((p)->flags &= ~(mask))
 #define	F_ISSET(p, mask)	((p)->flags & (mask) ? 1 : 0)
-#define	F_SET(p, mask)		(p)->flags |= (mask)
+#define	F_SET(p, mask)		((p)->flags |= (mask))
 
 #define	LF_CLR(mask)		((flags) &= ~(mask))
 #define	LF_ISSET(mask)		((flags) & (mask) ? 1 : 0)

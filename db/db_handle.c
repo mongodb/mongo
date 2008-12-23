@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static int __wt_db_config_default(DB *);
+
 /*
  * wt_db_create --
  *	DB constructor.
@@ -56,10 +58,10 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	if (ret != 0)
 		goto err;
 
+	__wt_db_config_methods(db);
+
 	if ((ret = __wt_db_config_default(db)) != 0)
 		goto err;
-
-	__wt_db_config_methods(db);
 
 	*dbp = db;
 	return (0);
@@ -159,12 +161,12 @@ __wt_idb_destroy(DB *db, int refresh)
  * __wt_db_config_default --
  *	Set default configuration for a just-created DB handle.
  */
-int
+static int
 __wt_db_config_default(DB *db)
 {
 	int ret;
 
-	if ((ret = __wt_db_set_pagesize(db,
+	if ((ret = db->set_pagesize(db,
 	    WT_PAGE_DEFAULT_SIZE,
 	    WT_FRAG_DEFAULT_SIZE,
 	    WT_EXTENT_DEFAULT_SIZE, 0)) != 0)
