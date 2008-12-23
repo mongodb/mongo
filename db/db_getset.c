@@ -39,6 +39,9 @@ __wt_db_set_pagesize_verify(DB *db, u_int32_t *pagesizep,
 {
 	u_int32_t pagesize, fragsize, extentsize, maxitemsize;
 
+#define	WT_MINIMUM_DATA_SPACE(db)					\
+	    (((db)->pagesize - (WT_HDR_SIZE + WT_DESC_SIZE)) / 4)
+
 	/* Copy in defaults, if not being set. */
 	pagesize = *pagesizep == 0 ? db->pagesize : *pagesizep;
 	fragsize = *fragsizep == 0 ? db->fragsize : *fragsizep;
@@ -46,7 +49,7 @@ __wt_db_set_pagesize_verify(DB *db, u_int32_t *pagesizep,
 	maxitemsize = *maxitemsizep == 0 ? db->maxitemsize : *maxitemsizep;
 	if ((maxitemsize = *maxitemsizep) == 0)
 		if ((maxitemsize = db->maxitemsize) == 0)
-			maxitemsize = WT_DATA_SPACE(pagesize) / 4;
+			maxitemsize = WT_MINIMUM_DATA_SPACE(db);
 
 	if (fragsize % WT_FRAG_MINIMUM_SIZE != 0) {
 		__wt_db_errx(db,
@@ -68,13 +71,11 @@ __wt_db_set_pagesize_verify(DB *db, u_int32_t *pagesizep,
 	 * The page must hold at least 4 keys, otherwise the whole Btree
 	 * thing breaks down because we can't split.
 	 */
-	if (maxitemsize > WT_DATA_SPACE(pagesize) / 4) {
+	if (maxitemsize > WT_MINIMUM_DATA_SPACE(db)) {
 		__wt_db_errx(db,
 		    "The specified page size is too small for the current"
 		    " maximum item size; at least two key/data pairs must"
-		    " fit on each page.  The current maximum item size is"
-		    " %lu, making the minimum maximum page size %lu",
-		    (u_long)maxitemsize, (u_long)maxitemsize * 4);
+		    " fit on each page");
 		return (WT_ERROR);
 	}
 
