@@ -286,6 +286,10 @@ public:
 	   supports "." notation to reach into embedded objects
 	*/
 	BSONElement getFieldDotted(const char *name) const; 
+	// Like above, but returns first array encountered while traversing the
+	// dotted fields of name.  The name variable is updated to represent field
+	// names with respect to the returned element.
+	BSONElement getFieldDottedOrArray(const char *&name) const; 
 
 	BSONElement getField(const char *name) const; /* return has eoo() true if no match */
 
@@ -303,7 +307,11 @@ public:
 	   if any field missing, you get back an empty object overall.
 	   */
 	// sets element field names to empty string
-	BSONObj extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b) const; // this version, builder owns the returned obj buffer
+	// If an array is encountered while scanning the dotted names in pattern,
+	// that array is added to the returned obj, rather than any subobjects
+	// referenced within the array.  The variable nameWithinArray is set to the
+	// name of the requested field within the returned array.
+	BSONObj extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b, const char *&nameWithinArray) const; // this version, builder owns the returned obj buffer
 	// sets element field names to empty string
     BSONObj extractFieldsUnDotted(BSONObj pattern);
 	// returns elements with original field names

@@ -389,6 +389,25 @@ BSONElement BSONObj::getFieldDotted(const char *name) const {
 */
 }
 
+BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
+	char *p = strchr(name, '.');
+	string left;
+	if ( p ) {
+		left = string(name, p-name);
+		name = p + 1;
+	} else {
+		left = string(name);
+		name = name + strlen(name);
+	}
+	BSONElement sub = getField(left.c_str());
+	if( sub.eoo() )
+		return nullElement;
+	else if( sub.type() == Array || strlen( name ) == 0 )
+		return sub;
+	else
+		return sub.embeddedObject().getFieldDottedOrArray( name );
+}
+
 /* makes a new BSONObj with the fields specified in pattern.
    fields returned in the order they appear in pattern.
    if any field missing, you get back an empty object overall.
@@ -396,15 +415,22 @@ BSONElement BSONObj::getFieldDotted(const char *name) const {
    n^2 implementation bad if pattern and object have lots 
    of fields - normally pattern doesn't so should be fine.
 */
-BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b) const { 
+BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b, const char *&nameWithinArray) const { 
+	nameWithinArray = "";
 	BSONObjIterator i(pattern);
 	while( i.more() ) {
 		BSONElement e = i.next();
 		if( e.eoo() )
 			break;
-		BSONElement x = getFieldDotted(e.fieldName());
-		if( x.eoo() )
+		const char *name = e.fieldName();
+		BSONElement x = getFieldDottedOrArray( name );
+		if( x.eoo() ) {
+			nameWithinArray = "";
 			return BSONObj();
+		} else if ( x.type() == Array ) {
+			// NOTE: Currently set based on last array discovered.
+			nameWithinArray = name;
+		}
 		b.appendAs(x, "");
 	}
 	return b.done();

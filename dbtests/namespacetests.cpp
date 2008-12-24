@@ -75,6 +75,12 @@ namespace NamespaceTests {
 				a.push_back( 3 );
 				return a;
 			}
+			static BSONObj simpleBC( int i ) {
+				BSONObjBuilder b;
+				b.append( "b", i );
+				b.append( "c", 4 );
+				return b.doneAndDecouple();
+			}
 		private:
 			IndexDetails id_;
 		};
@@ -101,7 +107,7 @@ namespace NamespaceTests {
 				set< BSONObj > keys;
 				id().getKeysFromObject( b.done(), keys );
 				ASSERT_EQUALS( 1, keys.size() );
-				ASSERT_EQUALS( e.done(), *keys.begin() );
+				ASSERT_EQUALS( e.doneAndDecouple(), *keys.begin() );
 			}
 		};
 		
@@ -117,7 +123,7 @@ namespace NamespaceTests {
 				set< BSONObj > keys;
 				id().getKeysFromObject( a.done(), keys );
 				ASSERT_EQUALS( 1, keys.size() );
-				ASSERT_EQUALS( e.done(), *keys.begin() );
+				ASSERT_EQUALS( e.doneAndDecouple(), *keys.begin() );
 			}
 		private:
 			virtual BSONObj key() const { return aDotB(); }
@@ -137,7 +143,7 @@ namespace NamespaceTests {
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
 					BSONObjBuilder b;
 					b.append( "", j );
-					ASSERT_EQUALS( b.done(), *i );
+					ASSERT_EQUALS( b.doneAndDecouple(), *i );
 				}
 			}
 		};
@@ -158,7 +164,7 @@ namespace NamespaceTests {
 					BSONObjBuilder b;
 					b.append( "", j );
 					b.append( "", 2 );
-					ASSERT_EQUALS( b.done(), *i );
+					ASSERT_EQUALS( b.doneAndDecouple(), *i );
 				}
 			}
 		private:
@@ -181,7 +187,7 @@ namespace NamespaceTests {
 					BSONObjBuilder b;
 					b.append( "", 5 );
 					b.append( "", j );
-					ASSERT_EQUALS( b.done(), *i );
+					ASSERT_EQUALS( b.doneAndDecouple(), *i );
 				}
 			}
 		private:
@@ -209,7 +215,7 @@ namespace NamespaceTests {
 				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
 					BSONObjBuilder b;
 					b.append( "", j );
-					ASSERT_EQUALS( b.done(), *i );
+					ASSERT_EQUALS( b.doneAndDecouple(), *i );
 				}
 			}
 		private:
@@ -231,10 +237,112 @@ namespace NamespaceTests {
 		private:
 			virtual BSONObj key() const { return aAndB(); }
 		};
+		
+		class ArraySubobjectBasic : public Base {
+		public:
+			void run() {
+				create();
+				vector< BSONObj > elts;
+				for( int i = 1; i < 4; ++i )
+					elts.push_back( simpleBC( i ) );
+				BSONObjBuilder b;
+				b.append( "a", elts );
+				
+				set< BSONObj > keys;
+				id().getKeysFromObject( b.done(), keys );
+				ASSERT_EQUALS( 3, keys.size() );
+				int j = 1;
+				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+					BSONObjBuilder b;
+					b.append( "", j );
+					ASSERT_EQUALS( b.doneAndDecouple(), *i );
+				}
+			}
+		private:
+			virtual BSONObj key() const { return aDotB(); }
+		};
+		
+		class ArraySubobjectMultiFieldIndex : public Base {
+		public:
+			void run() {
+				create();
+				vector< BSONObj > elts;
+				for( int i = 1; i < 4; ++i )
+					elts.push_back( simpleBC( i ) );
+				BSONObjBuilder b;
+				b.append( "a", elts );
+				b.append( "d", 99 );
+				
+				set< BSONObj > keys;
+				id().getKeysFromObject( b.done(), keys );
+				ASSERT_EQUALS( 3, keys.size() );
+				int j = 1;
+				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+					BSONObjBuilder c;
+					c.append( "", j );
+					c.append( "", 99 );
+					ASSERT_EQUALS( c.doneAndDecouple(), *i );
+				}
+			}
+		private:
+			virtual BSONObj key() const {
+				BSONObjBuilder k;
+				k.append( "a.b", 1 );
+				k.append( "d", 1 );
+				return k.doneAndDecouple();
+			}
+		};
+
+		class ArraySubobjectSingleMissing : public Base {
+		public:
+			void run() {
+				create();
+				vector< BSONObj > elts;
+				BSONObjBuilder s;
+				s.append( "foo", 41 );
+				elts.push_back( s.doneAndDecouple() );
+				for( int i = 1; i < 4; ++i )
+					elts.push_back( simpleBC( i ) );
+				BSONObjBuilder b;
+				b.append( "a", elts );
+				
+				set< BSONObj > keys;
+				id().getKeysFromObject( b.done(), keys );
+				ASSERT_EQUALS( 3, keys.size() );
+				int j = 1;
+				for( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+					BSONObjBuilder b;
+					b.append( "", j );
+					ASSERT_EQUALS( b.doneAndDecouple(), *i );
+				}
+			}
+		private:
+			virtual BSONObj key() const { return aDotB(); }
+		};
+
+		class ArraySubobjectMissing : public Base {
+		public:
+			void run() {
+				create();
+				vector< BSONObj > elts;
+				BSONObjBuilder s;
+				s.append( "foo", 41 );
+				for( int i = 1; i < 4; ++i )
+					elts.push_back( s.done() );
+				BSONObjBuilder b;
+				b.append( "a", elts );
+				
+				set< BSONObj > keys;
+				id().getKeysFromObject( b.done(), keys );
+				ASSERT_EQUALS( 0, keys.size() );
+			}
+		private:
+			virtual BSONObj key() const { return aDotB(); }			
+		};
 	} // namespace IndexDetailsTests
 	
 	// TODO
-	// array subelement
+	// array subelement complex
 	// parallel arrays complex
 	// allowed multi array indexes
 	
@@ -249,6 +357,10 @@ namespace NamespaceTests {
 			add< IndexDetailsTests::GetKeysFromArraySecondElement >();
 			add< IndexDetailsTests::GetKeysFromSecondLevelArray >();
 			add< IndexDetailsTests::ParallelArraysBasic >();
+			add< IndexDetailsTests::ArraySubobjectBasic >();
+			add< IndexDetailsTests::ArraySubobjectMultiFieldIndex >();
+			add< IndexDetailsTests::ArraySubobjectSingleMissing >();
+			add< IndexDetailsTests::ArraySubobjectMissing >();
 		}
 	};
 }

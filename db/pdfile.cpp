@@ -424,7 +424,8 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 		assert(false);
 	}
 	BSONObjBuilder b;
-	BSONObj key = obj.extractFieldsDotted(keyPattern, b);
+	const char *nameWithinArray;
+	BSONObj key = obj.extractFieldsDotted(keyPattern, b, nameWithinArray);
 	if( key.isEmpty() )
 		return;
 	BSONObjIterator keyIter( key );
@@ -442,6 +443,7 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 		}
 	}
 	if( arrayPos == -1 ) {
+		assert( strlen( nameWithinArray ) == 0 );
 		BSONObjBuilder b;
 		BSONObjIterator keyIter( key );
 		while( keyIter.more() ) {
@@ -462,6 +464,11 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 		if( e.eoo() )
 			break;
 
+		if ( strlen( nameWithinArray ) != 0 ) {
+			e = e.embeddedObject().getFieldDotted( nameWithinArray );
+			if( e.eoo() )
+				continue;
+		}
 		BSONObjBuilder b;
 		BSONObjIterator keyIter( key );
 		for( int i = 0; keyIter.more(); ++i ) {
