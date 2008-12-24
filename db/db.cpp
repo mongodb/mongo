@@ -285,7 +285,8 @@ void repairDatabases() {
 			PDFHeader *h = p->getHeader();
 			if ( !h->currentVersion() ) {
 				// QUESTION: Repair even if file format is higher version than code?
-				cout << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << endl;
+				cout << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", ";
+				cout << "new version: " << VERSION << "." << VERSION_MINOR << endl;
 				repairDatabase( dbName.c_str() );
 			} else {
 				closeClient( dbName.c_str() );
