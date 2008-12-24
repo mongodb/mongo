@@ -35,13 +35,13 @@ void sayDbContext(const char *errmsg = 0);
 
 /* "warning" assert -- safe to continue, so we don't throw exception. */
 void wasserted(const char *msg, const char *file, unsigned line) { 
-	problem() << "Assertion failure " << msg << ' ' << file << ' ' << line << endl;
+	problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
 	sayDbContext();
     lastAssert[1].set(msg, getDbContext().c_str(), file, line);
 }
 
 void asserted(const char *msg, const char *file, unsigned line) {
-	problem() << "Assertion failure " << msg << ' ' << file << ' ' << line << endl;
+	problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
 	sayDbContext();
     lastAssert[0].set(msg, getDbContext().c_str(), file, line);
 	throw AssertionException();

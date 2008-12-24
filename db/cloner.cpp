@@ -27,6 +27,7 @@
 #include "instance.h"
 #include "repl.h"
 
+void ensureHaveIdIndex(const char *ns);
 extern int port;
 
 class Cloner: boost::noncopyable { 
@@ -77,7 +78,7 @@ BSONObj fixindex(BSONObj o) {
 }
 
 /* copy the specified collection 
-   isindex - if true, this is system.indexes collection.
+   isindex - if true, this is system.indexes collection, in which we do some transformation when copying.
 */
 void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk) {
 	auto_ptr<DBClientCursor> c;
@@ -200,7 +201,16 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
 		//if( !options.isEmpty() )
         {
 			string err;
-			userCreateNS(to_name.c_str(), options, err, logForRepl);
+            const char *toname = to_name.c_str();
+			userCreateNS(toname, options, err, logForRepl);
+
+            /* chunks are big enough that we should create the _id index up front, that should 
+               be faster. perhaps we should do that for everything?  Not doing that yet -- not sure 
+               how we want to handle _id-less collections, and we might not want to create the index
+               there.
+               */
+            if( strstr(toname, "._chunks") ) 
+                ensureHaveIdIndex(toname);
 		}
 		copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk);
 	}

@@ -572,7 +572,13 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 	const char *ns = op.getStringField("ns");
 	nsToClient(ns, clientName);
 
-	if( !only.empty() && only != clientName )
+    if( *ns == 0 || *ns == '.' ) { 
+        problem() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
+        allDead = "bad object in oplog";
+        throw SyncException();
+    }
+
+    if( !only.empty() && only != clientName )
 		return;
 
 	bool newDb = dbs.count(clientName) == 0;
@@ -589,6 +595,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 	dblock lk;
 	bool justCreated = setClientTempNs(ns);
     if( allDead ) {
+        // hmmm why is this check here and not at top of this function? does it get set between top and here?
         log() << "allDead, throwing SyncException\n";
 		throw SyncException();
     }
@@ -609,7 +616,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
             else 
                 problem() << "warning: justCreated && !newDb in repl " << op.toString() << endl;
         }
-		else if( paired && !justCreated ) { 
+		else if( paired && !justCreated ) {
             if( strcmp(opType,"db") == 0 && strcmp(ns, "admin.") == 0 ) { 
                 // "admin" is a special namespace we use for priviledged commands -- ok if it exists first on 
                 // either side
@@ -685,7 +692,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 /* note: not yet in mutex at this point. */
 bool ReplSource::sync_pullOpLog() { 
 	string ns = string("local.oplog.$") + sourceName();
-    debugrepl( "sync_pullOpLog " << ns );
+    debugrepl( "sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() );
 
 	bool tailing = true;
 	DBClientCursor *c = cursor.get();
@@ -695,12 +702,12 @@ bool ReplSource::sync_pullOpLog() {
 	}
 
 	if( c == 0 ) {
-		// queryObj = { ts: { $gte: syncedTo } }
 		BSONObjBuilder q;
 		q.appendDate("$gte", syncedTo.asDate());
 		BSONObjBuilder query;
 		query.append("ts", q.done());
         BSONObj queryObj = query.done();
+		// queryObj = { ts: { $gte: syncedTo } }
 
         debugrepl( ns << ".find(" << queryObj.toString() << ')' );
 		cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable | Option_SlaveOk );
@@ -770,13 +777,13 @@ bool ReplSource::sync_pullOpLog() {
 	}
 	else if( nextOpTime != syncedTo ) { 
         Logstream& l = log();
-		l << "pull:   nextOpTime " << nextOpTime.toString() << ' ';
+		l << "pull:   nextOpTime " << nextOpTime.toStringLong() << ' ';
         if( nextOpTime < syncedTo ) 
             l << "<??";
         else
             l << ">";
 
-        l << " syncedTo " << syncedTo.toString() << '\n';
+        l << " syncedTo " << syncedTo.toStringLong() << '\n';
         log() << "pull:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
         log() << "pull:   tailing: " << tailing << '\n';
         log() << "pull:   data too stale, halting replication" << endl;
@@ -794,7 +801,7 @@ bool ReplSource::sync_pullOpLog() {
 			if( !c->more() ) {
 				log() << "pull:   applied " << n << " operations" << endl;
 				syncedTo = nextOpTime;
-                debugrepl( "end sync_pullOpLog syncedTo: " << syncedTo.toString() );
+                debugrepl( "end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() );
 				dblock lk;
 				save(); // note how far we are synced up to now
 				break;
