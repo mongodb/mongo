@@ -167,9 +167,7 @@ __wt_db_config_default(DB *db)
 	int ret;
 
 	if ((ret = db->set_pagesize(db,
-	    WT_PAGE_DEFAULT_SIZE,
-	    WT_FRAG_DEFAULT_SIZE,
-	    WT_EXTENT_DEFAULT_SIZE, 0)) != 0)
+	    WT_PAGE_DEFAULT_SIZE, WT_FRAG_DEFAULT_SIZE, 0, 0)) != 0)
 		return (ret);
 
 	db->btree_compare = db->dup_compare = __wt_lex_compare;
