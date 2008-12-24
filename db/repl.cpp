@@ -572,7 +572,11 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 	const char *ns = op.getStringField("ns");
 	nsToClient(ns, clientName);
 
-    if( *ns == 0 || *ns == '.' ) { 
+    if( *ns == '.' ) {
+        problem() << "skipping bad op in oplog: " << op.toString() << endl;
+        return;
+    }
+    else if( *ns == 0 ) { 
         problem() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
         allDead = "bad object in oplog";
         throw SyncException();
