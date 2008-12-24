@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static void __wt_env_config_default(ENV *);
+static int  __wt_env_config_default(ENV *);
 static void __wt_ienv_destroy(ENV *, int);
 
 /*
@@ -57,8 +57,10 @@ wt_env_create(ENV **envp, u_int32_t flags)
 	if (ret != 0)
 		goto err;
 
-	__wt_env_config_default(env);
 	__wt_env_config_methods(env);
+
+	if ((ret = __wt_env_config_default(env)) != 0)
+		goto err;
 
 	*envp = env;
 	return (0);
@@ -154,13 +156,15 @@ __wt_ienv_destroy(ENV *env, int refresh)
  * __wt_env_config_default --
  *	Set default configuration for a just-created ENV handle.
  */
-static void
+static int
 __wt_env_config_default(ENV *env)
 {
-	/*lint -esym(715,env)
-	 *
-	 * The ENV * argument isn't yet used, this routine is a stub.
-	 */
+	int ret;
+
+	if ((ret = env->set_cachesize(env, WT_CACHE_DEFAULT_SIZE)) != 0)
+		return (ret);
+
+	return (0);
 }
 
 int

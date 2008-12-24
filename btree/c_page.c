@@ -9,6 +9,7 @@
 
 #include "wt_internal.h"
 
+static int __wt_db_page_clean(DB *);
 static int __wt_db_page_discard(DB *, WT_PAGE *);
 
 /*
@@ -56,12 +57,14 @@ err:	(void)__wt_close(ienv, bt->fh);
 int
 __wt_db_page_close(DB *db)
 {
-	WT_BTREE *bt;
 	IENV *ienv;
+	IDB *idb;
+	WT_BTREE *bt;
 	WT_PAGE *page;
 	int ret, tret;
 
 	ienv = db->ienv;
+	idb = db->idb;
 	bt = db->idb->btree;
 	ret = 0;
 
@@ -74,6 +77,8 @@ __wt_db_page_close(DB *db)
 			ret = tret;
 	}
 
+	WT_ASSERT(ienv, idb->cache_frags== 0);
+
 	return (__wt_close(ienv, bt->fh));
 }
 
@@ -84,22 +89,30 @@ __wt_db_page_close(DB *db)
 int
 __wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 {
+	IDB *idb;
 	IENV *ienv;
 	WT_BTREE *bt;
 	WT_PAGE *page;
 	int ret;
 
 	ienv = db->ienv;
-	bt = db->idb->btree;
+	idb = db->idb;
+	bt = idb->btree;
 
 	*pagep = NULL;
 
+	/* Check for an inability to grow the file. */
 	if (UINT32_MAX - bt->frags < frags) {
 		__wt_db_errx(db,
 		    "Requested additional space is not available; the file"
 		    " cannot grow that much");
 		return (WT_ERROR);
 	}
+
+	/* Check for exceeding the size of the cache. */
+	while (idb->cache_frags > idb->cache_frags_max)
+		if ((ret = __wt_db_page_clean(db)) != 0)
+			return (ret);
 
 	/*
 	 * Allocate memory for the in-memory page information.  It's a separate
@@ -127,6 +140,8 @@ __wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	TAILQ_INSERT_HEAD(&bt->hhq[WT_HASH(page->addr)], page, hq);
 	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
 
+	idb->cache_frags += frags;
+
 	*pagep = page;
 	return (0);
 
@@ -145,6 +160,7 @@ __wt_db_page_in(DB *db,
     u_int32_t addr, u_int32_t frags, WT_PAGE **pagep, u_int32_t flags)
 {
 	IENV *ienv;
+	IDB *idb;
 	WT_BTREE *bt;
 	WT_PAGE_HQH *hashq;
 	WT_PAGE *page;
@@ -155,7 +171,8 @@ __wt_db_page_in(DB *db,
 	DB_FLAG_CHK(db, "__wt_db_page_in", flags, WT_APIMASK_DB_FILE_READ);
 
 	ienv = db->ienv;
-	bt = db->idb->btree;
+	idb = db->idb;
+	bt = idb->btree;
 
 	*pagep = NULL;
 
@@ -169,9 +186,15 @@ __wt_db_page_in(DB *db,
 		TAILQ_REMOVE(&bt->hlru, page, lq);
 		TAILQ_INSERT_HEAD(hashq, page, hq);
 		TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+
 		*pagep = page;
 		return (0);
 	}
+
+	/* Check for exceeding the size of the cache. */
+	while (idb->cache_frags > idb->cache_frags_max)
+		if ((ret = __wt_db_page_clean(db)) != 0)
+			return (ret);
 
 	/* Allocate the memory to hold a new page. */
 	bytes = (size_t)WT_FRAGS_TO_BYTES(db, frags);
@@ -209,13 +232,12 @@ __wt_db_page_in(DB *db,
 	TAILQ_INSERT_HEAD(hashq, page, hq);
 	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
 
-#ifdef HAVE_DIAGNOSTIC
-	/* Verify the page. */
-	if ((ret = __wt_db_verify_page(db, page, NULL)) != 0)
-		goto err;
-#endif
+	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
+
+	idb->cache_frags += frags;
 
 	*pagep = page;
+
 	return (0);
 
 err:	if (page != NULL)
@@ -243,11 +265,7 @@ __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 
 	DB_FLAG_CHK(db, "__wt_db_page_out", flags, WT_APIMASK_DB_FILE_WRITE);
 
-#ifdef HAVE_DIAGNOSTIC
-	/* Verify the page. */
-	if ((ret = __wt_db_verify_page(db, page, NULL)) != 0)
-		return (ret);
-#endif
+	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
 
 	/*
 	 * If the page is dirty, set the modified flag, unless we're going to
@@ -290,6 +308,28 @@ __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 }
 
 /*
+ * __wt_db_page_clean --
+ *	Clear some space out of the cache.
+ */
+static int
+__wt_db_page_clean(DB *db)
+{
+	WT_BTREE *bt;
+	WT_PAGE *page;
+	int ret;
+
+	bt = db->idb->btree;
+
+	TAILQ_FOREACH(page, &bt->hlru, lq) {
+		if (F_ISSET(page, WT_MODIFIED) &&
+		    (ret = __wt_db_page_out(db, page, WT_MODIFIED)) != 0)
+			return (ret);
+		return (__wt_db_page_discard(db, page));
+	}
+	return (0);
+}
+
+/*
  * __wt_db_page_discard --
  *	Discard a page of a file.
  */
@@ -297,17 +337,23 @@ static int
 __wt_db_page_discard(DB *db, WT_PAGE *page)
 {
 	IENV *ienv;
+	IDB *idb;
 	WT_BTREE *bt;
+	u_int32_t bytes;
 	int ret;
 
 	ienv = db->ienv;
-	bt = db->idb->btree;
+	idb = db->idb;
+	bt = idb->btree;
 
-#ifdef HAVE_DIAGNOSTIC
-	/* Verify the page. */
-	if ((ret = __wt_db_verify_page(db, page, NULL)) != 0)
-		return (ret);
-#endif
+	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
+
+	if (idb->cache_frags < page->frags) {
+		__wt_db_errx(db, "allocated cache size went negative");
+		return (WT_ERROR);
+	}
+	idb->cache_frags -= page->frags;
+
 	TAILQ_REMOVE(&bt->hhq[WT_HASH(page->addr)], page, hq);
 	TAILQ_REMOVE(&bt->hlru, page, lq);
 

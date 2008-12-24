@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static void __wt_db_idb_setup(DB *);
+
 /*
  * __wt_db_open --
  *	Open a DB handle.
@@ -30,6 +32,9 @@ __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 	idb->mode = mode;
 	F_SET(idb, LF_ISSET(WT_CREATE));
 
+	/* Initialize the IDB structure. */
+	__wt_db_idb_setup(db);
+
 	/* Open the underlying Btree. */
 	if ((ret = __wt_bt_open(db)) != 0)
 		goto err;
@@ -38,4 +43,19 @@ __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 
 err:	__wt_idb_destroy(db, 1);
 	return (ret);
+}
+
+/*
+ * __wt_db_idb_setup --
+ *	Routine to intialize any IDB values based on a DB value during open.i
+ */
+static void
+__wt_db_idb_setup(DB *db)
+{
+	IDB *idb;
+
+	idb = db->idb;
+
+	/* We track the cache size in frag count. */
+	idb->cache_frags_max = db->env->cachesize * (MEGABYTE / db->fragsize);
 }
