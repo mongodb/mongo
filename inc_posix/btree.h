@@ -46,7 +46,7 @@ struct __wt_btree {
 #define	WT_FRAG_MINIMUM_SIZE		(512)		/* 512B */
 #define	WT_FRAG_DEFAULT_SIZE		(2048)		/* 2KB */
 #define	WT_PAGE_DEFAULT_SIZE		(32768)		/* 32KB */
-#define	WT_EXTENT_DEFAULT_SIZE		(10485760)	/* 10MB */
+#define	WT_CACHE_DEFAULT_SIZE		(20 * MEGABYTE)	/* 20MB */
 
 /* Convert a file address into a byte offset. */
 #define	WT_FRAGS_TO_BYTES(db, frags)					\
