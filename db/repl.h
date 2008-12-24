@@ -60,6 +60,16 @@ public:
 //	  unsigned long long& asDate() { return *((unsigned long long *) &i); } 
 
 	  bool isNull() { return secs == 0; }
+
+      string toStringLong() const { 
+          char buf[64];
+          time_t_to_String(secs, buf);
+		  stringstream ss;
+          ss << buf << ' ';
+		  ss << hex << secs << ':' << i;
+		  return ss.str();
+      }
+
 	  string toString() const { 
 		  stringstream ss;
 		  ss << hex << secs << ':' << i;
