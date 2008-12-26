@@ -43,13 +43,14 @@ extern "C" {
 /*******************************************
  * Forward declarations
  *******************************************/
-struct __db;	typedef struct __db DB;
-struct __dbc;	typedef struct __dbc DBC;
-struct __dbt;	typedef struct __dbt DBT;
-struct __env;	typedef struct __env ENV;
-struct __idb;	typedef struct __idb IDB;
-struct __idbc;	typedef struct __idbc IDBC;
-struct __ienv;	typedef struct __ienv IENV;
+struct __db;			typedef struct __db DB;
+struct __dbc;			typedef struct __dbc DBC;
+struct __dbt;			typedef struct __dbt DBT;
+struct __env;			typedef struct __env ENV;
+struct __idb;			typedef struct __idb IDB;
+struct __idbc;			typedef struct __idbc IDBC;
+struct __ienv;			typedef struct __ienv IENV;
+struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 
 /*******************************************
  * Errors
@@ -91,6 +92,8 @@ struct __db {
 
 	ENV *env;			/* Enclosing environment */
 	IENV *ienv;			/* Private environment object */
+
+	WT_STATS *stats;		/* Statistics */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -155,6 +158,12 @@ struct __db {
 	    DB *, const char *, ...);
 	int (*open)(
 	    DB *, const char *, mode_t, u_int32_t);
+	int (*stat_print)(
+	    DB *, FILE *, u_int32_t);
+	int (*sync)(
+	    DB *, u_int32_t);
+	int (*verify)(
+	    DB *, u_int32_t);
 	/*
 	 * Db handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -177,6 +186,8 @@ struct __dbc {
  *******************************************/
 struct __env {
 	IENV *ienv;			/* Private object */
+
+	WT_STATS *stats;		/* Statistics */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -204,6 +215,12 @@ struct __env {
 	void (*get_verbose)(
 	    ENV *, u_int32_t *);
 	int (*set_verbose)(
+	    ENV *, u_int32_t );
+
+	u_int32_t cachesize;
+	void (*get_cachesize)(
+	    ENV *, u_int32_t *);
+	int (*set_cachesize)(
 	    ENV *, u_int32_t );
 
 	int (*destroy)(
@@ -238,6 +255,8 @@ char	*wt_strerror(int);
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MAXKEY_NOTSET				0x00000002
+#define	WT_MODIFIED					0x00000001
+#define	WT_NO_CHECKSUM					0x00000001
 #define	WT_PRINTABLES					0x00000001
 #define	WT_PRIVATE_ENV					0x00000001
 #define	WT_SORTED_INPUT					0x00000001
@@ -250,12 +269,18 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_DB_DESTROY				0x00000000
 #define	WT_APIMASK_DB_DUMP				0x00000003
 #define	WT_APIMASK_DB_OPEN				0x00000001
+#define	WT_APIMASK_DB_STAT_PRINT			0x00000000
+#define	WT_APIMASK_DB_SYNC				0x00000000
+#define	WT_APIMASK_DB_VERIFY				0x00000000
 #define	WT_APIMASK_DBT					0x00000000
 #define	WT_APIMASK_ENV					0x00000000
 #define	WT_APIMASK_ENV_DESTROY				0x00000000
 #define	WT_APIMASK_ENV_VERBOSE				0x00000003
 #define	WT_APIMASK_IDB					0x00000001
 #define	WT_APIMASK_IENV					0x00000000
+#define	WT_APIMASK_WT_PAGE				0x00000001
+#define	WT_APIMASK_DB_FILE_READ				0x00000001
+#define	WT_APIMASK_DB_FILE_WRITE			0x00000001
 #define	WT_APIMASK_WT_DB_CREATE				0x00000000
 #define	WT_APIMASK_WT_ENV_CREATE			0x00000000
 /*
