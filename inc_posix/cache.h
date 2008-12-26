@@ -25,6 +25,7 @@ extern "C" {
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +43,8 @@ struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
+struct __wt_page_hqh;		typedef struct __wt_page_hqh WT_PAGE_HQH;
+struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 
 /*******************************************
  * Internal include files.
@@ -52,6 +55,7 @@ struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 #include "misc.h"			/* Internal */
 #include "fh.h"
 #include "btree.h"
+#include "stat.h"
 
 /*******************************************
  * Database handle information that doesn't persist.
@@ -61,6 +65,9 @@ struct __idb {
 
 	char *file_name;		/* Database file name */
 	mode_t mode;			/* Database file create mode */
+
+	u_int32_t cache_frags;		/* Cache fragments allocated */
+	u_int32_t cache_frags_max;	/* Cache fragments max */
 
 	WT_BTREE *btree;		/* Enclosed btree */
 
