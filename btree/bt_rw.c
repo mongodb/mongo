@@ -11,6 +11,7 @@
 
 static int __wt_db_page_clean(DB *);
 static int __wt_db_page_discard(DB *, WT_PAGE *);
+static int __wt_db_page_write(DB *, WT_PAGE *);
 
 /*
  * __wt_db_page_open --
@@ -51,6 +52,26 @@ err:	(void)__wt_close(ienv, bt->fh);
 }
 
 /*
+ * __wt_db_page_sync --
+ *	Flush an underlying file to disk.
+ */
+int
+__wt_db_page_sync(DB *db)
+{
+	WT_BTREE *bt;
+	WT_PAGE *page;
+	int ret;
+
+	bt = db->idb->btree;
+
+	TAILQ_FOREACH(page, &bt->hlru, lq)
+		if (F_ISSET(page, WT_MODIFIED) &&
+		    (ret = __wt_db_page_write(db, page)) != 0)
+			return (ret);
+	return (0);
+}
+
+/*
  * __wt_db_page_close --
  *	Close an underlying file.
  */
@@ -70,7 +91,7 @@ __wt_db_page_close(DB *db)
 
 	while ((page = TAILQ_FIRST(&bt->hlru)) != NULL) {
 		if (F_ISSET(page, WT_MODIFIED) &&
-		    (tret = __wt_db_page_out(db, page, WT_MODIFIED)) != 0 &&
+		    (tret = __wt_db_page_write(db, page)) != 0 &&
 		    ret == 0)
 			ret = tret;
 		if ((tret = __wt_db_page_discard(db, page)) != 0 && ret == 0)
@@ -142,6 +163,9 @@ __wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 
 	idb->cache_frags += frags;
 
+	WT_STAT_INCR(db,
+	    PAGE_ALLOC, "count of pages allocated");
+
 	*pagep = page;
 	return (0);
 
@@ -153,7 +177,7 @@ err:	if (page->hdr != NULL)
 
 /*
  * __wt_db_page_in --
- *	Read fragments from a file.
+ *	Pin a fragment of a file, reading as necessary.
  */
 int
 __wt_db_page_in(DB *db,
@@ -186,10 +210,13 @@ __wt_db_page_in(DB *db,
 		TAILQ_REMOVE(&bt->hlru, page, lq);
 		TAILQ_INSERT_HEAD(hashq, page, hq);
 		TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+		WT_STAT_INCR(db, CACHE_HIT, "count of cache hits");
 
 		*pagep = page;
 		return (0);
 	}
+
+	WT_STAT_INCR(db, PAGE_READ, "count of page reads");
 
 	/* Check for exceeding the size of the cache. */
 	while (idb->cache_frags > idb->cache_frags_max)
@@ -248,63 +275,33 @@ err:	if (page != NULL)
 
 /*
  * __wt_db_page_out --
- *	Write a chunk of a file.
+ *	Unpin a fragment of a file, writing as necessary.
  */
 int
 __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 {
-	IENV *ienv;
 	WT_BTREE *bt;
-	WT_PAGE_HDR *hdr;
 	WT_PAGE_HQH *hashq;
-	size_t bytes;
-	int ret;
 
-	ienv = db->ienv;
 	bt = db->idb->btree;
 
 	DB_FLAG_CHK(db, "__wt_db_page_out", flags, WT_APIMASK_DB_FILE_WRITE);
 
-	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
-
 	/*
-	 * If the page is dirty, set the modified flag, unless we're going to
-	 * write it now.  If we're writing it now, clear the modified flag.
-	 * In any case, re-insert the page at the head of the hash queue and
-	 * at the tail of the LRU queue.
+	 * Re-insert the page at the head of the hash queue and at the tail of
+	 * the LRU queue.
 	 */
-	if (LF_ISSET(WT_MODIFIED))
-		F_SET(page, WT_MODIFIED);
-	if (LF_ISSET(WT_MODIFIED_FLUSH))
-		F_CLR(page, WT_MODIFIED);
-
 	hashq = &bt->hhq[WT_HASH(page->addr)];
 	TAILQ_REMOVE(hashq, page, hq);
 	TAILQ_INSERT_HEAD(hashq, page, hq);
 	TAILQ_REMOVE(&bt->hlru, page, lq);
 	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
 
-	if (!LF_ISSET(WT_MODIFIED_FLUSH))
-		return (0);
-
-	/*
-	 * If the page is dirty, but we don't need to flush it, mark it dirty
-	 * and continue.
-	 */
-	if (!LF_ISSET(WT_MODIFIED_FLUSH)) {
+	/* If the page is dirty, set the modified flag. */
+	if (LF_ISSET(WT_MODIFIED))
 		F_SET(page, WT_MODIFIED);
-		return (0);
-	}
 
-	/* Otherwise, update the checksum and write the page now. */
-	bytes = (size_t)WT_FRAGS_TO_BYTES(db, page->frags);
-
-	hdr = page->hdr;
-	hdr->checksum = 0;
-	hdr->checksum = __wt_cksum(hdr, bytes);
-
-	return (__wt_write(ienv, bt->fh,
-	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr));
+	return (0);
 }
 
 /*
@@ -322,11 +319,45 @@ __wt_db_page_clean(DB *db)
 
 	TAILQ_FOREACH(page, &bt->hlru, lq) {
 		if (F_ISSET(page, WT_MODIFIED) &&
-		    (ret = __wt_db_page_out(db, page, WT_MODIFIED)) != 0)
+		    (ret = __wt_db_page_write(db, page)) != 0)
 			return (ret);
 		return (__wt_db_page_discard(db, page));
 	}
 	return (0);
+}
+
+/*
+ * __wt_db_page_write --
+ *	Write a page to the backing file.
+ */
+static int
+__wt_db_page_write(DB *db, WT_PAGE *page)
+{
+	IENV *ienv;
+	WT_BTREE *bt;
+	WT_PAGE_HDR *hdr;
+	size_t bytes;
+
+	ienv = db->ienv;
+	bt = db->idb->btree;
+
+	WT_STAT_INCR(db, PAGE_WRITE, "count of page writes");
+
+	/* Clear the modified flag. */
+	F_CLR(page, WT_MODIFIED);
+
+	/* Verify the page. */
+	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
+
+	/* Update the checksum. */
+	bytes = (size_t)WT_FRAGS_TO_BYTES(db, page->frags);
+
+	hdr = page->hdr;
+	hdr->checksum = 0;
+	hdr->checksum = __wt_cksum(hdr, bytes);
+
+	return (__wt_write(ienv, bt->fh,
+	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr));
 }
 
 /*
@@ -339,8 +370,6 @@ __wt_db_page_discard(DB *db, WT_PAGE *page)
 	IENV *ienv;
 	IDB *idb;
 	WT_BTREE *bt;
-	u_int32_t bytes;
-	int ret;
 
 	ienv = db->ienv;
 	idb = db->idb;
