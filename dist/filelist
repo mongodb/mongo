@@ -4,17 +4,24 @@
 # $Id$
 
 btree/btree_bulk.c
+btree/btree_close.c
+btree/btree_cmp.c
 btree/btree_debug.c
+btree/btree_desc.c
 btree/btree_dump.c
 btree/btree_file.c
 btree/btree_misc.c
 btree/btree_open.c
+btree/btree_ovfl.c
 btree/btree_page.c
 btree/btree_vrfy.c
+db/db_close.c
 db/db_err.c
 db/db_getset.c
 db/db_method.c
 db/db_open.c
+db/db_stat.c
+db/db_sync.c
 env/env_err.c
 env/env_getset.c
 env/env_global.c
@@ -28,3 +35,4 @@ os_posix/os_rw.c
 support/cksum.c
 support/err.c
 support/getset.c
+support/stat.c

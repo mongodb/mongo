@@ -49,7 +49,23 @@ Db.dump
 Db.open
 	CREATE				# Create any backing files
 
+Db.stat_clear
+Db.stat_print
+
+Db.sync
+
+Db.verify
+
 #############################################
 # Other.
 #############################################
 Dbt
+
+db_file_read
+	NO_CHECKSUM			# Don't verify the checksum on reading
+
+db_file_write
+	MODIFIED			# Page is modified
+
+WT_PAGE
+	MODIFIED			# Page is modified
