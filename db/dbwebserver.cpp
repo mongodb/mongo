@@ -73,7 +73,7 @@ void statsThread() {
                         ss << (dlocked*100)/dt << '%';
                     string s = ss.str();
                     if( !quiet ) 
-                        log() << "cpu: " << s << '\n';
+                        log() << "cpu: " << s << endl;
                     lockStats[q] = s;
                 }
             }

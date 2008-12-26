@@ -102,7 +102,7 @@ class BSONElement {
 	friend class BSONObj;
 public:
 	string toString() const;
-    BSONType type() const { return (BSONType) *data; }
+	BSONType type() const { return (BSONType) *data; }
 	bool eoo() const { return type() == EOO; }
 	int size() const;
 
@@ -124,16 +124,16 @@ public:
 	unsigned long long date() const { return *((unsigned long long*) value()); }
   	//double& number() { return *((double *) value()); }
 
-    bool isNumber() const { return type() == NumberDouble || type() == NumberInt; }
-    void setNumber(double d) { 
-        if( type() == NumberDouble ) *((double *) value()) = d;
-        else if( type() == NumberInt ) *((int *) value()) = (int) d;
-    }
+	bool isNumber() const { return type() == NumberDouble || type() == NumberInt; }
+	void setNumber(double d) { 
+	  if( type() == NumberDouble ) *((double *) value()) = d;
+	  else if( type() == NumberInt ) *((int *) value()) = (int) d;
+	}
 	double number() const { 
-        if( type() == NumberDouble ) return *((double *) value()); 
-        if( type() == NumberInt ) return *((int *) value()); 
-        return 0;
-    }
+	  if( type() == NumberDouble ) return *((double *) value()); 
+	  if( type() == NumberInt ) return *((int *) value()); 
+	  return 0;
+	}
 	OID& oid() const { return *((OID*) value()); }
 
 	// for strings
@@ -149,9 +149,9 @@ public:
 	// for strings.  also gives you start of the real data for an embedded object
 	const char * valuestr() const { return value() + 4; }
 
-    const char *valuestrsafe() const { 
-        return type() == String ? valuestr() : ""; 
-    }
+	const char *valuestrsafe() const { 
+	  return type() == String ? valuestr() : ""; 
+	}
 
 	const char * codeWScopeCode() const { return value() + 8; }
 	const char * codeWScopeScopeData() const { 
@@ -430,9 +430,9 @@ public:
 	void appendElements(BSONObj x);
 
 	void append(BSONElement& e) { 
-        assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
-        b.append((void*) e.rawdata(), e.size()); 
-    }
+	  assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+	  b.append((void*) e.rawdata(), e.size()); 
+	}
 
 	/* append an element but with a new name */
 	void appendAs(const BSONElement& e, const char *as) { 
@@ -453,11 +453,11 @@ public:
 		b.append(fieldName);
 		b.append((char) (val?1:0));
 	}
-    void appendInt(const char *fieldName, int n) { 
+	void appendInt(const char *fieldName, int n) { 
 		b.append((char) NumberInt);
 		b.append(fieldName);
 		b.append(n);
-    }
+	}
 	void append(const char *fieldName, double n) { 
 		b.append((char) NumberDouble);
 		b.append(fieldName);
@@ -473,6 +473,14 @@ public:
 		b.append((char) Date);
 		b.append(fieldName);
 		b.append(dt);
+	}
+	void appendRegex(const char *fieldName, const char *regex, const char *options = "") { 
+		b.append((char) RegEx);
+		b.append(fieldName);
+		b.append((int) strlen(regex)+1);
+		b.append(regex);
+		b.append((int) strlen(options)+1);
+		b.append(options);
 	}
 	void append(const char *fieldName, const char *str) {
 		b.append((char) String);

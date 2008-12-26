@@ -598,7 +598,15 @@ struct EmptyObject {
 BSONObj emptyObj((char *) &emptyObject);
 
 struct BsonUnitTest : public UnitTest { 
-	void run() { 
+  void testRegex() { 
+    BSONObjBuilder b;
+    b.appendRegex("x", "foo");
+    BSONObj o = b.done();
+    cout << o.toString() << endl;
+    exit(1);
+  }
+    void run() { 
+      //        testRegex();
         BSONObjBuilder A,B,C;
         A.appendInt("x", 2);
         B.append("x", 2.0);
