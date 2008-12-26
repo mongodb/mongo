@@ -60,7 +60,7 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 
 	__wt_db_config_methods(db);
 
-	if ((ret = __wt_db_stat_alloc(ienv, &db->stats)) != 0)
+	if ((ret = __wt_stat_alloc_db(ienv, &db->stats)) != 0)
 		goto err;
 	if ((ret = __wt_db_config_default(db)) != 0)
 		goto err;

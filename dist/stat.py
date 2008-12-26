@@ -69,8 +69,8 @@ tfile.write('#include "wt_internal.h"\n')
 for d in stats.iteritems():
 	tfile.write('\n')
 	tfile.write('int\n')
-	tfile.write('__wt_' + d[0].lower() +\
-	    '_stat_alloc(IENV *ienv, WT_STATS **statsp)\n')
+	tfile.write('__wt_stat_alloc_' +\
+	    d[0] + '(IENV *ienv, WT_STATS **statsp)\n')
 	tfile.write('{\n')
 	tfile.write('\tWT_STATS *stats;\n')
 	tfile.write('\tint ret;\n\n')
@@ -79,10 +79,21 @@ for d in stats.iteritems():
 	    '_TOTAL_ENTRIES + 1, sizeof(WT_STATS), &stats)) != 0)\n')
 	tfile.write('\t\treturn (ret);\n\n');
 	for l in d[1]:
-		tfile.write(\
-		    '\tstats[WT_STAT_' + l[0] + '].desc = ' + l[1] + ';\n')
+		o = '\tstats[WT_STAT_' + l[0] + '].desc = ' + l[1] + ';\n'
+		if len(o) + 7  > 80:
+			o = o.replace('= ', '=\n\t    ')
+		tfile.write(o)
 	tfile.write('\n')
 	tfile.write('\t*statsp = stats;\n')
+	tfile.write('\treturn (0);\n')
+	tfile.write('}\n')
+	tfile.write('\n')
+
+	tfile.write('int\n')
+	tfile.write('__wt_stat_clear_' + d[0] + '(WT_STATS *stats)\n')
+	tfile.write('{\n')
+	for l in d[1]:
+		tfile.write('\tstats[WT_STAT_' + l[0] + '].v = 0;\n');
 	tfile.write('\treturn (0);\n')
 	tfile.write('}\n')
 tfile.close()

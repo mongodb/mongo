@@ -158,6 +158,8 @@ struct __db {
 	    DB *, const char *, ...);
 	int (*open)(
 	    DB *, const char *, mode_t, u_int32_t);
+	int (*stat_clear)(
+	    DB *, u_int32_t);
 	int (*stat_print)(
 	    DB *, FILE *, u_int32_t);
 	int (*sync)(
@@ -269,6 +271,7 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_DB_DESTROY				0x00000000
 #define	WT_APIMASK_DB_DUMP				0x00000003
 #define	WT_APIMASK_DB_OPEN				0x00000001
+#define	WT_APIMASK_DB_STAT_CLEAR			0x00000000
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000
 #define	WT_APIMASK_DB_SYNC				0x00000000
 #define	WT_APIMASK_DB_VERIFY				0x00000000
