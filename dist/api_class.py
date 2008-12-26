@@ -31,6 +31,8 @@ env	getset
 	errpfx	const char *@S
 env	getset,verify
 	verbose	u_int32_t @S
+env	getset
+	cachesize	u_int32_t @S
 
 ###################################################
 # Env standalone method declarations
@@ -50,6 +52,8 @@ db	getset
 db	getset,verify
 	btree_compare_int	int @S
 db	getset
+	dup_compare	int (*@S)(DB *, const DBT *, const DBT *)
+db	getset
 	errcall	void (*@S)(const DB *, const char *)
 db	getset
 	errfile	FILE *@S
@@ -67,6 +71,8 @@ db	getset,verify
 db	method
 	bulk_load	u_int32_t, int (*)(DB *, DBT **, DBT **)
 db	method
+	close	u_int32_t
+db	method
 	destroy	u_int32_t
 db	method
 	dump	FILE *, u_int32_t
@@ -76,3 +82,11 @@ db	voidmethod
 	errx	const char *, ...
 db	method
 	open	const char *, mode_t, u_int32_t
+db	method
+	stat_clear	u_int32_t
+db	method
+	stat_print	FILE *, u_int32_t
+db	method
+	sync	u_int32_t
+db	method
+	verify	u_int32_t
