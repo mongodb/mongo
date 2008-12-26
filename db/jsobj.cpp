@@ -250,8 +250,15 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
 				if( lsz - rsz != 0 ) return lsz - rsz;
 				return memcmp(l.value(), r.value(), lsz);
 			}
-		case BinData:
 		case RegEx:
+            { 
+                int c = strcmp(l.regex(), r.regex());
+                if( c ) 
+                    return c;
+                return strcmp(l.regexFlags(), r.regexFlags());
+            }
+        case BinData:
+            // todo: just memcmp these.
 			cout << "compareElementValues: can't compare this type:" << (int) l.type() << endl;
 			assert(false);
 			break;
@@ -598,15 +605,20 @@ struct EmptyObject {
 BSONObj emptyObj((char *) &emptyObject);
 
 struct BsonUnitTest : public UnitTest { 
-  void testRegex() { 
-    BSONObjBuilder b;
-    b.appendRegex("x", "foo");
-    BSONObj o = b.done();
-    cout << o.toString() << endl;
-    exit(1);
-  }
+    void testRegex() { 
+        BSONObjBuilder b;
+        b.appendRegex("x", "foo");
+        BSONObj o = b.done();
+
+        BSONObjBuilder c;
+        c.appendRegex("x", "goo");
+        BSONObj p = c.done();
+
+        assert( o != p );
+        assert( o < p );
+    }
     void run() { 
-      //        testRegex();
+        testRegex();
         BSONObjBuilder A,B,C;
         A.appendInt("x", 2);
         B.append("x", 2.0);
@@ -620,4 +632,4 @@ struct BsonUnitTest : public UnitTest {
         cmp = a.woCompare(c);
         assert( cmp < 0 );
     }
-} bsonut;
+} bson_unittest;

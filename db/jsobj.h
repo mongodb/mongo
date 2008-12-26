@@ -477,9 +477,7 @@ public:
 	void appendRegex(const char *fieldName, const char *regex, const char *options = "") { 
 		b.append((char) RegEx);
 		b.append(fieldName);
-		b.append((int) strlen(regex)+1);
 		b.append(regex);
-		b.append((int) strlen(options)+1);
 		b.append(options);
 	}
 	void append(const char *fieldName, const char *str) {
