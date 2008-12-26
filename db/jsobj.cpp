@@ -390,7 +390,7 @@ BSONElement BSONObj::getFieldDotted(const char *name) const {
 }
 
 BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
-	char *p = strchr(name, '.');
+	const char *p = strchr(name, '.');
 	string left;
 	if ( p ) {
 		left = string(name, p-name);
