@@ -11,6 +11,9 @@
 extern "C" {
 #endif
 
+/* Useful constants. */
+#define	MEGABYTE	(1024 * 1024)
+
 /* Align a number to a specified power-of-2. */
 #define	WT_ALIGN(n, v)							\
 	(((n) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
@@ -54,21 +57,6 @@ extern "C" {
  */
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
-
-/*
- * Statistics are optional to minimize our footprint.
- */
-#ifdef	HAVE_STATISTICS
-#define	WT_STAT_DECL(v)	wt_stat_t v
-#define	WT_STAT(v)	v
-
-/* By default, statistics are maintained in 64-bit types to avoid overflow. */
-typedef	u_int64_t	wt_stat_t;
-
-#else
-#define	WT_STAT_DECL(v)
-#define	WT_STAT(v)
-#endif
 
 /* A distinguished byte pattern to overwrite memory we are done using. */
 #define	OVERWRITE_BYTE	0xab

@@ -42,6 +42,8 @@ __wt_open(IENV *ienv,
 
 	if ((ret = __wt_calloc(ienv, 1, sizeof(WT_FH), &fh)) != 0)
                 return (ret);
+	if ((ret = __wt_fh_stat_alloc(ienv, &fh->stats)) != 0)
+		goto err;
 	if ((ret = __wt_strdup(ienv, name, &fh->name)) != 0)
 		goto err;
 
@@ -80,6 +82,7 @@ int
 __wt_close(IENV *ienv, WT_FH *fh)
 {
 	__wt_free(ienv, fh->name);
+	__wt_free(ienv, fh->stats);
 	__wt_free(ienv, fh);
 	return (0);
 }

@@ -20,7 +20,8 @@ __wt_read(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 
 	env = ienv->env;
 
-	WT_STAT(++fh->read_count);
+	WT_STAT_INCR(fh, READ_IO, "count of read I/Os");
+
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
 		__wt_env_errx(env,
 		    "fileops: %s: read %lu bytes at offset %lu",
@@ -44,7 +45,8 @@ __wt_write(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 
 	env = ienv->env;
 	
-	WT_STAT(++fh->write_count);
+	WT_STAT_INCR(fh, WRITE_IO, "count of write I/Os");
+
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
 		__wt_env_errx(env,
 		    "fileops: %s: write %lu bytes at offset %lu",

@@ -60,6 +60,8 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 
 	__wt_db_config_methods(db);
 
+	if ((ret = __wt_db_stat_alloc(ienv, &db->stats)) != 0)
+		goto err;
 	if ((ret = __wt_db_config_default(db)) != 0)
 		goto err;
 
@@ -98,6 +100,9 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 
 	/* Discard the underlying IDB structure. */
 	__wt_idb_destroy(db, 0);
+
+	/* Free any allocated memory. */
+	__wt_free(ienv, db->stats);
 
 	/* Free the DB structure. */
 	memset(db, OVERWRITE_BYTE, sizeof(db));

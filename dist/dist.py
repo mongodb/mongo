@@ -7,24 +7,53 @@
 
 import filecmp, os, re, shutil
 
-# source_files --
-#	List the source files in filelist.
-def source_files():
-	file_re = re.compile(r'^\w(\w|/)*/((\w|.)*)')
+# source_files_list --
+#	Return a list of the source file names in filelist.
+def source_files_list():
+	list=[]
+	file_re = re.compile(r'^(\w|/)+/((\w|.)+)')
 	for line in open('filelist', 'r'):
 		if file_re.match(line):
-			print "%s" % file_re.match(line).group(2)
+			list.append(file_re.match(line).group(2))
+	return sorted(list)
 
-# directory_files --
-#	List the directories in filelist.
-def directory_files():
-	dir_re = re.compile(r'^(\w(\w|/)*)/((\w|.)*)')
+# source_files --
+#	Print a list of the source file names in filelist.
+def source_files():
+	for line in source_files_list():
+		print line
+
+# source_paths_list --
+#	Return a list of the source file paths in filelist.
+def source_paths_list():
+	list=[]
+	file_re = re.compile(r'^\w')
+	for line in open('filelist', 'r'):
+		if file_re.match(line):
+			list.append(line.rstrip())
+	return sorted(list)
+
+# source_paths --
+#	Print a list of the source file paths in filelist.
+def source_paths():
+	for line in source_paths_list():
+		print line
+
+# directory_files_list --
+#	Return a list of the directories in filelist.
+def directory_files_list():
 	dirs = {}
+	dir_re = re.compile(r'^((\w|/)+/)')
 	for line in open('filelist', 'r'):
 		if dir_re.match(line):
 			dirs[dir_re.match(line).group(1)] = 1
-	for i in dirs.keys():
-		print "%s" % i
+	return sorted(dirs)
+
+# directory_files --
+#	Print a list of the directories in filelist.
+def directory_files():
+	for entry in directory_files_list():
+		print entry
 
 # compare_srcfile --
 #	Compare two files, and if they differ, update the source file.
