@@ -747,7 +747,7 @@ void ensureHaveIdIndex(const char *ns) {
 	string system_indexes = database->name + ".system.indexes";
 
 	BSONObjBuilder b;
-	b.append("name", "id_");
+	b.append("name", "_id_");
 	b.append("ns", ns);
 	b.append("key", id_obj);
 	BSONObj o = b.done();
