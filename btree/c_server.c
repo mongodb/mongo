@@ -18,24 +18,22 @@ static int __wt_db_page_write(DB *, WT_PAGE *);
  *	Open an underlying file.
  */
 int
-__wt_db_page_open(WT_BTREE *bt)
+__wt_db_page_open(IDB *idb)
 {
 	DB *db;
-	IDB *idb;
 	IENV *ienv;
 	off_t size;
 	int ret;
 
-	db = bt->db;
+	db = idb->db;
 	ienv = db->ienv;
-	idb = db->idb;
 
 	/* Try and open the fle. */
 	if ((ret = __wt_open(ienv, idb->file_name, idb->mode,
-	    F_ISSET(idb, WT_CREATE) ? WT_OPEN_CREATE : 0, &bt->fh)) != 0)
+	    F_ISSET(idb, WT_CREATE) ? WT_OPEN_CREATE : 0, &idb->fh)) != 0)
 		return (ret);
 
-	if ((ret = __wt_filesize(ienv, bt->fh, &size)) != 0)
+	if ((ret = __wt_filesize(ienv, idb->fh, &size)) != 0)
 		goto err;
 
 	/*
@@ -43,11 +41,11 @@ __wt_db_page_open(WT_BTREE *bt)
 	 * of a fragment failed, pretend it all failed, and truncate the
 	 * file.
 	 */
-	bt->frags = (u_int32_t)(size / db->fragsize);
+	idb->frags = (u_int32_t)(size / db->fragsize);
 
 	return (0);
 
-err:	(void)__wt_close(ienv, bt->fh);
+err:	(void)__wt_close(ienv, idb->fh);
 	return (ret);
 }
 
@@ -58,13 +56,13 @@ err:	(void)__wt_close(ienv, bt->fh);
 int
 __wt_db_page_sync(DB *db)
 {
-	WT_BTREE *bt;
+	IDB *idb;
 	WT_PAGE *page;
 	int ret;
 
-	bt = db->idb->btree;
+	idb = db->idb;
 
-	TAILQ_FOREACH(page, &bt->hlru, lq)
+	TAILQ_FOREACH(page, &idb->hlru, lq)
 		if (F_ISSET(page, WT_MODIFIED) &&
 		    (ret = __wt_db_page_write(db, page)) != 0)
 			return (ret);
@@ -80,16 +78,14 @@ __wt_db_page_close(DB *db)
 {
 	IENV *ienv;
 	IDB *idb;
-	WT_BTREE *bt;
 	WT_PAGE *page;
 	int ret, tret;
 
 	ienv = db->ienv;
 	idb = db->idb;
-	bt = db->idb->btree;
 	ret = 0;
 
-	while ((page = TAILQ_FIRST(&bt->hlru)) != NULL) {
+	while ((page = TAILQ_FIRST(&idb->hlru)) != NULL) {
 		if (F_ISSET(page, WT_MODIFIED) &&
 		    (tret = __wt_db_page_write(db, page)) != 0 &&
 		    ret == 0)
@@ -100,7 +96,7 @@ __wt_db_page_close(DB *db)
 
 	WT_ASSERT(ienv, idb->cache_frags== 0);
 
-	return (__wt_close(ienv, bt->fh));
+	return (__wt_close(ienv, idb->fh));
 }
 
 /*
@@ -112,18 +108,16 @@ __wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 {
 	IDB *idb;
 	IENV *ienv;
-	WT_BTREE *bt;
 	WT_PAGE *page;
 	int ret;
 
 	ienv = db->ienv;
 	idb = db->idb;
-	bt = idb->btree;
 
 	*pagep = NULL;
 
 	/* Check for an inability to grow the file. */
-	if (UINT32_MAX - bt->frags < frags) {
+	if (UINT32_MAX - idb->frags < frags) {
 		__wt_db_errx(db,
 		    "Requested additional space is not available; the file"
 		    " cannot grow that much");
@@ -151,15 +145,15 @@ __wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	    ienv, 1, (size_t)WT_FRAGS_TO_BYTES(db, frags), &page->hdr)) != 0)
 		goto err;
 
-	page->addr = bt->frags;
-	bt->frags += frags;
+	page->addr = idb->frags;
+	idb->frags += frags;
 	page->frags = frags;
 
 	/* Initialize the rest of the in-memory page structure. */
 	__wt_page_inmem(db, page, 1);
 
-	TAILQ_INSERT_HEAD(&bt->hhq[WT_HASH(page->addr)], page, hq);
-	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+	TAILQ_INSERT_HEAD(&idb->hhq[WT_HASH(page->addr)], page, hq);
+	TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
 
 	idb->cache_frags += frags;
 
@@ -185,7 +179,6 @@ __wt_db_page_in(DB *db,
 {
 	IENV *ienv;
 	IDB *idb;
-	WT_BTREE *bt;
 	WT_PAGE_HQH *hashq;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
@@ -196,20 +189,19 @@ __wt_db_page_in(DB *db,
 
 	ienv = db->ienv;
 	idb = db->idb;
-	bt = idb->btree;
 
 	*pagep = NULL;
 
 	/* Check for the page in the cache. */
-	hashq = &bt->hhq[WT_HASH(addr)];
+	hashq = &idb->hhq[WT_HASH(addr)];
 	TAILQ_FOREACH(page, hashq, hq)
 		if (page->addr == addr)
 			break;
 	if (page != NULL) {
 		TAILQ_REMOVE(hashq, page, hq);
-		TAILQ_REMOVE(&bt->hlru, page, lq);
+		TAILQ_REMOVE(&idb->hlru, page, lq);
 		TAILQ_INSERT_HEAD(hashq, page, hq);
-		TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+		TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
 		WT_STAT_INCR(db, CACHE_HIT, "count of cache hits");
 
 		*pagep = page;
@@ -230,7 +222,7 @@ __wt_db_page_in(DB *db,
 
 	/* Read the page. */
 	if ((ret = __wt_read(ienv,
-	    bt->fh, WT_FRAGS_TO_BYTES(db, addr), bytes, hdr)) != 0)
+	    idb->fh, WT_FRAGS_TO_BYTES(db, addr), bytes, hdr)) != 0)
 		goto err;
 
 	/* Verify the checksum. */
@@ -257,7 +249,7 @@ __wt_db_page_in(DB *db,
 
 	/* Insert at the head of the hash queue and the tail of LRU queue. */
 	TAILQ_INSERT_HEAD(hashq, page, hq);
-	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+	TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
 
 	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
 
@@ -280,10 +272,10 @@ err:	if (page != NULL)
 int
 __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 {
-	WT_BTREE *bt;
+	IDB *idb;
 	WT_PAGE_HQH *hashq;
 
-	bt = db->idb->btree;
+	idb = db->idb;
 
 	DB_FLAG_CHK(db, "__wt_db_page_out", flags, WT_APIMASK_DB_FILE_WRITE);
 
@@ -291,11 +283,11 @@ __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	 * Re-insert the page at the head of the hash queue and at the tail of
 	 * the LRU queue.
 	 */
-	hashq = &bt->hhq[WT_HASH(page->addr)];
+	hashq = &idb->hhq[WT_HASH(page->addr)];
 	TAILQ_REMOVE(hashq, page, hq);
 	TAILQ_INSERT_HEAD(hashq, page, hq);
-	TAILQ_REMOVE(&bt->hlru, page, lq);
-	TAILQ_INSERT_TAIL(&bt->hlru, page, lq);
+	TAILQ_REMOVE(&idb->hlru, page, lq);
+	TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
 
 	/* If the page is dirty, set the modified flag. */
 	if (LF_ISSET(WT_MODIFIED))
@@ -311,13 +303,13 @@ __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 static int
 __wt_db_page_clean(DB *db)
 {
-	WT_BTREE *bt;
+	IDB *idb;
 	WT_PAGE *page;
 	int ret;
 
-	bt = db->idb->btree;
+	idb = db->idb;
 
-	TAILQ_FOREACH(page, &bt->hlru, lq) {
+	TAILQ_FOREACH(page, &idb->hlru, lq) {
 		if (F_ISSET(page, WT_MODIFIED) &&
 		    (ret = __wt_db_page_write(db, page)) != 0)
 			return (ret);
@@ -333,13 +325,13 @@ __wt_db_page_clean(DB *db)
 static int
 __wt_db_page_write(DB *db, WT_PAGE *page)
 {
+	IDB *idb;
 	IENV *ienv;
-	WT_BTREE *bt;
 	WT_PAGE_HDR *hdr;
 	size_t bytes;
 
 	ienv = db->ienv;
-	bt = db->idb->btree;
+	idb = db->idb;
 
 	WT_STAT_INCR(db, PAGE_WRITE, "count of page writes");
 
@@ -356,7 +348,7 @@ __wt_db_page_write(DB *db, WT_PAGE *page)
 	hdr->checksum = 0;
 	hdr->checksum = __wt_cksum(hdr, bytes);
 
-	return (__wt_write(ienv, bt->fh,
+	return (__wt_write(ienv, idb->fh,
 	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr));
 }
 
@@ -369,11 +361,9 @@ __wt_db_page_discard(DB *db, WT_PAGE *page)
 {
 	IENV *ienv;
 	IDB *idb;
-	WT_BTREE *bt;
 
 	ienv = db->ienv;
 	idb = db->idb;
-	bt = idb->btree;
 
 	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
 
@@ -383,8 +373,8 @@ __wt_db_page_discard(DB *db, WT_PAGE *page)
 	}
 	idb->cache_frags -= page->frags;
 
-	TAILQ_REMOVE(&bt->hhq[WT_HASH(page->addr)], page, hq);
-	TAILQ_REMOVE(&bt->hlru, page, lq);
+	TAILQ_REMOVE(&idb->hhq[WT_HASH(page->addr)], page, hq);
+	TAILQ_REMOVE(&idb->hlru, page, lq);
 
 	__wt_free(ienv, page->hdr);
 	__wt_free(ienv, page);

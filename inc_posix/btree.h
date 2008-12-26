@@ -12,26 +12,6 @@ extern "C" {
 #endif
 
 /*
- * Structure that describes a single Btree.
- */
-struct __wt_btree {
-	DB *db;					/* Enclosing DB handle */
-
-	WT_FH *fh;				/* Backing file handle */
-
-	u_int32_t frags;			/* Fragments in the file */
-
-	/*
-	 * Each in-memoyr page is threaded on two queues: a hash queue
-	 * based on its fragment addr, and an LRU list.
-	 */
-#define	WT_HASHSIZE	128
-#define	WT_HASH(addr)	(addr % WT_HASHSIZE)	/* Page hash and LRU queues */
-	TAILQ_HEAD(__wt_page_hqh, __wt_page) hhq[WT_HASHSIZE];
-	TAILQ_HEAD(__wt_page_hlru, __wt_page) hlru;
-};
-
-/*
  * We only have 32-bits to hold file locations, so all file locations are
  * stored in counts of "fragments" (making a "fragment" the smallest unit
  * of allocation from the underlying file).  To simplify the bookkeeping,

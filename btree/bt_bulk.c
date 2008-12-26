@@ -61,7 +61,8 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 			__wt_db_errx(db, "zero-length keys are not supported");
 			goto err;
 		}
-		WT_STAT_INCR(db, BULK_PAIRS_READ, "bulk key/data pairs read");
+		WT_STAT_INCR(db,
+		    BULK_PAIRS_READ, "bulk key/data pairs inserted");
 
 		/*
 		 * We pushed a set of duplicates off-page, and that routine

@@ -33,12 +33,12 @@ __wt_db_force_load(void)
 int
 __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 {
-	WT_BTREE *bt;
+	IDB *idb;
 	WT_PAGE *page;
 	u_int32_t addr, frags;
 	int do_close, ret, tret;
 
-	bt = db->idb->btree;
+	idb = db->idb;
 
 	/* Optionally dump to a file, else to a stream, default to stdout. */
 	do_close = 0;
@@ -75,7 +75,7 @@ __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 			ret = tret;
 
 		addr += frags;
-		if (ret != 0 || addr >= bt->frags)
+		if (ret != 0 || addr >= idb->frags)
 			break;
 	}
 

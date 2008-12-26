@@ -22,15 +22,15 @@ static int __wt_db_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *);
 int
 __wt_db_verify(DB *db, u_int32_t flags)
 {
+	IDB *idb;
 	IENV *ienv;
-	WT_BTREE *bt;
 	WT_PAGE *page;
 	WT_PAGE_DESC desc;
 	bitstr_t *fragbits;
 	int ret;
 
 	ienv = db->ienv;
-	bt = db->idb->btree;
+	idb = db->idb;
 	ret = 0;
 
 	DB_FLAG_CHK(db, "Db.verify", flags, WT_APIMASK_DB_VERIFY);
@@ -51,11 +51,11 @@ __wt_db_verify(DB *db, u_int32_t flags)
 	 * to make sure we don't overflow.   I don't ever expect to see this
 	 * error message, but better safe than sorry.
 	 */
-	if (bt->frags > INT_MAX) {
+	if (idb->frags > INT_MAX) {
 		__wt_db_errx(db, "file has too many fragments to verify");
 		return (WT_ERROR);
 	}
-	if ((ret = bit_alloc(ienv, bt->frags, &fragbits)) != 0)
+	if ((ret = bit_alloc(ienv, idb->frags, &fragbits)) != 0)
 		return (ret);
 
 	/* Get the root and walk the tree. */
@@ -479,15 +479,15 @@ __wt_db_verify_ovfl(DB *db, WT_ITEM_OVFL *ovfl, bitstr_t *fragbits)
 static int
 __wt_db_verify_checkfrag(DB *db, bitstr_t *fragbits)
 {
-	WT_BTREE *bt;
+	IDB *idb;
 	int ffc, ffc_start, ffc_end, ret;
 
-	bt = db->idb->btree;
+	idb = db->idb;
 	ret = 0;
 
 	/* Check for page fragments we haven't verified. */
 	for (ffc_start = ffc_end = -1;;) {
-		bit_ffc(fragbits, bt->frags, &ffc);
+		bit_ffc(fragbits, idb->frags, &ffc);
 		if (ffc != -1) {
 			bit_set(fragbits, ffc);
 			if (ffc_start == -1) {
