@@ -81,7 +81,7 @@ for f in sorted(method_mask.iteritems()):
 	    "\t" * max(1, 6 - (len(f[0]) + len('WT_APIMASK_')) / 8), f[1])
 
 # Update the wiredtiger.in file with the flags information.
-tmp_file = '__tmp_api'
+tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 skip = 0
 for line in open('../inc_posix/wiredtiger.in', 'r'):

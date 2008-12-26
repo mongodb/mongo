@@ -173,7 +173,7 @@ env_config = ''					# Db method init
 env_header = ''					# Env handle structure
 env_lockout = ''				# Env lockout function
 
-tmp_file = '__tmp_api'
+tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
 tfile.write('#include "wt_internal.h"\n\n')
