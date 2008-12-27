@@ -179,7 +179,7 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 		if ( fn > 1 && fn < 1000 )
 			mult = fn;
 		length = 1024 * 512 * mult;
-		cout << "Warning : using small files for _hudsonSmall" << endl;
+		log() << "Warning : using small files for _hudsonSmall" << endl;
 	}
 	assert( length % 4096 == 0 );
 
