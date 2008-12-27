@@ -27,7 +27,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 
-extern bool objcheck, quiet;
+extern bool objcheck, quiet, quotasimple;
 bool useJNI = true;
 
 /* only off if --nocursors which is for debugging. */
@@ -438,6 +438,8 @@ int main(int argc, char* argv[], char *envp[] )
                 goto usage;
             else if( s == "--quiet" ) 
                 quiet = true;
+	    else if( s == "--quotasimple" ) 
+	        quotasimple = true;
             else if( s == "--objcheck" ) 
                 objcheck = true;
 			else if( s == "--source" ) { 
@@ -470,34 +472,35 @@ int main(int argc, char* argv[], char *envp[] )
 	}
 
 usage:
-	cout << "Mongo db ";
+    cout << "Mongo db ";
 #if defined(NOJNI)
     cout << "[nojni build] ";
 #endif
     cout << "usage:\n";
-	cout << "  run               run db" << endl;
-	cout << "  msg end [port]    shut down db server listening on port (or default)" << endl;
-	cout << "  msg [msg] [port]  send a request to the db server listening on port (or default)" << endl;
-	cout << "  msglots           send a bunch of test messages, and then wait for answer on the last one" << endl;
-	cout << "  longmsg           send a long test message to the db server" << endl;
-	cout << "  quicktest         just check basic assertions and exit" << endl;
-	cout << "  test2             run test2() - see code" << endl;
-	cout << "\nOptions:" << endl;
-    cout << " --help             show this usage information\n";
-    cout << " --quiet            quieter output (no cpu outputs)\n";
-    cout << " --objcheck         inspect client data for validity on receipt\n";
-	cout << " --port <portno>\n";
-    cout << " --dbpath <root>\n";
-    cout << " --appsrvpath <root of appsrv>" << endl;
-	cout << " --nocursors  --nojni" << endl;
-	cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
+    cout << "  run                run db" << endl;
+    cout << "  msg end [port]     shut down db server listening on port (or default)" << endl;
+    cout << "  msg [msg] [port]   send a request to the db server listening on port (or default)" << endl;
+    cout << "  msglots            send a bunch of test messages, and then wait for answer on the last one" << endl;
+    cout << "  longmsg            send a long test message to the db server" << endl;
+    cout << "  quicktest          just check basic assertions and exit" << endl;
+    cout << "  test2              run test2() - see code" << endl;
+    cout << "\nOptions:\n";
+    cout << " --help              show this usage information\n";
+    cout << " --port <portno>     specify port number, default is 27017\n";
+    cout << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
+    cout << " --quiet             quieter output (no cpu outputs)\n";
+    cout << " --objcheck          inspect client data for validity on receipt\n";
+    cout << " --quotasimple       apply simple quotas to use of the db\n";
+    cout << " --appsrvpath <path> root directory for the babble app server\n";
+    cout << " --nocursors         diagnostic/debugging option\n";
+    cout << " --nojni" << endl;
+    cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     cout << "\nReplication:" << endl;
-	cout << " --master\n";
+    cout << " --master\n";
     cout << " --slave" << endl;
     cout << " --source <server:port>" << endl;
-	cout << " --pairwith <server:port> <arbiter>" << endl;
-	cout << endl;
+    cout << " --pairwith <server:port> <arbiter>" << endl;
+    cout << endl;
 	
-	return 0;
+    return 0;
 }
-

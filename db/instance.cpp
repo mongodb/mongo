@@ -25,6 +25,8 @@
 #include "dbmessage.h"
 #include "instance.h"
 
+bool objcheck = false;
+bool quotasimple = false;
 bool slave = false;
 bool master = false; // true means keep an op log
 extern int curOp;
@@ -334,8 +336,6 @@ void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort,
 	dbresponse.responseTo = m.data->id;
 	//dbMsgPort.reply(m, resp);
 }
-
-bool objcheck = false;
 
 void receivedInsert(Message& m, stringstream& ss) {
 	DbMessage d(m);
