@@ -53,14 +53,20 @@ public:
 			files.push_back(0);
 		PhysicalDataFile* p = files[n];
 		if( p == 0 ) {
-			p = new PhysicalDataFile(n);
-			files[n] = p;
 			stringstream ss;
 			ss << name << '.' << n;
 			boost::filesystem::path fullName;
 			fullName = boost::filesystem::path(path) / ss.str();
 			string fullNameString = fullName.string();
-			p->open(n, fullNameString.c_str() );
+			p = new PhysicalDataFile(n);
+            try { 
+                p->open(n, fullNameString.c_str() );
+            } 
+            catch( AssertionException& u ) { 
+                delete p;
+                throw u;
+            }
+			files[n] = p;
 		}
 		return p;
 	}

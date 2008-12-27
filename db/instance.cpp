@@ -25,8 +25,11 @@
 #include "dbmessage.h"
 #include "instance.h"
 
+int nloggedsome = 0;
+#define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 ) 
+
 bool objcheck = false;
-bool quotasimple = false;
+bool quota = false;
 bool slave = false;
 bool master = false; // true means keep an op log
 extern int curOp;
@@ -111,7 +114,7 @@ bool assembleResponse( Message &m, DbResponse &dbresponse ) {
 			receivedInsert(m, ss);
 		}
 		catch( AssertionException& e ) { 
-			problem() << " Caught Assertion insert, continuing\n";
+            LOGSOME problem() << " Caught Assertion insert, continuing\n";
 			ss << " exception " + e.toString();
 		}
 	}
@@ -122,7 +125,7 @@ bool assembleResponse( Message &m, DbResponse &dbresponse ) {
 			receivedUpdate(m, ss);
 		}
 		catch( AssertionException& e ) { 
-			problem() << " Caught Assertion update, continuing" << endl; 
+			LOGSOME problem() << " Caught Assertion update, continuing" << endl; 
 			ss << " exception " + e.toString();
 		}
 	}
@@ -133,7 +136,7 @@ bool assembleResponse( Message &m, DbResponse &dbresponse ) {
 			receivedDelete(m);
 		}
 		catch( AssertionException& e ) { 
-			problem() << " Caught Assertion receivedDelete, continuing" << endl; 
+			LOGSOME problem() << " Caught Assertion receivedDelete, continuing" << endl; 
 			ss << " exception " + e.toString();
 		}
 	}
@@ -263,7 +266,7 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
 	}
 	catch( AssertionException& e ) { 
 		ss << " exception ";
-		problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
+		LOGSOME problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
 		log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
         if( q.query.valid() )
             log() << "  query:" << q.query.toString() << endl;

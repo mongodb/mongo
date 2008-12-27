@@ -47,8 +47,12 @@ void asserted(const char *msg, const char *file, unsigned line) {
 	throw AssertionException();
 }
 
+int uacount = 0;
 void uasserted(const char *msg) { 
-	problem() << "User Assertion " << msg << endl;
+    if( ++uacount < 100 ) 
+        problem() << "User Assertion " << msg << endl;
+    else
+        RARELY problem() << "User Assertion " << msg << endl;
     lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
 	throw UserAssertionException(msg);
 }

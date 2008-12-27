@@ -35,6 +35,7 @@ _ disallow system* manipulations from the database.
 #include "query.h"
 #include "repl.h"
 
+extern bool quota;
 extern int port;
 
 const char *dbpath = "/data/db/";
@@ -156,6 +157,24 @@ bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication
 /*---------------------------------------------------------------------*/ 
 
 void PhysicalDataFile::open(int fn, const char *filename) {
+    {
+        /* check quotas 
+           very simple temporary implementation - we will in future look up 
+           the quota from the grid database
+        */
+        if( quota && fn > 8 && !boost::filesystem::exists(filename) ) {
+            /* todo: if we were adding / changing keys in an index did we do some 
+               work previously that needs cleaning up?  Possible.  We should 
+               check code like that and have it catch the exception and do 
+               something reasonable.
+            */
+            string s = "db disk space quota exceeded ";
+            if( database ) 
+                s += database->name;
+            uasserted(s.c_str());
+        }
+    }
+
 	int length;
         
 	if( fn <= 4 ) {
@@ -168,10 +187,9 @@ void PhysicalDataFile::open(int fn, const char *filename) {
 	} else
 		length = 0x7ff00000;
         
-        if ( sizeof( int* ) == 4 && fn > 4 )
+    if ( sizeof( int* ) == 4 && fn > 4 )
 		length = 512 * 1024 * 1024;
 		
-
 	assert( length >= 64*1024*1024 );
 
 	if( strstr(filename, "_hudsonSmall") ) {
