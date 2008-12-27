@@ -21,10 +21,15 @@ struct __wt_stats {
 	const char	*desc;				/* Description */
 };
 
-#define	WT_STAT_INCR(handle, def, str)					\
-	++((handle)->stats[WT_STAT_ ## def].v)
-#define	WT_STAT_DECR(handle, def, str)					\
-	--((handle)->stats[WT_STAT_ ## def].v)
+#define	WT_STAT_SET(handle, def, str, value) do {			\
+	(handle)->stats[WT_STAT_ ## def].v = (value);			\
+} while (0)
+#define	WT_STAT_INCR(handle, def, str) do {				\
+	++(handle)->stats[WT_STAT_ ## def].v;				\
+} while (0)
+#define	WT_STAT_DECR(handle, def, str) do {				\
+	--(handle)->stats[WT_STAT_ ## def].v;				\
+} while (0)
 
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.
@@ -45,11 +50,14 @@ struct __wt_stats {
 #define	WT_STAT_BULK_OVERFLOW_DATA	    1
 #define	WT_STAT_BULK_OVERFLOW_KEY	    2
 #define	WT_STAT_BULK_PAIRS_READ		    3
-#define	WT_STAT_CACHE_HIT		    4
-#define	WT_STAT_PAGE_ALLOC		    5
-#define	WT_STAT_PAGE_READ		    6
-#define	WT_STAT_PAGE_WRITE		    7
-#define	WT_STAT_DB_TOTAL_ENTRIES	    8
+#define	WT_STAT_CACHE_ALLOC		    4
+#define	WT_STAT_CACHE_DIRTY		    5
+#define	WT_STAT_CACHE_EVICT		    6
+#define	WT_STAT_CACHE_HIT		    7
+#define	WT_STAT_CACHE_MISS		    8
+#define	WT_STAT_CACHE_WRITE		    9
+#define	WT_STAT_CACHE_WRITE_EVICT	   10
+#define	WT_STAT_DB_TOTAL_ENTRIES	   11
 
 /* Statistics section: END */
 

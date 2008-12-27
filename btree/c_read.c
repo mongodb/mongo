@@ -157,8 +157,7 @@ __wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 
 	idb->cache_frags += frags;
 
-	WT_STAT_INCR(db,
-	    PAGE_ALLOC, "count of pages allocated");
+	WT_STAT_INCR(db, CACHE_ALLOC, "pages allocated in the cache");
 
 	*pagep = page;
 	return (0);
@@ -202,13 +201,13 @@ __wt_db_page_in(DB *db,
 		TAILQ_REMOVE(&idb->hlru, page, lq);
 		TAILQ_INSERT_HEAD(hashq, page, hq);
 		TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
-		WT_STAT_INCR(db, CACHE_HIT, "count of cache hits");
+		WT_STAT_INCR(db, CACHE_HIT, "reads found in the cache");
 
 		*pagep = page;
 		return (0);
 	}
 
-	WT_STAT_INCR(db, PAGE_READ, "count of page reads");
+	WT_STAT_INCR(db, CACHE_MISS, "reads not found in the cache");
 
 	/* Check for exceeding the size of the cache. */
 	while (idb->cache_frags > idb->cache_frags_max)
@@ -292,6 +291,7 @@ __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	/* If the page is dirty, set the modified flag. */
 	if (LF_ISSET(WT_MODIFIED))
 		F_SET(page, WT_MODIFIED);
+		WT_STAT_INCR(db, CACHE_DIRTY, "dirty pages in the cache");
 
 	return (0);
 }
@@ -310,9 +310,14 @@ __wt_db_page_clean(DB *db)
 	idb = db->idb;
 
 	TAILQ_FOREACH(page, &idb->hlru, lq) {
-		if (F_ISSET(page, WT_MODIFIED) &&
-		    (ret = __wt_db_page_write(db, page)) != 0)
-			return (ret);
+		if (F_ISSET(page, WT_MODIFIED)) {
+			WT_STAT_INCR(db, CACHE_WRITE_EVICT,
+			    "dirty pages evicted from the cache");
+			if ((ret = __wt_db_page_write(db, page)) != 0)
+				return (ret);
+		} else
+			WT_STAT_INCR(db, CACHE_EVICT,
+			    "clean pages evicted from the cache");
 		return (__wt_db_page_discard(db, page));
 	}
 	return (0);
@@ -333,7 +338,8 @@ __wt_db_page_write(DB *db, WT_PAGE *page)
 	ienv = db->ienv;
 	idb = db->idb;
 
-	WT_STAT_INCR(db, PAGE_WRITE, "count of page writes");
+	WT_STAT_INCR(db, CACHE_WRITE, "writes from the cache");
+	WT_STAT_DECR(db, CACHE_DIRTY, NULL);
 
 	/* Clear the modified flag. */
 	F_CLR(page, WT_MODIFIED);
