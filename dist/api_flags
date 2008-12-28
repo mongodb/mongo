@@ -1,10 +1,9 @@
 # $Id$
 #
-# This file lists all of the #define interface flags used by the WiredTiger
-# library.   It's processed by the s_api_defines script to create a list of
-# masks, ensuring the names and values never collide
+# This file lists all of the API interface flags used by the WiredTiger
+# library, and is processed to ensure flag #defines never collide.
 #
-# The format of the api_defines file:
+# The format:
 #	Method/Function/API
 #	<tab>	Flag
 
@@ -45,6 +44,8 @@ Db.destroy
 Db.dump
 	DEBUG				# Debugging format
 	PRINTABLES			# Display printable characters
+
+Db.get
 
 Db.open
 	CREATE				# Create any backing files
