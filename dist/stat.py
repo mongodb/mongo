@@ -11,8 +11,6 @@ import re
 from dist import compare_srcfile
 from dist import source_paths_list
 
-sfile = ""
-
 # Read the source files and build a dictiony of handles and stat counters.
 def stat_build():
 	stats = {}
