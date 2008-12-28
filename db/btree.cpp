@@ -36,7 +36,7 @@ KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) :
 
 /* BucketBasics --------------------------------------------------- */
 
-int BucketBasics::Size() const { 
+int BucketBasics::Size() const {
 	assert( _Size == BucketSize );
 	return _Size;
 }
@@ -404,8 +404,8 @@ int qqq = 0;
 
 bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc ) {
 	if( key.objsize() > KeyMax ) {
-		problem() << "unindex: key too large to index, skipping " << id.indexNamespace() << ' ' << key.toString() << endl;
-		return false;
+	  OCCASIONALLY problem() << "unindex: key too large to index, skipping " << id.indexNamespace() << /* ' ' << key.toString() << */ '\n';
+	  return false;
 	}
 
 	int pos;
