@@ -11,7 +11,7 @@ import re
 from dist import compare_srcfile
 from dist import source_paths_list
 
-# Read the source files and build a dictiony of handles and stat counters.
+# Read the source files and build a dictionary of handles and stat counters.
 def stat_build():
 	stats = {}
 	stat_re = re.compile\
@@ -24,7 +24,7 @@ def stat_build():
 	return (stats)
 
 
-# Read the source files and build a dictiony of handles and stat counters.
+# Read the source files and build a dictionary of handles and stat counters.
 stats = stat_build()
 
 # Update the #defines in the stat.h file.
