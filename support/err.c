@@ -118,32 +118,3 @@ __wt_database_format(DB *db)
 	    " method or the db_salvage utility to repair the database");
 	return (WT_ERROR);
 }
-
-/*
- * wt_strerror --
- *	Return a string for any error value.
- */
-char *
-wt_strerror(int error)
-{
-	static char errbuf[64];
-	char *p;
-
-	if (error == 0)
-		return ("Successful return: 0");
-	switch (error) {
-	case WT_ERROR:
-		return ("WT_ERROR: Non-specific error");
-	default:
-		if (error > 0 && (p = strerror(error)) != NULL)
-			return (p);
-		break;
-	}
-
-	/* 
-	 * !!!
-	 * Not thread-safe, but this is never supposed to happen.
-	 */
-	(void)snprintf(errbuf, sizeof(errbuf), "Unknown error: %d", error);
-	return (errbuf);
-}
