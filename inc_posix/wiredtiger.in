@@ -53,21 +53,6 @@ struct __ienv;			typedef struct __ienv IENV;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 
 /*******************************************
- * Errors
- *******************************************/
-/*
- * User-visible error return codes.
- *  0 == success
- * >0 == hard error
- * <0 == unexpected outcome
- *
- * !!!
- * We don't want our error returns to conflict with any other package, so
- * try and use an uncommon range, specifically, -31,800 to -31,999.
- */
-#define	WT_ERROR	(-31800)
-
-/*******************************************
  * Exported types
  *******************************************/
 typedef u_int64_t wt_recno_t;		/* logical record numbers */
@@ -156,6 +141,8 @@ struct __db {
 	    DB *, int, const char *, ...);
 	void (*errx)(
 	    DB *, const char *, ...);
+	int (*get)(
+	    DB *, DBT *, DBT *, DBT *, u_int32_t);
 	int (*open)(
 	    DB *, const char *, mode_t, u_int32_t);
 	int (*stat_clear)(
@@ -270,6 +257,7 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_DB_CLOSE				0x00000000
 #define	WT_APIMASK_DB_DESTROY				0x00000000
 #define	WT_APIMASK_DB_DUMP				0x00000003
+#define	WT_APIMASK_DB_GET				0x00000000
 #define	WT_APIMASK_DB_OPEN				0x00000001
 #define	WT_APIMASK_DB_STAT_CLEAR			0x00000000
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000
@@ -289,6 +277,20 @@ char	*wt_strerror(int);
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api.py.
+ */
+
+/*******************************************
+ * Error returns
+ *******************************************/
+/*
+ * DO NOT EDIT: automatically built by dist/api_err.py.
+ * Error return section: BEGIN
+ */
+#define	WT_ERROR	-31800
+#define	WT_NOTFOUND	-31801
+/*
+ * Error return section: END
+ * DO NOT EDIT: automatically built by dist/api_err.py.
  */
 
 #if defined(__cplusplus)
