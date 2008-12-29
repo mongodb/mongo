@@ -22,16 +22,58 @@
 #include "dbtests.h"
 #include "mockdbclient.h"
 
-//extern bool seemCaughtUp;
-// Temorary, so that we compile.  Disabling these tests, but will fix them soon.
-bool seemCaughtUp;
+extern PairSync *pairSync;
 
 namespace PairingTests {
-struct Base {
+class Base {
+protected:
     Base() {
-        seemCaughtUp = true;
+        backup = pairSync;
+        setSynced();
     }
+    ~Base() {
+        pairSync = backup;
+        dblock lk;
+        emptyCollection( "local.pair.sync" );
+        if ( pairSync->initialSyncCompleted() ) {
+            // save to db
+            pairSync->setInitialSyncCompleted();
+        }
+    }
+    static void setSynced() {
+        init();
+        pairSync = synced;
+        pairSync->setInitialSyncCompletedLocking();
+    }
+    static void setNotSynced() {
+        init();
+        pairSync = notSynced;
+    }
+    static void flipSync() {
+        if ( (unsigned int)( pairSync ) == (unsigned int)( synced ) )
+            setNotSynced();
+        else
+            setSynced();
+    }
+private:
+    static void init() {
+        dblock lk;
+        emptyCollection( "local.pair.sync" );
+        if ( synced != 0 && notSynced != 0 )
+            return;
+        notSynced = new PairSync();
+        notSynced->init();
+        synced = new PairSync();
+        synced->init();
+        synced->setInitialSyncCompleted();
+        emptyCollection( "local.pair.sync" );
+    }
+    PairSync *backup;
+    static PairSync *synced;
+    static PairSync *notSynced;
 };
+PairSync *Base::synced = 0;
+PairSync *Base::notSynced = 0;
 
 namespace ReplPairTests {
 class Create : public Base {
@@ -210,7 +252,6 @@ protected:
 class Negotiate : public DirectConnectBase {
 public:
     void run() {
-        seemCaughtUp = true;
         checkNegotiation( "a", "-", ReplPair::State_Negotiating, ReplPair::State_Negotiating,
                           "b", "-", ReplPair::State_Negotiating, ReplPair::State_Negotiating );
         checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Slave,
@@ -236,31 +277,27 @@ class NegotiateWithCatchup : public DirectConnectBase {
 public:
     void run() {
         // a caught up, b not
-        seemCaughtUp = false;
+        setNotSynced();
         checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Slave,
                           "a", "-", ReplPair::State_Negotiating, ReplPair::State_Master );
         // b caught up, a not
-        seemCaughtUp = true;
+        setSynced();
         checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Master,
                           "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave );
 
         // a caught up, b not
-        seemCaughtUp = false;
+        setNotSynced();
         checkNegotiation( "b", "-", ReplPair::State_Slave, ReplPair::State_Slave,
                           "a", "-", ReplPair::State_Negotiating, ReplPair::State_Master );
         // b caught up, a not
-        seemCaughtUp = true;
+        setSynced();
         checkNegotiation( "b", "-", ReplPair::State_Slave, ReplPair::State_Master,
                           "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave );
     }
 private:
     class NegateCatchup : public DirectDBClientConnection::ConnectionCallback {
-        virtual void beforeCommand() {
-            seemCaughtUp = !seemCaughtUp;
-        }
-        virtual void afterCommand() {
-            seemCaughtUp = !seemCaughtUp;
-        }
+        virtual void beforeCommand() { Base::flipSync(); }
+        virtual void afterCommand() { Base::flipSync(); }
     };
     virtual DirectDBClientConnection::ConnectionCallback *cc() {
         return &cc_;
@@ -271,7 +308,7 @@ private:
 class NobodyCaughtUp : public DirectConnectBase {
 public:
     void run() {
-        seemCaughtUp = false;
+        setNotSynced();
         checkNegotiation( "b", "-", ReplPair::State_Negotiating, ReplPair::State_Negotiating,
                           "a", "-", ReplPair::State_Negotiating, ReplPair::State_Slave );
     }
@@ -285,7 +322,7 @@ public:
         m.arbitrate();
         ASSERT( m.state == ReplPair::State_Master );
 
-        seemCaughtUp = false;
+        setNotSynced();
         m.state = ReplPair::State_Negotiating;
         m.arbitrate();
         ASSERT( m.state == ReplPair::State_Negotiating );

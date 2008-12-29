@@ -69,8 +69,7 @@ int main( int argc, char** argv ) {
     tests.add( btreeTests(), "btree" );
     tests.add( jsobjTests(), "jsobj" );
     tests.add( namespaceTests(), "namespace" );
-    // Disabling these tests, but will fix them soon.
-// 	tests.add( pairingTests(), "pairing" );
+ 	tests.add( pairingTests(), "pairing" );
 
     return tests.run( argc, argv );
 }

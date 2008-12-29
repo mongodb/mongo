@@ -42,9 +42,7 @@
 #include "../client/dbclient.h"
 #include "pdfile.h"
 #include "query.h"
-#include "json.h"
 #include "db.h"
-#include "dbhelpers.h"
 #include "commands.h"
 
 extern bool quiet;
@@ -67,51 +65,15 @@ bool replacePeer = false;
 */
 const char *allDead = 0;
 
-/* This is set to true if we have EVER been up to date -- this way a new pair member
-   which is a replacement won't go online as master until we have initially fully synced.
-*/
-class PairSync {
-    int initialsynccomplete;
-public:
-    PairSync() {
-        initialsynccomplete = -1;
-    }
-
-    /* call before using the class.  from dbmutex */
-    void init() {
-        BSONObj o;
-        initialsynccomplete = 0;
-        if ( getSingleton("local.pair.sync", o) )
-            initialsynccomplete = 1;
-    }
-
-    bool initialSyncCompleted() {
-        return initialsynccomplete != 0;
-    }
-
-    void setInitialSyncCompleted() {
-        BSONObj o = fromjson("{initialsynccomplete:1}");
-        putSingleton("local.pair.sync", o);
-        initialsynccomplete = 1;
-    }
-
-    void setInitialSyncCompletedLocking() {
-        if ( initialsynccomplete == 1 )
-            return;
-        dblock lk;
-        BSONObj o = fromjson("{initialsynccomplete:1}");
-        putSingleton("local.pair.sync", o);
-        initialsynccomplete = 1;
-    }
-} pairSync;
-bool getInitialSyncCompleted() {
-    return pairSync.initialSyncCompleted();
-}
-
 #include "replset.h"
 
 #define debugrepl(z) cout << "debugrepl " << z << '\n'
 //define debugrepl
+
+PairSync *pairSync = new PairSync();
+bool getInitialSyncCompleted() {
+    return pairSync->initialSyncCompleted();
+}
 
 /* --- ReplPair -------------------------------- */
 
@@ -129,7 +91,7 @@ struct ReplInfo {
 };
 
 void ReplPair::setMaster(int n, const char *_comment ) {
-    if ( n == State_Master && !pairSync.initialSyncCompleted() )
+    if ( n == State_Master && !getInitialSyncCompleted() )
         return;
     info = _comment;
     if ( n != state && !quiet )
@@ -184,7 +146,7 @@ public:
             errmsg = "not paired";
             return false;
         }
-        if ( !pairSync.initialSyncCompleted() ) {
+        if ( !getInitialSyncCompleted() ) {
             errmsg = "not caught up cannot replace peer";
             return false;
         }
@@ -306,7 +268,7 @@ public:
         }
 
         int me, you;
-        if ( !pairSync.initialSyncCompleted() || ( replPair->state != M && was == M ) ) {
+        if ( !getInitialSyncCompleted() || ( replPair->state != M && was == M ) ) {
             me=S;
             you=M;
         }
@@ -633,7 +595,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
             newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
     {
         if ( op.getBoolField("first") &&
-                pairSync.initialSyncCompleted() /*<- when false, we are a replacement volume for a pair and need a full sync */
+                pairSync->initialSyncCompleted() /*<- when false, we are a replacement volume for a pair and need a full sync */
            ) {
             log() << "pull: got {first:true} op ns:" << ns << '\n';
             /* this is the first thing in the oplog ever, so we don't need to resync(). */
@@ -1013,7 +975,7 @@ int _replMain(vector<ReplSource*>& sources) {
             bool moreToSync = s->haveMoreDbsToSync();
             sleep = !moreToSync;
             if ( ok && !moreToSync /*&& !s->syncedTo.isNull()*/ ) {
-                pairSync.setInitialSyncCompletedLocking();
+                pairSync->setInitialSyncCompletedLocking();
             }
         }
         catch ( SyncException& ) {
@@ -1084,7 +1046,7 @@ void replSlaveThread() {
         if ( getSingleton("local.pair.startup", obj) ) {
             // should be: {replacepeer:1}
             replacePeer = true;
-            pairSync.setInitialSyncCompleted(); // we are the half that has all the data
+            pairSync->setInitialSyncCompleted(); // we are the half that has all the data
         }
     }
 
@@ -1168,7 +1130,7 @@ void startReplication() {
 
     {
         dblock lk;
-        pairSync.init();
+        pairSync->init();
     }
 
     if ( slave || replPair ) {

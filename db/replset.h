@@ -17,6 +17,8 @@
 #pragma once
 
 #include "db.h"
+#include "dbhelpers.h"
+#include "json.h"
 #include "../client/dbclient.h"
 
 extern int port;
@@ -132,3 +134,42 @@ inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {
     arbHost = arb;
     uassert("arbiter parm is empty", !arbHost.empty());
 }
+
+/* This is set to true if we have EVER been up to date -- this way a new pair member
+ which is a replacement won't go online as master until we have initially fully synced.
+ */
+class PairSync {
+    int initialsynccomplete;
+public:
+    PairSync() {
+        initialsynccomplete = -1;
+    }
+    
+    /* call before using the class.  from dbmutex */
+    void init() {
+        BSONObj o;
+        initialsynccomplete = 0;
+        if ( getSingleton("local.pair.sync", o) )
+            initialsynccomplete = 1;
+    }
+    
+    bool initialSyncCompleted() {
+        return initialsynccomplete != 0;
+    }
+    
+    void setInitialSyncCompleted() {
+        BSONObj o = fromjson("{initialsynccomplete:1}");
+        putSingleton("local.pair.sync", o);
+        initialsynccomplete = 1;
+    }
+    
+    void setInitialSyncCompletedLocking() {
+        if ( initialsynccomplete == 1 )
+            return;
+        dblock lk;
+        BSONObj o = fromjson("{initialsynccomplete:1}");
+        putSingleton("local.pair.sync", o);
+        initialsynccomplete = 1;
+    }
+};
+
