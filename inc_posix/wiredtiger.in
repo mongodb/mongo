@@ -212,6 +212,8 @@ struct __env {
 	int (*set_cachesize)(
 	    ENV *, u_int32_t );
 
+	int (*close)(
+	    ENV *, u_int32_t);
 	int (*destroy)(
 	    ENV *, u_int32_t);
 	void (*err)(
@@ -265,6 +267,7 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_DB_VERIFY				0x00000000
 #define	WT_APIMASK_DBT					0x00000000
 #define	WT_APIMASK_ENV					0x00000000
+#define	WT_APIMASK_ENV_CLOSE				0x00000000
 #define	WT_APIMASK_ENV_DESTROY				0x00000000
 #define	WT_APIMASK_ENV_VERBOSE				0x00000003
 #define	WT_APIMASK_IDB					0x00000001
