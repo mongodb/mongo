@@ -16,10 +16,6 @@
 int
 __wt_env_set_verbose_verify(ENV *env, u_int32_t *whichp)
 {
-	IENV *ienv;
-
-	ienv = env->ienv;
-
-	ENV_FLAG_CHK(ienv, "Env.set_verbose", *whichp, WT_APIMASK_ENV_VERBOSE);
+	ENV_FLAG_CHK(env, "Env.set_verbose", *whichp, WT_APIMASK_ENV_VERBOSE);
 	return (0);
 }

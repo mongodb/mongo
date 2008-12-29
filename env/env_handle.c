@@ -53,7 +53,7 @@ wt_env_create(ENV **envp, u_int32_t flags)
 	ienv->env = env;
 
 	ENV_FLAG_CHK_NOTFATAL(
-	    ienv, "wt_env_create", flags, WT_APIMASK_WT_ENV_CREATE, ret);
+	    env, "wt_env_create", flags, WT_APIMASK_WT_ENV_CREATE, ret);
 	if (ret != 0)
 		goto err;
 
@@ -77,14 +77,12 @@ err:	__wt_free(NULL, env->ienv);
 int
 __wt_env_destroy(ENV *env, u_int32_t flags)
 {
-	IENV *ienv;
 	int ret;
 
-	ienv = env->ienv;
 	ret = 0;
 
 	ENV_FLAG_CHK_NOTFATAL(
-	    ienv, "Env.destroy", flags, WT_APIMASK_ENV_DESTROY, ret);
+	    env, "Env.destroy", flags, WT_APIMASK_ENV_DESTROY, ret);
 
 	/*
 	 * !!!
