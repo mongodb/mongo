@@ -5,16 +5,16 @@
 #
 # $Id$
 #
-# A fair number of the getters/setters only get/set a single field of
-# a handle.  Auto-generate the code that supports them.
+# Auto-generate getter/setter code and handle method initialization.
 #
 # The fields of each line of the getset file:
 #
 #	handle<tab>conditions<tab>
-#		 getset -- a getter/setter declaration
-#		 method -- a standalone method, returning int
-#		 method -- a standalone method, returning void
-#		 verify -- getset: call a subroutine to OK the argument
+#		open    -- unavailable until after the Db.open method call.
+#		getset  -- a getter/setter declaration
+#		method  -- a standalone method, returning int
+#		methodV -- a standalone method, returning void
+#		verify  -- getset: call a subroutine to OK the argument
 #	<tab>field<tab>type
 #	...
 #
@@ -38,10 +38,12 @@ env	getset
 # Env standalone method declarations
 ###################################################
 env	method
+	close	u_int32_t
+env	method
 	destroy	u_int32_t
-env	voidmethod
+env	methodV
 	err	int, const char *, ...
-env	voidmethod
+env	methodV
 	errx	const char *, ...
 
 ###################################################
@@ -70,23 +72,25 @@ db	getset,verify
 ###################################################
 db	method
 	bulk_load	u_int32_t, int (*)(DB *, DBT **, DBT **)
-db	method
+db	method,open
 	close	u_int32_t
 db	method
 	destroy	u_int32_t
-db	method
+db	method,open
 	dump	FILE *, u_int32_t
-db	voidmethod
+db	methodV
 	err	int, const char *, ...
-db	voidmethod
+db	methodV
 	errx	const char *, ...
+db	method,open
+	get	DBT *, DBT *, DBT *, u_int32_t
 db	method
 	open	const char *, mode_t, u_int32_t
 db	method
 	stat_clear	u_int32_t
 db	method
 	stat_print	FILE *, u_int32_t
-db	method
+db	method,open
 	sync	u_int32_t
-db	method
+db	method,open
 	verify	u_int32_t

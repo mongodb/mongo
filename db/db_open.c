@@ -38,6 +38,9 @@ __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 	/* Open the underlying Btree. */
 	if ((ret = __wt_bt_open(db)) != 0)
 		goto err;
+
+	/* Turn on the methods that require open. */
+	__wt_db_config_methods_open(db);
 	
 	return (0);
 
@@ -47,7 +50,7 @@ err:	__wt_idb_destroy(db, 1);
 
 /*
  * __wt_db_idb_setup --
- *	Routine to intialize any IDB values based on a DB value during open.i
+ *	Routine to intialize any IDB values based on a DB value during open.
  */
 static void
 __wt_db_idb_setup(DB *db)

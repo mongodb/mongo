@@ -25,13 +25,13 @@ def func_cast(rettype, handle, field, func, args):
 	s += '))\n\t    __wt_' + handle + '_' + func + ';\n'
 	return (s)
 
-# handle_methods --
+# standalone --
 #	Standalone method code for the API.
-def handle_methods():
-	global db_config, db_header, db_lockout
-	global env_config, env_header, env_lockout
+def standalone():
+	global db_config, db_header, db_lockout, db_open
+	global env_config, env_header, env_lockout, env_open
 
-	if condition.count('voidmethod'):
+	if condition.count('methodV'):
 		rettype = 'void'
 	else:
 		rettype = 'int'
@@ -52,6 +52,12 @@ def handle_methods():
 	# XXX_config string.
 	s = '\t' + handle +\
 	    '->' + field + ' = __wt_' + handle + '_' + field + ';\n'
+	if condition.count('open'):
+		if handle.count('env'):
+			env_open += s
+		else:
+			db_open += s
+		s = func_cast('int', handle, field, 'lockout_open', list)
 	if handle.count('env'):
 		env_config += s
 	else:
@@ -67,9 +73,9 @@ def handle_methods():
 		else:
 			db_lockout += s
 
-# handle_getset --
+# getset --
 #	Getter/setter code for the API.
-def handle_getset():
+def getset():
 	global db_config, db_header, db_lockout
 	global env_config, env_header, env_lockout
 
@@ -160,12 +166,15 @@ def handle_getset():
 	s += '\treturn (0);\n}\n\n'
 	tfile.write(s)
 
-db_config = ''					# Env method init
+db_config = ''					# Db method init
 db_header = ''					# Db handle structure
 db_lockout = ''					# Db lockout function
-env_config = ''					# Db method init
+db_open = ''					# Db open initialize
+
+env_config = ''					# Env method init
 env_header = ''					# Env handle structure
 env_lockout = ''				# Env lockout function
+env_open = ''					# Env open initialize
 
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
@@ -179,9 +188,9 @@ for line in open('api', 'r'):
 	if setter_re.match(line):
 		if list:
 			if condition.count('getset'):
-				handle_getset()
+				getset()
 			if condition.count('method'):
-				handle_methods()
+				standalone()
 			list=[]
 		s = line.split('\t')
 		handle = s[0]
@@ -190,9 +199,9 @@ for line in open('api', 'r'):
 		list.append(string.strip(line))
 if list:
 	if condition.count('getset'):
-		handle_getset()
+		getset()
 	if condition.count('method'):
-		handle_methods()
+		standalone()
 
 # Write out the configuration initialization and lockout functions.
 tfile.write('void\n__wt_env_config_methods(ENV *env)\n{\n');
@@ -201,11 +210,18 @@ tfile.write('}\n\n')
 tfile.write('void\n__wt_env_config_methods_lockout(ENV *env)\n{\n');
 tfile.write(env_lockout)
 tfile.write('}\n\n')
+tfile.write('void\n__wt_env_config_methods_open(ENV *env)\n{\n');
+tfile.write(env_open)
+tfile.write('}\n\n')
+
 tfile.write('void\n__wt_db_config_methods(DB *db)\n{\n');
 tfile.write(db_config)
 tfile.write('}\n\n')
 tfile.write('void\n__wt_db_config_methods_lockout(DB *db)\n{\n');
 tfile.write(db_lockout)
+tfile.write('}\n\n')
+tfile.write('void\n__wt_db_config_methods_open(DB *db)\n{\n');
+tfile.write(db_open)
 tfile.write('}\n')
 	
 # Update the automatically generated function sources.

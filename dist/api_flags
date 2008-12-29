@@ -16,6 +16,8 @@ IEnv					# Private handle
 
 wt_env_create
 
+Env.close
+
 Env.destroy
 
 Env.verbose

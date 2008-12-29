@@ -127,9 +127,6 @@ __wt_idb_destroy(DB *db, int refresh)
 	idb = db->idb;
 	ienv = db->ienv;
 
-	/* Free any allocated memory. */
-	__wt_free(ienv, idb->file_name);
-
 	/* Free the actual structure. */
 	__wt_free(ienv, db->idb);
 	db->idb = NULL;
@@ -184,7 +181,16 @@ int
 __wt_db_lockout_err(DB *db)
 {
 	__wt_db_errx(db,
-	    "This Db handle has failed for some reason, and can no longer"
-	    " be used; the only method permitted on it is Db.destroy");
+	    "This Db handle has failed for some reason, and can no longer "
+	    "be used; the only method permitted on it is Db.destroy");
+	return (WT_ERROR);
+}
+
+int
+__wt_db_lockout_open(DB *db)
+{
+	__wt_db_errx(db,
+	    "This method may not be called until after the Db.open method has "
+	    "been called");
 	return (WT_ERROR);
 }
