@@ -27,12 +27,12 @@ extern "C" {
 #define	DB_FLAG_CHK_NOTFATAL(db, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
 		(ret) = __wt_api_flags((db)->ienv, name);
-#define	ENV_FLAG_CHK(ienv, name, f, mask)				\
+#define	ENV_FLAG_CHK(env, name, f, mask)				\
 	if ((f) & ~(mask))						\
-		return (__wt_api_flags(ienv, name));
-#define	ENV_FLAG_CHK_NOTFATAL(ienv, name, f, mask, ret)			\
+		return (__wt_api_flags((env)->ienv, name));
+#define	ENV_FLAG_CHK_NOTFATAL(env, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
-		(ret) = __wt_api_flags(ienv, name);
+		(ret) = __wt_api_flags((env)->ienv, name);
 
 /*
  * Flag set, clear and test.  They come in 3 flavors: F_XXX (handles a
