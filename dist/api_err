@@ -1,0 +1,11 @@
+# $Id$
+#
+# This file lists all of the errors returned by the WiredTiger library, and is
+# and is processed to create the #defines and the function that lists their
+# associated strings.
+#
+# The format:
+#	error<tab>string
+
+WT_ERROR	non-specific error
+WT_NOTFOUND	item not found
