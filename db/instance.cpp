@@ -483,6 +483,16 @@ void jniCallback(Message& m, Message& out)
     }
 }
 
+void getDatabaseNames( vector< string > &names ) {
+    boost::filesystem::path path( dbpath );
+    for ( boost::filesystem::directory_iterator i( path );
+         i != boost::filesystem::directory_iterator(); ++i ) {
+        string fileName = i->leaf();
+        if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
+            names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
+    }
+}
+
 #undef exit
 void dbexit(int rc, const char *why) {
     log() << "  dbexit: " << why << "; flushing op log and files" << endl;

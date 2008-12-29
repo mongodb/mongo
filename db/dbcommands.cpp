@@ -29,6 +29,7 @@
 #include "replset.h"
 #include "commands.h"
 #include "db.h"
+#include "instance.h"
 
 extern int queryTraceLevel;
 extern int otherTraceLevel;
