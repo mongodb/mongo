@@ -355,7 +355,8 @@ void NamespaceDetailsTransient::computeIndexKeys() {
    options: { capped : ..., size : ... }
 */
 void addNewNamespaceToCatalog(const char *ns, BSONObj *options = 0) {
-    OCCASIONALLY log() << "New namespace: " << ns << '\n';
+    if( verbose )
+        log() << "New namespace: " << ns << '\n';
     if ( strstr(ns, "system.namespaces") ) {
         // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
         // TODO: fix above should not be strstr!

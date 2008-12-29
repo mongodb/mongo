@@ -406,7 +406,6 @@ void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p) {
         markUnused(p);
 }
 
-int verbose = 0;
 int qqq = 0;
 
 bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc ) {
