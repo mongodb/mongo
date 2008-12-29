@@ -180,6 +180,14 @@ void connThread()
         problem() << "Uncaught AssertionException, terminating" << endl;
         exit(15);
     }
+    catch( std::exception &e ) {
+        problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
+        exit( 15 );
+    }
+    catch ( ... ) {
+        problem() << "Uncaught exception, terminating" << endl;
+        exit( 15 );
+    }
 }
 
 
