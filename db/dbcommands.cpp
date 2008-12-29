@@ -505,6 +505,28 @@ public:
     }
 } cmdDeleteIndexes;
 
+class CmdListDatabases : public Command {
+public:
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
+    virtual bool adminOnly() { return true; }
+    CmdListDatabases() : Command("listDatabases") {}
+    bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        vector< string > dbNames;
+        getDatabaseNames( dbNames );
+        vector< BSONObj > dbInfos;
+        for( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
+            BSONObjBuilder s;
+            s.append( "diskSize", dbSize( i->c_str() ) );
+            BSONObjBuilder b;
+            b.append( i->c_str(), s.done() );
+            dbInfos.push_back( b.doneAndDecouple() );
+        }
+        result.append( "databases", dbInfos );
+        return true;
+    }
+} cmdListDatabases;
+
 extern map<string,Command*> *commands;
 
 /* TODO make these all command objects -- legacy stuff here

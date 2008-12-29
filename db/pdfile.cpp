@@ -1035,7 +1035,7 @@ boost::intmax_t dbSize( const char *database ) {
         SizeAccumulator() : totalSize_( 0 ) {}
         boost::intmax_t size() const { return totalSize_; }
     private:
-        virtual bool apply( const Path &p ) {
+        virtual bool apply( const boost::filesystem::path &p ) {
             if( !boost::filesystem::exists( p ) )
                 return false;
             totalSize_ += boost::filesystem::file_size( p );

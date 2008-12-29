@@ -107,6 +107,8 @@ inline string getKey( const char *ns, const char *path ) {
     return string( cl ) + ":" + path;
 }
 
+void getDatabaseNames( vector< string > &names );
+
 /* returns true if the database ("database") did not exist, and it was created on this call */
 inline bool setClient(const char *ns, const char *path=dbpath) {
     /* we must be in critical section at this point as these are global

@@ -46,6 +46,16 @@ void closeAllSockets();
 void startReplication();
 void pairWith(const char *remoteEnd, const char *arb);
 
+void getDatabaseNames( vector< string > &names ) {
+    boost::filesystem::path path( dbpath );
+    for ( boost::filesystem::directory_iterator i( path );
+         i != boost::filesystem::directory_iterator(); ++i ) {
+        string fileName = i->leaf();
+        if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
+            names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
+    }
+}
+
 struct MyStartupTests {
     MyStartupTests() {
         assert( sizeof(OID) == 12 );
@@ -282,24 +292,21 @@ void setupSignals() {}
 
 void repairDatabases() {
     dblock lk;
-    boost::filesystem::path path( dbpath );
-    for ( boost::filesystem::directory_iterator i( path );
-            i != boost::filesystem::directory_iterator(); ++i ) {
-        string fileName = i->leaf();
-        if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" ) {
-            string dbName = fileName.substr( 0, fileName.length() - 3 );
-            assert( !setClientTempNs( dbName.c_str() ) );
-            PhysicalDataFile *p = database->getFile( 0 );
-            PDFHeader *h = p->getHeader();
-            if ( !h->currentVersion() ) {
-                // QUESTION: Repair even if file format is higher version than code?
-                log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", ";
-                log() << "new version: " << VERSION << "." << VERSION_MINOR << endl;
-                string errmsg;
-                assert( repairDatabase( dbName.c_str(), errmsg ) );
-            } else {
-                closeClient( dbName.c_str() );
-            }
+    vector< string > dbNames;
+    getDatabaseNames( dbNames );
+    for( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
+        string dbName = *i;
+        assert( !setClientTempNs( dbName.c_str() ) );
+        PhysicalDataFile *p = database->getFile( 0 );
+        PDFHeader *h = p->getHeader();
+        if ( !h->currentVersion() ) {
+            // QUESTION: Repair even if file format is higher version than code?
+            log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", ";
+            log() << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+            string errmsg;
+            assert( repairDatabase( dbName.c_str(), errmsg ) );
+        } else {
+            closeClient( dbName.c_str() );
         }
     }
 }

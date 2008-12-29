@@ -392,6 +392,8 @@ inline void _deleteDataFiles(const char *database) {
     _applyOpToDataFiles( database, deleter );
 }
 
+boost::intmax_t dbSize( const char *database );
+
 inline NamespaceIndex* nsindex(const char *ns) {
     DEV {
         char buf[256];
