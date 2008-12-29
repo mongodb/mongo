@@ -13,6 +13,10 @@ static int __wt_db_page_clean(DB *);
 static int __wt_db_page_discard(DB *, WT_PAGE *);
 static int __wt_db_page_write(DB *, WT_PAGE *);
 
+#ifdef HAVE_DIAGNOSTIC
+static int __wt_db_page_dump(DB *, char *, FILE *);
+#endif
+
 /*
  * __wt_db_page_open --
  *	Open an underlying file.
@@ -94,7 +98,7 @@ __wt_db_page_close(DB *db)
 			ret = tret;
 	}
 
-	WT_ASSERT(ienv, idb->cache_frags== 0);
+	WT_ASSERT(ienv, idb->cache_frags == 0);
 
 	return (__wt_close(ienv, idb->fh));
 }
@@ -289,9 +293,10 @@ __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
 
 	/* If the page is dirty, set the modified flag. */
-	if (LF_ISSET(WT_MODIFIED))
+	if (LF_ISSET(WT_MODIFIED)) {
 		F_SET(page, WT_MODIFIED);
 		WT_STAT_INCR(db, CACHE_DIRTY, "dirty pages in the cache");
+	}
 
 	return (0);
 }
@@ -386,3 +391,58 @@ __wt_db_page_discard(DB *db, WT_PAGE *page)
 	__wt_free(ienv, page);
 	return (0);
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_db_page_dump --
+ *	Dump the current hash and LRU queues.
+ */
+static int
+__wt_db_page_dump(DB *db, char *ofile, FILE *fp)
+{
+	IDB *idb;
+	WT_PAGE *page;
+	WT_PAGE_HQH *hashq;
+	int bucket_empty, do_close, i;
+	char *sep;
+
+	idb = db->idb;
+
+	/* Optionally dump to a file, else to a stream, default to stdout. */
+	do_close = 0;
+	if (ofile != NULL) {
+		if ((fp = fopen(ofile, "w")) == NULL)
+			return (WT_ERROR);
+		do_close = 1;
+	} else if (fp == NULL)
+		fp = stdout;
+
+	fprintf(fp, "LRU: ");
+	sep = "";
+	TAILQ_FOREACH(page, &idb->hlru, lq) {
+		fprintf(fp, "%s%lu", sep, (u_long)page->addr);
+		sep = ", ";
+	}
+	fprintf(fp, "\n");
+	for (i = 0; i < WT_HASHSIZE; ++i) {
+		sep = "";
+		bucket_empty = 1;
+		hashq = &idb->hhq[i];
+		TAILQ_FOREACH(page, hashq, hq) {
+			if (bucket_empty) {
+				fprintf(fp, "hash bucket %d: ");
+				bucket_empty = 0;
+			}
+			fprintf(fp, "%s%lu", sep, (u_long)page->addr);
+			sep = ", ";
+		}
+		if (!bucket_empty)
+			fprintf(fp, "\n");
+	}
+
+	if (do_close)
+		(void)fclose(fp);
+
+	return (0);
+}
+#endif
