@@ -67,19 +67,22 @@ struct __idb {
 	mode_t mode;			/* Database file create mode */
 
 	WT_FH *fh;			/* Backing file handle */
-	u_int32_t frags;		/* Fragments in the file */
+	u_int32_t frags;		/* Total fragments in the file */
 
 	/*
 	 * Each in-memory page is threaded on two queues: a hash queue
 	 * based on its fragment addr, and an LRU list.
 	 */
-#define	WT_HASHSIZE	128
-#define	WT_HASH(addr)	(addr % WT_HASHSIZE)	/* Page hash and LRU queues */
+#define	WT_HASHSIZE	32		/* Page hash and LRU queues */
+#define	WT_HASH(addr)	(addr % WT_HASHSIZE)
 	TAILQ_HEAD(__wt_page_hqh, __wt_page) hhq[WT_HASHSIZE];
 	TAILQ_HEAD(__wt_page_hlru, __wt_page) hlru;
 
 	u_int32_t cache_frags;		/* Cache fragments allocated */
 	u_int32_t cache_frags_max;	/* Cache fragments max */
+
+	WT_PAGE *root_page;		/* In-memory root page */
+	u_int32_t root_addr;		/* Root fragment */
 
 	u_int32_t flags;
 };
