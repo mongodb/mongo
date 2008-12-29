@@ -86,4 +86,5 @@ tfile.write('\t(void)snprintf(errbuf, sizeof(errbuf), ' +\
     '"Unknown error: %d", error);\n')
 tfile.write('\treturn (errbuf);\n')
 tfile.write('}\n')
+tfile.close()
 compare_srcfile(tmp_file, '../support/strerror.c')
