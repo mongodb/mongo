@@ -50,7 +50,7 @@ protected:
         pairSync = notSynced;
     }
     static void flipSync() {
-        if ( (unsigned int)( pairSync ) == (unsigned int)( synced ) )
+        if ( pairSync->initialSyncCompleted() )
             setNotSynced();
         else
             setSynced();
