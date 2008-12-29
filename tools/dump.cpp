@@ -113,7 +113,7 @@ namespace dump {
 
 int main( int argc , char ** argv ){
 
- boost:filesystem::path::default_name_check( boost::filesystem::no_check );
+    boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
     po::options_description options("dump parameters");
     options.add_options()
