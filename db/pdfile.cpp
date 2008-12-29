@@ -979,27 +979,27 @@ void dropDatabase(const char *ns) {
 typedef boost::filesystem::path Path;
 
 // back up original database files to 'temp' dir
-void _renameForBackup( const char *database, const Path &tmpPath ) {
+void _renameForBackup( const char *database, const Path &reservedPath ) {
     class Renamer : public FileOp {
     public:
-        Renamer( const Path &tmpPath ) : tmpPath_( tmpPath ) {}
+        Renamer( const Path &reservedPath ) : reservedPath_( reservedPath ) {}
     private:
-        const boost::filesystem::path &tmpPath_;
+        const boost::filesystem::path &reservedPath_;
         virtual bool apply( const Path &p ) {
             if ( !boost::filesystem::exists( p ) )
                 return false;
-            boost::filesystem::rename( p, tmpPath_ / ( p.leaf() + ".bak" ) );
+            boost::filesystem::rename( p, reservedPath_ / ( p.leaf() + ".bak" ) );
             return true;
         }
         virtual const char * op() const {
             return "renaming";
         }
-    } renamer( tmpPath );
+    } renamer( reservedPath );
     _applyOpToDataFiles( database, renamer );
 }
 
 // move temp files to standard data dir
-void _replaceWithRecovered( const char *database, const char *tmpPathString ) {
+void _replaceWithRecovered( const char *database, const char *reservedPathString ) {
     class : public FileOp {
         virtual bool apply( const Path &p ) {
             if ( !boost::filesystem::exists( p ) )
@@ -1011,22 +1011,22 @@ void _replaceWithRecovered( const char *database, const char *tmpPathString ) {
             return "renaming";
         }
     } renamer;
-    _applyOpToDataFiles( database, renamer, tmpPathString );
+    _applyOpToDataFiles( database, renamer, reservedPathString );
 }
 
 // generate a directory name for storing temp data files
-Path uniqueTmpPath() {
+Path uniqueReservedPath( const char *prefix ) {
     Path dbPath = Path( dbpath );
-    Path tmpPath;
+    Path reservedPath;
     int i = 0;
     bool exists = false;
     do {
         stringstream ss;
-        ss << "tmp_repairDatabase_" << i++;
-        tmpPath = dbPath / ss.str();
-        BOOST_CHECK_EXCEPTION( exists = boost::filesystem::exists( tmpPath ) );
+        ss << prefix << "_repairDatabase_" << i++;
+        reservedPath = dbPath / ss.str();
+        BOOST_CHECK_EXCEPTION( exists = boost::filesystem::exists( reservedPath ) );
     } while ( exists );
-    return tmpPath;
+    return reservedPath;
 }
 
 boost::intmax_t dbSize( const char *database ) {
@@ -1083,18 +1083,20 @@ bool repairDatabase( const char *ns, string &errmsg,
     }
 #endif
     
-    Path tmpPath = uniqueTmpPath();
-    BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( tmpPath ) );
-    string tmpPathString = tmpPath.native_directory_string();
-    assert( setClient( dbName, tmpPathString.c_str() ) );
+    Path reservedPath =
+        uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
+                           "backup" : "tmp" );
+    BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
+    string reservedPathString = reservedPath.native_directory_string();
+    assert( setClient( dbName, reservedPathString.c_str() ) );
 
     bool res = cloneFrom(localhost.c_str(), errmsg, dbName, /*logForReplication=*/false, /*slaveok*/false);
-    closeClient( dbName, tmpPathString.c_str() );
+    closeClient( dbName, reservedPathString.c_str() );
 
     if ( !res ) {
         problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
         if ( !preserveClonedFilesOnFailure )
-            BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( tmpPath ) );
+            BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
         return false;
     }
 
@@ -1102,14 +1104,14 @@ bool repairDatabase( const char *ns, string &errmsg,
     closeClient( dbName );
 
     if ( backupOriginalFiles )
-        _renameForBackup( dbName, tmpPath );
+        _renameForBackup( dbName, reservedPath );
     else
         _deleteDataFiles( dbName );
 
-    _replaceWithRecovered( dbName, tmpPathString.c_str() );
+    _replaceWithRecovered( dbName, reservedPathString.c_str() );
 
     if ( !backupOriginalFiles )
-        BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( tmpPath ) );
+        BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
 
     return true;
 }

@@ -311,7 +311,20 @@ void repairDatabases() {
     }
 }
 
+void clearTmpFiles() {
+    boost::filesystem::path path( dbpath );
+    for ( boost::filesystem::directory_iterator i( path );
+         i != boost::filesystem::directory_iterator(); ++i ) {
+        string fileName = i->leaf();
+        if ( boost::filesystem::is_directory( *i ) &&
+            fileName.length() > 2 && fileName.substr( 0, 3 ) == "tmp" )
+            boost::filesystem::remove_all( *i );
+    }    
+}
+
 void initAndListen(int listenPort, const char *appserverLoc = null) {
+    clearTmpFiles();
+    
     if ( opLogging )
         log() << "opLogging = " << opLogging << endl;
     _oplog.init();
