@@ -291,8 +291,8 @@ void repairDatabases() {
         PDFHeader *h = p->getHeader();
         if ( !h->currentVersion() ) {
             // QUESTION: Repair even if file format is higher version than code?
-            log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", ";
-            log() << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+            log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
+                  << "new version: " << VERSION << "." << VERSION_MINOR << endl;
             string errmsg;
             assert( repairDatabase( dbName.c_str(), errmsg ) );
         } else {
