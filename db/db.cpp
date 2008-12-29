@@ -295,7 +295,8 @@ void repairDatabases() {
                 // QUESTION: Repair even if file format is higher version than code?
                 log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", ";
                 log() << "new version: " << VERSION << "." << VERSION_MINOR << endl;
-                repairDatabase( dbName.c_str() );
+                string errmsg;
+                assert( repairDatabase( dbName.c_str(), errmsg ) );
             } else {
                 closeClient( dbName.c_str() );
             }

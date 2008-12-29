@@ -1025,8 +1025,37 @@ Path uniqueTmpPath() {
     return tmpPath;
 }
 
-bool repairDatabase( const char *ns, bool preserveClonedFilesOnFailure,
-                     bool backupOriginalFiles ) {
+boost::intmax_t dbSize( const char *database ) {
+    class SizeAccumulator : public FileOp {
+    public:
+        SizeAccumulator() : totalSize_( 0 ) {}
+        boost::intmax_t size() const { return totalSize_; }
+    private:
+        virtual bool apply( const Path &p ) {
+            if( !boost::filesystem::exists( p ) )
+                return false;
+            totalSize_ += boost::filesystem::file_size( p );
+            return true;
+        }
+        virtual const char *op() const { return "checking size"; }
+        boost::intmax_t totalSize_;
+    };
+    SizeAccumulator sa;
+    _applyOpToDataFiles( database, sa );
+    return sa.size();
+}
+
+#if !defined(_WIN32)
+#include <sys/statvfs.h>
+boost::intmax_t freeSpace() {
+    struct statvfs info;
+    assert( !statvfs( dbpath, &info ) );
+    return info.f_bavail * info.f_frsize;
+}
+#endif
+
+bool repairDatabase( const char *ns, string &errmsg,
+                    bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
     stringstream ss;
     ss << "localhost:" << port;
     string localhost = ss.str();
@@ -1037,17 +1066,29 @@ bool repairDatabase( const char *ns, bool preserveClonedFilesOnFailure,
     problem() << "repairDatabase " << dbName << endl;
     assert( database->name == dbName );
 
+#if !defined(_WIN32)
+    boost::intmax_t totalSize = dbSize( dbName );
+    boost::intmax_t freeSize = freeSpace();
+    if ( freeSize < totalSize ) {
+        stringstream ss;
+        ss << "Cannot repair database " << dbName << " having size: " << totalSize
+           << " (bytes) because free disk space is: " << freeSize << " (bytes)";
+        errmsg = ss.str();
+        problem() << errmsg << endl;
+        return false;
+    }
+#endif
+    
     Path tmpPath = uniqueTmpPath();
     BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( tmpPath ) );
     string tmpPathString = tmpPath.native_directory_string();
     assert( setClient( dbName, tmpPathString.c_str() ) );
 
-    string errmsg;
     bool res = cloneFrom(localhost.c_str(), errmsg, dbName, /*logForReplication=*/false, /*slaveok*/false);
     closeClient( dbName, tmpPathString.c_str() );
 
     if ( !res ) {
-        problem() << "clone failed for " << dbName << endl;
+        problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
         if ( !preserveClonedFilesOnFailure )
             BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( tmpPath ) );
         return false;

@@ -214,7 +214,7 @@ public:
         bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
         e = cmdObj.findElement( "backupOriginalFiles" );
         bool backupOriginalFiles = e.isBoolean() && e.boolean();
-        return repairDatabase( ns, preserveClonedFilesOnFailure, backupOriginalFiles );
+        return repairDatabase( ns, errmsg, preserveClonedFilesOnFailure, backupOriginalFiles );
     }
 } cmdRepairDatabase;
 

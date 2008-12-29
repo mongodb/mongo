@@ -41,7 +41,7 @@ class Record;
 class Cursor;
 
 void dropDatabase(const char *ns);
-bool repairDatabase(const char *ns, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
+bool repairDatabase(const char *ns, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 void dropNS(string& dropNs);;
 bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
 
