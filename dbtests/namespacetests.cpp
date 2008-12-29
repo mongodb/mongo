@@ -85,6 +85,9 @@ protected:
         b.append( "c", 4 );
         return b.doneAndDecouple();
     }
+    static void checkSize( int expected, const set< BSONObj >  &objs ) {
+        ASSERT_EQUALS( set< BSONObj >::size_type( expected ), objs.size() );
+    }
 private:
     IndexDetails id_;
 };
@@ -110,7 +113,7 @@ public:
         e.append( "", 5 );
         set< BSONObj > keys;
         id().getKeysFromObject( b.done(), keys );
-        ASSERT_EQUALS( 1, keys.size() );
+        checkSize( 1, keys );
         ASSERT_EQUALS( e.doneAndDecouple(), *keys.begin() );
     }
 };
@@ -126,7 +129,7 @@ public:
         e.append( "", 4 );
         set< BSONObj > keys;
         id().getKeysFromObject( a.done(), keys );
-        ASSERT_EQUALS( 1, keys.size() );
+        checkSize( 1, keys );
         ASSERT_EQUALS( e.doneAndDecouple(), *keys.begin() );
     }
 private:
@@ -144,7 +147,7 @@ public:
 
         set< BSONObj > keys;
         id().getKeysFromObject( b.done(), keys );
-        ASSERT_EQUALS( 3, keys.size() );
+        checkSize( 3, keys );
         int j = 1;
         for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
@@ -164,7 +167,7 @@ public:
 
         set< BSONObj > keys;
         id().getKeysFromObject( b.done(), keys );
-        ASSERT_EQUALS( 3, keys.size() );
+        checkSize( 3, keys );
         int j = 1;
         for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
@@ -189,7 +192,7 @@ public:
 
         set< BSONObj > keys;
         id().getKeysFromObject( b.done(), keys );
-        ASSERT_EQUALS( 3, keys.size() );
+        checkSize( 3, keys );
         int j = 1;
         for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
@@ -218,7 +221,7 @@ public:
 
         set< BSONObj > keys;
         id().getKeysFromObject( a.done(), keys );
-        ASSERT_EQUALS( 3, keys.size() );
+        checkSize( 3, keys );
         int j = 1;
         for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
@@ -262,7 +265,7 @@ public:
 
         set< BSONObj > keys;
         id().getKeysFromObject( b.done(), keys );
-        ASSERT_EQUALS( 3, keys.size() );
+        checkSize( 3, keys );
         int j = 1;
         for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
@@ -289,7 +292,7 @@ public:
 
         set< BSONObj > keys;
         id().getKeysFromObject( b.done(), keys );
-        ASSERT_EQUALS( 3, keys.size() );
+        checkSize( 3, keys );
         int j = 1;
         for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder c;
@@ -322,7 +325,7 @@ public:
 
         set< BSONObj > keys;
         id().getKeysFromObject( b.done(), keys );
-        ASSERT_EQUALS( 3, keys.size() );
+        checkSize( 3, keys );
         int j = 1;
         for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
@@ -350,7 +353,7 @@ public:
 
         set< BSONObj > keys;
         id().getKeysFromObject( b.done(), keys );
-        ASSERT_EQUALS( 0, keys.size() );
+        checkSize( 0, keys );
     }
 private:
     virtual BSONObj key() const {
