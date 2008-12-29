@@ -517,10 +517,9 @@ public:
         getDatabaseNames( dbNames );
         vector< BSONObj > dbInfos;
         for( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
-            BSONObjBuilder s;
-            s.append( "diskSize", dbSize( i->c_str() ) );
             BSONObjBuilder b;
-            b.append( i->c_str(), s.done() );
+            b.append( "name", i->c_str() );
+            b.append( "sizeOnDisk", dbSize( i->c_str() ) );
             dbInfos.push_back( b.doneAndDecouple() );
         }
         result.append( "databases", dbInfos );
