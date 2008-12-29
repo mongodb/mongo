@@ -153,14 +153,16 @@ void* MemoryMappedFile::map(const char *filename, int length) {
     /* make sure the file is the full desired length */
     off_t filelen = lseek(fd, 0, SEEK_END);
     if ( filelen < length ) {
-        log() << "map: file length=" << (unsigned) filelen << " want:"
-        << length
-        << endl;
+//        log() << "map: file length=" << (unsigned) filelen << " want:"
+//        << length
+//        << endl;
         if ( filelen != 0 ) {
-            log() << "  failing mapping" << endl;
+            problem() << "failure mapping new file " << filename << " length:" << length << endl;
             return 0;
         }
-        log() << "  writing file to full length with zeroes..." << endl;
+        Logstream &l = log();
+        l << "new datafile " << filename << " filling with zeroes ... "; l.flush();
+        Timer t;
         int z = 8192;
         char buf[z];
         memset(buf, 0, z);
@@ -173,7 +175,7 @@ void* MemoryMappedFile::map(const char *filename, int length) {
             write(fd, buf, z);
             left -= z;
         }
-        log() << "  done" << endl;
+        l << " done " << ((double)t.millis())/1000.0 << " secs" << endl;
     }
 
     lseek(fd, length, SEEK_SET);

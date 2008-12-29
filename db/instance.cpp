@@ -58,6 +58,7 @@ void flushOpLog() {
 
 int ctr = 0;
 bool quiet = false;
+bool verbose = false;
 
 // Returns false when request includes 'end'
 bool assembleResponse( Message &m, DbResponse &dbresponse ) {

@@ -110,7 +110,8 @@ bool _userCreateNS(const char *ns, BSONObj& j, string& err) {
         return false;
     }
 
-    log() << "create collection " << ns << ' ' << j.toString() << endl;
+    if( verbose )
+        log() << "create collection " << ns << ' ' << j.toString() << '\n';
 
     /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
              and then go back and set to ok : 1 after we are done.
@@ -734,7 +735,10 @@ void  _indexRecord(IndexDetails& idx, BSONObj& obj, DiskLoc newRecordLoc) {
 /* note there are faster ways to build an index in bulk, that can be
    done eventually */
 void addExistingToIndex(const char *ns, IndexDetails& idx) {
-    log() << "Adding all existing records for " << ns << " to new index" << endl;
+    Timer t;
+    Logstream& l = log();
+    l << "building new index for " << ns << " ... ";
+    l.flush();
     int n = 0;
     auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
     while ( c->ok() ) {
@@ -743,7 +747,7 @@ void addExistingToIndex(const char *ns, IndexDetails& idx) {
         c->advance();
         n++;
     };
-    log()  << "  indexing complete for " << n << " records" << endl;
+    l << "done for " << n << " records" << endl;
 }
 
 /* add keys to indexes for a new record */

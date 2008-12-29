@@ -27,7 +27,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 
-extern bool objcheck, quiet, quota;
+extern bool objcheck, quiet, quota, verbose;
 bool useJNI = true;
 
 /* only off if --nocursors which is for debugging. */
@@ -446,6 +446,8 @@ int main(int argc, char* argv[], char *envp[] )
                 goto usage;
             else if ( s == "--quiet" )
                 quiet = true;
+            else if ( s == "--verbose" )
+                verbose = true;
             else if ( s == "--quota" )
                 quota = true;
             else if ( s == "--objcheck" )
@@ -497,6 +499,7 @@ usage:
     cout << " --port <portno>     specify port number, default is 27017\n";
     cout << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
     cout << " --quiet             quieter output (no cpu outputs)\n";
+    cout << " --verbose\n";
     cout << " --objcheck          inspect client data for validity on receipt\n";
     cout << " --quota             enable db quota management\n";
     cout << " --appsrvpath <path> root directory for the babble app server\n";

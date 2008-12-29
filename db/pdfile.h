@@ -40,6 +40,7 @@ class Extent;
 class Record;
 class Cursor;
 
+extern bool verbose;
 void dropDatabase(const char *ns);
 bool repairDatabase(const char *ns, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 void dropNS(string& dropNs);;
@@ -357,7 +358,7 @@ inline void _applyOpToDataFiles( const char *database, FileOp &fo, const char *p
     q = p / (c+"ns");
     bool ok = false;
     BOOST_CHECK_EXCEPTION( ok = fo.apply( q ) );
-    if ( ok )
+    if ( ok && verbose )
         log() << fo.op() << " file " << q.string() << '\n';
     int i = 0;
     int extra = 10; // should not be necessary, this is defensive in case there are missing files
@@ -368,7 +369,8 @@ inline void _applyOpToDataFiles( const char *database, FileOp &fo, const char *p
         q = p / ss.str();
         BOOST_CHECK_EXCEPTION( ok = fo.apply(q) );
         if ( ok ) {
-            log() << fo.op() << " file " << q.string() << '\n';
+            if( verbose || extra != 10 )
+                log() << fo.op() << " file " << q.string() << '\n';
             if ( extra != 10 )
                 log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;
         }
