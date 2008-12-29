@@ -5,16 +5,16 @@
 
 /**
 *    Copyright (C) 2008 10gen Inc.
-*  
+*
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
-*  
+*
 *    This program is distributed in the hope that it will be useful,
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
-*  
+*
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -44,84 +44,84 @@
 const char *tempHost = "localhost:27018";
 
 void getMore(Message& m, MessagingPort& p) {
-  DbMessage d(m);
-  const char *ns = d.getns();
+    DbMessage d(m);
+    const char *ns = d.getns();
 
-  cout << "TEMP: getmore: " << ns << endl;
+    cout << "TEMP: getmore: " << ns << endl;
 
-  ScopedDbConnection dbcon(tempHost);
-  DBClientConnection &c = dbcon.conn();
+    ScopedDbConnection dbcon(tempHost);
+    DBClientConnection &c = dbcon.conn();
 
-  Message response;
-  bool ok = c.port().call(m, response);
-  uassert("dbgrid: getmore: error calling db", ok);
-  p.reply(m, response, m.data->id);
+    Message response;
+    bool ok = c.port().call(m, response);
+    uassert("dbgrid: getmore: error calling db", ok);
+    p.reply(m, response, m.data->id);
 
-  dbcon.done();
+    dbcon.done();
 }
 
 /* got query operation from a database */
 void queryOp(Message& m, MessagingPort& p) {
-  DbMessage d(m);
-  QueryMessage q(d);
-  bool lateAssert = false;
-  try { 
-      if( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
-          BSONObjBuilder builder;
-          cout << q.query.toString() << endl;
-          bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
-          if( ok ) { 
-              BSONObj x = builder.done();
-              replyToQuery(p, m, x);
-              return;
-          }
-      }
+    DbMessage d(m);
+    QueryMessage q(d);
+    bool lateAssert = false;
+    try {
+        if ( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
+            BSONObjBuilder builder;
+            cout << q.query.toString() << endl;
+            bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
+            if ( ok ) {
+                BSONObj x = builder.done();
+                replyToQuery(p, m, x);
+                return;
+            }
+        }
 
-      ScopedDbConnection dbcon(tempHost);
-      DBClientConnection &c = dbcon.conn();
-      Message response;
-      bool ok = c.port().call(m, response);
-      uassert("dbgrid: error calling db", ok);
-      lateAssert = true;
-      p.reply(m, response, m.data->id);
-      dbcon.done();
-  }
-  catch( AssertionException& e ) { 
-      assert( !lateAssert );
-      BSONObjBuilder err;
-      err.append("$err", string("dbgrid ") + (e.msg.empty() ? "dbgrid assertion during query" : e.msg));
-      BSONObj errObj = err.done();
-      replyToQuery(p, m, errObj);
-      return;
-  }
+        ScopedDbConnection dbcon(tempHost);
+        DBClientConnection &c = dbcon.conn();
+        Message response;
+        bool ok = c.port().call(m, response);
+        uassert("dbgrid: error calling db", ok);
+        lateAssert = true;
+        p.reply(m, response, m.data->id);
+        dbcon.done();
+    }
+    catch ( AssertionException& e ) {
+        assert( !lateAssert );
+        BSONObjBuilder err;
+        err.append("$err", string("dbgrid ") + (e.msg.empty() ? "dbgrid assertion during query" : e.msg));
+        BSONObj errObj = err.done();
+        replyToQuery(p, m, errObj);
+        return;
+    }
 }
 
 void writeOp(int op, Message& m, MessagingPort& p) {
-  DbMessage d(m);
-  const char *ns = d.getns();
-
-  ScopedDbConnection dbcon(tempHost);
-  DBClientConnection &c = dbcon.conn();
-
-  c.port().say(m);
-
-  dbcon.done();
-/*
-  while( d.moreJSObjs() ) {
-    BSONObj js = d.nextJsObj();
+    DbMessage d(m);
     const char *ns = d.getns();
-    assert(*ns);
-  }
-*/
+
+    ScopedDbConnection dbcon(tempHost);
+    DBClientConnection &c = dbcon.conn();
+
+    c.port().say(m);
+
+    dbcon.done();
+    /*
+      while( d.moreJSObjs() ) {
+        BSONObj js = d.nextJsObj();
+        const char *ns = d.getns();
+        assert(*ns);
+      }
+    */
 }
 
 void processRequest(Message& m, MessagingPort& p) {
     int op = m.data->operation();
     assert( op > dbMsg );
-    if( op == dbQuery ) { 
+    if ( op == dbQuery ) {
         queryOp(m,p);
     }
-    else if( op == dbGetMore ) { 
+    else if ( op == dbGetMore ) {
         getMore(m,p);
     }
     else {

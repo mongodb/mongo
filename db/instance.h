@@ -3,16 +3,16 @@
 
 /**
 *    Copyright (C) 2008 10gen Inc.
-*  
+*
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
-*  
+*
 *    This program is distributed in the hope that it will be useful,
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
-*  
+*
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -20,9 +20,9 @@
 #pragma once
 
 // turn on or off the oplog.* files which the db can generate.
-// these files are for diagnostic purposes and are unrelated to 
+// these files are for diagnostic purposes and are unrelated to
 // local.oplog.$main used by replication.
-// 
+//
 #define OPLOG if( 0 )
 
 int getOpLogging();
@@ -31,46 +31,50 @@ int getOpLogging();
 #define OPREAD if( getOpLogging() & 2 ) _oplog.readop((char *) m.data, m.data->len);
 
 struct OpLog {
-	ofstream *f;
-	OpLog() : f(0) { }
-	void init() { 
+    ofstream *f;
+    OpLog() : f(0) { }
+    void init() {
         OPLOG {
-		stringstream ss;
-		ss << "oplog." << hex << time(0);
-		string name = ss.str();
-		f = new ofstream(name.c_str(), ios::out | ios::binary);
-		if ( ! f->good() ){
-		  problem() << "couldn't open log stream" << endl;
-		  throw 1717;
-		}
+            stringstream ss;
+            ss << "oplog." << hex << time(0);
+            string name = ss.str();
+            f = new ofstream(name.c_str(), ios::out | ios::binary);
+            if ( ! f->good() ) {
+                problem() << "couldn't open log stream" << endl;
+                throw 1717;
+            }
         }
-	}
-    void flush() { 
+    }
+    void flush() {
         OPLOG f->flush();
     }
-    void write(char *data,int len) { 
+    void write(char *data,int len) {
         OPLOG f->write(data,len);
     }
-	void readop(char *data, int len) { 
+    void readop(char *data, int len) {
         OPLOG {
-		bool log = (getOpLogging() & 4) == 0;
-		OCCASIONALLY log = true;
-		if( log ) 
-			f->write(data,len);
+            bool log = (getOpLogging() & 4) == 0;
+            OCCASIONALLY log = true;
+            if ( log )
+                f->write(data,len);
         }
-	}
+    }
 };
 
-/* we defer response until we unlock.  don't want a blocked socket to 
+/* we defer response until we unlock.  don't want a blocked socket to
    keep things locked.
 */
-struct DbResponse { 
-	Message *response;
-	MSGID responseTo;
-	DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt) {
-	}
-	DbResponse() { response = 0; }
-	~DbResponse() { delete response; }
+struct DbResponse {
+    Message *response;
+    MSGID responseTo;
+    DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt) {
+    }
+    DbResponse() {
+        response = 0;
+    }
+    ~DbResponse() {
+        delete response;
+    }
 };
 
 bool assembleResponse( Message &m, DbResponse &dbresponse );

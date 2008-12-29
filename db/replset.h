@@ -1,15 +1,15 @@
 /**
 *    Copyright (C) 2008 10gen Inc.
-*  
+*
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
-*  
+*
 *    This program is distributed in the hope that it will be useful,
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
-*  
+*
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -29,13 +29,13 @@ extern const char *allDead;
 
    You may read from the slave at anytime though (if you don't mind the slight lag).
 
-   todo: Could be extended to be more than a pair, thus the name 'Set' -- for example, 
+   todo: Could be extended to be more than a pair, thus the name 'Set' -- for example,
    a set of 3...
 */
 
-class ReplPair { 
+class ReplPair {
 public:
-    enum { 
+    enum {
         State_CantArb = -3,
         State_Confused = -2,
         State_Negotiating = -1,
@@ -46,16 +46,16 @@ public:
     int state;
     string info; // commentary about our current state
     string arbHost;  // "-" for no arbiter.  "host[:port]"
-	int remotePort;
-	string remoteHost;
-	string remote; // host:port if port specified.
+    int remotePort;
+    string remoteHost;
+    string remote; // host:port if port specified.
 //    int date; // -1 not yet set; 0=slave; 1=master
 
     string getInfo() {
         stringstream ss;
         ss << "  state:   ";
-        if( state == 1 ) ss << "1 State_Master ";
-        else if( state == 0 ) ss << "0 State_Slave";
+        if ( state == 1 ) ss << "1 State_Master ";
+        else if ( state == 0 ) ss << "0 State_Slave";
         else
             ss << "<b>" << state << "</b>";
         ss << '\n';
@@ -66,19 +66,19 @@ public:
         return ss.str();
     }
 
-	ReplPair(const char *remoteEnd, const char *arbiter);
+    ReplPair(const char *remoteEnd, const char *arbiter);
 
-    bool dominant(const string& myname) { 
-        if( myname == remoteHost )
+    bool dominant(const string& myname) {
+        if ( myname == remoteHost )
             return port > remotePort;
         return myname > remoteHost;
     }
 
-	void setMasterLocked( int n, const char *_comment = "" ) {
-		dblock p;
-		setMaster( n, _comment );
-	}
-	
+    void setMasterLocked( int n, const char *_comment = "" ) {
+        dblock p;
+        setMaster( n, _comment );
+    }
+
     void setMaster(int n, const char *_comment = "");
 
     /* negotiate with our peer who is master */
@@ -88,8 +88,8 @@ public:
     void arbitrate();
 
     virtual
-      DBClientConnection *newClientConnection() const {
-      return new DBClientConnection();
+    DBClientConnection *newClientConnection() const {
+        return new DBClientConnection();
     }
 };
 
@@ -97,18 +97,18 @@ extern ReplPair *replPair;
 
 /* note we always return true for the "local" namespace.
 
-   we should not allow most operations when not the master 
+   we should not allow most operations when not the master
    also we report not master if we are "dead".
 
    See also CmdIsMaster.
 
 */
-inline bool isMaster() { 
-    if( allDead ) { 
+inline bool isMaster() {
+    if ( allDead ) {
         return database->name == "local";
     }
 
-    if( replPair == 0 || replPair->state == ReplPair::State_Master ) 
+    if ( replPair == 0 || replPair->state == ReplPair::State_Master )
         return true;
 
     return database->name == "local";
@@ -116,17 +116,17 @@ inline bool isMaster() {
 
 inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {
     state = -1;
-	remote = remoteEnd;
-	remotePort = DBPort;
-	remoteHost = remoteEnd;
-	const char *p = strchr(remoteEnd, ':');
-	if( p ) { 
-		remoteHost = string(remoteEnd, p-remoteEnd);
-		remotePort = atoi(p+1);
-		uassert("bad port #", remotePort > 0 && remotePort < 0x10000 );
-		if( remotePort == DBPort )
-			remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
-	}
+    remote = remoteEnd;
+    remotePort = DBPort;
+    remoteHost = remoteEnd;
+    const char *p = strchr(remoteEnd, ':');
+    if ( p ) {
+        remoteHost = string(remoteEnd, p-remoteEnd);
+        remotePort = atoi(p+1);
+        uassert("bad port #", remotePort > 0 && remotePort < 0x10000 );
+        if ( remotePort == DBPort )
+            remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
+    }
 
     uassert("arbiter parm is missing, use '-' for none", arb);
     arbHost = arb;

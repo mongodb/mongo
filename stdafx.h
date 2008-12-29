@@ -5,16 +5,16 @@
 
 /**
 *    Copyright (C) 2008 10gen Inc.
-*  
+*
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
-*  
+*
 *    This program is distributed in the hope that it will be useful,
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
-*  
+*
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -34,16 +34,16 @@ const bool debug=false;
 
 extern void dbexit(int returnCode, const char *whyMsg = "");
 
-inline void * ourmalloc(size_t size) { 
-	void *x = malloc(size);
-	if( x == 0 ) dbexit(42, "malloc fails");
-	return x;
+inline void * ourmalloc(size_t size) {
+    void *x = malloc(size);
+    if ( x == 0 ) dbexit(42, "malloc fails");
+    return x;
 }
 
-inline void * ourrealloc(void *ptr, size_t size) { 
-	void *x = realloc(ptr, size);
-	if( x == 0 ) dbexit(43, "realloc fails");
-	return x;
+inline void * ourrealloc(void *ptr, size_t size) {
+    void *x = realloc(ptr, size);
+    if ( x == 0 ) dbexit(43, "realloc fails");
+    return x;
 }
 
 #define malloc ourmalloc
@@ -57,8 +57,8 @@ inline void * ourrealloc(void *ptr, size_t size) {
 using namespace std;
 
 /* these are manipulated outside of mutexes, so be careful */
-struct Assertion { 
-    Assertion() { 
+struct Assertion {
+    Assertion() {
         msg[0] = msg[127] = 0;
         context[0] = context[127] = 0;
         file = "";
@@ -70,18 +70,21 @@ struct Assertion {
     const char *file;
     unsigned line;
     time_t when;
-    void set(const char *m, const char *ctxt, const char *f, unsigned l) { 
+    void set(const char *m, const char *ctxt, const char *f, unsigned l) {
         strncpy(msg, m, 127);
         strncpy(context, ctxt, 127);
-        file = f; line = l;
+        file = f;
+        line = l;
         when = time(0);
     }
     string toString();
-    bool isSet() { return when != 0; }
+    bool isSet() {
+        return when != 0;
+    }
 };
 
-enum { 
-    AssertRegular = 0, 
+enum {
+    AssertRegular = 0,
     AssertW = 1,
     AssertMsg = 2,
     AssertUser = 3
@@ -91,36 +94,58 @@ enum {
 extern Assertion lastAssert[4];
 
 // you can catch these
-class AssertionException { 
+class AssertionException {
 public:
-    string msg; 
-	AssertionException() { }
-    virtual bool severe() { return true; }
-	virtual bool isUserAssertion() { return false; }
-    virtual string toString() { return msg; }
+    string msg;
+    AssertionException() { }
+    virtual bool severe() {
+        return true;
+    }
+    virtual bool isUserAssertion() {
+        return false;
+    }
+    virtual string toString() {
+        return msg;
+    }
 };
 
 /* we use the same mechanism for bad things the user does -- which are really just errors */
-class UserAssertionException : public AssertionException { 
+class UserAssertionException : public AssertionException {
 public:
-	UserAssertionException(const char *_msg) { msg = _msg; }
-	UserAssertionException(string _msg) { msg = _msg; }
-    virtual bool severe() { return false; }
-	virtual bool isUserAssertion() { return true; }
-    virtual string toString() { return "userassert:" + msg; }
+    UserAssertionException(const char *_msg) {
+        msg = _msg;
+    }
+    UserAssertionException(string _msg) {
+        msg = _msg;
+    }
+    virtual bool severe() {
+        return false;
+    }
+    virtual bool isUserAssertion() {
+        return true;
+    }
+    virtual string toString() {
+        return "userassert:" + msg;
+    }
 };
 
-class MsgAssertionException : public AssertionException { 
+class MsgAssertionException : public AssertionException {
 public:
-	MsgAssertionException(const char *_msg) { msg = _msg; }
-    virtual bool severe() { return false; }
-    virtual string toString() { return "massert:" + msg; }
+    MsgAssertionException(const char *_msg) {
+        msg = _msg;
+    }
+    virtual bool severe() {
+        return false;
+    }
+    virtual string toString() {
+        return "massert:" + msg;
+    }
 };
 
 void asserted(const char *msg, const char *file, unsigned line);
 void wasserted(const char *msg, const char *file, unsigned line);
 void uasserted(const char *msg);
-void msgasserted(const char *msg); 
+void msgasserted(const char *msg);
 
 #ifdef assert
 #undef assert
@@ -141,12 +166,12 @@ void msgasserted(const char *msg);
 
 /* display a message, no context, and throw assertionexception
 
-   easy way to throw an exception and log something without our stack trace 
+   easy way to throw an exception and log something without our stack trace
    display happening.
 */
 #define massert(msg,_Expression) (void)( (!!(_Expression)) || (msgasserted(msg), 0) )
 
-/* dassert is 'debug assert' -- might want to turn off for production as these 
+/* dassert is 'debug assert' -- might want to turn off for production as these
    could be slow.
 */
 #define dassert assert
@@ -166,7 +191,9 @@ typedef char _TCHAR;
 
 #if !defined(_WIN32)
 typedef int HANDLE;
-inline void strcpy_s(char *dst, unsigned len, const char *src) { strcpy(dst, src); }
+inline void strcpy_s(char *dst, unsigned len, const char *src) {
+    strcpy(dst, src);
+}
 #else
 typedef void *HANDLE;
 #endif
@@ -187,47 +214,51 @@ typedef void *HANDLE;
 #include <vector>
 
 // for debugging
-typedef struct _Ints { int i[100]; } *Ints;
-typedef struct _Chars { char c[200]; } *Chars;
+typedef struct _Ints {
+    int i[100];
+} *Ints;
+typedef struct _Chars {
+    char c[200];
+} *Chars;
 
 typedef char CHARS[400];
 
 typedef struct _OWS {
-	int size;
-	char type;
-	char string[400];
+    int size;
+    char type;
+    char string[400];
 } *OWS;
 
 class Database;
 extern Database *database;
 extern const char *curNs;
 
-/* for now, running on win32 means development not production -- 
+/* for now, running on win32 means development not production --
    use this to log things just there.
 */
 #if defined(_WIN32)
-#define DEV if( 0 ) 
-#define WIN if( 1 ) 
+#define DEV if( 0 )
+#define WIN if( 1 )
 #else
-#define DEV if( 0 ) 
-#define WIN if( 0 ) 
+#define DEV if( 0 )
+#define WIN if( 0 )
 #endif
 
-#define DEBUGGING if( 0 ) 
+#define DEBUGGING if( 0 )
 
-extern unsigned occasion; 
+extern unsigned occasion;
 extern unsigned once;
 
-#define OCCASIONALLY if( ++occasion % 16 == 0 ) 
-#define RARELY if( ++occasion % 128 == 0 ) 
-#define ONCE if( ++once == 1 ) 
+#define OCCASIONALLY if( ++occasion % 16 == 0 )
+#define RARELY if( ++occasion % 128 == 0 )
+#define ONCE if( ++once == 1 )
 
 #if defined(_WIN32)
 inline void our_debug_free(void *p) {
-	unsigned *u = (unsigned *) p;
-	u[0] = 0xEEEEEEEE;
-	u[1] = 0xEEEEEEEE;
-	free(p);
+    unsigned *u = (unsigned *) p;
+    u[0] = 0xEEEEEEEE;
+    u[1] = 0xEEEEEEEE;
+    free(p);
 }
 #define free our_debug_free
 #endif
@@ -240,7 +271,7 @@ inline void our_debug_free(void *p) {
 #undef assert
 #define assert xassert
 #define yassert 1
-using namespace boost::filesystem;          
+using namespace boost::filesystem;
 
 #include "util/goodies.h"
 #include "util/log.h"

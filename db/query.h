@@ -2,16 +2,16 @@
 
 /**
 *    Copyright (C) 2008 10gen Inc.
-*  
+*
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
-*  
+*
 *    This program is distributed in the hope that it will be useful,
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
-*  
+*
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -23,7 +23,7 @@
 #include "jsobj.h"
 #include "storage.h"
 
-/* db request message format 
+/* db request message format
 
    unsigned opid;         // arbitary; will be echoed back
    byte operation;
@@ -33,7 +33,7 @@
 
    dbInsert:
       string collection;
-      a series of JSObjects 
+      a series of JSObjects
    dbDelete:
       string collection;
 	  int flags=0; // 1=DeleteSingle
@@ -76,7 +76,7 @@
 */
 
 /* the field 'resultFlags' above */
-enum { 
+enum {
     /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
     ResultFlag_CursorNotFound = 1
 };
@@ -88,9 +88,9 @@ enum {
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 
 // caller must free() returned QueryResult.
-QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn, 
-					  BSONObj j, auto_ptr< set<string> > fieldFilter,
-					  stringstream&, int queryOptions);
+QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn,
+                      BSONObj j, auto_ptr< set<string> > fieldFilter,
+                      stringstream&, int queryOptions);
 
 void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss);
 

@@ -2,16 +2,16 @@
 
 /**
 *    Copyright (C) 2008 10gen Inc.
-*  
+*
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
-*  
+*
 *    This program is distributed in the hope that it will be useful,
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
-*  
+*
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -30,7 +30,7 @@ bool getInitialSyncCompleted();
 time_t started = time(0);
 
 /*
-    string toString() { 
+    string toString() {
         stringstream ss;
         unsigned long long dt = last - start;
         ss << dt/1000;
@@ -42,8 +42,10 @@ time_t started = time(0);
     }
 */
 
-struct Timing { 
-    Timing() { start = timeLocked = 0; }
+struct Timing {
+    Timing() {
+        start = timeLocked = 0;
+    }
     unsigned long long start, timeLocked;
 };
 Timing tlast;
@@ -54,7 +56,7 @@ extern bool quiet;
 
 void statsThread() {
     unsigned long long timeLastPass = 0;
-    while( 1 ) { 
+    while ( 1 ) {
         {
             Timer lktm;
             dblock lk;
@@ -62,17 +64,17 @@ void statsThread() {
             Timing timing;
             dbMutexInfo.timingInfo(timing.start, timing.timeLocked);
             unsigned long long now = curTimeMicros64();
-            if( timeLastPass ) { 
+            if ( timeLastPass ) {
                 unsigned long long dt = now - timeLastPass;
                 unsigned long long dlocked = timing.timeLocked - tlast.timeLocked;
                 {
                     stringstream ss;
                     ss << dt / 1000 << '\t';
                     ss << dlocked / 1000 << '\t';
-                    if( dt )
+                    if ( dt )
                         ss << (dlocked*100)/dt << '%';
                     string s = ss.str();
-                    if( !quiet ) 
+                    if ( !quiet )
                         log() << "cpu: " << s << endl;
                     lockStats[q] = s;
                 }
@@ -87,18 +89,20 @@ void statsThread() {
 unsigned byLocSize();
 
 bool _bold;
-string bold(bool x) { 
+string bold(bool x) {
     _bold = x;
     return x ? "<b>" : "";
 }
-string bold() { return _bold ? "</b>" : ""; }
+string bold() {
+    return _bold ? "</b>" : "";
+}
 
-class DbWebServer : public MiniWebServer { 
+class DbWebServer : public MiniWebServer {
 public:
     // caller locks
-    void doLockedStuff(stringstream& ss) { 
+    void doLockedStuff(stringstream& ss) {
         ss << "# databases: " << databases.size() << '\n';
-        if( database ) { 
+        if ( database ) {
             ss << "curclient: " << database->name;
             ss << '\n';
         }
@@ -106,37 +110,37 @@ public:
         ss << "\n<b>replication</b>\n";
         ss << "master: " << master << '\n';
         ss << "slave:  " << slave << '\n';
-        if( replPair ) { 
+        if ( replPair ) {
             ss << "replpair:\n";
             ss << replPair->getInfo();
         }
         bool seemCaughtUp = getInitialSyncCompleted();
-        if( !seemCaughtUp ) ss << "<b>";
+        if ( !seemCaughtUp ) ss << "<b>";
         ss <<   "initialSyncCompleted: " << seemCaughtUp;
-        if( !seemCaughtUp ) ss << "</b>";
+        if ( !seemCaughtUp ) ss << "</b>";
         ss << '\n';
 
         ss << "\n<b>dt\ttlocked</b>\n";
         unsigned i = q;
-        while( 1 ) { 
+        while ( 1 ) {
             ss << lockStats[i] << '\n';
             i = (i-1)%NStats;
-            if( i == q )
+            if ( i == q )
                 break;
         }
     }
 
-    void doUnlockedStuff(stringstream& ss) { 
+    void doUnlockedStuff(stringstream& ss) {
         ss << "port:      " << port << '\n';
         ss << "dblocked:  " << dbMutexInfo.isLocked() << " (initial)\n";
         ss << "uptime:    " << time(0)-started << " seconds\n";
-        if( allDead ) 
+        if ( allDead )
             ss << "<b>replication allDead=" << allDead << "</b>\n";
         ss << "\nassertions:\n";
-        for( int i = 0; i < 4; i++ ) {
-            if( lastAssert[i].isSet() ) {
+        for ( int i = 0; i < 4; i++ ) {
+            if ( lastAssert[i].isSet() ) {
                 ss << "<b>";
-                if( i == 3 ) ss << "usererr";
+                if ( i == 3 ) ss << "usererr";
                 else ss << i;
                 ss << "</b>" << ' ' << lastAssert[i].toString();
             }
@@ -149,10 +153,10 @@ public:
         const char *rq, // the full request
         string url,
         // set these and return them:
-        string& responseMsg, 
+        string& responseMsg,
         int& responseCode,
         vector<string>& headers // if completely empty, content-type: text/html will be added
-        ) 
+    )
     {
         responseCode = 200;
         stringstream ss;
@@ -169,9 +173,9 @@ public:
         doUnlockedStuff(ss);
 
         int n = 2000;
-                    Timer t;
-        while( 1 ) {
-            if( !dbMutexInfo.isLocked() ) { 
+        Timer t;
+        while ( 1 ) {
+            if ( !dbMutexInfo.isLocked() ) {
                 {
                     dblock lk;
                     ss << "time to get dblock: " << t.millis() << "ms\n";
@@ -180,7 +184,7 @@ public:
                 break;
             }
             sleepmillis(1);
-            if( --n < 0 ) {
+            if ( --n < 0 ) {
                 ss << "\n<b>timed out getting dblock</b>\n";
                 break;
             }
@@ -194,6 +198,6 @@ public:
 void webServerThread() {
     boost::thread thr(statsThread);
     DbWebServer mini;
-    if( mini.init(port+1000) )
+    if ( mini.init(port+1000) )
         mini.run();
 }

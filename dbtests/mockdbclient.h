@@ -2,16 +2,16 @@
 
 /**
  *    Copyright (C) 2008 10gen Inc.
- *  
+ *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
- *  
+ *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
  *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *    GNU Affero General Public License for more details.
- *  
+ *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -23,62 +23,68 @@
 
 class MockDBClientConnection : public DBClientConnection {
 public:
-	MockDBClientConnection() : connect_() {}
-	virtual
+    MockDBClientConnection() : connect_() {}
+    virtual
     BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
-		return one_;
-	}
-	virtual
+        return one_;
+    }
+    virtual
     bool connect(const char *serverHostname, string& errmsg) {
-		return connect_;
-	}
-	virtual
+        return connect_;
+    }
+    virtual
     BSONObj cmdIsMaster(bool& isMaster) {
-		return res_;
-	}
-	void one( const BSONObj &one ) { one_ = one; }
-	void connect( bool val ) { connect_ = val; }
-	void res( const BSONObj &val ) { res_ = val; }
+        return res_;
+    }
+    void one( const BSONObj &one ) {
+        one_ = one;
+    }
+    void connect( bool val ) {
+        connect_ = val;
+    }
+    void res( const BSONObj &val ) {
+        res_ = val;
+    }
 private:
-	BSONObj one_;
-	bool connect_;
-	BSONObj res_;
+    BSONObj one_;
+    bool connect_;
+    BSONObj res_;
 };
 
 class DirectDBClientConnection : public DBClientConnection {
 public:
-	struct ConnectionCallback {
-		virtual void beforeCommand() {}
-		virtual void afterCommand() {}
-	};
-	DirectDBClientConnection( ReplPair *rp, ConnectionCallback *cc = 0 ) :
-	rp_( rp ),
-	cc_( cc ) {
-	}
-	virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
-		if( cc_ ) cc_->beforeCommand();
-		SetGlobalReplPair s( rp_ );
-		BSONObjBuilder result;
-		result.append( "ok", runCommandAgainstRegistered( "admin.$cmd", query, result ) ? 1.0 : 0.0 );
-		if ( cc_ ) cc_->afterCommand();
-		return result.doneAndDecouple();
-	}
-	virtual bool connect( const char *serverHostname, string& errmsg ) {
-		return true;
-	}
+    struct ConnectionCallback {
+        virtual void beforeCommand() {}
+        virtual void afterCommand() {}
+    };
+    DirectDBClientConnection( ReplPair *rp, ConnectionCallback *cc = 0 ) :
+            rp_( rp ),
+            cc_( cc ) {
+    }
+    virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+        if ( cc_ ) cc_->beforeCommand();
+        SetGlobalReplPair s( rp_ );
+        BSONObjBuilder result;
+        result.append( "ok", runCommandAgainstRegistered( "admin.$cmd", query, result ) ? 1.0 : 0.0 );
+        if ( cc_ ) cc_->afterCommand();
+        return result.doneAndDecouple();
+    }
+    virtual bool connect( const char *serverHostname, string& errmsg ) {
+        return true;
+    }
 private:
-	ReplPair *rp_;
-	ConnectionCallback *cc_;
-	class SetGlobalReplPair {
-	public:
-		SetGlobalReplPair( ReplPair *rp ) {
-			backup_ = replPair;
-			replPair = rp;
-		}
-		~SetGlobalReplPair() {
-			replPair = backup_;
-		}
-	private:
-		ReplPair *backup_;
-	};
+    ReplPair *rp_;
+    ConnectionCallback *cc_;
+    class SetGlobalReplPair {
+    public:
+        SetGlobalReplPair( ReplPair *rp ) {
+            backup_ = replPair;
+            replPair = rp;
+        }
+        ~SetGlobalReplPair() {
+            replPair = backup_;
+        }
+    private:
+        ReplPair *backup_;
+    };
 };

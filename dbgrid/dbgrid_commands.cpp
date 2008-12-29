@@ -2,16 +2,16 @@
 
 /**
 *    Copyright (C) 2008 10gen Inc.
-*  
+*
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
-*  
+*
 *    This program is distributed in the hope that it will be useful,
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
-*  
+*
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -38,11 +38,13 @@
 
 extern string ourHostname;
 
-namespace dbgrid_cmds { 
+namespace dbgrid_cmds {
 
-class NetStatCmd : public Command { 
+class NetStatCmd : public Command {
 public:
-    virtual bool slaveOk() { return true; }
+    virtual bool slaveOk() {
+        return true;
+    }
     NetStatCmd() : Command("netstat") { }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         result.append("griddb", gridDatabase.toString());
@@ -51,20 +53,24 @@ public:
     }
 } netstat;
 
-class IsDbGridCmd : public Command { 
+class IsDbGridCmd : public Command {
 public:
-    virtual bool slaveOk() { return true; }
+    virtual bool slaveOk() {
+        return true;
+    }
     IsDbGridCmd() : Command("isdbgrid") { }
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         result.append("isdbgrid", 1);
         result.append("hostname", ourHostname);
         return true;
     }
-} isdbgrid; 
+} isdbgrid;
 
-class CmdIsMaster : public Command { 
+class CmdIsMaster : public Command {
 public:
-    virtual bool slaveOk() { return true; }
+    virtual bool slaveOk() {
+        return true;
+    }
     CmdIsMaster() : Command("ismaster") { }
     virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
         result.append("ismaster", 0.0);
