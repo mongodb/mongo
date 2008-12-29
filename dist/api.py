@@ -11,6 +11,20 @@
 import os, re, string
 from dist import compare_srcfile
 
+# func_cast --
+#	Function to initialize a method name to an error function.
+def func_cast(rettype, handle, field, func, args):
+	if field.count('get_'):
+		redirect = '*'
+	else:
+		redirect = ''
+	s = '\t' + handle + '->' + field +\
+	    ' = (' + rettype + ' (*)\n\t    (' + handle.upper() + ' *'
+	for l in args:
+		s += ', ' + l.split('\t')[1].replace('@S', redirect)
+	s += '))\n\t    __wt_' + handle + '_' + func + ';\n'
+	return (s)
+
 # handle_methods --
 #	Standalone method code for the API.
 def handle_methods():
@@ -44,18 +58,10 @@ def handle_methods():
 		db_config += s
 
 	# Store the lockout of the handle's standalone methods in the
-	# XXX_lockout string.  Note that we skip the destroy method,
-	# it's the only legal one.
+	# XXX_lockout string.  Note we skip the destroy method, it's
+	# the only legal one.
 	if not field.count('destroy'):
-		if handle.count('env'):
-			func = '__wt_env_lockout_err'
-		else:
-			func = '__wt_db_lockout_err'
-		s = '\t' + handle + '->' + field +\
-		    ' = (' + rettype + ' (*)\n\t    (' + handle.upper() + ' *'
-		for l in list:
-			s += ', ' + l.split('\t')[1].replace(' @S', '')
-		s += '))' + func + ';\n'
+		s = func_cast(rettype, handle, field, 'lockout_err', list)
 		if handle.count('env'):
 			env_lockout += s
 		else:
@@ -100,20 +106,8 @@ def handle_getset():
 
 	# Store the lockout of the handle's getter/setter methods in the
 	# XXX_lockout string.
-	if handle.count('env'):
-		func = '__wt_env_lockout_err'
-	else:
-		func = '__wt_db_lockout_err'
-	s = '\t' + handle +\
-	    '->get_' + field + ' = (void (*)\n\t    (' + handle.upper() + ' *'
-	for l in list:
-		s += ', ' + l.split('\t')[1].replace('@S', '')
-	s += '))' + func + ';\n'
-	s = '\t' + handle +\
-	    '->set_' + field + ' = (int (*)\n\t    (' + handle.upper() + ' *'
-	for l in list:
-		s += ', ' + l.split('\t')[1].replace('@S', '')
-	s += '))' + func + ';\n'
+	s = func_cast('void', handle, 'get_' + field, 'lockout_err', list) +\
+	    func_cast('int', handle, 'set_' + field, 'lockout_err', list)
 	if handle.count('env'):
 		env_lockout += s
 	else:
