@@ -284,9 +284,18 @@ namespace FormattedStringTests {
             d[ 2 ] = 'b';
             BSONObjBuilder b;
             b.appendBinData( "a", 3, ByteArray, d );
-            ASSERT_EQUALS( "{ \"a\" : { \"$type\" : \"02\", \"$binData\" : \"a\\u0000b\" } }",
+            ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"a\\u0000b\", \"$type\" : \"02\" } }",
                           b.done().formattedString() );
         }
+    };
+    
+    class Symbol {
+    public:
+        void run() {
+            BSONObjBuilder b;
+            b.appendSymbol( "a", "b" );
+            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().formattedString() );
+        }        
     };
 } // namespace FormattedStringTests
 
@@ -318,6 +327,7 @@ public:
         add< BSONObjTests::FormattedStringTests::DBRef >();
         add< BSONObjTests::FormattedStringTests::ObjectId >();
         add< BSONObjTests::FormattedStringTests::BinData >();
+        add< BSONObjTests::FormattedStringTests::Symbol >();
     }
 };
 

@@ -155,6 +155,7 @@ string BSONElement::formattedString( bool includeFieldNames ) const {
         s << '"' << fieldName() << "\" : ";    
     switch ( type() ) {
         case String:
+        case Symbol:
             s << '"' << escape( valuestr() ) << '"';
             break;
         case NumberInt:
@@ -208,11 +209,11 @@ string BSONElement::formattedString( bool includeFieldNames ) const {
         case BinData: {
             int len = *(int *)( value() );
             BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
-            s << "{ \"$type\" : \"" << hex;
+            s << "{ \"$binary\" : \"" << escape( string( (char *)( value() ) + sizeof( int ) + 1, len ) );
+            s << "\", \"$type\" : \"" << hex;
             s.width( 2 );
             s.fill( '0' );
             s << type << dec;
-            s << "\", \"$binData\" : \"" << escape( string( (char *)( value() ) + sizeof( int ) + 1, len ) );
             s << "\" }";
             break;
         }

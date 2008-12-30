@@ -560,6 +560,12 @@ public:
     void append(const char *fieldName, string str) {
         append(fieldName, str.c_str());
     }
+    void appendSymbol(const char *fieldName, const char *symbol) {
+        b.append((char) Symbol);
+        b.append(fieldName);
+        b.append((int) strlen(symbol)+1);
+        b.append(symbol);
+    }
     void appendNull( const char *fieldName ) {
         b.append( (char) jstNULL );
         b.append( fieldName );
