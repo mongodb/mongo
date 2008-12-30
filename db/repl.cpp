@@ -581,7 +581,15 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
     }
 
     dblock lk;
-    bool justCreated = setClientTempNs(ns);
+    bool justCreated;
+    try { 
+      justCreated = setClientTempNs(ns);
+    } catch( AssertionException& e ) { 
+      problem() << "skipping bad(?) op in oplog, setClient() failed, ns: '" << ns << "'\n";
+      addDbNextPass.erase(clientName);
+      return;
+    }
+
     if ( allDead ) {
         // hmmm why is this check here and not at top of this function? does it get set between top and here?
         log() << "allDead, throwing SyncException\n";
