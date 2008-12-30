@@ -101,6 +101,125 @@ string BSONElement::toString() const {
     return s.str();
 }
 
+string escape( string s ) {
+    stringstream ret;
+    for( string::iterator i = s.begin(); i != s.end(); ++i ) {
+        switch( *i ) {
+            case '"':
+                ret << "\\\"";
+                break;
+            case '\\':
+                ret << "\\\\";
+                break;
+            case '/':
+                ret << "\\/";
+                break;
+            case '\b':
+                ret << "\\b";
+                break;
+            case '\f':
+                ret << "\\f";
+                break;
+            case '\n':
+                ret << "\\n";
+                break;
+            case '\r':
+                ret << "\\r";
+                break;
+            case '\t':
+                ret << "\\t";
+                break;
+            default:
+                if ( ( *i >= 0 && *i <= 0x1f ) || *i == 0x7f ) {
+                    ret << "\\u";
+                    ret << hex;
+                    ret.width( 4 );
+                    ret.fill( '0' );
+                    ret << int( *i );
+                } else {
+                    ret << *i;
+                }
+        }
+    }
+    return ret.str();
+}
+
+string BSONElement::formattedString( bool includeFieldNames ) const {
+    stringstream s;
+    if ( includeFieldNames )
+        s << '"' << fieldName() << "\" : ";    
+    switch ( type() ) {
+        case String:
+            s << '"' << escape( valuestr() ) << '"';
+            break;
+        case NumberInt:
+        case NumberDouble:
+            if ( number() >= numeric_limits< double >::min() &&
+                number() <= numeric_limits< double >::max() ) {
+                s.precision( 50 );
+                s << number();
+            } else {
+                problem() << "Number " << number() << " cannot be represented in JSON" << endl;
+                assert( false );
+            }
+            break;
+        case Bool:
+            s << ( boolean() ? "true" : "false" );
+            break;
+        case jstNULL:
+            s << "null";
+            break;
+        case Object:
+            s << embeddedObject().formattedString();
+            break;
+        case Array: {
+            if ( embeddedObject().isEmpty() ) {
+                s << "[]";
+                break;
+            }
+            s << "[ ";
+            BSONObjIterator i( embeddedObject() );
+            BSONElement e = i.next();
+            if ( !e.eoo() )
+                while ( 1 ) {
+                    s << e.formattedString( false );
+                    e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    s << ", ";
+                }
+            s << " ]";
+            break;
+        }
+        case DBRef: {
+            OID *x = (OID *) (valuestr() + valuestrsize());
+            s << "{ \"$ns\" : \"" << valuestr() << "\", \"$id\" : \"";
+            s << hex << x->a << x->b << dec << "\" }";
+            break;
+        }
+        case jstOID:
+            s << '"' << hex << oid().a << oid().b << dec << '"';
+            break;
+        case BinData: {
+            int len = *(int *)( value() );
+            BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
+            s << "{ \"$type\" : \"" << hex;
+            s.width( 2 );
+            s.fill( '0' );
+            s << type << dec;
+            s << "\", \"$binData\" : \"" << escape( string( (char *)( value() ) + sizeof( int ) + 1, len ) );
+            s << "\" }";
+            break;
+        }
+        default:
+            problem() << "Cannot create a properly formatted JSON string with "
+                      << "element: " << toString() << " of type: " << type()
+                      << endl;
+            assert( false );
+    }
+    return s.str();
+}
+
 int BSONElement::size() const {
     if ( totalSize >= 0 )
         return totalSize;
@@ -319,6 +438,25 @@ string BSONObj::toString() const {
     if ( !e.eoo() )
         while ( 1 ) {
             s << e.toString();
+            e = i.next();
+            if ( e.eoo() )
+                break;
+            s << ", ";
+        }
+    s << " }";
+    return s.str();
+}
+
+string BSONObj::formattedString() const {
+    if ( isEmpty() ) return "{}";
+    
+    stringstream s;
+    s << "{ ";
+    BSONObjIterator i(*this);
+    BSONElement e = i.next();
+    if ( !e.eoo() )
+        while ( 1 ) {
+            s << e.formattedString();
             e = i.next();
             if ( e.eoo() )
                 break;

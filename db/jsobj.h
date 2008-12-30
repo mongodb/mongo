@@ -106,6 +106,7 @@ class BSONElement {
     friend class BSONObj;
 public:
     string toString() const;
+    string formattedString( bool includeFieldNames = true ) const;
     BSONType type() const {
         return (BSONType) *data;
     }
@@ -303,7 +304,11 @@ public:
         details->refCount = 1;
     }
 
+    // Readable representation of a 10gen object.
     string toString() const;
+    // Properly formatted JSON string.
+    string formattedString() const;
+    
     /* note: addFields always adds _id even if not specified */
     int addFields(BSONObj& from, set<string>& fields); /* returns n added */
 
@@ -534,6 +539,10 @@ public:
     void append(const char *fieldName, string str) {
         append(fieldName, str.c_str());
     }
+    void appendNull( const char *fieldName ) {
+        b.append( (char) jstNULL );
+        b.append( fieldName );
+    }
     // Append an element that is less than all other keys.
     void appendMinKey( const char *fieldName ) {
         b.append( (char) MinKey );
@@ -544,7 +553,22 @@ public:
         b.append( (char) MaxKey );
         b.append( fieldName );
     }
-
+    void appendDBRef( const char *fieldName, const char *ns, OID oid ) {
+        b.append( (char) DBRef );
+        b.append( fieldName );
+        b.append( (int) strlen( ns ) + 1 );
+        b.append( ns );
+        b.append((long long) oid.a);
+        b.append((unsigned) oid.b);
+    }
+    void appendBinData( const char *fieldName, int len, BinDataType type, const char *data ) {
+        b.append( (char) BinData );
+        b.append( fieldName );
+        b.append( len );
+        b.append( (char) type );
+        b.append( (void *) data, len );
+    }
+    
     template < class T >
     void append( const char *fieldName, const vector< T >& vals ) {
         BSONObjBuilder arrBuilder;
