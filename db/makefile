@@ -4,7 +4,7 @@ FLAGS= ${CFLAGS} -fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-comp
 #FLAGS= ${CFLAGS} -fPIC -fno-strict-aliasing -ggdb -pthread -O0 -Wall -Wsign-compare -Wno-non-virtual-dtor -I .. -L/usr/local/lib -L/usr/lib -rdynamic
 
 LIB_DEPS = -lpcrecpp -lpcre
-LIB_BOOST = -lboost_thread -lboost_filesystem
+LIB_BOOST = -lboost_thread -lboost_filesystem -lboost_program_options
 
 LIBS= $(LIB_DEPS) $(LIB_BOOST) -lstdc++
 DBGRID_LIBS = $(LIB_BOOST) -lstdc++
@@ -51,7 +51,7 @@ dbtests: $(DBTEST_OBJS)
 
 dbgrid: $(DBGRID_OBJS) ../dbgrid/dbgrid.o
 	$(GPP) $(FLAGS) -o $@ $(DBGRID_OBJS) $(DBGRID_LIBS)
-    
+
 javatest: javatest.o $(OBJS)
 	$(GPP) $(FLAGS) -o $@ javatest.o $(OBJS) $(LIBS) $(JVM_LIBS)
 
@@ -63,6 +63,12 @@ clean:
 	-rm -f $(OBJS) db.o $(DBTEST_OBJS) $(DBGRID_OBJS) ../dbgrid/dbgrid.o
 	-rm -f db dbtests dbgrid
 	-rm -f *.o ../dbgrid/*.o
+
+tools:
+	mongodump
+
+mongodump: ../tools/dump.o $(OBJS)
+	$(GPP) $(FLAGS) -o $@ $(OBJS) ../tools/dump.o $(LIBS) $(JVM_LIBS)
 
 cleandb:
 	rm /data/db/*

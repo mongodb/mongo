@@ -329,6 +329,9 @@ public:
     // names with respect to the returned element.
     BSONElement getFieldDottedOrArray(const char *&name) const;
 
+    BSONElement getField(const string name) const {
+      return getField( name.c_str() );
+    };
     BSONElement getField(const char *name) const; /* return has eoo() true if no match */
 
     // returns "" if DNE or wrong type
