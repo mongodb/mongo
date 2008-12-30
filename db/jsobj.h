@@ -56,17 +56,30 @@ enum BinDataType { Function=1, ByteArray=2, bdtCustom=128 };
 
 /*	Object id's are optional for BSONObjects.
 	When present they should be the first object member added.
+    The app server serializes OIDs as <8-byte-int><4-byte-int>) using the machine's
+    native endianness.  We deserialize by casting as an OID object, assuming
+    the db server has the same endianness.
 */
-struct OID {
+class OID {
     long long a;
     unsigned b;
+public:
     bool operator==(const OID& r) {
         return a==r.a&&b==r.b;
     }
-    void out() {
-        cout << hex << a << hex << b << endl;
-    };
+    string str() const {
+        stringstream s;
+        s << hex;
+        s.fill( '0' );
+        s.width( 8 );
+        s << a;
+        s.width( 4 );
+        s << b;
+        s << dec;
+        return s.str();        
+    }
 };
+ostream& operator<<( ostream &s, const OID &o );
 
 /* marshalled js object format:
 
@@ -519,8 +532,13 @@ public:
     void appendOID(const char *fieldName, OID *oid = 0) {
         b.append((char) jstOID);
         b.append(fieldName);
-        b.append((long long) (oid ? oid->a : 0));
-        b.append((unsigned) (oid ? oid->b : 0));
+        if ( oid )
+            b.append( (void *) oid, 12 );
+        else {
+            OID tmp;
+            memset( &tmp, 0, 12 );
+            b.append( (void *) &tmp, 12 );
+        }
     }
     void appendDate(const char *fieldName, unsigned long long dt) {
         b.append((char) Date);
@@ -556,13 +574,12 @@ public:
         b.append( (char) MaxKey );
         b.append( fieldName );
     }
-    void appendDBRef( const char *fieldName, const char *ns, OID oid ) {
+    void appendDBRef( const char *fieldName, const char *ns, const OID &oid ) {
         b.append( (char) DBRef );
         b.append( fieldName );
         b.append( (int) strlen( ns ) + 1 );
         b.append( ns );
-        b.append((long long) oid.a);
-        b.append((unsigned) oid.b);
+        b.append( (void *) &oid, 12 );
     }
     void appendBinData( const char *fieldName, int len, BinDataType type, const char *data ) {
         b.append( (char) BinData );

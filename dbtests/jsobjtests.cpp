@@ -98,7 +98,7 @@ public:
         ASSERT( basic( "a", i ).woCompare( basic( "a", j ) ) < 0 );
     }
 };
-    
+
 namespace FormattedStringTests {
     class Empty {
     public:
@@ -255,11 +255,10 @@ namespace FormattedStringTests {
     public:
         void run() {
             OID oid;
-            oid.a = 0xffffffff;
-            oid.b = 0xffff;
+            memset( &oid, 0xff, 12 );
             BSONObjBuilder b;
             b.appendDBRef( "a", "namespace", oid );
-            ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffff\" } }",
+            ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
                           b.done().formattedString() );
         }        
     };
@@ -268,11 +267,10 @@ namespace FormattedStringTests {
     public:
         void run() {
             OID oid;
-            oid.a = 0xffffffff;
-            oid.b = 0xffff;
+            memset( &oid, 0xff, 12 );
             BSONObjBuilder b;
             b.appendOID( "a", &oid );
-            ASSERT_EQUALS( "{ \"a\" : \"ffffffffffff\" }",
+            ASSERT_EQUALS( "{ \"a\" : \"ffffffffffffffffffffffff\" }",
                           b.done().formattedString() );
         }        
     };

@@ -24,6 +24,11 @@
 
 BSONElement nullElement;
 
+ostream& operator<<( ostream &s, const OID &o ) {
+    s << o.str();
+    return s;
+}
+
 string BSONElement::toString() const {
     stringstream s;
     switch ( type() ) {
@@ -87,12 +92,12 @@ string BSONElement::toString() const {
         s << " : DBRef('" << valuestr() << "',";
         {
             OID *x = (OID *) (valuestr() + valuestrsize());
-            s << hex << x->a << x->b << dec << ')';
+            s << *x << ')';
         }
         break;
     case jstOID:
         s << fieldName() << " : ObjId(";
-        s << hex << oid().a << oid().b << dec << ')';
+        s << oid() << ')';
         break;
     default:
         s << fieldName() << ": ?type=" << type();
@@ -194,11 +199,11 @@ string BSONElement::formattedString( bool includeFieldNames ) const {
         case DBRef: {
             OID *x = (OID *) (valuestr() + valuestrsize());
             s << "{ \"$ns\" : \"" << valuestr() << "\", \"$id\" : \"";
-            s << hex << x->a << x->b << dec << "\" }";
+            s << *x << "\" }";
             break;
         }
         case jstOID:
-            s << '"' << hex << oid().a << oid().b << dec << '"';
+            s << '"' << oid() << '"';
             break;
         case BinData: {
             int len = *(int *)( value() );
