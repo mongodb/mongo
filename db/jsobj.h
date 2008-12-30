@@ -119,7 +119,7 @@ class BSONElement {
     friend class BSONObj;
 public:
     string toString() const;
-    string formattedString( bool includeFieldNames = true ) const;
+    string jsonString( bool includeFieldNames = true ) const;
     BSONType type() const {
         return (BSONType) *data;
     }
@@ -320,7 +320,7 @@ public:
     // Readable representation of a 10gen object.
     string toString() const;
     // Properly formatted JSON string.
-    string formattedString() const;
+    string jsonString() const;
     
     /* note: addFields always adds _id even if not specified */
     int addFields(BSONObj& from, set<string>& fields); /* returns n added */

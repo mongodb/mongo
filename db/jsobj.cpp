@@ -149,7 +149,7 @@ string escape( string s ) {
     return ret.str();
 }
 
-string BSONElement::formattedString( bool includeFieldNames ) const {
+string BSONElement::jsonString( bool includeFieldNames ) const {
     stringstream s;
     if ( includeFieldNames )
         s << '"' << fieldName() << "\" : ";    
@@ -176,7 +176,7 @@ string BSONElement::formattedString( bool includeFieldNames ) const {
             s << "null";
             break;
         case Object:
-            s << embeddedObject().formattedString();
+            s << embeddedObject().jsonString();
             break;
         case Array: {
             if ( embeddedObject().isEmpty() ) {
@@ -188,7 +188,7 @@ string BSONElement::formattedString( bool includeFieldNames ) const {
             BSONElement e = i.next();
             if ( !e.eoo() )
                 while ( 1 ) {
-                    s << e.formattedString( false );
+                    s << e.jsonString( false );
                     e = i.next();
                     if ( e.eoo() )
                         break;
@@ -217,6 +217,13 @@ string BSONElement::formattedString( bool includeFieldNames ) const {
             s << "\" }";
             break;
         }
+        case Date:
+            s << "{ \"$date\" : " << date() << " }";
+            break;
+        case RegEx:
+            s << "{ \"$regex\" : \"" << regex() << "\", ";
+            s << "\"$options\" : \"" << regexFlags() << "\" }";
+            break;
         default:
             problem() << "Cannot create a properly formatted JSON string with "
                       << "element: " << toString() << " of type: " << type()
@@ -453,7 +460,7 @@ string BSONObj::toString() const {
     return s.str();
 }
 
-string BSONObj::formattedString() const {
+string BSONObj::jsonString() const {
     if ( isEmpty() ) return "{}";
     
     stringstream s;
@@ -462,7 +469,7 @@ string BSONObj::formattedString() const {
     BSONElement e = i.next();
     if ( !e.eoo() )
         while ( 1 ) {
-            s << e.formattedString();
+            s << e.jsonString();
             e = i.next();
             if ( e.eoo() )
                 break;

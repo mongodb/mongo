@@ -99,12 +99,12 @@ public:
     }
 };
 
-namespace FormattedStringTests {
+namespace JsonStringTests {
     class Empty {
     public:
         void run() {
             BSONObjBuilder b;
-            ASSERT_EQUALS( "{}", b.done().formattedString() );
+            ASSERT_EQUALS( "{}", b.done().jsonString() );
         }
     };
 
@@ -113,7 +113,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "b" );
-            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().jsonString() );
         }
     };
 
@@ -122,7 +122,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "\" \\ / \b \f \n \r \t" );
-            ASSERT_EQUALS( "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }", b.done().jsonString() );
         }        
     };
     
@@ -131,7 +131,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "\x1 \x1f \x7f" );
-            ASSERT_EQUALS( "{ \"a\" : \"\\u0001 \\u001f \\u007f\" }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : \"\\u0001 \\u001f \\u007f\" }", b.done().jsonString() );
         }
     };
     
@@ -140,7 +140,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "\x80" );
-            ASSERT_EQUALS( "{ \"a\" : \"\x80\" }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : \"\x80\" }", b.done().jsonString() );
         }        
     };
     
@@ -149,7 +149,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendInt( "a", 1 );
-            ASSERT_EQUALS( "{ \"a\" : 1 }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : 1 }", b.done().jsonString() );
         }
     };
     
@@ -158,7 +158,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", 1.5 );
-            ASSERT_EQUALS( "{ \"a\" : 1.5 }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : 1.5 }", b.done().jsonString() );
         }
     };
 
@@ -167,15 +167,15 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", numeric_limits< double >::infinity() );
-            ASSERT_EXCEPTION( b.done().formattedString(), AssertionException );
+            ASSERT_EXCEPTION( b.done().jsonString(), AssertionException );
 
             BSONObjBuilder c;
             c.append( "a", numeric_limits< double >::quiet_NaN() );
-            ASSERT_EXCEPTION( c.done().formattedString(), AssertionException );
+            ASSERT_EXCEPTION( c.done().jsonString(), AssertionException );
 
             BSONObjBuilder d;
             d.append( "a", numeric_limits< double >::signaling_NaN() );
-            ASSERT_EXCEPTION( d.done().formattedString(), AssertionException );            
+            ASSERT_EXCEPTION( d.done().jsonString(), AssertionException );            
         }
     };    
 
@@ -184,7 +184,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", 123456789 );
-            ASSERT_EQUALS( "{ \"a\" : 123456789 }", b.done().formattedString() );            
+            ASSERT_EQUALS( "{ \"a\" : 123456789 }", b.done().jsonString() );            
         }
     };
     
@@ -193,11 +193,11 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendBool( "a", true );
-            ASSERT_EQUALS( "{ \"a\" : true }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : true }", b.done().jsonString() );
 
             BSONObjBuilder c;
             c.appendBool( "a", false );
-            ASSERT_EQUALS( "{ \"a\" : false }", c.done().formattedString() );            
+            ASSERT_EQUALS( "{ \"a\" : false }", c.done().jsonString() );            
         }
     };
 
@@ -206,7 +206,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendNull( "a" );
-            ASSERT_EQUALS( "{ \"a\" : null }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : null }", b.done().jsonString() );
         }
     };
     
@@ -215,7 +215,7 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b, c;
             b.append( "a", c.done() );
-            ASSERT_EQUALS( "{ \"a\" : {} }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : {} }", b.done().jsonString() );
         }
     };
     
@@ -225,7 +225,7 @@ namespace FormattedStringTests {
             BSONObjBuilder b;
             b.append( "a", 1 );
             b.append( "b", 2 );
-            ASSERT_EQUALS( "{ \"a\" : 1, \"b\" : 2 }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : 1, \"b\" : 2 }", b.done().jsonString() );
         }
     };
 
@@ -235,7 +235,7 @@ namespace FormattedStringTests {
             vector< int > arr;
             BSONObjBuilder b;
             b.append( "a", arr );
-            ASSERT_EQUALS( "{ \"a\" : [] }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : [] }", b.done().jsonString() );
         }
     };
     
@@ -247,7 +247,7 @@ namespace FormattedStringTests {
             arr.push_back( 2 );
             BSONObjBuilder b;
             b.append( "a", arr );
-            ASSERT_EQUALS( "{ \"a\" : [ 1, 2 ] }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : [ 1, 2 ] }", b.done().jsonString() );
         }        
     };
     
@@ -259,7 +259,7 @@ namespace FormattedStringTests {
             BSONObjBuilder b;
             b.appendDBRef( "a", "namespace", oid );
             ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
-                          b.done().formattedString() );
+                          b.done().jsonString() );
         }        
     };
 
@@ -271,7 +271,7 @@ namespace FormattedStringTests {
             BSONObjBuilder b;
             b.appendOID( "a", &oid );
             ASSERT_EQUALS( "{ \"a\" : \"ffffffffffffffffffffffff\" }",
-                          b.done().formattedString() );
+                          b.done().jsonString() );
         }        
     };
     
@@ -285,7 +285,7 @@ namespace FormattedStringTests {
             BSONObjBuilder b;
             b.appendBinData( "a", 3, ByteArray, d );
             ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"a\\u0000b\", \"$type\" : \"02\" } }",
-                          b.done().formattedString() );
+                          b.done().jsonString() );
         }
     };
     
@@ -294,10 +294,29 @@ namespace FormattedStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendSymbol( "a", "b" );
-            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().formattedString() );
+            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().jsonString() );
         }        
     };
-} // namespace FormattedStringTests
+    
+    class Date {
+    public:
+        void run() {
+            BSONObjBuilder b;
+            b.appendDate( "a", 0 );
+            ASSERT_EQUALS( "{ \"a\" : { \"$date\" : 0 } }", b.done().jsonString() );            
+        }
+    };
+    
+    class Regex {
+    public:
+        void run() {
+            BSONObjBuilder b;
+            b.appendRegex( "a", "abc", "I" );
+            ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"abc\", \"$options\" : \"I\" } }",
+                          b.done().jsonString() );            
+        }        
+    };
+} // namespace JsonStringTests
 
 } // namespace BSONObjTests
 
@@ -309,25 +328,27 @@ public:
         add< BSONObjTests::NumericCompareBasic >();
         add< BSONObjTests::WoCompareEmbeddedObject >();
         add< BSONObjTests::WoCompareEmbeddedArray >();
-        add< BSONObjTests::FormattedStringTests::Empty >();
-        add< BSONObjTests::FormattedStringTests::SingleStringMember >();
-        add< BSONObjTests::FormattedStringTests::EscapedCharacters >();
-        add< BSONObjTests::FormattedStringTests::AdditionalControlCharacters >();
-        add< BSONObjTests::FormattedStringTests::ExtendedAscii >();
-        add< BSONObjTests::FormattedStringTests::SingleIntMember >();
-        add< BSONObjTests::FormattedStringTests::SingleNumberMember >();
-        add< BSONObjTests::FormattedStringTests::InvalidNumbers >();
-        add< BSONObjTests::FormattedStringTests::NumberPrecision >();
-        add< BSONObjTests::FormattedStringTests::SingleBoolMember >();
-        add< BSONObjTests::FormattedStringTests::SingleNullMember >();
-        add< BSONObjTests::FormattedStringTests::SingleObjectMember >();
-        add< BSONObjTests::FormattedStringTests::TwoMembers >();
-        add< BSONObjTests::FormattedStringTests::EmptyArray >();
-        add< BSONObjTests::FormattedStringTests::Array >();
-        add< BSONObjTests::FormattedStringTests::DBRef >();
-        add< BSONObjTests::FormattedStringTests::ObjectId >();
-        add< BSONObjTests::FormattedStringTests::BinData >();
-        add< BSONObjTests::FormattedStringTests::Symbol >();
+        add< BSONObjTests::JsonStringTests::Empty >();
+        add< BSONObjTests::JsonStringTests::SingleStringMember >();
+        add< BSONObjTests::JsonStringTests::EscapedCharacters >();
+        add< BSONObjTests::JsonStringTests::AdditionalControlCharacters >();
+        add< BSONObjTests::JsonStringTests::ExtendedAscii >();
+        add< BSONObjTests::JsonStringTests::SingleIntMember >();
+        add< BSONObjTests::JsonStringTests::SingleNumberMember >();
+        add< BSONObjTests::JsonStringTests::InvalidNumbers >();
+        add< BSONObjTests::JsonStringTests::NumberPrecision >();
+        add< BSONObjTests::JsonStringTests::SingleBoolMember >();
+        add< BSONObjTests::JsonStringTests::SingleNullMember >();
+        add< BSONObjTests::JsonStringTests::SingleObjectMember >();
+        add< BSONObjTests::JsonStringTests::TwoMembers >();
+        add< BSONObjTests::JsonStringTests::EmptyArray >();
+        add< BSONObjTests::JsonStringTests::Array >();
+        add< BSONObjTests::JsonStringTests::DBRef >();
+        add< BSONObjTests::JsonStringTests::ObjectId >();
+        add< BSONObjTests::JsonStringTests::BinData >();
+        add< BSONObjTests::JsonStringTests::Symbol >();
+        add< BSONObjTests::JsonStringTests::Date >();
+        add< BSONObjTests::JsonStringTests::Regex >();
     }
 };
 
