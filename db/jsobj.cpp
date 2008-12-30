@@ -108,7 +108,13 @@ string BSONElement::toString() const {
 
 string escape( string s ) {
     stringstream ret;
-    for( string::iterator i = s.begin(); i != s.end(); ++i ) {
+    unsigned char last = '0';
+    for( string::iterator i = s.begin(); i != s.end(); last = *i, ++i ) {
+        // for now, assume utf-8 encoding.
+        if ( last & 0x80 ) {
+            ret << *i;
+            continue;
+        }
         switch( *i ) {
             case '"':
                 ret << "\\\"";
@@ -135,7 +141,7 @@ string escape( string s ) {
                 ret << "\\t";
                 break;
             default:
-                if ( ( *i >= 0 && *i <= 0x1f ) || *i == 0x7f ) {
+                if ( *i >= 0 && *i <= 0x1f ) {
                     ret << "\\u";
                     ret << hex;
                     ret.width( 4 );

@@ -126,12 +126,14 @@ namespace JsonStringTests {
         }        
     };
     
+    // per http://www.ietf.org/rfc/rfc4627.txt, control characters are
+    // (U+0000 through U+001F).  U+007F is not mentioned as a control character.
     class AdditionalControlCharacters {
     public:
         void run() {
             BSONObjBuilder b;
-            b.append( "a", "\x1 \x1f \x7f" );
-            ASSERT_EQUALS( "{ \"a\" : \"\\u0001 \\u001f \\u007f\" }", b.done().jsonString() );
+            b.append( "a", "\x1 \x1f" );
+            ASSERT_EQUALS( "{ \"a\" : \"\\u0001 \\u001f\" }", b.done().jsonString() );
         }
     };
     
@@ -142,6 +144,15 @@ namespace JsonStringTests {
             b.append( "a", "\x80" );
             ASSERT_EQUALS( "{ \"a\" : \"\x80\" }", b.done().jsonString() );
         }        
+    };
+    
+    class AsciiControlCharacterButNotUtf8UnicodeControlCharacter {
+    public:
+        void run() {
+            BSONObjBuilder b;
+            b.append( "a", "\x80\x01\x80\b" );
+            ASSERT_EQUALS( "{ \"a\" : \"\x80\x01\x80\b\" }", b.done().jsonString() );            
+        }
     };
     
     class SingleIntMember {
@@ -333,6 +344,7 @@ public:
         add< BSONObjTests::JsonStringTests::EscapedCharacters >();
         add< BSONObjTests::JsonStringTests::AdditionalControlCharacters >();
         add< BSONObjTests::JsonStringTests::ExtendedAscii >();
+        add< BSONObjTests::JsonStringTests::AsciiControlCharacterButNotUtf8UnicodeControlCharacter >();
         add< BSONObjTests::JsonStringTests::SingleIntMember >();
         add< BSONObjTests::JsonStringTests::SingleNumberMember >();
         add< BSONObjTests::JsonStringTests::InvalidNumbers >();
