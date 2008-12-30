@@ -33,6 +33,7 @@ public:
             uassert( "db name is empty", L > 0 );
             uassert( "bad db name [1]", *nm != '.' );
             uassert( "bad db name [2]", nm[L-1] != '.' );
+            uassert( "bad char(s) in db name", strchr(nm, ' ') == 0 );
             uassert( "db name too long", L < 64 );
         }
 
