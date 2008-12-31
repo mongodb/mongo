@@ -271,7 +271,11 @@ namespace JsonStringTests {
             b.appendDBRef( "a", "namespace", oid );
             ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
                           b.done().jsonString( Strict ) );
-        }        
+            ASSERT_EQUALS( "{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
+                          b.done().jsonString( TenGen ) );
+            ASSERT_EQUALS( "{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
+                          b.done().jsonString( JS ) );
+        }
     };
 
     class ObjectId {
@@ -291,14 +295,24 @@ namespace JsonStringTests {
     class BinData {
     public:
         void run() {
-            char d[ 3 ];
-            d[ 0 ] = 'a';
-            d[ 1 ] = '\0';
-            d[ 2 ] = 'b';
+            char z[ 3 ];
+            z[ 0 ] = 'a';
+            z[ 1 ] = 'b';
+            z[ 2 ] = 'c';
             BSONObjBuilder b;
-            b.appendBinData( "a", 3, ByteArray, d );
-            ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"a\\u0000b\", \"$type\" : \"02\" } }",
+            b.appendBinData( "a", 3, ByteArray, z );
+            ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"YWJj\", \"$type\" : \"02\" } }",
                           b.done().jsonString( Strict ) );
+
+            BSONObjBuilder c;
+            c.appendBinData( "a", 2, ByteArray, z );
+            ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"YWI=\", \"$type\" : \"02\" } }",
+                          c.done().jsonString( Strict ) );            
+
+            BSONObjBuilder d;
+            d.appendBinData( "a", 1, ByteArray, z );
+            ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"YQ==\", \"$type\" : \"02\" } }",
+                          d.done().jsonString( Strict ) );            
         }
     };
     

@@ -270,6 +270,8 @@ inline void our_debug_free(void *p) {
 #undef yassert
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
 #undef assert
 #define assert xassert
 #define yassert 1

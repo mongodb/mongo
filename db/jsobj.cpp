@@ -155,6 +155,11 @@ string escape( string s ) {
     return ret.str();
 }
 
+typedef boost::archive::iterators::base64_from_binary
+    < boost::archive::iterators::transform_width
+    < string::const_iterator, 6, 8>
+    > base64_t;
+
 string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
     stringstream s;
     if ( includeFieldNames )
@@ -205,8 +210,18 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
         }
         case DBRef: {
             OID *x = (OID *) (valuestr() + valuestrsize());
-            s << "{ \"$ns\" : \"" << valuestr() << "\", \"$id\" : \"";
-            s << *x << "\" }";
+            if ( format == Strict )
+                s << "{ \"$ns\" : ";
+            else
+                s << "Dbref( ";
+            s << '"' << valuestr() << "\", ";
+            if ( format == Strict )
+                s << "\"$id\" : ";
+            s << '"' << *x << "\" ";
+            if ( format == Strict )
+                s << '}';
+            else
+                s << ')';
             break;
         }
         case jstOID:
@@ -219,7 +234,14 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
         case BinData: {
             int len = *(int *)( value() );
             BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
-            s << "{ \"$binary\" : \"" << escape( string( (char *)( value() ) + sizeof( int ) + 1, len ) );
+            s << "{ \"$binary\" : \"";
+            char *start = ( char * )( value() ) + sizeof( int ) + 1;
+            char *end = start + len;
+            string base64 = string( base64_t( start ), base64_t( end ) );
+            s << base64;
+            int padding = ( 4 - ( base64.length() % 4 ) ) % 4;
+            for( int i = 0; i < padding; ++i )
+                s << '=';
             s << "\", \"$type\" : \"" << hex;
             s.width( 2 );
             s.fill( '0' );
