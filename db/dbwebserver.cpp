@@ -241,8 +241,21 @@ public:
         headers.push_back( (string)"x-action: " + action );
         headers.push_back( (string)"x-fullns: " + fullns );
 
-        responseCode = 405;
+        responseCode = 200;
         
+        static DBDirectClient db;
+        
+        stringstream ss;
+
+        BSONObjBuilder query;
+        auto_ptr<DBClientCursor> cursor = db.query( fullns.c_str() , query.doneAndDecouple() );
+        
+        while ( cursor->more() ){
+            BSONObj obj = cursor->next();
+            ss << obj.jsonString() << "\n";
+        }
+        
+        responseMsg = ss.str();
     }
     
         
