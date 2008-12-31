@@ -584,7 +584,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
     bool justCreated;
     try { 
       justCreated = setClientTempNs(ns);
-    } catch( AssertionException& e ) { 
+    } catch( AssertionException& ) { 
       problem() << "skipping bad(?) op in oplog, setClient() failed, ns: '" << ns << "'\n";
       addDbNextPass.erase(clientName);
       return;
