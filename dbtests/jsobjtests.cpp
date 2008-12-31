@@ -104,7 +104,7 @@ namespace JsonStringTests {
     public:
         void run() {
             BSONObjBuilder b;
-            ASSERT_EQUALS( "{}", b.done().jsonString() );
+            ASSERT_EQUALS( "{}", b.done().jsonString( Strict ) );
         }
     };
 
@@ -113,7 +113,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "b" );
-            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().jsonString( Strict ) );
         }
     };
 
@@ -122,7 +122,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "\" \\ / \b \f \n \r \t" );
-            ASSERT_EQUALS( "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }", b.done().jsonString( Strict ) );
         }        
     };
     
@@ -133,7 +133,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "\x1 \x1f" );
-            ASSERT_EQUALS( "{ \"a\" : \"\\u0001 \\u001f\" }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : \"\\u0001 \\u001f\" }", b.done().jsonString( Strict ) );
         }
     };
     
@@ -142,7 +142,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "\x80" );
-            ASSERT_EQUALS( "{ \"a\" : \"\x80\" }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : \"\x80\" }", b.done().jsonString( Strict ) );
         }        
     };
     
@@ -151,7 +151,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", "\x80\x01\x80\b" );
-            ASSERT_EQUALS( "{ \"a\" : \"\x80\x01\x80\b\" }", b.done().jsonString() );            
+            ASSERT_EQUALS( "{ \"a\" : \"\x80\x01\x80\b\" }", b.done().jsonString( Strict ) );            
         }
     };
     
@@ -160,7 +160,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendInt( "a", 1 );
-            ASSERT_EQUALS( "{ \"a\" : 1 }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : 1 }", b.done().jsonString( Strict ) );
         }
     };
     
@@ -169,7 +169,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", 1.5 );
-            ASSERT_EQUALS( "{ \"a\" : 1.5 }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : 1.5 }", b.done().jsonString( Strict ) );
         }
     };
 
@@ -178,15 +178,15 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", numeric_limits< double >::infinity() );
-            ASSERT_EXCEPTION( b.done().jsonString(), AssertionException );
+            ASSERT_EXCEPTION( b.done().jsonString( Strict ), AssertionException );
 
             BSONObjBuilder c;
             c.append( "a", numeric_limits< double >::quiet_NaN() );
-            ASSERT_EXCEPTION( c.done().jsonString(), AssertionException );
+            ASSERT_EXCEPTION( c.done().jsonString( Strict ), AssertionException );
 
             BSONObjBuilder d;
             d.append( "a", numeric_limits< double >::signaling_NaN() );
-            ASSERT_EXCEPTION( d.done().jsonString(), AssertionException );            
+            ASSERT_EXCEPTION( d.done().jsonString( Strict ), AssertionException );            
         }
     };    
 
@@ -195,7 +195,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.append( "a", 123456789 );
-            ASSERT_EQUALS( "{ \"a\" : 123456789 }", b.done().jsonString() );            
+            ASSERT_EQUALS( "{ \"a\" : 123456789 }", b.done().jsonString( Strict ) );            
         }
     };
     
@@ -204,11 +204,11 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendBool( "a", true );
-            ASSERT_EQUALS( "{ \"a\" : true }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : true }", b.done().jsonString( Strict ) );
 
             BSONObjBuilder c;
             c.appendBool( "a", false );
-            ASSERT_EQUALS( "{ \"a\" : false }", c.done().jsonString() );            
+            ASSERT_EQUALS( "{ \"a\" : false }", c.done().jsonString( Strict ) );            
         }
     };
 
@@ -217,7 +217,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendNull( "a" );
-            ASSERT_EQUALS( "{ \"a\" : null }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : null }", b.done().jsonString( Strict ) );
         }
     };
     
@@ -226,7 +226,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b, c;
             b.append( "a", c.done() );
-            ASSERT_EQUALS( "{ \"a\" : {} }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : {} }", b.done().jsonString( Strict ) );
         }
     };
     
@@ -236,7 +236,7 @@ namespace JsonStringTests {
             BSONObjBuilder b;
             b.append( "a", 1 );
             b.append( "b", 2 );
-            ASSERT_EQUALS( "{ \"a\" : 1, \"b\" : 2 }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : 1, \"b\" : 2 }", b.done().jsonString( Strict ) );
         }
     };
 
@@ -246,7 +246,7 @@ namespace JsonStringTests {
             vector< int > arr;
             BSONObjBuilder b;
             b.append( "a", arr );
-            ASSERT_EQUALS( "{ \"a\" : [] }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : [] }", b.done().jsonString( Strict ) );
         }
     };
     
@@ -258,7 +258,7 @@ namespace JsonStringTests {
             arr.push_back( 2 );
             BSONObjBuilder b;
             b.append( "a", arr );
-            ASSERT_EQUALS( "{ \"a\" : [ 1, 2 ] }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : [ 1, 2 ] }", b.done().jsonString( Strict ) );
         }        
     };
     
@@ -270,7 +270,7 @@ namespace JsonStringTests {
             BSONObjBuilder b;
             b.appendDBRef( "a", "namespace", oid );
             ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
-                          b.done().jsonString() );
+                          b.done().jsonString( Strict ) );
         }        
     };
 
@@ -282,7 +282,9 @@ namespace JsonStringTests {
             BSONObjBuilder b;
             b.appendOID( "a", &oid );
             ASSERT_EQUALS( "{ \"a\" : \"ffffffffffffffffffffffff\" }",
-                          b.done().jsonString() );
+                          b.done().jsonString( Strict ) );
+            ASSERT_EQUALS( "{ \"a\" : ObjectId( \"ffffffffffffffffffffffff\" ) }",
+                          b.done().jsonString( TenGen ) );
         }        
     };
     
@@ -296,7 +298,7 @@ namespace JsonStringTests {
             BSONObjBuilder b;
             b.appendBinData( "a", 3, ByteArray, d );
             ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"a\\u0000b\", \"$type\" : \"02\" } }",
-                          b.done().jsonString() );
+                          b.done().jsonString( Strict ) );
         }
     };
     
@@ -305,7 +307,7 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendSymbol( "a", "b" );
-            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().jsonString() );
+            ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().jsonString( Strict ) );
         }        
     };
     
@@ -314,7 +316,9 @@ namespace JsonStringTests {
         void run() {
             BSONObjBuilder b;
             b.appendDate( "a", 0 );
-            ASSERT_EQUALS( "{ \"a\" : { \"$date\" : 0 } }", b.done().jsonString() );            
+            ASSERT_EQUALS( "{ \"a\" : { \"$date\" : 0 } }", b.done().jsonString( Strict ) );
+            ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", b.done().jsonString( TenGen ) );
+            ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", b.done().jsonString( JS ) );
         }
     };
     
@@ -324,7 +328,9 @@ namespace JsonStringTests {
             BSONObjBuilder b;
             b.appendRegex( "a", "abc", "I" );
             ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"abc\", \"$options\" : \"I\" } }",
-                          b.done().jsonString() );            
+                          b.done().jsonString( Strict ) );
+            ASSERT_EQUALS( "{ \"a\" : /abc/I }", b.done().jsonString( TenGen ) );
+            ASSERT_EQUALS( "{ \"a\" : /abc/I }", b.done().jsonString( JS ) );
         }        
     };
 } // namespace JsonStringTests

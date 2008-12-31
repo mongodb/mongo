@@ -155,7 +155,7 @@ string escape( string s ) {
     return ret.str();
 }
 
-string BSONElement::jsonString( bool includeFieldNames ) const {
+string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
     stringstream s;
     if ( includeFieldNames )
         s << '"' << fieldName() << "\" : ";    
@@ -182,7 +182,7 @@ string BSONElement::jsonString( bool includeFieldNames ) const {
             s << "null";
             break;
         case Object:
-            s << embeddedObject().jsonString();
+            s << embeddedObject().jsonString( format );
             break;
         case Array: {
             if ( embeddedObject().isEmpty() ) {
@@ -194,7 +194,7 @@ string BSONElement::jsonString( bool includeFieldNames ) const {
             BSONElement e = i.next();
             if ( !e.eoo() )
                 while ( 1 ) {
-                    s << e.jsonString( false );
+                    s << e.jsonString( format, false );
                     e = i.next();
                     if ( e.eoo() )
                         break;
@@ -210,7 +210,11 @@ string BSONElement::jsonString( bool includeFieldNames ) const {
             break;
         }
         case jstOID:
+            if ( format == TenGen )
+                s << "ObjectId( ";
             s << '"' << oid() << '"';
+            if ( format == TenGen )
+                s << " )";
             break;
         case BinData: {
             int len = *(int *)( value() );
@@ -224,11 +228,29 @@ string BSONElement::jsonString( bool includeFieldNames ) const {
             break;
         }
         case Date:
-            s << "{ \"$date\" : " << date() << " }";
+            if ( format == Strict )
+                s << "{ \"$date\" : ";
+            else
+                s << "Date( ";
+            s << date();
+            if ( format == Strict )
+                s << " }";
+            else
+                s << " )";
             break;
         case RegEx:
-            s << "{ \"$regex\" : \"" << regex() << "\", ";
-            s << "\"$options\" : \"" << regexFlags() << "\" }";
+            if ( format == Strict )
+                s << "{ \"$regex\" : \"";
+            else
+                s << "/";
+            s << regex();
+            if ( format == Strict )
+                s << "\", \"$options\" : \"";
+            else
+                s << "/";
+            s << regexFlags();
+            if ( format == Strict )
+                s << "\" }";
             break;
         default:
             problem() << "Cannot create a properly formatted JSON string with "
@@ -466,7 +488,7 @@ string BSONObj::toString() const {
     return s.str();
 }
 
-string BSONObj::jsonString() const {
+string BSONObj::jsonString( JsonStringFormat format ) const {
     if ( isEmpty() ) return "{}";
     
     stringstream s;
@@ -475,7 +497,7 @@ string BSONObj::jsonString() const {
     BSONElement e = i.next();
     if ( !e.eoo() )
         while ( 1 ) {
-            s << e.jsonString();
+            s << e.jsonString( format );
             e = i.next();
             if ( e.eoo() )
                 break;

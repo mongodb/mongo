@@ -106,6 +106,9 @@ ostream& operator<<( ostream &s, const OID &o );
      Code With Scope: <total size><String><Object>
 */
 
+// Formatting mode for generating a JSON from the 10gen representation.
+enum JsonStringFormat { Strict, TenGen, JS };
+
 #pragma pack(pop)
 
 /* <type><fieldName    ><value>
@@ -119,7 +122,7 @@ class BSONElement {
     friend class BSONObj;
 public:
     string toString() const;
-    string jsonString( bool includeFieldNames = true ) const;
+    string jsonString( JsonStringFormat format, bool includeFieldNames = true ) const;
     BSONType type() const {
         return (BSONType) *data;
     }
@@ -319,8 +322,9 @@ public:
 
     // Readable representation of a 10gen object.
     string toString() const;
+    
     // Properly formatted JSON string.
-    string jsonString() const;
+    string jsonString( JsonStringFormat format ) const;
     
     /* note: addFields always adds _id even if not specified */
     int addFields(BSONObj& from, set<string>& fields); /* returns n added */
