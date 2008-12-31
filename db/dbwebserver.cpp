@@ -214,12 +214,19 @@ public:
             responseCode = 400;
             return;
         }
-
+        
+        string method = parseMethod( rq );
         string dbname = url.substr( 1 , first - 1 );
         string coll = url.substr( first + 1 );
         string action = "";
         
-        string::size_type last = coll.find_last_of( "/" );
+        map<string,string> params;
+        if ( coll.find( "?" ) != string::npos ){
+            parseParams( params , coll.substr( coll.find( "?" ) + 1 ) );
+            coll = coll.substr( 0 , coll.find( "?" ) );
+        }
+        
+        string::size_type last = coll.find_last_of( "/" );            
         if ( last == string::npos ){
             action = coll;
             coll = "_defaultCollection";
@@ -232,33 +239,85 @@ public:
         for ( string::size_type i=0; i<coll.size(); i++ )
             if ( coll[i] == '/' )
                 coll[i] = '.';
-
+        
         string fullns = dbname + "." + coll;
         
-
-        headers.push_back( (string)"x-dbname: " + dbname );
-        headers.push_back( (string)"x-coll: " + coll );
         headers.push_back( (string)"x-action: " + action );
-        headers.push_back( (string)"x-fullns: " + fullns );
-
-        responseCode = 200;
-        
-        static DBDirectClient db;
+        headers.push_back( (string)"x-ns: " + fullns );
+        headers.push_back( "Content-Type: text/plain;charset=utf-8" );
         
         stringstream ss;
-
-        BSONObjBuilder query;
-        auto_ptr<DBClientCursor> cursor = db.query( fullns.c_str() , query.doneAndDecouple() );
         
-        while ( cursor->more() ){
-            BSONObj obj = cursor->next();
-            ss << obj.jsonString() << "\n";
+        if ( method == "GET" ){
+            responseCode = 200;
+            handleRESTQuery( fullns , action , params , responseCode , ss  );
+        }
+        else if ( method == "POST" ){
+            responseCode = 400;
+            cout << "don't know how to handle REST updates yet" << endl;
+            ss << "don't know how to handle REST updates yet";;
+        }
+        else {
+            responseCode = 400;
+            headers.push_back( "X_err: bad request" );
+            ss << "don't know how to handle a [" << method << "]";
+            cout << "don't know how to handle a [" << method << "]" << endl;
         }
         
         responseMsg = ss.str();
     }
-    
+
+    void handleRESTQuery( string ns , string action , map<string,string> & params , int & responseCode , stringstream & out ){
+        static DBDirectClient db;
         
+        int skip = _getOption( params["skip"] , 0 );
+        int num = _getOption( params["count" ] , 0 );
+        
+        int one = 0;
+
+        if ( params["one"].size() > 0 && tolower( params["one"][0] ) == 't' ){
+            num = 1;
+            one = 1;
+        }
+        
+        BSONObjBuilder query;
+        auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query.doneAndDecouple() , num , skip );
+        
+        if ( one ){
+            if ( cursor->more() ){
+                BSONObj obj = cursor->next();
+                out << obj.jsonString() << "\n";
+            }
+            else {
+                responseCode = 404;
+            }
+            return;
+        }
+
+        out << "{\n";
+        //ss << "  \"total_rows\" : 0 ,\n";
+        out << "  \"offset\" : " << skip << ",\n";
+        out << "  \"rows\": [\n";
+        
+        int first = 1;
+        while ( cursor->more() ){
+            if ( first )
+                first = 0;
+            else 
+                out << " ,\n";
+            BSONObj obj = cursor->next();
+            out << "    " << obj.jsonString();
+        }
+        out << "\n  ]\n\n";
+        out << "}\n";
+    }
+    
+
+    int _getOption( string val , int def ){
+        if ( val.size() == 0 )
+            return def;
+        return atoi( val.c_str() );
+    }
 };
 
 void webServerThread() {
