@@ -21,6 +21,8 @@
 
 #pragma once
 
+#define NOMINMAX
+
 #if defined(_WIN32)
 const bool debug=true;
 #else
