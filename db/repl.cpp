@@ -67,7 +67,7 @@ const char *allDead = 0;
 
 #include "replset.h"
 
-#define debugrepl(z) cout << "debugrepl " << z << '\n'
+#define debugrepl(z) log() << "debugrepl " << z << '\n'
 //define debugrepl
 
 PairSync *pairSync = new PairSync();
