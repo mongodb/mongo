@@ -158,6 +158,8 @@ public:
         vector<string>& headers // if completely empty, content-type: text/html will be added
     )
     {
+        //cout << "url [" << url << "]" << endl;
+
         responseCode = 200;
         stringstream ss;
         ss << "<html><head><title>";

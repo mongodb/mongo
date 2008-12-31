@@ -49,6 +49,31 @@ bool MiniWebServer::init(int port) {
     return true;
 }
 
+string MiniWebServer::parseURL( char * buf ){
+    char * urlStart = strstr( buf , " " );
+    if ( ! urlStart )
+        return "/";
+    
+    urlStart++;
+    
+    char * end = strstr( urlStart , " " );
+    if ( ! end ){
+        end = strstr( urlStart , "\r" );
+        if ( ! end ){
+            end = strstr( urlStart , "\n" );
+        }
+    }
+    
+    if ( ! end ) 
+        return "/";
+    
+    int diff = (int)(end-urlStart);
+    if ( diff < 0 || diff > 255 )
+        return "/";
+    
+    return string( urlStart , (int)(end-urlStart) );
+}
+
 void MiniWebServer::accepted(int s) {
     char buf[4096];
     int x = ::recv(s, buf, sizeof(buf)-1, 0);
@@ -59,7 +84,7 @@ void MiniWebServer::accepted(int s) {
     string responseMsg;
     int responseCode = 599;
     vector<string> headers;
-    doRequest(buf, "not implemented yet", responseMsg, responseCode, headers);
+    doRequest(buf, parseURL( buf ), responseMsg, responseCode, headers);
 
     stringstream ss;
     ss << "HTTP/1.0 " << responseCode;
