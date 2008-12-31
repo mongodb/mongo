@@ -159,7 +159,13 @@ public:
     )
     {
         //cout << "url [" << url << "]" << endl;
-
+        
+        if ( url.size() > 1 ){
+            handleRESTRequest( rq , url , responseMsg , responseCode , headers );
+            return;
+        }
+            
+        
         responseCode = 200;
         stringstream ss;
         ss << "<html><head><title>";
@@ -195,6 +201,51 @@ public:
         ss << "</pre></body></html>";
         responseMsg = ss.str();
     }
+    
+    void handleRESTRequest( const char *rq, // the full request
+                            string url,
+                            string& responseMsg,
+                            int& responseCode,
+                            vector<string>& headers // if completely empty, content-type: text/html will be added
+                            ){
+        
+        string::size_type first = url.find( "/" , 1 );
+        if ( first == string::npos ){
+            responseCode = 400;
+            return;
+        }
+
+        string dbname = url.substr( 1 , first - 1 );
+        string coll = url.substr( first + 1 );
+        string action = "";
+        
+        string::size_type last = coll.find_last_of( "/" );
+        if ( last == string::npos ){
+            action = coll;
+            coll = "_defaultCollection";
+        }
+        else {
+            action = coll.substr( last + 1 );
+            coll = coll.substr( 0 , last );
+        }
+        
+        for ( string::size_type i=0; i<coll.size(); i++ )
+            if ( coll[i] == '/' )
+                coll[i] = '.';
+
+        string fullns = dbname + "." + coll;
+        
+
+        headers.push_back( (string)"x-dbname: " + dbname );
+        headers.push_back( (string)"x-coll: " + coll );
+        headers.push_back( (string)"x-action: " + action );
+        headers.push_back( (string)"x-fullns: " + fullns );
+
+        responseCode = 405;
+        
+    }
+    
+        
 };
 
 void webServerThread() {
