@@ -56,10 +56,16 @@ void MiniWebServer::accepted(int s) {
         return;
     buf[x] = 0;
 
+    string url = "/";
+
+    char * urlStart = strstr( buf , " " ) + 1;
+    if ( urlStart > buf && urlStart[0] != ' ' )
+        url = string( urlStart , (int)(strstr( urlStart , " " ) - urlStart ) );
+    
     string responseMsg;
     int responseCode = 599;
     vector<string> headers;
-    doRequest(buf, "not implemented yet", responseMsg, responseCode, headers);
+    doRequest(buf, url, responseMsg, responseCode, headers);
 
     stringstream ss;
     ss << "HTTP/1.0 " << responseCode;
