@@ -38,6 +38,7 @@ public:
 
 private:
     void accepted(int s);
+    string parseURL( char * buf );
 
     int sock;
 };

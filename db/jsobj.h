@@ -56,17 +56,30 @@ enum BinDataType { Function=1, ByteArray=2, bdtCustom=128 };
 
 /*	Object id's are optional for BSONObjects.
 	When present they should be the first object member added.
+    The app server serializes OIDs as <8-byte-int><4-byte-int>) using the machine's
+    native endianness.  We deserialize by casting as an OID object, assuming
+    the db server has the same endianness.
 */
-struct OID {
+class OID {
     long long a;
     unsigned b;
+public:
     bool operator==(const OID& r) {
         return a==r.a&&b==r.b;
     }
-    void out() {
-        cout << hex << a << hex << b << endl;
-    };
+    string str() const {
+        stringstream s;
+        s << hex;
+        s.fill( '0' );
+        s.width( 8 );
+        s << a;
+        s.width( 4 );
+        s << b;
+        s << dec;
+        return s.str();        
+    }
 };
+ostream& operator<<( ostream &s, const OID &o );
 
 /* marshalled js object format:
 
@@ -93,6 +106,9 @@ struct OID {
      Code With Scope: <total size><String><Object>
 */
 
+// Formatting mode for generating a JSON from the 10gen representation.
+enum JsonStringFormat { Strict, TenGen, JS };
+
 #pragma pack(pop)
 
 /* <type><fieldName    ><value>
@@ -106,6 +122,7 @@ class BSONElement {
     friend class BSONObj;
 public:
     string toString() const;
+    string jsonString( JsonStringFormat format, bool includeFieldNames = true ) const;
     BSONType type() const {
         return (BSONType) *data;
     }
@@ -303,7 +320,12 @@ public:
         details->refCount = 1;
     }
 
+    // Readable representation of a 10gen object.
     string toString() const;
+    
+    // Properly formatted JSON string.
+    string jsonString( JsonStringFormat format ) const;
+    
     /* note: addFields always adds _id even if not specified */
     int addFields(BSONObj& from, set<string>& fields); /* returns n added */
 
@@ -514,8 +536,13 @@ public:
     void appendOID(const char *fieldName, OID *oid = 0) {
         b.append((char) jstOID);
         b.append(fieldName);
-        b.append((long long) (oid ? oid->a : 0));
-        b.append((unsigned) (oid ? oid->b : 0));
+        if ( oid )
+            b.append( (void *) oid, 12 );
+        else {
+            OID tmp;
+            memset( &tmp, 0, 12 );
+            b.append( (void *) &tmp, 12 );
+        }
     }
     void appendDate(const char *fieldName, unsigned long long dt) {
         b.append((char) Date);
@@ -537,6 +564,16 @@ public:
     void append(const char *fieldName, string str) {
         append(fieldName, str.c_str());
     }
+    void appendSymbol(const char *fieldName, const char *symbol) {
+        b.append((char) Symbol);
+        b.append(fieldName);
+        b.append((int) strlen(symbol)+1);
+        b.append(symbol);
+    }
+    void appendNull( const char *fieldName ) {
+        b.append( (char) jstNULL );
+        b.append( fieldName );
+    }
     // Append an element that is less than all other keys.
     void appendMinKey( const char *fieldName ) {
         b.append( (char) MinKey );
@@ -547,7 +584,21 @@ public:
         b.append( (char) MaxKey );
         b.append( fieldName );
     }
-
+    void appendDBRef( const char *fieldName, const char *ns, const OID &oid ) {
+        b.append( (char) DBRef );
+        b.append( fieldName );
+        b.append( (int) strlen( ns ) + 1 );
+        b.append( ns );
+        b.append( (void *) &oid, 12 );
+    }
+    void appendBinData( const char *fieldName, int len, BinDataType type, const char *data ) {
+        b.append( (char) BinData );
+        b.append( fieldName );
+        b.append( len );
+        b.append( (char) type );
+        b.append( (void *) data, len );
+    }
+    
     template < class T >
     void append( const char *fieldName, const vector< T >& vals ) {
         BSONObjBuilder arrBuilder;
