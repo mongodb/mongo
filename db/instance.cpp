@@ -58,6 +58,7 @@ void flushOpLog() {
 
 int ctr = 0;
 bool quiet = false;
+bool verbose = false;
 
 // Returns false when request includes 'end'
 bool assembleResponse( Message &m, DbResponse &dbresponse ) {
@@ -479,6 +480,16 @@ void jniCallback(Message& m, Message& out)
     if ( database != clientOld ) {
         database = clientOld;
         wassert(false);
+    }
+}
+
+void getDatabaseNames( vector< string > &names ) {
+    boost::filesystem::path path( dbpath );
+    for ( boost::filesystem::directory_iterator i( path );
+         i != boost::filesystem::directory_iterator(); ++i ) {
+        string fileName = i->leaf();
+        if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
+            names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
     }
 }
 

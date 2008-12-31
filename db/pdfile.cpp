@@ -110,7 +110,8 @@ bool _userCreateNS(const char *ns, BSONObj& j, string& err) {
         return false;
     }
 
-    log() << "create collection " << ns << ' ' << j.toString() << endl;
+    if( verbose )
+        log() << "create collection " << ns << ' ' << j.toString() << '\n';
 
     /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
              and then go back and set to ok : 1 after we are done.
@@ -734,7 +735,10 @@ void  _indexRecord(IndexDetails& idx, BSONObj& obj, DiskLoc newRecordLoc) {
 /* note there are faster ways to build an index in bulk, that can be
    done eventually */
 void addExistingToIndex(const char *ns, IndexDetails& idx) {
-    log() << "Adding all existing records for " << ns << " to new index" << endl;
+    Timer t;
+    Logstream& l = log();
+    l << "building new index for " << ns << " ... ";
+    l.flush();
     int n = 0;
     auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
     while ( c->ok() ) {
@@ -743,7 +747,7 @@ void addExistingToIndex(const char *ns, IndexDetails& idx) {
         c->advance();
         n++;
     };
-    log()  << "  indexing complete for " << n << " records" << endl;
+    l << "done for " << n << " records" << endl;
 }
 
 /* add keys to indexes for a new record */
@@ -975,27 +979,27 @@ void dropDatabase(const char *ns) {
 typedef boost::filesystem::path Path;
 
 // back up original database files to 'temp' dir
-void _renameForBackup( const char *database, const Path &tmpPath ) {
+void _renameForBackup( const char *database, const Path &reservedPath ) {
     class Renamer : public FileOp {
     public:
-        Renamer( const Path &tmpPath ) : tmpPath_( tmpPath ) {}
+        Renamer( const Path &reservedPath ) : reservedPath_( reservedPath ) {}
     private:
-        const boost::filesystem::path &tmpPath_;
+        const boost::filesystem::path &reservedPath_;
         virtual bool apply( const Path &p ) {
             if ( !boost::filesystem::exists( p ) )
                 return false;
-            boost::filesystem::rename( p, tmpPath_ / ( p.leaf() + ".bak" ) );
+            boost::filesystem::rename( p, reservedPath_ / ( p.leaf() + ".bak" ) );
             return true;
         }
         virtual const char * op() const {
             return "renaming";
         }
-    } renamer( tmpPath );
+    } renamer( reservedPath );
     _applyOpToDataFiles( database, renamer );
 }
 
 // move temp files to standard data dir
-void _replaceWithRecovered( const char *database, const char *tmpPathString ) {
+void _replaceWithRecovered( const char *database, const char *reservedPathString ) {
     class : public FileOp {
         virtual bool apply( const Path &p ) {
             if ( !boost::filesystem::exists( p ) )
@@ -1007,26 +1011,55 @@ void _replaceWithRecovered( const char *database, const char *tmpPathString ) {
             return "renaming";
         }
     } renamer;
-    _applyOpToDataFiles( database, renamer, tmpPathString );
+    _applyOpToDataFiles( database, renamer, reservedPathString );
 }
 
 // generate a directory name for storing temp data files
-Path uniqueTmpPath() {
+Path uniqueReservedPath( const char *prefix ) {
     Path dbPath = Path( dbpath );
-    Path tmpPath;
+    Path reservedPath;
     int i = 0;
     bool exists = false;
     do {
         stringstream ss;
-        ss << "tmp_repairDatabase_" << i++;
-        tmpPath = dbPath / ss.str();
-        BOOST_CHECK_EXCEPTION( exists = boost::filesystem::exists( tmpPath ) );
+        ss << prefix << "_repairDatabase_" << i++;
+        reservedPath = dbPath / ss.str();
+        BOOST_CHECK_EXCEPTION( exists = boost::filesystem::exists( reservedPath ) );
     } while ( exists );
-    return tmpPath;
+    return reservedPath;
 }
 
-bool repairDatabase( const char *ns, bool preserveClonedFilesOnFailure,
-                     bool backupOriginalFiles ) {
+boost::intmax_t dbSize( const char *database ) {
+    class SizeAccumulator : public FileOp {
+    public:
+        SizeAccumulator() : totalSize_( 0 ) {}
+        boost::intmax_t size() const { return totalSize_; }
+    private:
+        virtual bool apply( const boost::filesystem::path &p ) {
+            if( !boost::filesystem::exists( p ) )
+                return false;
+            totalSize_ += boost::filesystem::file_size( p );
+            return true;
+        }
+        virtual const char *op() const { return "checking size"; }
+        boost::intmax_t totalSize_;
+    };
+    SizeAccumulator sa;
+    _applyOpToDataFiles( database, sa );
+    return sa.size();
+}
+
+#if !defined(_WIN32)
+#include <sys/statvfs.h>
+boost::intmax_t freeSpace() {
+    struct statvfs info;
+    assert( !statvfs( dbpath, &info ) );
+    return info.f_bavail * info.f_frsize;
+}
+#endif
+
+bool repairDatabase( const char *ns, string &errmsg,
+                    bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
     stringstream ss;
     ss << "localhost:" << port;
     string localhost = ss.str();
@@ -1037,19 +1070,33 @@ bool repairDatabase( const char *ns, bool preserveClonedFilesOnFailure,
     problem() << "repairDatabase " << dbName << endl;
     assert( database->name == dbName );
 
-    Path tmpPath = uniqueTmpPath();
-    BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( tmpPath ) );
-    string tmpPathString = tmpPath.native_directory_string();
-    assert( setClient( dbName, tmpPathString.c_str() ) );
+#if !defined(_WIN32)
+    boost::intmax_t totalSize = dbSize( dbName );
+    boost::intmax_t freeSize = freeSpace();
+    if ( freeSize < totalSize ) {
+        stringstream ss;
+        ss << "Cannot repair database " << dbName << " having size: " << totalSize
+           << " (bytes) because free disk space is: " << freeSize << " (bytes)";
+        errmsg = ss.str();
+        problem() << errmsg << endl;
+        return false;
+    }
+#endif
+    
+    Path reservedPath =
+        uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
+                           "backup" : "tmp" );
+    BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
+    string reservedPathString = reservedPath.native_directory_string();
+    assert( setClient( dbName, reservedPathString.c_str() ) );
 
-    string errmsg;
     bool res = cloneFrom(localhost.c_str(), errmsg, dbName, /*logForReplication=*/false, /*slaveok*/false);
-    closeClient( dbName, tmpPathString.c_str() );
+    closeClient( dbName, reservedPathString.c_str() );
 
     if ( !res ) {
-        problem() << "clone failed for " << dbName << endl;
+        problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
         if ( !preserveClonedFilesOnFailure )
-            BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( tmpPath ) );
+            BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
         return false;
     }
 
@@ -1057,14 +1104,14 @@ bool repairDatabase( const char *ns, bool preserveClonedFilesOnFailure,
     closeClient( dbName );
 
     if ( backupOriginalFiles )
-        _renameForBackup( dbName, tmpPath );
+        _renameForBackup( dbName, reservedPath );
     else
         _deleteDataFiles( dbName );
 
-    _replaceWithRecovered( dbName, tmpPathString.c_str() );
+    _replaceWithRecovered( dbName, reservedPathString.c_str() );
 
     if ( !backupOriginalFiles )
-        BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( tmpPath ) );
+        BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
 
     return true;
 }

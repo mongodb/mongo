@@ -27,7 +27,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 
-extern bool objcheck, quiet, quota;
+extern bool objcheck, quiet, quota, verbose;
 bool useJNI = true;
 
 /* only off if --nocursors which is for debugging. */
@@ -180,6 +180,14 @@ void connThread()
         problem() << "Uncaught AssertionException, terminating" << endl;
         exit(15);
     }
+    catch( std::exception &e ) {
+        problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
+        exit( 15 );
+    }
+    catch ( ... ) {
+        problem() << "Uncaught exception, terminating" << endl;
+        exit( 15 );
+    }
 }
 
 
@@ -274,28 +282,39 @@ void setupSignals() {}
 
 void repairDatabases() {
     dblock lk;
-    boost::filesystem::path path( dbpath );
-    for ( boost::filesystem::directory_iterator i( path );
-            i != boost::filesystem::directory_iterator(); ++i ) {
-        string fileName = i->leaf();
-        if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" ) {
-            string dbName = fileName.substr( 0, fileName.length() - 3 );
-            assert( !setClientTempNs( dbName.c_str() ) );
-            PhysicalDataFile *p = database->getFile( 0 );
-            PDFHeader *h = p->getHeader();
-            if ( !h->currentVersion() ) {
-                // QUESTION: Repair even if file format is higher version than code?
-                log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", ";
-                log() << "new version: " << VERSION << "." << VERSION_MINOR << endl;
-                repairDatabase( dbName.c_str() );
-            } else {
-                closeClient( dbName.c_str() );
-            }
+    vector< string > dbNames;
+    getDatabaseNames( dbNames );
+    for( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
+        string dbName = *i;
+        assert( !setClientTempNs( dbName.c_str() ) );
+        PhysicalDataFile *p = database->getFile( 0 );
+        PDFHeader *h = p->getHeader();
+        if ( !h->currentVersion() ) {
+            // QUESTION: Repair even if file format is higher version than code?
+            log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
+                  << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+            string errmsg;
+            assert( repairDatabase( dbName.c_str(), errmsg ) );
+        } else {
+            closeClient( dbName.c_str() );
         }
     }
 }
 
+void clearTmpFiles() {
+    boost::filesystem::path path( dbpath );
+    for ( boost::filesystem::directory_iterator i( path );
+         i != boost::filesystem::directory_iterator(); ++i ) {
+        string fileName = i->leaf();
+        if ( boost::filesystem::is_directory( *i ) &&
+            fileName.length() > 2 && fileName.substr( 0, 3 ) == "tmp" )
+            boost::filesystem::remove_all( *i );
+    }    
+}
+
 void initAndListen(int listenPort, const char *appserverLoc = null) {
+    clearTmpFiles();
+    
     if ( opLogging )
         log() << "opLogging = " << opLogging << endl;
     _oplog.init();
@@ -334,6 +353,9 @@ void testClient();
 
 int main(int argc, char* argv[], char *envp[] )
 {
+
+    boost::filesystem::path::default_name_check( boost::filesystem::no_check );
+    
     {
         unsigned x = 0x12345678;
         unsigned char& b = (unsigned char&) x;
@@ -438,6 +460,8 @@ int main(int argc, char* argv[], char *envp[] )
                 goto usage;
             else if ( s == "--quiet" )
                 quiet = true;
+            else if ( s == "--verbose" )
+                verbose = true;
             else if ( s == "--quota" )
                 quota = true;
             else if ( s == "--objcheck" )
@@ -489,6 +513,7 @@ usage:
     cout << " --port <portno>     specify port number, default is 27017\n";
     cout << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
     cout << " --quiet             quieter output (no cpu outputs)\n";
+    cout << " --verbose\n";
     cout << " --objcheck          inspect client data for validity on receipt\n";
     cout << " --quota             enable db quota management\n";
     cout << " --appsrvpath <path> root directory for the babble app server\n";

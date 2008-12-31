@@ -29,6 +29,7 @@
 #include "replset.h"
 #include "commands.h"
 #include "db.h"
+#include "instance.h"
 
 extern int queryTraceLevel;
 extern int otherTraceLevel;
@@ -214,7 +215,7 @@ public:
         bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
         e = cmdObj.findElement( "backupOriginalFiles" );
         bool backupOriginalFiles = e.isBoolean() && e.boolean();
-        return repairDatabase( ns, preserveClonedFilesOnFailure, backupOriginalFiles );
+        return repairDatabase( ns, errmsg, preserveClonedFilesOnFailure, backupOriginalFiles );
     }
 } cmdRepairDatabase;
 
@@ -504,6 +505,27 @@ public:
         return true;
     }
 } cmdDeleteIndexes;
+
+class CmdListDatabases : public Command {
+public:
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
+    virtual bool adminOnly() { return true; }
+    CmdListDatabases() : Command("listDatabases") {}
+    bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        vector< string > dbNames;
+        getDatabaseNames( dbNames );
+        vector< BSONObj > dbInfos;
+        for( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
+            BSONObjBuilder b;
+            b.append( "name", i->c_str() );
+            b.append( "sizeOnDisk", (double) dbSize( i->c_str() ) );
+            dbInfos.push_back( b.doneAndDecouple() );
+        }
+        result.append( "databases", dbInfos );
+        return true;
+    }
+} cmdListDatabases;
 
 extern map<string,Command*> *commands;
 

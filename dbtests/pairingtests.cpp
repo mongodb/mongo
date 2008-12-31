@@ -44,13 +44,15 @@ protected:
         init();
         pairSync = synced;
         pairSync->setInitialSyncCompletedLocking();
+        ASSERT( pairSync->initialSyncCompleted() );
     }
     static void setNotSynced() {
         init();
         pairSync = notSynced;
+        ASSERT( !pairSync->initialSyncCompleted() );
     }
     static void flipSync() {
-        if ( (unsigned int)( pairSync ) == (unsigned int)( synced ) )
+        if ( pairSync->initialSyncCompleted() )
             setNotSynced();
         else
             setSynced();

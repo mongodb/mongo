@@ -24,6 +24,11 @@
 
 BSONElement nullElement;
 
+ostream& operator<<( ostream &s, const OID &o ) {
+    s << o.str();
+    return s;
+}
+
 string BSONElement::toString() const {
     stringstream s;
     switch ( type() ) {
@@ -87,16 +92,171 @@ string BSONElement::toString() const {
         s << " : DBRef('" << valuestr() << "',";
         {
             OID *x = (OID *) (valuestr() + valuestrsize());
-            s << hex << x->a << x->b << dec << ')';
+            s << *x << ')';
         }
         break;
     case jstOID:
         s << fieldName() << " : ObjId(";
-        s << hex << oid().a << oid().b << dec << ')';
+        s << oid() << ')';
         break;
     default:
         s << fieldName() << ": ?type=" << type();
         break;
+    }
+    return s.str();
+}
+
+string escape( string s ) {
+    stringstream ret;
+    unsigned char last = '0';
+    for( string::iterator i = s.begin(); i != s.end(); last = *i, ++i ) {
+        // for now, assume utf-8 encoding.
+        if ( last & 0x80 ) {
+            ret << *i;
+            continue;
+        }
+        switch( *i ) {
+            case '"':
+                ret << "\\\"";
+                break;
+            case '\\':
+                ret << "\\\\";
+                break;
+            case '/':
+                ret << "\\/";
+                break;
+            case '\b':
+                ret << "\\b";
+                break;
+            case '\f':
+                ret << "\\f";
+                break;
+            case '\n':
+                ret << "\\n";
+                break;
+            case '\r':
+                ret << "\\r";
+                break;
+            case '\t':
+                ret << "\\t";
+                break;
+            default:
+                if ( *i >= 0 && *i <= 0x1f ) {
+                    ret << "\\u";
+                    ret << hex;
+                    ret.width( 4 );
+                    ret.fill( '0' );
+                    ret << int( *i );
+                } else {
+                    ret << *i;
+                }
+        }
+    }
+    return ret.str();
+}
+
+string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
+    stringstream s;
+    if ( includeFieldNames )
+        s << '"' << fieldName() << "\" : ";    
+    switch ( type() ) {
+        case String:
+        case Symbol:
+            s << '"' << escape( valuestr() ) << '"';
+            break;
+        case NumberInt:
+        case NumberDouble:
+            if ( number() >= numeric_limits< double >::min() &&
+                number() <= numeric_limits< double >::max() ) {
+                s.precision( 50 );
+                s << number();
+            } else {
+                problem() << "Number " << number() << " cannot be represented in JSON" << endl;
+                assert( false );
+            }
+            break;
+        case Bool:
+            s << ( boolean() ? "true" : "false" );
+            break;
+        case jstNULL:
+            s << "null";
+            break;
+        case Object:
+            s << embeddedObject().jsonString( format );
+            break;
+        case Array: {
+            if ( embeddedObject().isEmpty() ) {
+                s << "[]";
+                break;
+            }
+            s << "[ ";
+            BSONObjIterator i( embeddedObject() );
+            BSONElement e = i.next();
+            if ( !e.eoo() )
+                while ( 1 ) {
+                    s << e.jsonString( format, false );
+                    e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    s << ", ";
+                }
+            s << " ]";
+            break;
+        }
+        case DBRef: {
+            OID *x = (OID *) (valuestr() + valuestrsize());
+            s << "{ \"$ns\" : \"" << valuestr() << "\", \"$id\" : \"";
+            s << *x << "\" }";
+            break;
+        }
+        case jstOID:
+            if ( format == TenGen )
+                s << "ObjectId( ";
+            s << '"' << oid() << '"';
+            if ( format == TenGen )
+                s << " )";
+            break;
+        case BinData: {
+            int len = *(int *)( value() );
+            BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
+            s << "{ \"$binary\" : \"" << escape( string( (char *)( value() ) + sizeof( int ) + 1, len ) );
+            s << "\", \"$type\" : \"" << hex;
+            s.width( 2 );
+            s.fill( '0' );
+            s << type << dec;
+            s << "\" }";
+            break;
+        }
+        case Date:
+            if ( format == Strict )
+                s << "{ \"$date\" : ";
+            else
+                s << "Date( ";
+            s << date();
+            if ( format == Strict )
+                s << " }";
+            else
+                s << " )";
+            break;
+        case RegEx:
+            if ( format == Strict )
+                s << "{ \"$regex\" : \"";
+            else
+                s << "/";
+            s << regex();
+            if ( format == Strict )
+                s << "\", \"$options\" : \"";
+            else
+                s << "/";
+            s << regexFlags();
+            if ( format == Strict )
+                s << "\" }";
+            break;
+        default:
+            problem() << "Cannot create a properly formatted JSON string with "
+                      << "element: " << toString() << " of type: " << type()
+                      << endl;
+            assert( false );
     }
     return s.str();
 }
@@ -319,6 +479,25 @@ string BSONObj::toString() const {
     if ( !e.eoo() )
         while ( 1 ) {
             s << e.toString();
+            e = i.next();
+            if ( e.eoo() )
+                break;
+            s << ", ";
+        }
+    s << " }";
+    return s.str();
+}
+
+string BSONObj::jsonString( JsonStringFormat format ) const {
+    if ( isEmpty() ) return "{}";
+    
+    stringstream s;
+    s << "{ ";
+    BSONObjIterator i(*this);
+    BSONElement e = i.next();
+    if ( !e.eoo() )
+        while ( 1 ) {
+            s << e.jsonString( format );
             e = i.next();
             if ( e.eoo() )
                 break;

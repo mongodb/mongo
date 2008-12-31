@@ -85,3 +85,4 @@ void receivedDelete(Message& m);
 void receivedInsert(Message& m, stringstream& ss);
 void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss);
 void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit);
+void getDatabaseNames( vector< string > &names );

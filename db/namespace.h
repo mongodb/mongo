@@ -32,12 +32,13 @@ class Cursor;
 
 class Namespace {
 public:
+    enum { MaxNsLen = 128 };
     Namespace(const char *ns) {
         *this = ns;
     }
     Namespace& operator=(const char *ns) {
-        memset(buf, 0, 128); /* this is just to keep stuff clean in the files for easy dumping and reading */
-        strcpy_s(buf, 128, ns);
+        memset(buf, 0, MaxNsLen); /* this is just to keep stuff clean in the files for easy dumping and reading */
+        strcpy_s(buf, MaxNsLen, ns);
         return *this;
     }
 
@@ -61,7 +62,7 @@ public:
         return (x & 0x7fffffff) | 0x8000000; // must be > 0
     }
 
-    char buf[128];
+    char buf[MaxNsLen];
 };
 
 const int Buckets = 19;
@@ -113,7 +114,7 @@ public:
     string indexNamespace() {
         BSONObj io = info.obj();
         string s;
-        s.reserve(128);
+        s.reserve(Namespace::MaxNsLen);
         s = io.getStringField("ns");
         assert( !s.empty() );
         s += ".$";
