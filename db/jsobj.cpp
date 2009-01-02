@@ -232,12 +232,7 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
             BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
             s << "{ \"$binary\" : \"";
             char *start = ( char * )( value() ) + sizeof( int ) + 1;
-            char *end = start + len;
-
             string temp(start, len);
-
-
-//            string base64 = string( base64_t( start ), base64_t( end ) );
             string base64 = string( base64_t( temp.begin() ), base64_t( temp.end() ) );
             s << base64;
             int padding = ( 4 - ( base64.length() % 4 ) ) % 4;
