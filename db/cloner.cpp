@@ -113,16 +113,6 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
     }
 }
 
-class DirectConnector : public DBClientCursor::Connector {
-    virtual bool send( Message &toSend, Message &response, bool assertOk=true ) {
-        DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
-        assert( dbResponse.response );
-        response = *dbResponse.response;
-        return true;
-    }
-};
-
 auto_ptr< DBClientCursor > Cloner::createCursor( bool masterSameProcess, const char *ns, bool slaveOk ) {
     auto_ptr< DBClientCursor > c;
     if ( !masterSameProcess ) {

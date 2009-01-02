@@ -49,14 +49,14 @@ bool MiniWebServer::init(int port) {
     return true;
 }
 
-string MiniWebServer::parseURL( char * buf ){
-    char * urlStart = strstr( buf , " " );
+string MiniWebServer::parseURL( const char * buf ){
+    const char * urlStart = strstr( buf , " " );
     if ( ! urlStart )
         return "/";
     
     urlStart++;
     
-    char * end = strstr( urlStart , " " );
+    const char * end = strstr( urlStart , " " );
     if ( ! end ){
         end = strstr( urlStart , "\r" );
         if ( ! end ){
@@ -73,6 +73,41 @@ string MiniWebServer::parseURL( char * buf ){
     
     return string( urlStart , (int)(end-urlStart) );
 }
+
+void MiniWebServer::parseParams( map<string,string> & params , string query ){
+    if ( query.size() == 0 )
+        return;
+    
+    while ( query.size() ){
+        
+        string::size_type amp = query.find( "&" );
+        
+        string cur;
+        if ( amp == string::npos ){
+            cur = query;
+            query = "";
+        }
+        else {
+            cur = query.substr( 0 , amp );
+            query = query.substr( amp + 1 );
+        }
+
+        string::size_type eq = cur.find( "=" );
+        if ( eq == string::npos )
+            continue;
+        
+        params[cur.substr(0,eq)] = cur.substr(eq+1);
+    }
+    return;
+}
+
+string MiniWebServer::parseMethod( const char * headers ){
+    const char * end = strstr( headers , " " );
+    if ( ! end )
+        return "GET";
+    return string( headers , (int)(end-headers) );
+}
+
 
 void MiniWebServer::accepted(int s) {
     char buf[4096];

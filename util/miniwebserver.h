@@ -36,9 +36,14 @@ public:
         vector<string>& headers // if completely empty, content-type: text/html will be added
     ) = 0;
 
+
+protected:
+    string parseURL( const char * buf );
+    string parseMethod( const char * headers );
+    void parseParams( map<string,string> & params , string query );
+
 private:
     void accepted(int s);
-    string parseURL( char * buf );
 
     int sock;
 };
