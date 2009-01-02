@@ -176,8 +176,10 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
                 s.precision( 50 );
                 s << number();
             } else {
-                problem() << "Number " << number() << " cannot be represented in JSON" << endl;
-                assert( false );
+                stringstream ss;
+                ss << "Number " << number() << " cannot be represented in JSON" << endl;
+                string message = ss.str();
+                massert( message.c_str(), false );
             }
             break;
         case Bool:
@@ -280,10 +282,12 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
                 s << "\" }";
             break;
         default:
-            problem() << "Cannot create a properly formatted JSON string with "
-                      << "element: " << toString() << " of type: " << type()
-                      << endl;
-            assert( false );
+            stringstream ss;
+            ss << "Cannot create a properly formatted JSON string with "
+                << "element: " << toString() << " of type: " << type()
+                << endl;
+            string message = ss.str();
+            massert( message.c_str(), false );
     }
     return s.str();
 }
