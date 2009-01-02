@@ -21,6 +21,7 @@
 #include "db.h"
 #include "repl.h"
 #include "replset.h"
+#include "instance.h"
 
 extern int port;
 extern const char *replInfo;

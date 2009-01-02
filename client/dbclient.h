@@ -263,16 +263,3 @@ public:
 };
 
 
-class DBDirectClient : public DBClientInterface {
-    public:
-    
-    virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
-                                           BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-    
-    virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-};
-
-
-class DirectConnector : public DBClientCursor::Connector {
-    virtual bool send( Message &toSend, Message &response, bool assertOk=true );
-};
