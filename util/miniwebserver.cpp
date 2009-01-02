@@ -50,13 +50,13 @@ bool MiniWebServer::init(int port) {
 }
 
 string MiniWebServer::parseURL( const char * buf ){
-    char * urlStart = strstr( buf , " " );
+    const char * urlStart = strstr( buf , " " );
     if ( ! urlStart )
         return "/";
     
     urlStart++;
     
-    char * end = strstr( urlStart , " " );
+    const char * end = strstr( urlStart , " " );
     if ( ! end ){
         end = strstr( urlStart , "\r" );
         if ( ! end ){
@@ -102,7 +102,7 @@ void MiniWebServer::parseParams( map<string,string> & params , string query ){
 }
 
 string MiniWebServer::parseMethod( const char * headers ){
-    char * end = strstr( headers , " " );
+    const char * end = strstr( headers , " " );
     if ( ! end )
         return "GET";
     return string( headers , (int)(end-headers) );
