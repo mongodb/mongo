@@ -146,15 +146,6 @@ namespace JsonStringTests {
         }        
     };
     
-    class AsciiControlCharacterButNotUtf8UnicodeControlCharacter {
-    public:
-        void run() {
-            BSONObjBuilder b;
-            b.append( "a", "\x80\x01\x80\b" );
-            ASSERT_EQUALS( "{ \"a\" : \"\x80\x01\x80\b\" }", b.done().jsonString( Strict ) );            
-        }
-    };
-    
     class SingleIntMember {
     public:
         void run() {
@@ -364,7 +355,6 @@ public:
         add< BSONObjTests::JsonStringTests::EscapedCharacters >();
         add< BSONObjTests::JsonStringTests::AdditionalControlCharacters >();
         add< BSONObjTests::JsonStringTests::ExtendedAscii >();
-        add< BSONObjTests::JsonStringTests::AsciiControlCharacterButNotUtf8UnicodeControlCharacter >();
         add< BSONObjTests::JsonStringTests::SingleIntMember >();
         add< BSONObjTests::JsonStringTests::SingleNumberMember >();
         add< BSONObjTests::JsonStringTests::InvalidNumbers >();
