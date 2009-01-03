@@ -13,12 +13,10 @@ static int  __wt_db_dump_offpage(DB *, DBT *,
     u_int32_t, FILE *, void (*)(u_int8_t *, u_int32_t, FILE *));
 static void __wt_db_hexprint(u_int8_t *, u_int32_t, FILE *);
 static void __wt_db_print_nl(u_int8_t *, u_int32_t, FILE *);
-static int  __wt_ovfl_key_copy(DB *, u_int8_t *, size_t, DBT *);
 
 /* Check if the next page entry is part of a duplicate data set. */
-#define	WT_DUP_AHEAD(item, yesno) {				\
-	WT_ITEM *__item = (WT_ITEM *)					\
-	    ((u_int8_t *)(item) + WT_ITEM_SPACE_REQ(item->len));	\
+#define	WT_DUP_AHEAD(item, yesno) {					\
+	WT_ITEM *__item = WT_ITEM_NEXT(item);				\
 	(yesno) = __item->type == WT_ITEM_DUP ||			\
 	    __item->type == WT_ITEM_DUP_OVFL ||				\
 	    __item->type == WT_ITEM_OFFPAGE ? 1 : 0;			\
@@ -58,17 +56,12 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	WT_CLEAR(last_key_std);
 	WT_CLEAR(last_key_ovfl);
 
-	/* TRAVERSE TO FIRST LEAF PAGE */
-
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
 		if ((ret = __wt_db_page_in(
 		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 			return (ret);
 
-		for (item = (WT_ITEM *)page->first_data,
-		    i = page->hdr->u.entries; i > 0;
-		    item = (WT_ITEM *)
-		    ((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len)), --i)
+		WT_ITEM_FOREACH(page, item, i)
 			switch (item->type) {
 			case WT_ITEM_KEY:
 				last_key_std.data = WT_ITEM_BYTE(item);
@@ -123,7 +116,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 				 * later display.  Otherwise, dump this item.
 				 */
 				if (dup_ahead) {
-					if ((ret = __wt_ovfl_key_copy(db,
+					if ((ret = __wt_datalen_copy_to_dbt(db,
 					    WT_PAGE_BYTE(ovfl_page), ovfl->len,
 					    &last_key_ovfl)) != 0)
 						goto err;
@@ -196,10 +189,7 @@ __wt_db_dump_offpage(DB *db, DBT *key,
 	}
 
 	for (;;) {
-		for (item = (WT_ITEM *)page->first_data,
-		    i = page->hdr->u.entries; i > 0;
-		    item = (WT_ITEM *)
-		    ((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len)), --i) {
+		WT_ITEM_FOREACH(page, item, i) {
 			func(key->data, key->size, stream);
 			switch (item->type) {
 			case WT_ITEM_DUP:
@@ -242,25 +232,6 @@ err:		ret = WT_ERROR;
 			(void)__wt_db_page_out(db, page, 0);
 	}
 	return (ret);
-}
-
-/*
- * __wt_ovfl_key_copy --
- *	Copy an overflow key into a DBT.
- */
-static int
-__wt_ovfl_key_copy(DB *db, u_int8_t *data, size_t len, DBT *copy)
-{
-	int ret;
-
-	if (copy->data == NULL || copy->alloc_size < len) {
-		if ((ret = __wt_realloc(db->ienv, len, &copy->data)) != 0)
-			return (ret);
-		copy->alloc_size = len;
-	}
-	memcpy(copy->data, data, copy->size = len);
-
-	return (0);
 }
 
 static const char hex[] = "0123456789abcdef";
