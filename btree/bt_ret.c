@@ -17,7 +17,6 @@ int
 __wt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx)
 {
 	WT_ITEM *item;
-	WT_ITEM_OVFL ovfl;
 	u_int8_t *p;
 	u_int32_t size;
 	int ret;

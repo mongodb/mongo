@@ -63,7 +63,6 @@ static int
 __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 {
 	IDB *idb;
-	WT_ITEM *item;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, base, indx, limit;
@@ -150,7 +149,7 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		 * failure.
 		 */
 		if (isleaf)
-			return (WT_NOTFOUND);
+			break;
 	}
-	return (0);
+	return (WT_NOTFOUND);
 }

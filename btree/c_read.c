@@ -297,11 +297,6 @@ err:	if (page != NULL)
 int
 __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 {
-	IDB *idb;
-	WT_PAGE_HQH *hashq;
-
-	idb = db->idb;
-
 	DB_FLAG_CHK(db, "__wt_db_page_out", flags, WT_APIMASK_DB_FILE_WRITE);
 
 	/* Check and decrement the reference count. */
