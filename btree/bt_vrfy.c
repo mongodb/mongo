@@ -10,7 +10,6 @@
 #include "wt_internal.h"
 
 static int __wt_db_item_walk(DB *, WT_PAGE *, bitstr_t *);
-static int __wt_db_ovfl_item_copy(DB *, WT_ITEM_OVFL *, DBT *);
 static int __wt_db_verify_checkfrag(DB *, bitstr_t *);
 static int __wt_db_verify_level(DB *, u_int32_t, bitstr_t *);
 static int __wt_db_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *);
@@ -91,9 +90,8 @@ __wt_db_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits)
 {
 	WT_PAGE *page;
 	u_int32_t descend_addr;
-	int first, ret;
+	int first, ret, tret;
 
-	ret = 0;
 	descend_addr = WT_ADDR_INVALID;
 
 	/*
@@ -101,35 +99,38 @@ __wt_db_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits)
 	 * left-most page in the level.   We do it this way because while
 	 * I don't mind bouncing around the tree for the internal pages,
 	 * I want to read the leaf pages in contiguous order.
-	 *
-	 * We'll want to descend to the first offpage in this level, save
-	 * the address for later.
 	 */
 	for (first = 1, page = NULL; addr != WT_ADDR_INVALID;) {
 		if ((ret = __wt_db_page_in(
 		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
-			goto err;
+			return (ret);
+
 		if (first) {
+			/*
+			 * We'll want to descend to the first offpage in this
+			 * level, save the address for later.
+			 */
 			first = 0;
 			if (page->hdr->type == WT_PAGE_INT ||
 			    page->hdr->type == WT_PAGE_DUP_INT)
 				__wt_first_offp_addr(page, &descend_addr);
 		}
-		if ((ret = __wt_db_verify_page(db, page, fragbits)) != 0)
-			goto err;
+
+		ret = __wt_db_verify_page(db, page, fragbits);
+
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_db_page_out(db, page, 0)) != 0) {
-			page = NULL;
-			goto err;
-		}
+
+		if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
+			ret = tret;
+
+		if (ret != 0)
+			return (ret);
 	}
 
 	if (descend_addr != WT_ADDR_INVALID)
 		return (__wt_db_verify_level(db, descend_addr, fragbits));
 
-err:	if (page != NULL)
-		(void)__wt_db_page_out(db, page, 0);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -226,7 +227,7 @@ __wt_db_item_walk(DB *db, WT_PAGE *page, bitstr_t *fragbits)
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
-	u_int32_t addr, i;
+	u_int32_t addr, i, item_no;
 	int (*func)(DB *, const DBT *, const DBT *), ret;
 
 	ienv = db->ienv;
@@ -259,10 +260,10 @@ __wt_db_item_walk(DB *db, WT_PAGE *page, bitstr_t *fragbits)
 		func = db->btree_compare;
 
 	end = (u_int8_t *)hdr + db->pagesize;
-	for (item = (WT_ITEM *)page->first_data, i = 1;
-	    i <= hdr->u.entries;
-	    item = (WT_ITEM *)
-	    ((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len)), ++i) {
+	item_no = 0;
+	WT_ITEM_FOREACH(page, item, i) {
+		++item_no;
+
 		/* Check if this item is entirely on the page. */
 		if ((u_int8_t *)item + sizeof(WT_ITEM) > end)
 			goto eop;
@@ -294,7 +295,7 @@ __wt_db_item_walk(DB *db, WT_PAGE *page, bitstr_t *fragbits)
 item_vs_page:			__wt_db_errx(db,
 				    "item %lu on page at addr %lu is a %s "
 				    "type on a %s page",
-				    (u_long)i, (u_long)addr,
+				    (u_long)item_no, (u_long)addr,
 				    __wt_db_item_type(item->type),
 				    __wt_db_hdr_type(hdr->type));
 				goto err;
@@ -322,7 +323,7 @@ item_vs_page:			__wt_db_errx(db,
 item_len:			__wt_db_errx(db,
 				    "item %lu on page at addr %lu has an "
 				    "incorrect length",
-				    (u_long)i, (u_long)addr);
+				    (u_long)item_no, (u_long)addr);
 				goto err;
 			}
 			break;
@@ -335,16 +336,16 @@ item_len:			__wt_db_errx(db,
 			__wt_db_errx(db,
 			    "item %lu on page at addr %lu has non-zero "
 			    "unused item fields", 
-			    (u_long)i, (u_long)addr);
+			    (u_long)item_no, (u_long)addr);
 			goto err;
 		}
 
 		/* Check if the item's data is entirely on the page. */
-		if ((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len) > end) {
+		if ((u_int8_t *)WT_ITEM_NEXT(item) > end) {
 eop:			__wt_db_errx(db,
 			    "item %lu on page at addr %lu extends past the end "
 			    " of the page",
-			    (u_long)i, (u_long)addr);
+			    (u_long)item_no, (u_long)addr);
 			goto err;
 		}
 
@@ -378,14 +379,14 @@ eop:			__wt_db_errx(db,
 		switch (item->type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_DUP:
-			current->indx = i;
+			current->indx = item_no;
 			current->item = &current->item_std;
 			current->item_std.data = WT_ITEM_BYTE(item);
 			current->item_std.size = item->len;
 			break;
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DUP_OVFL:
-			current->indx = i;
+			current->indx = item_no;
 			current->item = &current->item_ovfl;
 			if ((ret = __wt_db_ovfl_item_copy(db, (WT_ITEM_OVFL *)
 			    WT_ITEM_BYTE(item), current->item)) != 0)
@@ -435,7 +436,7 @@ eop:			__wt_db_errx(db,
 	if (0) {
 item_type:	__wt_db_errx(db,
 		    "item %lu on page at addr %lu has an illegal type of %lu", 
-		    (u_long)i, (u_long)addr, (u_long)item->type);
+		    (u_long)item_no, (u_long)addr, (u_long)item->type);
 err:		ret = WT_ERROR;
 	}
 
@@ -509,36 +510,5 @@ __wt_db_verify_checkfrag(DB *db, bitstr_t *fragbits)
 		if (ffc == -1)
 			break;
 	}
-	return (ret);
-}
-
-/*
- * __wt_db_ovfl_item_copy --
- *	Copy an overflow item into a DBT.
- */
-static int
-__wt_db_ovfl_item_copy(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
-{
-	WT_PAGE *ovfl_page;
-	u_int32_t frags, len;
-	int ret, tret;
-
-	ret = 0;
-
-	len = ovfl->len;
-	WT_OVERFLOW_BYTES_TO_FRAGS(db, len, frags);
-	if ((ret = __wt_db_page_in(db, ovfl->addr, frags, &ovfl_page, 0)) != 0)
-		return (ret);
-
-	if (copy->data == NULL || copy->alloc_size < len) {
-		if ((ret = __wt_realloc(db->ienv, len, &copy->data)) != 0)
-			goto err;
-		copy->alloc_size = len;
-	}
-	memcpy(copy->data, WT_PAGE_BYTE(ovfl_page), copy->size = len);
-
-err:	if ((tret = __wt_db_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
-		ret = tret;
-
 	return (ret);
 }
