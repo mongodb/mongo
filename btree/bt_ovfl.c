@@ -10,6 +10,37 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_db_ovfl_write --
+ *	Store an overflow item in the database, returning the starting
+ *	addr.
+ */
+int
+__wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
+{
+	WT_PAGE *page;
+	u_int32_t frags;
+	int ret;
+
+	/* Allocate a chunk of file space. */
+	WT_OVERFLOW_BYTES_TO_FRAGS(db, dbt->size, frags);
+	if ((ret = __wt_db_page_alloc(db, frags, &page)) != 0)
+		return (ret);
+
+	/* Initialize the page and copy the overflow item in. */
+	page->hdr->type = WT_PAGE_OVFL;
+	page->hdr->u.datalen = dbt->size;
+	page->hdr->prntaddr =
+	    page->hdr->prevaddr = page->hdr->nextaddr = WT_ADDR_INVALID;
+	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
+
+	/* The caller wants the addr. */
+	*addrp = page->addr;
+
+	/* Write the overflow item back to the file. */
+	return (__wt_db_page_out(db, page, WT_MODIFIED));
+}
+
+/*
  * __wt_db_ovfl_copy --
  *	Copy an overflow item in the database, returning the starting
  *	addr.  This routine is used when an overflow item is promoted
@@ -46,32 +77,25 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 }
 
 /*
- * __wt_db_ovfl_write --
- *	Store an overflow item in the database, returning the starting
- *	addr.
+ * __wt_db_ovfl_item_copy --
+ *	Copy an overflow item into allocated memory in a DBT.
  */
 int
-__wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
+__wt_db_ovfl_item_copy(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 {
-	WT_PAGE *page;
+	WT_PAGE *ovfl_page;
 	u_int32_t frags;
-	int ret;
+	int ret, tret;
 
-	/* Allocate a chunk of file space. */
-	WT_OVERFLOW_BYTES_TO_FRAGS(db, dbt->size, frags);
-	if ((ret = __wt_db_page_alloc(db, frags, &page)) != 0)
+	WT_OVERFLOW_BYTES_TO_FRAGS(db, ovfl->len, frags);
+	if ((ret = __wt_db_page_in(db, ovfl->addr, frags, &ovfl_page, 0)) != 0)
 		return (ret);
 
-	/* Initialize the page and copy the overflow item in. */
-	page->hdr->type = WT_PAGE_OVFL;
-	page->hdr->u.datalen = dbt->size;
-	page->hdr->prntaddr =
-	    page->hdr->prevaddr = page->hdr->nextaddr = WT_ADDR_INVALID;
-	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
+	ret = __wt_datalen_copy_to_dbt(
+	    db, WT_PAGE_BYTE(ovfl_page), ovfl->len, copy);
 
-	/* The caller wants the addr. */
-	*addrp = page->addr;
+	if ((tret = __wt_db_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
+		ret = tret;
 
-	/* Write the overflow item back to the file. */
-	return (__wt_db_page_out(db, page, WT_MODIFIED));
+	return (ret);
 }
