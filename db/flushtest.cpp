@@ -7,6 +7,12 @@
 #undef cout
 #undef endl
 
+#if defined(F_FULLFSYNC)
+void fullsync(int f) { fcntl( f, F_FULLFSYNC ); }
+#else
+void fullsync(int f) { fdatasync(f); }
+#endif
+
 int main(int argc, char* argv[], char *envp[] ) {
 	cout << "hello" << endl;
 
@@ -60,7 +66,7 @@ int main(int argc, char* argv[], char *envp[] ) {
 				fwrite(buf, 8192, 1, f);
 			buf[0]++;
 			fflush(f);
-			fcntl( fileno(f), F_FULLFSYNC );
+			fullsync(fileno(f));
 		}
 		int ms = t.millis();
 		cout << "fullsync: " << ms << "ms, " << ms / ((double) n) << "ms/request" << endl;
@@ -75,7 +81,7 @@ int main(int argc, char* argv[], char *envp[] ) {
 				fwrite(buf, 8192, 1, f);
 			buf[0]++;
 			fflush(f);
-			fcntl( fileno(f), F_FULLFSYNC );
+			fullsync(fileno(f));
 			sleepmillis(10);
 		}
 		int ms = t.millis();
