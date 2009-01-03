@@ -49,7 +49,9 @@ extern "C" {
 
 /*
  * The first possible address is 0 (well, duh -- it's just strange to
- * see an address of 0 hard-coded in).
+ * see an address of 0 hard-coded in).   It is also always the first
+ * logical page in the database because it's created first and never
+ * replaced.
  *
  * The invalid address is the largest possible offset, which isn't a
  * possible fragment address.
@@ -57,11 +59,34 @@ extern "C" {
 #define	WT_ADDR_FIRST_PAGE	0
 #define	WT_ADDR_INVALID		UINT32_MAX
 
-/*
- * Each page of the Btree has an associated, in-memory structure that
- * describes it.  (This is where the on-page index array found in DB
- * 1.85 and Berkeley DB moved.)
- */
+typedef	struct __wt_indx {
+	/*
+	 * The first part of the WT_INDX structure looks exactly like a DBT
+	 * so we can feed it directly to a Btree comparison function.
+	 */
+	void	*data;			/* DBT: data */
+	size_t	 size;			/* DBT: data length */
+
+	u_int32_t addr;			/* WT_ITEM_{KEY_OVFL,OFFPAGE}->addr */
+
+	/*
+	 * Associated on-page data item.
+	 *
+	 * In the case of primary internal pages, the associated data item
+	 * is a WT_ITEM_OFFPAGE.
+	 *
+	 * In the case of primary leaf pages, the associated data item is a
+	 * WT_ITEM_DATA or WT_ITEM_DATA_OVFL, or a duplicate set (a group of
+	 * WT_ITEM_DUP and WT_ITEM_DUP_OVFL items).
+	 *
+	 * In the case of off-page duplicate leaf pages, the associated data
+	 * item is the same as the key.
+	 */
+	WT_ITEM *ditem;			/* Associated on-page data item */
+
+	u_int32_t flags;
+} WT_INDX;
+
 struct __wt_page {
 	u_int32_t    addr;			/* File block address */
 	u_int32_t    frags;			/* Number of fragments */
@@ -69,16 +94,25 @@ struct __wt_page {
 
 	WT_PAGE	*parent;			/* Parent page */
 
+	u_int8_t ref;				/* Reference count */
+	TAILQ_ENTRY(__wt_page) q;		/* LRU queue */
 	TAILQ_ENTRY(__wt_page) hq;		/* Hash queue */
-	TAILQ_ENTRY(__wt_page) lq;		/* LRU queue */
 
 	u_int8_t *first_data;			/* First data byte address */
 	u_int8_t *first_free;			/* First free byte address */
 	u_int32_t space_avail;			/* Available page memory */
 
-	u_int8_t **indx;			/* Array of page references */
-	u_int32_t indx_count;			/* Entries in indx */
-	u_int32_t indx_size;			/* Size of indx array */
+	/*
+	 * Each page has an associated, in-memory structure describing it.
+	 * (This is where the on-page index array found in DB 1.85 and Berkeley
+	 * DB moved.)   It's always sorted, but it's not always aa "key", for
+	 * example, offpage duplicate leaf pages contain sorted data items,
+	 * where the data is the interesting stuff.  For simplicity, and as
+	 * it's always a sorted list, we call it a key, 
+	 */
+	WT_INDX	 *indx;				/* Key items  on the page */
+	u_int32_t indx_count;			/* Entries in key index */
+	u_int32_t indx_size;			/* Size of key index */
 
 	u_int32_t flags;
 };
@@ -123,20 +157,41 @@ struct __wt_page_hdr {
 	} lsn;
 
 	/*
-	 * The type declares the purpose of the page and how to move through
-	 * the page.
+	 * !!!
+	 * The following comment describes the page layout for WiredTiger.
+	 *
+	 * The page type declares the purpose of the page and how to move
+	 * through the page.
 	 *
 	 * WT_PAGE_INT:
-	 * WT_PAGE_LEAF:
-	 *	The internal and leaf pages of the main btree.  The u.entries
-	 *	field is the number of entries on the page.
 	 * WT_PAGE_DUP_INT:
-	 * WT_PAGE_DUP_LEAF:
-	 *	The internal and leaf pages of an off-page duplicates btree.
+	 *	The page contains sorted key/offpage-reference pairs.  Keys
+	 *	are on-page (WT_ITEM_KEY) or overflow (WT_ITEM_KEY_OVFL) items.
+	 *	Offpage references are WT_ITEM_OFFPAGE items.
+	 *
 	 *	The u.entries field is the number of entries on the page.
+	 *
+	 * WT_PAGE_LEAF:
+	 *	The page contains sorted key/data sets.  Keys are on-page
+	 *	(WT_ITEM_KEY) or overflow (WT_ITEM_KEY_OVFL) items.  The data
+	 *	sets are either: a single on-page (WT_ITEM_DATA) or overflow
+	 *	(WT_ITEM_DATA_OVFL) item; a group of duplicate data items
+	 *	where each duplicate is an on-page (WT_ITEM_DUP) or overflow
+	 *	(WT_ITEM_DUP_OVFL) item; an offpage reference (WT_ITEM_OFFPAGE).
+	 *
+	 *	The u.entries field is the number of entries on the page.
+	 *
+	 * WT_PAGE_DUP_LEAF:
+	 *	The page contains sorted data items.  The data items are
+	 *	on-page (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL).
+	 *
+	 *	The u.entries field is the number of entries on the page.
+	 *
 	 * WT_PAGE_OVFL:
-	 *	A flat chunk of data.   The u.datalen field is the length
-	 *	of the data.  This is used for overflow key and data items.
+	 *	Pages of this type hold overflow key/data items, it's just a
+	 *	flat chunk of data.
+	 *
+	 *	The u.datalen field is the length of the data.
 	 */
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_INT		1	/* Primary btree internal page */
@@ -234,7 +289,8 @@ struct __wt_item {
 };
 
 /* WT_ITEM_BYTE is the first data byte for the item. */
-#define	WT_ITEM_BYTE(item)		((u_int8_t *)(item) + sizeof(WT_ITEM))
+#define	WT_ITEM_BYTE(item)						\
+	((u_int8_t *)(item) + sizeof(WT_ITEM))
 
 /*
  * The number of bytes required to store a WT_ITEM followed by len additional
@@ -243,6 +299,16 @@ struct __wt_item {
  */
 #define	WT_ITEM_SPACE_REQ(len)						\
 	WT_ALIGN(sizeof(WT_ITEM) + (len), sizeof(u_int32_t))
+
+/* WT_ITEM_NEXT is the first byte of the next item. */
+#define	WT_ITEM_NEXT(item)						\
+	((WT_ITEM *)((u_int8_t *)(item) + WT_ITEM_SPACE_REQ((item)->len)))
+
+/* WT_ITEM_FOREACH is a for loop that walks the items on a page */
+#define	WT_ITEM_FOREACH(page, item, i)					\
+	for ((item) = (WT_ITEM *)(page)->first_data,			\
+	    (i) = (page)->hdr->u.entries;				\
+	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))		\
 
 /*
  * Btree internal items and off-page duplicates reference another page.
