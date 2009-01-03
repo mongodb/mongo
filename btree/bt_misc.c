@@ -38,6 +38,25 @@ __wt_db_build_verify(void)
 }
 
 /*
+ * __wt_datalen_copy_to_dbt --
+ *	Copy a data/length pair into allocated memory in a DBT.
+ */
+int
+__wt_datalen_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
+{
+	int ret;
+
+	if (copy->data == NULL || copy->alloc_size < len) {
+		if ((ret = __wt_realloc(db->ienv, len, &copy->data)) != 0)
+			return (ret);
+		copy->alloc_size = len;
+	}
+	memcpy(copy->data, data, copy->size = len);
+
+	return (0);
+}
+
+/*
  * __wt_first_offp_addr --
  *	In a couple of places in the code, we're trying to walk down the
  *	internal pages from the root, and we need to get the address off
@@ -50,7 +69,7 @@ __wt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp)
 	WT_ITEM_OFFP *offp;
 
 	item = (WT_ITEM *)WT_PAGE_BYTE(page);
-	item = (WT_ITEM *)((u_int8_t *)item + WT_ITEM_SPACE_REQ(item->len));
+	item = WT_ITEM_NEXT(item);
 	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
 	*addrp = offp->addr;
 }
