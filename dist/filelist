@@ -15,6 +15,7 @@ btree/btree_misc.c
 btree/btree_open.c
 btree/btree_ovfl.c
 btree/btree_page.c
+btree/btree_ret.c
 btree/btree_vrfy.c
 db/db_close.c
 db/db_err.c
@@ -23,12 +24,12 @@ db/db_method.c
 db/db_open.c
 db/db_stat.c
 db/db_sync.c
+env/env_close.c
 env/env_err.c
 env/env_getset.c
 env/env_global.c
 env/env_method.c
 env/env_open.c
-env/env_close.c
 os_posix/os_abort.c
 os_posix/os_alloc.c
 os_posix/os_filesize.c

@@ -70,5 +70,10 @@ db_file_read
 db_file_write
 	MODIFIED			# Page is modified
 
+WT_INDX
+	ALLOCATED			# Index key in allocated memory
+
 WT_PAGE
+	ALLOCATED			# Index array has allocated memory
 	MODIFIED			# Page is modified
+
