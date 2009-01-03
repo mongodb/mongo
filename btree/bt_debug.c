@@ -115,6 +115,7 @@ static int
 __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	WT_ITEM *item;
+	WT_PAGE_DESC desc;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
 	u_int8_t *p;
@@ -131,6 +132,28 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 
 	fprintf(fp, "fragments: %lu-%lu {\n",
 	    (u_long)page->addr, (u_long)page->addr + (page->frags - 1));
+
+	/* Dump the description area, if it's page 0. */
+	if (page->addr == 0) {
+		memcpy(&desc,
+		    (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
+		fprintf(fp, "magic: %#lx, major: %lu, minor: %lu\n",
+		    (u_long)desc.magic,
+		    (u_long)desc.majorv, (u_long)desc.minorv);
+		fprintf(fp, "pagesize: %lu, base record: %lu\n",
+		    (u_long)desc.pagesize, (u_long)desc.base_recno);
+		if (desc.root_addr == WT_ADDR_INVALID)
+			fprintf(fp, "root fragment (none), ");
+		else
+			fprintf(fp,
+			    "root fragment %lu, ", (u_long)desc.root_addr);
+		if (desc.free_addr == WT_ADDR_INVALID)
+			fprintf(fp, "free fragment (none), ");
+		else
+			fprintf(fp,
+			    "free fragment %lu, ", (u_long)desc.free_addr);
+		fprintf(fp, "\n");
+	}
 
 	hdr = page->hdr;
 	fprintf(fp, "%s: ", __wt_db_hdr_type(hdr->type));

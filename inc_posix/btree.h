@@ -128,10 +128,10 @@ struct __wt_page_desc {
 	u_int32_t majorv;		/* 04-07: Major version */
 #define	WT_BTREE_MINOR_VERSION	1
 	u_int32_t minorv;		/* 08-11: Minor version */
-	u_int32_t pagesize;		/* 16-19: Page size */
-	u_int32_t root_addr;		/* 20-23: Root fragment */
-	u_int32_t free_addr;		/* 24-27: Freelist fragment */
-	u_int64_t base_recno;		/* 28-31: Base record number */
+	u_int32_t pagesize;		/* 12-15: Page size */
+	u_int64_t base_recno;		/* 16-23: Base record number */
+	u_int32_t root_addr;		/* 24-27: Root fragment */
+	u_int32_t free_addr;		/* 28-31: Freelist fragment */
 	u_int32_t unused[8];		/* 32-63: Spare */
 };
 /*

@@ -22,9 +22,9 @@ __wt_db_desc_init(DB *db, WT_PAGE *page)
 	desc.majorv = WT_BTREE_MAJOR_VERSION;
 	desc.minorv = WT_BTREE_MINOR_VERSION;
 	desc.pagesize = db->pagesize;
+	desc.base_recno = 0;
 	desc.root_addr = WT_ADDR_INVALID;
 	desc.free_addr = WT_ADDR_INVALID;
-	desc.base_recno = 0;
 	desc.unused[0] = 0;
 	desc.unused[1] = 0;
 	desc.unused[2] = 0;
