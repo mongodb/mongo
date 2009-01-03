@@ -98,13 +98,18 @@ int
 __wt_db_desc_read(DB *db, WT_PAGE_DESC *desc)
 {
 	WT_PAGE *page;
-	int ret;
+	int ret, tret;
 
 	if ((ret = __wt_db_page_in(db,
 	    WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 		return (ret);
 
+	ret = __wt_db_desc_verify(db, page);
+
 	memcpy(desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
 
-	return (__wt_db_page_out(db, page, 0));
+	if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
+		ret = tret;
+
+	return (ret);
 }
