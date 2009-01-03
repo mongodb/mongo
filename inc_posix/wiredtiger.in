@@ -242,6 +242,7 @@ char	*wt_strerror(int);
  * DO NOT EDIT: automatically built by dist/api.py.
  * API flags section: BEGIN
  */
+#define	WT_ALLOCATED					0x00000002
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
@@ -272,7 +273,8 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_ENV_VERBOSE				0x00000003
 #define	WT_APIMASK_IDB					0x00000001
 #define	WT_APIMASK_IENV					0x00000000
-#define	WT_APIMASK_WT_PAGE				0x00000001
+#define	WT_APIMASK_WT_INDX				0x00000002
+#define	WT_APIMASK_WT_PAGE				0x00000003
 #define	WT_APIMASK_DB_FILE_READ				0x00000001
 #define	WT_APIMASK_DB_FILE_WRITE			0x00000001
 #define	WT_APIMASK_WT_DB_CREATE				0x00000000

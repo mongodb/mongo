@@ -17,19 +17,30 @@ int
 __wt_bt_open(DB *db)
 {
 	IDB *idb;
-	IENV *ienv;
+	WT_PAGE_DESC desc;
 	int i, ret;
 
-	ienv = db->ienv;
 	idb = db->idb;
 
-	TAILQ_INIT(&idb->hlru);
+	/* Initialize the page queues. */
 	for (i = 0; i < WT_HASHSIZE; ++i)
-		TAILQ_INIT(&idb->hhq[i]);
+		TAILQ_INIT(&idb->hqh[i]);
+	TAILQ_INIT(&idb->lqh);
 
 	/* Open the underlying database file. */
 	if ((ret = __wt_db_page_open(idb)) != 0)
 		return (ret);
+
+	/*
+	 * Retrieve the root fragment address -- if the number of frags in
+	 * the file is non-zero, there had better be a description record.
+	 */
+	if (idb->frags != 0) {
+		if ((ret = __wt_db_desc_read(db, &desc)) != 0)
+			return (ret);
+		idb->root_addr = desc.root_addr;
+	} else
+		idb->root_addr = WT_ADDR_INVALID;
 
 	return (0);
 }
