@@ -66,10 +66,15 @@ __wt_db_page_sync(DB *db)
 
 	idb = db->idb;
 
-	TAILQ_FOREACH(page, &idb->hlru, lq)
+	/* Write any modified pages. */
+	TAILQ_FOREACH(page, &idb->lqh, q) {
+		/* There shouldn't be any pinned pages. */
+		WT_ASSERT(db->ienv, page->ref == 0);
+
 		if (F_ISSET(page, WT_MODIFIED) &&
 		    (ret = __wt_db_page_write(db, page)) != 0)
 			return (ret);
+	}
 	return (0);
 }
 
@@ -80,8 +85,8 @@ __wt_db_page_sync(DB *db)
 int
 __wt_db_page_close(DB *db)
 {
-	IENV *ienv;
 	IDB *idb;
+	IENV *ienv;
 	WT_PAGE *page;
 	int ret, tret;
 
@@ -89,15 +94,19 @@ __wt_db_page_close(DB *db)
 	idb = db->idb;
 	ret = 0;
 
-	while ((page = TAILQ_FIRST(&idb->hlru)) != NULL) {
+	/* Write any modified pages, discard pages. */
+	while ((page = TAILQ_FIRST(&idb->lqh)) != NULL) {
+		/* There shouldn't be any pinned pages. */
+		WT_ASSERT(ienv, page->ref == 0);
+
 		if (F_ISSET(page, WT_MODIFIED) &&
-		    (tret = __wt_db_page_write(db, page)) != 0 &&
-		    ret == 0)
+		    (tret = __wt_db_page_write(db, page)) != 0 && ret == 0)
 			ret = tret;
 		if ((tret = __wt_db_page_discard(db, page)) != 0 && ret == 0)
 			ret = tret;
 	}
 
+	/* There shouldn't be any allocated fragments. */
 	WT_ASSERT(ienv, idb->cache_frags == 0);
 
 	return (__wt_close(ienv, idb->fh));
@@ -148,18 +157,20 @@ __wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	if ((ret = __wt_calloc(
 	    ienv, 1, (size_t)WT_FRAGS_TO_BYTES(db, frags), &page->hdr)) != 0)
 		goto err;
-
 	page->addr = idb->frags;
 	idb->frags += frags;
 	page->frags = frags;
-
-	/* Initialize the rest of the in-memory page structure. */
-	__wt_page_inmem(db, page, 1);
-
-	TAILQ_INSERT_HEAD(&idb->hhq[WT_HASH(page->addr)], page, hq);
-	TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
-
 	idb->cache_frags += frags;
+
+	/*
+	 * Initialize the rest of the in-memory page structure and insert
+	 * the page onto the pinned and hash queues.
+	 */
+	__wt_page_inmem_alloc(db, page);
+
+	page->ref = 1;
+	TAILQ_INSERT_HEAD(&idb->hqh[WT_HASH(page->addr)], page, hq);
+	TAILQ_INSERT_TAIL(&idb->lqh, page, q);
 
 	WT_STAT_INCR(db, CACHE_ALLOC, "pages allocated in the cache");
 
@@ -196,22 +207,28 @@ __wt_db_page_in(DB *db,
 	*pagep = NULL;
 
 	/* Check for the page in the cache. */
-	hashq = &idb->hhq[WT_HASH(addr)];
+	hashq = &idb->hqh[WT_HASH(addr)];
 	TAILQ_FOREACH(page, hashq, hq)
 		if (page->addr == addr)
 			break;
 	if (page != NULL) {
+		++page->ref;
+
+		/* Move to the head of the hash queue */
 		TAILQ_REMOVE(hashq, page, hq);
-		TAILQ_REMOVE(&idb->hlru, page, lq);
 		TAILQ_INSERT_HEAD(hashq, page, hq);
-		TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
+
+		/* Move to the tail of the LRU queue. */
+		TAILQ_REMOVE(&idb->lqh, page, q);
+		TAILQ_INSERT_TAIL(&idb->lqh, page, q);
+
 		WT_STAT_INCR(db, CACHE_HIT, "reads found in the cache");
+
+		WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
 
 		*pagep = page;
 		return (0);
 	}
-
-	WT_STAT_INCR(db, CACHE_MISS, "reads not found in the cache");
 
 	/* Check for exceeding the size of the cache. */
 	while (idb->cache_frags > idb->cache_frags_max)
@@ -244,22 +261,27 @@ __wt_db_page_in(DB *db,
 	/* Allocate an in-memory page structure. */
 	if ((ret = __wt_calloc(ienv, 1, sizeof(WT_PAGE), &page)) != 0)
 		goto err;
-
 	page->addr = addr;
 	page->frags = frags;
 	page->hdr = hdr;
-	__wt_page_inmem(db, page, 0);
+	idb->cache_frags += frags;
 
-	/* Insert at the head of the hash queue and the tail of LRU queue. */
+	/*
+	 * Initialize the rest of the in-memory page structure and insert
+	 * the page onto the pinned and hash queues.
+	 */
+	if ((ret = __wt_page_inmem(db, page)) != 0)
+		goto err;
+
+	page->ref = 1;
 	TAILQ_INSERT_HEAD(hashq, page, hq);
-	TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
+	TAILQ_INSERT_TAIL(&idb->lqh, page, q);
+
+	WT_STAT_INCR(db, CACHE_MISS, "reads not found in the cache");
 
 	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
 
-	idb->cache_frags += frags;
-
 	*pagep = page;
-
 	return (0);
 
 err:	if (page != NULL)
@@ -282,21 +304,17 @@ __wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 
 	DB_FLAG_CHK(db, "__wt_db_page_out", flags, WT_APIMASK_DB_FILE_WRITE);
 
-	/*
-	 * Re-insert the page at the head of the hash queue and at the tail of
-	 * the LRU queue.
-	 */
-	hashq = &idb->hhq[WT_HASH(page->addr)];
-	TAILQ_REMOVE(hashq, page, hq);
-	TAILQ_INSERT_HEAD(hashq, page, hq);
-	TAILQ_REMOVE(&idb->hlru, page, lq);
-	TAILQ_INSERT_TAIL(&idb->hlru, page, lq);
+	/* Check and decrement the reference count. */
+	WT_ASSERT(db->ienv, page->ref > 0);
+	--page->ref;
 
 	/* If the page is dirty, set the modified flag. */
 	if (LF_ISSET(WT_MODIFIED)) {
 		F_SET(page, WT_MODIFIED);
 		WT_STAT_INCR(db, CACHE_DIRTY, "dirty pages in the cache");
 	}
+
+	WT_ASSERT(db->ienv, __wt_db_verify_page(db, page, NULL) == 0);
 
 	return (0);
 }
@@ -314,18 +332,22 @@ __wt_db_page_clean(DB *db)
 
 	idb = db->idb;
 
-	TAILQ_FOREACH(page, &idb->hlru, lq) {
+	TAILQ_FOREACH_REVERSE(page, &idb->lqh, __wt_page_lqh, q) {
+		if (page->ref > 0)
+			continue;
 		if (F_ISSET(page, WT_MODIFIED)) {
 			WT_STAT_INCR(db, CACHE_WRITE_EVICT,
 			    "dirty pages evicted from the cache");
+
 			if ((ret = __wt_db_page_write(db, page)) != 0)
 				return (ret);
 		} else
-			WT_STAT_INCR(db, CACHE_EVICT,
-			    "clean pages evicted from the cache");
-		return (__wt_db_page_discard(db, page));
+			WT_STAT_INCR(db,
+			    CACHE_EVICT, "clean pages evicted from the cache");
+		break;
 	}
-	return (0);
+
+	return (__wt_db_page_discard(db, page));
 }
 
 /*
@@ -343,14 +365,13 @@ __wt_db_page_write(DB *db, WT_PAGE *page)
 	ienv = db->ienv;
 	idb = db->idb;
 
+	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
+
 	WT_STAT_INCR(db, CACHE_WRITE, "writes from the cache");
 	WT_STAT_DECR(db, CACHE_DIRTY, NULL);
 
 	/* Clear the modified flag. */
 	F_CLR(page, WT_MODIFIED);
-
-	/* Verify the page. */
-	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
 
 	/* Update the checksum. */
 	bytes = (size_t)WT_FRAGS_TO_BYTES(db, page->frags);
@@ -370,13 +391,16 @@ __wt_db_page_write(DB *db, WT_PAGE *page)
 static int
 __wt_db_page_discard(DB *db, WT_PAGE *page)
 {
-	IENV *ienv;
 	IDB *idb;
+	IENV *ienv;
+	WT_INDX *indx;
+	u_int32_t i;
 
 	ienv = db->ienv;
 	idb = db->idb;
 
 	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
+	WT_ASSERT(ienv, page->ref == 0);
 
 	if (idb->cache_frags < page->frags) {
 		__wt_db_errx(db, "allocated cache size went negative");
@@ -384,9 +408,16 @@ __wt_db_page_discard(DB *db, WT_PAGE *page)
 	}
 	idb->cache_frags -= page->frags;
 
-	TAILQ_REMOVE(&idb->hhq[WT_HASH(page->addr)], page, hq);
-	TAILQ_REMOVE(&idb->hlru, page, lq);
+	TAILQ_REMOVE(&idb->hqh[WT_HASH(page->addr)], page, hq);
+	TAILQ_REMOVE(&idb->lqh, page, q);
 
+	if (F_ISSET(page, WT_ALLOCATED))
+		for (indx = page->indx,
+		    i = page->indx_count; i > 0; ++indx, --i)
+			if (F_ISSET(indx, WT_ALLOCATED))
+				__wt_free(ienv, indx->data);
+	if (page->indx != NULL)
+		__wt_free(ienv, page->indx);
 	__wt_free(ienv, page->hdr);
 	__wt_free(ienv, page);
 	return (0);
@@ -419,7 +450,7 @@ __wt_db_page_dump(DB *db, char *ofile, FILE *fp)
 
 	fprintf(fp, "LRU: ");
 	sep = "";
-	TAILQ_FOREACH(page, &idb->hlru, lq) {
+	TAILQ_FOREACH(page, &idb->lqh, q) {
 		fprintf(fp, "%s%lu", sep, (u_long)page->addr);
 		sep = ", ";
 	}
@@ -427,10 +458,10 @@ __wt_db_page_dump(DB *db, char *ofile, FILE *fp)
 	for (i = 0; i < WT_HASHSIZE; ++i) {
 		sep = "";
 		bucket_empty = 1;
-		hashq = &idb->hhq[i];
+		hashq = &idb->hqh[i];
 		TAILQ_FOREACH(page, hashq, hq) {
 			if (bucket_empty) {
-				fprintf(fp, "hash bucket %d: ");
+				fprintf(fp, "hash bucket %d: ", i);
 				bucket_empty = 0;
 			}
 			fprintf(fp, "%s%lu", sep, (u_long)page->addr);
