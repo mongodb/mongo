@@ -16,9 +16,6 @@
 int
 __wt_bt_close(DB *db)
 {
-	 IDB *idb;
-	 int ret, tret;
-
 	/* Close the underlying database file. */
 	return (__wt_db_page_close(db));
 }
