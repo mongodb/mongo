@@ -24,12 +24,13 @@ int main(int argc, char* argv[], char *envp[] ) {
 			fwrite("abc", 3, 1, f);
 		cout << "small writes: " << t.millis() << "ms" << endl;
 	}
-
+    
 	{
 		Timer t;
 		for( int i = 0; i < 50000; i++ ) {
 			fwrite("abc", 3, 1, f);
 			fflush(f);
+            fsync( fileno( f ) );
 		}
 		cout << "flush: " << t.millis() << "ms" << endl;
 	}
@@ -39,10 +40,11 @@ int main(int argc, char* argv[], char *envp[] ) {
 		for( int i = 0; i < 500; i++ ) {
 			fwrite("abc", 3, 1, f);
 			fflush(f);
+            fsync( fileno( f ) );
 			sleepmillis(10);
 		}
 		cout << "flush with 5000 sleep: " << t.millis() << "ms" << endl;
 	}
-
+    
 	return 0;
 }
