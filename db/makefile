@@ -90,3 +90,6 @@ info:
 	@echo 'Req version of GPP :' $(_REQ_GPP_VER)
 	@# todo - determine if we have the right version of gcc and error if not
 	@echo ''
+
+flushtest: flushtest.o
+	$(GPP) $(FLAGS) -o $@ flushtest.o $(LIBS)
