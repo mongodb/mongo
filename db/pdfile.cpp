@@ -737,7 +737,7 @@ void  _indexRecord(IndexDetails& idx, BSONObj& obj, DiskLoc newRecordLoc) {
 void addExistingToIndex(const char *ns, IndexDetails& idx) {
     Timer t;
     Logstream& l = log();
-    l << "building new index for " << ns << " ... ";
+    l << "building new index for " << ns << "...";
     l.flush();
     int n = 0;
     auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);

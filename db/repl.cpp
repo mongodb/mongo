@@ -67,7 +67,7 @@ const char *allDead = 0;
 
 #include "replset.h"
 
-#define debugrepl(z) cout << "debugrepl " << z << '\n'
+#define debugrepl(z) log() << "debugrepl " << z << '\n'
 //define debugrepl
 
 PairSync *pairSync = new PairSync();
@@ -584,7 +584,7 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
     bool justCreated;
     try { 
       justCreated = setClientTempNs(ns);
-    } catch( AssertionException& e ) { 
+    } catch( AssertionException& ) { 
       problem() << "skipping bad(?) op in oplog, setClient() failed, ns: '" << ns << "'\n";
       addDbNextPass.erase(clientName);
       return;

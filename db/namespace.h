@@ -170,7 +170,7 @@ public:
     int max; // max # of objects for a capped table.
     double paddingFactor; // 1.0 = no padding.
     int flags;
-    char reserved[256-16-4-4-8*MaxIndexes-8-8-8-4];
+    char reserved[124];
 
     enum {
         Flag_HaveIdIndex = 1 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)

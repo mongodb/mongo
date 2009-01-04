@@ -324,7 +324,7 @@ public:
     string toString() const;
     
     // Properly formatted JSON string.
-    string jsonString( JsonStringFormat format ) const;
+    string jsonString( JsonStringFormat format = Strict ) const;
     
     /* note: addFields always adds _id even if not specified */
     int addFields(BSONObj& from, set<string>& fields); /* returns n added */

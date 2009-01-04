@@ -161,7 +161,7 @@ void* MemoryMappedFile::map(const char *filename, int length) {
             return 0;
         }
         Logstream &l = log();
-        l << "new datafile " << filename << " filling with zeroes ... "; l.flush();
+        l << "new datafile " << filename << " filling with zeroes..."; l.flush();
         Timer t;
         int z = 8192;
         char buf[z];
@@ -175,7 +175,7 @@ void* MemoryMappedFile::map(const char *filename, int length) {
             write(fd, buf, z);
             left -= z;
         }
-        l << " done " << ((double)t.millis())/1000.0 << " secs" << endl;
+        l << "done " << ((double)t.millis())/1000.0 << " secs" << endl;
     }
 
     lseek(fd, length, SEEK_SET);

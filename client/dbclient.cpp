@@ -23,6 +23,7 @@
 #include "../db/jsobj.h"
 #include "../db/query.h"
 #include "../db/json.h"
+#include "../db/instance.h"
 
 /* --- dbclientcommands --- */
 
@@ -358,3 +359,5 @@ auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, BSONObj b, int c, 
 BSONObj DBClientPaired::findOne(const char *a, BSONObj b, BSONObj *c, int d) {
     return checkMaster().findOne(a,b,c,d);
 }
+
+

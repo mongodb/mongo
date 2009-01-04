@@ -58,17 +58,19 @@ javatest: javatest.o $(OBJS)
 javatest2: javatest.o javajs.o
 	$(GPP) $(FLAGS) -o javatest2 javatest.o javajs.o $(LIBS) $(JVM_LIBS)
 
+mongodump: ../tools/dump.o $(OBJS)
+	$(GPP) $(FLAGS) -o $@ $(OBJS) ../tools/dump.o $(LIBS) $(JVM_LIBS)
+
+all: db dbgrid mongodump
+
 # FIXME Currently javatests{,2} binaries not cleaned.
 clean:
 	-rm -f $(OBJS) db.o $(DBTEST_OBJS) $(DBGRID_OBJS) ../dbgrid/dbgrid.o
-	-rm -f db dbtests dbgrid
+	-rm -f db dbtests dbgrid mongodump
 	-rm -f *.o ../dbgrid/*.o
 
 tools:
 	mongodump
-
-mongodump: ../tools/dump.o $(OBJS)
-	$(GPP) $(FLAGS) -o $@ $(OBJS) ../tools/dump.o $(LIBS) $(JVM_LIBS)
 
 cleandb:
 	rm /data/db/*
@@ -88,3 +90,6 @@ info:
 	@echo 'Req version of GPP :' $(_REQ_GPP_VER)
 	@# todo - determine if we have the right version of gcc and error if not
 	@echo ''
+
+flushtest: flushtest.o
+	$(GPP) $(FLAGS) -o $@ flushtest.o $(LIBS)
