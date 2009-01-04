@@ -88,6 +88,24 @@ int main(int argc, char* argv[], char *envp[] ) {
 		cout << "fullsync with sleeps intermixed: " << ms << "ms, " << (ms-5000) / 500.0 << "ms/request" << endl;
 	}
 	}
+
+	// with noatime
+	{
+		fclose(f);
+		/* try from beginning of the file, where we aren't appending and changing the file length, 
+		   to see if this is faster as the directory entry then doesn't have to be flushed (if noatime in effect).
+		*/
+		f = fopen("/data/db/temptest", "r+");
+		Timer t;
+		int n = 500;
+		for( int i = 0; i < n; i++ ) {
+			fwrite("xyz", 3, 1, f);
+			fflush(f);
+			fullsync(fileno(f));
+		}
+		int ms = t.millis();
+		cout << "fullsync without growing: " << ms << "ms, " << ms / ((double) n) << "ms/request" << endl;
+	}
     
 	return 0;
 }
