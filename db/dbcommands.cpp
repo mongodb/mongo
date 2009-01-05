@@ -30,6 +30,7 @@
 #include "commands.h"
 #include "db.h"
 #include "instance.h"
+#include "lasterror.h"
 
 extern bool quiet;
 extern int queryTraceLevel;
@@ -176,6 +177,75 @@ string validateNS(const char *ns, NamespaceDetails *d) {
 
     return ss.str();
 }
+
+/* reset any errors so that getlasterror comes back clean.
+
+   useful before performing a long series of operations where we want to 
+   see if any of the operations triggered an error, but don't want to check 
+   after each op as that woudl be a client/server turnaround.
+*/
+class CmdResetError : public Command { 
+public:
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
+    CmdResetError() : Command("reseterror") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        LastError *le = lastError.get();
+        assert( le );
+        le->resetError();
+        return true;
+    }
+} cmdResetError;
+
+class CmdGetLastError : public Command { 
+public:
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
+    CmdGetLastError() : Command("getlasterror") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        LastError *le = lastError.get();
+        assert( le );
+        le->nPrev--; // we don't count as an operation
+        if( le->nPrev != 1 || !le->haveError() ) {
+            result.appendNull("err");
+            return true;
+        }
+        result.append("err", le->msg);
+        return true;
+    }
+} cmdGetLastError;
+
+/* for testing purposes only */
+class CmdForceError : public Command { 
+public:
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
+    CmdForceError() : Command("forceerror") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        uassert("forced error", false);
+        return true;
+    }
+} cmdForceError;
+
+class CmdGetPrevError : public Command { 
+public:
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
+    CmdGetPrevError() : Command("getpreverror") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        LastError *le = lastError.get();
+        assert( le );
+        le->nPrev--; // we don't count as an operation
+        if( !le->haveError() ) {
+            result.appendNull("err");
+            result.append("nPrev", 1);
+            return true;
+        }
+        result.append("err", le->msg);
+        result.append("nPrev", le->nPrev);
+        return true;
+    }
+} cmdGetPrevError;
 
 class CmdDropDatabase : public Command {
 public:

@@ -24,6 +24,7 @@
 #include "repl.h"
 #include "dbmessage.h"
 #include "instance.h"
+#include "lasterror.h"
 
 int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
