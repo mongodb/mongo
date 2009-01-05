@@ -272,7 +272,7 @@ public:
         static DBDirectClient db;
         
         int skip = _getOption( params["skip"] , 0 );
-        int num = _getOption( params["count" ] , 0 );
+        int num = _getOption( params["limit"] , _getOption( params["count" ] , 0 ) ); // count is old, limit is new
         
         int one = 0;
 
