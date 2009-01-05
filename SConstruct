@@ -28,7 +28,25 @@ if "darwin" == os.sys.platform:
 
     if os.path.exists( "/usr/bin/g++-4.2" ):
         env["CXX"] = "g++-4.2"
+
+elif "linux2" == os.sys.platform:
+    javaHome = "/opt/java/"
+
+    env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/linux"] )
     
+    javaVersion = "i386";
+
+    if os.uname()[4] == "x86_64":
+        javaVersion = "amd64"
+
+    env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
+    env.Append( LIBS=[ "java" , "jvm" ] )
+
+    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
+    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
+
+else:
+    print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
 for b in boostLibs:
     env.Append( LIBS=[ "boost_" + b ] )
