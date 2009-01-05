@@ -136,11 +136,15 @@ public:
     Message & container;
 };
 
+#include "lasterror.h"
+
 /* we create one thread for each connection from an app server database.
    app server will open a pool of threads.
 */
 void connThread()
 {
+    LastError *le = new LastError();
+    lastError.reset(le);
     try {
 
         MessagingPort& dbMsgPort = *grab;
@@ -155,6 +159,8 @@ void connThread()
                 dbMsgPort.shutdown();
                 break;
             }
+
+            le->nPrev++;
 
             DbResponse dbresponse;
             if ( !assembleResponse( m, dbresponse ) ) {
