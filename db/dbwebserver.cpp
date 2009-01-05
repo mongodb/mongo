@@ -271,18 +271,39 @@ public:
     void handleRESTQuery( string ns , string action , map<string,string> & params , int & responseCode , stringstream & out ){
         static DBDirectClient db;
         
-        int skip = _getOption( params["skip"] , 0 );
-        int num = _getOption( params["limit"] , _getOption( params["count" ] , 0 ) ); // count is old, limit is new
+        Timer t;
         
-        int one = 0;
+        int skip = _getOption( params["skip"] , 0 );
+        int num = _getOption( params["limit"] , _getOption( params["count" ] , 1000 ) ); // count is old, limit is new
 
+        int one = 0;
         if ( params["one"].size() > 0 && tolower( params["one"][0] ) == 't' ){
             num = 1;
             one = 1;
         }
         
-        BSONObjBuilder query;
-        auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query.doneAndDecouple() , num , skip );
+        BSONObjBuilder queryBuilder;
+        
+        for ( map<string,string>::iterator i = params.begin(); i != params.end(); i++ ){
+            if ( ! i->first.find( "filter_" ) == 0 )
+                continue;
+            
+            const char * field = i->first.substr( 7 ).c_str();
+            const char * val = i->second.c_str();
+
+            char * temp;
+            
+            // TODO: this is how i guess if something is a number.  pretty lame right now
+            float number = strtof( val , &temp );
+            if ( temp != val )
+                queryBuilder.append( field , number );
+            else 
+                queryBuilder.append( field , val );
+        }
+
+        BSONObj query = queryBuilder.doneAndDecouple();
+
+        auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
         
         if ( one ){
             if ( cursor->more() ){
@@ -296,20 +317,22 @@ public:
         }
 
         out << "{\n";
-        //ss << "  \"total_rows\" : 0 ,\n";
         out << "  \"offset\" : " << skip << ",\n";
         out << "  \"rows\": [\n";
         
-        int first = 1;
+        int howMany = 0;
         while ( cursor->more() ){
-            if ( first )
-                first = 0;
-            else 
+            if ( howMany++ )
                 out << " ,\n";
             BSONObj obj = cursor->next();
             out << "    " << obj.jsonString();
+            
         }
         out << "\n  ]\n\n";
+        
+        out << "  \"total_rows\" : " << howMany << " ,\n";
+        out << "  \"query\" : " << query.jsonString() << " ,\n";
+        out << "  \"millis\" : " << t.millis() << " ,\n";
         out << "}\n";
     }
     
