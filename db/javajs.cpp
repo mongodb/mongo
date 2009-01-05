@@ -154,7 +154,7 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath) {
     _vmArgs->nOptions = 3;
     _vmArgs->ignoreUnrecognized = JNI_FALSE;
 
-    log() << "Creating JVM" << endl;
+    log() << "loading JVM" << endl;
     jint res = JNI_CreateJavaVM( &_jvm, (void**)&_mainEnv, _vmArgs );
 
     if ( res ) {
@@ -515,7 +515,7 @@ const char * findEd() {
             continue;
 
         closedir( test );
-        log() << "Found directory for appserver : " << temp << endl;
+        log() << "found directory for appserver : " << temp << endl;
         return temp;
     }
 

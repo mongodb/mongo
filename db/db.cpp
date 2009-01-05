@@ -27,7 +27,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 
-extern bool objcheck, quiet, quota, verbose;
+extern bool objcheck, quiet, quota, verbose, cpu;
 bool useJNI = true;
 
 /* only off if --nocursors which is for debugging. */
@@ -113,9 +113,8 @@ void pdfileInit();
    115 replay, opLogging
 */
 void listen(int port) {
-    const char *Version = "db version: 122";
-    problem() << Version << endl;
-    problem() << "pdfile version " << VERSION << "." << VERSION_MINOR << endl;
+    const char *Version = "db version 122";
+    log() << Version << ", pdfile version " << VERSION << "." << VERSION_MINOR << endl;
     pdfileInit();
     //testTheDb();
     log() << "waiting for connections on port " << port << "..." << endl;
@@ -460,6 +459,8 @@ int main(int argc, char* argv[], char *envp[] )
                 goto usage;
             else if ( s == "--quiet" )
                 quiet = true;
+			else if( s == "--cpu" )
+				cpu = true;
             else if ( s == "--verbose" )
                 verbose = true;
             else if ( s == "--quota" )
@@ -512,7 +513,8 @@ usage:
     cout << " --help              show this usage information\n";
     cout << " --port <portno>     specify port number, default is 27017\n";
     cout << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
-    cout << " --quiet             quieter output (no cpu outputs)\n";
+    cout << " --quiet             quieter output\n";
+	cout << " --cpu               show cpu+iowait utilization periodically\n";
     cout << " --verbose\n";
     cout << " --objcheck          inspect client data for validity on receipt\n";
     cout << " --quota             enable db quota management\n";

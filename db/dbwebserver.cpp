@@ -53,7 +53,7 @@ Timing tlast;
 const int NStats = 32;
 string lockStats[NStats];
 unsigned q = 0;
-extern bool quiet;
+extern bool cpu;
 
 void statsThread() {
     unsigned long long timeLastPass = 0;
@@ -75,7 +75,7 @@ void statsThread() {
                     if ( dt )
                         ss << (dlocked*100)/dt << '%';
                     string s = ss.str();
-                    if ( !quiet )
+                    if ( cpu )
                         log() << "cpu: " << s << endl;
                     lockStats[q] = s;
                 }
