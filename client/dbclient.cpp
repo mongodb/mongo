@@ -114,6 +114,40 @@ auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, BSONObj query
     return auto_ptr< DBClientCursor >( 0 );
 }
 
+void DBClientConnection::insert( const char * ns , BSONObj obj ){
+    Message toSend;
+    
+    BufBuilder b;
+    int opts = 0;
+    b.append( opts );
+    b.append( ns );
+    obj.appendSelfToBufBuilder( b );
+    
+    toSend.setData( dbInsert , b.buf() , b.len() );
+
+    port().say( toSend );
+}
+
+void DBClientConnection::remove( const char * ns , BSONObj obj , bool justOne ){
+    Message toSend;
+    
+    BufBuilder b;
+    int opts = 0;
+    b.append( opts );
+    b.append( ns );
+    
+    int flags = 0;
+    if ( justOne || obj.hasField( "_id" ) )
+        flags &= 1;
+    b.append( flags );
+
+    obj.appendSelfToBufBuilder( b );
+    
+    toSend.setData( dbDelete , b.buf() , b.len() );
+
+    port().say( toSend );
+}
+
 /* -- DBClientCursor ---------------------------------------------- */
 
 void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
