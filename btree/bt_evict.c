@@ -270,7 +270,8 @@ __wt_db_page_in(DB *db,
 	 * Initialize the rest of the in-memory page structure and insert
 	 * the page onto the pinned and hash queues.
 	 */
-	if ((ret = __wt_page_inmem(db, page)) != 0)
+	if (!LF_ISSET(WT_NO_INMEM_PAGE) &&
+	    (ret = __wt_page_inmem(db, page)) != 0)
 		goto err;
 
 	page->ref = 1;
@@ -406,13 +407,13 @@ __wt_db_page_discard(DB *db, WT_PAGE *page)
 	TAILQ_REMOVE(&idb->hqh[WT_HASH(page->addr)], page, hq);
 	TAILQ_REMOVE(&idb->lqh, page, q);
 
-	if (F_ISSET(page, WT_ALLOCATED))
-		for (indx = page->indx,
-		    i = page->indx_count; i > 0; ++indx, --i)
-			if (F_ISSET(indx, WT_ALLOCATED))
-				__wt_free(ienv, indx->data);
-	if (page->indx != NULL)
+	if (page->indx != NULL) {
+		if (F_ISSET(page, WT_ALLOCATED))
+			WT_INDX_FOREACH(page, indx, i)
+				if (F_ISSET(indx, WT_ALLOCATED))
+					__wt_free(ienv, indx->data);
 		__wt_free(ienv, page->indx);
+	}
 	__wt_free(ienv, page->hdr);
 	__wt_free(ienv, page);
 	return (0);
