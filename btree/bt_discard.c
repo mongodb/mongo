@@ -9,9 +9,9 @@
 
 #include "wt_internal.h"
 
-static int  __wt_page_inmem_int(DB *, WT_PAGE *);
-static void __wt_page_inmem_leaf(DB *, WT_PAGE *);
-static void __wt_page_inmem_dup_leaf(DB *, WT_PAGE *);
+static int __wt_page_inmem_dup_leaf(DB *, WT_PAGE *);
+static int __wt_page_inmem_int(DB *, WT_PAGE *);
+static int __wt_page_inmem_leaf(DB *, WT_PAGE *);
 
 /*
  * WT_SET_FF_AND_SA_FROM_ADDR --
@@ -48,7 +48,6 @@ __wt_page_inmem(DB *db, WT_PAGE *page)
 		return (ret);
 	page->indx = indx;
 	page->indx_size = hdr->u.entries;
-	page->first_data = WT_PAGE_BYTE(page);
 
 	switch (hdr->type) {
 	case WT_PAGE_INT:
@@ -56,11 +55,13 @@ __wt_page_inmem(DB *db, WT_PAGE *page)
 		ret = __wt_page_inmem_int(db, page);
 		break;
 	case WT_PAGE_LEAF:
-		__wt_page_inmem_leaf(db, page);
+		ret = __wt_page_inmem_leaf(db, page);
 		break;
 	case WT_PAGE_DUP_LEAF:
-		__wt_page_inmem_dup_leaf(db, page);
+		ret = __wt_page_inmem_dup_leaf(db, page);
 		break;
+	default:
+		return (__wt_database_format(db));
 	}
 	return (ret);
 }
@@ -78,9 +79,7 @@ __wt_page_inmem_int(DB *db, WT_PAGE *page)
 	WT_ITEM_OFFP *offp;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE_HDR *hdr;
-	DBT ovfl_copy;
 	u_int32_t i;
-	int ret;
 
 	hdr = page->hdr;
 	indx = page->indx;
@@ -101,15 +100,8 @@ __wt_page_inmem_int(DB *db, WT_PAGE *page)
 			break;
 		case WT_ITEM_KEY_OVFL:
 			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-			WT_CLEAR(ovfl_copy);
-			if ((ret =
-			    __wt_db_ovfl_item_copy(db, ovfl, &ovfl_copy)) != 0)
-				return (ret);
-			indx->data = ovfl_copy.data;
 			indx->size = ovfl->len;
 			indx->addr = ovfl->addr;
-			F_SET(indx, WT_ALLOCATED);
-			F_SET(page, WT_ALLOCATED);
 			break;
 		case WT_ITEM_OFFPAGE:
 			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
@@ -117,6 +109,8 @@ __wt_page_inmem_int(DB *db, WT_PAGE *page)
 			indx->ditem = item;
 			++indx;
 			break;
+		default:
+			return (__wt_database_format(db));
 		}
 
 	page->indx_count = hdr->u.entries / 2;
@@ -129,7 +123,7 @@ __wt_page_inmem_int(DB *db, WT_PAGE *page)
  * __wt_page_inmem_leaf --
  *	Build in-memory index for primary leaf pages.
  */
-static void
+static int
 __wt_page_inmem_leaf(DB *db, WT_PAGE *page)
 {
 	WT_INDX *indx;
@@ -182,16 +176,19 @@ __wt_page_inmem_leaf(DB *db, WT_PAGE *page)
 			if (indx->ditem == NULL)
 				indx->ditem = item;
 			break;
+		default:
+			return (__wt_database_format(db));
 		}
 
 	WT_SET_FF_AND_SA_FROM_ADDR(db, page, item);
+	return (0);
 }
 
 /*
  * __wt_page_inmem_dup_leaf --
  *	Build in-memory index for off-page duplicate tree leaf pages.
  */
-static void
+static int
 __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 {
 	WT_INDX *indx;
@@ -221,6 +218,8 @@ __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 			indx->size = ovfl->len;
 			indx->addr = ovfl->addr;
 			break;
+		default:
+			return (__wt_database_format(db));
 		}
 		indx->ditem = item;
 		++indx;
@@ -228,6 +227,8 @@ __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 
 	page->indx_count = hdr->u.entries;
 	WT_SET_FF_AND_SA_FROM_ADDR(db, page, item);
+
+	return (0);
 }
 
 /*
@@ -237,8 +238,7 @@ __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 void
 __wt_page_inmem_alloc(DB *db, WT_PAGE *page)
 {
-	page->first_data = WT_PAGE_BYTE(page);
-	WT_SET_FF_AND_SA_FROM_ADDR(db, page, page->first_data);
+	WT_SET_FF_AND_SA_FROM_ADDR(db, page, WT_PAGE_BYTE(page));
 
 	if (page->addr == 0)
 		__wt_db_desc_init(db, page);
