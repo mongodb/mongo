@@ -368,7 +368,7 @@ struct regexEnd {
 
 // One gotcha with this parsing library is probably best ilustrated with an
 // example.  Say we have a production like this:
-// z = ( ch_p( 'a' )[ foo ] >> ch_p( 'b' ) ) | ( ch_p( 'a' )[ foo ] | ch_p( 'c' ) );
+// z = ( ch_p( 'a' )[ foo ] >> ch_p( 'b' ) ) | ( ch_p( 'a' )[ foo ] >> ch_p( 'c' ) );
 // On input "ac", action foo() will be called twice -- once as the parser tries
 // to match "ab", again as the parser successfully matches "ac".  Sometimes
 // the grammar can be modified to eliminate these situations.  Here, for example:
