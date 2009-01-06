@@ -369,6 +369,19 @@ namespace JsonStringTests {
             ASSERT_EQUALS( "{ \"a\" : /abc/I }", b.done().jsonString( JS ) );
         }        
     };
+    
+    class RegexEscape {
+    public:
+        void run() {
+            BSONObjBuilder b;
+            b.appendRegex( "a", "/\"", "I" );
+            ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"\\/\\\"\", \"$options\" : \"I\" } }",
+                          b.done().jsonString( Strict ) );
+            ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/I }", b.done().jsonString( TenGen ) );
+            ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/I }", b.done().jsonString( JS ) );
+        }        
+    };
+    
 } // namespace JsonStringTests
 } // namespace BSONObjTests
 
@@ -798,6 +811,7 @@ public:
         add< BSONObjTests::JsonStringTests::Symbol >();
         add< BSONObjTests::JsonStringTests::Date >();
         add< BSONObjTests::JsonStringTests::Regex >();
+        add< BSONObjTests::JsonStringTests::RegexEscape >();
         add< FromJsonTests::Empty >();
         add< FromJsonTests::EmptyWithSpace >();
         add< FromJsonTests::SingleString >();
