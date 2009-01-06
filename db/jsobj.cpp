@@ -165,8 +165,9 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
             break;
         case NumberInt:
         case NumberDouble:
-            if ( number() >= numeric_limits< double >::min() &&
-                number() <= numeric_limits< double >::max() ) {
+            if ( number() == 0 || 
+                 ( number() >= numeric_limits< double >::min() &&
+                   number() <= numeric_limits< double >::max() ) ){
                 s.precision( 50 );
                 s << number();
             } else {

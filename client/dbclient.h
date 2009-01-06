@@ -207,10 +207,14 @@ public:
     /*throws AssertionException*/
     auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
                                    BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-
+    
     /*throws AssertionException*/
     virtual
     BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+
+    void insert( const char * ns , BSONObj obj );
+    void remove( const char * ns , BSONObj obj , bool justOne = 0 );
+
 private:
     class CursorConnector : public DBClientCursor::Connector {
         DBClientConnection *conn;

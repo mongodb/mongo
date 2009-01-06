@@ -351,6 +351,10 @@ public:
     };
     BSONElement getField(const char *name) const; /* return has eoo() true if no match */
 
+    bool hasField( const char * name )const {
+        return ! getField( name ).eoo();
+    }
+
     // returns "" if DNE or wrong type
     const char * getStringField(const char *name);
 
