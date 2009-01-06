@@ -331,6 +331,9 @@ __wt_env_config_methods(ENV *env)
 	env->destroy = __wt_env_destroy;
 	env->err = __wt_env_err;
 	env->errx = __wt_env_errx;
+	env->open = __wt_env_open;
+	env->stat_clear = __wt_env_stat_clear;
+	env->stat_print = __wt_env_stat_print;
 }
 
 void
@@ -374,6 +377,15 @@ __wt_env_config_methods_lockout(ENV *env)
 	    __wt_env_lockout_err;
 	env->errx = (void (*)
 	    (ENV *, const char *, ...))
+	    __wt_env_lockout_err;
+	env->open = (int (*)
+	    (ENV *, const char *, mode_t, u_int32_t))
+	    __wt_env_lockout_err;
+	env->stat_clear = (int (*)
+	    (ENV *, u_int32_t))
+	    __wt_env_lockout_err;
+	env->stat_print = (int (*)
+	    (ENV *, FILE *, u_int32_t))
 	    __wt_env_lockout_err;
 }
 
