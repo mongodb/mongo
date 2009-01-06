@@ -54,7 +54,9 @@ __wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp);
 int
 __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy);
 int
-__wt_db_ovfl_item_copy(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy);
+__wt_db_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy);
+int
+__wt_db_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
 int
 __wt_page_inmem(DB *db, WT_PAGE *page);
 void
@@ -63,6 +65,8 @@ int
 __wt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx);
 int
 __wt_db_verify(DB *db, u_int32_t flags);
+int
+__wt_db_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits);
 int
 __wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits);
 int

@@ -92,13 +92,10 @@ struct __wt_page {
 	u_int32_t    frags;			/* Number of fragments */
 	WT_PAGE_HDR *hdr;			/* The on-disk page */
 
-	WT_PAGE	*parent;			/* Parent page */
-
 	u_int8_t ref;				/* Reference count */
 	TAILQ_ENTRY(__wt_page) q;		/* LRU queue */
 	TAILQ_ENTRY(__wt_page) hq;		/* Hash queue */
 
-	u_int8_t *first_data;			/* First data byte address */
 	u_int8_t *first_free;			/* First free byte address */
 	u_int32_t space_avail;			/* Available page memory */
 
@@ -116,6 +113,11 @@ struct __wt_page {
 
 	u_int32_t flags;
 };
+
+/* Macro to walk the indexes of an in-memory page. */
+#define	WT_INDX_FOREACH(page, ip, i)					\
+	for ((i) = 0,							\
+	    (ip) = (page)->indx; (i) < (page)->indx_count; ++(ip), ++(i))
 
 /*
  * The database itself needs a chunk of memory that describes it.   Here's
@@ -306,7 +308,7 @@ struct __wt_item {
 
 /* WT_ITEM_FOREACH is a for loop that walks the items on a page */
 #define	WT_ITEM_FOREACH(page, item, i)					\
-	for ((item) = (WT_ITEM *)(page)->first_data,			\
+	for ((item) = (WT_ITEM *)WT_PAGE_BYTE(page),			\
 	    (i) = (page)->hdr->u.entries;				\
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))		\
 
