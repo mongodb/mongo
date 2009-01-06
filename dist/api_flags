@@ -66,6 +66,7 @@ Dbt
 
 db_file_read
 	NO_CHECKSUM			# Don't verify the checksum on reading
+	NO_INMEM_PAGE			# Don't build the in-memory page
 
 db_file_write
 	MODIFIED			# Page is modified
