@@ -26,7 +26,6 @@ extern "C" {
 #define	WT_FRAG_MINIMUM_SIZE		(512)		/* 512B */
 #define	WT_FRAG_DEFAULT_SIZE		(2048)		/* 2KB */
 #define	WT_PAGE_DEFAULT_SIZE		(32768)		/* 32KB */
-#define	WT_CACHE_DEFAULT_SIZE		(20 * MEGABYTE)	/* 20MB */
 
 /* Convert a file address into a byte offset. */
 #define	WT_FRAGS_TO_BYTES(db, frags)					\
@@ -41,11 +40,8 @@ extern "C" {
 	((db)->pagesize / (db)->fragsize)
 
 /* Return the fragments needed for an overflow item. */
-#define	WT_OVERFLOW_BYTES_TO_FRAGS(db, len, frags) {			\
-	off_t __bytes;							\
-	 __bytes = (len) + sizeof(WT_PAGE_HDR);				\
-	 (frags) = WT_BYTES_TO_FRAGS(db, __bytes);			\
-}
+#define	WT_OVFL_BYTES_TO_FRAGS(db, len)					\
+	 WT_BYTES_TO_FRAGS(db, (len) + sizeof(WT_PAGE_HDR))
 
 /*
  * The first possible address is 0 (well, duh -- it's just strange to
@@ -88,9 +84,10 @@ typedef	struct __wt_indx {
 } WT_INDX;
 
 struct __wt_page {
+	u_int32_t    fileid;			/* File ID */
 	u_int32_t    addr;			/* File block address */
 	u_int32_t    frags;			/* Number of fragments */
-	WT_PAGE_HDR *hdr;			/* The on-disk page */
+	WT_PAGE_HDR *hdr;			/* On-disk page */
 
 	u_int8_t ref;				/* Reference count */
 	TAILQ_ENTRY(__wt_page) q;		/* LRU queue */
