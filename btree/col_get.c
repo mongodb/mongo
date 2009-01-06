@@ -63,6 +63,7 @@ static int
 __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 {
 	IDB *idb;
+	WT_INDX *ip;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, base, indx, limit;
@@ -86,13 +87,19 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		/*
 		 * Do a binary search of the page -- this loop needs to be
 		 * tight.
-		 *
-		 * We don't have to handle overflow keys here, overflow keys
-		 * are always instantiated into internal pages.
 		 */
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
+
+			/*
+			 * If the key is an overflow, it may not have been
+			 * instantiated yet.
+			 */
+			ip = page->indx + indx;
+			if (ip->data == NULL && (ret =
+			    __wt_db_ovfl_copy_to_indx(db, page, ip)) != 0)
+				goto err;
 
 			/*
 			 * If we're about to compare an application key with
@@ -103,8 +110,7 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 * the tree.
 			 */
 			if (indx != 0 || isleaf) {
-				cmp = db->btree_compare(
-				    db, key, (DBT *)(page->indx + indx));
+				cmp = db->btree_compare(db, key, (DBT *)ip);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -124,10 +130,10 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		if (cmp == 0) {
 			if (isleaf) {
 				*pagep = page;
-				*indxp = page->indx + indx;
+				*indxp = ip;
 				return (0);
 			} else
-				addr = (page->indx + indx)->addr;
+				addr = ip->addr;
 		} else {
 			/*
 			 * Base is the smallest index greater than key and may
@@ -152,4 +158,7 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			break;
 	}
 	return (WT_NOTFOUND);
+
+err:	(void)__wt_db_page_out(db, page, 0);
+	return (ret);
 }
