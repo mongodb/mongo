@@ -18,12 +18,11 @@ int
 __wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 {
 	WT_PAGE *page;
-	u_int32_t frags;
 	int ret;
 
 	/* Allocate a chunk of file space. */
-	WT_OVERFLOW_BYTES_TO_FRAGS(db, dbt->size, frags);
-	if ((ret = __wt_db_page_alloc(db, frags, &page)) != 0)
+	if ((ret = __wt_cache_db_alloc(
+	    db, WT_OVFL_BYTES_TO_FRAGS(db, dbt->size), &page)) != 0)
 		return (ret);
 
 	/* Initialize the page and copy the overflow item in. */
@@ -37,7 +36,7 @@ __wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 	*addrp = page->addr;
 
 	/* Write the overflow item back to the file. */
-	return (__wt_db_page_out(db, page, WT_MODIFIED));
+	return (__wt_cache_db_out(db, page, WT_MODIFIED));
 }
 
 /*
@@ -51,12 +50,12 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 {
 	DBT dbt;
 	WT_PAGE *ovfl_page;
-	u_int32_t frags;
 	int ret, tret;
 
 	/* Read in the overflow record. */
-	WT_OVERFLOW_BYTES_TO_FRAGS(db, from->len, frags);
-	if ((ret = __wt_db_page_in(db, from->addr, frags, &ovfl_page, 0)) != 0)
+	
+	if ((ret = __wt_cache_db_in(db, from->addr,
+	    WT_OVFL_BYTES_TO_FRAGS(db, from->len), &ovfl_page, 0)) != 0)
 		return (ret);
 
 	/*
@@ -70,7 +69,7 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 	copy->len = from->len;
 
 	/* Discard the overflow record. */
-	if ((tret = __wt_db_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_cache_db_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -84,17 +83,16 @@ int
 __wt_db_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 {
 	WT_PAGE *ovfl_page;
-	u_int32_t frags;
 	int ret, tret;
 
-	WT_OVERFLOW_BYTES_TO_FRAGS(db, ovfl->len, frags);
-	if ((ret = __wt_db_page_in(db, ovfl->addr, frags, &ovfl_page, 0)) != 0)
+	if ((ret = __wt_cache_db_in(db, ovfl->addr,
+	    WT_OVFL_BYTES_TO_FRAGS(db, ovfl->len), &ovfl_page, 0)) != 0)
 		return (ret);
 
 	ret = __wt_datalen_copy_to_dbt(
 	    db, WT_PAGE_BYTE(ovfl_page), ovfl->len, copy);
 
-	if ((tret = __wt_db_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_cache_db_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -108,18 +106,17 @@ int
 __wt_db_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
 {
 	WT_PAGE *ovfl_page;
-	u_int32_t frags;
 	int ret, tret;
 
-	WT_OVERFLOW_BYTES_TO_FRAGS(db, ip->size, frags);
-	if ((ret = __wt_db_page_in(db, ip->addr, frags, &ovfl_page, 0)) != 0)
+	if ((ret = __wt_cache_db_in(db, ip->addr,
+	    WT_OVFL_BYTES_TO_FRAGS(db, ip->size), &ovfl_page, 0)) != 0)
 		return (ret);
 
 	if ((ret = __wt_realloc(db->ienv, ip->size, &ip->data)) != 0)
 		return (ret);
 	memcpy(ip->data, WT_PAGE_BYTE(ovfl_page), ip->size);
 
-	if ((tret = __wt_db_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_cache_db_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	F_SET(ip, WT_ALLOCATED);
