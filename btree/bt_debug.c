@@ -50,28 +50,33 @@ __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 		fp = stdout;
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		/*
-		 * Read a database page of information.   The one nasty case
-		 * is if it turns out to be an overflow page.  In which case,
-		 * find out how bit it really is, and then re-read the right
-		 * size.
-		 */
+		/* Read a database page of information. */
 		frags = WT_FRAGS_PER_PAGE(db);
-		if ((ret = __wt_db_page_in(
+		if ((ret = __wt_cache_db_in(
 		    db, addr, frags, &page, WT_NO_CHECKSUM)) != 0)
 			break;
+
+		/*
+		 * Check for overflow pages.  Reads of overflow pages from
+		 * the disk may not be the right length.  (If we read the
+		 * page out of the cache, it will be OK, it's only if it
+		 * was read from the disk that it might be wrong.)  Check
+		 * the length, and if it's incorrect, discard this page and
+		 * get the right one.
+		 */
 		if (page->hdr->type == WT_PAGE_OVFL) {
 			frags = WT_BYTES_TO_FRAGS(db, page->hdr->u.datalen);
-			 if ((ret = __wt_db_page_out(db, page, 0)) != 0)
-				break;
-			if ((ret = __wt_db_page_in(
-			    db, addr, frags, &page, WT_NO_CHECKSUM)) != 0)
+			if (frags != page->frags && (
+			    (ret = __wt_cache_db_out(
+			    db, page, WT_DISCARD)) != 0 ||
+			    (ret = __wt_cache_db_in(
+			    db, addr, frags, &page, WT_NO_CHECKSUM)) != 0))
 				break;
 		}
 
 		ret = __wt_db_dump_page(db, page, NULL, fp);
 
-		if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
+		if ((tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
 			ret = tret;
 
 		addr += frags;
@@ -96,12 +101,12 @@ __wt_db_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	int ret, tret;
 
 	if ((ret =
-	    __wt_db_page_in(db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+	    __wt_cache_db_in(db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 		return (ret);
 
 	ret = __wt_db_dump_page(db, page, ofile, fp);
 
-	if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -228,7 +233,6 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 	WT_ITEM_OVFL *item_ovfl;
 	WT_ITEM_OFFP *item_offp;
 	WT_PAGE *page;
-	u_int32_t frags;
 
 	switch (item->type) {
 	case WT_ITEM_KEY:
@@ -242,11 +246,12 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		item_ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)item_ovfl->addr, (u_long)item_ovfl->len);
-		WT_OVERFLOW_BYTES_TO_FRAGS(db, item_ovfl->len, frags);
-		if (__wt_db_page_in(
-		    db, item_ovfl->addr, frags, &page, 0) == 0) {
+		
+		if (__wt_cache_db_in(db, item_ovfl->addr,
+		    WT_OVFL_BYTES_TO_FRAGS(db, item_ovfl->len),
+		    &page, 0) == 0) {
 			__wt_db_print(WT_PAGE_BYTE(page), item_ovfl->len, fp);
-			(void)__wt_db_page_out(db, page, 0);
+			(void)__wt_cache_db_out(db, page, 0);
 		}
 		break;
 	case WT_ITEM_OFFPAGE:
