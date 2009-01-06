@@ -73,6 +73,16 @@ struct __dbt {
  * Database handle
  *******************************************/
 struct __db {
+	/*
+	 * !!!
+	 * Explicit representations of structures from queue.h.
+	 * TAILQ_ENTRY(__db) q;
+	 */
+	struct {			/* Linked list of DB handles */
+		struct __db *tqe_next;
+		struct __db **tqe_prev;
+	} q;
+
 	IDB *idb;			/* Private object */
 
 	ENV *env;			/* Enclosing environment */
@@ -176,6 +186,17 @@ struct __dbc {
 struct __env {
 	IENV *ienv;			/* Private object */
 
+					/* Linked list of databases */
+	/*
+	 * !!!
+	 * Explicit representations of structures from queue.h.
+	 * TAILQ_HEAD(__wt_idb_qh, __db) dbqh;
+	 */
+	struct __wt_idb_qh {
+		struct __db *tqh_first;
+		struct __db **tqh_last;
+	} dbqh;
+
 	WT_STATS *stats;		/* Statistics */
 
 	/*
@@ -220,6 +241,12 @@ struct __env {
 	    ENV *, int, const char *, ...);
 	void (*errx)(
 	    ENV *, const char *, ...);
+	int (*open)(
+	    ENV *, const char *, mode_t, u_int32_t);
+	int (*stat_clear)(
+	    ENV *, u_int32_t);
+	int (*stat_print)(
+	    ENV *, FILE *, u_int32_t);
 	/*
 	 * Env handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -245,6 +272,7 @@ char	*wt_strerror(int);
 #define	WT_ALLOCATED					0x00000002
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
+#define	WT_DISCARD					0x00000002
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MAXKEY_NOTSET				0x00000002
 #define	WT_MODIFIED					0x00000001
@@ -271,15 +299,18 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_ENV					0x00000000
 #define	WT_APIMASK_ENV_CLOSE				0x00000000
 #define	WT_APIMASK_ENV_DESTROY				0x00000000
+#define	WT_APIMASK_ENV_OPEN				0x00000000
+#define	WT_APIMASK_ENV_STAT_CLEAR			0x00000000
+#define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
 #define	WT_APIMASK_ENV_VERBOSE				0x00000003
 #define	WT_APIMASK_IDB					0x00000001
 #define	WT_APIMASK_IENV					0x00000000
-#define	WT_APIMASK_WT_INDX				0x00000002
-#define	WT_APIMASK_WT_PAGE				0x00000003
-#define	WT_APIMASK_DB_FILE_READ				0x00000003
-#define	WT_APIMASK_DB_FILE_WRITE			0x00000001
+#define	WT_APIMASK_WT_CACHE_DB_IN			0x00000003
+#define	WT_APIMASK_WT_CACHE_DB_OUT			0x00000003
 #define	WT_APIMASK_WT_DB_CREATE				0x00000000
 #define	WT_APIMASK_WT_ENV_CREATE			0x00000000
+#define	WT_APIMASK_WT_INDX				0x00000002
+#define	WT_APIMASK_WT_PAGE				0x00000003
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api.py.
