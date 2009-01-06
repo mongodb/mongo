@@ -294,7 +294,7 @@ public:
             char * temp;
             
             // TODO: this is how i guess if something is a number.  pretty lame right now
-            float number = strtof( val , &temp );
+            double number = strtod( val , &temp );
             if ( temp != val )
                 queryBuilder.append( field , number );
             else 
