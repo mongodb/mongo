@@ -27,7 +27,7 @@
 
 /* --- dbclientcommands --- */
 
-BSONObj ismastercmdobj = fromjson("{ismaster:1}");
+BSONObj ismastercmdobj = fromjson("{\"ismaster\":1}");
 
 BSONObj DBClientWithCommands::cmdIsMaster(bool& isMaster) {
     BSONObj o = findOne("admin.$cmd", ismastercmdobj);

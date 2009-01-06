@@ -46,6 +46,7 @@ string BSONElement::toString() const {
     break;
     case NumberDouble:
     case NumberInt:
+        s.precision( 16 );
         s << fieldName() << ": " << number();
         break;
     case Bool:
@@ -99,6 +100,9 @@ string BSONElement::toString() const {
         s << fieldName() << " : ObjId(";
         s << oid() << ')';
         break;
+    case BinData:
+        s << fieldName() << " : BinData";
+        break;
     default:
         s << fieldName() << ": ?type=" << type();
         break;
@@ -151,13 +155,13 @@ string escape( string s ) {
 
 typedef boost::archive::iterators::base64_from_binary
     < boost::archive::iterators::transform_width
-    < string::const_iterator, 6, 8>
+    < string::const_iterator, 6, 8 >
     > base64_t;
 
 string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
     stringstream s;
     if ( includeFieldNames )
-        s << '"' << fieldName() << "\" : ";    
+        s << '"' << escape( fieldName() ) << "\" : ";    
     switch ( type() ) {
         case String:
         case Symbol:
@@ -165,10 +169,9 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
             break;
         case NumberInt:
         case NumberDouble:
-            if ( number() == 0 || 
-                 ( number() >= numeric_limits< double >::min() &&
-                   number() <= numeric_limits< double >::max() ) ){
-                s.precision( 50 );
+            if ( number() >= -numeric_limits< double >::max() &&
+                number() <= numeric_limits< double >::max() ) {
+                s.precision( 16 );
                 s << number();
             } else {
                 stringstream ss;
@@ -262,7 +265,7 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
                 s << "{ \"$regex\" : \"";
             else
                 s << "/";
-            s << regex();
+            s << escape( regex() );
             if ( format == Strict )
                 s << "\", \"$options\" : \"";
             else
@@ -434,7 +437,7 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
     case Array:
         return l.embeddedObject().woCompare( r.embeddedObject() );
     case DBRef:
-    {
+    case BinData: {
         int lsz = l.valuesize();
         int rsz = r.valuesize();
         if ( lsz - rsz != 0 ) return lsz - rsz;
@@ -447,11 +450,6 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
             return c;
         return strcmp(l.regexFlags(), r.regexFlags());
     }
-    case BinData:
-        // todo: just memcmp these.
-        cout << "compareElementValues: can't compare this type:" << (int) l.type() << endl;
-        assert(false);
-        break;
     default:
         cout << "compareElementValues: bad type " << (int) l.type() << endl;
         assert(false);

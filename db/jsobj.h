@@ -45,7 +45,6 @@ enum BSONType {MinKey=-1, EOO=0, NumberDouble=1, String=2, Object=3, Array=4, Bi
                NumberInt = 16,
                JSTypeMax=16,
                MaxKey=127
-
               };
 
 /* subtypes of BinData.
@@ -71,9 +70,9 @@ public:
         stringstream s;
         s << hex;
         s.fill( '0' );
-        s.width( 8 );
+        s.width( 16 );
         s << a;
-        s.width( 4 );
+        s.width( 8 );
         s << b;
         s << dec;
         return s.str();        
@@ -521,6 +520,13 @@ public:
         b.append(fieldName);
         b.append((void *) subObj.objdata(), subObj.objsize());
     }
+    
+    /* add a subobject as an array */
+    void appendArray(const char *fieldName, BSONObj subObj) {
+        b.append((char) Array);
+        b.append(fieldName);
+        b.append((void *) subObj.objdata(), subObj.objsize());
+    }
 
     void appendBool(const char *fieldName, int val) {
         b.append((char) Bool);
@@ -644,18 +650,18 @@ public:
         b.decouple();    // post done() call version.  be sure jsobj frees...
     }
 
+    static string numStr( int i ) {
+        stringstream o;
+        o << i;
+        return o.str();
+    }
+        
 private:
     // Append the provided arr object as an array.
     void marshalArray( const char *fieldName, const BSONObj &arr ) {
         b.append( (char) Array );
         b.append( fieldName );
         b.append( (void *) arr.objdata(), arr.objsize() );
-    }
-
-    string numStr( int i ) const {
-        stringstream o;
-        o << i;
-        return o.str();
     }
 
     char* _done() {
