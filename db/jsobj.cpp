@@ -265,7 +265,7 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
                 s << "{ \"$regex\" : \"";
             else
                 s << "/";
-            s << regex();
+            s << escape( regex() );
             if ( format == Strict )
                 s << "\", \"$options\" : \"";
             else

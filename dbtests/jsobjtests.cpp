@@ -742,6 +742,28 @@ namespace FromJsonTests {
         }        
     };
 
+    class RegexEscape : public Base {
+        virtual BSONObj bson() const {
+            BSONObjBuilder b;
+            b.appendRegex( "a", "\t", "c" );
+            return b.doneAndDecouple();
+        }
+        virtual string json() const {
+            return "{ \"a\" : { \"$regex\" : \"\\t\", \"$options\" : \"c\" } }";
+        }        
+    };
+
+    class RegexWithQuotes : public Base {
+        virtual BSONObj bson() const {
+            BSONObjBuilder b;
+            b.appendRegex( "a", "\"", "" );
+            return b.doneAndDecouple();
+        }
+        virtual string json() const {
+            return "{ \"a\" : /\"/ }";
+        }        
+    };
+    
 } // namespace FromJsonTests
     
 class All : public UnitTest::Suite {
@@ -802,6 +824,8 @@ public:
         add< FromJsonTests::BinDataPaddedDouble >();
         add< FromJsonTests::Date >();
         add< FromJsonTests::Regex >();
+        add< FromJsonTests::RegexEscape >();
+        add< FromJsonTests::RegexWithQuotes >();
     }
 };
 

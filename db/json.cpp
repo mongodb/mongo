@@ -344,7 +344,7 @@ struct dateEnd {
 struct regexValue {
     regexValue( ObjectBuilder &_b ) : b( _b ) {}
     void operator() ( const char *start, const char *end ) const {
-        b.regex = string( start, end );
+        b.regex = b.popString();
     }
     ObjectBuilder &b;    
 };
@@ -352,7 +352,7 @@ struct regexValue {
 struct regexOptions {
     regexOptions( ObjectBuilder &_b ) : b( _b ) {}
     void operator() ( const char *start, const char *end ) const {
-        b.regexOptions = string( start, end );
+        b.regexOptions = b.popString();
     }
     ObjectBuilder &b;    
 };
@@ -445,21 +445,27 @@ public:
             dateS = ch_p( '{' ) >> "\"$date\"" >> ':' >> uint_parser< unsigned long long >()[ dateValue( self.b ) ] >> '}';
             dateT = str_p( "Date" ) >> '(' >> uint_parser< unsigned long long >()[ dateValue( self.b ) ] >> ')';
 
-            // FIXME: Not unescaping regexp fields right now, since in the JS
-            // and TenGen formats there are no bracketing quotes and 'str' will
-            // not match.
-            // Obviously this should fixed up soon.
             regex = regexS | regexT;
-            regexS = ch_p( '{' ) >> "\"$regex\"" >> ':' >> regexValueS >> ',' >> "\"$options\"" >> ':' >> regexOptionsS >> '}';
-            regexValueS = lexeme_d[ '"' >> ( *( ~ch_p( '"' ) ) )[ regexValue( self.b ) ] >> '"' ];
-            regexOptionsS = lexeme_d[ '"' >> ( *( ~ch_p( '"' ) ) )[ regexOptions( self.b ) ] >> '"' ];
-            regexT = lexeme_d[ ch_p( '/' ) >>
-                              ( *( ~ch_p( '/' ) ) )[ regexValue( self.b ) ] >> '/' >>
-                              ( *( ~ch_p( ' ' ) ) )[ regexOptions( self.b ) ] ]; // assuming a space terminal is really gross, and tempoary.
+            regexS = ch_p( '{' ) >> "\"$regex\"" >> ':' >> str[ regexValue( self.b ) ] >> ',' >> "\"$options\"" >> ':' >> str[ regexOptions( self.b ) ] >> '}';
+            // FIXME Obviously it would be nice to unify this with str.
+            regexT = lexeme_d[ ch_p( '/' )[ chClear( self.b ) ] >>
+                           *( ( ch_p( "\\" ) >>
+                               ( ch_p( "\"" )[ chE( self.b ) ] |
+                                ch_p( "\\" )[ chE( self.b ) ] |
+                                ch_p( "/" )[ chE( self.b ) ] |
+                                ch_p( "b" )[ chE( self.b ) ] |
+                                ch_p( "f" )[ chE( self.b ) ] |
+                                ch_p( "n" )[ chE( self.b ) ] |
+                                ch_p( "r" )[ chE( self.b ) ] |
+                                ch_p( "t" )[ chE( self.b ) ] |
+                                ( ch_p( "u" ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
+                             ch_p( '\x7f' )[ ch( self.b ) ] |
+                             ( ~cntrl_p & ~ch_p( '/' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> str_p( "/" )[ regexValue( self.b ) ]
+                              >> ( *( alpha_p[ ch( self.b ) ] ) )[ regexOptions( self.b ) ] ];
         }
         rule< ScannerT > object, members, pair, array, elements, value, str, number,
             dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
-            regex, regexS, regexT, quotedOid, regexValueS, regexOptionsS;
+            regex, regexS, regexT, quotedOid;
         const rule< ScannerT > &start() const { return object; }
     };
     ObjectBuilder &b;
