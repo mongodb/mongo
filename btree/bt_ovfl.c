@@ -77,11 +77,11 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 }
 
 /*
- * __wt_db_ovfl_item_copy --
+ * __wt_db_ovfl_copy_to_dbt --
  *	Copy an overflow item into allocated memory in a DBT.
  */
 int
-__wt_db_ovfl_item_copy(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
+__wt_db_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 {
 	WT_PAGE *ovfl_page;
 	u_int32_t frags;
@@ -96,6 +96,34 @@ __wt_db_ovfl_item_copy(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 
 	if ((tret = __wt_db_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
+
+	return (ret);
+}
+
+/*
+ * __wt_db_ovfl_copy_to_indx --
+ *	Copy an overflow item into allocated memory in a WT_INDX
+ */
+int
+__wt_db_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
+{
+	WT_PAGE *ovfl_page;
+	u_int32_t frags;
+	int ret, tret;
+
+	WT_OVERFLOW_BYTES_TO_FRAGS(db, ip->size, frags);
+	if ((ret = __wt_db_page_in(db, ip->addr, frags, &ovfl_page, 0)) != 0)
+		return (ret);
+
+	if ((ret = __wt_realloc(db->ienv, ip->size, &ip->data)) != 0)
+		return (ret);
+	memcpy(ip->data, WT_PAGE_BYTE(ovfl_page), ip->size);
+
+	if ((tret = __wt_db_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
+		ret = tret;
+
+	F_SET(ip, WT_ALLOCATED);
+	F_SET(page, WT_ALLOCATED);
 
 	return (ret);
 }
