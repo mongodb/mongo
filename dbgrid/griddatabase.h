@@ -27,11 +27,13 @@
 
 class GridDatabase {
 public:
-    DBClientPaired conn;
+    DBClientWithCommands *conn;
+//    DBClientPaired conn;
     enum { Port = 27016 }; /* standard port # for a grid db */
     GridDatabase();
+    ~GridDatabase();
     string toString() {
-        return conn.toString();
+        return conn->toString();
     }
 
     /* call at startup, this will initiate connection to the grid db */

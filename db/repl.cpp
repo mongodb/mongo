@@ -1136,6 +1136,9 @@ void startReplication() {
        */
     //boost::thread tempt(tempThread);
 
+    if( !slave && !master && !replPair )
+        return;
+
     {
         dblock lk;
         pairSync->init();

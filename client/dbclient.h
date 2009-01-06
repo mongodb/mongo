@@ -147,10 +147,13 @@ public:
     */
     virtual
     BSONObj cmdIsMaster(bool& isMaster);
+
+    virtual string toString() = 0; 
 };
 
 class DBClientPaired;
 
+/* A basic connection to the database. */
 class DBClientConnection : public DBClientWithCommands {
     DBClientPaired *clientPaired;
     auto_ptr<MessagingPort> p;
@@ -167,7 +170,7 @@ public:
         if ( failed ) ss << " failed";
         return ss.str();
     }
-    string toString() const {
+    string toString() {
         return serverAddress;
     }
     MessagingPort& port() {
