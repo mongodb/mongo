@@ -23,19 +23,18 @@
 using namespace boost::spirit;
 
 struct ObjectBuilder {
-    BSONObjBuilder *back() { return builders.back(); }
+    BSONObjBuilder *back() { return builders.back().get(); }
     // Storage for field names of elements within builders.back().
     const char *fieldName() { return fieldNames.back().c_str(); }
     void push() {
-        builders.push_back( new BSONObjBuilder() );
+        boost::shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+        builders.push_back( b );
         fieldNames.push_back( "" );
         indexes.push_back( 0 );
     }
     BSONObj pop() {
-        BSONObjBuilder *b = builders.back();
+        BSONObj ret = back()->doneAndDecouple();
         builders.pop_back();
-        BSONObj ret = b->doneAndDecouple();
-        free( b );
         fieldNames.pop_back();
         indexes.pop_back();
         return ret;
@@ -48,7 +47,8 @@ struct ObjectBuilder {
         ss.str( "" );
         return ret;
     }
-    vector< BSONObjBuilder* > builders;
+    // Cannot use auto_ptr because its copy constructor takes a non const reference.
+    vector< boost::shared_ptr< BSONObjBuilder > > builders;
     vector< string > fieldNames;
     vector< int > indexes;
     stringstream ss;

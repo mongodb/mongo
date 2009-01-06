@@ -273,6 +273,7 @@ inline void our_debug_free(void *p) {
 #include <boost/archive/iterators/transform_width.hpp>
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/shared_ptr.hpp>
 #define BOOST_SPIRIT_THREADSAFE
 //#define BOOST_SPIRIT_DEBUG
 #include <boost/spirit/core.hpp>
