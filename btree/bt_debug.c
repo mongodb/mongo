@@ -175,8 +175,7 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 	else
 		fprintf(fp, "nextaddr %lu", (u_long)hdr->nextaddr);
 
-	fprintf(fp, "\nfirst-data %#lx, first-free %#lx, space avail: %lu\n",
-	    (u_long)page->first_data,
+	fprintf(fp, "\nfirst-free %#lx, space avail: %lu\n",
 	    (u_long)page->first_free, (u_long)page->space_avail);
 
 	fprintf(fp, "}\n");
