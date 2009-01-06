@@ -158,7 +158,7 @@ public:
     }
     
     void setInitialSyncCompleted() {
-        BSONObj o = fromjson("{initialsynccomplete:1}");
+        BSONObj o = fromjson("{\"initialsynccomplete\":1}");
         putSingleton("local.pair.sync", o);
         initialsynccomplete = 1;
     }
@@ -167,7 +167,7 @@ public:
         if ( initialsynccomplete == 1 )
             return;
         dblock lk;
-        BSONObj o = fromjson("{initialsynccomplete:1}");
+        BSONObj o = fromjson("{\"initialsynccomplete\":1}");
         putSingleton("local.pair.sync", o);
         initialsynccomplete = 1;
     }
