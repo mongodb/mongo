@@ -315,7 +315,6 @@ void pipeSigHandler( int signal );
 
 int main(int argc, char* argv[], char *envp[] )
 {
-
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
     
     {

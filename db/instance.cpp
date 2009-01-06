@@ -528,14 +528,14 @@ bool DirectConnector::send( Message &toSend, Message &response, bool assertOk ){
 /* not using log() herein in case we are called from segvhandler and we were already locked */
 #undef exit
 void dbexit(int rc, const char *why) {
-    cout << "  dbexit: " << why << "; flushing op log and files" << endl;
+    cout << "dbexit: " << why << "; flushing op log and files" << endl;
     flushOpLog();
 
     /* must do this before unmapping mem or you may get a seg fault */
     closeAllSockets();
 
     MemoryMappedFile::closeAllFiles();
-    cout << "  dbexit: really exiting now" << endl;
+    cout << "dbexit: really exiting now" << endl;
     exit(rc);
 }
 

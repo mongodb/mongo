@@ -88,9 +88,9 @@ public:
         return *this;
     }
     Logstream& prolog(bool withNs = false) {
-        time_t t;
-        time(&t);
-        string now(ctime(&t),0,20);
+        char now[64];
+        time_t_to_String(time(0), now);
+        now[20] = 0;
 
         boostlock lk(mutex);
         cout << now;
