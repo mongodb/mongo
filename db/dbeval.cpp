@@ -70,6 +70,7 @@ bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg
         res = s.invoke(f);
         int m = t.millis();
         if ( m > 100 ) {
+            stdcout() << "TEMP: dbeval too slow:" << endl;
             problem() << "dbeval time: " << dec << m << "ms " << ns << endl;
             OCCASIONALLY log() << code << endl;
             else if ( m >= 1000 ) log() << code << endl;

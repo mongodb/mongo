@@ -495,20 +495,6 @@ void getDatabaseNames( vector< string > &names ) {
     }
 }
 
-#undef exit
-void dbexit(int rc, const char *why) {
-    log() << "  dbexit: " << why << "; flushing op log and files" << endl;
-    flushOpLog();
-
-    /* must do this before unmapping mem or you may get a seg fault */
-    closeAllSockets();
-
-    MemoryMappedFile::closeAllFiles();
-    log() << "  dbexit: really exiting now" << endl;
-    exit(rc);
-}
-
-
 auto_ptr<DBClientCursor> DBDirectClient::query(const char *ns, BSONObj query, int nToReturn , int nToSkip ,
                                                BSONObj *fieldsToReturn , int queryOptions ){
     
@@ -538,3 +524,18 @@ bool DirectConnector::send( Message &toSend, Message &response, bool assertOk ){
     response = *dbResponse.response;
     return true;
 }
+
+/* not using log() herein in case we are called from segvhandler and we were already locked */
+#undef exit
+void dbexit(int rc, const char *why) {
+    cout << "  dbexit: " << why << "; flushing op log and files" << endl;
+    flushOpLog();
+
+    /* must do this before unmapping mem or you may get a seg fault */
+    closeAllSockets();
+
+    MemoryMappedFile::closeAllFiles();
+    cout << "  dbexit: really exiting now" << endl;
+    exit(rc);
+}
+

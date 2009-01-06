@@ -279,4 +279,3 @@ using namespace boost::filesystem;
 
 #include "util/goodies.h"
 #include "util/log.h"
-

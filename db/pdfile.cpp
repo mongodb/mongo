@@ -69,7 +69,6 @@ void sayDbContext(const char *errmsg) {
     if ( errmsg ) {
         problem() << errmsg << endl;
     }
-    log() << ' ' << getDbContext() << '\n';
     printStackTrace();
 }
 
