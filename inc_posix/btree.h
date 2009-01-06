@@ -136,6 +136,7 @@ struct __wt_page_desc {
 	u_int32_t free_addr;		/* 28-31: Freelist fragment */
 	u_int32_t unused[8];		/* 32-63: Spare */
 };
+
 /*
  * WT_DESC_SIZE is the expected WT_DESC size --  we check this on startup
  * to make sure the compiler hasn't inserted padding (which would break
@@ -231,7 +232,9 @@ struct __wt_page_hdr {
 
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.  Note the correction
- * for page addr of 0, the first fragment.
+ * for page addr of 0, the first fragment.   It would be simpler to put this at
+ * the end of the page, but that would make it more difficult to figure out the
+ * page size in a just opened database.
  */
 #define	WT_PAGE_BYTE(page)						\
 	(((u_int8_t *)(page)->hdr) +					\
