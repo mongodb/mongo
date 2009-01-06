@@ -167,6 +167,14 @@ struct chU {
     ObjectBuilder &b;
 };
 
+struct chClear {
+    chClear( ObjectBuilder &_b ) : b( _b ) {}
+    void operator() ( const char c ) const {
+        b.popString();
+    }
+    ObjectBuilder &b;
+};
+
 struct fieldNameEnd {
     fieldNameEnd( ObjectBuilder &_b ) : b( _b ) {}
     void operator() ( const char *start, const char *end ) const {
@@ -399,18 +407,19 @@ public:
                 lexeme_d[ str_p( "false" ) ][ falseValue( self.b ) ] |
                 lexeme_d[ str_p( "null" ) ][ nullValue( self.b ) ];
             // lexeme_d and rules don't mix well, so we have this mess
-            str = lexeme_d[ '"' >> *( ( ch_p( "\\" ) >>
-                                        ( ch_p( "\"" )[ chE( self.b ) ] |
-                                          ch_p( "\\" )[ chE( self.b ) ] |
-                                          ch_p( "/" )[ chE( self.b ) ] |
-                                          ch_p( "b" )[ chE( self.b ) ] |
-                                          ch_p( "f" )[ chE( self.b ) ] |
-                                          ch_p( "n" )[ chE( self.b ) ] |
-                                          ch_p( "r" )[ chE( self.b ) ] |
-                                          ch_p( "t" )[ chE( self.b ) ] |
-                                          ( ch_p( "u" ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
-                                        ch_p( '\x7f' )[ ch( self.b ) ] |
-                                        ( ~cntrl_p & ~ch_p( '\"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
+            str = lexeme_d[ ch_p( '"' )[ chClear( self.b ) ] >>
+                           *( ( ch_p( "\\" ) >>
+                              ( ch_p( "\"" )[ chE( self.b ) ] |
+                                ch_p( "\\" )[ chE( self.b ) ] |
+                                ch_p( "/" )[ chE( self.b ) ] |
+                                ch_p( "b" )[ chE( self.b ) ] |
+                                ch_p( "f" )[ chE( self.b ) ] |
+                                ch_p( "n" )[ chE( self.b ) ] |
+                                ch_p( "r" )[ chE( self.b ) ] |
+                                ch_p( "t" )[ chE( self.b ) ] |
+                                ( ch_p( "u" ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
+                                ch_p( '\x7f' )[ ch( self.b ) ] |
+                                ( ~cntrl_p & ~ch_p( '\"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
             // real_p accepts numbers with nonsignificant zero prefixes, which
             // aren't allowed in JSON.  Oh well.
             number = real_p[ numberValue( self.b ) ];
