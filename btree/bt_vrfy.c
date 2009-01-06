@@ -36,12 +36,12 @@ __wt_db_verify(DB *db, u_int32_t flags)
 
 	/*
 	 * Allocate a bit array to represent the fragments in the file --
-	 * that's how we keep track of the fragments we've visited and the
-	 * ones yet to visit.   Storing this on the heap seems reasonable:
-	 * a 16GB file of 512B frags, where we track 8 frags per allocated
-	 * byte, means we allocate 4MB for the bit array.   If we have to
-	 * verify larger files than we can track this way, we'd have to write
-	 * parts of the bit array into a file somewhere.
+	 * it's how we keep track of the fragments we've visited.  Storing
+	 * this on the heap seems reasonable: a 16GB file of 512B frags,
+	 * where we track 8 frags per allocated byte, means we allocate 4MB
+	 * for the bit array.   If we have to verify larger files than we
+	 * can track this way, we'd have to write parts of the bit array
+	 * into a file somewhere.
 	 *
 	 * !!!
 	 * There's one portability issue -- the bitstring package uses "ints",
@@ -57,11 +57,11 @@ __wt_db_verify(DB *db, u_int32_t flags)
 	if ((ret = bit_alloc(ienv, idb->frags, &fragbits)) != 0)
 		return (ret);
 
-	/* Get the root and walk the tree. */
+	/* Get the root address. */
 	if ((ret = __wt_db_desc_read(db, &desc)) != 0)
 		goto err;
 
-	/* If the root address has never been set, it's a one-page database. */
+	/* If no root address has been set, it's a one-leaf-page database. */
 	if (desc.root_addr == WT_ADDR_INVALID) {
 		if ((ret = __wt_db_page_in(db,
 		    WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
@@ -83,54 +83,387 @@ err:	__wt_free(ienv, fragbits);
 
 /*
  * __wt_db_verify_level --
- *	Verify one level of a tree.
+ *	Verify a level of a tree.
  */
 static int
 __wt_db_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits)
 {
-	WT_PAGE *page;
+	WT_PAGE *page, *prev;
+	WT_PAGE_HDR *hdr;
+	WT_INDX *page_indx, *prev_indx;
 	u_int32_t descend_addr;
+	int (*func)(DB *, const DBT *, const DBT *);
 	int first, ret, tret;
 
 	descend_addr = WT_ADDR_INVALID;
 
 	/*
-	 * Verify a level of the tree -- we are passed the address of the
-	 * left-most page in the level.   We do it this way because while
-	 * I don't mind bouncing around the tree for the internal pages,
-	 * I want to read the leaf pages in contiguous order.
+	 * The plan is pretty simple.  We read through the levels of the tree,
+	 * from top to bottom (root level to leaf level), and from left to
+	 * right (smallest to greatest), verifying each page as we go.  After
+	 * a page is verified, we know that it is correctly formed, and any
+	 * keys it contains are correctly ordered.  After we verify a page, we
+	 * check its connections.
+	 *
+	 * Most connection checks are done in the __wt_db_verify_connections
+	 * function, but one of them is done here.  The following comment
+	 * describes the entire process of connection checking.  Imagine the
+	 * following tree:
+	 *
+	 *	P1 - I1
+	 *	P2
+	 *	P3
+	 *	|    |
+	 *	P4 - I2
+	 *	P5
+	 *	P6
+	 *	|    |
+	 *	P7 - I3
+	 *	P8
+	 *	P9
+	 *
+	 * After page verification, we know the page is OK, and now all we
+	 * need to do is confirm that the tree itself is well formed.
+	 *
+	 * When walking each internal page level (I 1-3), we confirm the first
+	 * key on each page is greater than the last key on the previous page.
+	 * For example, we check that I2/K1 is greater than I1/K*, and I3/K1 is
+	 * greater than I2/K*.  This check is safe as we verify the pages in
+	 * list order.  That is the only check done in this function, the other
+	 * connection checks are done in __wt_db_verify_connections.
+	 *
+	 * When walking internal or leaf page levels (I 1-3, and later P 1-9),
+	 * we confirm the first key on each page is greater than or equal its
+	 * the referencing key on the parent page.  In other words, somewhere
+	 * on I1 is a key referencing P 1-3.  When verifying P 1-3, we check
+	 * that internal key against the first key on P 1-3.  We also check
+	 * the subsequent key in the internal level is greater than the last
+	 * key on the page.   So, in the example, key 2 in I1 references P2.
+	 * The check is that I1/K2 is less than the P2/K1, and I1/K3 is greater
+	 * than P2/K*.
+	 *
+	 * The boundary cases are where the internal key is the first or last
+	 * key on the page.
+	 *
+	 * If the key is the first key on the internal page, there are two
+	 * cases: First, the key may be the first key in the level (I1/K1 in
+	 * the example).  In this case, we confirm the referenced key in P1
+	 * is the first key in its level.  Second, if the key is not the first
+	 * key in the level (I2/K1, or I3/K1 in the example).  In this case,
+	 * there is again, no work to be done -- the above check that the first
+	 * key in each internal page sorts after the last key in the previous
+	 * internal page guarantees the referenced key in P1 is correct with
+	 * respect to the previous page on the internal level.
+	 *
+	 * If the key is the last key on the internal page, there are two
+	 * cases: First, the key may be the last key in the level (I3/K* in
+	 * the example).  In this case, we confirm the referenced key in P1
+	 * is the last key in its level.  Second, if the key is not the first
+	 * key in the level (I1/K*, or I2/K* in the example).   In this case,
+	 * we check the referenced key in the page against the first key in
+	 * the subsequent page.  For example, P6/KN would be compared against
+	 * I3/K1.
+	 *
+	 * All of the connection checks are safe because we only look at the
+	 * previous pages on the current level or pages in higher levels of
+	 * the tree.
+	 *
+	 * We do it this way because, while I don't mind random access in the
+	 * tree for the internal pages, I want to read the tree's leaf pages
+	 * contiguously.  As long as the internal nodes for any single level
+	 * fit into the cache, we'll not have to move the disk heads except to
+	 * get the next page we're verifying.
 	 */
-	for (first = 1, page = NULL; addr != WT_ADDR_INVALID;) {
-		if ((ret = __wt_db_page_in(
-		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+	for (first = 1, page = prev = NULL;
+	    addr != WT_ADDR_INVALID;
+	    addr = hdr->nextaddr, prev = page, page = NULL) {
+		/* Get the next page. */
+		if ((ret = __wt_db_page_in(db, addr,
+		    WT_FRAGS_PER_PAGE(db), &page, WT_NO_INMEM_PAGE)) != 0)
 			return (ret);
 
+		/* Verify the page. */
+		if ((ret = __wt_db_verify_page(db, page, fragbits)) != 0)
+			goto err;
+
+		/*
+		 * If we're walking an internal page, we'll want to descend
+		 * to the first offpage in this level, save the address for
+		 * the next iteration.
+		 */
+		hdr = page->hdr;
 		if (first) {
-			/*
-			 * We'll want to descend to the first offpage in this
-			 * level, save the address for later.
-			 */
 			first = 0;
-			if (page->hdr->type == WT_PAGE_INT ||
-			    page->hdr->type == WT_PAGE_DUP_INT)
-				__wt_first_offp_addr(page, &descend_addr);
+			 if (hdr->type == WT_PAGE_INT ||
+			     hdr->type == WT_PAGE_DUP_INT)
+				 __wt_first_offp_addr(page, &descend_addr);
+
+			/*
+			 * Set the comparison function -- tucked away here
+			 * because we can't set it without knowing what the
+			 * page looks like, and we don't want to set it every
+			 * time through the loop.
+			 */
+			if (hdr->type == WT_PAGE_DUP_INT ||
+			    hdr->type == WT_PAGE_DUP_LEAF)
+				func = db->dup_compare;
+			else
+				func = db->btree_compare;
 		}
 
-		ret = __wt_db_verify_page(db, page, fragbits);
+		/* The page is OK, instantiate its in-memory information. */
+		if ((ret = __wt_page_inmem(db, page)) != 0)
+			goto err;
 
-		addr = page->hdr->nextaddr;
+		/* Verify its connections. */
+		if ((ret = __wt_db_verify_connections(db, page, fragbits)) != 0)
+			goto err;
 
-		if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
-			ret = tret;
+		if (prev == NULL)
+			continue;
 
-		if (ret != 0)
-			return (ret);
+		/*
+		 * If we have a previous page, there's one more check, the last
+		 * key of the previous page against the first key of this page.
+		 *
+		 * The two keys we're going to compare may be overflow keys.
+		 */
+		prev_indx = prev->indx + (prev->indx_count - 1);
+		if (prev_indx->data == NULL &&
+		    (ret = __wt_db_ovfl_copy_to_indx(db, prev, prev_indx)) != 0)
+			goto err;
+		page_indx = page->indx;
+		if (page_indx->data == NULL &&
+		    (ret = __wt_db_ovfl_copy_to_indx(db, page, page_indx)) != 0)
+			goto err;
+		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
+			__wt_db_errx(db,
+			    "the first key on page at addr %lu does not sort "
+			    "after the last key on the previous page", 
+			    (u_long)addr);
+			goto err;
+		}
+
+		/* We're done with the previous page. */
+		if ((ret = __wt_db_page_out(db, prev, 0)) != 0)
+			goto err;
 	}
 
-	if (descend_addr != WT_ADDR_INVALID)
-		return (__wt_db_verify_level(db, descend_addr, fragbits));
+err:	if (prev != NULL &&
+	    (tret = __wt_db_page_out(db, prev, 0)) != 0 && ret == 0)
+		ret = tret;
+	if (page != NULL &&
+	    (tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
+		ret = tret;
 
-	return (0);
+	if (ret == 0 && descend_addr != WT_ADDR_INVALID)
+		ret = __wt_db_verify_level(db, descend_addr, fragbits);
+
+	return (ret);
+}
+
+/*
+ * __wt_db_verify_connections --
+ *	Verify that the page is in the right place in the tree.
+ */	
+int
+__wt_db_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
+{
+	WT_INDX *child_indx, *parent_indx;
+	WT_PAGE *parent;
+	WT_PAGE_DESC desc;
+	WT_PAGE_HDR *hdr;
+	u_int32_t addr, frags, i, nextaddr;
+	int (*func)(DB *, const DBT *, const DBT *);
+	int ret, tret;
+
+	parent = NULL;
+	hdr = child->hdr;
+	addr = child->addr;
+	frags = WT_FRAGS_PER_PAGE(db);
+	ret = 0;
+
+	/*
+	 * This function implements most of the connection checking in the
+	 * tree, but not all of it -- see the comment at the beginning of
+	 * the __wt_db_verify_level function for details.
+	 */
+
+	/* Root pages are special cases, they shouldn't point to anything. */
+	if (hdr->prntaddr == WT_ADDR_INVALID) {
+		if (hdr->prevaddr != WT_ADDR_INVALID ||
+		    hdr->nextaddr != WT_ADDR_INVALID) {
+			__wt_db_errx(db,
+			    "page at addr %lu has siblings, but no parent "
+			    "address",
+			    (u_long)addr);
+			return (WT_ERROR);
+		}
+
+		/*
+		 * If this is a primary root page, confirm the description
+		 * record points to the right place.
+		 */
+		if (hdr->type == WT_PAGE_INT) {
+			if ((ret = __wt_db_desc_read(db, &desc)) != 0)
+				return (ret);
+			if (desc.root_addr != addr) {
+				__wt_db_errx(db,
+				    "page at addr %lu has no parent",
+				    (u_long)addr);
+				return (WT_ERROR);
+			}
+		}
+		return (0);
+	}
+
+	/*
+	 * If it's not the root page, we need a copy of its parent page.
+	 *
+	 * First, check to make sure we've verified the parent page -- if we
+	 * haven't, there's a problem because we verified levels down the tree,
+	 * starting at the top.
+	 */
+	for (i = 0; i < frags; ++i)
+		if (!bit_test(fragbits, hdr->prntaddr + i)) {
+			__wt_db_errx(db,
+			    "parent of page at addr %lu not found on internal "
+			    "page links",
+			    (u_long)addr);
+			return (WT_ERROR);
+		}
+	if ((ret = __wt_db_page_in(db, hdr->prntaddr, frags, &parent, 0)) != 0)
+		return (ret);
+
+	/*
+	 * Search the parent for the reference to this page -- because we've
+	 * already verified this page, we can build the in-memory page info,
+	 * and use it in the search.
+	 */
+	WT_INDX_FOREACH(parent, parent_indx, i)
+		if (parent_indx->addr == addr)
+			break;
+	if (parent_indx == NULL) {
+		__wt_db_errx(db,
+		    "parent of page at addr %lu doesn't reference it",
+		    (u_long)addr);
+		goto err;
+	}
+
+	/* Set the comparison function. */
+	if (hdr->type == WT_PAGE_DUP_INT ||
+	    hdr->type == WT_PAGE_DUP_LEAF)
+		func = db->dup_compare;
+	else
+		func = db->btree_compare;
+
+	/*
+	 * Confirm the parent's key is less than or equal to the first key
+	 * on the child.
+	 *
+	 * If the parent's key is the smallest key on the page, check the
+	 * parent's previous page addr.  If the previous page addr is not
+	 * set (in other words, the parent is the smallest page on its level),
+	 * confirm that's also the case for the child.
+	 */
+	if (parent_indx == parent->indx) {
+		if (((hdr->prevaddr == WT_ADDR_INVALID &&
+		    parent->hdr->prevaddr != WT_ADDR_INVALID) ||
+		    (hdr->prevaddr != WT_ADDR_INVALID &&
+		    parent->hdr->prevaddr == WT_ADDR_INVALID))) {
+			__wt_db_errx(db,
+			    "parent of page at addr %lu is the smallest in its "
+			    "level, but the page is not the smallest in its "
+			    "level",
+			    (u_long)addr);
+			goto err;
+		}
+	} else {
+		/* The two keys we're going to compare may be overflow keys. */
+		child_indx = child->indx;
+		if (child_indx->data == NULL && (ret =
+		    __wt_db_ovfl_copy_to_indx(db, child, child_indx)) != 0)
+			goto err;
+		if (parent_indx->data == NULL && (ret =
+		    __wt_db_ovfl_copy_to_indx(db, parent, parent_indx)) != 0)
+			goto err;
+
+		/* Compare the parent's key against the child's key. */
+		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) < 0) {
+			__wt_db_errx(db,
+			    "the first key on page at addr %lu sorts before "
+			    "its reference key on its parent's page",
+			    (u_long)addr);
+			goto err;
+		}
+	}
+
+	/*
+	 * Confirm the parent's following key is greater than the last key
+	 * on the child.
+	 *
+	 * If the parent's key is the largest key on the page, look at the
+	 * parent's next page addr.  If the parent's next page addr is set,
+	 * confirm the first key on the page following the parent is greater
+	 * than the last key on the child.  If the parent's next page addr
+	 * is not set (in other words, the parent is the largest page on its
+	 * level), confirm that's also the case for the child.
+	 */
+	if (parent_indx == (parent->indx + (parent->indx_count - 1))) {
+		nextaddr = parent->hdr->nextaddr;
+		if ((hdr->nextaddr == WT_ADDR_INVALID &&
+		    nextaddr != WT_ADDR_INVALID) ||
+		    (hdr->nextaddr != WT_ADDR_INVALID &&
+		    nextaddr == WT_ADDR_INVALID)) {
+			__wt_db_errx(db,
+			    "parent of page at addr %lu is the largest in its "
+			    "level, but the page is not the largest in its "
+			    "level",
+			    (u_long)addr);
+			goto err;
+		}
+
+		/* Switch for the subsequent page at the parent level. */
+		if ((ret = __wt_db_page_out(db, parent, 0)) != 0)
+			return (ret);
+		if (nextaddr == WT_ADDR_INVALID)
+			parent = NULL;
+		else {
+			if ((ret = __wt_db_page_in(
+			    db, nextaddr, frags, &parent, 0)) != 0)
+				return (ret);
+			parent_indx = parent->indx;
+		}
+	} else
+		++parent_indx;
+
+	if (parent != NULL) {
+		/* The two keys we're going to compare may be overflow keys. */
+		child_indx = child->indx + (child->indx_count - 1);
+		if (child_indx->data == NULL && (ret =
+		    __wt_db_ovfl_copy_to_indx(db, child, child_indx)) != 0)
+			goto err;
+		if (parent_indx->data == NULL && (ret =
+		    __wt_db_ovfl_copy_to_indx(db, parent, parent_indx)) != 0)
+			goto err;
+		/* Compare the parent's key against the child's key. */
+		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) >= 0) {
+			__wt_db_errx(db,
+			    "the last key on page at addr %lu sorts after the "
+			    "first key on a parent page",
+			    (u_long)addr);
+			goto err;
+		}
+	}
+
+	if (0) {
+err:		ret = WT_ERROR;
+	}
+
+	if (parent != NULL &&
+	    (tret = __wt_db_page_out(db, parent, 0)) != 0 && ret == 0)
+		ret = tret;
+	return (ret);
 }
 
 /*
@@ -141,7 +474,7 @@ int
 __wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits)
 {
 	WT_PAGE_HDR *hdr;
-	u_int32_t addr;
+	u_int32_t addr, i;
 	int ret;
 
 	hdr = page->hdr;
@@ -151,12 +484,16 @@ __wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits)
 	 * If we're verifying the whole tree, complain if there's a page
 	 * we've already verified.
 	 */
-	if (fragbits != NULL)
-		if (bit_test(fragbits, addr))
-			__wt_db_errx(db,
-			    "page at addr %lu already verified", (u_long)addr);
-		else
-			bit_nset(fragbits, addr, addr + (page->frags - 1));
+	if (fragbits != NULL) {
+		for (i = 0; i < page->frags; ++i)
+			if (bit_test(fragbits, addr + i)) {
+				__wt_db_errx(db,
+				    "page at addr %lu already verified",
+				    (u_long)addr);
+				return (WT_ERROR);
+			}
+		bit_nset(fragbits, addr, addr + (page->frags - 1));
+	}
 
 	/*
 	 * FUTURE:
@@ -388,7 +725,7 @@ eop:			__wt_db_errx(db,
 		case WT_ITEM_DUP_OVFL:
 			current->indx = item_no;
 			current->item = &current->item_ovfl;
-			if ((ret = __wt_db_ovfl_item_copy(db, (WT_ITEM_OVFL *)
+			if ((ret = __wt_db_ovfl_copy_to_dbt(db, (WT_ITEM_OVFL *)
 			    WT_ITEM_BYTE(item), current->item)) != 0)
 				goto err;
 			break;
