@@ -23,19 +23,6 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags);
 void
 __wt_db_print(u_int8_t *data, u_int32_t len, FILE *stream);
 int
-__wt_db_page_open(IDB *idb);
-int
-__wt_db_page_sync(DB *db);
-int
-__wt_db_page_close(DB *db);
-int
-__wt_db_page_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep);
-int
-__wt_db_page_in(DB *db,
-    u_int32_t addr, u_int32_t frags, WT_PAGE **pagep, u_int32_t flags);
-int
-__wt_db_page_out(DB *db, WT_PAGE *page, u_int32_t flags);
-int
 __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
 int
 __wt_db_build_verify(void);
@@ -97,6 +84,23 @@ __wt_db_stat_clear(DB *db, u_int32_t flags);
 int
 __wt_db_sync(DB *db, u_int32_t flags);
 int
+__wt_cache_open(ENV *env);
+int
+__wt_cache_close(ENV *env);
+int
+__wt_cache_db_open(DB *db);
+int
+__wt_cache_db_close(DB *db);
+int
+__wt_cache_db_sync(DB *db);
+int
+__wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep);
+int
+__wt_cache_db_in(DB *db,
+    u_int32_t addr, u_int32_t frags, WT_PAGE **pagep, u_int32_t flags);
+int
+__wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags);
+int
 __wt_env_close(ENV *env, u_int32_t flags);
 void
 __wt_env_err(ENV *env, int error, const char *fmt, ...);
@@ -112,6 +116,10 @@ int
 __wt_env_lockout_err(ENV *env);
 int
 __wt_env_open(ENV *env, const char *home, mode_t mode, u_int32_t flags);
+int
+__wt_env_stat_print(ENV *env, FILE *fp, u_int32_t flags);
+int
+__wt_env_stat_clear(ENV *env, u_int32_t flags);
 void
 __wt_abort(IENV *ienv);
 int
@@ -163,6 +171,8 @@ void
 __wt_db_config_methods_lockout(DB *db);
 void
 __wt_db_config_methods_open(DB *db);
+u_int32_t
+__wt_prime(u_int32_t n);
 int
 __wt_stat_alloc_fh(IENV *ienv, WT_STATS **statsp);
 int
@@ -171,3 +181,7 @@ int
 __wt_stat_alloc_db(IENV *ienv, WT_STATS **statsp);
 int
 __wt_stat_clear_db(WT_STATS *stats);
+int
+__wt_stat_alloc_env(IENV *ienv, WT_STATS **statsp);
+int
+__wt_stat_clear_env(WT_STATS *stats);
