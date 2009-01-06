@@ -22,13 +22,8 @@ __wt_bt_open(DB *db)
 
 	idb = db->idb;
 
-	/* Initialize the page queues. */
-	for (i = 0; i < WT_HASHSIZE; ++i)
-		TAILQ_INIT(&idb->hqh[i]);
-	TAILQ_INIT(&idb->lqh);
-
 	/* Open the underlying database file. */
-	if ((ret = __wt_db_page_open(idb)) != 0)
+	if ((ret = __wt_cache_db_open(db)) != 0)
 		return (ret);
 
 	/*

@@ -63,23 +63,12 @@ struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 struct __idb {
 	DB *db;				/* Public object */
 
-	char *file_name;		/* Database file name */
-	mode_t mode;			/* Database file create mode */
+	char	 *file_name;		/* Database file name */
+	mode_t	  mode;			/* Database file create mode */
 
-	WT_FH *fh;			/* Backing file handle */
+	u_int32_t fileid;		/* In-memory file id */
+	WT_FH	 *fh;			/* Backing file handle */
 	u_int32_t frags;		/* Total fragments in the file */
-
-	/*
-	 * Each in-memory page is threaded on two queues: a hash queue
-	 * based on its fragment addr, and an LRU list.
-	 */
-#define	WT_HASHSIZE	32		/* Page hash and LRU queues. */
-#define	WT_HASH(addr)	(addr % WT_HASHSIZE)
-	TAILQ_HEAD(__wt_page_hqh, __wt_page) hqh[WT_HASHSIZE];
-	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;
-
-	u_int32_t cache_frags;		/* Cache fragments allocated */
-	u_int32_t cache_frags_max;	/* Cache fragments max */
 
 	u_int32_t root_addr;		/* Root fragment */
 
@@ -100,6 +89,28 @@ struct __idbc {
  *******************************************/
 struct __ienv {
 	ENV *env;			/* Public object */
+
+	/*
+	 * Cache information.
+	 */
+#define	WT_CACHE_DEFAULT_SIZE		(20)		/* 20MB */
+
+	/*
+	 * Each in-memory page is threaded on two queues: a hash queue
+	 * based on its file and page number, and an LRU list.
+	 */
+	int hashsize;
+#define	WT_HASH(ienv, pgno)	((pgno) % (ienv)->hashsize)
+	TAILQ_HEAD(__wt_page_hqh, __wt_page) *hqh;
+	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;
+
+	/*
+	 * The cache is tracked in units of 512B (the minimum frag size), in
+	 * 32-bit memory, for a maximum 2TB cache size.  There's no reason
+	 * they couldn't be 64-bit types, but there's no need now.
+	 */
+	u_int32_t cache_frags;		/* Cache fragments allocated */
+	u_int32_t cache_frags_max;	/* Cache fragments max */
 
 	u_int32_t flags;
 };

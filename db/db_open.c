@@ -55,10 +55,10 @@ err:	__wt_idb_destroy(db, 1);
 static void
 __wt_db_idb_setup(DB *db)
 {
+	static u_int32_t fileid;
 	IDB *idb;
 
 	idb = db->idb;
 
-	/* We track the cache size in frag count. */
-	idb->cache_frags_max = db->env->cachesize * (MEGABYTE / db->fragsize);
+	idb->fileid = ++fileid;
 }

@@ -35,6 +35,8 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 		if ((ret = wt_env_create(&env, 0)) != 0)
 			return (ret);
 		F_SET(env, WT_PRIVATE_ENV);
+		if ((ret = env->open(env, NULL, 0, 0)) != 0)
+			goto err;
 	}
 	ienv = env->ienv;
 
@@ -52,6 +54,7 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	idb->db = db;
 	db->env = env;
 	db->ienv = ienv;
+	TAILQ_INSERT_TAIL(&env->dbqh, db, q);
 
 	DB_FLAG_CHK_NOTFATAL(
 	    db, "wt_db_create", flags, WT_APIMASK_WT_DB_CREATE, ret);
@@ -103,6 +106,9 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 
 	/* Free any allocated memory. */
 	__wt_free(ienv, db->stats);
+
+	/* Disconnect from the list. */
+	TAILQ_REMOVE(&env->dbqh, db, q);
 
 	/* Free the DB structure. */
 	memset(db, OVERWRITE_BYTE, sizeof(db));

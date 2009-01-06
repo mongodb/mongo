@@ -77,7 +77,7 @@ __wt_db_desc_set_root(DB *db, u_int32_t root_addr)
 
 	idb = db->idb;
 
-	if ((ret = __wt_db_page_in(db,
+	if ((ret = __wt_cache_db_in(db,
 	    WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 		return (ret);
 
@@ -87,7 +87,7 @@ __wt_db_desc_set_root(DB *db, u_int32_t root_addr)
 	desc.root_addr = root_addr;
 	memcpy((u_int8_t *)page->hdr + WT_HDR_SIZE, &desc, WT_DESC_SIZE);
 
-	return (__wt_db_page_out(db, page, WT_MODIFIED));
+	return (__wt_cache_db_out(db, page, WT_MODIFIED));
 }
 
 /*
@@ -100,7 +100,7 @@ __wt_db_desc_read(DB *db, WT_PAGE_DESC *desc)
 	WT_PAGE *page;
 	int ret, tret;
 
-	if ((ret = __wt_db_page_in(db,
+	if ((ret = __wt_cache_db_in(db,
 	    WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 		return (ret);
 
@@ -108,7 +108,7 @@ __wt_db_desc_read(DB *db, WT_PAGE_DESC *desc)
 
 	memcpy(desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
 
-	if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);

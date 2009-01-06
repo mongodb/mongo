@@ -17,5 +17,5 @@ int
 __wt_bt_close(DB *db)
 {
 	/* Close the underlying database file. */
-	return (__wt_db_page_close(db));
+	return (__wt_cache_db_close(db));
 }

@@ -49,7 +49,7 @@ __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 	if (0) {
 err:		ret = WT_ERROR;
 	}
-	if ((tret = __wt_db_page_out(db, page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 	return (ret);
 
@@ -77,7 +77,7 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 
 	/* Search the tree. */
 	for (;;) {
-		if ((ret = __wt_db_page_in(
+		if ((ret = __wt_cache_db_in(
 		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 			return (ret);
 		hdr = page->hdr;
@@ -147,7 +147,7 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		}
 
 		/* We're done with the page. */
-		if ((ret = __wt_db_page_out(db, page, 0)) != 0)
+		if ((ret = __wt_cache_db_out(db, page, 0)) != 0)
 			return (ret);
 
 		/*
@@ -159,6 +159,6 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 	}
 	return (WT_NOTFOUND);
 
-err:	(void)__wt_db_page_out(db, page, 0);
+err:	(void)__wt_cache_db_out(db, page, 0);
 	return (ret);
 }

@@ -18,5 +18,5 @@ __wt_db_sync(DB *db, u_int32_t flags)
 {
 	DB_FLAG_CHK(db, "Db.sync", flags, WT_APIMASK_DB_SYNC);
 
-	return (__wt_db_page_sync(db));
+	return (__wt_cache_db_sync(db));
 }

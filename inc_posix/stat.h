@@ -50,14 +50,19 @@ struct __wt_stats {
 #define	WT_STAT_BULK_OVERFLOW_DATA	    1
 #define	WT_STAT_BULK_OVERFLOW_KEY	    2
 #define	WT_STAT_BULK_PAIRS_READ		    3
-#define	WT_STAT_CACHE_ALLOC		    4
-#define	WT_STAT_CACHE_DIRTY		    5
-#define	WT_STAT_CACHE_EVICT		    6
-#define	WT_STAT_CACHE_HIT		    7
-#define	WT_STAT_CACHE_MISS		    8
-#define	WT_STAT_CACHE_WRITE		    9
-#define	WT_STAT_CACHE_WRITE_EVICT	   10
-#define	WT_STAT_DB_TOTAL_ENTRIES	   11
+#define	WT_STAT_DB_TOTAL_ENTRIES	    4
+
+/*
+ * Statistics entries for the ENV handle.
+ */
+#define	WT_STAT_CACHE_ALLOC		    0
+#define	WT_STAT_CACHE_DIRTY		    1
+#define	WT_STAT_CACHE_EVICT		    2
+#define	WT_STAT_CACHE_HIT		    3
+#define	WT_STAT_CACHE_MISS		    4
+#define	WT_STAT_CACHE_WRITE		    5
+#define	WT_STAT_CACHE_WRITE_EVICT	    6
+#define	WT_STAT_ENV_TOTAL_ENTRIES	    7
 
 /* Statistics section: END */
 
