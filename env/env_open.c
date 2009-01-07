@@ -16,12 +16,22 @@
 int
 __wt_env_open(ENV *env, const char *home, mode_t mode, u_int32_t flags)
 {
-	/*lint -esym(715,home) */
-	/*lint -esym(715,mode) */
-	/*lint -esym(715,flags) */
+	IENV *ienv;
+	u_int32_t buckets, i;
+	int ret;
+
+	ENV_FLAG_CHK(env, "Env.open", flags, WT_APIMASK_ENV_OPEN);
+
+	ienv = env->ienv;
+
+	TAILQ_INIT(&env->dbqh);
 
 	/* Turn on the methods that require open. */
 	__wt_env_config_methods_open(env);
-	
+
+	/* Initialize the cache. */
+	if ((ret = __wt_cache_open(env)) != 0)
+		return (ret);
+
 	return (0);
 }
