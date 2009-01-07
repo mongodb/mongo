@@ -9,12 +9,12 @@
 
 #include "wt_internal.h"
 
+#ifdef HAVE_DIAGNOSTIC
 static int  __wt_db_dump_addr(DB *, u_int32_t, char *, FILE *);
 static void __wt_db_dump_dbt(DBT *, FILE *);
 static void __wt_db_dump_item(DB *, WT_ITEM *, FILE *);
 static void __wt_db_dump_item_data (DB *, WT_ITEM *, FILE *);
 
-#ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_db_force_load --
  *	For the code to be loaded, and a simple place to put a breakpoint.
