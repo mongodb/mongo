@@ -272,6 +272,8 @@ void clearTmpFiles() {
     }    
 }
 
+Timer startupSrandTimer;
+
 void segvhandler(int x);
 void initAndListen(int listenPort, const char *appserverLoc = null) {
     clearTmpFiles();
@@ -305,6 +307,9 @@ void initAndListen(int listenPort, const char *appserverLoc = null) {
 
     repairDatabases();
 
+    /* this is for dbcommands getnonce */
+    srand(curTimeMillis() ^ startupSrandTimer.micros());
+
     listen(listenPort);
 }
 
@@ -313,8 +318,12 @@ int test2();
 void testClient();
 void pipeSigHandler( int signal );
 
+#include "../util/md5.hpp"
+extern "C" int do_md5_test(void);
+
 int main(int argc, char* argv[], char *envp[] )
 {
+    srand(curTimeMillis());
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
     
     {
@@ -331,9 +340,9 @@ int main(int argc, char* argv[], char *envp[] )
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);
 #endif
-    srand(curTimeMillis());
-
     UnitTest::runTests();
+    if( do_md5_test() )
+        return 30;
 
     if ( argc >= 2 ) {
         if ( strcmp(argv[1], "quicktest") == 0 ) {
