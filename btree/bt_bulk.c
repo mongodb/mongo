@@ -90,7 +90,7 @@ skip_read:
 			if (dup_count == 1)
 				dup_data->type =
 				    dup_data->type == WT_ITEM_DATA ?
-			            WT_ITEM_DUP : WT_ITEM_DUP_OVFL;
+				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL;
 
 			WT_STAT_INCR(db, BULK_DUP_DATA_READ,
 			    "bulk duplicate data pairs read");

@@ -150,7 +150,6 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	if (last_key_ovfl.data != NULL)
 		__wt_free(env, last_key_ovfl.data);
 
-
 	if (0) {
 err:		ret = WT_ERROR;
 	}

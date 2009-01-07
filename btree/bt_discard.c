@@ -200,7 +200,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	hdr = page->hdr;
 
 	/*
-	 * Walk the page, building indices and finding the end of the page. 
+	 * Walk the page, building indices and finding the end of the page.
 	 *
 	 *	The page contains sorted data items.  The data items are
 	 *	on-page (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL).

@@ -180,7 +180,6 @@ __wt_bt_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 	fprintf(fp, "}\n");
 }
 
-
 /*
  * __wt_bt_dump_item_data --
  *	Dump a single item's data in debugging mode.
@@ -204,7 +203,7 @@ __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		item_ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)item_ovfl->addr, (u_long)item_ovfl->len);
-		
+
 		if (__wt_cache_db_in(db, item_ovfl->addr,
 		    WT_OVFL_BYTES_TO_FRAGS(db, item_ovfl->len),
 		    &page, 0) == 0) {

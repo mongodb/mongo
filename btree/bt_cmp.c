@@ -42,7 +42,7 @@ __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 			return (*userp < *treep ? -1 : 1);
 
 	/* Contents are equal up to the smallest length. */
-	return (user_dbt->size == tree_dbt->size ? 0 : 
+	return (user_dbt->size == tree_dbt->size ? 0 :
 	    (user_dbt->size < tree_dbt->size ? -1 : 1));
 }
 

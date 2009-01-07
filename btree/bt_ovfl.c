@@ -53,7 +53,7 @@ __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 	int ret, tret;
 
 	/* Read in the overflow record. */
-	
+
 	if ((ret = __wt_cache_db_in(db, from->addr,
 	    WT_OVFL_BYTES_TO_FRAGS(db, from->len), &ovfl_page, 0)) != 0)
 		return (ret);

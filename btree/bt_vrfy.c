@@ -256,7 +256,7 @@ __wt_bt_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits, FILE *fp)
 		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
 			__wt_db_errx(db,
 			    "the first key on page at addr %lu does not sort "
-			    "after the last key on the previous page", 
+			    "after the last key on the previous page",
 			    (u_long)addr);
 			goto err;
 		}
@@ -282,7 +282,7 @@ err:	if (prev != NULL &&
 /*
  * __wt_bt_verify_connections --
  *	Verify that the page is in the right place in the tree.
- */	
+ */
 static int
 __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits, FILE *fp)
 {
@@ -689,7 +689,7 @@ item_len:			__wt_db_errx(db,
 		if (item->unused[0] != 0 || item->unused[1] != 0) {
 			__wt_db_errx(db,
 			    "item %lu on page at addr %lu has non-zero "
-			    "unused item fields", 
+			    "unused item fields",
 			    (u_long)item_no, (u_long)addr);
 			goto err;
 		}
@@ -759,7 +759,7 @@ eop:			__wt_db_errx(db,
 			    func(db, last_key->item, current->item) >= 0) {
 				__wt_db_errx(db,
 				    "item %lu and item %lu on page at addr %lu "
-				    "are incorrectly sorted", 
+				    "are incorrectly sorted",
 				    last_key->indx, current->indx,
 				    (u_long)addr);
 				goto err;
@@ -774,7 +774,7 @@ eop:			__wt_db_errx(db,
 			    func(db, last_data->item, current->item) >= 0) {
 				__wt_db_errx(db,
 				    "item %lu and item %lu on page at addr %lu "
-				    "are incorrectly sorted", 
+				    "are incorrectly sorted",
 				    last_data->indx, current->indx,
 				    (u_long)addr);
 				goto err;
@@ -790,7 +790,7 @@ eop:			__wt_db_errx(db,
 
 	if (0) {
 item_type:	__wt_db_errx(db,
-		    "item %lu on page at addr %lu has an illegal type of %lu", 
+		    "item %lu on page at addr %lu has an illegal type of %lu",
 		    (u_long)item_no, (u_long)addr, (u_long)item->type);
 err:		ret = WT_ERROR;
 	}
