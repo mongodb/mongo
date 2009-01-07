@@ -208,9 +208,9 @@ __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	}
 
 	/* Check for exceeding the size of the cache. */
-	while (ienv->cache_frags > ienv->cache_frags_max)
-		if ((ret = __wt_cache_clean(env)) != 0)
-			return (ret);
+	if (ienv->cache_frags > ienv->cache_frags_max &&
+	    (ret = __wt_cache_clean(env)) != 0)
+		return (ret);
 
 	/*
 	 * Allocate memory for the in-memory page information and for the page
@@ -294,8 +294,8 @@ __wt_cache_db_in(DB *db,
 	}
 
 	/* Check for exceeding the size of the cache. */
-	while (ienv->cache_frags > ienv->cache_frags_max)
-		if ((ret = __wt_cache_clean(env)) != 0)
+	if (ienv->cache_frags > ienv->cache_frags_max &&
+	    (ret = __wt_cache_clean(env)) != 0)
 			return (ret);
 
 	/* Allocate the memory to hold a new page. */
@@ -403,25 +403,32 @@ __wt_cache_clean(ENV *env)
 	int ret;
 
 	ienv = env->ienv;
+	ret = 0;
 
-	/* Find an unpinned page to discard. */
-	TAILQ_FOREACH_REVERSE(page, &ienv->lqh, __wt_page_lqh, q)
-		if (page->ref == 0)
+	while (ienv->cache_frags > ienv->cache_frags_max) {
+		/* Find an unpinned page to discard. */
+		TAILQ_FOREACH_REVERSE(page, &ienv->lqh, __wt_page_lqh, q)
+			if (page->ref == 0)
+				break;
+		if (page == NULL)
 			break;
 
-	/* Write the page if it's been modified. */
-	if (F_ISSET(page, WT_MODIFIED)) {
-		WT_STAT_INCR(env, CACHE_WRITE_EVICT,
-		    "dirty pages evicted from the cache");
+		/* Write the page if it's been modified. */
+		if (F_ISSET(page, WT_MODIFIED)) {
+			WT_STAT_INCR(env, CACHE_WRITE_EVICT,
+			    "dirty pages evicted from the cache");
 
-		if ((ret = __wt_cache_write(env, NULL, page)) != 0)
-			return (ret);
-	} else
-		WT_STAT_INCR(env,
-		    CACHE_EVICT, "clean pages evicted from the cache");
+			if ((ret = __wt_cache_write(env, NULL, page)) != 0)
+				return (ret);
+		} else
+			WT_STAT_INCR(env,
+			    CACHE_EVICT, "clean pages evicted from the cache");
 
-	/* Discard the page. */
-	return (__wt_cache_discard(env, page));
+		/* Discard the page. */
+		if ((ret = __wt_cache_discard(env, page)) != 0)
+			break;
+	}
+	return (ret);
 }
 
 /*
