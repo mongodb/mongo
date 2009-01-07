@@ -50,6 +50,17 @@ elif "linux2" == os.sys.platform:
 
     nix = True
 
+elif "win32" == os.sys.platform:
+    boostDir = "C:/Program Files/Boost/boost_1_35_0"
+    javaHome = "C:/Program Files/java/jdk/"
+	
+    env.Append( CPPPATH=[ boostDir , javaHome + "include" , javaHome + "include/win32" , "pcre-7.4" ] )
+
+# /Gm /EHsc /RTC1 /MDd /Fo"Debug\\" /Fd"Debug\vc90.pdb" /W3 /c /ZI /TP "..\pcre-7.4\pcre_stringpiece.cc"
+
+    env.Append( CPPFLAGS="/Od " )
+    env.Append( CPPDEFINES=["WIN32","_DEBUG","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
+
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
