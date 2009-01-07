@@ -495,34 +495,17 @@ void getDatabaseNames( vector< string > &names ) {
     }
 }
 
-auto_ptr<DBClientCursor> DBDirectClient::query(const char *ns, BSONObj query, int nToReturn , int nToSkip ,
-                                               BSONObj *fieldsToReturn , int queryOptions ){
-    
-    auto_ptr<DBClientCursor> c( new DBClientCursor( new DirectConnector() , ns , 
-                                                    query , nToReturn , nToSkip , fieldsToReturn , queryOptions ));
-    if ( c->init() )
-        return c;
-
-    return auto_ptr< DBClientCursor >( 0 );
-}
-
-BSONObj DBDirectClient::findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn , int queryOptions ){
-    auto_ptr<DBClientCursor> c =
-        this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
-    
-    if ( ! c->more() )
-        return BSONObj();
-    
-    return c->next().copy();
-}
-
-
-bool DirectConnector::send( Message &toSend, Message &response, bool assertOk ){
+bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ){
     DbResponse dbResponse;
     assembleResponse( toSend, dbResponse );
     assert( dbResponse.response );
     response = *dbResponse.response;
     return true;
+}
+
+void DBDirectClient::say( Message &toSend ) {
+    DbResponse dbResponse;
+    assembleResponse( toSend, dbResponse );    
 }
 
 /* not using log() herein in case we are called from segvhandler and we were already locked */

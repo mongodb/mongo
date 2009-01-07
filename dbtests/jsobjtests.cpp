@@ -777,6 +777,14 @@ namespace FromJsonTests {
         }        
     };
     
+    class Malformed {
+    public:
+        void run() {
+            string bad( "{" );
+            ASSERT_EXCEPTION( fromjson( bad ), MsgAssertionException );
+        }
+    };
+    
 } // namespace FromJsonTests
     
 class All : public UnitTest::Suite {
@@ -840,6 +848,7 @@ public:
         add< FromJsonTests::Regex >();
         add< FromJsonTests::RegexEscape >();
         add< FromJsonTests::RegexWithQuotes >();
+        add< FromJsonTests::Malformed >();
     }
 };
 

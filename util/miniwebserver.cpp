@@ -108,14 +108,41 @@ string MiniWebServer::parseMethod( const char * headers ){
     return string( headers , (int)(end-headers) );
 }
 
+const char *MiniWebServer::body( const char *buf ) {
+    const char *ret = strstr( buf, "\r\n\r\n" );
+    return ret ? ret + 4 : ret;
+}
+
+bool MiniWebServer::fullReceive( const char *buf ) {
+    const char *bod = body( buf );
+    if( !bod )
+        return false;
+    const char *lenString = "Content-Length:";
+    const char *lengthLoc = strstr( buf, lenString );
+    if ( !lengthLoc )
+        return true;
+    lengthLoc += strlen( lenString );
+    long len = strtol( lengthLoc, 0, 10 );
+    if ( long( strlen( bod ) ) == len )
+        return true;
+    return false;
+}
 
 void MiniWebServer::accepted(int s) {
     char buf[4096];
-    int x = ::recv(s, buf, sizeof(buf)-1, 0);
-    if ( x <= 0 )
-        return;
-    buf[x] = 0;
-
+    int len = 0;
+    while( 1 ) {
+        int x = ::recv(s, buf + len, sizeof(buf) - 1 - len, 0);
+        if ( x <= 0 ) {
+            return;
+        }
+        len += x;
+        buf[ len ] = 0;
+        if ( fullReceive( buf ) )
+            break;
+    }
+    buf[len] = 0;
+    
     string responseMsg;
     int responseCode = 599;
     vector<string> headers;
