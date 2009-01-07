@@ -26,6 +26,6 @@ __wt_env_close(ENV *env, u_int32_t flags)
 
 	/* Reset the methods that are permitted. */
 	__wt_env_config_methods(env);
-	
+
 	return (ret);
 }

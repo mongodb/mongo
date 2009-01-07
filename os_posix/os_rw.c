@@ -22,7 +22,7 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 		__wt_env_errx(env,
 		    "fileops: %s: read %lu bytes at offset %lu",
 		    fh->name, (u_long)bytes, (u_long)offset);
-	
+
 	if (pread(fh->fd, buf, bytes, offset) == (ssize_t)bytes)
 		return (0);
 

@@ -41,7 +41,7 @@ __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 
 	/* Turn on the methods that require open. */
 	__wt_db_config_methods_open(db);
-	
+
 	return (0);
 
 err:	__wt_idb_destroy(db, 1);

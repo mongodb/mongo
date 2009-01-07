@@ -62,10 +62,10 @@ extern "C" {
 #define	OVERWRITE_BYTE	0xab
 
 #ifdef HAVE_DIAGNOSTIC
-#define WT_ASSERT(env, e)						\
+#define	WT_ASSERT(env, e)						\
 	((e) ? (void)0 : __wt_assert(env, #e, __FILE__, __LINE__))
 #else
-#define WT_ASSERT(ienv, e)
+#define	WT_ASSERT(ienv, e)
 #endif
 
 #if defined(__cplusplus)

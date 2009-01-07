@@ -102,7 +102,7 @@ struct __wt_page {
 	 * DB moved.)   It's always sorted, but it's not always aa "key", for
 	 * example, offpage duplicate leaf pages contain sorted data items,
 	 * where the data is the interesting stuff.  For simplicity, and as
-	 * it's always a sorted list, we call it a key, 
+	 * it's always a sorted list, we call it a key,
 	 */
 	WT_INDX	 *indx;				/* Key items  on the page */
 	u_int32_t indx_count;			/* Entries in key index */
@@ -327,7 +327,7 @@ struct __wt_item_offp {
 struct __wt_item_ovfl {
 	u_int32_t len;			/* Overflow length */
 	u_int32_t addr;			/* Overflow address */
-}; 
+};
 
 #if defined(__cplusplus)
 }

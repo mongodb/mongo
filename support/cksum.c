@@ -14,7 +14,8 @@
  *	Return a checksum for a chunk of memory.
  *
  *	Algorithm 3 from Richard Black's discussion of CRC32.
- *	http://www.cl.cam.ac.uk/research/srg/bluebook/21/crc/node6.html#SECTION00060000000000000000
+ *	http://www.cl.cam.ac.uk/research/srg/
+ *	    bluebook/21/crc/node6.html#SECTION00060000000000000000
  */
 u_int32_t
 __wt_cksum(void *chunk, size_t len)

@@ -21,7 +21,7 @@ struct __wt_fh {
 
 	WT_STATS *stats;			/* Statistics */
 };
-	
+
 #if defined(__cplusplus)
 }
 #endif
