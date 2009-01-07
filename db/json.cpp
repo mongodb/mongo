@@ -296,12 +296,13 @@ struct binDataBinary {
         > binary_t;
     binDataBinary( ObjectBuilder &_b ) : b( _b ) {}
     void operator() ( const char *start, const char *end ) const {
-        assert( ( end - start ) % 4 == 0 );
+        massert( "Badly formatted bindata", ( end - start ) % 4 == 0 );
         string base64( start, end );
         int len = base64.length();
         int pad = 0;
         for(; len - pad > 0 && base64[ len - 1 - pad ] == '='; ++pad )
             base64[ len - 1 - pad ] = 'A';
+        massert( "Badly formatted bindata", pad < 3 );
         b.binData = string( binary_t( base64.begin() ), binary_t( base64.end() ) );
         b.binData.resize( b.binData.length() - pad );
     }
@@ -408,18 +409,18 @@ public:
                 lexeme_d[ str_p( "null" ) ][ nullValue( self.b ) ];
             // lexeme_d and rules don't mix well, so we have this mess
             str = lexeme_d[ ch_p( '"' )[ chClear( self.b ) ] >>
-                           *( ( ch_p( "\\" ) >>
-                              ( ch_p( "\"" )[ chE( self.b ) ] |
-                                ch_p( "\\" )[ chE( self.b ) ] |
-                                ch_p( "/" )[ chE( self.b ) ] |
-                                ch_p( "b" )[ chE( self.b ) ] |
-                                ch_p( "f" )[ chE( self.b ) ] |
-                                ch_p( "n" )[ chE( self.b ) ] |
-                                ch_p( "r" )[ chE( self.b ) ] |
-                                ch_p( "t" )[ chE( self.b ) ] |
-                                ( ch_p( "u" ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
+                           *( ( ch_p( '\\' ) >>
+                              ( ch_p( '"' )[ chE( self.b ) ] |
+                                ch_p( '\\' )[ chE( self.b ) ] |
+                                ch_p( '/' )[ chE( self.b ) ] |
+                                ch_p( 'b' )[ chE( self.b ) ] |
+                                ch_p( 'f' )[ chE( self.b ) ] |
+                                ch_p( 'n' )[ chE( self.b ) ] |
+                                ch_p( 'r' )[ chE( self.b ) ] |
+                                ch_p( 't' )[ chE( self.b ) ] |
+                                ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
                                 ch_p( '\x7f' )[ ch( self.b ) ] |
-                                ( ~cntrl_p & ~ch_p( '\"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
+                                ( ~cntrl_p & ~ch_p( '"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
             // real_p accepts numbers with nonsignificant zero prefixes, which
             // aren't allowed in JSON.  Oh well.
             number = real_p[ numberValue( self.b ) ];
@@ -449,16 +450,16 @@ public:
             regexS = ch_p( '{' ) >> "\"$regex\"" >> ':' >> str[ regexValue( self.b ) ] >> ',' >> "\"$options\"" >> ':' >> str[ regexOptions( self.b ) ] >> '}';
             // FIXME Obviously it would be nice to unify this with str.
             regexT = lexeme_d[ ch_p( '/' )[ chClear( self.b ) ] >>
-                           *( ( ch_p( "\\" ) >>
-                               ( ch_p( "\"" )[ chE( self.b ) ] |
-                                ch_p( "\\" )[ chE( self.b ) ] |
-                                ch_p( "/" )[ chE( self.b ) ] |
-                                ch_p( "b" )[ chE( self.b ) ] |
-                                ch_p( "f" )[ chE( self.b ) ] |
-                                ch_p( "n" )[ chE( self.b ) ] |
-                                ch_p( "r" )[ chE( self.b ) ] |
-                                ch_p( "t" )[ chE( self.b ) ] |
-                                ( ch_p( "u" ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
+                           *( ( ch_p( '\\' ) >>
+                               ( ch_p( '"' )[ chE( self.b ) ] |
+                                ch_p( '\\' )[ chE( self.b ) ] |
+                                ch_p( '/' )[ chE( self.b ) ] |
+                                ch_p( 'b' )[ chE( self.b ) ] |
+                                ch_p( 'f' )[ chE( self.b ) ] |
+                                ch_p( 'n' )[ chE( self.b ) ] |
+                                ch_p( 'r' )[ chE( self.b ) ] |
+                                ch_p( 't' )[ chE( self.b ) ] |
+                                ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
                              ch_p( '\x7f' )[ ch( self.b ) ] |
                              ( ~cntrl_p & ~ch_p( '/' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> str_p( "/" )[ regexValue( self.b ) ]
                               >> ( *( alpha_p[ ch( self.b ) ] ) )[ regexOptions( self.b ) ] ];
