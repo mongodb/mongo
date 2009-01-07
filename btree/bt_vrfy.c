@@ -11,7 +11,7 @@
 
 static int __wt_bt_item_walk(DB *, WT_PAGE *, bitstr_t *, FILE *);
 static int __wt_bt_verify_checkfrag(DB *, bitstr_t *);
-static int __wt_bt_verify_connections(DB *, WT_PAGE *, bitstr_t *, FILE *);
+static int __wt_bt_verify_connections(DB *, WT_PAGE *, bitstr_t *);
 static int __wt_bt_verify_level(DB *, u_int32_t, bitstr_t *, FILE *);
 static int __wt_bt_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *, FILE *);
 
@@ -232,8 +232,7 @@ __wt_bt_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits, FILE *fp)
 			goto err;
 
 		/* Verify its connections. */
-		if ((ret =
-		    __wt_bt_verify_connections(db, page, fragbits, fp)) != 0)
+		if ((ret = __wt_bt_verify_connections(db, page, fragbits)) != 0)
 			goto err;
 
 		if (prev == NULL)
@@ -284,7 +283,7 @@ err:	if (prev != NULL &&
  *	Verify that the page is in the right place in the tree.
  */
 static int
-__wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits, FILE *fp)
+__wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 {
 	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
