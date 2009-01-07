@@ -36,6 +36,7 @@ extern "C" {
  *******************************************/
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
+struct __wt_global;		typedef struct __wt_global WT_GLOBAL;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_item_offp;		typedef struct __wt_item_offp WT_ITEM_OFFP;
 struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
@@ -54,6 +55,7 @@ struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 
 #include "misc.h"			/* Internal */
 #include "fh.h"
+#include "global.h"
 #include "btree.h"
 #include "stat.h"
 

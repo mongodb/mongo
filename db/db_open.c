@@ -55,10 +55,9 @@ err:	__wt_idb_destroy(db, 1);
 static void
 __wt_db_idb_setup(DB *db)
 {
-	static u_int32_t fileid;
 	IDB *idb;
 
 	idb = db->idb;
 
-	idb->fileid = ++fileid;
+	idb->fileid = ++WT_GLOBAL(file_id);
 }

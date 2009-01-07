@@ -9,6 +9,12 @@
 
 #include "wt_internal.h"
 
+WT_GLOBAL __wt_globals = {
+	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=",	/* sep */
+	{ 0 },							/* err_buf */
+	0							/* file_id */
+};
+
 /*
  * __wt_env_build_verify --
  *	Verify the build itself.
