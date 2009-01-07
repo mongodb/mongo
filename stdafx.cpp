@@ -29,6 +29,7 @@ Assertion lastAssert[4];
 
 #undef yassert
 #include "assert.h"
+#include "db/lasterror.h"
 
 string getDbContext();
 void sayDbContext(const char *errmsg = 0);
@@ -37,12 +38,14 @@ void sayDbContext(const char *errmsg = 0);
 void wasserted(const char *msg, const char *file, unsigned line) {
     problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
     sayDbContext();
+    raiseError(msg && *msg ? msg : "wassertion failure");
     lastAssert[1].set(msg, getDbContext().c_str(), file, line);
 }
 
 void asserted(const char *msg, const char *file, unsigned line) {
     problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
     sayDbContext();
+    raiseError(msg && *msg ? msg : "assertion failure");
     lastAssert[0].set(msg, getDbContext().c_str(), file, line);
     throw AssertionException();
 }
@@ -54,12 +57,14 @@ void uasserted(const char *msg) {
     else
         RARELY problem() << "User Assertion " << msg << endl;
     lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
+    raiseError(msg);
     throw UserAssertionException(msg);
 }
 
 void msgasserted(const char *msg) {
     log() << "Assertion: " << msg << '\n';
     lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
+    raiseError(msg && *msg ? msg : "massert failure");
     throw MsgAssertionException(msg);
 }
 

@@ -138,6 +138,11 @@ inline void time_t_to_String(time_t t, char *buf) {
     buf[24] = 0; // don't want the \n
 }
 
+#define asctime _asctime_not_threadsafe_
+#define gmtime _gmtime_not_threadsafe_
+#define localtime _localtime_not_threadsafe_
+#define ctime _ctime_is_not_threadsafe_
+
 inline void sleepsecs(int s) {
     boost::xtime xt;
     boost::xtime_get(&xt, boost::TIME_UTC);

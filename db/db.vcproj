@@ -328,6 +328,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\lasterror.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\matcher.cpp"
 				>
 			</File>
@@ -542,6 +546,10 @@
 				</File>
 				<File
 					RelativePath="..\util\hashtab.h"
+					>
+				</File>
+				<File
+					RelativePath=".\lasterror.h"
 					>
 				</File>
 				<File

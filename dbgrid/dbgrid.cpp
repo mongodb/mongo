@@ -22,7 +22,8 @@
 #include "../client/connpool.h"
 #include "gridconfig.h"
 
-string dashDashGridDb;
+bool dashDashInfer = false;
+vector<string> dashDashGridDb;
 int port = 27017;
 const char *curNs = "";
 Database *database = 0;
@@ -54,11 +55,10 @@ void setupSignals() {}
 
 void usage() {
     cout << "Mongo dbgrid usage:\n\n";
-    cout << " run (run with default settings)\n";
     cout << " --port <portno>\n";
-    cout << " --griddb <griddbname>\n\n";
-    cout << "If not explicitly specified, griddbname is infered by replacing \"-n<n>\"\n";
-    cout << "in our hostname with \"-grid\".\n";
+    cout << " --griddb <griddbname> [<griddbname>...]\n";
+    cout << " --infer                                   infer griddbname by replacing \"-n<n>\"\n";
+    cout << "                                           in our hostname with \"-grid\".\n";
     cout << endl;
 }
 
@@ -149,12 +149,25 @@ int main(int argc, char* argv[], char *envp[] ) {
         if ( s == "--port" ) {
             port = atoi(argv[++i]);
         }
-        else if ( s == "--griddb" ) {
-            dashDashGridDb = argv[++i];
-            i++;
+        else if( s == "--infer" ) { 
+            dashDashInfer = true;
         }
-        else if ( s == "run" )
-            ;
+        else if ( s == "--griddb" ) {
+            assert( !dashDashInfer );
+            int n = 0;
+            while( ++i < argc ) {
+                dashDashGridDb.push_back(argv[i]);
+                n++;
+            }
+            if( n == 0 ) {
+                cout << "error: no args for --griddb\n";
+                return 4;
+            }
+            if( n > 2 ) { 
+                cout << "error: --griddb does not support more than 2 parameters yet\n";
+                return 5;
+            }
+        }
         else {
             usage();
             return 3;

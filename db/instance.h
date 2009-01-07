@@ -90,16 +90,8 @@ void getDatabaseNames( vector< string > &names );
 
 // --- local client ---
 
-class DBDirectClient : public DBClientInterface {
-    public:
-    
-    virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
-                                           BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-    
-    virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-};
-
-
-class DirectConnector : public DBClientCursor::Connector {
-    virtual bool send( Message &toSend, Message &response, bool assertOk=true );
+class DBDirectClient : public DBClientBase {
+    virtual string toString() { return "DBDirectClient"; }
+    virtual bool call( Message &toSend, Message &response, bool assertOk=true );
+    virtual void say( Message &toSend );
 };

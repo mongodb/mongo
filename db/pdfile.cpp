@@ -69,7 +69,6 @@ void sayDbContext(const char *errmsg) {
     if ( errmsg ) {
         problem() << errmsg << endl;
     }
-    log() << ' ' << getDbContext() << '\n';
     printStackTrace();
 }
 
@@ -759,7 +758,7 @@ void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newReco
 }
 
 extern BSONObj emptyObj;
-extern BSONObj id_obj; // = fromjson("{_id:ObjId()}");
+extern BSONObj id_obj;
 
 void ensureHaveIdIndex(const char *ns) {
     NamespaceDetails *d = nsdetails(ns);

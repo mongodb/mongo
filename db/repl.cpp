@@ -178,7 +178,7 @@ public:
         }
         {
             emptyCollection("local.sources");
-            BSONObj o = fromjson("{replacepeer:1}");
+            BSONObj o = fromjson("{\"replacepeer\":1}");
             putSingleton("local.pair.startup", o);
         }
         syncing = -1;
@@ -514,7 +514,7 @@ void ReplSource::loadAll(vector<ReplSource*>& v) {
         delete *i;
 }
 
-BSONObj opTimeQuery = fromjson("{getoptime:1}");
+BSONObj opTimeQuery = fromjson("{\"getoptime\":1}");
 
 bool ReplSource::resync(string db) {
     {
@@ -1135,6 +1135,9 @@ void startReplication() {
        not to be locked when trying to connect() or query() the other side.
        */
     //boost::thread tempt(tempThread);
+
+    if( !slave && !master && !replPair )
+        return;
 
     {
         dblock lk;

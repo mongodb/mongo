@@ -484,7 +484,7 @@ void killCursors(int n, long long *ids) {
 // order.$natural sets natural order direction
 auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
 
-BSONObj id_obj = fromjson("{_id:ObjId()}");
+BSONObj id_obj = fromjson("{\"_id\":ObjectId( \"000000000000000000000000\" )}");
 BSONObj empty_obj = fromjson("{}");
 
 /* { count: "collectionname"[, query: <query>] }
