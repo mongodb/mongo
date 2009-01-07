@@ -14,7 +14,7 @@ extern "C" {
 /*
  * Global data.
  */
-struct __wt_global {
+struct __wt_globals {
 	char *sep;				/* Display separator line */
 
 	char  err_buf[32];			/* Last-ditch error buffer */
@@ -22,7 +22,7 @@ struct __wt_global {
 	int   file_id;				/* Serial file ID */
 };
 
-extern WT_GLOBAL __wt_globals;
+extern WT_GLOBALS __wt_globals;
 
 #define	WT_GLOBAL(v)	__wt_globals.v
 

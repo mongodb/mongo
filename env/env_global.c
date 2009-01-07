@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-WT_GLOBAL __wt_globals = {
+WT_GLOBALS __wt_globals = {
 	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=",	/* sep */
 	{ 0 },							/* err_buf */
 	0							/* file_id */
