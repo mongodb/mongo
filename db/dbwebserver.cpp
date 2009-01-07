@@ -254,9 +254,8 @@ public:
             handleRESTQuery( fullns , action , params , responseCode , ss  );
         }
         else if ( method == "POST" ){
-            responseCode = 400;
-            cout << "don't know how to handle REST updates yet" << endl;
-            ss << "don't know how to handle REST updates yet";;
+            responseCode = 201;
+            handlePost( fullns , body( rq ) , params , responseCode , ss  );
         }
         else {
             responseCode = 400;
@@ -269,8 +268,6 @@ public:
     }
 
     void handleRESTQuery( string ns , string action , map<string,string> & params , int & responseCode , stringstream & out ){
-        static DBDirectClient db;
-        
         Timer t;
         
         int skip = _getOption( params["skip"] , 0 );
@@ -335,14 +332,33 @@ public:
         out << "  \"millis\" : " << t.millis() << " ,\n";
         out << "}\n";
     }
-    
+
+    // TODO Generate id and revision per couch POST spec
+    void handlePost( string ns, const char *body, map<string,string> & params, int & responseCode, stringstream & out ){
+        try {
+            BSONObj obj = fromjson( body );
+            db.insert( ns.c_str(), obj );
+        } catch ( ... ) {
+            responseCode = 400; // Bad Request.  Seems reasonable for now.
+            out << "{ \"ok\" : false }";
+            return;
+        }
+        
+        responseCode = 201;
+        out << "{ \"ok\" : true }";
+    }
 
     int _getOption( string val , int def ){
         if ( val.size() == 0 )
             return def;
         return atoi( val.c_str() );
     }
+    
+private:
+    static DBDirectClient db;
 };
+
+DBDirectClient DbWebServer::db;
 
 void webServerThread() {
     boost::thread thr(statsThread);

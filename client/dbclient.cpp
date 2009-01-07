@@ -37,11 +37,11 @@ BSONObj DBClientWithCommands::cmdIsMaster(bool& isMaster) {
 
 /* --- dbclientconnection --- */
 
-BSONObj DBClientConnection::findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn, int queryOptions) {
+BSONObj DBClientBase::findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn, int queryOptions) {
     auto_ptr<DBClientCursor> c =
         this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
-    massert( "DBClientConnection::findOne: transport error", c.get() );
+    massert( "DBClientBase::findOne: transport error", c.get() );
 
     if ( !c->more() )
         return BSONObj();
@@ -102,11 +102,9 @@ void DBClientConnection::checkConnection() {
         log() << "reconnect " << serverAddress << " ok" << endl;
 }
 
-auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, BSONObj query, int nToReturn,
+auto_ptr<DBClientCursor> DBClientBase::query(const char *ns, BSONObj query, int nToReturn,
         int nToSkip, BSONObj *fieldsToReturn, int queryOptions) {
-    checkConnection();
-
-    auto_ptr<DBClientCursor> c( new DBClientCursor( new CursorConnector( this ),
+    auto_ptr<DBClientCursor> c( new DBClientCursor( this,
                                 ns, query, nToReturn, nToSkip,
                                 fieldsToReturn, queryOptions ) );
     if ( c->init() )
@@ -114,7 +112,7 @@ auto_ptr<DBClientCursor> DBClientConnection::query(const char *ns, BSONObj query
     return auto_ptr< DBClientCursor >( 0 );
 }
 
-void DBClientConnection::insert( const char * ns , BSONObj obj ){
+void DBClientBase::insert( const char * ns , BSONObj obj ){
     Message toSend;
     
     BufBuilder b;
@@ -125,7 +123,7 @@ void DBClientConnection::insert( const char * ns , BSONObj obj ){
     
     toSend.setData( dbInsert , b.buf() , b.len() );
 
-    port().say( toSend );
+    say( toSend );
 }
 
 void DBClientConnection::remove( const char * ns , BSONObj obj , bool justOne ){
@@ -165,9 +163,13 @@ void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSki
     toSend.setData(dbQuery, b.buf(), b.len());
 }
 
-bool DBClientConnection::CursorConnector::send( Message &toSend, Message &response, bool assertOk ) {
-    if ( !conn->port().call(toSend, response) ) {
-        conn->failed = true;
+void DBClientConnection::say( Message &toSend ) {
+    port().say( toSend );
+}
+
+bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk ) {
+    if ( !port().call(toSend, response) ) {
+        failed = true;
         if ( assertOk )
             massert("dbclient error communicating with server", false);
         return false;
@@ -175,15 +177,15 @@ bool DBClientConnection::CursorConnector::send( Message &toSend, Message &respon
     return true;
 }
 
-void DBClientConnection::CursorConnector::checkResponse( const char *data, int nReturned ) {
+void DBClientConnection::checkResponse( const char *data, int nReturned ) {
     /* check for errors.  the only one we really care about at
      this stage is "not master" */
-    if ( conn->clientPaired && nReturned ) {
+    if ( clientPaired && nReturned ) {
         BSONObj o(data);
         BSONElement e = o.firstElement();
         if ( strcmp(e.fieldName(), "$err") == 0 &&
                 e.type() == String && strncmp(e.valuestr(), "not master", 10) == 0 ) {
-            conn->clientPaired->isntMaster();
+            clientPaired->isntMaster();
         }
     }
 }
@@ -191,7 +193,7 @@ void DBClientConnection::CursorConnector::checkResponse( const char *data, int n
 bool DBClientCursor::init() {
     Message toSend;
     assembleRequest( ns, query, nToReturn, nToSkip, fieldsToReturn, opts, toSend );
-    if ( !connector->send( toSend, *m, false ) )
+    if ( !connector->call( toSend, *m, false ) )
         return false;
 
     dataReceived();
@@ -210,7 +212,7 @@ void DBClientCursor::requestMore() {
     Message toSend;
     toSend.setData(dbGetMore, b.buf(), b.len());
     auto_ptr<Message> response(new Message());
-    connector->send( toSend, *response );
+    connector->call( toSend, *response );
 
     m = response;
     dataReceived();

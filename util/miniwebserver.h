@@ -41,9 +41,11 @@ protected:
     string parseURL( const char * buf );
     string parseMethod( const char * headers );
     void parseParams( map<string,string> & params , string query );
+    static const char *body( const char *buf );
 
 private:
     void accepted(int s);
-
+    static bool fullReceive( const char *buf );
+    
     int sock;
 };

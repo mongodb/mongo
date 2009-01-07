@@ -301,7 +301,7 @@ struct binDataBinary {
         int len = base64.length();
         int pad = 0;
         for(; len - pad > 0 && base64[ len - 1 - pad ] == '='; ++pad )
-            base64[ len - 1 - pad ] = 'A';        
+            base64[ len - 1 - pad ] = 'A';
         b.binData = string( binary_t( base64.begin() ), binary_t( base64.end() ) );
         b.binData.resize( b.binData.length() - pad );
     }

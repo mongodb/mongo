@@ -31,10 +31,9 @@ void ensureHaveIdIndex(const char *ns);
 extern int port;
 
 class Cloner: boost::noncopyable {
-    DBClientConnection conn;
+    auto_ptr< DBClientInterface > conn;
     void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
               bool masterSameProcess, bool slaveOk);
-    auto_ptr<DBClientCursor> createCursor(bool masterSameProcess, const char *ns, bool slaveOk);
 public:
     Cloner() { }
 
@@ -84,7 +83,7 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
     auto_ptr<DBClientCursor> c;
     {
         dbtemprelease r;
-        c = createCursor( masterSameProcess, from_collection, slaveOk );
+        c = conn->query( from_collection, emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
     }
     assert( c.get() );
     while ( 1 ) {
@@ -113,18 +112,6 @@ void Cloner::copy(const char *from_collection, const char *to_collection, bool i
     }
 }
 
-auto_ptr< DBClientCursor > Cloner::createCursor( bool masterSameProcess, const char *ns, bool slaveOk ) {
-    auto_ptr< DBClientCursor > c;
-    if ( !masterSameProcess ) {
-        c = auto_ptr<DBClientCursor>( conn.query(ns, emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0) );
-    } else {
-        c = auto_ptr<DBClientCursor>( new DBClientCursor( new DirectConnector(), ns,
-                                      emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 ) );
-        c->init();
-    }
-    return c;
-}
-
 bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk) {
     string todb = database->name;
     stringstream a,b;
@@ -146,10 +133,15 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
     auto_ptr<DBClientCursor> c;
     {
         dbtemprelease r;
-        if ( !masterSameProcess )
-            if ( !conn.connect(masterHost, errmsg) )
+        if ( !masterSameProcess ) {
+            auto_ptr< DBClientConnection > c( new DBClientConnection() );
+            if( !c->connect( masterHost, errmsg ) )
                 return false;
-        c = createCursor( masterSameProcess, ns.c_str(), slaveOk );
+            conn = c;
+        } else {
+            conn = auto_ptr< DBClientInterface >( new DBDirectClient() );
+        }
+        c = conn->query( ns.c_str(), emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
     }
     if ( c.get() == 0 ) {
         errmsg = "query failed " + ns;
