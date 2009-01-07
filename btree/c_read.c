@@ -287,8 +287,6 @@ __wt_cache_db_in(DB *db,
 
 		WT_STAT_INCR(env, CACHE_HIT, "reads found in the cache");
 
-		WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
-
 		*pagep = page;
 		return (0);
 	}
@@ -339,7 +337,7 @@ __wt_cache_db_in(DB *db,
 
 	WT_STAT_INCR(env, CACHE_MISS, "reads not found in the cache");
 
-	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
+	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL, NULL) == 0);
 
 	*pagep = page;
 	return (0);
@@ -370,7 +368,7 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	WT_ASSERT(ienv, page->ref > 0);
 	--page->ref;
 
-	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
+	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL, NULL) == 0);
 
 	/* If the page is dirty, set the modified flag. */
 	if (LF_ISSET(WT_MODIFIED)) {

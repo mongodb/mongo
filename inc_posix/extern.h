@@ -10,6 +10,8 @@ int
 __wt_db_force_load(void);
 int
 __wt_db_dump_debug(DB *db, char *ofile, FILE *fp);
+int
+__wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp);
 void
 __wt_db_desc_init(DB *db, WT_PAGE *page);
 int
@@ -53,9 +55,9 @@ __wt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx);
 int
 __wt_db_verify(DB *db, u_int32_t flags);
 int
-__wt_db_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits);
+__wt_db_verify_int(DB *db, FILE *fp);
 int
-__wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits);
+__wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp);
 int
 __wt_db_close(DB *db, u_int32_t flags);
 void
