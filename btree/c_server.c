@@ -239,6 +239,7 @@ __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	__wt_page_inmem_alloc(db, page);
 
 	WT_STAT_INCR(env, CACHE_ALLOC, "pages allocated in the cache");
+	WT_STAT_INCR(db, DB_CACHE_ALLOC, "pages allocated in the cache");
 
 	*pagep = page;
 	return (0);
@@ -286,6 +287,7 @@ __wt_cache_db_in(DB *db,
 		TAILQ_INSERT_TAIL(&ienv->lqh, page, q);
 
 		WT_STAT_INCR(env, CACHE_HIT, "reads found in the cache");
+		WT_STAT_INCR(db, DB_CACHE_HIT, "reads found in the cache");
 
 		*pagep = page;
 		return (0);
@@ -336,6 +338,7 @@ __wt_cache_db_in(DB *db,
 		goto err;
 
 	WT_STAT_INCR(env, CACHE_MISS, "reads not found in the cache");
+	WT_STAT_INCR(db, DB_CACHE_MISS, "reads not found in the cache");
 
 	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL, NULL) == 0);
 
@@ -374,6 +377,7 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	if (LF_ISSET(WT_MODIFIED)) {
 		F_SET(page, WT_MODIFIED);
 		WT_STAT_INCR(env, CACHE_DIRTY, "dirty pages in the cache");
+		WT_STAT_INCR(db, DB_CACHE_DIRTY, "dirty pages in the cache");
 	}
 
 	/*
@@ -438,7 +442,6 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 	ienv = env->ienv;
 
 	WT_STAT_INCR(env, CACHE_WRITE, "writes from the cache");
-	WT_STAT_DECR(env, CACHE_DIRTY, NULL);
 
 	/* If not included, find the underlying DB handle. */
 	if (db == NULL) {
@@ -457,8 +460,11 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 
 	/* Write, and if successful, clear the modified flag. */
 	if ((ret = __wt_write(ienv, idb->fh,
-	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr)) == 0)
+	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr)) == 0) {
 		F_CLR(page, WT_MODIFIED);
+		WT_STAT_DECR(env, CACHE_DIRTY, NULL);
+		WT_STAT_DECR(db, DB_CACHE_DIRTY, NULL);
+	}
 
 	return (ret);
 }
