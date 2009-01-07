@@ -708,7 +708,7 @@ namespace FromJsonTests {
 
     class BinDataPaddedSingle : public Base {
         virtual BSONObj bson() const {
-            char z[ 1 ];
+            char z[ 2 ];
             z[ 0 ] = 'a';
             z[ 1 ] = 'b';
             BSONObjBuilder b;

@@ -313,12 +313,6 @@ public:
         b.append((void *) objdata(), objsize());
     }
 
-    /* switch the buffer's ownership to us. */
-    void iWillFree() {
-        assert( !details->owned() );
-        details->refCount = 1;
-    }
-
     // Readable representation of a 10gen object.
     string toString() const;
     
