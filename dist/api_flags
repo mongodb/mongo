@@ -20,6 +20,11 @@ Env.close
 
 Env.destroy
 
+Env.open
+
+Env.stat_clear
+Env.stat_print
+
 Env.verbose
 	VERB_FILEOPS			# Verbose, major file operations
 	VERB_FILEOPS_ALL		# Verbose, all file operations
@@ -60,21 +65,24 @@ Db.sync
 Db.verify
 
 #############################################
-# Other.
+# Structures
 #############################################
 Dbt
 
-db_file_read
-	NO_CHECKSUM			# Don't verify the checksum on reading
-	NO_INMEM_PAGE			# Don't build the in-memory page
-
-db_file_write
-	MODIFIED			# Page is modified
-
-WT_INDX
+wt_indx
 	ALLOCATED			# Index key in allocated memory
 
-WT_PAGE
+wt_page
 	ALLOCATED			# Index array has allocated memory
 	MODIFIED			# Page is modified
 
+#############################################
+# Internal functions
+#############################################
+wt_cache_db_in
+	NO_CHECKSUM			# Don't verify the checksum on reading
+	NO_INMEM_PAGE			# Don't build the in-memory page
+
+wt_cache_db_out
+	DISCARD				# Discard page from cache
+	MODIFIED			# Page is modified
