@@ -31,7 +31,7 @@ __wt_bt_open(DB *db)
 	 * the file is non-zero, there had better be a description record.
 	 */
 	if (idb->frags != 0) {
-		if ((ret = __wt_db_desc_read(db, &desc)) != 0)
+		if ((ret = __wt_bt_desc_read(db, &desc)) != 0)
 			return (ret);
 		idb->root_addr = desc.root_addr;
 	} else

@@ -9,9 +9,9 @@
 
 #include "wt_internal.h"
 
-static int __wt_page_inmem_dup_leaf(DB *, WT_PAGE *);
-static int __wt_page_inmem_int(DB *, WT_PAGE *);
-static int __wt_page_inmem_leaf(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_int(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_leaf(DB *, WT_PAGE *);
 
 /*
  * WT_SET_FF_AND_SA_FROM_ADDR --
@@ -25,11 +25,11 @@ static int __wt_page_inmem_leaf(DB *, WT_PAGE *);
 	    (u_int32_t)((page)->first_free - (u_int8_t *)(page)->hdr);
 
 /*
- * __wt_page_inmem --
+ * __wt_bt_page_inmem --
  *	Initialize the in-memory page structure after a page is read.
  */
 int
-__wt_page_inmem(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem(DB *db, WT_PAGE *page)
 {
 	IENV *ienv;
 	WT_INDX *indx;
@@ -52,13 +52,13 @@ __wt_page_inmem(DB *db, WT_PAGE *page)
 	switch (hdr->type) {
 	case WT_PAGE_INT:
 	case WT_PAGE_DUP_INT:
-		ret = __wt_page_inmem_int(db, page);
+		ret = __wt_bt_page_inmem_int(db, page);
 		break;
 	case WT_PAGE_LEAF:
-		ret = __wt_page_inmem_leaf(db, page);
+		ret = __wt_bt_page_inmem_leaf(db, page);
 		break;
 	case WT_PAGE_DUP_LEAF:
-		ret = __wt_page_inmem_dup_leaf(db, page);
+		ret = __wt_bt_page_inmem_dup_leaf(db, page);
 		break;
 	default:
 		return (__wt_database_format(db));
@@ -67,12 +67,12 @@ __wt_page_inmem(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_page_inmem_int --
+ * __wt_bt_page_inmem_int --
  *	Build in-memory index for primary and off-page duplicate tree internal
  *	pages.
  */
 static int
-__wt_page_inmem_int(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_int(DB *db, WT_PAGE *page)
 {
 	WT_INDX *indx;
 	WT_ITEM *item;
@@ -120,11 +120,11 @@ __wt_page_inmem_int(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_page_inmem_leaf --
+ * __wt_bt_page_inmem_leaf --
  *	Build in-memory index for primary leaf pages.
  */
 static int
-__wt_page_inmem_leaf(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 {
 	WT_INDX *indx;
 	WT_ITEM *item;
@@ -185,11 +185,11 @@ __wt_page_inmem_leaf(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_page_inmem_dup_leaf --
+ * __wt_bt_page_inmem_dup_leaf --
  *	Build in-memory index for off-page duplicate tree leaf pages.
  */
 static int
-__wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 {
 	WT_INDX *indx;
 	WT_ITEM *item;
@@ -232,14 +232,14 @@ __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_page_inmem_alloc --
+ * __wt_bt_page_inmem_alloc --
  *	Initialize the in-memory page structure after a page is allocated.
  */
 void
-__wt_page_inmem_alloc(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_alloc(DB *db, WT_PAGE *page)
 {
 	WT_SET_FF_AND_SA_FROM_ADDR(db, page, WT_PAGE_BYTE(page));
 
 	if (page->addr == 0)
-		__wt_db_desc_init(db, page);
+		__wt_bt_desc_init(db, page);
 }

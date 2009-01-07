@@ -9,11 +9,11 @@
 
 #include "wt_internal.h"
 
-static int __wt_btree_search(DB *, DBT *, WT_PAGE **, WT_INDX **);
+static int __wt_bt_search(DB *, DBT *, WT_PAGE **, WT_INDX **);
 
 /*
  * __wt_db_get --
- *	Get a key/data pair.
+ *	Db.get method.
  */
 int
 __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
@@ -28,7 +28,7 @@ __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 	WT_ASSERT(db->ienv, pkey == NULL);
 
 	/* Search the primary btree for the key. */
-	if ((ret = __wt_btree_search(db, key, &page, &indx)) != 0)
+	if ((ret = __wt_bt_search(db, key, &page, &indx)) != 0)
 		return (ret);
 
 	/*
@@ -44,7 +44,7 @@ __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 		goto err;
 	}
 
-	ret = __wt_dbt_return(db, data, page, indx);
+	ret = __wt_bt_dbt_return(db, data, page, indx);
 
 	if (0) {
 err:		ret = WT_ERROR;
@@ -56,11 +56,11 @@ err:		ret = WT_ERROR;
 }
 
 /*
- * __wt_btree_search --
+ * __wt_bt_search --
  *	Search the tree for a specific key.
  */
 static int
-__wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
+__wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 {
 	IDB *idb;
 	WT_INDX *ip;
@@ -98,7 +98,7 @@ __wt_btree_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 */
 			ip = page->indx + indx;
 			if (ip->data == NULL && (ret =
-			    __wt_db_ovfl_copy_to_indx(db, page, ip)) != 0)
+			    __wt_bt_ovfl_copy_to_indx(db, page, ip)) != 0)
 				goto err;
 
 			/*

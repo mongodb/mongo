@@ -9,10 +9,10 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_promote(DB *, WT_PAGE *, u_int32_t *);
-static int __wt_dup_offpage(DB *, WT_PAGE *, DBT **, DBT **,
+static int __wt_bt_dbt_copy(IENV *, DBT *, DBT *);
+static int __wt_bt_dup_offpage(DB *, WT_PAGE *, DBT **, DBT **,
     DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
-static int __wt_ovfl_copy(IENV *, DBT *, DBT *);
+static int __wt_bt_promote(DB *, WT_PAGE *, u_int32_t *);
 
 /*
  * __wt_db_bulk_load --
@@ -109,13 +109,13 @@ skip_read:
 			if (LF_ISSET(WT_DUPLICATES)) {
 				lastkey = &lastkey_ovfl;
 				if ((ret =
-				    __wt_ovfl_copy(ienv, key, lastkey)) != 0)
+				    __wt_bt_dbt_copy(ienv, key, lastkey)) != 0)
 					goto err;
 			}
 
 			key_ovfl.len = key->size;
 			if ((ret =
-			    __wt_db_ovfl_write(db, key, &key_ovfl.addr)) != 0)
+			    __wt_bt_ovfl_write(db, key, &key_ovfl.addr)) != 0)
 				goto err;
 			key->data = &key_ovfl;
 			key->size = sizeof(key_ovfl);
@@ -128,7 +128,7 @@ skip_read:
 
 		if (data->size > db->maxitemsize) {
 			data_ovfl.len = data->size;
-			if ((ret = __wt_db_ovfl_write(
+			if ((ret = __wt_bt_ovfl_write(
 			    db, data, &data_ovfl.addr)) != 0)
 				goto err;
 			data->data = &data_ovfl;
@@ -231,7 +231,7 @@ skip_read:
 			 */
 			if (page != NULL) {
 				if ((ret =
-				    __wt_db_promote(db, page, NULL)) != 0)
+				    __wt_bt_promote(db, page, NULL)) != 0)
 					goto err;
 				next->hdr->prntaddr = page->hdr->prntaddr;
 				if ((ret = __wt_cache_db_out(
@@ -317,7 +317,7 @@ skip_read:
 			 * Move the duplicate set offpage and read in the
 			 * rest of the duplicate set.
 			 */
-			if ((ret = __wt_dup_offpage(db, page, &key,
+			if ((ret = __wt_bt_dup_offpage(db, page, &key,
 			    &data, lastkey, dup_data, dup_count, cb)) != 0)
 				goto err;
 
@@ -334,7 +334,7 @@ skip_read:
 
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
-			ret = __wt_db_promote(db, page, NULL);
+			ret = __wt_bt_promote(db, page, NULL);
 			if ((tret = __wt_cache_db_out(
 			    db, page, WT_MODIFIED)) != 0 && ret == 0)
 				ret = tret;
@@ -351,12 +351,12 @@ err:		ret = WT_ERROR;
 }
 
 /*
- * __wt_dup_offpage --
+ * __wt_bt_dup_offpage --
  *	Move the last set of duplicates on the page to a page of their own,
  *	then load the rest of the duplicate set.
  */
 static int
-__wt_dup_offpage(DB *db, WT_PAGE *leaf_page,
+__wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
     DBT **keyp, DBT **datap, DBT *lastkey, WT_ITEM *dup_data,
     u_int32_t dup_count, int (*cb)(DB *, DBT **, DBT **))
 {
@@ -453,7 +453,7 @@ __wt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 		/* Create overflow objects if the data won't fit. */
 		if (data->size > db->maxitemsize) {
 			data_local.len = data->size;
-			if ((ret = __wt_db_ovfl_write(
+			if ((ret = __wt_bt_ovfl_write(
 			    db, data, &data_local.addr)) != 0)
 				goto err;
 			data->data = &data_local;
@@ -486,7 +486,7 @@ __wt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 			 * If we promoted a key, we might have split, and so
 			 * there may be a new offpage duplicates root page.
 			 */
-			if ((ret = __wt_db_promote(db, page, &root_addr)) != 0)
+			if ((ret = __wt_bt_promote(db, page, &root_addr)) != 0)
 				goto err;
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			if ((ret =
@@ -514,7 +514,7 @@ __wt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	 *
 	 * Promote a key from any partially-filled page and write it.
 	 */
-	if ((tret = __wt_db_promote(
+	if ((tret = __wt_bt_promote(
 	    db, page, &root_addr)) != 0 && (ret == 0 || ret == 1))
 		ret = tret;
 	if ((tret = __wt_cache_db_out(
@@ -544,11 +544,11 @@ err:		ret = WT_ERROR;
 }
 
 /*
- * __wt_db_promote --
+ * __wt_bt_promote --
  *	Promote the first item on a page to a parent.
  */
 static int
-__wt_db_promote(DB *db, WT_PAGE *page, u_int32_t *root_addrp)
+__wt_bt_promote(DB *db, WT_PAGE *page, u_int32_t *root_addrp)
 {
 	DBT key;
 	WT_ITEM *key_item, item;
@@ -580,7 +580,7 @@ __wt_db_promote(DB *db, WT_PAGE *page, u_int32_t *root_addrp)
 	case WT_ITEM_DUP_OVFL:
 	case WT_ITEM_KEY_OVFL:
 		WT_CLEAR(tmp_ovfl);
-		if ((ret = __wt_db_ovfl_copy(db,
+		if ((ret = __wt_bt_ovfl_copy(db,
 		    (WT_ITEM_OVFL *)WT_ITEM_BYTE(key_item),
 		    &tmp_ovfl)) != 0)
 			return (ret);
@@ -684,7 +684,7 @@ split:		if ((ret =
 			 */
 			if (parent->hdr->prntaddr == WT_ADDR_INVALID) {
 				root_split = 1;
-				if ((ret = __wt_db_promote(
+				if ((ret = __wt_bt_promote(
 				    db, parent, root_addrp)) != 0)
 					goto err;
 				root_addr = parent->hdr->prntaddr;
@@ -710,7 +710,7 @@ split:		if ((ret =
 		if (root_split)
 			if (next->hdr->type == WT_PAGE_INT) {
 				if ((ret =
-				    __wt_db_desc_set_root(db, root_addr)) != 0)
+				    __wt_bt_desc_set_root(db, root_addr)) != 0)
 					goto err;
 			} else
 				*root_addrp = root_addr;
@@ -763,7 +763,7 @@ split:		if ((ret =
 	 * parent.
 	 */
 	if (need_promotion)
-		ret = __wt_db_promote(db, parent, root_addrp);
+		ret = __wt_bt_promote(db, parent, root_addrp);
 
 err:	/* Discard the parent page. */
 	if (parent != NULL && (tret =
@@ -777,11 +777,11 @@ err:	/* Discard the parent page. */
 }
 
 /*
- * __wt_ovfl_copy --
+ * __wt_bt_dbt_copy --
  *	Get a local copy of an overflow key.
  */
 static int
-__wt_ovfl_copy(IENV *ienv, DBT *orig, DBT *copy)
+__wt_bt_dbt_copy(IENV *ienv, DBT *orig, DBT *copy)
 {
 	int ret;
 

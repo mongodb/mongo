@@ -20,7 +20,7 @@ __wt_db_set_btree_compare_int_verify(DB *db, int *bytesp)
 
 	bytes = *bytesp;
 	if (bytes >= 0 && bytes <= 8) {
-		db->btree_compare = __wt_int_compare;
+		db->btree_compare = __wt_bt_int_compare;
 		return (0);
 	}
 

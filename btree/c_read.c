@@ -235,7 +235,7 @@ __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	TAILQ_INSERT_TAIL(&ienv->lqh, page, q);
 	TAILQ_INSERT_HEAD(&ienv->hqh[WT_HASH(ienv, page->addr)], page, hq);
 
-	__wt_page_inmem_alloc(db, page);
+	__wt_bt_page_inmem_alloc(db, page);
 
 	WT_STAT_INCR(env, CACHE_ALLOC, "pages allocated in the cache");
 	WT_STAT_INCR(db, DB_CACHE_ALLOC, "pages allocated in the cache");
@@ -333,13 +333,13 @@ __wt_cache_db_in(DB *db,
 	TAILQ_INSERT_HEAD(hashq, page, hq);
 
 	if (!LF_ISSET(WT_NO_INMEM_PAGE) &&
-	    (ret = __wt_page_inmem(db, page)) != 0)
+	    (ret = __wt_bt_page_inmem(db, page)) != 0)
 		goto err;
 
 	WT_STAT_INCR(env, CACHE_MISS, "reads not found in the cache");
 	WT_STAT_INCR(db, DB_CACHE_MISS, "reads not found in the cache");
 
-	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL, NULL) == 0);
+	WT_ASSERT(ienv, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
 	*pagep = page;
 	return (0);
@@ -370,7 +370,7 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	WT_ASSERT(ienv, page->ref > 0);
 	--page->ref;
 
-	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL, NULL) == 0);
+	WT_ASSERT(ienv, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
 	/* If the page is dirty, set the modified flag. */
 	if (LF_ISSET(WT_MODIFIED)) {

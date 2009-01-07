@@ -10,12 +10,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_ovfl_write --
+ * __wt_bt_ovfl_write --
  *	Store an overflow item in the database, returning the starting
  *	addr.
  */
 int
-__wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
+__wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 {
 	WT_PAGE *page;
 	int ret;
@@ -40,13 +40,13 @@ __wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 }
 
 /*
- * __wt_db_ovfl_copy --
+ * __wt_bt_ovfl_copy --
  *	Copy an overflow item in the database, returning the starting
  *	addr.  This routine is used when an overflow item is promoted
  *	to an internal page.
  */
 int
-__wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
+__wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 {
 	DBT dbt;
 	WT_PAGE *ovfl_page;
@@ -65,7 +65,7 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 	WT_CLEAR(dbt);
 	dbt.data = WT_PAGE_BYTE(ovfl_page);
 	dbt.size = from->len;
-	ret = __wt_db_ovfl_write(db, &dbt, &copy->addr);
+	ret = __wt_bt_ovfl_write(db, &dbt, &copy->addr);
 	copy->len = from->len;
 
 	/* Discard the overflow record. */
@@ -76,11 +76,11 @@ __wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 }
 
 /*
- * __wt_db_ovfl_copy_to_dbt --
+ * __wt_bt_ovfl_copy_to_dbt --
  *	Copy an overflow item into allocated memory in a DBT.
  */
 int
-__wt_db_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
+__wt_bt_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 {
 	WT_PAGE *ovfl_page;
 	int ret, tret;
@@ -89,7 +89,7 @@ __wt_db_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 	    WT_OVFL_BYTES_TO_FRAGS(db, ovfl->len), &ovfl_page, 0)) != 0)
 		return (ret);
 
-	ret = __wt_datalen_copy_to_dbt(
+	ret = __wt_bt_data_copy_to_dbt(
 	    db, WT_PAGE_BYTE(ovfl_page), ovfl->len, copy);
 
 	if ((tret = __wt_cache_db_out(db, ovfl_page, 0)) != 0 && ret == 0)
@@ -99,11 +99,11 @@ __wt_db_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 }
 
 /*
- * __wt_db_ovfl_copy_to_indx --
+ * __wt_bt_ovfl_copy_to_indx --
  *	Copy an overflow item into allocated memory in a WT_INDX
  */
 int
-__wt_db_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
+__wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
 {
 	WT_PAGE *ovfl_page;
 	int ret, tret;

@@ -3,61 +3,59 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **));
 int
 __wt_bt_close(DB *db);
 int
-__wt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
+__wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
-__wt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
+__wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
-__wt_db_force_load(void);
+__wt_bt_dump_debug(DB *db, char *ofile, FILE *fp);
 int
-__wt_db_dump_debug(DB *db, char *ofile, FILE *fp);
-int
-__wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp);
+__wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp);
 void
-__wt_db_desc_init(DB *db, WT_PAGE *page);
+__wt_bt_desc_init(DB *db, WT_PAGE *page);
 int
-__wt_db_desc_verify(DB *db, WT_PAGE *page);
+__wt_bt_desc_verify(DB *db, WT_PAGE *page);
 int
-__wt_db_desc_set_root(DB *db, u_int32_t root_addr);
+__wt_bt_desc_set_root(DB *db, u_int32_t root_addr);
 int
-__wt_db_desc_read(DB *db, WT_PAGE_DESC *desc);
+__wt_bt_desc_read(DB *db, WT_PAGE_DESC *desc);
 int
 __wt_db_dump(DB *db, FILE *stream, u_int32_t flags);
 void
-__wt_db_print(u_int8_t *data, u_int32_t len, FILE *stream);
+__wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream);
 int
 __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
 int
-__wt_db_build_verify(void);
+__wt_bt_build_verify(void);
 int
-__wt_datalen_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
+__wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
 void
-__wt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp);
+__wt_bt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp);
 const char *
-__wt_db_hdr_type(u_int32_t type);
+__wt_bt_hdr_type(u_int32_t type);
 const char *
-__wt_db_item_type(u_int32_t type);
+__wt_bt_item_type(u_int32_t type);
 int
 __wt_bt_open(DB *db);
 int
-__wt_db_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp);
+__wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp);
 int
-__wt_db_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy);
+__wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy);
 int
-__wt_db_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy);
+__wt_bt_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy);
 int
-__wt_db_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
+__wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
 int
-__wt_page_inmem(DB *db, WT_PAGE *page);
+__wt_bt_page_inmem(DB *db, WT_PAGE *page);
 void
-__wt_page_inmem_alloc(DB *db, WT_PAGE *page);
+__wt_bt_page_inmem_alloc(DB *db, WT_PAGE *page);
 int
-__wt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx);
+__wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx);
 int
 __wt_db_verify(DB *db, u_int32_t flags);
 int
-__wt_db_verify_int(DB *db, FILE *fp);
+__wt_bt_verify_int(DB *db, FILE *fp);
 int
-__wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp);
+__wt_bt_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp);
 int
 __wt_db_close(DB *db, u_int32_t flags);
 void
@@ -112,6 +110,8 @@ int
 __wt_env_set_verbose_verify(ENV *env, u_int32_t *whichp);
 int
 __wt_env_build_verify(void);
+int
+__wt_breakpoint(void);
 int
 __wt_env_destroy(ENV *env, u_int32_t flags);
 int

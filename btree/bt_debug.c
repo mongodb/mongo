@@ -10,27 +10,17 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
-static int  __wt_db_dump_addr(DB *, u_int32_t, char *, FILE *);
-static void __wt_db_dump_dbt(DBT *, FILE *);
-static void __wt_db_dump_item(DB *, WT_ITEM *, FILE *);
-static void __wt_db_dump_item_data (DB *, WT_ITEM *, FILE *);
+static int  __wt_bt_dump_addr(DB *, u_int32_t, char *, FILE *);
+static void __wt_bt_dump_dbt(DBT *, FILE *);
+static void __wt_bt_dump_item(DB *, WT_ITEM *, FILE *);
+static void __wt_bt_dump_item_data (DB *, WT_ITEM *, FILE *);
 
 /*
- * __wt_db_force_load --
- *	For the code to be loaded, and a simple place to put a breakpoint.
- */
-int
-__wt_db_force_load(void)
-{
-	return (0);
-}
-
-/*
- * __wt_db_dump_debug --
+ * __wt_bt_dump_debug --
  *	Dump a database in debugging mode.
  */
 int
-__wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
+__wt_bt_dump_debug(DB *db, char *ofile, FILE *fp)
 {
 	int do_close, ret;
 
@@ -50,7 +40,7 @@ __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 	 * to walk the entire tree anyway, and there's a fair amount of effort
 	 * involved in walking every page of a file safely.
 	 */
-	ret = __wt_db_verify_int(db, fp);
+	ret = __wt_bt_verify_int(db, fp);
 
 	if (do_close)
 		(void)fclose(fp);
@@ -59,11 +49,11 @@ __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_db_dump_addr --
+ * __wt_bt_dump_addr --
  *	Dump a single page in debugging mode.
  */
 static int
-__wt_db_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
+__wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 {
 	WT_PAGE *page;
 	int ret, tret;
@@ -72,7 +62,7 @@ __wt_db_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	    __wt_cache_db_in(db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 		return (ret);
 
-	ret = __wt_db_dump_page(db, page, ofile, fp);
+	ret = __wt_bt_dump_page(db, page, ofile, fp);
 
 	if ((tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
@@ -81,11 +71,11 @@ __wt_db_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_db_dump_page --
+ * __wt_bt_dump_page --
  *	Dump a single page in debugging mode.
  */
 int
-__wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
+__wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	WT_ITEM *item;
 	WT_PAGE_DESC desc;
@@ -129,7 +119,7 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 	}
 
 	hdr = page->hdr;
-	fprintf(fp, "%s: ", __wt_db_hdr_type(hdr->type));
+	fprintf(fp, "%s: ", __wt_bt_hdr_type(hdr->type));
 	if (hdr->type == WT_PAGE_OVFL)
 		fprintf(fp, "%lu bytes", (u_long)hdr->u.datalen);
 	else
@@ -159,9 +149,9 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 	for (p = WT_PAGE_BYTE(page), i = 1; i <= hdr->u.entries; ++i) {
 		item = (WT_ITEM *)p;
 		fprintf(fp, "%6lu: {type %s; len %lu; off %lu}\n\t{",
-		    (u_long)i, __wt_db_item_type(item->type),
+		    (u_long)i, __wt_bt_item_type(item->type),
 		    (u_long)item->len, (u_long)(p - (u_int8_t *)hdr));
-		__wt_db_dump_item_data(db, item, fp);
+		__wt_bt_dump_item_data(db, item, fp);
 		fprintf(fp, "}\n");
 		p += WT_ITEM_SPACE_REQ(item->len);
 	}
@@ -174,29 +164,29 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_db_dump_item --
+ * __wt_bt_dump_item --
  *	Dump a single item in debugging mode.
  */
 static void
-__wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
+__wt_bt_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 {
 	if (fp == NULL)
 		fp = stdout;
 
-	fprintf(fp, "%s {", __wt_db_item_type(item->type));
+	fprintf(fp, "%s {", __wt_bt_item_type(item->type));
 
-	__wt_db_dump_item_data(db, item, fp);
+	__wt_bt_dump_item_data(db, item, fp);
 
 	fprintf(fp, "}\n");
 }
 
 
 /*
- * __wt_db_dump_item_data --
+ * __wt_bt_dump_item_data --
  *	Dump a single item's data in debugging mode.
  */
 static void
-__wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
+__wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 {
 	WT_ITEM_OVFL *item_ovfl;
 	WT_ITEM_OFFP *item_offp;
@@ -206,7 +196,7 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_KEY:
 	case WT_ITEM_DATA:
 	case WT_ITEM_DUP:
-		__wt_db_print(WT_ITEM_BYTE(item), item->len, fp);
+		__wt_bt_print(WT_ITEM_BYTE(item), item->len, fp);
 		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
@@ -218,7 +208,7 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		if (__wt_cache_db_in(db, item_ovfl->addr,
 		    WT_OVFL_BYTES_TO_FRAGS(db, item_ovfl->len),
 		    &page, 0) == 0) {
-			__wt_db_print(WT_PAGE_BYTE(page), item_ovfl->len, fp);
+			__wt_bt_print(WT_PAGE_BYTE(page), item_ovfl->len, fp);
 			(void)__wt_cache_db_out(db, page, 0);
 		}
 		break;
@@ -234,16 +224,16 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 }
 
 /*
- * __wt_db_dump_dbt --
+ * __wt_bt_dump_dbt --
  *	Dump a single DBT in debugging mode.
  */
 static void
-__wt_db_dump_dbt(DBT *dbt, FILE *fp)
+__wt_bt_dump_dbt(DBT *dbt, FILE *fp)
 {
 	if (fp == NULL)
 		fp = stdout;
 	fprintf(fp, "{");
-	__wt_db_print(dbt->data, dbt->size, fp);
+	__wt_bt_print(dbt->data, dbt->size, fp);
 	fprintf(fp, "}\n");
 }
 #endif

@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_build_verify --
+ * __wt_bt_build_verify --
  *	Verify the Btree build itself.
  */
 int
-__wt_db_build_verify(void)
+__wt_bt_build_verify(void)
 {
 	/*
 	 * The compiler had better not have padded our structures -- make
@@ -38,11 +38,11 @@ __wt_db_build_verify(void)
 }
 
 /*
- * __wt_datalen_copy_to_dbt --
+ * __wt_bt_data_copy_to_dbt --
  *	Copy a data/length pair into allocated memory in a DBT.
  */
 int
-__wt_datalen_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
+__wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 {
 	int ret;
 
@@ -57,13 +57,13 @@ __wt_datalen_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 }
 
 /*
- * __wt_first_offp_addr --
+ * __wt_bt_first_offp_addr --
  *	In a couple of places in the code, we're trying to walk down the
  *	internal pages from the root, and we need to get the address off
  *	the first WT_ITEM_OFFP on the page.
  */
 void
-__wt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp)
+__wt_bt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp)
 {
 	WT_ITEM *item;
 	WT_ITEM_OFFP *offp;
@@ -75,11 +75,11 @@ __wt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp)
 }
 
 /*
- * __wt_db_hdr_type --
+ * __wt_bt_hdr_type --
  *	Return a string representing the page type.
  */
 const char *
-__wt_db_hdr_type(u_int32_t type)
+__wt_bt_hdr_type(u_int32_t type)
 {
 	switch (type) {
 	case WT_PAGE_INVALID:
@@ -101,11 +101,11 @@ __wt_db_hdr_type(u_int32_t type)
 }
 
 /*
- * __wt_db_item_type --
+ * __wt_bt_item_type --
  *	Return a string representing the item type.
  */
 const char *
-__wt_db_item_type(u_int32_t type)
+__wt_bt_item_type(u_int32_t type)
 {
 	switch (type) {
 	case WT_ITEM_KEY:

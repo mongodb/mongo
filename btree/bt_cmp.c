@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_lex_compare --
+ * __wt_bt_lex_compare --
  *	Lexicographic comparison routine.
  */
 int
-__wt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
+__wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 {
 	u_int32_t len;
 	u_int8_t *userp, *treep;
@@ -47,11 +47,11 @@ __wt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 }
 
 /*
- * __wt_int_compare --
+ * __wt_bt_int_compare --
  *	Integer comparison routine.
  */
 int
-__wt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
+__wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 {
 	u_int64_t user_int, tree_int;
 

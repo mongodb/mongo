@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_desc_init --
+ * __wt_bt_desc_init --
  *	Initialize the database description on page 0.
  */
 void
-__wt_db_desc_init(DB *db, WT_PAGE *page)
+__wt_bt_desc_init(DB *db, WT_PAGE *page)
 {
 	WT_PAGE_DESC desc;
 
@@ -38,11 +38,11 @@ __wt_db_desc_init(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_db_desc_verify --
+ * __wt_bt_desc_verify --
  *	Verify the database description on page 0.
  */
 int
-__wt_db_desc_verify(DB *db, WT_PAGE *page)
+__wt_bt_desc_verify(DB *db, WT_PAGE *page)
 {
 	WT_PAGE_DESC desc;
 
@@ -64,11 +64,11 @@ __wt_db_desc_verify(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_db_desc_set_root --
+ * __wt_bt_desc_set_root --
  *	Update the root addr.
  */
 int
-__wt_db_desc_set_root(DB *db, u_int32_t root_addr)
+__wt_bt_desc_set_root(DB *db, u_int32_t root_addr)
 {
 	IDB *idb;
 	WT_PAGE *page;
@@ -91,11 +91,11 @@ __wt_db_desc_set_root(DB *db, u_int32_t root_addr)
 }
 
 /*
- * __wt_db_desc_read --
+ * __wt_bt_desc_read --
  *	Read the descriptor structure from page 0.
  */
 int
-__wt_db_desc_read(DB *db, WT_PAGE_DESC *desc)
+__wt_bt_desc_read(DB *db, WT_PAGE_DESC *desc)
 {
 	WT_PAGE *page;
 	int ret, tret;
@@ -104,7 +104,7 @@ __wt_db_desc_read(DB *db, WT_PAGE_DESC *desc)
 	    WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 		return (ret);
 
-	ret = __wt_db_desc_verify(db, page);
+	ret = __wt_bt_desc_verify(db, page);
 
 	memcpy(desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
 

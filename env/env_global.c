@@ -27,14 +27,24 @@ __wt_env_build_verify(void)
 	/*
 	 * Check the build & compiler itself before going further.
 	 */
-	if ((ret = __wt_db_build_verify()) != 0)
+	if ((ret = __wt_bt_build_verify()) != 0)
 		return (ret);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Load debug code the compiler might optimize out. */
-	if ((ret = __wt_db_force_load()) != 0)
+	if ((ret = __wt_breakpoint()) != 0)
 		return (ret);
 #endif
 
+	return (0);
+}
+
+/*
+ * __wt_breakpoint --
+ *	A simple place to put a breakpoint, if you need one.
+ */
+int
+__wt_breakpoint(void)
+{
 	return (0);
 }

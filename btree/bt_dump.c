@@ -9,10 +9,10 @@
 
 #include "wt_internal.h"
 
-static int  __wt_db_dump_offpage(DB *, DBT *,
+static int  __wt_bt_dump_offpage(DB *, DBT *,
     u_int32_t, FILE *, void (*)(u_int8_t *, u_int32_t, FILE *));
-static void __wt_db_hexprint(u_int8_t *, u_int32_t, FILE *);
-static void __wt_db_print_nl(u_int8_t *, u_int32_t, FILE *);
+static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
+static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
 
 /* Check if the next page entry is part of a duplicate data set. */
 #define	WT_DUP_AHEAD(item, yesno) {					\
@@ -24,7 +24,7 @@ static void __wt_db_print_nl(u_int8_t *, u_int32_t, FILE *);
 
 /*
  * __wt_db_dump --
- *	Dump the database.
+ *	Db.dump method.
  */
 int
 __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
@@ -42,11 +42,11 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	DB_FLAG_CHK(db, "Db.dump", flags, WT_APIMASK_DB_DUMP);
 
 	if (LF_ISSET(WT_DEBUG))
-		return (__wt_db_dump_debug(db, NULL, stream));
+		return (__wt_bt_dump_debug(db, NULL, stream));
 
 	ienv = db->ienv;
 	dup_ahead = ret = 0;
-	func = flags == WT_PRINTABLES ? __wt_db_print_nl : __wt_db_hexprint;
+	func = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;
 
 	/*lint -esym(644,last_key)
 	 * LINT complains last_key may be used before being set -- that's not
@@ -115,7 +115,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 				 * later display.  Otherwise, dump this item.
 				 */
 				if (dup_ahead) {
-					if ((ret = __wt_datalen_copy_to_dbt(db,
+					if ((ret = __wt_bt_data_copy_to_dbt(db,
 					    WT_PAGE_BYTE(ovfl_page), ovfl->len,
 					    &last_key_ovfl)) != 0)
 						goto err;
@@ -131,7 +131,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 				break;
 			case WT_ITEM_OFFPAGE:
 				offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_db_dump_offpage(db,
+				if ((ret = __wt_bt_dump_offpage(db,
 				    last_key, offp->addr, stream, func)) != 0)
 					goto err;
 				break;
@@ -158,11 +158,11 @@ err:		ret = WT_ERROR;
 }
 
 /*
- * __wt_db_dump_offpage --
+ * __wt_bt_dump_offpage --
  *	Dump a set of off-page duplicates.
  */
 static int
-__wt_db_dump_offpage(DB *db, DBT *key,
+__wt_bt_dump_offpage(DB *db, DBT *key,
     u_int32_t addr, FILE *stream, void (*func)(u_int8_t *, u_int32_t, FILE *))
 {
 	WT_ITEM *item;
@@ -180,7 +180,7 @@ __wt_db_dump_offpage(DB *db, DBT *key,
 			goto err;
 		if (page->hdr->type == WT_PAGE_DUP_LEAF)
 			break;
-		__wt_first_offp_addr(page, &addr);
+		__wt_bt_first_offp_addr(page, &addr);
 		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
@@ -235,26 +235,26 @@ err:		ret = WT_ERROR;
 static const char hex[] = "0123456789abcdef";
 
 /*
- * __wt_db_print_nl --
+ * __wt_bt_print_nl --
  *	Output a single key/data entry in printable characters, where possible.
  *	In addition, terminate with a <newline> character, unless the entry is
  *	itself terminated with a <newline> character.
  */
 static void
-__wt_db_print_nl(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_bt_print_nl(u_int8_t *data, u_int32_t len, FILE *stream)
 {
 	if (data[len - 1] == '\n')
 		--len;
-	__wt_db_print(data, len, stream);
+	__wt_bt_print(data, len, stream);
 	fprintf(stream, "\n");
 }
 
 /*
- * __wt_db_print --
+ * __wt_bt_print --
  *	Output a single key/data entry in printable characters, where possible.
  */
 void
-__wt_db_print(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream)
 {
 	int ch;
 
@@ -269,11 +269,11 @@ __wt_db_print(u_int8_t *data, u_int32_t len, FILE *stream)
 }
 
 /*
- * __wt_db_hexprint --
+ * __wt_bt_hexprint --
  *	Output a single key/data entry in hex.
  */
 static void
-__wt_db_hexprint(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_bt_hexprint(u_int8_t *data, u_int32_t len, FILE *stream)
 {
 	for (; len > 0; --len, ++data)
 		fprintf(stream, "%x%x",
