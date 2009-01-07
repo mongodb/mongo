@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_dbt_copy(IENV *, DBT *, DBT *);
+static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int __wt_bt_dup_offpage(DB *, WT_PAGE *, DBT **, DBT **,
     DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
 static int __wt_bt_promote(DB *, WT_PAGE *, u_int32_t *);
@@ -22,17 +22,17 @@ int
 __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 {
 	DBT *key, *data, *lastkey, lastkey_std, lastkey_ovfl;
-	IENV *ienv;
+	ENV *env;
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
 	u_int32_t dup_count, dup_space, len;
 	int ret, tret;
 
-	ienv = db->ienv;
+	env = db->env;
 
 	DB_FLAG_CHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
-	WT_ASSERT(ienv, LF_ISSET(WT_SORTED_INPUT));
+	WT_ASSERT(env, LF_ISSET(WT_SORTED_INPUT));
 
 	page = NULL;
 	dup_space = dup_count = 0;
@@ -109,7 +109,7 @@ skip_read:
 			if (LF_ISSET(WT_DUPLICATES)) {
 				lastkey = &lastkey_ovfl;
 				if ((ret =
-				    __wt_bt_dbt_copy(ienv, key, lastkey)) != 0)
+				    __wt_bt_dbt_copy(env, key, lastkey)) != 0)
 					goto err;
 			}
 
@@ -345,7 +345,7 @@ skip_read:
 err:		ret = WT_ERROR;
 	}
 	if (lastkey_ovfl.data != NULL)
-		__wt_free(ienv, lastkey_ovfl.data);
+		__wt_free(env, lastkey_ovfl.data);
 
 	return (ret == 1 ? 0 : ret);
 }
@@ -781,12 +781,12 @@ err:	/* Discard the parent page. */
  *	Get a local copy of an overflow key.
  */
 static int
-__wt_bt_dbt_copy(IENV *ienv, DBT *orig, DBT *copy)
+__wt_bt_dbt_copy(ENV *env, DBT *orig, DBT *copy)
 {
 	int ret;
 
 	if (copy->data == NULL || copy->alloc_size < orig->size) {
-		if ((ret = __wt_realloc(ienv, orig->size, &copy->data)) != 0)
+		if ((ret = __wt_realloc(env, orig->size, &copy->data)) != 0)
 			return (ret);
 		copy->alloc_size = orig->size;
 	}

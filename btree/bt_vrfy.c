@@ -35,14 +35,14 @@ __wt_db_verify(DB *db, u_int32_t flags)
 int
 __wt_bt_verify_int(DB *db, FILE *fp)
 {
+	ENV *env;
 	IDB *idb;
-	IENV *ienv;
 	WT_PAGE *page;
 	WT_PAGE_DESC desc;
 	bitstr_t *fragbits;
 	int ret;
 
-	ienv = db->ienv;
+	env = db->env;
 	idb = db->idb;
 	ret = 0;
 
@@ -66,7 +66,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 		__wt_db_errx(db, "file has too many fragments to verify");
 		return (WT_ERROR);
 	}
-	if ((ret = bit_alloc(ienv, idb->frags, &fragbits)) != 0)
+	if ((ret = bit_alloc(env, idb->frags, &fragbits)) != 0)
 		return (ret);
 
 	/* Get the root address. */
@@ -89,7 +89,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 
 	ret = __wt_bt_verify_checkfrag(db, fragbits);
 
-err:	__wt_free(ienv, fragbits);
+err:	__wt_free(env, fragbits);
 	return (ret);
 }
 
@@ -577,14 +577,14 @@ __wt_bt_item_walk(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 		DBT item_ovfl;			/* Overflow holder */
 		DBT item_std;			/* On-page reference */
 	} *current, *last_data, *last_key, *swap_tmp, _a, _b, _c;
-	IENV *ienv;
+	ENV *env;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
 	u_int32_t addr, i, item_no;
 	int (*func)(DB *, const DBT *, const DBT *), ret;
 
-	ienv = db->ienv;
+	env = db->env;
 	hdr = page->hdr;
 	addr = page->addr;
 	ret = 0;
@@ -796,11 +796,11 @@ err:		ret = WT_ERROR;
 	}
 
 	if (_a.item_ovfl.data != NULL)
-		__wt_free(ienv, _a.item_ovfl.data);
+		__wt_free(env, _a.item_ovfl.data);
 	if (_b.item_ovfl.data != NULL)
-		__wt_free(ienv, _b.item_ovfl.data);
+		__wt_free(env, _b.item_ovfl.data);
 	if (_c.item_ovfl.data != NULL)
-		__wt_free(ienv, _c.item_ovfl.data);
+		__wt_free(env, _c.item_ovfl.data);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */

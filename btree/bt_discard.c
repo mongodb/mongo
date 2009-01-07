@@ -31,12 +31,12 @@ static int __wt_bt_page_inmem_leaf(DB *, WT_PAGE *);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 {
-	IENV *ienv;
+	ENV *env;
 	WT_INDX *indx;
 	WT_PAGE_HDR *hdr;
 	int ret;
 
-	ienv = db->ienv;
+	env = db->env;
 	hdr = page->hdr;
 
 	/* Build page indexes for all page types other than overflow pages. */
@@ -44,7 +44,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 		return (0);
 
 	if ((ret =
-	    __wt_calloc(ienv, hdr->u.entries, sizeof(WT_INDX), &indx)) != 0)
+	    __wt_calloc(env, hdr->u.entries, sizeof(WT_INDX), &indx)) != 0)
 		return (ret);
 	page->indx = indx;
 	page->indx_size = hdr->u.entries;

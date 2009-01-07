@@ -14,14 +14,12 @@
  *	Open a file handle.
  */
 int
-__wt_open(IENV *ienv,
+__wt_open(ENV *env,
     const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp)
 {
-	ENV *env;
 	WT_FH *fh;
 	int f, fd, ret;
 
-	env = ienv->env;
 	fh = NULL;
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS | WT_VERB_FILEOPS_ALL))
@@ -40,11 +38,11 @@ __wt_open(IENV *ienv,
 		return (WT_ERROR);
 	}
 
-	if ((ret = __wt_calloc(ienv, 1, sizeof(WT_FH), &fh)) != 0)
+	if ((ret = __wt_calloc(env, 1, sizeof(WT_FH), &fh)) != 0)
                 return (ret);
-	if ((ret = __wt_stat_alloc_fh(ienv, &fh->stats)) != 0)
+	if ((ret = __wt_stat_alloc_fh(env, &fh->stats)) != 0)
 		goto err;
-	if ((ret = __wt_strdup(ienv, name, &fh->name)) != 0)
+	if ((ret = __wt_strdup(env, name, &fh->name)) != 0)
 		goto err;
 
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
@@ -67,8 +65,8 @@ __wt_open(IENV *ienv,
 
 err:	if (fh != NULL) {
 		if (fh->name != NULL)
-			__wt_free(ienv, fh->name);
-		__wt_free(ienv, fh);
+			__wt_free(env, fh->name);
+		__wt_free(env, fh);
 	}
 	(void)close(fd);
 	return (WT_ERROR);
@@ -79,10 +77,10 @@ err:	if (fh != NULL) {
  *	Close a file handle.
  */
 int
-__wt_close(IENV *ienv, WT_FH *fh)
+__wt_close(ENV *env, WT_FH *fh)
 {
-	__wt_free(ienv, fh->name);
-	__wt_free(ienv, fh->stats);
-	__wt_free(ienv, fh);
+	__wt_free(env, fh->name);
+	__wt_free(env, fh->stats);
+	__wt_free(env, fh);
 	return (0);
 }

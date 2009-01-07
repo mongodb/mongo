@@ -123,28 +123,28 @@ __wt_env_stat_print(ENV *env, FILE *fp, u_int32_t flags);
 int
 __wt_env_stat_clear(ENV *env, u_int32_t flags);
 void
-__wt_abort(IENV *ienv);
+__wt_abort(ENV *env);
 int
-__wt_calloc(IENV *ienv, size_t number, size_t size, void *retp);
+__wt_calloc(ENV *env, size_t number, size_t size, void *retp);
 int
-__wt_malloc(IENV *ienv, size_t bytes_to_allocate, void *retp);
+__wt_malloc(ENV *env, size_t bytes_to_allocate, void *retp);
 int
-__wt_realloc(IENV *ienv, size_t bytes_to_allocate, void *retp);
+__wt_realloc(ENV *env, size_t bytes_to_allocate, void *retp);
 int
-__wt_strdup(IENV *ienv, const char *str, void *retp);
+__wt_strdup(ENV *env, const char *str, void *retp);
 void
-__wt_free(IENV *ienv, void *p);
+__wt_free(ENV *env, void *p);
 int
-__wt_filesize(IENV *ienv, WT_FH *fh, off_t *sizep);
+__wt_filesize(ENV *env, WT_FH *fh, off_t *sizep);
 int
-__wt_open(IENV *ienv,
+__wt_open(ENV *env,
     const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp);
 int
-__wt_close(IENV *ienv, WT_FH *fh);
+__wt_close(ENV *env, WT_FH *fh);
 int
-__wt_read(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf);
+__wt_read(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf);
 int
-__wt_write(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf);
+__wt_write(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf);
 u_int32_t
 __wt_cksum(void *chunk, size_t len);
 void
@@ -155,10 +155,9 @@ void
 __wt_errfile(FILE *fp,
     const char *pfx1, const char *pfx2, int error, const char *fmt, va_list ap);
 void
-__wt_assert(
-    IENV *ienv, const char *check, const char *file_name, int line_number);
+__wt_assert(ENV *env, const char *check, const char *file_name, int line_number);
 int
-__wt_api_flags(IENV *ienv, const char *name);
+__wt_api_flags(ENV *env, const char *name);
 int
 __wt_database_format(DB *db);
 void
@@ -176,14 +175,14 @@ __wt_db_config_methods_open(DB *db);
 u_int32_t
 __wt_prime(u_int32_t n);
 int
-__wt_stat_alloc_fh(IENV *ienv, WT_STATS **statsp);
+__wt_stat_alloc_fh(ENV *env, WT_STATS **statsp);
 int
 __wt_stat_clear_fh(WT_STATS *stats);
 int
-__wt_stat_alloc_db(IENV *ienv, WT_STATS **statsp);
+__wt_stat_alloc_db(ENV *env, WT_STATS **statsp);
 int
 __wt_stat_clear_db(WT_STATS *stats);
 int
-__wt_stat_alloc_env(IENV *ienv, WT_STATS **statsp);
+__wt_stat_alloc_env(ENV *env, WT_STATS **statsp);
 int
 __wt_stat_clear_env(WT_STATS *stats);

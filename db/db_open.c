@@ -18,16 +18,16 @@ static void __wt_db_idb_setup(DB *);
 int
 __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 {
+	ENV *env;
 	IDB *idb;
-	IENV *ienv;
 	int ret;
 
-	ienv = db->ienv;
+	env = db->env;
 	idb = db->idb;
 
 	DB_FLAG_CHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
 
-	if ((ret = __wt_strdup(ienv, file_name, &idb->file_name)) != 0)
+	if ((ret = __wt_strdup(env, file_name, &idb->file_name)) != 0)
 		goto err;
 	idb->mode = mode;
 	F_SET(idb, LF_ISSET(WT_CREATE));

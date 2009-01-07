@@ -16,10 +16,13 @@
 int
 __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx)
 {
+	ENV *env;
 	WT_ITEM *item;
 	u_int8_t *p;
 	u_int32_t size;
 	int ret;
+
+	env = db->env;
 
 	if (page->hdr->type == WT_PAGE_LEAF) {
 		if (indx->addr == WT_ADDR_INVALID) {
@@ -39,7 +42,7 @@ __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx)
 	}
 
 	if (data->alloc_size < size) {
-		if ((ret = __wt_realloc(db->ienv, size + 40, &data->data)) != 0)
+		if ((ret = __wt_realloc(env, size + 40, &data->data)) != 0)
 			return (ret);
 		data->alloc_size = size + 40;
 	}

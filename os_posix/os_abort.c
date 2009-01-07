@@ -14,11 +14,11 @@
  *	Abort the process, dropping core.
  */
 void
-__wt_abort(IENV *ienv)
+__wt_abort(ENV *env)
 {
-	/*lint -esym(715,ienv)
+	/*lint -esym(715,env)
 	 *
-	 * ienv isn't referenced, but this layer always takes an ienv
+	 * env isn't referenced, but this layer always takes an env
 	 * argument.
 	 */
 	abort();

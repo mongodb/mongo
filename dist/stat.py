@@ -68,11 +68,11 @@ for d in stats.iteritems():
 	tfile.write('\n')
 	tfile.write('int\n')
 	tfile.write('__wt_stat_alloc_' +\
-	    d[0] + '(IENV *ienv, WT_STATS **statsp)\n')
+	    d[0] + '(ENV *env, WT_STATS **statsp)\n')
 	tfile.write('{\n')
 	tfile.write('\tWT_STATS *stats;\n')
 	tfile.write('\tint ret;\n\n')
-	tfile.write('\tif ((ret = __wt_calloc(ienv,\n')
+	tfile.write('\tif ((ret = __wt_calloc(env,\n')
 	tfile.write('\t    WT_STAT_' + d[0].upper() +\
 	    '_TOTAL_ENTRIES + 1, sizeof(WT_STATS), &stats)) != 0)\n')
 	tfile.write('\t\treturn (ret);\n\n');

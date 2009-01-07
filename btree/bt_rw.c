@@ -36,7 +36,7 @@ __wt_cache_open(ENV *env)
 	 * per MB).
 	 */
 	ienv->hashsize = __wt_prime(env->cachesize * 8);
-	if ((ret = __wt_calloc(ienv,
+	if ((ret = __wt_calloc(env,
 	    ienv->hashsize, sizeof(ienv->hqh[0]), &ienv->hqh)) != 0)
 		return (ret);
 	for (i = 0; i < ienv->hashsize; ++i)
@@ -67,14 +67,14 @@ __wt_cache_close(ENV *env)
 	/* Discard pages. */
 	while ((page = TAILQ_FIRST(&ienv->lqh)) != NULL) {
 		/* There shouldn't be any pinned pages. */
-		WT_ASSERT(ienv, page->ref == 0);
+		WT_ASSERT(env, page->ref == 0);
 
 		if ((tret = __wt_cache_discard(env, page)) != 0 && ret == 0)
 			ret = tret;
 	}
 
 	/* There shouldn't be any allocated fragments. */
-	WT_ASSERT(ienv, ienv->cache_frags == 0);
+	WT_ASSERT(env, ienv->cache_frags == 0);
 }
 
 /*
@@ -84,20 +84,20 @@ __wt_cache_close(ENV *env)
 int
 __wt_cache_db_open(DB *db)
 {
+	ENV *env;
 	IDB *idb;
-	IENV *ienv;
 	off_t size;
 	int ret;
 
-	ienv = db->ienv;
+	env = db->env;
 	idb = db->idb;
 
 	/* Try and open the fle. */
-	if ((ret = __wt_open(ienv, idb->file_name, idb->mode,
+	if ((ret = __wt_open(env, idb->file_name, idb->mode,
 	    F_ISSET(idb, WT_CREATE) ? WT_OPEN_CREATE : 0, &idb->fh)) != 0)
 		return (ret);
 
-	if ((ret = __wt_filesize(ienv, idb->fh, &size)) != 0)
+	if ((ret = __wt_filesize(env, idb->fh, &size)) != 0)
 		goto err;
 
 	/* Convert the size in bytes to "fragments". */
@@ -105,7 +105,7 @@ __wt_cache_db_open(DB *db)
 
 	return (0);
 
-err:	(void)__wt_close(ienv, idb->fh);
+err:	(void)__wt_close(env, idb->fh);
 	return (ret);
 }
 
@@ -134,7 +134,7 @@ __wt_cache_db_close(DB *db)
 			continue;
 
 		/* There shouldn't be any pinned pages. */
-		WT_ASSERT(ienv, page->ref == 0);
+		WT_ASSERT(env, page->ref == 0);
 
 		if (F_ISSET(page, WT_MODIFIED) &&
 		    (tret = __wt_cache_write(env, db, page)) != 0 && ret == 0)
@@ -143,7 +143,7 @@ __wt_cache_db_close(DB *db)
 			ret = tret;
 	}
 
-	return (__wt_close(ienv, idb->fh));
+	return (__wt_close(env, idb->fh));
 }
 
 /*
@@ -170,7 +170,7 @@ __wt_cache_db_sync(DB *db)
 			continue;
 
 		/* There shouldn't be any pinned pages. */
-		WT_ASSERT(ienv, page->ref == 0);
+		WT_ASSERT(env, page->ref == 0);
 
 		if (F_ISSET(page, WT_MODIFIED) &&
 		    (ret = __wt_cache_write(env, db, page)) != 0)
@@ -219,11 +219,11 @@ __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	 *
 	 * Initialize the in-memory page structure.
 	 */
-	if ((ret = __wt_calloc(ienv, 1, sizeof(WT_PAGE), &page)) != 0)
+	if ((ret = __wt_calloc(env, 1, sizeof(WT_PAGE), &page)) != 0)
 		return (ret);
 	if ((ret = __wt_calloc(
-	    ienv, 1, (size_t)WT_FRAGS_TO_BYTES(db, frags), &page->hdr)) != 0) {
-		__wt_free(ienv, page);
+	    env, 1, (size_t)WT_FRAGS_TO_BYTES(db, frags), &page->hdr)) != 0) {
+		__wt_free(env, page);
 		return (ret);
 	}
 	page->fileid = idb->fileid;
@@ -299,11 +299,11 @@ __wt_cache_db_in(DB *db,
 
 	/* Allocate the memory to hold a new page. */
 	bytes = (size_t)WT_FRAGS_TO_BYTES(db, frags);
-	if ((ret = __wt_malloc(ienv, bytes, &hdr)) != 0)
+	if ((ret = __wt_malloc(env, bytes, &hdr)) != 0)
 		return (ret);
 
 	/* Read the page. */
-	if ((ret = __wt_read(ienv,
+	if ((ret = __wt_read(env,
 	    idb->fh, WT_FRAGS_TO_BYTES(db, addr), bytes, hdr)) != 0)
 		goto err;
 
@@ -321,7 +321,7 @@ __wt_cache_db_in(DB *db,
 	}
 
 	/* Allocate and initialize the in-memory page structure. */
-	if ((ret = __wt_calloc(ienv, 1, sizeof(WT_PAGE), &page)) != 0)
+	if ((ret = __wt_calloc(env, 1, sizeof(WT_PAGE), &page)) != 0)
 		goto err;
 	page->fileid = idb->fileid;
 	page->addr = addr;
@@ -339,14 +339,14 @@ __wt_cache_db_in(DB *db,
 	WT_STAT_INCR(env, CACHE_MISS, "reads not found in the cache");
 	WT_STAT_INCR(db, DB_CACHE_MISS, "reads not found in the cache");
 
-	WT_ASSERT(ienv, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
 	*pagep = page;
 	return (0);
 
 err:	if (page != NULL)
-		__wt_free(ienv, page);
-	__wt_free(ienv, hdr);
+		__wt_free(env, page);
+	__wt_free(env, hdr);
 	return (ret);
 }
 
@@ -367,10 +367,10 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	DB_FLAG_CHK(db, "__wt_cache_db_out", flags, WT_APIMASK_WT_CACHE_DB_OUT);
 
 	/* Check and decrement the reference count. */
-	WT_ASSERT(ienv, page->ref > 0);
+	WT_ASSERT(env, page->ref > 0);
 	--page->ref;
 
-	WT_ASSERT(ienv, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
 	/* If the page is dirty, set the modified flag. */
 	if (LF_ISSET(WT_MODIFIED)) {
@@ -433,12 +433,9 @@ static int
 __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 {
 	IDB *idb;
-	IENV *ienv;
 	WT_PAGE_HDR *hdr;
 	size_t bytes;
 	int ret;
-
-	ienv = env->ienv;
 
 	WT_STAT_INCR(env, CACHE_WRITE, "writes from the cache");
 
@@ -447,7 +444,7 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 		TAILQ_FOREACH(db, &env->dbqh, q)
 			if (page->fileid == db->idb->fileid)
 				break;
-		WT_ASSERT(ienv, db != NULL);
+		WT_ASSERT(env, db != NULL);
 	}
 	idb = db->idb;
 
@@ -458,7 +455,7 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 	hdr->checksum = __wt_cksum(hdr, bytes);
 
 	/* Write, and if successful, clear the modified flag. */
-	if ((ret = __wt_write(ienv, idb->fh,
+	if ((ret = __wt_write(env, idb->fh,
 	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr)) == 0) {
 		F_CLR(page, WT_MODIFIED);
 		WT_STAT_DECR(env, CACHE_DIRTY, NULL);
@@ -481,7 +478,7 @@ __wt_cache_discard(ENV *env, WT_PAGE *page)
 
 	ienv = env->ienv;
 
-	WT_ASSERT(ienv, page->ref == 0);
+	WT_ASSERT(env, page->ref == 0);
 
 	if (ienv->cache_frags < page->frags) {
 		__wt_env_errx(env, "allocated cache size went negative");
@@ -496,11 +493,11 @@ __wt_cache_discard(ENV *env, WT_PAGE *page)
 		if (F_ISSET(page, WT_ALLOCATED))
 			WT_INDX_FOREACH(page, indx, i)
 				if (F_ISSET(indx, WT_ALLOCATED))
-					__wt_free(ienv, indx->data);
-		__wt_free(ienv, page->indx);
+					__wt_free(env, indx->data);
+		__wt_free(env, page->indx);
 	}
-	__wt_free(ienv, page->hdr);
-	__wt_free(ienv, page);
+	__wt_free(env, page->hdr);
+	__wt_free(env, page);
 	return (0);
 }
 

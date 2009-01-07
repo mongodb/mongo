@@ -36,15 +36,15 @@ wt_env_create(ENV **envp, u_int32_t flags)
 
 	/*
 	 * !!!
-	 * For part of this function we don't have a valid IENV structure
+	 * For part of this function we don't have valid ENV/IENV structures
 	 * when calling other library functions.  The only such functions
-	 * that can handle a NULL IENV structure are the memory allocation
-	 * and free functions, no other functions may be called.
+	 * that can handle NULL structures are the memory allocation and free
+	 * functions, no other functions may be called.
 	 */
-	if ((ret = __wt_calloc(NULL, 1, sizeof(IENV), &ienv)) != 0)
+	if ((ret = __wt_calloc(NULL, 1, sizeof(ENV), &env)) != 0)
 		return (ret);
-	if ((ret = __wt_calloc(ienv, 1, sizeof(ENV), &env)) != 0) {
-		__wt_free(NULL, ienv);
+	if ((ret = __wt_calloc(NULL, 1, sizeof(IENV), &ienv)) != 0) {
+		__wt_free(NULL, env);
 		return (ret);
 	}
 
@@ -59,7 +59,7 @@ wt_env_create(ENV **envp, u_int32_t flags)
 
 	__wt_env_config_methods(env);
 
-	if ((ret = __wt_stat_alloc_env(ienv, &env->stats)) != 0)
+	if ((ret = __wt_stat_alloc_env(env, &env->stats)) != 0)
 		goto err;
 	if ((ret = __wt_env_config_default(env)) != 0)
 		goto err;
@@ -88,12 +88,12 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 
 	/*
 	 * !!!
-	 * For part of this function we don't have a valid IENV structure
+	 * For part of this function we don't have valid ENV/IENV structures
 	 * when calling other library functions.  The only such functions
-	 * that can handle a NULL IENV structure are the memory allocation
-	 * and free functions, no other functions may be called.
+	 * that can handle NULL structures are the memory allocation and free
+	 * functions, no other functions may be called.
 	 *
-	 * Discard the underlying IENV structure.
+	 * Discard the underlying structures.
 	 */
 	__wt_ienv_destroy(env, 0);
 

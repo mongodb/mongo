@@ -3,12 +3,12 @@
 #include "wt_internal.h"
 
 int
-__wt_stat_alloc_fh(IENV *ienv, WT_STATS **statsp)
+__wt_stat_alloc_fh(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 	int ret;
 
-	if ((ret = __wt_calloc(ienv,
+	if ((ret = __wt_calloc(env,
 	    WT_STAT_FH_TOTAL_ENTRIES + 1, sizeof(WT_STATS), &stats)) != 0)
 		return (ret);
 
@@ -28,12 +28,12 @@ __wt_stat_clear_fh(WT_STATS *stats)
 }
 
 int
-__wt_stat_alloc_db(IENV *ienv, WT_STATS **statsp)
+__wt_stat_alloc_db(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 	int ret;
 
-	if ((ret = __wt_calloc(ienv,
+	if ((ret = __wt_calloc(env,
 	    WT_STAT_DB_TOTAL_ENTRIES + 1, sizeof(WT_STATS), &stats)) != 0)
 		return (ret);
 
@@ -67,12 +67,12 @@ __wt_stat_clear_db(WT_STATS *stats)
 }
 
 int
-__wt_stat_alloc_env(IENV *ienv, WT_STATS **statsp)
+__wt_stat_alloc_env(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 	int ret;
 
-	if ((ret = __wt_calloc(ienv,
+	if ((ret = __wt_calloc(env,
 	    WT_STAT_ENV_TOTAL_ENTRIES + 1, sizeof(WT_STATS), &stats)) != 0)
 		return (ret);
 

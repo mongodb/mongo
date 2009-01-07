@@ -23,16 +23,16 @@ extern "C" {
  */
 #define	DB_FLAG_CHK(db, name, f, mask)					\
 	if ((f) & ~(mask))						\
-		return (__wt_api_flags((db)->ienv, name));
+		return (__wt_api_flags((db)->env, name));
 #define	DB_FLAG_CHK_NOTFATAL(db, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
-		(ret) = __wt_api_flags((db)->ienv, name);
+		(ret) = __wt_api_flags((db)->env, name);
 #define	ENV_FLAG_CHK(env, name, f, mask)				\
 	if ((f) & ~(mask))						\
-		return (__wt_api_flags((env)->ienv, name));
+		return (__wt_api_flags(env, name));
 #define	ENV_FLAG_CHK_NOTFATAL(env, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
-		(ret) = __wt_api_flags((env)->ienv, name);
+		(ret) = __wt_api_flags(env, name);
 
 /*
  * Flag set, clear and test.  They come in 3 flavors: F_XXX (handles a
@@ -62,8 +62,8 @@ extern "C" {
 #define	OVERWRITE_BYTE	0xab
 
 #ifdef HAVE_DIAGNOSTIC
-#define WT_ASSERT(ienv, e)						\
-	((e) ? (void)0 : __wt_assert(ienv, #e, __FILE__, __LINE__))
+#define WT_ASSERT(env, e)						\
+	((e) ? (void)0 : __wt_assert(env, #e, __FILE__, __LINE__))
 #else
 #define WT_ASSERT(ienv, e)
 #endif

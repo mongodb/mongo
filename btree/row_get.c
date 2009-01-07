@@ -18,14 +18,17 @@ static int __wt_bt_search(DB *, DBT *, WT_PAGE **, WT_INDX **);
 int
 __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
+	ENV *env;
 	WT_PAGE *page;
 	WT_INDX *indx;
 	WT_ITEM *item;
 	int ret, tret;
 
+	env = db->env;
+
 	DB_FLAG_CHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
 
-	WT_ASSERT(db->ienv, pkey == NULL);
+	WT_ASSERT(env, pkey == NULL);
 
 	/* Search the primary btree for the key. */
 	if ((ret = __wt_bt_search(db, key, &page, &indx)) != 0)

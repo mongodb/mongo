@@ -30,7 +30,7 @@ int
 __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 {
 	DBT last_key_ovfl, last_key_std, *last_key;
-	IENV *ienv;
+	ENV *env;
 	WT_ITEM *item;
 	WT_ITEM_OFFP *offp;
 	WT_ITEM_OVFL *ovfl;
@@ -44,7 +44,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	if (LF_ISSET(WT_DEBUG))
 		return (__wt_bt_dump_debug(db, NULL, stream));
 
-	ienv = db->ienv;
+	env = db->env;
 	dup_ahead = ret = 0;
 	func = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;
 
@@ -148,7 +148,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 
 	/* Discard any space allocated to hold an overflow key. */
 	if (last_key_ovfl.data != NULL)
-		__wt_free(ienv, last_key_ovfl.data);
+		__wt_free(env, last_key_ovfl.data);
 
 
 	if (0) {

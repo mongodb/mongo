@@ -14,12 +14,8 @@
  *	Read a file handle.
  */
 int
-__wt_read(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf)
+__wt_read(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 {
-	ENV *env;
-
-	env = ienv->env;
-
 	WT_STAT_INCR(fh, READ_IO, "count of read I/Os");
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
@@ -39,12 +35,8 @@ __wt_read(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf)
  *	Write a file handle.
  */
 int
-__wt_write(IENV *ienv, WT_FH *fh, off_t offset, size_t bytes, void *buf)
+__wt_write(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 {
-	ENV *env;
-
-	env = ienv->env;
-	
 	WT_STAT_INCR(fh, WRITE_IO, "count of write I/Os");
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))

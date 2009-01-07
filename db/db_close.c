@@ -16,18 +16,18 @@
 int
 __wt_db_close(DB *db, u_int32_t flags)
 {
+	ENV *env;
 	IDB *idb;
-	IENV *ienv;
 	int ret, tret;
 
+	env = db->env;
 	idb = db->idb;
-	ienv = db->ienv;
 	ret = 0;
 
 	DB_FLAG_CHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
 
 	/* Free associated memory. */
-	__wt_free(ienv, idb->file_name);
+	__wt_free(env, idb->file_name);
 
 	/* Close the underlying Btree. */
 	if ((tret = __wt_bt_close(db)) != 0 && ret == 0)

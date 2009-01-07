@@ -83,13 +83,12 @@ __wt_errfile(FILE *fp,
  *	Internal version of assert function.
  */
 void
-__wt_assert(
-    IENV *ienv, const char *check, const char *file_name, int line_number)
+__wt_assert(ENV *env, const char *check, const char *file_name, int line_number)
 {
-	__wt_env_errx(ienv->env,
+	__wt_env_errx(env,
 	    "assertion failure: %s/%d: \"%s\"", file_name, line_number, check);
 
-	__wt_abort(ienv);
+	__wt_abort(env);
 	/* NOTREACHED */
 }
 #endif
@@ -100,9 +99,9 @@ __wt_assert(
  *	flags.
  */
 int
-__wt_api_flags(IENV *ienv, const char *name)
+__wt_api_flags(ENV *env, const char *name)
 {
-	__wt_env_errx(ienv->env, "%s: illegal API flag specified", name);
+	__wt_env_errx(env, "%s: illegal API flag specified", name);
 	return (WT_ERROR);
 }
 

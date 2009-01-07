@@ -18,7 +18,6 @@ static int __wt_db_config_default(DB *);
 int
 wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 {
-	IENV *ienv;
 	DB *db;
 	IDB *idb;
 	int ret;
@@ -28,7 +27,7 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 
 	/*
 	 * !!!
-	 * We may not have been passed a valid IENV structure -- get one
+	 * We may not have been passed a valid ENV structure -- get one
 	 * before doing anything else.
 	 */
 	if (env == NULL) {
@@ -38,22 +37,21 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 		if ((ret = env->open(env, NULL, 0, 0)) != 0)
 			goto err;
 	}
-	ienv = env->ienv;
 
 	/*
 	 * !!!
 	 * Get valid DB and IDB structures next, then everything should
 	 * work.
 	 */
-	if ((ret = __wt_calloc(ienv, 1, sizeof(DB), &db)) != 0 ||
-	    (ret = __wt_calloc(ienv, 1, sizeof(IDB), &idb)) != 0)
+	if ((ret = __wt_calloc(env, 1, sizeof(DB), &db)) != 0 ||
+	    (ret = __wt_calloc(env, 1, sizeof(IDB), &idb)) != 0)
 		goto err;
 
 	/* Connect everything together. */
 	db->idb = idb;
 	idb->db = db;
 	db->env = env;
-	db->ienv = ienv;
+	db->ienv = env->ienv;
 	TAILQ_INSERT_TAIL(&env->dbqh, db, q);
 
 	DB_FLAG_CHK_NOTFATAL(
@@ -63,7 +61,7 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 
 	__wt_db_config_methods(db);
 
-	if ((ret = __wt_stat_alloc_db(ienv, &db->stats)) != 0)
+	if ((ret = __wt_stat_alloc_db(env, &db->stats)) != 0)
 		goto err;
 	if ((ret = __wt_db_config_default(db)) != 0)
 		goto err;
@@ -72,9 +70,9 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	return (0);
 
 err:	if (idb != NULL)
-		__wt_free(ienv, idb);
+		__wt_free(env, idb);
 	if (db != NULL)
-		__wt_free(ienv, db);
+		__wt_free(env, db);
 	if (env != NULL && F_ISSET(env, WT_PRIVATE_ENV))
 		(void)env->destroy(env, 0);
 	return (ret);
@@ -88,11 +86,9 @@ int
 __wt_db_destroy(DB *db, u_int32_t flags)
 {
 	ENV *env;
-	IENV *ienv;
 	int is_private, ret;
 
 	env = db->env;
-	ienv = env->ienv;
 	ret = 0;
 
 	DB_FLAG_CHK_NOTFATAL(
@@ -105,14 +101,14 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 	__wt_idb_destroy(db, 0);
 
 	/* Free any allocated memory. */
-	__wt_free(ienv, db->stats);
+	__wt_free(env, db->stats);
 
 	/* Disconnect from the list. */
 	TAILQ_REMOVE(&env->dbqh, db, q);
 
 	/* Free the DB structure. */
 	memset(db, OVERWRITE_BYTE, sizeof(db));
-	__wt_free(ienv, db);
+	__wt_free(env, db);
 
 	if (is_private)
 		(void)env->destroy(env, 0);
@@ -127,14 +123,14 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 void
 __wt_idb_destroy(DB *db, int refresh)
 {
+	ENV *env;
 	IDB *idb;
-	IENV *ienv;
 
+	env = db->env;
 	idb = db->idb;
-	ienv = db->ienv;
 
 	/* Free the actual structure. */
-	__wt_free(ienv, db->idb);
+	__wt_free(env, db->idb);
 	db->idb = NULL;
 
 	if (!refresh)
@@ -157,7 +153,7 @@ __wt_idb_destroy(DB *db, int refresh)
 	 *	return, so this only gets called in a few, nasty error paths,
 	 *	immediately before returning to the user.
 	 */
-	if (__wt_calloc(ienv, 1, sizeof(IDB), &idb) != 0)
+	if (__wt_calloc(env, 1, sizeof(IDB), &idb) != 0)
 		__wt_db_config_methods_lockout(db);
 	else {
 		db->idb = idb;
