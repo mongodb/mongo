@@ -130,7 +130,7 @@ __wt_cache_db_close(DB *db)
 	/* Write any modified pages, discard pages. */
 	while ((page = TAILQ_FIRST(&ienv->lqh)) != NULL) {
 		/* Ignore other files */
-		if (page->fileid != idb->fileid)
+		if (page->file_id != idb->file_id)
 			continue;
 
 		/* There shouldn't be any pinned pages. */
@@ -166,7 +166,7 @@ __wt_cache_db_sync(DB *db)
 	/* Write any modified pages. */
 	TAILQ_FOREACH(page, &ienv->lqh, q) {
 		/* Ignore other files */
-		if (page->fileid != idb->fileid)
+		if (page->file_id != idb->file_id)
 			continue;
 
 		/* There shouldn't be any pinned pages. */
@@ -226,7 +226,7 @@ __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 		__wt_free(env, page);
 		return (ret);
 	}
-	page->fileid = idb->fileid;
+	page->file_id = idb->file_id;
 	page->addr = idb->frags;
 	idb->frags += frags;
 	page->frags = frags;
@@ -272,7 +272,7 @@ __wt_cache_db_in(DB *db,
 	/* Check for the page in the cache. */
 	hashq = &ienv->hqh[WT_HASH(ienv, addr)];
 	TAILQ_FOREACH(page, hashq, hq)
-		if (page->addr == addr && page->fileid == idb->fileid)
+		if (page->addr == addr && page->file_id == idb->file_id)
 			break;
 	if (page != NULL) {
 		++page->ref;
@@ -323,7 +323,7 @@ __wt_cache_db_in(DB *db,
 	/* Allocate and initialize the in-memory page structure. */
 	if ((ret = __wt_calloc(env, 1, sizeof(WT_PAGE), &page)) != 0)
 		goto err;
-	page->fileid = idb->fileid;
+	page->file_id = idb->file_id;
 	page->addr = addr;
 	page->frags = frags;
 	page->hdr = hdr;
@@ -442,7 +442,7 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 	/* If not included, find the underlying DB handle. */
 	if (db == NULL) {
 		TAILQ_FOREACH(db, &env->dbqh, q)
-			if (page->fileid == db->idb->fileid)
+			if (page->file_id == db->idb->file_id)
 				break;
 		WT_ASSERT(env, db != NULL);
 	}

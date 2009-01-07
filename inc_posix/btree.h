@@ -84,7 +84,7 @@ typedef	struct __wt_indx {
 } WT_INDX;
 
 struct __wt_page {
-	u_int32_t    fileid;			/* File ID */
+	u_int32_t    file_id;			/* File ID */
 	u_int32_t    addr;			/* File block address */
 	u_int32_t    frags;			/* Number of fragments */
 	WT_PAGE_HDR *hdr;			/* On-disk page */

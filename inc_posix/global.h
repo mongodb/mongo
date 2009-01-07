@@ -17,9 +17,9 @@ extern "C" {
 struct __wt_globals {
 	char *sep;				/* Display separator line */
 
-	char  err_buf[32];			/* Last-ditch error buffer */
+	char err_buf[32];			/* Last-ditch error buffer */
 
-	int   file_id;				/* Serial file ID */
+	u_int32_t file_id;			/* Serial file ID */
 };
 
 extern WT_GLOBALS __wt_globals;

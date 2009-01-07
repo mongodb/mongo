@@ -59,5 +59,5 @@ __wt_db_idb_setup(DB *db)
 
 	idb = db->idb;
 
-	idb->fileid = ++WT_GLOBAL(file_id);
+	idb->file_id = ++WT_GLOBAL(file_id);
 }

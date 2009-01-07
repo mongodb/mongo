@@ -68,7 +68,7 @@ struct __idb {
 	char	 *file_name;		/* Database file name */
 	mode_t	  mode;			/* Database file create mode */
 
-	u_int32_t fileid;		/* In-memory file id */
+	u_int32_t file_id;		/* In-memory file id */
 	WT_FH	 *fh;			/* Backing file handle */
 	u_int32_t frags;		/* Total fragments in the file */
 
