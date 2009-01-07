@@ -102,7 +102,7 @@ struct __ienv {
 	 * based on its file and page number, and an LRU list.
 	 */
 	int hashsize;
-#define	WT_HASH(ienv, pgno)	((pgno) % (ienv)->hashsize)
+#define	WT_HASH(ienv, addr)	((addr) % (ienv)->hashsize)
 	TAILQ_HEAD(__wt_page_hqh, __wt_page) *hqh;
 	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;
 
