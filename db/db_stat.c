@@ -16,7 +16,10 @@
 int
 __wt_db_stat_print(DB *db, FILE *fp, u_int32_t flags)
 {
+	IDB *idb;
 	WT_STATS *stats;
+
+	idb = db->idb;
 
 	DB_FLAG_CHK(db, "Db.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
 
@@ -24,6 +27,9 @@ __wt_db_stat_print(DB *db, FILE *fp, u_int32_t flags)
 	fprintf(fp, "Db: %s\n", db->idb->file_name);
 	for (stats = db->stats; stats->desc != NULL; ++stats)
 		fprintf(fp, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+	if (idb->fh != NULL)
+		for (stats = idb->fh->stats; stats->desc != NULL; ++stats)
+			fprintf(fp, "%lu\t%s\n", (u_long)stats->v, stats->desc);
 	return (0);
 }
 
