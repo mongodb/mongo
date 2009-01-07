@@ -227,10 +227,6 @@ public:
     }
 } cmdForceError;
 
-/* todo: we should use java.security.SecureRandom here, or something else similar */
-class CmdGetNonce : public Command { 
-};
-
 class CmdGetPrevError : public Command { 
 public:
     virtual bool logTheOp() { return false; }

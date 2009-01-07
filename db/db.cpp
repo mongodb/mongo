@@ -307,7 +307,7 @@ void initAndListen(int listenPort, const char *appserverLoc = null) {
 
     repairDatabases();
 
-    /* this is for dbcommands getnonce */
+    /* this is for security on certain platforms */
     srand(curTimeMillis() ^ startupSrandTimer.micros());
 
     listen(listenPort);
@@ -317,9 +317,6 @@ void initAndListen(int listenPort, const char *appserverLoc = null) {
 int test2();
 void testClient();
 void pipeSigHandler( int signal );
-
-#include "../util/md5.hpp"
-extern "C" int do_md5_test(void);
 
 int main(int argc, char* argv[], char *envp[] )
 {
@@ -341,8 +338,6 @@ int main(int argc, char* argv[], char *envp[] )
     signal(SIGPIPE, pipeSigHandler);
 #endif
     UnitTest::runTests();
-    if( do_md5_test() )
-        return 30;
 
     if ( argc >= 2 ) {
         if ( strcmp(argv[1], "quicktest") == 0 ) {
@@ -541,7 +536,7 @@ void mysighandler(int x) {
     cout << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
     {
         dblock lk;
-        problem() << "  now exiting" << endl;
+        log() << "now exiting" << endl;
         exit(12);
     }
 }
