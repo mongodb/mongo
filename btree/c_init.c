@@ -25,7 +25,7 @@ int
 __wt_cache_open(ENV *env)
 {
 	IENV *ienv;
-	u_int32_t buckets, i;
+	u_int32_t i;
 	int ret;
 
 	ienv = env->ienv;
@@ -35,12 +35,11 @@ __wt_cache_open(ENV *env)
 	 * 16KB pages, and 8 pages per bucket (which works out to 8 buckets
 	 * per MB).
 	 */
-	buckets = env->cachesize * 8;
-	ienv->hashsize = __wt_prime(buckets);
-	if ((ret =
-	    __wt_calloc(ienv, buckets, sizeof(ienv->hqh[0]), &ienv->hqh)) != 0)
+	ienv->hashsize = __wt_prime(env->cachesize * 8);
+	if ((ret = __wt_calloc(ienv,
+	    ienv->hashsize, sizeof(ienv->hqh[0]), &ienv->hqh)) != 0)
 		return (ret);
-	for (i = 0; i < buckets; ++i)
+	for (i = 0; i < ienv->hashsize; ++i)
 		TAILQ_INIT(&ienv->hqh[i]);
 	TAILQ_INIT(&ienv->lqh);
 
