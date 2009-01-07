@@ -101,7 +101,7 @@ struct __ienv {
 	 * Each in-memory page is threaded on two queues: a hash queue
 	 * based on its file and page number, and an LRU list.
 	 */
-	int hashsize;
+	u_int32_t hashsize;
 #define	WT_HASH(ienv, addr)	((addr) % (ienv)->hashsize)
 	TAILQ_HEAD(__wt_page_hqh, __wt_page) *hqh;
 	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;

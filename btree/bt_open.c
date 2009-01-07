@@ -18,7 +18,7 @@ __wt_bt_open(DB *db)
 {
 	IDB *idb;
 	WT_PAGE_DESC desc;
-	int i, ret;
+	int ret;
 
 	idb = db->idb;
 

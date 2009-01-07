@@ -57,7 +57,6 @@ int
 __wt_cache_close(ENV *env)
 {
 	IENV *ienv;
-	IDB *idb;
 	WT_PAGE *page;
 	int ret, tret;
 
@@ -75,6 +74,8 @@ __wt_cache_close(ENV *env)
 
 	/* There shouldn't be any allocated fragments. */
 	WT_ASSERT(env, ienv->cache_frags == 0);
+
+	return (ret);
 }
 
 /*
@@ -358,11 +359,9 @@ int
 __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 {
 	ENV *env;
-	IENV *ienv;
 	int ret;
 
 	env = db->env;
-	ienv = db->ienv;
 
 	DB_FLAG_CHK(db, "__wt_cache_db_out", flags, WT_APIMASK_WT_CACHE_DB_OUT);
 

@@ -108,6 +108,7 @@ __wt_bt_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits, FILE *fp)
 	int first, ret, tret;
 
 	descend_addr = WT_ADDR_INVALID;
+	ret = 0;
 
 	/*
 	 * The plan is pretty simple.  We read through the levels of the tree,
