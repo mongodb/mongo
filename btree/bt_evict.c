@@ -438,7 +438,6 @@ __wt_cache_clean(ENV *env)
 static int
 __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 {
-	IDB *idb;
 	WT_PAGE_HDR *hdr;
 	size_t bytes;
 	int ret;
@@ -452,7 +451,6 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 				break;
 		WT_ASSERT(env, db != NULL);
 	}
-	idb = db->idb;
 
 	/* Update the checksum. */
 	bytes = (size_t)WT_FRAGS_TO_BYTES(db, page->frags);
@@ -461,7 +459,7 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 	hdr->checksum = __wt_cksum(hdr, bytes);
 
 	/* Write, and if successful, clear the modified flag. */
-	if ((ret = __wt_write(env, idb->fh,
+	if ((ret = __wt_write(env, db->idb->fh,
 	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr)) == 0) {
 		F_CLR(page, WT_MODIFIED);
 		WT_STAT_DECR(env, CACHE_DIRTY, NULL);
