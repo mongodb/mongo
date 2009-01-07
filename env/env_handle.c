@@ -59,6 +59,8 @@ wt_env_create(ENV **envp, u_int32_t flags)
 
 	__wt_env_config_methods(env);
 
+	if ((ret = __wt_stat_alloc_env(ienv, &env->stats)) != 0)
+		goto err;
 	if ((ret = __wt_env_config_default(env)) != 0)
 		goto err;
 
