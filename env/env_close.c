@@ -11,17 +11,18 @@
 
 /*
  * __wt_env_close --
- *	Close a Env handle.
+ *	Close an Env handle.
  */
 int
 __wt_env_close(ENV *env, u_int32_t flags)
 {
 	int ret;
 
-	ret = 0;
-
 	ENV_FLAG_CHK_NOTFATAL(
 	    env, "ENV.close", flags, WT_APIMASK_ENV_CLOSE, ret);
+
+	/* Destroy the cache. */
+	ret = __wt_cache_close(env);
 
 	/* Reset the methods that are permitted. */
 	__wt_env_config_methods(env);
