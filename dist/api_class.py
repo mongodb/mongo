@@ -45,6 +45,12 @@ env	methodV
 	err	int, const char *, ...
 env	methodV
 	errx	const char *, ...
+env	method
+	open	const char *, mode_t, u_int32_t
+env	method
+	stat_clear	u_int32_t
+env	method
+	stat_print	FILE *, u_int32_t
 
 ###################################################
 # Db getter/setter method declarations
