@@ -372,15 +372,21 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 
 	WT_ASSERT(ienv, __wt_db_verify_page(db, page, NULL) == 0);
 
-	/* If the page is worthless, discard it. */
-	if (LF_ISSET(WT_DISCARD) && (ret = __wt_cache_discard(env, page)) != 0)
-		return (ret);
-
 	/* If the page is dirty, set the modified flag. */
 	if (LF_ISSET(WT_MODIFIED)) {
 		F_SET(page, WT_MODIFIED);
 		WT_STAT_INCR(env, CACHE_DIRTY, "dirty pages in the cache");
 	}
+
+	/*
+	 * If the page is not dirty and marked worthless, discard it.  (We
+	 * can't discard modified pages, some thread of control thinks it's
+	 * useful...).
+	 */
+	if (LF_ISSET(WT_DISCARD) &&
+	    !F_ISSET(page, WT_MODIFIED) &&
+	    (ret = __wt_cache_discard(env, page)) != 0)
+		return (ret);
 
 	return (0);
 }
