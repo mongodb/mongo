@@ -13,7 +13,6 @@ static int  __wt_db_dump_addr(DB *, u_int32_t, char *, FILE *);
 static void __wt_db_dump_dbt(DBT *, FILE *);
 static void __wt_db_dump_item(DB *, WT_ITEM *, FILE *);
 static void __wt_db_dump_item_data (DB *, WT_ITEM *, FILE *);
-static int  __wt_db_dump_page(DB *, WT_PAGE *, char *, FILE *);
 
 #ifdef HAVE_DIAGNOSTIC
 /*
@@ -33,12 +32,7 @@ __wt_db_force_load(void)
 int
 __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 {
-	IDB *idb;
-	WT_PAGE *page;
-	u_int32_t addr, frags;
-	int do_close, ret, tret;
-
-	idb = db->idb;
+	int do_close, ret;
 
 	/* Optionally dump to a file, else to a stream, default to stdout. */
 	do_close = 0;
@@ -49,40 +43,14 @@ __wt_db_dump_debug(DB *db, char *ofile, FILE *fp)
 	} else if (fp == NULL)
 		fp = stdout;
 
-	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		/* Read a database page of information. */
-		frags = WT_FRAGS_PER_PAGE(db);
-		if ((ret = __wt_cache_db_in(
-		    db, addr, frags, &page, WT_NO_CHECKSUM)) != 0)
-			break;
-
-		/*
-		 * Check for overflow pages.  Reads of overflow pages from
-		 * the disk may not be the right length.  (If we read the
-		 * page out of the cache, it will be OK, it's only if it
-		 * was read from the disk that it might be wrong.)  Check
-		 * the length, and if it's incorrect, discard this page and
-		 * get the right one.
-		 */
-		if (page->hdr->type == WT_PAGE_OVFL) {
-			frags = WT_BYTES_TO_FRAGS(db, page->hdr->u.datalen);
-			if (frags != page->frags && (
-			    (ret = __wt_cache_db_out(
-			    db, page, WT_DISCARD)) != 0 ||
-			    (ret = __wt_cache_db_in(
-			    db, addr, frags, &page, WT_NO_CHECKSUM)) != 0))
-				break;
-		}
-
-		ret = __wt_db_dump_page(db, page, NULL, fp);
-
-		if ((tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
-			ret = tret;
-
-		addr += frags;
-		if (ret != 0 || addr >= idb->frags)
-			break;
-	}
+	/*
+	 * We use the verification code to do debugging dumps for two reasons:
+	 * First, if we're dumping in debugging mode, it's best to check that
+	 * the page is OK before walking it.  Second, the verification code has
+	 * to walk the entire tree anyway, and there's a fair amount of effort
+	 * involved in walking every page of a file safely.
+	 */
+	ret = __wt_db_verify_int(db, fp);
 
 	if (do_close)
 		(void)fclose(fp);
@@ -116,7 +84,7 @@ __wt_db_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
  * __wt_db_dump_page --
  *	Dump a single page in debugging mode.
  */
-static int
+int
 __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	WT_ITEM *item;
@@ -207,7 +175,7 @@ __wt_db_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 
 /*
  * __wt_db_dump_item --
- *	Dump a single item.
+ *	Dump a single item in debugging mode.
  */
 static void
 __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
@@ -225,7 +193,7 @@ __wt_db_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 
 /*
  * __wt_db_dump_item_data --
- *	Dump an item's data.
+ *	Dump a single item's data in debugging mode.
  */
 static void
 __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
@@ -267,7 +235,7 @@ __wt_db_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 
 /*
  * __wt_db_dump_dbt --
- *	Dump a single DBT.
+ *	Dump a single DBT in debugging mode.
  */
 static void
 __wt_db_dump_dbt(DBT *dbt, FILE *fp)

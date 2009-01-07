@@ -9,10 +9,11 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_item_walk(DB *, WT_PAGE *, bitstr_t *);
+static int __wt_db_item_walk(DB *, WT_PAGE *, bitstr_t *, FILE *);
 static int __wt_db_verify_checkfrag(DB *, bitstr_t *);
-static int __wt_db_verify_level(DB *, u_int32_t, bitstr_t *);
-static int __wt_db_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *);
+static int __wt_db_verify_connections(DB *, WT_PAGE *, bitstr_t *, FILE *);
+static int __wt_db_verify_level(DB *, u_int32_t, bitstr_t *, FILE *);
+static int __wt_db_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *, FILE *);
 
 /*
  * __wt_db_verify --
@@ -20,6 +21,19 @@ static int __wt_db_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *);
  */
 int
 __wt_db_verify(DB *db, u_int32_t flags)
+{
+	DB_FLAG_CHK(db, "Db.verify", flags, WT_APIMASK_DB_VERIFY);
+
+	return (__wt_db_verify_int(db, NULL));
+}
+
+/*
+ * __wt_db_verify_int --
+ *	Verify a Btree, internal version, optionally dumping each page in
+ *	debugging mode.
+ */
+int
+__wt_db_verify_int(DB *db, FILE *fp)
 {
 	IDB *idb;
 	IENV *ienv;
@@ -31,8 +45,6 @@ __wt_db_verify(DB *db, u_int32_t flags)
 	ienv = db->ienv;
 	idb = db->idb;
 	ret = 0;
-
-	DB_FLAG_CHK(db, "Db.verify", flags, WT_APIMASK_DB_VERIFY);
 
 	/*
 	 * Allocate a bit array to represent the fragments in the file --
@@ -66,13 +78,13 @@ __wt_db_verify(DB *db, u_int32_t flags)
 		if ((ret = __wt_cache_db_in(db,
 		    WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
 			goto err;
-		if ((ret = __wt_db_verify_page(db, page, fragbits)) != 0)
+		if ((ret = __wt_db_verify_page(db, page, fragbits, fp)) != 0)
 			goto err;
 		if ((ret = __wt_cache_db_out(db, page, 0)) != 0)
 			goto err;
 	} else
-		if ((ret =
-		    __wt_db_verify_level(db, desc.root_addr, fragbits)) != 0)
+		if ((ret = __wt_db_verify_level(
+		    db, desc.root_addr, fragbits, fp)) != 0)
 			goto err;
 
 	ret = __wt_db_verify_checkfrag(db, fragbits);
@@ -86,7 +98,7 @@ err:	__wt_free(ienv, fragbits);
  *	Verify a level of a tree.
  */
 static int
-__wt_db_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits)
+__wt_db_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits, FILE *fp)
 {
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
@@ -183,7 +195,7 @@ __wt_db_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits)
 			return (ret);
 
 		/* Verify the page. */
-		if ((ret = __wt_db_verify_page(db, page, fragbits)) != 0)
+		if ((ret = __wt_db_verify_page(db, page, fragbits, fp)) != 0)
 			goto err;
 
 		/*
@@ -211,12 +223,17 @@ __wt_db_verify_level(DB *db, u_int32_t addr, bitstr_t *fragbits)
 				func = db->btree_compare;
 		}
 
-		/* The page is OK, instantiate its in-memory information. */
-		if ((ret = __wt_page_inmem(db, page)) != 0)
+		/*
+		 * The page is OK, instantiate its in-memory information, if
+		 * we don't have it already.
+		 */
+		if (page->indx == NULL &&
+		    (ret = __wt_page_inmem(db, page)) != 0)
 			goto err;
 
 		/* Verify its connections. */
-		if ((ret = __wt_db_verify_connections(db, page, fragbits)) != 0)
+		if ((ret =
+		    __wt_db_verify_connections(db, page, fragbits, fp)) != 0)
 			goto err;
 
 		if (prev == NULL)
@@ -257,7 +274,7 @@ err:	if (prev != NULL &&
 		ret = tret;
 
 	if (ret == 0 && descend_addr != WT_ADDR_INVALID)
-		ret = __wt_db_verify_level(db, descend_addr, fragbits);
+		ret = __wt_db_verify_level(db, descend_addr, fragbits, fp);
 
 	return (ret);
 }
@@ -266,8 +283,8 @@ err:	if (prev != NULL &&
  * __wt_db_verify_connections --
  *	Verify that the page is in the right place in the tree.
  */	
-int
-__wt_db_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
+static int
+__wt_db_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits, FILE *fp)
 {
 	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
@@ -471,7 +488,7 @@ err:		ret = WT_ERROR;
  *	Verify a single Btree page.
  */
 int
-__wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits)
+__wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 {
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, i;
@@ -540,7 +557,7 @@ __wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits)
 
 	/* Verify the items on the page. */
 	if (hdr->type != WT_PAGE_OVFL &&
-	    (ret = __wt_db_item_walk(db, page, fragbits)) != 0)
+	    (ret = __wt_db_item_walk(db, page, fragbits, fp)) != 0)
 		return (ret);
 
 	return (0);
@@ -551,7 +568,7 @@ __wt_db_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits)
  *	Walk the items on a page and verify them.
  */
 static int
-__wt_db_item_walk(DB *db, WT_PAGE *page, bitstr_t *fragbits)
+__wt_db_item_walk(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 {
 	struct {
 		u_int32_t indx;			/* Item number */
@@ -695,14 +712,15 @@ eop:			__wt_db_errx(db,
 			    page->hdr->type == WT_PAGE_LEAF &&
 			    (ret = __wt_db_verify_level(db,
 			    ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr,
-			    fragbits)) != 0)
+			    fragbits, fp)) != 0)
 				goto err;
 
 			if ((item->type == WT_ITEM_KEY_OVFL ||
 			    item->type == WT_ITEM_DATA_OVFL ||
 			    item->type == WT_ITEM_DUP_OVFL) &&
 			    (ret = __wt_db_verify_ovfl(db,
-			    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item), fragbits)) != 0)
+			    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item),
+			    fragbits, fp)) != 0)
 				goto err;
 		}
 
@@ -784,6 +802,12 @@ err:		ret = WT_ERROR;
 	if (_c.item_ovfl.data != NULL)
 		__wt_free(ienv, _c.item_ovfl.data);
 
+#ifdef HAVE_DIAGNOSTIC
+	/* Optionally dump the page in debugging mode. */
+	if (ret == 0 && fp != NULL)
+		ret = __wt_db_dump_page(db, page, NULL, fp);
+#endif
+
 	return (ret);
 }
 
@@ -792,7 +816,7 @@ err:		ret = WT_ERROR;
  *	Verify an overflow item.
  */
 static int
-__wt_db_verify_ovfl(DB *db, WT_ITEM_OVFL *ovfl, bitstr_t *fragbits)
+__wt_db_verify_ovfl(DB *db, WT_ITEM_OVFL *ovfl, bitstr_t *fragbits, FILE *fp)
 {
 	WT_PAGE *ovfl_page;
 	int ret, tret;
@@ -801,7 +825,7 @@ __wt_db_verify_ovfl(DB *db, WT_ITEM_OVFL *ovfl, bitstr_t *fragbits)
 	    WT_OVFL_BYTES_TO_FRAGS(db, ovfl->len), &ovfl_page, 0)) != 0)
 		return (ret);
 
-	ret = __wt_db_verify_page(db, ovfl_page, fragbits);
+	ret = __wt_db_verify_page(db, ovfl_page, fragbits, fp);
 
 	if ((tret = __wt_cache_db_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
