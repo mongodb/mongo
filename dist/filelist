@@ -19,7 +19,7 @@ btree/btree_vrfy.c
 db/db_close.c
 db/db_err.c
 db/db_getset.c
-db/db_method.c
+db/db_handle.c
 db/db_open.c
 db/db_stat.c
 db/db_sync.c
@@ -28,7 +28,7 @@ env/env_close.c
 env/env_err.c
 env/env_getset.c
 env/env_global.c
-env/env_method.c
+env/env_handle.c
 env/env_open.c
 env/env_stat.c
 os_posix/os_abort.c
