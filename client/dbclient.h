@@ -109,6 +109,8 @@ public:
         cursorId = 0;
     }
 
+    virtual ~DBClientCursor();
+
 private:
     DBConnector *connector;
     string ns;
