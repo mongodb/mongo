@@ -42,6 +42,7 @@ int javajstest();
 
 const char * findEd();
 const char * findEd(const char *);
+const char * findJars();
 
 class BSONObj;
 

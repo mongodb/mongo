@@ -111,17 +111,32 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath) {
     _jvm = 0;
     _mainEnv = 0;
     _dbhook = 0;
-
-    const char * ed = findEd(appserverPath);
+    
     stringstream ss;
-
+    string edTemp;
+            
+    const char * ed = 0;
     ss << "-Djava.class.path=.";
-    ss << SYSTEM_COLON << ed << "/build/";
+        
+    if ( appserverPath ){
+        ed = findEd(appserverPath);
 
-    _addClassPath( ed , ss , "include" );
-    _addClassPath( ed , ss , "include/jython/" );
-    _addClassPath( ed , ss , "include/jython/javalib" );
+        ss << SYSTEM_COLON << ed << "/build/";
+        
+        _addClassPath( ed , ss , "include" );
+        _addClassPath( ed , ss , "include/jython/" );
+        _addClassPath( ed , ss , "include/jython/javalib" );
+    }
+    else {
+        const char * jars = findJars();
+        _addClassPath( jars , ss , "jars" );
 
+        edTemp += (string)jars + "/jars/babble.jar";
+        ed = edTemp.c_str();
+    }
+
+
+    
 #if defined(_WIN32)
     ss << SYSTEM_COLON << "C:\\Program Files\\Java\\jdk\\lib\\tools.jar";
 #else
@@ -180,11 +195,13 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath) {
     _envs->reset( _mainEnv );
 
     _dbhook = findClass( "ed/db/JSHook" );
-    if ( _dbhook == 0 )
+    if ( _dbhook == 0 ){
         log() << "using classpath: " << q << endl;
+        printException();
+    }
     jassert( _dbhook );
 
-    {
+    if ( ed ){
         jmethodID init = _mainEnv->GetStaticMethodID( _dbhook ,  "init" , "(Ljava/lang/String;)V" );
         jassert( init );
         _mainEnv->CallStaticVoidMethod( _dbhook , init , _getEnv()->NewStringUTF( ed ) );
@@ -524,6 +541,33 @@ const char * findEd() {
     return 0;
 #endif
 };
+
+const char * findJars(){
+
+    static list<const char*> possible;
+    if ( ! possible.size() ) {
+        possible.push_back( "./" );
+        possible.push_back( "../" );
+    }
+    
+    for ( list<const char*>::iterator i = possible.begin() ; i != possible.end(); i++ ) {
+        const char * temp = *i;
+        const string jarDir = ((string)temp) + "jars/";
+        DIR * test = opendir( temp );
+        if ( ! test )
+            continue;
+
+        closedir( test );
+        log() << "found directory for jars : " << jarDir << endl;
+        return temp;
+    }
+
+    problem() << "ERROR : can't find directory for jars - terminating" << endl;
+    exit(44);
+    return 0;
+
+};
+
 
 // ---
 
