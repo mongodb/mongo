@@ -35,8 +35,16 @@ const int edebug=0;
 
 bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg) {
     BSONElement e = cmd.firstElement();
-    assert( e.type() == Code || e.type() == CodeWScope );
-    const char *code = e.type() == Code ? e.valuestr() : e.codeWScopeCode();
+    assert( e.type() == Code || e.type() == CodeWScope || e.type() == String );
+    
+    const char *code = 0;
+    switch ( e.type() ){
+    case String: 
+    case Code: code = e.valuestr(); break;
+    case CodeWScope: code = e.codeWScopeCode(); break;
+    default: assert(0);
+    }
+    assert( code );
 
     if ( ! JavaJS ) {
         errmsg = "db side execution is disabled";
@@ -78,10 +86,11 @@ bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg
     }
     if ( res ) {
         result.append("errno", (double) res);
-        errmsg = "invoke failed";
+        errmsg = "invoke failed: ";
+        errmsg += s.getString( "error" );
         return false;
     }
-
+    
     int type = s.type("return");
     if ( type == Object || type == Array )
         result.append("retval", s.getObject("return"));
