@@ -409,6 +409,15 @@ namespace FromJsonTests {
         }
     };
     
+    class Bad {
+    public:
+        void run() {
+            ASSERT_EXCEPTION( fromjson( json() ), MsgAssertionException );
+        }
+    protected:
+        virtual string json() const = 0;        
+    };
+    
     class Empty : public Base {
         virtual BSONObj bson() const {
             BSONObjBuilder b;
@@ -440,6 +449,23 @@ namespace FromJsonTests {
         }
     };    
 
+    class EmptyStrings : public Base {
+        virtual BSONObj bson() const {
+            BSONObjBuilder b;
+            b.append( "", "" );
+            return b.doneAndDecouple();
+        }
+        virtual string json() const {
+            return "{ \"\" : \"\" }";
+        }
+    };    
+
+    class ReservedFieldName : public Bad {
+        virtual string json() const {
+            return "{ \"$a\" : \"b\" }";
+        }        
+    };    
+    
     class SingleNumber : public Base {
         virtual BSONObj bson() const {
             BSONObjBuilder b;
@@ -665,21 +691,6 @@ namespace FromJsonTests {
         }
     };
 
-    class DBRefLike : public Base {
-        virtual BSONObj bson() const {
-            BSONObjBuilder b;
-            b.append( "$ns", "foo" );
-            b.append( "$id", "000000000000000000000000" );
-            b.append( "foo", "bar" );
-            BSONObjBuilder c;
-            c.append( "a", b.done() );
-            return c.doneAndDecouple();
-        }
-        virtual string json() const {
-            return "{ \"a\" : { \"$ns\" : \"foo\", \"$id\" : \"000000000000000000000000\", \"foo\" : \"bar\" } }";
-        }
-    };
-    
     class Oid : public Base {
         virtual BSONObj bson() const {
             BSONObjBuilder b;
@@ -732,6 +743,24 @@ namespace FromJsonTests {
             return "{ \"a\" : { \"$binary\" : \"YQ==\", \"$type\" : \"02\" } }";
         }
     };
+
+    class BinDataAllChars : public Base {
+        virtual BSONObj bson() const {
+            char z[] = {
+                0x00, 0x10, 0x83, 0x10, 0x51, 0x87, 0x20, 0x92, 0x8B, 0x30,
+                0xD3, 0x8F, 0x41, 0x14, 0x93, 0x51, 0x55, 0x97, 0x61, 0x96,
+                0x9B, 0x71, 0xD7, 0x9F, 0x82, 0x18, 0xA3, 0x92, 0x59, 0xA7,
+                0xA2, 0x9A, 0xAB, 0xB2, 0xDB, 0xAF, 0xC3, 0x1C, 0xB3, 0xD3,
+                0x5D, 0xB7, 0xE3, 0x9E, 0xBB, 0xF3, 0xDF, 0xBF
+            };
+            BSONObjBuilder b;
+            b.appendBinData( "a", 48, ByteArray, z );
+            return b.doneAndDecouple();
+        }
+        virtual string json() const {
+            return "{ \"a\" : { \"$binary\" : \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/\", \"$type\" : \"02\" } }";
+        }        
+    };
     
     class Date : public Base {
         virtual BSONObj bson() const {
@@ -744,6 +773,25 @@ namespace FromJsonTests {
         }        
     };
 
+    class DateNonzero : public Base {
+        virtual BSONObj bson() const {
+            BSONObjBuilder b;
+            b.appendDate( "a", 100 );
+            return b.doneAndDecouple();
+        }
+        virtual string json() const {
+            return "{ \"a\" : { \"$date\" : 100 } }";
+        }        
+    };
+
+    class DateTooLong : public Bad {
+        virtual string json() const {
+            stringstream ss;
+            ss << "{ \"a\" : { \"$date\" : " << ~(0LL) << "0" << " } }";
+            return ss.str();
+        }        
+    };    
+    
     class Regex : public Base {
         virtual BSONObj bson() const {
             BSONObjBuilder b;
@@ -777,12 +825,8 @@ namespace FromJsonTests {
         }        
     };
     
-    class Malformed {
-    public:
-        void run() {
-            string bad( "{" );
-            ASSERT_EXCEPTION( fromjson( bad ), MsgAssertionException );
-        }
+    class Malformed : public Bad {
+        string json() const { return "{"; }
     };
     
 } // namespace FromJsonTests
@@ -823,6 +867,8 @@ public:
         add< FromJsonTests::Empty >();
         add< FromJsonTests::EmptyWithSpace >();
         add< FromJsonTests::SingleString >();
+        add< FromJsonTests::EmptyStrings >();
+        add< FromJsonTests::ReservedFieldName >();
         add< FromJsonTests::SingleNumber >();
         add< FromJsonTests::FancyNumber >();
         add< FromJsonTests::TwoElements >();
@@ -839,12 +885,14 @@ public:
         add< FromJsonTests::Utf8AllOnes >();
         add< FromJsonTests::Utf8FirstByteOnes >();
         add< FromJsonTests::DBRef >();
-        add< FromJsonTests::DBRefLike >();
         add< FromJsonTests::Oid >();
         add< FromJsonTests::BinData >();
         add< FromJsonTests::BinDataPaddedSingle >();
         add< FromJsonTests::BinDataPaddedDouble >();
+        add< FromJsonTests::BinDataAllChars >();
         add< FromJsonTests::Date >();
+        add< FromJsonTests::DateNonzero >();
+        add< FromJsonTests::DateTooLong >();
         add< FromJsonTests::Regex >();
         add< FromJsonTests::RegexEscape >();
         add< FromJsonTests::RegexWithQuotes >();
