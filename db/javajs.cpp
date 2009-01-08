@@ -553,11 +553,11 @@ const char * findJars(){
     for ( list<const char*>::iterator i = possible.begin() ; i != possible.end(); i++ ) {
         const char * temp = *i;
         const string jarDir = ((string)temp) + "jars/";
-        DIR * test = opendir( temp );
-        if ( ! test )
+
+        path p(jarDir );
+        if ( ! boost::filesystem::exists( p) )
             continue;
 
-        closedir( test );
         log() << "found directory for jars : " << jarDir << endl;
         return temp;
     }
