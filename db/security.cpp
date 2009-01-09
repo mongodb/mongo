@@ -1,9 +1,12 @@
 // security.cpp
 
 #include "stdafx.h"
+#include "security.h"
 #include "../util/md5.hpp"
 
 extern "C" int do_md5_test(void);
+
+boost::thread_specific_ptr<AuthenticationInfo> authInfo;
 
 typedef unsigned long long nonce;
 
@@ -47,3 +50,14 @@ public:
         return true;
     }
 } cmdGetNonce;
+
+class CmdAuthenticate : public Command { 
+public:
+    virtual bool logTheOp() { return false; }
+    virtual bool slaveOk() { return true; }
+    CmdAuthenticate() : Command("authenticate") {}
+    bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        return false;
+    }
+} cmdAuthenticate;
+

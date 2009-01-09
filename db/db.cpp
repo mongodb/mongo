@@ -138,12 +138,15 @@ public:
 };
 
 #include "lasterror.h"
+#include "security.h" 
 
 /* we create one thread for each connection from an app server database.
    app server will open a pool of threads.
 */
 void connThread()
 {
+    AuthenticationInfo *ai = new AuthenticationInfo();
+    authInfo.reset(ai);
     LastError *le = new LastError();
     lastError.reset(le);
     try {

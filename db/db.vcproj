@@ -582,6 +582,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\security.h"
+				>
+			</File>
+			<File
 				RelativePath="..\stdafx.h"
 				>
 			</File>
