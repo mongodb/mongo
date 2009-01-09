@@ -293,7 +293,7 @@ void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, *
         msgdata = (QueryResult *) b.buf();
         b.decouple();
         QueryResult *qr = msgdata;
-        qr->_data[0] = 0;
+        qr->_data[0] = queryError;
         qr->_data[1] = 0;
         qr->_data[2] = 0;
         qr->_data[3] = 0;
