@@ -161,6 +161,10 @@ public:
         data = d;
     }
 
+    bool doIFreeIt(){
+        return freeIt;
+    }
+
 private:
     bool freeIt;
 };
