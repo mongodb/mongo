@@ -62,9 +62,26 @@ elif "win32" == os.sys.platform:
     env.Append( CPPDEFINES=["WIN32","_DEBUG","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
 
     env.Append( LIBPATH=[ boostDir + "/Lib" , javaHome + "Lib" , winSDKHome + "/Lib" ] )
+    env.Append( LIBS=[ "jvm" ] )
 
-    commonFiles += Glob( "pcre-7.4/*.c"  )
-    print( commonFiles )
+    def pcreFilter(x):
+        name = x.name
+        if x.name.endswith( "dftables.c" ):
+            return False
+        if x.name.endswith( "pcredemo.c" ):
+            return False
+        if x.name.endswith( "pcretest.c" ):
+            return False
+        if x.name.endswith( "unittest.cc" ):
+            return False
+        if x.name.endswith( "pcregrep.c" ):
+            return False
+        return True
+
+    commonFiles += filter( pcreFilter , Glob( "pcre-7.4/*.c"  ) )
+    commonFiles += filter( pcreFilter , Glob( "pcre-7.4/*.cc" ) )
+    
+    env.Append( LIBS=Split("ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib" ) )
 
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )

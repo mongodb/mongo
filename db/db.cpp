@@ -272,6 +272,8 @@ void clearTmpFiles() {
     }    
 }
 
+Timer startupSrandTimer;
+
 void segvhandler(int x);
 void initAndListen(int listenPort, const char *appserverLoc = null) {
     clearTmpFiles();
@@ -305,6 +307,9 @@ void initAndListen(int listenPort, const char *appserverLoc = null) {
 
     repairDatabases();
 
+    /* this is for security on certain platforms */
+    srand(curTimeMillis() ^ startupSrandTimer.micros());
+
     listen(listenPort);
 }
 
@@ -315,6 +320,7 @@ void pipeSigHandler( int signal );
 
 int main(int argc, char* argv[], char *envp[] )
 {
+    srand(curTimeMillis());
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
     
     {
@@ -331,8 +337,6 @@ int main(int argc, char* argv[], char *envp[] )
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);
 #endif
-    srand(curTimeMillis());
-
     UnitTest::runTests();
 
     if ( argc >= 2 ) {
@@ -532,7 +536,7 @@ void mysighandler(int x) {
     cout << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
     {
         dblock lk;
-        problem() << "  now exiting" << endl;
+        log() << "now exiting" << endl;
         exit(12);
     }
 }

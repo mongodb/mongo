@@ -259,6 +259,13 @@ BSONObj DBClientCursor::next() {
     return o;
 }
 
+DBClientCursor::~DBClientCursor(){
+    if ( cursorId ){
+        cerr << "TODO: need to kill the cursor here __FILE__:__LINE__" << endl;
+    }
+        
+}
+
 /* ------------------------------------------------------ */
 
 // "./db testclient" to invoke
