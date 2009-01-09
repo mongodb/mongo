@@ -82,14 +82,6 @@ enum Operations {
     dbKillCursors = 2007
 };
 
-/*
- *  flags for query responses
- */
-enum ReponseMsgFlags {
-    operationOk = 0x00,
-    queryError = 0x01
-};
-
 struct MsgData {
     int len; /* len of the msg, including this field */
     MSGID id; /* request/reply id's match... */

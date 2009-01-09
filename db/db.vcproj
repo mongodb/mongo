@@ -546,10 +546,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\client\model.h"
-				>
-			</File>
-			<File
 				RelativePath=".\namespace.h"
 				>
 			</File>
@@ -642,6 +638,22 @@
 				</File>
 				<File
 					RelativePath="..\util\unittest.h"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="client"
+				>
+				<File
+					RelativePath="..\client\connpool.h"
+					>
+				</File>
+				<File
+					RelativePath="..\client\dbclient.h"
+					>
+				</File>
+				<File
+					RelativePath="..\client\model.h"
 					>
 				</File>
 			</Filter>

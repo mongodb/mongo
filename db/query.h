@@ -63,25 +63,7 @@
    Note that the update field layout is very similar layout to Query.
 */
 
-// see dbclient.h for query options enum
-
-/* db response format
-
-   Query or GetMore: // see struct QueryResult
-      int resultFlags = 0;
-      int64 cursorID;
-      int startingFrom;
-      int nReturned;
-      list of marshalled JSObjects;
-*/
-
-/* the field 'resultFlags' above */
-enum {
-    /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
-    ResultFlag_CursorNotFound = 1
-};
-
-// grab struct QueryResult from:
+// struct QueryOptions, QueryResult, QueryResultFlags in:
 #include "../client/dbclient.h"
 
 // for an existing query (ie a ClientCursor), send back additional information.

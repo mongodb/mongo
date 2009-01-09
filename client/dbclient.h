@@ -22,7 +22,7 @@
 #include "../db/jsobj.h"
 
 /* the query field 'options' can have these bits set: */
-enum {
+enum QueryOptions {
     /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
        the final object's position.  you can resume using the cursor later, from where it was located,
        if more data were received.  Set on dbQuery and dbGetMore.
@@ -42,8 +42,23 @@ enum {
 
 class BSONObj;
 
+/* db response format
+
+   Query or GetMore: // see struct QueryResult
+      int resultFlags;
+      int64 cursorID;
+      int startingFrom;
+      int nReturned;
+      list of marshalled JSObjects;
+*/
+
 #pragma pack(push,1)
 struct QueryResult : public MsgData {
+    enum {
+        ResultFlag_CursorNotFound = 1, /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
+        ResultFlag_ErrSet = 2          /* { $err : ... } is being returned */
+    };
+
     long long cursorId;
     int startingFrom;
     int nReturned;
