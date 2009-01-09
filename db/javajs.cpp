@@ -587,10 +587,11 @@ JNIEXPORT jint JNICALL java_native_call(JNIEnv * env , jclass, jobject outBuffer
     Message in;
 
     jniCallback( out , in );
-
+    
     JNI_DEBUG( "in.data : " << in.data );
     if ( in.data && in.data->len > 0 ) {
         JNI_DEBUG( "copying data of len :" << in.data->len );
+        assert( env->GetDirectBufferCapacity( inBuffer ) >= in.data->len );
         memcpy( env->GetDirectBufferAddress( inBuffer ) , in.data , in.data->len );
         return in.data->len;
     }
