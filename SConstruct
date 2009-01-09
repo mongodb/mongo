@@ -19,6 +19,12 @@ coreDbFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcurso
 
 nix = False
 
+def findVersion( root , choices ):
+    for c in choices:
+        if ( os.path.exists( root + c ) ):
+            return root + c
+    raise "can't find a version of [" + root + "] choices: " + choices
+
 if "darwin" == os.sys.platform:
     env.Append( CPPPATH=[ "/sw/include" , "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
     env.Append( LIBPATH=["/sw/lib/"] )
@@ -51,17 +57,19 @@ elif "linux2" == os.sys.platform:
 
 elif "win32" == os.sys.platform:
     boostDir = "C:/Program Files/Boost/boost_1_35_0"
-    javaHome = "C:/Program Files/java/jdk/"
-    winSDKHome = "C:/Program Files/Microsoft SDKs/Windows/v6.0"
+    javaHome = findVersion( "C:/Program Files/java/" , 
+                            [ "jdk" , "jdk1.6.0_10" ] )
+    winSDKHome = findVersion( "C:/Program Files/Microsoft SDKs/Windows/" , 
+                              [ "v6.0" , "v6.0a" , "v6.1" ] )
 
-    env.Append( CPPPATH=[ boostDir , javaHome + "include" , javaHome + "include/win32" , "pcre-7.4" , winSDKHome + "/Include" ] )
+    env.Append( CPPPATH=[ boostDir , javaHome + "/include" , javaHome + "/include/win32" , "pcre-7.4" , winSDKHome + "/Include" ] )
 
     # /Fo"Debug\\" /Fd"Debug\vc90.pdb" 
 
     env.Append( CPPFLAGS=" /Od /EHsc /Gm /RTC1 /MDd /ZI  /W3 " )
     env.Append( CPPDEFINES=["WIN32","_DEBUG","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
 
-    env.Append( LIBPATH=[ boostDir + "/Lib" , javaHome + "Lib" , winSDKHome + "/Lib" ] )
+    env.Append( LIBPATH=[ boostDir + "/Lib" , javaHome + "/Lib" , winSDKHome + "/Lib" ] )
     env.Append( LIBS=[ "jvm" ] )
 
     def pcreFilter(x):

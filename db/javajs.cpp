@@ -578,6 +578,8 @@ JNIEXPORT void JNICALL java_native_say(JNIEnv * env , jclass, jobject outBuffer 
     Message in;
 
     jniCallback( out , in );
+    assert( ! out.doIFreeIt() );
+    curNs = 0;
 }
 
 JNIEXPORT jint JNICALL java_native_call(JNIEnv * env , jclass, jobject outBuffer , jobject inBuffer ) {
@@ -587,11 +589,16 @@ JNIEXPORT jint JNICALL java_native_call(JNIEnv * env , jclass, jobject outBuffer
     Message in;
 
     jniCallback( out , in );
-
+    curNs = 0;
+        
     JNI_DEBUG( "in.data : " << in.data );
     if ( in.data && in.data->len > 0 ) {
         JNI_DEBUG( "copying data of len :" << in.data->len );
+        assert( env->GetDirectBufferCapacity( inBuffer ) >= in.data->len );
         memcpy( env->GetDirectBufferAddress( inBuffer ) , in.data , in.data->len );
+
+        assert( ! out.doIFreeIt() );
+        assert( in.doIFreeIt() );
         return in.data->len;
     }
 
