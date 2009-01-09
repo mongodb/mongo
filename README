@@ -36,3 +36,22 @@ Mongo uses memory mapped files.  If built as a 32 bit executable, you will
 not be able to work with large (multi-gigabyte) databases.  However, 32 bit 
 builds should work fine with small development databases.
 
+
+--- WINDOWS ---
+
+COMPILING
+   REQUIREMENTS
+     - python 2.6 (for scons)
+     - scons
+     - boost 1.35
+     - vc++ express
+     - windows sdk - tested with v6.0 v6.0a
+     - java sdk 1.6
+
+
+    you have to add java\jdk\bin\ to your path
+
+   scons
+   mkdir \data\
+   mkdir \data\db
+   db\db run
