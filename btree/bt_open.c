@@ -19,7 +19,6 @@ int
 __wt_bt_open(DB *db)
 {
 	IDB *idb;
-	WT_PAGE_DESC desc;
 	int ret;
 
 	idb = db->idb;
@@ -33,15 +32,13 @@ __wt_bt_open(DB *db)
 		return (ret);
 
 	/*
-	 * Retrieve the root fragment address -- if the number of frags in
-	 * the file is non-zero, there had better be a description record.
+	 * If the file exsists, update the DB handle based on the information
+	 * in the on-disk WT_PAGE_DESC structure.  (If the number of frags in
+	 * the file is non-zero, there had better be a description record.)
 	 */
 	if (idb->frags != 0) {
-		if ((ret = __wt_bt_desc_read(db, &desc)) != 0)
+		if ((ret = __wt_bt_desc_read(db)) != 0)
 			return (ret);
-		db->leafsize = desc.leafsize;
-		db->intlsize = desc.intlsize;
-		idb->root_addr = desc.root_addr;
 	} else
 		idb->root_addr = WT_ADDR_INVALID;
 

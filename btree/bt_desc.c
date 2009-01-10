@@ -64,11 +64,48 @@ __wt_bt_desc_verify(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_desc_set_root --
+ * __wt_bt_desc_read --
+ *	Read the descriptor structure from page 0, and update the DB handle
+ *	to reflect that information.
+ */
+int
+__wt_bt_desc_read(DB *db)
+{
+	IDB *idb;
+	WT_PAGE *page;
+	WT_PAGE_DESC desc;
+	int ret;
+
+	idb = db->idb;
+
+	/*
+	 * When we first read the description chunk, we're reading blind --
+	 * read carefully.
+	 *
+	 * Read in the first fragment of the database and get the root addr
+	 * and pagesizes from it.
+	 */
+	if ((ret = __wt_cache_db_in(
+	    db, WT_ADDR_FIRST_PAGE, 1, &page, WT_UNFORMATTED)) != 0)
+		return (ret);
+
+	memcpy(&desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
+	db->leafsize = desc.leafsize;
+	db->intlsize = desc.intlsize;
+	idb->root_addr = desc.root_addr;
+
+	if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
+		return (ret);
+
+	return (0);
+}
+
+/*
+ * __wt_bt_desc_write --
  *	Update the root addr.
  */
 int
-__wt_bt_desc_set_root(DB *db, u_int32_t root_addr)
+__wt_bt_desc_write(DB *db, u_int32_t root_addr)
 {
 	IDB *idb;
 	WT_PAGE *page;
@@ -92,24 +129,3 @@ __wt_bt_desc_set_root(DB *db, u_int32_t root_addr)
 	return (__wt_cache_db_out(db, page, WT_MODIFIED));
 }
 
-/*
- * __wt_bt_desc_read --
- *	Read the descriptor structure from page 0.
- */
-int
-__wt_bt_desc_read(DB *db, WT_PAGE_DESC *desc)
-{
-	WT_PAGE *page;
-	int ret, tret;
-
-	if ((ret = __wt_cache_db_in(
-	    db, WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_LEAF(db), &page, 0)) != 0)
-		return (ret);
-
-	memcpy(desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
-
-	if ((tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
-		ret = tret;
-
-	return (ret);
-}

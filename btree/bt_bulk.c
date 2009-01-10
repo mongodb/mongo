@@ -698,7 +698,7 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 		 */
 		if (root_split) {
 			if (next->hdr->type == WT_PAGE_INT && (ret =
-			    __wt_bt_desc_set_root(db, root_offp->addr)) != 0)
+			    __wt_bt_desc_write(db, root_offp->addr)) != 0)
 				goto err;
 			root_offp->level = next->hdr->level;
 		}

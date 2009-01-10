@@ -38,7 +38,6 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_PAGE_DESC desc;
 	WT_ITEM_OFFP offp;
 	bitstr_t *fragbits;
 	int ret, tret;
@@ -71,25 +70,12 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	if ((ret = bit_alloc(env, idb->frags, &fragbits)) != 0)
 		return (ret);
 
-	/*
-	 * Read in the first page of the database and verify it, then read in
-	 * the database description chunk.  Don't bother to remember that we
-	 * verified this page -- we're just trying to get enough information
-	 * to find the root page, we'll visit the page again.
-	 */
-	if ((ret = __wt_cache_db_in(
-	    db, WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_LEAF(db), &page, 0)) != 0)
-		goto err;
-	if ((ret = __wt_bt_verify_page(db, page, NULL, fp)) != 0)
-		goto err;
-	if ((ret = __wt_cache_db_out(db, page, 0)) != 0)
-		goto err;
-	page = NULL;
-	if ((ret = __wt_bt_desc_read(db, &desc)) != 0)
+	/* Read the database description chunk. */
+	if ((ret = __wt_bt_desc_read(db)) != 0)
 		goto err;
 
 	/* If no root address has been set, it's a one-leaf-page database. */
-	if (desc.root_addr == WT_ADDR_INVALID) {
+	if (idb->root_addr == WT_ADDR_INVALID) {
 		if ((ret =
 		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, page)) != 0)
 			goto err;
@@ -105,7 +91,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 		 * level in the DESC structure, so there's no way to know
 		 * what the correct level is yet.
 		 */
-		offp.addr = desc.root_addr;
+		offp.addr = idb->root_addr;
 		offp.level = WT_FIRST_INTERNAL_LEVEL;
 		if ((ret = __wt_bt_verify_level(db, &offp, fragbits, fp)) != 0)
 			goto err;
@@ -319,6 +305,7 @@ err:	if (prev != NULL &&
 static int
 __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 {
+	IDB *idb;
 	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
 	WT_PAGE_DESC desc;
@@ -327,6 +314,7 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 	int (*func)(DB *, const DBT *, const DBT *);
 	int ret, tret;
 
+	idb = db->idb;
 	parent = NULL;
 	hdr = child->hdr;
 	addr = child->addr;
@@ -351,17 +339,15 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 
 		/*
 		 * If this is a primary root page, confirm the description
-		 * record points to the right place.
+		 * record (which we've already read in) points to the right
+		 * place.
 		 */
-		if (hdr->type == WT_PAGE_INT) {
-			if ((ret = __wt_bt_desc_read(db, &desc)) != 0)
-				return (ret);
-			if (desc.root_addr != addr) {
-				__wt_db_errx(db,
-				    "page at addr %lu has no parent",
-				    (u_long)addr);
-				return (WT_ERROR);
-			}
+		if (hdr->type == WT_PAGE_INT && idb->root_addr != addr) {
+			__wt_db_errx(db,
+			    "page at addr %lu doesn't match the database "
+			    "description information",
+			    (u_long)addr);
+			return (WT_ERROR);
 		}
 		return (0);
 	}

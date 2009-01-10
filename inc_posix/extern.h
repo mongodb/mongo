@@ -15,9 +15,9 @@ __wt_bt_desc_init(DB *db, WT_PAGE *page);
 int
 __wt_bt_desc_verify(DB *db, WT_PAGE *page);
 int
-__wt_bt_desc_set_root(DB *db, u_int32_t root_addr);
+__wt_bt_desc_read(DB *db);
 int
-__wt_bt_desc_read(DB *db, WT_PAGE_DESC *desc);
+__wt_bt_desc_write(DB *db, u_int32_t root_addr);
 int
 __wt_db_dump(DB *db, FILE *stream, u_int32_t flags);
 void
