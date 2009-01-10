@@ -34,26 +34,24 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	DB_FLAG_CHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
 	WT_ASSERT(env, LF_ISSET(WT_SORTED_INPUT));
 
-	page = NULL;
 	dup_space = dup_count = 0;
-
-	/*lint -esym(530,dup_key) */
-	/*lint -esym(530,dup_data)
-	 *
-	 * LINT complains dup_key and dup_data may be used before being set --
-	 * that's not true, we set/check dup_count before accessing dup_key
-	 * or dup_data.
-	 */
-	/*lint -esym(613,page)
-	 * LINT complains page may be used before being set -- that's not
-	 * correct, state is set to FIRST_PAGE until page is initialized.
-	 */
 
 	lastkey = &lastkey_std;
 	WT_CLEAR(lastkey_std);
 	WT_CLEAR(lastkey_ovfl);
 	WT_CLEAR(key_item);
 	WT_CLEAR(data_item);
+
+	/*
+	 * Allocate our first page -- we do this before we look at any keys
+	 * because the first key/data items may be overflow items, in which
+	 * case we would allocate page 0 as an overflow page, which is, for
+	 * lack of a better phrase, "bad".
+	 */
+	if ((ret = __wt_bt_page_alloc(db, 1, &page)) != 0)
+		return (ret);
+	page->hdr->type = WT_PAGE_LEAF;
+	page->hdr->level = WT_LEAF_LEVEL;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key->size == 0) {
@@ -144,21 +142,18 @@ skip_read:
 			    key == NULL ? WT_ITEM_DUP : WT_ITEM_DATA;
 
 		/*
-		 * We now know what the key/data items will look like on a
-		 * page.  If we haven't yet allocated a page, or there is
-		 * insufficient space on the current page, allocate a new page.
+		 * We now have the key/data items to store on the page.  If
+		 * there is insufficient space on the current page, allocate
+		 * a new one.
 		 */
-		if (page == NULL ||
-		    (key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
+		if ((key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
 		    WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
 			if ((ret = __wt_bt_page_alloc(db, 1, &next)) != 0)
 				goto err;
 			next->hdr->type = WT_PAGE_LEAF;
 			next->hdr->level = WT_LEAF_LEVEL;
-			if (page != NULL) {
-				next->hdr->prevaddr = page->addr;
-				page->hdr->nextaddr = next->addr;
-			}
+			next->hdr->prevaddr = page->addr;
+			page->hdr->nextaddr = next->addr;
 
 			/*
 			 * If in the middle of loading a set of duplicates, but
@@ -225,15 +220,12 @@ skip_read:
 			 * sets the page's parent address, which is the same for
 			 * the newly allocated page.
 			 */
-			if (page != NULL) {
-				if ((ret =
-				    __wt_bt_promote(db, page, NULL)) != 0)
-					goto err;
-				next->hdr->prntaddr = page->hdr->prntaddr;
-				if ((ret = __wt_cache_db_out(
-				    db, page, WT_MODIFIED)) != 0)
-					goto err;
-			}
+			if ((ret = __wt_bt_promote(db, page, NULL)) != 0)
+				goto err;
+			next->hdr->prntaddr = page->hdr->prntaddr;
+			if ((ret =
+			    __wt_cache_db_out(db, page, WT_MODIFIED)) != 0)
+				goto err;
 
 			/* Switch to the next page. */
 			page = next;
