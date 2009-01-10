@@ -1,0 +1,17 @@
+
+com
+net
+org
+edu
+gov
+
+info
+tv
+
+co.uk
+fr
+de
+nl
+
+com.au
+
