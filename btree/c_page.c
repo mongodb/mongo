@@ -236,8 +236,6 @@ __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	TAILQ_INSERT_TAIL(&ienv->lqh, page, q);
 	TAILQ_INSERT_HEAD(&ienv->hqh[WT_HASH(ienv, page->addr)], page, hq);
 
-	__wt_bt_page_inmem_alloc(db, page);
-
 	WT_STAT_INCR(env, CACHE_ALLOC, "pages allocated in the cache");
 	WT_STAT_INCR(db, DB_CACHE_ALLOC, "pages allocated in the cache");
 
@@ -309,7 +307,7 @@ __wt_cache_db_in(DB *db,
 		goto err;
 
 	/* Verify the checksum. */
-	if (!LF_ISSET(WT_NO_CHECKSUM)) {
+	if (!LF_ISSET(WT_UNFORMATTED)) {
 		u_int32_t checksum = hdr->checksum;
 		hdr->checksum = 0;
 		if (checksum != __wt_cksum(hdr, bytes)) {
@@ -333,14 +331,12 @@ __wt_cache_db_in(DB *db,
 	TAILQ_INSERT_TAIL(&ienv->lqh, page, q);
 	TAILQ_INSERT_HEAD(hashq, page, hq);
 
-	if (!LF_ISSET(WT_NO_INMEM_PAGE) &&
-	    (ret = __wt_bt_page_inmem(db, page)) != 0)
-		goto err;
-
 	WT_STAT_INCR(env, CACHE_MISS, "reads not found in the cache");
 	WT_STAT_INCR(db, DB_CACHE_MISS, "reads not found in the cache");
 
-	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+	/* If the checksum passed, then the page should be valid. */
+	WT_ASSERT(env, LF_ISSET(WT_UNFORMATTED) ||
+	    __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
 	*pagep = page;
 	return (0);
@@ -369,7 +365,8 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	WT_ASSERT(env, page->ref > 0);
 	--page->ref;
 
-	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+	WT_ASSERT(env, LF_ISSET(WT_UNFORMATTED) ||
+	    __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
 	/* If the page is dirty, set the modified flag. */
 	if (LF_ISSET(WT_MODIFIED)) {
@@ -383,7 +380,7 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	 * can't discard modified pages, some thread of control thinks it's
 	 * useful...).
 	 */
-	if (LF_ISSET(WT_DISCARD) &&
+	if (LF_ISSET(WT_UNFORMATTED) &&
 	    !F_ISSET(page, WT_MODIFIED) &&
 	    (ret = __wt_cache_discard(env, page)) != 0)
 		return (ret);
