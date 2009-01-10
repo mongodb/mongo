@@ -10,49 +10,74 @@
 #include "wt_internal.h"
 
 static int __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_int(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_intl(DB *, WT_PAGE *);
 static int __wt_bt_page_inmem_leaf(DB *, WT_PAGE *);
 
 /*
- * WT_SET_FF_AND_SA_FROM_ADDR --
- *	Set the page's first-free and space-available values from an
- *	address positioned one past the last used byte on the page.
- *	Common to functions in this file.
+ * __wt_bt_page_alloc --
+ *	Allocate a new btree page from the cache.
  */
-#define	WT_SET_FF_AND_SA_FROM_ADDR(db, page, item)			\
-	(page)->first_free = (u_int8_t *)(item);			\
-	(page)->space_avail = (db)->pagesize -				\
-	    (u_int32_t)((page)->first_free - (u_int8_t *)(page)->hdr);
+int
+__wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
+{
+	WT_PAGE *page;
+	WT_PAGE_HDR *hdr;
+	int ret;
+
+	if ((ret = __wt_cache_db_alloc(db,
+	    WT_BYTES_TO_FRAGS(db, isleaf ? db->leafsize : db->intlsize),
+	    &page)) != 0)
+		return (ret);
+
+	__wt_set_ff_and_sa_from_addr(db, page, WT_PAGE_BYTE(page));
+
+	if (page->addr == 0)
+		__wt_bt_desc_init(db, page);
+
+	/*
+	 * Generally, the defaults values of 0 on page are correct; set
+	 * the fragment addresses to the "unset" value.
+	 */
+	hdr = page->hdr;
+	hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
+
+	*pagep = page;
+	return (0);
+}
 
 /*
  * __wt_bt_page_inmem --
- *	Initialize the in-memory page structure after a page is read.
+ *	Build in-memory page information.
  */
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 {
 	ENV *env;
-	WT_INDX *indx;
+	IDB *idb;
 	WT_PAGE_HDR *hdr;
 	int ret;
 
 	env = db->env;
+	idb = db->idb;
 	hdr = page->hdr;
 
-	/* Build page indexes for all page types other than overflow pages. */
-	if (hdr->type == WT_PAGE_OVFL)
-		return (0);
-
-	if ((ret =
-	    __wt_calloc(env, hdr->u.entries, sizeof(WT_INDX), &indx)) != 0)
+	if ((ret = __wt_calloc(
+	    env, hdr->u.entries, sizeof(WT_INDX), &page->indx)) != 0)
 		return (ret);
-	page->indx = indx;
 	page->indx_size = hdr->u.entries;
+
+	/*
+	 * Keep a running track of the most indexes we find on a single
+	 * page in this database -- we use the hint if we allocate a new
+	 * internal page.
+	 */
+	if (idb->indx_size_hint < page->indx_size)
+		idb->indx_size_hint = page->indx_size;
 
 	switch (hdr->type) {
 	case WT_PAGE_INT:
 	case WT_PAGE_DUP_INT:
-		ret = __wt_bt_page_inmem_int(db, page);
+		ret = __wt_bt_page_inmem_intl(db, page);
 		break;
 	case WT_PAGE_LEAF:
 		ret = __wt_bt_page_inmem_leaf(db, page);
@@ -60,19 +85,76 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	case WT_PAGE_DUP_LEAF:
 		ret = __wt_bt_page_inmem_dup_leaf(db, page);
 		break;
-	default:
-		return (__wt_database_format(db));
 	}
 	return (ret);
 }
 
+
 /*
- * __wt_bt_page_inmem_int --
+ * __wt_bt_page_inmem_append --
+ *	Append a new item/WT_ITEM_OFFP pair to an internal page's in-memory
+ *	information.
+ */
+int
+__wt_bt_page_inmem_append(DB *db,
+    WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *off_item)
+{
+	ENV *env;
+	IDB *idb;
+	WT_INDX *indx;
+	WT_ITEM_OFFP *offp;
+	WT_ITEM_OVFL *ovfl;
+	u_int32_t n;
+	int ret;
+
+	env = db->env;
+	idb = db->idb;
+
+	/*
+	 * Make sure there's enough room in the in-memory index.  We track how
+	 * many keys fit on internal pages in this database, use it as a hint.
+	 */
+	if (page->indx_count == page->indx_size) {
+		n = page->indx_size + 50;
+		if (idb->indx_size_hint < n)
+			idb->indx_size_hint = n;
+		else
+			n = idb->indx_size_hint;
+		if ((ret = __wt_realloc(
+		    env, n * sizeof(page->indx[0]), &page->indx)) != 0)
+			return (ret);
+		page->indx_size = n;
+	}
+	indx = page->indx + page->indx_count;
+	++page->indx_count;
+
+	switch (key_item->type) {
+	case WT_ITEM_KEY:
+		indx->data = WT_ITEM_BYTE(key_item);
+		indx->size = key_item->len;
+		indx->addr = WT_ADDR_INVALID;
+		break;
+	case WT_ITEM_KEY_OVFL:
+		ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(key_item);
+		indx->size = ovfl->len;
+		indx->addr = ovfl->addr;
+		break;
+	}
+
+	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(off_item);
+	indx->addr = offp->addr;
+	indx->ditem = off_item;
+
+	return (0);
+}
+
+/*
+ * __wt_bt_page_inmem_intl --
  *	Build in-memory index for primary and off-page duplicate tree internal
  *	pages.
  */
 static int
-__wt_bt_page_inmem_int(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 {
 	WT_INDX *indx;
 	WT_ITEM *item;
@@ -114,7 +196,7 @@ __wt_bt_page_inmem_int(DB *db, WT_PAGE *page)
 		}
 
 	page->indx_count = hdr->u.entries / 2;
-	WT_SET_FF_AND_SA_FROM_ADDR(db, page, item);
+	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
 
 	return (0);
 }
@@ -180,7 +262,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 			return (__wt_database_format(db));
 		}
 
-	WT_SET_FF_AND_SA_FROM_ADDR(db, page, item);
+	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -226,20 +308,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	}
 
 	page->indx_count = hdr->u.entries;
-	WT_SET_FF_AND_SA_FROM_ADDR(db, page, item);
+	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
 
 	return (0);
-}
-
-/*
- * __wt_bt_page_inmem_alloc --
- *	Initialize the in-memory page structure after a page is allocated.
- */
-void
-__wt_bt_page_inmem_alloc(DB *db, WT_PAGE *page)
-{
-	WT_SET_FF_AND_SA_FROM_ADDR(db, page, WT_PAGE_BYTE(page));
-
-	if (page->addr == 0)
-		__wt_bt_desc_init(db, page);
 }
