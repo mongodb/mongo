@@ -143,7 +143,7 @@ int main( int argc , char ** argv ){
         db = vm["db"].as<string>().c_str();
     
     if ( vm.count( "out" ) )
-        outdir = vm["db"].as<string>().c_str();
+        outdir = vm["out"].as<string>().c_str();
     
     cout << "mongo dump" << endl;
     cout << "\t host        \t" << host << endl;

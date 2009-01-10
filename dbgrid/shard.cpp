@@ -21,7 +21,7 @@
 #include "griddatabase.h"
 
 DBClientWithCommands* Shard::conn() {
-    return &gridDatabase.conn;
+    return gridDatabase.conn;
 }
 
 void Shard::serialize(BSONObjBuilder& to) {

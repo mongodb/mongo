@@ -27,11 +27,19 @@
 
 static boost::mutex griddb_mutex;
 GridDatabase gridDatabase;
-DBClientWithCommands *Model::globalConn = &gridDatabase.conn;
+DBClientWithCommands *Model::globalConn = gridDatabase.conn;
 string ourHostname;
-extern string dashDashGridDb;
+extern vector<string> dashDashGridDb;
+extern bool dashDashInfer;
 
-GridDatabase::GridDatabase() { }
+GridDatabase::GridDatabase() { 
+    conn = 0;
+}
+
+GridDatabase::~GridDatabase() { 
+    delete conn;
+    conn = 0; // defensive
+}
 
 void GridDatabase::init() {
     string hn = getHostName();
@@ -60,6 +68,10 @@ void GridDatabase::init() {
     string hostLeft, hostRight;
 
     if ( dashDashGridDb.empty() ) {
+        if( !dashDashInfer ) { 
+            cout << "--griddb or --infer required\n";
+            exit(7);
+        }
         stringstream sl, sr;
         sl << buf << "grid-l";
         sr << buf << "grid-r";
@@ -72,23 +84,17 @@ void GridDatabase::init() {
     }
     else {
         stringstream sl, sr;
-        sl << dashDashGridDb;
-        sr << dashDashGridDb;
-        if ( !isdigit(dashDashGridDb[0]) ) {
-            sl << "-l";
-            sr << "-r";
-        }
-        else {
-            /* ip address specified, so "-l" / "-r" not meaningful
-               silly though that we put it on both sides -- to be fixed.
-            */
-        }
+        sl << dashDashGridDb[0];
         hostLeft = sl.str();
-        hostRight = sr.str();
         sl << ":" << Port;
-        sr << ":" << Port;
         left = sl.str();
-        right = sr.str();
+
+        if( dashDashGridDb.size() > 1 ) {
+            sr << dashDashGridDb[1];
+            hostRight = sr.str();
+            sr << ":" << Port;
+            right = sr.str();
+        }
     }
 
 
@@ -103,7 +109,7 @@ void GridDatabase::init() {
                 sleepsecs(15);
                 continue;
             }
-            if ( hostbyname(hostRight.c_str()).empty() ) {
+            if ( !hostRight.empty() && hostbyname(hostRight.c_str()).empty() ) {
                 log() << "can't resolve DNS for " << hostRight << ", sleeping and then trying again" << endl;
                 sleepsecs(15);
                 continue;
@@ -112,9 +118,24 @@ void GridDatabase::init() {
         }
 
     Logstream& l = log();
-    (l << "connecting to griddb L:" << left << " R:" << right << "...").flush();
+    l << "connecting to griddb ";
 
-    bool ok = conn.connect(left.c_str(),right.c_str());
+    bool ok;
+    if( !hostRight.empty() ) { 
+        // connect in paired mode
+        l << "L:" << left << " R:" << right << "..."; l.flush();
+        DBClientPaired *dbp = new DBClientPaired();
+        conn = dbp;
+        ok = dbp->connect(left.c_str(),right.c_str());
+    }
+    else { 
+        l << left << "..."; l.flush();
+        DBClientConnection *dcc = new DBClientConnection(/*autoreconnect=*/true);
+        conn = dcc;
+        string errmsg;
+        ok = dcc->connect(left.c_str(), errmsg);
+    }
+
     if ( !ok ) {
         l << '\n';
         log() << "  griddb connect failure at startup (will retry)" << endl;

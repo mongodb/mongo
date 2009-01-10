@@ -22,3 +22,4 @@
 #include "jsobj.h"
 
 BSONObj fromjson(const char *str);
+BSONObj fromjson(const string &str);

@@ -88,12 +88,13 @@ public:
         return *this;
     }
     Logstream& prolog(bool withNs = false) {
+        char now[64];
+        time_t_to_String(time(0), now);
+        now[20] = 0;
+
         boostlock lk(mutex);
-        time_t t;
-        time(&t);
-        string now(ctime(&t),0,20);
         cout << now;
-        if ( withNs && database )
+        if ( withNs && database && curNs )
             cout << curNs << ' ';
         return *this;
     }
@@ -110,4 +111,7 @@ inline Logstream& log() {
     return logstream.prolog();
 }
 
+inline ostream& stdcout() { return cout; }
+
 #define cout logstream
+

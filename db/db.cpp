@@ -42,6 +42,7 @@ extern OpLog _oplog;
 extern int ctr;
 extern int callDepth;
 
+void setupSignals();
 void closeAllSockets();
 void startReplication();
 void pairWith(const char *remoteEnd, const char *arb);
@@ -136,11 +137,18 @@ public:
     Message & container;
 };
 
+#include "lasterror.h"
+#include "security.h" 
+
 /* we create one thread for each connection from an app server database.
    app server will open a pool of threads.
 */
 void connThread()
 {
+    AuthenticationInfo *ai = new AuthenticationInfo();
+    authInfo.reset(ai);
+    LastError *le = new LastError();
+    lastError.reset(le);
     try {
 
         MessagingPort& dbMsgPort = *grab;
@@ -155,6 +163,8 @@ void connThread()
                 dbMsgPort.shutdown();
                 break;
             }
+
+            le->nPrev++;
 
             DbResponse dbresponse;
             if ( !assembleResponse( m, dbresponse ) ) {
@@ -233,52 +243,6 @@ void msg(const char *m, int extras = 0) {
     msg(m, "127.0.0.1", DBPort, extras);
 }
 
-#if !defined(_WIN32)
-
-#include <signal.h>
-
-void pipeSigHandler( int signal ) {
-    psignal( signal, "Signal Received : ");
-}
-
-int segvs = 0;
-void segvhandler(int x) {
-    if ( ++segvs > 1 ) {
-        signal(x, SIG_DFL);
-        if ( segvs == 2 ) {
-            cout << "\n\n\n got 2nd SIGSEGV" << endl;
-            sayDbContext();
-        }
-        return;
-    }
-    problem() << "got SIGSEGV " << x << ", terminating :-(" << endl;
-    sayDbContext();
-//	closeAllSockets();
-//	MemoryMappedFile::closeAllFiles();
-//	flushOpLog();
-    dbexit(14);
-}
-
-void mysighandler(int x) {
-    signal(x, SIG_IGN);
-    log() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
-    {
-        dblock lk;
-        problem() << "  now exiting" << endl;
-        exit(12);
-    }
-}
-
-void setupSignals() {
-    assert( signal(SIGINT, mysighandler) != SIG_ERR );
-    assert( signal(SIGTERM, mysighandler) != SIG_ERR );
-}
-
-#else
-void setupSignals() {}
-#endif
-
-
 void repairDatabases() {
     dblock lk;
     vector< string > dbNames;
@@ -311,6 +275,9 @@ void clearTmpFiles() {
     }    
 }
 
+Timer startupSrandTimer;
+
+void segvhandler(int x);
 void initAndListen(int listenPort, const char *appserverLoc = null) {
     clearTmpFiles();
     
@@ -343,16 +310,20 @@ void initAndListen(int listenPort, const char *appserverLoc = null) {
 
     repairDatabases();
 
+    /* this is for security on certain platforms */
+    srand(curTimeMillis() ^ startupSrandTimer.micros());
+
     listen(listenPort);
 }
 
 //ofstream problems("dbproblems.log", ios_base::app | ios_base::out);
 int test2();
 void testClient();
+void pipeSigHandler( int signal );
 
 int main(int argc, char* argv[], char *envp[] )
 {
-
+    srand(curTimeMillis());
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
     
     {
@@ -369,8 +340,6 @@ int main(int argc, char* argv[], char *envp[] )
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);
 #endif
-    srand(curTimeMillis());
-
     UnitTest::runTests();
 
     if ( argc >= 2 ) {
@@ -531,3 +500,55 @@ usage:
 
     return 0;
 }
+
+/* we do not use log() below as it uses a mutex and that could cause deadlocks.
+*/
+
+string getDbContext();
+
+#undef cout
+
+#if !defined(_WIN32)
+
+#include <signal.h>
+
+void pipeSigHandler( int signal ) {
+    psignal( signal, "Signal Received : ");
+}
+
+int segvs = 0;
+void segvhandler(int x) {
+    if ( ++segvs > 1 ) {
+        signal(x, SIG_DFL);
+        if ( segvs == 2 ) {
+            cout << "\n\n\n got 2nd SIGSEGV" << endl;
+            sayDbContext();
+        }
+        return;
+    }
+    cout << "got SIGSEGV " << x << ", terminating :-(" << endl;
+    sayDbContext();
+//	closeAllSockets();
+//	MemoryMappedFile::closeAllFiles();
+//	flushOpLog();
+    dbexit(14);
+}
+
+void mysighandler(int x) {
+    signal(x, SIG_IGN);
+    cout << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+    {
+        dblock lk;
+        log() << "now exiting" << endl;
+        exit(12);
+    }
+}
+
+void setupSignals() {
+    assert( signal(SIGINT, mysighandler) != SIG_ERR );
+    assert( signal(SIGTERM, mysighandler) != SIG_ERR );
+}
+
+#else
+void setupSignals() {}
+#endif

@@ -22,7 +22,7 @@
 #include "../db/jsobj.h"
 
 /* the query field 'options' can have these bits set: */
-enum {
+enum QueryOptions {
     /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
        the final object's position.  you can resume using the cursor later, from where it was located,
        if more data were received.  Set on dbQuery and dbGetMore.
@@ -42,8 +42,23 @@ enum {
 
 class BSONObj;
 
+/* db response format
+
+   Query or GetMore: // see struct QueryResult
+      int resultFlags;
+      int64 cursorID;
+      int startingFrom;
+      int nReturned;
+      list of marshalled JSObjects;
+*/
+
 #pragma pack(push,1)
 struct QueryResult : public MsgData {
+    enum {
+        ResultFlag_CursorNotFound = 1, /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
+        ResultFlag_ErrSet = 2          /* { $err : ... } is being returned */
+    };
+
     long long cursorId;
     int startingFrom;
     int nReturned;
@@ -55,6 +70,13 @@ struct QueryResult : public MsgData {
     }
 };
 #pragma pack(pop)
+
+class DBConnector {
+public:
+    virtual bool call( Message &toSend, Message &response, bool assertOk=true ) = 0;
+    virtual void say( Message &toSend ) = 0;
+    virtual void checkResponse( const char *data, int nReturned ) {}
+};
 
 class DBClientCursor : boost::noncopyable {
 public:
@@ -89,13 +111,7 @@ public:
 
     bool init();
 
-    class Connector {
-    public:
-        virtual bool send( Message &toSend, Message &response, bool assertOk=true ) = 0;
-        virtual void checkResponse( const char *data, int nReturned ) {}
-    };
-
-    DBClientCursor( Connector *_connector, const char * _ns, BSONObj _query, int _nToReturn,
+    DBClientCursor( DBConnector *_connector, const char * _ns, BSONObj _query, int _nToReturn,
                     int _nToSkip, BSONObj *_fieldsToReturn, int queryOptions ) :
             connector(_connector),
             ns(_ns),
@@ -108,8 +124,10 @@ public:
         cursorId = 0;
     }
 
+    virtual ~DBClientCursor();
+
 private:
-    auto_ptr< Connector > connector;
+    DBConnector *connector;
     string ns;
     BSONObj query;
     int nToReturn;
@@ -134,6 +152,8 @@ public:
 
     virtual
     BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+    
+    virtual void insert( const char * ns , BSONObj obj ) = 0;
 };
 
 /* db "commands"
@@ -270,11 +290,42 @@ public:
 		return true;
 	}
 
+    virtual string toString() = 0; 
+};
+
+class DBClientBase : public DBClientWithCommands, public DBConnector {
+public:
+    /* send a query to the database.
+     ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
+     query:         query to perform on the collection.  this is a BSONObj (binary JSON)
+     You may format as
+     { query: { ... }, order: { ... } }
+     to specify a sort order.
+     nToReturn:     n to return.  0 = unlimited
+     nToSkip:       start with the nth item
+     fieldsToReturn:
+     optional template of which fields to select. if unspecified, returns all fields
+     queryOptions:  see options enum at top of this file
+     
+     returns:       cursor.
+     0 if error (connection failure)
+     */
+    /*throws AssertionException*/
+    virtual
+    auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+                                   BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+
+    /*throws AssertionException*/
+    virtual
+    BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+    
+    virtual void insert( const char * ns , BSONObj obj );
 };
 
 class DBClientPaired;
 
-class DBClientConnection : public DBClientWithCommands {
+/* A basic connection to the database. */
+class DBClientConnection : public DBClientBase {
     DBClientPaired *clientPaired;
     auto_ptr<MessagingPort> p;
     auto_ptr<SockAddr> server;
@@ -290,7 +341,7 @@ public:
         if ( failed ) ss << " failed";
         return ss.str();
     }
-    string toString() const {
+    string toString() {
         return serverAddress;
     }
     MessagingPort& port() {
@@ -302,6 +353,12 @@ public:
     DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) :
             clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
 
+    virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+                                           BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+        checkConnection();
+        return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions );
+    }
+
     /* Returns false if fails to connect.
        If autoReconnect is true, you can try to use the DBClientConnection even when
        false was returned -- it will try to connect again.
@@ -309,38 +366,12 @@ public:
     virtual
     bool connect(const char *serverHostname, string& errmsg);
 
-    /* send a query to the database.
-       ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
-       query:         query to perform on the collection.  this is a BSONObj (binary JSON)
-                      You may format as
-                        { query: { ... }, order: { ... } }
-                      to specify a sort order.
-       nToReturn:     n to return.  0 = unlimited
-       nToSkip:       start with the nth item
-       fieldsToReturn:
-                      optional template of which fields to select. if unspecified, returns all fields
-       queryOptions:  see options enum at top of this file
+    void remove( const char * ns , BSONObj obj , bool justOne = 0 );
 
-       returns:       cursor.
-                      0 if error (connection failure)
-    */
-    /*throws AssertionException*/
-    auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
-                                   BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-
-    /*throws AssertionException*/
-    virtual
-    BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-private:
-    class CursorConnector : public DBClientCursor::Connector {
-        DBClientConnection *conn;
-        virtual bool send( Message &toSend, Message &response, bool assertOk = true );
-        virtual void checkResponse( const char *data, int nReturned );
-    public:
-        CursorConnector( DBClientConnection *_conn ) :
-                conn( _conn ) {
-        }
-    };
+protected:
+    virtual bool call( Message &toSend, Message &response, bool assertOk = true );
+    virtual void say( Message &toSend );
+    virtual void checkResponse( const char *data, int nReturned );
 };
 
 /* Use this class to connect to a replica pair of servers.  The class will manage
@@ -376,6 +407,11 @@ public:
     virtual
     BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
+    // Not implemented
+    virtual void insert( const char * ns , BSONObj obj ) {
+        assert( false );
+    }
+    
     string toString();
 
     /* notification that we got a "not master" error.

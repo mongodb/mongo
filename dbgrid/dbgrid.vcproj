@@ -278,6 +278,34 @@
 				RelativePath=".\shard.cpp"
 				>
 			</File>
+			<File
+				RelativePath="..\stdafx.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="release_nojni|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"
+					/>
+				</FileConfiguration>
+			</File>
 			<Filter
 				Name="Shared Source Files"
 				>
@@ -298,40 +326,16 @@
 					>
 				</File>
 				<File
+					RelativePath="..\db\lasterror.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\grid\message.cpp"
 					>
 				</File>
 				<File
 					RelativePath="..\util\sock.cpp"
 					>
-				</File>
-				<File
-					RelativePath="..\stdafx.cpp"
-					>
-					<FileConfiguration
-						Name="Debug|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="1"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="1"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="release_nojni|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="1"
-						/>
-					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\util\util.cpp"

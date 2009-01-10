@@ -39,7 +39,7 @@ them both to 0; an emulation function will be used. */
 /* #undef HAVE_BITS_TYPE_TRAITS_H */
 
 /* Define to 1 if you have the <dirent.h> header file. */
-#define HAVE_DIRENT_H 1
+// #define HAVE_DIRENT_H 1 ERH
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
@@ -95,7 +95,7 @@ them both to 0; an emulation function will be used. */
 /* #undef HAVE_TYPE_TRAITS_H */
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#define HAVE_UNISTD_H 1
+//#define HAVE_UNISTD_H 1 ERH
 
 /* Define to 1 if the system has the type `unsigned long long'. */
 #define HAVE_UNSIGNED_LONG_LONG 1

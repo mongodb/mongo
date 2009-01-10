@@ -72,7 +72,7 @@ void queryOp(Message& m, MessagingPort& p) {
             bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
             if ( ok ) {
                 BSONObj x = builder.done();
-                replyToQuery(p, m, x);
+                replyToQuery(0, p, m, x);
                 return;
             }
         }
@@ -91,7 +91,7 @@ void queryOp(Message& m, MessagingPort& p) {
         BSONObjBuilder err;
         err.append("$err", string("dbgrid ") + (e.msg.empty() ? "dbgrid assertion during query" : e.msg));
         BSONObj errObj = err.done();
-        replyToQuery(p, m, errObj);
+        replyToQuery(QueryResult::ResultFlag_ErrSet, p, m, errObj);
         return;
     }
 }
@@ -99,6 +99,7 @@ void queryOp(Message& m, MessagingPort& p) {
 void writeOp(int op, Message& m, MessagingPort& p) {
     DbMessage d(m);
     const char *ns = d.getns();
+    assert( *ns );
 
     ScopedDbConnection dbcon(tempHost);
     DBClientConnection &c = dbcon.conn();

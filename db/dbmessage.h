@@ -123,7 +123,8 @@ public:
 
 #include "../client/dbclient.h"
 
-inline void replyToQuery(MessagingPort& p, Message& requestMsg,
+inline void replyToQuery(int queryResultFlags,
+                         MessagingPort& p, Message& requestMsg,
                          void *data, int size,
                          int nReturned, int startingFrom = 0,
                          long long cursorId = 0
@@ -132,10 +133,7 @@ inline void replyToQuery(MessagingPort& p, Message& requestMsg,
     b.skip(sizeof(QueryResult));
     b.append(data, size);
     QueryResult *qr = (QueryResult *) b.buf();
-    qr->_data[0] = 0;
-    qr->_data[1] = 0;
-    qr->_data[2] = 0;
-    qr->_data[3] = 0;
+    qr->resultFlags() = queryResultFlags;
     qr->len = b.len();
     qr->setOperation(opReply);
     qr->cursorId = cursorId;
@@ -149,10 +147,11 @@ inline void replyToQuery(MessagingPort& p, Message& requestMsg,
 
 //#include "bsonobj.h"
 
-inline void replyToQuery(MessagingPort& p, Message& requestMsg,
+inline void replyToQuery(int queryResultFlags,
+                         MessagingPort& p, Message& requestMsg,
                          BSONObj& responseObj)
 {
-    replyToQuery(
+    replyToQuery(queryResultFlags,
         p, requestMsg,
         (void *) responseObj.objdata(), responseObj.objsize(), 1);
 }

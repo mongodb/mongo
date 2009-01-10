@@ -484,7 +484,7 @@ void killCursors(int n, long long *ids) {
 // order.$natural sets natural order direction
 auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
 
-BSONObj id_obj = fromjson("{_id:ObjId()}");
+BSONObj id_obj = fromjson("{\"_id\":ObjectId( \"000000000000000000000000\" )}");
 BSONObj empty_obj = fromjson("{}");
 
 /* { count: "collectionname"[, query: <query>] }
@@ -754,10 +754,7 @@ QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoret
     }
 
     QueryResult *qr = (QueryResult *) b.buf();
-    qr->_data[0] = 0;
-    qr->_data[1] = 0;
-    qr->_data[2] = 0;
-    qr->_data[3] = 0;
+    qr->resultFlags() = 0;
     qr->len = b.len();
     ss << " reslen:" << b.len();
     //	qr->channel = 0;
@@ -810,7 +807,7 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
     if ( !cc ) {
         DEV log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
         cursorid = 0;
-        resultFlags = ResultFlag_CursorNotFound;
+        resultFlags = QueryResult::ResultFlag_CursorNotFound;
     }
     else {
         start = cc->pos;
