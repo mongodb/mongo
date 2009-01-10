@@ -74,6 +74,8 @@ struct __idb {
 
 	u_int32_t root_addr;		/* Root fragment */
 
+	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
+
 	u_int32_t flags;
 };
 
