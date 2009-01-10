@@ -2,12 +2,6 @@
 
 # Script to run Gimpel's flexlint program.
 
-# List of sources
-l="../btree/*.c ../db/*.c ../env/*.c ../os_posix/*.c ../support/*.c"
-
-# Expand the list.
-l=`ls $l`
-
 f()
 {
 	flexelint_binary +fll \
@@ -16,6 +10,7 @@ f()
 	    "-emacro(776,WT_OVERFLOW_BYTES_TO_FRAGS)" \
 	    "-emacro(737,WT_ALIGN)" \
 	    "-e506" \
+	    "-e613" \
 	    "-e717" \
 	    "-e774" \
 	    "-e801" \
@@ -31,13 +26,36 @@ f()
 	     "-i." "-i../inc_posix" "-i/usr/include" $1
 }
 
+update=0
+while :
+	do case "$1" in
+	-u)
+		update=1
+		shift;;
+	*)
+		break;;
+	esac
+done
+
+# List of source files.
+l="../btree/*.c ../db/*.c ../env/*.c ../os_posix/*.c ../support/*.c"
+l=`ls $l`
+
 if [ $# -ne 0 ]; then
 	f "$*"
 else
 	f "$l" > flexlint.out 2>&1
 
 	f=../lint/flexlint.out
-	test -f $f && cmp flexlint.out $f 2>&1 > /dev/null || more flexlint.out
+
+	if test "$update" -eq 1; then
+		cp flexlint.out $f
+	elif test -f "$f"; then
+		cmp flexlint.out $f > /dev/null 2>&1 ||
+		    diff flexlint.out $f | more
+	else
+		more flexlint.out
+	fi
 fi
 
 exit 0
