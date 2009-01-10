@@ -80,9 +80,8 @@ wt_page
 # Internal functions
 #############################################
 wt_cache_db_in
-	NO_CHECKSUM			# Don't verify the checksum on reading
-	NO_INMEM_PAGE			# Don't build the in-memory page
+	UNFORMATTED			# Page may not be a valid database page.
 
 wt_cache_db_out
-	DISCARD				# Discard page from cache
 	MODIFIED			# Page is modified
+	UNFORMATTED			# Page may not be a valid database page.
