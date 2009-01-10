@@ -11,7 +11,7 @@
 
 /*
  * __wt_db_set_btree_compare_int_verify --
- *	Verify an argument to the Db.set_btree_compare_int setter.
+ *	Verify arguments to the Db.set_btree_compare_int setter.
  */
 int
 __wt_db_set_btree_compare_int_verify(DB *db, int *bytesp)
@@ -27,62 +27,4 @@ __wt_db_set_btree_compare_int_verify(DB *db, int *bytesp)
 	__wt_db_errx(db,
 	    "The number of bytes must be an integral value between 1 and 8");
 	return (WT_ERROR);
-}
-
-/*
- * __wt_db_set_pagesize_verify --
- *	Verify an argument to the Db.set_pagesize setter.
- */
-int
-__wt_db_set_pagesize_verify(DB *db, u_int32_t *pagesizep,
-    u_int32_t *fragsizep, u_int32_t *extentsizep, u_int32_t *maxitemsizep)
-{
-	u_int32_t pagesize, fragsize, extentsize, maxitemsize;
-
-#define	WT_MINIMUM_DATA_SPACE(db)					\
-	    (((db)->pagesize - (WT_HDR_SIZE + WT_DESC_SIZE)) / 4)
-
-	/* Copy in defaults, if not being set. */
-	pagesize = *pagesizep == 0 ? db->pagesize : *pagesizep;
-	fragsize = *fragsizep == 0 ? db->fragsize : *fragsizep;
-	extentsize = *extentsizep == 0 ? db->extentsize : *extentsizep;
-	maxitemsize = *maxitemsizep == 0 ? db->maxitemsize : *maxitemsizep;
-	if ((maxitemsize = *maxitemsizep) == 0)
-		if ((maxitemsize = db->maxitemsize) == 0)
-			maxitemsize = WT_MINIMUM_DATA_SPACE(db);
-
-	if (fragsize % WT_FRAG_MINIMUM_SIZE != 0) {
-		__wt_db_errx(db,
-		    "The fragment size must be a multiple of 512B");
-		return (WT_ERROR);
-	}
-	if (pagesize % fragsize != 0) {
-		__wt_db_errx(db,
-		    "The page size must be a multiple of the fragment size");
-		return (WT_ERROR);
-	}
-	if (extentsize % pagesize != 0) {
-		__wt_db_errx(db,
-		    "The extent size must be a multiple of the page size");
-		return (WT_ERROR);
-	}
-
-	/*
-	 * The page must hold at least 4 keys, otherwise the whole Btree
-	 * thing breaks down because we can't split.
-	 */
-	if (maxitemsize > WT_MINIMUM_DATA_SPACE(db)) {
-		__wt_db_errx(db,
-		    "The specified page size is too small for the current"
-		    " maximum item size; at least two key/data pairs must"
-		    " fit on each page");
-		return (WT_ERROR);
-	}
-
-	*pagesizep = pagesize;
-	*fragsizep = fragsize;
-	*extentsizep = extentsize;
-	*maxitemsizep = maxitemsize;
-
-	return (0);
 }
