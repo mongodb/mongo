@@ -79,7 +79,11 @@ def getset():
 	global db_config, db_header, db_lockout
 	global env_config, env_header, env_lockout
 
-	field = list[0].split('\t')[0]
+	name_re = re.compile(r'^.*=([a-z_]+)')
+	if name_re.match(condition):
+		field = name_re.match(condition).group(1)
+	else:
+		field = list[0].split('\t')[0]
 
 	# Store the handle's getter/setter variables and methods into the
 	# XXX_header string.
