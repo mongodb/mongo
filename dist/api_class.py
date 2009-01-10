@@ -14,6 +14,7 @@
 #		getset  -- a getter/setter declaration
 #		method  -- a standalone method, returning int
 #		methodV -- a standalone method, returning void
+#		name	-- the name of the method (by default same as arg #1)
 #		verify  -- getset: call a subroutine to OK the argument
 #	<tab>field<tab>type
 #	...
@@ -56,22 +57,31 @@ env	method
 # Db getter/setter method declarations
 ###################################################
 db	getset
-	btree_compare	int (*@S)(DB *, const DBT *, const DBT *)
-db	getset,verify
-	btree_compare_int	int @S
-db	getset
-	dup_compare	int (*@S)(DB *, const DBT *, const DBT *)
-db	getset
 	errcall	void (*@S)(const DB *, const char *)
 db	getset
 	errfile	FILE *@S
 db	getset
 	errpfx	const char *@S
+
+###################################################
+# Btree getter/setter method declarations
+###################################################
+db	getset
+	btree_compare	int (*@S)(DB *, const DBT *, const DBT *)
 db	getset,verify
-	pagesize	u_int32_t @S
+	btree_compare_int	int @S
+db	getset
+	btree_dup_compare	int (*@S)(DB *, const DBT *, const DBT *)
+db	getset,name=btree_itemsize
+	intlitemsize	u_int32_t @S
+	leafitemsize	u_int32_t @S
+db	getset,name=btree_pagesize
 	fragsize	u_int32_t @S
-	extentsize	u_int32_t @S
-	maxitemsize	u_int32_t @S
+	intlsize	u_int32_t @S
+	leafsize	u_int32_t @S
+	extsize	u_int32_t @S
+db	getset
+	btree_dup_offpage	u_int32_t @S
 
 ###################################################
 # Db standalone method declarations

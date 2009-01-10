@@ -94,24 +94,6 @@ struct __db {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * Db handle api section: BEGIN
 	 */
-	int (*btree_compare)(DB *, const DBT *, const DBT *);
-	void (*get_btree_compare)(
-	    DB *, int (**)(DB *, const DBT *, const DBT *));
-	int (*set_btree_compare)(
-	    DB *, int (*)(DB *, const DBT *, const DBT *));
-
-	int btree_compare_int;
-	void (*get_btree_compare_int)(
-	    DB *, int *);
-	int (*set_btree_compare_int)(
-	    DB *, int );
-
-	int (*dup_compare)(DB *, const DBT *, const DBT *);
-	void (*get_dup_compare)(
-	    DB *, int (**)(DB *, const DBT *, const DBT *));
-	int (*set_dup_compare)(
-	    DB *, int (*)(DB *, const DBT *, const DBT *));
-
 	void (*errcall)(const DB *, const char *);
 	void (*get_errcall)(
 	    DB *, void (**)(const DB *, const char *));
@@ -130,14 +112,45 @@ struct __db {
 	int (*set_errpfx)(
 	    DB *, const char *);
 
-	u_int32_t pagesize;
+	int (*btree_compare)(DB *, const DBT *, const DBT *);
+	void (*get_btree_compare)(
+	    DB *, int (**)(DB *, const DBT *, const DBT *));
+	int (*set_btree_compare)(
+	    DB *, int (*)(DB *, const DBT *, const DBT *));
+
+	int btree_compare_int;
+	void (*get_btree_compare_int)(
+	    DB *, int *);
+	int (*set_btree_compare_int)(
+	    DB *, int );
+
+	int (*btree_dup_compare)(DB *, const DBT *, const DBT *);
+	void (*get_btree_dup_compare)(
+	    DB *, int (**)(DB *, const DBT *, const DBT *));
+	int (*set_btree_dup_compare)(
+	    DB *, int (*)(DB *, const DBT *, const DBT *));
+
+	u_int32_t intlitemsize;
+	u_int32_t leafitemsize;
+	void (*get_btree_itemsize)(
+	    DB *, u_int32_t *, u_int32_t *);
+	int (*set_btree_itemsize)(
+	    DB *, u_int32_t , u_int32_t );
+
 	u_int32_t fragsize;
-	u_int32_t extentsize;
-	u_int32_t maxitemsize;
-	void (*get_pagesize)(
+	u_int32_t intlsize;
+	u_int32_t leafsize;
+	u_int32_t extsize;
+	void (*get_btree_pagesize)(
 	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
-	int (*set_pagesize)(
+	int (*set_btree_pagesize)(
 	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
+
+	u_int32_t btree_dup_offpage;
+	void (*get_btree_dup_offpage)(
+	    DB *, u_int32_t *);
+	int (*set_btree_dup_offpage)(
+	    DB *, u_int32_t );
 
 	int (*bulk_load)(
 	    DB *, u_int32_t, int (*)(DB *, DBT **, DBT **));
@@ -269,18 +282,16 @@ char	*wt_strerror(int);
  * DO NOT EDIT: automatically built by dist/api.py.
  * API flags section: BEGIN
  */
-#define	WT_ALLOCATED					0x00000002
+#define	WT_ALLOCATED					0x00000001
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
-#define	WT_DISCARD					0x00000002
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MAXKEY_NOTSET				0x00000002
-#define	WT_MODIFIED					0x00000001
-#define	WT_NO_CHECKSUM					0x00000002
-#define	WT_NO_INMEM_PAGE				0x00000001
+#define	WT_MODIFIED					0x00000002
 #define	WT_PRINTABLES					0x00000001
 #define	WT_PRIVATE_ENV					0x00000001
 #define	WT_SORTED_INPUT					0x00000001
+#define	WT_UNFORMATTED					0x00000001
 #define	WT_VERB_FILEOPS					0x00000002
 #define	WT_VERB_FILEOPS_ALL				0x00000001
 
@@ -305,11 +316,11 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_ENV_VERBOSE				0x00000003
 #define	WT_APIMASK_IDB					0x00000001
 #define	WT_APIMASK_IENV					0x00000000
-#define	WT_APIMASK_WT_CACHE_DB_IN			0x00000003
+#define	WT_APIMASK_WT_CACHE_DB_IN			0x00000001
 #define	WT_APIMASK_WT_CACHE_DB_OUT			0x00000003
 #define	WT_APIMASK_WT_DB_CREATE				0x00000000
 #define	WT_APIMASK_WT_ENV_CREATE			0x00000000
-#define	WT_APIMASK_WT_INDX				0x00000002
+#define	WT_APIMASK_WT_INDX				0x00000001
 #define	WT_APIMASK_WT_PAGE				0x00000003
 /*
  * API flags section: END
