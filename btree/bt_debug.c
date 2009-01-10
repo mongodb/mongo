@@ -56,11 +56,43 @@ static int
 __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 {
 	WT_PAGE *page;
+	u_int32_t frags;
 	int ret, tret;
 
-	if ((ret =
-	    __wt_cache_db_in(db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+	/*
+	 * Read in a single fragment.   If we get the page from the cache,
+	 * it will be correct, and we can use it without further concern.
+	 * If we don't get the page from the cache, figure out the type of
+	 * the page and get it for real.
+	 *
+	 * We don't have any way to test if a page was found in the cache,
+	 * so we check the in-memory page information -- pages in the cache
+	 * should have in-memory page information.
+	 */
+	if ((ret = __wt_cache_db_in(db, addr, 1, &page, WT_UNFORMATTED)) != 0)
 		return (ret);
+	if (page->indx == NULL) {
+		switch (page->hdr->type) {
+		case WT_PAGE_OVFL:
+			frags =
+			    WT_OVFL_BYTES_TO_FRAGS(db, page->hdr->u.datalen);
+			break;
+		case WT_PAGE_INT:
+		case WT_PAGE_DUP_INT:
+			frags = WT_BYTES_TO_FRAGS(db, db->intlsize);
+			break;
+		case WT_PAGE_LEAF:
+		case WT_PAGE_DUP_LEAF:
+			frags = WT_BYTES_TO_FRAGS(db, db->leafsize);
+			break;
+		default:
+			return (__wt_database_format(db));
+		}
+		if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
+			return (ret);
+		if ((ret = __wt_cache_db_in(db, addr, frags, &page, 0)) != 0)
+			return (ret);
+	}
 
 	ret = __wt_bt_dump_page(db, page, ofile, fp);
 
@@ -103,8 +135,9 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		fprintf(fp, "magic: %#lx, major: %lu, minor: %lu\n",
 		    (u_long)desc.magic,
 		    (u_long)desc.majorv, (u_long)desc.minorv);
-		fprintf(fp, "pagesize: %lu, base record: %lu\n",
-		    (u_long)desc.pagesize, (u_long)desc.base_recno);
+		fprintf(fp, "intlsize: %lu, leafsize: %lu, base record: %lu\n",
+		    (u_long)desc.intlsize,
+		    (u_long)desc.leafsize, (u_long)desc.base_recno);
 		if (desc.root_addr == WT_ADDR_INVALID)
 			fprintf(fp, "root fragment (none), ");
 		else
@@ -124,7 +157,8 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		fprintf(fp, "%lu bytes", (u_long)hdr->u.datalen);
 	else
 		fprintf(fp, "%lu entries", (u_long)hdr->u.entries);
-	fprintf(fp, ", lsn %lu/%lu\n", (u_long)hdr->lsn.f, (u_long)hdr->lsn.o);
+	fprintf(fp, ", level %lu, lsn %lu/%lu\n",
+	    (u_long)hdr->level, (u_long)hdr->lsn.f, (u_long)hdr->lsn.o);
 	if (hdr->prntaddr == WT_ADDR_INVALID)
 		fprintf(fp, "prntaddr (none), ");
 	else
@@ -187,8 +221,8 @@ __wt_bt_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 static void
 __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 {
-	WT_ITEM_OVFL *item_ovfl;
-	WT_ITEM_OFFP *item_offp;
+	WT_ITEM_OVFL *ovfl;
+	WT_ITEM_OFFP *offp;
 	WT_PAGE *page;
 
 	switch (item->type) {
@@ -200,21 +234,21 @@ __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
-		item_ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
+		ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 		fprintf(fp, "addr %lu; len %lu; ",
-		    (u_long)item_ovfl->addr, (u_long)item_ovfl->len);
+		    (u_long)ovfl->addr, (u_long)ovfl->len);
 
-		if (__wt_cache_db_in(db, item_ovfl->addr,
-		    WT_OVFL_BYTES_TO_FRAGS(db, item_ovfl->len),
-		    &page, 0) == 0) {
-			__wt_bt_print(WT_PAGE_BYTE(page), item_ovfl->len, fp);
+		if (__wt_bt_ovfl_page_in(db,
+		    ovfl->addr, (u_int32_t)ovfl->len, page) == 0) {
+			__wt_bt_print(WT_PAGE_BYTE(page), ovfl->len, fp);
 			(void)__wt_cache_db_out(db, page, 0);
 		}
 		break;
 	case WT_ITEM_OFFPAGE:
-		item_offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-		fprintf(fp, "addr: %lu, records %lu",
-		    (u_long)item_offp->addr, (u_long)item_offp->records);
+		offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+		fprintf(fp, "addr: %lu, records %lu, level %lu",
+		    (u_long)offp->addr,
+		    (u_long)offp->records, (u_long)offp->level);
 		break;
 	default:
 		fprintf(fp, "unsupported type");

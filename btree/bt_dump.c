@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 static int  __wt_bt_dump_offpage(DB *, DBT *,
-    u_int32_t, FILE *, void (*)(u_int8_t *, u_int32_t, FILE *));
+    WT_ITEM_OFFP *, FILE *, void (*)(u_int8_t *, u_int32_t, FILE *));
 static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
 static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
 
@@ -32,8 +32,8 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	DBT last_key_ovfl, last_key_std, *last_key;
 	ENV *env;
 	WT_ITEM *item;
-	WT_ITEM_OFFP *offp;
 	WT_ITEM_OVFL *ovfl;
+	WT_ITEM_OFFP offp;
 	WT_PAGE *page, *ovfl_page;
 	u_int32_t addr, i;
 	int dup_ahead, ret;
@@ -57,8 +57,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	WT_CLEAR(last_key_ovfl);
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		if ((ret = __wt_cache_db_in(
-		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, 1, page)) != 0)
 			return (ret);
 
 		WT_ITEM_FOREACH(page, item, i)
@@ -96,9 +95,8 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_cache_db_in(db, ovfl->addr,
-				    WT_OVFL_BYTES_TO_FRAGS(db, ovfl->len),
-				    &ovfl_page, 0)) != 0)
+				if ((ret = __wt_bt_ovfl_page_in(db,
+				    ovfl->addr, ovfl->len, ovfl_page)) != 0)
 					goto err;
 
 				/*
@@ -130,9 +128,15 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 					goto err;
 				break;
 			case WT_ITEM_OFFPAGE:
-				offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_bt_dump_offpage(db,
-				    last_key, offp->addr, stream, func)) != 0)
+				/*
+				 * !!!
+				 * Don't pass __wt_bt_dump_offpage a pointer
+				 * to the on-page OFFP structure, it writes
+				 * the offp passed in.
+				 */
+				offp = *(WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+				if ((ret = __wt_bt_dump_offpage(
+				    db, last_key, &offp, stream, func)) != 0)
 					goto err;
 				break;
 			default:
@@ -161,25 +165,27 @@ err:		ret = WT_ERROR;
  *	Dump a set of off-page duplicates.
  */
 static int
-__wt_bt_dump_offpage(DB *db, DBT *key,
-    u_int32_t addr, FILE *stream, void (*func)(u_int8_t *, u_int32_t, FILE *))
+__wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
+    FILE *stream, void (*func)(u_int8_t *, u_int32_t, FILE *))
 {
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE *page, *ovfl_page;
-	u_int32_t i, next_addr;
+	u_int32_t addr, i;
 	int ret;
 
 	page = NULL;
 
-	/* Walk the tree to the first leaf page. */
+	/* Walk down the duplicates tree to the first leaf page. */
 	for (;;) {
-		if ((ret = __wt_cache_db_in(
-		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+		if ((ret = __wt_bt_page_in(db, offp->addr,
+		    offp->level == WT_LEAF_LEVEL ? 1 : 0, page)) != 0)
 			goto err;
-		if (page->hdr->type == WT_PAGE_DUP_LEAF)
+
+		if (offp->level == WT_LEAF_LEVEL)
 			break;
-		__wt_bt_first_offp_addr(page, &addr);
+		__wt_bt_first_offp(page, offp);
+
 		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
@@ -195,9 +201,8 @@ __wt_bt_dump_offpage(DB *db, DBT *key,
 				break;
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_cache_db_in(db, ovfl->addr,
-				    WT_OVFL_BYTES_TO_FRAGS(db, ovfl->len),
-				    &ovfl_page, 0)) != 0)
+				if ((ret = __wt_bt_ovfl_page_in(
+				    db, ovfl->addr, ovfl->len, ovfl_page)) != 0)
 					goto err;
 				func(
 				    WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
@@ -210,16 +215,15 @@ __wt_bt_dump_offpage(DB *db, DBT *key,
 			}
 		}
 
-		next_addr = page->hdr->nextaddr;
+		addr = page->hdr->nextaddr;
 		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
-		if ((addr = next_addr) == WT_ADDR_INVALID)
+		if (addr == WT_ADDR_INVALID)
 			break;
 
-		if ((ret = __wt_cache_db_in(
-		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, 1, page)) != 0)
 			goto err;
 	}
 

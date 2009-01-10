@@ -123,81 +123,6 @@ __wt_env_set_cachesize(
 	return (0);
 }
 
-static void __wt_db_get_btree_compare(
-	DB *,
-	int (**)(DB *, const DBT *, const DBT *));
-static void
-__wt_db_get_btree_compare(
-	DB *handle,
-	int (**btree_comparep)(DB *, const DBT *, const DBT *))
-{
-	*btree_comparep = handle->btree_compare;
-}
-
-static int __wt_db_set_btree_compare(
-	DB *,
-	int (*)(DB *, const DBT *, const DBT *));
-static int
-__wt_db_set_btree_compare(
-	DB *handle,
-	int (*btree_compare)(DB *, const DBT *, const DBT *))
-{
-	handle->btree_compare = btree_compare;
-	return (0);
-}
-
-static void __wt_db_get_btree_compare_int(
-	DB *,
-	int *);
-static void
-__wt_db_get_btree_compare_int(
-	DB *handle,
-	int *btree_compare_intp)
-{
-	*btree_compare_intp = handle->btree_compare_int;
-}
-
-static int __wt_db_set_btree_compare_int(
-	DB *,
-	int );
-static int
-__wt_db_set_btree_compare_int(
-	DB *handle,
-	int btree_compare_int)
-{
-	int ret;
-
-	if ((ret = __wt_db_set_btree_compare_int_verify(
-	    handle, &btree_compare_int)) != 0)
-		return (ret);
-
-	handle->btree_compare_int = btree_compare_int;
-	return (0);
-}
-
-static void __wt_db_get_dup_compare(
-	DB *,
-	int (**)(DB *, const DBT *, const DBT *));
-static void
-__wt_db_get_dup_compare(
-	DB *handle,
-	int (**dup_comparep)(DB *, const DBT *, const DBT *))
-{
-	*dup_comparep = handle->dup_compare;
-}
-
-static int __wt_db_set_dup_compare(
-	DB *,
-	int (*)(DB *, const DBT *, const DBT *));
-static int
-__wt_db_set_dup_compare(
-	DB *handle,
-	int (*dup_compare)(DB *, const DBT *, const DBT *))
-{
-	handle->dup_compare = dup_compare;
-	return (0);
-}
-
 static void __wt_db_get_errcall(
 	DB *,
 	void (**)(const DB *, const char *));
@@ -267,50 +192,171 @@ __wt_db_set_errpfx(
 	return (0);
 }
 
-static void __wt_db_get_pagesize(
+static void __wt_db_get_btree_compare(
+	DB *,
+	int (**)(DB *, const DBT *, const DBT *));
+static void
+__wt_db_get_btree_compare(
+	DB *handle,
+	int (**btree_comparep)(DB *, const DBT *, const DBT *))
+{
+	*btree_comparep = handle->btree_compare;
+}
+
+static int __wt_db_set_btree_compare(
+	DB *,
+	int (*)(DB *, const DBT *, const DBT *));
+static int
+__wt_db_set_btree_compare(
+	DB *handle,
+	int (*btree_compare)(DB *, const DBT *, const DBT *))
+{
+	handle->btree_compare = btree_compare;
+	return (0);
+}
+
+static void __wt_db_get_btree_compare_int(
+	DB *,
+	int *);
+static void
+__wt_db_get_btree_compare_int(
+	DB *handle,
+	int *btree_compare_intp)
+{
+	*btree_compare_intp = handle->btree_compare_int;
+}
+
+static int __wt_db_set_btree_compare_int(
+	DB *,
+	int );
+static int
+__wt_db_set_btree_compare_int(
+	DB *handle,
+	int btree_compare_int)
+{
+	int ret;
+
+	if ((ret = __wt_db_set_btree_compare_int_verify(
+	    handle, &btree_compare_int)) != 0)
+		return (ret);
+
+	handle->btree_compare_int = btree_compare_int;
+	return (0);
+}
+
+static void __wt_db_get_btree_dup_compare(
+	DB *,
+	int (**)(DB *, const DBT *, const DBT *));
+static void
+__wt_db_get_btree_dup_compare(
+	DB *handle,
+	int (**btree_dup_comparep)(DB *, const DBT *, const DBT *))
+{
+	*btree_dup_comparep = handle->btree_dup_compare;
+}
+
+static int __wt_db_set_btree_dup_compare(
+	DB *,
+	int (*)(DB *, const DBT *, const DBT *));
+static int
+__wt_db_set_btree_dup_compare(
+	DB *handle,
+	int (*btree_dup_compare)(DB *, const DBT *, const DBT *))
+{
+	handle->btree_dup_compare = btree_dup_compare;
+	return (0);
+}
+
+static void __wt_db_get_btree_itemsize(
+	DB *,
+	u_int32_t *,
+	u_int32_t *);
+static void
+__wt_db_get_btree_itemsize(
+	DB *handle,
+	u_int32_t *intlitemsizep,
+	u_int32_t *leafitemsizep)
+{
+	*intlitemsizep = handle->intlitemsize;
+	*leafitemsizep = handle->leafitemsize;
+}
+
+static int __wt_db_set_btree_itemsize(
+	DB *,
+	u_int32_t ,
+	u_int32_t );
+static int
+__wt_db_set_btree_itemsize(
+	DB *handle,
+	u_int32_t intlitemsize,
+	u_int32_t leafitemsize)
+{
+	handle->intlitemsize = intlitemsize;
+	handle->leafitemsize = leafitemsize;
+	return (0);
+}
+
+static void __wt_db_get_btree_pagesize(
 	DB *,
 	u_int32_t *,
 	u_int32_t *,
 	u_int32_t *,
 	u_int32_t *);
 static void
-__wt_db_get_pagesize(
+__wt_db_get_btree_pagesize(
 	DB *handle,
-	u_int32_t *pagesizep,
 	u_int32_t *fragsizep,
-	u_int32_t *extentsizep,
-	u_int32_t *maxitemsizep)
+	u_int32_t *intlsizep,
+	u_int32_t *leafsizep,
+	u_int32_t *extsizep)
 {
-	*pagesizep = handle->pagesize;
 	*fragsizep = handle->fragsize;
-	*extentsizep = handle->extentsize;
-	*maxitemsizep = handle->maxitemsize;
+	*intlsizep = handle->intlsize;
+	*leafsizep = handle->leafsize;
+	*extsizep = handle->extsize;
 }
 
-static int __wt_db_set_pagesize(
+static int __wt_db_set_btree_pagesize(
 	DB *,
 	u_int32_t ,
 	u_int32_t ,
 	u_int32_t ,
 	u_int32_t );
 static int
-__wt_db_set_pagesize(
+__wt_db_set_btree_pagesize(
 	DB *handle,
-	u_int32_t pagesize,
 	u_int32_t fragsize,
-	u_int32_t extentsize,
-	u_int32_t maxitemsize)
+	u_int32_t intlsize,
+	u_int32_t leafsize,
+	u_int32_t extsize)
 {
-	int ret;
-
-	if ((ret = __wt_db_set_pagesize_verify(
-	    handle, &pagesize, &fragsize, &extentsize, &maxitemsize)) != 0)
-		return (ret);
-
-	handle->pagesize = pagesize;
 	handle->fragsize = fragsize;
-	handle->extentsize = extentsize;
-	handle->maxitemsize = maxitemsize;
+	handle->intlsize = intlsize;
+	handle->leafsize = leafsize;
+	handle->extsize = extsize;
+	return (0);
+}
+
+static void __wt_db_get_btree_dup_offpage(
+	DB *,
+	u_int32_t *);
+static void
+__wt_db_get_btree_dup_offpage(
+	DB *handle,
+	u_int32_t *btree_dup_offpagep)
+{
+	*btree_dup_offpagep = handle->btree_dup_offpage;
+}
+
+static int __wt_db_set_btree_dup_offpage(
+	DB *,
+	u_int32_t );
+static int
+__wt_db_set_btree_dup_offpage(
+	DB *handle,
+	u_int32_t btree_dup_offpage)
+{
+	handle->btree_dup_offpage = btree_dup_offpage;
 	return (0);
 }
 
@@ -397,20 +443,24 @@ __wt_env_config_methods_open(ENV *env)
 void
 __wt_db_config_methods(DB *db)
 {
-	db->get_btree_compare = __wt_db_get_btree_compare;
-	db->set_btree_compare = __wt_db_set_btree_compare;
-	db->get_btree_compare_int = __wt_db_get_btree_compare_int;
-	db->set_btree_compare_int = __wt_db_set_btree_compare_int;
-	db->get_dup_compare = __wt_db_get_dup_compare;
-	db->set_dup_compare = __wt_db_set_dup_compare;
 	db->get_errcall = __wt_db_get_errcall;
 	db->set_errcall = __wt_db_set_errcall;
 	db->get_errfile = __wt_db_get_errfile;
 	db->set_errfile = __wt_db_set_errfile;
 	db->get_errpfx = __wt_db_get_errpfx;
 	db->set_errpfx = __wt_db_set_errpfx;
-	db->get_pagesize = __wt_db_get_pagesize;
-	db->set_pagesize = __wt_db_set_pagesize;
+	db->get_btree_compare = __wt_db_get_btree_compare;
+	db->set_btree_compare = __wt_db_set_btree_compare;
+	db->get_btree_compare_int = __wt_db_get_btree_compare_int;
+	db->set_btree_compare_int = __wt_db_set_btree_compare_int;
+	db->get_btree_dup_compare = __wt_db_get_btree_dup_compare;
+	db->set_btree_dup_compare = __wt_db_set_btree_dup_compare;
+	db->get_btree_itemsize = __wt_db_get_btree_itemsize;
+	db->set_btree_itemsize = __wt_db_set_btree_itemsize;
+	db->get_btree_pagesize = __wt_db_get_btree_pagesize;
+	db->set_btree_pagesize = __wt_db_set_btree_pagesize;
+	db->get_btree_dup_offpage = __wt_db_get_btree_dup_offpage;
+	db->set_btree_dup_offpage = __wt_db_set_btree_dup_offpage;
 	db->bulk_load = __wt_db_bulk_load;
 	db->close = (int (*)
 	    (DB *, u_int32_t))
@@ -438,24 +488,6 @@ __wt_db_config_methods(DB *db)
 void
 __wt_db_config_methods_lockout(DB *db)
 {
-	db->get_btree_compare = (void (*)
-	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout_err;
-	db->set_btree_compare = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout_err;
-	db->get_btree_compare_int = (void (*)
-	    (DB *, int *))
-	    __wt_db_lockout_err;
-	db->set_btree_compare_int = (int (*)
-	    (DB *, int ))
-	    __wt_db_lockout_err;
-	db->get_dup_compare = (void (*)
-	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout_err;
-	db->set_dup_compare = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout_err;
 	db->get_errcall = (void (*)
 	    (DB *, void (**)(const DB *, const char *)))
 	    __wt_db_lockout_err;
@@ -474,11 +506,41 @@ __wt_db_config_methods_lockout(DB *db)
 	db->set_errpfx = (int (*)
 	    (DB *, const char *))
 	    __wt_db_lockout_err;
-	db->get_pagesize = (void (*)
+	db->get_btree_compare = (void (*)
+	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
+	    __wt_db_lockout_err;
+	db->set_btree_compare = (int (*)
+	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
+	    __wt_db_lockout_err;
+	db->get_btree_compare_int = (void (*)
+	    (DB *, int *))
+	    __wt_db_lockout_err;
+	db->set_btree_compare_int = (int (*)
+	    (DB *, int ))
+	    __wt_db_lockout_err;
+	db->get_btree_dup_compare = (void (*)
+	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
+	    __wt_db_lockout_err;
+	db->set_btree_dup_compare = (int (*)
+	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
+	    __wt_db_lockout_err;
+	db->get_btree_itemsize = (void (*)
+	    (DB *, u_int32_t *, u_int32_t *))
+	    __wt_db_lockout_err;
+	db->set_btree_itemsize = (int (*)
+	    (DB *, u_int32_t , u_int32_t ))
+	    __wt_db_lockout_err;
+	db->get_btree_pagesize = (void (*)
 	    (DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *))
 	    __wt_db_lockout_err;
-	db->set_pagesize = (int (*)
+	db->set_btree_pagesize = (int (*)
 	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    __wt_db_lockout_err;
+	db->get_btree_dup_offpage = (void (*)
+	    (DB *, u_int32_t *))
+	    __wt_db_lockout_err;
+	db->set_btree_dup_offpage = (int (*)
+	    (DB *, u_int32_t ))
 	    __wt_db_lockout_err;
 	db->bulk_load = (int (*)
 	    (DB *, u_int32_t, int (*)(DB *, DBT **, DBT **)))

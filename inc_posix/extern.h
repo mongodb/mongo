@@ -29,7 +29,9 @@ __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
 void
-__wt_bt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp);
+__wt_bt_first_offp(WT_PAGE *page, WT_ITEM_OFFP *offp);
+void
+__wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr);
 const char *
 __wt_bt_hdr_type(u_int32_t type);
 const char *
@@ -45,9 +47,12 @@ __wt_bt_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy);
 int
 __wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
 int
+__wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep);
+int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
-void
-__wt_bt_page_inmem_alloc(DB *db, WT_PAGE *page);
+int
+__wt_bt_page_inmem_append(DB *db,
+    WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *off_item);
 int
 __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx);
 int
@@ -64,9 +69,6 @@ void
 __wt_db_errx(DB *db, const char *fmt, ...);
 int
 __wt_db_set_btree_compare_int_verify(DB *db, int *bytesp);
-int
-__wt_db_set_pagesize_verify(DB *db, u_int32_t *pagesizep,
-    u_int32_t *fragsizep, u_int32_t *extentsizep, u_int32_t *maxitemsizep);
 int
 __wt_db_destroy(DB *db, u_int32_t flags);
 void

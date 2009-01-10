@@ -78,14 +78,19 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
 		return (WT_NOTFOUND);
 
+	/*
+	 * If the tree has split, the root page is an internal page, otherwise
+	 * it's a leaf page.
+	 */
+	isleaf = idb->root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
+
 	/* Search the tree. */
 	for (;;) {
-		if ((ret = __wt_cache_db_in(
-		    db, addr, WT_FRAGS_PER_PAGE(db), &page, 0)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, page)) != 0)
 			return (ret);
 		hdr = page->hdr;
-		isleaf = hdr->type == WT_PAGE_LEAF ||
-		    hdr->type == WT_PAGE_DUP_LEAF ? 1 : 0;
+		if (hdr->level == WT_LEAF_LEVEL)
+			isleaf = 1;
 
 		/*
 		 * Do a binary search of the page -- this loop needs to be
