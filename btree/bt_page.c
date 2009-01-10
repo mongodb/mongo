@@ -255,8 +255,10 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
 		case WT_ITEM_OFFPAGE:
-			if (indx->ditem == NULL)
+			if (indx->ditem == NULL) {
 				indx->ditem = item;
+				indx->addr = WT_ADDR_INVALID;
+			}
 			break;
 		default:
 			return (__wt_database_format(db));
