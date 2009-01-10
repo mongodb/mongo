@@ -23,34 +23,30 @@ extern "C" {
  * code can't build a database sufficiently large for whatever the hell it
  * is they want to do.
  */
-#define	WT_FRAG_MINIMUM_SIZE		(512)		/* 512B */
-#define	WT_FRAG_DEFAULT_SIZE		(2048)		/* 2KB */
-#define	WT_PAGE_DEFAULT_SIZE		(32768)		/* 32KB */
-
 /* Convert a file address into a byte offset. */
 #define	WT_FRAGS_TO_BYTES(db, frags)					\
-	((off_t)(frags) * (db)->fragsize)
+	((u_int32_t)(frags) * (db)->fragsize)
 
 /* Return the number of fragments needed to hold N bytes. */
 #define	WT_BYTES_TO_FRAGS(db, bytes)					\
 	((u_int32_t)(((bytes) + ((db)->fragsize - 1)) / (db)->fragsize))
 
 /* Return the number of fragments for a database page. */
-#define	WT_FRAGS_PER_PAGE(db)						\
-	((db)->pagesize / (db)->fragsize)
+#define	WT_FRAGS_PER_LEAF(db)						\
+	((db)->leafsize / (db)->fragsize)
+#define	WT_FRAGS_PER_INTL(db)						\
+	((db)->intlsize / (db)->fragsize)
 
 /* Return the fragments needed for an overflow item. */
-#define	WT_OVFL_BYTES_TO_FRAGS(db, len)					\
-	 WT_BYTES_TO_FRAGS(db, (len) + sizeof(WT_PAGE_HDR))
+#define	WT_OVFL_BYTES_TO_FRAGS(db, bytes)				\
+	 WT_BYTES_TO_FRAGS(db, (bytes) + sizeof(WT_PAGE_HDR))
 
 /*
- * The first possible address is 0 (well, duh -- it's just strange to
- * see an address of 0 hard-coded in).   It is also always the first
- * logical page in the database because it's created first and never
- * replaced.
+ * The first possible address is 0.  It is also always the first leaf page in
+ * in the database because it's created first and never replaced.
  *
- * The invalid address is the largest possible offset, which isn't a
- * possible fragment address.
+ * The invalid address is the largest possible offset, which isn't a possible
+ * fragment address.
  */
 #define	WT_ADDR_FIRST_PAGE	0
 #define	WT_ADDR_INVALID		UINT32_MAX
@@ -127,11 +123,12 @@ struct __wt_page_desc {
 	u_int32_t majorv;		/* 04-07: Major version */
 #define	WT_BTREE_MINOR_VERSION	1
 	u_int32_t minorv;		/* 08-11: Minor version */
-	u_int32_t pagesize;		/* 12-15: Page size */
-	u_int64_t base_recno;		/* 16-23: Base record number */
-	u_int32_t root_addr;		/* 24-27: Root fragment */
-	u_int32_t free_addr;		/* 28-31: Freelist fragment */
-	u_int32_t unused[8];		/* 32-63: Spare */
+	u_int32_t leafsize;		/* 12-15: Leaf page size */
+	u_int32_t intlsize;		/* 16-19: Internal page size */
+	u_int64_t base_recno;		/* 20-23: Base record number */
+	u_int32_t root_addr;		/* 28-31: Root fragment */
+	u_int32_t free_addr;		/* 32-35: Freelist fragment */
+	u_int32_t unused[7];		/* 36-63: Spare */
 };
 
 /*
@@ -201,7 +198,17 @@ struct __wt_page_hdr {
 #define	WT_PAGE_OVFL		5	/* Overflow page */
 	u_int8_t type;			/* 08: page index type */
 
-	u_int8_t unused[3];		/* 09-11: unused padding */
+	/*
+	 * We maintain a tree-level counter -- this is required because we
+	 * need to know the type (and thus the size) of a page before we 
+	 * request it from the cache as we descend the tree.  The maximum
+	 * tree level is 255, which is bigger than any practical fan-out.
+	 */
+#define	WT_LEAF_LEVEL		0	/* Level 0: the leaf page */
+#define	WT_FIRST_INTERNAL_LEVEL	1	/* Level 1: the bottom internal level */
+	u_int8_t level;			/* 09: tree level */
+
+	u_int8_t unused[2];		/* 10-11: unused padding */
 
 	u_int32_t checksum;		/* 12-15: checksum */
 
@@ -311,13 +318,13 @@ struct __wt_item {
 	for ((item) = (WT_ITEM *)WT_PAGE_BYTE(page),			\
 	    (i) = (page)->hdr->u.entries;				\
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))		\
-
 /*
  * Btree internal items and off-page duplicates reference another page.
  */
 struct __wt_item_offp {
 	u_int32_t  addr;		/* Subtree address */
 	wt_recno_t records;		/* Subtree record count */
+	u_int8_t   level;		/* Subtree level */
 };
 
 /*
@@ -328,6 +335,15 @@ struct __wt_item_ovfl {
 	u_int32_t len;			/* Overflow length */
 	u_int32_t addr;			/* Overflow address */
 };
+
+/* Macros to read pages, and read/allocate overflow pages. */
+#define	__wt_bt_page_in(db, addr, isleaf, page)				\
+	((ret = __wt_cache_db_in(db, addr,				\
+	    (isleaf) ? WT_FRAGS_PER_LEAF(db) : WT_FRAGS_PER_INTL(db),	\
+	    &(page), 0)) != 0 ? ret :					\
+	    (page->indx == NULL ? __wt_bt_page_inmem(db, page) : 0))
+#define	__wt_bt_ovfl_page_in(db, addr, len, page)			\
+	__wt_cache_db_in(db, addr, WT_OVFL_BYTES_TO_FRAGS(db, len), &(page), 0)
 
 #if defined(__cplusplus)
 }
