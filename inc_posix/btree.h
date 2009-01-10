@@ -59,6 +59,16 @@ typedef	struct __wt_indx {
 	void	*data;			/* DBT: data */
 	size_t	 size;			/* DBT: data length */
 
+	/*
+	 * Associated address.
+	 *
+	 * WT_PAGE_INT: WT_ITEM_KEY_OVFL->addr or WT_ITEM_OFFPAGE->addr,
+	 * otherwise invalid.
+	 *
+	 * WT_PAGE_LEAF: WT_ITEM_KEY_OVFL->addr, otherwise invalid.
+	 *
+	 * WT_PAGE_DUP_LEAF: WT_ITEM_DATA_OVFL->addr, otherwise invalid.
+	 */
 	u_int32_t addr;			/* WT_ITEM_{KEY_OVFL,OFFPAGE}->addr */
 
 	/*
