@@ -44,6 +44,7 @@ __wt_env_stat_clear(ENV *env, u_int32_t flags)
 
 	ENV_FLAG_CHK(env, "Env.stat_clear", flags, WT_APIMASK_ENV_STAT_CLEAR);
 
+	ret = 0;
 	TAILQ_FOREACH(db, &env->dbqh, q)
 		if ((tret = __wt_db_stat_clear(db, flags)) != 0 && ret == 0)
 			ret = tret;
