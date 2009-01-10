@@ -680,7 +680,7 @@ BSONObj BSONObj::extractFields(BSONObj& pattern) {
     return b.doneAndDecouple();
 }
 
-int BSONObj::getIntField(const char *name) {
+int BSONObj::getIntField(const char *name) const {
     BSONElement e = getField(name);
     return e.isNumber() ? (int) e.number() : INT_MIN;
 }

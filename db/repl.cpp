@@ -116,10 +116,10 @@ void ReplPair::arbitrate() {
         return;
     }
 
+	/* todo: make an arbitrate command we send to the arbiter instead of this */
     bool is_master;
-    BSONObj res = conn->cmdIsMaster(is_master);
-    /*findOne("admin.$cmd", ismasterobj);*/
-    if ( res.isEmpty() ) {
+    bool ok = conn->isMaster(is_master);
+    if ( !ok ) {
         setMasterLocked(State_CantArb, "can't arb 2");
         return;
     }
@@ -336,10 +336,6 @@ struct TestOpTime {
         assert( !(q != t) );
     }
 } testoptime;
-
-int test2() {
-    return 0;
-}
 
 /* --------------------------------------------------------------*/
 

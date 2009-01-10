@@ -27,12 +27,138 @@
 
 /* --- dbclientcommands --- */
 
+inline bool DBClientWithCommands::isOk(const BSONObj& o) { 
+	return o.getIntField("ok") == 1;
+}
+
+inline bool DBClientWithCommands::runCommand(const char *dbname, BSONObj cmd, BSONObj &info) { 
+	string ns = string(dbname) + ".$cmd";
+    info = findOne(ns.c_str(), cmd);
+	return isOk(info);
+}
+
+/* note - we build a bson obj here -- for something that is super common like getlasterror you 
+          should have that object prebuilt as that would be faster.
+*/
+bool DBClientWithCommands::simpleCommand(const char *dbname, BSONObj *info, const char *command) { 
+	BSONObj o;
+	if( info == 0 )
+		info = &o;
+	BSONObjBuilder b;
+	b.appendInt(command, 1);
+	return runCommand(dbname, b.done(), *info);
+}
+
 BSONObj ismastercmdobj = fromjson("{ismaster:1}");
 
-BSONObj DBClientWithCommands::cmdIsMaster(bool& isMaster) {
-    BSONObj o = findOne("admin.$cmd", ismastercmdobj);
-    isMaster = (o.getIntField("ismaster") == 1);
-    return o;
+bool DBClientWithCommands::isMaster(bool& isMaster, BSONObj *info) {
+	BSONObj o;	if( info == 0 )	info = &o;
+	bool ok = runCommand("admin", ismastercmdobj, *info);
+    isMaster = (info->getIntField("ismaster") == 1);
+	return ok;
+}
+
+bool DBClientWithCommands::createCollection(const char *ns, unsigned size, bool capped, int max, BSONObj *info) { 
+	BSONObj o;	if( info == 0 )	info = &o;
+	BSONObjBuilder b;
+	b.append("create", ns);
+	if( size ) b.append("size", size);
+	if( capped ) b.append("capped", true);
+	if( max ) b.append("max", max);
+	string db = nsToClient(ns);
+	return runCommand(db.c_str(), b.done(), *info);
+}
+
+bool DBClientWithCommands::copyDatabase(const char *fromdb, const char *todb, const char *fromhost, BSONObj *info) { 
+	assert( *fromdb && *todb );
+	BSONObj o; if( info == 0 ) info = &o;
+	BSONObjBuilder b;
+	b.append("copydb", 1);
+	b.append("fromhost", fromhost);
+	b.append("fromdb", fromdb);
+	b.append("todb", todb);
+	return runCommand("admin", b.done(), *info);
+}
+
+bool DBClientWithCommands::setDbProfilingLevel(const char *dbname, ProfilingLevel level, BSONObj *info ) { 
+	BSONObj o; if( info == 0 ) info = &o;
+
+    if( level ) {
+        // Create system.profile collection.  If it already exists this does nothing.  
+		// TODO: move this into the db instead of here so that all 
+		//       drivers don't have to do this.
+		string ns = string(dbname) + ".system.profile";
+		createCollection(ns.c_str(), 1024 * 1024, true, 0, info);
+    }
+
+	BSONObjBuilder b;
+	b.append("profile", (int) level);
+	return runCommand(dbname, b.done(), *info);
+}
+
+BSONObj getprofilingcmdobj; // TODO UNCOMMENT !!! = fromjson("{profile:-1}");
+
+bool DBClientWithCommands::getDbProfilingLevel(const char *dbname, ProfilingLevel& level, BSONObj *info) { 
+	BSONObj o; if( info == 0 ) info = &o;
+	if( runCommand(dbname, getprofilingcmdobj, *info) ) { 
+		level = (ProfilingLevel) info->getIntField("was");
+		return true;
+	}
+	return false;
+}
+
+bool DBClientWithCommands::eval(const char *dbname, const char *jscode, BSONObj& info, BSONElement& retValue, BSONObj *args) { 
+	BSONObjBuilder b;
+	b.appendCode("$eval", jscode);
+	if( args ) 
+		b.appendArray("args", *args);
+	bool ok = runCommand(dbname, b.done(), info);
+	if( ok ) 
+		retValue = info.getField("retval");
+	return ok;
+}
+
+bool DBClientWithCommands::eval(const char *dbname, const char *jscode) { 
+	BSONObj info;
+	BSONElement retValue;
+	return eval(dbname, jscode, info, retValue);
+}
+
+/* TODO: unit tests should run this? */
+void testDbEval() { 
+	DBClientConnection c;
+	string err;
+	if( !c.connect("localhost", err) ) { 
+		cout << "can't connect to server " << err << endl;
+		return;
+	}
+	BSONObj info;
+	BSONElement retValue;
+	BSONObjBuilder b;
+	b.append("0", 99);
+	BSONObj args = b.done();
+	bool ok = c.eval("dwight", "function() { return args[0]; }", info, retValue, &args);
+	cout << "eval ok=" << ok << endl;
+	cout << "retvalue=" << retValue.toString() << endl;
+	cout << "info=" << info.toString() << endl;
+
+	cout << endl;
+
+	int x = 3;
+	assert( c.eval("dwight", "function() { return 3; }", x) );
+
+	cout << "***\n";
+
+	BSONObj foo = fromjson("{x:1}");
+	cout << foo.toString() << endl;
+	int res=0;
+	ok = c.eval("dwight", "function(parm1) { return parm1.x; }", foo, res);
+	cout << ok << " retval:" << res << endl;
+}
+
+int test2() { 
+	testDbEval();
+	return 0;
 }
 
 /* --- dbclientconnection --- */
@@ -297,7 +423,8 @@ void DBClientPaired::_checkMaster() {
             DBClientConnection& c = x == 0 ? left : right;
             try {
                 bool im;
-                BSONObj o = c.cmdIsMaster(im);
+                BSONObj o;
+				c.isMaster(im, &o);
                 if ( retry )
                     log() << "checkmaster: " << c.toString() << ' ' << o.toString() << '\n';
                 if ( im ) {

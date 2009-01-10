@@ -140,13 +140,136 @@ public:
      basically just invocations of connection.$cmd.findOne({...});
 */
 class DBClientWithCommands : public DBClientInterface {
+	bool isOk(const BSONObj&);
+	bool simpleCommand(const char *dbname, BSONObj *info, const char *command);
 public:
-    /* returns true in isMaster parm if this db is the master instance.
-       BSONObj contains more details e.g.:
+	/* Run a database command.  Database commands are represented as BSON objects.  Common database 
+	   commands have prebuilt helper functions -- see below.  If a helper is not available you can 
+	   directly call runCommand.
+
+	   dbname - database name.  Use "admin" for global administrative commands.
+       cmd    - the command object to execute.  For example, { ismaster : 1 }
+       info   - the result object the database returns. Typically has { ok : ..., errmsg : ... } fields 
+	            set.
+
+       returns: true if the command returned "ok".
+	*/
+	bool runCommand(const char *dbname, BSONObj cmd, BSONObj &info);
+
+    /* returns true in isMaster parm if this db is the current master 
+	   of a replica pair.
+       
+	   pass in info for more details e.g.:
          { "ismaster" : 1.0 , "msg" : "not paired" , "ok" : 1.0  }
+
+	   returns true if command invoked successfully.
     */
-    virtual
-    BSONObj cmdIsMaster(bool& isMaster);
+	bool isMaster(bool& isMaster, BSONObj *info=0);
+
+    /*
+	   Create a new collection in the database.  Normally, collection creation is automatic.  You would
+	   use this function if you wish to specify special options on creation.
+
+	   If the collection already exists, no action occurs.
+
+	   ns:     fully qualified collection name   
+ 	   size:   desired initial extent size for the collection.  
+	           Must be <= 1000000000 for normal collections.
+			   For fixed size (capped) collections, this size is the total/max size of the 
+			   collection.
+	   capped: if true, this is a fixed size collection (where old data rolls out).
+	   max:    maximum number of objects if capped (optional).
+
+	   returns true if successful.
+	*/
+	bool createCollection(const char *ns, unsigned size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
+
+	/* Erase / drop an entire database */
+	bool dropDatabase(const char *dbname, BSONObj *info = 0) { return simpleCommand(dbname, info, "dropDatabase"); }
+
+	/* Perform a repair and compaction of the specified database.  May take a long time to run.  Disk space 
+	   must be available equal to the size of the database while repairing. 
+	*/
+	bool repairDatabase(const char *dbname, BSONObj *info = 0) { return simpleCommand(dbname, info, "repairDatabase"); }
+
+	/* Copy database from one server or name to another server or name.
+
+	   Generally, you should dropDatabase() first as otherwise the copied information will MERGE 
+	   into whatever data is already present in this database.
+
+	   For security reasons this function only works when you are authorized to access the "admin" db.  However, 
+	   if you have access to said db, you can copy any database from one place to another.  
+	   TODO: this needs enhancement to be more flexible in terms of security.
+
+	   This method provides a way to "rename" a database by copying it to a new db name and 
+	   location.  The copy is "repaired" and compacted.
+
+	   fromdb   database name from which to copy.
+	   todb     database name to copy to.
+	   fromhost hostname of the database (and optionally, ":port") from which to 
+	            copy the data.  copies from self if "".
+
+	   returns true if successful
+    */
+	bool copyDatabase(const char *fromdb, const char *todb, const char *fromhost = "", BSONObj *info = 0);
+
+	/* The Mongo database provides built-in performance profiling capabilities.  Uset setDbProfilingLevel() 
+	   to enable.  Profiling information is then written to the system.profiling collection, which one can 
+	   then query. 
+	*/
+	enum ProfilingLevel { 
+		ProfileOff = 0, 
+		ProfileSlow = 1, // log very slow (>100ms) operations
+		ProfileAll = 2
+	};
+	bool setDbProfilingLevel(const char *dbname, ProfilingLevel level, BSONObj *info = 0);
+	bool getDbProfilingLevel(const char *dbname, ProfilingLevel& level, BSONObj *info = 0);
+
+	/* Run javascript code on the database server.
+	   dbname    database context in which the code runs. The javascript variable 'db' will be assigned 
+	             to this database when the function is invoked.
+	   jscode    source code for a javascript function.
+	   info      the command object which contains any information on the invocation result including 
+ 	             the return value and other information.  If an error occurs running the jscode, error 
+				 information will be in info.  (try "cout << info.toString()")
+       retValue  return value from the jscode function. 
+       args      args to pass to the jscode function.  when invoked, the 'args' variable will be defined 
+	             for use by the jscode.
+
+	   returns true if runs ok.
+
+	   See testDbEval() in dbclient.cpp for an example of usage.
+	*/
+	bool eval(const char *dbname, const char *jscode, BSONObj& info, BSONElement& retValue, BSONObj *args = 0);
+
+	/* The following helpers are simply more convenient forms of eval() for certain common cases */
+	
+	/* invocation with no return value of interest -- with or without one simple parameter */
+	bool eval(const char *dbname, const char *jscode);
+	template< class T >
+	bool eval(const char *dbname, const char *jscode, T parm1) {
+		BSONObj info;
+		BSONElement retValue;
+		BSONObjBuilder b;
+		b.append("0", parm1);
+		BSONObj args = b.done();
+		return eval(dbname, jscode, info, retValue, &args);
+	}
+
+	/* invocation with one parm to server and one numeric field (either int or double) returned */
+	template< class T, class NumType >
+	bool eval(const char *dbname, const char *jscode, T parm1, NumType& ret) {
+		BSONObj info;
+		BSONElement retValue;
+		BSONObjBuilder b;
+		b.append("0", parm1);
+		BSONObj args = b.done();
+		if( !eval(dbname, jscode, info, retValue, &args) ) 
+			return false;
+		ret = (NumType) retValue.number();
+		return true;
+	}
+
 };
 
 class DBClientPaired;

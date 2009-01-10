@@ -106,12 +106,23 @@ ostream& operator<<( ostream &s, const OID &o );
      Code With Scope: <total size><String><Object>
 */
 
-// Formatting mode for generating a JSON from the 10gen representation.
+/* Formatting mode for generating a JSON from the 10gen representation.
+     Strict - strict RFC format 
+	 TenGen - 10gen format, which is close to JS format.  This form is understandable by 
+ 	          javascript running inside the Mongo server via eval()
+     JS     - Javascript JSON compatible
+ */
 enum JsonStringFormat { Strict, TenGen, JS };
 
 #pragma pack(pop)
 
-/* <type><fieldName    ><value>
+/* BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
+   'a : 3' is the first element (key+value).
+
+   The BSONElement object points into the BSONObj's data.  Thus the BSONObj must stay in scope 
+   for the life of the BSONElement.
+
+   <type><fieldName    ><value>
    -------- size() ------------
          -fieldNameSize-
                         value()
@@ -356,7 +367,7 @@ public:
 
     BSONObj getObjectField(const char *name) const;
 
-    int getIntField(const char *name); // INT_MIN if not present
+    int getIntField(const char *name) const; // INT_MIN if not present
 
     bool getBoolField(const char *name);
 
@@ -511,6 +522,13 @@ public:
         b.append((void *) e.value(), e.valuesize());
     }
 
+	/* add object as a member with type Array.  Thus arr object should have "0", "1", ... 
+	   style fields in it.
+	*/
+    void appendArray(const char *fieldName, const BSONObj &arr ) {
+		marshalArray(fieldName, arr);
+	}
+
     /* add a subobject as a member */
     void append(const char *fieldName, BSONObj subObj) {
         b.append((char) Object);
@@ -554,6 +572,12 @@ public:
         b.append(fieldName);
         b.append(regex);
         b.append(options);
+    }
+    void appendCode(const char *fieldName, const char *code) {
+        b.append((char) Code);
+        b.append(fieldName);
+        b.append((int) strlen(code)+1);
+        b.append(code);
     }
     void append(const char *fieldName, const char *str) {
         b.append((char) String);

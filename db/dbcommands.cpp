@@ -541,6 +541,9 @@ extern map<string,Command*> *commands;
    returns true if ran a cmd
 */
 bool _runCommands(const char *ns, BSONObj& _cmdobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl) {
+	if( verbose )
+		log() << "run command " << ns << ' ' << _cmdobj.toString() << endl;
+
     const char *p = strchr(ns, '.');
     if ( !p ) return false;
     if ( strcmp(p, ".$cmd") != 0 ) return false;
