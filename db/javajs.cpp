@@ -120,6 +120,7 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath) {
         
     if ( appserverPath ){
         ed = findEd(appserverPath);
+        assert( ed );
 
         ss << SYSTEM_COLON << ed << "/build/";
         
@@ -128,11 +129,28 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath) {
         _addClassPath( ed , ss , "include/jython/javalib" );
     }
     else {
+
+      
         const char * jars = findJars();
         _addClassPath( jars , ss , "jars" );
-
+        
         edTemp += (string)jars + "/jars/babble.jar";
         ed = edTemp.c_str();
+
+#if !defined(_WIN32)
+        const char * otherEd = findEd();
+        if ( otherEd ){
+            log() << "found ed as well" << endl;
+            ed = otherEd;
+
+            ss << SYSTEM_COLON << ed << "/build/";
+            
+            _addClassPath( ed , ss , "include" );
+            _addClassPath( ed , ss , "include/jython/" );
+            _addClassPath( ed , ss , "include/jython/javalib" );            
+        }
+            
+#endif
     }
 
 
@@ -536,8 +554,6 @@ const char * findEd() {
         return temp;
     }
 
-    problem() << "ERROR : can't find directory for appserver - terminating" << endl;
-    exit(44);
     return 0;
 #endif
 };
