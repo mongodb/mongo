@@ -24,21 +24,26 @@ __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx)
 
 	env = db->env;
 
-	if (page->hdr->type == WT_PAGE_LEAF) {
-		if (indx->addr == WT_ADDR_INVALID) {
-			item = indx->ditem;
+	switch (page->hdr->type) {
+	case WT_PAGE_LEAF:
+		item = indx->ditem;
+		if (item->type == WT_ITEM_DATA) {
 			p = WT_ITEM_BYTE(item);
 			size = item->len;
-		} else
-			return (__wt_bt_ovfl_copy_to_dbt(db,
-			    (WT_ITEM_OVFL *)WT_ITEM_BYTE(indx->ditem), data));
-	} else {
+			break;
+		}
+		return (__wt_bt_ovfl_copy_to_dbt(db,
+		    (WT_ITEM_OVFL *)WT_ITEM_BYTE(indx->ditem), data));
+		/* NOTREACHED */
+	case WT_PAGE_DUP_LEAF:
 		if (indx->addr == WT_ADDR_INVALID) {
 			p = indx->data;
 			size = indx->size;
-		} else
-			return (__wt_bt_ovfl_copy_to_dbt(db,
-			    (WT_ITEM_OVFL *)WT_ITEM_BYTE(indx->ditem), data));
+			break;
+		}
+		return (__wt_bt_ovfl_copy_to_dbt(db,
+		    (WT_ITEM_OVFL *)WT_ITEM_BYTE(indx->ditem), data));
+		/* NOTREACHED */
 	}
 
 	if (data->alloc_size < size) {
