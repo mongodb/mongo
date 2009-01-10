@@ -60,21 +60,32 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 }
 
 /*
- * __wt_bt_first_offp_addr --
+ * __wt_bt_first_offp --
  *	In a couple of places in the code, we're trying to walk down the
- *	internal pages from the root, and we need to get the address off
- *	the first WT_ITEM_OFFP on the page.
+ *	internal pages from the root, and we need to get the WT_ITEM_OFFP
+ *	information for the first key/WT_ITEM_OFFP pair on the page.
  */
 void
-__wt_bt_first_offp_addr(WT_PAGE *page, u_int32_t *addrp)
+__wt_bt_first_offp(WT_PAGE *page, WT_ITEM_OFFP *offp)
 {
 	WT_ITEM *item;
-	WT_ITEM_OFFP *offp;
 
 	item = (WT_ITEM *)WT_PAGE_BYTE(page);
 	item = WT_ITEM_NEXT(item);
-	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-	*addrp = offp->addr;
+	*offp = *(WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+}
+
+/*
+ * __wt_set_ff_and_sa_from_addr --
+ *	Set the page's first-free and space-available values from an
+ *	address positioned one past the last used byte on the page.
+ */
+void
+__wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr)
+{
+	page->first_free = addr;
+	page->space_avail =
+	    WT_FRAGS_TO_BYTES(db, page->frags) - (addr - (u_int8_t *)page->hdr);
 }
 
 /*
