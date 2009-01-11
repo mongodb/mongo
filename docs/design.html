@@ -133,69 +133,7 @@ during the operation but a split is unexpectedly required during
 recovery), and complicating recovery is a bad idea.
 
 </ol>
-<h3>New features:</h3>
-<ol>
 
-<p><li><b>Large page sizes</b>:
-Wired Tiger will support page sizes larger than 64KB by supporting both
-16- or 32-bit page offsets.  (The page layout in Berkeley DB isn't bad,
-but needs to optionally have 32-bit offsets for pages bigger than 64KB.
-Additionally, have a unique page-header length for each page type which
-finds the beginning of the index table, the magic to store the checksum
-and encryption information at the end of the page wasn't worth having.)
-The reason to support large page sizes is to allow items
-larger than 64KB to be stored within B+tree leaf pages.
-
-<p><li><b>Extent allocation</b>:
-Wired Tiger will support extent-based allocation in the B+tree.   Pages
-will be initially allocated at the page size; when splitting, pages will
-increase in size to the maximum page size.   Pages split after reaching
-the maximum page size will be aggregated into extents.  For example,
-imagine an 8KB page size with a maximum page size of 64KB and 10MB
-extents.  The page is initially 8KB; as that runs out of space, the page
-size doubles until it's 64KB.  The next split will result in 2
-contiguous 64KB pages, until there are 160 contiguous pages in memory,
-that is, a 10MB extent.  Internal pages will not be gathered into
-extents, although they will increase in size from the initial size to
-the maximum page size.
-
-<p>
-The reason to support extents is to speed sequential search as much
-larger chunks of disk can be returned in a single disk read.  Small page
-sizes are supported within the extents so random accesses do not need
-to read the full extent.
-
-<p><li><b>Secondary indices</b>:
-Optionally store  a copy (or part of a copy) of the primary data item
-in the secondary to speed the use of a secondary index, avoiding the
-subsequent lookup in the primary.  The problem this is solving is an
-"ordered" lookup (the secondary) turns into a "random" lookup (the
-primary), resulting in a colder cache and more deadlocks.  By storing a
-copy of the primary's data in the secondary, we can avoid the second
-lookup.
-
-<p><li><b>Copy avoidance</b>:
-Support a call-back function which is called from inside the library and
-given a pointer to the key/data item (normally on the page), avoiding
-any data copy at all.
-
-<p><li><b>Bulk load</b>:
-Wired Tiger will include code to take a sorted key/data pairs and build
-B+tree pages from bottom-up in a new database.
-
-<p><li><b><font color="blue">Future </font>BLOB support</b>:
-Support BLOBs using the original returned-file-handle design.
-
-<p><li><b><font color="blue">Future </font>Compression</b>:
-Huffman-based key/data item compression is generally useful and worth
-doing, because CPU is less-important than memory, and trading CPU to
-keep the cache hotter is the right choice to make.
-
-<p><li><b><font color="blue">Future </font>Automatic transaction retry</b>:
-Optionally support automatic retry of an individual transactional
-operation, should it be selected to resolve a deadlock.
-
-</ol
 <h3>General API changes:</h3>
 <ol>
 
@@ -267,14 +205,159 @@ Add high-level environment configuration which indicates no underlying
 disk support.
 
 </ol>
+
+<h3>Btree access method layout changes:</h3>
+
+<table width="100%" border="1" align=left>
+<tr valign="top">
+<th align="left" valign="top" width="15%">Feature</th>
+<th align="left" width="2%">Implemented</th>
+<th align="left">Notes</th>
+</tr>
+
+<tr valign="top"><td>
+Large page sizes
+</td><td>
+Yes
+</td><td>
+Wired Tiger supports page sizes larger than 64KB.  The goal is two-fold,
+to allow databases with key or data items larger than 16KB to be stored
+on-page, and to increase the data transferred from each read of the
+disk.  Large pages in Berkeley DB have a problem, however, because
+internal nodes are the same size as database pages, and a binary search
+of a large page will behave badly in the L1 cache.   To avoid this
+problem, Wired Tiger allows the size of internal nodes to be separately
+specified from the size of the leaf nodes.
+
+</td></tr>
+<tr valign="top"><td>
+Overflow objects
+</td><td>
+Yes
+</td><td>
+Allocate overflow objects (key or data items too large to fit on a leaf
+page) directly from the file, using a unit other than "leaf page size"
+as the unit of allocation.  The goal is to eliminate the manipulation
+of multiple pages in order to store and/or retrieve large objects, and
+the wasted space from discarding, on average, half of a leaf page for
+every allocated large object.
+
+</td></tr>
+<tr valign="top"><td>
+Extent allocation
+</td><td>
+</td><td>
+Wired Tiger supports extent-based allocation in the B+tree.   Pages will
+be initially allocated at the page size; when splitting, pages will
+increase in size to the maximum page size.   Pages split after reaching
+the maximum page size will be aggregated into extents.  For example,
+imagine an 8KB page size with a maximum page size of 64KB and 10MB
+extents.  The page is initially 8KB; as that runs out of space, the page
+size doubles until it's 64KB.  The next split will result in 2
+contiguous 64KB pages, until there are 160 contiguous pages in memory,
+that is, a 10MB extent.  Internal pages will not be gathered into
+extents, although they will increase in size from the initial size to
+the maximum page size.
+
+<p>
+The goal is to speed sequential search as much larger chunks of disk can
+be returned in a single disk read.  As extents are made up of smaller
+pages, random accesses do not need to read the full extent.
+
+</td></tr>
+<tr valign="top"><td>
+Secondary indices
+</td><td>
+</td><td>
+Wired Tiger optionally stores  a copy (or part of a copy) of the primary
+data item in the secondary to speed the use of a secondary index,
+avoiding subsequent lookup in the primary.  In Berkeley DB, an "ordered"
+lookup when walking a secondary becomes a "random" lookup on the primary
+in order to return the primary's data item, resulting in a colder cache
+and more deadlocks.  By storing a copy of the primary's data in the
+secondary, we can avoid the second lookup.
+
+</td></tr>
+<tr valign="top"><td>
+Bulk load
+</td><td>
+Yes
+</td><td>
+Wired Tiger supports bulk load, where sorted key/data pairs are read
+from a callback function, and a B+tree is built bottom-up in a new
+database.
+
+</td></tr>
+<tr valign="top"><td>
+Compression
+</td><td>
+</td><td>
+Wired Tiger will support static (probalby Huffman encoding) key/data
+item compression.  This worth doing because CPU is less-important than
+memory, and trading CPU to keep the cache hotter is the right choice to
+make.
+
+</td></tr>
+</table>
+
+<h3>Btree access method API changes:</h3>
+
+<table width="100%" border="1" align=left>
+<tr valign="top">
+<th align="left" valign="top" width="15%">Feature</th>
+<th align="left" width="2%">Implemented</th>
+<th align="left">Notes</th>
+</tr>
+
+</td></tr>
+<tr valign="top"><td>
+Salvage
+</td><td>
+</td><td>
+Wired Tiger supports in-place database salvage.
+
+</td></tr>
+<tr valign="top"><td>
+Overflow object sizes
+</td><td>
+</td><td>
+Wired Tiger includes an API to set the size of overflow items on both
+internal and leaf pages.  The goal is to allow applications with known
+data sets greater control over how the size of an overflow object is
+determined.
+
+</td></tr>
+<tr valign="top"><td>
+Automatic transaction retry
+</td><td>
+</td><td>
+Wired Tiger supports automatic retry of an individual transactional
+operation, should it be selected to resolve a deadlock.
+
+</td></tr>
+<tr valign="top"><td>
+Copy avoidance
+</td><td>
+</td><td>
+Wired Tiger supports a call-back function which is called from inside
+the library and given a pointer to the key/data item (normally on the
+page), avoiding any data copy at all.
+
+</td></tr>
+<tr valign="top"><td>
+BLOB support
+</td><td>
+</td><td>
+Wired Tiger will support BLOBs using Berkeley DB's "returned file
+handle" design.  While this is less necessary given Wired Tiger's
+support for large page sizes, it's still useful for truly large data
+items.
+
+</td></tr>
+</table>
+
 <h3>Implementation changes:</h3>
 <ol>
-
-<p><li><b>Overflow objects</b>:
-Allocate large objects (objects too large to fit on a leaf page)
-directly from the file.  This will minimize wasted space as well as
-eliminate the manipulation of multiple pages in order to store and/or
-retrieve large objects.
 
 <p><li><b>Micro-logging</b>:
 To the extent possible, Wired Tiger should support TimesTen's notion of
@@ -313,11 +396,6 @@ allow us to consistently use handle methods to access internal as well
 as external functions throughout the library.  The "global" thread
 cookie will contain the information we need to figure out if any locks
 are needed as we cross API layers.
-
-<p><li><b>Verification and salvage</b>:
-Wired Tiger will support verification and salvage early on.  In
-diagnostic mode, as a recovery change is made to a page, or the page is
-read/written from/to disk, we will be able to verify and dump the page.
 
 <p><li><b>Code Generation</b>:
 Wired Tiger will support a code-generation utility early on.   It will
