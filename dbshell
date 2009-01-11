@@ -19,5 +19,7 @@ export memory_small="-Xmx200m  -XX:MaxDirectMemorySize=200M"
 export java_memory_large="java $standard_options $memory_large"
 export java_memory_small="java $standard_options $memory_small"
 
+export ED_HOME="jars/babble.jar"
+
 $java_memory_small ed.db.Shell "$@"
 
