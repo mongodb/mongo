@@ -1,0 +1,545 @@
+<htmL
+<head>
+<title>Wired Tiger V1.0</title>
+</head>
+<body bgcolor=white>
+<center><h1><font color="green">Wired Tiger</font></h1></center>
+<p align=right>V1.0<br>
+11/14/2008
+
+<hr size=1 noshade>
+
+<h3>Major architectural differences from Berkeley DB:</h3>
+<ol>
+
+<li><b>Support for multi-core architectures</b>:
+architectures have 10's or 100's of cores, with multiple threads per
+core, and touching shared memory kills performance.  Berkeley DB's
+shared memory data mutex architecture (where mutexes serialize access
+to data structures), won't scale.
+
+<p>Wired Tiger will have a "work queue architecture", that is, an
+interface outside of the database engine where threads of control queue
+work.   Inside the database engine, a different thread of control will
+perform the work.  The work queue will be read and written by only two
+threads, limiting the amount of memory that's touched by more than a
+single thread of control.
+
+<p>Initial benchmarks show that schedulers/architectures are not
+uniform: for some, processes are better than threads and vice-versa, and
+polling is better than mutexing, and vice-versa.  For that reason, we
+will use run-time configuration to choose if the client/server pair
+polls or mutexes the work queue, and if the database engine uses a
+separate process or a separate thread to perform the work.   Mutexes
+will behave in the usual fashion: clients will write their work into the
+shared memory queue, wake the worker if necessary, then sleep on a
+mutex.  Workers will perform the work and wake the client.   Polling
+will be implemented using shared memory and a memory flush, in other
+words, the usual "lock; write the data structure; unlock" cycle is
+replaced with "write new task into a memory slot, flush memory, poll for
+new task to complete".  However, only the application knows how many
+threads it has and what they're doing, so the application will have to
+be responsible for binding threads to cores.  This means we will need
+to export controls so applications can bind threads of control to
+specific processors and do other platform-specific scheduling tasks.
+
+<p>As in Berkeley DB, this "work queue architecture" must handle two
+different programmatic architectures:
+
+<ol>
+<li>A single process, without threads, in other words, a single thread
+of control.  In this architecture, the work queue will be skipped
+entirely, and the thread of control will enter the library and do all
+work itself.
+
+<li>One or more processes, optionally threaded -- in other words,
+multiple threads of control.  Complicating this architecture is the
+possibility that Wired Tiger may be called from other library routines
+(this is the Berkeley DB Subversion problem, and the reason Berkeley DB
+implemented the DB_REGISTER flag).
+</ol>
+
+<p>
+The programmatic architecture will be selectable at run-time (unless
+that proves too costly in terms of performance, in which case we can
+add configuration-time options).
+
+<p>
+The "work queue architecture" results in one significant difference from
+the Berkeley DB architecture.   A separate process cannot configure any
+database engine callbacks or other functions for the database (such as
+providing a key sort function), those must be configured within the
+threads of control executing the actual database code.  This is
+annoying, as it requires the database configuration and callback to be
+done before any separate process accesses the database.  On the other
+hand, it is useful as only one process in the application suite has to
+be aware of the underlying configuration details of the database.
+
+<p>
+<font color="blue">Maybe </font>Automatically partition the
+database to transfer work requests to a different machine or thread of
+control.   Once the database is large enough that threads will
+reasonably not conflict, it would be best to have multiple threads of
+control to partition work on the data.  In this case, each thread which
+owns a chunk of a database should write to its own, individual, log
+file.
+
+<p><li><b>Environment creation and recovery</b>:
+Berkeley DB's environment creation and recovery model is too complex.
+Applications were often unable to determine when to run recovery,
+requiring, for example, features like the DB_REGISTER flag and the
+DbEnv.failchk method.
+
+<p>As previously described, Wired Tiger environments will have separate
+threads of control performing all database work.  The default Wired
+Tiger environment will be a combination of Berkeley DB's DbEnv.failchk
+and DB_REGISTER configurations: whenever a thread of control "joins" a
+Wired Tiger environment, or periodically as called by an application
+thread, Wired Tiger will confirm the database engine's thread of control
+is still running.  If that thread of control has failed, another thread
+of control will optionally be created, whatever recovery is necessary
+will be performed, and the system will continue.   In this sense, Wired
+Tiger will be a "crashless" system, that is, applications will never
+know that recovery was performed, it will be performed behind the scenes
+as necessary.
+
+<p><li><b>Schema layer</b>:
+Wired Tiger database environments have a configuration which describes
+the contents of the environment.   This focuses on, but is not limited
+to, the database files.  The goal is to eliminate Berkeley DB's baroque
+file handling.   File operations (for example, remove, rename, create,
+etc.) will be done by transactionally modifying the schema database.  To
+remove a file, we can remove the name in the schema database, and deal
+with the physical remove as part of the transaction commit.  Any
+transaction serialization required by operations on that file can be
+done based on handling the record in the schema database.  Recovery
+cleanup can be done by reviewing the entries in the scheme database
+after it has been recovered.  By divorcing file system names from
+logical database names, things get easier: as another example, file
+striping can be done at a logical layer, where looking up a name in the
+schema database can return whatever physical file and/or offset we want.
+
+<p><li><b><font color="blue">Maybe </font>Record-level locking</b>:
+Record-level locking is tempting in order to increase concurrency.  It
+significantly complicates recovery, unfortunately.   However, there
+isn't any other way to increase insert rates where the keys are inserted
+in sorted order, which is a significant failing of Berkeley DB.
+
+<p><li><b><font color="blue">Maybe </font>Logical logging</b>:
+Logical logging is tempting because of the possibility of supporting
+multi-master replication (by shipping logical operations to the replicas
+instead of shipping physical record changes).  However, logical logging
+significantly complicates recovery (for example, no split was required
+during the operation but a split is unexpectedly required during
+recovery), and complicating recovery is a bad idea.
+
+</ol>
+<h3>New features:</h3>
+<ol>
+
+<p><li><b>Large page sizes</b>:
+Wired Tiger will support page sizes larger than 64KB by supporting both
+16- or 32-bit page offsets.  (The page layout in Berkeley DB isn't bad,
+but needs to optionally have 32-bit offsets for pages bigger than 64KB.
+Additionally, have a unique page-header length for each page type which
+finds the beginning of the index table, the magic to store the checksum
+and encryption information at the end of the page wasn't worth having.)
+The reason to support large page sizes is to allow items
+larger than 64KB to be stored within B+tree leaf pages.
+
+<p><li><b>Extent allocation</b>:
+Wired Tiger will support extent-based allocation in the B+tree.   Pages
+will be initially allocated at the page size; when splitting, pages will
+increase in size to the maximum page size.   Pages split after reaching
+the maximum page size will be aggregated into extents.  For example,
+imagine an 8KB page size with a maximum page size of 64KB and 10MB
+extents.  The page is initially 8KB; as that runs out of space, the page
+size doubles until it's 64KB.  The next split will result in 2
+contiguous 64KB pages, until there are 160 contiguous pages in memory,
+that is, a 10MB extent.  Internal pages will not be gathered into
+extents, although they will increase in size from the initial size to
+the maximum page size.
+
+<p>
+The reason to support extents is to speed sequential search as much
+larger chunks of disk can be returned in a single disk read.  Small page
+sizes are supported within the extents so random accesses do not need
+to read the full extent.
+
+<p><li><b>Secondary indices</b>:
+Optionally store  a copy (or part of a copy) of the primary data item
+in the secondary to speed the use of a secondary index, avoiding the
+subsequent lookup in the primary.  The problem this is solving is an
+"ordered" lookup (the secondary) turns into a "random" lookup (the
+primary), resulting in a colder cache and more deadlocks.  By storing a
+copy of the primary's data in the secondary, we can avoid the second
+lookup.
+
+<p><li><b>Copy avoidance</b>:
+Support a call-back function which is called from inside the library and
+given a pointer to the key/data item (normally on the page), avoiding
+any data copy at all.
+
+<p><li><b>Bulk load</b>:
+Wired Tiger will include code to take a sorted key/data pairs and build
+B+tree pages from bottom-up in a new database.
+
+<p><li><b><font color="blue">Future </font>BLOB support</b>:
+Support BLOBs using the original returned-file-handle design.
+
+<p><li><b><font color="blue">Future </font>Compression</b>:
+Huffman-based key/data item compression is generally useful and worth
+doing, because CPU is less-important than memory, and trading CPU to
+keep the cache hotter is the right choice to make.
+
+<p><li><b><font color="blue">Future </font>Automatic transaction retry</b>:
+Optionally support automatic retry of an individual transactional
+operation, should it be selected to resolve a deadlock.
+
+</ol
+<h3>General API changes:</h3>
+<ol>
+
+<p><li><b>Per-thread handles</b>:
+Applications must allocate a per-thread object for any thread that will
+be calling a library function.  When crossing the library API, the
+per-thread handle will be updated to reference any current environment
+and database handles, then the per-thread handle will be the handle
+passed as the first argument of every internal database function.
+
+<p>
+Each thread of control's information will include a lock ID which will
+be used for deadlock detection.  (This assumes we eventually implement
+some kind of deadlock detection...)
+
+<p><li><b>Object constructors/destructors</b>:
+There will be explicit object constructor/destructor functions which are
+used for configuration only (the DB_ENV vs. ENV split done right).  The
+application has to allocate the object, then configure it, then use it
+and then destroy it.   It may be repeatedly used, as it contains no
+internal information.
+
+<p><li><b>Error handling</b>:
+Wired Tiger error messages will include a URL which can be used to look
+up detailed error information.  This makes error configuration fairly
+complicated: an error message will have two parts, a per-release URL for
+detailed information and a cryptic error message.  By default, both will
+be displayed, but  there will be a compile-time options to output only
+the number (to support a small footprint).  Error messages in the code
+will need to contain the number, the short message and the detailed
+message, and the URL support will be automatically generated for each
+release.
+
+<p>
+Error handling (error message, prefix, stream, whatever) will be
+database name specific.
+
+<p><li><b>Configuration</b>:
+There will be no general configuration functions, Wired Tiger will use
+configuration methods only; as in Berkeley DB, there will be getter
+functions in all cases.  This will also apply to many of the arguments
+for methods, that is, optional arguments will be set with configuration
+methods, rather than specifying potentially ignored-values to the method
+call.
+
+<p>
+Configuration routines will only update specific shared memory region
+locations, to allow auto-generation of the configuration code.
+
+<p><li><b>Cursor errors</b>:
+By default, cursors will become unusable after any error; applications
+wanting Berkeley DB behavior, where the cursor has not moved and can be
+used after error, will have a flag which duplicates the cursor before
+each operation (Berkeley DB's DbCursor.dup method).  The point is that
+cursor duplication is painful and difficult, and most applications don't
+need it.
+
+<p><li><b>Secondary indices</b>:
+Combine the Db.get and Db.pget calls into a single method.
+
+<p><li><b>Delete of non-existent entry</b>:
+Delete of a non-existent entry should optionally not return an error.
+
+<p><li><b>File/directory permission modes</b>:
+Support explicit modes for all physical files.
+
+<p><li><b>Flash support</b>:
+Add high-level environment configuration which indicates no underlying
+disk support.
+
+</ol>
+<h3>Implementation changes:</h3>
+<ol>
+
+<p><li><b>Overflow objects</b>:
+Allocate large objects (objects too large to fit on a leaf page)
+directly from the file.  This will minimize wasted space as well as
+eliminate the manipulation of multiple pages in order to store and/or
+retrieve large objects.
+
+<p><li><b>Micro-logging</b>:
+To the extent possible, Wired Tiger should support TimesTen's notion of
+micro-logging (where threads of control do work in ways that if they
+fail, other threads of control can clean up without interrupting the
+overall progress of the database engine).  While desirable, this is not
+a requirement of the architecture itself, it's a performance enhancement
+in that it minimizes the events which can force more or less expensive
+recovery operations to be performed.
+
+<p>
+The biggest problem for Berkeley DB was the shared regions, as they
+could be corrupted by an application thread of control dying while
+modifying the shared region, resulting in an expensive recovery period
+as well as an expensive re-creation of the large shared region.  In
+Wired Tiger, the only shared regions will be the individual chunks used
+by threads of control to communicate with the threads running in the
+database engine, removing this problem entirely.
+
+<p><li><b>Utilities</b>:
+All of the Wired Tiger utilities (except for any code generation
+utility) will be implemented as thin wrappers.  (In Berkeley DB db_dump,
+db_load and db_hotbackup have far too much program logic.)
+
+<p><li><b>Exported subsystems</b>:
+Wired Tiger will not export the cache, locking, logging, mutex and
+transaction APIs in a general way.  Reason: the insistence on separate
+subsystems meant we didn't pass a single object handle throughout the
+entire system.  There isn't enough demand for the subsystems to make
+them available initially.  That said, we will continue to rigorously
+separate the functionality to the extent possible.
+
+<p><li><b>API layering</b>:
+Wired Tiger will not require mutexes to cross the API layer.  This will
+allow us to consistently use handle methods to access internal as well
+as external functions throughout the library.  The "global" thread
+cookie will contain the information we need to figure out if any locks
+are needed as we cross API layers.
+
+<p><li><b>Verification and salvage</b>:
+Wired Tiger will support verification and salvage early on.  In
+diagnostic mode, as a recovery change is made to a page, or the page is
+read/written from/to disk, we will be able to verify and dump the page.
+
+<p><li><b>Code Generation</b>:
+Wired Tiger will support a code-generation utility early on.   It will
+be a script that outputs a C-language program, supporting all features.
+
+<p><li><b>File types</b>:
+Wired Tiger will use the file name space to aggressively categorize
+storage by class: optionally taking advantage of Flash vs. RAM vs.
+durable disk writes vs. standard disk, vs. network storage.
+
+<p><li><b>Hot backup</b>:
+Wired Tiger will have a hot-backup operation as part of the library.
+Hot backups can be faster if the hot backup thread writes a log record
+("starting database copy") into the log, because recovery only has to
+go back to the checkpoint preceding that record, rather than to the
+beginning of the log, when doing "catastrophic" recovery on a hot
+backup.
+
+<p>
+Additionally, hot backup should be integrated with replication: a hot
+backup is no different from the initialization of a replica.
+
+<p><li><b>Scripting language</b>:
+Use Python or Ruby as our initial scripting language, and possibly
+Erlang to write multi-threaded tests.
+
+<p><li><b>Cache</b>:
+Align pages in memory (write page header information after the page
+itself) so we can do direct I/O from the underlying file into memory.
+
+<p>
+Use the file name itself, and expect it to be unique (remove the file
+ID entirely).
+
+<p>
+Remove MVCC's support for backing freeze files, applications must grow
+the cache if there's insufficient space for the transactional
+requirements.
+
+<p><li><b>Cursor operations</b>:
+Split up the cursor get/pget functions into a group of methods, instead
+of the current complex set of flags.
+
+<p><li><b>Record numbers</b>:
+Support 64-bit logical record numbers.
+<p>
+Give the application a flag to specify keys are numbers, it's too common
+an error.
+<p>
+Support holes in the record number space.
+
+<p><li><b>Statistics</b>:
+Implement 64-bit statistics values.
+<p>
+Output statistics in XML, and provide a script to display them in text.
+<p>
+Store all statistics in a single chunk of space so it's easy to snapshot
+the engine's performance.
+
+<p><li><b>Log files</b>:
+Dump log files in XML and provide a script which turns them into flat text.
+
+<p><li><b>Compaction</b>:
+Do compaction lazily, top-down through the tree instead of bottom-up.
+
+</ol>
+<h3>Documentation:</h3>
+<ol>
+
+<p><li>
+Support HTML only.  Use cpp instead of m4 as our flat-text to HTML
+pre-processor.
+
+<p><li>
+Write tutorials (booklets) around the features from day 1, don't depend
+on the man pages alone.  (Instead of having a Reference Guide, have
+booklets.)
+
+<p><li>
+Every man page will have a code example that can be cut-and-pasted by
+programmers.
+
+</ol>
+<h3>Do it the same (mostly):</h3>
+<ol>
+
+<ul type=disc>
+<li>Bulk get
+<li>C API (require ANSI C)
+<li>C++ API (we should support C++ hash & cursors)
+<li>Checksums
+<li>Documentation
+<li>Duplicates (both on- and off-page)
+<li>Error handling
+<li>Event notification
+<li>Group commit
+<li>Growing and shrinking the cache
+<li>Micro tests
+<li>Mutexes
+<li>Page layout
+<li>POSIX and Windows support, initially
+<li>Purify
+<li>Secondary indices, foreign key constraints
+<li>Subsystem separation (access methods, cache, lock, log, replication, txn)
+<li>Test suite (written in Python, Ruby, or C)
+</ul>
+
+<p><li><b>Replication Manager</b>:
+Wired Tiger's focus needs to be on partial and cascading replication,
+there's useful features in both.
+
+</ol>
+<h3>Don't do it at all:</h3>
+<ol>
+
+<p><li><b>Concurrent Data Store, in-memory databases</b>:
+Named, non-durable databases are the simpler solution to both problems.
+
+<p><li><b>Cryptography</b>:
+It's hard and nobody on the engineering team ever understands it.  If
+the files need to be encrypted, rely on 3rd party products that encrypt
+the entire filesystem.
+
+<p><li><b>Deadlock detection</b>:
+Use timeout-based deadlock detection, instead -- the graphs are
+complicated and expensive to build.
+
+<p><li><b>Java API</b>:
+Java: the Berkeley DB JE product is a better solution than JNI.
+
+<p><li><b>Application-specific logging</b>:
+Not useful enough to replace, although we should continue to allow
+applications to insert their own records into the log, just no longer
+document any interface to those records during recovery (or even when
+the records will be used and/or discarded).  Application-written log
+records will only be subsequently available by reading the log from
+outside of the engine.
+
+<p><li><b>Hash access method</b>:
+The Berkeley DB Hash access method offers one feature: a hotter cache
+because fewer meta-data pages are required when the data is truly large.
+This feature is less useful for Wired Tiger, given Wired Tiger's support
+for larger pages, but is still useful in some cases.   However, it isn't
+useful enough to implement a separate access method as in Berkeley DB.
+Could we do it by modifying the B+tree somehow?
+
+<p><li><b>Recno access method</b>:
+The Berkeley DB Recno access method offers two features: immutable
+record numbers and backing text files.   Immutable record numbers could
+be supported in a key-based B+tree where deleted records were replaced
+with placeholders.  Backing text files aren't useful enough to re-implement.
+
+<p><li><b>Queue access method</b>:
+The Berkeley DB Queue access method offers two features: removal of
+extent-based files as the database grows and shrinks, and record-level
+locking, at the price of fixed-sized key/data items.  These features
+could be provided by a key-based, record-level locking B+tree, that
+could be striped across multiple files (using the schema layer
+database).   The one problem is this will result in phantoms, which may
+be a problem for queue-based applications.
+
+<p><li><b>Subdatabases</b>:
+Subdatabases (multiple databases per file) are actually useful for the
+few applications wanting to use the database name space for things like
+objects (for example, a C++ compiler writing objects into databases, or
+an application storing a user mailbox per database).   However, they
+greatly complicate database creation and deletion, not to mention
+logging and recovery.  It might be possible to do something cleaner than
+Berkeley DB in the context of a schema file, but for now I don't think
+it's worth the effort.
+
+<p><li><b>Db.feedback</b>:
+Not useful enough to replace -- include any feedback as part of general
+event notification.
+
+<p><li>
+List of other features/support not useful enough to replace:
+<ul type=disc>
+<li>Apache, PHP, Perl, Tcl
+<li>BREW, QNX, S60
+<li>dbm, gdbm, ndbm, hsearch, DB 1.85 APIs
+<li>DB_REGISTER (it's now the default)
+<li>Db.key_range
+<li>Example code (replaced by documentation and code generation)
+<li>Flat-text backing files
+<li>RPC
+<li>Replication base API
+<li>SWIG
+<li>Sequences
+<li>System V shared memory regions
+<li>XA-style distributed transactions
+</ul>
+
+</ol>
+<h3>FAQ:</h3>
+<ol>
+<p><li>
+Why not use real database terms ("database" means environment, "table"
+means database)?
+<p>
+Even though that's desirable, since we're continuing to use the
+Berkeley DB API, it doesn't make sense to switch.
+
+<p><li>
+Will the engine require a 64-bit type?
+<p>
+I guess so, this shouldn't be a problem, should it?
+
+</ol>
+<h3>References:</h3>
+
+<ul type="none">
+
+<li><a href="http://www.cs.berkeley.edu/~brewer/cs262/Aries.pdf">ARIES:
+A Transaction Recovery Method Supporting Fine-Granularity Locking and
+Partial Rollbacks Using Write-Ahead Logging</a>
+
+<p>
+<li><a href="http://Berkeley DB.cs.yale.edu/hstore/oltpperf-sigmod08.pdf">OLTP Through the Looking Glass, and What We Found There</a>
+
+</ul>
+
+</body>
+</html>
