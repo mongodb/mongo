@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "../stdafx.h"
 #include "../grid/message.h"
 #include "../db/jsobj.h"
 
