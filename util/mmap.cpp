@@ -40,6 +40,13 @@ void MemoryMappedFile::closeAllFiles() {
     --closingAllFiles;
 }
 
+void MemoryMappedFile::updateLength( const char *filename, int &length ) const {
+    if ( !boost::filesystem::exists( filename ) )
+        return;
+    // make sure we map full length if preexisting file.
+    length = boost::filesystem::file_size( filename );
+}
+
 #if defined(_WIN32)
 
 #include "windows.h"
@@ -72,6 +79,7 @@ std::wstring toWideString(const char *s) {
 unsigned mapped = 0;
 
 void* MemoryMappedFile::map(const char *filename, int length) {
+    updateLength( filename, length );
     std::wstring filenamew = toWideString(filename);
 
     fd = CreateFile(
@@ -142,6 +150,7 @@ void MemoryMappedFile::close() {
 #endif
 
 void* MemoryMappedFile::map(const char *filename, int length) {
+    updateLength( filename, length );
     len = length;
 
     fd = open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
@@ -160,6 +169,9 @@ void* MemoryMappedFile::map(const char *filename, int length) {
             problem() << "failure mapping new file " << filename << " length:" << length << endl;
             return 0;
         }
+        // Check for end of disk.
+        lseek(fd, length - 1, SEEK_SET);
+        write(fd, "", 1);        
         Logstream &l = log();
         l << "new datafile " << filename << " filling with zeroes..."; l.flush();
         Timer t;
@@ -177,9 +189,6 @@ void* MemoryMappedFile::map(const char *filename, int length) {
         }
         l << "done " << ((double)t.millis())/1000.0 << " secs" << endl;
     }
-
-    lseek(fd, length, SEEK_SET);
-    write(fd, "", 1);
 
     view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if ( view == MAP_FAILED ) {

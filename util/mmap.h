@@ -25,10 +25,10 @@ public:
     ~MemoryMappedFile(); /* closes the file if open */
     void close();
 
+    // Throws exception if file doesn't exist.
     void* map( const char *filename );
 
-    /* only smart enough right now to deal with files of a fixed length.
-       creates if DNE
+    /* Creates with length if DNE, otherwise uses existing file length.
     */
     void* map(const char *filename, int length);
 
@@ -41,6 +41,8 @@ public:
     int length(){
       return len;
     }
+    
+    void updateLength( const char *filename, int &length ) const;
 
 private:
     HANDLE fd;
