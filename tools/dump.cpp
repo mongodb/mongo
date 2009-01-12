@@ -118,7 +118,7 @@ int main( int argc , char ** argv ){
     po::options_description options("dump parameters");
     options.add_options()
         ("help", "produce help message")
-        ("host,h", po::value<string>() , "mongo host to connecto to")
+        ("host,h", po::value<string>() , "mongo host to connect to")
         ("db,d" , po::value<string>() , "database to dump" )
         ("out" , po::value<string>() , "output directory" )
         ;
