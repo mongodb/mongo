@@ -186,34 +186,34 @@ public:
         rp1.arbitrate();
         ASSERT( rp1.state == ReplPair::State_Master );
 
-        TestableReplPair rp2( false, BSONObj() );
+        TestableReplPair rp2( false, false );
         rp2.arbitrate();
         ASSERT( rp2.state == ReplPair::State_CantArb );
 
         BSONObjBuilder b;
         b.append( "foo", 1 );
-        TestableReplPair rp3( true, b.doneAndDecouple() );
+        TestableReplPair rp3( true, true );
         rp3.arbitrate();
         ASSERT( rp3.state == ReplPair::State_Master );
     }
 private:
     class TestableReplPair : public ReplPair {
     public:
-        TestableReplPair( bool connect, const BSONObj &res ) :
+        TestableReplPair( bool connect, bool isMaster ) :
                 ReplPair( "a", "z" ),
                 connect_( connect ),
-                res_( res ) {
+                isMaster_( isMaster ) {
         }
         virtual
         DBClientConnection *newClientConnection() const {
             MockDBClientConnection * c = new MockDBClientConnection();
             c->connect( connect_ );
-            c->res( res_ );
+            c->setIsMaster( isMaster_ );
             return c;
         }
     private:
         bool connect_;
-        BSONObj res_;
+        bool isMaster_;
     };
 };
 } // namespace ReplPairTests

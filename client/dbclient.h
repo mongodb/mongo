@@ -184,7 +184,7 @@ public:
 
 	   returns true if command invoked successfully.
     */
-	bool isMaster(bool& isMaster, BSONObj *info=0);
+	virtual bool isMaster(bool& isMaster, BSONObj *info=0);
 
     /*
 	   Create a new collection in the database.  Normally, collection creation is automatic.  You would

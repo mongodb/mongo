@@ -33,8 +33,8 @@ public:
         return connect_;
     }
     virtual
-    BSONObj cmdIsMaster(bool& isMaster) {
-        return res_;
+    bool isMaster(bool& isMaster, BSONObj *info=0) {
+        return isMaster_;
     }
     void one( const BSONObj &one ) {
         one_ = one;
@@ -42,13 +42,13 @@ public:
     void connect( bool val ) {
         connect_ = val;
     }
-    void res( const BSONObj &val ) {
-        res_ = val;
+    void setIsMaster( bool val ) {
+        isMaster_ = val;
     }
 private:
     BSONObj one_;
     bool connect_;
-    BSONObj res_;
+    bool isMaster_;
 };
 
 class DirectDBClientConnection : public DBClientConnection {
