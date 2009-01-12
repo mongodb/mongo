@@ -103,8 +103,15 @@ if nix:
         env.Append( LIBS=[ "boost_" + b ] )
 
 
-env.Program( "mongodump" , commonFiles + coreDbFiles + [ "tools/dump.cpp" ] )
-env.Program( "mongoimport" , commonFiles + coreDbFiles + [ "tools/import.cpp" ] )
+# main db target
 Default( env.Program( "db/db" , commonFiles + coreDbFiles + [ "db/db.cpp" ]  ) )
 
+# tools
+env.Program( "mongodump" , commonFiles + coreDbFiles + [ "tools/dump.cpp" ] )
+env.Program( "mongoimport" , commonFiles + coreDbFiles + [ "tools/import.cpp" ] )
+
+# dbgrid
 env.Program( "db/dbgrid" , commonFiles + Glob( "dbgrid/*.cpp" ) )
+
+# c++ library
+env.Library( "mongoclient" , commonFiles + coreDbFiles )
