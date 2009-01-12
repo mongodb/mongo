@@ -71,7 +71,7 @@ int
 __wt_db_set_btree_compare_int_verify(DB *db, int *bytesp);
 int
 __wt_db_destroy(DB *db, u_int32_t flags);
-void
+int
 __wt_idb_destroy(DB *db, int refresh);
 int
 __wt_db_lockout_err(DB *db);
@@ -116,6 +116,8 @@ int
 __wt_breakpoint(void);
 int
 __wt_env_destroy(ENV *env, u_int32_t flags);
+void
+__wt_ienv_destroy(ENV *env, int refresh);
 int
 __wt_env_lockout_err(ENV *env);
 int

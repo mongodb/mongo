@@ -54,7 +54,11 @@ struct __wt_stats {
 #define	WT_STAT_DB_CACHE_DIRTY		    5
 #define	WT_STAT_DB_CACHE_HIT		    6
 #define	WT_STAT_DB_CACHE_MISS		    7
-#define	WT_STAT_DB_TOTAL_ENTRIES	    8
+#define	WT_STAT_EXTSIZE			    8
+#define	WT_STAT_FRAGSIZE		    9
+#define	WT_STAT_INTLSIZE		   10
+#define	WT_STAT_LEAFSIZE		   11
+#define	WT_STAT_DB_TOTAL_ENTRIES	   12
 
 /*
  * Statistics entries for the ENV handle.
