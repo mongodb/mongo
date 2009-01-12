@@ -462,10 +462,21 @@ namespace FromJsonTests {
 
     class ReservedFieldName : public Bad {
         virtual string json() const {
-            return "{ \"$a\" : \"b\" }";
+            return "{ \"$ns\" : \"b\" }";
         }        
     };    
     
+    class OkDollarFieldName : public Base {
+        virtual BSONObj bson() const {
+            BSONObjBuilder b;
+            b.append( "$where", 1 );
+            return b.doneAndDecouple();
+        }
+        virtual string json() const {
+            return "{ \"$where\" : 1 }";
+        }        
+    };
+
     class SingleNumber : public Base {
         virtual BSONObj bson() const {
             BSONObjBuilder b;
@@ -869,6 +880,7 @@ public:
         add< FromJsonTests::SingleString >();
         add< FromJsonTests::EmptyStrings >();
         add< FromJsonTests::ReservedFieldName >();
+        add< FromJsonTests::OkDollarFieldName >();
         add< FromJsonTests::SingleNumber >();
         add< FromJsonTests::FancyNumber >();
         add< FromJsonTests::TwoElements >();

@@ -178,10 +178,16 @@ struct chClear {
 struct fieldNameEnd {
     fieldNameEnd( ObjectBuilder &_b ) : b( _b ) {}
     void operator() ( const char *start, const char *end ) const {
-        b.fieldNames.back() = b.popString();
-        massert( "Field name cannot start with '$'",
-                b.fieldNames.back().length() == 0 ||
-                b.fieldNames.back()[ 0 ] != '$' );
+        string name = b.popString();
+        massert( "Invalid use of reserved field name",
+                    name != "$ns" &&
+                    name != "$id" &&
+                    name != "$binary" &&
+                    name != "$type" &&
+                    name != "$date" &&
+                    name != "$regex" &&
+                    name != "$options" );
+        b.fieldNames.back() = name;
     }
     ObjectBuilder &b;    
 };
@@ -384,9 +390,6 @@ struct regexEnd {
 // worth noting here that this parser follows a short-circuit convention.  So,
 // in the original z example on line 3, if the input was "ab", foo() would only
 // be called once.
-// 2009-01-08 I've disallowed field names beginning with '$' (except those matching
-// our special types).  If we go with this convention long term, parser
-// backtracking is less of a concern.
 struct JsonGrammar : public grammar< JsonGrammar > {
 public:
     JsonGrammar( ObjectBuilder &_b ) : b( _b ) {}
