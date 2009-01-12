@@ -16,4 +16,12 @@ db/dbgrid
 db/dbtests
 db/oplog*
 db/.gdb*
+
+#temp dirs
+dump
 log
+logs
+
+# binaryies
+mongodump
+mongoimport
