@@ -43,6 +43,10 @@ __wt_stat_alloc_db(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_BULK_OVERFLOW_KEY].desc = "bulk overflow key items read";
 	stats[WT_STAT_BULK_OVERFLOW_DATA].desc =
 	    "bulk overflow data items read";
+	stats[WT_STAT_FRAGSIZE].desc = "database fragment size";
+	stats[WT_STAT_INTLSIZE].desc = "database internal node page size";
+	stats[WT_STAT_LEAFSIZE].desc = "database leaf node page size";
+	stats[WT_STAT_EXTSIZE].desc = "database extentsize";
 	stats[WT_STAT_DB_CACHE_ALLOC].desc = "pages allocated in the cache";
 	stats[WT_STAT_DB_CACHE_HIT].desc = "reads found in the cache";
 	stats[WT_STAT_DB_CACHE_MISS].desc = "reads not found in the cache";
@@ -59,6 +63,10 @@ __wt_stat_clear_db(WT_STATS *stats)
 	stats[WT_STAT_BULK_DUP_DATA_READ].v = 0;
 	stats[WT_STAT_BULK_OVERFLOW_KEY].v = 0;
 	stats[WT_STAT_BULK_OVERFLOW_DATA].v = 0;
+	stats[WT_STAT_FRAGSIZE].v = 0;
+	stats[WT_STAT_INTLSIZE].v = 0;
+	stats[WT_STAT_LEAFSIZE].v = 0;
+	stats[WT_STAT_EXTSIZE].v = 0;
 	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;
