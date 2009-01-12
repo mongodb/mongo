@@ -26,18 +26,20 @@ __wt_db_close(DB *db, u_int32_t flags)
 
 	DB_FLAG_CHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
 
-	/* Free associated memory. */
-	__wt_free(env, idb->file_name);
-
 	/* Close the underlying Btree. */
 	if ((tret = __wt_bt_close(db)) != 0 && ret == 0)
 		ret = tret;
 
-	/* Re-cycle the underlying IDB structure */
+	/* Re-cycle the underlying IDB structure. */
 	__wt_idb_destroy(db, 1);
 
 	/* Reset the methods that are permitted. */
 	__wt_db_config_methods(db);
+
+	/* We have to close the environment too, if it was private. */
+	if (F_ISSET(env, WT_PRIVATE_ENV) &&
+	    (tret = env->close(env, 0)) != 0 && ret == 0)
+		ret = tret;
 
 	return (ret);
 }
