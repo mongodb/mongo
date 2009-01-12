@@ -13,7 +13,7 @@ env.Append( CPPPATH=[ "." ] )
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
-commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp " ) + Glob( "util/*.cpp" ) + Glob( "grid/*.cpp" ) + Glob( "client/*.cpp" ) 
+commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/security.o " ) + Glob( "util/*.cpp" ) + Glob( "util/*.c" ) + Glob( "grid/*.cpp" ) + Glob( "client/*.cpp" ) 
 
 coreDbFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp" )
 
@@ -104,6 +104,7 @@ if nix:
 
 
 env.Program( "mongodump" , commonFiles + coreDbFiles + [ "tools/dump.cpp" ] )
+env.Program( "mongoimport" , commonFiles + coreDbFiles + [ "tools/import.cpp" ] )
 Default( env.Program( "db/db" , commonFiles + coreDbFiles + [ "db/db.cpp" ]  ) )
 
 env.Program( "db/dbgrid" , commonFiles + Glob( "dbgrid/*.cpp" ) )
