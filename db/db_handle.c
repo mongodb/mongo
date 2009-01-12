@@ -10,6 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_db_config_default(DB *);
+static int __wt_idb_config_default(DB *);
 
 /*
  * wt_db_create --
@@ -59,11 +60,16 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	if (ret != 0)
 		goto err;
 
+	/* Configure the DB. */
 	__wt_db_config_methods(db);
 
 	if ((ret = __wt_stat_alloc_db(env, &db->stats)) != 0)
 		goto err;
 	if ((ret = __wt_db_config_default(db)) != 0)
+		goto err;
+
+	/* Configure the IDB. */
+	if ((ret = __wt_idb_config_default(db)) != 0)
 		goto err;
 
 	*dbp = db;
@@ -86,7 +92,7 @@ int
 __wt_db_destroy(DB *db, u_int32_t flags)
 {
 	ENV *env;
-	int is_private, ret;
+	int ret;
 
 	env = db->env;
 	ret = 0;
@@ -94,11 +100,8 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 	DB_FLAG_CHK_NOTFATAL(
 	    db, "Db.destroy", flags, WT_APIMASK_DB_DESTROY, ret);
 
-	/* We have to destroy the environment too, if it was private. */
-	is_private = F_ISSET(db, WT_PRIVATE_ENV);
-
 	/* Discard the underlying IDB structure. */
-	__wt_idb_destroy(db, 0);
+	ret = __wt_idb_destroy(db, 0);
 
 	/* Free any allocated memory. */
 	__wt_free(env, db->stats);
@@ -110,31 +113,69 @@ __wt_db_destroy(DB *db, u_int32_t flags)
 	memset(db, OVERWRITE_BYTE, sizeof(db));
 	__wt_free(env, db);
 
-	if (is_private)
+	/* We have to destroy the environment too, if it was private. */
+	if (F_ISSET(env, WT_PRIVATE_ENV))
 		(void)env->destroy(env, 0);
 
 	return (ret);
 }
 
 /*
+ * __wt_db_config_default --
+ *	Set default configuration for a just-created DB handle.
+ */
+static int
+__wt_db_config_default(DB *db)
+{
+	db->btree_compare = db->btree_dup_compare = __wt_bt_lex_compare;
+
+	return (0);
+}
+
+/*
+ * __wt_idb_config_default --
+ *	Set default configuration for a just-created IDB handle.
+ */
+static int
+__wt_idb_config_default(DB *db)
+{
+	IDB *idb;
+
+	WT_CLEAR(idb->key);
+	WT_CLEAR(idb->data);
+
+	return (0);
+}
+
+/*
  * __wt_idb_destroy --
  *	Destroy the DB's underlying IDB structure.
  */
-void
+int
 __wt_idb_destroy(DB *db, int refresh)
 {
 	ENV *env;
 	IDB *idb;
+	int ret;
 
 	env = db->env;
 	idb = db->idb;
+
+	/* Free allocated memory. */
+	if (idb->key.data != NULL)
+		__wt_free(env, idb->key.data);
+	if (idb->data.data != NULL)
+		__wt_free(env, idb->data.data);
+
+	if (idb->file_name != NULL)
+		__wt_free(env, idb->file_name);
 
 	/* Free the actual structure. */
 	__wt_free(env, db->idb);
 	db->idb = NULL;
 
 	if (!refresh)
-		return;
+		return (0);
 
 	/*
 	 * Allocate a new IDB structure on request.
@@ -159,16 +200,9 @@ __wt_idb_destroy(DB *db, int refresh)
 		db->idb = idb;
 		idb->db = db;
 	}
-}
 
-/*
- * __wt_db_config_default --
- *	Set default configuration for a just-created DB handle.
- */
-static int
-__wt_db_config_default(DB *db)
-{
-	db->btree_compare = db->btree_dup_compare = __wt_bt_lex_compare;
+	if ((ret = __wt_idb_config_default(db)) != 0)
+		return (ret);
 
 	return (0);
 }
