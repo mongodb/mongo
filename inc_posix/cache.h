@@ -65,6 +65,8 @@ struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 struct __idb {
 	DB *db;				/* Public object */
 
+	DBT	  key, data;		/* Returned key/data pairs */
+
 	char	 *file_name;		/* Database file name */
 	mode_t	  mode;			/* Database file create mode */
 
