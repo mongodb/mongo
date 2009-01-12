@@ -195,3 +195,7 @@ void MemoryMappedFile::flush(bool sync) {
 }
 
 #endif
+
+void* MemoryMappedFile::map(const char *filename) {
+    return map( filename , file_size( filename ) ); // file_size is from boost
+}

@@ -25,15 +25,21 @@ public:
     ~MemoryMappedFile(); /* closes the file if open */
     void close();
 
+    void* map( const char *filename );
+
     /* only smart enough right now to deal with files of a fixed length.
        creates if DNE
     */
     void* map(const char *filename, int length);
 
     void flush(bool sync);
-
+    
     void* viewOfs() {
         return view;
+    }
+
+    int length(){
+      return len;
     }
 
 private:
@@ -42,3 +48,4 @@ private:
     void *view;
     int len;
 };
+
