@@ -10,7 +10,6 @@
 #include "wt_internal.h"
 
 static int  __wt_env_config_default(ENV *);
-static void __wt_ienv_destroy(ENV *, int);
 
 /*
  * wt_env_create --
@@ -97,6 +96,9 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 	 */
 	__wt_ienv_destroy(env, 0);
 
+	/* Free allocated memory. */
+	__wt_free(env, env->stats);
+
 	memset(env, OVERWRITE_BYTE, sizeof(env));
 	__wt_free(NULL, env);
 
@@ -107,7 +109,7 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
  * __wt_ienv_destroy --
  *	Destroy the ENV's underlying IENV structure.
  */
-static void
+void
 __wt_ienv_destroy(ENV *env, int refresh)
 {
 	IENV *ienv;

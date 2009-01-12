@@ -72,6 +72,9 @@ __wt_cache_close(ENV *env)
 			ret = tret;
 	}
 
+	/* Discard buckets. */
+	__wt_free(env, ienv->hqh);
+
 	/* There shouldn't be any allocated fragments. */
 	WT_ASSERT(env, ienv->cache_frags == 0);
 
