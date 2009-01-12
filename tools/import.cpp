@@ -88,9 +88,11 @@ namespace import {
             read += o.objsize();
             data += o.objsize();
             
-            if ( ! ( ++num % 100 ) )
-                cout << "read " << read << "/" << mmf.length() << endl;
+            if ( ! ( ++num % 1000 ) )
+                cout << "read " << read << "/" << mmf.length() << " bytes so far. " << num << " objects" << endl;
         }
+        
+        cout << "\t "  << num << " objects" << endl;
         
     }
 
