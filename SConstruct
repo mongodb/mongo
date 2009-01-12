@@ -102,6 +102,13 @@ if nix:
     for b in boostLibs:
         env.Append( LIBS=[ "boost_" + b ] )
 
+# SYSTEM CHECKS
+configure = env.Configure()
+
+
+
+# ----- TARGETS ------
+
 
 # main db target
 Default( env.Program( "db/db" , commonFiles + coreDbFiles + [ "db/db.cpp" ]  ) )
@@ -115,3 +122,27 @@ env.Program( "db/dbgrid" , commonFiles + Glob( "dbgrid/*.cpp" ) )
 
 # c++ library
 env.Library( "mongoclient" , commonFiles + coreDbFiles )
+
+env.Program( "firstExample" , commonFiles + coreDbFiles + [ "client/examples/first.cpp" ] )
+
+
+#  ----  INSTALL -------
+
+installDir = "/opt/mongo"
+
+#binaries
+env.Install( installDir + "/bin" , "mongodump" )
+env.Install( installDir + "/bin" , "mongoimport" )
+env.Install( installDir + "/bin" , "db/db" )
+
+#headers
+for id in [ "" , "client/" , "util/" , "grid/" , "db/" ]:
+    env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
+
+#lib
+env.Install( installDir + "/lib" , "libmongoclient.a" )
+env.Install( installDir + "/lib/mongo-jars" , Glob( "jars/*" ) )
+
+#final alias
+env.Alias( "install" , installDir )
+
