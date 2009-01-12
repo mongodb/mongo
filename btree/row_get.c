@@ -19,12 +19,14 @@ int
 __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
 	ENV *env;
+	IDB *idb;
 	WT_PAGE *page;
 	WT_INDX *indx;
 	WT_ITEM *item;
 	int ret, tret;
 
 	env = db->env;
+	idb = db->idb;
 
 	DB_FLAG_CHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
 
@@ -47,7 +49,8 @@ __wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 		goto err;
 	}
 
-	ret = __wt_bt_dbt_return(db, data, page, indx);
+	ret = __wt_bt_dbt_return(db, &idb->data, page, indx);
+	*data = idb->data;
 
 	if (0) {
 err:		ret = WT_ERROR;
