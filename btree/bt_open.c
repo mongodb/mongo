@@ -165,5 +165,11 @@ __wt_bt_vrfy_sizes(DB *db)
 		return (WT_ERROR);
 	}
 
+	WT_STAT_SET(db, FRAGSIZE, "database fragment size", db->fragsize);
+	WT_STAT_SET(db,
+	    INTLSIZE, "database internal node page size", db->intlsize);
+	WT_STAT_SET(db, LEAFSIZE, "database leaf node page size", db->leafsize);
+	WT_STAT_SET(db, EXTSIZE, "database extentsize", db->extsize);
+
 	return (0);
 }
