@@ -1053,7 +1053,7 @@ boost::intmax_t dbSize( const char *database ) {
 boost::intmax_t freeSpace() {
     struct statvfs info;
     assert( !statvfs( dbpath, &info ) );
-    return info.f_bavail * info.f_frsize;
+    return boost::intmax_t( info.f_bavail ) * info.f_frsize;
 }
 #endif
 
