@@ -67,6 +67,50 @@ void Listener::listen() {
 
 /* messagingport -------------------------------------------------------------- */
 
+class PiggyBackData {
+public:
+    PiggyBackData( MessagingPort * port ){
+        _port = port;
+        _buf = new char[1300];
+        _cur = _buf;
+    }
+    
+    ~PiggyBackData(){
+        flush();
+        delete( _cur );
+    }
+
+    void append( Message& m ){
+        assert( m.data->len <= 1300 );
+        
+        if ( len() + m.data->len > 1300 )
+            flush();
+        
+        memcpy( _cur , m.data , m.data->len );
+        _cur += m.data->len;
+    }
+
+    int flush(){
+        if ( _buf == _cur )
+            return 0;
+        
+        int x = ::send( _port->sock , _buf , len() , 0 );
+        _cur = _buf;
+        return x;
+    }
+    
+    int len(){
+        return _cur - _buf;
+    }
+
+private:
+    
+    MessagingPort* _port;
+    
+    char * _buf;
+    char * _cur;
+};
+
 MSGID NextMsgId;
 struct MsgStart {
     MsgStart() {
@@ -84,13 +128,14 @@ void closeAllSockets() {
         (*i)->shutdown();
 }
 
-MessagingPort::MessagingPort(int _sock, SockAddr& _far) : sock(_sock), farEnd(_far) {
+MessagingPort::MessagingPort(int _sock, SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far) {
     ports.insert(this);
 }
 
 MessagingPort::MessagingPort() {
     ports.insert(this);
     sock = -1;
+    piggyBackData = 0;
 }
 
 void MessagingPort::shutdown() {
@@ -101,6 +146,8 @@ void MessagingPort::shutdown() {
 }
 
 MessagingPort::~MessagingPort() {
+    if ( piggyBackData )
+        delete( piggyBackData );
     shutdown();
     ports.erase(this);
 }
@@ -282,12 +329,45 @@ void MessagingPort::say(Message& toSend, int responseTo) {
     ++NextMsgId;
     toSend.data->id = msgid;
     toSend.data->responseTo = responseTo;
-    int x = ::send(sock, (char *) toSend.data, toSend.data->len, 0);
+    
+    int x = -100;
+    
+    if ( piggyBackData && piggyBackData->len() ){
+        if ( ( piggyBackData->len() + toSend.data->len ) > 1300 ){
+            // won't fit in a packet - so just send it off
+            piggyBackData->flush();
+        }
+        else {
+            piggyBackData->append( toSend );
+            x = piggyBackData->flush();
+        }
+    }
+    
+    if ( x == -100 )
+        x = ::send(sock, (char*)toSend.data, toSend.data->len , 0);
+    
     if ( x <= 0 ) {
         log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
     }
+
 }
 
-void MessagingPort::piggyBack( Message& toSend ){
-    say( toSend );
+void MessagingPort::piggyBack( Message& toSend , int responseTo ){
+    
+    if ( toSend.data->len > 1300 ){
+        // not worth saving because its almost an entire packet
+        say( toSend );
+        return;
+    }
+
+    // we're going to be storing this, so need to set it up
+    MSGID msgid = NextMsgId;
+    ++NextMsgId;
+    toSend.data->id = msgid;
+    toSend.data->responseTo = responseTo;
+    
+    if ( ! piggyBackData )
+        piggyBackData = new PiggyBackData( this );
+
+    piggyBackData->append( toSend );
 }
