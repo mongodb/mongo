@@ -147,15 +147,22 @@ extern int bucketSizes[];
 */
 class NamespaceDetails {
 public:
-    NamespaceDetails() {
+    NamespaceDetails( const DiskLoc &loc, bool _capped ) {
         /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
+        firstExtent = lastExtent = capExtent = loc;
         datasize = nrecords = 0;
         lastExtentSize = 0;
         nIndexes = 0;
-        capped = 0;
+        capped = _capped;
         max = 0x7fffffff;
         paddingFactor = 1.0;
         flags = 0;
+        capFirstNewRecord = DiskLoc();
+        // Signal that we are on first allocation iteration through extents.
+        capFirstNewRecord.setInvalid();
+        // For capped case, signal that we are doing initial extent allocation.
+        if ( capped )
+            deletedList[ 1 ].setInvalid();
         memset(reserved, 0, sizeof(reserved));
     }
     DiskLoc firstExtent;
@@ -170,7 +177,9 @@ public:
     int max; // max # of objects for a capped table.
     double paddingFactor; // 1.0 = no padding.
     int flags;
-    char reserved[124];
+    DiskLoc capExtent;
+    DiskLoc capFirstNewRecord;
+    char reserved[108];
 
     enum {
         Flag_HaveIdIndex = 1 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
@@ -221,10 +230,32 @@ public:
     void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
 
     void dumpDeleted(set<DiskLoc> *extents = 0);
+
+    bool capLooped() const {
+        return capped && capFirstNewRecord.isValid();        
+    }
+    
+    // Start from firstExtent by default.
+    DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
+
+    // Start from lastExtent by default.
+    DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
+
+    bool inCapExtent( const DiskLoc &dl ) const;
+
+    void checkMigrate();
+    
 private:
+    Extent *theCapExtent() const { return capExtent.ext(); }
+    void advanceCapExtent( const char *ns );
+    void maybeComplain( const char *ns, int len ) const;
     DiskLoc __stdAlloc(int len);
+    DiskLoc __capAlloc(int len);
     DiskLoc _alloc(const char *ns, int len);
     void compact();
+    
+    DiskLoc &firstDeletedInCapExtent();
+    bool nextIsInCapExtent( const DiskLoc &dl ) const;
 };
 
 #pragma pack(pop)
@@ -278,10 +309,9 @@ public:
     /* returns true if we created (did not exist) during init() */
     bool init(const char *dir, const char *database);
 
-    void add(const char *ns, DiskLoc& loc) {
+    void add(const char *ns, DiskLoc& loc, bool capped) {
         Namespace n(ns);
-        NamespaceDetails details;
-        details.lastExtent = details.firstExtent = loc;
+        NamespaceDetails details( loc, capped );
         ht->put(n, details);
     }
 
@@ -292,7 +322,10 @@ public:
 
     NamespaceDetails* details(const char *ns) {
         Namespace n(ns);
-        return ht->get(n);
+        NamespaceDetails *d = ht->get(n);
+        if ( d )
+            d->checkMigrate();
+        return d;
     }
 
     void kill(const char *ns) {

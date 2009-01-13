@@ -69,14 +69,30 @@ void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
         // defensive code: try to make us notice if we reference a deleted record
         (unsigned&) (((Record *) d)->data) = 0xeeeeeeee;
     }
-
     dassert( dloc.drec() == d );
     DEBUGGING cout << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
-    int b = bucket(d->lengthWithHeaders);
-    DiskLoc& list = deletedList[b];
-    DiskLoc oldHead = list;
-    list = dloc;
-    d->nextDeleted = oldHead;
+    if ( capped ) {
+        if( !deletedList[ 1 ].isValid() ) {
+            // Initial extent allocation.  Insert at end.
+            d->nextDeleted = DiskLoc();
+            if ( deletedList[ 0 ].isNull() )
+                deletedList[ 0 ] = dloc;
+            else {
+                DiskLoc i = deletedList[ 0 ];
+                for(; !i.drec()->nextDeleted.isNull(); i = i.drec()->nextDeleted );
+                i.drec()->nextDeleted = dloc;
+            }
+        } else {
+            d->nextDeleted = firstDeletedInCapExtent();
+            firstDeletedInCapExtent() = dloc;
+        }
+    } else {
+        int b = bucket(d->lengthWithHeaders);
+        DiskLoc& list = deletedList[b];
+        DiskLoc oldHead = list;
+        list = dloc;
+        d->nextDeleted = oldHead;
+    }
 }
 
 /*
@@ -99,9 +115,11 @@ DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentL
     DEBUGGING cout << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
 
     int left = regionlen - lenToAlloc;
-    if ( left < 24 || (left < (lenToAlloc >> 3) && capped == 0) ) {
-        // you get the whole thing.
-        return loc;
+    if ( capped == 0 ) {
+        if ( left < 24 || left < (lenToAlloc >> 3) ) {
+            // you get the whole thing.
+            return loc;
+        }
     }
 
     /* split off some for further use. */
@@ -112,9 +130,9 @@ DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentL
     newDel->extentOfs = r->extentOfs;
     newDel->lengthWithHeaders = left;
     newDel->nextDeleted.Null();
-
+    
     addDeletedRec(newDel, newDelLoc);
-
+    
     return loc;
 }
 
@@ -136,7 +154,7 @@ DiskLoc NamespaceDetails::__stdAlloc(int len) {
             int a = cur.a();
             if ( a < -1 || a >= 100000 ) {
                 problem() << "~~ Assertion - cur out of range in _alloc() " << cur.toString() <<
-                " b:" << b << " chain:" << chain << '\n';
+                " a:" << a << " b:" << b << " chain:" << chain << '\n';
                 sayDbContext();
                 if ( cur == *prev )
                     prev->Null();
@@ -221,18 +239,16 @@ void NamespaceDetails::dumpDeleted(set<DiskLoc> *extents) {
 */
 void NamespaceDetails::compact() {
     assert(capped);
+    
     list<DiskLoc> drecs;
 
-    for ( int i = 0; i < Buckets; i++ ) {
-        DiskLoc dl = deletedList[i];
-        deletedList[i].Null();
-        while ( !dl.isNull() ) {
-            DeletedRecord *r = dl.drec();
-            drecs.push_back(dl);
-            dl = r->nextDeleted;
-        }
-    }
-
+    // Pull out capExtent's DRs from deletedList
+    DiskLoc i = firstDeletedInCapExtent();
+    for(; !i.isNull() && inCapExtent( i ); i = i.drec()->nextDeleted )
+        drecs.push_back( i );
+    firstDeletedInCapExtent() = i;
+    
+    // This is the O(n^2) part.
     drecs.sort();
 
     list<DiskLoc>::iterator j = drecs.begin();
@@ -263,46 +279,192 @@ void NamespaceDetails::compact() {
     }
 }
 
-/* alloc with capped table handling. */
+DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {
+    for(DiskLoc i = startExtent.isNull() ? firstExtent : startExtent;
+        !i.isNull(); i = i.ext()->xnext ) {
+        if ( !i.ext()->firstRecord.isNull() )
+            return i.ext()->firstRecord;
+    }
+    return DiskLoc();
+}
+
+DiskLoc NamespaceDetails::lastRecord( const DiskLoc &startExtent ) const {
+    for(DiskLoc i = startExtent.isNull() ? lastExtent : startExtent;
+        !i.isNull(); i = i.ext()->xprev ) {
+        if ( !i.ext()->lastRecord.isNull() )
+            return i.ext()->lastRecord;
+    }
+    return DiskLoc();
+}
+
+DiskLoc &NamespaceDetails::firstDeletedInCapExtent() {
+    if ( deletedList[ 1 ].isNull() )
+        return deletedList[ 0 ];
+    else
+        return deletedList[ 1 ].drec()->nextDeleted;
+}
+
+bool NamespaceDetails::inCapExtent( const DiskLoc &dl ) const {
+    assert( !dl.isNull() );
+    // We could have a rec or drec, doesn't matter.
+    return dl.drec()->myExtent( dl ) == capExtent.ext();
+}
+
+bool NamespaceDetails::nextIsInCapExtent( const DiskLoc &dl ) const {
+    assert( !dl.isNull() );
+    DiskLoc next = dl.drec()->nextDeleted;
+    if ( next.isNull() )
+        return false;
+    return inCapExtent( next );
+}
+
+void NamespaceDetails::advanceCapExtent( const char *ns ) {
+    // We want deletedList[ 1 ] to be the last DeletedRecord of the prev cap extent
+    // (or DiskLoc() if new capExtent == firstExtent)
+    if ( capExtent == lastExtent )
+        deletedList[ 1 ] = DiskLoc();
+    else {
+        DiskLoc i = firstDeletedInCapExtent();
+        for(; !i.isNull() && nextIsInCapExtent( i ); i = i.drec()->nextDeleted );
+        deletedList[ 1 ] = i;
+    }
+
+    capExtent = theCapExtent()->xnext.isNull() ? firstExtent : theCapExtent()->xnext;
+    dassert( theCapExtent()->ns == ns );
+    theCapExtent()->assertOk();
+    capFirstNewRecord = DiskLoc();
+}
+
 int n_complaints_cap = 0;
+void NamespaceDetails::maybeComplain( const char *ns, int len ) const {
+    if ( ++n_complaints_cap < 8 ) {
+        cout << "couldn't make room for new record (len: " << len << ") in capped ns " << ns << '\n';
+        int i = 0;
+        for( DiskLoc e = firstExtent; !e.isNull(); e = e.ext()->xnext, ++i ) {
+            cout << "  Extent " << i;
+            if ( e == capExtent )
+                cout << " (capExtent)";
+            cout << '\n';
+            cout << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->ns.buf << '\n';
+            cout << "    fr: " << e.ext()->firstRecord.toString() <<
+                    " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
+        }
+        assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
+    }
+}
+
+DiskLoc NamespaceDetails::__capAlloc( int len ) {
+    DiskLoc prev = deletedList[ 1 ];
+    DiskLoc i = firstDeletedInCapExtent();
+    DiskLoc ret;
+    for(; !i.isNull() && inCapExtent( i ); prev = i, i = i.drec()->nextDeleted ) {
+        // We need to keep at least one DR per extent in deletedList[ 0 ],
+        // so make sure there's space to create a DR at the end.
+        if ( i.drec()->lengthWithHeaders >= len + 24 ) {
+            ret = i;
+            break;
+        }
+    }
+    
+    /* unlink ourself from the deleted list */
+    if ( !ret.isNull() ) {
+        if ( prev.isNull() )
+            deletedList[ 0 ] = ret.drec()->nextDeleted;
+        else
+            prev.drec()->nextDeleted = ret.drec()->nextDeleted;
+        ret.drec()->nextDeleted.setInvalid(); // defensive.
+        assert( ret.drec()->extentOfs < ret.getOfs() );
+    }
+
+    return ret;
+}
+
+void NamespaceDetails::checkMigrate() {
+    // migrate old NamespaceDetails format
+    if ( capped && capExtent.a() == 0 && capExtent.getOfs() == 0 ) {
+        capFirstNewRecord = DiskLoc();
+        capFirstNewRecord.setInvalid();
+        // put all the DeletedRecords in deletedList[ 0 ]
+        for( int i = 1; i < Buckets; ++i ) {
+            DiskLoc first = deletedList[ i ];
+            if ( first.isNull() )
+                continue;
+            DiskLoc last = first;
+            for(; !last.drec()->nextDeleted.isNull(); last = last.drec()->nextDeleted );
+            last.drec()->nextDeleted = deletedList[ 0 ];
+            deletedList[ 0 ] = first;
+            deletedList[ i ] = DiskLoc();
+        }
+        // NOTE deletedList[ 1 ] set to DiskLoc() in above
+        
+        // Last, in case we're killed before getting here
+        capExtent = firstExtent;
+    }    
+}
+
+/* alloc with capped table handling. */
 DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
     if ( !capped )
         return __stdAlloc(len);
 
     // capped.
+    
+    // signal done allocating new extents.
+    if ( !deletedList[ 1 ].isValid() )
+        deletedList[ 1 ] = DiskLoc();
 
     assert( len < 400000000 );
     int passes = 0;
     DiskLoc loc;
 
     // delete records until we have room and the max # objects limit achieved.
-    Extent *theExtent = firstExtent.ext(); // only one extent if capped.
-    dassert( theExtent->ns == ns );
-    theExtent->assertOk();
+    dassert( theCapExtent()->ns == ns );
+    theCapExtent()->assertOk();
+    DiskLoc firstEmptyExtent;
     while ( 1 ) {
         if ( nrecords < max ) {
-            loc = __stdAlloc(len);
+            loc = __capAlloc( len );
             if ( !loc.isNull() )
                 break;
         }
 
-        DiskLoc fr = theExtent->firstRecord;
-        if ( fr.isNull() ) {
-            if ( ++n_complaints_cap < 8 ) {
-                cout << "couldn't make room for new record in capped ns " << ns << '\n'
-                     << "  len: " << len << " extentsize:" << lastExtentSize << '\n';
-                cout << "  magic: " << hex << theExtent->magic << " extent->ns: " << theExtent->ns.buf << '\n';
-                cout << "  fr: " << theExtent->firstRecord.toString() <<
-                     " lr: " << theExtent->lastRecord.toString() << " extent->len: " << theExtent->length << '\n';
-                assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
+        // If on first iteration through extents, don't delete anything.
+        if ( !capFirstNewRecord.isValid() ) {
+            advanceCapExtent( ns );
+            if ( capExtent != firstExtent )
+                capFirstNewRecord.setInvalid();
+            // else signal done with first iteration through extents.
+            continue;
+        }
+        
+        if ( !capFirstNewRecord.isNull() &&
+            theCapExtent()->firstRecord == capFirstNewRecord ) {
+            // We've deleted all records that were allocated on the previous
+            // iteration through this extent.
+            advanceCapExtent( ns );
+            continue;
+        }
+        
+        if ( theCapExtent()->firstRecord.isNull() ) {
+            if ( firstEmptyExtent.isNull() )
+                firstEmptyExtent = capExtent;
+            advanceCapExtent( ns );
+            if ( firstEmptyExtent == capExtent ) {
+                maybeComplain( ns, len );
+                return DiskLoc();
             }
-            return DiskLoc();
+            continue;
         }
 
+        DiskLoc fr = theCapExtent()->firstRecord;
         theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
         compact();
         assert( ++passes < 5000 );
     }
+
+    // Remember first record allocated on this iteration through capExtent.
+    if ( capFirstNewRecord.isValid() && capFirstNewRecord.isNull() )
+        capFirstNewRecord = loc;
 
     return loc;
 }
