@@ -45,6 +45,10 @@ void dropDatabase(const char *ns);
 bool repairDatabase(const char *ns, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 void dropNS(string& dropNs);;
 bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
+auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, bool *isSorted=0);
+
+// -1 if library unavailable.
+boost::intmax_t freeSpace();
 
 /*---------------------------------------------------------------------*/
 
@@ -54,13 +58,16 @@ class PhysicalDataFile {
     friend class BasicCursor;
 public:
     PhysicalDataFile(int fn) : fileNo(fn) { }
-    void open(int fileNo, const char *filename);
+    void open(const char *filename, int requestedDataSize = 0);
 
-    Extent* newExtent(const char *ns, int approxSize, int loops = 0);
+    Extent* newExtent(const char *ns, int approxSize, bool newCapped = false, int loops = 0);
     PDFHeader *getHeader() {
         return header;
     }
+    static int maxSize();
 private:
+    int defaultSize( const char *filename ) const;
+
     Extent* getExtent(DiskLoc loc);
     Extent* _getExtent(DiskLoc loc);
     Record* recordAt(DiskLoc dl);
@@ -105,6 +112,9 @@ public:
     int lengthWithHeaders;
     int extentOfs;
     DiskLoc nextDeleted;
+    Extent* myExtent(const DiskLoc& myLoc) {
+        return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
+    }
 };
 
 /* Record is a record in a datafile.  DeletedRecord is similar but for deleted space.
@@ -309,7 +319,7 @@ inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
         return DiskLoc();
     return e->xprev.ext()->lastRecord;
 }
-
+            
 inline Record* DiskLoc::rec() const {
     return DataFileMgr::getRecord(*this);
 }

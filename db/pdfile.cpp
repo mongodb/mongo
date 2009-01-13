@@ -117,30 +117,47 @@ bool _userCreateNS(const char *ns, BSONObj& j, string& err) {
     */
     addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
 
-    int ies = initialExtentSize(128);
+    long long size = initialExtentSize(128);
     BSONElement e = j.findElement("size");
     if ( e.isNumber() ) {
-        ies = (int) e.number();
-        ies += 256;
-        ies &= 0xffffff00;
-        if ( ies > 1024 * 1024 * 1024 + 256 ) return false;
+        size = (long long) e.number();
+        size += 256;
+        size &= 0xffffffffffffff00LL;
     }
 
-    database->suitableFile(ies)->newExtent(ns, ies);
+    bool newCapped = false;
+    int mx = 0;
+    e = j.findElement("capped");
+    if ( e.type() == Bool && e.boolean() ) {
+        newCapped = true;
+        e = j.findElement("max");
+        if ( e.isNumber() ) {
+            mx = (int) e.number();
+        }
+    }
+        
+    // $nExtents just for debug/testing.  We create '$nExtents' extents,
+    // each of size 'size'.
+    e = j.findElement( "$nExtents" );
+    int nExtents = e.number();
+    if ( nExtents > 0 )
+        for( int i = 0; i < nExtents; ++i ) {
+            database->suitableFile(size)->newExtent( ns, size, newCapped );
+        }
+    else
+        while( size > 0 ) {
+            int max = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
+            int desiredExtentSize = size > max ? max : size;
+            Extent *e = database->suitableFile( desiredExtentSize )->newExtent( ns, desiredExtentSize, newCapped );
+            size -= e->length;
+        }
+
     NamespaceDetails *d = nsdetails(ns);
     assert(d);
 
-    e = j.findElement("capped");
-    if ( e.type() == Bool && e.boolean() ) {
-        d->capped = 1;
-        e = j.findElement("max");
-        if ( e.isNumber() ) {
-            int mx = (int) e.number();
-            if ( mx > 0 )
-                d->max = mx;
-        }
-    }
-
+    if ( mx > 0 )
+        d->max = mx;
+    
     return true;
 }
 
@@ -156,13 +173,39 @@ bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication
 
 /*---------------------------------------------------------------------*/
 
-void PhysicalDataFile::open(int fn, const char *filename) {
+int PhysicalDataFile::maxSize() {
+    if ( sizeof( int* ) == 4 )
+        return 512 * 1024 * 1024;
+    else
+        return 0x7ff00000;
+}
+
+int PhysicalDataFile::defaultSize( const char *filename ) const {
+    int size;
+    
+    if ( fileNo <= 4 )
+        size = (64*1024*1024) << fileNo;
+    else
+        size = 0x7ff00000;
+        
+    if ( strstr(filename, "_hudsonSmall") ) {
+        int mult = 1;
+        if ( fileNo > 1 && fileNo < 1000 )
+            mult = fileNo;
+        size = 1024 * 512 * mult;
+        log() << "Warning : using small files for _hudsonSmall" << endl;
+    }
+
+    return size;
+}
+
+void PhysicalDataFile::open( const char *filename, int minSize ) {
     {
         /* check quotas
            very simple temporary implementation - we will in future look up
            the quota from the grid database
         */
-        if ( quota && fn > 8 && !boost::filesystem::exists(filename) ) {
+        if ( quota && fileNo > 8 && !boost::filesystem::exists(filename) ) {
             /* todo: if we were adding / changing keys in an index did we do some
                work previously that needs cleaning up?  Possible.  We should
                check code like that and have it catch the exception and do
@@ -175,40 +218,22 @@ void PhysicalDataFile::open(int fn, const char *filename) {
         }
     }
 
-    int length;
+    int size = defaultSize( filename );
+    for(; size < minSize; size *= 2 );
+    if ( size > maxSize() )
+        size = maxSize();
 
-    if ( fn <= 4 ) {
-        length = (64*1024*1024) << fn;
-        if ( strstr(filename, "alleyinsider") && length < 1024 * 1024 * 1024 ) {
-            DEV cout << "Warning: not making alleyinsider datafile bigger because DEV is true" << endl;
-            else
-                length = 1024 * 1024 * 1024;
-        }
-    } else
-        length = 0x7ff00000;
+    assert( ( size >= 64*1024*1024 ) || ( strstr( filename, "_hudsonSmall" ) ) );
+    assert( size % 4096 == 0 );
 
-    if ( sizeof( int* ) == 4 && fn > 4 )
-        length = 512 * 1024 * 1024;
-
-    assert( length >= 64*1024*1024 );
-
-    if ( strstr(filename, "_hudsonSmall") ) {
-        int mult = 1;
-        if ( fn > 1 && fn < 1000 )
-            mult = fn;
-        length = 1024 * 512 * mult;
-        log() << "Warning : using small files for _hudsonSmall" << endl;
-    }
-    assert( length % 4096 == 0 );
-
-    assert(fn == fileNo);
-    header = (PDFHeader *) mmf.map(filename, length);
+    header = (PDFHeader *) mmf.map(filename, size);
     uassert("can't map file memory", header);
-    header->init(fileNo, length);
+    // If opening an existing file, this is a no-op.
+    header->init(fileNo, size);
 }
 
 /* prev - previous extent for this namespace.  null=this is the first one. */
-Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
+Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, bool newCapped, int loops) {
     assert( approxSize >= 0 && approxSize <= 0x7ff00000 );
 
     assert( header ); // null if file open failed
@@ -222,7 +247,7 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
             cout << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
         }
         log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
-        return database->addAFile()->newExtent(ns, approxSize, loops+1);
+        return database->addAFile()->newExtent(ns, approxSize, newCapped, loops+1);
     }
     int offset = header->unused.getOfs();
     header->unused.setOfs( fileNo, offset + ExtentSize );
@@ -241,7 +266,7 @@ Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, int loops) {
         details->lastExtent = loc;
     }
     else {
-        ni->add(ns, loc);
+        ni->add(ns, loc, newCapped);
         details = ni->details(ns);
     }
 
@@ -355,22 +380,26 @@ auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
         nsdetails(ns)->dumpDeleted(&extents);
     }
 
-    while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
-        /* todo: if extent is empty, free it for reuse elsewhere.
-                 that is a bit complicated have to clean up the freelists.
-        */
-        RARELY cout << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
-        // find a nonempty extent
-        // it might be nice to free the whole extent here!  but have to clean up free recs then.
-        e = e->getNextExtent();
+    if ( !nsdetails( ns )->capped ) {
+        while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
+            /* todo: if extent is empty, free it for reuse elsewhere.
+                that is a bit complicated have to clean up the freelists.
+            */
+            RARELY cout << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
+            // find a nonempty extent
+            // it might be nice to free the whole extent here!  but have to clean up free recs then.
+            e = e->getNextExtent();
+        }
+        return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
+    } else {
+        return auto_ptr< Cursor >( new ForwardCappedCursor( nsdetails( ns ) ) );
     }
-    return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
 }
 
 /* get a table scan cursor, but can be forward or reverse direction.
    order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
 */
-auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted) {
+auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, bool *isSorted) {
     BSONElement el = order.findElement("$natural"); // e.g., { $natural : -1 }
     if ( !el.eoo() && isSorted )
         *isSorted = true;
@@ -382,12 +411,16 @@ auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted) {
     NamespaceDetails *d = nsdetails(ns);
     if ( !d )
         return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
-    Extent *e = d->lastExtent.ext();
-    while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
-        OCCASIONALLY cout << "  findTableScan: extent empty, skipping ahead" << endl;
-        e = e->getPrevExtent();
+    if ( !d->capped ) {
+        Extent *e = d->lastExtent.ext();
+        while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
+            OCCASIONALLY cout << "  findTableScan: extent empty, skipping ahead" << endl;
+            e = e->getPrevExtent();
+        }
+        return auto_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
+    } else {
+        return auto_ptr< Cursor >( new ReverseCappedCursor( d ) );
     }
-    return auto_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
 }
 
 void aboutToDelete(const DiskLoc& dl);
@@ -779,7 +812,7 @@ void ensureHaveIdIndex(const char *ns) {
     theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
 }
 
-DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
+DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {    
     bool addIndex = false;
     const char *sys = strstr(ns, "system.");
     if ( sys ) {
@@ -1050,12 +1083,16 @@ boost::intmax_t dbSize( const char *database ) {
 
 #if !defined(_WIN32)
 #include <sys/statvfs.h>
+#endif
 boost::intmax_t freeSpace() {
+#if !defined(_WIN32)
     struct statvfs info;
     assert( !statvfs( dbpath, &info ) );
     return boost::intmax_t( info.f_bavail ) * info.f_frsize;
-}
+#else
+    return -1;
 #endif
+}
 
 bool repairDatabase( const char *ns, string &errmsg,
                     bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
@@ -1069,10 +1106,9 @@ bool repairDatabase( const char *ns, string &errmsg,
     problem() << "repairDatabase " << dbName << endl;
     assert( database->name == dbName );
 
-#if !defined(_WIN32)
     boost::intmax_t totalSize = dbSize( dbName );
     boost::intmax_t freeSize = freeSpace();
-    if ( freeSize < totalSize ) {
+    if ( freeSize > -1 && freeSize < totalSize ) {
         stringstream ss;
         ss << "Cannot repair database " << dbName << " having size: " << totalSize
            << " (bytes) because free disk space is: " << freeSize << " (bytes)";
@@ -1080,7 +1116,6 @@ bool repairDatabase( const char *ns, string &errmsg,
         problem() << errmsg << endl;
         return false;
     }
-#endif
     
     Path reservedPath =
         uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
