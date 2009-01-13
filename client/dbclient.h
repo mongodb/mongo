@@ -322,6 +322,8 @@ public:
     BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
     
     virtual void insert( const char * ns , BSONObj obj );
+
+    virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 );
 };
 
 class DBClientPaired;
@@ -367,8 +369,6 @@ public:
     */
     virtual
     bool connect(const char *serverHostname, string& errmsg);
-
-    void remove( const char * ns , BSONObj obj , bool justOne = 0 );
 
 protected:
     virtual bool call( Message &toSend, Message &response, bool assertOk = true );

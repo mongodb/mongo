@@ -252,7 +252,7 @@ void DBClientBase::insert( const char * ns , BSONObj obj ){
     say( toSend );
 }
 
-void DBClientConnection::remove( const char * ns , BSONObj obj , bool justOne ){
+void DBClientBase::remove( const char * ns , BSONObj obj , bool justOne ){
     Message toSend;
     
     BufBuilder b;
@@ -269,7 +269,7 @@ void DBClientConnection::remove( const char * ns , BSONObj obj , bool justOne ){
     
     toSend.setData( dbDelete , b.buf() , b.len() );
 
-    port().say( toSend );
+    say( toSend );
 }
 
 /* -- DBClientCursor ---------------------------------------------- */
