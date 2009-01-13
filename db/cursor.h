@@ -84,10 +84,19 @@ public:
     }
 };
 
+class AdvanceStrategy {
+public:
+    virtual DiskLoc next( const DiskLoc &prev ) const = 0;
+};
+
+AdvanceStrategy *forward();
+AdvanceStrategy *reverse();
+
 /* table-scan style cursor */
 class BasicCursor : public Cursor {
 protected:
     DiskLoc curr, last;
+    AdvanceStrategy *s;
 
 private:
     // for tailing:
@@ -116,16 +125,16 @@ public:
     bool advance() {
         if ( eof() )
             return false;
-        Record *r = _current();
+        _current();
         last = curr;
-        curr = r->getNext(curr);
+        curr = s->next( curr );
         return ok();
     }
 
-    BasicCursor(DiskLoc dl) : curr(dl) {
+    BasicCursor(DiskLoc dl, AdvanceStrategy *_s = forward()) : curr(dl), s( _s ) {
         init();
     }
-    BasicCursor() {
+    BasicCursor(AdvanceStrategy *_s = forward()) : s( _s ) {
         init();
     }
     virtual string toString() {
@@ -158,19 +167,33 @@ public:
 /* used for order { $natural: -1 } */
 class ReverseCursor : public BasicCursor {
 public:
-    bool advance() {
-        if ( eof() )
-            return false;
-        Record *r = _current();
-        last = curr;
-        curr = r->getPrev(curr);
-        return ok();
-    }
-
-    ReverseCursor(DiskLoc dl) : BasicCursor(dl) { }
-    ReverseCursor() { }
+    ReverseCursor(DiskLoc dl) : BasicCursor( dl, reverse() ) { }
+    ReverseCursor() : BasicCursor( reverse() ) { }
     virtual string toString() {
         return "ReverseCursor";
     }
 };
 
+class NamespaceDetails;
+
+class ForwardCappedCursor : public BasicCursor, public AdvanceStrategy {
+public:
+    ForwardCappedCursor( NamespaceDetails *nsd = 0 );
+    virtual string toString() {
+        return "ForwardCappedCursor";
+    }
+    virtual DiskLoc next( const DiskLoc &prev ) const;
+private:
+    NamespaceDetails *nsd;
+};
+
+class ReverseCappedCursor : public BasicCursor, public AdvanceStrategy {
+public:
+    ReverseCappedCursor( NamespaceDetails *nsd = 0 );
+    virtual string toString() {
+        return "ReverseCappedCursor";
+    }
+    virtual DiskLoc next( const DiskLoc &prev ) const;
+private:
+    NamespaceDetails *nsd;
+};
