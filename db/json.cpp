@@ -362,7 +362,7 @@ struct regexValue {
 struct regexOptions {
     regexOptions( ObjectBuilder &_b ) : b( _b ) {}
     void operator() ( const char *start, const char *end ) const {
-        b.regexOptions = b.popString();
+        b.regexOptions = string( start, end );
     }
     ObjectBuilder &b;    
 };
@@ -456,7 +456,7 @@ public:
             dateT = str_p( "Date" ) >> '(' >> uint_parser< unsigned long long >()[ dateValue( self.b ) ] >> ')';
 
             regex = regexS | regexT;
-            regexS = ch_p( '{' ) >> "\"$regex\"" >> ':' >> str[ regexValue( self.b ) ] >> ',' >> "\"$options\"" >> ':' >> str[ regexOptions( self.b ) ] >> '}';
+            regexS = ch_p( '{' ) >> "\"$regex\"" >> ':' >> str[ regexValue( self.b ) ] >> ',' >> "\"$options\"" >> ':' >> lexeme_d[ '"' >> ( *( alpha_p ) )[ regexOptions( self.b ) ] >> '"' ] >> '}';
             // FIXME Obviously it would be nice to unify this with str.
             regexT = lexeme_d[ ch_p( '/' )[ chClear( self.b ) ] >>
                            *( ( ch_p( '\\' ) >>
@@ -471,7 +471,7 @@ public:
                                 ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
                              ch_p( '\x7f' )[ ch( self.b ) ] |
                              ( ~cntrl_p & ~ch_p( '/' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> str_p( "/" )[ regexValue( self.b ) ]
-                              >> ( *( alpha_p[ ch( self.b ) ] ) )[ regexOptions( self.b ) ] ];
+                              >> ( *( ch_p( 'i' ) | ch_p( 'g' ) | ch_p( 'm' ) ) )[ regexOptions( self.b ) ] ];
         }
         rule< ScannerT > object, members, pair, array, elements, value, str, number,
             dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,

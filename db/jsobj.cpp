@@ -210,18 +210,18 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
         }
         case DBRef: {
             OID *x = (OID *) (valuestr() + valuestrsize());
-            if ( format == Strict )
-                s << "{ \"$ns\" : ";
-            else
+            if ( format == TenGen )
                 s << "Dbref( ";
+            else
+                s << "{ \"$ns\" : ";
             s << '"' << valuestr() << "\", ";
-            if ( format == Strict )
+            if ( format != TenGen )
                 s << "\"$id\" : ";
             s << '"' << *x << "\" ";
-            if ( format == Strict )
-                s << '}';
-            else
+            if ( format == TenGen )
                 s << ')';
+            else
+                s << '}';
             break;
         }
         case jstOID:
@@ -267,12 +267,20 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
                 s << "/";
             s << escape( regex() );
             if ( format == Strict )
-                s << "\", \"$options\" : \"";
-            else
+                s << "\", \"$options\" : \"" << regexFlags() << "\" }";
+            else {
                 s << "/";
-            s << regexFlags();
-            if ( format == Strict )
-                s << "\" }";
+                // FIXME Worry about alpha order?
+                for( const char *f = regexFlags(); *f; ++f )
+                    switch( *f ) {
+                        case 'g':
+                        case 'i':
+                        case 'm':
+                            s << *f;
+                        default:
+                            break;
+                    }
+            }
             break;
         default:
             stringstream ss;

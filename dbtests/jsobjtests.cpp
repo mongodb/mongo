@@ -281,10 +281,10 @@ namespace JsonStringTests {
             b.appendDBRef( "a", "namespace", oid );
             ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
                           b.done().jsonString( Strict ) );
+            ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
+                          b.done().jsonString( JS ) );
             ASSERT_EQUALS( "{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
                           b.done().jsonString( TenGen ) );
-            ASSERT_EQUALS( "{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
-                          b.done().jsonString( JS ) );
         }
     };
     
@@ -362,11 +362,11 @@ namespace JsonStringTests {
     public:
         void run() {
             BSONObjBuilder b;
-            b.appendRegex( "a", "abc", "I" );
-            ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"abc\", \"$options\" : \"I\" } }",
+            b.appendRegex( "a", "abc", "i" );
+            ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"abc\", \"$options\" : \"i\" } }",
                           b.done().jsonString( Strict ) );
-            ASSERT_EQUALS( "{ \"a\" : /abc/I }", b.done().jsonString( TenGen ) );
-            ASSERT_EQUALS( "{ \"a\" : /abc/I }", b.done().jsonString( JS ) );
+            ASSERT_EQUALS( "{ \"a\" : /abc/i }", b.done().jsonString( TenGen ) );
+            ASSERT_EQUALS( "{ \"a\" : /abc/i }", b.done().jsonString( JS ) );
         }        
     };
     
@@ -374,13 +374,25 @@ namespace JsonStringTests {
     public:
         void run() {
             BSONObjBuilder b;
-            b.appendRegex( "a", "/\"", "I" );
-            ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"\\/\\\"\", \"$options\" : \"I\" } }",
+            b.appendRegex( "a", "/\"", "i" );
+            ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"\\/\\\"\", \"$options\" : \"i\" } }",
                           b.done().jsonString( Strict ) );
-            ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/I }", b.done().jsonString( TenGen ) );
-            ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/I }", b.done().jsonString( JS ) );
+            ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", b.done().jsonString( TenGen ) );
+            ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", b.done().jsonString( JS ) );
         }        
     };
+
+    class RegexManyOptions {
+    public:
+        void run() {
+            BSONObjBuilder b;
+            b.appendRegex( "a", "z", "abcgimx" );
+            ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"z\", \"$options\" : \"abcgimx\" } }",
+                          b.done().jsonString( Strict ) );
+            ASSERT_EQUALS( "{ \"a\" : /z/gim }", b.done().jsonString( TenGen ) );
+            ASSERT_EQUALS( "{ \"a\" : /z/gim }", b.done().jsonString( JS ) );
+        }        
+    };    
     
 } // namespace JsonStringTests
 } // namespace BSONObjTests
@@ -806,22 +818,22 @@ namespace FromJsonTests {
     class Regex : public Base {
         virtual BSONObj bson() const {
             BSONObjBuilder b;
-            b.appendRegex( "a", "b", "c" );
+            b.appendRegex( "a", "b", "i" );
             return b.doneAndDecouple();
         }
         virtual string json() const {
-            return "{ \"a\" : { \"$regex\" : \"b\", \"$options\" : \"c\" } }";
+            return "{ \"a\" : { \"$regex\" : \"b\", \"$options\" : \"i\" } }";
         }        
     };
 
     class RegexEscape : public Base {
         virtual BSONObj bson() const {
             BSONObjBuilder b;
-            b.appendRegex( "a", "\t", "c" );
+            b.appendRegex( "a", "\t", "i" );
             return b.doneAndDecouple();
         }
         virtual string json() const {
-            return "{ \"a\" : { \"$regex\" : \"\\t\", \"$options\" : \"c\" } }";
+            return "{ \"a\" : { \"$regex\" : \"\\t\", \"$options\" : \"i\" } }";
         }        
     };
 
@@ -836,6 +848,18 @@ namespace FromJsonTests {
         }        
     };
     
+    class RegexInvalidOption : public Bad {
+        virtual string json() const {
+            return "{ \"a\" : { \"$regex\" : \"b\", \"$options\" : \"1\" } }";
+        }        
+    };
+    
+    class RegexInvalidOption2 : public Bad {
+        virtual string json() const {
+            return "{ \"a\" : /b/c }";
+        }        
+    };
+
     class Malformed : public Bad {
         string json() const { return "{"; }
     };
@@ -875,6 +899,7 @@ public:
         add< BSONObjTests::JsonStringTests::Date >();
         add< BSONObjTests::JsonStringTests::Regex >();
         add< BSONObjTests::JsonStringTests::RegexEscape >();
+        add< BSONObjTests::JsonStringTests::RegexManyOptions >();
         add< FromJsonTests::Empty >();
         add< FromJsonTests::EmptyWithSpace >();
         add< FromJsonTests::SingleString >();
@@ -908,6 +933,8 @@ public:
         add< FromJsonTests::Regex >();
         add< FromJsonTests::RegexEscape >();
         add< FromJsonTests::RegexWithQuotes >();
+        add< FromJsonTests::RegexInvalidOption >();
+        add< FromJsonTests::RegexInvalidOption2 >();
         add< FromJsonTests::Malformed >();
     }
 };
