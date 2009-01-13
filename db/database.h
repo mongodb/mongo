@@ -47,7 +47,7 @@ public:
             delete files[i];
     }
 
-    PhysicalDataFile* getFile(int n) {
+    PhysicalDataFile* getFile( int n, int sizeNeeded = 0 ) {
         assert(this);
 
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
@@ -68,8 +68,11 @@ public:
             fullName = boost::filesystem::path(path) / ss.str();
             string fullNameString = fullName.string();
             p = new PhysicalDataFile(n);
+            int minSize = n == 0 ? 0 : files[ n - 1 ]->getHeader()->fileLength;
+            if ( sizeNeeded + PDFHeader::headerSize() > minSize )
+                minSize = sizeNeeded + PDFHeader::headerSize();
             try {
-                p->open(n, fullNameString.c_str() );
+                p->open( fullNameString.c_str(), minSize );
             }
             catch ( AssertionException& u ) {
                 delete p;
@@ -80,18 +83,18 @@ public:
         return p;
     }
 
-    PhysicalDataFile* addAFile() {
+    PhysicalDataFile* addAFile( int sizeNeeded = 0 ) {
         int n = (int) files.size();
-        return getFile(n);
+        return getFile( n, sizeNeeded );
     }
 
-    PhysicalDataFile* suitableFile(int sizeNeeded) {
+    PhysicalDataFile* suitableFile( int sizeNeeded ) {
         PhysicalDataFile* f = newestFile();
         for ( int i = 0; i < 8; i++ ) {
             if ( f->getHeader()->unusedLength >= sizeNeeded )
                 break;
-            f = addAFile();
-            if ( f->getHeader()->fileLength > 1500000000 ) // this is as big as they get so might as well stop
+            f = addAFile( sizeNeeded );
+            if ( f->getHeader()->fileLength >= PhysicalDataFile::maxSize() ) // this is as big as they get so might as well stop
                 break;
         }
         return f;
