@@ -134,7 +134,7 @@ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
 
 # testing
 clientEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
-
+clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
 
 #  ----  INSTALL -------
 
