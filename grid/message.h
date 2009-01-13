@@ -60,6 +60,8 @@ public:
     void reply(Message& received, Message& response);
     bool call(Message& toSend, Message& response);
     void say(Message& toSend, int responseTo = -1);
+    
+    void piggyBack( Message& toSend );
 
 private:
     int sock;

@@ -76,6 +76,7 @@ class DBConnector {
 public:
     virtual bool call( Message &toSend, Message &response, bool assertOk=true ) = 0;
     virtual void say( Message &toSend ) = 0;
+    virtual void sayPiggyBack( Message &toSend ) = 0;
     virtual void checkResponse( const char *data, int nReturned ) {}
 };
 
@@ -372,6 +373,7 @@ public:
 protected:
     virtual bool call( Message &toSend, Message &response, bool assertOk = true );
     virtual void say( Message &toSend );
+    virtual void sayPiggyBack( Message &toSend );
     virtual void checkResponse( const char *data, int nReturned );
 };
 

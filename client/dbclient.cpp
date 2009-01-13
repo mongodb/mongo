@@ -293,6 +293,10 @@ void DBClientConnection::say( Message &toSend ) {
     port().say( toSend );
 }
 
+void DBClientConnection::sayPiggyBack( Message &toSend ) {
+    port().piggyBack( toSend );
+}
+
 bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk ) {
     if ( !port().call(toSend, response) ) {
         failed = true;
@@ -387,7 +391,15 @@ BSONObj DBClientCursor::next() {
 
 DBClientCursor::~DBClientCursor(){
     if ( cursorId ){
-        cerr << "TODO: need to kill the cursor here __FILE__:__LINE__" << endl;
+        BufBuilder b;
+        b.append( (int)0 ); // reserved
+        b.append( (int)1 ); // number
+        b.append( cursorId );
+        
+        Message m;
+        m.setData( dbKillCursors , b.buf() , b.len() );
+        
+        connector->sayPiggyBack( m );
     }
         
 }

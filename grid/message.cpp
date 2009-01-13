@@ -287,3 +287,7 @@ void MessagingPort::say(Message& toSend, int responseTo) {
         log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
     }
 }
+
+void MessagingPort::piggyBack( Message& toSend ){
+    say( toSend );
+}
