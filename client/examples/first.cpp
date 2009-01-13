@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-#include "../dbclient.h"
+#include "mongo/client/dbclient.h"
 
 using namespace std;
 

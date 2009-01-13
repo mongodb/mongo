@@ -102,6 +102,11 @@ if nix:
     for b in boostLibs:
         env.Append( LIBS=[ "boost_" + b ] )
 
+clientEnv = env.Clone();
+clientEnv.Append( CPPPATH=["../"] )
+clientEnv.Append( LIBS=["unittest" , "libmongoclient.a"] )
+clientEnv.Append( LIBPATH=["."] )
+
 # SYSTEM CHECKS
 configure = env.Configure()
 
@@ -124,10 +129,10 @@ env.Program( "db/dbgrid" , commonFiles + Glob( "dbgrid/*.cpp" ) )
 env.Library( "mongoclient" , commonFiles + coreDbFiles )
 
 # examples
-env.Program( "firstExample" , commonFiles + coreDbFiles + [ "client/examples/first.cpp" ] )
+clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
 
 # testing
-env.Program( "test" , Glob( "dbtests/*.cpp" ) , LIBS=["unittest" , "libmongoclient.a"] + env["LIBS"], LIBPATH=["."] + env["LIBPATH"] )
+clientEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 
 
 #  ----  INSTALL -------
