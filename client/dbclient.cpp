@@ -272,6 +272,23 @@ void DBClientBase::remove( const char * ns , BSONObj obj , bool justOne ){
     say( toSend );
 }
 
+void DBClientBase::update( const char * ns , BSONObj query , BSONObj obj , bool upsert ){
+    
+    BufBuilder b;
+    b.append( (int)0 ); // reserverd
+    b.append( ns );
+    
+    b.append( (int)upsert );
+    
+    query.appendSelfToBufBuilder( b );
+    obj.appendSelfToBufBuilder( b );
+
+    Message toSend;
+    toSend.setData( dbUpdate , b.buf() , b.len() );
+
+    say( toSend );    
+}
+
 /* -- DBClientCursor ---------------------------------------------- */
 
 void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
