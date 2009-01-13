@@ -437,8 +437,8 @@ public:
     BSONElement firstElement() const {
         return BSONElement(objdata() + 4);
     }
-    BSONElement findElement(const char *name);
-    BSONElement findElement(string name) {
+    BSONElement findElement(const char *name) const;
+    BSONElement findElement(string name) const {
         return findElement(name.c_str());
     }
     bool hasElement(const char *name);
@@ -803,7 +803,7 @@ inline bool BSONObj::hasElement(const char *name) {
     return false;
 }
 
-inline BSONElement BSONObj::findElement(const char *name) {
+inline BSONElement BSONObj::findElement(const char *name) const {
     if ( !isEmpty() ) {
         BSONObjIterator it(*this);
         while ( it.more() ) {
