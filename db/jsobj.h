@@ -505,7 +505,7 @@ public:
     }
 
     /* add all the fields from the object specified to this object */
-    void appendElements(BSONObj x);
+    BSONObjBuilder& appendElements(BSONObj x);
 
     void append(BSONElement& e) {
         assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
@@ -818,13 +818,14 @@ inline BSONElement BSONObj::findElement(const char *name) const {
 }
 
 /* add all the fields from the object specified to this object */
-inline void BSONObjBuilder::appendElements(BSONObj x) {
+inline BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
     BSONObjIterator it(x);
     while ( it.more() ) {
         BSONElement e = it.next();
         if ( e.eoo() ) break;
         append(e);
     }
+    return *this;
 }
 
 extern BSONObj emptyObj;
