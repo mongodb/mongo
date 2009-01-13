@@ -243,7 +243,6 @@ int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
         }
         else {
             c->advance(); // must advance before deleting as the next ptr will die
-
             assert( !deep || !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
             if ( !justOne )
                 c->noteLocation();
@@ -255,7 +254,7 @@ int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
             c->checkLocation();
         }
     }
-
+    
     return nDeleted;
 }
 
@@ -480,9 +479,6 @@ void killCursors(int n, long long *ids) {
     }
     log() << "killCursors: found " << k << " of " << n << '\n';
 }
-
-// order.$natural sets natural order direction
-auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
 
 BSONObj id_obj = fromjson("{\"_id\":ObjectId( \"000000000000000000000000\" )}");
 BSONObj empty_obj = fromjson("{}");

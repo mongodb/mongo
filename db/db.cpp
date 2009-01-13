@@ -37,6 +37,7 @@ extern int port;
 extern int curOp;
 extern string dashDashSource;
 extern int opLogging;
+extern long long oplogSize;
 extern OpLog _oplog;
 
 extern int ctr;
@@ -450,6 +451,9 @@ int main(int argc, char* argv[], char *envp[] )
                 appsrvPath = argv[++i];
             else if ( s == "--nocursors" )
                 useCursors = false;
+            else if ( strncmp(s.c_str(), "--oplogSize", 11) == 0 ) {
+                oplogSize = strtoll( argv[ ++i ], 0, 10 );
+            }
             else if ( strncmp(s.c_str(), "--oplog", 7) == 0 ) {
                 int x = s[7] - '0';
                 if ( x < 0 || x > 7 ) {
@@ -491,6 +495,7 @@ usage:
     cout << " --nocursors         diagnostic/debugging option\n";
     cout << " --nojni" << endl;
     cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
+    cout << " --oplogSize <size>  custom size for operation log" << endl;
     cout << "\nReplication:" << endl;
     cout << " --master\n";
     cout << " --slave" << endl;

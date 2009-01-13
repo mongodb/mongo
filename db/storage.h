@@ -65,11 +65,14 @@ public:
         fileNo = -1;
         ofs = NullOfs;
     }
+    void assertOk() {
+        assert(!isNull());
+    }
     void setInvalid() {
         fileNo = -2;
     }
-    void assertOk() {
-        assert(!isNull());
+    bool isValid() const {
+        return fileNo != -2;
     }
 
     string toString() const {

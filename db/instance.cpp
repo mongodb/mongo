@@ -49,6 +49,7 @@ int getOpLogging() {
 }
 OpLog _oplog;
 //#define oplog (*(_oplog.f))
+long long oplogSize = 0;
 
 bool useCursors = true;
 
