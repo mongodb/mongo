@@ -15,7 +15,7 @@ boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
 commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/security.cpp " ) + Glob( "util/*.cpp" ) + Glob( "util/*.c" ) + Glob( "grid/*.cpp" ) + Glob( "client/*.cpp" ) 
 
-coreDbFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp" )
+coreDbFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp" )
 
 nix = False
 
@@ -130,6 +130,7 @@ env.Library( "mongoclient" , commonFiles + coreDbFiles )
 
 # examples
 clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
+clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
 
 # testing
 clientEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
