@@ -36,6 +36,8 @@ Mongo uses memory mapped files.  If built as a 32 bit executable, you will
 not be able to work with large (multi-gigabyte) databases.  However, 32 bit 
 builds should work fine with small development databases.
 
+To compile the unit tests, you need to install the unit test framework from:
+ http://unittest.red-bean.com/
 
 --- WINDOWS ---
 
@@ -55,3 +57,5 @@ COMPILING
    mkdir \data\
    mkdir \data\db
    db\db run
+
+

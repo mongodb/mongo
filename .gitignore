@@ -25,3 +25,6 @@ logs
 # binaryies
 mongodump
 mongoimport
+firstExample
+libmongoclient.*
+test
