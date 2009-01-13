@@ -23,3 +23,4 @@ UnitTest::TestPtr btreeTests();
 UnitTest::TestPtr jsobjTests();
 UnitTest::TestPtr namespaceTests();
 UnitTest::TestPtr pairingTests();
+UnitTest::TestPtr pdfileTests();

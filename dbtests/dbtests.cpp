@@ -70,6 +70,7 @@ int main( int argc, char** argv ) {
     tests.add( jsobjTests(), "jsobj" );
     tests.add( namespaceTests(), "namespace" );
     tests.add( pairingTests(), "pairing" );
+    tests.add( pdfileTests(), "pdfile" );
 
     return tests.run( argc, argv );
 }
