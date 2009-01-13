@@ -47,7 +47,7 @@
 
 extern bool quiet;
 extern boost::mutex dbMutex;
-auto_ptr<Cursor> findTableScan(const char *ns, BSONObj& order, bool *isSorted=0);
+extern long long oplogSize;
 int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
 bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl);
 void ensureHaveIdIndex(const char *ns);
@@ -1155,9 +1155,19 @@ void startReplication() {
             dblock lk;
             /* create an oplog collection, if it doesn't yet exist. */
             BSONObjBuilder b;
-            double sz = 50.0 * 1000 * 1000;
-            if ( sizeof(int *) >= 8 )
-                sz = 990.0 * 1000 * 1000;
+            double sz;
+            if ( oplogSize != 0 )
+                sz = oplogSize;
+            else {
+                sz = 50.0 * 1000 * 1000;
+                if ( sizeof(int *) >= 8 ) {
+                    sz = 990.0 * 1000 * 1000;
+                    boost::intmax_t free = freeSpace(); //-1 if call not supported.
+                    double fivePct = free * 0.05;
+                    if ( fivePct > sz )
+                        sz = fivePct;
+                }
+            }
             b.append("size", sz);
             b.appendBool("capped", 1);
             setClientTempNs("local.oplog.$main");
