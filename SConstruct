@@ -123,7 +123,11 @@ env.Program( "db/dbgrid" , commonFiles + Glob( "dbgrid/*.cpp" ) )
 # c++ library
 env.Library( "mongoclient" , commonFiles + coreDbFiles )
 
+# examples
 env.Program( "firstExample" , commonFiles + coreDbFiles + [ "client/examples/first.cpp" ] )
+
+# testing
+env.Program( "test" , Glob( "dbtests/*.cpp" ) , LIBS=["unittest" , "libmongoclient.a"] + env["LIBS"], LIBPATH=["."] + env["LIBPATH"] )
 
 
 #  ----  INSTALL -------
