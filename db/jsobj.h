@@ -545,10 +545,11 @@ public:
         b.append(fieldName);
         b.append(n);
     }
-    void append(const char *fieldName, double n) {
+    BSONObjBuilder& append(const char *fieldName, double n) {
         b.append((char) NumberDouble);
         b.append(fieldName);
         b.append(n);
+        return *this;
     }
     void appendOID(const char *fieldName, OID *oid = 0) {
         b.append((char) jstOID);
@@ -578,11 +579,12 @@ public:
         b.append((int) strlen(code)+1);
         b.append(code);
     }
-    void append(const char *fieldName, const char *str) {
+    BSONObjBuilder& append(const char *fieldName, const char *str) {
         b.append((char) String);
         b.append(fieldName);
         b.append((int) strlen(str)+1);
         b.append(str);
+        return *this;
     }
     void append(const char *fieldName, string str) {
         append(fieldName, str.c_str());
