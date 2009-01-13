@@ -68,7 +68,9 @@ public:
             fullName = boost::filesystem::path(path) / ss.str();
             string fullNameString = fullName.string();
             p = new PhysicalDataFile(n);
-            int minSize = n == 0 ? 0 : files[ n - 1 ]->getHeader()->fileLength;
+            int minSize = 0;
+            if ( n != 0 && files[ n - 1 ] )
+                minSize = files[ n - 1 ]->getHeader()->fileLength;
             if ( sizeNeeded + PDFHeader::headerSize() > minSize )
                 minSize = sizeNeeded + PDFHeader::headerSize();
             try {
