@@ -22,7 +22,9 @@
 #include "dbtests.h"
 #include "mockdbclient.h"
 
-extern PairSync *mongo::pairSync;
+namespace mongo {
+extern PairSync *pairSync;
+} // namespace mongo
 
 namespace PairingTests {
 class Base {
