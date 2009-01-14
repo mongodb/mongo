@@ -307,7 +307,6 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 	IDB *idb;
 	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
-	WT_PAGE_DESC desc;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, frags, i, nextaddr;
 	int (*func)(DB *, const DBT *, const DBT *);

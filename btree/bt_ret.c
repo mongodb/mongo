@@ -34,7 +34,6 @@ __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx)
 		}
 		return (__wt_bt_ovfl_copy_to_dbt(db,
 		    (WT_ITEM_OVFL *)WT_ITEM_BYTE(indx->ditem), data));
-		/* NOTREACHED */
 	case WT_PAGE_DUP_LEAF:
 		if (indx->addr == WT_ADDR_INVALID) {
 			p = indx->data;
@@ -43,7 +42,6 @@ __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx)
 		}
 		return (__wt_bt_ovfl_copy_to_dbt(db,
 		    (WT_ITEM_OVFL *)WT_ITEM_BYTE(indx->ditem), data));
-		/* NOTREACHED */
 	}
 
 	if (data->alloc_size < size) {

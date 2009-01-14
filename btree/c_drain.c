@@ -433,6 +433,7 @@ __wt_cache_clean(ENV *env, u_int32_t frags, WT_PAGE **pagep)
 
 	*pagep = NULL;
 	ienv = env->ienv;
+	frags_free = 0;
 	ret = 0;
 
 	for (;;) {

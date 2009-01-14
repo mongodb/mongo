@@ -19,7 +19,6 @@ int
 __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 {
 	ENV *env;
-	IDB *idb;
 	int ret;
 
 	env = db->env;
