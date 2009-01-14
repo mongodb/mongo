@@ -100,7 +100,7 @@ public:
        only when it's a "multikey" array.
        keys will be left empty if key not found in the object.
     */
-    void getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) const;
+    void getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const;
 
     /* get the key pattern for this object.
        e.g., { lastname:1, firstname:1 }

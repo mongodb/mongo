@@ -408,14 +408,12 @@ public:
         }
     }
 
-    bool operator<(const BSONObj& r) const {
-        return woCompare(r) < 0;
-    }
-
     /* <0: l<r. 0:l==r. >0:l>r
        wo='well ordered'.  fields must be in same order in each object.
+       Ordering is with respect to the signs of the elements in idxKey.
     */
-    int woCompare(const BSONObj& r, bool considerFieldName=true) const;
+    int woCompare(const BSONObj& r, const BSONObj &idxKey = BSONObj(),
+                  bool considerFieldName=true) const;
 
     /* note this is "shallow equality" -- ints and doubles won't match.  for a
        deep equality test use woCompare (which is slower).
@@ -426,12 +424,6 @@ public:
             return (os == 0 || memcmp(objdata(),r.objdata(),os)==0);
         }
         return false;
-    }
-    bool operator==(const BSONObj& r) const {
-        return this->woEqual(r);
-    }
-    bool operator!=(const BSONObj& r) const {
-        return !operator==( r );
     }
 
     BSONElement firstElement() const {
@@ -497,6 +489,23 @@ public:
     bool valid() const;
 };
 ostream& operator<<( ostream &s, const BSONObj &o );
+
+class BSONObjCmp {
+public:
+    BSONObjCmp( const BSONObj &_order ) : order( _order ) {}
+    bool operator()( const BSONObj &l, const BSONObj &r ) const {
+        return l.woCompare( r, order ) < 0;
+    }
+private:
+    BSONObj order;
+};
+
+class BSONObjCmpDefaultOrder : public BSONObjCmp {
+public:
+    BSONObjCmpDefaultOrder() : BSONObjCmp( BSONObj() ) {}
+};
+
+typedef set< BSONObj, BSONObjCmpDefaultOrder > BSONObjSetDefaultOrder;
 
 class BSONObjBuilder {
 public:

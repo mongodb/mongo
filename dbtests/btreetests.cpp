@@ -64,11 +64,11 @@ protected:
     void checkValid( int nKeys ) const {
         ASSERT( bt() );
         ASSERT( bt()->isHead() );
-        bt()->assertValid( true );
-        ASSERT_EQUALS( nKeys, bt()->fullValidate( dl() ) );
+        bt()->assertValid( order(), true );
+        ASSERT_EQUALS( nKeys, bt()->fullValidate( dl(), order() ) );
     }
     void insert( BSONObj &key ) {
-        bt()->insert( dl(), recordLoc(), key, true, id(), true );
+        bt()->insert( dl(), recordLoc(), key, order(), true, id(), true );
     }
     void unindex( BSONObj &key ) {
         bt()->unindex( dl(), id(), key, recordLoc() );
@@ -85,10 +85,13 @@ protected:
         int pos;
         bool found;
         DiskLoc location =
-            bt()->locate( dl(), key, pos, found, recordLoc(), direction );
+            bt()->locate( dl(), key, order(), pos, found, recordLoc(), direction );
         ASSERT_EQUALS( expectedFound, found );
         ASSERT( location == expectedLocation );
         ASSERT_EQUALS( expectedPos, pos );
+    }
+    BSONObj order() const {
+        return idx_.keyPattern();
     }
 private:
     IndexDetails idx_;

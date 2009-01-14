@@ -60,14 +60,14 @@ void BucketBasics::_shape(int level, stringstream& ss) {
 int bt_fv=0;
 int bt_dmp=0;
 
-void BucketBasics::dumpTree(DiskLoc thisLoc) {
+void BucketBasics::dumpTree(DiskLoc thisLoc, const BSONObj &order) {
     bt_dmp=1;
-    fullValidate(thisLoc);
+    fullValidate(thisLoc, order);
     bt_dmp=0;
 }
 
-int BucketBasics::fullValidate(const DiskLoc& thisLoc) {
-    assertValid(true);
+int BucketBasics::fullValidate(const DiskLoc& thisLoc, const BSONObj &order) {
+    assertValid(order, true);
 //	if( bt_fv==0 )
 //		return;
 
@@ -87,13 +87,13 @@ int BucketBasics::fullValidate(const DiskLoc& thisLoc) {
             DiskLoc left = kn.prevChildBucket;
             BtreeBucket *b = left.btree();
             wassert( b->parent == thisLoc );
-            kc += b->fullValidate(kn.prevChildBucket);
+            kc += b->fullValidate(kn.prevChildBucket, order);
         }
     }
     if ( !nextChild.isNull() ) {
         BtreeBucket *b = nextChild.btree();
         wassert( b->parent == thisLoc );
-        kc += b->fullValidate(nextChild);
+        kc += b->fullValidate(nextChild, order);
     }
 
     return kc;
@@ -101,7 +101,7 @@ int BucketBasics::fullValidate(const DiskLoc& thisLoc) {
 
 int nDumped = 0;
 
-void BucketBasics::assertValid(bool force) {
+void BucketBasics::assertValid(const BSONObj &order, bool force) {
     if ( !debug && !force )
         return;
     wassert( n >= 0 && n < Size() );
@@ -112,7 +112,7 @@ void BucketBasics::assertValid(bool force) {
         for ( int i = 0; i < n-1; i++ ) {
             BSONObj k1 = keyNode(i).key;
             BSONObj k2 = keyNode(i+1).key;
-            int z = k1.woCompare(k2); //OK
+            int z = k1.woCompare(k2, order); //OK
             if ( z > 0 ) {
                 cout << "ERROR: btree key order corrupt.  Keys:" << endl;
                 if ( ++nDumped < 5 ) {
@@ -139,7 +139,7 @@ void BucketBasics::assertValid(bool force) {
         if ( n > 1 ) {
             BSONObj k1 = keyNode(0).key;
             BSONObj k2 = keyNode(n-1).key;
-            int z = k1.woCompare(k2);
+            int z = k1.woCompare(k2, order);
             //wassert( z <= 0 );
             if ( z > 0 ) {
                 problem() << "btree keys out of order" << '\n';
@@ -195,10 +195,10 @@ void BucketBasics::_delKeyAtPos(int keypos) {
 }
 
 /* add a key.  must be > all existing.  be careful to set next ptr right. */
-void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, DiskLoc prevChild) {
+void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild) {
     int bytesNeeded = key.objsize() + sizeof(_KeyNode);
     assert( bytesNeeded <= emptySize );
-    assert( n == 0 || keyNode(n-1).key.woCompare(key) <= 0 );
+    assert( n == 0 || keyNode(n-1).key.woCompare(key, order) <= 0 );
     emptySize -= sizeof(_KeyNode);
     _KeyNode& kn = k(n++);
     kn.prevChildBucket = prevChild;
@@ -208,11 +208,11 @@ void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, DiskLoc prev
     memcpy(p, key.objdata(), key.objsize());
 }
 
-bool BucketBasics::basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key) {
+bool BucketBasics::basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order) {
     assert( keypos >= 0 && keypos <= n );
     int bytesNeeded = key.objsize() + sizeof(_KeyNode);
     if ( bytesNeeded > emptySize ) {
-        pack();
+        pack( order );
         if ( bytesNeeded > emptySize )
             return false;
     }
@@ -232,7 +232,7 @@ bool BucketBasics::basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& ke
 /* when we delete things we just leave empty space until the node is
    full and then we repack it.
 */
-void BucketBasics::pack() {
+void BucketBasics::pack( const BSONObj &order ) {
     if ( flags & Packed )
         return;
 
@@ -254,13 +254,13 @@ void BucketBasics::pack() {
     assert( emptySize >= 0 );
 
     setPacked();
-    assertValid();
+    assertValid( order );
 }
 
-inline void BucketBasics::truncateTo(int N) {
+inline void BucketBasics::truncateTo(int N, const BSONObj &order) {
     n = N;
     setNotPacked();
-    pack();
+    pack( order );
 }
 
 /* - BtreeBucket --------------------------------------------------- */
@@ -288,14 +288,14 @@ void BtreeBucket::findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, in
    returns n if it goes after the last existing key.
    note result might be Unused!
 */
-bool BtreeBucket::find(BSONObj& key, DiskLoc recordLoc, int& pos) {
+bool BtreeBucket::find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos) {
     /* binary search for this key */
     int l=0;
     int h=n-1;
     while ( l <= h ) {
         int m = (l+h)/2;
         KeyNode M = keyNode(m);
-        int x = key.woCompare(M.key);
+        int x = key.woCompare(M.key, order);
         if ( x == 0 )
             x = recordLoc.compare(M.recordLoc);
         if ( x < 0 ) // key < M.key
@@ -328,15 +328,14 @@ bool BtreeBucket::find(BSONObj& key, DiskLoc recordLoc, int& pos) {
 
             return true;
         }
-//?		x = key.woCompare(M.key);
     }
     // not found
     pos = l;
     if ( pos != n ) {
         BSONObj keyatpos = keyNode(pos).key;
-        wassert( key.woCompare(keyatpos) <= 0 );
+        wassert( key.woCompare(keyatpos, order) <= 0 );
         if ( pos > 0 ) {
-            wassert( keyNode(pos-1).key.woCompare(key) <= 0 );
+            wassert( keyNode(pos-1).key.woCompare(key, order) <= 0 );
         }
     }
 
@@ -416,7 +415,7 @@ bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key
 
     int pos;
     bool found;
-    DiskLoc loc = locate(thisLoc, key, pos, found, recordLoc, 1);
+    DiskLoc loc = locate(thisLoc, key, id.keyPattern(), pos, found, recordLoc, 1);
     if ( found ) {
         loc.btree()->delKeyAtPos(loc, id, pos);
         return true;
@@ -449,7 +448,7 @@ void BtreeBucket::fixParentPtrs(const DiskLoc& thisLoc) {
 /* keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
 */
 void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
-                             DiskLoc recordLoc, BSONObj& key,
+                             DiskLoc recordLoc, BSONObj& key, const BSONObj& order,
                              DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
 {
     dassert( thisLoc.btree() == this );
@@ -459,7 +458,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 
     DiskLoc oldLoc = thisLoc;
 
-    if ( basicInsert(keypos, recordLoc, key) ) {
+    if ( basicInsert(keypos, recordLoc, key, order) ) {
         _KeyNode& kn = k(keypos);
         if ( keypos+1 == n ) { // last key
             if ( nextChild != lchild ) {
@@ -521,7 +520,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
         while ( 1 ) {
             KeyNode mn = keyNode(mid);
             KeyNode left = keyNode(mid-1);
-            if ( left.key < mn.key )
+            if ( left.key.woCompare( mn.key, order ) < 0 )
                 break;
             mid--;
             if ( mid < 3 ) {
@@ -541,10 +540,10 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
         cout << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
     for ( int i = mid+1; i < n; i++ ) {
         KeyNode kn = keyNode(i);
-        r->pushBack(kn.recordLoc, kn.key, kn.prevChildBucket);
+        r->pushBack(kn.recordLoc, kn.key, order, kn.prevChildBucket);
     }
     r->nextChild = nextChild;
-    r->assertValid();
+    r->assertValid( order );
 //r->dump();
     rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size(), true);
     if ( split_debug )
@@ -565,9 +564,9 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
         if ( parent.isNull() ) {
             // make a new parent if we were the root
             BtreeBucket *p = allocTemp();
-            p->pushBack(middle.recordLoc, middle.key, thisLoc);
+            p->pushBack(middle.recordLoc, middle.key, order, thisLoc);
             p->nextChild = rLoc;
-            p->assertValid();
+            p->assertValid( order );
             parent = idx.head = theDataFileMgr.insert(idx.indexNamespace().c_str(), p, p->Size(), true);
             if ( split_debug )
                 cout << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
@@ -581,7 +580,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
             rLoc.btree()->parent = parent;
             if ( split_debug )
                 cout << "    promoting middle key " << middle.key.toString() << endl;
-            parent.btree()->_insert(parent, middle.recordLoc, middle.key, false, thisLoc, rLoc, idx);
+            parent.btree()->_insert(parent, middle.recordLoc, middle.key, order, false, thisLoc, rLoc, idx);
         }
 //BtreeBucket *br = rLoc.btree();
 //br->dump();
@@ -591,7 +590,7 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 
     }
 
-    truncateTo(mid);  // note this may trash middle.key!  thus we had to promote it before finishing up here.
+    truncateTo(mid, order);  // note this may trash middle.key!  thus we had to promote it before finishing up here.
 
     // add our new key, there is room now
     {
@@ -602,12 +601,12 @@ void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
 //		if( keypos < mid ) {
             if ( split_debug )
                 cout << "  keypos<mid, insertHere() the new key" << endl;
-            insertHere(thisLoc, keypos, recordLoc, key, lchild, rchild, idx);
+            insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
 //dump();
         } else {
             int kp = keypos-mid-1;
             assert(kp>=0);
-            rLoc.btree()->insertHere(rLoc, kp, recordLoc, key, lchild, rchild, idx);
+            rLoc.btree()->insertHere(rLoc, kp, recordLoc, key, order, lchild, rchild, idx);
 // set a bp here.
 //			if( !lchild.isNull() ) cout << lchild.btree()->parent.toString() << endl;
 //			if( !rchild.isNull() ) cout << rchild.btree()->parent.toString() << endl;
@@ -682,9 +681,9 @@ DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction,
     return DiskLoc();
 }
 
-DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, BSONObj& key, int& pos, bool& found, DiskLoc recordLoc, int direction) {
+DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction) {
     int p;
-    found = find(key, recordLoc, p);
+    found = find(key, recordLoc, order, p);
     if ( found ) {
         pos = p;
         return thisLoc;
@@ -693,7 +692,7 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, BSONObj& key, int& pos, bool
     DiskLoc child = childForPos(p);
 
     if ( !child.isNull() ) {
-        DiskLoc l = child.btree()->locate(child, key, pos, found, recordLoc, direction);
+        DiskLoc l = child.btree()->locate(child, key, order, pos, found, recordLoc, direction);
         if ( !l.isNull() )
             return l;
     }
@@ -707,7 +706,7 @@ DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, BSONObj& key, int& pos, bool
 
 /* thisloc is the location of this bucket object.  you must pass that in. */
 int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc,
-                         BSONObj& key, bool dupsAllowed,
+                         BSONObj& key, const BSONObj &order, bool dupsAllowed,
                          DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) {
     if ( key.objsize() > KeyMax ) {
         problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << idx.indexNamespace() << endl;
@@ -716,7 +715,7 @@ int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc,
     assert( key.objsize() > 0 );
 
     int pos;
-    bool found = find(key, recordLoc, pos);
+    bool found = find(key, recordLoc, order, pos);
     if ( insert_debug ) {
         cout << "  " << thisLoc.toString() << '.' << "_insert " <<
              key.toString() << '/' << recordLoc.toString() <<
@@ -756,11 +755,11 @@ int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc,
     if ( insert_debug )
         cout << "    getChild(" << pos << "): " << child.toString() << endl;
     if ( child.isNull() || !rChild.isNull() /* means an 'internal' insert */ ) {
-        insertHere(thisLoc, pos, recordLoc, key, lChild, rChild, idx);
+        insertHere(thisLoc, pos, recordLoc, key, order, lChild, rChild, idx);
         return 0;
     }
 
-    return child.btree()->insert(child, recordLoc, key, dupsAllowed, idx, false);
+    return child.btree()->insert(child, recordLoc, key, order, dupsAllowed, idx, false);
 }
 
 void BtreeBucket::dump() {
@@ -779,7 +778,8 @@ void BtreeBucket::dump() {
 
 /* todo: meaning of return code unclear clean up */
 int BtreeBucket::insert(DiskLoc thisLoc, DiskLoc recordLoc,
-                        BSONObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel)
+                        BSONObj& key, const BSONObj &order, bool dupsAllowed,
+                        IndexDetails& idx, bool toplevel)
 {
     if ( toplevel ) {
         if ( key.objsize() > KeyMax ) {
@@ -798,8 +798,8 @@ int BtreeBucket::insert(DiskLoc thisLoc, DiskLoc recordLoc,
         */
     }
 
-    int x = _insert(thisLoc, recordLoc, key, dupsAllowed, DiskLoc(), DiskLoc(), idx);
-    assertValid();
+    int x = _insert(thisLoc, recordLoc, key, order, dupsAllowed, DiskLoc(), DiskLoc(), idx);
+    assertValid( order );
 
     return x;
 }

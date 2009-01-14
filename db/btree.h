@@ -75,12 +75,12 @@ public:
 class BucketBasics {
     friend class KeyNode;
 public:
-    void dumpTree(DiskLoc thisLoc);
+    void dumpTree(DiskLoc thisLoc, const BSONObj &order);
     bool isHead() {
         return parent.isNull();
     }
-    void assertValid(bool force = false);
-    int fullValidate(const DiskLoc& thisLoc); /* traverses everything */
+    void assertValid(const BSONObj &order, bool force = false);
+    int fullValidate(const DiskLoc& thisLoc, const BSONObj &order); /* traverses everything */
 protected:
     DiskLoc& getChild(int pos) {
         assert( pos >= 0 && pos <= n );
@@ -100,8 +100,8 @@ protected:
     /* returns false if node is full and must be split
        keypos is where to insert -- inserted after that key #.  so keypos=0 is the leftmost one.
     */
-    bool basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key);
-    void pushBack(const DiskLoc& recordLoc, BSONObj& key, DiskLoc prevChild);
+    bool basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order);
+    void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild);
     void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs.
 
     /* !Packed means there is deleted fragment space within the bucket.
@@ -115,11 +115,11 @@ protected:
     }
 
     int totalDataSize() const;
-    void pack();
+    void pack( const BSONObj &order );
     void setNotPacked();
     void setPacked();
     int _alloc(int bytes);
-    void truncateTo(int N);
+    void truncateTo(int N, const BSONObj &order);
     void markUnused(int keypos);
 public:
     DiskLoc parent;
@@ -158,14 +158,15 @@ public:
 
     static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
     int insert(DiskLoc thisLoc, DiskLoc recordLoc,
-               BSONObj& key, bool dupsAllowed, IndexDetails& idx, bool toplevel);
+               BSONObj& key, const BSONObj &order, bool dupsAllowed,
+               IndexDetails& idx, bool toplevel);
 
     bool unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc);
 
     /* locate may return an "unused" key that is just a marker.  so be careful.
          looks for a key:recordloc pair.
     */
-    DiskLoc locate(const DiskLoc& thisLoc, BSONObj& key, int& pos, bool& found, DiskLoc recordLoc, int direction=1);
+    DiskLoc locate(const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction=1);
 
     /* advance one key position in the index: */
     DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
@@ -182,12 +183,12 @@ private:
     }
     static BtreeBucket* allocTemp(); /* caller must release with free() */
     void insertHere(DiskLoc thisLoc, int keypos,
-                    DiskLoc recordLoc, BSONObj& key,
+                    DiskLoc recordLoc, BSONObj& key, const BSONObj &order,
                     DiskLoc lchild, DiskLoc rchild, IndexDetails&);
     int _insert(DiskLoc thisLoc, DiskLoc recordLoc,
-                BSONObj& key, bool dupsAllowed,
+                BSONObj& key, const BSONObj &order, bool dupsAllowed,
                 DiskLoc lChild, DiskLoc rChild, IndexDetails&);
-    bool find(BSONObj& key, DiskLoc recordLoc, int& pos);
+    bool find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos);
     static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
 };
 
@@ -256,6 +257,7 @@ private:
     void checkUnused();
     void checkEnd();
     IndexDetails& indexDetails;
+    BSONObj order;
     DiskLoc bucket;
     int keyOfs;
     int direction; // 1=fwd,-1=reverse

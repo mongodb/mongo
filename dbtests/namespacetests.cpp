@@ -85,8 +85,15 @@ protected:
         b.append( "c", 4 );
         return b.doneAndDecouple();
     }
-    static void checkSize( int expected, const set< BSONObj >  &objs ) {
-        ASSERT_EQUALS( set< BSONObj >::size_type( expected ), objs.size() );
+    static void checkSize( int expected, const BSONObjSetDefaultOrder  &objs ) {
+        ASSERT_EQUALS( BSONObjSetDefaultOrder::size_type( expected ), objs.size() );
+    }
+    static void assertEquals( const BSONObj &a, const BSONObj &b ) {
+        if ( a.woCompare( b ) != 0 ) {
+            cout << "expected: " << a.toString()
+                << ", got: " << b.toString() << endl;
+        }
+        ASSERT( a.woCompare( b ) == 0 );
     }
 private:
     IndexDetails id_;
@@ -98,8 +105,7 @@ public:
         create();
         ASSERT_EQUALS( "testIndex", id().indexName() );
         ASSERT_EQUALS( ns(), id().parentNS() );
-        // check equal
-        ASSERT_EQUALS( key(), id().keyPattern() );
+        assertEquals( key(), id().keyPattern() );
     }
 };
 
@@ -111,10 +117,10 @@ public:
         b.append( "b", 4 );
         b.append( "a", 5 );
         e.append( "", 5 );
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( b.done(), keys );
         checkSize( 1, keys );
-        ASSERT_EQUALS( e.doneAndDecouple(), *keys.begin() );
+        assertEquals( e.doneAndDecouple(), *keys.begin() );
     }
 };
 
@@ -127,10 +133,10 @@ public:
         a.append( "a", b.done() );
         a.append( "c", "foo" );
         e.append( "", 4 );
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( a.done(), keys );
         checkSize( 1, keys );
-        ASSERT_EQUALS( e.doneAndDecouple(), *keys.begin() );
+        assertEquals( e.doneAndDecouple(), *keys.begin() );
     }
 private:
     virtual BSONObj key() const {
@@ -145,14 +151,14 @@ public:
         BSONObjBuilder b;
         b.append( "a", shortArray()) ;
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( b.done(), keys );
         checkSize( 3, keys );
         int j = 1;
-        for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+        for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
             b.append( "", j );
-            ASSERT_EQUALS( b.doneAndDecouple(), *i );
+            assertEquals( b.doneAndDecouple(), *i );
         }
     }
 };
@@ -165,15 +171,15 @@ public:
         b.append( "a", shortArray() );
         b.append( "b", 2 );
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( b.done(), keys );
         checkSize( 3, keys );
         int j = 1;
-        for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+        for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
             b.append( "", j );
             b.append( "", 2 );
-            ASSERT_EQUALS( b.doneAndDecouple(), *i );
+            assertEquals( b.doneAndDecouple(), *i );
         }
     }
 private:
@@ -190,15 +196,15 @@ public:
         b.append( "first", 5 );
         b.append( "a", shortArray()) ;
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( b.done(), keys );
         checkSize( 3, keys );
         int j = 1;
-        for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+        for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
             b.append( "", 5 );
             b.append( "", j );
-            ASSERT_EQUALS( b.doneAndDecouple(), *i );
+            assertEquals( b.doneAndDecouple(), *i );
         }
     }
 private:
@@ -219,14 +225,14 @@ public:
         BSONObjBuilder a;
         a.append( "a", b.done() );
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( a.done(), keys );
         checkSize( 3, keys );
         int j = 1;
-        for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+        for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
             b.append( "", j );
-            ASSERT_EQUALS( b.doneAndDecouple(), *i );
+            assertEquals( b.doneAndDecouple(), *i );
         }
     }
 private:
@@ -243,7 +249,7 @@ public:
         b.append( "a", shortArray() );
         b.append( "b", shortArray() );
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         ASSERT_EXCEPTION( id().getKeysFromObject( b.done(), keys ),
                           UserAssertionException );
     }
@@ -263,14 +269,14 @@ public:
         BSONObjBuilder b;
         b.append( "a", elts );
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( b.done(), keys );
         checkSize( 3, keys );
         int j = 1;
-        for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+        for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
             b.append( "", j );
-            ASSERT_EQUALS( b.doneAndDecouple(), *i );
+            assertEquals( b.doneAndDecouple(), *i );
         }
     }
 private:
@@ -290,15 +296,15 @@ public:
         b.append( "a", elts );
         b.append( "d", 99 );
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( b.done(), keys );
         checkSize( 3, keys );
         int j = 1;
-        for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+        for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder c;
             c.append( "", j );
             c.append( "", 99 );
-            ASSERT_EQUALS( c.doneAndDecouple(), *i );
+            assertEquals( c.doneAndDecouple(), *i );
         }
     }
 private:
@@ -323,14 +329,14 @@ public:
         BSONObjBuilder b;
         b.append( "a", elts );
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( b.done(), keys );
         checkSize( 3, keys );
         int j = 1;
-        for ( set< BSONObj >::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+        for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
             BSONObjBuilder b;
             b.append( "", j );
-            ASSERT_EQUALS( b.doneAndDecouple(), *i );
+            assertEquals( b.doneAndDecouple(), *i );
         }
     }
 private:
@@ -351,7 +357,7 @@ public:
         BSONObjBuilder b;
         b.append( "a", elts );
 
-        set< BSONObj > keys;
+        BSONObjSetDefaultOrder keys;
         id().getKeysFromObject( b.done(), keys );
         checkSize( 0, keys );
     }

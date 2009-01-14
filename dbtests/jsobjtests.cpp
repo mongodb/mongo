@@ -100,6 +100,18 @@ public:
     }
 };
 
+class WoCompareOrdered : public Base {
+public:
+    void run() {
+        ASSERT( basic( "a", 1 ).woCompare( basic( "a", 1 ), basic( "a", 1 ) ) == 0 );
+        ASSERT( basic( "a", 2 ).woCompare( basic( "a", 1 ), basic( "a", 1 ) ) > 0 );
+        ASSERT( basic( "a", 1 ).woCompare( basic( "a", 2 ), basic( "a", 1 ) ) < 0 );
+        ASSERT( basic( "a", 1 ).woCompare( basic( "a", 1 ), basic( "a", -1 ) ) == 0 );
+        ASSERT( basic( "a", 2 ).woCompare( basic( "a", 1 ), basic( "a", -1 ) ) < 0 );
+        ASSERT( basic( "a", 1 ).woCompare( basic( "a", 2 ), basic( "a", -1 ) ) > 0 );
+    }
+};
+    
 namespace JsonStringTests {
     class Empty {
     public:
@@ -874,6 +886,7 @@ public:
         add< BSONObjTests::NumericCompareBasic >();
         add< BSONObjTests::WoCompareEmbeddedObject >();
         add< BSONObjTests::WoCompareEmbeddedArray >();
+        add< BSONObjTests::WoCompareOrdered >();
         add< BSONObjTests::JsonStringTests::Empty >();
         add< BSONObjTests::JsonStringTests::SingleStringMember >();
         add< BSONObjTests::JsonStringTests::EscapedCharacters >();

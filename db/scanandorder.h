@@ -61,24 +61,22 @@ inline bool fillQueryResultFromObj(BufBuilder& b, set<string> *filter, BSONObj& 
     return true;
 }
 
-typedef multimap<BSONObj,BSONObj> BestMap;
+typedef multimap<BSONObj,BSONObj,BSONObjCmp> BestMap;
 class ScanAndOrder {
     BestMap best; // key -> full object
     int startFrom;
     int limit;   // max to send back.
     KeyType order;
-    int dir;
     unsigned approxSize;
 
     void _add(BSONObj& k, BSONObj o) {
         best.insert(make_pair(k,o));
     }
 
-    // T may be iterator or reverse_iterator
     void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i) {
         const BSONObj& worstBestKey = i->first;
-        int c = worstBestKey.woCompare(k);
-        if ( (c<0 && dir<0) || (c>0&&dir>0) ) {
+        int c = worstBestKey.woCompare(k, order.pattern);
+        if ( c > 0 ) {
             // k is better, 'upgrade'
             best.erase(i);
             _add(k, o);
@@ -87,16 +85,10 @@ class ScanAndOrder {
 
 public:
     ScanAndOrder(int _startFrom, int _limit, BSONObj _order) :
+            best( BSONObjCmp( _order ) ),
             startFrom(_startFrom), order(_order) {
         limit = _limit > 0 ? _limit + startFrom : 0x7fffffff;
         approxSize = 0;
-
-        // todo: do order right for compound keys.  this is temp.
-        dir = 1;
-        BSONElement e = order.pattern.firstElement();
-        if ( e.number() < 0 ) {
-            dir = -1;
-        }
     }
 
     int size() const {
@@ -112,21 +104,16 @@ public:
             return;
         }
         BestMap::iterator i;
-        if ( dir < 0 )
-            i = best.begin();
-        else {
-            assert( best.end() != best.begin() );
-            i = best.end();
-            i--;
-        }
+        assert( best.end() != best.begin() );
+        i = best.end();
+        i--;
         _addIfBetter(k, o, i);
     }
 
-    template<class T>
-    void _fill(BufBuilder& b, set<string> *filter, int& nout, T begin, T end) {
+    void _fill(BufBuilder& b, set<string> *filter, int& nout, BestMap::iterator begin, BestMap::iterator end) {
         int n = 0;
         int nFilled = 0;
-        for ( T i = begin; i != end; i++ ) {
+        for ( BestMap::iterator i = begin; i != end; i++ ) {
             n++;
             if ( n <= startFrom )
                 continue;
@@ -144,14 +131,7 @@ done:
 
     /* scanning complete. stick the query result in b for n objects. */
     void fill(BufBuilder& b, set<string> *filter, int& nout) {
-        //    for( BestMap::iterator i = best.begin(); i != best.end(); i++ )
-        //      cout << "  fill:" << i->first.toString() << endl;
-        //    for( BestMap::reverse_iterator i = best.rbegin(); i != best.rend(); i++ )
-        //      cout << "  fillr:" << i->first.toString() << endl;
-        if ( dir > 0 )
-            _fill(b, filter, nout, best.begin(), best.end());
-        else
-            _fill(b, filter, nout, best.rbegin(), best.rend());
+        _fill(b, filter, nout, best.begin(), best.end());
     }
 
 };

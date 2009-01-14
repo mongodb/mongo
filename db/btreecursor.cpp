@@ -29,6 +29,7 @@ DiskLoc minDiskLoc(0, 1);
 BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, BSONObj& _query) :
 //    query(_query),
         indexDetails(_id),
+        order(_id.keyPattern()),
         direction(_direction)
 {
 //otherTraceLevel = 999;
@@ -37,7 +38,7 @@ BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, BS
     if ( otherTraceLevel >= 12 ) {
         if ( otherTraceLevel >= 200 ) {
             cout << "::BtreeCursor() qtl>200.  validating entire index." << endl;
-            indexDetails.head.btree()->fullValidate(indexDetails.head);
+            indexDetails.head.btree()->fullValidate(indexDetails.head, order);
         }
         else {
             cout << "BTreeCursor(). dumping head bucket" << endl;
@@ -50,7 +51,7 @@ BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, BS
         startKey = k;
 
     bucket = indexDetails.head.btree()->
-             locate(indexDetails.head, startKey, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
+             locate(indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
 
     checkUnused();
 }
@@ -66,10 +67,8 @@ void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
     for ( set<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
         const char * field = i->c_str();
         BSONElement k = indexDetails.keyPattern().getFieldDotted( field );
-//		int number = (int) k.number(); // returns 0.0 if not numeric
-//		bool forward = ( ( number >= 0 ? 1 : -1 ) * direction > 0 );
-        // Temporary, until btree supports directional indexes.
-        bool forward = ( direction > 0 );
+		int number = (int) k.number(); // returns 0.0 if not numeric
+		bool forward = ( ( number >= 0 ? 1 : -1 ) * direction > 0 );
         BSONElement lowest = minKey.firstElement();
         BSONElement highest = maxKey.firstElement();
         BSONElement e = query.getFieldDotted( field );
@@ -156,7 +155,7 @@ int sgn( int i ) {
 void BtreeCursor::checkEnd() {
     if ( bucket.isNull() )
         return;
-    int cmp = sgn( endKey.woCompare( currKey() ) );
+    int cmp = sgn( endKey.woCompare( currKey(), order ) );
     if ( cmp != 0 && cmp != direction )
         bucket = DiskLoc();
 }
@@ -217,7 +216,7 @@ void BtreeCursor::checkLocation() {
     bool found;
 
     /* TODO: Switch to keep indexdetails and do idx.head! */
-    bucket = indexDetails.head.btree()->locate(indexDetails.head, keyAtKeyOfs, keyOfs, found, locAtKeyOfs, direction);
+    bucket = indexDetails.head.btree()->locate(indexDetails.head, keyAtKeyOfs, order, keyOfs, found, locAtKeyOfs, direction);
     RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
     if ( found )
         checkUnused();

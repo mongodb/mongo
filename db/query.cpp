@@ -44,6 +44,29 @@ extern bool useCursors;
 
 void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e);
 
+int matchDirection( const BSONObj &index, const BSONObj &sort ) {
+    int direction = 0;
+    BSONObjIterator i( index );
+    BSONObjIterator s( sort );
+    while( 1 ) {
+        BSONElement ie = i.next();
+        BSONElement se = s.next();
+        if ( ie.eoo() ) {
+            if ( !se.eoo() )
+                return 0;
+            return direction;
+        }
+        if ( strcmp( ie.fieldName(), se.fieldName() ) != 0 )
+            return 0;
+        
+        int d = ie.number() == se.number() ? 1 : -1;
+        if ( direction == 0 )
+            direction = d;
+        else if ( direction != d )
+            return 0;
+    }
+}
+
 /* todo: _ cache query plans
          _ use index on partial match with the query
 
@@ -76,24 +99,19 @@ auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, 
     }
 
     if ( !order.isEmpty() ) {
-        set<string> orderFields;
-        order.getFieldNames(orderFields);
         // order by
         for (int i = 0; i < d->nIndexes; i++ ) {
             BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
             assert( strcmp(ns, idxInfo.getStringField("ns")) == 0 );
             BSONObj idxKey = idxInfo.getObjectField("key");
-            set<string> keyFields;
-            idxKey.getFieldNames(keyFields);
-            if ( keyFields == orderFields ) {
-                bool reverse =
-                    order.firstElement().number() < 0;
+            int direction = matchDirection( idxKey, order );
+            if ( direction != 0 ) {
                 BSONObjBuilder b;
                 DEV cout << " using index " << d->indexes[i].indexNamespace() << '\n';
                 if ( isSorted )
                     *isSorted = true;
 
-                return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], BSONObj(), reverse ? -1 : 1, query));
+                return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], BSONObj(), direction, query));
             }
         }
     }
@@ -512,11 +530,11 @@ int runCount(const char *ns, BSONObj& cmd, string& err) {
                */
             int count = 0;
             BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
-            if ( c->ok() && !query.woCompare( bc->currKeyNode().key, false ) ) {
+            if ( c->ok() && !query.woCompare( bc->currKeyNode().key, BSONObj(), false ) ) {
                 BSONObj firstMatch = bc->currKeyNode().key;
                 count++;
                 while ( c->advance() ) {
-                    if ( firstMatch != bc->currKeyNode().key )
+                    if ( !firstMatch.woEqual( bc->currKeyNode().key ) )
                         break;
                     count++;
                 }

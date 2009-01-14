@@ -469,7 +469,7 @@ void IndexDetails::kill() {
    only when it's a "multikey" array.
    Keys will be left empty if key not found in the object.
 */
-void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) const {
+void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
     BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 }
     if ( keyPattern.objsize() == 0 ) {
         cout << keyPattern.toString() << endl;
@@ -543,7 +543,7 @@ void IndexDetails::getKeysFromObject( const BSONObj& obj, set<BSONObj>& keys) co
 int nUnindexes = 0;
 
 void _unindexRecord(const char *ns, IndexDetails& id, BSONObj& obj, const DiskLoc& dl) {
-    set<BSONObj> keys;
+    BSONObjSetDefaultOrder keys;
     id.getKeysFromObject(obj, keys);
     for ( set<BSONObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
         BSONObj j = *i;
@@ -640,15 +640,15 @@ void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& 
     }
 }
 
-void setDifference(set<BSONObj>& l, set<BSONObj>& r, vector<BSONObj*> &diff) {
-    set<BSONObj>::iterator i = l.begin();
-    set<BSONObj>::iterator j = r.begin();
+void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
+    BSONObjSetDefaultOrder::iterator i = l.begin();
+    BSONObjSetDefaultOrder::iterator j = r.begin();
     while ( 1 ) {
         if ( i == l.end() )
             break;
-        while ( j != r.end() && *j < *i )
+        while ( j != r.end() && j->woCompare( *i ) < 0 )
             j++;
-        if ( j == r.end() || !i->woEqual(*j) ) {
+        if ( j == r.end() || i->woCompare(*j) != 0  ) {
             const BSONObj *jo = &*i;
             diff.push_back( (BSONObj *) jo );
         }
@@ -694,8 +694,8 @@ void DataFileMgr::update(
                 IndexDetails& idx = d->indexes[i];
                 BSONObj idxKey = idx.info.obj().getObjectField("key");
 
-                set<BSONObj> oldkeys;
-                set<BSONObj> newkeys;
+                BSONObjSetDefaultOrder oldkeys;
+                BSONObjSetDefaultOrder newkeys;
                 idx.getKeysFromObject(oldObj, oldkeys);
                 idx.getKeysFromObject(newObj, newkeys);
                 vector<BSONObj*> removed;
@@ -717,7 +717,7 @@ void DataFileMgr::update(
                     try {
                         idx.head.btree()->insert(
                             idx.head,
-                            dl, *added[i], false, idx, true);
+                            dl, *added[i], idxKey, false, idx, true);
                     }
                     catch (AssertionException&) {
                         ss << " exception update index ";
@@ -750,13 +750,14 @@ int deb=0;
 /* add keys to indexes for a new record */
 void  _indexRecord(IndexDetails& idx, BSONObj& obj, DiskLoc newRecordLoc) {
 
-    set<BSONObj> keys;
+    BSONObjSetDefaultOrder keys;
     idx.getKeysFromObject(obj, keys);
+    BSONObj order = idx.keyPattern();
     for ( set<BSONObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
         assert( !newRecordLoc.isNull() );
         try {
             idx.head.btree()->insert(idx.head, newRecordLoc,
-                                     (BSONObj&) *i, false, idx, true);
+                                     (BSONObj&) *i, order, false, idx, true);
         }
         catch (AssertionException&) {
             problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;

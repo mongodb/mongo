@@ -546,23 +546,32 @@ bool BSONObj::valid() const {
 }
 
 /* well ordered compare */
-int BSONObj::woCompare(const BSONObj& r, bool considerFieldName) const {
+int BSONObj::woCompare(const BSONObj &r, const BSONObj &idxKey,
+                       bool considerFieldName) const {
     if ( isEmpty() )
         return r.isEmpty() ? 0 : -1;
     if ( r.isEmpty() )
         return 1;
 
+    bool ordered = !idxKey.isEmpty();
+    
     BSONObjIterator i(*this);
     BSONObjIterator j(r);
+    BSONObjIterator k(idxKey);
     while ( 1 ) {
         // so far, equal...
 
         BSONElement l = i.next();
         BSONElement r = j.next();
+        BSONElement o;
+        if ( ordered )
+            o = k.next();
         if ( l.eoo() )
             return 0;
 
         int x = l.woCompare( r, considerFieldName );
+        if ( ordered && o.number() < 0 )
+            x = -x;
         if ( x != 0 )
             return x;
     }
@@ -845,8 +854,8 @@ struct BsonUnitTest : public UnitTest {
         c.appendRegex("x", "goo");
         BSONObj p = c.done();
 
-        assert( o != p );
-        assert( o < p );
+        assert( !o.woEqual( p ) );
+        assert( o.woCompare( p ) < 0 );
     }
     void run() {
         testRegex();
@@ -857,7 +866,7 @@ struct BsonUnitTest : public UnitTest {
         BSONObj a = A.done();
         BSONObj b = B.done();
         BSONObj c = C.done();
-        assert( !(a==b) ); // comments on operator==
+        assert( !a.woEqual( b ) ); // comments on operator==
         int cmp = a.woCompare(b);
         assert( cmp == 0 );
         cmp = a.woCompare(c);

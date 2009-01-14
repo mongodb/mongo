@@ -158,7 +158,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
             ss << "  nIndexes:" << d->nIndexes << endl;
             for ( ; idxn < d->nIndexes; idxn++ ) {
                 ss << "    " << d->indexes[idxn].indexNamespace() << " keys:" <<
-                d->indexes[idxn].head.btree()->fullValidate(d->indexes[idxn].head) << endl;
+                d->indexes[idxn].head.btree()->fullValidate(d->indexes[idxn].head, d->indexes[idxn].keyPattern()) << endl;
             }
         }
         catch (...) {
