@@ -29,11 +29,6 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
 	    &page)) != 0)
 		return (ret);
 
-	__wt_set_ff_and_sa_from_addr(db, page, WT_PAGE_BYTE(page));
-
-	if (page->addr == 0)
-		__wt_bt_desc_init(db, page);
-
 	/*
 	 * Generally, the defaults values of 0 on page are correct; set
 	 * the fragment addresses to the "unset" value.
@@ -41,8 +36,84 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
 	hdr = page->hdr;
 	hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
 
+	/* Set the space-available and first-free byte. */
+	__wt_set_ff_and_sa_from_addr(db, page, WT_PAGE_BYTE(page));
+
+	/* If we're allocating page 0, initialize the WT_PAGE_DESC structure. */
+	if (page->addr == 0)
+		__wt_bt_desc_init(db, page);
+
 	*pagep = page;
 	return (0);
+}
+
+/*
+ * __wt_bt_page_in --
+ *	Read a btree page from the cache.
+ */
+int
+__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep)
+{
+	WT_PAGE *page;
+	int ret;
+
+	if ((ret = __wt_cache_db_in(db, addr, isleaf ?
+	    WT_FRAGS_PER_LEAF(db) : WT_FRAGS_PER_INTL(db), 0, &page)) != 0)
+		return (ret);
+
+	if (page->indx_count == 0 && (ret = __wt_bt_page_inmem(db, page)) != 0)
+		return (ret);
+
+	*pagep = page;
+	return (0);
+}
+
+/*
+ * __wt_bt_ovfl_in --
+ *	Read overflow fragments from the cache.
+ */
+int
+__wt_bt_ovfl_in(DB *db, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
+{
+	WT_PAGE *page;
+	int ret;
+
+	if ((ret = __wt_cache_db_in(
+	    db, addr, WT_OVFL_BYTES_TO_FRAGS(db, len), 0, &page)) != 0)
+		return (ret);
+
+	*pagep = page;
+	return (0);
+}
+
+/*
+ * __wt_bt_page_indx_clean --
+ *	Discard any in-memory allocated memory and reset the counters.
+ */
+void
+__wt_bt_page_indx_clean(ENV *env, WT_PAGE *page, int free_indx)
+{
+	WT_INDX *indx;
+	u_int32_t i;
+
+	/*
+	 * Release any allocated in-memory information, but keep the
+	 * in-memory array itself, unless it's too small for this page.
+	 */
+	if (F_ISSET(page, WT_ALLOCATED)) {
+		F_CLR(page, WT_ALLOCATED);
+		WT_INDX_FOREACH(page, indx, i) {
+			if (F_ISSET(indx, WT_ALLOCATED)) {
+				F_CLR(indx, WT_ALLOCATED);
+				__wt_free(env, indx->data);
+			}
+		}
+	}
+	memset(page->indx, 0, sizeof(WT_INDX) * page->indx_size);
+	page->indx_count = 0;
+
+	if (free_indx)
+		WT_FREE_AND_CLEAR(env, page->indx);
 }
 
 /*
@@ -55,24 +126,49 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE_HDR *hdr;
+	u_int32_t nindx;
 	int ret;
 
 	env = db->env;
 	idb = db->idb;
 	hdr = page->hdr;
+	ret = 0;
 
-	if ((ret = __wt_calloc(
-	    env, hdr->u.entries, sizeof(WT_INDX), &page->indx)) != 0)
-		return (ret);
-	page->indx_size = hdr->u.entries;
+	/* Figure out how many indexes we'll need for this page. */
+	switch (hdr->type) {
+	case WT_PAGE_INT:
+	case WT_PAGE_DUP_INT:
+		/*
+		 * Track the most indexes we find on an internal page in this
+		 * database, used if we allocate new internal pages.
+		 */
+		nindx = hdr->u.entries / 2;
+		if (idb->indx_size_hint < nindx)
+			idb->indx_size_hint = nindx;
+		break;
+	case WT_PAGE_LEAF:
+		nindx = hdr->u.entries / 2;
+		break;
+	case WT_PAGE_DUP_LEAF:
+		nindx = hdr->u.entries;
+		break;
+	}
 
 	/*
-	 * Keep a running track of the most indexes we find on a single
-	 * page in this database -- we use the hint if we allocate a new
-	 * internal page.
+	 * We may be passed a page with a too-small indx array -- in that case,
+	 * build one of the appropriate size.   We can simply free the indx
+	 * array, as any allocated memory in the array  will have have already
+	 * been freed.
 	 */
-	if (idb->indx_size_hint < page->indx_size)
-		idb->indx_size_hint = page->indx_size;
+	if (page->indx != NULL && page->indx_size < nindx)
+		WT_FREE_AND_CLEAR(env, page->indx);
+
+	if (page->indx == NULL) {
+		if ((ret =
+		    __wt_calloc(env, nindx, sizeof(WT_INDX), &page->indx)) != 0)
+			return (ret);
+		page->indx_size = nindx;
+	}
 
 	switch (hdr->type) {
 	case WT_PAGE_INT:
@@ -88,7 +184,6 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	}
 	return (ret);
 }
-
 
 /*
  * __wt_bt_page_inmem_append --
