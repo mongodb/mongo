@@ -139,7 +139,7 @@ bool _userCreateNS(const char *ns, BSONObj& j, string& err) {
     // $nExtents just for debug/testing.  We create '$nExtents' extents,
     // each of size 'size'.
     e = j.findElement( "$nExtents" );
-    int nExtents = e.number();
+    int nExtents = int( e.number() );
     if ( nExtents > 0 )
         for( int i = 0; i < nExtents; ++i ) {
             database->suitableFile(size)->newExtent( ns, size, newCapped );
@@ -219,7 +219,14 @@ void PhysicalDataFile::open( const char *filename, int minSize ) {
     }
 
     int size = defaultSize( filename );
-    for(; size < minSize; size *= 2 );
+    while( size < minSize ) {
+        if ( size < maxSize() / 2 )
+	    size *= 2;
+	else {
+	    size = maxSize();
+	    break;
+	}
+    }
     if ( size > maxSize() )
         size = maxSize();
 
