@@ -9,6 +9,8 @@ __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_bt_dump_debug(DB *db, char *ofile, FILE *fp);
 int
+__wt_bt_dump_ipage(DB *db, WT_PAGE *page, char *ofile, FILE *fp);
+int
 __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp);
 void
 __wt_bt_desc_init(DB *db, WT_PAGE *page);
@@ -48,6 +50,12 @@ int
 __wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
 int
 __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep);
+int
+__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep);
+int
+__wt_bt_ovfl_in(DB *db, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
+void
+__wt_bt_page_indx_clean(ENV *env, WT_PAGE *page, int free_indx);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
@@ -99,7 +107,7 @@ int
 __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep);
 int
 __wt_cache_db_in(DB *db,
-    u_int32_t addr, u_int32_t frags, WT_PAGE **pagep, u_int32_t flags);
+    u_int32_t addr, u_int32_t frags, u_int32_t flags, WT_PAGE **pagep);
 int
 __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags);
 int
@@ -116,7 +124,7 @@ int
 __wt_breakpoint(void);
 int
 __wt_env_destroy(ENV *env, u_int32_t flags);
-void
+int
 __wt_ienv_destroy(ENV *env, int refresh);
 int
 __wt_env_lockout_err(ENV *env);
