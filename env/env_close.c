@@ -16,22 +16,29 @@
 int
 __wt_env_close(ENV *env, u_int32_t flags)
 {
-	IENV *ienv;
-	int ret;
+	int ret, tret;
 
-	ienv = env->ienv;
+	ret = 0;
 
 	ENV_FLAG_CHK_NOTFATAL(
 	    env, "ENV.close", flags, WT_APIMASK_ENV_CLOSE, ret);
 
 	/* Destroy the cache. */
-	ret = __wt_cache_close(env);
+	if ((tret = __wt_cache_close(env)) != 0 && ret == 0)
+		ret = tret;
 
 	/* Re-cycle the underlying IENV structure. */
-	__wt_ienv_destroy(env, 1);
+	if ((tret = __wt_ienv_destroy(env, 1)) != 0 && ret == 0)
+		ret = tret;
 
-	/* Reset the methods that are permitted. */
-	__wt_env_config_methods(env);
+	/*
+	 * Reset the methods that are permitted.
+	 * If anything failed, we're done with this handle.
+	 */
+	if (ret == 0)
+		__wt_env_config_methods(env);
+	else
+		__wt_env_config_methods_lockout(env);
 
 	return (ret);
 }

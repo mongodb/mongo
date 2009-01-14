@@ -20,8 +20,6 @@ __wt_env_open(ENV *env, const char *home, mode_t mode, u_int32_t flags)
 
 	ENV_FLAG_CHK(env, "Env.open", flags, WT_APIMASK_ENV_OPEN);
 
-	TAILQ_INIT(&env->dbqh);
-
 	/* Turn on the methods that require open. */
 	__wt_env_config_methods_open(env);
 
