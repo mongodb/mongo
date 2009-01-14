@@ -52,11 +52,17 @@ extern "C" {
 #define	FLD_ISSET(field, mask)	((field) & (mask) ? 1 : 0)
 #define	FLD_SET(field, mask)	((field) |= (mask))
 
-/*
- * Clear a chunk of memory.
- */
+/* Clear a chunk of memory. */
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
+
+/* Free memory if set. */
+#define	WT_FREE_AND_CLEAR(env, p) do {					\
+	if ((p) != NULL) {						\
+		__wt_free(env, p);					\
+		(p) = NULL;						\
+	}								\
+} while (0)
 
 /* A distinguished byte pattern to overwrite memory we are done using. */
 #define	OVERWRITE_BYTE	0xab
