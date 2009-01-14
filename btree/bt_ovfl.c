@@ -55,8 +55,7 @@ __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 
 	/* Read in the overflow record. */
 
-	if ((ret =
-	    __wt_bt_ovfl_page_in(db, from->addr, from->len, ovfl_page)) != 0)
+	if ((ret = __wt_bt_ovfl_in(db, from->addr, from->len, &ovfl_page)) != 0)
 		return (ret);
 
 	/*
@@ -86,8 +85,7 @@ __wt_bt_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 	WT_PAGE *ovfl_page;
 	int ret, tret;
 
-	if ((ret =
-	    __wt_bt_ovfl_page_in(db, ovfl->addr, ovfl->len, ovfl_page)) != 0)
+	if ((ret = __wt_bt_ovfl_in(db, ovfl->addr, ovfl->len, &ovfl_page)) != 0)
 		return (ret);
 
 	ret = __wt_bt_data_copy_to_dbt(
@@ -112,8 +110,7 @@ __wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
 
 	env = db->env;
 
-	if ((ret =
-	    __wt_bt_ovfl_page_in(db, ip->addr, ip->size, ovfl_page)) != 0)
+	if ((ret = __wt_bt_ovfl_in(db, ip->addr, ip->size, &ovfl_page)) != 0)
 		return (ret);
 
 	if ((ret = __wt_realloc(env, ip->size, &ip->data)) != 0)
