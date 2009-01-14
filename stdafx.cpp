@@ -32,7 +32,6 @@ Assertion lastAssert[4];
 #include "db/lasterror.h"
 
 string getDbContext();
-void sayDbContext(const char *errmsg = 0);
 
 /* "warning" assert -- safe to continue, so we don't throw exception. */
 void wasserted(const char *msg, const char *file, unsigned line) {
@@ -80,3 +79,14 @@ string Assertion::toString() {
         ss << file << ' ' << line << '\n';
     return ss.str();
 }
+
+/* this is a good place to set a breakpoint when debugging, as lots of warning things
+   (assert, wassert) call it.
+*/
+void sayDbContext(const char *errmsg) {
+    if ( errmsg ) {
+        problem() << errmsg << endl;
+    }
+    printStackTrace();
+}
+
