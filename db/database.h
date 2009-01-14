@@ -28,7 +28,7 @@ class Database {
 public:
     Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
             name(nm),
-            path(_path) 
+            path(_path)
     {
         {
             int L = strlen(nm);

@@ -12,10 +12,10 @@ boost::thread_specific_ptr<AuthenticationInfo> authInfo;
 
 typedef unsigned long long nonce;
 
-struct Security { 
+struct Security {
     ifstream *devrandom;
 
-    nonce getNonce() { 
+    nonce getNonce() {
         nonce n;
 #if defined(__linux__)
         devrandom->read((char*)&n, sizeof(n));
@@ -27,14 +27,14 @@ struct Security {
     }
 
     Security()
-    { 
+    {
 #if defined(__linux__)
         devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
         massert( "can't open dev/urandom", devrandom->is_open() );
 #endif
         assert( sizeof(nonce) == 8 );
 
-        if( do_md5_test() )
+        if ( do_md5_test() )
             massert("md5 unit test fails", false);
     }
 } security;
@@ -46,10 +46,14 @@ struct Security {
 
 namespace mongo {
 
-class CmdGetNonce : public Command { 
+class CmdGetNonce : public Command {
 public:
-    virtual bool logTheOp() { return false; }
-    virtual bool slaveOk() { return true; }
+    virtual bool logTheOp() {
+        return false;
+    }
+    virtual bool slaveOk() {
+        return true;
+    }
     CmdGetNonce() : Command("getnonce") {}
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         result.append("nonce", (double) security.getNonce());
@@ -57,10 +61,14 @@ public:
     }
 } cmdGetNonce;
 
-class CmdAuthenticate : public Command { 
+class CmdAuthenticate : public Command {
 public:
-    virtual bool logTheOp() { return false; }
-    virtual bool slaveOk() { return true; }
+    virtual bool logTheOp() {
+        return false;
+    }
+    virtual bool slaveOk() {
+        return true;
+    }
     CmdAuthenticate() : Command("authenticate") {}
     bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         return false;

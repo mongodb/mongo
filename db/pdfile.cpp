@@ -101,7 +101,7 @@ bool _userCreateNS(const char *ns, BSONObj& j, string& err) {
         return false;
     }
 
-    if( verbose )
+    if ( verbose )
         log() << "create collection " << ns << ' ' << j.toString() << '\n';
 
     /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
@@ -127,17 +127,17 @@ bool _userCreateNS(const char *ns, BSONObj& j, string& err) {
             mx = (int) e.number();
         }
     }
-        
+
     // $nExtents just for debug/testing.  We create '$nExtents' extents,
     // each of size 'size'.
     e = j.findElement( "$nExtents" );
     int nExtents = int( e.number() );
     if ( nExtents > 0 )
-        for( int i = 0; i < nExtents; ++i ) {
+        for ( int i = 0; i < nExtents; ++i ) {
             database->suitableFile(size)->newExtent( ns, size, newCapped );
         }
     else
-        while( size > 0 ) {
+        while ( size > 0 ) {
             int max = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
             int desiredExtentSize = size > max ? max : size;
             Extent *e = database->suitableFile( desiredExtentSize )->newExtent( ns, desiredExtentSize, newCapped );
@@ -149,7 +149,7 @@ bool _userCreateNS(const char *ns, BSONObj& j, string& err) {
 
     if ( mx > 0 )
         d->max = mx;
-    
+
     return true;
 }
 
@@ -174,12 +174,12 @@ int PhysicalDataFile::maxSize() {
 
 int PhysicalDataFile::defaultSize( const char *filename ) const {
     int size;
-    
+
     if ( fileNo <= 4 )
         size = (64*1024*1024) << fileNo;
     else
         size = 0x7ff00000;
-        
+
     if ( strstr(filename, "_hudsonSmall") ) {
         int mult = 1;
         if ( fileNo > 1 && fileNo < 1000 )
@@ -211,13 +211,13 @@ void PhysicalDataFile::open( const char *filename, int minSize ) {
     }
 
     int size = defaultSize( filename );
-    while( size < minSize ) {
+    while ( size < minSize ) {
         if ( size < maxSize() / 2 )
-	    size *= 2;
-	else {
-	    size = maxSize();
-	    break;
-	}
+            size *= 2;
+        else {
+            size = maxSize();
+            break;
+        }
     }
     if ( size > maxSize() )
         size = maxSize();
@@ -812,7 +812,7 @@ void ensureHaveIdIndex(const char *ns) {
     theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
 }
 
-DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {    
+DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
     bool addIndex = false;
     const char *sys = strstr(ns, "system.");
     if ( sys ) {
@@ -1069,15 +1069,19 @@ boost::intmax_t dbSize( const char *database ) {
     class SizeAccumulator : public FileOp {
     public:
         SizeAccumulator() : totalSize_( 0 ) {}
-        boost::intmax_t size() const { return totalSize_; }
+        boost::intmax_t size() const {
+            return totalSize_;
+        }
     private:
         virtual bool apply( const boost::filesystem::path &p ) {
-            if( !boost::filesystem::exists( p ) )
+            if ( !boost::filesystem::exists( p ) )
                 return false;
             totalSize_ += boost::filesystem::file_size( p );
             return true;
         }
-        virtual const char *op() const { return "checking size"; }
+        virtual const char *op() const {
+            return "checking size";
+        }
         boost::intmax_t totalSize_;
     };
     SizeAccumulator sa;
@@ -1101,7 +1105,7 @@ boost::intmax_t freeSpace() {
 }
 
 bool repairDatabase( const char *ns, string &errmsg,
-                    bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
+                     bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
     stringstream ss;
     ss << "localhost:" << port;
     string localhost = ss.str();
@@ -1117,15 +1121,15 @@ bool repairDatabase( const char *ns, string &errmsg,
     if ( freeSize > -1 && freeSize < totalSize ) {
         stringstream ss;
         ss << "Cannot repair database " << dbName << " having size: " << totalSize
-           << " (bytes) because free disk space is: " << freeSize << " (bytes)";
+        << " (bytes) because free disk space is: " << freeSize << " (bytes)";
         errmsg = ss.str();
         problem() << errmsg << endl;
         return false;
     }
-    
+
     Path reservedPath =
         uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
-                           "backup" : "tmp" );
+                            "backup" : "tmp" );
     BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
     string reservedPathString = reservedPath.native_directory_string();
     assert( setClient( dbName, reservedPathString.c_str() ) );

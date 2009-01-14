@@ -7,11 +7,11 @@
 using namespace std;
 using namespace mongo;
 
-int main(){
+int main() {
 
     DBClientConnection conn;
     string errmsg;
-    if ( ! conn.connect( "127.0.0.1" , errmsg ) ){
+    if ( ! conn.connect( "127.0.0.1" , errmsg ) ) {
         cout << "couldn't connect : " << errmsg << endl;
         throw -11;
     }
@@ -19,13 +19,13 @@ int main(){
     const char * ns = "test.second";
 
     conn.remove( ns , emptyObj );
-    
+
     conn.insert( ns , BUILDOBJ( "name" << "eliot" << "num" << 17 ) );
     conn.insert( ns , BUILDOBJ( "name" << "sara" << "num" << 24 ) );
 
     auto_ptr<DBClientCursor> cursor = conn.query( ns , emptyObj );
     cout << "using cursor" << endl;
-    while ( cursor->more() ){    
+    while ( cursor->more() ) {
         BSONObj obj = cursor->next();
         cout << "\t" << obj.jsonString() << endl;
     }

@@ -323,7 +323,7 @@ inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
         return DiskLoc();
     return e->xprev.ext()->lastRecord;
 }
-            
+
 inline Record* DiskLoc::rec() const {
     return DataFileMgr::getRecord(*this);
 }
@@ -387,7 +387,7 @@ inline void _applyOpToDataFiles( const char *database, FileOp &fo, const char *p
         q = p / ss.str();
         BOOST_CHECK_EXCEPTION( ok = fo.apply(q) );
         if ( ok ) {
-            if( verbose || extra != 10 )
+            if ( verbose || extra != 10 )
                 log() << fo.op() << " file " << q.string() << '\n';
             if ( extra != 10 )
                 log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;

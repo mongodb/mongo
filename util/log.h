@@ -107,7 +107,9 @@ inline Logstream& log() {
     return logstream.prolog();
 }
 
-inline ostream& stdcout() { return cout; }
+inline ostream& stdcout() {
+    return cout;
+}
 
 #define cout logstream
 

@@ -146,7 +146,7 @@ public:
     PairSync() {
         initialsynccomplete = -1;
     }
-    
+
     /* call before using the class.  from dbmutex */
     void init() {
         BSONObj o;
@@ -154,17 +154,17 @@ public:
         if ( getSingleton("local.pair.sync", o) )
             initialsynccomplete = 1;
     }
-    
+
     bool initialSyncCompleted() {
         return initialsynccomplete != 0;
     }
-    
+
     void setInitialSyncCompleted() {
         BSONObj o = fromjson("{\"initialsynccomplete\":1}");
         putSingleton("local.pair.sync", o);
         initialsynccomplete = 1;
     }
-    
+
     void setInitialSyncCompletedLocking() {
         if ( initialsynccomplete == 1 )
             return;

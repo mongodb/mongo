@@ -51,41 +51,41 @@ bool MiniWebServer::init(int port) {
     return true;
 }
 
-string MiniWebServer::parseURL( const char * buf ){
+string MiniWebServer::parseURL( const char * buf ) {
     const char * urlStart = strstr( buf , " " );
     if ( ! urlStart )
         return "/";
-    
+
     urlStart++;
-    
+
     const char * end = strstr( urlStart , " " );
-    if ( ! end ){
+    if ( ! end ) {
         end = strstr( urlStart , "\r" );
-        if ( ! end ){
+        if ( ! end ) {
             end = strstr( urlStart , "\n" );
         }
     }
-    
-    if ( ! end ) 
+
+    if ( ! end )
         return "/";
-    
+
     int diff = (int)(end-urlStart);
     if ( diff < 0 || diff > 255 )
         return "/";
-    
+
     return string( urlStart , (int)(end-urlStart) );
 }
 
-void MiniWebServer::parseParams( map<string,string> & params , string query ){
+void MiniWebServer::parseParams( map<string,string> & params , string query ) {
     if ( query.size() == 0 )
         return;
-    
-    while ( query.size() ){
-        
+
+    while ( query.size() ) {
+
         string::size_type amp = query.find( "&" );
-        
+
         string cur;
-        if ( amp == string::npos ){
+        if ( amp == string::npos ) {
             cur = query;
             query = "";
         }
@@ -97,13 +97,13 @@ void MiniWebServer::parseParams( map<string,string> & params , string query ){
         string::size_type eq = cur.find( "=" );
         if ( eq == string::npos )
             continue;
-        
+
         params[cur.substr(0,eq)] = cur.substr(eq+1);
     }
     return;
 }
 
-string MiniWebServer::parseMethod( const char * headers ){
+string MiniWebServer::parseMethod( const char * headers ) {
     const char * end = strstr( headers , " " );
     if ( ! end )
         return "GET";
@@ -117,7 +117,7 @@ const char *MiniWebServer::body( const char *buf ) {
 
 bool MiniWebServer::fullReceive( const char *buf ) {
     const char *bod = body( buf );
-    if( !bod )
+    if ( !bod )
         return false;
     const char *lenString = "Content-Length:";
     const char *lengthLoc = strstr( buf, lenString );
@@ -133,7 +133,7 @@ bool MiniWebServer::fullReceive( const char *buf ) {
 void MiniWebServer::accepted(int s) {
     char buf[4096];
     int len = 0;
-    while( 1 ) {
+    while ( 1 ) {
         int x = ::recv(s, buf + len, sizeof(buf) - 1 - len, 0);
         if ( x <= 0 ) {
             return;
@@ -144,7 +144,7 @@ void MiniWebServer::accepted(int s) {
             break;
     }
     buf[len] = 0;
-    
+
     string responseMsg;
     int responseCode = 599;
     vector<string> headers;

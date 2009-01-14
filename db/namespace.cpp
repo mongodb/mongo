@@ -74,14 +74,14 @@ void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
     dassert( dloc.drec() == d );
     DEBUGGING cout << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
     if ( capped ) {
-        if( !deletedList[ 1 ].isValid() ) {
+        if ( !deletedList[ 1 ].isValid() ) {
             // Initial extent allocation.  Insert at end.
             d->nextDeleted = DiskLoc();
             if ( deletedList[ 0 ].isNull() )
                 deletedList[ 0 ] = dloc;
             else {
                 DiskLoc i = deletedList[ 0 ];
-                for(; !i.drec()->nextDeleted.isNull(); i = i.drec()->nextDeleted );
+                for (; !i.drec()->nextDeleted.isNull(); i = i.drec()->nextDeleted );
                 i.drec()->nextDeleted = dloc;
             }
         } else {
@@ -132,9 +132,9 @@ DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentL
     newDel->extentOfs = r->extentOfs;
     newDel->lengthWithHeaders = left;
     newDel->nextDeleted.Null();
-    
+
     addDeletedRec(newDel, newDelLoc);
-    
+
     return loc;
 }
 
@@ -241,15 +241,15 @@ void NamespaceDetails::dumpDeleted(set<DiskLoc> *extents) {
 */
 void NamespaceDetails::compact() {
     assert(capped);
-    
+
     list<DiskLoc> drecs;
 
     // Pull out capExtent's DRs from deletedList
     DiskLoc i = firstDeletedInCapExtent();
-    for(; !i.isNull() && inCapExtent( i ); i = i.drec()->nextDeleted )
+    for (; !i.isNull() && inCapExtent( i ); i = i.drec()->nextDeleted )
         drecs.push_back( i );
     firstDeletedInCapExtent() = i;
-    
+
     // This is the O(n^2) part.
     drecs.sort();
 
@@ -282,8 +282,8 @@ void NamespaceDetails::compact() {
 }
 
 DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {
-    for(DiskLoc i = startExtent.isNull() ? firstExtent : startExtent;
-        !i.isNull(); i = i.ext()->xnext ) {
+    for (DiskLoc i = startExtent.isNull() ? firstExtent : startExtent;
+            !i.isNull(); i = i.ext()->xnext ) {
         if ( !i.ext()->firstRecord.isNull() )
             return i.ext()->firstRecord;
     }
@@ -291,8 +291,8 @@ DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {
 }
 
 DiskLoc NamespaceDetails::lastRecord( const DiskLoc &startExtent ) const {
-    for(DiskLoc i = startExtent.isNull() ? lastExtent : startExtent;
-        !i.isNull(); i = i.ext()->xprev ) {
+    for (DiskLoc i = startExtent.isNull() ? lastExtent : startExtent;
+            !i.isNull(); i = i.ext()->xprev ) {
         if ( !i.ext()->lastRecord.isNull() )
             return i.ext()->lastRecord;
     }
@@ -327,7 +327,7 @@ void NamespaceDetails::advanceCapExtent( const char *ns ) {
         deletedList[ 1 ] = DiskLoc();
     else {
         DiskLoc i = firstDeletedInCapExtent();
-        for(; !i.isNull() && nextIsInCapExtent( i ); i = i.drec()->nextDeleted );
+        for (; !i.isNull() && nextIsInCapExtent( i ); i = i.drec()->nextDeleted );
         deletedList[ 1 ] = i;
     }
 
@@ -342,14 +342,14 @@ void NamespaceDetails::maybeComplain( const char *ns, int len ) const {
     if ( ++n_complaints_cap < 8 ) {
         cout << "couldn't make room for new record (len: " << len << ") in capped ns " << ns << '\n';
         int i = 0;
-        for( DiskLoc e = firstExtent; !e.isNull(); e = e.ext()->xnext, ++i ) {
+        for ( DiskLoc e = firstExtent; !e.isNull(); e = e.ext()->xnext, ++i ) {
             cout << "  Extent " << i;
             if ( e == capExtent )
                 cout << " (capExtent)";
             cout << '\n';
             cout << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->ns.buf << '\n';
             cout << "    fr: " << e.ext()->firstRecord.toString() <<
-                    " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
+                 " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
         }
         assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
     }
@@ -359,7 +359,7 @@ DiskLoc NamespaceDetails::__capAlloc( int len ) {
     DiskLoc prev = deletedList[ 1 ];
     DiskLoc i = firstDeletedInCapExtent();
     DiskLoc ret;
-    for(; !i.isNull() && inCapExtent( i ); prev = i, i = i.drec()->nextDeleted ) {
+    for (; !i.isNull() && inCapExtent( i ); prev = i, i = i.drec()->nextDeleted ) {
         // We need to keep at least one DR per extent in deletedList[ 0 ],
         // so make sure there's space to create a DR at the end.
         if ( i.drec()->lengthWithHeaders >= len + 24 ) {
@@ -367,7 +367,7 @@ DiskLoc NamespaceDetails::__capAlloc( int len ) {
             break;
         }
     }
-    
+
     /* unlink ourself from the deleted list */
     if ( !ret.isNull() ) {
         if ( prev.isNull() )
@@ -387,21 +387,21 @@ void NamespaceDetails::checkMigrate() {
         capFirstNewRecord = DiskLoc();
         capFirstNewRecord.setInvalid();
         // put all the DeletedRecords in deletedList[ 0 ]
-        for( int i = 1; i < Buckets; ++i ) {
+        for ( int i = 1; i < Buckets; ++i ) {
             DiskLoc first = deletedList[ i ];
             if ( first.isNull() )
                 continue;
             DiskLoc last = first;
-            for(; !last.drec()->nextDeleted.isNull(); last = last.drec()->nextDeleted );
+            for (; !last.drec()->nextDeleted.isNull(); last = last.drec()->nextDeleted );
             last.drec()->nextDeleted = deletedList[ 0 ];
             deletedList[ 0 ] = first;
             deletedList[ i ] = DiskLoc();
         }
         // NOTE deletedList[ 1 ] set to DiskLoc() in above
-        
+
         // Last, in case we're killed before getting here
         capExtent = firstExtent;
-    }    
+    }
 }
 
 /* alloc with capped table handling. */
@@ -410,7 +410,7 @@ DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
         return __stdAlloc(len);
 
     // capped.
-    
+
     // signal done allocating new extents.
     if ( !deletedList[ 1 ].isValid() )
         deletedList[ 1 ] = DiskLoc();
@@ -438,15 +438,15 @@ DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
             // else signal done with first iteration through extents.
             continue;
         }
-        
+
         if ( !capFirstNewRecord.isNull() &&
-            theCapExtent()->firstRecord == capFirstNewRecord ) {
+                theCapExtent()->firstRecord == capFirstNewRecord ) {
             // We've deleted all records that were allocated on the previous
             // iteration through this extent.
             advanceCapExtent( ns );
             continue;
         }
-        
+
         if ( theCapExtent()->firstRecord.isNull() ) {
             if ( firstEmptyExtent.isNull() )
                 firstEmptyExtent = capExtent;
@@ -519,7 +519,7 @@ void NamespaceDetailsTransient::computeIndexKeys() {
    options: { capped : ..., size : ... }
 */
 void addNewNamespaceToCatalog(const char *ns, BSONObj *options = 0) {
-    if( verbose )
+    if ( verbose )
         log() << "New namespace: " << ns << '\n';
     if ( strstr(ns, "system.namespaces") ) {
         // system.namespaces holds all the others, so it is not explicitly listed in the catalog.

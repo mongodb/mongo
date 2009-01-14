@@ -77,7 +77,7 @@ public:
         s.width( 8 );
         s << b;
         s << dec;
-        return s.str();        
+        return s.str();
     }
 };
 ostream& operator<<( ostream &s, const OID &o );
@@ -108,8 +108,8 @@ ostream& operator<<( ostream &s, const OID &o );
 */
 
 /* Formatting mode for generating a JSON from the 10gen representation.
-     Strict - strict RFC format 
-	 TenGen - 10gen format, which is close to JS format.  This form is understandable by 
+     Strict - strict RFC format
+	 TenGen - 10gen format, which is close to JS format.  This form is understandable by
  	          javascript running inside the Mongo server via eval()
      JS     - Javascript JSON compatible
  */
@@ -120,7 +120,7 @@ enum JsonStringFormat { Strict, TenGen, JS };
 /* BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
    'a : 3' is the first element (key+value).
 
-   The BSONElement object points into the BSONObj's data.  Thus the BSONObj must stay in scope 
+   The BSONElement object points into the BSONObj's data.  Thus the BSONObj must stay in scope
    for the life of the BSONElement.
 
    <type><fieldName    ><value>
@@ -328,10 +328,10 @@ public:
 
     // Readable representation of a 10gen object.
     string toString() const;
-    
+
     // Properly formatted JSON string.
     string jsonString( JsonStringFormat format = Strict ) const;
-    
+
     /* note: addFields always adds _id even if not specified */
     int addFields(BSONObj& from, set<string>& fields); /* returns n added */
 
@@ -353,7 +353,7 @@ public:
     BSONElement getFieldDottedOrArray(const char *&name) const;
 
     BSONElement getField(const string name) const {
-      return getField( name.c_str() );
+        return getField( name.c_str() );
     };
     BSONElement getField(const char *name) const; /* return has eoo() true if no match */
 
@@ -514,7 +514,7 @@ typedef set< BSONObj, BSONObjCmpDefaultOrder > BSONObjSetDefaultOrder;
 class BSONObjBuilderValueStream {
 public:
     BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder );
-    
+
     BSONObjBuilder& operator<<( const char * value );
     BSONObjBuilder& operator<<( const int value );
     BSONObjBuilder& operator<<( const double value );
@@ -551,10 +551,10 @@ public:
         b.append(fieldName);
         b.append((void *) subObj.objdata(), subObj.objsize());
     }
-    
-	/* add a subobject as a member with type Array.  Thus arr object should have "0", "1", ... 
-	   style fields in it.
-	*/
+
+    /* add a subobject as a member with type Array.  Thus arr object should have "0", "1", ...
+       style fields in it.
+    */
     void appendArray(const char *fieldName, BSONObj subObj) {
         b.append((char) Array);
         b.append(fieldName);
@@ -649,7 +649,7 @@ public:
         b.append( (char) type );
         b.append( (void *) data, len );
     }
-    
+
     template < class T >
     void append( const char *fieldName, const vector< T >& vals ) {
         BSONObjBuilder arrBuilder;
@@ -697,15 +697,15 @@ public:
         return o.str();
     }
 
-    BSONObjBuilderValueStream operator<<(const char * name ){
+    BSONObjBuilderValueStream operator<<(const char * name ) {
         return BSONObjBuilderValueStream( name , this );
     }
 
-    BSONObjBuilderValueStream operator<<( string name ){
+    BSONObjBuilderValueStream operator<<( string name ) {
         return BSONObjBuilderValueStream( name.c_str() , this );
     }
 
-        
+
 private:
     // Append the provided arr object as an array.
     void marshalArray( const char *fieldName, const BSONObj &arr ) {

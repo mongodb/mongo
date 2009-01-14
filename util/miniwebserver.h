@@ -48,7 +48,7 @@ protected:
 private:
     void accepted(int s);
     static bool fullReceive( const char *buf );
-    
+
     int sock;
 };
 

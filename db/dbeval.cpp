@@ -38,13 +38,18 @@ const int edebug=0;
 bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg) {
     BSONElement e = cmd.firstElement();
     assert( e.type() == Code || e.type() == CodeWScope || e.type() == String );
-    
+
     const char *code = 0;
-    switch ( e.type() ){
-    case String: 
-    case Code: code = e.valuestr(); break;
-    case CodeWScope: code = e.codeWScopeCode(); break;
-    default: assert(0);
+    switch ( e.type() ) {
+    case String:
+    case Code:
+        code = e.valuestr();
+        break;
+    case CodeWScope:
+        code = e.codeWScopeCode();
+        break;
+    default:
+        assert(0);
     }
     assert( code );
 
@@ -80,7 +85,7 @@ bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg
         res = s.invoke(f);
         int m = t.millis();
         if ( m > 100 ) {
-   	    stdcout() << "TEMP: dbeval too slow:" << endl;
+            stdcout() << "TEMP: dbeval too slow:" << endl;
             problem() << "dbeval time: " << dec << m << "ms " << ns << endl;
             OCCASIONALLY log() << code << endl;
             else if ( m >= 1000 ) log() << code << endl;
@@ -92,7 +97,7 @@ bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg
         errmsg += s.getString( "error" );
         return false;
     }
-    
+
     int type = s.type("return");
     if ( type == Object || type == Array )
         result.append("retval", s.getObject("return"));

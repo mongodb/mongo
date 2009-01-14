@@ -137,7 +137,7 @@ bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bo
         dbtemprelease r;
         if ( !masterSameProcess ) {
             auto_ptr< DBClientConnection > c( new DBClientConnection() );
-            if( !c->connect( masterHost, errmsg ) )
+            if ( !c->connect( masterHost, errmsg ) )
                 return false;
             conn = c;
         } else {

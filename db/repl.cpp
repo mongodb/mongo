@@ -122,7 +122,7 @@ void ReplPair::arbitrate() {
         return;
     }
 
-	/* todo: make an arbitrate command we send to the arbiter instead of this */
+    /* todo: make an arbitrate command we send to the arbiter instead of this */
     bool is_master;
     bool ok = conn->isMaster(is_master);
     if ( !ok ) {
@@ -584,12 +584,12 @@ void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
 
     dblock lk;
     bool justCreated;
-    try { 
-      justCreated = setClientTempNs(ns);
-    } catch( AssertionException& ) { 
-      problem() << "skipping bad(?) op in oplog, setClient() failed, ns: '" << ns << "'\n";
-      addDbNextPass.erase(clientName);
-      return;
+    try {
+        justCreated = setClientTempNs(ns);
+    } catch ( AssertionException& ) {
+        problem() << "skipping bad(?) op in oplog, setClient() failed, ns: '" << ns << "'\n";
+        addDbNextPass.erase(clientName);
+        return;
     }
 
     if ( allDead ) {
@@ -1138,7 +1138,7 @@ void startReplication() {
        */
     //boost::thread tempt(tempThread);
 
-    if( !slave && !master && !replPair )
+    if ( !slave && !master && !replPair )
         return;
 
     {

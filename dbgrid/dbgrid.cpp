@@ -150,21 +150,21 @@ int main(int argc, char* argv[], char *envp[] ) {
         if ( s == "--port" ) {
             port = atoi(argv[++i]);
         }
-        else if( s == "--infer" ) { 
+        else if ( s == "--infer" ) {
             dashDashInfer = true;
         }
         else if ( s == "--griddb" ) {
             assert( !dashDashInfer );
             int n = 0;
-            while( ++i < argc ) {
+            while ( ++i < argc ) {
                 dashDashGridDb.push_back(argv[i]);
                 n++;
             }
-            if( n == 0 ) {
+            if ( n == 0 ) {
                 cout << "error: no args for --griddb\n";
                 return 4;
             }
-            if( n > 2 ) { 
+            if ( n > 2 ) {
                 cout << "error: --griddb does not support more than 2 parameters yet\n";
                 return 5;
             }

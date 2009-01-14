@@ -22,14 +22,14 @@
 
 namespace mongo {
 
-class AuthenticationInfo : boost::noncopyable { 
+class AuthenticationInfo : boost::noncopyable {
 public:
     AuthenticationInfo() { }
-    ~AuthenticationInfo() { 
+    ~AuthenticationInfo() {
 //        cout << "TEMP: auth info was cleaned up ********************************************" << endl;
     }
 };
 
 extern boost::thread_specific_ptr<AuthenticationInfo> authInfo;
 
-  } // namespace mongo
+} // namespace mongo

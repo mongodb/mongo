@@ -181,9 +181,10 @@ void* MemoryMappedFile::map(const char *filename, int length) {
         }
         // Check for end of disk.
         lseek(fd, length - 1, SEEK_SET);
-        write(fd, "", 1);        
+        write(fd, "", 1);
         Logstream &l = log();
-        l << "new datafile " << filename << " filling with zeroes..."; l.flush();
+        l << "new datafile " << filename << " filling with zeroes...";
+        l.flush();
         Timer t;
         int z = 8192;
         char buf[z];

@@ -114,182 +114,182 @@ string BSONElement::toString() const {
 
 string escape( string s ) {
     stringstream ret;
-    for( string::iterator i = s.begin(); i != s.end(); ++i ) {
-        switch( *i ) {
-            case '"':
-                ret << "\\\"";
-                break;
-            case '\\':
-                ret << "\\\\";
-                break;
-            case '/':
-                ret << "\\/";
-                break;
-            case '\b':
-                ret << "\\b";
-                break;
-            case '\f':
-                ret << "\\f";
-                break;
-            case '\n':
-                ret << "\\n";
-                break;
-            case '\r':
-                ret << "\\r";
-                break;
-            case '\t':
-                ret << "\\t";
-                break;
-            default:
-                if ( *i >= 0 && *i <= 0x1f ) {
-                    ret << "\\u";
-                    ret << hex;
-                    ret.width( 4 );
-                    ret.fill( '0' );
-                    ret << int( *i );
-                } else {
-                    ret << *i;
-                }
+    for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
+        switch ( *i ) {
+        case '"':
+            ret << "\\\"";
+            break;
+        case '\\':
+            ret << "\\\\";
+            break;
+        case '/':
+            ret << "\\/";
+            break;
+        case '\b':
+            ret << "\\b";
+            break;
+        case '\f':
+            ret << "\\f";
+            break;
+        case '\n':
+            ret << "\\n";
+            break;
+        case '\r':
+            ret << "\\r";
+            break;
+        case '\t':
+            ret << "\\t";
+            break;
+        default:
+            if ( *i >= 0 && *i <= 0x1f ) {
+                ret << "\\u";
+                ret << hex;
+                ret.width( 4 );
+                ret.fill( '0' );
+                ret << int( *i );
+            } else {
+                ret << *i;
+            }
         }
     }
     return ret.str();
 }
 
 typedef boost::archive::iterators::base64_from_binary
-    < boost::archive::iterators::transform_width
-    < string::const_iterator, 6, 8 >
-    > base64_t;
+< boost::archive::iterators::transform_width
+< string::const_iterator, 6, 8 >
+> base64_t;
 
 string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
     stringstream s;
     if ( includeFieldNames )
-        s << '"' << escape( fieldName() ) << "\" : ";    
+        s << '"' << escape( fieldName() ) << "\" : ";
     switch ( type() ) {
-        case String:
-        case Symbol:
-            s << '"' << escape( valuestr() ) << '"';
-            break;
-        case NumberInt:
-        case NumberDouble:
-            if ( number() >= -numeric_limits< double >::max() &&
+    case String:
+    case Symbol:
+        s << '"' << escape( valuestr() ) << '"';
+        break;
+    case NumberInt:
+    case NumberDouble:
+        if ( number() >= -numeric_limits< double >::max() &&
                 number() <= numeric_limits< double >::max() ) {
-                s.precision( 16 );
-                s << number();
-            } else {
-                stringstream ss;
-                ss << "Number " << number() << " cannot be represented in JSON";
-                string message = ss.str();
-                massert( message.c_str(), false );
-            }
-            break;
-        case Bool:
-            s << ( boolean() ? "true" : "false" );
-            break;
-        case jstNULL:
-            s << "null";
-            break;
-        case Object:
-            s << embeddedObject().jsonString( format );
-            break;
-        case Array: {
-            if ( embeddedObject().isEmpty() ) {
-                s << "[]";
-                break;
-            }
-            s << "[ ";
-            BSONObjIterator i( embeddedObject() );
-            BSONElement e = i.next();
-            if ( !e.eoo() )
-                while ( 1 ) {
-                    s << e.jsonString( format, false );
-                    e = i.next();
-                    if ( e.eoo() )
-                        break;
-                    s << ", ";
-                }
-            s << " ]";
-            break;
-        }
-        case DBRef: {
-            OID *x = (OID *) (valuestr() + valuestrsize());
-            if ( format == TenGen )
-                s << "Dbref( ";
-            else
-                s << "{ \"$ns\" : ";
-            s << '"' << valuestr() << "\", ";
-            if ( format != TenGen )
-                s << "\"$id\" : ";
-            s << '"' << *x << "\" ";
-            if ( format == TenGen )
-                s << ')';
-            else
-                s << '}';
-            break;
-        }
-        case jstOID:
-            if ( format == TenGen )
-                s << "ObjectId( ";
-            s << '"' << oid() << '"';
-            if ( format == TenGen )
-                s << " )";
-            break;
-        case BinData: {
-            int len = *(int *)( value() );
-            BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
-            s << "{ \"$binary\" : \"";
-            char *start = ( char * )( value() ) + sizeof( int ) + 1;
-            string temp(start, len);
-            string base64 = string( base64_t( temp.begin() ), base64_t( temp.end() ) );
-            s << base64;
-            int padding = ( 4 - ( base64.length() % 4 ) ) % 4;
-            for( int i = 0; i < padding; ++i )
-                s << '=';
-            s << "\", \"$type\" : \"" << hex;
-            s.width( 2 );
-            s.fill( '0' );
-            s << type << dec;
-            s << "\" }";
-            break;
-        }
-        case Date:
-            if ( format == Strict )
-                s << "{ \"$date\" : ";
-            else
-                s << "Date( ";
-            s << date();
-            if ( format == Strict )
-                s << " }";
-            else
-                s << " )";
-            break;
-        case RegEx:
-            if ( format == Strict )
-                s << "{ \"$regex\" : \"";
-            else
-                s << "/";
-            s << escape( regex() );
-            if ( format == Strict )
-                s << "\", \"$options\" : \"" << regexFlags() << "\" }";
-            else {
-                s << "/";
-                // FIXME Worry about alpha order?
-                for( const char *f = regexFlags(); *f; ++f )
-                    switch( *f ) {
-                        case 'g':
-                        case 'i':
-                        case 'm':
-                            s << *f;
-                        default:
-                            break;
-                    }
-            }
-            break;
-        default:
+            s.precision( 16 );
+            s << number();
+        } else {
             stringstream ss;
-            ss << "Cannot create a properly formatted JSON string with "
-	       << "element: " << toString() << " of type: " << type();
+            ss << "Number " << number() << " cannot be represented in JSON";
             string message = ss.str();
             massert( message.c_str(), false );
+        }
+        break;
+    case Bool:
+        s << ( boolean() ? "true" : "false" );
+        break;
+    case jstNULL:
+        s << "null";
+        break;
+    case Object:
+        s << embeddedObject().jsonString( format );
+        break;
+    case Array: {
+        if ( embeddedObject().isEmpty() ) {
+            s << "[]";
+            break;
+        }
+        s << "[ ";
+        BSONObjIterator i( embeddedObject() );
+        BSONElement e = i.next();
+        if ( !e.eoo() )
+            while ( 1 ) {
+                s << e.jsonString( format, false );
+                e = i.next();
+                if ( e.eoo() )
+                    break;
+                s << ", ";
+            }
+        s << " ]";
+        break;
+    }
+    case DBRef: {
+        OID *x = (OID *) (valuestr() + valuestrsize());
+        if ( format == TenGen )
+            s << "Dbref( ";
+        else
+            s << "{ \"$ns\" : ";
+        s << '"' << valuestr() << "\", ";
+        if ( format != TenGen )
+            s << "\"$id\" : ";
+        s << '"' << *x << "\" ";
+        if ( format == TenGen )
+            s << ')';
+        else
+            s << '}';
+        break;
+    }
+    case jstOID:
+        if ( format == TenGen )
+            s << "ObjectId( ";
+        s << '"' << oid() << '"';
+        if ( format == TenGen )
+            s << " )";
+        break;
+    case BinData: {
+        int len = *(int *)( value() );
+        BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
+        s << "{ \"$binary\" : \"";
+        char *start = ( char * )( value() ) + sizeof( int ) + 1;
+        string temp(start, len);
+        string base64 = string( base64_t( temp.begin() ), base64_t( temp.end() ) );
+        s << base64;
+        int padding = ( 4 - ( base64.length() % 4 ) ) % 4;
+        for ( int i = 0; i < padding; ++i )
+            s << '=';
+        s << "\", \"$type\" : \"" << hex;
+        s.width( 2 );
+        s.fill( '0' );
+        s << type << dec;
+        s << "\" }";
+        break;
+    }
+    case Date:
+        if ( format == Strict )
+            s << "{ \"$date\" : ";
+        else
+            s << "Date( ";
+        s << date();
+        if ( format == Strict )
+            s << " }";
+        else
+            s << " )";
+        break;
+    case RegEx:
+        if ( format == Strict )
+            s << "{ \"$regex\" : \"";
+        else
+            s << "/";
+        s << escape( regex() );
+        if ( format == Strict )
+            s << "\", \"$options\" : \"" << regexFlags() << "\" }";
+        else {
+            s << "/";
+            // FIXME Worry about alpha order?
+            for ( const char *f = regexFlags(); *f; ++f )
+                switch ( *f ) {
+                case 'g':
+                case 'i':
+                case 'm':
+                    s << *f;
+                default:
+                    break;
+                }
+        }
+        break;
+    default:
+        stringstream ss;
+        ss << "Cannot create a properly formatted JSON string with "
+        << "element: " << toString() << " of type: " << type();
+        string message = ss.str();
+        massert( message.c_str(), false );
     }
     return s.str();
 }
@@ -518,7 +518,7 @@ string BSONObj::toString() const {
 
 string BSONObj::jsonString( JsonStringFormat format ) const {
     if ( isEmpty() ) return "{}";
-    
+
     stringstream s;
     s << "{ ";
     BSONObjIterator i(*this);
@@ -555,7 +555,7 @@ int BSONObj::woCompare(const BSONObj &r, const BSONObj &idxKey,
         return 1;
 
     bool ordered = !idxKey.isEmpty();
-    
+
     BSONObjIterator i(*this);
     BSONObjIterator j(r);
     BSONObjIterator k(idxKey);
@@ -878,22 +878,22 @@ struct BsonUnitTest : public UnitTest {
 
 
 
-BSONObjBuilderValueStream::BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder ){
+BSONObjBuilderValueStream::BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder ) {
     _fieldName = fieldName;
     _builder = builder;
 }
-    
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const char * value ){
+
+BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const char * value ) {
     _builder->append( _fieldName , value );
     return *_builder;
 }
 
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const int value ){
+BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const int value ) {
     _builder->appendInt( _fieldName , value );
     return *_builder;
 }
 
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const double value ){
+BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const double value ) {
     _builder->append( _fieldName , value );
     return *_builder;
 }

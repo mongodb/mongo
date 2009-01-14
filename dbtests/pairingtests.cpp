@@ -298,8 +298,12 @@ public:
     }
 private:
     class NegateCatchup : public DirectDBClientConnection::ConnectionCallback {
-        virtual void beforeCommand() { Base::flipSync(); }
-        virtual void afterCommand() { Base::flipSync(); }
+        virtual void beforeCommand() {
+            Base::flipSync();
+        }
+        virtual void afterCommand() {
+            Base::flipSync();
+        }
     };
     virtual DirectDBClientConnection::ConnectionCallback *cc() {
         return &cc_;

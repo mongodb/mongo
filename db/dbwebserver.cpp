@@ -162,13 +162,13 @@ public:
     )
     {
         //cout << "url [" << url << "]" << endl;
-        
-        if ( url.size() > 1 ){
+
+        if ( url.size() > 1 ) {
             handleRESTRequest( rq , url , responseMsg , responseCode , headers );
             return;
         }
-            
-        
+
+
         responseCode = 200;
         stringstream ss;
         ss << "<html><head><title>";
@@ -204,33 +204,33 @@ public:
         ss << "</pre></body></html>";
         responseMsg = ss.str();
     }
-    
+
     void handleRESTRequest( const char *rq, // the full request
                             string url,
                             string& responseMsg,
                             int& responseCode,
                             vector<string>& headers // if completely empty, content-type: text/html will be added
-                            ){
-        
+                          ) {
+
         string::size_type first = url.find( "/" , 1 );
-        if ( first == string::npos ){
+        if ( first == string::npos ) {
             responseCode = 400;
             return;
         }
-        
+
         string method = parseMethod( rq );
         string dbname = url.substr( 1 , first - 1 );
         string coll = url.substr( first + 1 );
         string action = "";
-        
+
         map<string,string> params;
-        if ( coll.find( "?" ) != string::npos ){
+        if ( coll.find( "?" ) != string::npos ) {
             parseParams( params , coll.substr( coll.find( "?" ) + 1 ) );
             coll = coll.substr( 0 , coll.find( "?" ) );
         }
-        
-        string::size_type last = coll.find_last_of( "/" );            
-        if ( last == string::npos ){
+
+        string::size_type last = coll.find_last_of( "/" );
+        if ( last == string::npos ) {
             action = coll;
             coll = "_defaultCollection";
         }
@@ -238,24 +238,24 @@ public:
             action = coll.substr( last + 1 );
             coll = coll.substr( 0 , last );
         }
-        
+
         for ( string::size_type i=0; i<coll.size(); i++ )
             if ( coll[i] == '/' )
                 coll[i] = '.';
-        
+
         string fullns = dbname + "." + coll;
-        
+
         headers.push_back( (string)"x-action: " + action );
         headers.push_back( (string)"x-ns: " + fullns );
         headers.push_back( "Content-Type: text/plain;charset=utf-8" );
-        
+
         stringstream ss;
-        
-        if ( method == "GET" ){
+
+        if ( method == "GET" ) {
             responseCode = 200;
             handleRESTQuery( fullns , action , params , responseCode , ss  );
         }
-        else if ( method == "POST" ){
+        else if ( method == "POST" ) {
             responseCode = 201;
             handlePost( fullns , body( rq ) , params , responseCode , ss  );
         }
@@ -265,47 +265,47 @@ public:
             ss << "don't know how to handle a [" << method << "]";
             cout << "don't know how to handle a [" << method << "]" << endl;
         }
-        
+
         responseMsg = ss.str();
     }
 
-    void handleRESTQuery( string ns , string action , map<string,string> & params , int & responseCode , stringstream & out ){
+    void handleRESTQuery( string ns , string action , map<string,string> & params , int & responseCode , stringstream & out ) {
         Timer t;
-        
+
         int skip = _getOption( params["skip"] , 0 );
         int num = _getOption( params["limit"] , _getOption( params["count" ] , 1000 ) ); // count is old, limit is new
 
         int one = 0;
-        if ( params["one"].size() > 0 && tolower( params["one"][0] ) == 't' ){
+        if ( params["one"].size() > 0 && tolower( params["one"][0] ) == 't' ) {
             num = 1;
             one = 1;
         }
-        
+
         BSONObjBuilder queryBuilder;
-        
-        for ( map<string,string>::iterator i = params.begin(); i != params.end(); i++ ){
+
+        for ( map<string,string>::iterator i = params.begin(); i != params.end(); i++ ) {
             if ( ! i->first.find( "filter_" ) == 0 )
                 continue;
-            
+
             const char * field = i->first.substr( 7 ).c_str();
             const char * val = i->second.c_str();
 
             char * temp;
-            
+
             // TODO: this is how i guess if something is a number.  pretty lame right now
             double number = strtod( val , &temp );
             if ( temp != val )
                 queryBuilder.append( field , number );
-            else 
+            else
                 queryBuilder.append( field , val );
         }
 
         BSONObj query = queryBuilder.doneAndDecouple();
 
         auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
-        
-        if ( one ){
-            if ( cursor->more() ){
+
+        if ( one ) {
+            if ( cursor->more() ) {
                 BSONObj obj = cursor->next();
                 out << obj.jsonString() << "\n";
             }
@@ -318,17 +318,17 @@ public:
         out << "{\n";
         out << "  \"offset\" : " << skip << ",\n";
         out << "  \"rows\": [\n";
-        
+
         int howMany = 0;
-        while ( cursor->more() ){
+        while ( cursor->more() ) {
             if ( howMany++ )
                 out << " ,\n";
             BSONObj obj = cursor->next();
             out << "    " << obj.jsonString();
-            
+
         }
         out << "\n  ]\n\n";
-        
+
         out << "  \"total_rows\" : " << howMany << " ,\n";
         out << "  \"query\" : " << query.jsonString() << " ,\n";
         out << "  \"millis\" : " << t.millis() << " ,\n";
@@ -336,7 +336,7 @@ public:
     }
 
     // TODO Generate id and revision per couch POST spec
-    void handlePost( string ns, const char *body, map<string,string> & params, int & responseCode, stringstream & out ){
+    void handlePost( string ns, const char *body, map<string,string> & params, int & responseCode, stringstream & out ) {
         try {
             BSONObj obj = fromjson( body );
             db.insert( ns.c_str(), obj );
@@ -345,17 +345,17 @@ public:
             out << "{ \"ok\" : false }";
             return;
         }
-        
+
         responseCode = 201;
         out << "{ \"ok\" : true }";
     }
 
-    int _getOption( string val , int def ){
+    int _getOption( string val , int def ) {
         if ( val.size() == 0 )
             return def;
         return atoi( val.c_str() );
     }
-    
+
 private:
     static DBDirectClient db;
 };

@@ -162,8 +162,8 @@ inline void replyToQuery(int queryResultFlags,
                          BSONObj& responseObj)
 {
     replyToQuery(queryResultFlags,
-        p, requestMsg,
-        (void *) responseObj.objdata(), responseObj.objsize(), 1);
+                 p, requestMsg,
+                 (void *) responseObj.objdata(), responseObj.objsize(), 1);
 }
 
 } // namespace mongo

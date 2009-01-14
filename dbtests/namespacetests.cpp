@@ -91,7 +91,7 @@ protected:
     static void assertEquals( const BSONObj &a, const BSONObj &b ) {
         if ( a.woCompare( b ) != 0 ) {
             cout << "expected: " << a.toString()
-                << ", got: " << b.toString() << endl;
+                 << ", got: " << b.toString() << endl;
         }
         ASSERT( a.woCompare( b ) == 0 );
     }
@@ -366,7 +366,7 @@ private:
         return aDotB();
     }
 };
-    
+
 // TODO
 // array subelement complex
 // parallel arrays complex
@@ -376,168 +376,170 @@ private:
 
 namespace NamespaceDetailsTests {
 
-    class Base {
-    public:
-        Base( const char *ns = "foo" ) : ns_( ns ) {}
-        ~Base() {
-            if ( !nsd() )
-                return;
-            string s( ns() );
-            dropNS( s );
-        }
-    protected:
-        void create() {
-            dblock lk;
-            setClient( ns() );
-            string err;
-            ASSERT( userCreateNS( ns(), fromjson( spec() ), err, false ) );
-        }
-        virtual string spec() const {
-            return "{\"capped\":true,\"size\":512}";
-        }
-        int nRecords() const {
-            int count = 0;
-            for( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext )
-                for( DiskLoc j = i.ext()->firstRecord; !j.isNull();
+class Base {
+public:
+    Base( const char *ns = "foo" ) : ns_( ns ) {}
+    ~Base() {
+        if ( !nsd() )
+            return;
+        string s( ns() );
+        dropNS( s );
+    }
+protected:
+    void create() {
+        dblock lk;
+        setClient( ns() );
+        string err;
+        ASSERT( userCreateNS( ns(), fromjson( spec() ), err, false ) );
+    }
+    virtual string spec() const {
+        return "{\"capped\":true,\"size\":512}";
+    }
+    int nRecords() const {
+        int count = 0;
+        for ( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext )
+            for ( DiskLoc j = i.ext()->firstRecord; !j.isNull();
                     j.setOfs( j.a(), j.rec()->nextOfs ) ) {
-                    ++count;
-                }
-            ASSERT_EQUALS( count, nsd()->nrecords );
-            return count;
-        }
-        int nExtents() const {
-            int count = 0;
-            for( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext )
                 ++count;
-            return count;            
-        }
-        static int min( int a, int b ) {
-            return a < b ? a : b;
-        }
-        const char *ns() const { return ns_; }
-        NamespaceDetails *nsd() const {
-            return nsdetails( ns() );
-        }
-    private:
-        const char *ns_;
-    };
-    
-    class Create : public Base {
-    public:
-        void run() {
-            create();
-            ASSERT( nsd() );
-            ASSERT_EQUALS( 0, nRecords() );
-            ASSERT( nsd()->firstExtent == nsd()->capExtent );
-            DiskLoc initial = DiskLoc();
-            initial.setInvalid();
-            ASSERT( initial == nsd()->capFirstNewRecord );
-        }
-    };
-    
-    class SingleAlloc : public Base {
-    public:
-        void run() {
-            create();
-            char ch[ 200 ];
-            memset( ch, 0, 200 );
-            ASSERT( !theDataFileMgr.insert( ns(), ch, 200 ).isNull() );
-            ASSERT_EQUALS( 1, nRecords() );
-        }
-    };
-    
-    class Realloc : public Base {
-    public:
-        void run() {
-            create();
-            char ch[ 200 ];
-            
-            DiskLoc l[ 6 ];
-            for( int i = 0; i < 6; ++i ) {
-                l[ i ] = theDataFileMgr.insert( ns(), ch, 200 );
-                ASSERT( !l[ i ].isNull() );
-                ASSERT_EQUALS( 1 + i % 2, nRecords() );
-                if ( i > 1 )
-                    ASSERT( l[ i ] == l[ i - 2 ] );
             }
-        }
-    };
-    
-    class TwoExtent : public Base {
-    public:
-        void run() {
-            create();
-            ASSERT_EQUALS( 2, nExtents() );
-            char ch[ 200 ];
-            
-            DiskLoc l[ 8 ];
-            for( int i = 0; i < 8; ++i ) {
-                l[ i ] = theDataFileMgr.insert( ns(), ch, 200 );
-                ASSERT( !l[ i ].isNull() );
-                ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
-                if ( i > 3 )
-                    ASSERT( l[ i ] == l[ i - 4 ] );
-            }
-            
-            // Too big
-            char ch2[ 800 ];
-            ASSERT( theDataFileMgr.insert( ns(), ch2, 800 ).isNull() );
-            ASSERT_EQUALS( 0, nRecords() );
-        }
-    private:
-        virtual string spec() const {
-            return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
-        }        
-    };
-    
-    class Migrate : public Base {
-    public:
-        void run() {
-            create();
-            nsd()->deletedList[ 2 ] = nsd()->deletedList[ 0 ].drec()->nextDeleted.drec()->nextDeleted;
-            nsd()->deletedList[ 0 ].drec()->nextDeleted.drec()->nextDeleted = DiskLoc();
-            NamespaceDetails *d = nsd();
-            zero( &d->capExtent );
-            zero( &d->capFirstNewRecord );
-            
-            nsd();
-            
-            ASSERT( nsd()->firstExtent == nsd()->capExtent );
-            ASSERT( nsd()->capExtent.getOfs() != 0 );
-            ASSERT( !nsd()->capFirstNewRecord.isValid() );
-            int nDeleted = 0;
-            for( DiskLoc i = nsd()->deletedList[ 0 ]; !i.isNull(); i = i.drec()->nextDeleted, ++nDeleted );
-            ASSERT_EQUALS( 10, nDeleted );
-            ASSERT( nsd()->deletedList[ 1 ].isNull() );
-        }
-    private:
-        static void zero( DiskLoc *d ) {
-            memset( d, 0, sizeof( DiskLoc ) );
-        }
-        virtual string spec() const {
-            return "{\"capped\":true,\"size\":512,\"$nExtents\":10}";
-        }        
-    };
+        ASSERT_EQUALS( count, nsd()->nrecords );
+        return count;
+    }
+    int nExtents() const {
+        int count = 0;
+        for ( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext )
+            ++count;
+        return count;
+    }
+    static int min( int a, int b ) {
+        return a < b ? a : b;
+    }
+    const char *ns() const {
+        return ns_;
+    }
+    NamespaceDetails *nsd() const {
+        return nsdetails( ns() );
+    }
+private:
+    const char *ns_;
+};
 
-    class BigCollection : public Base {
-    public:
-        BigCollection() : Base( "NamespaceDetailsTests_BigCollection" ) {}
-        void run() {
-            create();
-            ASSERT_EQUALS( 2, nExtents() );
+class Create : public Base {
+public:
+    void run() {
+        create();
+        ASSERT( nsd() );
+        ASSERT_EQUALS( 0, nRecords() );
+        ASSERT( nsd()->firstExtent == nsd()->capExtent );
+        DiskLoc initial = DiskLoc();
+        initial.setInvalid();
+        ASSERT( initial == nsd()->capFirstNewRecord );
+    }
+};
+
+class SingleAlloc : public Base {
+public:
+    void run() {
+        create();
+        char ch[ 200 ];
+        memset( ch, 0, 200 );
+        ASSERT( !theDataFileMgr.insert( ns(), ch, 200 ).isNull() );
+        ASSERT_EQUALS( 1, nRecords() );
+    }
+};
+
+class Realloc : public Base {
+public:
+    void run() {
+        create();
+        char ch[ 200 ];
+
+        DiskLoc l[ 6 ];
+        for ( int i = 0; i < 6; ++i ) {
+            l[ i ] = theDataFileMgr.insert( ns(), ch, 200 );
+            ASSERT( !l[ i ].isNull() );
+            ASSERT_EQUALS( 1 + i % 2, nRecords() );
+            if ( i > 1 )
+                ASSERT( l[ i ] == l[ i - 2 ] );
         }
-    private:
-        virtual string spec() const {
-            // NOTE 256 added to size in _userCreateNS()
-            long long big = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
-            stringstream ss;
-            ss << "{\"capped\":true,\"size\":" << big << "}";
-            return ss.str();
-        }        
-    };
-    
+    }
+};
+
+class TwoExtent : public Base {
+public:
+    void run() {
+        create();
+        ASSERT_EQUALS( 2, nExtents() );
+        char ch[ 200 ];
+
+        DiskLoc l[ 8 ];
+        for ( int i = 0; i < 8; ++i ) {
+            l[ i ] = theDataFileMgr.insert( ns(), ch, 200 );
+            ASSERT( !l[ i ].isNull() );
+            ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+            if ( i > 3 )
+                ASSERT( l[ i ] == l[ i - 4 ] );
+        }
+
+        // Too big
+        char ch2[ 800 ];
+        ASSERT( theDataFileMgr.insert( ns(), ch2, 800 ).isNull() );
+        ASSERT_EQUALS( 0, nRecords() );
+    }
+private:
+    virtual string spec() const {
+        return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
+    }
+};
+
+class Migrate : public Base {
+public:
+    void run() {
+        create();
+        nsd()->deletedList[ 2 ] = nsd()->deletedList[ 0 ].drec()->nextDeleted.drec()->nextDeleted;
+        nsd()->deletedList[ 0 ].drec()->nextDeleted.drec()->nextDeleted = DiskLoc();
+        NamespaceDetails *d = nsd();
+        zero( &d->capExtent );
+        zero( &d->capFirstNewRecord );
+
+        nsd();
+
+        ASSERT( nsd()->firstExtent == nsd()->capExtent );
+        ASSERT( nsd()->capExtent.getOfs() != 0 );
+        ASSERT( !nsd()->capFirstNewRecord.isValid() );
+        int nDeleted = 0;
+        for ( DiskLoc i = nsd()->deletedList[ 0 ]; !i.isNull(); i = i.drec()->nextDeleted, ++nDeleted );
+        ASSERT_EQUALS( 10, nDeleted );
+        ASSERT( nsd()->deletedList[ 1 ].isNull() );
+    }
+private:
+    static void zero( DiskLoc *d ) {
+        memset( d, 0, sizeof( DiskLoc ) );
+    }
+    virtual string spec() const {
+        return "{\"capped\":true,\"size\":512,\"$nExtents\":10}";
+    }
+};
+
+class BigCollection : public Base {
+public:
+    BigCollection() : Base( "NamespaceDetailsTests_BigCollection" ) {}
+    void run() {
+        create();
+        ASSERT_EQUALS( 2, nExtents() );
+    }
+private:
+    virtual string spec() const {
+        // NOTE 256 added to size in _userCreateNS()
+        long long big = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
+        stringstream ss;
+        ss << "{\"capped\":true,\"size\":" << big << "}";
+        return ss.str();
+    }
+};
+
 } // namespace NamespaceDetailsTests
-    
+
 class All : public UnitTest::Suite {
 public:
     All() {
@@ -556,7 +558,7 @@ public:
         add< NamespaceDetailsTests::Create >();
         add< NamespaceDetailsTests::SingleAlloc >();
         add< NamespaceDetailsTests::Realloc >();
-        add< NamespaceDetailsTests::TwoExtent >();        
+        add< NamespaceDetailsTests::TwoExtent >();
         add< NamespaceDetailsTests::Migrate >();
         add< NamespaceDetailsTests::BigCollection >();
     }

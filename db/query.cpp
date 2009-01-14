@@ -50,7 +50,7 @@ int matchDirection( const BSONObj &index, const BSONObj &sort ) {
     int direction = 0;
     BSONObjIterator i( index );
     BSONObjIterator s( sort );
-    while( 1 ) {
+    while ( 1 ) {
         BSONElement ie = i.next();
         BSONElement se = s.next();
         if ( ie.eoo() ) {
@@ -60,7 +60,7 @@ int matchDirection( const BSONObj &index, const BSONObj &sort ) {
         }
         if ( strcmp( ie.fieldName(), se.fieldName() ) != 0 )
             return 0;
-        
+
         int d = ie.number() == se.number() ? 1 : -1;
         if ( direction == 0 )
             direction = d;
@@ -274,7 +274,7 @@ int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
             c->checkLocation();
         }
     }
-    
+
     return nDeleted;
 }
 

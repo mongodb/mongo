@@ -34,11 +34,11 @@ string ourHostname;
 extern vector<string> dashDashGridDb;
 extern bool dashDashInfer;
 
-GridDatabase::GridDatabase() { 
+GridDatabase::GridDatabase() {
     conn = 0;
 }
 
-GridDatabase::~GridDatabase() { 
+GridDatabase::~GridDatabase() {
     delete conn;
     conn = 0; // defensive
 }
@@ -70,7 +70,7 @@ void GridDatabase::init() {
     string hostLeft, hostRight;
 
     if ( dashDashGridDb.empty() ) {
-        if( !dashDashInfer ) { 
+        if ( !dashDashInfer ) {
             cout << "--griddb or --infer required\n";
             exit(7);
         }
@@ -91,7 +91,7 @@ void GridDatabase::init() {
         sl << ":" << Port;
         left = sl.str();
 
-        if( dashDashGridDb.size() > 1 ) {
+        if ( dashDashGridDb.size() > 1 ) {
             sr << dashDashGridDb[1];
             hostRight = sr.str();
             sr << ":" << Port;
@@ -123,15 +123,17 @@ void GridDatabase::init() {
     l << "connecting to griddb ";
 
     bool ok;
-    if( !hostRight.empty() ) { 
+    if ( !hostRight.empty() ) {
         // connect in paired mode
-        l << "L:" << left << " R:" << right << "..."; l.flush();
+        l << "L:" << left << " R:" << right << "...";
+        l.flush();
         DBClientPaired *dbp = new DBClientPaired();
         conn = dbp;
         ok = dbp->connect(left.c_str(),right.c_str());
     }
-    else { 
-        l << left << "..."; l.flush();
+    else {
+        l << left << "...";
+        l.flush();
         DBClientConnection *dcc = new DBClientConnection(/*autoreconnect=*/true);
         conn = dcc;
         string errmsg;

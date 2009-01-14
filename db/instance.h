@@ -93,10 +93,12 @@ void getDatabaseNames( vector< string > &names );
 // --- local client ---
 
 class DBDirectClient : public DBClientBase {
-    virtual string toString() { return "DBDirectClient"; }
+    virtual string toString() {
+        return "DBDirectClient";
+    }
     virtual bool call( Message &toSend, Message &response, bool assertOk=true );
     virtual void say( Message &toSend );
-    virtual void sayPiggyBack( Message &toSend ){
+    virtual void sayPiggyBack( Message &toSend ) {
         // don't need to piggy back when connected locally
         return say( toSend );
     }

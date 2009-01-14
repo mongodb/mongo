@@ -115,50 +115,50 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath) {
     _jvm = 0;
     _mainEnv = 0;
     _dbhook = 0;
-    
+
     stringstream ss;
     string edTemp;
-            
+
     const char * ed = 0;
     ss << "-Djava.class.path=.";
-        
-    if ( appserverPath ){
+
+    if ( appserverPath ) {
         ed = findEd(appserverPath);
         assert( ed );
 
         ss << SYSTEM_COLON << ed << "/build/";
-        
+
         _addClassPath( ed , ss , "include" );
         _addClassPath( ed , ss , "include/jython/" );
         _addClassPath( ed , ss , "include/jython/javalib" );
     }
     else {
 
-      
+
         const char * jars = findJars();
         _addClassPath( jars , ss , "jars" );
-        
+
         edTemp += (string)jars + "/jars/babble.jar";
         ed = edTemp.c_str();
 
 #if !defined(_WIN32)
         const char * otherEd = findEd();
-        if ( otherEd ){
+        if ( otherEd ) {
             log() << "found ed as well" << endl;
             ed = otherEd;
 
             ss << SYSTEM_COLON << ed << "/build/";
-            
+
             _addClassPath( ed , ss , "include" );
             _addClassPath( ed , ss , "include/jython/" );
-            _addClassPath( ed , ss , "include/jython/javalib" );            
+            _addClassPath( ed , ss , "include/jython/javalib" );
         }
-            
+
 #endif
     }
 
 
-    
+
 #if defined(_WIN32)
     ss << SYSTEM_COLON << "C:\\Program Files\\Java\\jdk\\lib\\tools.jar";
 #else
@@ -217,13 +217,13 @@ JavaJSImpl::JavaJSImpl(const char *appserverPath) {
     _envs->reset( _mainEnv );
 
     _dbhook = findClass( "ed/db/JSHook" );
-    if ( _dbhook == 0 ){
+    if ( _dbhook == 0 ) {
         log() << "using classpath: " << q << endl;
         printException();
     }
     jassert( _dbhook );
 
-    if ( ed ){
+    if ( ed ) {
         jmethodID init = _mainEnv->GetStaticMethodID( _dbhook ,  "init" , "(Ljava/lang/String;)V" );
         jassert( init );
         _mainEnv->CallStaticVoidMethod( _dbhook , init , _getEnv()->NewStringUTF( ed ) );
@@ -562,14 +562,14 @@ const char * findEd() {
 #endif
 };
 
-const char * findJars(){
+const char * findJars() {
 
     static list<const char*> possible;
     if ( ! possible.size() ) {
         possible.push_back( "./" );
         possible.push_back( "../" );
     }
-    
+
     for ( list<const char*>::iterator i = possible.begin() ; i != possible.end(); i++ ) {
         const char * temp = *i;
         const string jarDir = ((string)temp) + "jars/";
@@ -610,7 +610,7 @@ JNIEXPORT jint JNICALL java_native_call(JNIEnv * env , jclass, jobject outBuffer
 
     jniCallback( out , in );
     curNs = 0;
-        
+
     JNI_DEBUG( "in.data : " << in.data );
     if ( in.data && in.data->len > 0 ) {
         JNI_DEBUG( "copying data of len :" << in.data->len );

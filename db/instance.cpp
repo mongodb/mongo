@@ -488,14 +488,14 @@ void jniCallback(Message& m, Message& out)
 void getDatabaseNames( vector< string > &names ) {
     boost::filesystem::path path( dbpath );
     for ( boost::filesystem::directory_iterator i( path );
-         i != boost::filesystem::directory_iterator(); ++i ) {
+            i != boost::filesystem::directory_iterator(); ++i ) {
         string fileName = i->leaf();
         if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
             names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
     }
 }
 
-bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ){
+bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
     DbResponse dbResponse;
     assembleResponse( toSend, dbResponse );
     assert( dbResponse.response );
@@ -505,7 +505,7 @@ bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ){
 
 void DBDirectClient::say( Message &toSend ) {
     DbResponse dbResponse;
-    assembleResponse( toSend, dbResponse );    
+    assembleResponse( toSend, dbResponse );
 }
 
 /* not using log() herein in case we are called from segvhandler and we were already locked */

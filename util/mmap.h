@@ -35,15 +35,15 @@ public:
     void* map(const char *filename, int length);
 
     void flush(bool sync);
-    
+
     void* viewOfs() {
         return view;
     }
 
-    int length(){
-      return len;
+    int length() {
+        return len;
     }
-    
+
     void updateLength( const char *filename, int &length ) const;
 
 private:

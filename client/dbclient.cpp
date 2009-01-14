@@ -29,138 +29,143 @@ namespace mongo {
 
 /* --- dbclientcommands --- */
 
-inline bool DBClientWithCommands::isOk(const BSONObj& o) { 
-	return o.getIntField("ok") == 1;
+inline bool DBClientWithCommands::isOk(const BSONObj& o) {
+    return o.getIntField("ok") == 1;
 }
 
-inline bool DBClientWithCommands::runCommand(const char *dbname, BSONObj cmd, BSONObj &info) { 
-	string ns = string(dbname) + ".$cmd";
+inline bool DBClientWithCommands::runCommand(const char *dbname, BSONObj cmd, BSONObj &info) {
+    string ns = string(dbname) + ".$cmd";
     info = findOne(ns.c_str(), cmd);
-	return isOk(info);
+    return isOk(info);
 }
 
-/* note - we build a bson obj here -- for something that is super common like getlasterror you 
+/* note - we build a bson obj here -- for something that is super common like getlasterror you
           should have that object prebuilt as that would be faster.
 */
-bool DBClientWithCommands::simpleCommand(const char *dbname, BSONObj *info, const char *command) { 
-	BSONObj o;
-	if( info == 0 )
-		info = &o;
-	BSONObjBuilder b;
-	b.appendInt(command, 1);
-	return runCommand(dbname, b.done(), *info);
+bool DBClientWithCommands::simpleCommand(const char *dbname, BSONObj *info, const char *command) {
+    BSONObj o;
+    if ( info == 0 )
+        info = &o;
+    BSONObjBuilder b;
+    b.appendInt(command, 1);
+    return runCommand(dbname, b.done(), *info);
 }
 
 BSONObj ismastercmdobj = fromjson("{\"ismaster\":1}");
 
 bool DBClientWithCommands::isMaster(bool& isMaster, BSONObj *info) {
-	BSONObj o;	if( info == 0 )	info = &o;
-	bool ok = runCommand("admin", ismastercmdobj, *info);
+    BSONObj o;
+    if ( info == 0 )	info = &o;
+    bool ok = runCommand("admin", ismastercmdobj, *info);
     isMaster = (info->getIntField("ismaster") == 1);
-	return ok;
+    return ok;
 }
 
-bool DBClientWithCommands::createCollection(const char *ns, unsigned size, bool capped, int max, BSONObj *info) { 
-	BSONObj o;	if( info == 0 )	info = &o;
-	BSONObjBuilder b;
-	b.append("create", ns);
-	if( size ) b.append("size", size);
-	if( capped ) b.append("capped", true);
-	if( max ) b.append("max", max);
-	string db = nsToClient(ns);
-	return runCommand(db.c_str(), b.done(), *info);
+bool DBClientWithCommands::createCollection(const char *ns, unsigned size, bool capped, int max, BSONObj *info) {
+    BSONObj o;
+    if ( info == 0 )	info = &o;
+    BSONObjBuilder b;
+    b.append("create", ns);
+    if ( size ) b.append("size", size);
+    if ( capped ) b.append("capped", true);
+    if ( max ) b.append("max", max);
+    string db = nsToClient(ns);
+    return runCommand(db.c_str(), b.done(), *info);
 }
 
-bool DBClientWithCommands::copyDatabase(const char *fromdb, const char *todb, const char *fromhost, BSONObj *info) { 
-	assert( *fromdb && *todb );
-	BSONObj o; if( info == 0 ) info = &o;
-	BSONObjBuilder b;
-	b.append("copydb", 1);
-	b.append("fromhost", fromhost);
-	b.append("fromdb", fromdb);
-	b.append("todb", todb);
-	return runCommand("admin", b.done(), *info);
+bool DBClientWithCommands::copyDatabase(const char *fromdb, const char *todb, const char *fromhost, BSONObj *info) {
+    assert( *fromdb && *todb );
+    BSONObj o;
+    if ( info == 0 ) info = &o;
+    BSONObjBuilder b;
+    b.append("copydb", 1);
+    b.append("fromhost", fromhost);
+    b.append("fromdb", fromdb);
+    b.append("todb", todb);
+    return runCommand("admin", b.done(), *info);
 }
 
-bool DBClientWithCommands::setDbProfilingLevel(const char *dbname, ProfilingLevel level, BSONObj *info ) { 
-	BSONObj o; if( info == 0 ) info = &o;
+bool DBClientWithCommands::setDbProfilingLevel(const char *dbname, ProfilingLevel level, BSONObj *info ) {
+    BSONObj o;
+    if ( info == 0 ) info = &o;
 
-    if( level ) {
-        // Create system.profile collection.  If it already exists this does nothing.  
-		// TODO: move this into the db instead of here so that all 
-		//       drivers don't have to do this.
-		string ns = string(dbname) + ".system.profile";
-		createCollection(ns.c_str(), 1024 * 1024, true, 0, info);
+    if ( level ) {
+        // Create system.profile collection.  If it already exists this does nothing.
+        // TODO: move this into the db instead of here so that all
+        //       drivers don't have to do this.
+        string ns = string(dbname) + ".system.profile";
+        createCollection(ns.c_str(), 1024 * 1024, true, 0, info);
     }
 
-	BSONObjBuilder b;
-	b.append("profile", (int) level);
-	return runCommand(dbname, b.done(), *info);
+    BSONObjBuilder b;
+    b.append("profile", (int) level);
+    return runCommand(dbname, b.done(), *info);
 }
 
 BSONObj getprofilingcmdobj = fromjson("{\"profile\":-1}");
 
-bool DBClientWithCommands::getDbProfilingLevel(const char *dbname, ProfilingLevel& level, BSONObj *info) { 
-	BSONObj o; if( info == 0 ) info = &o;
-	if( runCommand(dbname, getprofilingcmdobj, *info) ) { 
-		level = (ProfilingLevel) info->getIntField("was");
-		return true;
-	}
-	return false;
+bool DBClientWithCommands::getDbProfilingLevel(const char *dbname, ProfilingLevel& level, BSONObj *info) {
+    BSONObj o;
+    if ( info == 0 ) info = &o;
+    if ( runCommand(dbname, getprofilingcmdobj, *info) ) {
+        level = (ProfilingLevel) info->getIntField("was");
+        return true;
+    }
+    return false;
 }
 
-bool DBClientWithCommands::eval(const char *dbname, const char *jscode, BSONObj& info, BSONElement& retValue, BSONObj *args) { 
-	BSONObjBuilder b;
-	b.appendCode("$eval", jscode);
-	if( args ) 
-		b.appendArray("args", *args);
-	bool ok = runCommand(dbname, b.done(), info);
-	if( ok ) 
-		retValue = info.getField("retval");
-	return ok;
+bool DBClientWithCommands::eval(const char *dbname, const char *jscode, BSONObj& info, BSONElement& retValue, BSONObj *args) {
+    BSONObjBuilder b;
+    b.appendCode("$eval", jscode);
+    if ( args )
+        b.appendArray("args", *args);
+    bool ok = runCommand(dbname, b.done(), info);
+    if ( ok )
+        retValue = info.getField("retval");
+    return ok;
 }
 
-bool DBClientWithCommands::eval(const char *dbname, const char *jscode) { 
-	BSONObj info;
-	BSONElement retValue;
-	return eval(dbname, jscode, info, retValue);
+bool DBClientWithCommands::eval(const char *dbname, const char *jscode) {
+    BSONObj info;
+    BSONElement retValue;
+    return eval(dbname, jscode, info, retValue);
 }
 
 /* TODO: unit tests should run this? */
-void testDbEval() { 
-	DBClientConnection c;
-	string err;
-	if( !c.connect("localhost", err) ) { 
-		cout << "can't connect to server " << err << endl;
-		return;
-	}
-	BSONObj info;
-	BSONElement retValue;
-	BSONObjBuilder b;
-	b.append("0", 99);
-	BSONObj args = b.done();
-	bool ok = c.eval("dwight", "function() { return args[0]; }", info, retValue, &args);
-	cout << "eval ok=" << ok << endl;
-	cout << "retvalue=" << retValue.toString() << endl;
-	cout << "info=" << info.toString() << endl;
+void testDbEval() {
+    DBClientConnection c;
+    string err;
+    if ( !c.connect("localhost", err) ) {
+        cout << "can't connect to server " << err << endl;
+        return;
+    }
+    BSONObj info;
+    BSONElement retValue;
+    BSONObjBuilder b;
+    b.append("0", 99);
+    BSONObj args = b.done();
+    bool ok = c.eval("dwight", "function() { return args[0]; }", info, retValue, &args);
+    cout << "eval ok=" << ok << endl;
+    cout << "retvalue=" << retValue.toString() << endl;
+    cout << "info=" << info.toString() << endl;
 
-	cout << endl;
+    cout << endl;
 
-	int x = 3;
-	assert( c.eval("dwight", "function() { return 3; }", x) );
+    int x = 3;
+    assert( c.eval("dwight", "function() { return 3; }", x) );
 
-	cout << "***\n";
+    cout << "***\n";
 
-	BSONObj foo = fromjson("{\"x\":7}");
-	cout << foo.toString() << endl;
-	int res=0;
-	ok = c.eval("dwight", "function(parm1) { return parm1.x; }", foo, res);
-	cout << ok << " retval:" << res << endl;
+    BSONObj foo = fromjson("{\"x\":7}");
+    cout << foo.toString() << endl;
+    int res=0;
+    ok = c.eval("dwight", "function(parm1) { return parm1.x; }", foo, res);
+    cout << ok << " retval:" << res << endl;
 }
 
-int test2() { 
-	testDbEval();
-	return 0;
+int test2() {
+    testDbEval();
+    return 0;
 }
 
 /* --- dbclientconnection --- */
@@ -240,90 +245,90 @@ auto_ptr<DBClientCursor> DBClientBase::query(const char *ns, BSONObj query, int 
     return auto_ptr< DBClientCursor >( 0 );
 }
 
-void DBClientBase::insert( const char * ns , BSONObj obj ){
+void DBClientBase::insert( const char * ns , BSONObj obj ) {
     Message toSend;
-    
+
     BufBuilder b;
     int opts = 0;
     b.append( opts );
     b.append( ns );
     obj.appendSelfToBufBuilder( b );
-    
+
     toSend.setData( dbInsert , b.buf() , b.len() );
 
     say( toSend );
 }
 
-void DBClientBase::remove( const char * ns , BSONObj obj , bool justOne ){
+void DBClientBase::remove( const char * ns , BSONObj obj , bool justOne ) {
     Message toSend;
-    
+
     BufBuilder b;
     int opts = 0;
     b.append( opts );
     b.append( ns );
-    
+
     int flags = 0;
     if ( justOne || obj.hasField( "_id" ) )
         flags &= 1;
     b.append( flags );
 
     obj.appendSelfToBufBuilder( b );
-    
+
     toSend.setData( dbDelete , b.buf() , b.len() );
 
     say( toSend );
 }
 
-void DBClientBase::update( const char * ns , BSONObj query , BSONObj obj , bool upsert ){
-    
+void DBClientBase::update( const char * ns , BSONObj query , BSONObj obj , bool upsert ) {
+
     BufBuilder b;
     b.append( (int)0 ); // reserverd
     b.append( ns );
-    
+
     b.append( (int)upsert );
-    
+
     query.appendSelfToBufBuilder( b );
     obj.appendSelfToBufBuilder( b );
 
     Message toSend;
     toSend.setData( dbUpdate , b.buf() , b.len() );
 
-    say( toSend );    
+    say( toSend );
 }
 
-bool DBClientBase::ensureIndex( const char * ns , BSONObj keys , const char * name ){
+bool DBClientBase::ensureIndex( const char * ns , BSONObj keys , const char * name ) {
     BSONObjBuilder toSave;
     toSave.append( "ns" , ns );
     toSave.append( "key" , keys );
-    
+
     string cacheKey(ns);
     cacheKey += "--";
-    
-    if ( name ){
+
+    if ( name ) {
         toSave.append( "name" , name );
         cacheKey += name;
     }
     else {
         stringstream ss;
-        
+
         bool first = 1;
-        for ( BSONObjIterator i(keys); i.more(); ){
+        for ( BSONObjIterator i(keys); i.more(); ) {
             BSONElement f = i.next();
             if ( f.eoo() )
                 break;
-            
+
             if ( first )
                 first = 0;
             else
                 ss << "_";
-            
+
             ss << f.fieldName() << "_";
-            
+
             if ( f.type() == NumberInt )
                 ss << (int)(f.number() );
             else if ( f.type() == NumberDouble )
                 ss << f.number();
-            
+
         }
 
         toSave.append( "name" , ss.str() );
@@ -338,7 +343,7 @@ bool DBClientBase::ensureIndex( const char * ns , BSONObj keys , const char * na
     return 1;
 }
 
-void DBClientBase::resetIndexCache(){
+void DBClientBase::resetIndexCache() {
     _seenIndexes.clear();
 }
 
@@ -459,19 +464,19 @@ BSONObj DBClientCursor::next() {
     return o;
 }
 
-DBClientCursor::~DBClientCursor(){
-    if ( cursorId ){
+DBClientCursor::~DBClientCursor() {
+    if ( cursorId ) {
         BufBuilder b;
         b.append( (int)0 ); // reserved
         b.append( (int)1 ); // number
         b.append( cursorId );
-        
+
         Message m;
         m.setData( dbKillCursors , b.buf() , b.len() );
-        
+
         connector->sayPiggyBack( m );
     }
-        
+
 }
 
 /* ------------------------------------------------------ */
@@ -549,7 +554,7 @@ void DBClientPaired::_checkMaster() {
             try {
                 bool im;
                 BSONObj o;
-				c.isMaster(im, &o);
+                c.isMaster(im, &o);
                 if ( retry )
                     log() << "checkmaster: " << c.toString() << ' ' << o.toString() << '\n';
                 if ( im ) {

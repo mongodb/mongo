@@ -143,7 +143,7 @@ public:
 } // namespace mongo
 
 #include "lasterror.h"
-#include "security.h" 
+#include "security.h"
 
 namespace mongo {
 
@@ -196,7 +196,7 @@ void connThread()
         problem() << "Uncaught AssertionException, terminating" << endl;
         exit(15);
     }
-    catch( std::exception &e ) {
+    catch ( std::exception &e ) {
         problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
         exit( 15 );
     }
@@ -254,7 +254,7 @@ void repairDatabases() {
     dblock lk;
     vector< string > dbNames;
     getDatabaseNames( dbNames );
-    for( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
+    for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
         string dbName = *i;
         assert( !setClientTempNs( dbName.c_str() ) );
         PhysicalDataFile *p = database->getFile( 0 );
@@ -262,7 +262,7 @@ void repairDatabases() {
         if ( !h->currentVersion() ) {
             // QUESTION: Repair even if file format is higher version than code?
             log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
-                  << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+            << "new version: " << VERSION << "." << VERSION_MINOR << endl;
             string errmsg;
             assert( repairDatabase( dbName.c_str(), errmsg ) );
         } else {
@@ -274,12 +274,12 @@ void repairDatabases() {
 void clearTmpFiles() {
     boost::filesystem::path path( dbpath );
     for ( boost::filesystem::directory_iterator i( path );
-         i != boost::filesystem::directory_iterator(); ++i ) {
+            i != boost::filesystem::directory_iterator(); ++i ) {
         string fileName = i->leaf();
         if ( boost::filesystem::is_directory( *i ) &&
-            fileName.length() > 2 && fileName.substr( 0, 3 ) == "tmp" )
+                fileName.length() > 2 && fileName.substr( 0, 3 ) == "tmp" )
             boost::filesystem::remove_all( *i );
-    }    
+    }
 }
 
 Timer startupSrandTimer;
@@ -287,7 +287,7 @@ Timer startupSrandTimer;
 void segvhandler(int x);
 void initAndListen(int listenPort, const char *appserverLoc = null) {
     clearTmpFiles();
-    
+
     if ( opLogging )
         log() << "opLogging = " << opLogging << endl;
     _oplog.init();
@@ -336,7 +336,7 @@ int main(int argc, char* argv[], char *envp[] )
 {
     srand(curTimeMillis());
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
-    
+
     {
         unsigned x = 0x12345678;
         unsigned char& b = (unsigned char&) x;
@@ -439,8 +439,8 @@ int main(int argc, char* argv[], char *envp[] )
                 goto usage;
             else if ( s == "--quiet" )
                 quiet = true;
-			else if( s == "--cpu" )
-				cpu = true;
+            else if ( s == "--cpu" )
+                cpu = true;
             else if ( s == "--verbose" )
                 verbose = true;
             else if ( s == "--quota" )
@@ -497,7 +497,7 @@ usage:
     cout << " --port <portno>     specify port number, default is 27017\n";
     cout << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
     cout << " --quiet             quieter output\n";
-	cout << " --cpu               show cpu+iowait utilization periodically\n";
+    cout << " --cpu               show cpu+iowait utilization periodically\n";
     cout << " --verbose\n";
     cout << " --objcheck          inspect client data for validity on receipt\n";
     cout << " --quota             enable db quota management\n";

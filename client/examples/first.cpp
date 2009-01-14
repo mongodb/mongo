@@ -11,18 +11,18 @@
 using namespace std;
 using namespace mongo;
 
-void insert( DBClientConnection & conn , const char * name , int num ){
+void insert( DBClientConnection & conn , const char * name , int num ) {
     BSONObjBuilder obj;
     obj.append( "name" , name );
     obj.append( "num" , num );
     conn.insert( "test.people" , obj.doneAndDecouple() );
 }
 
-int main(){
+int main() {
 
     DBClientConnection conn;
     string errmsg;
-    if ( ! conn.connect( "127.0.0.1" , errmsg ) ){
+    if ( ! conn.connect( "127.0.0.1" , errmsg ) ) {
         cout << "couldn't connect : " << errmsg << endl;
         throw -11;
     }
@@ -31,21 +31,21 @@ int main(){
         BSONObjBuilder query;
         conn.remove( "test.people" , query.doneAndDecouple() );
     }
-                 
+
     insert( conn , "eliot" , 15 );
     insert( conn , "sara" , 23 );
-    
+
     {
         BSONObjBuilder query;
         auto_ptr<DBClientCursor> cursor = conn.query( "test.people" , query.doneAndDecouple() );
         cout << "using cursor" << endl;
-        while ( cursor->more() ){    
+        while ( cursor->more() ) {
             BSONObj obj = cursor->next();
             cout << "\t" << obj.jsonString() << endl;
         }
-        
+
     }
-    
+
     {
         BSONObjBuilder query;
         query.append( "name" , "eliot" );
@@ -59,6 +59,6 @@ int main(){
         BSONObj res = conn.findOne( "test.people" , query.doneAndDecouple() );
         cout << res.isEmpty() << "\t" << res.jsonString() << endl;
     }
-    
+
 
 }

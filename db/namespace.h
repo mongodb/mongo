@@ -68,7 +68,7 @@ public:
     /**
        ( foo.bar ).getSisterNS( "blah" ) == foo.blah
      */
-    string getSisterNS( const char * local ){
+    string getSisterNS( const char * local ) {
         assert( local && local[0] != '.' );
         string old(buf);
         if ( old.find( "." ) != string::npos )
@@ -246,9 +246,9 @@ public:
     void dumpDeleted(set<DiskLoc> *extents = 0);
 
     bool capLooped() const {
-        return capped && capFirstNewRecord.isValid();        
+        return capped && capFirstNewRecord.isValid();
     }
-    
+
     // Start from firstExtent by default.
     DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
 
@@ -258,16 +258,18 @@ public:
     bool inCapExtent( const DiskLoc &dl ) const;
 
     void checkMigrate();
-    
+
 private:
-    Extent *theCapExtent() const { return capExtent.ext(); }
+    Extent *theCapExtent() const {
+        return capExtent.ext();
+    }
     void advanceCapExtent( const char *ns );
     void maybeComplain( const char *ns, int len ) const;
     DiskLoc __stdAlloc(int len);
     DiskLoc __capAlloc(int len);
     DiskLoc _alloc(const char *ns, int len);
     void compact();
-    
+
     DiskLoc &firstDeletedInCapExtent();
     bool nextIsInCapExtent( const DiskLoc &dl ) const;
 };

@@ -71,44 +71,44 @@ void Listener::listen() {
 
 class PiggyBackData {
 public:
-    PiggyBackData( MessagingPort * port ){
+    PiggyBackData( MessagingPort * port ) {
         _port = port;
         _buf = new char[1300];
         _cur = _buf;
     }
-    
-    ~PiggyBackData(){
+
+    ~PiggyBackData() {
         flush();
         delete( _cur );
     }
 
-    void append( Message& m ){
+    void append( Message& m ) {
         assert( m.data->len <= 1300 );
-        
+
         if ( len() + m.data->len > 1300 )
             flush();
-        
+
         memcpy( _cur , m.data , m.data->len );
         _cur += m.data->len;
     }
 
-    int flush(){
+    int flush() {
         if ( _buf == _cur )
             return 0;
-        
+
         int x = ::send( _port->sock , _buf , len() , 0 );
         _cur = _buf;
         return x;
     }
-    
-    int len(){
+
+    int len() {
         return _cur - _buf;
     }
 
 private:
-    
+
     MessagingPort* _port;
-    
+
     char * _buf;
     char * _cur;
 };
@@ -335,11 +335,11 @@ void MessagingPort::say(Message& toSend, int responseTo) {
     ++NextMsgId;
     toSend.data->id = msgid;
     toSend.data->responseTo = responseTo;
-    
+
     int x = -100;
-    
-    if ( piggyBackData && piggyBackData->len() ){
-        if ( ( piggyBackData->len() + toSend.data->len ) > 1300 ){
+
+    if ( piggyBackData && piggyBackData->len() ) {
+        if ( ( piggyBackData->len() + toSend.data->len ) > 1300 ) {
             // won't fit in a packet - so just send it off
             piggyBackData->flush();
         }
@@ -348,19 +348,19 @@ void MessagingPort::say(Message& toSend, int responseTo) {
             x = piggyBackData->flush();
         }
     }
-    
+
     if ( x == -100 )
         x = ::send(sock, (char*)toSend.data, toSend.data->len , 0);
-    
+
     if ( x <= 0 ) {
         log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
     }
 
 }
 
-void MessagingPort::piggyBack( Message& toSend , int responseTo ){
-    
-    if ( toSend.data->len > 1300 ){
+void MessagingPort::piggyBack( Message& toSend , int responseTo ) {
+
+    if ( toSend.data->len > 1300 ) {
         // not worth saving because its almost an entire packet
         say( toSend );
         return;
@@ -371,7 +371,7 @@ void MessagingPort::piggyBack( Message& toSend , int responseTo ){
     ++NextMsgId;
     toSend.data->id = msgid;
     toSend.data->responseTo = responseTo;
-    
+
     if ( ! piggyBackData )
         piggyBackData = new PiggyBackData( this );
 

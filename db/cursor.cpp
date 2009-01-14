@@ -30,8 +30,12 @@ class Reverse : public AdvanceStrategy {
     }
 } _reverse;
 
-AdvanceStrategy *forward() { return &_forward; }
-AdvanceStrategy *reverse() { return &_reverse; }
+AdvanceStrategy *forward() {
+    return &_forward;
+}
+AdvanceStrategy *reverse() {
+    return &_reverse;
+}
 
 DiskLoc nextLoop( NamespaceDetails *nsd, const DiskLoc &prev ) {
     assert( nsd->capLooped() );
@@ -50,8 +54,8 @@ DiskLoc prevLoop( NamespaceDetails *nsd, const DiskLoc &curr ) {
 }
 
 ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd ) :
-    BasicCursor( DiskLoc(), this ),
-    nsd( _nsd ) {
+        BasicCursor( DiskLoc(), this ),
+        nsd( _nsd ) {
     if ( !nsd )
         return;
     DiskLoc start;
@@ -79,18 +83,18 @@ DiskLoc ForwardCappedCursor::next( const DiskLoc &prev ) const {
     i = nextLoop( nsd, i );
     // If we become capFirstNewRecord from same extent, advance to next extent.
     if ( i == nsd->capFirstNewRecord &&
-        i != nsd->capExtent.ext()->firstRecord )
+            i != nsd->capExtent.ext()->firstRecord )
         i = nextLoop( nsd, nsd->capExtent.ext()->lastRecord );
     // If we have just gotten to beginning of capExtent, skip to capFirstNewRecord
     if ( i == nsd->capExtent.ext()->firstRecord )
         i = nsd->capFirstNewRecord;
-    
+
     return i;
 }
 
 ReverseCappedCursor::ReverseCappedCursor( NamespaceDetails *_nsd ) :
-    BasicCursor( DiskLoc(), this ),
-    nsd( _nsd ) {
+        BasicCursor( DiskLoc(), this ),
+        nsd( _nsd ) {
     if ( !nsd )
         return;
     DiskLoc start;
@@ -105,7 +109,7 @@ DiskLoc ReverseCappedCursor::next( const DiskLoc &prev ) const {
     assert( nsd );
     if ( !nsd->capLooped() )
         return reverse()->next( prev );
-    
+
     DiskLoc i = prev;
     // Last record
     if ( nsd->capFirstNewRecord == nsd->capExtent.ext()->firstRecord ) {
