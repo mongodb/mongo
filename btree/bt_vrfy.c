@@ -29,8 +29,7 @@ __wt_db_verify(DB *db, u_int32_t flags)
 
 /*
  * __wt_bt_verify_int --
- *	Verify a Btree, internal version, optionally dumping each page in
- *	debugging mode.
+ *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
 __wt_bt_verify_int(DB *db, FILE *fp)
@@ -77,7 +76,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
 		if ((ret =
-		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, page)) != 0)
+		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, &page)) != 0)
 			goto err;
 		if ((ret = __wt_bt_verify_page(db, page, fragbits, fp)) != 0)
 			goto err;
@@ -209,7 +208,7 @@ __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 	    addr != WT_ADDR_INVALID;
 	    addr = hdr->nextaddr, prev = page, page = NULL) {
 		/* Get the next page. */
-		if ((ret = __wt_cache_db_in(db, addr, frags, &page, 0)) != 0)
+		if ((ret = __wt_cache_db_in(db, addr, frags, 0, &page)) != 0)
 			return (ret);
 
 		/* Verify the page. */
@@ -224,8 +223,8 @@ __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 		hdr = page->hdr;
 		if (first) {
 			first = 0;
-			 if (hdr->type == WT_PAGE_INT ||
-			     hdr->type == WT_PAGE_DUP_INT)
+			if (hdr->type == WT_PAGE_INT ||
+			    hdr->type == WT_PAGE_DUP_INT)
 				__wt_bt_first_offp(page, offp);
 			else
 				offp = NULL;
@@ -247,7 +246,7 @@ __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 		 * The page is OK, instantiate its in-memory information, if
 		 * we don't have it already.
 		 */
-		if (page->indx == NULL &&
+		if (page->indx_count == 0 &&
 		    (ret = __wt_bt_page_inmem(db, page)) != 0)
 			goto err;
 
@@ -368,7 +367,7 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
-	if ((ret = __wt_bt_page_in(db, hdr->prntaddr, 0, parent)) != 0)
+	if ((ret = __wt_bt_page_in(db, hdr->prntaddr, 0, &parent)) != 0)
 		return (ret);
 
 	/* Check the levels match up. */
@@ -475,7 +474,7 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 			parent = NULL;
 		else {
 			if ((ret =
-			    __wt_bt_page_in(db, nextaddr, 0, parent)) != 0)
+			    __wt_bt_page_in(db, nextaddr, 0, &parent)) != 0)
 				return (ret);
 			parent_indx = parent->indx;
 		}
@@ -855,12 +854,9 @@ item_type:	__wt_db_errx(db,
 err:		ret = WT_ERROR;
 	}
 
-	if (_a.item_ovfl.data != NULL)
-		__wt_free(env, _a.item_ovfl.data);
-	if (_b.item_ovfl.data != NULL)
-		__wt_free(env, _b.item_ovfl.data);
-	if (_c.item_ovfl.data != NULL)
-		__wt_free(env, _c.item_ovfl.data);
+	WT_FREE_AND_CLEAR(env, _a.item_ovfl.data);
+	WT_FREE_AND_CLEAR(env, _b.item_ovfl.data);
+	WT_FREE_AND_CLEAR(env, _c.item_ovfl.data);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
@@ -881,8 +877,7 @@ __wt_bt_verify_ovfl(DB *db, WT_ITEM_OVFL *ovfl, bitstr_t *fragbits, FILE *fp)
 	WT_PAGE *ovfl_page;
 	int ret, tret;
 
-	if ((ret =
-	    __wt_bt_ovfl_page_in(db, ovfl->addr, ovfl->len, ovfl_page)) != 0)
+	if ((ret = __wt_bt_ovfl_in(db, ovfl->addr, ovfl->len, &ovfl_page)) != 0)
 		return (ret);
 
 	ret = __wt_bt_verify_page(db, ovfl_page, fragbits, fp);
