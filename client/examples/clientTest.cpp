@@ -100,5 +100,10 @@ int main(){
         
     }
 
+    { // ensure index
+        assert( conn.ensureIndex( ns , BUILDOBJ( "name" << 1 ) ) );
+        assert( ! conn.ensureIndex( ns , BUILDOBJ( "name" << 1 ) ) );
+    }
+
     cout << "client test finished!" << endl;
 }

@@ -29,7 +29,5 @@ int main(){
         cout << "\t" << obj.jsonString() << endl;
     }
 
-    assert( conn.ensureIndex( ns , BUILDOBJ( "name" << 1 << "num" << -1 ) ) );
-    assert( ! conn.ensureIndex( ns , BUILDOBJ( "name" << 1 << "num" << -1 ) ) ); // already created, so don't do anything
-
+    conn.ensureIndex( ns , BUILDOBJ( "name" << 1 << "num" << -1 ) );
 }
