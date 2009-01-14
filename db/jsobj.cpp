@@ -879,6 +879,11 @@ BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const char * value ){
 }
 
 BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const int value ){
+    _builder->appendInt( _fieldName , value );
+    return *_builder;
+}
+
+BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const double value ){
     _builder->append( _fieldName , value );
     return *_builder;
 }

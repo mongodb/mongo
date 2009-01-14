@@ -506,6 +506,7 @@ public:
     
     BSONObjBuilder& operator<<( const char * value );
     BSONObjBuilder& operator<<( const int value );
+    BSONObjBuilder& operator<<( const double value );
 
 private:
     const char * _fieldName;
