@@ -289,6 +289,57 @@ void DBClientBase::update( const char * ns , BSONObj query , BSONObj obj , bool 
     say( toSend );    
 }
 
+bool DBClientBase::ensureIndex( const char * ns , BSONObj keys , const char * name ){
+    BSONObjBuilder toSave;
+    toSave.append( "ns" , ns );
+    toSave.append( "key" , keys );
+    
+    string cacheKey(ns);
+    cacheKey += "--";
+    
+    if ( name ){
+        toSave.append( "name" , name );
+        cacheKey += name;
+    }
+    else {
+        stringstream ss;
+        
+        bool first = 1;
+        for ( BSONObjIterator i(keys); i.more(); ){
+            BSONElement f = i.next();
+            if ( f.eoo() )
+                break;
+            
+            if ( first )
+                first = 0;
+            else
+                ss << "_";
+            
+            ss << f.fieldName() << "_";
+            
+            if ( f.type() == NumberInt )
+                ss << (int)(f.number() );
+            else if ( f.type() == NumberDouble )
+                ss << f.number();
+            
+        }
+
+        toSave.append( "name" , ss.str() );
+        cacheKey += ss.str();
+    }
+
+    if ( _seenIndexes.count( cacheKey ) )
+        return 0;
+    _seenIndexes.insert( cacheKey );
+
+    insert( Namespace( ns ).getSisterNS( "system.indexes"  ).c_str() , toSave.doneAndDecouple() );
+    return 1;
+}
+
+void DBClientBase::resetIndexCache(){
+    _seenIndexes.clear();
+}
+
 /* -- DBClientCursor ---------------------------------------------- */
 
 void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
