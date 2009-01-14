@@ -332,8 +332,8 @@ skip_read:
 	if (0) {
 err:		ret = WT_ERROR;
 	}
-	if (lastkey_ovfl.data != NULL)
-		__wt_free(env, lastkey_ovfl.data);
+
+	WT_FREE_AND_CLEAR(env, lastkey_ovfl.data);
 
 	return (ret == 1 ? 0 : ret);
 }
@@ -700,7 +700,7 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 		parent = next;
 		next = NULL;
 	} else {
-		if ((ret = __wt_bt_page_in(db, parent_addr, 0, parent)) != 0)
+		if ((ret = __wt_bt_page_in(db, parent_addr, 0, &parent)) != 0)
 			goto err;
 
 		need_promotion = 0;
@@ -739,7 +739,7 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 	parent->first_free += WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
 	parent->space_avail -= WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
 
-	/* Append the new indx into the in-memory page structures. */
+	/* Append the new index into the in-memory page structures. */
 	if ((ret = __wt_bt_page_inmem_append(
 	    db, parent, parent_key, parent_offp)) != 0)
 		goto err;
