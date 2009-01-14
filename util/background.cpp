@@ -18,6 +18,8 @@
 #include "goodies.h"
 #include "background.h"
 
+namespace mongo {
+
 BackgroundJob *BackgroundJob::grab = 0;
 boost::mutex BackgroundJob::mutex;
 
@@ -57,3 +59,5 @@ bool BackgroundJob::wait(int msMax) {
     }
     return true;
 }
+
+} // namespace mongo

@@ -21,6 +21,8 @@
 #include <queue>
 #include "dbclient.h"
 
+namespace mongo {
+
 struct PoolForHost {
     queue<DBClientConnection*> pool;
 };
@@ -86,3 +88,5 @@ public:
         }
     }
 };
+
+} // namespace mongo

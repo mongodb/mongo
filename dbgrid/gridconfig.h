@@ -27,6 +27,8 @@
 #include "../client/model.h"
 #include "griddatabase.h"
 
+namespace mongo {
+
 /* Machine is the concept of a host that runs the db process.
 */
 class Machine {
@@ -103,3 +105,5 @@ public:
 };
 
 extern Grid grid;
+
+} // namespace mongo

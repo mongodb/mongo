@@ -21,6 +21,8 @@
 #include "json.h"
 #include "../client/dbclient.h"
 
+namespace mongo {
+
 extern int port;
 extern const char *allDead;
 
@@ -173,3 +175,5 @@ public:
     }
 };
 
+
+} // namespace mongo

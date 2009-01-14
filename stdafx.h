@@ -21,6 +21,8 @@
 
 #pragma once
 
+namespace mongo {
+
 #define NOMINMAX
 
 #if defined(_WIN32)
@@ -29,10 +31,14 @@ const bool debug=true;
 const bool debug=false;
 #endif
 
+} // namespace mongo
+
 #include <memory>
 #include "stdlib.h"
 #include "string.h"
 #include "limits.h"
+
+namespace mongo {
 
 void sayDbContext(const char *msg = 0);
 void dbexit(int returnCode, const char *whyMsg = "");
@@ -52,12 +58,16 @@ inline void * ourrealloc(void *ptr, size_t size) {
 #define malloc ourmalloc
 #define realloc ourrealloc
 
+} // namespace mongo
+
 #include "targetver.h"
 
 #include <string>
 #include "time.h"
 
 using namespace std;
+
+namespace mongo {
 
 /* these are manipulated outside of mutexes, so be careful */
 struct Assertion {
@@ -179,17 +189,26 @@ void msgasserted(const char *msg);
 */
 #define dassert assert
 
+} // namespace mongo
+
 #include <stdio.h>
 #include <sstream>
 #include <signal.h>
 
+namespace mongo {
+
 typedef char _TCHAR;
+
+} // namespace mongo
 
 #include <iostream>
 #include <fstream>
 #include <map>
 #include <vector>
 #include <set>
+
+namespace mongo {
+
 //using namespace std;
 
 #if !defined(_WIN32)
@@ -214,7 +233,11 @@ typedef void *HANDLE;
 
 #define null (0)
 
+} // namespace mongo
+
 #include <vector>
+
+namespace mongo {
 
 // for debugging
 typedef struct _Ints {
@@ -268,12 +291,15 @@ inline void our_debug_free(void *p) {
 
 #define exit dbexit
 
+} // namespace mongo
+
 #undef yassert
 #include <boost/archive/iterators/base64_from_binary.hpp>
 #include <boost/archive/iterators/binary_from_base64.hpp>
 #include <boost/archive/iterators/transform_width.hpp>
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
 #define BOOST_SPIRIT_THREADSAFE
 //#define BOOST_SPIRIT_DEBUG

@@ -30,6 +30,8 @@
 #include "scanandorder.h"
 #include "queryoptimizer.h"
 
+namespace mongo {
+
 QueryPlan QueryOptimizer::getPlan(
     const char *ns,
     BSONObj* query,
@@ -42,3 +44,5 @@ QueryPlan QueryOptimizer::getPlan(
 
     return plan;
 }
+
+} // namespace mongo

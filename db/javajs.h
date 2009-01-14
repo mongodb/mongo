@@ -35,6 +35,8 @@
 
 #include "jsobj.h"
 
+namespace mongo {
+
 void jasserted(const char *msg, const char *file, unsigned line);
 #define jassert(_Expression) if ( ! ( _Expression ) ){ jasserted(#_Expression, __FILE__, __LINE__); }
 
@@ -202,3 +204,5 @@ public:
 
 JNIEXPORT void JNICALL java_native_say(JNIEnv *, jclass, jobject outBuffer );
 JNIEXPORT jint JNICALL java_native_call(JNIEnv *, jclass, jobject outBuffer , jobject inBuffer );
+
+} // namespace mongo

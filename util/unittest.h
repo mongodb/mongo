@@ -18,6 +18,8 @@
 
 #pragma once
 
+namespace mongo {
+
 /* The idea here is to let all initialization of global variables (classes inheriting from UnitTest)
    complete before we run the tests -- otherwise order of initilization being arbitrary may mess
    us up.  The app's main() function should call runTests().
@@ -48,3 +50,5 @@ struct UnitTest {
     }
 };
 
+
+} // namespace mongo

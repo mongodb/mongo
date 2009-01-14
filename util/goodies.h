@@ -21,12 +21,26 @@
 
 #include "../stdafx.h"
 
+namespace mongo {
+
 #if !defined(_WIN32)
+
+} // namespace mongo
+
 #include <pthread.h>
+
+namespace mongo {
+
 inline pthread_t GetCurrentThreadId() {
     return pthread_self();
 }
+
+} // namespace mongo
+
 #include <execinfo.h>
+
+namespace mongo {
+
 /* use "addr2line -CFe <exe>" to parse. */
 inline void printStackTrace() {
     void *b[12];
@@ -95,8 +109,14 @@ inline void dumpmemory(const char *data, int len) {
 }
 
 #undef yassert
+
+} // namespace mongo
+
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
+
+namespace mongo {
+
 #undef assert
 #define assert xassert
 #define yassert 1
@@ -127,7 +147,11 @@ struct WrappingInt {
     }
 };
 
+} // namespace mongo
+
 #include <ctime>
+
+namespace mongo {
 
 inline void time_t_to_String(time_t t, char *buf) {
 #if defined(_WIN32)
@@ -243,7 +267,11 @@ inline bool endsWith(const char *p, const char *suffix) {
     return strcmp(p + a - b, suffix) == 0;
 }
 
+} // namespace mongo
+
 #include "boost/detail/endian.hpp"
+
+namespace mongo {
 
 inline unsigned long swapEndian(unsigned long x) {
     return
@@ -263,3 +291,5 @@ inline unsigned long fixEndian(unsigned long x) {
 }
 #endif
 
+
+} // namespace mongo

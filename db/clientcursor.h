@@ -26,6 +26,8 @@
 
 #include "../stdafx.h"
 
+namespace mongo {
+
 typedef long long CursorId;
 class Cursor;
 class ClientCursor;
@@ -86,3 +88,5 @@ public:
 
     void cleanupByLocation(DiskLoc loc);
 };
+
+} // namespace mongo

@@ -23,6 +23,8 @@
 
 using namespace boost::filesystem;
 
+namespace mongo {
+
 //#define JNI_DEBUG 1
 
 #ifdef JNI_DEBUG
@@ -33,7 +35,7 @@ using namespace boost::filesystem;
 #define JNI_DEBUG(x)
 #endif
 
-
+} // namespace mongo
 
 #ifdef J_USE_OBJ
 #include "jsobj.h"
@@ -43,6 +45,8 @@ using namespace boost::filesystem;
 #include "db.h"
 
 using namespace std;
+
+namespace mongo {
 
 #if defined(_WIN32)
 /* [dm] this being undefined without us adding it here means there is
@@ -627,7 +631,7 @@ int javajstest() {
 
     const int debug = 0;
 
-    JavaJSImpl& JavaJS = *::JavaJS;
+    JavaJSImpl& JavaJS = *mongo::JavaJS;
 
     if ( debug ) log() << "about to create scope" << endl;
     jlong scope = JavaJS.scopeCreate();
@@ -718,6 +722,8 @@ int javajstest() {
 
 }
 
+} // namespace mongo
+
 #if defined(_MAIN)
 int main() {
     return javajstest();
@@ -725,3 +731,4 @@ int main() {
 #endif
 
 #endif
+

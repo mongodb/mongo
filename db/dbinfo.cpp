@@ -19,6 +19,8 @@
 #include "stdafx.h"
 #include "db.h"
 
+namespace mongo {
+
 void DBInfo::setHaveLogged() {
     if ( haveLogged() )
         return;
@@ -43,3 +45,5 @@ void DBInfo::dbDropped() {
        */
 }
 
+
+} // namespace mongo

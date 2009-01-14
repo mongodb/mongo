@@ -20,6 +20,8 @@
 
 #include <boost/thread/tss.hpp>
 
+namespace mongo {
+
 struct LastError {
     string msg;
     int nPrev;
@@ -42,3 +44,5 @@ inline void raiseError(const char *msg) {
     }
     le->raiseError(msg);
 }
+
+} // namespace mongo

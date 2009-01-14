@@ -20,6 +20,8 @@
 
 #include "dbclient.h"
 
+namespace mongo {
+
 /* Model is a base class for defining objects which are serializable to the Mongo
    database via the database driver.
 
@@ -52,3 +54,5 @@ public:
     /* true if successful */
     bool load(BSONObj& query);
 };
+
+} // namespace mongo

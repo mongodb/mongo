@@ -9,6 +9,7 @@
 #include "mongo/client/dbclient.h"
 
 using namespace std;
+using namespace mongo;
 
 void insert( DBClientConnection & conn , const char * name , int num ){
     BSONObjBuilder obj;

@@ -20,6 +20,8 @@
 
 #include <boost/thread/tss.hpp>
 
+namespace mongo {
+
 class AuthenticationInfo : boost::noncopyable { 
 public:
     AuthenticationInfo() { }
@@ -29,3 +31,5 @@ public:
 };
 
 extern boost::thread_specific_ptr<AuthenticationInfo> authInfo;
+
+  } // namespace mongo

@@ -22,6 +22,8 @@
 #include <sstream>
 #include "goodies.h"
 
+namespace mongo {
+
 #if defined(_WIN32)
 //#include <winsock2.h>
 //#include <ws2tcpip.h>
@@ -37,6 +39,9 @@ inline void disableNagle(int sock) {
 inline void prebindOptions( int sock ) {
 }
 #else
+
+} // namespace mongo
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -45,6 +50,9 @@ inline void prebindOptions( int sock ) {
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+
+namespace mongo {
+
 inline void closesocket(int s) {
     close(s);
 }
@@ -222,3 +230,5 @@ inline string getHostName() {
 }
 
 
+
+} // namespace mongo

@@ -25,6 +25,8 @@
 #include "../util/goodies.h"
 #include <fcntl.h>
 
+namespace mongo {
+
 // if you want trace output:
 #define mmm(x)
 
@@ -152,7 +154,11 @@ MessagingPort::~MessagingPort() {
     ports.erase(this);
 }
 
+} // namespace mongo
+
 #include "../util/background.h"
+
+namespace mongo {
 
 class ConnectBG : public BackgroundJob {
 public:
@@ -371,3 +377,5 @@ void MessagingPort::piggyBack( Message& toSend , int responseTo ){
 
     piggyBackData->append( toSend );
 }
+
+} // namespace mongo

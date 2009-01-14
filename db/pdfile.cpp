@@ -35,6 +35,8 @@ _ disallow system* manipulations from the database.
 #include "query.h"
 #include "repl.h"
 
+namespace mongo {
+
 extern bool quota;
 extern int port;
 
@@ -993,7 +995,11 @@ void pdfileInit() {
     theDataFileMgr.init(dbpath);
 }
 
+} // namespace mongo
+
 #include "clientcursor.h"
+
+namespace mongo {
 
 void dropDatabase(const char *ns) {
     // ns is of the form "<dbname>.$cmd"
@@ -1080,7 +1086,9 @@ boost::intmax_t dbSize( const char *database ) {
 }
 
 #if !defined(_WIN32)
+} // namespace mongo
 #include <sys/statvfs.h>
+namespace mongo {
 #endif
 boost::intmax_t freeSpace() {
 #if !defined(_WIN32)
@@ -1147,3 +1155,5 @@ bool repairDatabase( const char *ns, string &errmsg,
 
     return true;
 }
+
+} // namespace mongo

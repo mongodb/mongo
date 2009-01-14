@@ -25,15 +25,17 @@
 
 #pragma once
 
-// see version, versionMinor, below.
-const int VERSION = 4;
-const int VERSION_MINOR = 4;
-
 #include "../stdafx.h"
 #include "../util/mmap.h"
 #include "storage.h"
 #include "jsobj.h"
 #include "namespace.h"
+
+// see version, versionMinor, below.
+const int VERSION = 4;
+const int VERSION_MINOR = 4;
+
+namespace mongo {
 
 class PDFHeader;
 class Extent;
@@ -282,7 +284,11 @@ inline Extent* PhysicalDataFile::getExtent(DiskLoc loc) {
     return e;
 }
 
+} // namespace mongo
+
 #include "cursor.h"
+
+namespace mongo {
 
 inline Record* PhysicalDataFile::recordAt(DiskLoc dl) {
     return header->getRecord(dl);
@@ -339,8 +345,12 @@ inline BtreeBucket* DiskLoc::btree() const {
 
 /*---------------------------------------------------------------------*/
 
+} // namespace mongo
+
 #include "queryoptimizer.h"
 #include "database.h"
+
+namespace mongo {
 
 #define BOOST_CHECK_EXCEPTION( expression ) \
 	try { \
@@ -434,3 +444,5 @@ inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
     assert( dl.a() != -1 );
     return database->getFile(dl.a())->recordAt(dl);
 }
+
+} // namespace mongo

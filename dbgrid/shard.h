@@ -25,6 +25,8 @@
 #include "../client/dbclient.h"
 #include "../client/model.h"
 
+namespace mongo {
+
 /* grid.shards
      { name: 'hostname'
      }
@@ -40,3 +42,5 @@ public:
     virtual void unserialize(BSONObj& from);
     virtual DBClientWithCommands* conn();
 };
+
+} // namespace mongo

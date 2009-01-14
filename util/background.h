@@ -16,6 +16,8 @@
 
 #pragma once
 
+namespace mongo {
+
 /* object-orienty background thread dispatching.
 
    subclass and define run()
@@ -66,3 +68,5 @@ private:
     static void thr();
     volatile State state;
 };
+
+} // namespace mongo

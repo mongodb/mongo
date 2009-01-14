@@ -27,6 +27,8 @@
 #include "dbmessage.h"
 #include "instance.h"
 
+namespace mongo {
+
 extern bool objcheck, quiet, quota, verbose, cpu;
 bool useJNI = true;
 
@@ -138,8 +140,12 @@ public:
     Message & container;
 };
 
+} // namespace mongo
+
 #include "lasterror.h"
 #include "security.h" 
+
+namespace mongo {
 
 /* we create one thread for each connection from an app server database.
    app server will open a pool of threads.
@@ -321,6 +327,10 @@ void initAndListen(int listenPort, const char *appserverLoc = null) {
 int test2();
 void testClient();
 void pipeSigHandler( int signal );
+
+} // namespace mongo
+
+using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] )
 {
@@ -506,6 +516,8 @@ usage:
     return 0;
 }
 
+namespace mongo {
+
 /* we do not use log() below as it uses a mutex and that could cause deadlocks.
 */
 
@@ -515,7 +527,11 @@ string getDbContext();
 
 #if !defined(_WIN32)
 
+} // namespace mongo
+
 #include <signal.h>
+
+namespace mongo {
 
 void pipeSigHandler( int signal ) {
     psignal( signal, "Signal Received : ");
@@ -557,3 +573,5 @@ void setupSignals() {
 #else
 void setupSignals() {}
 #endif
+
+} // namespace mongo

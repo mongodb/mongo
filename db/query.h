@@ -66,6 +66,8 @@
 // struct QueryOptions, QueryResult, QueryResultFlags in:
 #include "../client/dbclient.h"
 
+namespace mongo {
+
 // for an existing query (ie a ClientCursor), send back additional information.
 QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 
@@ -77,5 +79,7 @@ QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn,
 void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss);
 
 int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god=false);
+
+} // namespace mongo
 
 #include "clientcursor.h"

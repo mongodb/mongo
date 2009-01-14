@@ -18,6 +18,8 @@
 
 #pragma once
 
+namespace mongo {
+
 class Nullstream {
 public:
     Nullstream& operator<<(const char *) {
@@ -54,9 +56,6 @@ public:
         return *this;
     }
 };
-inline Nullstream& endl ( Nullstream& os ) {
-    return os;
-}
 extern Nullstream nullstream;
 
 #define LOGIT { boostlock lk(mutex); cout << x; return *this; }
@@ -99,9 +98,6 @@ public:
         return *this;
     }
 };
-inline Logstream& endl ( Logstream& os ) {
-    return os;
-}
 extern Logstream logstream;
 
 inline Logstream& problem() {
@@ -115,3 +111,5 @@ inline ostream& stdcout() { return cout; }
 
 #define cout logstream
 
+
+} // namespace mongo

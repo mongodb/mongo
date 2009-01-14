@@ -18,6 +18,8 @@
 
 #pragma once
 
+namespace mongo {
+
 class MemoryMappedFile {
 public:
     static void closeAllFiles();
@@ -51,3 +53,5 @@ private:
     int len;
 };
 
+
+} // namespace mongo

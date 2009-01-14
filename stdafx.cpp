@@ -20,6 +20,8 @@
 
 #include "stdafx.h"
 
+namespace mongo {
+
 // TODO: reference any additional headers you need in STDAFX.H
 // and not in this file
 
@@ -28,8 +30,13 @@ Assertion lastAssert[4];
 #undef assert
 
 #undef yassert
+
+} // namespace mongo
+
 #include "assert.h"
 #include "db/lasterror.h"
+
+namespace mongo {
 
 string getDbContext();
 
@@ -90,3 +97,5 @@ void sayDbContext(const char *errmsg) {
     printStackTrace();
 }
 
+
+} // namespace mongo

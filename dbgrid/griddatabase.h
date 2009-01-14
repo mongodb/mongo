@@ -25,6 +25,8 @@
 
 #include "shard.h"
 
+namespace mongo {
+
 class GridDatabase {
 public:
     DBClientWithCommands *conn;
@@ -41,3 +43,5 @@ public:
 };
 extern GridDatabase gridDatabase;
 
+
+} // namespace mongo

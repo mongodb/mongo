@@ -26,6 +26,8 @@
 #include "../stdafx.h"
 #include <map>
 
+namespace mongo {
+
 #pragma pack(push,1)
 
 /* you should define:
@@ -129,3 +131,5 @@ public:
 };
 
 #pragma pack(pop)
+
+} // namespace mongo

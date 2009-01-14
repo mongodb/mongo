@@ -16,6 +16,8 @@
 
 #include "pdfile.h"
 
+namespace mongo {
+
 class Forward : public AdvanceStrategy {
     virtual DiskLoc next( const DiskLoc &prev ) const {
         return prev.rec()->getNext( prev );
@@ -128,3 +130,4 @@ DiskLoc ReverseCappedCursor::next( const DiskLoc &prev ) const {
 
     return i;
 }
+} // namespace mongo

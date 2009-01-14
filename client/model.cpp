@@ -19,6 +19,8 @@
 #include "stdafx.h"
 #include "model.h"
 
+namespace mongo {
+
 bool Model::load(BSONObj& query) {
     BSONObj b = conn()->findOne(getNS(), query);
     if ( b.isEmpty() )
@@ -27,3 +29,5 @@ bool Model::load(BSONObj& query) {
     unserialize(b);
     return true;
 }
+
+} // namespace mongo

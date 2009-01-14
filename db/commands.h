@@ -17,6 +17,8 @@
 
 #pragma once
 
+namespace mongo {
+
 class BSONObj;
 class BSONObjBuilder;
 
@@ -59,3 +61,5 @@ public:
 };
 
 bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
+
+} // namespace mongo

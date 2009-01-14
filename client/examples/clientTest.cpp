@@ -9,6 +9,7 @@
 #include "mongo/client/dbclient.h"
 
 using namespace std;
+using namespace mongo;
 
 int main(){
 

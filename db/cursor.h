@@ -18,6 +18,8 @@
 
 #include "../stdafx.h"
 
+namespace mongo {
+
 /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
    concept and is for the user's cursor.
 */
@@ -197,3 +199,5 @@ public:
 private:
     NamespaceDetails *nsd;
 };
+
+} // namespace mongo

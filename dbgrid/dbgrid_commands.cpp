@@ -36,6 +36,8 @@
 #include "../db/commands.h"
 #include "gridconfig.h"
 
+namespace mongo {
+
 extern string ourHostname;
 
 namespace dbgrid_cmds {
@@ -80,3 +82,5 @@ public:
 } ismaster;
 
 }
+
+} // namespace mongo

@@ -4,6 +4,8 @@
 
 #include "md5.h"
 
+namespace mongo {
+
 typedef unsigned char md5digest[16];
 
 inline void md5(const void *buf, int nbytes, md5digest digest) {
@@ -16,3 +18,5 @@ inline void md5(const void *buf, int nbytes, md5digest digest) {
 inline void md5(const char *str, md5digest digest) {
     md5(str, strlen(str), digest);
 }
+
+} // namespace mongo

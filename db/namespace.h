@@ -26,6 +26,8 @@
 #include "../util/hashtab.h"
 #include "../util/mmap.h"
 
+namespace mongo {
+
 class Cursor;
 
 #pragma pack(push,1)
@@ -382,3 +384,5 @@ inline string nsToClient(const char *ns) {
     nsToClient(ns, buf);
     return buf;
 }
+
+} // namespace mongo

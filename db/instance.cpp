@@ -26,6 +26,8 @@
 #include "instance.h"
 #include "lasterror.h"
 
+namespace mongo {
+
 int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
@@ -520,3 +522,5 @@ void dbexit(int rc, const char *why) {
     exit(rc);
 }
 
+
+} // namespace mongo

@@ -20,6 +20,8 @@
 
 #include "../grid/message.h"
 
+namespace mongo {
+
 class MiniWebServer {
 public:
     MiniWebServer();
@@ -49,3 +51,5 @@ private:
     
     int sock;
 };
+
+} // namespace mongo

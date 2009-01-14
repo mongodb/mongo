@@ -22,6 +22,8 @@
 #include "stdafx.h"
 #include "connpool.h"
 
+namespace mongo {
+
 DBConnectionPool pool;
 
 DBClientConnection* DBConnectionPool::get(const string& host) {
@@ -44,3 +46,5 @@ DBClientConnection* DBConnectionPool::get(const string& host) {
     p->pool.pop();
     return c;
 }
+
+} // namespace mongo

@@ -21,6 +21,8 @@
 #include "../stdafx.h"
 #include "../util/goodies.h"
 
+namespace mongo {
+
 /* Your K object must define:
 	 int hash() - must always return > 0.
 	 operator==
@@ -73,3 +75,5 @@ private:
     int *hashes;
     V *values;
 };
+
+} // namespace mongo

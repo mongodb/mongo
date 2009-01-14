@@ -19,6 +19,8 @@
 
 #include <unittest/UnitTest.hpp>
 
+using namespace mongo;
+
 UnitTest::TestPtr btreeTests();
 UnitTest::TestPtr jsobjTests();
 UnitTest::TestPtr namespaceTests();

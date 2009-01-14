@@ -32,6 +32,8 @@
 #include "instance.h"
 #include "lasterror.h"
 
+namespace mongo {
+
 extern bool quiet;
 extern int queryTraceLevel;
 extern int otherTraceLevel;
@@ -147,7 +149,7 @@ string validateNS(const char *ns, NamespaceDetails *d) {
                 valid = false;
             }
         }
-        ss << "  deleted: n: " << ndel << " size: " << delSize << '\n';
+        ss << "  deleted: n: " << ndel << " size: " << delSize << endl;
         if ( incorrect ) {
             ss << "    ?corrupt: " << incorrect << " records from datafile are in deleted list\n";
             valid = false;
@@ -709,3 +711,4 @@ bool _runCommands(const char *ns, BSONObj& _cmdobj, stringstream& ss, BufBuilder
     return true;
 }
 
+} // namespace mongo

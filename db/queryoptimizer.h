@@ -18,6 +18,8 @@
 
 #pragma once
 
+namespace mongo {
+
 class QueryPlan {
 public:
     QueryPlan() {
@@ -47,3 +49,5 @@ public:
         BSONObj* order = 0,
         BSONObj* hint = 0);
 };
+
+} // namespace mongo

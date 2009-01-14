@@ -25,6 +25,8 @@
 #include "../db/json.h"
 #include "../db/instance.h"
 
+namespace mongo {
+
 /* --- dbclientcommands --- */
 
 inline bool DBClientWithCommands::isOk(const BSONObj& o) { 
@@ -611,3 +613,5 @@ BSONObj DBClientPaired::findOne(const char *a, BSONObj b, BSONObj *c, int d) {
 }
 
 
+
+} // namespace mongo

@@ -22,6 +22,8 @@
 
 using namespace boost::spirit;
 
+namespace mongo {
+
 struct ObjectBuilder {
     BSONObjBuilder *back() { return builders.back().get(); }
     // Storage for field names of elements within builders.back().
@@ -491,3 +493,5 @@ BSONObj fromjson( const char *str ) {
 BSONObj fromjson( const string &str ) {
     return fromjson( str.c_str() );
 }
+
+} // namespace mongo

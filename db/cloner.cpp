@@ -27,6 +27,8 @@
 #include "instance.h"
 #include "repl.h"
 
+namespace mongo {
+
 void ensureHaveIdIndex(const char *ns);
 extern int port;
 
@@ -263,3 +265,5 @@ public:
         return res;
     }
 } cmdcopydb;
+
+} // namespace mongo

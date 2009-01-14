@@ -41,6 +41,8 @@
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 
+namespace mongo {
+
 const char *tempHost = "localhost:27018";
 
 void getMore(Message& m, MessagingPort& p) {
@@ -129,3 +131,5 @@ void processRequest(Message& m, MessagingPort& p) {
         writeOp(op, m, p);
     }
 }
+
+} // namespace mongo

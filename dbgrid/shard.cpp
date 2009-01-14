@@ -20,6 +20,8 @@
 #include "shard.h"
 #include "griddatabase.h"
 
+namespace mongo {
+
 DBClientWithCommands* Shard::conn() {
     return gridDatabase.conn;
 }
@@ -32,3 +34,5 @@ void Shard::unserialize(BSONObj& from) {
     name = from.getStringField("name");
     uassert("bad grid.shards.name", !name.empty());
 }
+
+} // namespace mongo

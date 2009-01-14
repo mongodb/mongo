@@ -19,9 +19,9 @@
 #include "../stdafx.h"
 #include "../client/dbclient.h"
 
-#include <boost/program_options.hpp>
-
 #include <fcntl.h>
+
+namespace mongo {
 
 namespace po = boost::program_options;
 
@@ -108,8 +108,11 @@ namespace dump {
         }
     }
 
-}
+} // namespace dump
 
+} // namespace mongo
+
+using namespace mongo;
 
 int main( int argc , char ** argv ){
 

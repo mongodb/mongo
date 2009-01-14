@@ -21,5 +21,9 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 
+namespace mongo {
+
 BSONObj fromjson(const char *str);
 BSONObj fromjson(const string &str);
+
+} // namespace mongo

@@ -21,6 +21,8 @@
 #include "dbhelpers.h"
 #include "query.h"
 
+namespace mongo {
+
 /* Get the first object from a collection.  Generally only useful if the collection
    only ever has a single object -- which is a "singleton collection.
 
@@ -47,3 +49,5 @@ void emptyCollection(const char *ns) {
     DBContext context(ns);
     deleteObjects(ns, emptyObj, false);
 }
+
+} // namespace mongo

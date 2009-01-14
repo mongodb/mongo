@@ -24,6 +24,8 @@
 #include "gridconfig.h"
 #include "../client/model.h"
 
+namespace mongo {
+
 /* --- Machine --- */
 
 map<string, Machine*> Machine::machines;
@@ -63,3 +65,5 @@ Machine* Grid::owner(const char *ns, BSONObj& objOrKey) {
     uassert("dbgrid: not implemented 100", false);
     return 0;
 }
+
+} // namespace mongo

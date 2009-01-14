@@ -20,6 +20,8 @@
 #include "goodies.h"
 #include "unittest.h"
 
+namespace mongo {
+
 vector<UnitTest*> *UnitTest::tests = 0;
 
 Nullstream nullstream;
@@ -78,3 +80,5 @@ struct UtilTest : public UnitTest {
 
     }
 } utilTest;
+
+} // namespace mongo

@@ -21,6 +21,8 @@
 #include "jsobj.h"
 #include "commands.h"
 
+namespace mongo {
+
 map<string,Command*> *commands;
 
 Command::Command(const char *_name) : name(_name) {
@@ -66,3 +68,5 @@ bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder&
 
     return false;
 }
+
+} // namespace mongo

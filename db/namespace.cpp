@@ -26,6 +26,8 @@
 #include <list>
 #include "query.h"
 
+namespace mongo {
+
 /* deleted lists -- linked lists of deleted records -- tehy are placed in 'buckets' of various sizes
    so you can look for a deleterecord about the right size.
 */
@@ -539,3 +541,4 @@ void addNewNamespaceToCatalog(const char *ns, BSONObj *options = 0) {
     }
 }
 
+} // namespace mongo

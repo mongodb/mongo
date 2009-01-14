@@ -20,6 +20,8 @@
 
 #include "../util/sock.h"
 
+namespace mongo {
+
 class Message;
 class MessagingPort;
 class PiggyBackData;
@@ -174,3 +176,5 @@ public:
 private:
     bool freeIt;
 };
+
+} // namespace mongo

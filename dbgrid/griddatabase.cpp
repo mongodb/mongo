@@ -25,6 +25,8 @@
 #include "../util/background.h"
 #include "griddatabase.h"
 
+namespace mongo {
+
 static boost::mutex griddb_mutex;
 GridDatabase gridDatabase;
 DBClientWithCommands *Model::globalConn = gridDatabase.conn;
@@ -143,3 +145,5 @@ void GridDatabase::init() {
         l << "ok" << endl;
     }
 }
+
+} // namespace mongo

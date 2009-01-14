@@ -19,6 +19,8 @@
 #include "../stdafx.h"
 #include "../grid/message.h"
 
+namespace mongo {
+
 void jniCallback(Message& m, Message& out);
 
 class MutexInfo {
@@ -71,7 +73,11 @@ struct dblock : public lock {
     }
 };
 
+} // namespace mongo
+
 #include "boost/version.hpp"
+
+namespace mongo {
 
 /* a scoped release of a mutex temporarily -- like a scopedlock but reversed.
 */
@@ -93,7 +99,11 @@ struct temprelease {
     }
 };
 
+} // namespace mongo
+
 #include "pdfile.h"
+
+namespace mongo {
 
 // tempish...move to TLS or pass all the way down as a parm
 extern map<string,Database*> databases;
@@ -189,5 +199,7 @@ struct dbtemprelease {
             setClient(clientname.c_str(), clientpath.c_str());
     }
 };
+
+} // namespace mongo
 
 #include "dbinfo.h"

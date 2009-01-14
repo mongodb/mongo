@@ -21,6 +21,8 @@
 #include "pdfile.h"
 #include "jsobj.h"
 
+namespace mongo {
+
 extern int otherTraceLevel;
 
 DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
@@ -229,3 +231,5 @@ struct BtreeUnitTest {
         assert( minDiskLoc.compare(maxDiskLoc) < 0 );
     }
 } btut;
+
+} // namespace mongo

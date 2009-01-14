@@ -31,6 +31,8 @@
 #include "replset.h"
 #include "scanandorder.h"
 
+namespace mongo {
+
 /* We cut off further objects once we cross this threshold; thus, you might get
    a little bit more than this, it is a threshold rather than a limit.
 */
@@ -884,3 +886,5 @@ QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
 
     return qr;
 }
+
+} // namespace mongo

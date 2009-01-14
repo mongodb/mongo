@@ -22,6 +22,8 @@
 
 #include "../stdafx.h"
 
+namespace mongo {
+
 class BufBuilder {
 public:
     BufBuilder(int initsize = 512) : size(initsize) {
@@ -106,3 +108,5 @@ private:
     int l;
     int size;
 };
+
+} // namespace mongo

@@ -22,6 +22,8 @@
 #include "stdafx.h"
 #include "../util/mmap.h"
 
+namespace mongo {
+
 int test2_old() {
     cout << "test2" << endl;
     printStackTrace();
@@ -61,3 +63,5 @@ int test2_old() {
 
     return 1;
 }
+
+} // namespace mongo

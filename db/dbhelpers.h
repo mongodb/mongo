@@ -22,6 +22,8 @@
 
 #pragma once
 
+namespace mongo {
+
 
 /* Get/put the first object from a collection.  Generally only useful if the collection
    only ever has a single object -- which is a "singleton collection".
@@ -57,3 +59,5 @@ public:
         database = old;
     }
 };
+
+} // namespace mongo

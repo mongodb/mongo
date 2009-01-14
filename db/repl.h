@@ -30,6 +30,8 @@
 
 #include "../client/dbclient.h"
 
+namespace mongo {
+
 class DBClientConnection;
 class DBClientCursor;
 extern bool slave;
@@ -182,3 +184,5 @@ inline void logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt
     if ( master )
         _logOp(opstr, ns, obj, patt, b);
 }
+
+} // namespace mongo

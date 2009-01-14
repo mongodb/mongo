@@ -22,6 +22,8 @@
 
 #include <pcrecpp.h>
 
+namespace mongo {
+
 class RegexMatcher {
 public:
     const char *fieldName;
@@ -132,3 +134,5 @@ private:
 
     bool checkInIndex;
 };
+
+} // namespace mongo

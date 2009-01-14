@@ -24,10 +24,16 @@
 #include "javajs.h"
 #include "../util/unittest.h"
 
+namespace mongo {
+
 #if defined(_WIN32)
+
+} // namespace mongo
 
 #include <hash_map>
 using namespace stdext;
+
+namespace mongo {
 
 typedef const char * MyStr;
 struct less_str {
@@ -43,7 +49,12 @@ typedef hash_map<const char*, int, hash_compare<const char *, less_str> > strhas
 
 #else
 
+} // namespace mongo
+
 #include <ext/hash_map>
+
+namespace mongo {
+
 using namespace __gnu_cxx;
 
 typedef const char * MyStr;
@@ -96,7 +107,11 @@ JSMatcher::~JSMatcher() {
     delete where;
 }
 
+} // namespace mongo
+
 #include "pdfile.h"
+
+namespace mongo {
 
 /* _jsobj          - the query pattern
    indexKeyPattern - the "key pattern" / template of what is in the keys of the index we are using.
@@ -527,3 +542,5 @@ struct RXTest : public UnitTest {
         assert( part.PartialMatch("dwight") );
     }
 } rxtest;
+
+} // namespace mongo

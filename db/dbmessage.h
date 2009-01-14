@@ -18,6 +18,8 @@
 #include "jsobj.h"
 #include "namespace.h"
 
+namespace mongo {
+
 /* For the database/server protocol, these objects and functions encapsulate
    the various messages transmitted over the connection.
 */
@@ -121,7 +123,11 @@ public:
     }
 };
 
+} // namespace mongo
+
 #include "../client/dbclient.h"
+
+namespace mongo {
 
 inline void replyToQuery(int queryResultFlags,
                          MessagingPort& p, Message& requestMsg,
@@ -145,7 +151,11 @@ inline void replyToQuery(int queryResultFlags,
     p.reply(requestMsg, *resp, requestMsg.data->id);
 }
 
+} // namespace mongo
+
 //#include "bsonobj.h"
+
+namespace mongo {
 
 inline void replyToQuery(int queryResultFlags,
                          MessagingPort& p, Message& requestMsg,
@@ -155,3 +165,5 @@ inline void replyToQuery(int queryResultFlags,
         p, requestMsg,
         (void *) responseObj.objdata(), responseObj.objsize(), 1);
 }
+
+} // namespace mongo

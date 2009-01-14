@@ -22,6 +22,8 @@
 
 #pragma once
 
+namespace mongo {
+
 #pragma pack(push,1)
 
 class Record;
@@ -143,3 +145,5 @@ public:
 };
 
 #pragma pack(pop)
+
+} // namespace mongo

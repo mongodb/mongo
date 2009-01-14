@@ -30,6 +30,8 @@
 
 #include <set>
 
+namespace mongo {
+
 class BSONObj;
 class Record;
 class BSONObjBuilder;
@@ -765,7 +767,11 @@ public:
 };
 */
 
+} // namespace mongo
+
 #include "matcher.h"
+
+namespace mongo {
 
 extern BSONObj maxKey;
 extern BSONObj minKey;
@@ -869,3 +875,5 @@ inline void BSONObj::validateEmpty() {
         *this = emptyObj;
 }
 
+
+} // namespace mongo

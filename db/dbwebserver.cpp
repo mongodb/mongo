@@ -23,6 +23,8 @@
 #include "replset.h"
 #include "instance.h"
 
+namespace mongo {
+
 extern int port;
 extern const char *replInfo;
 
@@ -366,3 +368,5 @@ void webServerThread() {
     if ( mini.init(port+1000) )
         mini.run();
 }
+
+} // namespace mongo

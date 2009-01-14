@@ -23,6 +23,8 @@
 #include "jsobj.h"
 #include "pdfile.h"
 
+namespace mongo {
+
 auto_ptr<Cursor> getSpecialCursor(const char *ns);
 
 class SingleResultObjCursor : public Cursor {
@@ -71,3 +73,5 @@ public:
 
 void profile(const char *str,
              int millis);
+
+} // namespace mongo

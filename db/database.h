@@ -22,6 +22,8 @@
    Each database database has its own set of files -- dbname.ns, dbname.0, dbname.1, ...
 */
 
+namespace mongo {
+
 class Database {
 public:
     Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
@@ -128,3 +130,4 @@ private:
     bool _haveLogged;
 };
 
+} // namespace mongo

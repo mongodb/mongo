@@ -22,6 +22,8 @@
 #include "../grid/message.h"
 #include "../db/jsobj.h"
 
+namespace mongo {
+
 /* the query field 'options' can have these bits set: */
 enum QueryOptions {
     /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
@@ -438,3 +440,5 @@ public:
 };
 
 
+
+} // namespace mongo

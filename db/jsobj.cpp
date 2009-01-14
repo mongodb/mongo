@@ -22,6 +22,8 @@
 #include <limits>
 #include "../util/unittest.h"
 
+namespace mongo {
+
 BSONElement nullElement;
 
 ostream& operator<<( ostream &s, const OID &o ) {
@@ -175,7 +177,7 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
                 s << number();
             } else {
                 stringstream ss;
-                ss << "Number " << number() << " cannot be represented in JSON" << endl;
+                ss << "Number " << number() << " cannot be represented in JSON";
                 string message = ss.str();
                 massert( message.c_str(), false );
             }
@@ -285,8 +287,7 @@ string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames 
         default:
             stringstream ss;
             ss << "Cannot create a properly formatted JSON string with "
-                << "element: " << toString() << " of type: " << type()
-                << endl;
+	       << "element: " << toString() << " of type: " << type();
             string message = ss.str();
             massert( message.c_str(), false );
     }
@@ -897,3 +898,5 @@ BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const double value ){
     return *_builder;
 }
 
+
+} // namespace mongo

@@ -17,6 +17,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+namespace mongo {
+
 struct MiniLex {
     strhashmap reserved;
     bool ic[256]; // ic=Identifier Character
@@ -109,3 +111,5 @@ struct MiniLex {
         reserved["with "] = true;
     }
 };
+
+} // namespace mongo

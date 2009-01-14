@@ -4,6 +4,8 @@
 #include "security.h"
 #include "../util/md5.hpp"
 
+namespace mongo {
+
 extern "C" int do_md5_test(void);
 
 boost::thread_specific_ptr<AuthenticationInfo> authInfo;
@@ -37,8 +39,12 @@ struct Security {
     }
 } security;
 
+} // namespace mongo
+
 #include "commands.h"
 #include "jsobj.h"
+
+namespace mongo {
 
 class CmdGetNonce : public Command { 
 public:
@@ -61,3 +67,5 @@ public:
     }
 } cmdAuthenticate;
 
+
+} // namespace mongo

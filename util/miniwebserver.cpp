@@ -20,6 +20,8 @@
 #include "stdafx.h"
 #include "miniwebserver.h"
 
+namespace mongo {
+
 MiniWebServer::MiniWebServer() {
     sock = 0;
 }
@@ -181,3 +183,5 @@ void MiniWebServer::run() {
         closesocket(s);
     }
 }
+
+} // namespace mongo

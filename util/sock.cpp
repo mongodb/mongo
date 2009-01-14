@@ -19,6 +19,8 @@
 #include "stdafx.h"
 #include "sock.h"
 
+namespace mongo {
+
 static boost::mutex sock_mutex;
 // .empty() if err
 string hostbyname(const char *hostname) {
@@ -187,3 +189,5 @@ void xmain() {
 #endif
 
 
+
+} // namespace mongo

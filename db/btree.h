@@ -23,6 +23,8 @@
 #include "storage.h"
 #include "pdfile.h"
 
+namespace mongo {
+
 #pragma pack(push,1)
 
 struct _KeyNode {
@@ -266,3 +268,5 @@ private:
 };
 
 #pragma pack(pop)
+
+} // namespace mongo;

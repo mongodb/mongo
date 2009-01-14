@@ -18,6 +18,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+namespace mongo {
+
 // Next default values for new objects
 //
 #ifdef APSTUDIO_INVOKED
@@ -28,3 +30,5 @@
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
+
+} // namespace mongo

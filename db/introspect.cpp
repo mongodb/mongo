@@ -24,6 +24,8 @@
 #include "jsobj.h"
 #include "pdfile.h"
 
+namespace mongo {
+
 typedef map<string,Cursor*> StringToCursor;
 StringToCursor *specialNamespaces;
 
@@ -53,3 +55,5 @@ void profile(const char *str,
     theDataFileMgr.insert(database->profileName.c_str(),
                           p.objdata(), p.objsize(), true);
 }
+
+} // namespace mongo

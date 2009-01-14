@@ -45,6 +45,8 @@
 #include "db.h"
 #include "commands.h"
 
+namespace mongo {
+
 extern bool quiet;
 extern boost::mutex dbMutex;
 extern long long oplogSize;
@@ -65,7 +67,11 @@ bool replacePeer = false;
 */
 const char *allDead = 0;
 
+} // namespace mongo
+
 #include "replset.h"
+
+namespace mongo {
 
 #define debugrepl(z) log() << "debugrepl " << z << '\n'
 //define debugrepl
@@ -1185,3 +1191,5 @@ void startReplication() {
 void pairWith(const char *remoteEnd, const char *arb) {
     replPair = new ReplPair(remoteEnd, arb);
 }
+
+} // namespace mongo

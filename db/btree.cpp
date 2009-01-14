@@ -20,6 +20,8 @@
 #include "btree.h"
 #include "pdfile.h"
 
+namespace mongo {
+
 /* it is easy to do custom sizes for a namespace - all the same for now */
 const int BucketSize = 8192;
 const int KeyMax = BucketSize / 10;
@@ -808,3 +810,4 @@ void BtreeBucket::shape(stringstream& ss) {
     _shape(0, ss);
 }
 
+} // namespace mongo

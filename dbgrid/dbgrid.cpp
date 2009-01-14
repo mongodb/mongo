@@ -22,6 +22,8 @@
 #include "../client/connpool.h"
 #include "gridconfig.h"
 
+namespace mongo {
+
 bool dashDashInfer = false;
 vector<string> dashDashGridDb;
 int port = 27017;
@@ -34,7 +36,11 @@ string getDbContext() {
 
 #if !defined(_WIN32)
 
+} // namespace mongo
+
 #include <signal.h>
+
+namespace mongo {
 
 void pipeSigHandler( int signal ) {
     psignal( signal, "Signal Received : ");
@@ -124,6 +130,10 @@ void start() {
     l.listen();
 }
 
+} // namespace mongo
+
+using namespace mongo;
+
 int main(int argc, char* argv[], char *envp[] ) {
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);
@@ -179,8 +189,12 @@ int main(int argc, char* argv[], char *envp[] ) {
     return 0;
 }
 
+namespace mongo {
+
 #undef exit
 void dbexit(int rc, const char *why) {
     log() << "dbexit: " << why << " rc:" << rc << endl;
     exit(rc);
 }
+
+} // namespace mongo

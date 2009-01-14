@@ -18,6 +18,8 @@
 
 #pragma once
 
+namespace mongo {
+
 /* this is an "accessor" class to data held in local.dbinfo.<dbname>
 
    system.dbinfo contains:
@@ -70,3 +72,5 @@ inline void Database::finishInit() {
     DBInfo i(name.c_str());
     _haveLogged = i.haveLogged();
 }
+
+} // namespace mongo

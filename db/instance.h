@@ -19,6 +19,8 @@
 
 #pragma once
 
+namespace mongo {
+
 // turn on or off the oplog.* files which the db can generate.
 // these files are for diagnostic purposes and are unrelated to
 // local.oplog.$main used by replication.
@@ -99,3 +101,5 @@ class DBDirectClient : public DBClientBase {
         return say( toSend );
     }
 };
+
+} // namespace mongo

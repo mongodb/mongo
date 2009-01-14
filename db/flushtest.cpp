@@ -3,6 +3,8 @@
 #include "../util/goodies.h"
 #include <fcntl.h>
 
+namespace mongo {
+
 // logstream defines these, we don't want that:
 #undef cout
 #undef endl
@@ -128,3 +130,5 @@ int main(int argc, char* argv[], char *envp[] ) {
     
 	return 0;
 }
+
+} // namespace mongo

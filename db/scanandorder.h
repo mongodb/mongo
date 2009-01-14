@@ -20,6 +20,8 @@
 
 #pragma once
 
+namespace mongo {
+
 /* todo:
    _ handle compound keys with differing directions.  we don't handle this yet: neither here nor in indexes i think!!!
    _ limit amount of data
@@ -135,3 +137,5 @@ done:
     }
 
 };
+
+} // namespace mongo

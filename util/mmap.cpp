@@ -19,6 +19,8 @@
 #include "stdafx.h"
 #include "mmap.h"
 
+namespace mongo {
+
 set<MemoryMappedFile*> mmfiles;
 
 MemoryMappedFile::~MemoryMappedFile() {
@@ -49,7 +51,11 @@ void MemoryMappedFile::updateLength( const char *filename, int &length ) const {
 
 #if defined(_WIN32)
 
+} // namespace mongo
+
 #include "windows.h"
+
+namespace mongo {
 
 MemoryMappedFile::MemoryMappedFile() {
     fd = 0;
@@ -120,11 +126,15 @@ void MemoryMappedFile::flush(bool) {
 
 #else
 
+} // namespace mongo
+
 #include <errno.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+namespace mongo {
 
 MemoryMappedFile::MemoryMappedFile() {
     fd = 0;
@@ -208,3 +218,5 @@ void MemoryMappedFile::flush(bool sync) {
 void* MemoryMappedFile::map(const char *filename) {
     return map( filename , file_size( filename ) ); // file_size is from boost
 }
+
+} // namespace mongo

@@ -24,6 +24,8 @@
 
 #include <fcntl.h>
 
+namespace mongo {
+
 namespace po = boost::program_options;
 
 namespace import {
@@ -107,7 +109,11 @@ namespace import {
 
         drillDown( conn , dirRoot );
     }
-}
+} // namespace import
+
+} // namespace mongo
+
+using namespace mongo;
 
 int main( int argc , char ** argv ){
 
@@ -151,4 +157,3 @@ int main( int argc , char ** argv ){
     import::go( host , dir );
     return 0;
 }
-
