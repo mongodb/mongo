@@ -93,7 +93,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 	/* Search the tree. */
 	for (;; --level) {
 		if ((ret =
-		    __wt_bt_page_in(db, addr, WT_ISLEAF(level), page)) != 0)
+		    __wt_bt_page_in(db, addr, WT_ISLEAF(level), &page)) != 0)
 			return (ret);
 		level = page->hdr->level;
 

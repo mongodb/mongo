@@ -90,15 +90,23 @@ typedef	struct __wt_indx {
 } WT_INDX;
 
 struct __wt_page {
+	/*********************************************************
+	 * The following fields are owned by the cache layer.
+	 *********************************************************/
 	u_int32_t    file_id;			/* File ID */
 	u_int32_t    addr;			/* File block address */
 	u_int32_t    frags;			/* Number of fragments */
-	WT_PAGE_HDR *hdr;			/* On-disk page */
 
 	u_int8_t ref;				/* Reference count */
+
 	TAILQ_ENTRY(__wt_page) q;		/* LRU queue */
 	TAILQ_ENTRY(__wt_page) hq;		/* Hash queue */
 
+	WT_PAGE_HDR *hdr;			/* On-disk page */
+
+	/*********************************************************
+	 * The following fields are owned by the btree layer.
+	 *********************************************************/
 	u_int8_t *first_free;			/* First free byte address */
 	u_int32_t space_avail;			/* Available page memory */
 
@@ -345,15 +353,6 @@ struct __wt_item_ovfl {
 	u_int32_t len;			/* Overflow length */
 	u_int32_t addr;			/* Overflow address */
 };
-
-/* Macros to read pages, and read/allocate overflow pages. */
-#define	__wt_bt_page_in(db, addr, isleaf, page)				\
-	((ret = __wt_cache_db_in(db, addr,				\
-	    (isleaf) ? WT_FRAGS_PER_LEAF(db) : WT_FRAGS_PER_INTL(db),	\
-	    &(page), 0)) != 0 ? ret :					\
-	    (page->indx == NULL ? __wt_bt_page_inmem(db, page) : 0))
-#define	__wt_bt_ovfl_page_in(db, addr, len, page)			\
-	__wt_cache_db_in(db, addr, WT_OVFL_BYTES_TO_FRAGS(db, len), &(page), 0)
 
 #if defined(__cplusplus)
 }
