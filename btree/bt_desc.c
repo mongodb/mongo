@@ -86,7 +86,7 @@ __wt_bt_desc_read(DB *db)
 	 * and pagesizes from it.
 	 */
 	if ((ret = __wt_cache_db_in(
-	    db, WT_ADDR_FIRST_PAGE, 1, &page, WT_UNFORMATTED)) != 0)
+	    db, WT_ADDR_FIRST_PAGE, 1, WT_UNFORMATTED, &page)) != 0)
 		return (ret);
 
 	memcpy(&desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
@@ -115,7 +115,7 @@ __wt_bt_desc_write(DB *db, u_int32_t root_addr)
 	idb = db->idb;
 
 	if ((ret = __wt_cache_db_in(
-	    db, WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_LEAF(db), &page, 0)) != 0)
+	    db, WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_LEAF(db), 0, &page)) != 0)
 		return (ret);
 
 	idb->root_addr = root_addr;
