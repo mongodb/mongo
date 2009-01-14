@@ -57,7 +57,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	WT_CLEAR(last_key_ovfl);
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		if ((ret = __wt_bt_page_in(db, addr, 1, page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, 1, &page)) != 0)
 			return (ret);
 
 		WT_ITEM_FOREACH(page, item, i)
@@ -95,8 +95,8 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_bt_ovfl_page_in(db,
-				    ovfl->addr, ovfl->len, ovfl_page)) != 0)
+				if ((ret = __wt_bt_ovfl_in(db,
+				    ovfl->addr, ovfl->len, &ovfl_page)) != 0)
 					goto err;
 
 				/*
@@ -151,8 +151,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	}
 
 	/* Discard any space allocated to hold an overflow key. */
-	if (last_key_ovfl.data != NULL)
-		__wt_free(env, last_key_ovfl.data);
+	WT_FREE_AND_CLEAR(env, last_key_ovfl.data);
 
 	if (0) {
 err:		ret = WT_ERROR;
@@ -179,7 +178,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 	/* Walk down the duplicates tree to the first leaf page. */
 	for (;;) {
 		if ((ret = __wt_bt_page_in(db, offp->addr,
-		    offp->level == WT_LEAF_LEVEL ? 1 : 0, page)) != 0)
+		    offp->level == WT_LEAF_LEVEL ? 1 : 0, &page)) != 0)
 			goto err;
 
 		if (offp->level == WT_LEAF_LEVEL)
@@ -201,8 +200,8 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 				break;
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_bt_ovfl_page_in(
-				    db, ovfl->addr, ovfl->len, ovfl_page)) != 0)
+				if ((ret = __wt_bt_ovfl_in(db,
+				    ovfl->addr, ovfl->len, &ovfl_page)) != 0)
 					goto err;
 				func(
 				    WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
@@ -223,7 +222,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 		if (addr == WT_ADDR_INVALID)
 			break;
 
-		if ((ret = __wt_bt_page_in(db, addr, 1, page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, 1, &page)) != 0)
 			goto err;
 	}
 
