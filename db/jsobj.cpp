@@ -864,3 +864,22 @@ struct BsonUnitTest : public UnitTest {
         assert( cmp < 0 );
     }
 } bson_unittest;
+
+
+
+
+BSONObjBuilderValueStream::BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder ){
+    _fieldName = fieldName;
+    _builder = builder;
+}
+    
+BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const char * value ){
+    _builder->append( _fieldName , value );
+    return *_builder;
+}
+
+BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const int value ){
+    _builder->append( _fieldName , value );
+    return *_builder;
+}
+

@@ -498,6 +498,21 @@ public:
 };
 ostream& operator<<( ostream &s, const BSONObj &o );
 
+#define BUILDOBJ(x) ( BSONObjBuilder() << x ).doneAndDecouple()
+
+class BSONObjBuilderValueStream {
+public:
+    BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder );
+    
+    BSONObjBuilder& operator<<( const char * value );
+    BSONObjBuilder& operator<<( const int value );
+
+private:
+    const char * _fieldName;
+    BSONObjBuilder * _builder;
+};
+
+
 class BSONObjBuilder {
 public:
     BSONObjBuilder(int initsize=512) : b(initsize) {
@@ -670,6 +685,15 @@ public:
         o << i;
         return o.str();
     }
+
+    BSONObjBuilderValueStream operator<<(const char * name ){
+        return BSONObjBuilderValueStream( name , this );
+    }
+
+    BSONObjBuilderValueStream operator<<( string name ){
+        return BSONObjBuilderValueStream( name.c_str() , this );
+    }
+
         
 private:
     // Append the provided arr object as an array.
@@ -688,6 +712,7 @@ private:
 
     BufBuilder b;
 };
+
 
 /* iterator for a BSONObj
 
