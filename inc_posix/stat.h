@@ -51,26 +51,28 @@ struct __wt_stats {
 #define	WT_STAT_BULK_OVERFLOW_KEY	    2
 #define	WT_STAT_BULK_PAIRS_READ		    3
 #define	WT_STAT_DB_CACHE_ALLOC		    4
-#define	WT_STAT_DB_CACHE_DIRTY		    5
-#define	WT_STAT_DB_CACHE_HIT		    6
-#define	WT_STAT_DB_CACHE_MISS		    7
-#define	WT_STAT_EXTSIZE			    8
-#define	WT_STAT_FRAGSIZE		    9
-#define	WT_STAT_INTLSIZE		   10
-#define	WT_STAT_LEAFSIZE		   11
-#define	WT_STAT_DB_TOTAL_ENTRIES	   12
+#define	WT_STAT_DB_CACHE_CLEAN		    5
+#define	WT_STAT_DB_CACHE_DIRTY		    6
+#define	WT_STAT_DB_CACHE_HIT		    7
+#define	WT_STAT_DB_CACHE_MISS		    8
+#define	WT_STAT_EXTSIZE			    9
+#define	WT_STAT_FRAGSIZE		   10
+#define	WT_STAT_INTLSIZE		   11
+#define	WT_STAT_LEAFSIZE		   12
+#define	WT_STAT_DB_TOTAL_ENTRIES	   13
 
 /*
  * Statistics entries for the ENV handle.
  */
 #define	WT_STAT_CACHE_ALLOC		    0
-#define	WT_STAT_CACHE_DIRTY		    1
-#define	WT_STAT_CACHE_EVICT		    2
-#define	WT_STAT_CACHE_HIT		    3
-#define	WT_STAT_CACHE_MISS		    4
-#define	WT_STAT_CACHE_WRITE		    5
-#define	WT_STAT_CACHE_WRITE_EVICT	    6
-#define	WT_STAT_ENV_TOTAL_ENTRIES	    7
+#define	WT_STAT_CACHE_CLEAN		    1
+#define	WT_STAT_CACHE_DIRTY		    2
+#define	WT_STAT_CACHE_EVICT		    3
+#define	WT_STAT_CACHE_HIT		    4
+#define	WT_STAT_CACHE_MISS		    5
+#define	WT_STAT_CACHE_WRITE		    6
+#define	WT_STAT_CACHE_WRITE_EVICT	    7
+#define	WT_STAT_ENV_TOTAL_ENTRIES	    8
 
 /* Statistics section: END */
 

@@ -51,6 +51,7 @@ __wt_stat_alloc_db(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_CACHE_HIT].desc = "reads found in the cache";
 	stats[WT_STAT_DB_CACHE_MISS].desc = "reads not found in the cache";
 	stats[WT_STAT_DB_CACHE_DIRTY].desc = "dirty pages in the cache";
+	stats[WT_STAT_DB_CACHE_CLEAN].desc = "clean pages in the cache";
 
 	*statsp = stats;
 	return (0);
@@ -71,6 +72,7 @@ __wt_stat_clear_db(WT_STATS *stats)
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;
 	stats[WT_STAT_DB_CACHE_DIRTY].v = 0;
+	stats[WT_STAT_DB_CACHE_CLEAN].v = 0;
 	return (0);
 }
 
@@ -88,6 +90,7 @@ __wt_stat_alloc_env(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_CACHE_HIT].desc = "reads found in the cache";
 	stats[WT_STAT_CACHE_MISS].desc = "reads not found in the cache";
 	stats[WT_STAT_CACHE_DIRTY].desc = "dirty pages in the cache";
+	stats[WT_STAT_CACHE_CLEAN].desc = "clean pages in the cache";
 	stats[WT_STAT_CACHE_WRITE_EVICT].desc =
 	    "dirty pages evicted from the cache";
 	stats[WT_STAT_CACHE_EVICT].desc = "clean pages evicted from the cache";
@@ -104,6 +107,7 @@ __wt_stat_clear_env(WT_STATS *stats)
 	stats[WT_STAT_CACHE_HIT].v = 0;
 	stats[WT_STAT_CACHE_MISS].v = 0;
 	stats[WT_STAT_CACHE_DIRTY].v = 0;
+	stats[WT_STAT_CACHE_CLEAN].v = 0;
 	stats[WT_STAT_CACHE_WRITE_EVICT].v = 0;
 	stats[WT_STAT_CACHE_EVICT].v = 0;
 	stats[WT_STAT_CACHE_WRITE].v = 0;
