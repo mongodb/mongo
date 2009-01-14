@@ -69,9 +69,9 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	 * so we check the in-memory page information -- pages in the cache
 	 * should have in-memory page information.
 	 */
-	if ((ret = __wt_cache_db_in(db, addr, 1, &page, WT_UNFORMATTED)) != 0)
+	if ((ret = __wt_cache_db_in(db, addr, 1, WT_UNFORMATTED, &page)) != 0)
 		return (ret);
-	if (page->indx == NULL) {
+	if (page->indx_count == 0) {
 		switch (page->hdr->type) {
 		case WT_PAGE_OVFL:
 			frags =
@@ -90,7 +90,7 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 		}
 		if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
 			return (ret);
-		if ((ret = __wt_cache_db_in(db, addr, frags, &page, 0)) != 0)
+		if ((ret = __wt_cache_db_in(db, addr, frags, 0, &page)) != 0)
 			return (ret);
 	}
 
@@ -100,6 +100,49 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 		ret = tret;
 
 	return (ret);
+}
+
+/*
+ * __wt_bt_dump_ipage --
+ *	Dump a single in-memory page in debugging mode.
+ */
+int
+__wt_bt_dump_ipage(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
+{
+	WT_INDX *indx;
+	u_int32_t i;
+	int do_close;
+
+	/* Optionally dump to a file, else to a stream, default to stdout. */
+	do_close = 0;
+	if (ofile != NULL) {
+		if ((fp = fopen(ofile, "w")) == NULL)
+			return (WT_ERROR);
+		do_close = 1;
+	} else if (fp == NULL)
+		fp = stdout;
+
+	WT_INDX_FOREACH(page, indx, i) {
+		fprintf(fp, "%6lu: {addr: ", i);
+		if (indx->addr == WT_ADDR_INVALID)
+			fprintf(fp, "(none)");
+		else
+			fprintf(fp, "%lu", (u_long)indx->addr);
+		fprintf(fp, ", flags: %lx}\n", (u_long)indx->flags);
+		if (indx->data != NULL) {
+			fprintf(fp, "\tdbt: ");
+			__wt_bt_dump_dbt((DBT *)indx, fp);
+		}
+		if (indx->ditem != NULL) {
+			fprintf(fp, "\tditem: ");
+			__wt_bt_dump_item(db, indx->ditem, fp);
+		}
+	}
+
+	if (do_close)
+		(void)fclose(fp);
+
+	return (0);
 }
 
 /*
@@ -238,8 +281,8 @@ __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)ovfl->addr, (u_long)ovfl->len);
 
-		if (__wt_bt_ovfl_page_in(db,
-		    ovfl->addr, (u_int32_t)ovfl->len, page) == 0) {
+		if (__wt_bt_ovfl_in(db,
+		    ovfl->addr, (u_int32_t)ovfl->len, &page) == 0) {
 			__wt_bt_print(WT_PAGE_BYTE(page), ovfl->len, fp);
 			(void)__wt_cache_db_out(db, page, 0);
 		}
