@@ -322,6 +322,21 @@ public:
     BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
     
     virtual void insert( const char * ns , BSONObj obj );
+
+    virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 );
+
+    virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 );
+
+    /**
+       if name isn't specified, it will be created from the keys (reccomended)
+       @return whether or not sent message to db
+         should be true on first call, false on subsequent unless resetIndexCache was called
+     */
+    virtual bool ensureIndex( const char * ns , BSONObj keys , const char * name = 0 );
+    virtual void resetIndexCache();
+
+private:
+    set<string> _seenIndexes;
 };
 
 class DBClientPaired;
@@ -367,8 +382,6 @@ public:
     */
     virtual
     bool connect(const char *serverHostname, string& errmsg);
-
-    void remove( const char * ns , BSONObj obj , bool justOne = 0 );
 
 protected:
     virtual bool call( Message &toSend, Message &response, bool assertOk = true );

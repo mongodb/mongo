@@ -288,8 +288,6 @@ inline Record* PhysicalDataFile::recordAt(DiskLoc dl) {
     return header->getRecord(dl);
 }
 
-void sayDbContext(const char *msg = 0);
-
 inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
     if ( nextOfs != DiskLoc::NullOfs ) {
         /* defensive */

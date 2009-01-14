@@ -34,7 +34,8 @@ const bool debug=false;
 #include "string.h"
 #include "limits.h"
 
-extern void dbexit(int returnCode, const char *whyMsg = "");
+void sayDbContext(const char *msg = 0);
+void dbexit(int returnCode, const char *whyMsg = "");
 
 inline void * ourmalloc(size_t size) {
     void *x = malloc(size);

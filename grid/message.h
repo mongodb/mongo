@@ -22,6 +22,7 @@
 
 class Message;
 class MessagingPort;
+class PiggyBackData;
 typedef WrappingInt MSGID;
 const int DBPort = 27017;
 
@@ -61,12 +62,15 @@ public:
     bool call(Message& toSend, Message& response);
     void say(Message& toSend, int responseTo = -1);
     
-    void piggyBack( Message& toSend );
+    void piggyBack( Message& toSend , int responseTo = -1 );
 
 private:
     int sock;
+    PiggyBackData * piggyBackData;
 public:
     SockAddr farEnd;
+
+    friend class PiggyBackData;
 };
 
 #pragma pack(push)

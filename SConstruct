@@ -6,6 +6,18 @@
 
 import os
 
+# --- options ----
+AddOption('--prefix',
+          dest='prefix',
+          type='string',
+          nargs=1,
+          action='store',
+          metavar='DIR',
+          help='installation prefix')
+
+
+# --- environment setup ---
+
 env = Environment()
 
 env.Append( CPPPATH=[ "." ] )
@@ -134,11 +146,13 @@ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
 
 # testing
 clientEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
-
+clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
 
 #  ----  INSTALL -------
 
-installDir = "/opt/mongo"
+installDir = "/usr/local"
+if GetOption( "prefix" ):
+    installDir = GetOption( "prefix" )
 
 #binaries
 env.Install( installDir + "/bin" , "mongodump" )

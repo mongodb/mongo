@@ -507,6 +507,21 @@ public:
 
 typedef set< BSONObj, BSONObjCmpDefaultOrder > BSONObjSetDefaultOrder;
 
+#define BUILDOBJ(x) ( BSONObjBuilder() << x ).doneAndDecouple()
+
+class BSONObjBuilderValueStream {
+public:
+    BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder );
+    
+    BSONObjBuilder& operator<<( const char * value );
+    BSONObjBuilder& operator<<( const int value );
+    BSONObjBuilder& operator<<( const double value );
+
+private:
+    const char * _fieldName;
+    BSONObjBuilder * _builder;
+};
+
 class BSONObjBuilder {
 public:
     BSONObjBuilder(int initsize=512) : b(initsize) {
@@ -514,7 +529,7 @@ public:
     }
 
     /* add all the fields from the object specified to this object */
-    void appendElements(BSONObj x);
+    BSONObjBuilder& appendElements(BSONObj x);
 
     void append(BSONElement& e) {
         assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
@@ -554,10 +569,11 @@ public:
         b.append(fieldName);
         b.append(n);
     }
-    void append(const char *fieldName, double n) {
+    BSONObjBuilder& append(const char *fieldName, double n) {
         b.append((char) NumberDouble);
         b.append(fieldName);
         b.append(n);
+        return *this;
     }
     void appendOID(const char *fieldName, OID *oid = 0) {
         b.append((char) jstOID);
@@ -587,11 +603,12 @@ public:
         b.append((int) strlen(code)+1);
         b.append(code);
     }
-    void append(const char *fieldName, const char *str) {
+    BSONObjBuilder& append(const char *fieldName, const char *str) {
         b.append((char) String);
         b.append(fieldName);
         b.append((int) strlen(str)+1);
         b.append(str);
+        return *this;
     }
     void append(const char *fieldName, string str) {
         append(fieldName, str.c_str());
@@ -677,6 +694,15 @@ public:
         o << i;
         return o.str();
     }
+
+    BSONObjBuilderValueStream operator<<(const char * name ){
+        return BSONObjBuilderValueStream( name , this );
+    }
+
+    BSONObjBuilderValueStream operator<<( string name ){
+        return BSONObjBuilderValueStream( name.c_str() , this );
+    }
+
         
 private:
     // Append the provided arr object as an array.
@@ -695,6 +721,7 @@ private:
 
     BufBuilder b;
 };
+
 
 /* iterator for a BSONObj
 
@@ -825,13 +852,14 @@ inline BSONElement BSONObj::findElement(const char *name) const {
 }
 
 /* add all the fields from the object specified to this object */
-inline void BSONObjBuilder::appendElements(BSONObj x) {
+inline BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
     BSONObjIterator it(x);
     while ( it.more() ) {
         BSONElement e = it.next();
         if ( e.eoo() ) break;
         append(e);
     }
+    return *this;
 }
 
 extern BSONObj emptyObj;

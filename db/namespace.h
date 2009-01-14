@@ -62,6 +62,18 @@ public:
         return (x & 0x7fffffff) | 0x8000000; // must be > 0
     }
 
+
+    /**
+       ( foo.bar ).getSisterNS( "blah" ) == foo.blah
+     */
+    string getSisterNS( const char * local ){
+        assert( local && local[0] != '.' );
+        string old(buf);
+        if ( old.find( "." ) != string::npos )
+            old = old.substr( 0 , old.find( "." ) );
+        return old + "." + local;
+    }
+
     char buf[MaxNsLen];
 };
 
