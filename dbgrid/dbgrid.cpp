@@ -32,15 +32,6 @@ string getDbContext() {
     return "?";
 }
 
-/* this is a good place to set a breakpoint when debugging, as lots of warning things
-   (assert, wassert) call it.
-*/
-void sayDbContext(const char *errmsg) {
-    if ( errmsg )
-        problem() << errmsg << endl;
-    printStackTrace();
-}
-
 #if !defined(_WIN32)
 
 #include <signal.h>
