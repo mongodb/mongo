@@ -84,6 +84,9 @@ namespace mongo {
             dups.insert(loc);
             return false;
         }
+
+        virtual BSONObj prettyStartKey() const { return emptyObj; }
+        virtual BSONObj prettyEndKey() const { return emptyObj; }
     };
 
     class AdvanceStrategy {

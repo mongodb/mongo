@@ -742,6 +742,8 @@ fail:
             if ( explain ) {
                 BSONObjBuilder builder;
                 builder.append("cursor", c->toString());
+                builder.append("startKey", c->prettyStartKey());
+                builder.append("endKey", c->prettyEndKey());
                 builder.append("nscanned", nscanned);
                 builder.append("n", ordering ? so->size() : n);
                 if ( ordering )

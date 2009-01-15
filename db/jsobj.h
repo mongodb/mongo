@@ -487,6 +487,15 @@ namespace mongo {
             return (x & 0x7fffffff) | 0x8000000; // must be > 0
         }
 
+        // Return a version of this object where top level elements of types
+        // that are not part of the bson wire protocol are replaced with
+        // string identifier equivalents.
+        // TODO Support conversion of element types other than min and max.
+        BSONObj clientReadable() const;
+        
+        // Return new object with the field names replaced.
+        BSONObj replaceFieldNames( const vector< string > &names ) const;
+        
         // true unless corrupt
         bool valid() const;
     };

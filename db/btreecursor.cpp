@@ -60,13 +60,13 @@ namespace mongo {
 
 // Given a query, find the lowest and highest keys along our index that could
 // potentially match the query.  These lowest and highest keys will be mapped
-// to startKey and endKey based on the value of direction.
+// to startKey_ and endKey_ based on the value of direction.
     void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
         BSONObjBuilder startBuilder;
         BSONObjBuilder endBuilder;
-        set< string >fields;
-        getFields( indexDetails.keyPattern(), fields );
-        for ( set<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
+        vector< string >fields;
+        getIndexFields( fields );
+        for ( vector<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
             const char * field = i->c_str();
             BSONElement k = indexDetails.keyPattern().getFieldDotted( field );
             int number = (int) k.number(); // returns 0.0 if not numeric
@@ -109,7 +109,7 @@ namespace mongo {
     }
 
 // Expand all field names in key to use dotted notation.
-    void BtreeCursor::getFields( const BSONObj &key, set< string > &fields ) {
+    void BtreeCursor::getFields( const BSONObj &key, vector< string > &fields ) {
         BSONObjIterator i( key );
         while ( 1 ) {
             BSONElement k = i.next();
@@ -117,15 +117,15 @@ namespace mongo {
                 break;
             bool addedSubfield = false;
             if ( k.type() == Object ) {
-                set< string > subFields;
+                vector< string > subFields;
                 getFields( k.embeddedObject(), subFields );
-                for ( set< string >::iterator i = subFields.begin(); i != subFields.end(); ++i ) {
+                for ( vector< string >::iterator i = subFields.begin(); i != subFields.end(); ++i ) {
                     addedSubfield = true;
-                    fields.insert( k.fieldName() + string( "." ) + *i );
+                    fields.push_back( k.fieldName() + string( "." ) + *i );
                 }
             }
             if ( !addedSubfield )
-                fields.insert( k.fieldName() );
+                fields.push_back( k.fieldName() );
         }
     }
 
@@ -153,7 +153,7 @@ namespace mongo {
         return i > 0 ? 1 : -1;
     }
 
-// Check if the current key is beyond endKey.
+// Check if the current key is beyond endKey_.
     void BtreeCursor::checkEnd() {
         if ( bucket.isNull() )
             return;
