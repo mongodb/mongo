@@ -27,81 +27,81 @@ namespace mongo {
 //
 #define OPLOG if( 0 )
 
-int getOpLogging();
+    int getOpLogging();
 
 #define OPWRITE if( getOpLogging() & 1 ) _oplog.write((char *) m.data, m.data->len);
 #define OPREAD if( getOpLogging() & 2 ) _oplog.readop((char *) m.data, m.data->len);
 
-struct OpLog {
-    ofstream *f;
-    OpLog() : f(0) { }
-    void init() {
-        OPLOG {
-            stringstream ss;
-            ss << "oplog." << hex << time(0);
-            string name = ss.str();
-            f = new ofstream(name.c_str(), ios::out | ios::binary);
-            if ( ! f->good() ) {
-                problem() << "couldn't open log stream" << endl;
-                throw 1717;
+    struct OpLog {
+        ofstream *f;
+        OpLog() : f(0) { }
+        void init() {
+            OPLOG {
+                stringstream ss;
+                ss << "oplog." << hex << time(0);
+                string name = ss.str();
+                f = new ofstream(name.c_str(), ios::out | ios::binary);
+                if ( ! f->good() ) {
+                    problem() << "couldn't open log stream" << endl;
+                    throw 1717;
+                }
             }
         }
-    }
-    void flush() {
-        OPLOG f->flush();
-    }
-    void write(char *data,int len) {
-        OPLOG f->write(data,len);
-    }
-    void readop(char *data, int len) {
-        OPLOG {
-            bool log = (getOpLogging() & 4) == 0;
-            OCCASIONALLY log = true;
-            if ( log )
-                f->write(data,len);
+        void flush() {
+            OPLOG f->flush();
         }
-    }
-};
+        void write(char *data,int len) {
+            OPLOG f->write(data,len);
+        }
+        void readop(char *data, int len) {
+            OPLOG {
+                bool log = (getOpLogging() & 4) == 0;
+                OCCASIONALLY log = true;
+                if ( log )
+                    f->write(data,len);
+            }
+        }
+    };
 
-/* we defer response until we unlock.  don't want a blocked socket to
-   keep things locked.
-*/
-struct DbResponse {
-    Message *response;
-    MSGID responseTo;
-    DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt) {
-    }
-    DbResponse() {
-        response = 0;
-    }
-    ~DbResponse() {
-        delete response;
-    }
-};
+    /* we defer response until we unlock.  don't want a blocked socket to
+       keep things locked.
+    */
+    struct DbResponse {
+        Message *response;
+        MSGID responseTo;
+        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt) {
+        }
+        DbResponse() {
+            response = 0;
+        }
+        ~DbResponse() {
+            delete response;
+        }
+    };
 
-bool assembleResponse( Message &m, DbResponse &dbresponse );
+    bool assembleResponse( Message &m, DbResponse &dbresponse );
 
-void receivedKillCursors(Message& m);
-void receivedUpdate(Message& m, stringstream& ss);
-void receivedDelete(Message& m);
-void receivedInsert(Message& m, stringstream& ss);
-void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss);
-void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit);
-void getDatabaseNames( vector< string > &names );
+    void receivedKillCursors(Message& m);
+    void receivedUpdate(Message& m, stringstream& ss);
+    void receivedDelete(Message& m);
+    void receivedInsert(Message& m, stringstream& ss);
+    void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss);
+    void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit);
+    void getDatabaseNames( vector< string > &names );
 
 
 // --- local client ---
 
-class DBDirectClient : public DBClientBase {
-    virtual string toString() {
-        return "DBDirectClient";
-    }
-    virtual bool call( Message &toSend, Message &response, bool assertOk=true );
-    virtual void say( Message &toSend );
-    virtual void sayPiggyBack( Message &toSend ) {
-        // don't need to piggy back when connected locally
-        return say( toSend );
-    }
-};
+    class DBDirectClient : public DBClientBase {
+        virtual string toString() {
+            return "DBDirectClient";
+        }
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true );
+        virtual void say( Message &toSend );
+        virtual void sayPiggyBack( Message &toSend ) {
+            // don't need to piggy back when connected locally
+            return say( toSend );
+        }
+    };
 
 } // namespace mongo

@@ -30,105 +30,105 @@ namespace mongo {
 
 #pragma pack(push,1)
 
-/* you should define:
+    /* you should define:
 
-   int Key::hash() return > 0 always.
-*/
+       int Key::hash() return > 0 always.
+    */
 
-template <
-class Key,
-class Type
->
-class HashTable {
-public:
-    const char *name;
-    struct Node {
-        int hash;
-        Key k;
-        Type value;
-        bool inUse() {
-            return hash != 0;
-        }
-        void setUnused() {
-            hash = 0;
-        }
-    } *nodes;
-    int n;
-
-    int _find(const Key& k, bool& found) {
-        found = false;
-        int h = k.hash();
-        int i = h % n;
-        int start = i;
-        int chain = 0;
-        while ( 1 ) {
-            if ( !nodes[i].inUse() ) {
-                return i;
+    template <
+    class Key,
+    class Type
+    >
+    class HashTable {
+    public:
+        const char *name;
+        struct Node {
+            int hash;
+            Key k;
+            Type value;
+            bool inUse() {
+                return hash != 0;
             }
-            if ( nodes[i].hash == h && nodes[i].k == k ) {
-                found = true;
-                return i;
+            void setUnused() {
+                hash = 0;
             }
-            chain++;
-            i = (i+1) % n;
-            if ( i == start ) {
-                cout << "warning: hashtable is full " << name << endl;
-                return -1;
+        } *nodes;
+        int n;
+
+        int _find(const Key& k, bool& found) {
+            found = false;
+            int h = k.hash();
+            int i = h % n;
+            int start = i;
+            int chain = 0;
+            while ( 1 ) {
+                if ( !nodes[i].inUse() ) {
+                    return i;
+                }
+                if ( nodes[i].hash == h && nodes[i].k == k ) {
+                    found = true;
+                    return i;
+                }
+                chain++;
+                i = (i+1) % n;
+                if ( i == start ) {
+                    out() << "warning: hashtable is full " << name << endl;
+                    return -1;
+                }
+                if ( chain == 200 )
+                    out() << "warning: hashtable long chain " << name << endl;
             }
-            if ( chain == 200 )
-                cout << "warning: hashtable long chain " << name << endl;
         }
-    }
 
-public:
-    /* buf must be all zeroes on initialization. */
-    HashTable(void *buf, int buflen, const char *_name) : name(_name) {
-        int m = sizeof(Node);
-        // cout << "hashtab init, buflen:" << buflen << " m:" << m << endl;
-        n = buflen / m;
-        if ( (n & 1) == 0 )
-            n--;
-        nodes = (Node *) buf;
-        assert(nodes[n-1].hash == 0);
-        assert(nodes[0].hash == 0);
+    public:
+        /* buf must be all zeroes on initialization. */
+        HashTable(void *buf, int buflen, const char *_name) : name(_name) {
+            int m = sizeof(Node);
+            // out() << "hashtab init, buflen:" << buflen << " m:" << m << endl;
+            n = buflen / m;
+            if ( (n & 1) == 0 )
+                n--;
+            nodes = (Node *) buf;
+            assert(nodes[n-1].hash == 0);
+            assert(nodes[0].hash == 0);
 
-        assert( sizeof(Node) == 628 );
-        //cout << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
-    }
-
-    Type* get(const Key& k) {
-        bool found;
-        int i = _find(k, found);
-        if ( found )
-            return &nodes[i].value;
-        return 0;
-    }
-
-    void kill(const Key& k) {
-        bool found;
-        int i = _find(k, found);
-        if ( i >= 0 && found ) {
-            nodes[i].k.kill();
-            nodes[i].setUnused();
+            assert( sizeof(Node) == 628 );
+            //out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
         }
-    }
 
-    void put(const Key& k, const Type& value) {
-        bool found;
-        int i = _find(k, found);
-        if ( i < 0 )
-            return;
-        if ( !found ) {
-            nodes[i].k = k;
-            nodes[i].hash = k.hash();
+        Type* get(const Key& k) {
+            bool found;
+            int i = _find(k, found);
+            if ( found )
+                return &nodes[i].value;
+            return 0;
         }
-        else {
-            assert( nodes[i].hash == k.hash() );
-        }
-        nodes[i].value = value;
-    }
 
-};
+        void kill(const Key& k) {
+            bool found;
+            int i = _find(k, found);
+            if ( i >= 0 && found ) {
+                nodes[i].k.kill();
+                nodes[i].setUnused();
+            }
+        }
+
+        void put(const Key& k, const Type& value) {
+            bool found;
+            int i = _find(k, found);
+            if ( i < 0 )
+                return;
+            if ( !found ) {
+                nodes[i].k = k;
+                nodes[i].hash = k.hash();
+            }
+            else {
+                assert( nodes[i].hash == k.hash() );
+            }
+            nodes[i].value = value;
+        }
+
+    };
 
 #pragma pack(pop)
 

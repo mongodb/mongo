@@ -22,17 +22,17 @@
 
 namespace mongo {
 
-DBClientWithCommands* Shard::conn() {
-    return gridDatabase.conn;
-}
+    DBClientWithCommands* Shard::conn() {
+        return gridDatabase.conn;
+    }
 
-void Shard::serialize(BSONObjBuilder& to) {
-    to.append("name", name);
-}
+    void Shard::serialize(BSONObjBuilder& to) {
+        to.append("name", name);
+    }
 
-void Shard::unserialize(BSONObj& from) {
-    name = from.getStringField("name");
-    uassert("bad grid.shards.name", !name.empty());
-}
+    void Shard::unserialize(BSONObj& from) {
+        name = from.getStringField("name");
+        uassert("bad grid.shards.name", !name.empty());
+    }
 
 } // namespace mongo

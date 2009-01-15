@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-BSONObj fromjson(const char *str);
-BSONObj fromjson(const string &str);
+    BSONObj fromjson(const char *str);
+    BSONObj fromjson(const string &str);
 
 } // namespace mongo

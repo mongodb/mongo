@@ -27,21 +27,21 @@
 
 namespace mongo {
 
-class GridDatabase {
-public:
-    DBClientWithCommands *conn;
+    class GridDatabase {
+    public:
+        DBClientWithCommands *conn;
 //    DBClientPaired conn;
-    enum { Port = 27016 }; /* standard port # for a grid db */
-    GridDatabase();
-    ~GridDatabase();
-    string toString() {
-        return conn->toString();
-    }
+        enum { Port = 27016 }; /* standard port # for a grid db */
+        GridDatabase();
+        ~GridDatabase();
+        string toString() {
+            return conn->toString();
+        }
 
-    /* call at startup, this will initiate connection to the grid db */
-    void init();
-};
-extern GridDatabase gridDatabase;
+        /* call at startup, this will initiate connection to the grid db */
+        void init();
+    };
+    extern GridDatabase gridDatabase;
 
 
 } // namespace mongo

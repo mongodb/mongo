@@ -27,20 +27,20 @@
 
 namespace mongo {
 
-/* grid.shards
-     { name: 'hostname'
-     }
-*/
-class Shard : public Model {
-public:
-    string name; // hostname (less -l, -r)
+    /* grid.shards
+         { name: 'hostname'
+         }
+    */
+    class Shard : public Model {
+    public:
+        string name; // hostname (less -l, -r)
 
-    virtual const char * getNS() {
-        return "grid.shards";
-    }
-    virtual void serialize(BSONObjBuilder& to);
-    virtual void unserialize(BSONObj& from);
-    virtual DBClientWithCommands* conn();
-};
+        virtual const char * getNS() {
+            return "grid.shards";
+        }
+        virtual void serialize(BSONObjBuilder& to);
+        virtual void unserialize(BSONObj& from);
+        virtual DBClientWithCommands* conn();
+    };
 
 } // namespace mongo

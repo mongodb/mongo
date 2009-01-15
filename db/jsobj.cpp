@@ -24,449 +24,449 @@
 
 namespace mongo {
 
-BSONElement nullElement;
+    BSONElement nullElement;
 
-ostream& operator<<( ostream &s, const OID &o ) {
-    s << o.str();
-    return s;
-}
-
-string BSONElement::toString() const {
-    stringstream s;
-    switch ( type() ) {
-    case EOO:
-        return "EOO";
-    case Date:
-        s << fieldName() << ": Date(" << hex << date() << ')';
-        break;
-    case RegEx:
-    {
-        s << fieldName() << ": /" << regex() << '/';
-        const char *p = regexFlags();
-        if ( p ) s << p;
+    ostream& operator<<( ostream &s, const OID &o ) {
+        s << o.str();
+        return s;
     }
-    break;
-    case NumberDouble:
-    case NumberInt:
-        s.precision( 16 );
-        s << fieldName() << ": " << number();
-        break;
-    case Bool:
-        s << fieldName() << ": " << ( boolean() ? "true" : "false" );
-        break;
-    case Object:
-    case Array:
-        s << fieldName() << ": " << embeddedObject().toString();
-        break;
-    case Undefined:
-        s << fieldName() << ": undefined";
-        break;
-    case jstNULL:
-        s << fieldName() << ": null";
-        break;
-    case MaxKey:
-        s << fieldName() << ": MaxKey";
-        break;
-    case MinKey:
-        s << fieldName() << ": MinKey";
-        break;
-    case CodeWScope:
-        s << fieldName() << ": codewscope";
-        break;
-    case Code:
-        s << fieldName() << ": ";
-        if ( valuestrsize() > 80 )
-            s << string(valuestr()).substr(0, 70) << "...";
-        else {
-            s << valuestr();
-        }
-        break;
-    case Symbol:
-    case String:
-        s << fieldName() << ": ";
-        if ( valuestrsize() > 80 )
-            s << '"' << string(valuestr()).substr(0, 70) << "...\"";
-        else {
-            s << '"' << valuestr() << '"';
-        }
-        break;
-    case DBRef:
-        s << fieldName();
-        s << " : DBRef('" << valuestr() << "',";
+
+    string BSONElement::toString() const {
+        stringstream s;
+        switch ( type() ) {
+        case EOO:
+            return "EOO";
+        case Date:
+            s << fieldName() << ": Date(" << hex << date() << ')';
+            break;
+        case RegEx:
         {
-            OID *x = (OID *) (valuestr() + valuestrsize());
-            s << *x << ')';
+            s << fieldName() << ": /" << regex() << '/';
+            const char *p = regexFlags();
+            if ( p ) s << p;
         }
         break;
-    case jstOID:
-        s << fieldName() << " : ObjId(";
-        s << oid() << ')';
-        break;
-    case BinData:
-        s << fieldName() << " : BinData";
-        break;
-    default:
-        s << fieldName() << ": ?type=" << type();
-        break;
-    }
-    return s.str();
-}
-
-string escape( string s ) {
-    stringstream ret;
-    for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
-        switch ( *i ) {
-        case '"':
-            ret << "\\\"";
+        case NumberDouble:
+        case NumberInt:
+            s.precision( 16 );
+            s << fieldName() << ": " << number();
             break;
-        case '\\':
-            ret << "\\\\";
+        case Bool:
+            s << fieldName() << ": " << ( boolean() ? "true" : "false" );
             break;
-        case '/':
-            ret << "\\/";
+        case Object:
+        case Array:
+            s << fieldName() << ": " << embeddedObject().toString();
             break;
-        case '\b':
-            ret << "\\b";
+        case Undefined:
+            s << fieldName() << ": undefined";
             break;
-        case '\f':
-            ret << "\\f";
+        case jstNULL:
+            s << fieldName() << ": null";
             break;
-        case '\n':
-            ret << "\\n";
+        case MaxKey:
+            s << fieldName() << ": MaxKey";
             break;
-        case '\r':
-            ret << "\\r";
+        case MinKey:
+            s << fieldName() << ": MinKey";
             break;
-        case '\t':
-            ret << "\\t";
+        case CodeWScope:
+            s << fieldName() << ": codewscope";
+            break;
+        case Code:
+            s << fieldName() << ": ";
+            if ( valuestrsize() > 80 )
+                s << string(valuestr()).substr(0, 70) << "...";
+            else {
+                s << valuestr();
+            }
+            break;
+        case Symbol:
+        case String:
+            s << fieldName() << ": ";
+            if ( valuestrsize() > 80 )
+                s << '"' << string(valuestr()).substr(0, 70) << "...\"";
+            else {
+                s << '"' << valuestr() << '"';
+            }
+            break;
+        case DBRef:
+            s << fieldName();
+            s << " : DBRef('" << valuestr() << "',";
+            {
+                OID *x = (OID *) (valuestr() + valuestrsize());
+                s << *x << ')';
+            }
+            break;
+        case jstOID:
+            s << fieldName() << " : ObjId(";
+            s << oid() << ')';
+            break;
+        case BinData:
+            s << fieldName() << " : BinData";
             break;
         default:
-            if ( *i >= 0 && *i <= 0x1f ) {
-                ret << "\\u";
-                ret << hex;
-                ret.width( 4 );
-                ret.fill( '0' );
-                ret << int( *i );
-            } else {
-                ret << *i;
+            s << fieldName() << ": ?type=" << type();
+            break;
+        }
+        return s.str();
+    }
+
+    string escape( string s ) {
+        stringstream ret;
+        for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
+            switch ( *i ) {
+            case '"':
+                ret << "\\\"";
+                break;
+            case '\\':
+                ret << "\\\\";
+                break;
+            case '/':
+                ret << "\\/";
+                break;
+            case '\b':
+                ret << "\\b";
+                break;
+            case '\f':
+                ret << "\\f";
+                break;
+            case '\n':
+                ret << "\\n";
+                break;
+            case '\r':
+                ret << "\\r";
+                break;
+            case '\t':
+                ret << "\\t";
+                break;
+            default:
+                if ( *i >= 0 && *i <= 0x1f ) {
+                    ret << "\\u";
+                    ret << hex;
+                    ret.width( 4 );
+                    ret.fill( '0' );
+                    ret << int( *i );
+                } else {
+                    ret << *i;
+                }
             }
         }
+        return ret.str();
     }
-    return ret.str();
-}
 
-typedef boost::archive::iterators::base64_from_binary
-< boost::archive::iterators::transform_width
-< string::const_iterator, 6, 8 >
-> base64_t;
+    typedef boost::archive::iterators::base64_from_binary
+    < boost::archive::iterators::transform_width
+    < string::const_iterator, 6, 8 >
+    > base64_t;
 
-string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
-    stringstream s;
-    if ( includeFieldNames )
-        s << '"' << escape( fieldName() ) << "\" : ";
-    switch ( type() ) {
-    case String:
-    case Symbol:
-        s << '"' << escape( valuestr() ) << '"';
-        break;
-    case NumberInt:
-    case NumberDouble:
-        if ( number() >= -numeric_limits< double >::max() &&
-                number() <= numeric_limits< double >::max() ) {
-            s.precision( 16 );
-            s << number();
-        } else {
+    string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
+        stringstream s;
+        if ( includeFieldNames )
+            s << '"' << escape( fieldName() ) << "\" : ";
+        switch ( type() ) {
+        case String:
+        case Symbol:
+            s << '"' << escape( valuestr() ) << '"';
+            break;
+        case NumberInt:
+        case NumberDouble:
+            if ( number() >= -numeric_limits< double >::max() &&
+                    number() <= numeric_limits< double >::max() ) {
+                s.precision( 16 );
+                s << number();
+            } else {
+                stringstream ss;
+                ss << "Number " << number() << " cannot be represented in JSON";
+                string message = ss.str();
+                massert( message.c_str(), false );
+            }
+            break;
+        case Bool:
+            s << ( boolean() ? "true" : "false" );
+            break;
+        case jstNULL:
+            s << "null";
+            break;
+        case Object:
+            s << embeddedObject().jsonString( format );
+            break;
+        case Array: {
+            if ( embeddedObject().isEmpty() ) {
+                s << "[]";
+                break;
+            }
+            s << "[ ";
+            BSONObjIterator i( embeddedObject() );
+            BSONElement e = i.next();
+            if ( !e.eoo() )
+                while ( 1 ) {
+                    s << e.jsonString( format, false );
+                    e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    s << ", ";
+                }
+            s << " ]";
+            break;
+        }
+        case DBRef: {
+            OID *x = (OID *) (valuestr() + valuestrsize());
+            if ( format == TenGen )
+                s << "Dbref( ";
+            else
+                s << "{ \"$ns\" : ";
+            s << '"' << valuestr() << "\", ";
+            if ( format != TenGen )
+                s << "\"$id\" : ";
+            s << '"' << *x << "\" ";
+            if ( format == TenGen )
+                s << ')';
+            else
+                s << '}';
+            break;
+        }
+        case jstOID:
+            if ( format == TenGen )
+                s << "ObjectId( ";
+            s << '"' << oid() << '"';
+            if ( format == TenGen )
+                s << " )";
+            break;
+        case BinData: {
+            int len = *(int *)( value() );
+            BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
+            s << "{ \"$binary\" : \"";
+            char *start = ( char * )( value() ) + sizeof( int ) + 1;
+            string temp(start, len);
+            string base64 = string( base64_t( temp.begin() ), base64_t( temp.end() ) );
+            s << base64;
+            int padding = ( 4 - ( base64.length() % 4 ) ) % 4;
+            for ( int i = 0; i < padding; ++i )
+                s << '=';
+            s << "\", \"$type\" : \"" << hex;
+            s.width( 2 );
+            s.fill( '0' );
+            s << type << dec;
+            s << "\" }";
+            break;
+        }
+        case Date:
+            if ( format == Strict )
+                s << "{ \"$date\" : ";
+            else
+                s << "Date( ";
+            s << date();
+            if ( format == Strict )
+                s << " }";
+            else
+                s << " )";
+            break;
+        case RegEx:
+            if ( format == Strict )
+                s << "{ \"$regex\" : \"";
+            else
+                s << "/";
+            s << escape( regex() );
+            if ( format == Strict )
+                s << "\", \"$options\" : \"" << regexFlags() << "\" }";
+            else {
+                s << "/";
+                // FIXME Worry about alpha order?
+                for ( const char *f = regexFlags(); *f; ++f )
+                    switch ( *f ) {
+                    case 'g':
+                    case 'i':
+                    case 'm':
+                        s << *f;
+                    default:
+                        break;
+                    }
+            }
+            break;
+        default:
             stringstream ss;
-            ss << "Number " << number() << " cannot be represented in JSON";
+            ss << "Cannot create a properly formatted JSON string with "
+            << "element: " << toString() << " of type: " << type();
             string message = ss.str();
             massert( message.c_str(), false );
         }
-        break;
-    case Bool:
-        s << ( boolean() ? "true" : "false" );
-        break;
-    case jstNULL:
-        s << "null";
-        break;
-    case Object:
-        s << embeddedObject().jsonString( format );
-        break;
-    case Array: {
-        if ( embeddedObject().isEmpty() ) {
-            s << "[]";
+        return s.str();
+    }
+
+    int BSONElement::size() const {
+        if ( totalSize >= 0 )
+            return totalSize;
+
+        int x = 1;
+        switch ( type() ) {
+        case EOO:
+        case Undefined:
+        case jstNULL:
+        case MaxKey:
+        case MinKey:
             break;
-        }
-        s << "[ ";
-        BSONObjIterator i( embeddedObject() );
-        BSONElement e = i.next();
-        if ( !e.eoo() )
-            while ( 1 ) {
-                s << e.jsonString( format, false );
-                e = i.next();
-                if ( e.eoo() )
-                    break;
-                s << ", ";
-            }
-        s << " ]";
-        break;
-    }
-    case DBRef: {
-        OID *x = (OID *) (valuestr() + valuestrsize());
-        if ( format == TenGen )
-            s << "Dbref( ";
-        else
-            s << "{ \"$ns\" : ";
-        s << '"' << valuestr() << "\", ";
-        if ( format != TenGen )
-            s << "\"$id\" : ";
-        s << '"' << *x << "\" ";
-        if ( format == TenGen )
-            s << ')';
-        else
-            s << '}';
-        break;
-    }
-    case jstOID:
-        if ( format == TenGen )
-            s << "ObjectId( ";
-        s << '"' << oid() << '"';
-        if ( format == TenGen )
-            s << " )";
-        break;
-    case BinData: {
-        int len = *(int *)( value() );
-        BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
-        s << "{ \"$binary\" : \"";
-        char *start = ( char * )( value() ) + sizeof( int ) + 1;
-        string temp(start, len);
-        string base64 = string( base64_t( temp.begin() ), base64_t( temp.end() ) );
-        s << base64;
-        int padding = ( 4 - ( base64.length() % 4 ) ) % 4;
-        for ( int i = 0; i < padding; ++i )
-            s << '=';
-        s << "\", \"$type\" : \"" << hex;
-        s.width( 2 );
-        s.fill( '0' );
-        s << type << dec;
-        s << "\" }";
-        break;
-    }
-    case Date:
-        if ( format == Strict )
-            s << "{ \"$date\" : ";
-        else
-            s << "Date( ";
-        s << date();
-        if ( format == Strict )
-            s << " }";
-        else
-            s << " )";
-        break;
-    case RegEx:
-        if ( format == Strict )
-            s << "{ \"$regex\" : \"";
-        else
-            s << "/";
-        s << escape( regex() );
-        if ( format == Strict )
-            s << "\", \"$options\" : \"" << regexFlags() << "\" }";
-        else {
-            s << "/";
-            // FIXME Worry about alpha order?
-            for ( const char *f = regexFlags(); *f; ++f )
-                switch ( *f ) {
-                case 'g':
-                case 'i':
-                case 'm':
-                    s << *f;
-                default:
-                    break;
-                }
+        case Bool:
+            x = 2;
+            break;
+        case NumberInt:
+            x = 5;
+            break;
+        case Date:
+        case NumberDouble:
+            x = 9;
+            break;
+        case jstOID:
+            x = 13;
+            break;
+        case Symbol:
+        case Code:
+        case String:
+            x = valuestrsize() + 4 + 1;
+            break;
+        case CodeWScope:
+            x = objsize() + 1;
+            break;
+
+        case DBRef:
+            x = valuestrsize() + 4 + 12 + 1;
+            break;
+        case Object:
+        case Array:
+            x = objsize() + 1;
+            break;
+        case BinData:
+            x = valuestrsize() + 4 + 1 + 1/*subtype*/;
+            break;
+        case RegEx:
+        {
+            const char *p = value();
+            int len1 = strlen(p);
+            p = p + len1 + 1;
+            x = 1 + len1 + strlen(p) + 2;
         }
         break;
-    default:
-        stringstream ss;
-        ss << "Cannot create a properly formatted JSON string with "
-        << "element: " << toString() << " of type: " << type();
-        string message = ss.str();
-        massert( message.c_str(), false );
-    }
-    return s.str();
-}
-
-int BSONElement::size() const {
-    if ( totalSize >= 0 )
-        return totalSize;
-
-    int x = 1;
-    switch ( type() ) {
-    case EOO:
-    case Undefined:
-    case jstNULL:
-    case MaxKey:
-    case MinKey:
-        break;
-    case Bool:
-        x = 2;
-        break;
-    case NumberInt:
-        x = 5;
-        break;
-    case Date:
-    case NumberDouble:
-        x = 9;
-        break;
-    case jstOID:
-        x = 13;
-        break;
-    case Symbol:
-    case Code:
-    case String:
-        x = valuestrsize() + 4 + 1;
-        break;
-    case CodeWScope:
-        x = objsize() + 1;
-        break;
-
-    case DBRef:
-        x = valuestrsize() + 4 + 12 + 1;
-        break;
-    case Object:
-    case Array:
-        x = objsize() + 1;
-        break;
-    case BinData:
-        x = valuestrsize() + 4 + 1 + 1/*subtype*/;
-        break;
-    case RegEx:
-    {
-        const char *p = value();
-        int len1 = strlen(p);
-        p = p + len1 + 1;
-        x = 1 + len1 + strlen(p) + 2;
-    }
-    break;
-    default:
-        cout << "BSONElement: bad type " << (int) type() << endl;
-        assert(false);
-    }
-    ((BSONElement *) this)->totalSize =  x + fieldNameSize;
-
-    if ( !eoo() ) {
-        const char *next = data + totalSize;
-        if ( *next < MinKey || ( *next > JSTypeMax && *next != MaxKey ) ) {
-            // bad type.
-            cout << "***\n";
-            cout << "Bad data or size in BSONElement::size()\n";
-            cout << "bad type:" << (int) *next << '\n';
-            cout << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << '\n';
-            cout << "lastrec:" << endl;
-            //dumpmemory(data, totalSize + 15);
+        default:
+            out() << "BSONElement: bad type " << (int) type() << endl;
             assert(false);
         }
-    }
+        ((BSONElement *) this)->totalSize =  x + fieldNameSize;
 
-    return totalSize;
-}
-
-int BSONElement::getGtLtOp() const {
-    const char *fn = fieldName();
-    if ( fn[0] == '$' && fn[1] ) {
-        if ( fn[2] == 't' ) {
-            if ( fn[1] == 'g' ) {
-                if ( fn[3] == 0 ) return JSMatcher::GT;
-                else if ( fn[3] == 'e' && fn[4] == 0 ) return JSMatcher::GTE;
-            }
-            else if ( fn[1] == 'l' ) {
-                if ( fn[3] == 0 ) return JSMatcher::LT;
-                else if ( fn[3] == 'e' && fn[4] == 0 ) return JSMatcher::LTE;
+        if ( !eoo() ) {
+            const char *next = data + totalSize;
+            if ( *next < MinKey || ( *next > JSTypeMax && *next != MaxKey ) ) {
+                // bad type.
+                out() << "***\n";
+                out() << "Bad data or size in BSONElement::size()\n";
+                out() << "bad type:" << (int) *next << '\n';
+                out() << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << '\n';
+                out() << "lastrec:" << endl;
+                //dumpmemory(data, totalSize + 15);
+                assert(false);
             }
         }
-        else if ( fn[2] == 'e' ) {
-            if ( fn[1] == 'n' && fn[3] == 0 )
-                return JSMatcher::NE;
-        }
-        else if ( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
-            return JSMatcher::opIN;
+
+        return totalSize;
     }
-    return JSMatcher::Equality;
-}
 
-int BSONElement::woCompare( const BSONElement &e,
-                            bool considerFieldName ) const {
-    int lt = (int) type();
-    if ( lt == NumberInt ) lt = NumberDouble;
-    int rt = (int) e.type();
-    if ( rt == NumberInt ) rt = NumberDouble;
+    int BSONElement::getGtLtOp() const {
+        const char *fn = fieldName();
+        if ( fn[0] == '$' && fn[1] ) {
+            if ( fn[2] == 't' ) {
+                if ( fn[1] == 'g' ) {
+                    if ( fn[3] == 0 ) return JSMatcher::GT;
+                    else if ( fn[3] == 'e' && fn[4] == 0 ) return JSMatcher::GTE;
+                }
+                else if ( fn[1] == 'l' ) {
+                    if ( fn[3] == 0 ) return JSMatcher::LT;
+                    else if ( fn[3] == 'e' && fn[4] == 0 ) return JSMatcher::LTE;
+                }
+            }
+            else if ( fn[2] == 'e' ) {
+                if ( fn[1] == 'n' && fn[3] == 0 )
+                    return JSMatcher::NE;
+            }
+            else if ( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
+                return JSMatcher::opIN;
+        }
+        return JSMatcher::Equality;
+    }
 
-    int x = lt - rt;
-    if ( x != 0 )
-        return x;
-    if ( considerFieldName ) {
-        x = strcmp(fieldName(), e.fieldName());
+    int BSONElement::woCompare( const BSONElement &e,
+                                bool considerFieldName ) const {
+        int lt = (int) type();
+        if ( lt == NumberInt ) lt = NumberDouble;
+        int rt = (int) e.type();
+        if ( rt == NumberInt ) rt = NumberDouble;
+
+        int x = lt - rt;
         if ( x != 0 )
             return x;
+        if ( considerFieldName ) {
+            x = strcmp(fieldName(), e.fieldName());
+            if ( x != 0 )
+                return x;
+        }
+        x = compareElementValues(*this, e);
+        return x;
     }
-    x = compareElementValues(*this, e);
-    return x;
-}
 
-/* must be same type! */
-int compareElementValues(const BSONElement& l, const BSONElement& r) {
-    int f;
-    double x;
-    switch ( l.type() ) {
-    case EOO:
-    case Undefined:
-    case jstNULL:
-    case MaxKey:
-    case MinKey:
-        f = l.type() - r.type();
-        if ( f<0 ) return -1;
-        return f==0 ? 0 : 1;
-    case Bool:
-        return *l.value() - *r.value();
-    case Date:
-        if ( l.date() < r.date() )
-            return -1;
-        return l.date() == r.date() ? 0 : 1;
-    case NumberInt:
-    case NumberDouble:
-        x = l.number() - r.number();
-        if ( x < 0 ) return -1;
-        return x == 0 ? 0 : 1;
-    case jstOID:
-        return memcmp(l.value(), r.value(), 12);
-    case Code:
-    case Symbol:
-    case String:
-        /* todo: utf version */
-        return strcmp(l.valuestr(), r.valuestr());
-    case Object:
-    case Array:
-        return l.embeddedObject().woCompare( r.embeddedObject() );
-    case DBRef:
-    case BinData: {
-        int lsz = l.valuesize();
-        int rsz = r.valuesize();
-        if ( lsz - rsz != 0 ) return lsz - rsz;
-        return memcmp(l.value(), r.value(), lsz);
+    /* must be same type! */
+    int compareElementValues(const BSONElement& l, const BSONElement& r) {
+        int f;
+        double x;
+        switch ( l.type() ) {
+        case EOO:
+        case Undefined:
+        case jstNULL:
+        case MaxKey:
+        case MinKey:
+            f = l.type() - r.type();
+            if ( f<0 ) return -1;
+            return f==0 ? 0 : 1;
+        case Bool:
+            return *l.value() - *r.value();
+        case Date:
+            if ( l.date() < r.date() )
+                return -1;
+            return l.date() == r.date() ? 0 : 1;
+        case NumberInt:
+        case NumberDouble:
+            x = l.number() - r.number();
+            if ( x < 0 ) return -1;
+            return x == 0 ? 0 : 1;
+        case jstOID:
+            return memcmp(l.value(), r.value(), 12);
+        case Code:
+        case Symbol:
+        case String:
+            /* todo: utf version */
+            return strcmp(l.valuestr(), r.valuestr());
+        case Object:
+        case Array:
+            return l.embeddedObject().woCompare( r.embeddedObject() );
+        case DBRef:
+        case BinData: {
+            int lsz = l.valuesize();
+            int rsz = r.valuesize();
+            if ( lsz - rsz != 0 ) return lsz - rsz;
+            return memcmp(l.value(), r.value(), lsz);
+        }
+        case RegEx:
+        {
+            int c = strcmp(l.regex(), r.regex());
+            if ( c )
+                return c;
+            return strcmp(l.regexFlags(), r.regexFlags());
+        }
+        default:
+            out() << "compareElementValues: bad type " << (int) l.type() << endl;
+            assert(false);
+        }
+        return -1;
     }
-    case RegEx:
-    {
-        int c = strcmp(l.regex(), r.regex());
-        if ( c )
-            return c;
-        return strcmp(l.regexFlags(), r.regexFlags());
-    }
-    default:
-        cout << "compareElementValues: bad type " << (int) l.type() << endl;
-        assert(false);
-    }
-    return -1;
-}
 
-/* JSMatcher --------------------------------------*/
+    /* JSMatcher --------------------------------------*/
 
 // If the element is something like:
 //   a : { $gt : 3 }
@@ -474,429 +474,429 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
 //   a : 3
 // else we just append the element.
 //
-void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e) {
-    if ( e.type() == Object ) {
-        BSONElement fe = e.embeddedObject().firstElement();
-        const char *fn = fe.fieldName();
-        if ( fn[0] == '$' && fn[1] && fn[2] == 't' ) {
-            b.appendAs(fe, e.fieldName());
-            return;
+    void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e) {
+        if ( e.type() == Object ) {
+            BSONElement fe = e.embeddedObject().firstElement();
+            const char *fn = fe.fieldName();
+            if ( fn[0] == '$' && fn[1] && fn[2] == 't' ) {
+                b.appendAs(fe, e.fieldName());
+                return;
+            }
         }
+        b.append(e);
     }
-    b.append(e);
-}
 
-int getGtLtOp(BSONElement& e) {
-    if ( e.type() != Object )
-        return JSMatcher::Equality;
+    int getGtLtOp(BSONElement& e) {
+        if ( e.type() != Object )
+            return JSMatcher::Equality;
 
-    BSONElement fe = e.embeddedObject().firstElement();
-    return fe.getGtLtOp();
-}
+        BSONElement fe = e.embeddedObject().firstElement();
+        return fe.getGtLtOp();
+    }
 
 
-/* BSONObj ------------------------------------------------------------*/
+    /* BSONObj ------------------------------------------------------------*/
 
-string BSONObj::toString() const {
-    if ( isEmpty() ) return "{}";
+    string BSONObj::toString() const {
+        if ( isEmpty() ) return "{}";
 
-    stringstream s;
-    s << "{ ";
-    BSONObjIterator i(*this);
-    BSONElement e = i.next();
-    if ( !e.eoo() )
-        while ( 1 ) {
-            s << e.toString();
-            e = i.next();
-            if ( e.eoo() )
-                break;
-            s << ", ";
-        }
-    s << " }";
-    return s.str();
-}
+        stringstream s;
+        s << "{ ";
+        BSONObjIterator i(*this);
+        BSONElement e = i.next();
+        if ( !e.eoo() )
+            while ( 1 ) {
+                s << e.toString();
+                e = i.next();
+                if ( e.eoo() )
+                    break;
+                s << ", ";
+            }
+        s << " }";
+        return s.str();
+    }
 
-string BSONObj::jsonString( JsonStringFormat format ) const {
-    if ( isEmpty() ) return "{}";
+    string BSONObj::jsonString( JsonStringFormat format ) const {
+        if ( isEmpty() ) return "{}";
 
-    stringstream s;
-    s << "{ ";
-    BSONObjIterator i(*this);
-    BSONElement e = i.next();
-    if ( !e.eoo() )
-        while ( 1 ) {
-            s << e.jsonString( format );
-            e = i.next();
-            if ( e.eoo() )
-                break;
-            s << ", ";
-        }
-    s << " }";
-    return s.str();
-}
+        stringstream s;
+        s << "{ ";
+        BSONObjIterator i(*this);
+        BSONElement e = i.next();
+        if ( !e.eoo() )
+            while ( 1 ) {
+                s << e.jsonString( format );
+                e = i.next();
+                if ( e.eoo() )
+                    break;
+                s << ", ";
+            }
+        s << " }";
+        return s.str();
+    }
 
 // todo: can be a little faster if we don't use toString() here.
-bool BSONObj::valid() const {
-    try {
-        toString();
+    bool BSONObj::valid() const {
+        try {
+            toString();
+        }
+        catch (...) {
+            return false;
+        }
+        return true;
     }
-    catch (...) {
-        return false;
+
+    /* well ordered compare */
+    int BSONObj::woCompare(const BSONObj &r, const BSONObj &idxKey,
+                           bool considerFieldName) const {
+        if ( isEmpty() )
+            return r.isEmpty() ? 0 : -1;
+        if ( r.isEmpty() )
+            return 1;
+
+        bool ordered = !idxKey.isEmpty();
+
+        BSONObjIterator i(*this);
+        BSONObjIterator j(r);
+        BSONObjIterator k(idxKey);
+        while ( 1 ) {
+            // so far, equal...
+
+            BSONElement l = i.next();
+            BSONElement r = j.next();
+            BSONElement o;
+            if ( ordered )
+                o = k.next();
+            if ( l.eoo() )
+                return 0;
+
+            int x = l.woCompare( r, considerFieldName );
+            if ( ordered && o.number() < 0 )
+                x = -x;
+            if ( x != 0 )
+                return x;
+        }
+        return -1;
     }
-    return true;
-}
 
-/* well ordered compare */
-int BSONObj::woCompare(const BSONObj &r, const BSONObj &idxKey,
-                       bool considerFieldName) const {
-    if ( isEmpty() )
-        return r.isEmpty() ? 0 : -1;
-    if ( r.isEmpty() )
-        return 1;
-
-    bool ordered = !idxKey.isEmpty();
-
-    BSONObjIterator i(*this);
-    BSONObjIterator j(r);
-    BSONObjIterator k(idxKey);
-    while ( 1 ) {
-        // so far, equal...
-
-        BSONElement l = i.next();
-        BSONElement r = j.next();
-        BSONElement o;
-        if ( ordered )
-            o = k.next();
-        if ( l.eoo() )
-            return 0;
-
-        int x = l.woCompare( r, considerFieldName );
-        if ( ordered && o.number() < 0 )
-            x = -x;
-        if ( x != 0 )
-            return x;
+    BSONElement BSONObj::getField(const char *name) const {
+        if ( details ) {
+            BSONObjIterator i(*this);
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                if ( strcmp(e.fieldName(), name) == 0 )
+                    return e;
+            }
+        }
+        return nullElement;
     }
-    return -1;
-}
 
-BSONElement BSONObj::getField(const char *name) const {
-    if ( details ) {
+    /* return has eoo() true if no match
+       supports "." notation to reach into embedded objects
+    */
+    BSONElement BSONObj::getFieldDotted(const char *name) const {
+        BSONElement e = getField( name );
+        if ( e.eoo() ) {
+            const char *p = strchr(name, '.');
+            if ( p ) {
+                string left(name, p-name);
+                BSONObj sub = getObjectField(left.c_str());
+                return sub.isEmpty() ? nullElement : sub.getFieldDotted(p+1);
+            }
+        }
+
+        return e;
+        /*
+        	BSONObjIterator i(*this);
+        	while( i.more() ) {
+        		BSONElement e = i.next();
+        		if( e.eoo() )
+        			break;
+        		if( strcmp(e.fieldName(), name) == 0 )
+        			return e;
+        	}
+        	return nullElement;
+        */
+    }
+
+    BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
+        const char *p = strchr(name, '.');
+        string left;
+        if ( p ) {
+            left = string(name, p-name);
+            name = p + 1;
+        } else {
+            left = string(name);
+            name = name + strlen(name);
+        }
+        BSONElement sub = getField(left.c_str());
+        if ( sub.eoo() )
+            return nullElement;
+        else if ( sub.type() == Array || strlen( name ) == 0 )
+            return sub;
+        else
+            return sub.embeddedObject().getFieldDottedOrArray( name );
+    }
+
+    /* makes a new BSONObj with the fields specified in pattern.
+       fields returned in the order they appear in pattern.
+       if any field missing, you get back an empty object overall.
+
+       n^2 implementation bad if pattern and object have lots
+       of fields - normally pattern doesn't so should be fine.
+    */
+    BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b, const char *&nameWithinArray) const {
+        nameWithinArray = "";
+        BSONObjIterator i(pattern);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            const char *name = e.fieldName();
+            BSONElement x = getFieldDottedOrArray( name );
+            if ( x.eoo() ) {
+                nameWithinArray = "";
+                return BSONObj();
+            } else if ( x.type() == Array ) {
+                // NOTE: Currently set based on last array discovered.
+                nameWithinArray = name;
+            }
+            b.appendAs(x, "");
+        }
+        return b.done();
+    }
+    BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) {
+        BSONObjBuilder b;
+        BSONObjIterator i(pattern);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            BSONElement x = getField(e.fieldName());
+            if ( x.eoo() )
+                return BSONObj();
+            b.appendAs(x, "");
+        }
+        return b.doneAndDecouple();
+    }
+
+    BSONObj BSONObj::extractFields(BSONObj& pattern) {
+        BSONObjBuilder b(32); // scanandorder.h can make a zillion of these, so we start the allocation very small
+        BSONObjIterator i(pattern);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            BSONElement x = getFieldDotted(e.fieldName());
+            if ( x.eoo() )
+                return BSONObj();
+            b.append(x);
+        }
+        return b.doneAndDecouple();
+    }
+
+    int BSONObj::getIntField(const char *name) const {
+        BSONElement e = getField(name);
+        return e.isNumber() ? (int) e.number() : INT_MIN;
+    }
+
+    bool BSONObj::getBoolField(const char *name) {
+        BSONElement e = getField(name);
+        return e.type() == Bool ? e.boolean() : false;
+    }
+
+    const char * BSONObj::getStringField(const char *name) {
+        BSONElement e = getField(name);
+        return e.type() == String ? e.valuestr() : "";
+    }
+
+    BSONObj BSONObj::getObjectField(const char *name) const {
+        BSONElement e = getField(name);
+        BSONType t = e.type();
+        return t == Object || t == Array ? e.embeddedObject() : BSONObj();
+    }
+
+    int BSONObj::nFields() {
+        int n = 0;
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
-            if ( strcmp(e.fieldName(), name) == 0 )
-                return e;
+            n++;
         }
-    }
-    return nullElement;
-}
-
-/* return has eoo() true if no match
-   supports "." notation to reach into embedded objects
-*/
-BSONElement BSONObj::getFieldDotted(const char *name) const {
-    BSONElement e = getField( name );
-    if ( e.eoo() ) {
-        const char *p = strchr(name, '.');
-        if ( p ) {
-            string left(name, p-name);
-            BSONObj sub = getObjectField(left.c_str());
-            return sub.isEmpty() ? nullElement : sub.getFieldDotted(p+1);
-        }
+        return n;
     }
 
-    return e;
-    /*
-    	BSONObjIterator i(*this);
-    	while( i.more() ) {
-    		BSONElement e = i.next();
-    		if( e.eoo() )
-    			break;
-    		if( strcmp(e.fieldName(), name) == 0 )
-    			return e;
-    	}
-    	return nullElement;
+    /* grab names of all the fields in this object */
+    int BSONObj::getFieldNames(set<string>& fields) {
+        int n = 0;
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            fields.insert(e.fieldName());
+            n++;
+        }
+        return n;
+    }
+
+    /* note: addFields always adds _id even if not specified
+       returns n added not counting _id unless requested.
     */
-}
+    int BSONObj::addFields(BSONObj& from, set<string>& fields) {
+        assert( details == 0 ); /* partial implementation for now... */
 
-BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
-    const char *p = strchr(name, '.');
-    string left;
-    if ( p ) {
-        left = string(name, p-name);
-        name = p + 1;
-    } else {
-        left = string(name);
-        name = name + strlen(name);
-    }
-    BSONElement sub = getField(left.c_str());
-    if ( sub.eoo() )
-        return nullElement;
-    else if ( sub.type() == Array || strlen( name ) == 0 )
-        return sub;
-    else
-        return sub.embeddedObject().getFieldDottedOrArray( name );
-}
-
-/* makes a new BSONObj with the fields specified in pattern.
-   fields returned in the order they appear in pattern.
-   if any field missing, you get back an empty object overall.
-
-   n^2 implementation bad if pattern and object have lots
-   of fields - normally pattern doesn't so should be fine.
-*/
-BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b, const char *&nameWithinArray) const {
-    nameWithinArray = "";
-    BSONObjIterator i(pattern);
-    while ( i.more() ) {
-        BSONElement e = i.next();
-        if ( e.eoo() )
-            break;
-        const char *name = e.fieldName();
-        BSONElement x = getFieldDottedOrArray( name );
-        if ( x.eoo() ) {
-            nameWithinArray = "";
-            return BSONObj();
-        } else if ( x.type() == Array ) {
-            // NOTE: Currently set based on last array discovered.
-            nameWithinArray = name;
-        }
-        b.appendAs(x, "");
-    }
-    return b.done();
-}
-BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) {
-    BSONObjBuilder b;
-    BSONObjIterator i(pattern);
-    while ( i.more() ) {
-        BSONElement e = i.next();
-        if ( e.eoo() )
-            break;
-        BSONElement x = getField(e.fieldName());
-        if ( x.eoo() )
-            return BSONObj();
-        b.appendAs(x, "");
-    }
-    return b.doneAndDecouple();
-}
-
-BSONObj BSONObj::extractFields(BSONObj& pattern) {
-    BSONObjBuilder b(32); // scanandorder.h can make a zillion of these, so we start the allocation very small
-    BSONObjIterator i(pattern);
-    while ( i.more() ) {
-        BSONElement e = i.next();
-        if ( e.eoo() )
-            break;
-        BSONElement x = getFieldDotted(e.fieldName());
-        if ( x.eoo() )
-            return BSONObj();
-        b.append(x);
-    }
-    return b.doneAndDecouple();
-}
-
-int BSONObj::getIntField(const char *name) const {
-    BSONElement e = getField(name);
-    return e.isNumber() ? (int) e.number() : INT_MIN;
-}
-
-bool BSONObj::getBoolField(const char *name) {
-    BSONElement e = getField(name);
-    return e.type() == Bool ? e.boolean() : false;
-}
-
-const char * BSONObj::getStringField(const char *name) {
-    BSONElement e = getField(name);
-    return e.type() == String ? e.valuestr() : "";
-}
-
-BSONObj BSONObj::getObjectField(const char *name) const {
-    BSONElement e = getField(name);
-    BSONType t = e.type();
-    return t == Object || t == Array ? e.embeddedObject() : BSONObj();
-}
-
-int BSONObj::nFields() {
-    int n = 0;
-    BSONObjIterator i(*this);
-    while ( i.more() ) {
-        BSONElement e = i.next();
-        if ( e.eoo() )
-            break;
-        n++;
-    }
-    return n;
-}
-
-/* grab names of all the fields in this object */
-int BSONObj::getFieldNames(set<string>& fields) {
-    int n = 0;
-    BSONObjIterator i(*this);
-    while ( i.more() ) {
-        BSONElement e = i.next();
-        if ( e.eoo() )
-            break;
-        fields.insert(e.fieldName());
-        n++;
-    }
-    return n;
-}
-
-/* note: addFields always adds _id even if not specified
-   returns n added not counting _id unless requested.
-*/
-int BSONObj::addFields(BSONObj& from, set<string>& fields) {
-    assert( details == 0 ); /* partial implementation for now... */
-
-    BSONObjBuilder b;
-
-    int N = fields.size();
-    int n = 0;
-    BSONObjIterator i(from);
-    bool gotId = false;
-    while ( i.more() ) {
-        BSONElement e = i.next();
-        const char *fname = e.fieldName();
-        if ( fields.count(fname) ) {
-            b.append(e);
-            ++n;
-            gotId = gotId || strcmp(fname, "_id")==0;
-            if ( n == N && gotId )
-                break;
-        } else if ( strcmp(fname, "_id")==0 ) {
-            b.append(e);
-            gotId = true;
-            if ( n == N && gotId )
-                break;
-        }
-    }
-
-    if ( n ) {
-        int len;
-        init( b.decouple(len), true );
-    }
-
-    return n;
-}
-
-ostream& operator<<( ostream &s, const BSONObj &o ) {
-    return s << o.toString();
-}
-
-/*-- test things ----------------------------------------------------*/
-
-#pragma pack(push,1)
-struct MaxKeyData {
-    MaxKeyData() {
-        totsize=7;
-        maxkey=MaxKey;
-        name=0;
-        eoo=EOO;
-    }
-    int totsize;
-    char maxkey;
-    char name;
-    char eoo;
-} maxkeydata;
-BSONObj maxKey((const char *) &maxkeydata);
-
-struct MinKeyData {
-    MinKeyData() {
-        totsize=7;
-        minkey=MinKey;
-        name=0;
-        eoo=EOO;
-    }
-    int totsize;
-    char minkey;
-    char name;
-    char eoo;
-} minkeydata;
-BSONObj minKey((const char *) &minkeydata);
-
-struct JSObj0 {
-    JSObj0() {
-        totsize = 5;
-        eoo = EOO;
-    }
-    int totsize;
-    char eoo;
-} js0;
-#pragma pack(pop)
-
-BSONElement::BSONElement() {
-    data = &js0.eoo;
-    fieldNameSize = 0;
-    totalSize = -1;
-}
-
-#pragma pack(push,1)
-struct EmptyObject {
-    EmptyObject() {
-        len = 5;
-        jstype = EOO;
-    }
-    int len;
-    char jstype;
-} emptyObject;
-#pragma pack(pop)
-
-BSONObj emptyObj((char *) &emptyObject);
-
-struct BsonUnitTest : public UnitTest {
-    void testRegex() {
         BSONObjBuilder b;
-        b.appendRegex("x", "foo");
-        BSONObj o = b.done();
 
-        BSONObjBuilder c;
-        c.appendRegex("x", "goo");
-        BSONObj p = c.done();
+        int N = fields.size();
+        int n = 0;
+        BSONObjIterator i(from);
+        bool gotId = false;
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            const char *fname = e.fieldName();
+            if ( fields.count(fname) ) {
+                b.append(e);
+                ++n;
+                gotId = gotId || strcmp(fname, "_id")==0;
+                if ( n == N && gotId )
+                    break;
+            } else if ( strcmp(fname, "_id")==0 ) {
+                b.append(e);
+                gotId = true;
+                if ( n == N && gotId )
+                    break;
+            }
+        }
 
-        assert( !o.woEqual( p ) );
-        assert( o.woCompare( p ) < 0 );
+        if ( n ) {
+            int len;
+            init( b.decouple(len), true );
+        }
+
+        return n;
     }
-    void run() {
-        testRegex();
-        BSONObjBuilder A,B,C;
-        A.appendInt("x", 2);
-        B.append("x", 2.0);
-        C.append("x", 2.1);
-        BSONObj a = A.done();
-        BSONObj b = B.done();
-        BSONObj c = C.done();
-        assert( !a.woEqual( b ) ); // comments on operator==
-        int cmp = a.woCompare(b);
-        assert( cmp == 0 );
-        cmp = a.woCompare(c);
-        assert( cmp < 0 );
+
+    ostream& operator<<( ostream &s, const BSONObj &o ) {
+        return s << o.toString();
     }
-} bson_unittest;
+
+    /*-- test things ----------------------------------------------------*/
+
+#pragma pack(push,1)
+    struct MaxKeyData {
+        MaxKeyData() {
+            totsize=7;
+            maxkey=MaxKey;
+            name=0;
+            eoo=EOO;
+        }
+        int totsize;
+        char maxkey;
+        char name;
+        char eoo;
+    } maxkeydata;
+    BSONObj maxKey((const char *) &maxkeydata);
+
+    struct MinKeyData {
+        MinKeyData() {
+            totsize=7;
+            minkey=MinKey;
+            name=0;
+            eoo=EOO;
+        }
+        int totsize;
+        char minkey;
+        char name;
+        char eoo;
+    } minkeydata;
+    BSONObj minKey((const char *) &minkeydata);
+
+    struct JSObj0 {
+        JSObj0() {
+            totsize = 5;
+            eoo = EOO;
+        }
+        int totsize;
+        char eoo;
+    } js0;
+#pragma pack(pop)
+
+    BSONElement::BSONElement() {
+        data = &js0.eoo;
+        fieldNameSize = 0;
+        totalSize = -1;
+    }
+
+#pragma pack(push,1)
+    struct EmptyObject {
+        EmptyObject() {
+            len = 5;
+            jstype = EOO;
+        }
+        int len;
+        char jstype;
+    } emptyObject;
+#pragma pack(pop)
+
+    BSONObj emptyObj((char *) &emptyObject);
+
+    struct BsonUnitTest : public UnitTest {
+        void testRegex() {
+            BSONObjBuilder b;
+            b.appendRegex("x", "foo");
+            BSONObj o = b.done();
+
+            BSONObjBuilder c;
+            c.appendRegex("x", "goo");
+            BSONObj p = c.done();
+
+            assert( !o.woEqual( p ) );
+            assert( o.woCompare( p ) < 0 );
+        }
+        void run() {
+            testRegex();
+            BSONObjBuilder A,B,C;
+            A.appendInt("x", 2);
+            B.append("x", 2.0);
+            C.append("x", 2.1);
+            BSONObj a = A.done();
+            BSONObj b = B.done();
+            BSONObj c = C.done();
+            assert( !a.woEqual( b ) ); // comments on operator==
+            int cmp = a.woCompare(b);
+            assert( cmp == 0 );
+            cmp = a.woCompare(c);
+            assert( cmp < 0 );
+        }
+    } bson_unittest;
 
 
 
 
-BSONObjBuilderValueStream::BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder ) {
-    _fieldName = fieldName;
-    _builder = builder;
-}
+    BSONObjBuilderValueStream::BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder ) {
+        _fieldName = fieldName;
+        _builder = builder;
+    }
 
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const char * value ) {
-    _builder->append( _fieldName , value );
-    return *_builder;
-}
+    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const char * value ) {
+        _builder->append( _fieldName , value );
+        return *_builder;
+    }
 
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const int value ) {
-    _builder->appendInt( _fieldName , value );
-    return *_builder;
-}
+    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const int value ) {
+        _builder->appendInt( _fieldName , value );
+        return *_builder;
+    }
 
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const double value ) {
-    _builder->append( _fieldName , value );
-    return *_builder;
-}
+    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const double value ) {
+        _builder->append( _fieldName , value );
+        return *_builder;
+    }
 
 
 } // namespace mongo

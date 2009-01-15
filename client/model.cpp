@@ -21,13 +21,13 @@
 
 namespace mongo {
 
-bool Model::load(BSONObj& query) {
-    BSONObj b = conn()->findOne(getNS(), query);
-    if ( b.isEmpty() )
-        return false;
+    bool Model::load(BSONObj& query) {
+        BSONObj b = conn()->findOne(getNS(), query);
+        if ( b.isEmpty() )
+            return false;
 
-    unserialize(b);
-    return true;
-}
+        unserialize(b);
+        return true;
+    }
 
 } // namespace mongo

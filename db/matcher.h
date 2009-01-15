@@ -24,115 +24,115 @@
 
 namespace mongo {
 
-class RegexMatcher {
-public:
-    const char *fieldName;
-    pcrecpp::RE *re;
-    bool inIndex;
-    RegexMatcher() {
-        re = 0;
-        inIndex = false;
-    }
-    ~RegexMatcher() {
-        delete re;
-    }
-};
-
-class BasicMatcher {
-public:
-    BSONElement toMatch;
-    int compareOp;
-    bool inIndex;
-};
-
-// SQL where clause equivalent
-class Where;
-
-/* Match BSON objects against a query pattern.
-
-   e.g.
-       db.foo.find( { a : 3 } );
-
-   { a : 3 } is the pattern object.
-
-   GT/LT:
-   { a : { $gt : 3 } }
-
-   Not equal:
-   { a : { $ne : 3 } }
-
-   TODO: we should rewrite the matcher to be more an AST style.
-*/
-class JSMatcher : boost::noncopyable {
-    int matchesDotted(
-        const char *fieldName,
-        BSONElement& toMatch, BSONObj& obj,
-        int compareOp, bool *deep, bool isArr = false);
-
-    struct element_lt
-    {
-        bool operator()(const BSONElement& l, const BSONElement& r) const
-        {
-            int x = (int) l.type() - (int) r.type();
-            if ( x < 0 ) return true;
-            if ( x > 0 ) return false;
-            return compareElementValues(l,r) < 0;
+    class RegexMatcher {
+    public:
+        const char *fieldName;
+        pcrecpp::RE *re;
+        bool inIndex;
+        RegexMatcher() {
+            re = 0;
+            inIndex = false;
+        }
+        ~RegexMatcher() {
+            delete re;
         }
     };
-public:
-    enum {
-        Equality = 0,
-        LT = 0x1,
-        LTE = 0x3,
-        GTE = 0x6,
-        GT = 0x4,
-        opIN = 0x8, // { x : { $in : [1,2,3] } }
-        NE = 0x9
+
+    class BasicMatcher {
+    public:
+        BSONElement toMatch;
+        int compareOp;
+        bool inIndex;
     };
 
-    static int opDirection(int op) {
-        return op <= LTE ? -1 : 1;
-    }
+// SQL where clause equivalent
+    class Where;
 
-    JSMatcher(BSONObj& pattern, BSONObj indexKeyPattern);
+    /* Match BSON objects against a query pattern.
 
-    ~JSMatcher();
+       e.g.
+           db.foo.find( { a : 3 } );
 
-    /* deep - means we looked into arrays for a match
+       { a : 3 } is the pattern object.
+
+       GT/LT:
+       { a : { $gt : 3 } }
+
+       Not equal:
+       { a : { $ne : 3 } }
+
+       TODO: we should rewrite the matcher to be more an AST style.
     */
-    bool matches(BSONObj& j, bool *deep = 0);
+    class JSMatcher : boost::noncopyable {
+        int matchesDotted(
+            const char *fieldName,
+            BSONElement& toMatch, BSONObj& obj,
+            int compareOp, bool *deep, bool isArr = false);
 
-    int getN() {
-        return n;
-    }
+        struct element_lt
+        {
+            bool operator()(const BSONElement& l, const BSONElement& r) const
+            {
+                int x = (int) l.type() - (int) r.type();
+                if ( x < 0 ) return true;
+                if ( x > 0 ) return false;
+                return compareElementValues(l,r) < 0;
+            }
+        };
+    public:
+        enum {
+            Equality = 0,
+            LT = 0x1,
+            LTE = 0x3,
+            GTE = 0x6,
+            GT = 0x4,
+            opIN = 0x8, // { x : { $in : [1,2,3] } }
+            NE = 0x9
+        };
 
-private:
-    void addBasic(BSONElement e, int c, BSONObj& indexKeyPattern) {
-        BasicMatcher bm;
-        bm.toMatch = e;
-        bm.compareOp = c;
-        bm.inIndex = indexKeyPattern.hasElement(e.fieldName());
-        basics.push_back(bm);
-        n++;
-    }
+        static int opDirection(int op) {
+            return op <= LTE ? -1 : 1;
+        }
 
-    int valuesMatch(BSONElement& l, BSONElement& r, int op);
+        JSMatcher(BSONObj& pattern, BSONObj indexKeyPattern);
 
-    set<BSONElement,element_lt> *in; // set if query uses $in
-    Where *where;                    // set if query uses $where
-    BSONObj& jsobj;                  // the query pattern.  e.g., { name: "joe" }
+        ~JSMatcher();
 
-    vector<BasicMatcher> basics;
-    int n;                           // # of basicmatcher items
+        /* deep - means we looked into arrays for a match
+        */
+        bool matches(BSONObj& j, bool *deep = 0);
 
-    RegexMatcher regexs[4];
-    int nRegex;
+        int getN() {
+            return n;
+        }
 
-    // so we delete the mem when we're done:
-    BSONObjBuilder *builders[8];
-    int nBuilders;
+    private:
+        void addBasic(BSONElement e, int c, BSONObj& indexKeyPattern) {
+            BasicMatcher bm;
+            bm.toMatch = e;
+            bm.compareOp = c;
+            bm.inIndex = indexKeyPattern.hasElement(e.fieldName());
+            basics.push_back(bm);
+            n++;
+        }
 
-    bool checkInIndex;
-};
+        int valuesMatch(BSONElement& l, BSONElement& r, int op);
+
+        set<BSONElement,element_lt> *in; // set if query uses $in
+        Where *where;                    // set if query uses $where
+        BSONObj& jsobj;                  // the query pattern.  e.g., { name: "joe" }
+
+        vector<BasicMatcher> basics;
+        int n;                           // # of basicmatcher items
+
+        RegexMatcher regexs[4];
+        int nRegex;
+
+        // so we delete the mem when we're done:
+        BSONObjBuilder *builders[8];
+        int nBuilders;
+
+        bool checkInIndex;
+    };
 
 } // namespace mongo

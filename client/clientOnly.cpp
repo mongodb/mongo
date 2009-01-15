@@ -1,23 +1,20 @@
-
-#include <iostream>
-
-using namespace std;
+#include "../stdafx.h"
 
 namespace mongo {
 
     const char * curNs = "in client mode";
     //    Database* database = 0;
 
-    void dbexit(int returnCode, const char *whyMsg ){
-        cout << "dbexit called" << endl;
+    void dbexit(int returnCode, const char *whyMsg ) {
+        out() << "dbexit called" << endl;
         if ( whyMsg )
-            cout << " b/c " << whyMsg << endl;
-        cout << "exiting" << endl;
+            out() << " b/c " << whyMsg << endl;
+        out() << "exiting" << endl;
         exit( returnCode );
     }
 
 
-    string getDbContext(){
+    string getDbContext() {
         return "in client only mode";
     }
 }

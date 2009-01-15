@@ -5,6 +5,6 @@
 
 namespace mongo {
 
-boost::thread_specific_ptr<LastError> lastError;
+    boost::thread_specific_ptr<LastError> lastError;
 
 } // namespace mongo

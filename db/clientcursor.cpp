@@ -30,201 +30,201 @@
 
 namespace mongo {
 
-/* TODO: FIX cleanup of clientCursors when hit the end. (ntoreturn insufficient) */
+    /* TODO: FIX cleanup of clientCursors when hit the end. (ntoreturn insufficient) */
 
-CCById clientCursorsById;
+    CCById clientCursorsById;
 
-/* ------------------------------------------- */
+    /* ------------------------------------------- */
 
-typedef multimap<DiskLoc, ClientCursor*> ByLoc;
-ByLoc byLoc;
-unsigned byLocSize() {
-    return byLoc.size();
-}
-
-void ClientCursor::setLastLoc(DiskLoc L) {
-    if ( L == _lastLoc )
-        return;
-
-    if ( !_lastLoc.isNull() ) {
-        ByLoc::iterator i = kv_find(byLoc, _lastLoc, this);
-        if ( i != byLoc.end() )
-            byLoc.erase(i);
+    typedef multimap<DiskLoc, ClientCursor*> ByLoc;
+    ByLoc byLoc;
+    unsigned byLocSize() {
+        return byLoc.size();
     }
 
-    if ( !L.isNull() )
-        byLoc.insert( make_pair(L, this) );
-    _lastLoc = L;
-}
+    void ClientCursor::setLastLoc(DiskLoc L) {
+        if ( L == _lastLoc )
+            return;
 
-/* ------------------------------------------- */
+        if ( !_lastLoc.isNull() ) {
+            ByLoc::iterator i = kv_find(byLoc, _lastLoc, this);
+            if ( i != byLoc.end() )
+                byLoc.erase(i);
+        }
 
-/* must call this when a btree node is updated */
+        if ( !L.isNull() )
+            byLoc.insert( make_pair(L, this) );
+        _lastLoc = L;
+    }
+
+    /* ------------------------------------------- */
+
+    /* must call this when a btree node is updated */
 //void removedKey(const DiskLoc& btreeLoc, int keyPos) {
 //}
 
-/* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which
-         works fine as the prefix will end with '.'.  however, when used with drop and
-		 deleteIndexes, this could take out cursors that belong to something else -- if you
-		 drop "foo", currently, this will kill cursors for "foobar".
-*/
-void ClientCursor::invalidate(const char *nsPrefix) {
-    vector<ClientCursor*> toDelete;
+    /* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which
+             works fine as the prefix will end with '.'.  however, when used with drop and
+    		 deleteIndexes, this could take out cursors that belong to something else -- if you
+    		 drop "foo", currently, this will kill cursors for "foobar".
+    */
+    void ClientCursor::invalidate(const char *nsPrefix) {
+        vector<ClientCursor*> toDelete;
 
-    int len = strlen(nsPrefix);
-    assert( len > 0 && strchr(nsPrefix, '.') );
-    for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
-        ClientCursor *cc = i->second;
-        if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 )
-            toDelete.push_back(i->second);
+        int len = strlen(nsPrefix);
+        assert( len > 0 && strchr(nsPrefix, '.') );
+        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
+            ClientCursor *cc = i->second;
+            if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 )
+                toDelete.push_back(i->second);
+        }
+
+        for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
+            delete (*i);
     }
 
-    for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
-        delete (*i);
-}
-
-/* must call when a btree bucket going away.
-   note this is potentially slow
-*/
-void aboutToDeleteBucket(const DiskLoc& b) {
-    RARELY if ( byLoc.size() > 70 ) {
-        log() << "perf warning: byLoc.size=" << byLoc.size() << " in aboutToDeleteBucket\n";
+    /* must call when a btree bucket going away.
+       note this is potentially slow
+    */
+    void aboutToDeleteBucket(const DiskLoc& b) {
+        RARELY if ( byLoc.size() > 70 ) {
+            log() << "perf warning: byLoc.size=" << byLoc.size() << " in aboutToDeleteBucket\n";
+        }
+        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
+            i->second->c->aboutToDeleteBucket(b);
     }
-    for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
-        i->second->c->aboutToDeleteBucket(b);
-}
 
-/* must call this on a delete so we clean up the cursors. */
-void aboutToDelete(const DiskLoc& dl) {
-    ByLoc::iterator j = byLoc.lower_bound(dl);
-    ByLoc::iterator stop = byLoc.upper_bound(dl);
-    if ( j == stop )
-        return;
-
-    assert( dbMutexInfo.isLocked() );
-    vector<ClientCursor*> toAdvance;
-
-    while ( 1 ) {
-        toAdvance.push_back(j->second);
-        WIN assert( j->first == dl );
-        ++j;
+    /* must call this on a delete so we clean up the cursors. */
+    void aboutToDelete(const DiskLoc& dl) {
+        ByLoc::iterator j = byLoc.lower_bound(dl);
+        ByLoc::iterator stop = byLoc.upper_bound(dl);
         if ( j == stop )
-            break;
-    }
+            return;
 
-    wassert( toAdvance.size() < 5000 );
+        assert( dbMutexInfo.isLocked() );
+        vector<ClientCursor*> toAdvance;
 
-    for ( vector<ClientCursor*>::iterator i = toAdvance.begin();
-            i != toAdvance.end(); ++i )
-    {
-        Cursor *c = (*i)->c.get();
-        DiskLoc tmp1 = c->currLoc();
-        if ( tmp1 != dl ) {
-            /* this might indicate a failure to call ClientCursor::updateLocation() */
-            problem() << "warning: cursor loc does not match byLoc position!" << endl;
+        while ( 1 ) {
+            toAdvance.push_back(j->second);
+            WIN assert( j->first == dl );
+            ++j;
+            if ( j == stop )
+                break;
         }
-        c->checkLocation();
-        if ( c->tailing() ) {
-            DEV cout << "killing cursor as we would have to advance it and it is tailable" << endl;
-            delete *i;
-            continue;
+
+        wassert( toAdvance.size() < 5000 );
+
+        for ( vector<ClientCursor*>::iterator i = toAdvance.begin();
+                i != toAdvance.end(); ++i )
+        {
+            Cursor *c = (*i)->c.get();
+            DiskLoc tmp1 = c->currLoc();
+            if ( tmp1 != dl ) {
+                /* this might indicate a failure to call ClientCursor::updateLocation() */
+                problem() << "warning: cursor loc does not match byLoc position!" << endl;
+            }
+            c->checkLocation();
+            if ( c->tailing() ) {
+                DEV out() << "killing cursor as we would have to advance it and it is tailable" << endl;
+                delete *i;
+                continue;
+            }
+            c->advance();
+            DiskLoc newLoc = c->currLoc();
+            if ( newLoc.isNull() ) {
+                // advanced to end -- delete cursor
+                delete *i;
+            }
+            else {
+                wassert( newLoc != dl );
+                (*i)->updateLocation();
+            }
         }
-        c->advance();
-        DiskLoc newLoc = c->currLoc();
-        if ( newLoc.isNull() ) {
-            // advanced to end -- delete cursor
-            delete *i;
+    }
+
+    ClientCursor::~ClientCursor() {
+        assert( pos != -2 );
+        setLastLoc( DiskLoc() ); // removes us from bylocation multimap
+        clientCursorsById.erase(cursorid);
+        // defensive:
+        (CursorId&) cursorid = -1;
+        pos = -2;
+    }
+
+    /* call when cursor's location changes so that we can update the
+       cursorsbylocation map.  if you are locked and internally iterating, only
+       need to call when you are ready to "unlock".
+    */
+    void ClientCursor::updateLocation() {
+        assert( cursorid );
+        DiskLoc cl = c->currLoc();
+        if ( lastLoc() == cl ) {
+            //log() << "info: lastloc==curloc " << ns << '\n';
+            return;
         }
-        else {
-            wassert( newLoc != dl );
-            (*i)->updateLocation();
+        setLastLoc(cl);
+        c->noteLocation();
+    }
+
+    int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
+    long long ClientCursor::allocCursorId() {
+        long long x;
+        int ctm = (int) curTimeMillis();
+        while ( 1 ) {
+            x = (((long long)rand()) << 32);
+            x = x | ctm | 0x80000000; // OR to make sure not zero
+            if ( ctm != ctmLast || ClientCursor::find(x, false) == 0 )
+                break;
         }
+        ctmLast = ctm;
+        DEV out() << "  alloccursorid " << x << endl;
+        return x;
     }
-}
 
-ClientCursor::~ClientCursor() {
-    assert( pos != -2 );
-    setLastLoc( DiskLoc() ); // removes us from bylocation multimap
-    clientCursorsById.erase(cursorid);
-    // defensive:
-    (CursorId&) cursorid = -1;
-    pos = -2;
-}
-
-/* call when cursor's location changes so that we can update the
-   cursorsbylocation map.  if you are locked and internally iterating, only
-   need to call when you are ready to "unlock".
-*/
-void ClientCursor::updateLocation() {
-    assert( cursorid );
-    DiskLoc cl = c->currLoc();
-    if ( lastLoc() == cl ) {
-        //log() << "info: lastloc==curloc " << ns << '\n';
-        return;
-    }
-    setLastLoc(cl);
-    c->noteLocation();
-}
-
-int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
-long long ClientCursor::allocCursorId() {
-    long long x;
-    int ctm = (int) curTimeMillis();
-    while ( 1 ) {
-        x = (((long long)rand()) << 32);
-        x = x | ctm | 0x80000000; // OR to make sure not zero
-        if ( ctm != ctmLast || ClientCursor::find(x, false) == 0 )
-            break;
-    }
-    ctmLast = ctm;
-    DEV cout << "  alloccursorid " << x << endl;
-    return x;
-}
-
-class CursInspector : public SingleResultObjCursor {
-    Cursor* clone() {
-        return new CursInspector();
-    }
-    void fill() {
-        b.append("byLocation_size", byLoc.size());
-        b.append("clientCursors_size", clientCursorsById.size());
-        /* todo update for new impl:
-        		stringstream ss;
-        		ss << '\n';
-        		int x = 40;
-        		DiskToCC::iterator it = clientCursorsByLocation.begin();
-        		while( it != clientCursorsByLocation.end() ) {
-        			DiskLoc dl = it->first;
-        			ss << dl.toString() << " -> \n";
-        			set<ClientCursor*>::iterator j = it->second.begin();
-        			while( j != it->second.end() ) {
-        				ss << "    cid:" << j->second->cursorid << ' ' << j->second->ns << " pos:" << j->second->pos << " LL:" << j->second->lastLoc.toString();
-        				try {
-        					setClient(j->second->ns.c_str());
-        					Record *r = dl.rec();
-        					ss << " lwh:" << hex << r->lengthWithHeaders << " nxt:" << r->nextOfs << " prv:" << r->prevOfs << dec << ' ' << j->second->c->toString();
-        					if( r->nextOfs >= 0 && r->nextOfs < 16 )
-        						ss << " DELETED??? (!)";
-        				}
-        				catch(...) {
-        					ss << " EXCEPTION";
-        				}
-        				ss << "\n";
-        				j++;
-        			}
-        			if( --x <= 0 ) {
-        				ss << "only first 40 shown\n" << endl;
-        				break;
-        			}
-        			it++;
-        		}
-        		b.append("dump", ss.str().c_str());
-        */
-    }
-public:
-    CursInspector() {
-        reg("intr.cursors");
-    }
-} _ciproto;
+    class CursInspector : public SingleResultObjCursor {
+        Cursor* clone() {
+            return new CursInspector();
+        }
+        void fill() {
+            b.append("byLocation_size", byLoc.size());
+            b.append("clientCursors_size", clientCursorsById.size());
+            /* todo update for new impl:
+            		stringstream ss;
+            		ss << '\n';
+            		int x = 40;
+            		DiskToCC::iterator it = clientCursorsByLocation.begin();
+            		while( it != clientCursorsByLocation.end() ) {
+            			DiskLoc dl = it->first;
+            			ss << dl.toString() << " -> \n";
+            			set<ClientCursor*>::iterator j = it->second.begin();
+            			while( j != it->second.end() ) {
+            				ss << "    cid:" << j->second->cursorid << ' ' << j->second->ns << " pos:" << j->second->pos << " LL:" << j->second->lastLoc.toString();
+            				try {
+            					setClient(j->second->ns.c_str());
+            					Record *r = dl.rec();
+            					ss << " lwh:" << hex << r->lengthWithHeaders << " nxt:" << r->nextOfs << " prv:" << r->prevOfs << dec << ' ' << j->second->c->toString();
+            					if( r->nextOfs >= 0 && r->nextOfs < 16 )
+            						ss << " DELETED??? (!)";
+            				}
+            				catch(...) {
+            					ss << " EXCEPTION";
+            				}
+            				ss << "\n";
+            				j++;
+            			}
+            			if( --x <= 0 ) {
+            				ss << "only first 40 shown\n" << endl;
+            				break;
+            			}
+            			it++;
+            		}
+            		b.append("dump", ss.str().c_str());
+            */
+        }
+    public:
+        CursInspector() {
+            reg("intr.cursors");
+        }
+    } _ciproto;
 
 } // namespace mongo

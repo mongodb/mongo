@@ -25,39 +25,39 @@
 namespace mongo {
 
 
-/* Get/put the first object from a collection.  Generally only useful if the collection
-   only ever has a single object -- which is a "singleton collection".
+    /* Get/put the first object from a collection.  Generally only useful if the collection
+       only ever has a single object -- which is a "singleton collection".
 
-   You do not need to set the database before calling.
+       You do not need to set the database before calling.
 
-   Returns: true if object exists.
-*/
-bool getSingleton(const char *ns, BSONObj& result);
-void putSingleton(const char *ns, BSONObj obj);
+       Returns: true if object exists.
+    */
+    bool getSingleton(const char *ns, BSONObj& result);
+    void putSingleton(const char *ns, BSONObj obj);
 
 
-/* Remove all objects from a collection.
-   You do not need to set the database before calling.
-*/
-void emptyCollection(const char *ns);
+    /* Remove all objects from a collection.
+       You do not need to set the database before calling.
+    */
+    void emptyCollection(const char *ns);
 
-/* Set database we want to use, then, restores when we finish (are out of scope)
-   Note this is also helpful if an exception happens as the state if fixed up.
-*/
-class DBContext {
-    Database *old;
-public:
-    DBContext(const char *ns) {
-        old = database;
-        setClientTempNs(ns);
-    }
-    DBContext(string ns) {
-        old = database;
-        setClientTempNs(ns.c_str());
-    }
-    ~DBContext() {
-        database = old;
-    }
-};
+    /* Set database we want to use, then, restores when we finish (are out of scope)
+       Note this is also helpful if an exception happens as the state if fixed up.
+    */
+    class DBContext {
+        Database *old;
+    public:
+        DBContext(const char *ns) {
+            old = database;
+            setClientTempNs(ns);
+        }
+        DBContext(string ns) {
+            old = database;
+            setClientTempNs(ns.c_str());
+        }
+        ~DBContext() {
+            database = old;
+        }
+    };
 
 } // namespace mongo

@@ -23,50 +23,50 @@
 
 namespace mongo {
 
-map<string,Command*> *commands;
+    map<string,Command*> *commands;
 
-Command::Command(const char *_name) : name(_name) {
-    // register ourself.
-    if ( commands == 0 )
-        commands = new map<string,Command*>;
-    (*commands)[name] = this;
-}
-
-bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
-    const char *p = strchr(ns, '.');
-    if ( !p ) return false;
-    if ( strcmp(p, ".$cmd") != 0 ) return false;
-
-    bool ok = false;
-    bool valid = false;
-
-    BSONElement e;
-    e = jsobj.firstElement();
-
-    map<string,Command*>::iterator i;
-
-    if ( e.eoo() )
-        ;
-    /* check for properly registered command objects.  Note that all the commands below should be
-       migrated over to the command object format.
-       */
-    else if ( (i = commands->find(e.fieldName())) != commands->end() ) {
-        valid = true;
-        string errmsg;
-        Command *c = i->second;
-        if ( c->adminOnly() && strncmp(ns, "admin", p-ns) != 0 ) {
-            ok = false;
-            errmsg = "access denied";
-        }
-        else {
-            ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
-        }
-        if ( !ok )
-            anObjBuilder.append("errmsg", errmsg);
-        return true;
+    Command::Command(const char *_name) : name(_name) {
+        // register ourself.
+        if ( commands == 0 )
+            commands = new map<string,Command*>;
+        (*commands)[name] = this;
     }
 
-    return false;
-}
+    bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
+        const char *p = strchr(ns, '.');
+        if ( !p ) return false;
+        if ( strcmp(p, ".$cmd") != 0 ) return false;
+
+        bool ok = false;
+        bool valid = false;
+
+        BSONElement e;
+        e = jsobj.firstElement();
+
+        map<string,Command*>::iterator i;
+
+        if ( e.eoo() )
+            ;
+        /* check for properly registered command objects.  Note that all the commands below should be
+           migrated over to the command object format.
+           */
+        else if ( (i = commands->find(e.fieldName())) != commands->end() ) {
+            valid = true;
+            string errmsg;
+            Command *c = i->second;
+            if ( c->adminOnly() && strncmp(ns, "admin", p-ns) != 0 ) {
+                ok = false;
+                errmsg = "access denied";
+            }
+            else {
+                ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
+            }
+            if ( !ok )
+                anObjBuilder.append("errmsg", errmsg);
+            return true;
+        }
+
+        return false;
+    }
 
 } // namespace mongo

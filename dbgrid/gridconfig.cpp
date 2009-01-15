@@ -26,44 +26,44 @@
 
 namespace mongo {
 
-/* --- Machine --- */
+    /* --- Machine --- */
 
-map<string, Machine*> Machine::machines;
+    map<string, Machine*> Machine::machines;
 
-/* --- GridConfig --- */
+    /* --- GridConfig --- */
 
 //static boost::mutex loc_mutex;
-Grid grid;
+    Grid grid;
 
-ClientConfig* GridConfig::getClientConfig(string database) {
-    ClientConfig*& cc = databases[database];
-    if ( cc == 0 ) {
-        cc = new ClientConfig();
-        if ( !cc->loadByName(database.c_str()) ) {
-            log() << "couldn't find database " << database << " in grid db" << endl;
-            // note here that cc->primary == 0.
+    ClientConfig* GridConfig::getClientConfig(string database) {
+        ClientConfig*& cc = databases[database];
+        if ( cc == 0 ) {
+            cc = new ClientConfig();
+            if ( !cc->loadByName(database.c_str()) ) {
+                log() << "couldn't find database " << database << " in grid db" << endl;
+                // note here that cc->primary == 0.
+            }
         }
-    }
-    return cc;
-}
-
-/* --- Grid --- */
-
-Machine* Grid::owner(const char *ns, BSONObj& objOrKey) {
-    ClientConfig *cc = gc.getClientConfig( nsToClient(ns) );
-    if ( cc == 0 ) {
-        throw UserAssertionException(
-            string("dbgrid: no config for db for ") + ns);
+        return cc;
     }
 
-    if ( !cc->partitioned ) {
-        if ( !cc->primary )
-            throw UserAssertionException(string("dbgrid: no primary for ")+ns);
-        return cc->primary;
-    }
+    /* --- Grid --- */
 
-    uassert("dbgrid: not implemented 100", false);
-    return 0;
-}
+    Machine* Grid::owner(const char *ns, BSONObj& objOrKey) {
+        ClientConfig *cc = gc.getClientConfig( nsToClient(ns) );
+        if ( cc == 0 ) {
+            throw UserAssertionException(
+                string("dbgrid: no config for db for ") + ns);
+        }
+
+        if ( !cc->partitioned ) {
+            if ( !cc->primary )
+                throw UserAssertionException(string("dbgrid: no primary for ")+ns);
+            return cc->primary;
+        }
+
+        uassert("dbgrid: not implemented 100", false);
+        return 0;
+    }
 
 } // namespace mongo

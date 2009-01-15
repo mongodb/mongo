@@ -24,15 +24,15 @@
 
 namespace mongo {
 
-bool dashDashInfer = false;
-vector<string> dashDashGridDb;
-int port = 27017;
-const char *curNs = "";
-Database *database = 0;
+    bool dashDashInfer = false;
+    vector<string> dashDashGridDb;
+    int port = 27017;
+    const char *curNs = "";
+    Database *database = 0;
 
-string getDbContext() {
-    return "?";
-}
+    string getDbContext() {
+        return "?";
+    }
 
 #if !defined(_WIN32)
 
@@ -42,93 +42,93 @@ string getDbContext() {
 
 namespace mongo {
 
-void pipeSigHandler( int signal ) {
-    psignal( signal, "Signal Received : ");
-}
+    void pipeSigHandler( int signal ) {
+        psignal( signal, "Signal Received : ");
+    }
 
 #else
-void setupSignals() {}
+    void setupSignals() {}
 #endif
 
-void usage() {
-    cout << "Mongo dbgrid usage:\n\n";
-    cout << " --port <portno>\n";
-    cout << " --griddb <griddbname> [<griddbname>...]\n";
-    cout << " --infer                                   infer griddbname by replacing \"-n<n>\"\n";
-    cout << "                                           in our hostname with \"-grid\".\n";
-    cout << endl;
-}
+    void usage() {
+        out() << "Mongo dbgrid usage:\n\n";
+        out() << " --port <portno>\n";
+        out() << " --griddb <griddbname> [<griddbname>...]\n";
+        out() << " --infer                                   infer griddbname by replacing \"-n<n>\"\n";
+        out() << "                                           in our hostname with \"-grid\".\n";
+        out() << endl;
+    }
 
-MessagingPort *grab = 0;
-void processRequest(Message&, MessagingPort&);
+    MessagingPort *grab = 0;
+    void processRequest(Message&, MessagingPort&);
 
-void _dbGridConnThread() {
-    MessagingPort& dbMsgPort = *grab;
-    grab = 0;
-    Message m;
-    while ( 1 ) {
-        m.reset();
+    void _dbGridConnThread() {
+        MessagingPort& dbMsgPort = *grab;
+        grab = 0;
+        Message m;
+        while ( 1 ) {
+            m.reset();
 
-        if ( !dbMsgPort.recv(m) ) {
-            log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
-            dbMsgPort.shutdown();
-            break;
+            if ( !dbMsgPort.recv(m) ) {
+                log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
+                dbMsgPort.shutdown();
+                break;
+            }
+
+            processRequest(m, dbMsgPort);
         }
 
-        processRequest(m, dbMsgPort);
     }
 
-}
-
-void dbGridConnThread() {
-    MessagingPort *p = grab;
-    try {
-        _dbGridConnThread();
-    } catch ( ... ) {
-        problem() << "uncaught exception in dbgridconnthread, closing connection" << endl;
-        delete p;
-    }
-}
-
-class DbGridListener : public Listener {
-public:
-    DbGridListener(int p) : Listener(p) { }
-    virtual void accepted(MessagingPort *mp) {
-        assert( grab == 0 );
-        grab = mp;
-        boost::thread thr(dbGridConnThread);
-        while ( grab )
-            sleepmillis(1);
-    }
-};
-
-void start() {
-    gridDatabase.init();
-    /*
+    void dbGridConnThread() {
+        MessagingPort *p = grab;
         try {
-    cout << "TEMP" << endl;
-    {
-        ScopedDbConnection c("localhost");
-        cout << c.conn().findOne("dwight.bar", emptyObj).toString() << endl;
-        c.done();
-        cout << "OK1" << endl;
-    }
-    {
-        ScopedDbConnection c("localhost");
-        c.conn().findOne("dwight.bar", emptyObj);
-        c.done();
-        cout << "OK1" << endl;
-    }
-    cout << "OK2" << endl;
-        } catch(...) {
-    cout << "exception" << endl;
+            _dbGridConnThread();
+        } catch ( ... ) {
+            problem() << "uncaught exception in dbgridconnthread, closing connection" << endl;
+            delete p;
         }
-    */
+    }
 
-    log() << "waiting for connections on port " << port << "..." << endl;
-    DbGridListener l(port);
-    l.listen();
-}
+    class DbGridListener : public Listener {
+    public:
+        DbGridListener(int p) : Listener(p) { }
+        virtual void accepted(MessagingPort *mp) {
+            assert( grab == 0 );
+            grab = mp;
+            boost::thread thr(dbGridConnThread);
+            while ( grab )
+                sleepmillis(1);
+        }
+    };
+
+    void start() {
+        gridDatabase.init();
+        /*
+            try {
+        out() << "TEMP" << endl;
+        {
+            ScopedDbConnection c("localhost");
+            out() << c.conn().findOne("dwight.bar", emptyObj).toString() << endl;
+            c.done();
+            out() << "OK1" << endl;
+        }
+        {
+            ScopedDbConnection c("localhost");
+            c.conn().findOne("dwight.bar", emptyObj);
+            c.done();
+            out() << "OK1" << endl;
+        }
+        out() << "OK2" << endl;
+            } catch(...) {
+        out() << "exception" << endl;
+            }
+        */
+
+        log() << "waiting for connections on port " << port << "..." << endl;
+        DbGridListener l(port);
+        l.listen();
+    }
 
 } // namespace mongo
 
@@ -161,11 +161,11 @@ int main(int argc, char* argv[], char *envp[] ) {
                 n++;
             }
             if ( n == 0 ) {
-                cout << "error: no args for --griddb\n";
+                out() << "error: no args for --griddb\n";
                 return 4;
             }
             if ( n > 2 ) {
-                cout << "error: --griddb does not support more than 2 parameters yet\n";
+                out() << "error: --griddb does not support more than 2 parameters yet\n";
                 return 5;
             }
         }
@@ -192,9 +192,9 @@ int main(int argc, char* argv[], char *envp[] ) {
 namespace mongo {
 
 #undef exit
-void dbexit(int rc, const char *why) {
-    log() << "dbexit: " << why << " rc:" << rc << endl;
-    exit(rc);
-}
+    void dbexit(int rc, const char *why) {
+        log() << "dbexit: " << why << " rc:" << rc << endl;
+        exit(rc);
+    }
 
 } // namespace mongo
