@@ -256,7 +256,7 @@ typedef struct _OWS {
 } *OWS;
 
 class Database;
-extern Database *database;
+    //extern Database *database;
 extern const char *curNs;
 
 /* for now, running on win32 means development not production --

@@ -130,4 +130,6 @@ private:
     bool _haveLogged;
 };
 
+    extern Database *database;
+
 } // namespace mongo

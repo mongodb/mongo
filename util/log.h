@@ -93,7 +93,7 @@ public:
 
         boostlock lk(mutex);
         cout << now;
-        if ( withNs && database && curNs )
+        if ( withNs && /*database && */curNs )
             cout << curNs << ' ';
         return *this;
     }

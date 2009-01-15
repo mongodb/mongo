@@ -25,9 +25,15 @@ env.Append( CPPPATH=[ "." ] )
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
-commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/security.cpp " ) + Glob( "util/*.cpp" ) + Glob( "util/*.c" ) + Glob( "grid/*.cpp" ) + Glob( "client/*.cpp" ) 
+commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/security.cpp " )
+commonFiles += Glob( "util/*.cpp" ) + Glob( "util/*.c" ) + Glob( "grid/*.cpp" )
+commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
 
-coreDbFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp" )
+coreDbFiles = Split( "" )
+
+serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp" )
+
+allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
 
@@ -116,8 +122,13 @@ if nix:
 
 clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )
-clientEnv.Append( LIBS=["unittest" , "libmongoclient.a"] )
+clientEnv.Append( LIBS=[ "libmongoclient.a"] )
 clientEnv.Append( LIBPATH=["."] )
+
+testEnv = env.Clone()
+testEnv.Append( CPPPATH=["../"] )
+testEnv.Append( LIBS=[ "unittest" , "libmongotestfiles.a" ] )
+testEnv.Append( LIBPATH=["."] )
 
 # SYSTEM CHECKS
 configure = env.Configure()
@@ -128,24 +139,25 @@ configure = env.Configure()
 
 
 # main db target
-Default( env.Program( "db/db" , commonFiles + coreDbFiles + [ "db/db.cpp" ]  ) )
+Default( env.Program( "db/db" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ]  ) )
 
 # tools
-env.Program( "mongodump" , commonFiles + coreDbFiles + [ "tools/dump.cpp" ] )
-env.Program( "mongoimport" , commonFiles + coreDbFiles + [ "tools/import.cpp" ] )
+env.Program( "mongodump" , allClientFiles + [ "tools/dump.cpp" ] )
+env.Program( "mongoimport" , allClientFiles + [ "tools/import.cpp" ] )
 
 # dbgrid
-env.Program( "db/dbgrid" , commonFiles + Glob( "dbgrid/*.cpp" ) )
+env.Program( "db/dbgrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
 
 # c++ library
-env.Library( "mongoclient" , commonFiles + coreDbFiles )
+env.Library( "mongoclient" , allClientFiles )
+env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
 
 # examples
 clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
 clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
 
 # testing
-clientEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
+testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
 
 #  ----  INSTALL -------
