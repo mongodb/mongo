@@ -326,28 +326,35 @@ namespace mongo {
         /*throws AssertionException*/
         virtual
         BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-
+        
         virtual void insert( const char * ns , BSONObj obj );
 
         virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 );
-
+        
         virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 );
 
         /**
            if name isn't specified, it will be created from the keys (reccomended)
-           @return whether or not sent message to db
+           @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
         virtual bool ensureIndex( const char * ns , BSONObj keys , const char * name = 0 );
+
+        /**
+           clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
+         */
         virtual void resetIndexCache();
 
     private:
         set<string> _seenIndexes;
     };
-
+    
     class DBClientPaired;
-
-    /* A basic connection to the database. */
+    
+    /** 
+        A basic connection to the database. 
+        This is the main entry point for talking to a simple Mongo setup
+    */
     class DBClientConnection : public DBClientBase {
         DBClientPaired *clientPaired;
         auto_ptr<MessagingPort> p;
@@ -358,6 +365,45 @@ namespace mongo {
         string serverAddress; // remember for reconnects
         void checkConnection();
     public:
+
+        /**
+           @param _autoReconnect whether or not to reconnect on a db or socket failure
+         */
+        DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) :
+                clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
+
+
+        /**
+           If autoReconnect is true, you can try to use the DBClientConnection even when
+           false was returned -- it will try to connect again.
+
+           @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
+           @param errmsg any relevant error message will appneded to the string
+           @return false if fails to connect.
+        */
+        virtual bool connect(const char *serverHostname, string& errmsg);
+
+        virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+                                               BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+            checkConnection();
+            return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions );
+        }
+
+        /**
+           @return whether or not this connection is in a failed state
+         */
+        bool isFailed() const {
+            return failed;
+        }
+
+        /**
+           this gives you access to the low level interface.
+           not reccomented to use
+         */
+        MessagingPort& port() {
+            return *p.get();
+        }
+
         string toStringLong() const {
             stringstream ss;
             ss << serverAddress;
@@ -367,27 +413,6 @@ namespace mongo {
         string toString() {
             return serverAddress;
         }
-        MessagingPort& port() {
-            return *p.get();
-        }
-        bool isFailed() const {
-            return failed;
-        }
-        DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) :
-                clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
-
-        virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
-                                               BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
-            checkConnection();
-            return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions );
-        }
-
-        /* Returns false if fails to connect.
-           If autoReconnect is true, you can try to use the DBClientConnection even when
-           false was returned -- it will try to connect again.
-        */
-        virtual
-        bool connect(const char *serverHostname, string& errmsg);
 
     protected:
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );
