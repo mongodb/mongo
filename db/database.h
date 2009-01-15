@@ -24,111 +24,111 @@
 
 namespace mongo {
 
-class Database {
-public:
-    Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
-            name(nm),
-            path(_path)
-    {
+    class Database {
+    public:
+        Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
+                name(nm),
+                path(_path)
         {
-            int L = strlen(nm);
-            uassert( "db name is empty", L > 0 );
-            uassert( "bad db name [1]", *nm != '.' );
-            uassert( "bad db name [2]", nm[L-1] != '.' );
-            uassert( "bad char(s) in db name", strchr(nm, ' ') == 0 );
-            uassert( "db name too long", L < 64 );
-        }
-
-        justCreated = namespaceIndex.init(_path, nm);
-        profile = 0;
-        profileName = name + ".system.profile";
-    }
-    ~Database() {
-        int n = files.size();
-        for ( int i = 0; i < n; i++ )
-            delete files[i];
-    }
-
-    PhysicalDataFile* getFile( int n, int sizeNeeded = 0 ) {
-        assert(this);
-
-        if ( n < 0 || n >= DiskLoc::MaxFiles ) {
-            cout << "getFile(): n=" << n << endl;
-            assert( n >= 0 && n < DiskLoc::MaxFiles );
-        }
-        DEV {
-            if ( n > 100 )
-                cout << "getFile(): n=" << n << "?" << endl;
-        }
-        while ( n >= (int) files.size() )
-            files.push_back(0);
-        PhysicalDataFile* p = files[n];
-        if ( p == 0 ) {
-            stringstream ss;
-            ss << name << '.' << n;
-            boost::filesystem::path fullName;
-            fullName = boost::filesystem::path(path) / ss.str();
-            string fullNameString = fullName.string();
-            p = new PhysicalDataFile(n);
-            int minSize = 0;
-            if ( n != 0 && files[ n - 1 ] )
-                minSize = files[ n - 1 ]->getHeader()->fileLength;
-            if ( sizeNeeded + PDFHeader::headerSize() > minSize )
-                minSize = sizeNeeded + PDFHeader::headerSize();
-            try {
-                p->open( fullNameString.c_str(), minSize );
+            {
+                int L = strlen(nm);
+                uassert( "db name is empty", L > 0 );
+                uassert( "bad db name [1]", *nm != '.' );
+                uassert( "bad db name [2]", nm[L-1] != '.' );
+                uassert( "bad char(s) in db name", strchr(nm, ' ') == 0 );
+                uassert( "db name too long", L < 64 );
             }
-            catch ( AssertionException& u ) {
-                delete p;
-                throw u;
+
+            justCreated = namespaceIndex.init(_path, nm);
+            profile = 0;
+            profileName = name + ".system.profile";
+        }
+        ~Database() {
+            int n = files.size();
+            for ( int i = 0; i < n; i++ )
+                delete files[i];
+        }
+
+        PhysicalDataFile* getFile( int n, int sizeNeeded = 0 ) {
+            assert(this);
+
+            if ( n < 0 || n >= DiskLoc::MaxFiles ) {
+                cout << "getFile(): n=" << n << endl;
+                assert( n >= 0 && n < DiskLoc::MaxFiles );
             }
-            files[n] = p;
+            DEV {
+                if ( n > 100 )
+                    cout << "getFile(): n=" << n << "?" << endl;
+            }
+            while ( n >= (int) files.size() )
+                files.push_back(0);
+            PhysicalDataFile* p = files[n];
+            if ( p == 0 ) {
+                stringstream ss;
+                ss << name << '.' << n;
+                boost::filesystem::path fullName;
+                fullName = boost::filesystem::path(path) / ss.str();
+                string fullNameString = fullName.string();
+                p = new PhysicalDataFile(n);
+                int minSize = 0;
+                if ( n != 0 && files[ n - 1 ] )
+                    minSize = files[ n - 1 ]->getHeader()->fileLength;
+                if ( sizeNeeded + PDFHeader::headerSize() > minSize )
+                    minSize = sizeNeeded + PDFHeader::headerSize();
+                try {
+                    p->open( fullNameString.c_str(), minSize );
+                }
+                catch ( AssertionException& u ) {
+                    delete p;
+                    throw u;
+                }
+                files[n] = p;
+            }
+            return p;
         }
-        return p;
-    }
 
-    PhysicalDataFile* addAFile( int sizeNeeded = 0 ) {
-        int n = (int) files.size();
-        return getFile( n, sizeNeeded );
-    }
-
-    PhysicalDataFile* suitableFile( int sizeNeeded ) {
-        PhysicalDataFile* f = newestFile();
-        for ( int i = 0; i < 8; i++ ) {
-            if ( f->getHeader()->unusedLength >= sizeNeeded )
-                break;
-            f = addAFile( sizeNeeded );
-            if ( f->getHeader()->fileLength >= PhysicalDataFile::maxSize() ) // this is as big as they get so might as well stop
-                break;
+        PhysicalDataFile* addAFile( int sizeNeeded = 0 ) {
+            int n = (int) files.size();
+            return getFile( n, sizeNeeded );
         }
-        return f;
-    }
 
-    PhysicalDataFile* newestFile() {
-        int n = (int) files.size();
-        if ( n > 0 ) n--;
-        return getFile(n);
-    }
+        PhysicalDataFile* suitableFile( int sizeNeeded ) {
+            PhysicalDataFile* f = newestFile();
+            for ( int i = 0; i < 8; i++ ) {
+                if ( f->getHeader()->unusedLength >= sizeNeeded )
+                    break;
+                f = addAFile( sizeNeeded );
+                if ( f->getHeader()->fileLength >= PhysicalDataFile::maxSize() ) // this is as big as they get so might as well stop
+                    break;
+            }
+            return f;
+        }
 
-    void finishInit(); // ugly...
+        PhysicalDataFile* newestFile() {
+            int n = (int) files.size();
+            if ( n > 0 ) n--;
+            return getFile(n);
+        }
 
-    vector<PhysicalDataFile*> files;
-    string name; // "alleyinsider"
-    string path;
-    NamespaceIndex namespaceIndex;
-    int profile; // 0=off.
-    string profileName; // "alleyinsider.system.profile"
-    QueryOptimizer optimizer;
+        void finishInit(); // ugly...
 
-    bool haveLogged() {
-        return _haveLogged;
-    }
-    void setHaveLogged();
+        vector<PhysicalDataFile*> files;
+        string name; // "alleyinsider"
+        string path;
+        NamespaceIndex namespaceIndex;
+        int profile; // 0=off.
+        string profileName; // "alleyinsider.system.profile"
+        QueryOptimizer optimizer;
 
-private:
-    // see dbinfo.h description.  if true, we have logged to the replication log.
-    bool _haveLogged;
-};
+        bool haveLogged() {
+            return _haveLogged;
+        }
+        void setHaveLogged();
+
+    private:
+        // see dbinfo.h description.  if true, we have logged to the replication log.
+        bool _haveLogged;
+    };
 
     extern Database *database;
 

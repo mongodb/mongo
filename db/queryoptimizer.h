@@ -20,34 +20,34 @@
 
 namespace mongo {
 
-class QueryPlan {
-public:
-    QueryPlan() {
-        scanAndOrderRequired = false;
-        simpleKeyMatch = false;
-    }
+    class QueryPlan {
+    public:
+        QueryPlan() {
+            scanAndOrderRequired = false;
+            simpleKeyMatch = false;
+        }
 
-    auto_ptr<Cursor> cursor;
+        auto_ptr<Cursor> cursor;
 
-    /* ScanAndOrder processing will be required if true */
-    bool scanAndOrderRequired;
+        /* ScanAndOrder processing will be required if true */
+        bool scanAndOrderRequired;
 
-    /* When true, the index we are using has keys such that it can completely resolve the
-       query expression to match by itself without ever checking the main object.
-       */
-    bool simpleKeyMatch;
-};
+        /* When true, the index we are using has keys such that it can completely resolve the
+           query expression to match by itself without ever checking the main object.
+           */
+        bool simpleKeyMatch;
+    };
 
-/* We put these objects inside the Database objects: that way later if we want to do
-   stats, it's in the right place.
-*/
-class QueryOptimizer {
-public:
-    QueryPlan getPlan(
-        const char *ns,
-        BSONObj* query,
-        BSONObj* order = 0,
-        BSONObj* hint = 0);
-};
+    /* We put these objects inside the Database objects: that way later if we want to do
+       stats, it's in the right place.
+    */
+    class QueryOptimizer {
+    public:
+        QueryPlan getPlan(
+            const char *ns,
+            BSONObj* query,
+            BSONObj* order = 0,
+            BSONObj* hint = 0);
+    };
 
 } // namespace mongo

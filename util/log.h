@@ -20,96 +20,96 @@
 
 namespace mongo {
 
-class Nullstream {
-public:
-    Nullstream& operator<<(const char *) {
-        return *this;
-    }
-    Nullstream& operator<<(int) {
-        return *this;
-    }
-    Nullstream& operator<<(unsigned long) {
-        return *this;
-    }
-    Nullstream& operator<<(unsigned) {
-        return *this;
-    }
-    Nullstream& operator<<(double) {
-        return *this;
-    }
-    Nullstream& operator<<(void *) {
-        return *this;
-    }
-    Nullstream& operator<<(long long) {
-        return *this;
-    }
-    Nullstream& operator<<(unsigned long long) {
-        return *this;
-    }
-    Nullstream& operator<<(const string&) {
-        return *this;
-    }
-    Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
-        return *this;
-    }
-    Nullstream& operator<< (ios_base& (*hex)(ios_base&)) {
-        return *this;
-    }
-};
-extern Nullstream nullstream;
+    class Nullstream {
+    public:
+        Nullstream& operator<<(const char *) {
+            return *this;
+        }
+        Nullstream& operator<<(int) {
+            return *this;
+        }
+        Nullstream& operator<<(unsigned long) {
+            return *this;
+        }
+        Nullstream& operator<<(unsigned) {
+            return *this;
+        }
+        Nullstream& operator<<(double) {
+            return *this;
+        }
+        Nullstream& operator<<(void *) {
+            return *this;
+        }
+        Nullstream& operator<<(long long) {
+            return *this;
+        }
+        Nullstream& operator<<(unsigned long long) {
+            return *this;
+        }
+        Nullstream& operator<<(const string&) {
+            return *this;
+        }
+        Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
+            return *this;
+        }
+        Nullstream& operator<< (ios_base& (*hex)(ios_base&)) {
+            return *this;
+        }
+    };
+    extern Nullstream nullstream;
 
 #define LOGIT { boostlock lk(mutex); cout << x; return *this; }
-class Logstream {
-    static boost::mutex mutex;
-public:
-    void flush() {
-        boostlock lk(mutex);
-        cout.flush();
-    }
-    Logstream& operator<<(const char *x) LOGIT
-    Logstream& operator<<(char x) LOGIT
-    Logstream& operator<<(int x) LOGIT
-    Logstream& operator<<(unsigned long x) LOGIT
-    Logstream& operator<<(unsigned x) LOGIT
-    Logstream& operator<<(double x) LOGIT
-    Logstream& operator<<(void *x) LOGIT
-    Logstream& operator<<(long long x) LOGIT
-    Logstream& operator<<(unsigned long long x) LOGIT
-    Logstream& operator<<(const string& x) LOGIT
-    Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
-        boostlock lk(mutex);
-        cout << _endl;
-        return *this;
-    }
-    Logstream& operator<< (ios_base& (*_hex)(ios_base&)) {
-        boostlock lk(mutex);
-        cout << _hex;
-        return *this;
-    }
-    Logstream& prolog(bool withNs = false) {
-        char now[64];
-        time_t_to_String(time(0), now);
-        now[20] = 0;
+    class Logstream {
+        static boost::mutex mutex;
+    public:
+        void flush() {
+            boostlock lk(mutex);
+            cout.flush();
+        }
+        Logstream& operator<<(const char *x) LOGIT
+        Logstream& operator<<(char x) LOGIT
+        Logstream& operator<<(int x) LOGIT
+        Logstream& operator<<(unsigned long x) LOGIT
+        Logstream& operator<<(unsigned x) LOGIT
+        Logstream& operator<<(double x) LOGIT
+        Logstream& operator<<(void *x) LOGIT
+        Logstream& operator<<(long long x) LOGIT
+        Logstream& operator<<(unsigned long long x) LOGIT
+        Logstream& operator<<(const string& x) LOGIT
+        Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
+            boostlock lk(mutex);
+            cout << _endl;
+            return *this;
+        }
+        Logstream& operator<< (ios_base& (*_hex)(ios_base&)) {
+            boostlock lk(mutex);
+            cout << _hex;
+            return *this;
+        }
+        Logstream& prolog(bool withNs = false) {
+            char now[64];
+            time_t_to_String(time(0), now);
+            now[20] = 0;
 
-        boostlock lk(mutex);
-        cout << now;
-        if ( withNs && /*database && */curNs )
-            cout << curNs << ' ';
-        return *this;
+            boostlock lk(mutex);
+            cout << now;
+            if ( withNs && /*database && */curNs )
+                cout << curNs << ' ';
+            return *this;
+        }
+    };
+    extern Logstream logstream;
+
+    inline Logstream& problem() {
+        return logstream.prolog(true);
     }
-};
-extern Logstream logstream;
+    inline Logstream& log() {
+        return logstream.prolog();
+    }
 
-inline Logstream& problem() {
-    return logstream.prolog(true);
-}
-inline Logstream& log() {
-    return logstream.prolog();
-}
-
-inline ostream& stdcout() {
-    return cout;
-}
+    inline ostream& stdcout() {
+        return cout;
+    }
 
 #define cout logstream
 

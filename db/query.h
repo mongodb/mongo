@@ -69,16 +69,16 @@
 namespace mongo {
 
 // for an existing query (ie a ClientCursor), send back additional information.
-QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
+    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
 
 // caller must free() returned QueryResult.
-QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn,
-                      BSONObj j, auto_ptr< set<string> > fieldFilter,
-                      stringstream&, int queryOptions);
+    QueryResult* runQuery(Message&, const char *ns, int ntoskip, int ntoreturn,
+                          BSONObj j, auto_ptr< set<string> > fieldFilter,
+                          stringstream&, int queryOptions);
 
-void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss);
+    void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss);
 
-int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god=false);
+    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god=false);
 
 } // namespace mongo
 

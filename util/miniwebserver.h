@@ -22,34 +22,34 @@
 
 namespace mongo {
 
-class MiniWebServer {
-public:
-    MiniWebServer();
+    class MiniWebServer {
+    public:
+        MiniWebServer();
 
-    bool init(int port);
-    void run();
+        bool init(int port);
+        void run();
 
-    virtual void doRequest(
-        const char *rq, // the full request
-        string url,
-        // set these and return them:
-        string& responseMsg,
-        int& responseCode,
-        vector<string>& headers // if completely empty, content-type: text/html will be added
-    ) = 0;
+        virtual void doRequest(
+            const char *rq, // the full request
+            string url,
+            // set these and return them:
+            string& responseMsg,
+            int& responseCode,
+            vector<string>& headers // if completely empty, content-type: text/html will be added
+        ) = 0;
 
 
-protected:
-    string parseURL( const char * buf );
-    string parseMethod( const char * headers );
-    void parseParams( map<string,string> & params , string query );
-    static const char *body( const char *buf );
+    protected:
+        string parseURL( const char * buf );
+        string parseMethod( const char * headers );
+        void parseParams( map<string,string> & params , string query );
+        static const char *body( const char *buf );
 
-private:
-    void accepted(int s);
-    static bool fullReceive( const char *buf );
+    private:
+        void accepted(int s);
+        static bool fullReceive( const char *buf );
 
-    int sock;
-};
+        int sock;
+    };
 
 } // namespace mongo

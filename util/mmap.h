@@ -20,38 +20,38 @@
 
 namespace mongo {
 
-class MemoryMappedFile {
-public:
-    static void closeAllFiles();
-    MemoryMappedFile();
-    ~MemoryMappedFile(); /* closes the file if open */
-    void close();
+    class MemoryMappedFile {
+    public:
+        static void closeAllFiles();
+        MemoryMappedFile();
+        ~MemoryMappedFile(); /* closes the file if open */
+        void close();
 
-    // Throws exception if file doesn't exist.
-    void* map( const char *filename );
+        // Throws exception if file doesn't exist.
+        void* map( const char *filename );
 
-    /* Creates with length if DNE, otherwise uses existing file length.
-    */
-    void* map(const char *filename, int length);
+        /* Creates with length if DNE, otherwise uses existing file length.
+        */
+        void* map(const char *filename, int length);
 
-    void flush(bool sync);
+        void flush(bool sync);
 
-    void* viewOfs() {
-        return view;
-    }
+        void* viewOfs() {
+            return view;
+        }
 
-    int length() {
-        return len;
-    }
+        int length() {
+            return len;
+        }
 
-    void updateLength( const char *filename, int &length ) const;
+        void updateLength( const char *filename, int &length ) const;
 
-private:
-    HANDLE fd;
-    HANDLE maphandle;
-    void *view;
-    int len;
-};
+    private:
+        HANDLE fd;
+        HANDLE maphandle;
+        void *view;
+        int len;
+    };
 
 
 } // namespace mongo

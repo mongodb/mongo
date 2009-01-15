@@ -20,108 +20,108 @@
 
 namespace mongo {
 
-/* For the database/server protocol, these objects and functions encapsulate
-   the various messages transmitted over the connection.
-*/
+    /* For the database/server protocol, these objects and functions encapsulate
+       the various messages transmitted over the connection.
+    */
 
-class DbMessage {
-public:
-    DbMessage(const Message& _m) : m(_m) {
-        theEnd = _m.data->_data + _m.data->dataLen();
-        int *r = (int *) _m.data->_data;
-        reserved = *r;
-        r++;
-        data = (const char *) r;
-        nextjsobj = data;
-    }
-
-    const char * getns() {
-        return data;
-    }
-    void getns(Namespace& ns) {
-        ns = data;
-    }
-
-    int pullInt() {
-        if ( nextjsobj == data )
-            nextjsobj += strlen(data) + 1; // skip namespace
-        int i = *((int *)nextjsobj);
-        nextjsobj += 4;
-        return i;
-    }
-    long long pullInt64() {
-        if ( nextjsobj == data )
-            nextjsobj += strlen(data) + 1; // skip namespace
-        long long i = *((long long *)nextjsobj);
-        nextjsobj += 8;
-        return i;
-    }
-
-    OID* getOID() {
-        return (OID *) (data + strlen(data) + 1); // skip namespace
-    }
-
-    void getQueryStuff(const char *&query, int& ntoreturn) {
-        int *i = (int *) (data + strlen(data) + 1);
-        ntoreturn = *i;
-        i++;
-        query = (const char *) i;
-    }
-
-    /* for insert and update msgs */
-    bool moreJSObjs() {
-        return nextjsobj != 0;
-    }
-    BSONObj nextJsObj() {
-        if ( nextjsobj == data )
-            nextjsobj += strlen(data) + 1; // skip namespace
-        BSONObj js(nextjsobj);
-        assert( js.objsize() < ( theEnd - data ) );
-        if ( js.objsize() <= 0 )
-            nextjsobj = null;
-        else {
-            nextjsobj += js.objsize();
-            if ( nextjsobj >= theEnd )
-                nextjsobj = 0;
+    class DbMessage {
+    public:
+        DbMessage(const Message& _m) : m(_m) {
+            theEnd = _m.data->_data + _m.data->dataLen();
+            int *r = (int *) _m.data->_data;
+            reserved = *r;
+            r++;
+            data = (const char *) r;
+            nextjsobj = data;
         }
-        return js;
-    }
 
-    const Message& msg() {
-        return m;
-    }
-
-private:
-    const Message& m;
-    int reserved;
-    const char *data;
-    const char *nextjsobj;
-    const char *theEnd;
-};
-
-/* a request to run a query, received from the database */
-class QueryMessage {
-public:
-    const char *ns;
-    int ntoskip;
-    int ntoreturn;
-    int queryOptions;
-    BSONObj query;
-    auto_ptr< set<string> > fields;
-
-    /* parses the message into the above fields */
-    QueryMessage(DbMessage& d) {
-        ns = d.getns();
-        ntoskip = d.pullInt();
-        ntoreturn = d.pullInt();
-        query = d.nextJsObj();
-        if ( d.moreJSObjs() ) {
-            fields = auto_ptr< set<string> >(new set<string>());
-            d.nextJsObj().getFieldNames(*fields);
+        const char * getns() {
+            return data;
         }
-        queryOptions = d.msg().data->dataAsInt();
-    }
-};
+        void getns(Namespace& ns) {
+            ns = data;
+        }
+
+        int pullInt() {
+            if ( nextjsobj == data )
+                nextjsobj += strlen(data) + 1; // skip namespace
+            int i = *((int *)nextjsobj);
+            nextjsobj += 4;
+            return i;
+        }
+        long long pullInt64() {
+            if ( nextjsobj == data )
+                nextjsobj += strlen(data) + 1; // skip namespace
+            long long i = *((long long *)nextjsobj);
+            nextjsobj += 8;
+            return i;
+        }
+
+        OID* getOID() {
+            return (OID *) (data + strlen(data) + 1); // skip namespace
+        }
+
+        void getQueryStuff(const char *&query, int& ntoreturn) {
+            int *i = (int *) (data + strlen(data) + 1);
+            ntoreturn = *i;
+            i++;
+            query = (const char *) i;
+        }
+
+        /* for insert and update msgs */
+        bool moreJSObjs() {
+            return nextjsobj != 0;
+        }
+        BSONObj nextJsObj() {
+            if ( nextjsobj == data )
+                nextjsobj += strlen(data) + 1; // skip namespace
+            BSONObj js(nextjsobj);
+            assert( js.objsize() < ( theEnd - data ) );
+            if ( js.objsize() <= 0 )
+                nextjsobj = null;
+            else {
+                nextjsobj += js.objsize();
+                if ( nextjsobj >= theEnd )
+                    nextjsobj = 0;
+            }
+            return js;
+        }
+
+        const Message& msg() {
+            return m;
+        }
+
+    private:
+        const Message& m;
+        int reserved;
+        const char *data;
+        const char *nextjsobj;
+        const char *theEnd;
+    };
+
+    /* a request to run a query, received from the database */
+    class QueryMessage {
+    public:
+        const char *ns;
+        int ntoskip;
+        int ntoreturn;
+        int queryOptions;
+        BSONObj query;
+        auto_ptr< set<string> > fields;
+
+        /* parses the message into the above fields */
+        QueryMessage(DbMessage& d) {
+            ns = d.getns();
+            ntoskip = d.pullInt();
+            ntoreturn = d.pullInt();
+            query = d.nextJsObj();
+            if ( d.moreJSObjs() ) {
+                fields = auto_ptr< set<string> >(new set<string>());
+                d.nextJsObj().getFieldNames(*fields);
+            }
+            queryOptions = d.msg().data->dataAsInt();
+        }
+    };
 
 } // namespace mongo
 
@@ -129,27 +129,27 @@ public:
 
 namespace mongo {
 
-inline void replyToQuery(int queryResultFlags,
-                         MessagingPort& p, Message& requestMsg,
-                         void *data, int size,
-                         int nReturned, int startingFrom = 0,
-                         long long cursorId = 0
-                        ) {
-    BufBuilder b(32768);
-    b.skip(sizeof(QueryResult));
-    b.append(data, size);
-    QueryResult *qr = (QueryResult *) b.buf();
-    qr->resultFlags() = queryResultFlags;
-    qr->len = b.len();
-    qr->setOperation(opReply);
-    qr->cursorId = cursorId;
-    qr->startingFrom = startingFrom;
-    qr->nReturned = 1;
-    b.decouple();
-    Message *resp = new Message();
-    resp->setData(qr, true); // transport will free
-    p.reply(requestMsg, *resp, requestMsg.data->id);
-}
+    inline void replyToQuery(int queryResultFlags,
+                             MessagingPort& p, Message& requestMsg,
+                             void *data, int size,
+                             int nReturned, int startingFrom = 0,
+                             long long cursorId = 0
+                            ) {
+        BufBuilder b(32768);
+        b.skip(sizeof(QueryResult));
+        b.append(data, size);
+        QueryResult *qr = (QueryResult *) b.buf();
+        qr->resultFlags() = queryResultFlags;
+        qr->len = b.len();
+        qr->setOperation(opReply);
+        qr->cursorId = cursorId;
+        qr->startingFrom = startingFrom;
+        qr->nReturned = 1;
+        b.decouple();
+        Message *resp = new Message();
+        resp->setData(qr, true); // transport will free
+        p.reply(requestMsg, *resp, requestMsg.data->id);
+    }
 
 } // namespace mongo
 
@@ -157,13 +157,13 @@ inline void replyToQuery(int queryResultFlags,
 
 namespace mongo {
 
-inline void replyToQuery(int queryResultFlags,
-                         MessagingPort& p, Message& requestMsg,
-                         BSONObj& responseObj)
-{
-    replyToQuery(queryResultFlags,
-                 p, requestMsg,
-                 (void *) responseObj.objdata(), responseObj.objsize(), 1);
-}
+    inline void replyToQuery(int queryResultFlags,
+                             MessagingPort& p, Message& requestMsg,
+                             BSONObj& responseObj)
+    {
+        replyToQuery(queryResultFlags,
+                     p, requestMsg,
+                     (void *) responseObj.objdata(), responseObj.objsize(), 1);
+    }
 
 } // namespace mongo

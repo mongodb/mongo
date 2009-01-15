@@ -43,93 +43,93 @@
 
 namespace mongo {
 
-const char *tempHost = "localhost:27018";
+    const char *tempHost = "localhost:27018";
 
-void getMore(Message& m, MessagingPort& p) {
-    DbMessage d(m);
-    const char *ns = d.getns();
+    void getMore(Message& m, MessagingPort& p) {
+        DbMessage d(m);
+        const char *ns = d.getns();
 
-    cout << "TEMP: getmore: " << ns << endl;
-
-    ScopedDbConnection dbcon(tempHost);
-    DBClientConnection &c = dbcon.conn();
-
-    Message response;
-    bool ok = c.port().call(m, response);
-    uassert("dbgrid: getmore: error calling db", ok);
-    p.reply(m, response, m.data->id);
-
-    dbcon.done();
-}
-
-/* got query operation from a database */
-void queryOp(Message& m, MessagingPort& p) {
-    DbMessage d(m);
-    QueryMessage q(d);
-    bool lateAssert = false;
-    try {
-        if ( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
-            BSONObjBuilder builder;
-            cout << q.query.toString() << endl;
-            bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
-            if ( ok ) {
-                BSONObj x = builder.done();
-                replyToQuery(0, p, m, x);
-                return;
-            }
-        }
+        cout << "TEMP: getmore: " << ns << endl;
 
         ScopedDbConnection dbcon(tempHost);
         DBClientConnection &c = dbcon.conn();
+
         Message response;
         bool ok = c.port().call(m, response);
-        uassert("dbgrid: error calling db", ok);
-        lateAssert = true;
+        uassert("dbgrid: getmore: error calling db", ok);
         p.reply(m, response, m.data->id);
+
         dbcon.done();
     }
-    catch ( AssertionException& e ) {
-        assert( !lateAssert );
-        BSONObjBuilder err;
-        err.append("$err", string("dbgrid ") + (e.msg.empty() ? "dbgrid assertion during query" : e.msg));
-        BSONObj errObj = err.done();
-        replyToQuery(QueryResult::ResultFlag_ErrSet, p, m, errObj);
-        return;
+
+    /* got query operation from a database */
+    void queryOp(Message& m, MessagingPort& p) {
+        DbMessage d(m);
+        QueryMessage q(d);
+        bool lateAssert = false;
+        try {
+            if ( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
+                BSONObjBuilder builder;
+                cout << q.query.toString() << endl;
+                bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
+                if ( ok ) {
+                    BSONObj x = builder.done();
+                    replyToQuery(0, p, m, x);
+                    return;
+                }
+            }
+
+            ScopedDbConnection dbcon(tempHost);
+            DBClientConnection &c = dbcon.conn();
+            Message response;
+            bool ok = c.port().call(m, response);
+            uassert("dbgrid: error calling db", ok);
+            lateAssert = true;
+            p.reply(m, response, m.data->id);
+            dbcon.done();
+        }
+        catch ( AssertionException& e ) {
+            assert( !lateAssert );
+            BSONObjBuilder err;
+            err.append("$err", string("dbgrid ") + (e.msg.empty() ? "dbgrid assertion during query" : e.msg));
+            BSONObj errObj = err.done();
+            replyToQuery(QueryResult::ResultFlag_ErrSet, p, m, errObj);
+            return;
+        }
     }
-}
 
-void writeOp(int op, Message& m, MessagingPort& p) {
-    DbMessage d(m);
-    const char *ns = d.getns();
-    assert( *ns );
-
-    ScopedDbConnection dbcon(tempHost);
-    DBClientConnection &c = dbcon.conn();
-
-    c.port().say(m);
-
-    dbcon.done();
-    /*
-      while( d.moreJSObjs() ) {
-        BSONObj js = d.nextJsObj();
+    void writeOp(int op, Message& m, MessagingPort& p) {
+        DbMessage d(m);
         const char *ns = d.getns();
-        assert(*ns);
-      }
-    */
-}
+        assert( *ns );
 
-void processRequest(Message& m, MessagingPort& p) {
-    int op = m.data->operation();
-    assert( op > dbMsg );
-    if ( op == dbQuery ) {
-        queryOp(m,p);
+        ScopedDbConnection dbcon(tempHost);
+        DBClientConnection &c = dbcon.conn();
+
+        c.port().say(m);
+
+        dbcon.done();
+        /*
+          while( d.moreJSObjs() ) {
+            BSONObj js = d.nextJsObj();
+            const char *ns = d.getns();
+            assert(*ns);
+          }
+        */
     }
-    else if ( op == dbGetMore ) {
-        getMore(m,p);
+
+    void processRequest(Message& m, MessagingPort& p) {
+        int op = m.data->operation();
+        assert( op > dbMsg );
+        if ( op == dbQuery ) {
+            queryOp(m,p);
+        }
+        else if ( op == dbGetMore ) {
+            getMore(m,p);
+        }
+        else {
+            writeOp(op, m, p);
+        }
     }
-    else {
-        writeOp(op, m, p);
-    }
-}
 
 } // namespace mongo

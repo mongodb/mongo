@@ -32,17 +32,17 @@
 
 namespace mongo {
 
-QueryPlan QueryOptimizer::getPlan(
-    const char *ns,
-    BSONObj* query,
-    BSONObj* order,
-    BSONObj* hint)
-{
-    QueryPlan plan;
+    QueryPlan QueryOptimizer::getPlan(
+        const char *ns,
+        BSONObj* query,
+        BSONObj* order,
+        BSONObj* hint)
+    {
+        QueryPlan plan;
 
 
 
-    return plan;
-}
+        return plan;
+    }
 
 } // namespace mongo

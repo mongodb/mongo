@@ -22,33 +22,33 @@
 
 namespace mongo {
 
-struct LastError {
-    string msg;
-    int nPrev;
-    void raiseError(const char *_msg) {
-        msg = _msg;
-        nPrev = 1;
-    }
-    bool haveError() const {
-        return !msg.empty();
-    }
-    void resetError() {
-        msg.clear();
-    }
-    LastError() {
-        nPrev = 0;
-    }
-};
+    struct LastError {
+        string msg;
+        int nPrev;
+        void raiseError(const char *_msg) {
+            msg = _msg;
+            nPrev = 1;
+        }
+        bool haveError() const {
+            return !msg.empty();
+        }
+        void resetError() {
+            msg.clear();
+        }
+        LastError() {
+            nPrev = 0;
+        }
+    };
 
-extern boost::thread_specific_ptr<LastError> lastError;
+    extern boost::thread_specific_ptr<LastError> lastError;
 
-inline void raiseError(const char *msg) {
-    LastError *le = lastError.get();
-    if ( le == 0 ) {
-        DEV log() << "warning: lastError==0 can't report:" << msg << '\n';
-        return;
+    inline void raiseError(const char *msg) {
+        LastError *le = lastError.get();
+        if ( le == 0 ) {
+            DEV log() << "warning: lastError==0 can't report:" << msg << '\n';
+            return;
+        }
+        le->raiseError(msg);
     }
-    le->raiseError(msg);
-}
 
 } // namespace mongo

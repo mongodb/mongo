@@ -18,120 +18,120 @@
 
 namespace mongo {
 
-class Forward : public AdvanceStrategy {
-    virtual DiskLoc next( const DiskLoc &prev ) const {
-        return prev.rec()->getNext( prev );
+    class Forward : public AdvanceStrategy {
+        virtual DiskLoc next( const DiskLoc &prev ) const {
+            return prev.rec()->getNext( prev );
+        }
+    } _forward;
+
+    class Reverse : public AdvanceStrategy {
+        virtual DiskLoc next( const DiskLoc &prev ) const {
+            return prev.rec()->getPrev( prev );
+        }
+    } _reverse;
+
+    AdvanceStrategy *forward() {
+        return &_forward;
     }
-} _forward;
-
-class Reverse : public AdvanceStrategy {
-    virtual DiskLoc next( const DiskLoc &prev ) const {
-        return prev.rec()->getPrev( prev );
+    AdvanceStrategy *reverse() {
+        return &_reverse;
     }
-} _reverse;
 
-AdvanceStrategy *forward() {
-    return &_forward;
-}
-AdvanceStrategy *reverse() {
-    return &_reverse;
-}
+    DiskLoc nextLoop( NamespaceDetails *nsd, const DiskLoc &prev ) {
+        assert( nsd->capLooped() );
+        DiskLoc next = forward()->next( prev );
+        if ( !next.isNull() )
+            return next;
+        return nsd->firstRecord();
+    }
 
-DiskLoc nextLoop( NamespaceDetails *nsd, const DiskLoc &prev ) {
-    assert( nsd->capLooped() );
-    DiskLoc next = forward()->next( prev );
-    if ( !next.isNull() )
-        return next;
-    return nsd->firstRecord();
-}
+    DiskLoc prevLoop( NamespaceDetails *nsd, const DiskLoc &curr ) {
+        assert( nsd->capLooped() );
+        DiskLoc prev = reverse()->next( curr );
+        if ( !prev.isNull() )
+            return prev;
+        return nsd->lastRecord();
+    }
 
-DiskLoc prevLoop( NamespaceDetails *nsd, const DiskLoc &curr ) {
-    assert( nsd->capLooped() );
-    DiskLoc prev = reverse()->next( curr );
-    if ( !prev.isNull() )
-        return prev;
-    return nsd->lastRecord();
-}
+    ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd ) :
+            BasicCursor( DiskLoc(), this ),
+            nsd( _nsd ) {
+        if ( !nsd )
+            return;
+        DiskLoc start;
+        if ( !nsd->capLooped() )
+            start = nsd->firstRecord();
+        else {
+            start = nsd->capExtent.ext()->firstRecord;
+            if ( !start.isNull() && start == nsd->capFirstNewRecord ) {
+                start = nsd->capExtent.ext()->lastRecord;
+                start = nextLoop( nsd, start );
+            }
+        }
+        curr = start;
+    }
 
-ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd ) :
-        BasicCursor( DiskLoc(), this ),
-        nsd( _nsd ) {
-    if ( !nsd )
-        return;
-    DiskLoc start;
-    if ( !nsd->capLooped() )
-        start = nsd->firstRecord();
-    else {
-        start = nsd->capExtent.ext()->firstRecord;
-        if ( !start.isNull() && start == nsd->capFirstNewRecord ) {
+    DiskLoc ForwardCappedCursor::next( const DiskLoc &prev ) const {
+        assert( nsd );
+        if ( !nsd->capLooped() )
+            return forward()->next( prev );
+
+        DiskLoc i = prev;
+        // Last record
+        if ( i == nsd->capExtent.ext()->lastRecord )
+            return DiskLoc();
+        i = nextLoop( nsd, i );
+        // If we become capFirstNewRecord from same extent, advance to next extent.
+        if ( i == nsd->capFirstNewRecord &&
+                i != nsd->capExtent.ext()->firstRecord )
+            i = nextLoop( nsd, nsd->capExtent.ext()->lastRecord );
+        // If we have just gotten to beginning of capExtent, skip to capFirstNewRecord
+        if ( i == nsd->capExtent.ext()->firstRecord )
+            i = nsd->capFirstNewRecord;
+
+        return i;
+    }
+
+    ReverseCappedCursor::ReverseCappedCursor( NamespaceDetails *_nsd ) :
+            BasicCursor( DiskLoc(), this ),
+            nsd( _nsd ) {
+        if ( !nsd )
+            return;
+        DiskLoc start;
+        if ( !nsd->capLooped() )
+            start = nsd->lastRecord();
+        else
             start = nsd->capExtent.ext()->lastRecord;
-            start = nextLoop( nsd, start );
-        }
+        curr = start;
     }
-    curr = start;
-}
 
-DiskLoc ForwardCappedCursor::next( const DiskLoc &prev ) const {
-    assert( nsd );
-    if ( !nsd->capLooped() )
-        return forward()->next( prev );
+    DiskLoc ReverseCappedCursor::next( const DiskLoc &prev ) const {
+        assert( nsd );
+        if ( !nsd->capLooped() )
+            return reverse()->next( prev );
 
-    DiskLoc i = prev;
-    // Last record
-    if ( i == nsd->capExtent.ext()->lastRecord )
-        return DiskLoc();
-    i = nextLoop( nsd, i );
-    // If we become capFirstNewRecord from same extent, advance to next extent.
-    if ( i == nsd->capFirstNewRecord &&
-            i != nsd->capExtent.ext()->firstRecord )
-        i = nextLoop( nsd, nsd->capExtent.ext()->lastRecord );
-    // If we have just gotten to beginning of capExtent, skip to capFirstNewRecord
-    if ( i == nsd->capExtent.ext()->firstRecord )
-        i = nsd->capFirstNewRecord;
-
-    return i;
-}
-
-ReverseCappedCursor::ReverseCappedCursor( NamespaceDetails *_nsd ) :
-        BasicCursor( DiskLoc(), this ),
-        nsd( _nsd ) {
-    if ( !nsd )
-        return;
-    DiskLoc start;
-    if ( !nsd->capLooped() )
-        start = nsd->lastRecord();
-    else
-        start = nsd->capExtent.ext()->lastRecord;
-    curr = start;
-}
-
-DiskLoc ReverseCappedCursor::next( const DiskLoc &prev ) const {
-    assert( nsd );
-    if ( !nsd->capLooped() )
-        return reverse()->next( prev );
-
-    DiskLoc i = prev;
-    // Last record
-    if ( nsd->capFirstNewRecord == nsd->capExtent.ext()->firstRecord ) {
-        if ( i == nextLoop( nsd, nsd->capExtent.ext()->lastRecord ) ) {
-            return DiskLoc();
+        DiskLoc i = prev;
+        // Last record
+        if ( nsd->capFirstNewRecord == nsd->capExtent.ext()->firstRecord ) {
+            if ( i == nextLoop( nsd, nsd->capExtent.ext()->lastRecord ) ) {
+                return DiskLoc();
+            }
+        } else {
+            if ( i == nsd->capExtent.ext()->firstRecord ) {
+                return DiskLoc();
+            }
         }
-    } else {
-        if ( i == nsd->capExtent.ext()->firstRecord ) {
-            return DiskLoc();
-        }
+        // If we are capFirstNewRecord, advance to prev extent, otherwise just get prev.
+        if ( i == nsd->capFirstNewRecord )
+            i = prevLoop( nsd, nsd->capExtent.ext()->firstRecord );
+        else
+            i = prevLoop( nsd, i );
+        // If we just became last in cap extent, advance past capFirstNewRecord
+        // (We know capExtent.ext()->firstRecord != capFirstNewRecord, since would
+        // have returned DiskLoc() earlier otherwise.)
+        if ( i == nsd->capExtent.ext()->lastRecord )
+            i = reverse()->next( nsd->capFirstNewRecord );
+
+        return i;
     }
-    // If we are capFirstNewRecord, advance to prev extent, otherwise just get prev.
-    if ( i == nsd->capFirstNewRecord )
-        i = prevLoop( nsd, nsd->capExtent.ext()->firstRecord );
-    else
-        i = prevLoop( nsd, i );
-    // If we just became last in cap extent, advance past capFirstNewRecord
-    // (We know capExtent.ext()->firstRecord != capFirstNewRecord, since would
-    // have returned DiskLoc() earlier otherwise.)
-    if ( i == nsd->capExtent.ext()->lastRecord )
-        i = reverse()->next( nsd->capFirstNewRecord );
-
-    return i;
-}
 } // namespace mongo

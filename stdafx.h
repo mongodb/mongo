@@ -26,9 +26,9 @@ namespace mongo {
 #define NOMINMAX
 
 #if defined(_WIN32)
-const bool debug=true;
+    const bool debug=true;
 #else
-const bool debug=false;
+    const bool debug=false;
 #endif
 
 } // namespace mongo
@@ -40,20 +40,20 @@ const bool debug=false;
 
 namespace mongo {
 
-void sayDbContext(const char *msg = 0);
-void dbexit(int returnCode, const char *whyMsg = "");
+    void sayDbContext(const char *msg = 0);
+    void dbexit(int returnCode, const char *whyMsg = "");
 
-inline void * ourmalloc(size_t size) {
-    void *x = malloc(size);
-    if ( x == 0 ) dbexit(42, "malloc fails");
-    return x;
-}
+    inline void * ourmalloc(size_t size) {
+        void *x = malloc(size);
+        if ( x == 0 ) dbexit(42, "malloc fails");
+        return x;
+    }
 
-inline void * ourrealloc(void *ptr, size_t size) {
-    void *x = realloc(ptr, size);
-    if ( x == 0 ) dbexit(43, "realloc fails");
-    return x;
-}
+    inline void * ourrealloc(void *ptr, size_t size) {
+        void *x = realloc(ptr, size);
+        if ( x == 0 ) dbexit(43, "realloc fails");
+        return x;
+    }
 
 #define malloc ourmalloc
 #define realloc ourrealloc
@@ -69,96 +69,96 @@ using namespace std;
 
 namespace mongo {
 
-/* these are manipulated outside of mutexes, so be careful */
-struct Assertion {
-    Assertion() {
-        msg[0] = msg[127] = 0;
-        context[0] = context[127] = 0;
-        file = "";
-        line = 0;
-        when = 0;
-    }
-    char msg[128];
-    char context[128];
-    const char *file;
-    unsigned line;
-    time_t when;
-    void set(const char *m, const char *ctxt, const char *f, unsigned l) {
-        strncpy(msg, m, 127);
-        strncpy(context, ctxt, 127);
-        file = f;
-        line = l;
-        when = time(0);
-    }
-    string toString();
-    bool isSet() {
-        return when != 0;
-    }
-};
+    /* these are manipulated outside of mutexes, so be careful */
+    struct Assertion {
+        Assertion() {
+            msg[0] = msg[127] = 0;
+            context[0] = context[127] = 0;
+            file = "";
+            line = 0;
+            when = 0;
+        }
+        char msg[128];
+        char context[128];
+        const char *file;
+        unsigned line;
+        time_t when;
+        void set(const char *m, const char *ctxt, const char *f, unsigned l) {
+            strncpy(msg, m, 127);
+            strncpy(context, ctxt, 127);
+            file = f;
+            line = l;
+            when = time(0);
+        }
+        string toString();
+        bool isSet() {
+            return when != 0;
+        }
+    };
 
-enum {
-    AssertRegular = 0,
-    AssertW = 1,
-    AssertMsg = 2,
-    AssertUser = 3
-};
+    enum {
+        AssertRegular = 0,
+        AssertW = 1,
+        AssertMsg = 2,
+        AssertUser = 3
+    };
 
-/* last assert of diff types: regular, wassert, msgassert, uassert: */
-extern Assertion lastAssert[4];
+    /* last assert of diff types: regular, wassert, msgassert, uassert: */
+    extern Assertion lastAssert[4];
 
 // you can catch these
-class AssertionException {
-public:
-    string msg;
-    AssertionException() { }
-    virtual bool severe() {
-        return true;
-    }
-    virtual bool isUserAssertion() {
-        return false;
-    }
-    virtual string toString() {
-        return msg;
-    }
-};
+    class AssertionException {
+    public:
+        string msg;
+        AssertionException() { }
+        virtual bool severe() {
+            return true;
+        }
+        virtual bool isUserAssertion() {
+            return false;
+        }
+        virtual string toString() {
+            return msg;
+        }
+    };
 
-/* we use the same mechanism for bad things the user does -- which are really just errors */
-class UserAssertionException : public AssertionException {
-public:
-    UserAssertionException(const char *_msg) {
-        msg = _msg;
-    }
-    UserAssertionException(string _msg) {
-        msg = _msg;
-    }
-    virtual bool severe() {
-        return false;
-    }
-    virtual bool isUserAssertion() {
-        return true;
-    }
-    virtual string toString() {
-        return "userassert:" + msg;
-    }
-};
+    /* we use the same mechanism for bad things the user does -- which are really just errors */
+    class UserAssertionException : public AssertionException {
+    public:
+        UserAssertionException(const char *_msg) {
+            msg = _msg;
+        }
+        UserAssertionException(string _msg) {
+            msg = _msg;
+        }
+        virtual bool severe() {
+            return false;
+        }
+        virtual bool isUserAssertion() {
+            return true;
+        }
+        virtual string toString() {
+            return "userassert:" + msg;
+        }
+    };
 
-class MsgAssertionException : public AssertionException {
-public:
-    MsgAssertionException(const char *_msg) {
-        msg = _msg;
-    }
-    virtual bool severe() {
-        return false;
-    }
-    virtual string toString() {
-        return "massert:" + msg;
-    }
-};
+    class MsgAssertionException : public AssertionException {
+    public:
+        MsgAssertionException(const char *_msg) {
+            msg = _msg;
+        }
+        virtual bool severe() {
+            return false;
+        }
+        virtual string toString() {
+            return "massert:" + msg;
+        }
+    };
 
-void asserted(const char *msg, const char *file, unsigned line);
-void wasserted(const char *msg, const char *file, unsigned line);
-void uasserted(const char *msg);
-void msgasserted(const char *msg);
+    void asserted(const char *msg, const char *file, unsigned line);
+    void wasserted(const char *msg, const char *file, unsigned line);
+    void uasserted(const char *msg);
+    void msgasserted(const char *msg);
 
 #ifdef assert
 #undef assert
@@ -166,7 +166,7 @@ void msgasserted(const char *msg);
 
 #define assert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
 
-/* "user assert".  if asserts, user did something wrong, not our code */
+    /* "user assert".  if asserts, user did something wrong, not our code */
 //#define uassert(_Expression) (void)( (!!(_Expression)) || (uasserted(#_Expression, __FILE__, __LINE__), 0) )
 #define uassert(msg,_Expression) (void)( (!!(_Expression)) || (uasserted(msg), 0) )
 
@@ -174,19 +174,19 @@ void msgasserted(const char *msg);
 
 #define yassert 1
 
-/* warning only - keeps going */
+    /* warning only - keeps going */
 #define wassert(_Expression) (void)( (!!(_Expression)) || (wasserted(#_Expression, __FILE__, __LINE__), 0) )
 
-/* display a message, no context, and throw assertionexception
+    /* display a message, no context, and throw assertionexception
 
-   easy way to throw an exception and log something without our stack trace
-   display happening.
-*/
+       easy way to throw an exception and log something without our stack trace
+       display happening.
+    */
 #define massert(msg,_Expression) (void)( (!!(_Expression)) || (msgasserted(msg), 0) )
 
-/* dassert is 'debug assert' -- might want to turn off for production as these
-   could be slow.
-*/
+    /* dassert is 'debug assert' -- might want to turn off for production as these
+       could be slow.
+    */
 #define dassert assert
 
 } // namespace mongo
@@ -197,7 +197,7 @@ void msgasserted(const char *msg);
 
 namespace mongo {
 
-typedef char _TCHAR;
+    typedef char _TCHAR;
 
 } // namespace mongo
 
@@ -212,12 +212,12 @@ namespace mongo {
 //using namespace std;
 
 #if !defined(_WIN32)
-typedef int HANDLE;
-inline void strcpy_s(char *dst, unsigned len, const char *src) {
-    strcpy(dst, src);
-}
+    typedef int HANDLE;
+    inline void strcpy_s(char *dst, unsigned len, const char *src) {
+        strcpy(dst, src);
+    }
 #else
-typedef void *HANDLE;
+    typedef void *HANDLE;
 #endif
 
 //#if defined(CHAR)
@@ -240,28 +240,28 @@ typedef void *HANDLE;
 namespace mongo {
 
 // for debugging
-typedef struct _Ints {
-    int i[100];
-} *Ints;
-typedef struct _Chars {
-    char c[200];
-} *Chars;
+    typedef struct _Ints {
+        int i[100];
+    } *Ints;
+    typedef struct _Chars {
+        char c[200];
+    } *Chars;
 
-typedef char CHARS[400];
+    typedef char CHARS[400];
 
-typedef struct _OWS {
-    int size;
-    char type;
-    char string[400];
-} *OWS;
+    typedef struct _OWS {
+        int size;
+        char type;
+        char string[400];
+    } *OWS;
 
-class Database;
+    class Database;
     //extern Database *database;
-extern const char *curNs;
+    extern const char *curNs;
 
-/* for now, running on win32 means development not production --
-   use this to log things just there.
-*/
+    /* for now, running on win32 means development not production --
+       use this to log things just there.
+    */
 #if defined(_WIN32)
 #define DEV if( 0 )
 #define WIN if( 1 )
@@ -272,20 +272,20 @@ extern const char *curNs;
 
 #define DEBUGGING if( 0 )
 
-extern unsigned occasion;
-extern unsigned once;
+    extern unsigned occasion;
+    extern unsigned once;
 
 #define OCCASIONALLY if( ++occasion % 16 == 0 )
 #define RARELY if( ++occasion % 128 == 0 )
 #define ONCE if( ++once == 1 )
 
 #if defined(_WIN32)
-inline void our_debug_free(void *p) {
-    unsigned *u = (unsigned *) p;
-    u[0] = 0xEEEEEEEE;
-    u[1] = 0xEEEEEEEE;
-    free(p);
-}
+    inline void our_debug_free(void *p) {
+        unsigned *u = (unsigned *) p;
+        u[0] = 0xEEEEEEEE;
+        u[1] = 0xEEEEEEEE;
+        free(p);
+    }
 #define free our_debug_free
 #endif
 

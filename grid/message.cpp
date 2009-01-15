@@ -30,129 +30,129 @@ namespace mongo {
 // if you want trace output:
 #define mmm(x)
 
-/* listener ------------------------------------------------------------------- */
+    /* listener ------------------------------------------------------------------- */
 
-void Listener::listen() {
-    SockAddr me(port);
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if ( sock == INVALID_SOCKET ) {
-        log() << "ERROR: listen(): invalid socket? " << errno << endl;
-        return;
-    }
-    prebindOptions( sock );
-    if ( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) {
-        log() << "listen(): bind() failed errno:" << errno << endl;
-        if ( errno == 98 )
-            log() << "98 == addr already in use" << endl;
-        closesocket(sock);
-        return;
-    }
-
-    if ( ::listen(sock, 128) != 0 ) {
-        log() << "listen(): listen() failed " << errno << endl;
-        closesocket(sock);
-        return;
-    }
-
-    SockAddr from;
-    while ( 1 ) {
-        int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
-        if ( s < 0 ) {
-            log() << "Listener: accept() returns " << s << " errno:" << errno << endl;
-            continue;
+    void Listener::listen() {
+        SockAddr me(port);
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        if ( sock == INVALID_SOCKET ) {
+            log() << "ERROR: listen(): invalid socket? " << errno << endl;
+            return;
         }
-        disableNagle(s);
-        log() << "connection accepted from " << from.toString() << endl;
-        accepted( new MessagingPort(s, from) );
+        prebindOptions( sock );
+        if ( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) {
+            log() << "listen(): bind() failed errno:" << errno << endl;
+            if ( errno == 98 )
+                log() << "98 == addr already in use" << endl;
+            closesocket(sock);
+            return;
+        }
+
+        if ( ::listen(sock, 128) != 0 ) {
+            log() << "listen(): listen() failed " << errno << endl;
+            closesocket(sock);
+            return;
+        }
+
+        SockAddr from;
+        while ( 1 ) {
+            int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
+            if ( s < 0 ) {
+                log() << "Listener: accept() returns " << s << " errno:" << errno << endl;
+                continue;
+            }
+            disableNagle(s);
+            log() << "connection accepted from " << from.toString() << endl;
+            accepted( new MessagingPort(s, from) );
+        }
     }
-}
 
-/* messagingport -------------------------------------------------------------- */
+    /* messagingport -------------------------------------------------------------- */
 
-class PiggyBackData {
-public:
-    PiggyBackData( MessagingPort * port ) {
-        _port = port;
-        _buf = new char[1300];
-        _cur = _buf;
-    }
+    class PiggyBackData {
+    public:
+        PiggyBackData( MessagingPort * port ) {
+            _port = port;
+            _buf = new char[1300];
+            _cur = _buf;
+        }
 
-    ~PiggyBackData() {
-        flush();
-        delete( _cur );
-    }
-
-    void append( Message& m ) {
-        assert( m.data->len <= 1300 );
-
-        if ( len() + m.data->len > 1300 )
+        ~PiggyBackData() {
             flush();
+            delete( _cur );
+        }
 
-        memcpy( _cur , m.data , m.data->len );
-        _cur += m.data->len;
-    }
+        void append( Message& m ) {
+            assert( m.data->len <= 1300 );
 
-    int flush() {
-        if ( _buf == _cur )
-            return 0;
+            if ( len() + m.data->len > 1300 )
+                flush();
 
-        int x = ::send( _port->sock , _buf , len() , 0 );
-        _cur = _buf;
-        return x;
-    }
+            memcpy( _cur , m.data , m.data->len );
+            _cur += m.data->len;
+        }
 
-    int len() {
-        return _cur - _buf;
-    }
+        int flush() {
+            if ( _buf == _cur )
+                return 0;
 
-private:
+            int x = ::send( _port->sock , _buf , len() , 0 );
+            _cur = _buf;
+            return x;
+        }
 
-    MessagingPort* _port;
+        int len() {
+            return _cur - _buf;
+        }
 
-    char * _buf;
-    char * _cur;
-};
+    private:
 
-MSGID NextMsgId;
-struct MsgStart {
-    MsgStart() {
-        NextMsgId = (((unsigned) time(0)) << 16) ^ curTimeMillis();
-        assert(MsgDataHeaderSize == 16);
-    }
-} msgstart;
+        MessagingPort* _port;
+
+        char * _buf;
+        char * _cur;
+    };
+
+    MSGID NextMsgId;
+    struct MsgStart {
+        MsgStart() {
+            NextMsgId = (((unsigned) time(0)) << 16) ^ curTimeMillis();
+            assert(MsgDataHeaderSize == 16);
+        }
+    } msgstart;
 
 // we "new" this so it guaranteed to still be around when other automatic global vars
 // are being destructed during termination.
-set<MessagingPort*>& ports = *(new set<MessagingPort*>());
+    set<MessagingPort*>& ports = *(new set<MessagingPort*>());
 
-void closeAllSockets() {
-    for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
-        (*i)->shutdown();
-}
-
-MessagingPort::MessagingPort(int _sock, SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far) {
-    ports.insert(this);
-}
-
-MessagingPort::MessagingPort() {
-    ports.insert(this);
-    sock = -1;
-    piggyBackData = 0;
-}
-
-void MessagingPort::shutdown() {
-    if ( sock >= 0 ) {
-        closesocket(sock);
-        sock = -1;
+    void closeAllSockets() {
+        for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
+            (*i)->shutdown();
     }
-}
 
-MessagingPort::~MessagingPort() {
-    if ( piggyBackData )
-        delete( piggyBackData );
-    shutdown();
-    ports.erase(this);
-}
+    MessagingPort::MessagingPort(int _sock, SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far) {
+        ports.insert(this);
+    }
+
+    MessagingPort::MessagingPort() {
+        ports.insert(this);
+        sock = -1;
+        piggyBackData = 0;
+    }
+
+    void MessagingPort::shutdown() {
+        if ( sock >= 0 ) {
+            closesocket(sock);
+            sock = -1;
+        }
+    }
+
+    MessagingPort::~MessagingPort() {
+        if ( piggyBackData )
+            delete( piggyBackData );
+        shutdown();
+        ports.erase(this);
+    }
 
 } // namespace mongo
 
@@ -160,222 +160,222 @@ MessagingPort::~MessagingPort() {
 
 namespace mongo {
 
-class ConnectBG : public BackgroundJob {
-public:
-    int sock;
-    int res;
-    SockAddr farEnd;
-    void run() {
-        res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
-    }
-};
+    class ConnectBG : public BackgroundJob {
+    public:
+        int sock;
+        int res;
+        SockAddr farEnd;
+        void run() {
+            res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
+        }
+    };
 
-bool MessagingPort::connect(SockAddr& _far)
-{
-    farEnd = _far;
+    bool MessagingPort::connect(SockAddr& _far)
+    {
+        farEnd = _far;
 
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if ( sock == INVALID_SOCKET ) {
-        log() << "ERROR: connect(): invalid socket? " << errno << endl;
-        return false;
-    }
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+        if ( sock == INVALID_SOCKET ) {
+            log() << "ERROR: connect(): invalid socket? " << errno << endl;
+            return false;
+        }
 
 #if 0
-    long fl = fcntl(sock, F_GETFL, 0);
-    assert( fl >= 0 );
-    fl |= O_NONBLOCK;
-    fcntl(sock, F_SETFL, fl);
+        long fl = fcntl(sock, F_GETFL, 0);
+        assert( fl >= 0 );
+        fl |= O_NONBLOCK;
+        fcntl(sock, F_SETFL, fl);
 
-    int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
-    if ( res ) {
-        if ( errno == EINPROGRESS )
-            //log() << "connect(): failed errno:" << errno << ' ' << farEnd.getPort() << endl;
-            closesocket(sock);
-        sock = -1;
-        return false;
-    }
-
-#endif
-
-    ConnectBG bg;
-    bg.sock = sock;
-    bg.farEnd = farEnd;
-    bg.go();
-
-    // int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
-    if ( bg.wait(5000) ) {
-        if ( bg.res ) {
-            closesocket(sock);
+        int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
+        if ( res ) {
+            if ( errno == EINPROGRESS )
+                //log() << "connect(): failed errno:" << errno << ' ' << farEnd.getPort() << endl;
+                closesocket(sock);
             sock = -1;
             return false;
         }
-    }
-    else {
-        // time out the connect
-        closesocket(sock);
-        sock = -1;
-        bg.wait(); // so bg stays in scope until bg thread terminates
-        return false;
-    }
 
-    disableNagle(sock);
-    return true;
-}
+#endif
 
-bool MessagingPort::recv(Message& m) {
-again:
-    mmm( cout << "*  recv() sock:" << this->sock << endl; )
-    int len = -1;
+        ConnectBG bg;
+        bg.sock = sock;
+        bg.farEnd = farEnd;
+        bg.go();
 
-    char *lenbuf = (char *) &len;
-    int lft = 4;
-    while ( 1 ) {
-        int x = ::recv(sock, lenbuf, lft, 0);
-        if ( x == 0 ) {
-            DEV cout << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
-            m.reset();
-            return false;
-        }
-        if ( x < 0 ) {
-            log() << "MessagingPort recv() error " << errno << ' ' << farEnd.toString()<<endl;
-            m.reset();
-            return false;
-        }
-        lft -= x;
-        if ( lft == 0 )
-            break;
-        lenbuf += x;
-        log() << "MessagingPort recv() got " << x << " bytes wanted 4, lft=" << lft << endl;
-        assert( lft > 0 );
-    }
-
-    if ( len < 0 || len > 16000000 ) {
-        if ( len == -1 ) {
-            // Endian check from the database, after connecting, to see what mode server is running in.
-            unsigned foo = 0x10203040;
-            int x = ::send(sock, (char *) &foo, 4, 0);
-            if ( x <= 0 ) {
-                log() << "MessagingPort endian send() error " << errno << ' ' << farEnd.toString() << endl;
+        // int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
+        if ( bg.wait(5000) ) {
+            if ( bg.res ) {
+                closesocket(sock);
+                sock = -1;
                 return false;
             }
-            goto again;
-        }
-        log() << "bad recv() len: " << len << '\n';
-        return false;
-    }
-
-    int z = (len+1023)&0xfffffc00;
-    assert(z>=len);
-    MsgData *md = (MsgData *) malloc(z);
-    md->len = len;
-
-    if ( len <= 0 ) {
-        cout << "got a length of " << len << ", something is wrong" << endl;
-        return false;
-    }
-
-    char *p = (char *) &md->id;
-    int left = len -4;
-    while ( 1 ) {
-        int x = ::recv(sock, p, left, 0);
-        if ( x == 0 ) {
-            DEV cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
-            m.reset();
-            return false;
-        }
-        if ( x < 0 ) {
-            log() << "MessagingPort recv() error " << errno << ' ' << farEnd.toString() << endl;
-            m.reset();
-            return false;
-        }
-        left -= x;
-        p += x;
-        if ( left <= 0 )
-            break;
-    }
-
-    m.setData(md, true);
-    return true;
-}
-
-void MessagingPort::reply(Message& received, Message& response) {
-    say(/*received.from, */response, received.data->id);
-}
-
-void MessagingPort::reply(Message& received, Message& response, MSGID responseTo) {
-    say(/*received.from, */response, responseTo);
-}
-
-bool MessagingPort::call(Message& toSend, Message& response) {
-    mmm( cout << "*call()" << endl; )
-    MSGID old = toSend.data->id;
-    say(/*to,*/ toSend);
-    while ( 1 ) {
-        bool ok = recv(response);
-        if ( !ok )
-            return false;
-        //cout << "got response: " << response.data->responseTo << endl;
-        if ( response.data->responseTo == toSend.data->id )
-            break;
-        cout << "********************" << endl;
-        cout << "ERROR: MessagingPort::call() wrong id got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
-        cout << "  old:" << old << endl;
-        cout << "  response msgid:" << response.data->id << endl;
-        cout << "  response len:  " << response.data->len << endl;
-        assert(false);
-        response.reset();
-    }
-    mmm( cout << "*call() end" << endl; )
-    return true;
-}
-
-void MessagingPort::say(Message& toSend, int responseTo) {
-    mmm( cout << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
-    MSGID msgid = NextMsgId;
-    ++NextMsgId;
-    toSend.data->id = msgid;
-    toSend.data->responseTo = responseTo;
-
-    int x = -100;
-
-    if ( piggyBackData && piggyBackData->len() ) {
-        if ( ( piggyBackData->len() + toSend.data->len ) > 1300 ) {
-            // won't fit in a packet - so just send it off
-            piggyBackData->flush();
         }
         else {
-            piggyBackData->append( toSend );
-            x = piggyBackData->flush();
+            // time out the connect
+            closesocket(sock);
+            sock = -1;
+            bg.wait(); // so bg stays in scope until bg thread terminates
+            return false;
         }
+
+        disableNagle(sock);
+        return true;
     }
 
-    if ( x == -100 )
-        x = ::send(sock, (char*)toSend.data, toSend.data->len , 0);
+    bool MessagingPort::recv(Message& m) {
+again:
+        mmm( cout << "*  recv() sock:" << this->sock << endl; )
+        int len = -1;
 
-    if ( x <= 0 ) {
-        log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
+        char *lenbuf = (char *) &len;
+        int lft = 4;
+        while ( 1 ) {
+            int x = ::recv(sock, lenbuf, lft, 0);
+            if ( x == 0 ) {
+                DEV cout << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
+                m.reset();
+                return false;
+            }
+            if ( x < 0 ) {
+                log() << "MessagingPort recv() error " << errno << ' ' << farEnd.toString()<<endl;
+                m.reset();
+                return false;
+            }
+            lft -= x;
+            if ( lft == 0 )
+                break;
+            lenbuf += x;
+            log() << "MessagingPort recv() got " << x << " bytes wanted 4, lft=" << lft << endl;
+            assert( lft > 0 );
+        }
+
+        if ( len < 0 || len > 16000000 ) {
+            if ( len == -1 ) {
+                // Endian check from the database, after connecting, to see what mode server is running in.
+                unsigned foo = 0x10203040;
+                int x = ::send(sock, (char *) &foo, 4, 0);
+                if ( x <= 0 ) {
+                    log() << "MessagingPort endian send() error " << errno << ' ' << farEnd.toString() << endl;
+                    return false;
+                }
+                goto again;
+            }
+            log() << "bad recv() len: " << len << '\n';
+            return false;
+        }
+
+        int z = (len+1023)&0xfffffc00;
+        assert(z>=len);
+        MsgData *md = (MsgData *) malloc(z);
+        md->len = len;
+
+        if ( len <= 0 ) {
+            cout << "got a length of " << len << ", something is wrong" << endl;
+            return false;
+        }
+
+        char *p = (char *) &md->id;
+        int left = len -4;
+        while ( 1 ) {
+            int x = ::recv(sock, p, left, 0);
+            if ( x == 0 ) {
+                DEV cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
+                m.reset();
+                return false;
+            }
+            if ( x < 0 ) {
+                log() << "MessagingPort recv() error " << errno << ' ' << farEnd.toString() << endl;
+                m.reset();
+                return false;
+            }
+            left -= x;
+            p += x;
+            if ( left <= 0 )
+                break;
+        }
+
+        m.setData(md, true);
+        return true;
     }
 
-}
-
-void MessagingPort::piggyBack( Message& toSend , int responseTo ) {
-
-    if ( toSend.data->len > 1300 ) {
-        // not worth saving because its almost an entire packet
-        say( toSend );
-        return;
+    void MessagingPort::reply(Message& received, Message& response) {
+        say(/*received.from, */response, received.data->id);
     }
 
-    // we're going to be storing this, so need to set it up
-    MSGID msgid = NextMsgId;
-    ++NextMsgId;
-    toSend.data->id = msgid;
-    toSend.data->responseTo = responseTo;
+    void MessagingPort::reply(Message& received, Message& response, MSGID responseTo) {
+        say(/*received.from, */response, responseTo);
+    }
 
-    if ( ! piggyBackData )
-        piggyBackData = new PiggyBackData( this );
+    bool MessagingPort::call(Message& toSend, Message& response) {
+        mmm( cout << "*call()" << endl; )
+        MSGID old = toSend.data->id;
+        say(/*to,*/ toSend);
+        while ( 1 ) {
+            bool ok = recv(response);
+            if ( !ok )
+                return false;
+            //cout << "got response: " << response.data->responseTo << endl;
+            if ( response.data->responseTo == toSend.data->id )
+                break;
+            cout << "********************" << endl;
+            cout << "ERROR: MessagingPort::call() wrong id got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
+            cout << "  old:" << old << endl;
+            cout << "  response msgid:" << response.data->id << endl;
+            cout << "  response len:  " << response.data->len << endl;
+            assert(false);
+            response.reset();
+        }
+        mmm( cout << "*call() end" << endl; )
+        return true;
+    }
 
-    piggyBackData->append( toSend );
-}
+    void MessagingPort::say(Message& toSend, int responseTo) {
+        mmm( cout << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
+        MSGID msgid = NextMsgId;
+        ++NextMsgId;
+        toSend.data->id = msgid;
+        toSend.data->responseTo = responseTo;
+
+        int x = -100;
+
+        if ( piggyBackData && piggyBackData->len() ) {
+            if ( ( piggyBackData->len() + toSend.data->len ) > 1300 ) {
+                // won't fit in a packet - so just send it off
+                piggyBackData->flush();
+            }
+            else {
+                piggyBackData->append( toSend );
+                x = piggyBackData->flush();
+            }
+        }
+
+        if ( x == -100 )
+            x = ::send(sock, (char*)toSend.data, toSend.data->len , 0);
+
+        if ( x <= 0 ) {
+            log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
+        }
+
+    }
+
+    void MessagingPort::piggyBack( Message& toSend , int responseTo ) {
+
+        if ( toSend.data->len > 1300 ) {
+            // not worth saving because its almost an entire packet
+            say( toSend );
+            return;
+        }
+
+        // we're going to be storing this, so need to set it up
+        MSGID msgid = NextMsgId;
+        ++NextMsgId;
+        toSend.data->id = msgid;
+        toSend.data->responseTo = responseTo;
+
+        if ( ! piggyBackData )
+            piggyBackData = new PiggyBackData( this );
+
+        piggyBackData->append( toSend );
+    }
 
 } // namespace mongo

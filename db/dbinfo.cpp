@@ -21,29 +21,29 @@
 
 namespace mongo {
 
-void DBInfo::setHaveLogged() {
-    if ( haveLogged() )
-        return;
+    void DBInfo::setHaveLogged() {
+        if ( haveLogged() )
+            return;
 
-    NamespaceDetails *d = nsdetails(ns.c_str());
-    assert( d == 0 || d->nrecords == 0 );
-    BSONObjBuilder b;
-    b.appendBool("haveLogged", true);
-    BSONObj o = b.done();
-    theDataFileMgr.insert(ns.c_str(), (void *) o.objdata(), o.objsize());
-}
+        NamespaceDetails *d = nsdetails(ns.c_str());
+        assert( d == 0 || d->nrecords == 0 );
+        BSONObjBuilder b;
+        b.appendBool("haveLogged", true);
+        BSONObj o = b.done();
+        theDataFileMgr.insert(ns.c_str(), (void *) o.objdata(), o.objsize());
+    }
 
-int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god);
+    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god);
 
-void DBInfo::dbDropped() {
-    BSONObj empty;
-    deleteObjects(ns.c_str(), empty, false, false);
+    void DBInfo::dbDropped() {
+        BSONObj empty;
+        deleteObjects(ns.c_str(), empty, false, false);
 
-    /* do we also need to clear the info in 'dbs' in local.sources if we
-    are a slave?
-       TODO if so.  need to be careful not to mess up replications of dropDatabase().
-       */
-}
+        /* do we also need to clear the info in 'dbs' in local.sources if we
+        are a slave?
+           TODO if so.  need to be careful not to mess up replications of dropDatabase().
+           */
+    }
 
 
 } // namespace mongo

@@ -26,7 +26,7 @@
 using namespace std;
 
 namespace mongo {
-extern const char* dbpath;
+    extern const char* dbpath;
 } // namespace mongo
 string dbpathSpec = "/tmp/unittest/";
 

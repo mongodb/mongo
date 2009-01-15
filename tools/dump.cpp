@@ -23,92 +23,92 @@
 
 namespace mongo {
 
-namespace po = boost::program_options;
+    namespace po = boost::program_options;
 
-namespace dump {
+    namespace dump {
 
-void doCollection( DBClientConnection & conn , const char * coll , path outputFile ) {
-    cout << "\t" << coll << " to " << outputFile.string() << endl;
+        void doCollection( DBClientConnection & conn , const char * coll , path outputFile ) {
+            cout << "\t" << coll << " to " << outputFile.string() << endl;
 
-    int out = open( outputFile.string().c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
-    assert( out );
+            int out = open( outputFile.string().c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
+            assert( out );
 
-    BSONObjBuilder query;
-    auto_ptr<DBClientCursor> cursor = conn.query( coll , query.doneAndDecouple() );
+            BSONObjBuilder query;
+            auto_ptr<DBClientCursor> cursor = conn.query( coll , query.doneAndDecouple() );
 
-    int num = 0;
-    while ( cursor->more() ) {
-        BSONObj obj = cursor->next();
-        write( out , obj.objdata() , obj.objsize() );
-        num++;
-    }
+            int num = 0;
+            while ( cursor->more() ) {
+                BSONObj obj = cursor->next();
+                write( out , obj.objdata() , obj.objsize() );
+                num++;
+            }
 
-    cout << "\t\t " << num << " objects" << endl;
+            cout << "\t\t " << num << " objects" << endl;
 
-    close( out );
-}
-
-void go( DBClientConnection & conn , const char * db , const path outdir ) {
-    cout << "DATABASE: " << db << endl;
-
-    create_directories( outdir );
-
-    string sns = db;
-    sns += ".system.namespaces";
-
-    BSONObjBuilder query;
-    auto_ptr<DBClientCursor> cursor = conn.query( sns.c_str() , query.doneAndDecouple() );
-    while ( cursor->more() ) {
-        BSONObj obj = cursor->next();
-        if ( obj.toString().find( ".$" ) != string::npos )
-            continue;
-
-        const string name = obj.getField( "name" ).valuestr();
-        const string filename = name.substr( strlen( db ) + 1 );
-
-        doCollection( conn , name.c_str() , outdir / ( filename + ".bson" ) );
-
-    }
-
-}
-
-void go( const char * host , const char * db , const char * outdir ) {
-    DBClientConnection conn;
-    string errmsg;
-    if ( ! conn.connect( host , errmsg ) ) {
-        cout << "couldn't connect : " << errmsg << endl;
-        throw -11;
-    }
-
-    path root(outdir);
-
-    if ( strlen( db ) == 1 && db[0] == '*' ) {
-        cout << "all dbs" << endl;
-
-        BSONObjBuilder query;
-        query.appendBool( "listDatabases" , 1 );
-
-        BSONObj res = conn.findOne( "admin.$cmd" , query.doneAndDecouple() );
-        BSONObj dbs = res.getField( "databases" ).embeddedObjectUserCheck();
-        set<string> keys;
-        dbs.getFieldNames( keys );
-        for ( set<string>::iterator i = keys.begin() ; i != keys.end() ; i++ ) {
-            string key = *i;
-
-            BSONObj db = dbs.getField( key ).embeddedObjectUserCheck();
-
-            const char * dbName = db.getField( "name" ).valuestr();
-            if ( (string)dbName == "local" )
-                continue;
-            go ( conn , dbName , root / dbName );
+            close( out );
         }
-    }
-    else {
-        go( conn , db , root / db );
-    }
-}
 
-} // namespace dump
+        void go( DBClientConnection & conn , const char * db , const path outdir ) {
+            cout << "DATABASE: " << db << endl;
+
+            create_directories( outdir );
+
+            string sns = db;
+            sns += ".system.namespaces";
+
+            BSONObjBuilder query;
+            auto_ptr<DBClientCursor> cursor = conn.query( sns.c_str() , query.doneAndDecouple() );
+            while ( cursor->more() ) {
+                BSONObj obj = cursor->next();
+                if ( obj.toString().find( ".$" ) != string::npos )
+                    continue;
+
+                const string name = obj.getField( "name" ).valuestr();
+                const string filename = name.substr( strlen( db ) + 1 );
+
+                doCollection( conn , name.c_str() , outdir / ( filename + ".bson" ) );
+
+            }
+
+        }
+
+        void go( const char * host , const char * db , const char * outdir ) {
+            DBClientConnection conn;
+            string errmsg;
+            if ( ! conn.connect( host , errmsg ) ) {
+                cout << "couldn't connect : " << errmsg << endl;
+                throw -11;
+            }
+
+            path root(outdir);
+
+            if ( strlen( db ) == 1 && db[0] == '*' ) {
+                cout << "all dbs" << endl;
+
+                BSONObjBuilder query;
+                query.appendBool( "listDatabases" , 1 );
+
+                BSONObj res = conn.findOne( "admin.$cmd" , query.doneAndDecouple() );
+                BSONObj dbs = res.getField( "databases" ).embeddedObjectUserCheck();
+                set<string> keys;
+                dbs.getFieldNames( keys );
+                for ( set<string>::iterator i = keys.begin() ; i != keys.end() ; i++ ) {
+                    string key = *i;
+
+                    BSONObj db = dbs.getField( key ).embeddedObjectUserCheck();
+
+                    const char * dbName = db.getField( "name" ).valuestr();
+                    if ( (string)dbName == "local" )
+                        continue;
+                    go ( conn , dbName , root / dbName );
+                }
+            }
+            else {
+                go( conn , db , root / db );
+            }
+        }
+
+    } // namespace dump
 
 } // namespace mongo
 

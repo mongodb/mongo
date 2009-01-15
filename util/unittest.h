@@ -20,35 +20,35 @@
 
 namespace mongo {
 
-/* The idea here is to let all initialization of global variables (classes inheriting from UnitTest)
-   complete before we run the tests -- otherwise order of initilization being arbitrary may mess
-   us up.  The app's main() function should call runTests().
+    /* The idea here is to let all initialization of global variables (classes inheriting from UnitTest)
+       complete before we run the tests -- otherwise order of initilization being arbitrary may mess
+       us up.  The app's main() function should call runTests().
 
-   To define a unit test, inherit from this and implement run. instantiate one object for the new class
-   as a global.
-*/
-struct UnitTest {
-    UnitTest() {
-        registerTest(this);
-    }
-
-    // assert if fails
-    virtual void run() = 0;
-
-    static vector<UnitTest*> *tests;
-
-    static void registerTest(UnitTest *t) {
-        if ( tests == 0 )
-            tests = new vector<UnitTest*>();
-        tests->push_back(t);
-    }
-
-    static void runTests() {
-        for ( vector<UnitTest*>::iterator i = tests->begin(); i != tests->end(); i++ ) {
-            (*i)->run();
+       To define a unit test, inherit from this and implement run. instantiate one object for the new class
+       as a global.
+    */
+    struct UnitTest {
+        UnitTest() {
+            registerTest(this);
         }
-    }
-};
+
+        // assert if fails
+        virtual void run() = 0;
+
+        static vector<UnitTest*> *tests;
+
+        static void registerTest(UnitTest *t) {
+            if ( tests == 0 )
+                tests = new vector<UnitTest*>();
+            tests->push_back(t);
+        }
+
+        static void runTests() {
+            for ( vector<UnitTest*>::iterator i = tests->begin(); i != tests->end(); i++ ) {
+                (*i)->run();
+            }
+        }
+    };
 
 
 } // namespace mongo

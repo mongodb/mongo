@@ -24,27 +24,27 @@
 
 namespace mongo {
 
-DBConnectionPool pool;
+    DBConnectionPool pool;
 
-DBClientConnection* DBConnectionPool::get(const string& host) {
-    boostlock L(poolMutex);
+    DBClientConnection* DBConnectionPool::get(const string& host) {
+        boostlock L(poolMutex);
 
-    PoolForHost *&p = pools[host];
-    if ( p == 0 )
-        p = new PoolForHost();
-    if ( p->pool.empty() ) {
-        string errmsg;
-        DBClientConnection *c = new DBClientConnection();
-        if ( !c->connect(host.c_str(), errmsg) ) {
-            delete c;
-            uassert("dbconnectionpool: connect failed", false);
-            return 0;
+        PoolForHost *&p = pools[host];
+        if ( p == 0 )
+            p = new PoolForHost();
+        if ( p->pool.empty() ) {
+            string errmsg;
+            DBClientConnection *c = new DBClientConnection();
+            if ( !c->connect(host.c_str(), errmsg) ) {
+                delete c;
+                uassert("dbconnectionpool: connect failed", false);
+                return 0;
+            }
+            return c;
         }
+        DBClientConnection *c = p->pool.front();
+        p->pool.pop();
         return c;
     }
-    DBClientConnection *c = p->pool.front();
-    p->pool.pop();
-    return c;
-}
 
 } // namespace mongo

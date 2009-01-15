@@ -23,157 +23,157 @@
 
 namespace mongo {
 
-extern int port;
-extern const char *allDead;
+    extern int port;
+    extern const char *allDead;
 
-/* ReplPair is a pair of db servers replicating to one another and cooperating.
+    /* ReplPair is a pair of db servers replicating to one another and cooperating.
 
-   Only one member of the pair is active at a time; so this is a smart master/slave
-   configuration basically.
+       Only one member of the pair is active at a time; so this is a smart master/slave
+       configuration basically.
 
-   You may read from the slave at anytime though (if you don't mind the slight lag).
+       You may read from the slave at anytime though (if you don't mind the slight lag).
 
-   todo: Could be extended to be more than a pair, thus the name 'Set' -- for example,
-   a set of 3...
-*/
+       todo: Could be extended to be more than a pair, thus the name 'Set' -- for example,
+       a set of 3...
+    */
 
-class ReplPair {
-public:
-    enum {
-        State_CantArb = -3,
-        State_Confused = -2,
-        State_Negotiating = -1,
-        State_Slave = 0,
-        State_Master = 1
-    };
+    class ReplPair {
+    public:
+        enum {
+            State_CantArb = -3,
+            State_Confused = -2,
+            State_Negotiating = -1,
+            State_Slave = 0,
+            State_Master = 1
+        };
 
-    int state;
-    string info; // commentary about our current state
-    string arbHost;  // "-" for no arbiter.  "host[:port]"
-    int remotePort;
-    string remoteHost;
-    string remote; // host:port if port specified.
+        int state;
+        string info; // commentary about our current state
+        string arbHost;  // "-" for no arbiter.  "host[:port]"
+        int remotePort;
+        string remoteHost;
+        string remote; // host:port if port specified.
 //    int date; // -1 not yet set; 0=slave; 1=master
 
-    string getInfo() {
-        stringstream ss;
-        ss << "  state:   ";
-        if ( state == 1 ) ss << "1 State_Master ";
-        else if ( state == 0 ) ss << "0 State_Slave";
-        else
-            ss << "<b>" << state << "</b>";
-        ss << '\n';
-        ss << "  info:    " << info << '\n';
-        ss << "  arbhost: " << arbHost << '\n';
-        ss << "  remote:  " << remoteHost << ':' << remotePort << '\n';
+        string getInfo() {
+            stringstream ss;
+            ss << "  state:   ";
+            if ( state == 1 ) ss << "1 State_Master ";
+            else if ( state == 0 ) ss << "0 State_Slave";
+            else
+                ss << "<b>" << state << "</b>";
+            ss << '\n';
+            ss << "  info:    " << info << '\n';
+            ss << "  arbhost: " << arbHost << '\n';
+            ss << "  remote:  " << remoteHost << ':' << remotePort << '\n';
 //        ss << "  date:    " << date << '\n';
-        return ss.str();
-    }
+            return ss.str();
+        }
 
-    ReplPair(const char *remoteEnd, const char *arbiter);
+        ReplPair(const char *remoteEnd, const char *arbiter);
 
-    bool dominant(const string& myname) {
-        if ( myname == remoteHost )
-            return port > remotePort;
-        return myname > remoteHost;
-    }
+        bool dominant(const string& myname) {
+            if ( myname == remoteHost )
+                return port > remotePort;
+            return myname > remoteHost;
+        }
 
-    void setMasterLocked( int n, const char *_comment = "" ) {
-        dblock p;
-        setMaster( n, _comment );
-    }
+        void setMasterLocked( int n, const char *_comment = "" ) {
+            dblock p;
+            setMaster( n, _comment );
+        }
 
-    void setMaster(int n, const char *_comment = "");
+        void setMaster(int n, const char *_comment = "");
 
-    /* negotiate with our peer who is master */
-    void negotiate(DBClientConnection *conn);
+        /* negotiate with our peer who is master */
+        void negotiate(DBClientConnection *conn);
 
-    /* peer unreachable, try our arbitrator */
-    void arbitrate();
+        /* peer unreachable, try our arbitrator */
+        void arbitrate();
 
-    virtual
-    DBClientConnection *newClientConnection() const {
-        return new DBClientConnection();
-    }
-};
+        virtual
+        DBClientConnection *newClientConnection() const {
+            return new DBClientConnection();
+        }
+    };
 
-extern ReplPair *replPair;
+    extern ReplPair *replPair;
 
-/* note we always return true for the "local" namespace.
+    /* note we always return true for the "local" namespace.
 
-   we should not allow most operations when not the master
-   also we report not master if we are "dead".
+       we should not allow most operations when not the master
+       also we report not master if we are "dead".
 
-   See also CmdIsMaster.
+       See also CmdIsMaster.
 
-*/
-inline bool isMaster() {
-    if ( allDead ) {
+    */
+    inline bool isMaster() {
+        if ( allDead ) {
+            return database->name == "local";
+        }
+
+        if ( replPair == 0 || replPair->state == ReplPair::State_Master )
+            return true;
+
         return database->name == "local";
     }
 
-    if ( replPair == 0 || replPair->state == ReplPair::State_Master )
-        return true;
+    inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {
+        state = -1;
+        remote = remoteEnd;
+        remotePort = DBPort;
+        remoteHost = remoteEnd;
+        const char *p = strchr(remoteEnd, ':');
+        if ( p ) {
+            remoteHost = string(remoteEnd, p-remoteEnd);
+            remotePort = atoi(p+1);
+            uassert("bad port #", remotePort > 0 && remotePort < 0x10000 );
+            if ( remotePort == DBPort )
+                remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
+        }
 
-    return database->name == "local";
-}
-
-inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {
-    state = -1;
-    remote = remoteEnd;
-    remotePort = DBPort;
-    remoteHost = remoteEnd;
-    const char *p = strchr(remoteEnd, ':');
-    if ( p ) {
-        remoteHost = string(remoteEnd, p-remoteEnd);
-        remotePort = atoi(p+1);
-        uassert("bad port #", remotePort > 0 && remotePort < 0x10000 );
-        if ( remotePort == DBPort )
-            remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
+        uassert("arbiter parm is missing, use '-' for none", arb);
+        arbHost = arb;
+        uassert("arbiter parm is empty", !arbHost.empty());
     }
 
-    uassert("arbiter parm is missing, use '-' for none", arb);
-    arbHost = arb;
-    uassert("arbiter parm is empty", !arbHost.empty());
-}
+    /* This is set to true if we have EVER been up to date -- this way a new pair member
+     which is a replacement won't go online as master until we have initially fully synced.
+     */
+    class PairSync {
+        int initialsynccomplete;
+    public:
+        PairSync() {
+            initialsynccomplete = -1;
+        }
 
-/* This is set to true if we have EVER been up to date -- this way a new pair member
- which is a replacement won't go online as master until we have initially fully synced.
- */
-class PairSync {
-    int initialsynccomplete;
-public:
-    PairSync() {
-        initialsynccomplete = -1;
-    }
+        /* call before using the class.  from dbmutex */
+        void init() {
+            BSONObj o;
+            initialsynccomplete = 0;
+            if ( getSingleton("local.pair.sync", o) )
+                initialsynccomplete = 1;
+        }
 
-    /* call before using the class.  from dbmutex */
-    void init() {
-        BSONObj o;
-        initialsynccomplete = 0;
-        if ( getSingleton("local.pair.sync", o) )
+        bool initialSyncCompleted() {
+            return initialsynccomplete != 0;
+        }
+
+        void setInitialSyncCompleted() {
+            BSONObj o = fromjson("{\"initialsynccomplete\":1}");
+            putSingleton("local.pair.sync", o);
             initialsynccomplete = 1;
-    }
+        }
 
-    bool initialSyncCompleted() {
-        return initialsynccomplete != 0;
-    }
-
-    void setInitialSyncCompleted() {
-        BSONObj o = fromjson("{\"initialsynccomplete\":1}");
-        putSingleton("local.pair.sync", o);
-        initialsynccomplete = 1;
-    }
-
-    void setInitialSyncCompletedLocking() {
-        if ( initialsynccomplete == 1 )
-            return;
-        dblock lk;
-        BSONObj o = fromjson("{\"initialsynccomplete\":1}");
-        putSingleton("local.pair.sync", o);
-        initialsynccomplete = 1;
-    }
-};
+        void setInitialSyncCompletedLocking() {
+            if ( initialsynccomplete == 1 )
+                return;
+            dblock lk;
+            BSONObj o = fromjson("{\"initialsynccomplete\":1}");
+            putSingleton("local.pair.sync", o);
+            initialsynccomplete = 1;
+        }
+    };
 
 
 } // namespace mongo

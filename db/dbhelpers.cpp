@@ -23,31 +23,31 @@
 
 namespace mongo {
 
-/* Get the first object from a collection.  Generally only useful if the collection
-   only ever has a single object -- which is a "singleton collection.
+    /* Get the first object from a collection.  Generally only useful if the collection
+       only ever has a single object -- which is a "singleton collection.
 
-   Returns: true if object exists.
-*/
-bool getSingleton(const char *ns, BSONObj& result) {
-    DBContext context(ns);
+       Returns: true if object exists.
+    */
+    bool getSingleton(const char *ns, BSONObj& result) {
+        DBContext context(ns);
 
-    auto_ptr<Cursor> c = DataFileMgr::findAll(ns);
-    if ( !c->ok() )
-        return false;
+        auto_ptr<Cursor> c = DataFileMgr::findAll(ns);
+        if ( !c->ok() )
+            return false;
 
-    result = c->current();
-    return true;
-}
+        result = c->current();
+        return true;
+    }
 
-void putSingleton(const char *ns, BSONObj obj) {
-    DBContext context(ns);
-    stringstream ss;
-    updateObjects(ns, obj, /*pattern=*/emptyObj, /*upsert=*/true, ss);
-}
+    void putSingleton(const char *ns, BSONObj obj) {
+        DBContext context(ns);
+        stringstream ss;
+        updateObjects(ns, obj, /*pattern=*/emptyObj, /*upsert=*/true, ss);
+    }
 
-void emptyCollection(const char *ns) {
-    DBContext context(ns);
-    deleteObjects(ns, emptyObj, false);
-}
+    void emptyCollection(const char *ns) {
+        DBContext context(ns);
+        deleteObjects(ns, emptyObj, false);
+    }
 
 } // namespace mongo
