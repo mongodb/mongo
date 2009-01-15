@@ -426,7 +426,7 @@ namespace JsobjTests {
         private:
             static void assertEquals( const BSONObj &expected, const BSONObj &actual ) {
                 if ( expected.woCompare( actual ) ) {
-                    cout << "Expected: " << expected.toString()
+                    out() << "Expected: " << expected.toString()
                          << ", got: " << actual.toString();
                 }
                 ASSERT( !expected.woCompare( actual ) );

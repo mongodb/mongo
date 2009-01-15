@@ -70,12 +70,12 @@ namespace mongo {
         	_objdata = r->data;
         	_objsize = *((int*) _objdata);
         	if( _objsize > r->netLength() ) {
-        		cout << "About to assert fail _objsize <= r->netLength()" << endl;
-        		cout << " _objsize: " << _objsize << endl;
-        		cout << " netLength(): " << r->netLength() << endl;
-        		cout << " extentOfs: " << r->extentOfs << endl;
-        		cout << " nextOfs: " << r->nextOfs << endl;
-        		cout << " prevOfs: " << r->prevOfs << endl;
+        		out() << "About to assert fail _objsize <= r->netLength()" << endl;
+        		out() << " _objsize: " << _objsize << endl;
+        		out() << " netLength(): " << r->netLength() << endl;
+        		out() << " extentOfs: " << r->extentOfs << endl;
+        		out() << " nextOfs: " << r->nextOfs << endl;
+        		out() << " prevOfs: " << r->prevOfs << endl;
         		assert( _objsize <= r->netLength() );
         	}
         	iFree = false;
@@ -243,7 +243,7 @@ namespace mongo {
                no files are open yet.  we might want to do something about that. */
             if ( loops > 8 ) {
                 assert( loops < 10000 );
-                cout << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
+                out() << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
             }
             log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
             return database->addAFile()->newExtent(ns, approxSize, newCapped, loops+1);
@@ -270,7 +270,7 @@ namespace mongo {
         }
 
         details->lastExtentSize = approxSize;
-        DEBUGGING cout << "temp: newextent adddelrec " << ns << endl;
+        DEBUGGING out() << "temp: newextent adddelrec " << ns << endl;
         details->addDeletedRec(emptyLoc.drec(), emptyLoc);
 
         DEV log() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
@@ -354,20 +354,20 @@ namespace mongo {
         DiskLoc loc;
         bool found = nsindex(ns)->find(ns, loc);
         if ( !found ) {
-            //		cout << "info: findAll() namespace does not exist: " << ns << endl;
+            //		out() << "info: findAll() namespace does not exist: " << ns << endl;
             return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
         }
 
         Extent *e = getExtent(loc);
 
         DEBUGGING {
-            cout << "listing extents for " << ns << endl;
+            out() << "listing extents for " << ns << endl;
             DiskLoc tmp = loc;
             set<DiskLoc> extents;
 
             while ( 1 ) {
                 Extent *f = getExtent(tmp);
-                cout << "extent: " << tmp.toString() << endl;
+                out() << "extent: " << tmp.toString() << endl;
                 extents.insert(tmp);
                 tmp = f->xnext;
                 if ( tmp.isNull() )
@@ -375,7 +375,7 @@ namespace mongo {
                 f = f->getNextExtent();
             }
 
-            cout << endl;
+            out() << endl;
             nsdetails(ns)->dumpDeleted(&extents);
         }
 
@@ -384,7 +384,7 @@ namespace mongo {
                 /* todo: if extent is empty, free it for reuse elsewhere.
                     that is a bit complicated have to clean up the freelists.
                 */
-                RARELY cout << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
+                RARELY out() << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
                 // find a nonempty extent
                 // it might be nice to free the whole extent here!  but have to clean up free recs then.
                 e = e->getNextExtent();
@@ -413,7 +413,7 @@ namespace mongo {
         if ( !d->capped ) {
             Extent *e = d->lastExtent.ext();
             while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
-                OCCASIONALLY cout << "  findTableScan: extent empty, skipping ahead" << endl;
+                OCCASIONALLY out() << "  findTableScan: extent empty, skipping ahead" << endl;
                 e = e->getPrevExtent();
             }
             return auto_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
@@ -471,8 +471,8 @@ namespace mongo {
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
         BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 }
         if ( keyPattern.objsize() == 0 ) {
-            cout << keyPattern.toString() << endl;
-            cout << info.obj().toString() << endl;
+            out() << keyPattern.toString() << endl;
+            out() << info.obj().toString() << endl;
             assert(false);
         }
         BSONObjBuilder b;
@@ -546,10 +546,10 @@ namespace mongo {
         id.getKeysFromObject(obj, keys);
         for ( set<BSONObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
-//		cout << "UNINDEX: j:" << j.toString() << " head:" << id.head.toString() << dl.toString() << endl;
+//		out() << "UNINDEX: j:" << j.toString() << " head:" << id.head.toString() << dl.toString() << endl;
             if ( otherTraceLevel >= 5 ) {
-                cout << "_unindexRecord() " << obj.toString();
-                cout << "\n  unindex:" << j.toString() << endl;
+                out() << "_unindexRecord() " << obj.toString();
+                out() << "\n  unindex:" << j.toString() << endl;
             }
             nUnindexes++;
             bool ok = false;
@@ -558,15 +558,15 @@ namespace mongo {
             }
             catch (AssertionException&) {
                 problem() << "Assertion failure: _unindex failed " << id.indexNamespace() << endl;
-                cout << "Assertion failure: _unindex failed" << '\n';
-                cout << "  obj:" << obj.toString() << '\n';
-                cout << "  key:" << j.toString() << '\n';
-                cout << "  dl:" << dl.toString() << endl;
+                out() << "Assertion failure: _unindex failed" << '\n';
+                out() << "  obj:" << obj.toString() << '\n';
+                out() << "  key:" << j.toString() << '\n';
+                out() << "  dl:" << dl.toString() << endl;
                 sayDbContext();
             }
 
             if ( !ok ) {
-                cout << "unindex failed (key too big?) " << id.indexNamespace() << '\n';
+                out() << "unindex failed (key too big?) " << id.indexNamespace() << '\n';
             }
         }
     }
@@ -586,7 +586,7 @@ namespace mongo {
 
         NamespaceDetails* d = nsdetails(ns);
         if ( d->capped && !cappedOK ) {
-            cout << "failing remove on a capped ns " << ns << endl;
+            out() << "failing remove on a capped ns " << ns << endl;
             return;
         }
 
@@ -720,7 +720,7 @@ namespace mongo {
                         }
                         catch (AssertionException&) {
                             ss << " exception update index ";
-                            cout << " caught assertion update index " << idxns.c_str() << '\n';
+                            out() << " caught assertion update index " << idxns.c_str() << '\n';
                             problem() << " caught assertion update index " << idxns.c_str() << endl;
                         }
                     }
@@ -817,14 +817,14 @@ namespace mongo {
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
             if ( sys == ns ) {
-                cout << "ERROR: attempt to insert for invalid database 'system': " << ns << endl;
+                out() << "ERROR: attempt to insert for invalid database 'system': " << ns << endl;
                 return DiskLoc();
             }
             if ( strstr(ns, ".system.") ) {
                 if ( strstr(ns, ".system.indexes") )
                     addIndex = true;
                 else if ( !god ) {
-                    cout << "ERROR: attempt to insert in system namespace " << ns << endl;
+                    out() << "ERROR: attempt to insert in system namespace " << ns << endl;
                     return DiskLoc();
                 }
             }
@@ -856,9 +856,9 @@ namespace mongo {
 
             BSONObj key = io.getObjectField("key");
             if ( *name == 0 || tabletoidxns.empty() || key.isEmpty() || key.objsize() > 2048 ) {
-                cout << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
+                out() << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
                      tabletoidxns << "\n  ourns:" << ns;
-                cout << "\n  idxobj:" << io.toString() << endl;
+                out() << "\n  idxobj:" << io.toString() << endl;
                 return DiskLoc();
             }
             tableToIndex = nsdetails(tabletoidxns.c_str());
@@ -878,7 +878,7 @@ namespace mongo {
                 return DiskLoc();
             }
             if ( tableToIndex->findIndexByName(name) >= 0 ) {
-                //cout << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;
+                //out() << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;
                 return DiskLoc();
             }
             //indexFullNS = tabletoidxns;
@@ -943,7 +943,7 @@ namespace mongo {
         if ( d->nIndexes )
             indexRecord(d, buf, len, loc);
 
-//	cout << "   inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << ' ' << ns << endl;
+//	out() << "   inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << ' ' << ns << endl;
         return loc;
     }
 

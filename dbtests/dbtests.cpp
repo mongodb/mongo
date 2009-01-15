@@ -39,7 +39,7 @@ void usage() {
         "  -debug          run tests with verbose output\n"
         "  -list           list available test suites\n"
         "  <suite>         run the specified test suite only";
-    cout << instructions << endl;
+    out() << instructions << endl;
 }
 
 int main( int argc, char** argv ) {

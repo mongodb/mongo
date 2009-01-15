@@ -152,7 +152,7 @@ namespace mongo {
 
             if ( e.type() == RegEx ) {
                 if ( nRegex >= 4 ) {
-                    cout << "ERROR: too many regexes in query" << endl;
+                    out() << "ERROR: too many regexes in query" << endl;
                 }
                 else {
                     pcrecpp::RE_Options options;
@@ -527,8 +527,8 @@ namespace mongo {
             /*
             static const boost::regex e("(\\d{4}[- ]){3}\\d{4}");
             static const boost::regex b(".....");
-            cout << "regex result: " << regex_match("hello", e) << endl;
-            cout << "regex result: " << regex_match("abcoo", b) << endl;
+            out() << "regex result: " << regex_match("hello", e) << endl;
+            out() << "regex result: " << regex_match("abcoo", b) << endl;
             */
             pcrecpp::RE re1(")({a}h.*o");
             pcrecpp::RE re("h.llo");

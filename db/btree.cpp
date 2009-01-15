@@ -74,7 +74,7 @@ namespace mongo {
 //		return;
 
         if ( bt_dmp ) {
-            cout << thisLoc.toString() << ' ';
+            out() << thisLoc.toString() << ' ';
             ((BtreeBucket *) this)->dump();
         }
 
@@ -116,10 +116,10 @@ namespace mongo {
                 BSONObj k2 = keyNode(i+1).key;
                 int z = k1.woCompare(k2, order); //OK
                 if ( z > 0 ) {
-                    cout << "ERROR: btree key order corrupt.  Keys:" << endl;
+                    out() << "ERROR: btree key order corrupt.  Keys:" << endl;
                     if ( ++nDumped < 5 ) {
                         for ( int j = 0; j < n; j++ ) {
-                            cout << "  " << keyNode(j).key.toString() << endl;
+                            out() << "  " << keyNode(j).key.toString() << endl;
                         }
                         ((BtreeBucket *) this)->dump();
                     }
@@ -128,9 +128,9 @@ namespace mongo {
                 }
                 else if ( z == 0 ) {
                     if ( !(k(i).recordLoc < k(i+1).recordLoc) ) {
-                        cout << "ERROR: btree key order corrupt (recordloc's wrong).  Keys:" << endl;
-                        cout << " k(" << i << "):" << keyNode(i).key.toString() << " RL:" << k(i).recordLoc.toString() << endl;
-                        cout << " k(" << i+1 << "):" << keyNode(i+1).key.toString() << " RL:" << k(i+1).recordLoc.toString() << endl;
+                        out() << "ERROR: btree key order corrupt (recordloc's wrong).  Keys:" << endl;
+                        out() << " k(" << i << "):" << keyNode(i).key.toString() << " RL:" << k(i).recordLoc.toString() << endl;
+                        out() << " k(" << i+1 << "):" << keyNode(i+1).key.toString() << " RL:" << k(i+1).recordLoc.toString() << endl;
                         wassert( k(i).recordLoc < k(i+1).recordLoc );
                     }
                 }
@@ -361,10 +361,10 @@ namespace mongo {
                     goto found;
                 }
             }
-            cout << "ERROR: can't find ref to deleted bucket.\n";
-            cout << "To delete:\n";
+            out() << "ERROR: can't find ref to deleted bucket.\n";
+            out() << "To delete:\n";
             dump();
-            cout << "Parent:\n";
+            out() << "Parent:\n";
             p->dump();
             assert(false);
         }
@@ -434,7 +434,7 @@ found:
     inline void fix(const DiskLoc& thisLoc, const DiskLoc& child) {
         if ( !child.isNull() ) {
             if ( insert_debug )
-                cout << "      " << child.toString() << ".parent=" << thisLoc.toString() << endl;
+                out() << "      " << child.toString() << ".parent=" << thisLoc.toString() << endl;
             child.btree()->parent = thisLoc;
         }
     }
@@ -455,7 +455,7 @@ found:
     {
         dassert( thisLoc.btree() == this );
         if ( insert_debug )
-            cout << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' '
+            out() << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' '
                  << lchild.toString() << ' ' << rchild.toString() << " keypos:" << keypos << endl;
 
         DiskLoc oldLoc = thisLoc;
@@ -464,15 +464,15 @@ found:
             _KeyNode& kn = k(keypos);
             if ( keypos+1 == n ) { // last key
                 if ( nextChild != lchild ) {
-                    cout << "ERROR nextChild != lchild" << endl;
-                    cout << "  thisLoc: " << thisLoc.toString() << ' ' << idx.indexNamespace() << endl;
-                    cout << "  keyPos: " << keypos << " n:" << n << endl;
-                    cout << "  nextChild: " << nextChild.toString() << " lchild: " << lchild.toString() << endl;
-                    cout << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
-                    cout << "  key: " << key.toString() << endl;
+                    out() << "ERROR nextChild != lchild" << endl;
+                    out() << "  thisLoc: " << thisLoc.toString() << ' ' << idx.indexNamespace() << endl;
+                    out() << "  keyPos: " << keypos << " n:" << n << endl;
+                    out() << "  nextChild: " << nextChild.toString() << " lchild: " << lchild.toString() << endl;
+                    out() << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
+                    out() << "  key: " << key.toString() << endl;
                     dump();
 #if defined(_WIN32)
-                    cout << "\n\nDUMPING FULL INDEX" << endl;
+                    out() << "\n\nDUMPING FULL INDEX" << endl;
                     bt_dmp=1;
                     bt_fv=1;
                     idx.head.btree()->fullValidate(idx.head);
@@ -488,15 +488,15 @@ found:
             else {
                 k(keypos).prevChildBucket = lchild;
                 if ( k(keypos+1).prevChildBucket != lchild ) {
-                    cout << "ERROR k(keypos+1).prevChildBucket != lchild" << endl;
-                    cout << "  thisLoc: " << thisLoc.toString() << ' ' << idx.indexNamespace() << endl;
-                    cout << "  keyPos: " << keypos << " n:" << n << endl;
-                    cout << "  k(keypos+1).pcb: " << k(keypos+1).prevChildBucket.toString() << " lchild: " << lchild.toString() << endl;
-                    cout << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
-                    cout << "  key: " << key.toString() << endl;
+                    out() << "ERROR k(keypos+1).prevChildBucket != lchild" << endl;
+                    out() << "  thisLoc: " << thisLoc.toString() << ' ' << idx.indexNamespace() << endl;
+                    out() << "  keyPos: " << keypos << " n:" << n << endl;
+                    out() << "  k(keypos+1).pcb: " << k(keypos+1).prevChildBucket.toString() << " lchild: " << lchild.toString() << endl;
+                    out() << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
+                    out() << "  key: " << key.toString() << endl;
                     dump();
 #if defined(_WIN32)
-                    cout << "\n\nDUMPING FULL INDEX" << endl;
+                    out() << "\n\nDUMPING FULL INDEX" << endl;
                     bt_dmp=1;
                     bt_fv=1;
                     idx.head.btree()->fullValidate(idx.head);
@@ -512,7 +512,7 @@ found:
 
         // split
         if ( split_debug )
-            cout << "    " << thisLoc.toString() << ".split" << endl;
+            out() << "    " << thisLoc.toString() << ".split" << endl;
 
         int mid = n / 2;
 
@@ -527,9 +527,9 @@ found:
                 mid--;
                 if ( mid < 3 ) {
                     problem() << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
-                    cout << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
-                    cout << "  ns:" << idx.indexNamespace() << endl;
-                    cout << "  key:" << mn.key.toString() << endl;
+                    out() << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
+                    out() << "  ns:" << idx.indexNamespace() << endl;
+                    out() << "  key:" << mn.key.toString() << endl;
                     break;
                 }
             }
@@ -539,7 +539,7 @@ found:
         DiskLoc rLoc;
 
         if ( split_debug )
-            cout << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
+            out() << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
         for ( int i = mid+1; i < n; i++ ) {
             KeyNode kn = keyNode(i);
             r->pushBack(kn.recordLoc, kn.key, order, kn.prevChildBucket);
@@ -549,7 +549,7 @@ found:
 //r->dump();
         rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size(), true);
         if ( split_debug )
-            cout << "     new rLoc:" << rLoc.toString() << endl;
+            out() << "     new rLoc:" << rLoc.toString() << endl;
         free(r);
         r = 0;
         rLoc.btree()->fixParentPtrs(rLoc);
@@ -559,7 +559,7 @@ found:
             nextChild = middle.prevChildBucket; // middle key gets promoted, its children will be thisLoc (l) and rLoc (r)
             if ( split_debug ) {
                 //rLoc.btree()->dump();
-                cout << "    middle key:" << middle.key.toString() << endl;
+                out() << "    middle key:" << middle.key.toString() << endl;
             }
 
             // promote middle to a parent node
@@ -571,7 +571,7 @@ found:
                 p->assertValid( order );
                 parent = idx.head = theDataFileMgr.insert(idx.indexNamespace().c_str(), p, p->Size(), true);
                 if ( split_debug )
-                    cout << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
+                    out() << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
                 free(p);
                 rLoc.btree()->parent = parent;
             }
@@ -581,7 +581,7 @@ found:
                 */
                 rLoc.btree()->parent = parent;
                 if ( split_debug )
-                    cout << "    promoting middle key " << middle.key.toString() << endl;
+                    out() << "    promoting middle key " << middle.key.toString() << endl;
                 parent.btree()->_insert(parent, middle.recordLoc, middle.key, order, false, thisLoc, rLoc, idx);
             }
 //BtreeBucket *br = rLoc.btree();
@@ -602,7 +602,7 @@ found:
             if ( keypos <= mid ) {
 //		if( keypos < mid ) {
                 if ( split_debug )
-                    cout << "  keypos<mid, insertHere() the new key" << endl;
+                    out() << "  keypos<mid, insertHere() the new key" << endl;
                 insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
 //dump();
             } else {
@@ -610,13 +610,13 @@ found:
                 assert(kp>=0);
                 rLoc.btree()->insertHere(rLoc, kp, recordLoc, key, order, lchild, rchild, idx);
 // set a bp here.
-//			if( !lchild.isNull() ) cout << lchild.btree()->parent.toString() << endl;
-//			if( !rchild.isNull() ) cout << rchild.btree()->parent.toString() << endl;
+//			if( !lchild.isNull() ) out() << lchild.btree()->parent.toString() << endl;
+//			if( !rchild.isNull() ) out() << rchild.btree()->parent.toString() << endl;
             }
         }
 
         if ( split_debug )
-            cout << "     split end " << hex << thisLoc.getOfs() << dec << endl;
+            out() << "     split end " << hex << thisLoc.getOfs() << dec << endl;
     }
 
     /* start a new index off, empty */
@@ -636,10 +636,10 @@ found:
 
     DiskLoc BtreeBucket::advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) {
         if ( keyOfs < 0 || keyOfs >= n ) {
-            cout << "ASSERT failure BtreeBucket::advance, caller: " << caller << endl;
-            cout << "  thisLoc: " << thisLoc.toString() << endl;
-            cout << "  keyOfs: " << keyOfs << " n:" << n << " direction: " << direction << endl;
-            cout << bucketSummary() << endl;
+            out() << "ASSERT failure BtreeBucket::advance, caller: " << caller << endl;
+            out() << "  thisLoc: " << thisLoc.toString() << endl;
+            out() << "  keyOfs: " << keyOfs << " n:" << n << " direction: " << direction << endl;
+            out() << bucketSummary() << endl;
             assert(false);
         }
         int adj = direction < 0 ? 1 : 0;
@@ -719,24 +719,24 @@ found:
         int pos;
         bool found = find(key, recordLoc, order, pos);
         if ( insert_debug ) {
-            cout << "  " << thisLoc.toString() << '.' << "_insert " <<
+            out() << "  " << thisLoc.toString() << '.' << "_insert " <<
                  key.toString() << '/' << recordLoc.toString() <<
                  " l:" << lChild.toString() << " r:" << rChild.toString() << endl;
-            cout << "    found:" << found << " pos:" << pos << " n:" << n << endl;
+            out() << "    found:" << found << " pos:" << pos << " n:" << n << endl;
         }
 
         if ( found ) {
             if ( k(pos).isUnused() ) {
-                cout << "an unused already occupying keyslot, write more code.\n";
-                cout << "  index may be corrupt (missing data) now.\n";
+                out() << "an unused already occupying keyslot, write more code.\n";
+                out() << "  index may be corrupt (missing data) now.\n";
             }
 
-            cout << "_insert(): key already exists in index\n";
-            cout << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
-            cout << "  " << key.toString() << '\n';
-            cout << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
-            cout << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
-            cout << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
+            out() << "_insert(): key already exists in index\n";
+            out() << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
+            out() << "  " << key.toString() << '\n';
+            out() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
+            out() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
+            out() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
             assert(false);
 
             // on a dup key always insert on the right or else you will be broken.
@@ -746,16 +746,16 @@ found:
             if( !rChild.isNull() ) {
             	while( pos < n && k(pos).prevChildBucket != lchild ) {
             		pos++;
-            		cout << "looking for the right dup key" << endl;
+            		out() << "looking for the right dup key" << endl;
             	}
             }
             */
         }
 
-        DEBUGGING cout << "TEMP: key: " << key.toString() << endl;
+        DEBUGGING out() << "TEMP: key: " << key.toString() << endl;
         DiskLoc& child = getChild(pos);
         if ( insert_debug )
-            cout << "    getChild(" << pos << "): " << child.toString() << endl;
+            out() << "    getChild(" << pos << "): " << child.toString() << endl;
         if ( child.isNull() || !rChild.isNull() /* means an 'internal' insert */ ) {
             insertHere(thisLoc, pos, recordLoc, key, order, lChild, rChild, idx);
             return 0;
@@ -765,17 +765,17 @@ found:
     }
 
     void BtreeBucket::dump() {
-        cout << "DUMP btreebucket: ";
-        cout << " parent:" << hex << parent.getOfs() << dec;
+        out() << "DUMP btreebucket: ";
+        out() << " parent:" << hex << parent.getOfs() << dec;
         for ( int i = 0; i < n; i++ ) {
-            cout << '\n';
+            out() << '\n';
             KeyNode k = keyNode(i);
-            cout << '\t' << i << '\t' << k.key.toString() << "\tleft:" << hex <<
+            out() << '\t' << i << '\t' << k.key.toString() << "\tleft:" << hex <<
                  k.prevChildBucket.getOfs() << "\trec:" << k.recordLoc.getOfs() << dec;
             if ( this->k(i).isUnused() )
-                cout << " UNUSED";
+                out() << " UNUSED";
         }
-        cout << " right:" << hex << nextChild.getOfs() << dec << endl;
+        out() << " right:" << hex << nextChild.getOfs() << dec << endl;
     }
 
     /* todo: meaning of return code unclear clean up */
@@ -791,9 +791,9 @@ found:
             ++ninserts;
             /*
             if( ninserts % 1000 == 0 ) {
-            	cout << "ninserts: " << ninserts << endl;
+            	out() << "ninserts: " << ninserts << endl;
             	if( 0 && ninserts >= 127287 ) {
-            		cout << "debug?" << endl;
+            		out() << "debug?" << endl;
             		split_debug = 1;
             	}
             }

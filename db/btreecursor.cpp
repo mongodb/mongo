@@ -39,11 +39,11 @@ namespace mongo {
         bool found;
         if ( otherTraceLevel >= 12 ) {
             if ( otherTraceLevel >= 200 ) {
-                cout << "::BtreeCursor() qtl>200.  validating entire index." << endl;
+                out() << "::BtreeCursor() qtl>200.  validating entire index." << endl;
                 indexDetails.head.btree()->fullValidate(indexDetails.head, order);
             }
             else {
-                cout << "BTreeCursor(). dumping head bucket" << endl;
+                out() << "BTreeCursor(). dumping head bucket" << endl;
                 indexDetails.head.btree()->dump();
             }
         }

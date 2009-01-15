@@ -92,7 +92,7 @@ namespace mongo {
         if ( strncmp(ddd.getns(), "clusterstock", 12) != 0 ) {
             static int q;
             if ( ++q < 20 )
-                cout << "TEMP skip " << ddd.getns() << endl;
+                out() << "TEMP skip " << ddd.getns() << endl;
             goto skip;
         }
 #endif
@@ -102,7 +102,7 @@ namespace mongo {
             char *p = m.data->_data;
             int len = strlen(p);
             if ( len > 400 )
-                cout << curTimeMillis() % 10000 <<
+                out() << curTimeMillis() % 10000 <<
                      " long msg received, len:" << len <<
                      " ends with: " << p + len - 10 << endl;
             bool end = strcmp("end", p) == 0;
@@ -169,7 +169,7 @@ namespace mongo {
             }
         }
         else {
-            cout << "    operation isn't supported: " << m.data->operation() << endl;
+            out() << "    operation isn't supported: " << m.data->operation() << endl;
             assert(false);
         }
 
@@ -178,7 +178,7 @@ namespace mongo {
         DEV log = true;
         if ( log || ms > 100 ) {
             ss << ' ' << t.millis() << "ms";
-            cout << ss.str().c_str() << endl;
+            out() << ss.str().c_str() << endl;
         }
         if ( database && database->profile >= 1 ) {
             if ( database->profile >= 2 || ms >= 100 ) {
@@ -453,7 +453,7 @@ namespace mongo {
                     }
                 }
                 else {
-                    cout << "    jnicall: operation isn't supported: " << m.data->operation() << endl;
+		    mongo::out() << "    jnicall: operation isn't supported: " << m.data->operation() << endl;
                     assert(false);
                 }
 
@@ -461,7 +461,7 @@ namespace mongo {
                 log = log || ctr++ % 128 == 0;
                 if ( log || ms > 100 ) {
                     ss << ' ' << t.millis() << "ms";
-                    cout << ss.str().c_str() << endl;
+		    mongo::out() << ss.str().c_str() << endl;
                 }
                 if ( database && database->profile >= 1 ) {
                     if ( database->profile >= 2 || ms >= 100 ) {
@@ -511,14 +511,14 @@ namespace mongo {
     /* not using log() herein in case we are called from segvhandler and we were already locked */
 #undef exit
     void dbexit(int rc, const char *why) {
-        cout << "dbexit: " << why << "; flushing op log and files" << endl;
+        out() << "dbexit: " << why << "; flushing op log and files" << endl;
         flushOpLog();
 
         /* must do this before unmapping mem or you may get a seg fault */
         closeAllSockets();
 
         MemoryMappedFile::closeAllFiles();
-        cout << "dbexit: really exiting now" << endl;
+        out() << "dbexit: really exiting now" << endl;
         exit(rc);
     }
 

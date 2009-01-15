@@ -72,11 +72,11 @@ namespace mongo {
                 chain++;
                 i = (i+1) % n;
                 if ( i == start ) {
-                    cout << "warning: hashtable is full " << name << endl;
+                    out() << "warning: hashtable is full " << name << endl;
                     return -1;
                 }
                 if ( chain == 200 )
-                    cout << "warning: hashtable long chain " << name << endl;
+                    out() << "warning: hashtable long chain " << name << endl;
             }
         }
 
@@ -84,7 +84,7 @@ namespace mongo {
         /* buf must be all zeroes on initialization. */
         HashTable(void *buf, int buflen, const char *_name) : name(_name) {
             int m = sizeof(Node);
-            // cout << "hashtab init, buflen:" << buflen << " m:" << m << endl;
+            // out() << "hashtab init, buflen:" << buflen << " m:" << m << endl;
             n = buflen / m;
             if ( (n & 1) == 0 )
                 n--;
@@ -93,7 +93,7 @@ namespace mongo {
             assert(nodes[0].hash == 0);
 
             assert( sizeof(Node) == 628 );
-            //cout << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
+            //out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
         }
 
         Type* get(const Key& k) {

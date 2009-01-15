@@ -25,7 +25,7 @@
 namespace mongo {
 
     int test2_old() {
-        cout << "test2" << endl;
+        out() << "test2" << endl;
         printStackTrace();
         if ( 1 )
             return 1;
@@ -47,14 +47,14 @@ namespace mongo {
         *p = 'a';
 
         f.flush(true);
-        cout << "done" << endl;
+        out() << "done" << endl;
 
         char *x = start + 32 * 1024 * 1024;
         char *y = start + 48 * 1024 * 1024;
         char *z = start + 62 * 1024 * 1024;
 
         strcpy(z, "zfoo");
-        cout << "y" << endl;
+        out() << "y" << endl;
         strcpy(y, "yfoo");
         strcpy(x, "xfoo");
         strcpy(start, "xfoo");

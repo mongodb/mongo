@@ -74,7 +74,7 @@ namespace mongo {
             CCById::iterator it = clientCursorsById.find(id);
             if ( it == clientCursorsById.end() ) {
                 if ( warn )
-                    OCCASIONALLY cout << "ClientCursor::find(): cursor not found in map " << id << " (ok after a drop)\n";
+                    OCCASIONALLY out() << "ClientCursor::find(): cursor not found in map " << id << " (ok after a drop)\n";
                 return 0;
             }
             return it->second;

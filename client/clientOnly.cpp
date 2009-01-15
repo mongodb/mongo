@@ -1,7 +1,4 @@
-
-#include <iostream>
-
-using namespace std;
+#include "../stdafx.h"
 
 namespace mongo {
 
@@ -9,10 +6,10 @@ namespace mongo {
     //    Database* database = 0;
 
     void dbexit(int returnCode, const char *whyMsg ) {
-        cout << "dbexit called" << endl;
+        out() << "dbexit called" << endl;
         if ( whyMsg )
-            cout << " b/c " << whyMsg << endl;
-        cout << "exiting" << endl;
+            out() << " b/c " << whyMsg << endl;
+        out() << "exiting" << endl;
         exit( returnCode );
     }
 

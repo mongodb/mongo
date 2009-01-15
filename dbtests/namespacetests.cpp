@@ -90,7 +90,7 @@ namespace NamespaceTests {
             }
             static void assertEquals( const BSONObj &a, const BSONObj &b ) {
                 if ( a.woCompare( b ) != 0 ) {
-                    cout << "expected: " << a.toString()
+                    out() << "expected: " << a.toString()
                          << ", got: " << b.toString() << endl;
                 }
                 ASSERT( a.woCompare( b ) == 0 );

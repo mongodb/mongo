@@ -34,7 +34,7 @@ namespace mongo {
     inline void disableNagle(int sock) {
         int x = 1;
         if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            cout << "ERROR: disableNagle failed" << endl;
+            out() << "ERROR: disableNagle failed" << endl;
     }
     inline void prebindOptions( int sock ) {
     }
@@ -79,7 +79,7 @@ namespace mongo {
         DEV log() << "doing prebind option" << endl;
         int x = 1;
         if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x)) < 0 )
-            cout << "Failed to set socket opt, SO_REUSEADDR" << endl;
+            out() << "Failed to set socket opt, SO_REUSEADDR" << endl;
     }
 
 
@@ -92,7 +92,7 @@ namespace mongo {
         tv.tv_usec = 1000;
         int rc = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv));
         if ( rc ) {
-            cout << "ERROR: setsockopt RCVTIMEO failed rc:" << rc << " errno:" << getLastError() << " secs:" << secs << " sock:" << sock << endl;
+            out() << "ERROR: setsockopt RCVTIMEO failed rc:" << rc << " errno:" << getLastError() << " secs:" << secs << " sock:" << sock << endl;
         }
     }
 
@@ -172,8 +172,8 @@ namespace mongo {
 
     inline int UDPConnection::sendto(char *buf, int len, const SockAddr& EndPoint) {
         if ( 0 && rand() < (RAND_MAX>>4) ) {
-            cout << " NOTSENT ";
-            //		cout << curTimeMillis() << " .TEST: NOT SENDING PACKET" << endl;
+            out() << " NOTSENT ";
+            //		out() << curTimeMillis() << " .TEST: NOT SENDING PACKET" << endl;
             return 0;
         }
         return ::sendto(sock, buf, len, 0, (sockaddr *) &EndPoint.sa, EndPoint.addressSize);
@@ -182,12 +182,12 @@ namespace mongo {
     inline bool UDPConnection::init(const SockAddr& myAddr) {
         sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if ( sock == INVALID_SOCKET ) {
-            cout << "invalid socket? " << errno << endl;
+            out() << "invalid socket? " << errno << endl;
             return false;
         }
-        //cout << sizeof(sockaddr_in) << ' ' << myAddr.addressSize << endl;
+        //out() << sizeof(sockaddr_in) << ' ' << myAddr.addressSize << endl;
         if ( ::bind(sock, (sockaddr *) &myAddr.sa, myAddr.addressSize) != 0 ) {
-            cout << "udp init failed" << endl;
+            out() << "udp init failed" << endl;
             closesocket(sock);
             sock = 0;
             return false;
@@ -199,7 +199,7 @@ namespace mongo {
                        SO_RCVBUF,
                        (char*)&rcvbuf,
                        &optLen) != -1)
-            cout << "SO_RCVBUF:" << rcvbuf << endl;
+            out() << "SO_RCVBUF:" << rcvbuf << endl;
         return true;
     }
 

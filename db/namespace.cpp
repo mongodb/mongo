@@ -72,7 +72,7 @@ namespace mongo {
             (unsigned&) (((Record *) d)->data) = 0xeeeeeeee;
         }
         dassert( dloc.drec() == d );
-        DEBUGGING cout << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
+        DEBUGGING out() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
         if ( capped ) {
             if ( !deletedList[ 1 ].isValid() ) {
                 // Initial extent allocation.  Insert at end.
@@ -114,7 +114,7 @@ namespace mongo {
         extentLoc.set(loc.a(), r->extentOfs);
         assert( r->extentOfs < loc.getOfs() );
 
-        DEBUGGING cout << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
+        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
 
         int left = regionlen - lenToAlloc;
         if ( capped == 0 ) {
@@ -214,24 +214,24 @@ namespace mongo {
     }
 
     void NamespaceDetails::dumpDeleted(set<DiskLoc> *extents) {
-//	cout << "DUMP deleted chains" << endl;
+//	out() << "DUMP deleted chains" << endl;
         for ( int i = 0; i < Buckets; i++ ) {
-//		cout << "  bucket " << i << endl;
+//		out() << "  bucket " << i << endl;
             DiskLoc dl = deletedList[i];
             while ( !dl.isNull() ) {
                 DeletedRecord *r = dl.drec();
                 DiskLoc extLoc(dl.a(), r->extentOfs);
                 if ( extents == 0 || extents->count(extLoc) <= 0 ) {
-                    cout << "  bucket " << i << endl;
-                    cout << "   " << dl.toString() << " ext:" << extLoc.toString();
+                    out() << "  bucket " << i << endl;
+                    out() << "   " << dl.toString() << " ext:" << extLoc.toString();
                     if ( extents && extents->count(extLoc) <= 0 )
-                        cout << '?';
-                    cout << " len:" << r->lengthWithHeaders << endl;
+                        out() << '?';
+                    out() << " len:" << r->lengthWithHeaders << endl;
                 }
                 dl = r->nextDeleted;
             }
         }
-//	cout << endl;
+//	out() << endl;
     }
 
     /* combine adjacent deleted records
@@ -259,7 +259,7 @@ namespace mongo {
         while ( 1 ) {
             j++;
             if ( j == drecs.end() ) {
-                DEBUGGING cout << "TEMP: compact adddelrec\n";
+                DEBUGGING out() << "TEMP: compact adddelrec\n";
                 addDeletedRec(a.drec(), a);
                 break;
             }
@@ -269,13 +269,13 @@ namespace mongo {
                 a.drec()->lengthWithHeaders += b.drec()->lengthWithHeaders;
                 j++;
                 if ( j == drecs.end() ) {
-                    DEBUGGING cout << "temp: compact adddelrec2\n";
+                    DEBUGGING out() << "temp: compact adddelrec2\n";
                     addDeletedRec(a.drec(), a);
                     return;
                 }
                 b = *j;
             }
-            DEBUGGING cout << "temp: compact adddelrec3\n";
+            DEBUGGING out() << "temp: compact adddelrec3\n";
             addDeletedRec(a.drec(), a);
             a = b;
         }
@@ -340,15 +340,15 @@ namespace mongo {
     int n_complaints_cap = 0;
     void NamespaceDetails::maybeComplain( const char *ns, int len ) const {
         if ( ++n_complaints_cap < 8 ) {
-            cout << "couldn't make room for new record (len: " << len << ") in capped ns " << ns << '\n';
+            out() << "couldn't make room for new record (len: " << len << ") in capped ns " << ns << '\n';
             int i = 0;
             for ( DiskLoc e = firstExtent; !e.isNull(); e = e.ext()->xnext, ++i ) {
-                cout << "  Extent " << i;
+                out() << "  Extent " << i;
                 if ( e == capExtent )
-                    cout << " (capExtent)";
-                cout << '\n';
-                cout << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->ns.buf << '\n';
-                cout << "    fr: " << e.ext()->firstRecord.toString() <<
+                    out() << " (capExtent)";
+                out() << '\n';
+                out() << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->ns.buf << '\n';
+                out() << "    fr: " << e.ext()->firstRecord.toString() <<
                      " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
             }
             assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken

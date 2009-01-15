@@ -51,12 +51,12 @@ namespace mongo {
 #endif
 
     void usage() {
-        cout << "Mongo dbgrid usage:\n\n";
-        cout << " --port <portno>\n";
-        cout << " --griddb <griddbname> [<griddbname>...]\n";
-        cout << " --infer                                   infer griddbname by replacing \"-n<n>\"\n";
-        cout << "                                           in our hostname with \"-grid\".\n";
-        cout << endl;
+        out() << "Mongo dbgrid usage:\n\n";
+        out() << " --port <portno>\n";
+        out() << " --griddb <griddbname> [<griddbname>...]\n";
+        out() << " --infer                                   infer griddbname by replacing \"-n<n>\"\n";
+        out() << "                                           in our hostname with \"-grid\".\n";
+        out() << endl;
     }
 
     MessagingPort *grab = 0;
@@ -106,22 +106,22 @@ namespace mongo {
         gridDatabase.init();
         /*
             try {
-        cout << "TEMP" << endl;
+        out() << "TEMP" << endl;
         {
             ScopedDbConnection c("localhost");
-            cout << c.conn().findOne("dwight.bar", emptyObj).toString() << endl;
+            out() << c.conn().findOne("dwight.bar", emptyObj).toString() << endl;
             c.done();
-            cout << "OK1" << endl;
+            out() << "OK1" << endl;
         }
         {
             ScopedDbConnection c("localhost");
             c.conn().findOne("dwight.bar", emptyObj);
             c.done();
-            cout << "OK1" << endl;
+            out() << "OK1" << endl;
         }
-        cout << "OK2" << endl;
+        out() << "OK2" << endl;
             } catch(...) {
-        cout << "exception" << endl;
+        out() << "exception" << endl;
             }
         */
 
@@ -161,11 +161,11 @@ int main(int argc, char* argv[], char *envp[] ) {
                 n++;
             }
             if ( n == 0 ) {
-                cout << "error: no args for --griddb\n";
+                out() << "error: no args for --griddb\n";
                 return 4;
             }
             if ( n > 2 ) {
-                cout << "error: --griddb does not support more than 2 parameters yet\n";
+                out() << "error: --griddb does not support more than 2 parameters yet\n";
                 return 5;
             }
         }

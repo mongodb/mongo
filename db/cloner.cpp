@@ -69,9 +69,9 @@ namespace mongo {
         BSONObj res= b.doneAndDecouple();
 
         /*    if( mod ) {
-            cout << "before: " << o.toString() << endl;
+            out() << "before: " << o.toString() << endl;
             o.dump();
-            cout << "after:  " << res.toString() << endl;
+            out() << "after:  " << res.toString() << endl;
             res.dump();
             }*/
 
@@ -98,7 +98,7 @@ namespace mongo {
 
             /* assure object is valid.  note this will slow us down a good bit. */
             if ( !tmp.valid() ) {
-                cout << "skipping corrupt object from " << from_collection << '\n';
+                out() << "skipping corrupt object from " << from_collection << '\n';
                 continue;
             }
 
@@ -162,9 +162,9 @@ namespace mongo {
                 string s = "bad system.namespaces object " + collection.toString();
 
                 /* temp
-                cout << masterHost << endl;
-                cout << ns << endl;
-                cout << e.toString() << endl;
+                out() << masterHost << endl;
+                out() << ns << endl;
+                out() << e.toString() << endl;
                 exit(1);*/
 
                 massert(s.c_str(), false);

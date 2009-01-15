@@ -399,13 +399,13 @@ namespace mongo {
         void validateEmpty();
 
         void dump() {
-            cout << hex;
+            out() << hex;
             const char *p = objdata();
             for ( int i = 0; i < objsize(); i++ ) {
-                cout << i << '\t' << (unsigned) *p;
+                out() << i << '\t' << (unsigned) *p;
                 if ( *p >= 'A' && *p <= 'z' )
-                    cout << '\t' << *p;
-                cout << endl;
+                    out() << '\t' << *p;
+                out() << endl;
                 p++;
             }
         }

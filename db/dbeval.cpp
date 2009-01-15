@@ -73,8 +73,8 @@ namespace mongo {
         if ( args.type() == Array ) {
             BSONObj eo = args.embeddedObject();
             if ( edebug ) {
-                cout << "args:" << eo.toString() << endl;
-                cout << "code:\n" << code << endl;
+                out() << "args:" << eo.toString() << endl;
+                out() << "code:\n" << code << endl;
             }
             s.setObject("args", eo);
         }
@@ -85,7 +85,7 @@ namespace mongo {
             res = s.invoke(f);
             int m = t.millis();
             if ( m > 100 ) {
-                stdcout() << "TEMP: dbeval too slow:" << endl;
+                out() << "TEMP: dbeval too slow:" << endl;
                 problem() << "dbeval time: " << dec << m << "ms " << ns << endl;
                 OCCASIONALLY log() << code << endl;
                 else if ( m >= 1000 ) log() << code << endl;

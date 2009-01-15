@@ -5,10 +5,6 @@
 
 namespace mongo {
 
-// logstream defines these, we don't want that:
-#undef cout
-#undef endl
-
 #if defined(F_FULLFSYNC)
     void fullsync(int f) {
         fcntl( f, F_FULLFSYNC );

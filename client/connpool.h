@@ -81,9 +81,9 @@ namespace mongo {
                 /* you are supposed to call done().  if you did that, correctly, we
                    only get here if an exception was thrown.  in such a scenario, we can't
                    be sure we fully read all expected data of a reply on the socket.  so
-                   we don't try to reuse the connection.  The cout is just informational.
+                   we don't try to reuse the connection.  The out() is just informational.
                    */
-                cout << "~ScopedDBConnection: _conn != null\n";
+                out() << "~ScopedDBConnection: _conn != null\n";
                 kill();
             }
         }

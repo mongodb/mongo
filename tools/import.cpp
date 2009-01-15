@@ -50,7 +50,7 @@ namespace mongo {
             }
 
 
-            cout << root.string() << endl;
+            out() << root.string() << endl;
 
             string ns;
             {
@@ -67,7 +67,7 @@ namespace mongo {
                 ns += "." + l;
             }
 
-            cout << "\t going into namespace [" << ns << "]" << endl;
+            out() << "\t going into namespace [" << ns << "]" << endl;
 
             MemoryMappedFile mmf;
             assert( mmf.map( root.string().c_str() ) );
@@ -79,7 +79,7 @@ namespace mongo {
 
             while ( read < mmf.length() ) {
                 if ( ! *data ) {
-                    cout << "\t ** got unexpected end of file **  continuing..." << endl;
+                    out() << "\t ** got unexpected end of file **  continuing..." << endl;
                     break;
                 }
 
@@ -91,10 +91,10 @@ namespace mongo {
                 data += o.objsize();
 
                 if ( ! ( ++num % 1000 ) )
-                    cout << "read " << read << "/" << mmf.length() << " bytes so far. " << num << " objects" << endl;
+                    out() << "read " << read << "/" << mmf.length() << " bytes so far. " << num << " objects" << endl;
             }
 
-            cout << "\t "  << num << " objects" << endl;
+            out() << "\t "  << num << " objects" << endl;
 
         }
 
@@ -103,7 +103,7 @@ namespace mongo {
             DBClientConnection conn;
             string errmsg;
             if ( ! conn.connect( dbHost , errmsg ) ) {
-                cout << "couldn't connect : " << errmsg << endl;
+                out() << "couldn't connect : " << errmsg << endl;
                 throw -11;
             }
 
@@ -150,9 +150,9 @@ int main( int argc , char ** argv ) {
     if ( vm.count( "dir" ) )
         dir = vm["dir"].as<string>().c_str();
 
-    cout << "mongo dump" << endl;
-    cout << "\t host        \t" << host << endl;
-    cout << "\t dir         \t" << dir << endl;
+    out() << "mongo dump" << endl;
+    out() << "\t host        \t" << host << endl;
+    out() << "\t dir         \t" << dir << endl;
 
     import::go( host , dir );
     return 0;

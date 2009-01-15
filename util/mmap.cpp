@@ -32,7 +32,7 @@ namespace mongo {
     int closingAllFiles = 0;
     void MemoryMappedFile::closeAllFiles() {
         if ( closingAllFiles ) {
-            cout << "warning closingAllFiles=" << closingAllFiles << endl;
+            out() << "warning closingAllFiles=" << closingAllFiles << endl;
             return;
         }
         ++closingAllFiles;
@@ -92,13 +92,13 @@ namespace mongo {
                  filenamew.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ,
                  NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if ( fd == INVALID_HANDLE_VALUE ) {
-            cout << "CreateFile failed " << filename << endl;
+            out() << "CreateFile failed " << filename << endl;
             return 0;
         }
 
 #if defined(_WIN32)
         if ( mapped > 500000000 ) {
-            cout << "WARNING: too much mem mapped for win32" << endl;
+            out() << "WARNING: too much mem mapped for win32" << endl;
 //		if( length > 50000000 )
 //			length = 50000000;
         }
@@ -107,15 +107,15 @@ namespace mongo {
 
         maphandle = CreateFileMapping(fd, NULL, PAGE_READWRITE, 0, length, NULL);
         if ( maphandle == NULL ) {
-            cout << "CreateFileMapping failed " << filename << endl;
+            out() << "CreateFileMapping failed " << filename << endl;
             return 0;
         }
 
         view = MapViewOfFile(maphandle, FILE_MAP_ALL_ACCESS, 0, 0, 0);
         if ( view == 0 ) {
-            cout << "MapViewOfFile failed " << filename << " errno:";
-            cout << GetLastError();
-            cout << endl;
+            out() << "MapViewOfFile failed " << filename << " errno:";
+            out() << GetLastError();
+            out() << endl;
         }
 
         return view;
@@ -165,7 +165,7 @@ namespace mongo {
 
         fd = open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
         if ( !fd ) {
-            cout << "couldn't open " << filename << ' ' << errno << endl;
+            out() << "couldn't open " << filename << ' ' << errno << endl;
             return 0;
         }
 
@@ -203,7 +203,7 @@ namespace mongo {
 
         view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if ( view == MAP_FAILED ) {
-            cout << "  mmap() failed for " << filename << " len:" << length << " errno:" << errno << endl;
+            out() << "  mmap() failed for " << filename << " len:" << length << " errno:" << errno << endl;
             return 0;
         }
         return view;

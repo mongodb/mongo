@@ -57,11 +57,11 @@ namespace mongo {
     } mystartupdbcpp;
 
     void quicktest() {
-        cout << "quicktest()\n";
+        out() << "quicktest()\n";
 
         MemoryMappedFile mmf;
         char *m = (char *) mmf.map("/tmp/quicktest", 16384);
-        //	cout << "mmf reads: " << m << endl;
+        //	out() << "mmf reads: " << m << endl;
         strcpy_s(m, 1000, "hello worldz");
     }
 
@@ -89,7 +89,7 @@ namespace mongo {
             c->_current();
             c->advance();
         }
-        cout << endl;
+        out() << endl;
 
         database = 0;
     }
@@ -175,7 +175,7 @@ namespace mongo {
 
                 DbResponse dbresponse;
                 if ( !assembleResponse( m, dbresponse ) ) {
-                    cout << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
+                    out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
                     if ( dbMsgPort.farEnd.isLocalHost() ) {
                         dbMsgPort.shutdown();
                         sleepmillis(50);
@@ -183,7 +183,7 @@ namespace mongo {
                         exit(EXIT_SUCCESS);
                     }
                     else {
-                        cout << "  (not from localhost, ignoring end msg)" << endl;
+                        out() << "  (not from localhost, ignoring end msg)" << endl;
                     }
                 }
 
@@ -234,10 +234,10 @@ namespace mongo {
             Timer t;
             bool ok = p.call(send, response);
             double tm = t.micros() + 1;
-            cout << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " <<
+            out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " <<
                  ((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
             if (  q+1 < Loops ) {
-                cout << "\t\tSLEEP 8 then sending again as a test" << endl;
+                out() << "\t\tSLEEP 8 then sending again as a test" << endl;
                 sleepsecs(8);
             }
         }
@@ -341,12 +341,12 @@ int main(int argc, char* argv[], char *envp[] )
         unsigned x = 0x12345678;
         unsigned char& b = (unsigned char&) x;
         if ( b != 0x78 ) {
-            cout << "big endian cpus not yet supported" << endl;
+            out() << "big endian cpus not yet supported" << endl;
             return 33;
         }
     }
 
-    DEV cout << "warning: DEV mode enabled\n";
+    DEV out() << "warning: DEV mode enabled\n";
 
 #if !defined(_WIN32)
     signal(SIGPIPE, pipeSigHandler);
@@ -363,7 +363,7 @@ int main(int argc, char* argv[], char *envp[] )
             JavaJS = new JavaJSImpl();
             javajstest();
 #else
-            cout << "NOJNI build cannot test" << endl;
+            out() << "NOJNI build cannot test" << endl;
 #endif
             return 0;
         }
@@ -467,7 +467,7 @@ int main(int argc, char* argv[], char *envp[] )
             else if ( strncmp(s.c_str(), "--oplog", 7) == 0 ) {
                 int x = s[7] - '0';
                 if ( x < 0 || x > 7 ) {
-                    cout << "can't interpret --oplog setting" << endl;
+                    out() << "can't interpret --oplog setting" << endl;
                     exit(13);
                 }
                 opLogging = x;
@@ -480,38 +480,38 @@ int main(int argc, char* argv[], char *envp[] )
     }
 
 usage:
-    cout << "Mongo db ";
+    out() << "Mongo db ";
 #if defined(NOJNI)
-    cout << "[nojni build] ";
+    out() << "[nojni build] ";
 #endif
-    cout << "usage:\n";
-    cout << "  run                run db" << endl;
-    cout << "  msg end [port]     shut down db server listening on port (or default)" << endl;
-    cout << "  msg [msg] [port]   send a request to the db server listening on port (or default)" << endl;
-    cout << "  msglots            send a bunch of test messages, and then wait for answer on the last one" << endl;
-    cout << "  longmsg            send a long test message to the db server" << endl;
-    cout << "  quicktest          just check basic assertions and exit" << endl;
-    cout << "  test2              run test2() - see code" << endl;
-    cout << "\nOptions:\n";
-    cout << " --help              show this usage information\n";
-    cout << " --port <portno>     specify port number, default is 27017\n";
-    cout << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
-    cout << " --quiet             quieter output\n";
-    cout << " --cpu               show cpu+iowait utilization periodically\n";
-    cout << " --verbose\n";
-    cout << " --objcheck          inspect client data for validity on receipt\n";
-    cout << " --quota             enable db quota management\n";
-    cout << " --appsrvpath <path> root directory for the babble app server\n";
-    cout << " --nocursors         diagnostic/debugging option\n";
-    cout << " --nojni" << endl;
-    cout << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-    cout << " --oplogSize <size>  custom size for operation log" << endl;
-    cout << "\nReplication:" << endl;
-    cout << " --master\n";
-    cout << " --slave" << endl;
-    cout << " --source <server:port>" << endl;
-    cout << " --pairwith <server:port> <arbiter>" << endl;
-    cout << endl;
+    out() << "usage:\n";
+    out() << "  run                run db" << endl;
+    out() << "  msg end [port]     shut down db server listening on port (or default)" << endl;
+    out() << "  msg [msg] [port]   send a request to the db server listening on port (or default)" << endl;
+    out() << "  msglots            send a bunch of test messages, and then wait for answer on the last one" << endl;
+    out() << "  longmsg            send a long test message to the db server" << endl;
+    out() << "  quicktest          just check basic assertions and exit" << endl;
+    out() << "  test2              run test2() - see code" << endl;
+    out() << "\nOptions:\n";
+    out() << " --help              show this usage information\n";
+    out() << " --port <portno>     specify port number, default is 27017\n";
+    out() << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
+    out() << " --quiet             quieter output\n";
+    out() << " --cpu               show cpu+iowait utilization periodically\n";
+    out() << " --verbose\n";
+    out() << " --objcheck          inspect client data for validity on receipt\n";
+    out() << " --quota             enable db quota management\n";
+    out() << " --appsrvpath <path> root directory for the babble app server\n";
+    out() << " --nocursors         diagnostic/debugging option\n";
+    out() << " --nojni" << endl;
+    out() << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
+    out() << " --oplogSize <size>  custom size for operation log" << endl;
+    out() << "\nReplication:" << endl;
+    out() << " --master\n";
+    out() << " --slave" << endl;
+    out() << " --source <server:port>" << endl;
+    out() << " --pairwith <server:port> <arbiter>" << endl;
+    out() << endl;
 
     return 0;
 }
@@ -523,7 +523,7 @@ namespace mongo {
 
     string getDbContext();
 
-#undef cout
+#undef out()
 
 #if !defined(_WIN32)
 
@@ -542,12 +542,12 @@ namespace mongo {
         if ( ++segvs > 1 ) {
             signal(x, SIG_DFL);
             if ( segvs == 2 ) {
-                cout << "\n\n\n got 2nd SIGSEGV" << endl;
+                out() << "\n\n\n got 2nd SIGSEGV" << endl;
                 sayDbContext();
             }
             return;
         }
-        cout << "got SIGSEGV " << x << ", terminating :-(" << endl;
+        out() << "got SIGSEGV " << x << ", terminating :-(" << endl;
         sayDbContext();
 //	closeAllSockets();
 //	MemoryMappedFile::closeAllFiles();
@@ -557,7 +557,7 @@ namespace mongo {
 
     void mysighandler(int x) {
         signal(x, SIG_IGN);
-        cout << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+        out() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
         {
             dblock lk;
             log() << "now exiting" << endl;

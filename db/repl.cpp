@@ -948,7 +948,7 @@ namespace mongo {
         *p = EOO;
 
         //BSONObj temp(r);
-        //cout << "temp:" << temp.toString() << endl;
+        //out() << "temp:" << temp.toString() << endl;
 
         database = oldClient;
     }
@@ -1025,7 +1025,7 @@ namespace mongo {
             try {
                 s = _replMain(sources);
             } catch (...) {
-                cout << "TEMP: caught exception in _replMain" << endl;
+                out() << "TEMP: caught exception in _replMain" << endl;
             }
             {
                 dblock lk;
@@ -1127,7 +1127,7 @@ namespace mongo {
 
     void tempThread() {
         while ( 1 ) {
-            cout << dbMutexInfo.isLocked() << endl;
+            out() << dbMutexInfo.isLocked() << endl;
             sleepmillis(100);
         }
     }

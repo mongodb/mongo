@@ -106,12 +106,12 @@ namespace mongo {
     inline Logstream& log() {
         return logstream.prolog();
     }
-
+    inline Logstream& out() {
+        return logstream;
+    }
+    
     inline ostream& stdcout() {
         return cout;
     }
-
-#define cout logstream
-
 
 } // namespace mongo

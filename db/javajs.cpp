@@ -68,7 +68,7 @@ namespace mongo {
     		  longer needed and can be removed.
     */
     extern "C" void tss_cleanup_implemented(void) {
-        //cout << "tss_cleanup_implemented called" << endl;
+        //out() << "tss_cleanup_implemented called" << endl;
     }
 #endif
 
@@ -425,7 +425,7 @@ namespace mongo {
 
         int len = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _getEnv()->NewStringUTF( field ) , bb );
         _getEnv()->DeleteLocalRef( bb );
-        //cout << "len : " << len << endl;
+        //out() << "len : " << len << endl;
         jassert( len > 0 && len < guess );
 
         BSONObj obj(buf, true);
@@ -478,7 +478,7 @@ namespace mongo {
 
         int res = _jvm->AttachCurrentThread( (void**)&env , (void*)&_vmArgs );
         if ( res ) {
-            cout << "ERROR javajs attachcurrentthread fails res:" << res << '\n';
+            out() << "ERROR javajs attachcurrentthread fails res:" << res << '\n';
             assert(false);
         }
 
@@ -636,7 +636,7 @@ namespace mongo {
         if ( debug ) log() << "about to create scope" << endl;
         jlong scope = JavaJS.scopeCreate();
         jassert( scope );
-        if ( debug ) cout << "got scope" << endl;
+        if ( debug ) out() << "got scope" << endl;
 
 
         jlong func1 = JavaJS.functionCreate( "foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
@@ -645,28 +645,28 @@ namespace mongo {
         jassert( 5.6 == JavaJS.scopeGetNumber( scope , "foo" ) );
         jassert( ((string)"eliot") == JavaJS.scopeGetString( scope , "bar" ) );
 
-        if ( debug ) cout << "func2 start" << endl;
+        if ( debug ) out() << "func2 start" << endl;
         jassert( JavaJS.scopeSetNumber( scope , "a" , 5.17 ) );
         jassert( JavaJS.scopeSetString( scope , "b" , "eliot" ) );
         jlong func2 = JavaJS.functionCreate( "assert( 5.17 == a ); assert( \"eliot\" == b );" );
         jassert( ! JavaJS.invoke( scope , func2 ) );
-        if ( debug ) cout << "func2 end" << endl;
+        if ( debug ) out() << "func2 end" << endl;
 
-        if ( debug ) cout << "func3 start" << endl;
+        if ( debug ) out() << "func3 start" << endl;
         jlong func3 = JavaJS.functionCreate( "function(){ z = true; } " );
         jassert( func3 );
         jassert( ! JavaJS.invoke( scope , func3 ) );
         jassert( JavaJS.scopeGetBoolean( scope , "z" ) );
-        if ( debug ) cout << "func3 done" << endl;
+        if ( debug ) out() << "func3 done" << endl;
 
 #ifdef J_USE_OBJ
 
-        if ( debug ) cout << "going to get object" << endl;
+        if ( debug ) out() << "going to get object" << endl;
         BSONObj obj = JavaJS.scopeGetObject( scope , "abc" );
-        if ( debug ) cout << "done getting object" << endl;
+        if ( debug ) out() << "done getting object" << endl;
 
         if ( debug ) {
-            cout << "obj : " << obj.toString() << endl;
+            out() << "obj : " << obj.toString() << endl;
         }
 
         {
@@ -677,27 +677,27 @@ namespace mongo {
             time_t end = time(0);
 
             if ( debug )
-                cout << "time : " << (unsigned) ( end - start ) << endl;
+                out() << "time : " << (unsigned) ( end - start ) << endl;
         }
 
-        if ( debug ) cout << "func4 start" << endl;
+        if ( debug ) out() << "func4 start" << endl;
         JavaJS.scopeSetObject( scope , "obj" , &obj );
-        if ( debug ) cout << "\t here 1" << endl;
+        if ( debug ) out() << "\t here 1" << endl;
         jlong func4 = JavaJS.functionCreate( "tojson( obj );" );
-        if ( debug ) cout << "\t here 2" << endl;
+        if ( debug ) out() << "\t here 2" << endl;
         jassert( ! JavaJS.invoke( scope , func4 ) );
-        if ( debug ) cout << "func4 end" << endl;
+        if ( debug ) out() << "func4 end" << endl;
 
-        if ( debug ) cout << "func5 start" << endl;
+        if ( debug ) out() << "func5 start" << endl;
         jassert( JavaJS.scopeSetObject( scope , "c" , &obj ) );
         jlong func5 = JavaJS.functionCreate( "assert.eq( 517 , c.foo );" );
         jassert( func5 );
         jassert( ! JavaJS.invoke( scope , func5 ) );
-        if ( debug ) cout << "func5 done" << endl;
+        if ( debug ) out() << "func5 done" << endl;
 
 #endif
 
-        if ( debug ) cout << "func6 start" << endl;
+        if ( debug ) out() << "func6 start" << endl;
         for ( int i=0; i<100; i++ ) {
             double val = i + 5;
             JavaJS.scopeSetNumber( scope , "zzz" , val );
@@ -706,7 +706,7 @@ namespace mongo {
             double n = JavaJS.scopeGetNumber( scope , "xxx" );
             jassert( val == n );
         }
-        if ( debug ) cout << "func6 done" << endl;
+        if ( debug ) out() << "func6 done" << endl;
 
         jlong func7 = JavaJS.functionCreate( "return 11;" );
         jassert( ! JavaJS.invoke( scope , func7 ) );

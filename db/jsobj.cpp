@@ -347,7 +347,7 @@ namespace mongo {
         }
         break;
         default:
-            cout << "BSONElement: bad type " << (int) type() << endl;
+            out() << "BSONElement: bad type " << (int) type() << endl;
             assert(false);
         }
         ((BSONElement *) this)->totalSize =  x + fieldNameSize;
@@ -356,11 +356,11 @@ namespace mongo {
             const char *next = data + totalSize;
             if ( *next < MinKey || ( *next > JSTypeMax && *next != MaxKey ) ) {
                 // bad type.
-                cout << "***\n";
-                cout << "Bad data or size in BSONElement::size()\n";
-                cout << "bad type:" << (int) *next << '\n';
-                cout << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << '\n';
-                cout << "lastrec:" << endl;
+                out() << "***\n";
+                out() << "Bad data or size in BSONElement::size()\n";
+                out() << "bad type:" << (int) *next << '\n';
+                out() << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << '\n';
+                out() << "lastrec:" << endl;
                 //dumpmemory(data, totalSize + 15);
                 assert(false);
             }
@@ -460,7 +460,7 @@ namespace mongo {
             return strcmp(l.regexFlags(), r.regexFlags());
         }
         default:
-            cout << "compareElementValues: bad type " << (int) l.type() << endl;
+            out() << "compareElementValues: bad type " << (int) l.type() << endl;
             assert(false);
         }
         return -1;

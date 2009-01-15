@@ -26,7 +26,7 @@ namespace mongo {
     public:
         AuthenticationInfo() { }
         ~AuthenticationInfo() {
-//        cout << "TEMP: auth info was cleaned up ********************************************" << endl;
+//        stdout() << "TEMP: auth info was cleaned up ********************************************" << endl;
         }
     };
 

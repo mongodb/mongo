@@ -71,7 +71,7 @@ namespace mongo {
 
         if ( dashDashGridDb.empty() ) {
             if ( !dashDashInfer ) {
-                cout << "--griddb or --infer required\n";
+                out() << "--griddb or --infer required\n";
                 exit(7);
             }
             stringstream sl, sr;

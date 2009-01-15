@@ -28,7 +28,7 @@ namespace mongo {
     namespace dump {
 
         void doCollection( DBClientConnection & conn , const char * coll , path outputFile ) {
-            cout << "\t" << coll << " to " << outputFile.string() << endl;
+            mongo::out() << "\t" << coll << " to " << outputFile.string() << endl;
 
             int out = open( outputFile.string().c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
             assert( out );
@@ -43,13 +43,13 @@ namespace mongo {
                 num++;
             }
 
-            cout << "\t\t " << num << " objects" << endl;
+            mongo::out() << "\t\t " << num << " objects" << endl;
 
             close( out );
         }
 
         void go( DBClientConnection & conn , const char * db , const path outdir ) {
-            cout << "DATABASE: " << db << endl;
+            mongo::out() << "DATABASE: " << db << endl;
 
             create_directories( outdir );
 
@@ -76,14 +76,14 @@ namespace mongo {
             DBClientConnection conn;
             string errmsg;
             if ( ! conn.connect( host , errmsg ) ) {
-                cout << "couldn't connect : " << errmsg << endl;
+                mongo::out() << "couldn't connect : " << errmsg << endl;
                 throw -11;
             }
 
             path root(outdir);
 
             if ( strlen( db ) == 1 && db[0] == '*' ) {
-                cout << "all dbs" << endl;
+                mongo::out() << "all dbs" << endl;
 
                 BSONObjBuilder query;
                 query.appendBool( "listDatabases" , 1 );
@@ -148,10 +148,10 @@ int main( int argc , char ** argv ) {
     if ( vm.count( "out" ) )
         outdir = vm["out"].as<string>().c_str();
 
-    cout << "mongo dump" << endl;
-    cout << "\t host        \t" << host << endl;
-    cout << "\t db          \t" << db << endl;
-    cout << "\t output dir  \t" << outdir << endl;
+    mongo::out() << "mongo dump" << endl;
+    mongo::out() << "\t host        \t" << host << endl;
+    mongo::out() << "\t db          \t" << db << endl;
+    mongo::out() << "\t output dir  \t" << outdir << endl;
 
     dump::go( host , db , outdir );
 }

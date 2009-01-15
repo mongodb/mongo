@@ -417,9 +417,9 @@ namespace mongo {
             char buf[256];
             nsToClient(ns, buf);
             if ( database->name != buf ) {
-                cout << "ERROR: attempt to write to wrong database database\n";
-                cout << " ns:" << ns << '\n';
-                cout << " database->name:" << database->name << endl;
+                out() << "ERROR: attempt to write to wrong database database\n";
+                out() << " ns:" << ns << '\n';
+                out() << " database->name:" << database->name << endl;
                 assert( database->name == buf );
             }
         }

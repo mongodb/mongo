@@ -568,7 +568,7 @@ namespace mongo {
                             // delete just one index
                             int x = d->findIndexByName(idxName);
                             if ( x >= 0 ) {
-                                cout << "  d->nIndexes was " << d->nIndexes << endl;
+                                out() << "  d->nIndexes was " << d->nIndexes << endl;
                                 anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
 
                                 /* note it is  important we remove the IndexDetails with this

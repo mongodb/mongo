@@ -224,7 +224,7 @@ namespace mongo {
 
     bool MessagingPort::recv(Message& m) {
 again:
-        mmm( cout << "*  recv() sock:" << this->sock << endl; )
+        mmm( out() << "*  recv() sock:" << this->sock << endl; )
         int len = -1;
 
         char *lenbuf = (char *) &len;
@@ -232,7 +232,7 @@ again:
         while ( 1 ) {
             int x = ::recv(sock, lenbuf, lft, 0);
             if ( x == 0 ) {
-                DEV cout << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
+                DEV out() << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
                 m.reset();
                 return false;
             }
@@ -270,7 +270,7 @@ again:
         md->len = len;
 
         if ( len <= 0 ) {
-            cout << "got a length of " << len << ", something is wrong" << endl;
+            out() << "got a length of " << len << ", something is wrong" << endl;
             return false;
         }
 
@@ -279,7 +279,7 @@ again:
         while ( 1 ) {
             int x = ::recv(sock, p, left, 0);
             if ( x == 0 ) {
-                DEV cout << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
+                DEV out() << "MessagingPort::recv(): conn closed? " << farEnd.toString() << endl;
                 m.reset();
                 return false;
             }
@@ -307,30 +307,30 @@ again:
     }
 
     bool MessagingPort::call(Message& toSend, Message& response) {
-        mmm( cout << "*call()" << endl; )
+        mmm( out() << "*call()" << endl; )
         MSGID old = toSend.data->id;
         say(/*to,*/ toSend);
         while ( 1 ) {
             bool ok = recv(response);
             if ( !ok )
                 return false;
-            //cout << "got response: " << response.data->responseTo << endl;
+            //out() << "got response: " << response.data->responseTo << endl;
             if ( response.data->responseTo == toSend.data->id )
                 break;
-            cout << "********************" << endl;
-            cout << "ERROR: MessagingPort::call() wrong id got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
-            cout << "  old:" << old << endl;
-            cout << "  response msgid:" << response.data->id << endl;
-            cout << "  response len:  " << response.data->len << endl;
+            out() << "********************" << endl;
+            out() << "ERROR: MessagingPort::call() wrong id got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
+            out() << "  old:" << old << endl;
+            out() << "  response msgid:" << response.data->id << endl;
+            out() << "  response len:  " << response.data->len << endl;
             assert(false);
             response.reset();
         }
-        mmm( cout << "*call() end" << endl; )
+        mmm( out() << "*call() end" << endl; )
         return true;
     }
 
     void MessagingPort::say(Message& toSend, int responseTo) {
-        mmm( cout << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
+        mmm( out() << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
         MSGID msgid = NextMsgId;
         ++NextMsgId;
         toSend.data->id = msgid;

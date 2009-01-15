@@ -49,7 +49,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
 
-        cout << "TEMP: getmore: " << ns << endl;
+        out() << "TEMP: getmore: " << ns << endl;
 
         ScopedDbConnection dbcon(tempHost);
         DBClientConnection &c = dbcon.conn();
@@ -70,7 +70,7 @@ namespace mongo {
         try {
             if ( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
                 BSONObjBuilder builder;
-                cout << q.query.toString() << endl;
+                out() << q.query.toString() << endl;
                 bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
                 if ( ok ) {
                     BSONObj x = builder.done();

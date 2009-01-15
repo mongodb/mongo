@@ -53,12 +53,12 @@ namespace mongo {
             assert(this);
 
             if ( n < 0 || n >= DiskLoc::MaxFiles ) {
-                cout << "getFile(): n=" << n << endl;
+                out() << "getFile(): n=" << n << endl;
                 assert( n >= 0 && n < DiskLoc::MaxFiles );
             }
             DEV {
                 if ( n > 100 )
-                    cout << "getFile(): n=" << n << "?" << endl;
+                    out() << "getFile(): n=" << n << "?" << endl;
             }
             while ( n >= (int) files.size() )
                 files.push_back(0);

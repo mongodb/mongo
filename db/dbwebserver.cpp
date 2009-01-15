@@ -161,7 +161,7 @@ namespace mongo {
             vector<string>& headers // if completely empty, content-type: text/html will be added
         )
         {
-            //cout << "url [" << url << "]" << endl;
+            //out() << "url [" << url << "]" << endl;
 
             if ( url.size() > 1 ) {
                 handleRESTRequest( rq , url , responseMsg , responseCode , headers );
@@ -263,7 +263,7 @@ namespace mongo {
                 responseCode = 400;
                 headers.push_back( "X_err: bad request" );
                 ss << "don't know how to handle a [" << method << "]";
-                cout << "don't know how to handle a [" << method << "]" << endl;
+                out() << "don't know how to handle a [" << method << "]" << endl;
             }
 
             responseMsg = ss.str();

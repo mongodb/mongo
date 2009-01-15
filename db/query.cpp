@@ -109,7 +109,7 @@ namespace mongo {
                 int direction = matchDirection( idxKey, order );
                 if ( direction != 0 ) {
                     BSONObjBuilder b;
-                    DEV cout << " using index " << d->indexes[i].indexNamespace() << '\n';
+                    DEV out() << " using index " << d->indexes[i].indexNamespace() << '\n';
                     if ( isSorted )
                         *isSorted = true;
 
@@ -175,7 +175,7 @@ namespace mongo {
                                        be issues with it.  so fix this to use index after
                                        that is fixed.
                                     */
-                                    OCCASIONALLY cout << "finish query optimizer for lt gt compound\n";
+                                    OCCASIONALLY out() << "finish query optimizer for lt gt compound\n";
                                     goto fail;
                                 }
                             }
@@ -215,7 +215,7 @@ namespace mongo {
                     }
                 }
                 BSONObj q2 = b2.done();
-                DEV cout << "using index " << d->indexes[i].indexNamespace() << endl;
+                DEV out() << "using index " << d->indexes[i].indexNamespace() << endl;
                 if ( simple && simpleKeyMatch ) *simpleKeyMatch = true;
                 return auto_ptr<Cursor>(
                            new BtreeCursor(d->indexes[i], q2, 1, query));
@@ -223,7 +223,7 @@ namespace mongo {
         }
 
 fail:
-        DEV cout << "getIndexCursor fail " << ns << '\n';
+        DEV out() << "getIndexCursor fail " << ns << '\n';
         return auto_ptr<Cursor>();
     }
 
@@ -234,13 +234,13 @@ fail:
     int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
         if ( strstr(ns, ".system.") && !god ) {
             /*if( strstr(ns, ".system.namespaces") ){
-            	cout << "info: delete on system namespace " << ns << '\n';
+            	out() << "info: delete on system namespace " << ns << '\n';
             }
             else if( strstr(ns, ".system.indexes") ) {
-            	cout << "info: delete on system namespace " << ns << '\n';
+            	out() << "info: delete on system namespace " << ns << '\n';
             }
             else*/ {
-                cout << "ERROR: attempt to delete in system namespace " << ns << endl;
+                out() << "ERROR: attempt to delete in system namespace " << ns << endl;
                 return -1;
             }
         }
@@ -364,16 +364,16 @@ fail:
          (clean these up later...)
     */
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
-        //cout << "TEMP BAD";
+        //out() << "TEMP BAD";
         //lrutest.find(updateobj);
 
         int profile = database->profile;
 
-        //	cout << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" <<
+        //	out() << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" <<
         //		pattern.objsize();
 
         if ( strstr(ns, ".system.") ) {
-            cout << "\nERROR: attempt to update in system namespace " << ns << endl;
+            out() << "\nERROR: attempt to update in system namespace " << ns << endl;
             ss << " can't update system namespace ";
             return 0;
         }
@@ -646,9 +646,9 @@ fail:
                 (Which may indicate bad data from appserver?)
             */
             if ( query.objsize() == 0 ) {
-                cout << "Bad query object?\n  jsobj:";
-                cout << jsobj.toString() << "\n  query:";
-                cout << query.toString() << endl;
+                out() << "Bad query object?\n  jsobj:";
+                out() << jsobj.toString() << "\n  query:";
+                out() << query.toString() << endl;
                 uassert("bad query object", false);
             }
 
@@ -677,7 +677,7 @@ fail:
             while ( c->ok() ) {
                 BSONObj js = c->current();
                 //if( queryTraceLevel >= 50 )
-                //	cout << " checking against:\n " << js.toString() << endl;
+                //	out() << " checking against:\n " << js.toString() << endl;
                 nscanned++;
                 bool deep;
                 if ( !matcher->matches(js, &deep) ) {
@@ -719,7 +719,7 @@ fail:
                                                 ClientCursor *cc = new ClientCursor();
                                                 cc->c = c;
                                                 cursorid = cc->cursorid;
-                                                DEV cout << "  query has more, cursorid: " << cursorid << endl;
+                                                DEV out() << "  query has more, cursorid: " << cursorid << endl;
                                                 //cc->pattern = query;
                                                 cc->matcher = matcher;
                                                 cc->ns = ns;
@@ -758,7 +758,7 @@ fail:
                 ClientCursor *cc = new ClientCursor();
                 cc->c = c;
                 cursorid = cc->cursorid;
-                DEV cout << "  query has no more but tailable, cursorid: " << cursorid << endl;
+                DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
                 //cc->pattern = query;
                 cc->matcher = matcher;
                 cc->ns = ns;
@@ -849,9 +849,9 @@ fail:
                 if ( !cc->matcher->matches(js, &deep) ) {
                 }
                 else {
-                    //cout << "matches " << c->currLoc().toString() << ' ' << deep << '\n';
+                    //out() << "matches " << c->currLoc().toString() << ' ' << deep << '\n';
                     if ( deep && c->getsetdup(c->currLoc()) ) {
-                        //cout << "  but it's a dup \n";
+                        //out() << "  but it's a dup \n";
                     }
                     else {
                         bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);

@@ -125,7 +125,7 @@ namespace mongo {
             }
             c->checkLocation();
             if ( c->tailing() ) {
-                DEV cout << "killing cursor as we would have to advance it and it is tailable" << endl;
+                DEV out() << "killing cursor as we would have to advance it and it is tailable" << endl;
                 delete *i;
                 continue;
             }
@@ -177,7 +177,7 @@ namespace mongo {
                 break;
         }
         ctmLast = ctm;
-        DEV cout << "  alloccursorid " << x << endl;
+        DEV out() << "  alloccursorid " << x << endl;
         return x;
     }
 

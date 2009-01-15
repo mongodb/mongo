@@ -32,29 +32,29 @@ namespace mongo {
     }
 
     void sendtest() {
-        cout << "sendtest\n";
+        out() << "sendtest\n";
         SockAddr me(27016);
         SockAddr dest("127.0.0.1", 27015);
         UDPConnection c;
         if ( c.init(me) ) {
             char buf[256];
-            cout << "sendto: ";
-            cout << c.sendto(buf, sizeof(buf), dest) << " errno:" << h_errno << endl;
+            out() << "sendto: ";
+            out() << c.sendto(buf, sizeof(buf), dest) << " errno:" << h_errno << endl;
         }
-        cout << "end\n";
+        out() << "end\n";
     }
 
     void listentest() {
-        cout << "listentest\n";
+        out() << "listentest\n";
         SockAddr me(27015);
         SockAddr sender;
         UDPConnection c;
         if ( c.init(me) ) {
             char buf[256];
-            cout << "recvfrom: ";
-            cout << c.recvfrom(buf, sizeof(buf), sender) << " errno:" << h_errno << endl;
+            out() << "recvfrom: ";
+            out() << c.recvfrom(buf, sizeof(buf), sender) << " errno:" << h_errno << endl;
         }
-        cout << "end listentest\n";
+        out() << "end listentest\n";
     }
 
     void xmain();
@@ -63,12 +63,12 @@ namespace mongo {
 #if defined(_WIN32)
             WSADATA d;
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                cout << "ERROR: wsastartup failed " << errno << endl;
+                out() << "ERROR: wsastartup failed " << errno << endl;
                 problem() << "ERROR: wsastartup failed " << errno << endl;
                 exit(1);
             }
 #endif
-            //cout << "ntohl:" << ntohl(256) << endl;
+            //out() << "ntohl:" << ntohl(256) << endl;
             //sendtest();
             //listentest();
         }

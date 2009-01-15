@@ -136,7 +136,7 @@ namespace mongo {
         DBClientConnection c;
         string err;
         if ( !c.connect("localhost", err) ) {
-            cout << "can't connect to server " << err << endl;
+            out() << "can't connect to server " << err << endl;
             return;
         }
         BSONObj info;
@@ -145,22 +145,22 @@ namespace mongo {
         b.append("0", 99);
         BSONObj args = b.done();
         bool ok = c.eval("dwight", "function() { return args[0]; }", info, retValue, &args);
-        cout << "eval ok=" << ok << endl;
-        cout << "retvalue=" << retValue.toString() << endl;
-        cout << "info=" << info.toString() << endl;
+        out() << "eval ok=" << ok << endl;
+        out() << "retvalue=" << retValue.toString() << endl;
+        out() << "info=" << info.toString() << endl;
 
-        cout << endl;
+        out() << endl;
 
         int x = 3;
         assert( c.eval("dwight", "function() { return 3; }", x) );
 
-        cout << "***\n";
+        out() << "***\n";
 
         BSONObj foo = fromjson("{\"x\":7}");
-        cout << foo.toString() << endl;
+        out() << foo.toString() << endl;
         int res=0;
         ok = c.eval("dwight", "function(parm1) { return parm1.x; }", foo, res);
-        cout << ok << " retval:" << res << endl;
+        out() << ok << " retval:" << res << endl;
     }
 
     int test2() {
@@ -192,7 +192,7 @@ namespace mongo {
 
         size_t idx = ip.find( ":" );
         if ( idx != string::npos ) {
-            //cout << "port string:" << ip.substr( idx ) << endl;
+            //out() << "port string:" << ip.substr( idx ) << endl;
             port = atoi( ip.substr( idx + 1 ).c_str() );
             ip = ip.substr( 0 , idx );
             ip = hostbyname(ip.c_str());
@@ -484,25 +484,25 @@ namespace mongo {
 // "./db testclient" to invoke
     extern BSONObj emptyObj;
     void testClient() {
-        cout << "testClient()" << endl;
+        out() << "testClient()" << endl;
 //	DBClientConnection c(true);
         DBClientPaired c;
         string err;
         if ( !c.connect("10.211.55.2", "1.2.3.4") ) {
 //    if( !c.connect("10.211.55.2", err) ) {
-            cout << "testClient: connect() failed" << endl;
+            out() << "testClient: connect() failed" << endl;
         }
         else {
             // temp:
-            cout << "test query returns: " << c.findOne("foo.bar", fromjson("{}")).toString() << endl;
+            out() << "test query returns: " << c.findOne("foo.bar", fromjson("{}")).toString() << endl;
         }
 again:
-        cout << "query foo.bar..." << endl;
+        out() << "query foo.bar..." << endl;
         auto_ptr<DBClientCursor> cursor =
             c.query("foo.bar", emptyObj, 0, 0, 0, Option_CursorTailable);
         DBClientCursor *cc = cursor.get();
         if ( cc == 0 ) {
-            cout << "query() returned 0, sleeping 10 secs" << endl;
+            out() << "query() returned 0, sleeping 10 secs" << endl;
             sleepsecs(10);
             goto again;
         }
@@ -511,21 +511,21 @@ again:
             try {
                 m = cc->more();
             } catch (AssertionException&) {
-                cout << "more() asserted, sleeping 10 sec" << endl;
+                out() << "more() asserted, sleeping 10 sec" << endl;
                 goto again;
             }
-            cout << "more: " << m << " dead:" << cc->isDead() << endl;
+            out() << "more: " << m << " dead:" << cc->isDead() << endl;
             if ( !m ) {
                 if ( cc->isDead() )
-                    cout << "cursor dead, stopping" << endl;
+                    out() << "cursor dead, stopping" << endl;
                 else {
-                    cout << "Sleeping 10 seconds" << endl;
+                    out() << "Sleeping 10 seconds" << endl;
                     sleepsecs(10);
                     continue;
                 }
                 break;
             }
-            cout << cc->next().toString() << endl;
+            out() << cc->next().toString() << endl;
         }
     }
 
