@@ -66,6 +66,12 @@ int main( int argc, char** argv ) {
         dbpathSpec += "/";
     dbpath = dbpathSpec.c_str();
 
+    time_t seed = time( 0 );
+    srand( seed );
+    stringstream ss;
+    ss << "random seed: " << seed;
+    out() << ss.str() << endl;
+    
     UnitTest::Registry tests;
 
     tests.add( btreeTests(), "btree" );

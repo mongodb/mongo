@@ -287,6 +287,44 @@ namespace JsobjTests {
                 BSONType type_;
             };
             
+            // Randomized BSON parsing test.  See if we seg fault.
+            class Fuzz {
+            public:
+                void run() {
+                    BSONObj o = fromjson( "{\"one\":2, \"two\":5, \"three\": {},"
+                                         "\"four\": { \"five\": { \"six\" : 11 } },"
+                                         "\"seven\": [ \"a\", \"bb\", \"ccc\", 5 ],"
+                                         "\"eight\": Dbref( \"rrr\", \"01234567890123456789aaaa\" ),"
+                                         "\"_id\": ObjectId( \"deadbeefdeadbeefdeadbeef\" ),"
+                                         "\"nine\": { \"$binary\": \"abc=\", \"$type\": \"02\" },"
+                                         "\"ten\": Date( 44 ), \"eleven\": /foooooo/i }" );
+                    for( int i = 4; i < o.objsize(); ++i )
+                        for( int j = 1; j; j <<= 1 )
+                            if ( rand() > int( RAND_MAX * 0.95 ) ) {
+                                char *c = const_cast< char * >( o.objdata() ) + i;
+                                if ( *c & j )
+                                    *c &= ~j;
+                                else
+                                    *c |= j;
+                            }
+                    o.valid();
+                }
+            };
+            
+            // Randomized BSON parsing test.  See if we seg fault.
+            class RandomBytes {
+            public:
+                void run() {
+                    char data[ 104 ];
+                    *(int *)( data ) = 104;
+                    for( int i = 4; i < 104; ++i ) {
+                        data[ i ] = rand();
+                    }
+                    BSONObj o( data );
+                    o.valid();
+                }
+            };
+            
         } // namespace Validation
         
         namespace JsonStringTests {
@@ -1102,6 +1140,8 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::NoSize >( Object );
             add< BSONObjTests::Validation::NoSize >( Array );
             add< BSONObjTests::Validation::NoSize >( BinData );
+            add< BSONObjTests::Validation::Fuzz >();
+            add< BSONObjTests::Validation::RandomBytes >();
             add< BSONObjTests::JsonStringTests::Empty >();
             add< BSONObjTests::JsonStringTests::SingleStringMember >();
             add< BSONObjTests::JsonStringTests::EscapedCharacters >();
