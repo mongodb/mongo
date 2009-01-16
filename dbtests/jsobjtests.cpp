@@ -299,7 +299,7 @@ namespace JsobjTests {
                                          "\"nine\": { \"$binary\": \"abc=\", \"$type\": \"02\" },"
                                          "\"ten\": Date( 44 ), \"eleven\": /foooooo/i }" );
                     for( int i = 4; i < o.objsize(); ++i )
-                        for( int j = 1; j; j <<= 1 )
+                        for( unsigned char j = 1; j; j <<= 1 )
                             if ( rand() > int( RAND_MAX * 0.95 ) ) {
                                 char *c = const_cast< char * >( o.objdata() ) + i;
                                 if ( *c & j )
