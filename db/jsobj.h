@@ -38,8 +38,10 @@ namespace mongo {
 
 #pragma pack(push,1)
 
-    /* BinData = binary data types.
-       EOO = end of object
+    /** 
+        the complete list of valie BSON types
+        BinData = binary data types.
+        EOO = end of object
     */
     enum BSONType {MinKey=-1, EOO=0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5,
                    Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
