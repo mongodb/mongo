@@ -73,7 +73,10 @@ namespace mongo {
         }
     };
 #pragma pack(pop)
-
+    
+    /**
+       interface that handles communication with the db
+     */
     class DBConnector {
     public:
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) = 0;
@@ -148,20 +151,27 @@ namespace mongo {
         void requestMore();
     };
 
+
+    /**
+       the interface that any db connection should implement
+     */
     class DBClientInterface : boost::noncopyable {
     public:
-        virtual
-        auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
-                                       BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+        virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+                                               BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
-        virtual
-        BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+        virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
         virtual void insert( const char * ns , BSONObj obj ) = 0;
+
+        virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 );
+
+        virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 );
     };
 
-    /* db "commands"
-         basically just invocations of connection.$cmd.findOne({...});
+    /**
+       db "commands"
+       basically just invocations of connection.$cmd.findOne({...});
     */
     class DBClientWithCommands : public DBClientInterface {
         bool isOk(const BSONObj&);
@@ -300,10 +310,13 @@ namespace mongo {
 
         virtual string toString() = 0;
     };
-
+    
+    /**
+     abstract class that implements the core db operations
+     */
     class DBClientBase : public DBClientWithCommands, public DBConnector {
     public:
-        /* send a query to the database.
+        /** send a query to the database.
          ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
          query:         query to perform on the collection.  this is a BSONObj (binary JSON)
          You may format as
@@ -315,22 +328,33 @@ namespace mongo {
          optional template of which fields to select. if unspecified, returns all fields
          queryOptions:  see options enum at top of this file
 
-         returns:       cursor.
-         0 if error (connection failure)
-         */
-        /*throws AssertionException*/
-        virtual
-        auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
-                                       BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+         @return    cursor.   0 if error (connection failure)
+         @throws AssertionException
+        */
+        virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+                                               BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        /*throws AssertionException*/
-        virtual
-        BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        /**
+           @return a single object that matches the query.  if none do, then the object is empty
+           @throws AssertionException
+        */
+        virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
         
+        /**
+           insert an object into the database
+         */
         virtual void insert( const char * ns , BSONObj obj );
 
+
+        /**
+           remove matching objects from the database
+           @param justOne if this true, then once a single match is found will stop
+         */
         virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 );
         
+        /**
+           updates objects matching query
+         */
         virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 );
 
         /**
