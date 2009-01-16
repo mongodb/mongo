@@ -50,7 +50,7 @@ namespace mongo {
 
         findExtremeKeys( _query );
         if ( !k.isEmpty() )
-            startKey = k;
+            startKey = k.copy();
 
         bucket = indexDetails.head.btree()->
                  locate(indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
@@ -64,9 +64,9 @@ namespace mongo {
     void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
         BSONObjBuilder startBuilder;
         BSONObjBuilder endBuilder;
-        set< string >fields;
-        getFields( indexDetails.keyPattern(), fields );
-        for ( set<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
+        vector< string >fields;
+        getIndexFields( fields );
+        for ( vector<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
             const char * field = i->c_str();
             BSONElement k = indexDetails.keyPattern().getFieldDotted( field );
             int number = (int) k.number(); // returns 0.0 if not numeric
@@ -74,12 +74,19 @@ namespace mongo {
             BSONElement lowest = minKey.firstElement();
             BSONElement highest = maxKey.firstElement();
             BSONElement e = query.getFieldDotted( field );
+            BSONObjBuilder temp;
             if ( !e.eoo() && e.type() != RegEx ) {
                 if ( getGtLtOp( e ) == JSMatcher::Equality )
                     lowest = highest = e;
                 else
                     findExtremeInequalityValues( e, lowest, highest );
-            }
+            } else if ( e.type() == RegEx ) {                                                      
+                const char *r = e.simpleRegex();
+                if ( r ) {                                                                         
+                    temp.append( "", r );                                                          
+                    lowest = temp.done().firstElement();                                           
+                }
+            }                  
             startBuilder.appendAs( forward ? lowest : highest, "" );
             endBuilder.appendAs( forward ? highest : lowest, "" );
         }
@@ -109,7 +116,7 @@ namespace mongo {
     }
 
 // Expand all field names in key to use dotted notation.
-    void BtreeCursor::getFields( const BSONObj &key, set< string > &fields ) {
+    void BtreeCursor::getFields( const BSONObj &key, vector< string > &fields ) {
         BSONObjIterator i( key );
         while ( 1 ) {
             BSONElement k = i.next();
@@ -117,15 +124,15 @@ namespace mongo {
                 break;
             bool addedSubfield = false;
             if ( k.type() == Object ) {
-                set< string > subFields;
+                vector< string > subFields;
                 getFields( k.embeddedObject(), subFields );
-                for ( set< string >::iterator i = subFields.begin(); i != subFields.end(); ++i ) {
+                for ( vector< string >::iterator i = subFields.begin(); i != subFields.end(); ++i ) {
                     addedSubfield = true;
-                    fields.insert( k.fieldName() + string( "." ) + *i );
+                    fields.push_back( k.fieldName() + string( "." ) + *i );
                 }
             }
             if ( !addedSubfield )
-                fields.insert( k.fieldName() );
+                fields.push_back( k.fieldName() );
         }
     }
 
@@ -153,7 +160,7 @@ namespace mongo {
         return i > 0 ? 1 : -1;
     }
 
-// Check if the current key is beyond endKey.
+// Check if the current key is beyond endKey_.
     void BtreeCursor::checkEnd() {
         if ( bucket.isNull() )
             return;

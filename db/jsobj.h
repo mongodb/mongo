@@ -223,6 +223,7 @@ namespace mongo {
             assert(type() == RegEx);
             return value();
         }
+        const char *simpleRegex() const;
         const char *regexFlags() const {
             const char *p = regex();
             return p + strlen(p) + 1;
@@ -487,7 +488,7 @@ namespace mongo {
            by something else.  this is a useful way to get your own copy of the buffer
            data (which is freed when the new jsobj destructs).
            */
-        BSONObj copy();
+        BSONObj copy() const;
 
         int hash() const {
             unsigned x = 0;
@@ -497,6 +498,15 @@ namespace mongo {
             return (x & 0x7fffffff) | 0x8000000; // must be > 0
         }
 
+        // Return a version of this object where top level elements of types
+        // that are not part of the bson wire protocol are replaced with
+        // string identifier equivalents.
+        // TODO Support conversion of element types other than min and max.
+        BSONObj clientReadable() const;
+        
+        // Return new object with the field names replaced.
+        BSONObj replaceFieldNames( const vector< string > &names ) const;
+        
         // true unless corrupt
         bool valid() const;
     };
@@ -830,7 +840,7 @@ namespace mongo {
         return BSONObj(value());
     }
 
-    inline BSONObj BSONObj::copy() {
+    inline BSONObj BSONObj::copy() const {
         if ( isEmpty() )
             return *this;
 

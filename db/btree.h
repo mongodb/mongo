@@ -250,12 +250,26 @@ namespace mongo {
             return s;
         }
 
+        virtual BSONObj prettyStartKey() const {
+            vector< string > fieldNames;
+            getIndexFields( fieldNames );
+            return startKey.replaceFieldNames( fieldNames ).clientReadable();
+        }
+        virtual BSONObj prettyEndKey() const {
+            vector< string > fieldNames;
+            getIndexFields( fieldNames );
+            return endKey.replaceFieldNames( fieldNames ).clientReadable();
+        }
+        
     private:
         void findExtremeKeys( const BSONObj &query );
         void findExtremeInequalityValues( const BSONElement &e,
                                           BSONElement &lowest,
                                           BSONElement &highest );
-        static void getFields( const BSONObj &key, set< string > &fields );
+        void getIndexFields( vector< string > &fields ) const {
+            return getFields( indexDetails.keyPattern(), fields );
+        }
+        static void getFields( const BSONObj &key, vector< string > &fields );
         void checkUnused();
         void checkEnd();
         IndexDetails& indexDetails;

@@ -108,20 +108,17 @@ namespace mongo {
                 BSONObj idxKey = idxInfo.getObjectField("key");
                 int direction = matchDirection( idxKey, order );
                 if ( direction != 0 ) {
-                    BSONObjBuilder b;
                     DEV out() << " using index " << d->indexes[i].indexNamespace() << '\n';
                     if ( isSorted )
                         *isSorted = true;
 
-                    return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], BSONObj(), direction, query));
+                    return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], emptyObj, direction, query));
                 }
             }
         }
 
-        // queryFields, e.g. { 'name' }
         set<string> queryFields;
         query.getFieldNames(queryFields);
-
         // regular query without order by
         for (int i = 0; i < d->nIndexes; i++ ) {
             BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
@@ -129,100 +126,35 @@ namespace mongo {
             set<string> keyFields;
             idxKey.getFieldNames(keyFields);
 
-            // keyFields: e.g. { "name" }
-            bool match = keyFields == queryFields;
-            if ( 0 && !match && queryFields.size() > 1 && simpleKeyMatch == 0 && keyFields.size() == 1 ) {
-                // TEMP
-                string s = *(keyFields.begin());
-                match = queryFields.count(s) == 1;
-            }
-
-            if ( match ) {
-                bool simple = true;
-                //BSONObjBuilder b;
+            if ( keyFields == queryFields ) {
                 BSONObj q = query.extractFieldsUnDotted(idxKey);
                 assert(q.objsize() != 0); // guard against a seg fault if details is 0
+                                                                                                               
+                // Make sure 1st element of index will help us.                                    
+                BSONElement e = q.firstElement();          
                 /* regexp: only supported if form is /^text/ */
-                BSONObjBuilder b2;
-                BSONObjIterator it(q);
-                bool first = true;
-                while ( it.more() ) {
+                if ( e.type() == RegEx && !e.simpleRegex() )                         
+                    continue;                                                                      
+                if ( e.type() == Object && getGtLtOp( e ) >= JSMatcher::opIN )                     
+                    continue;                                                                      
+                
+                bool simple = true;                                                                
+                BSONObjIterator it( q );                                                           
+                while( simple && it.more() ) {                
                     BSONElement e = it.next();
                     if ( e.eoo() )
                         break;
-
-                    // GT/LT
-                    if ( e.type() == Object ) {
-                        int op = getGtLtOp(e);
-                        if ( op ) {
-                            if ( !first || !it.next().eoo() ) {
-                                // compound keys with GT/LT not supported yet via index.
-                                goto fail;
-                            }
-                            if ( op >= JSMatcher::opIN ) {
-                                // $in does not use an index (at least yet, should when # of elems is tiny)
-                                // likewise $ne
-                                goto fail;
-                            }
-
-                            {
-                                BSONObjIterator k(e.embeddedObject());
-                                k.next();
-                                if ( !k.next().eoo() ) {
-                                    /* compound query like { $lt : 9, $gt : 2 }
-                                       for those our method below won't work.
-                                       need more work on "stopOnMiss" in general -- may
-                                       be issues with it.  so fix this to use index after
-                                       that is fixed.
-                                    */
-                                    OCCASIONALLY out() << "finish query optimizer for lt gt compound\n";
-                                    goto fail;
-                                }
-                            }
-
-                            int direction = - JSMatcher::opDirection(op);
-                            return auto_ptr<Cursor>( new BtreeCursor(
-                                                         d->indexes[i],
-                                                         BSONObj(),
-                                                         direction, query) );
-                        }
-                    }
-
-                    first = false;
-                    if ( e.type() == RegEx ) {
+                    if ( e.type() == RegEx )                                                       
+                        simple = false;                                                            
+                    if ( e.type() == Object && getGtLtOp( e ) != JSMatcher::Equality )
                         simple = false;
-                        if ( *e.regexFlags() )
-                            goto fail;
-                        const char *re = e.regex();
-                        const char *p = re;
-                        if ( *p++ != '^' ) goto fail;
-                        while ( *p ) {
-                            if ( *p == ' ' || (*p>='0'&&*p<='9') || (*p>='@'&&*p<='Z') || (*p>='a'&&*p<='z') )
-                                ;
-                            else
-                                goto fail;
-                            p++;
-                        }
-                        if ( it.more() && !it.next().eoo() ) // we must be the last part of the key (for now until we are smarter)
-                            goto fail;
-                        // ok!
-                        b2.append(e.fieldName(), re+1);
-                        break;
-                    }
-                    else {
-                        b2.append(e);
-                        //appendElementHandlingGtLt(b2, e);
-                    }
                 }
-                BSONObj q2 = b2.done();
                 DEV out() << "using index " << d->indexes[i].indexNamespace() << endl;
-                if ( simple && simpleKeyMatch ) *simpleKeyMatch = true;
-                return auto_ptr<Cursor>(
-                           new BtreeCursor(d->indexes[i], q2, 1, query));
+                if ( simple && simpleKeyMatch )
+                    *simpleKeyMatch = true;
+                return auto_ptr< Cursor >( new BtreeCursor( d->indexes[ i ], emptyObj, 1, query ) );
             }
         }
-
-fail:
         DEV out() << "getIndexCursor fail " << ns << '\n';
         return auto_ptr<Cursor>();
     }
@@ -742,6 +674,8 @@ fail:
             if ( explain ) {
                 BSONObjBuilder builder;
                 builder.append("cursor", c->toString());
+                builder.append("startKey", c->prettyStartKey());
+                builder.append("endKey", c->prettyEndKey());
                 builder.append("nscanned", nscanned);
                 builder.append("n", ordering ? so->size() : n);
                 if ( ordering )

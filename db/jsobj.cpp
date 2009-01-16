@@ -466,6 +466,22 @@ namespace mongo {
         return -1;
     }
 
+    const char *BSONElement::simpleRegex() const {
+        if ( *regexFlags() )                                                                     
+            return 0;                                                                              
+        const char *i = regex();                                                                 
+        if ( *i != '^' )                                                                           
+            return 0;                                                                              
+        ++i;                                                                                       
+        // Empty string matches everything, won't limit our search.                                
+        if ( !*i )                                                                                 
+            return 0;                                                                              
+        for( ; *i; ++i )                                                                           
+            if (!( *i == ' ' || (*i>='0'&&*i<='9') || (*i>='@'&&*i<='Z') || (*i>='a'&&*i<='z') ))  
+                return 0;                                                                          
+        return regex() + 1;              
+    }    
+        
     /* JSMatcher --------------------------------------*/
 
 // If the element is something like:
@@ -493,7 +509,6 @@ namespace mongo {
         BSONElement fe = e.embeddedObject().firstElement();
         return fe.getGtLtOp();
     }
-
 
     /* BSONObj ------------------------------------------------------------*/
 
@@ -781,6 +796,51 @@ namespace mongo {
         return n;
     }
 
+    BSONObj BSONObj::clientReadable() const {
+        BSONObjBuilder b;
+        BSONObjIterator i( *this );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            switch( e.type() ) {
+                case MinKey: {
+                    BSONObjBuilder m;
+                    m.append( "$minElement", 1 );
+                    b.append( e.fieldName(), m.done() );
+                    break;
+                }
+                case MaxKey: {
+                    BSONObjBuilder m;
+                    m.append( "$maxElement", 1 );
+                    b.append( e.fieldName(), m.done() );
+                    break;
+                }
+                default:
+                    b.append( e );
+            }
+        }
+        return b.doneAndDecouple();
+    }
+    
+    BSONObj BSONObj::replaceFieldNames( const vector< string > &names ) const {
+        BSONObjBuilder b;
+        BSONObjIterator i( *this );
+        vector< string >::const_iterator j = names.begin();
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            if ( j != names.end() ) {
+                b.appendAs( e, j->c_str() );
+                ++j;
+            } else {
+                b.append( e );
+            }
+        }
+        return b.doneAndDecouple();
+    }
+    
     ostream& operator<<( ostream &s, const BSONObj &o ) {
         return s << o.toString();
     }
