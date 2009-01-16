@@ -117,9 +117,9 @@ namespace mongo {
 
 #pragma pack(pop)
 
-    /* BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
+    /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
        'a : 3' is the first element (key+value).
-
+       
        The BSONElement object points into the BSONObj's data.  Thus the BSONObj must stay in scope
        for the life of the BSONElement.
 
@@ -280,6 +280,9 @@ namespace mongo {
     int compareElementValues(const BSONElement& l, const BSONElement& r);
     int getGtLtOp(BSONElement& e);
 
+    /**
+       an actual bson object
+     */
     class BSONObj {
         friend class BSONObjIterator;
         class Details {
@@ -332,18 +335,18 @@ namespace mongo {
         // Properly formatted JSON string.
         string jsonString( JsonStringFormat format = Strict ) const;
 
-        /* note: addFields always adds _id even if not specified */
+        /** note: addFields always adds _id even if not specified */
         int addFields(BSONObj& from, set<string>& fields); /* returns n added */
 
-        /* returns # of top level fields in the object
+        /** returns # of top level fields in the object
            note: iterates to count the fields
         */
         int nFields();
 
-        /* adds the field names to the fields set.  does NOT clear it (appends). */
+        /** adds the field names to the fields set.  does NOT clear it (appends). */
         int getFieldNames(set<string>& fields);
 
-        /* return has eoo() true if no match
+        /** return has eoo() true if no match
            supports "." notation to reach into embedded objects
         */
         BSONElement getFieldDotted(const char *name) const;
@@ -370,19 +373,26 @@ namespace mongo {
 
         bool getBoolField(const char *name);
 
-        /* makes a new BSONObj with the fields specified in pattern.
+        /** makes a new BSONObj with the fields specified in pattern.
            fields returned in the order they appear in pattern.
            if any field missing, you get back an empty object overall.
-           */
-        // sets element field names to empty string
-        // If an array is encountered while scanning the dotted names in pattern,
-        // that array is added to the returned obj, rather than any subobjects
-        // referenced within the array.  The variable nameWithinArray is set to the
-        // name of the requested field within the returned array.
+
+           sets element field names to empty string
+           If an array is encountered while scanning the dotted names in pattern,
+           that array is added to the returned obj, rather than any subobjects
+           referenced within the array.  The variable nameWithinArray is set to the
+           name of the requested field within the returned array.
+        */
         BSONObj extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b, const char *&nameWithinArray) const; // this version, builder owns the returned obj buffer
-        // sets element field names to empty string
+        
+        /**
+           sets element field names to empty string
+        */
         BSONObj extractFieldsUnDotted(BSONObj pattern);
-        // returns elements with original field names
+        
+        /**
+           returns elements with original field names
+        */
         BSONObj extractFields(BSONObj &pattern);
 
         const char *objdata() const {
@@ -524,6 +534,9 @@ namespace mongo {
         BSONObjBuilder * _builder;
     };
 
+    /**
+       utility for creating BSONObj
+     */
     class BSONObjBuilder {
     public:
         BSONObjBuilder(int initsize=512) : b(initsize) {
