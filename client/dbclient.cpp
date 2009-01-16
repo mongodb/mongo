@@ -310,7 +310,7 @@ namespace mongo {
         }
         else {
             stringstream ss;
-
+            
             bool first = 1;
             for ( BSONObjIterator i(keys); i.more(); ) {
                 BSONElement f = i.next();
