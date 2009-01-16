@@ -521,22 +521,24 @@ namespace NamespaceTests {
             }
         };
 
-        class BigCollection : public Base {
-        public:
-            BigCollection() : Base( "NamespaceDetailsTests_BigCollection" ) {}
-            void run() {
-                create();
-                ASSERT_EQUALS( 2, nExtents() );
-            }
-        private:
-            virtual string spec() const {
-                // NOTE 256 added to size in _userCreateNS()
-                long long big = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
-                stringstream ss;
-                ss << "{\"capped\":true,\"size\":" << big << "}";
-                return ss.str();
-            }
-        };
+        // This isn't a particularly useful test, and because it doesn't clean up
+        // after itself, /tmp/unittest needs to be cleared after running.
+//        class BigCollection : public Base {
+//        public:
+//            BigCollection() : Base( "NamespaceDetailsTests_BigCollection" ) {}
+//            void run() {
+//                create();
+//                ASSERT_EQUALS( 2, nExtents() );
+//            }
+//        private:
+//            virtual string spec() const {
+//                // NOTE 256 added to size in _userCreateNS()
+//                long long big = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
+//                stringstream ss;
+//                ss << "{\"capped\":true,\"size\":" << big << "}";
+//                return ss.str();
+//            }
+//        };
 
     } // namespace NamespaceDetailsTests
 
@@ -560,7 +562,7 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::Realloc >();
             add< NamespaceDetailsTests::TwoExtent >();
             add< NamespaceDetailsTests::Migrate >();
-            add< NamespaceDetailsTests::BigCollection >();
+//            add< NamespaceDetailsTests::BigCollection >();
         }
     };
 } // namespace NamespaceTests
