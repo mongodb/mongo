@@ -411,6 +411,9 @@ namespace mongo {
             }
         }
 
+        // Alternative output format
+        string hexDump() const;
+        
         /* <0: l<r. 0:l==r. >0:l>r
            wo='well ordered'.  fields must be in same order in each object.
            Ordering is with respect to the signs of the elements in idxKey.

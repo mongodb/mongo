@@ -841,6 +841,22 @@ namespace mongo {
         return b.doneAndDecouple();
     }
     
+    string BSONObj::hexDump() const {
+        stringstream ss;
+        const char *d = objdata();
+        int size = objsize();
+        for( int i = 0; i < size; ++i ) {
+            ss.width( 2 );
+            ss.fill( '0' );
+            ss << hex << (unsigned)(unsigned char)( d[ i ] ) << dec;
+            if ( ( d[ i ] >= '0' && d[ i ] <= '9' ) || ( d[ i ] >= 'A' && d[ i ] <= 'z' ) )
+                ss << '\'' << d[ i ] << '\'';
+            if ( i != size - 1 )
+                ss << ' ';
+        }
+        return ss.str();
+    }
+    
     ostream& operator<<( ostream &s, const BSONObj &o ) {
         return s << o.toString();
     }
