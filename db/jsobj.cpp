@@ -466,6 +466,22 @@ namespace mongo {
         return -1;
     }
 
+    const char *BSONElement::simpleRegex() const {
+        if ( *regexFlags() )                                                                     
+            return 0;                                                                              
+        const char *i = regex();                                                                 
+        if ( *i != '^' )                                                                           
+            return 0;                                                                              
+        ++i;                                                                                       
+        // Empty string matches everything, won't limit our search.                                
+        if ( !*i )                                                                                 
+            return 0;                                                                              
+        for( ; *i; ++i )                                                                           
+            if (!( *i == ' ' || (*i>='0'&&*i<='9') || (*i>='@'&&*i<='Z') || (*i>='a'&&*i<='z') ))  
+                return 0;                                                                          
+        return regex() + 1;              
+    }    
+        
     /* JSMatcher --------------------------------------*/
 
 // If the element is something like:
@@ -493,7 +509,6 @@ namespace mongo {
         BSONElement fe = e.embeddedObject().firstElement();
         return fe.getGtLtOp();
     }
-
 
     /* BSONObj ------------------------------------------------------------*/
 
@@ -789,12 +804,18 @@ namespace mongo {
             if ( e.eoo() )
                 break;
             switch( e.type() ) {
-                case MinKey:
-                    b.append( e.fieldName(), "$minElement" );
+                case MinKey: {
+                    BSONObjBuilder m;
+                    m.append( "$minElement", 1 );
+                    b.append( e.fieldName(), m.done() );
                     break;
-                case MaxKey:
-                    b.append( e.fieldName(), "$maxElement" );
+                }
+                case MaxKey: {
+                    BSONObjBuilder m;
+                    m.append( "$maxElement", 1 );
+                    b.append( e.fieldName(), m.done() );
                     break;
+                }
                 default:
                     b.append( e );
             }

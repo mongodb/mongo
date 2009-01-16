@@ -50,7 +50,7 @@ namespace mongo {
 
         findExtremeKeys( _query );
         if ( !k.isEmpty() )
-            startKey = k;
+            startKey = k.copy();
 
         bucket = indexDetails.head.btree()->
                  locate(indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
@@ -60,7 +60,7 @@ namespace mongo {
 
 // Given a query, find the lowest and highest keys along our index that could
 // potentially match the query.  These lowest and highest keys will be mapped
-// to startKey_ and endKey_ based on the value of direction.
+// to startKey and endKey based on the value of direction.
     void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
         BSONObjBuilder startBuilder;
         BSONObjBuilder endBuilder;
@@ -74,12 +74,19 @@ namespace mongo {
             BSONElement lowest = minKey.firstElement();
             BSONElement highest = maxKey.firstElement();
             BSONElement e = query.getFieldDotted( field );
+            BSONObjBuilder temp;
             if ( !e.eoo() && e.type() != RegEx ) {
                 if ( getGtLtOp( e ) == JSMatcher::Equality )
                     lowest = highest = e;
                 else
                     findExtremeInequalityValues( e, lowest, highest );
-            }
+            } else if ( e.type() == RegEx ) {                                                      
+                const char *r = e.simpleRegex();
+                if ( r ) {                                                                         
+                    temp.append( "", r );                                                          
+                    lowest = temp.done().firstElement();                                           
+                }
+            }                  
             startBuilder.appendAs( forward ? lowest : highest, "" );
             endBuilder.appendAs( forward ? highest : lowest, "" );
         }
