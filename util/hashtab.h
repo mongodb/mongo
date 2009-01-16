@@ -89,8 +89,6 @@ namespace mongo {
             if ( (n & 1) == 0 )
                 n--;
             nodes = (Node *) buf;
-            assert(nodes[n-1].hash == 0);
-            assert(nodes[0].hash == 0);
 
             assert( sizeof(Node) == 628 );
             //out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
