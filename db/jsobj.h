@@ -143,7 +143,8 @@ namespace mongo {
         bool eoo() const {
             return type() == EOO;
         }
-        int size() const;
+        // If maxLen is specified, don't scan more than maxLen bytes to calculate size.
+        int size( int maxLen = -1 ) const;
 
         // wrap this element up as a singleton object.
         BSONObj wrap();
@@ -268,15 +269,29 @@ namespace mongo {
         int getGtLtOp() const;
 
         BSONElement();
+        
+        // Check that data is internally consistent.
+        void validate() const;
 
     private:
-        BSONElement(const char *d) : data(d) {
-            fieldNameSize = eoo() ? 0 : strlen(fieldName()) + 1;
+        // If maxLen is specified, don't scan more than maxLen bytes.
+        BSONElement(const char *d, int maxLen = -1) : data(d) {
+            if ( eoo() )
+                fieldNameSize = 0;
+            else {
+                if ( maxLen != -1 ) {
+                    int size = strnlen( fieldName(), maxLen - 1 );
+                    massert( "Invalid field name", size != -1 );
+                    fieldNameSize = size + 1;
+                } else {
+                    fieldNameSize = strlen( fieldName() ) + 1;
+                }
+            }
             totalSize = -1;
         }
         const char *data;
         int fieldNameSize;
-        int totalSize; /* caches the computed size */
+        mutable int totalSize; /* caches the computed size */
     };
 
     /* l and r MUST have same type when called: check that first. */
@@ -772,9 +787,10 @@ namespace mongo {
         bool more() {
             return pos < theend;
         }
-        BSONElement next() {
-            BSONElement e(pos);
-            pos += e.size();
+        BSONElement next( bool checkEnd = false ) {
+            assert( pos < theend );
+            BSONElement e( pos, checkEnd ? theend - pos : -1 );
+            pos += e.size( checkEnd ? theend - pos : -1 );
             return e;
         }
     private:

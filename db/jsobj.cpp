@@ -294,11 +294,13 @@ namespace mongo {
         return s.str();
     }
 
-    int BSONElement::size() const {
+    int BSONElement::size( int maxLen ) const {
         if ( totalSize >= 0 )
             return totalSize;
 
-        int x = 1;
+        int remain = maxLen - fieldNameSize - 1;
+        
+        int x = 0;
         switch ( type() ) {
         case EOO:
         case Undefined:
@@ -307,64 +309,60 @@ namespace mongo {
         case MinKey:
             break;
         case Bool:
-            x = 2;
+            x = 1;
             break;
         case NumberInt:
-            x = 5;
+            x = 4;
             break;
         case Date:
         case NumberDouble:
-            x = 9;
+            x = 8;
             break;
         case jstOID:
-            x = 13;
+            x = 12;
             break;
         case Symbol:
         case Code:
         case String:
-            x = valuestrsize() + 4 + 1;
+            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            x = valuestrsize() + 4;
             break;
         case CodeWScope:
-            x = objsize() + 1;
+            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            x = objsize();
             break;
 
         case DBRef:
-            x = valuestrsize() + 4 + 12 + 1;
+            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            x = valuestrsize() + 4 + 12;
             break;
         case Object:
         case Array:
-            x = objsize() + 1;
+            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            x = objsize();
             break;
         case BinData:
-            x = valuestrsize() + 4 + 1 + 1/*subtype*/;
+            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            x = valuestrsize() + 4 + 1/*subtype*/;
             break;
         case RegEx:
         {
             const char *p = value();
-            int len1 = strlen(p);
+            int len1 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain );
+            massert( "Invalid regex string", len1 != -1 );
             p = p + len1 + 1;
-            x = 1 + len1 + strlen(p) + 2;
+            int len2 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain - len1 - 1 );
+            massert( "Invalid regex options string", len2 != -1 );
+            x = len1 + 1 + len2 + 1;
         }
         break;
-        default:
-            out() << "BSONElement: bad type " << (int) type() << endl;
-            assert(false);
+        default: {
+            stringstream ss;
+            ss << "BSONElement: bad type " << (int) type();
+            massert(ss.str().c_str(),false);
         }
-        ((BSONElement *) this)->totalSize =  x + fieldNameSize;
-
-        if ( !eoo() ) {
-            const char *next = data + totalSize;
-            if ( *next < MinKey || ( *next > JSTypeMax && *next != MaxKey ) ) {
-                // bad type.
-                out() << "***\n";
-                out() << "Bad data or size in BSONElement::size()\n";
-                out() << "bad type:" << (int) *next << '\n';
-                out() << "totalsize:" << totalSize << " fieldnamesize:" << fieldNameSize << '\n';
-                out() << "lastrec:" << endl;
-                //dumpmemory(data, totalSize + 15);
-                assert(false);
-            }
         }
+        totalSize =  x + fieldNameSize + 1; // BSONType
 
         return totalSize;
     }
@@ -481,7 +479,22 @@ namespace mongo {
                 return 0;                                                                          
         return regex() + 1;              
     }    
-        
+
+    void BSONElement::validate() const {
+        switch( type() ) {
+            case Symbol:
+            case String:
+            case DBRef:
+                massert( "Invalid string/symbol/dbref size",
+                        valuestrsize() - 1 == strnlen( valuestr(), valuestrsize() ) );
+                break;
+            case Object:
+                // We expect Object size validation to be handled elsewhere.
+            default:
+                break;
+        }
+    }
+    
     /* JSMatcher --------------------------------------*/
 
 // If the element is something like:
@@ -501,7 +514,7 @@ namespace mongo {
         }
         b.append(e);
     }
-
+    
     int getGtLtOp(BSONElement& e) {
         if ( e.type() != Object )
             return JSMatcher::Equality;
@@ -518,15 +531,27 @@ namespace mongo {
         stringstream s;
         s << "{ ";
         BSONObjIterator i(*this);
-        BSONElement e = i.next();
-        if ( !e.eoo() )
-            while ( 1 ) {
-                s << e.toString();
-                e = i.next();
-                if ( e.eoo() )
-                    break;
-                s << ", ";
+        bool first = true;
+        while ( 1 ) {
+            massert( "Object does not end with EOO or Undefined", i.more() );
+            BSONElement e = i.next( true );
+            const char *objEnd = this->objdata() + this->objsize();
+            const char *eEnd = e.rawdata() + e.size();
+            massert( "Element extends past end of object", eEnd <= objEnd );
+            e.validate();
+            if ( e.eoo() ) {
+                massert( "EOO Before end of object", eEnd == objEnd );
+                break;
+            } else if ( e.type() == Undefined ) {
+                massert( "Undefined Before end of object", eEnd == objEnd );
+                break;                
             }
+            if ( first )
+                first = false;
+            else
+                s << ", ";
+            s << e.toString();
+        }
         s << " }";
         return s.str();
     }

@@ -112,6 +112,183 @@ namespace JsobjTests {
             }
         };
 
+        namespace Validation {
+            
+            class Base {
+            public:
+                void run() {
+                    ASSERT( valid().valid() );
+                    ASSERT( !invalid().valid() );
+                }
+            protected:
+                virtual BSONObj valid() const = 0;
+                virtual BSONObj invalid() const = 0;
+                static char get( const BSONObj &o, int i ) {
+                    return o.objdata()[ i ];
+                }
+                static void set( BSONObj &o, int i, char c ) {
+                    const_cast< char * >( o.objdata() )[ i ] = c;
+                }
+            };
+            
+            class BadType : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":1}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 4, 50 );
+                    return ret;
+                }
+            };
+
+            class EooBeforeEnd : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":1}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    // (first byte of size)++
+                    set( ret, 0, get( ret, 0 ) + 1 );
+                    // re-read size for BSONObj::details
+                    return ret.copy();
+                }
+            };
+
+            class UndefinedBeforeEnd : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":1}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 4, Undefined );
+                    return ret;
+                }
+            };
+            
+            class TotalSizeTooSmall : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":1}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    // (first byte of size)--
+                    set( ret, 0, get( ret, 0 ) - 1 );
+                    // re-read size for BSONObj::details
+                    return ret.copy();                    
+                }
+            };
+
+            class EooMissing : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":1}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, ret.objsize() - 1, 0xff );
+                    // (first byte of size)--
+                    set( ret, 0, get( ret, 0 ) - 1 );
+                    // re-read size for BSONObj::details
+                    return ret.copy();                    
+                }
+            };
+            
+            class WrongStringSize : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":\"b\"}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 0, get( ret, 0 ) + 1 );
+                    set( ret, 7, get( ret, 7 ) + 1 );
+                    return ret.copy();       
+                }
+            };
+
+            class WrongSubobjectSize : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":{\"b\":1}}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 0, get( ret, 0 ) + 1 );
+                    set( ret, 7, get( ret, 7 ) + 1 );
+                    return ret.copy();       
+                }
+            };            
+
+            class WrongDbrefNsSize : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{ \"a\": Dbref( \"b\", \"ffffffffffffffffffffffff\" ) }" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 0, get( ret, 0 ) + 1 );
+                    set( ret, 7, get( ret, 7 ) + 1 );
+                    return ret.copy();
+                };
+            };
+            
+            class WrongSymbolSize : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":\"b\"}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 4, Symbol );
+                    set( ret, 0, get( ret, 0 ) + 1 );
+                    set( ret, 7, get( ret, 7 ) + 1 );
+                    return ret.copy();       
+                }
+            };
+
+            class NoFieldNameEnd : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":1}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    memset( const_cast< char * >( ret.objdata() ) + 5, 0xff, ret.objsize() - 5 );
+                    return ret;
+                }                
+            };
+            
+            class BadRegex : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":/c/i}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    memset( const_cast< char * >( ret.objdata() ) + 7, 0xff, ret.objsize() - 7 );
+                    return ret;
+                }                
+            };
+            
+            class BadRegexOptions : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":/c/i}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    memset( const_cast< char * >( ret.objdata() ) + 9, 0xff, ret.objsize() - 9 );
+                    return ret;
+                }                
+            };
+
+            class NoSize {
+            public:
+                NoSize( BSONType type ) : type_( type ) {}
+                void run() {
+                    const char data[] = { 0x07, 0x00, 0x00, 0x00, char( type_ ), 'a', 0x00 };
+                    BSONObj o( data );
+                    ASSERT( !o.valid() );
+                }
+            private:
+                BSONType type_;
+            };
+            
+        } // namespace Validation
+        
         namespace JsonStringTests {
             class Empty {
             public:
@@ -415,6 +592,7 @@ namespace JsobjTests {
         class Base {
         public:
             void run() {
+                ASSERT( fromjson( json() ).valid() );
                 assertEquals( bson(), fromjson( json() ) );
                 assertEquals( bson(), fromjson( bson().jsonString( Strict ) ) );
                 assertEquals( bson(), fromjson( bson().jsonString( TenGen ) ) );
@@ -889,6 +1067,26 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareEmbeddedObject >();
             add< BSONObjTests::WoCompareEmbeddedArray >();
             add< BSONObjTests::WoCompareOrdered >();
+            add< BSONObjTests::Validation::BadType >();
+            add< BSONObjTests::Validation::EooBeforeEnd >();
+            add< BSONObjTests::Validation::UndefinedBeforeEnd >();
+            add< BSONObjTests::Validation::TotalSizeTooSmall >();
+            add< BSONObjTests::Validation::EooMissing >();
+            add< BSONObjTests::Validation::WrongStringSize >();
+            add< BSONObjTests::Validation::WrongSubobjectSize >();
+            add< BSONObjTests::Validation::WrongDbrefNsSize >();
+            add< BSONObjTests::Validation::WrongSymbolSize >();
+            add< BSONObjTests::Validation::NoFieldNameEnd >();
+            add< BSONObjTests::Validation::BadRegex >();
+            add< BSONObjTests::Validation::BadRegexOptions >();
+            add< BSONObjTests::Validation::NoSize >( Symbol );
+            add< BSONObjTests::Validation::NoSize >( Code );
+            add< BSONObjTests::Validation::NoSize >( String );
+            add< BSONObjTests::Validation::NoSize >( CodeWScope );
+            add< BSONObjTests::Validation::NoSize >( DBRef );
+            add< BSONObjTests::Validation::NoSize >( Object );
+            add< BSONObjTests::Validation::NoSize >( Array );
+            add< BSONObjTests::Validation::NoSize >( BinData );
             add< BSONObjTests::JsonStringTests::Empty >();
             add< BSONObjTests::JsonStringTests::SingleStringMember >();
             add< BSONObjTests::JsonStringTests::EscapedCharacters >();
