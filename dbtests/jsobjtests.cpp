@@ -1057,6 +1057,21 @@ namespace JsobjTests {
         };
 
     } // namespace FromJsonTests
+    
+    namespace OIDTests {
+        class init1 {
+        public:
+            void run(){
+                OID a;
+                OID b;
+                
+                a.init();
+                b.init();
+                
+                ASSERT( a != b );
+            }
+        };
+    }
 
     class All : public UnitTest::Suite {
     public:
@@ -1149,6 +1164,8 @@ namespace JsobjTests {
             add< FromJsonTests::RegexInvalidOption >();
             add< FromJsonTests::RegexInvalidOption2 >();
             add< FromJsonTests::Malformed >();
+
+            add< OIDTests::init1 >();
         }
     };
 
