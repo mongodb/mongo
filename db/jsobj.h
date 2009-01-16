@@ -56,8 +56,8 @@ namespace mongo {
        opaque to the database.
     */
     enum BinDataType { Function=1, ByteArray=2, bdtCustom=128 };
-
-    /*	Object id's are optional for BSONObjects.
+    
+    /**	Object id's are optional for BSONObjects.
     	When present they should be the first object member added.
         The app server serializes OIDs as <8-byte-int><4-byte-int>) using the machine's
         native endianness.  We deserialize by casting as an OID object, assuming
@@ -70,6 +70,9 @@ namespace mongo {
         bool operator==(const OID& r) {
             return a==r.a&&b==r.b;
         }
+        bool operator!=(const OID& r) {
+            return a!=r.a||b!=r.b;
+        }
         string str() const {
             stringstream s;
             s << hex;
@@ -81,11 +84,17 @@ namespace mongo {
             s << dec;
             return s.str();
         }
+
+        /**
+           sets the contents to a new oid
+         */
+        void init();
+        
     };
     ostream& operator<<( ostream &s, const OID &o );
 
     /* marshalled js object format:
-
+       
        <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
           totalSize includes itself.
 

@@ -958,5 +958,17 @@ namespace mongo {
         return *_builder;
     }
 
+    void OID::init(){
+        // note: this isn't correct - but we're probably deprecating anyway, so not worrying so much right now
+        
+        static long machine = random();
+        static int inc = (int)(random());
+
+        a = time(0);
+        a = a << 32;
+        a += machine & 0xffffffff;
+        
+        b = ++inc;
+    }
 
 } // namespace mongo
