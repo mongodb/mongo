@@ -18,6 +18,7 @@
 
 #include "stdafx.h"
 #include "jsobj.h"
+#include "security.h"
 #include "../util/goodies.h"
 #include <limits>
 #include "../util/unittest.h"
@@ -1002,7 +1003,7 @@ namespace mongo {
     void OID::init(){
         // note: this isn't correct - but we're probably deprecating anyway, so not worrying so much right now
         
-        static long machine = random();
+        static unsigned long long machine = security.getNonce();
         static int inc = (int)(random());
 
         a = time(0);
@@ -1010,6 +1011,18 @@ namespace mongo {
         a += machine & 0xffffffff;
         
         b = ++inc;
+    }
+    
+    void OID::init( string s ){
+        assert( s.size() == 24 );
+        string as = s.substr( 0 , 16 );
+        string bs = s.substr( 16 );
+        
+        stringstream ssa(as);
+        ssa >> hex >> a;
+
+        stringstream ssb(bs);
+        ssb >> hex >> b;
     }
 
 } // namespace mongo

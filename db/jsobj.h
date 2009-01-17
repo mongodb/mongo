@@ -84,11 +84,13 @@ namespace mongo {
             s << dec;
             return s.str();
         }
-
+        
         /**
            sets the contents to a new oid
          */
         void init();
+
+        void init( string s );
         
     };
     ostream& operator<<( ostream &s, const OID &o );
