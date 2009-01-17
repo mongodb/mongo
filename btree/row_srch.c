@@ -121,6 +121,11 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 * test is so we don't have to update internal pages
 			 * if the application stores a new, "smallest" key in
 			 * the tree.
+			 *
+			 * For the record, we still maintain the key at the
+			 * 0th location because it means tree verification
+			 * and other code that processes a level of the tree
+			 * doesn't need to know about this.
 			 */
 			if (indx != 0 || WT_ISLEAF(level)) {
 				cmp = db->btree_compare(db, key, (DBT *)ip);
