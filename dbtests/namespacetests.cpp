@@ -1,4 +1,4 @@
-// indexdetailstests.cpp : IndexDetails unit tests.
+// namespacetests.cpp : namespace.{h,cpp} unit tests.
 //
 
 /**
