@@ -32,4 +32,15 @@ namespace mongo {
 
     extern boost::thread_specific_ptr<AuthenticationInfo> authInfo;
 
+    typedef unsigned long long nonce;
+
+    struct Security {
+        ifstream *devrandom;
+        Security();
+        nonce getNonce();
+    };
+
+    extern Security security;
+
+
 } // namespace mongo

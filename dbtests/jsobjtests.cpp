@@ -317,6 +317,7 @@ namespace JsobjTests {
     } // namespace BSONObjTests
     
     namespace OIDTests {
+        
         class init1 {
         public:
             void run(){
@@ -327,6 +328,21 @@ namespace JsobjTests {
                 b.init();
                 
                 ASSERT( a != b );
+            }
+        };
+
+        class initParse1 {
+        public:
+            void run(){
+
+                OID a;
+                OID b;
+                
+                cout << endl;
+                a.init();
+                b.init( a.str() );
+                
+                ASSERT( a == b );
             }
         };
     }
@@ -366,9 +382,10 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::Fuzz >( .01 );
             add< BSONObjTests::Validation::Fuzz >( .001 );
             add< OIDTests::init1 >();
+            add< OIDTests::initParse1 >();
         }
     };
-
+    
 } // namespace JsobjTests
 
 UnitTest::TestPtr jsobjTests() {
