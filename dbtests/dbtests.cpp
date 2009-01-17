@@ -38,12 +38,15 @@ void usage() {
         "                  (default is /tmp/unittest/)\n"
         "  -debug          run tests with verbose output\n"
         "  -list           list available test suites\n"
+        "  -seed <seed>    random number seed\n"
         "  <suite>         run the specified test suite only";
     out() << instructions << endl;
 }
 
 int main( int argc, char** argv ) {
 
+    unsigned long long seed = time( 0 );
+    
     int offset = 0;
     for ( int i = 1; i < argc; ++i ) {
         if ( argv[ i ] == string( "-dbpath" ) ) {
@@ -52,6 +55,14 @@ int main( int argc, char** argv ) {
                 exit( -1 );
             }
             dbpathSpec = argv[ ++i ];
+            offset += 2;
+        } else if ( argv[ i ] == string( "-seed" ) ) {
+            if ( i == argc - 1 ) {
+                usage();
+                exit( -1 );
+            }
+            // Don't bother checking for conversion error
+            seed = strtoll( argv[ ++i ], 0, 10 );
             offset += 2;
         } else if ( argv[ i ] == string( "-help" ) ) {
             usage();
@@ -66,11 +77,8 @@ int main( int argc, char** argv ) {
         dbpathSpec += "/";
     dbpath = dbpathSpec.c_str();
 
-    time_t seed = time( 0 );
     srand( seed );
-    stringstream ss;
-    ss << "random seed: " << seed;
-    out() << ss.str() << endl;
+    out() << "random seed: " << seed << endl;
     
     UnitTest::Registry tests;
 
