@@ -157,8 +157,13 @@ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
 clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
 
 # testing
-testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
+test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
+
+#  ---- RUNNING TESTS ----
+
+testEnv.Alias( "smoke", "test", test[ 0 ].abspath )
+testEnv.AlwaysBuild( "smoke" )
 
 #  ----  INSTALL -------
 
@@ -182,3 +187,24 @@ env.Install( installDir + "/lib/mongo-jars" , Glob( "jars/*" ) )
 #final alias
 env.Alias( "install" , installDir )
 
+#  ---- CONVENIENCE ----
+
+def tabs( env, target, source ):
+    from subprocess import Popen, PIPE
+    from re import search, match
+    diff = Popen( [ "git", "diff", "-U0", "origin", "master" ], stdout=PIPE ).communicate()[ 0 ]
+    sourceFile = False
+    for line in diff.split( "\n" ):
+        if match( "diff --git", line ):
+            sourceFile = not not search( ".(h|hpp|c|cpp)\s*$", line )
+	if sourceFile and match( "\+ *\t", line ):
+            return True
+    return False
+env.Alias( "checkSource", [], [ tabs ] )
+env.AlwaysBuild( "checkSource" )
+
+def gitPush( env, target, source ):
+    import subprocess
+    return subprocess.call( [ "git", "push" ] )
+env.Alias( "push", [ ".", "smoke", "checkSource" ], gitPush )
+env.AlwaysBuild( "push" )
