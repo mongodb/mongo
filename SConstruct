@@ -197,7 +197,7 @@ def tabs( env, target, source ):
     for line in diff.split( "\n" ):
         if match( "diff --git", line ):
             sourceFile = not not search( ".(h|hpp|c|cpp)\s*$", line )
-	if sourceFile and match( "\+ *\t", line ):
+        if sourceFile and match( "\+ *\t", line ):
             return True
     return False
 env.Alias( "checkSource", [], [ tabs ] )
