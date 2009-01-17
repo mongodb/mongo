@@ -10,36 +10,32 @@ namespace mongo {
 
     boost::thread_specific_ptr<AuthenticationInfo> authInfo;
 
-    typedef unsigned long long nonce;
-
-    struct Security {
-        ifstream *devrandom;
-
-        nonce getNonce() {
-            nonce n;
+    Security::Security(){
 #if defined(__linux__)
-            devrandom->read((char*)&n, sizeof(n));
-            massert("devrandom failed", !devrandom->fail());
+        devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
+        massert( "can't open dev/urandom", devrandom->is_open() );
+#endif
+        assert( sizeof(nonce) == 8 );
+        
+        if ( do_md5_test() )
+            massert("md5 unit test fails", false);
+    }
+
+    nonce Security::getNonce(){
+        nonce n;
+#if defined(__linux__)
+        devrandom->read((char*)&n, sizeof(n));
+        massert("devrandom failed", !devrandom->fail());
 #else
-            n = ((unsigned long long)rand())<<32 | rand();
+        n = ((unsigned long long)rand())<<32 | rand();
 #endif
-            return n;
-        }
+        return n;
+    }
 
-        Security()
-        {
-#if defined(__linux__)
-            devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
-            massert( "can't open dev/urandom", devrandom->is_open() );
-#endif
-            assert( sizeof(nonce) == 8 );
-
-            if ( do_md5_test() )
-                massert("md5 unit test fails", false);
-        }
-    } security;
+    Security security;
 
 } // namespace mongo
+
 
 #include "commands.h"
 #include "jsobj.h"
