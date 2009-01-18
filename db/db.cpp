@@ -156,10 +156,11 @@ namespace mongo {
         authInfo.reset(ai);
         LastError *le = new LastError();
         lastError.reset(le);
-        try {
 
-            MessagingPort& dbMsgPort = *grab;
-            grab = 0;
+        MessagingPort& dbMsgPort = *grab;
+        grab = 0;
+
+        try {
 
             Message m;
             while ( 1 ) {
@@ -193,8 +194,8 @@ namespace mongo {
 
         }
         catch ( AssertionException& ) {
-            problem() << "Uncaught AssertionException, terminating" << endl;
-            exit(15);
+            problem() << "AssertionException in connThread, closing client connection" << endl;
+            dbMsgPort.shutdown();
         }
         catch ( std::exception &e ) {
             problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
@@ -323,7 +324,6 @@ namespace mongo {
         listen(listenPort);
     }
 
-//ofstream problems("dbproblems.log", ios_base::app | ios_base::out);
     int test2();
     void testClient();
     void pipeSigHandler( int signal );

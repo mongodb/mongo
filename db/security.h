@@ -22,11 +22,16 @@
 
 namespace mongo {
 
+    /* for a particular db */
+    struct Auth {
+        int level;
+    };
+
     class AuthenticationInfo : boost::noncopyable {
+        map<string, Auth> m;
     public:
         AuthenticationInfo() { }
         ~AuthenticationInfo() {
-//        stdout() << "TEMP: auth info was cleaned up ********************************************" << endl;
         }
     };
 
@@ -41,6 +46,5 @@ namespace mongo {
     };
 
     extern Security security;
-
 
 } // namespace mongo

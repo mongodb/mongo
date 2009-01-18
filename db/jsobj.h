@@ -55,7 +55,7 @@ namespace mongo {
        bdtCustom and above are ones that the JS compiler understands, but are
        opaque to the database.
     */
-    enum BinDataType { Function=1, ByteArray=2, bdtCustom=128 };
+    enum BinDataType { Function=1, ByteArray=2, MD5Type=5, bdtCustom=128 };
     
     /**	Object id's are optional for BSONObjects.
     	When present they should be the first object member added.
@@ -230,8 +230,15 @@ namespace mongo {
 
         BSONObj embeddedObject() const;
 
-        /* uassert if not an object */
+        /* uasserts if not an object */
         BSONObj embeddedObjectUserCheck();
+
+        const char *binData(int& len) { 
+            // BinData: <int len> <byte subtype> <byte[len] data>
+            assert( type() == BinData );
+            len = valuestrsize();
+            return value() + 5;
+        }
 
         const char *regex() const {
             assert(type() == RegEx);
@@ -567,6 +574,7 @@ namespace mongo {
         BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder );
 
         BSONObjBuilder& operator<<( const char * value );
+        BSONObjBuilder& operator<<( const string& v ) { return (*this << v.c_str()); }
         BSONObjBuilder& operator<<( const int value );
         BSONObjBuilder& operator<<( const double value );
 

@@ -822,8 +822,11 @@ namespace mongo {
                 return DiskLoc();
             }
             if ( strstr(ns, ".system.") ) {
+                // todo later: check for dba-type permissions here.
                 if ( strstr(ns, ".system.indexes") )
                     addIndex = true;
+                else if ( strstr(ns, ".system.users") )
+                    ;
                 else if ( !god ) {
                     out() << "ERROR: attempt to insert in system namespace " << ns << endl;
                     return DiskLoc();

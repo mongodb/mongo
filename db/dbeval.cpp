@@ -85,8 +85,7 @@ namespace mongo {
             res = s.invoke(f);
             int m = t.millis();
             if ( m > 100 ) {
-                out() << "TEMP: dbeval too slow:" << endl;
-                problem() << "dbeval time: " << dec << m << "ms " << ns << endl;
+                out() << "dbeval slow, time: " << dec << m << "ms " << ns << endl;
                 OCCASIONALLY log() << code << endl;
                 else if ( m >= 1000 ) log() << code << endl;
             }

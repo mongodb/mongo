@@ -177,18 +177,23 @@ namespace mongo {
         bool isOk(const BSONObj&);
         bool simpleCommand(const char *dbname, BSONObj *info, const char *command);
     public:
-        /* Run a database command.  Database commands are represented as BSON objects.  Common database
+        /** Run a database command.  Database commands are represented as BSON objects.  Common database
            commands have prebuilt helper functions -- see below.  If a helper is not available you can
            directly call runCommand.
 
-           dbname - database name.  Use "admin" for global administrative commands.
-           cmd    - the command object to execute.  For example, { ismaster : 1 }
-           info   - the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
-                    set.
+           @param dbname database name.  Use "admin" for global administrative commands.
+           @param cmd  the command object to execute.  For example, { ismaster : 1 }
+           @param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
+                       set.
 
-           returns: true if the command returned "ok".
+           @return true if the command returned "ok".
         */
         bool runCommand(const char *dbname, BSONObj cmd, BSONObj &info);
+
+        /** Authorize access.
+            @return true if successful
+        */
+        bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg);
 
         /* returns true in isMaster parm if this db is the current master
            of a replica pair.

@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    int test2_old() {
+    int test2_old9() {
         out() << "test2" << endl;
         printStackTrace();
         if ( 1 )

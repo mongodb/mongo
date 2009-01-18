@@ -364,6 +364,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\security_commands.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\stdafx.cpp"
 				>
 				<FileConfiguration

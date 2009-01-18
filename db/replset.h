@@ -151,7 +151,7 @@ namespace mongo {
         void init() {
             BSONObj o;
             initialsynccomplete = 0;
-            if ( getSingleton("local.pair.sync", o) )
+            if ( Helpers::getSingleton("local.pair.sync", o) )
                 initialsynccomplete = 1;
         }
 
@@ -161,7 +161,7 @@ namespace mongo {
 
         void setInitialSyncCompleted() {
             BSONObj o = fromjson("{\"initialsynccomplete\":1}");
-            putSingleton("local.pair.sync", o);
+            Helpers::putSingleton("local.pair.sync", o);
             initialsynccomplete = 1;
         }
 
@@ -170,7 +170,7 @@ namespace mongo {
                 return;
             dblock lk;
             BSONObj o = fromjson("{\"initialsynccomplete\":1}");
-            putSingleton("local.pair.sync", o);
+            Helpers::putSingleton("local.pair.sync", o);
             initialsynccomplete = 1;
         }
     };

@@ -1,8 +1,13 @@
+
 // security.cpp
 
 #include "stdafx.h"
 #include "security.h"
 #include "../util/md5.hpp"
+#include "json.h" 
+#include "pdfile.h"
+#include "db.h"
+#include "dbhelpers.h"
 
 namespace mongo {
 
@@ -42,40 +47,3 @@ namespace mongo {
 
 } // namespace mongo
 
-
-#include "commands.h"
-#include "jsobj.h"
-
-namespace mongo {
-
-    class CmdGetNonce : public Command {
-    public:
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() {
-            return true;
-        }
-        CmdGetNonce() : Command("getnonce") {}
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            result.append("nonce", (double) security.getNonce());
-            return true;
-        }
-    } cmdGetNonce;
-
-    class CmdAuthenticate : public Command {
-    public:
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() {
-            return true;
-        }
-        CmdAuthenticate() : Command("authenticate") {}
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            return false;
-        }
-    } cmdAuthenticate;
-
-
-} // namespace mongo

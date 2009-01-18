@@ -144,7 +144,8 @@ namespace mongo {
 #if !defined(_WIN32)
             const char * otherEd = findEd();
             if ( otherEd ) {
-                log() << "found ed as well" << endl;
+                if( verbose )
+                    log() << "found ed as well" << endl;
                 ed = otherEd;
 
                 ss << SYSTEM_COLON << ed << "/build/";
@@ -191,19 +192,17 @@ namespace mongo {
         _vmArgs->nOptions = 3;
         _vmArgs->ignoreUnrecognized = JNI_FALSE;
 
-        log() << "loading JVM" << endl;
+        if( verbose )
+            log() << "loading JVM" << endl;
         jint res = JNI_CreateJavaVM( &_jvm, (void**)&_mainEnv, _vmArgs );
 
         if ( res ) {
             log() << "using classpath: " << q << endl;
             log()
-            << " res : " << (unsigned) res << " "
-            << "_jvm : " << _jvm  << " "
-            << "_env : " << _mainEnv << " "
-            << endl;
-        }
-
-        if ( res ) {
+                << " res : " << (unsigned) res << " "
+                << "_jvm : " << _jvm  << " "
+                << "_env : " << _mainEnv << " "
+                << endl;
             problem() << "Couldn't create JVM res:" << (int) res << " terminating" << endl;
             log() << "(try --nojni if you do not require that functionality)" << endl;
             exit(22);
@@ -520,7 +519,8 @@ namespace mongo {
         DIR *testDir = opendir(path);
 
         if (testDir) {
-            log() << "   found directory for appserver : " << path << endl;
+            if( verbose )
+                log() << "   found directory for appserver : " << path << endl;
             closedir(testDir);
             return path;
         }
@@ -554,7 +554,8 @@ namespace mongo {
                 continue;
 
             closedir( test );
-            log() << "found directory for appserver : " << temp << endl;
+            if( verbose ) 
+                log() << "found directory for appserver : " << temp << endl;
             return temp;
         }
 
@@ -578,7 +579,8 @@ namespace mongo {
             if ( ! boost::filesystem::exists( p) )
                 continue;
 
-            log() << "found directory for jars : " << jarDir << endl;
+            if( verbose ) 
+                log() << "found directory for jars : " << jarDir << endl;
             return temp;
         }
 
