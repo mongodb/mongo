@@ -318,7 +318,7 @@ namespace mongo {
         repairDatabases();
 
         /* this is for security on certain platforms */
-        srand(curTimeMillis() ^ startupSrandTimer.micros());
+        srand(curTimeMicros() ^ startupSrandTimer.micros());
 
         listen(listenPort);
     }
@@ -334,7 +334,7 @@ using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] )
 {
-    srand(curTimeMillis());
+    srand(curTimeMicros());
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
     {
