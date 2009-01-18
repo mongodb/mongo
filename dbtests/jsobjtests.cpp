@@ -367,13 +367,22 @@ namespace JsobjTests {
             public:
                 Fuzz( double frequency ) : frequency_( frequency ) {}
                 void run() {
-                    BSONObj o = fromjson( "{\"one\":2, \"two\":5, \"three\": {},"
+                    BSONObj a = fromjson( "{\"a\": 1, \"b\": \"c\"}" );
+                    fuzz( a );
+                    a.valid();
+                    
+                    BSONObj b = fromjson( "{\"one\":2, \"two\":5, \"three\": {},"
                                          "\"four\": { \"five\": { \"six\" : 11 } },"
                                          "\"seven\": [ \"a\", \"bb\", \"ccc\", 5 ],"
                                          "\"eight\": Dbref( \"rrr\", \"01234567890123456789aaaa\" ),"
                                          "\"_id\": ObjectId( \"deadbeefdeadbeefdeadbeef\" ),"
                                          "\"nine\": { \"$binary\": \"abc=\", \"$type\": \"02\" },"
                                          "\"ten\": Date( 44 ), \"eleven\": /foooooo/i }" );
+                    fuzz( b );
+                    b.valid();
+                }
+            private:
+                void fuzz( BSONObj &o ) const {
                     for( int i = 4; i < o.objsize(); ++i )
                         for( unsigned char j = 1; j; j <<= 1 )
                             if ( rand() < int( RAND_MAX * frequency_ ) ) {
@@ -382,10 +391,8 @@ namespace JsobjTests {
                                     *c &= ~j;
                                 else
                                     *c |= j;
-                            }
-                    o.valid();
+                            }                    
                 }
-            private:
                 double frequency_;
             };
             
