@@ -203,6 +203,17 @@ namespace JsobjTests {
                 }
             };
 
+            class ZeroStringSize : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":\"b\"}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 7, 0 );
+                    return ret;
+                }
+            };
+
             class WrongSubobjectSize : public Base {
                 BSONObj valid() const {
                     return fromjson( "{\"a\":{\"b\":1}}" );
@@ -234,6 +245,19 @@ namespace JsobjTests {
                 BSONObj invalid() const {
                     BSONObj ret = valid();
                     set( ret, 4, Symbol );
+                    set( ret, 0, get( ret, 0 ) + 1 );
+                    set( ret, 7, get( ret, 7 ) + 1 );
+                    return ret.copy();       
+                }
+            };
+
+            class WrongCodeSize : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":\"b\"}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 4, Code );
                     set( ret, 0, get( ret, 0 ) + 1 );
                     set( ret, 7, get( ret, 7 ) + 1 );
                     return ret.copy();       
@@ -272,6 +296,59 @@ namespace JsobjTests {
                     return ret;
                 }                
             };
+
+            class CodeWScopeBase : public Base {
+                BSONObj valid() const {
+                    BSONObjBuilder b;
+                    BSONObjBuilder scope;
+                    scope.append( "a", "b" );
+                    b.appendCodeWScope( "c", "d", scope.done() );
+                    return b.doneAndDecouple();
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    modify( ret );
+                    return ret;
+                }
+            protected:
+                virtual void modify( BSONObj &o ) const = 0;
+            };
+            
+            class CodeWScopeSmallSize : public CodeWScopeBase {
+                void modify( BSONObj &o ) const {
+                    set( o, 7, 7 );
+                }
+            };
+            
+            class CodeWScopeZeroStrSize : public CodeWScopeBase {
+                void modify( BSONObj &o ) const {
+                    set( o, 11, 0 );
+                }
+            };
+
+            class CodeWScopeSmallStrSize : public CodeWScopeBase {
+                void modify( BSONObj &o ) const {
+                    set( o, 11, 1 );
+                }
+            };
+            
+            class CodeWScopeNoSizeForObj : public CodeWScopeBase {
+                void modify( BSONObj &o ) const {
+                    set( o, 7, 13 );
+                }
+            };            
+            
+            class CodeWScopeSmallObjSize : public CodeWScopeBase {
+                void modify( BSONObj &o ) const {
+                    set( o, 17, 1 );
+                }
+            };            
+
+            class CodeWScopeBadObject : public CodeWScopeBase {
+                void modify( BSONObj &o ) const {
+                    set( o, 21, JSTypeMax + 1 );
+                }
+            };            
 
             class NoSize {
             public:
@@ -362,12 +439,20 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::TotalSizeTooSmall >();
             add< BSONObjTests::Validation::EooMissing >();
             add< BSONObjTests::Validation::WrongStringSize >();
+            add< BSONObjTests::Validation::ZeroStringSize >();
             add< BSONObjTests::Validation::WrongSubobjectSize >();
             add< BSONObjTests::Validation::WrongDbrefNsSize >();
             add< BSONObjTests::Validation::WrongSymbolSize >();
+            add< BSONObjTests::Validation::WrongCodeSize >();
             add< BSONObjTests::Validation::NoFieldNameEnd >();
             add< BSONObjTests::Validation::BadRegex >();
             add< BSONObjTests::Validation::BadRegexOptions >();
+            add< BSONObjTests::Validation::CodeWScopeSmallSize >();
+            add< BSONObjTests::Validation::CodeWScopeZeroStrSize >();
+            add< BSONObjTests::Validation::CodeWScopeSmallStrSize >();
+            add< BSONObjTests::Validation::CodeWScopeNoSizeForObj >();
+            add< BSONObjTests::Validation::CodeWScopeSmallObjSize >();
+            add< BSONObjTests::Validation::CodeWScopeBadObject >();
             add< BSONObjTests::Validation::NoSize >( Symbol );
             add< BSONObjTests::Validation::NoSize >( Code );
             add< BSONObjTests::Validation::NoSize >( String );

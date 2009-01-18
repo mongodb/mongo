@@ -233,6 +233,8 @@ namespace mongo {
         /* uassert if not an object */
         BSONObj embeddedObjectUserCheck();
 
+        BSONObj codeWScopeObject() const;
+        
         const char *regex() const {
             assert(type() == RegEx);
             return value();
@@ -703,7 +705,15 @@ namespace mongo {
             b.append( (char) type );
             b.append( (void *) data, len );
         }
-
+        void appendCodeWScope( const char *fieldName, const char *code, const BSONObj &scope ) {
+            b.append( (char) CodeWScope );
+            b.append( fieldName );
+            b.append( ( int )( 4 + 4 + strlen( code ) + 1 + scope.objsize() ) );
+            b.append( ( int ) strlen( code ) + 1 );
+            b.append( code );
+            b.append( ( void * )scope.objdata(), scope.objsize() );
+        }
+        
         template < class T >
         void append( const char *fieldName, const vector< T >& vals ) {
             BSONObjBuilder arrBuilder;
@@ -872,6 +882,12 @@ namespace mongo {
         return BSONObj(value());
     }
 
+    inline BSONObj BSONElement::codeWScopeObject() const {
+        assert( type() == CodeWScope );
+        int strSizeWNull = *(int *)( value() + 4 );
+        return BSONObj( value() + 4 + 4 + strSizeWNull );
+    }
+    
     inline BSONObj BSONObj::copy() const {
         if ( isEmpty() )
             return *this;

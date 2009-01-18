@@ -72,7 +72,8 @@ namespace mongo {
             s << fieldName() << ": MinKey";
             break;
         case CodeWScope:
-            s << fieldName() << ": codewscope";
+            s << fieldName() << ": CodeWScope( "
+                << codeWScopeCode() << ", " << codeWScopeObject().toString() << ")";
             break;
         case Code:
             s << fieldName() << ": ";
@@ -483,12 +484,27 @@ namespace mongo {
 
     void BSONElement::validate() const {
         switch( type() ) {
+            case DBRef:
+            case Code:
             case Symbol:
             case String:
-            case DBRef:
-                massert( "Invalid string/symbol/dbref size",
+                massert( "Invalid dbref/code/string/symbol size",
+                        valuestrsize() > 0 &&
                         valuestrsize() - 1 == strnlen( valuestr(), valuestrsize() ) );
                 break;
+            case CodeWScope: {
+                int totalSize = *( int * )( value() );
+                massert( "Invalid CodeWScope size", totalSize >= 8 );
+                int strSizeWNull = *( int * )( value() + 4 );
+                massert( "Invalid CodeWScope string size", totalSize >= strSizeWNull + 4 + 4 );
+                massert( "Invalid CodeWScope string size",
+                        strSizeWNull > 0 &&
+                        strSizeWNull - 1 == strnlen( codeWScopeCode(), strSizeWNull ) );
+                massert( "Invalid CodeWScope size", totalSize >= strSizeWNull + 4 + 4 + 4 );
+                int objSize = *( int * )( value() + 4 + 4 + strSizeWNull );
+                massert( "Invalid CodeWScope object size", totalSize == 4 + 4 + strSizeWNull + objSize );
+                // Subobject validation handled elsewhere.
+            }
             case Object:
                 // We expect Object size validation to be handled elsewhere.
             default:
