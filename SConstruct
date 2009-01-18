@@ -117,8 +117,29 @@ if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-compare -Wno-non-virtual-dtor" )
     env.Append( LIBS=[ "pcrecpp" , "pcre" , "stdc++" ] )
 
+# --- check system ---
+
+conf = Configure(env)
+
+if not conf.CheckCXXHeader( 'pcrecpp.h' ):
+    print( "can't find pcre" )
+    Exit(1)
+
+if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
+    print( "can't find boost headers" )
+    Exit(1)
+
+if nix:
     for b in boostLibs:
-        env.Append( LIBS=[ "boost_" + b ] )
+        l = "boost_" + b
+        if not conf.CheckLib( l + "-mt" ):
+            if not conf.CheckLib( l ):
+                print "can't find a required boost library [" + l + "]";
+                Exit(1)
+
+env = conf.Finish()
+
+# --- targets ----
 
 clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )
