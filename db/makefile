@@ -1,7 +1,8 @@
-# makefile for our db project
+# Mongo DB makefile
+# "make db" is the main command
 
-FLAGS= ${CFLAGS} -fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-compare -Wno-non-virtual-dtor -I .. -L/usr/local/lib -L/usr/lib -rdynamic
-#FLAGS= ${CFLAGS} -fPIC -fno-strict-aliasing -ggdb -pthread -O0 -Wall -Wsign-compare -Wno-non-virtual-dtor -I .. -L/usr/local/lib -L/usr/lib -rdynamic
+CFLAGS+= -fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-compare -I .. -L/usr/local/lib -L/usr/lib -rdynamic
+FLAGS= ${CFLAGS} -Wno-non-virtual-dtor
 
 LIB_DEPS = -lpcrecpp -lpcre
 LIB_BOOST = -lboost_thread -lboost_filesystem -lboost_program_options
