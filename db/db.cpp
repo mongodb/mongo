@@ -462,7 +462,10 @@ int main(int argc, char* argv[], char *envp[] )
             else if ( s == "--nocursors" )
                 useCursors = false;
             else if ( strncmp(s.c_str(), "--oplogSize", 11) == 0 ) {
-                oplogSize = strtoll( argv[ ++i ], 0, 10 );
+                long x = strtol( argv[ ++i ], 0, 10 );
+                uassert("bad arg", x > 0);
+                oplogSize = x * 1024 * 1024;
+                assert(oplogSize > 0);
             }
             else if ( strncmp(s.c_str(), "--oplog", 7) == 0 ) {
                 int x = s[7] - '0';
@@ -505,7 +508,7 @@ usage:
     out() << " --nocursors         diagnostic/debugging option\n";
     out() << " --nojni" << endl;
     out() << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-    out() << " --oplogSize <size>  custom size for operation log" << endl;
+    out() << " --oplogSize <size_in_megabytes>  custom size for replication operation log" << endl;
     out() << "\nReplication:" << endl;
     out() << " --master\n";
     out() << " --slave" << endl;
@@ -523,7 +526,7 @@ namespace mongo {
 
     string getDbContext();
 
-#undef out()
+#undef out
 
 #if !defined(_WIN32)
 

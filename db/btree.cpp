@@ -471,7 +471,7 @@ found:
                     out() << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
                     out() << "  key: " << key.toString() << endl;
                     dump();
-#if defined(_WIN32)
+#if 0
                     out() << "\n\nDUMPING FULL INDEX" << endl;
                     bt_dmp=1;
                     bt_fv=1;
@@ -495,7 +495,7 @@ found:
                     out() << "  recordLoc: " << recordLoc.toString() << " rchild: " << rchild.toString() << endl;
                     out() << "  key: " << key.toString() << endl;
                     dump();
-#if defined(_WIN32)
+#if 0
                     out() << "\n\nDUMPING FULL INDEX" << endl;
                     bt_dmp=1;
                     bt_fv=1;

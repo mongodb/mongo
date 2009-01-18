@@ -280,6 +280,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\cursor.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\db.cpp"
 				>
 			</File>
