@@ -57,6 +57,11 @@ namespace mongo {
             return false;
         }
 
+        /* Return true if authentication and security applies to the commands.  Some commands 
+           (e.g., getnonce, authenticate) can be done by anyone even unauthorized.
+        */
+        virtual bool requiresAuth() { return true; }
+
         Command(const char *_name);
     };
 

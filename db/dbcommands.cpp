@@ -31,6 +31,7 @@
 #include "db.h"
 #include "instance.h"
 #include "lasterror.h"
+#include "security.h"
 
 namespace mongo {
 
@@ -188,6 +189,7 @@ namespace mongo {
     */
     class CmdResetError : public Command {
     public:
+        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -205,6 +207,7 @@ namespace mongo {
 
     class CmdGetLastError : public Command {
     public:
+        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -243,6 +246,7 @@ namespace mongo {
 
     class CmdGetPrevError : public Command {
     public:
+        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -670,6 +674,10 @@ namespace mongo {
             valid = true;
             string errmsg;
             Command *c = i->second;
+            AuthenticationInfo *ai = authInfo.get();
+
+            uassert("unauthorized", ai->isAuthorized(database->name.c_str()) || !c->requiresAuth());
+
             if ( c->adminOnly() && !fromRepl && strncmp(ns, "admin", p-ns) != 0 ) {
                 ok = false;
                 errmsg = "access denied";
@@ -688,6 +696,9 @@ namespace mongo {
                 anObjBuilder.append("errmsg", errmsg);
         }
         else if ( e.type() == String ) {
+            AuthenticationInfo *ai = authInfo.get();
+            uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
+
             /* { count: "collectionname"[, query: <query>] } */
             string us(ns, p-ns);
 

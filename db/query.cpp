@@ -30,6 +30,7 @@
 #include "repl.h"
 #include "replset.h"
 #include "scanandorder.h"
+#include "security.h"
 
 namespace mongo {
 
@@ -540,6 +541,9 @@ namespace mongo {
             n = 1;
         }
         else {
+
+            AuthenticationInfo *ai = authInfo.get();
+            uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
 
             uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
 

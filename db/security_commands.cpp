@@ -31,6 +31,7 @@ namespace mongo {
 
     class CmdGetNonce : public Command {
     public:
+        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -57,13 +58,16 @@ namespace mongo {
         CmdLogout() : Command("logout") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // database->name is the one we are logging out...
-            result.append("info", "not yet implemented, coming soon");
+            AuthenticationInfo *ai = authInfo.get();
+            assert( ai ); 
+            ai->logout(database->name.c_str());
             return true;
         }
     } cmdLogout;
 
     class CmdAuthenticate : public Command {
     public:
+        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -130,6 +134,9 @@ namespace mongo {
                 return false;
             }
 
+            AuthenticationInfo *ai = authInfo.get();
+            assert( ai );
+            ai->authorize(database->name.c_str());
             return true;
         }
     } cmdAuthenticate;

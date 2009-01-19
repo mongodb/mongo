@@ -22,8 +22,12 @@
 
 namespace mongo {
 
+    // --noauth cmd line option
+    extern bool noauth;
+
     /* for a particular db */
     struct Auth {
+        Auth() { level = 0; }
         int level;
     };
 
@@ -34,6 +38,12 @@ namespace mongo {
         ~AuthenticationInfo() {
         }
         void logout(const char *dbname) { m.erase(dbname); }
+        void authorize(const char *dbname) { 
+            m[dbname].level = 2;
+        }
+        bool isAuthorized(const char *dbname) { 
+            return m[dbname].level == 2 || noauth;
+        }
     };
 
     extern boost::thread_specific_ptr<AuthenticationInfo> authInfo;

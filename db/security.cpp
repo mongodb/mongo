@@ -15,6 +15,8 @@ namespace mongo {
 
     boost::thread_specific_ptr<AuthenticationInfo> authInfo;
 
+    bool noauth = true;
+
     Security::Security(){
 #if defined(__linux__)
         devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);

@@ -56,6 +56,11 @@ namespace mongo {
         throw AssertionException();
     }
 
+    void uassert_nothrow(const char *msg) {
+        lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
+        raiseError(msg);
+    }
+
     int uacount = 0;
     void uasserted(const char *msg) {
         if ( ++uacount < 100 )

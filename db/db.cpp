@@ -177,6 +177,7 @@ namespace mongo {
                 DbResponse dbresponse;
                 if ( !assembleResponse( m, dbresponse ) ) {
                     out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
+                    /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
                     if ( dbMsgPort.farEnd.isLocalHost() ) {
                         dbMsgPort.shutdown();
                         sleepmillis(50);
@@ -441,6 +442,10 @@ int main(int argc, char* argv[], char *envp[] )
                 quiet = true;
             else if ( s == "--cpu" )
                 cpu = true;
+            else if ( s == "--noauth" )
+                noauth = true;
+            else if ( s == "--auth" )
+                noauth = false;
             else if ( s == "--verbose" )
                 verbose = true;
             else if ( s == "--quota" )
@@ -501,6 +506,8 @@ usage:
     out() << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
     out() << " --quiet             quieter output\n";
     out() << " --cpu               show cpu+iowait utilization periodically\n";
+    out() << " --noauth            run without security\n";
+    out() << " --auth              run with security (temp - this will be default)\n";
     out() << " --verbose\n";
     out() << " --objcheck          inspect client data for validity on receipt\n";
     out() << " --quota             enable db quota management\n";
