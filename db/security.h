@@ -28,11 +28,12 @@ namespace mongo {
     };
 
     class AuthenticationInfo : boost::noncopyable {
-        map<string, Auth> m;
+        map<string, Auth> m; // dbname -> auth
     public:
         AuthenticationInfo() { }
         ~AuthenticationInfo() {
         }
+        void logout(const char *dbname) { m.erase(dbname); }
     };
 
     extern boost::thread_specific_ptr<AuthenticationInfo> authInfo;

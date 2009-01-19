@@ -84,7 +84,8 @@ namespace mongo {
 
             double n = nonce.number();
             {
-                double *ln = lastNonce.get();
+                double *ln = lastNonce.release();
+
                 if( ln == 0 || n != *ln ) {
                     log() << "auth: bad nonce received. could be a driver bug or a security attack. db:" << database->name << '\n';                log() << "field missing/wr " << database->name << '\n';
                     errmsg = "auth fails";
