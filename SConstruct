@@ -64,6 +64,7 @@ elif "linux2" == os.sys.platform:
 
     if os.uname()[4] == "x86_64":
         javaVersion = "amd64"
+        env.Append( LIBPATH=["/usr/lib64"] )
 
     env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
     env.Append( LIBS=[ "java" , "jvm" ] )
