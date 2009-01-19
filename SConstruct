@@ -16,6 +16,16 @@ AddOption('--prefix',
           help='installation prefix')
 
 
+AddOption('--java',
+          dest='javaHome',
+          type='string',
+          default="/opt/java/",
+          nargs=1,
+          action='store',
+          metavar='DIR',
+          help='java home')
+
+
 # --- environment setup ---
 
 env = Environment()
@@ -37,6 +47,8 @@ allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
 
+print( "javaHome:" + GetOption( "javaHome" ) )
+
 def findVersion( root , choices ):
     for c in choices:
         if ( os.path.exists( root + c ) ):
@@ -56,7 +68,6 @@ if "darwin" == os.sys.platform:
     nix = True
 
 elif "linux2" == os.sys.platform:
-    javaHome = "/opt/java/"
 
     env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/linux"] )
     
