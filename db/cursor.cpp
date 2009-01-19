@@ -55,7 +55,6 @@ namespace mongo {
     }
 
     ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd ) :
-            BasicCursor( DiskLoc(), this ),
             nsd( _nsd ) {
         if ( !nsd )
             return;
@@ -70,6 +69,7 @@ namespace mongo {
             }
         }
         curr = start;
+        s = this;
     }
 
     DiskLoc ForwardCappedCursor::next( const DiskLoc &prev ) const {
@@ -94,7 +94,6 @@ namespace mongo {
     }
 
     ReverseCappedCursor::ReverseCappedCursor( NamespaceDetails *_nsd ) :
-            BasicCursor( DiskLoc(), this ),
             nsd( _nsd ) {
         if ( !nsd )
             return;
@@ -104,6 +103,7 @@ namespace mongo {
         else
             start = nsd->capExtent.ext()->lastRecord;
         curr = start;
+        s = this;
     }
 
     DiskLoc ReverseCappedCursor::next( const DiskLoc &prev ) const {
