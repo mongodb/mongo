@@ -24,6 +24,7 @@
 #include "../db/query.h"
 #include "../db/json.h"
 #include "../db/instance.h"
+#include "../util/md5.hpp"
 
 namespace mongo {
 
@@ -49,6 +50,47 @@ namespace mongo {
         BSONObjBuilder b;
         b.appendInt(command, 1);
         return runCommand(dbname, b.done(), *info);
+    }
+
+    BSONObj getnoncecmdobj = fromjson("{\"getnonce\":1}");
+
+    bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password, string& errmsg) {
+        BSONObj info;
+        double nonce;
+        if( !runCommand(dbname, getnoncecmdobj, info) ) {
+            errmsg = "getnonce fails - connection problem?";
+            return false;
+        }
+        {
+            BSONElement e = info.getField("nonce");
+            assert( e.type() == NumberDouble );
+            nonce = e.number();
+        }
+
+        BSONObj authCmd;
+        BSONObjBuilder b;
+        {
+
+            b << "authenticate" << 1 << "nonce" << nonce << "user" << username << "key";
+            md5digest d;
+            {
+                md5_state_t st;
+                md5_init(&st);
+                md5_append(&st, (const md5_byte_t *) &nonce, sizeof(nonce));
+                md5_append(&st, (const md5_byte_t *) username, strlen(username));
+                md5_append(&st, (const md5_byte_t *) password, strlen(password));
+                md5_finish(&st, d);
+            }
+            b.appendBinData("key", 16, MD5Type, (const char *) d);
+            authCmd = b.done();
+            //cout << "TEMP: authCmd: " << authCmd.toString() << endl;
+        }
+
+        if( runCommand(dbname, authCmd, info) ) 
+            return true;
+
+        errmsg = info.toString();
+        return false;
     }
 
     BSONObj ismastercmdobj = fromjson("{\"ismaster\":1}");
@@ -139,6 +181,12 @@ namespace mongo {
             out() << "can't connect to server " << err << endl;
             return;
         }
+
+        if( !c.auth("dwight", "foo", "apassw", err) ) { 
+            out() << "can't authenticate " << err << endl;
+            return;
+        }
+
         BSONObj info;
         BSONElement retValue;
         BSONObjBuilder b;

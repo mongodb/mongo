@@ -183,9 +183,9 @@ namespace mongo {
                 }
             }
             {
-                emptyCollection("local.sources");
+                Helpers::emptyCollection("local.sources");
                 BSONObj o = fromjson("{\"replacepeer\":1}");
-                putSingleton("local.pair.startup", o);
+                Helpers::putSingleton("local.pair.startup", o);
             }
             syncing = -1;
             allDead = "replacepeer invoked -- adjust local.sources hostname then restart this db process";
@@ -425,7 +425,7 @@ namespace mongo {
             replacing = false;
             wassert( replacePeer );
             replacePeer = false;
-            emptyCollection("local.pair.startup");
+            Helpers::emptyCollection("local.pair.startup");
         }
     }
 
@@ -1053,7 +1053,7 @@ namespace mongo {
         {
             dblock lk;
             BSONObj obj;
-            if ( getSingleton("local.pair.startup", obj) ) {
+            if ( Helpers::getSingleton("local.pair.startup", obj) ) {
                 // should be: {replacepeer:1}
                 replacePeer = true;
                 pairSync->setInitialSyncCompleted(); // we are the half that has all the data
@@ -1163,7 +1163,7 @@ namespace mongo {
                 BSONObjBuilder b;
                 double sz;
                 if ( oplogSize != 0 )
-                    sz = oplogSize;
+                    sz = (double) oplogSize;
                 else {
                     sz = 50.0 * 1000 * 1000;
                     if ( sizeof(int *) >= 8 ) {

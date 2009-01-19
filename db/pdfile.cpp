@@ -132,14 +132,15 @@ namespace mongo {
         // each of size 'size'.
         e = j.findElement( "$nExtents" );
         int nExtents = int( e.number() );
-        if ( nExtents > 0 )
+        if ( nExtents > 0 ) {
+            assert( size <= 0x7fffffff );
             for ( int i = 0; i < nExtents; ++i ) {
-                database->suitableFile(size)->newExtent( ns, size, newCapped );
+                database->suitableFile((int) size)->newExtent( ns, (int) size, newCapped );
             }
-        else
+        } else
             while ( size > 0 ) {
                 int max = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
-                int desiredExtentSize = size > max ? max : size;
+                int desiredExtentSize = (int) (size > max ? max : size);
                 Extent *e = database->suitableFile( desiredExtentSize )->newExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
             }
@@ -544,7 +545,7 @@ namespace mongo {
     void _unindexRecord(const char *ns, IndexDetails& id, BSONObj& obj, const DiskLoc& dl) {
         BSONObjSetDefaultOrder keys;
         id.getKeysFromObject(obj, keys);
-        for ( set<BSONObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
+        for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
 //		out() << "UNINDEX: j:" << j.toString() << " head:" << id.head.toString() << dl.toString() << endl;
             if ( otherTraceLevel >= 5 ) {
@@ -752,7 +753,7 @@ namespace mongo {
         BSONObjSetDefaultOrder keys;
         idx.getKeysFromObject(obj, keys);
         BSONObj order = idx.keyPattern();
-        for ( set<BSONObj>::iterator i=keys.begin(); i != keys.end(); i++ ) {
+        for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
             assert( !newRecordLoc.isNull() );
             try {
                 idx.head.btree()->insert(idx.head, newRecordLoc,
@@ -821,8 +822,11 @@ namespace mongo {
                 return DiskLoc();
             }
             if ( strstr(ns, ".system.") ) {
+                // todo later: check for dba-type permissions here.
                 if ( strstr(ns, ".system.indexes") )
                     addIndex = true;
+                else if ( strstr(ns, ".system.users") )
+                    ;
                 else if ( !god ) {
                     out() << "ERROR: attempt to insert in system namespace " << ns << endl;
                     return DiskLoc();

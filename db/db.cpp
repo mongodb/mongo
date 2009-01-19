@@ -156,10 +156,11 @@ namespace mongo {
         authInfo.reset(ai);
         LastError *le = new LastError();
         lastError.reset(le);
-        try {
 
-            MessagingPort& dbMsgPort = *grab;
-            grab = 0;
+        MessagingPort& dbMsgPort = *grab;
+        grab = 0;
+
+        try {
 
             Message m;
             while ( 1 ) {
@@ -176,6 +177,7 @@ namespace mongo {
                 DbResponse dbresponse;
                 if ( !assembleResponse( m, dbresponse ) ) {
                     out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
+                    /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
                     if ( dbMsgPort.farEnd.isLocalHost() ) {
                         dbMsgPort.shutdown();
                         sleepmillis(50);
@@ -193,8 +195,8 @@ namespace mongo {
 
         }
         catch ( AssertionException& ) {
-            problem() << "Uncaught AssertionException, terminating" << endl;
-            exit(15);
+            problem() << "AssertionException in connThread, closing client connection" << endl;
+            dbMsgPort.shutdown();
         }
         catch ( std::exception &e ) {
             problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
@@ -318,12 +320,11 @@ namespace mongo {
         repairDatabases();
 
         /* this is for security on certain platforms */
-        srand(curTimeMillis() ^ startupSrandTimer.micros());
+        srand(curTimeMicros() ^ startupSrandTimer.micros());
 
         listen(listenPort);
     }
 
-//ofstream problems("dbproblems.log", ios_base::app | ios_base::out);
     int test2();
     void testClient();
     void pipeSigHandler( int signal );
@@ -334,7 +335,7 @@ using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] )
 {
-    srand(curTimeMillis());
+    srand(curTimeMicros());
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
     {
@@ -441,6 +442,10 @@ int main(int argc, char* argv[], char *envp[] )
                 quiet = true;
             else if ( s == "--cpu" )
                 cpu = true;
+            else if ( s == "--noauth" )
+                noauth = true;
+            else if ( s == "--auth" )
+                noauth = false;
             else if ( s == "--verbose" )
                 verbose = true;
             else if ( s == "--quota" )
@@ -462,7 +467,10 @@ int main(int argc, char* argv[], char *envp[] )
             else if ( s == "--nocursors" )
                 useCursors = false;
             else if ( strncmp(s.c_str(), "--oplogSize", 11) == 0 ) {
-                oplogSize = strtoll( argv[ ++i ], 0, 10 );
+                long x = strtol( argv[ ++i ], 0, 10 );
+                uassert("bad arg", x > 0);
+                oplogSize = x * 1024 * 1024;
+                assert(oplogSize > 0);
             }
             else if ( strncmp(s.c_str(), "--oplog", 7) == 0 ) {
                 int x = s[7] - '0';
@@ -498,6 +506,8 @@ usage:
     out() << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
     out() << " --quiet             quieter output\n";
     out() << " --cpu               show cpu+iowait utilization periodically\n";
+    out() << " --noauth            run without security\n";
+    out() << " --auth              run with security (temp - this will be default)\n";
     out() << " --verbose\n";
     out() << " --objcheck          inspect client data for validity on receipt\n";
     out() << " --quota             enable db quota management\n";
@@ -505,7 +515,7 @@ usage:
     out() << " --nocursors         diagnostic/debugging option\n";
     out() << " --nojni" << endl;
     out() << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-    out() << " --oplogSize <size>  custom size for operation log" << endl;
+    out() << " --oplogSize <size_in_megabytes>  custom size for replication operation log" << endl;
     out() << "\nReplication:" << endl;
     out() << " --master\n";
     out() << " --slave" << endl;
@@ -523,7 +533,7 @@ namespace mongo {
 
     string getDbContext();
 
-#undef out()
+#undef out
 
 #if !defined(_WIN32)
 

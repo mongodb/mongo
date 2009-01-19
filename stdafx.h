@@ -158,6 +158,7 @@ namespace mongo {
     void asserted(const char *msg, const char *file, unsigned line);
     void wasserted(const char *msg, const char *file, unsigned line);
     void uasserted(const char *msg);
+    void uassert_nothrow(const char *msg); // reported via lasterror, but don't throw exception
     void msgasserted(const char *msg);
 
 #ifdef assert

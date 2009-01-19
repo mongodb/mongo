@@ -1020,7 +1020,7 @@ namespace mongo {
         // note: this isn't correct - but we're probably deprecating anyway, so not worrying so much right now
         
         static unsigned long long machine = security.getNonce();
-        static int inc = (int)(random());
+        static int inc = (int)security.getNonce();
 
         a = time(0);
         a = a << 32;

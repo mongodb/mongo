@@ -80,6 +80,9 @@ namespace mongo {
 
     int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god=false);
 
+    class Cursor;
+    auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0, string *hint = 0);
+
 } // namespace mongo
 
 #include "clientcursor.h"

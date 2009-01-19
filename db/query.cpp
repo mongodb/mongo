@@ -30,6 +30,7 @@
 #include "repl.h"
 #include "replset.h"
 #include "scanandorder.h"
+#include "security.h"
 
 namespace mongo {
 
@@ -69,8 +70,7 @@ namespace mongo {
         }
     }
 
-    /* todo: _ cache query plans
-             _ use index on partial match with the query
+    /* todo: _ use index on partial match with the query
 
        parameters
          query - the query, e.g., { name: 'joe' }
@@ -78,7 +78,7 @@ namespace mongo {
          simpleKeyMatch - set to true if the query is purely for a single key value
                           unchanged otherwise.
     */
-    auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0, string *hint = 0) {
+    auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, bool *simpleKeyMatch, bool *isSorted, string *hint) {
         NamespaceDetails *d = nsdetails(ns);
         if ( d == 0 ) return auto_ptr<Cursor>();
 
@@ -165,13 +165,13 @@ namespace mongo {
     */
     int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
         if ( strstr(ns, ".system.") && !god ) {
-            /*if( strstr(ns, ".system.namespaces") ){
-            	out() << "info: delete on system namespace " << ns << '\n';
-            }
-            else if( strstr(ns, ".system.indexes") ) {
-            	out() << "info: delete on system namespace " << ns << '\n';
-            }
-            else*/ {
+            /* note a delete from system.indexes would corrupt the db 
+               if done here, as there are pointers into those objects in 
+               NamespaceDetails.
+            */
+            if( strstr(ns, ".system.users") )
+                ;
+            else {
                 out() << "ERROR: attempt to delete in system namespace " << ns << endl;
                 return -1;
             }
@@ -296,18 +296,16 @@ namespace mongo {
          (clean these up later...)
     */
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
-        //out() << "TEMP BAD";
-        //lrutest.find(updateobj);
-
         int profile = database->profile;
 
-        //	out() << "update ns:" << ns << " objsize:" << updateobj.objsize() << " queryobjsize:" <<
-        //		pattern.objsize();
-
         if ( strstr(ns, ".system.") ) {
-            out() << "\nERROR: attempt to update in system namespace " << ns << endl;
-            ss << " can't update system namespace ";
-            return 0;
+            if( strstr(ns, ".system.users") )
+                ;
+            else {
+                out() << "\nERROR: attempt to update in system namespace " << ns << endl;
+                ss << " can't update system namespace ";
+                return 0;
+            }
         }
 
         int nscanned = 0;
@@ -543,6 +541,9 @@ namespace mongo {
             n = 1;
         }
         else {
+
+            AuthenticationInfo *ai = authInfo.get();
+            uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
 
             uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
 

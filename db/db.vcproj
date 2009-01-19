@@ -280,6 +280,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\cursor.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\db.cpp"
 				>
 			</File>
@@ -357,6 +361,10 @@
 			</File>
 			<File
 				RelativePath=".\security.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\security_commands.cpp"
 				>
 			</File>
 			<File
@@ -481,118 +489,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
-			<File
-				RelativePath=".\btree.h"
-				>
-			</File>
-			<File
-				RelativePath=".\clientcursor.h"
-				>
-			</File>
-			<File
-				RelativePath=".\commands.h"
-				>
-			</File>
-			<File
-				RelativePath=".\cursor.h"
-				>
-			</File>
-			<File
-				RelativePath=".\database.h"
-				>
-			</File>
-			<File
-				RelativePath=".\db.h"
-				>
-			</File>
-			<File
-				RelativePath=".\dbhelpers.h"
-				>
-			</File>
-			<File
-				RelativePath=".\dbinfo.h"
-				>
-			</File>
-			<File
-				RelativePath=".\dbmessage.h"
-				>
-			</File>
-			<File
-				RelativePath=".\introspect.h"
-				>
-			</File>
-			<File
-				RelativePath=".\javajs.h"
-				>
-			</File>
-			<File
-				RelativePath=".\jsobj.h"
-				>
-			</File>
-			<File
-				RelativePath=".\json.h"
-				>
-			</File>
-			<File
-				RelativePath=".\matcher.h"
-				>
-			</File>
-			<File
-				RelativePath="..\grid\message.h"
-				>
-			</File>
-			<File
-				RelativePath=".\minilex.h"
-				>
-			</File>
-			<File
-				RelativePath=".\namespace.h"
-				>
-			</File>
-			<File
-				RelativePath=".\pdfile.h"
-				>
-			</File>
-			<File
-				RelativePath="..\grid\protocol.h"
-				>
-			</File>
-			<File
-				RelativePath=".\query.h"
-				>
-			</File>
-			<File
-				RelativePath=".\queryoptimizer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\repl.h"
-				>
-			</File>
-			<File
-				RelativePath=".\replset.h"
-				>
-			</File>
-			<File
-				RelativePath=".\resource.h"
-				>
-			</File>
-			<File
-				RelativePath=".\scanandorder.h"
-				>
-			</File>
-			<File
-				RelativePath=".\security.h"
-				>
-			</File>
-			<File
-				RelativePath="..\stdafx.h"
-				>
-			</File>
-			<File
-				RelativePath=".\storage.h"
-				>
-			</File>
 			<Filter
 				Name="util"
 				>
@@ -661,6 +557,122 @@
 					>
 				</File>
 			</Filter>
+			<Filter
+				Name="db"
+				>
+				<File
+					RelativePath=".\btree.h"
+					>
+				</File>
+				<File
+					RelativePath=".\clientcursor.h"
+					>
+				</File>
+				<File
+					RelativePath=".\commands.h"
+					>
+				</File>
+				<File
+					RelativePath=".\cursor.h"
+					>
+				</File>
+				<File
+					RelativePath=".\database.h"
+					>
+				</File>
+				<File
+					RelativePath=".\db.h"
+					>
+				</File>
+				<File
+					RelativePath=".\dbhelpers.h"
+					>
+				</File>
+				<File
+					RelativePath=".\dbinfo.h"
+					>
+				</File>
+				<File
+					RelativePath=".\dbmessage.h"
+					>
+				</File>
+				<File
+					RelativePath=".\introspect.h"
+					>
+				</File>
+				<File
+					RelativePath=".\javajs.h"
+					>
+				</File>
+				<File
+					RelativePath=".\jsobj.h"
+					>
+				</File>
+				<File
+					RelativePath=".\json.h"
+					>
+				</File>
+				<File
+					RelativePath=".\matcher.h"
+					>
+				</File>
+				<File
+					RelativePath="..\grid\message.h"
+					>
+				</File>
+				<File
+					RelativePath=".\minilex.h"
+					>
+				</File>
+				<File
+					RelativePath=".\namespace.h"
+					>
+				</File>
+				<File
+					RelativePath=".\pdfile.h"
+					>
+				</File>
+				<File
+					RelativePath="..\grid\protocol.h"
+					>
+				</File>
+				<File
+					RelativePath=".\query.h"
+					>
+				</File>
+				<File
+					RelativePath=".\queryoptimizer.h"
+					>
+				</File>
+				<File
+					RelativePath=".\repl.h"
+					>
+				</File>
+				<File
+					RelativePath=".\replset.h"
+					>
+				</File>
+				<File
+					RelativePath=".\resource.h"
+					>
+				</File>
+				<File
+					RelativePath=".\scanandorder.h"
+					>
+				</File>
+				<File
+					RelativePath=".\security.h"
+					>
+				</File>
+				<File
+					RelativePath="..\stdafx.h"
+					>
+				</File>
+				<File
+					RelativePath=".\storage.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Resource Files"
@@ -679,6 +691,22 @@
 		<Filter
 			Name="misc"
 			>
+			<File
+				RelativePath="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp"
+				>
+			</File>
+			<File
+				RelativePath="C:\Program Files\Java\jdk\lib\jvm.lib"
+				>
+				<FileConfiguration
+					Name="release_nojni|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
 			<File
 				RelativePath=".\makefile"
 				>
@@ -715,30 +743,14 @@
 				RelativePath="..\pcre-7.4\pcrecpp.h"
 				>
 			</File>
-		</Filter>
-		<Filter
-			Name="libs_etc"
-			>
-			<File
-				RelativePath="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp"
-				>
-			</File>
-			<File
-				RelativePath="C:\Program Files\Java\jdk\lib\jvm.lib"
-				>
-				<FileConfiguration
-					Name="release_nojni|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-			</File>
 			<File
 				RelativePath="..\..\boostw\boost_1_34_1\boost\version.hpp"
 				>
 			</File>
+		</Filter>
+		<Filter
+			Name="libs_etc"
+			>
 		</Filter>
 		<Filter
 			Name="pcre"

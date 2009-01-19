@@ -22,11 +22,27 @@
 
 namespace mongo {
 
+    // --noauth cmd line option
+    extern bool noauth;
+
+    /* for a particular db */
+    struct Auth {
+        Auth() { level = 0; }
+        int level;
+    };
+
     class AuthenticationInfo : boost::noncopyable {
+        map<string, Auth> m; // dbname -> auth
     public:
         AuthenticationInfo() { }
         ~AuthenticationInfo() {
-//        stdout() << "TEMP: auth info was cleaned up ********************************************" << endl;
+        }
+        void logout(const char *dbname) { m.erase(dbname); }
+        void authorize(const char *dbname) { 
+            m[dbname].level = 2;
+        }
+        bool isAuthorized(const char *dbname) { 
+            return m[dbname].level == 2 || noauth;
         }
     };
 
@@ -41,6 +57,5 @@ namespace mongo {
     };
 
     extern Security security;
-
 
 } // namespace mongo

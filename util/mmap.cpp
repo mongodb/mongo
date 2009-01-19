@@ -46,7 +46,9 @@ namespace mongo {
         if ( !boost::filesystem::exists( filename ) )
             return;
         // make sure we map full length if preexisting file.
-        length = boost::filesystem::file_size( filename );
+        boost::uintmax_t l = boost::filesystem::file_size( filename );
+        assert( l <= 0x7fffffff );
+        length = (int) l;
     }
 
 #if defined(_WIN32)
@@ -217,7 +219,9 @@ namespace mongo {
 #endif
 
     void* MemoryMappedFile::map(const char *filename) {
-        return map( filename , file_size( filename ) ); // file_size is from boost
+        boost::uintmax_t l = boost::filesystem::file_size( filename );
+        assert( l <= 0x7fffffff );
+        return map( filename , (int) l );
     }
 
 } // namespace mongo

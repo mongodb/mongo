@@ -25,6 +25,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 #include "lasterror.h"
+#include "security.h"
 
 namespace mongo {
 
@@ -115,64 +116,74 @@ namespace mongo {
                 return false;
         }
         else if ( m.data->operation() == dbQuery ) {
+            // receivedQuery() does its own authorization processing.
             receivedQuery(dbresponse, m, ss, true);
         }
-        else if ( m.data->operation() == dbInsert ) {
-            OPWRITE;
-            try {
-                ss << "insert ";
-                receivedInsert(m, ss);
-            }
-            catch ( AssertionException& e ) {
-                LOGSOME problem() << " Caught Assertion insert, continuing\n";
-                ss << " exception " + e.toString();
-            }
-        }
-        else if ( m.data->operation() == dbUpdate ) {
-            OPWRITE;
-            try {
-                ss << "update ";
-                receivedUpdate(m, ss);
-            }
-            catch ( AssertionException& e ) {
-                LOGSOME problem() << " Caught Assertion update, continuing" << endl;
-                ss << " exception " + e.toString();
-            }
-        }
-        else if ( m.data->operation() == dbDelete ) {
-            OPWRITE;
-            try {
-                ss << "remove ";
-                receivedDelete(m);
-            }
-            catch ( AssertionException& e ) {
-                LOGSOME problem() << " Caught Assertion receivedDelete, continuing" << endl;
-                ss << " exception " + e.toString();
-            }
-        }
         else if ( m.data->operation() == dbGetMore ) {
+            // receivedQuery() does its own authorization processing.
             OPREAD;
             DEV log = true;
             ss << "getmore ";
             receivedGetMore(dbresponse, m, ss);
         }
-        else if ( m.data->operation() == dbKillCursors ) {
-            OPREAD;
-            try {
-                log = true;
-                ss << "killcursors ";
-                receivedKillCursors(m);
-            }
-            catch ( AssertionException& e ) {
-                problem() << " Caught Assertion in kill cursors, continuing" << endl;
-                ss << " exception " + e.toString();
-            }
-        }
         else {
-            out() << "    operation isn't supported: " << m.data->operation() << endl;
-            assert(false);
+            const char *ns = m.data->_data + 4;
+            char cl[256];
+            nsToClient(ns, cl);
+            AuthenticationInfo *ai = authInfo.get();
+            if( !ai->isAuthorized(cl) ) { 
+                uassert_nothrow("unauthorized");
+            }
+            else if ( m.data->operation() == dbInsert ) {
+                OPWRITE;
+                try {
+                    ss << "insert ";
+                    receivedInsert(m, ss);
+                }
+                catch ( AssertionException& e ) {
+                    LOGSOME problem() << " Caught Assertion insert, continuing\n";
+                    ss << " exception " + e.toString();
+                }
+            }
+            else if ( m.data->operation() == dbUpdate ) {
+                OPWRITE;
+                try {
+                    ss << "update ";
+                    receivedUpdate(m, ss);
+                }
+                catch ( AssertionException& e ) {
+                    LOGSOME problem() << " Caught Assertion update, continuing" << endl;
+                    ss << " exception " + e.toString();
+                }
+            }
+            else if ( m.data->operation() == dbDelete ) {
+                OPWRITE;
+                try {
+                    ss << "remove ";
+                    receivedDelete(m);
+                }
+                catch ( AssertionException& e ) {
+                    LOGSOME problem() << " Caught Assertion receivedDelete, continuing" << endl;
+                    ss << " exception " + e.toString();
+                }
+            }
+            else if ( m.data->operation() == dbKillCursors ) {
+                OPREAD;
+                try {
+                    log = true;
+                    ss << "killcursors ";
+                    receivedKillCursors(m);
+                }
+                catch ( AssertionException& e ) {
+                    problem() << " Caught Assertion in kill cursors, continuing" << endl;
+                    ss << " exception " + e.toString();
+                }
+            }
+            else {
+                out() << "    operation isn't supported: " << m.data->operation() << endl;
+                assert(false);
+            }
         }
-
         ms = t.millis();
         log = log || (ctr++ % 512 == 0 && !quiet);
         DEV log = true;
@@ -257,21 +268,22 @@ namespace mongo {
 
         DbMessage d(m);
         QueryMessage q(d);
-
-        if ( opLogging && logit ) {
-            if ( strstr(q.ns, ".$cmd") ) {
-                /* $cmd queries are "commands" and usually best treated as write operations */
-                OPWRITE;
-            }
-            else {
-                OPREAD;
-            }
-        }
-
-        setClient(q.ns);
         QueryResult* msgdata;
 
         try {
+            /* note these are logged BEFORE authentication -- which is sort of ok */
+            if ( opLogging && logit ) {
+                if ( strstr(q.ns, ".$cmd") ) {
+                    /* $cmd queries are "commands" and usually best treated as write operations */
+                    OPWRITE;
+                }
+                else {
+                    OPREAD;
+                }
+            }
+
+            setClient(q.ns);
+
             msgdata = runQuery(m, q.ns, q.ntoskip, q.ntoreturn, q.query, q.fields, ss, q.queryOptions);
         }
         catch ( AssertionException& e ) {
@@ -332,6 +344,8 @@ namespace mongo {
         ss << " ntoreturn:" << ntoreturn;
         QueryResult* msgdata;
         try {
+            AuthenticationInfo *ai = authInfo.get();
+            uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
             msgdata = getMore(ns, ntoreturn, cursorid);
         }
         catch ( AssertionException& e ) {
@@ -349,7 +363,9 @@ namespace mongo {
 
     void receivedInsert(Message& m, stringstream& ss) {
         DbMessage d(m);
-        while ( d.moreJSObjs() ) {
+        //while ( d.moreJSObjs() ) {
+        assert( d.moreJSObjs() );
+        {
             BSONObj js = d.nextJsObj();
             const char *ns = d.getns();
             assert(*ns);
@@ -364,6 +380,7 @@ namespace mongo {
             theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
             logOp("i", ns, js);
         }
+        assert( !d.moreJSObjs() ); // only currently supporting 1 object per message as authentication done above this call would be a security hole
     }
 
     extern int callDepth;

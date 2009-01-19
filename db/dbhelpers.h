@@ -24,22 +24,48 @@
 
 namespace mongo {
 
+    struct Helpers { 
 
-    /* Get/put the first object from a collection.  Generally only useful if the collection
-       only ever has a single object -- which is a "singleton collection".
+        /* ensure the specified index exists.
 
-       You do not need to set the database before calling.
+           @param keyPattern key pattern, e.g., { ts : 1 }
+           @param name index name, e.g., "name_1"
 
-       Returns: true if object exists.
-    */
-    bool getSingleton(const char *ns, BSONObj& result);
-    void putSingleton(const char *ns, BSONObj obj);
+           This method can be a little (not much) cpu-slow, so you may wish to use
+             OCCASIONALLY ensureIndex(...);
+
+           Note: use ensureHaveIdIndex() for the _id index: it is faster.
+           Note: does nothing if collection does not yet exist.
+        */
+        static void ensureIndex(const char *ns, BSONObj keyPattern, const char *name);
+
+        /* fetch a single object from collection ns that matches query 
+        set your db context first
+
+        @param requireIndex if true, complain if no index for the query.  a way to guard against
+        writing a slow query.
+
+        @return true if object found
+        */
+        static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex=false);
+
+        /* Get/put the first object from a collection.  Generally only useful if the collection
+        only ever has a single object -- which is a "singleton collection".
+
+        You do not need to set the database before calling.
+
+        Returns: true if object exists.
+        */
+        static bool getSingleton(const char *ns, BSONObj& result);
+        static void putSingleton(const char *ns, BSONObj obj);
 
 
-    /* Remove all objects from a collection.
-       You do not need to set the database before calling.
-    */
-    void emptyCollection(const char *ns);
+        /* Remove all objects from a collection.
+        You do not need to set the database before calling.
+        */
+        static void emptyCollection(const char *ns);
+
+    };
 
     /* Set database we want to use, then, restores when we finish (are out of scope)
        Note this is also helpful if an exception happens as the state if fixed up.

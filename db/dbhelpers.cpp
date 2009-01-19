@@ -20,15 +20,82 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "query.h"
+#include "json.h"
 
 namespace mongo {
+
+    void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, const char *name) {
+        NamespaceDetails *d = nsdetails(ns);
+        if( d == 0 )
+            return;
+
+        for( int i = 0; i < d->nIndexes; i++ ) {
+            if( d->indexes[i].keyPattern().woCompare(keyPattern) == 0 )
+                return;
+        }
+
+        if( d->nIndexes >= MaxIndexes ) { 
+            problem() << "Helper::ensureIndex fails, MaxIndexes exceeded " << ns << '\n';
+            return;
+        }
+
+        string system_indexes = database->name + ".system.indexes";
+
+        BSONObjBuilder b;
+        b.append("name", name);
+        b.append("ns", ns);
+        b.append("key", keyPattern);
+        BSONObj o = b.done();
+
+        theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
+    }
+
+    /* fetch a single object from collection ns that matches query 
+       set your db context first
+    */
+    bool Helpers::findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex) { 
+        auto_ptr<Cursor> c = getIndexCursor(ns, query, emptyObj);
+        if ( c.get() == 0 ) {
+            massert("index missing on server's findOne invocation", !requireIndex);
+            c = DataFileMgr::findAll(ns);
+        }
+
+        JSMatcher matcher(query, c->indexKeyPattern());
+
+        while ( c->ok() ) {
+            BSONObj js = c->current();
+            if( matcher.matches(js) ) { 
+                result = js;
+                return true;
+            }
+            c->advance();
+        }
+
+        return false;
+    }
+
+    int test2_dbh() {
+        dblock lk;
+        DBContext c("dwight.foo");
+        BSONObj q = fromjson("{\"x\":9}");
+        BSONObj result;
+
+        {
+            BSONObj kp = fromjson("{\"x\":1}");
+            Helpers::ensureIndex("dwight.foo", kp, "x_1");
+        }
+
+        cout << Helpers::findOne("dwight.foo", q, result, true) << endl;
+        cout << result.toString() << endl;
+        return 0;
+    }
 
     /* Get the first object from a collection.  Generally only useful if the collection
        only ever has a single object -- which is a "singleton collection.
 
        Returns: true if object exists.
     */
-    bool getSingleton(const char *ns, BSONObj& result) {
+    bool Helpers::getSingleton(const char *ns, BSONObj& result) {
         DBContext context(ns);
 
         auto_ptr<Cursor> c = DataFileMgr::findAll(ns);
@@ -39,13 +106,13 @@ namespace mongo {
         return true;
     }
 
-    void putSingleton(const char *ns, BSONObj obj) {
+    void Helpers::putSingleton(const char *ns, BSONObj obj) {
         DBContext context(ns);
         stringstream ss;
         updateObjects(ns, obj, /*pattern=*/emptyObj, /*upsert=*/true, ss);
     }
 
-    void emptyCollection(const char *ns) {
+    void Helpers::emptyCollection(const char *ns) {
         DBContext context(ns);
         deleteObjects(ns, emptyObj, false);
     }

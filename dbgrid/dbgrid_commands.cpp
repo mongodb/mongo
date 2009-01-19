@@ -70,6 +70,7 @@ namespace mongo {
 
         class CmdIsMaster : public Command {
         public:
+            virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() {
                 return true;
             }

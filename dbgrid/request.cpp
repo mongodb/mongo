@@ -110,7 +110,7 @@ namespace mongo {
 
         dbcon.done();
         /*
-          while( d.moreJSObjs() ) {
+          while( d.mmoreJSObjs() ) {
             BSONObj js = d.nextJsObj();
             const char *ns = d.getns();
             assert(*ns);

@@ -275,6 +275,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\security.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\shard.cpp"
 				>
 			</File>
@@ -328,6 +332,30 @@
 				<File
 					RelativePath="..\db\lasterror.cpp"
 					>
+				</File>
+				<File
+					RelativePath="..\util\md5.c"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\util\md5main.c"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\grid\message.cpp"
