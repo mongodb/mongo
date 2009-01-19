@@ -36,7 +36,7 @@ namespace PairingTests {
         ~Base() {
             pairSync = backup;
             dblock lk;
-            emptyCollection( "local.pair.sync" );
+			Helpers::emptyCollection( "local.pair.sync" );
             if ( pairSync->initialSyncCompleted() ) {
                 // save to db
                 pairSync->setInitialSyncCompleted();
@@ -62,7 +62,7 @@ namespace PairingTests {
     private:
         static void init() {
             dblock lk;
-            emptyCollection( "local.pair.sync" );
+			Helpers::emptyCollection( "local.pair.sync" );
             if ( synced != 0 && notSynced != 0 )
                 return;
             notSynced = new PairSync();
@@ -70,7 +70,7 @@ namespace PairingTests {
             synced = new PairSync();
             synced->init();
             synced->setInitialSyncCompleted();
-            emptyCollection( "local.pair.sync" );
+			Helpers::emptyCollection( "local.pair.sync" );
         }
         PairSync *backup;
         static PairSync *synced;
