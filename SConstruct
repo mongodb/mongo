@@ -227,5 +227,5 @@ env.AlwaysBuild( "checkSource" )
 def gitPush( env, target, source ):
     import subprocess
     return subprocess.call( [ "git", "push" ] )
-env.Alias( "push", [ ".", "smoke", "checkSource" ], gitPush )
+env.Alias( "push", [ "smoke", "checkSource" ], gitPush )
 env.AlwaysBuild( "push" )
