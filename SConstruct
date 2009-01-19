@@ -47,7 +47,7 @@ allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
 
-print( "javaHome:" + GetOption( "javaHome" ) )
+javaHome = GetOption( "javaHome" )
 
 def findVersion( root , choices ):
     for c in choices:
