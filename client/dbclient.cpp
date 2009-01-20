@@ -56,15 +56,15 @@ namespace mongo {
 
     bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password, string& errmsg) {
         BSONObj info;
-        double nonce;
+        string nonce;
         if( !runCommand(dbname, getnoncecmdobj, info) ) {
             errmsg = "getnonce fails - connection problem?";
             return false;
         }
         {
             BSONElement e = info.getField("nonce");
-            assert( e.type() == NumberDouble );
-            nonce = e.number();
+            assert( e.type() == String );
+            nonce = e.valuestr();
         }
 
         BSONObj authCmd;
@@ -76,16 +76,17 @@ namespace mongo {
             {
                 md5_state_t st;
                 md5_init(&st);
-                md5_append(&st, (const md5_byte_t *) &nonce, sizeof(nonce));
+                md5_append(&st, (const md5_byte_t *) nonce.c_str(), nonce.size() );
                 md5_append(&st, (const md5_byte_t *) username, strlen(username));
                 md5_append(&st, (const md5_byte_t *) password, strlen(password));
                 md5_finish(&st, d);
             }
-            b.appendBinData("key", 16, MD5Type, (const char *) d);
+            b << "key" << digestToString( d );
+            //b.appendBinData("key", 16, MD5Type, (const char *) d);
             authCmd = b.done();
-            //cout << "TEMP: authCmd: " << authCmd.toString() << endl;
+            cout << "TEMP: authCmd: " << authCmd.toString() << endl;
         }
-
+        
         if( runCommand(dbname, authCmd, info) ) 
             return true;
 
