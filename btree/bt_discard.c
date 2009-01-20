@@ -158,6 +158,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	case WT_PAGE_DUP_LEAF:
 		nindx = hdr->u.entries;
 		break;
+	WT_DEFAULT_FORMAT(db);
 	}
 
 	/*
@@ -187,6 +188,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	case WT_PAGE_DUP_LEAF:
 		ret = __wt_bt_page_inmem_dup_leaf(db, page);
 		break;
+	WT_DEFAULT_FORMAT(db);
 	}
 	return (ret);
 }
@@ -240,6 +242,7 @@ __wt_bt_page_inmem_append(DB *db,
 		indx->size = ovfl->len;
 		indx->addr = ovfl->addr;
 		break;
+	WT_DEFAULT_FORMAT(db);
 	}
 
 	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(off_item);
@@ -292,8 +295,7 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 			indx->ditem = item;
 			++indx;
 			break;
-		default:
-			return (__wt_database_format(db));
+		WT_DEFAULT_FORMAT(db);
 		}
 
 	page->indx_count = hdr->u.entries / 2;
@@ -361,8 +363,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 				indx->addr = WT_ADDR_INVALID;
 			}
 			break;
-		default:
-			return (__wt_database_format(db));
+		WT_DEFAULT_FORMAT(db);
 		}
 
 	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
@@ -403,8 +404,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 			indx->size = ovfl->len;
 			indx->addr = ovfl->addr;
 			break;
-		default:
-			return (__wt_database_format(db));
+		WT_DEFAULT_FORMAT(db);
 		}
 		indx->ditem = item;
 		++indx;

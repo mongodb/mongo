@@ -572,8 +572,7 @@ __wt_bt_promote(DB *db, WT_PAGE *page, WT_ITEM_OFFP *root_offp)
 		item.type = WT_ITEM_KEY_OVFL;
 		item.len = key.size = sizeof(tmp_ovfl);
 		break;
-	default:
-		return (__wt_database_format(db));
+	WT_DEFAULT_FORMAT(db);
 	}
 
 	/*

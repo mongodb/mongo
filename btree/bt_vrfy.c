@@ -591,6 +591,7 @@ __wt_bt_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 			return (WT_ERROR);
 		}
 		break;
+	WT_DEFAULT_FORMAT(db);
 	}
 
 	if (hdr->unused[0] != '\0' || hdr->unused[1] != '\0') {

@@ -139,8 +139,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 				    db, last_key, &offp, stream, func)) != 0)
 					goto err;
 				break;
-			default:
-				return (__wt_database_format(db));
+			WT_DEFAULT_FORMAT(db);
 			}
 
 		addr = page->hdr->nextaddr;
@@ -209,8 +208,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 				    __wt_bt_page_out(db, ovfl_page, 0)) != 0)
 					goto err;
 				break;
-			default:
-				return (__wt_database_format(db));
+			WT_DEFAULT_FORMAT(db);
 			}
 		}
 

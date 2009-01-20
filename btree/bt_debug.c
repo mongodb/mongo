@@ -88,8 +88,7 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 		case WT_PAGE_DUP_LEAF:
 			bytes = db->leafsize;
 			break;
-		default:
-			return (__wt_database_format(db));
+		WT_DEFAULT_FORMAT(db);
 		}
 		if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
 			return (ret);

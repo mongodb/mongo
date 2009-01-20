@@ -75,6 +75,10 @@ extern "C" {
 #define	WT_ASSERT(ienv, e)
 #endif
 
+#define	WT_DEFAULT_FORMAT(db)						\
+	default:							\
+		return (__wt_database_format(db))
+
 #if defined(__cplusplus)
 }
 #endif
