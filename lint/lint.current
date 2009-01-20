@@ -19,7 +19,7 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/btree_debug.c (C)
                                                     _
 			__wt_bt_dump_dbt((DBT *)indx, fp);
-../btree/btree_debug.c  134  Info 740: Unusual pointer cast (incompatible
+../btree/btree_debug.c  136  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
     --- Wrap-up for Module: ../btree/btree_debug.c
@@ -35,23 +35,23 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/btree_get.c (C)
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/btree_get.c  126  Info 740: Unusual pointer cast (incompatible
+../btree/btree_get.c  131  Info 740: Unusual pointer cast (incompatible
     indirect types)
                             _
 		if (cmp == 0) {
-../btree/btree_get.c  143  Warning 644: Variable 'cmp' (line 75) may not have
+../btree/btree_get.c  148  Warning 644: Variable 'cmp' (line 75) may not have
     been initialized
 ../btree/btree_get.c  75  Info 830: Location cited in prior message
                                            _
 				*indxp = ip;
-../btree/btree_get.c  146  Info 771: Symbol 'ip' (line 72) conceivably not
+../btree/btree_get.c  151  Info 771: Symbol 'ip' (line 72) conceivably not
     initialized
 ../btree/btree_get.c  72  Info 830: Location cited in prior message
 
 --- Module:   ../btree/btree_misc.c (C)
-                                                                               _
-	    WT_FRAGS_TO_BYTES(db, page->frags) - (addr - (u_int8_t *)page->hdr);
-../btree/btree_misc.c  88  Info 737: Loss of sign in promotion from int to
+                                                                        _
+	page->space_avail = page->bytes - (addr - (u_int8_t *)page->hdr);
+../btree/btree_misc.c  100  Info 737: Loss of sign in promotion from int to
     unsigned int
 
 --- Module:   ../btree/btree_open.c (C)
@@ -59,114 +59,108 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/btree_ovfl.c (C)
 
 --- Module:   ../btree/btree_page.c (C)
-        _
-	}
-../btree/btree_page.c  155  Info 744: switch statement has no default
-                                                         _
-	if (page->indx != NULL && page->indx_size < nindx)
-../btree/btree_page.c  163  Warning 644: Variable 'nindx' (line 129) may not
-    have been initialized
-../btree/btree_page.c  129  Info 830: Location cited in prior message
-        _
-	}
-../btree/btree_page.c  184  Info 744: switch statement has no default
-        _
-	}
-../btree/btree_page.c  237  Info 744: switch statement has no default
 
 --- Module:   ../btree/btree_ret.c (C)
-        _
-	}
-../btree/btree_ret.c  45  Info 744: switch statement has no default
-                                   _
-	if (data->alloc_size < size) {
-../btree/btree_ret.c  47  Warning 644: Variable 'size' (line 22) may not have
-    been initialized
-../btree/btree_ret.c  22  Info 830: Location cited in prior message
-                                   _
-	memcpy(data->data, p, size);
-../btree/btree_ret.c  54  Warning 644: Variable 'p' (line 21) may not have been
-    initialized
-../btree/btree_ret.c  21  Info 830: Location cited in prior message
 
 --- Module:   ../btree/btree_vrfy.c (C)
+                                                       _
+#... __wt_calloc( (env), (size_t)bitstr_size((int)frags), sizeof(bitstr_t), (&f
+	if ((ret = bit_alloc(env, (int)frags, &fragbits)) != 0)
+../btree/btree_vrfy.c  77  Info 702: Shift right of signed quantity (int)
+                                _
+	__wt_free(env, fragbits);
+../btree/btree_vrfy.c  109  Warning 644: Variable 'fragbits' (line 41) may not
+    have been initialized
+../btree/btree_vrfy.c  41  Info 830: Location cited in prior message
                                              _
 		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
-../btree/btree_vrfy.c  274  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  279  Info 740: Unusual pointer cast (incompatible
     indirect types)
-../btree/btree_vrfy.c  274  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  279  Info 740: Unusual pointer cast (incompatible
     indirect types)
-../btree/btree_vrfy.c  274  Warning 644: Variable 'func' (line 120) may not
+../btree/btree_vrfy.c  279  Warning 644: Variable 'func' (line 125) may not
     have been initialized
-../btree/btree_vrfy.c  120  Info 830: Location cited in prior message
+../btree/btree_vrfy.c  125  Info 830: Location cited in prior message
+                                                              _
+#...                                  (((int)hdr->prntaddr + i) >> 3)
+#...              ((fragbits)[_bit_byte((int)hdr->prntaddr + i)] & _bit_mask((i
+		if (!bit_test(fragbits, (int)hdr->prntaddr + i)) {
+../btree/btree_vrfy.c  367  Info 737: Loss of sign in promotion from int to
+    unsigned int
+                                                              _
+#...                            (1 << (((int)hdr->prntaddr + i)&0x7))
+#... nt)hdr->prntaddr + i)] & _bit_mask((int)hdr->prntaddr + i))
+		if (!bit_test(fragbits, (int)hdr->prntaddr + i)) {
+../btree/btree_vrfy.c  367  Info 737: Loss of sign in promotion from int to
+    unsigned int
                                               _
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) < 0) {
-../btree/btree_vrfy.c  435  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  440  Info 740: Unusual pointer cast (incompatible
     indirect types)
-../btree/btree_vrfy.c  435  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  440  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                               _
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) >= 0) {
-../btree/btree_vrfy.c  493  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  498  Info 740: Unusual pointer cast (incompatible
     indirect types)
-../btree/btree_vrfy.c  493  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  498  Info 740: Unusual pointer cast (incompatible
     indirect types)
-                                                                 _
-#... r bitstr_t *_name = (fragbits); register int _start = (addr), _stop = (add
-		bit_nset(fragbits, addr, addr + (page->frags - 1));
-../btree/btree_vrfy.c  538  Info 713: Loss of precision (initialization)
-    (unsigned int to int)
-                                                                 _
-#... ster int _start = (addr), _stop = (addr + (page->frags - 1)); register int
-		bit_nset(fragbits, addr, addr + (page->frags - 1));
-../btree/btree_vrfy.c  538  Info 713: Loss of precision (initialization)
-    (unsigned int to int)
-                                                                 _
-#... age->frags - 1)); register int _startbyte = _bit_byte(_start); register in
-		bit_nset(fragbits, addr, addr + (page->frags - 1));
-../btree/btree_vrfy.c  538  Info 702: Shift right of signed quantity (int)
-                                                                 _
-#...  _bit_byte(_start); register int _stopbyte = _bit_byte(_stop); if (_startb
-		bit_nset(fragbits, addr, addr + (page->frags - 1));
-../btree/btree_vrfy.c  538  Info 702: Shift right of signed quantity (int)
-                                                                 _
-#... x7)))); } else { _name[_startbyte] |= 0xff << ((_start)&0x7); while (++_st
-		bit_nset(fragbits, addr, addr + (page->frags - 1));
-../btree/btree_vrfy.c  538  Info 734: Loss of precision (assignment) (15 bits
-    to 8 bits)
-        _
-	}
-../btree/btree_vrfy.c  588  Info 744: switch statement has no default
-                                                  _
-#... s); register int _byte, _nbits = (idb->frags); register int _stopbyte = _b
-		bit_ffc(fragbits, idb->frags, &ffc);
-../btree/btree_vrfy.c  905  Info 713: Loss of precision (initialization)
-    (unsigned int to int)
-                                                  _
-#... register int _stopbyte = _bit_byte(_nbits - 1), _value = -1; if (_nbits > 
-		bit_ffc(fragbits, idb->frags, &ffc);
-../btree/btree_vrfy.c  905  Info 702: Shift right of signed quantity (int)
-                                                  _
-#...  != 0xff) { bitstr_t _lb; _value = _byte << 3; for (_lb = _name[_byte]; (_
-		bit_ffc(fragbits, idb->frags, &ffc);
-../btree/btree_vrfy.c  905  Info 701: Shift left of signed quantity (int)
-                                                  _
-#...  _name[_byte]; (_lb&0x1); ++_value, _lb >>= 1); break; } if (_value >= idb
-		bit_ffc(fragbits, idb->frags, &ffc);
-../btree/btree_vrfy.c  905  Info 722: Suspicious use of ;
-                                                  _
-#... _lb >>= 1); break; } if (_value >= idb->frags) _value = -1; *(&ffc) = _val
-		bit_ffc(fragbits, idb->frags, &ffc);
-../btree/btree_vrfy.c  905  Warning 574: Signed-unsigned mix with relational
-                                                  _
-#... _lb >>= 1); break; } if (_value >= idb->frags) _value = -1; *(&ffc) = _val
-		bit_ffc(fragbits, idb->frags, &ffc);
-../btree/btree_vrfy.c  905  Info 737: Loss of sign in promotion from int to
+                                                            _
+#...                                         (((int)addr + i) >> 3)
+#...                     ((fragbits)[_bit_byte((int)addr + i)] & _bit_mask((int
+			if (bit_test(fragbits, (int)addr + i)) {
+../btree/btree_vrfy.c  538  Info 737: Loss of sign in promotion from int to
     unsigned int
+                                                            _
+#...                                   (1 << (((int)addr + i)&0x7))
+#... ts)[_bit_byte((int)addr + i)] & _bit_mask((int)addr + i))
+			if (bit_test(fragbits, (int)addr + i)) {
+../btree/btree_vrfy.c  538  Info 737: Loss of sign in promotion from int to
+    unsigned int
+                                                                _
+#...  bitstr_t *_name = (fragbits); register int _start = (addr), _stop = ((int
+		bit_nset(fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  544  Info 713: Loss of precision (initialization)
+    (unsigned int to int)
+                                                                _
+#... ister int _start = (addr), _stop = ((int)addr + (frags - 1)); register int
+		bit_nset(fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  544  Info 737: Loss of sign in promotion from int to
+    unsigned int
+                                                                _
+#... ster int _start = (addr), _stop = ((int)addr + (frags - 1)); register int 
+		bit_nset(fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  544  Info 713: Loss of precision (initialization)
+    (unsigned int to int)
+                                                                _
+#...  + (frags - 1)); register int _startbyte = _bit_byte(_start); register int
+		bit_nset(fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  544  Info 702: Shift right of signed quantity (int)
+                                                                _
+#... _bit_byte(_start); register int _stopbyte = _bit_byte(_stop); if (_startby
+		bit_nset(fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  544  Info 702: Shift right of signed quantity (int)
+                                                                _
+#... 7)))); } else { _name[_startbyte] |= 0xff << ((_start)&0x7); while (++_sta
+		bit_nset(fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  544  Info 734: Loss of precision (assignment) (15 bits
+    to 8 bits)
+                                             _
+#... ter int _stopbyte = _bit_byte(_nbits - 1), _value = -1; if (_nbits > 0) fo
+		bit_ffc(fragbits, frags, &ffc);
+../btree/btree_vrfy.c  913  Info 702: Shift right of signed quantity (int)
+                                             _
+#... xff) { bitstr_t _lb; _value = _byte << 3; for (_lb = _name[_byte]; (_lb&0x
+		bit_ffc(fragbits, frags, &ffc);
+../btree/btree_vrfy.c  913  Info 701: Shift left of signed quantity (int)
+                                             _
+#... e[_byte]; (_lb&0x1); ++_value, _lb >>= 1); break; } if (_value >= frags) _
+		bit_ffc(fragbits, frags, &ffc);
+../btree/btree_vrfy.c  913  Info 722: Suspicious use of ;
                                              _
 #...                ((fragbits)[_bit_byte(ffc)] |= _bit_mask(ffc))
 			bit_set(fragbits, ffc);
-../btree/btree_vrfy.c  907  Info 702: Shift right of signed quantity (int)
+../btree/btree_vrfy.c  915  Info 702: Shift right of signed quantity (int)
 
 --- Module:   ../db/db_close.c (C)
 
@@ -183,219 +177,235 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../db/db_sync.c (C)
 
 --- Module:   ../env/env_cache.c (C)
-                                             _
-	    (off_t)WT_FRAGS_TO_BYTES(db, addr), bytes, page->hdr)) != 0)
-../env/env_cache.c  351  Warning 647: Suspicious truncation
+                                                 _
+	ienv->cache_bytes_max = env->cachesize * WT_MEGABYTE;
+../env/env_cache.c  46  Warning 647: Suspicious truncation
+                                   _
+	bytes_need_free = bytes * 3;
+../env/env_cache.c  420  Warning 647: Suspicious truncation
                                              _
 		if (F_ISSET(page, WT_MODIFIED)) {
-../env/env_cache.c  447  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: line 440]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
+../env/env_cache.c  430  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: line 423]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
                                         _
-		if (page->frags == frags) {
-../env/env_cache.c  458  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: line 440]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
+		if (page->bytes == bytes) {
+../env/env_cache.c  441  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: line 423]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
                                           _
 			if (page->indx != NULL)
-../env/env_cache.c  463  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: line 440]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
+../env/env_cache.c  446  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: line 423]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
                                          _
-		frags_free += page->frags;
-../env/env_cache.c  470  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: line 440]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-                                                   _
-	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr)) == 0) {
-../env/env_cache.c  519  Warning 647: Suspicious truncation
+		bytes_free += page->bytes;
+../env/env_cache.c  453  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: line 423]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 451: __wt_cache_write(?, 0, 0)
-../env/env_cache.c  506  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    451]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  451  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 434: __wt_cache_write(?, 0, 0)
+../env/env_cache.c  488  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    434]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  434  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 451: __wt_cache_write(?, 0, 0)
-../env/env_cache.c  512  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    451]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  451  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 434: __wt_cache_write(?, 0, 0)
+../env/env_cache.c  494  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    434]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  434  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 451: __wt_cache_write(?, 0, 0)
-../env/env_cache.c  513  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    451]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  451  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 434: __wt_cache_write(?, 0, 0)
+../env/env_cache.c  496  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    434]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  434  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 451: __wt_cache_write(?, 0, 0)
-../env/env_cache.c  519  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    451]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  451  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 434: __wt_cache_write(?, 0, 0)
+../env/env_cache.c  500  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    434]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  434  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 451: __wt_cache_write(?, 0, 0)
-../env/env_cache.c  520  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    451]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  451  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 434: __wt_cache_write(?, 0, 0)
+../env/env_cache.c  500  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    434]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  434  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  541  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 434: __wt_cache_write(?, 0, 0)
+../env/env_cache.c  501  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    434]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  434  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  543  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  522  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  548  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  524  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  548  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  525  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  548  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  527  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  548  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  527  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  548  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  527  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  548  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  527  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  548  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  527  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  549  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  527  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  549  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  527  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  549  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  528  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  549  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  528  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  549  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  528  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  549  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  528  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  551  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  528  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
 
 During Specific Walk:
-  File ../env/env_cache.c line 473: __wt_cache_discard(?, 0)
-../env/env_cache.c  554  Warning 413: Likely use of null pointer 'page' in left
-    argument to operator '->' [Reference: file ../env/env_cache.c: lines 440,
-    473]
-../env/env_cache.c  440  Info 831: Reference cited in prior message
-../env/env_cache.c  473  Info 831: Reference cited in prior message
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  528  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
+
+During Specific Walk:
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  530  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
+
+During Specific Walk:
+  File ../env/env_cache.c line 456: __wt_cache_discard(?, 0)
+../env/env_cache.c  533  Warning 413: Likely use of null pointer 'page' in left
+    argument to operator '->' [Reference: file ../env/env_cache.c: lines 423,
+    456]
+../env/env_cache.c  423  Info 831: Reference cited in prior message
+../env/env_cache.c  456  Info 831: Reference cited in prior message
                                       _
 	for (i = 0; i < ienv->hashsize; ++i) {
-../env/env_cache.c  591  Warning 574: Signed-unsigned mix with relational
-../env/env_cache.c  591  Info 737: Loss of sign in promotion from int to
+../env/env_cache.c  570  Warning 574: Signed-unsigned mix with relational
+../env/env_cache.c  570  Info 737: Loss of sign in promotion from int to
     unsigned int
 
     --- Wrap-up for Module: ../env/env_cache.c
 
 Warning 528: Symbol '__wt_cache_dump(struct __env *, char *, struct __sFILE *)'
-    (line 565, file ../env/env_cache.c) not referenced
-../env/env_cache.c  565  Info 830: Location cited in prior message
+    (line 544, file ../env/env_cache.c) not referenced
+../env/env_cache.c  544  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_close.c (C)
 
@@ -427,6 +437,14 @@ _
 
 --- Module:   ../os_posix/os_alloc.c (C)
 
+During Specific Walk:
+  File ../btree/btree_vrfy.c line 77: __wt_calloc(?, -268435456?, 1, [4])
+../os_posix/os_alloc.c  82  Warning 671: Possibly passing to function
+    'calloc(unsigned int, unsigned int)' a negative value (-268435456), arg.
+    no. 1 [Reference: file ../btree/btree_vrfy.c: lines 73, 77]
+../btree/btree_vrfy.c  73  Info 831: Reference cited in prior message
+../btree/btree_vrfy.c  77  Info 831: Reference cited in prior message
+
 --- Module:   ../os_posix/os_filesize.c (C)
 
 --- Module:   ../os_posix/os_open.c (C)
@@ -457,16 +475,16 @@ Info 765: external '__wt_breakpoint(void)' (line 47, file ../env/env_global.c)
     could be made static
 ../env/env_global.c  47  Info 830: Location cited in prior message
 Info 759: header declaration for symbol '__wt_bt_dump_ipage(struct __db *,
-    struct __wt_page *, char *, struct __sFILE *)' defined at (line 110, file
+    struct __wt_page *, char *, struct __sFILE *)' defined at (line 112, file
     ../btree/btree_debug.c) could be moved from header to module
-../btree/btree_debug.c  110  Info 830: Location cited in prior message
+../btree/btree_debug.c  112  Info 830: Location cited in prior message
 Info 765: external '__wt_bt_dump_ipage(struct __db *, struct __wt_page *, char
-    *, struct __sFILE *)' (line 110, file ../btree/btree_debug.c) could be made
+    *, struct __sFILE *)' (line 112, file ../btree/btree_debug.c) could be made
     static
-../btree/btree_debug.c  110  Info 830: Location cited in prior message
+../btree/btree_debug.c  112  Info 830: Location cited in prior message
 Info 714: Symbol '__wt_bt_dump_ipage(struct __db *, struct __wt_page *, char *,
-    struct __sFILE *)' (line 110, file ../btree/btree_debug.c) not referenced
-../btree/btree_debug.c  110  Info 830: Location cited in prior message
+    struct __sFILE *)' (line 112, file ../btree/btree_debug.c) not referenced
+../btree/btree_debug.c  112  Info 830: Location cited in prior message
 Info 759: header declaration for symbol '__wt_malloc(struct __env *, unsigned
     int, void *)' defined at (line 102, file ../os_posix/os_alloc.c) could be
     moved from header to module
@@ -500,18 +518,18 @@ Info 765: external 'wt_db_create(struct __db **, struct __env *, unsigned int)'
 Info 714: Symbol 'wt_db_create(struct __db **, struct __env *, unsigned int)'
     (line 20, file ../db/db_handle.c) not referenced
 ../db/db_handle.c  20  Info 830: Location cited in prior message
-Info 755: global macro 'LF_CLR' (line 47, file ../inc_posix/misc.h) not
+Info 755: global macro 'LF_CLR' (line 48, file ../inc_posix/misc.h) not
     referenced
-../inc_posix/misc.h  47  Info 830: Location cited in prior message
-Info 755: global macro 'LF_SET' (line 49, file ../inc_posix/misc.h) not
+../inc_posix/misc.h  48  Info 830: Location cited in prior message
+Info 755: global macro 'LF_SET' (line 50, file ../inc_posix/misc.h) not
     referenced
-../inc_posix/misc.h  49  Info 830: Location cited in prior message
-Info 755: global macro 'FLD_CLR' (line 51, file ../inc_posix/misc.h) not
+../inc_posix/misc.h  50  Info 830: Location cited in prior message
+Info 755: global macro 'FLD_CLR' (line 52, file ../inc_posix/misc.h) not
     referenced
-../inc_posix/misc.h  51  Info 830: Location cited in prior message
-Info 755: global macro 'FLD_SET' (line 53, file ../inc_posix/misc.h) not
+../inc_posix/misc.h  52  Info 830: Location cited in prior message
+Info 755: global macro 'FLD_SET' (line 54, file ../inc_posix/misc.h) not
     referenced
-../inc_posix/misc.h  53  Info 830: Location cited in prior message
+../inc_posix/misc.h  54  Info 830: Location cited in prior message
 Info 755: global macro 'WIREDTIGER_VERSION_MAJOR' (line 19, file
     /a/bostic/wiredtiger/build_posix/wiredtiger.h) not referenced
 /a/bostic/wiredtiger/build_posix/wiredtiger.h  19  Info 830: Location cited in
@@ -594,6 +612,6 @@ Info 768: global struct member '__idbc::dbc' (line 88, file ./wt_internal.h)
 Info 768: global struct member '__idbc::flags' (line 90, file ./wt_internal.h)
     not referenced
 ./wt_internal.h  90  Info 830: Location cited in prior message
-Info 768: global struct member '__ienv::flags' (line 121, file ./wt_internal.h)
+Info 768: global struct member '__ienv::flags' (line 116, file ./wt_internal.h)
     not referenced
-./wt_internal.h  121  Info 830: Location cited in prior message
+./wt_internal.h  116  Info 830: Location cited in prior message
