@@ -552,15 +552,18 @@ namespace mongo {
         while ( 1 ) {
             massert( "Object does not end with EOO or Undefined", i.more() );
             BSONElement e = i.next( true );
-            const char *objEnd = this->objdata() + this->objsize();
-            const char *eEnd = e.rawdata() + e.size();
-            massert( "Element extends past end of object", eEnd <= objEnd );
+            massert( "Invalid element size", e.size() > 0 );
+            massert( "Element too large", e.size() < ( 1 << 30 ) );
+            int offset = e.rawdata() - this->objdata();
+            massert( "Element extends past end of object",
+                    e.size() + offset <= this->objsize() );
             e.validate();
+            bool end = ( e.size() + offset == this->objsize() );
             if ( e.eoo() ) {
-                massert( "EOO Before end of object", eEnd == objEnd );
+                massert( "EOO Before end of object", end );
                 break;
             } else if ( e.type() == Undefined ) {
-                massert( "Undefined Before end of object", eEnd == objEnd );
+                massert( "Undefined Before end of object", end );
                 break;                
             }
             if ( first )
