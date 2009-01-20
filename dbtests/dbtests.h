@@ -28,3 +28,4 @@ UnitTest::TestPtr matcherTests();
 UnitTest::TestPtr namespaceTests();
 UnitTest::TestPtr pairingTests();
 UnitTest::TestPtr pdfileTests();
+UnitTest::TestPtr queryTests();

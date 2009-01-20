@@ -17,7 +17,7 @@ OBJS=../stdafx.o ../util/sock.o ../grid/message.o ../util/mmap.o pdfile.o query.
 
 DBGRID_OBJS=../stdafx.o json.o ../util/sock.o ../grid/message.o ../util/util.o jsobj.o ../client/dbclient.o ../dbgrid/dbgrid.o ../dbgrid/request.o ../client/connpool.o ../dbgrid/gridconfig.o commands.o ../dbgrid/dbgrid_commands.o ../dbgrid/griddatabase.o ../client/model.o ../util/background.o ../dbgrid/shard.o lasterror.o  ../util/md5.o ../util/md5main.o security.o
 
-DBTEST_OBJS= $(OBJS) ../dbtests/dbtests.o ../dbtests/btreetests.o ../dbtests/jsobjtests.o ../dbtests/jsontests.o ../dbtests/matchertests.o ../dbtests/namespacetests.o ../dbtests/pairingtests.o ../dbtests/pdfiletests.o
+DBTEST_OBJS= $(OBJS) ../dbtests/dbtests.o ../dbtests/btreetests.o ../dbtests/jsobjtests.o ../dbtests/jsontests.o ../dbtests/matchertests.o ../dbtests/namespacetests.o ../dbtests/pairingtests.o ../dbtests/pdfiletests.o ../dbtests/querytests.o
 
 GPP = g++
 

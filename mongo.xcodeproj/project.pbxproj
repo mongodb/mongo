@@ -105,6 +105,7 @@
 		93D0C1520EF1D377005253B7 /* jsobjtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobjtests.cpp; sourceTree = "<group>"; };
 		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
 		93D6BBF70F265E1100FE5722 /* matchertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = matchertests.cpp; sourceTree = "<group>"; };
+		93D6BC9B0F266FC300FE5722 /* querytests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = querytests.cpp; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -155,6 +156,7 @@
 		934223850EF16D7000608550 /* dbtests */ = {
 			isa = PBXGroup;
 			children = (
+				93D6BC9B0F266FC300FE5722 /* querytests.cpp */,
 				93D6BBF70F265E1100FE5722 /* matchertests.cpp */,
 				93AF75500F216D0300994C66 /* jsontests.cpp */,
 				93B4A82A0F1C0256000C862C /* pdfiletests.cpp */,

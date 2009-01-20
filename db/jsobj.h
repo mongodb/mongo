@@ -293,6 +293,13 @@ namespace mongo {
         // Check that data is internally consistent.
         void validate() const;
 
+        // True if this element may contain subobjects.
+        bool mayEncapsulate() const {
+            return type() == Object ||
+                type() == Array ||
+                type() == CodeWScope;
+        }
+        
     private:
         // If maxLen is specified, don't scan more than maxLen bytes.
         BSONElement(const char *d, int maxLen = -1) : data(d) {
@@ -379,10 +386,10 @@ namespace mongo {
         /** returns # of top level fields in the object
            note: iterates to count the fields
         */
-        int nFields();
+        int nFields() const;
 
         /** adds the field names to the fields set.  does NOT clear it (appends). */
-        int getFieldNames(set<string>& fields);
+        int getFieldNames(set<string>& fields) const;
 
         /** return has eoo() true if no match
            supports "." notation to reach into embedded objects
@@ -426,7 +433,7 @@ namespace mongo {
         /**
            sets element field names to empty string
         */
-        BSONObj extractFieldsUnDotted(BSONObj pattern);
+        BSONObj extractFieldsUnDotted(BSONObj pattern) const;
         
         /**
            returns elements with original field names

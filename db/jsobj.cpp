@@ -51,7 +51,7 @@ namespace mongo {
         case NumberInt:
             s.precision( 16 );
             s << fieldName() << ": " << number();
-            s << "(type:" << ( type() == NumberInt ? "int" : "double" ) << ")";
+            s << "(" << ( type() == NumberInt ? "int" : "double" ) << ")";
             break;
         case Bool:
             s << fieldName() << ": " << ( boolean() ? "true" : "false" );
@@ -728,7 +728,7 @@ namespace mongo {
         }
         return b.done();
     }
-    BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) {
+    BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) const {
         BSONObjBuilder b;
         BSONObjIterator i(pattern);
         while ( i.more() ) {
@@ -779,7 +779,7 @@ namespace mongo {
         return t == Object || t == Array ? e.embeddedObject() : BSONObj();
     }
 
-    int BSONObj::nFields() {
+    int BSONObj::nFields() const {
         int n = 0;
         BSONObjIterator i(*this);
         while ( i.more() ) {
@@ -792,7 +792,7 @@ namespace mongo {
     }
 
     /* grab names of all the fields in this object */
-    int BSONObj::getFieldNames(set<string>& fields) {
+    int BSONObj::getFieldNames(set<string>& fields) const {
         int n = 0;
         BSONObjIterator i(*this);
         while ( i.more() ) {

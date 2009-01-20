@@ -89,6 +89,7 @@ int main( int argc, char** argv ) {
     tests.add( namespaceTests(), "namespace" );
     tests.add( pairingTests(), "pairing" );
     tests.add( pdfileTests(), "pdfile" );
+    tests.add( queryTests(), "query" );
 
     return tests.run( argc, argv );
 }
