@@ -20,46 +20,55 @@
 
 namespace mongo {
 
+    class Stringable {
+    public:
+        virtual string toString() const = 0;
+    };
+    
     class Nullstream {
     public:
-        Nullstream& operator<<(const char *) {
+        virtual Nullstream& operator<<(const char *) {
             return *this;
         }
-        Nullstream& operator<<(int) {
+        virtual Nullstream& operator<<(int) {
             return *this;
         }
-        Nullstream& operator<<(unsigned long) {
+        virtual Nullstream& operator<<(unsigned long) {
             return *this;
         }
-        Nullstream& operator<<(unsigned) {
+        virtual Nullstream& operator<<(unsigned) {
             return *this;
         }
-        Nullstream& operator<<(double) {
+        virtual Nullstream& operator<<(double) {
             return *this;
         }
-        Nullstream& operator<<(void *) {
+        virtual Nullstream& operator<<(void *) {
             return *this;
         }
-        Nullstream& operator<<(long long) {
+        virtual Nullstream& operator<<(long long) {
             return *this;
         }
-        Nullstream& operator<<(unsigned long long) {
+        virtual Nullstream& operator<<(unsigned long long) {
             return *this;
         }
-        Nullstream& operator<<(const string&) {
+        virtual Nullstream& operator<<(Stringable&) {
             return *this;
         }
-        Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
+        virtual Nullstream& operator<<(const string&) {
             return *this;
         }
-        Nullstream& operator<< (ios_base& (*hex)(ios_base&)) {
+        virtual Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
             return *this;
         }
+        virtual Nullstream& operator<< (ios_base& (*hex)(ios_base&)) {
+            return *this;
+        }
+        virtual void flush(){}
     };
     extern Nullstream nullstream;
-
+    
 #define LOGIT { boostlock lk(mutex); cout << x; return *this; }
-    class Logstream {
+    class Logstream : public Nullstream {
         static boost::mutex mutex;
     public:
         void flush() {
@@ -76,6 +85,11 @@ namespace mongo {
         Logstream& operator<<(long long x) LOGIT
         Logstream& operator<<(unsigned long long x) LOGIT
         Logstream& operator<<(const string& x) LOGIT
+        Logstream& operator<<(Stringable& x){
+            boostlock lk(mutex);
+            cout << x.toString();
+            return *this;
+        }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
             boostlock lk(mutex);
             cout << _endl;
@@ -100,18 +114,28 @@ namespace mongo {
     };
     extern Logstream logstream;
 
-    inline Logstream& problem() {
+    inline Nullstream& problem() {
         return logstream.prolog(true);
     }
-    inline Logstream& log() {
+
+    inline Nullstream& log() {
         return logstream.prolog();
     }
-    inline Logstream& out() {
+    inline Nullstream& out() {
         return logstream;
     }
     
     inline ostream& stdcout() {
         return cout;
     }
+
+    extern int logLevel;
+
+    inline Nullstream& log( int level ){
+        if ( level > logLevel )
+            return nullstream;
+        return log();
+    }
+    
 
 } // namespace mongo

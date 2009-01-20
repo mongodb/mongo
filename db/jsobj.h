@@ -328,7 +328,7 @@ namespace mongo {
     /**
        an actual bson object
      */
-    class BSONObj {
+    class BSONObj : public Stringable {
         friend class BSONObjIterator;
         class Details {
         public:

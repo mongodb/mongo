@@ -64,7 +64,6 @@ namespace mongo {
     int ctr = 0;
     bool quiet = false;
     bool cpu = false; // --cpu show cpu time periodically
-    bool verbose = false;
 
 // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse ) {

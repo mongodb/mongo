@@ -101,8 +101,7 @@ namespace mongo {
             return false;
         }
 
-        if ( verbose )
-            log() << "create collection " << ns << ' ' << j.toString() << '\n';
+        log(1) << "create collection " << ns << ' ' << j << '\n';
 
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
                  and then go back and set to ok : 1 after we are done.
@@ -769,7 +768,7 @@ namespace mongo {
        done eventually */
     void addExistingToIndex(const char *ns, IndexDetails& idx) {
         Timer t;
-        Logstream& l = log();
+        Nullstream& l = log();
         l << "building new index for " << ns << "...";
         l.flush();
         int n = 0;

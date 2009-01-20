@@ -26,6 +26,7 @@ namespace mongo {
 
     Nullstream nullstream;
     Logstream logstream;
+    int logLevel = 0;
     boost::mutex Logstream::mutex;
 
     unsigned occasion = 0;

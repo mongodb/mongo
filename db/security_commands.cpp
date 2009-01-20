@@ -64,7 +64,7 @@ namespace mongo {
             return true;
         }
     } cmdLogout;
-
+    
     class CmdAuthenticate : public Command {
     public:
         virtual bool requiresAuth() { return false; }
@@ -76,6 +76,8 @@ namespace mongo {
         }
         CmdAuthenticate() : Command("authenticate") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            log(1) << " authenticate: " << cmdObj << endl;
+
             string user = cmdObj.getStringField("user");
             BSONElement key = cmdObj.findElement("key");
             BSONElement nonce = cmdObj.findElement("nonce");
@@ -85,7 +87,7 @@ namespace mongo {
                 sleepmillis(10);
                 return false;
             }
-
+            
             double n = nonce.number();
             {
                 double *ln = lastNonce.release();
