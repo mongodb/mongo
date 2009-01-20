@@ -15,6 +15,13 @@ AddOption('--prefix',
           metavar='DIR',
           help='installation prefix')
 
+AddOption( "--64",
+           dest="force64",
+           type="string",
+           nargs=0,
+           action="store",
+           help="whether to force 64 bit" )
+
 
 AddOption('--java',
           dest='javaHome',
@@ -35,7 +42,7 @@ env.Append( CPPPATH=[ "." ] )
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
-commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/security.cpp " )
+commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/security.cpp db/security_commands.cpp " )
 commonFiles += Glob( "util/*.cpp" ) + Glob( "util/*.c" ) + Glob( "grid/*.cpp" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
 
@@ -46,6 +53,8 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
+force64 = not GetOption( "force64" ) is None
+
 
 javaHome = GetOption( "javaHome" )
 
@@ -66,7 +75,7 @@ if "darwin" == os.sys.platform:
         env["CXX"] = "g++-4.2"
 
     nix = True
-
+    
 elif "linux2" == os.sys.platform:
 
     env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/linux"] )
@@ -128,6 +137,11 @@ else:
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-compare -Wno-non-virtual-dtor" )
     env.Append( LIBS=[ "pcrecpp" , "pcre" , "stdc++" ] )
+
+    if force64:
+        env.Append( CXXFLAGS="-m64" )
+
+
 
 # --- check system ---
 
