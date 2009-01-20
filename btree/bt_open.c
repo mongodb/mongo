@@ -33,10 +33,10 @@ __wt_bt_open(DB *db)
 
 	/*
 	 * If the file exsists, update the DB handle based on the information
-	 * in the on-disk WT_PAGE_DESC structure.  (If the number of frags in
-	 * the file is non-zero, there had better be a description record.)
+	 * in the on-disk WT_PAGE_DESC structure.  (If the file is not empty,
+	 * there had better be a description record.)
 	 */
-	if (idb->frags != 0) {
+	if (idb->file_size != 0) {
 		if ((ret = __wt_bt_desc_read(db)) != 0)
 			return (ret);
 	} else
@@ -60,15 +60,24 @@ __wt_bt_vrfy_sizes(DB *db)
 	 * has to set them in a specific order or we'd have to have one set
 	 * function that took 10 parameters.)
 	 *
-	 * If the values haven't been set, set the defaults.
+	 * Limit allocation and page sizes to 128MB.  There isn't a reason
+	 * (other than testing) we can't support larger sizes (any size up
+	 * to the smaller of an off_t and a size_t), but an application
+	 * specifying allocation or page sizes larger than 128MB is almost
+	 * certainly making a mistake.
 	 */
+#define	WT_UNEXPECTED(s)	((s) > 128 * WT_MEGABYTE)
 
 	/*
+	 * If the values haven't been set, set the defaults.
+	 *
 	 * Default to a small fragment size, so overflow items don't consume
 	 * a lot of space.  
 	 */
-	if (db->fragsize == 0)
-		db->fragsize = 512;
+	if (db->allocsize == 0)
+		db->allocsize = 512;
+	else if (WT_UNEXPECTED(db->allocsize))
+		goto unexpected;
 
 	/*
 	 * Internal pages are also fairly small, we want it to fit into the
@@ -86,6 +95,8 @@ __wt_bt_vrfy_sizes(DB *db)
 	 */
 	if (db->intlsize == 0)
 		db->intlsize = 8 * 1024;
+	else if (WT_UNEXPECTED(db->intlsize))
+		goto unexpected;
 	if (db->intlitemsize == 0)
 		if (db->intlsize <= 1024)
 			db->intlitemsize = 50;
@@ -109,6 +120,11 @@ __wt_bt_vrfy_sizes(DB *db)
 	 */
 	if (db->leafsize == 0)
 		db->leafsize = 32 * 1024;
+	else if (WT_UNEXPECTED(db->leafsize)) {
+unexpected:	__wt_db_errx(db,
+		    "Allocation and page sizes are limited to 128MB");
+		return (WT_ERROR);
+	}
 	if (db->leafitemsize == 0)
 		if (db->leafsize <= 4096)
 			db->leafitemsize = 80;
@@ -117,7 +133,7 @@ __wt_bt_vrfy_sizes(DB *db)
 
 	/* Extents are 10MB by default. */
 	if (db->extsize == 0)
-		db->extsize = MEGABYTE;
+		db->extsize = WT_MEGABYTE;
 
 	/*
 	 * By default, any duplicate set that reaches 25% of a leaf page is
@@ -127,14 +143,14 @@ __wt_bt_vrfy_sizes(DB *db)
 		db->btree_dup_offpage = 4;
 
 	/* Check everything for safety. */
-	if (db->fragsize < 512 || db->fragsize % 512 != 0) {
+	if (db->allocsize < 512 || db->allocsize % 512 != 0) {
 		__wt_db_errx(db,
 		    "The fragment size must be a multiple of 512B");
 		return (WT_ERROR);
 	}
-	if (db->intlsize % db->fragsize != 0 ||
-	    db->leafsize % db->fragsize != 0 ||
-	    db->extsize % db->fragsize != 0) {
+	if (db->intlsize % db->allocsize != 0 ||
+	    db->leafsize % db->allocsize != 0 ||
+	    db->extsize % db->allocsize != 0) {
 		__wt_db_errx(db,
 		    "The internal, leaf and extent sizes must be a multiple "
 		    "of the fragment size");
@@ -165,7 +181,7 @@ __wt_bt_vrfy_sizes(DB *db)
 		return (WT_ERROR);
 	}
 
-	WT_STAT_SET(db, FRAGSIZE, "database fragment size", db->fragsize);
+	WT_STAT_SET(db, FRAGSIZE, "database fragment size", db->allocsize);
 	WT_STAT_SET(db,
 	    INTLSIZE, "database internal node page size", db->intlsize);
 	WT_STAT_SET(db, LEAFSIZE, "database leaf node page size", db->leafsize);

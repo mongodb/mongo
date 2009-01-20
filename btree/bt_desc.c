@@ -79,14 +79,15 @@ __wt_bt_desc_read(DB *db)
 	idb = db->idb;
 
 	/*
-	 * When we first read the description chunk, we're reading blind --
-	 * read carefully.
+	 * When we first read the description chunk after first opening the
+	 * file, we're reading blind, we don't know the database page size.
 	 *
 	 * Read in the first fragment of the database and get the root addr
 	 * and pagesizes from it.
 	 */
-	if ((ret = __wt_cache_db_in(
-	    db, WT_ADDR_FIRST_PAGE, 1, WT_UNFORMATTED, &page)) != 0)
+	if ((ret = __wt_cache_db_in(db,
+	    WT_ADDR_TO_OFF(db, WT_ADDR_FIRST_PAGE),
+	    (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)) != 0)
 		return (ret);
 
 	memcpy(&desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
@@ -94,7 +95,8 @@ __wt_bt_desc_read(DB *db)
 	db->intlsize = desc.intlsize;
 	idb->root_addr = desc.root_addr;
 
-	if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
+	if ((ret =
+	    __wt_cache_db_out(db, page, WT_MODIFIED | WT_UNFORMATTED)) != 0)
 		return (ret);
 
 	return (0);
@@ -114,8 +116,8 @@ __wt_bt_desc_write(DB *db, u_int32_t root_addr)
 
 	idb = db->idb;
 
-	if ((ret = __wt_cache_db_in(
-	    db, WT_ADDR_FIRST_PAGE, WT_FRAGS_PER_LEAF(db), 0, &page)) != 0)
+	if ((ret = __wt_cache_db_in(db, WT_ADDR_TO_OFF(
+	    db, WT_ADDR_FIRST_PAGE), db->leafsize, 0, &page)) != 0)
 		return (ret);
 
 	idb->root_addr = root_addr;

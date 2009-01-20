@@ -43,8 +43,7 @@ __wt_cache_open(ENV *env)
 		TAILQ_INIT(&ienv->hqh[i]);
 	TAILQ_INIT(&ienv->lqh);
 
-	/* We track cache utilization in units of 512B */
-	ienv->cache_frags_max = env->cachesize * (MEGABYTE / 512);
+	ienv->cache_bytes_max = env->cachesize * WT_MEGABYTE;
 
 	return (0);
 }
@@ -75,8 +74,8 @@ __wt_cache_close(ENV *env)
 	/* Discard buckets. */
 	__wt_free(env, ienv->hqh);
 
-	/* There shouldn't be any allocated fragments. */
-	WT_ASSERT(env, ienv->cache_frags == 0);
+	/* There shouldn't be any allocated bytes. */
+	WT_ASSERT(env, ienv->cache_bytes == 0);
 
 	return (ret);
 }
@@ -90,7 +89,6 @@ __wt_cache_db_open(DB *db)
 {
 	ENV *env;
 	IDB *idb;
-	off_t size;
 	int ret;
 
 	env = db->env;
@@ -101,11 +99,8 @@ __wt_cache_db_open(DB *db)
 	    F_ISSET(idb, WT_CREATE) ? WT_OPEN_CREATE : 0, &idb->fh)) != 0)
 		return (ret);
 
-	if ((ret = __wt_filesize(env, idb->fh, &size)) != 0)
+	if ((ret = __wt_filesize(env, idb->fh, &idb->file_size)) != 0)
 		goto err;
-
-	/* Convert the size in bytes to "fragments". */
-	idb->frags = (u_int32_t)(size / db->fragsize);
 
 	return (0);
 
@@ -204,20 +199,20 @@ __wt_cache_db_sync(DB *db)
 		__wt_free((env), (page));				\
 		return ((ret));						\
 	}								\
+	(env)->ienv->cache_bytes += (bytes);				\
 } while (0)
 
 /*
  * __wt_cache_db_alloc --
- *	Allocate fragments from a file.
+ *	Allocate bytes from a file.
  */
 int
-__wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
+__wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep)
 {
 	ENV *env;
 	IDB *idb;
 	IENV *ienv;
 	WT_PAGE *page;
-	u_int32_t bytes;
 	int ret;
 
 	*pagep = NULL;
@@ -225,46 +220,38 @@ __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 	env = db->env;
 	ienv = db->ienv;
 	idb = db->idb;
-	bytes = WT_FRAGS_TO_BYTES(db, frags);
 
-	/* Check for an inability to grow the file. */
-	if (UINT32_MAX - idb->frags < frags) {
-		__wt_db_errx(db,
-		    "Requested additional space is not available; the file"
-		    " cannot grow that much");
-		return (WT_ERROR);
-	}
+	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
 	WT_STAT_INCR(env, CACHE_ALLOC, "pages allocated in the cache");
 	WT_STAT_INCR(db, DB_CACHE_ALLOC, "pages allocated in the cache");
 
 	/* Check for exceeding the size of the cache. */
-	if (ienv->cache_frags > ienv->cache_frags_max) {
+	if (ienv->cache_bytes > ienv->cache_bytes_max) {
 		/*
 		 * __wt_cache_clean will pass us back a page it free'd, if
 		 * it's of the correct size.
 		 */
-		if ((ret = __wt_cache_clean(env, frags, &page)) != 0)
+		if ((ret = __wt_cache_clean(env, bytes, &page)) != 0)
 			return (ret);
 	} else
 		page = NULL;
 
-	if (page == NULL) {
+	if (page == NULL)
 		WT_PAGE_ALLOC(env, bytes, page, ret);
-
-		ienv->cache_frags += frags;
-	} else
-		memset(page->hdr, 0, bytes);
+	else
+		memset(page->hdr, 0, (size_t)bytes);
 
 	/* Initialize the page. */
+	page->offset = idb->file_size;
+	page->addr = WT_OFF_TO_ADDR(db, page->offset);
+	page->bytes = bytes;
 	page->file_id = idb->file_id;
-	page->addr = idb->frags;
-	page->frags = frags;
 	page->ref = 1;
 	TAILQ_INSERT_TAIL(&ienv->lqh, page, q);
-	TAILQ_INSERT_HEAD(&ienv->hqh[WT_HASH(ienv, page->addr)], page, hq);
+	TAILQ_INSERT_HEAD(&ienv->hqh[WT_HASH(ienv, page->offset)], page, hq);
 
-	idb->frags += frags;
+	idb->file_size += bytes;
 
 	*pagep = page;
 	return (0);
@@ -272,11 +259,11 @@ __wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep)
 
 /*
  * __wt_cache_db_in --
- *	Pin a fragment of a file, reading as necessary.
+ *	Pin bytes of a file, reading as necessary.
  */
 int
 __wt_cache_db_in(DB *db,
-    u_int32_t addr, u_int32_t frags, u_int32_t flags, WT_PAGE **pagep)
+    off_t offset, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep)
 {
 	ENV *env;
 	IDB *idb;
@@ -284,7 +271,6 @@ __wt_cache_db_in(DB *db,
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	WT_PAGE_HQH *hashq;
-	u_int32_t bytes;
 	int ret;
 
 	*pagep = NULL;
@@ -294,12 +280,13 @@ __wt_cache_db_in(DB *db,
 	env = db->env;
 	ienv = db->ienv;
 	idb = db->idb;
-	bytes = WT_FRAGS_TO_BYTES(db, frags);
+
+	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
 	/* Check for the page in the cache. */
-	hashq = &ienv->hqh[WT_HASH(ienv, addr)];
+	hashq = &ienv->hqh[WT_HASH(ienv, offset)];
 	TAILQ_FOREACH(page, hashq, hq)
-		if (page->addr == addr && page->file_id == idb->file_id)
+		if (page->offset == offset && page->file_id == idb->file_id)
 			break;
 	if (page != NULL) {
 		++page->ref;
@@ -323,32 +310,30 @@ __wt_cache_db_in(DB *db,
 	WT_STAT_INCR(db, DB_CACHE_MISS, "reads not found in the cache");
 
 	/* Check for exceeding the size of the cache. */
-	if (ienv->cache_frags > ienv->cache_frags_max) {
+	if (ienv->cache_bytes > ienv->cache_bytes_max) {
 		/*
 		 * __wt_cache_clean will pass us back a page it free'd, if
 		 * it's of the correct size.
 		 */
-		if ((ret = __wt_cache_clean(env, frags, &page)) != 0)
+		if ((ret = __wt_cache_clean(env, bytes, &page)) != 0)
 			return (ret);
 	} else
 		page = NULL;
 
-	if (page == NULL) {
+	if (page == NULL)
 		WT_PAGE_ALLOC(env, bytes, page, ret);
-		ienv->cache_frags += frags;
-	}
 
 	/* Initialize the page. */
+	page->offset = offset;
+	page->addr = WT_OFF_TO_ADDR(db, offset);
+	page->bytes = bytes;
 	page->file_id = idb->file_id;
-	page->addr = addr;
-	page->frags = frags;
 	page->ref = 1;
 	TAILQ_INSERT_TAIL(&ienv->lqh, page, q);
 	TAILQ_INSERT_HEAD(hashq, page, hq);
 
 	/* Read the page. */
-	if ((ret = __wt_read(env, idb->fh,
-	    (off_t)WT_FRAGS_TO_BYTES(db, addr), bytes, page->hdr)) != 0)
+	if ((ret = __wt_read(env, idb->fh, offset, bytes, page->hdr)) != 0)
 		goto err;
 
 	/* Verify the checksum. */
@@ -358,16 +343,13 @@ __wt_cache_db_in(DB *db,
 		hdr->checksum = 0;
 		if (checksum != __wt_cksum(hdr, bytes)) {
 			__wt_db_errx(db,
-			    "fragment %lu was read and had a checksum error",
-			    (u_long)addr);
+			    "file offset %lu with length %lu was read and "
+			    "had a checksum error",
+			    (u_long)offset, (u_long)bytes);
 			ret = WT_ERROR;
 			goto err;
 		}
 	}
-
-	/* If the checksum passed, then the page should be valid. */
-	WT_ASSERT(env, LF_ISSET(WT_UNFORMATTED) ||
-	    __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
 	*pagep = page;
 	return (0);
@@ -378,7 +360,7 @@ err:	(void)__wt_cache_discard(env, page);
 
 /*
  * __wt_cache_db_out --
- *	Unpin a fragment of a file, writing as necessary.
+ *	Unpin bytes of a file, writing as necessary.
  */
 int
 __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
@@ -394,27 +376,25 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	WT_ASSERT(env, page->ref > 0);
 	--page->ref;
 
-	WT_ASSERT(env, LF_ISSET(WT_UNFORMATTED) ||
-	    __wt_bt_verify_page(db, page, NULL, NULL) == 0);
-
-	/* If the page is dirty, set the modified flag. */
-	if (LF_ISSET(WT_MODIFIED)) {
+	/*
+	 * If the page isn't to be retained in the cache, discard it, writing
+	 * it first, if it has been modified.
+	 *
+	 * Otherwise, if the page has been modified, set the appropriate flag.
+	 */
+	if (LF_ISSET(WT_UNFORMATTED)) {
+		if (F_ISSET(page, WT_MODIFIED) &&
+		    (ret = __wt_cache_write(env, db, page)) != 0)
+			return (ret);
+		if ((ret = __wt_cache_discard(env, page)) != 0)
+			return (ret);
+	} else if (LF_ISSET(WT_MODIFIED)) {
 		F_SET(page, WT_MODIFIED);
 		WT_STAT_INCR(env, CACHE_DIRTY, "dirty pages in the cache");
 		WT_STAT_INCR(db, DB_CACHE_DIRTY, "dirty pages in the cache");
 		WT_STAT_DECR(env, CACHE_CLEAN, "clean pages in the cache");
 		WT_STAT_DECR(db, DB_CACHE_CLEAN, "clean pages in the cache");
 	}
-
-	/*
-	 * If the page is not dirty and marked worthless, discard it.  (We
-	 * can't discard modified pages, some thread of control thinks it's
-	 * useful...).
-	 */
-	if (LF_ISSET(WT_UNFORMATTED) &&
-	    !F_ISSET(page, WT_MODIFIED) &&
-	    (ret = __wt_cache_discard(env, page)) != 0)
-		return (ret);
 
 	return (0);
 }
@@ -424,17 +404,20 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
  *	Clear some space out of the cache.
  */
 static int
-__wt_cache_clean(ENV *env, u_int32_t frags, WT_PAGE **pagep)
+__wt_cache_clean(ENV *env, u_int32_t bytes, WT_PAGE **pagep)
 {
 	IENV *ienv;
 	WT_PAGE *page;
-	u_int32_t frags_free;
+	u_int64_t bytes_free, bytes_need_free;
 	int ret;
 
 	*pagep = NULL;
+
 	ienv = env->ienv;
-	frags_free = 0;
 	ret = 0;
+
+	bytes_free = 0;
+	bytes_need_free = bytes * 3;
 
 	for (;;) {
 		TAILQ_FOREACH(page, &ienv->lqh, q)
@@ -455,9 +438,9 @@ __wt_cache_clean(ENV *env, u_int32_t frags, WT_PAGE **pagep)
 			    CACHE_EVICT, "clean pages evicted from the cache");
 
 		/* Return the page if it's the right size. */
-		if (page->frags == frags) {
+		if (page->bytes == bytes) {
 			TAILQ_REMOVE(
-			    &ienv->hqh[WT_HASH(ienv, page->addr)], page, hq);
+			    &ienv->hqh[WT_HASH(ienv, page->offset)], page, hq);
 			TAILQ_REMOVE(&ienv->lqh, page, q);
 
 			if (page->indx != NULL)
@@ -467,7 +450,7 @@ __wt_cache_clean(ENV *env, u_int32_t frags, WT_PAGE **pagep)
 			return (0);
 		}
 
-		frags_free += page->frags;
+		bytes_free += page->bytes;
 
 		/* Discard the page. */
 		if ((ret = __wt_cache_discard(env, page)) != 0)
@@ -480,8 +463,8 @@ __wt_cache_clean(ENV *env, u_int32_t frags, WT_PAGE **pagep)
 		 * let's free some memory -- keep going until we've free'd
 		 * 3x what we need.
 		 */
-		if (frags_free > frags * 3 &&
-		    ienv->cache_frags <= ienv->cache_frags_max)
+		if (bytes_free > bytes_need_free &&
+		    ienv->cache_bytes <= ienv->cache_bytes_max)
 			break;
 	}
 	return (ret);
@@ -495,7 +478,6 @@ static int
 __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 {
 	WT_PAGE_HDR *hdr;
-	size_t bytes;
 	int ret;
 
 	WT_STAT_INCR(env, CACHE_WRITE, "writes from the cache");
@@ -509,14 +491,13 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 	}
 
 	/* Update the checksum. */
-	bytes = (size_t)WT_FRAGS_TO_BYTES(db, page->frags);
 	hdr = page->hdr;
 	hdr->checksum = 0;
-	hdr->checksum = __wt_cksum(hdr, bytes);
+	hdr->checksum = __wt_cksum(hdr, page->bytes);
 
 	/* Write, and if successful, clear the modified flag. */
-	if ((ret = __wt_write(env, db->idb->fh,
-	    (off_t)WT_FRAGS_TO_BYTES(db, page->addr), bytes, hdr)) == 0) {
+	if ((ret = __wt_write(
+	    env, db->idb->fh, page->offset, page->bytes, hdr)) == 0) {
 		F_CLR(page, WT_MODIFIED);
 		WT_STAT_DECR(env, CACHE_DIRTY, NULL);
 		WT_STAT_DECR(db, DB_CACHE_DIRTY, NULL);
@@ -535,15 +516,13 @@ static int
 __wt_cache_discard(ENV *env, WT_PAGE *page)
 {
 	IENV *ienv;
-	u_int32_t frags;
 
 	ienv = env->ienv;
-	frags = page->frags;
 
 	WT_ASSERT(env, page->ref == 0);
 
-	WT_ASSERT(env, ienv->cache_frags >= frags);
-	ienv->cache_frags -= frags;
+	WT_ASSERT(env, ienv->cache_bytes >= page->bytes);
+	ienv->cache_bytes -= page->bytes;
 
 	TAILQ_REMOVE(&ienv->hqh[WT_HASH(ienv, page->addr)], page, hq);
 	TAILQ_REMOVE(&ienv->lqh, page, q);

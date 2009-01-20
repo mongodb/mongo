@@ -24,9 +24,8 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
 	WT_PAGE_HDR *hdr;
 	int ret;
 
-	if ((ret = __wt_cache_db_alloc(db,
-	    WT_BYTES_TO_FRAGS(db, isleaf ? db->leafsize : db->intlsize),
-	    &page)) != 0)
+	if ((ret = __wt_cache_db_alloc(
+	    db, isleaf ? db->leafsize : db->intlsize, &page)) != 0)
 		return (ret);
 
 	/*
@@ -54,13 +53,21 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
 int
 __wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep)
 {
+	ENV *env;
 	WT_PAGE *page;
 	int ret;
 
-	if ((ret = __wt_cache_db_in(db, addr, isleaf ?
-	    WT_FRAGS_PER_LEAF(db) : WT_FRAGS_PER_INTL(db), 0, &page)) != 0)
+	env = db->env;
+
+	if ((ret = __wt_cache_db_in(db,
+	    WT_ADDR_TO_OFF(db, addr),
+	    isleaf ? db->leafsize : db->intlsize, 0, &page)) != 0)
 		return (ret);
 
+	/* Verify the page. */
+	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+
+	/* Build the in-memory version of the page as necessary. */
 	if (page->indx_count == 0 && (ret = __wt_bt_page_inmem(db, page)) != 0)
 		return (ret);
 
@@ -69,21 +76,20 @@ __wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep)
 }
 
 /*
- * __wt_bt_ovfl_in --
- *	Read overflow fragments from the cache.
+ * __wt_bt_page_out --
+ *	Write a btree page to the cache.
  */
 int
-__wt_bt_ovfl_in(DB *db, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
+__wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 {
-	WT_PAGE *page;
-	int ret;
+	ENV *env;
 
-	if ((ret = __wt_cache_db_in(
-	    db, addr, WT_OVFL_BYTES_TO_FRAGS(db, len), 0, &page)) != 0)
-		return (ret);
+	env = db->env;
 
-	*pagep = page;
-	return (0);
+	/* Verify the page. */
+	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+
+	return (__wt_cache_db_out(db, page, flags));
 }
 
 /*

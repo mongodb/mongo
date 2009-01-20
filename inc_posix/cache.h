@@ -72,9 +72,9 @@ struct __idb {
 
 	u_int32_t file_id;		/* In-memory file id */
 	WT_FH	 *fh;			/* Backing file handle */
-	u_int32_t frags;		/* Total fragments in the file */
 
-	u_int32_t root_addr;		/* Root fragment */
+	u_int32_t root_addr;		/* Root address */
+	off_t	  file_size;		/* File size */
 
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
 
@@ -110,13 +110,8 @@ struct __ienv {
 	TAILQ_HEAD(__wt_page_hqh, __wt_page) *hqh;
 	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;
 
-	/*
-	 * The cache is tracked in units of 512B (the minimum frag size), in
-	 * 32-bit memory, for a maximum 2TB cache size.  There's no reason
-	 * they couldn't be 64-bit types, but there's no need now.
-	 */
-	u_int32_t cache_frags;		/* Cache fragments allocated */
-	u_int32_t cache_frags_max;	/* Cache fragments max */
+	u_int64_t cache_bytes;		/* Cache bytes allocated */
+	u_int64_t cache_bytes_max;	/* Cache bytes maximum */
 
 	u_int32_t flags;
 };

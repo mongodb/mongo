@@ -34,6 +34,19 @@ __wt_bt_build_verify(void)
 		return (WT_ERROR);
 	}
 
+	/*
+	 * We mix-and-match 32-bit unsigned values and size_t's, mostly because
+	 * we allocate and handle 32-bit objects, and lots of the underlying C
+	 * library expects size_t values for the length of memory objects.  We
+	 * check, just to be sure.
+	 */
+	if (sizeof(size_t) < sizeof(u_int32_t)) {
+		fprintf(stderr,
+		    "Build verification failed, a size_t is smaller than "
+		    "32-bits");
+		return (WT_ERROR);
+	}
+
 	return (0);
 }
 
@@ -84,8 +97,7 @@ void
 __wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr)
 {
 	page->first_free = addr;
-	page->space_avail =
-	    WT_FRAGS_TO_BYTES(db, page->frags) - (addr - (u_int8_t *)page->hdr);
+	page->space_avail = page->bytes - (addr - (u_int8_t *)page->hdr);
 }
 
 /*

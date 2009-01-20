@@ -18,7 +18,7 @@
  *	    bluebook/21/crc/node6.html#SECTION00060000000000000000
  */
 u_int32_t
-__wt_cksum(void *chunk, size_t len)
+__wt_cksum(void *chunk, u_int32_t bytes)
 {
 	#if 0
 	/*
@@ -116,8 +116,7 @@ __wt_cksum(void *chunk, size_t len)
 		0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668,
 		0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 	};
-	size_t i;
-	u_int32_t result;
+	u_int32_t i, result;
 	u_int8_t *data;
 
 	data = chunk;
@@ -126,9 +125,9 @@ __wt_cksum(void *chunk, size_t len)
 	result |= *data++ << 8;
 	result |= *data++;
 	result = ~result;
-	len -= 4;
+	bytes -= 4;
 
-	for (i = 0; i < len; ++i)
+	for (i = 0; i < bytes; ++i)
 		result = (result << 8 | *data++) ^ crctab[result >> 24];
 
 	return (~result);

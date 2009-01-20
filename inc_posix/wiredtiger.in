@@ -137,7 +137,7 @@ struct __db {
 	int (*set_btree_itemsize)(
 	    DB *, u_int32_t , u_int32_t );
 
-	u_int32_t fragsize;
+	u_int32_t allocsize;
 	u_int32_t intlsize;
 	u_int32_t leafsize;
 	u_int32_t extsize;

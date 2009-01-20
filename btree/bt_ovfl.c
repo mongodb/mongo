@@ -10,6 +10,30 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_bt_ovfl_in --
+ *	Read an overflow item from the cache.
+ */
+int
+__wt_bt_ovfl_in(DB *db, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
+{
+	ENV *env;
+	WT_PAGE *page;
+	int ret;
+
+	env = db->env;
+
+	if ((ret = __wt_cache_db_in(db,
+	    WT_ADDR_TO_OFF(db, addr), WT_OVFL_BYTES(db, len), 0, &page)) != 0)
+		return (ret);
+
+	/* Verify the page. */
+	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+
+	*pagep = page;
+	return (0);
+}
+
+/*
  * __wt_bt_ovfl_write --
  *	Store an overflow item in the database, returning the starting
  *	addr.
@@ -21,8 +45,8 @@ __wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 	int ret;
 
 	/* Allocate a chunk of file space. */
-	if ((ret = __wt_cache_db_alloc(
-	    db, WT_OVFL_BYTES_TO_FRAGS(db, dbt->size), &page)) != 0)
+	if ((ret =
+	    __wt_cache_db_alloc(db, WT_OVFL_BYTES(db, dbt->size), &page)) != 0)
 		return (ret);
 
 	/* Initialize the page and copy the overflow item in. */
@@ -31,13 +55,14 @@ __wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 	page->hdr->prntaddr =
 	    page->hdr->prevaddr = page->hdr->nextaddr = WT_ADDR_INVALID;
 
-	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
-
-	/* The caller wants the addr. */
+	/* Return the page address to the caller. */
 	*addrp = page->addr;
 
+	/* Copy the record into place. */
+	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
+
 	/* Write the overflow item back to the file. */
-	return (__wt_cache_db_out(db, page, WT_MODIFIED));
+	return (__wt_bt_page_out(db, page, WT_MODIFIED));
 }
 
 /*
@@ -69,7 +94,7 @@ __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 	copy->len = from->len;
 
 	/* Discard the overflow record. */
-	if ((tret = __wt_cache_db_out(db, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_bt_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -91,7 +116,7 @@ __wt_bt_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 	ret = __wt_bt_data_copy_to_dbt(
 	    db, WT_PAGE_BYTE(ovfl_page), ovfl->len, copy);
 
-	if ((tret = __wt_cache_db_out(db, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_bt_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -117,7 +142,7 @@ __wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
 		return (ret);
 	memcpy(ip->data, WT_PAGE_BYTE(ovfl_page), ip->size);
 
-	if ((tret = __wt_cache_db_out(db, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_bt_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	F_SET(ip, WT_ALLOCATED);

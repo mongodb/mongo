@@ -124,7 +124,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 					    ovfl->len, stream);
 
 				if ((ret =
-				    __wt_cache_db_out(db, ovfl_page, 0)) != 0)
+				    __wt_bt_page_out(db, ovfl_page, 0)) != 0)
 					goto err;
 				break;
 			case WT_ITEM_OFFPAGE:
@@ -144,7 +144,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 			}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_cache_db_out(db, page, 0)) != 0)
+		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
 			return (ret);
 		if (addr == WT_ADDR_INVALID)
 			break;
@@ -185,7 +185,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 			break;
 		__wt_bt_first_offp(page, offp);
 
-		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
+		if ((ret = __wt_bt_page_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
@@ -206,7 +206,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 				func(
 				    WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
 				if ((ret =
-				    __wt_cache_db_out(db, ovfl_page, 0)) != 0)
+				    __wt_bt_page_out(db, ovfl_page, 0)) != 0)
 					goto err;
 				break;
 			default:
@@ -215,7 +215,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 		}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
+		if ((ret = __wt_bt_page_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
@@ -229,7 +229,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 	if (0) {
 err:		ret = WT_ERROR;
 		if (page != NULL)
-			(void)__wt_cache_db_out(db, page, 0);
+			(void)__wt_bt_page_out(db, page, 0);
 	}
 	return (ret);
 }

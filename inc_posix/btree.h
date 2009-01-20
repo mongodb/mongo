@@ -12,41 +12,41 @@ extern "C" {
 #endif
 
 /*
- * We only have 32-bits to hold file locations, so all file locations are
- * stored in counts of "fragments" (making a "fragment" the smallest unit
- * of allocation from the underlying file).  To simplify the bookkeeping,
- * the database page size must be a multiple of the fragment size, and the
- * database extent size must be a multiple of the page size.  The minimum
- * fragment size is 512B, so the minimum maximum database size is 2TB, and
- * the maximum maximum (assuming we could pass file offsets that large,
- * which we can't), is 4EB.   In short, nobody will ever complain this
- * code can't build a database sufficiently large for whatever the hell it
- * is they want to do.
+ * We use 32-bits to store file locations on database pages, so all such file
+ * locations are counts of "database allocation units" (making an "allocation
+ * unit" the smallest database chunk allocated from an underlying file).  In
+ * the code, these are all "addresses" or "addrs".  To simplify bookkeeping,
+ * database internal and leaf page sizes, and extent size, must be a multiple
+ * of the allocation unit size.
+ *
+ * The minimum database allocation unit is 512B so the minimum maximum database
+ * size is 2TB, and the maximum maximum (assuming we could pass file offsets
+ * that large, which we can't), is 4EB.   In summary, small allocation units
+ * limit the database size, and as the allocation unit grows, the maximum size
+ * of the database grows as well.
+ *
+ * Underneath the database layer is the cache and file layers.  In both, sizes
+ * are stored as numbers of bytes.   In the cache layer, 32-bits is too small
+ * (a cache might be larger than 4GB), so we use a 64-bit type.  In the file
+ * layer, 32-bits might also be too small, but we have a standard type known to
+ * hold the size of a file, an off_t.
  */
-/* Convert a file address into a byte offset. */
-#define	WT_FRAGS_TO_BYTES(db, frags)					\
-	((u_int32_t)(frags) * (db)->fragsize)
+/* Convert a data address to/from a byte offset. */
+#define	WT_ADDR_TO_OFF(db, addr)					\
+	((off_t)(addr) * (db)->allocsize)
+#define	WT_OFF_TO_ADDR(db, off)						\
+	((u_int32_t)((off) / (db)->allocsize))
 
-/* Return the number of fragments needed to hold N bytes. */
-#define	WT_BYTES_TO_FRAGS(db, bytes)					\
-	((u_int32_t)(((bytes) + ((db)->fragsize - 1)) / (db)->fragsize))
-
-/* Return the number of fragments for a database page. */
-#define	WT_FRAGS_PER_LEAF(db)						\
-	((db)->leafsize / (db)->fragsize)
-#define	WT_FRAGS_PER_INTL(db)						\
-	((db)->intlsize / (db)->fragsize)
-
-/* Return the fragments needed for an overflow item. */
-#define	WT_OVFL_BYTES_TO_FRAGS(db, bytes)				\
-	 WT_BYTES_TO_FRAGS(db, (bytes) + sizeof(WT_PAGE_HDR))
+/* Return bytes needed for an overflow item, rounded to an allocation unit. */
+#define	WT_OVFL_BYTES(db, len)						\
+	((u_int32_t)WT_ALIGN((len) + sizeof(WT_PAGE_HDR), (db)->allocsize))
 
 /*
  * The first possible address is 0.  It is also always the first leaf page in
  * in the database because it's created first and never replaced.
  *
  * The invalid address is the largest possible offset, which isn't a possible
- * fragment address.
+ * database address.
  */
 #define	WT_ADDR_FIRST_PAGE	0
 #define	WT_ADDR_INVALID		UINT32_MAX
@@ -60,16 +60,15 @@ typedef	struct __wt_indx {
 	size_t	 size;			/* DBT: data length */
 
 	/*
-	 * Associated address.
+	 * Associated address, else WT_ADDR_INVALID.
 	 *
-	 * WT_PAGE_INT: WT_ITEM_KEY_OVFL->addr or WT_ITEM_OFFPAGE->addr,
-	 * otherwise invalid.
+	 * WT_PAGE_INT: WT_ITEM_KEY_OVFL->addr or WT_ITEM_OFFPAGE->addr.
 	 *
-	 * WT_PAGE_LEAF: WT_ITEM_KEY_OVFL->addr, otherwise invalid.
+	 * WT_PAGE_LEAF: WT_ITEM_KEY_OVFL->addr.
 	 *
-	 * WT_PAGE_DUP_LEAF: WT_ITEM_DATA_OVFL->addr, otherwise invalid.
+	 * WT_PAGE_DUP_LEAF: WT_ITEM_DATA_OVFL->addr.
 	 */
-	u_int32_t addr;			/* WT_ITEM_{KEY_OVFL,OFFPAGE}->addr */
+	u_int32_t addr;
 
 	/*
 	 * Associated on-page data item.
@@ -93,9 +92,17 @@ struct __wt_page {
 	/*********************************************************
 	 * The following fields are owned by the cache layer.
 	 *********************************************************/
-	u_int32_t    file_id;			/* File ID */
-	u_int32_t    addr;			/* File block address */
-	u_int32_t    frags;			/* Number of fragments */
+	off_t     offset;			/* Page's file offset */
+	u_int32_t addr;				/* Page's allocation address */
+
+	/*
+	 * The page size is limited to 4GB by this type -- we could use
+	 * off_t's here if we need something bigger, but the page-sizing
+	 * code limits page sizes to 128MB.
+	 */
+	u_int32_t bytes;			/* Page size */
+
+	u_int32_t file_id;			/* File ID */
 
 	u_int8_t ref;				/* Reference count */
 
@@ -144,8 +151,8 @@ struct __wt_page_desc {
 	u_int32_t leafsize;		/* 12-15: Leaf page size */
 	u_int32_t intlsize;		/* 16-19: Internal page size */
 	u_int64_t base_recno;		/* 20-23: Base record number */
-	u_int32_t root_addr;		/* 28-31: Root fragment */
-	u_int32_t free_addr;		/* 32-35: Freelist fragment */
+	u_int32_t root_addr;		/* 28-31: Root address */
+	u_int32_t free_addr;		/* 32-35: Freelist address */
 	u_int32_t unused[7];		/* 36-63: Spare */
 };
 
@@ -254,7 +261,7 @@ struct __wt_page_hdr {
 
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.  Note the correction
- * for page addr of 0, the first fragment.   It would be simpler to put this at
+ * for page addr of 0, the first address.   It would be simpler to put this at
  * the end of the page, but that would make it more difficult to figure out the
  * page size in a just opened database.
  */

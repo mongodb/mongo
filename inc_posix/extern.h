@@ -41,6 +41,8 @@ __wt_bt_item_type(u_int32_t type);
 int
 __wt_bt_open(DB *db);
 int
+__wt_bt_ovfl_in(DB *db, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
+int
 __wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp);
 int
 __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy);
@@ -53,7 +55,7 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep);
 int
 __wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep);
 int
-__wt_bt_ovfl_in(DB *db, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
+__wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags);
 void
 __wt_bt_page_indx_clean(ENV *env, WT_PAGE *page, int free_indx);
 int
@@ -104,10 +106,10 @@ __wt_cache_db_close(DB *db);
 int
 __wt_cache_db_sync(DB *db);
 int
-__wt_cache_db_alloc(DB *db, u_int32_t frags, WT_PAGE **pagep);
+__wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep);
 int
 __wt_cache_db_in(DB *db,
-    u_int32_t addr, u_int32_t frags, u_int32_t flags, WT_PAGE **pagep);
+    off_t offset, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep);
 int
 __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags);
 int
@@ -154,11 +156,11 @@ __wt_open(ENV *env,
 int
 __wt_close(ENV *env, WT_FH *fh);
 int
-__wt_read(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf);
+__wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
 int
-__wt_write(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf);
+__wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
 u_int32_t
-__wt_cksum(void *chunk, size_t len);
+__wt_cksum(void *chunk, u_int32_t bytes);
 void
 __wt_errcall(void *cb, void *handle,
     const char *pfx1, const char *pfx2,

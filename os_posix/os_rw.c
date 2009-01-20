@@ -14,7 +14,7 @@
  *	Read a file handle.
  */
 int
-__wt_read(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf)
+__wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 {
 	WT_STAT_INCR(fh, READ_IO, "count of read I/Os");
 
@@ -23,7 +23,7 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 		    "fileops: %s: read %lu bytes at offset %lu",
 		    fh->name, (u_long)bytes, (u_long)offset);
 
-	if (pread(fh->fd, buf, bytes, offset) == (ssize_t)bytes)
+	if (pread(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
 
 	__wt_env_err(env, errno, "Read error; file %s", fh->name);
@@ -35,7 +35,7 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf)
  *	Write a file handle.
  */
 int
-__wt_write(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf)
+__wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 {
 	WT_STAT_INCR(fh, WRITE_IO, "count of write I/Os");
 
@@ -44,7 +44,7 @@ __wt_write(ENV *env, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 		    "fileops: %s: write %lu bytes at offset %lu",
 		    fh->name, (u_long)bytes, (u_long)offset);
 
-	if (pwrite(fh->fd, buf, bytes, offset) == (ssize_t)bytes)
+	if (pwrite(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
 
 	__wt_env_err(env, errno, "Write error; file %s", fh->name);

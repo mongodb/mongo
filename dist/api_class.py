@@ -76,7 +76,7 @@ db	getset,name=btree_itemsize
 	intlitemsize	u_int32_t @S
 	leafitemsize	u_int32_t @S
 db	getset,name=btree_pagesize
-	fragsize	u_int32_t @S
+	allocsize	u_int32_t @S
 	intlsize	u_int32_t @S
 	leafsize	u_int32_t @S
 	extsize	u_int32_t @S

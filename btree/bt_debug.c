@@ -56,7 +56,8 @@ static int
 __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 {
 	WT_PAGE *page;
-	u_int32_t frags;
+	off_t offset;
+	u_int32_t bytes;
 	int ret, tret;
 
 	/*
@@ -69,28 +70,30 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	 * so we check the in-memory page information -- pages in the cache
 	 * should have in-memory page information.
 	 */
-	if ((ret = __wt_cache_db_in(db, addr, 1, WT_UNFORMATTED, &page)) != 0)
+	offset = WT_ADDR_TO_OFF(db, addr);
+	if ((ret = __wt_cache_db_in(
+	    db, offset, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)) != 0)
 		return (ret);
 	if (page->indx_count == 0) {
 		switch (page->hdr->type) {
 		case WT_PAGE_OVFL:
-			frags =
-			    WT_OVFL_BYTES_TO_FRAGS(db, page->hdr->u.datalen);
+			bytes =
+			    WT_OVFL_BYTES(db, page->hdr->u.datalen);
 			break;
 		case WT_PAGE_INT:
 		case WT_PAGE_DUP_INT:
-			frags = WT_BYTES_TO_FRAGS(db, db->intlsize);
+			bytes = db->intlsize;
 			break;
 		case WT_PAGE_LEAF:
 		case WT_PAGE_DUP_LEAF:
-			frags = WT_BYTES_TO_FRAGS(db, db->leafsize);
+			bytes = db->leafsize;
 			break;
 		default:
 			return (__wt_database_format(db));
 		}
 		if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
 			return (ret);
-		if ((ret = __wt_cache_db_in(db, addr, frags, 0, &page)) != 0)
+		if ((ret = __wt_cache_db_in(db, offset, bytes, 0, &page)) != 0)
 			return (ret);
 	}
 
@@ -168,8 +171,8 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 	} else if (fp == NULL)
 		fp = stdout;
 
-	fprintf(fp, "fragments: %lu-%lu {\n",
-	    (u_long)page->addr, (u_long)page->addr + (page->frags - 1));
+	fprintf(fp, "addr: %lu-%lu {\n", (u_long)page->addr,
+	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->bytes) - 1));
 
 	/* Dump the description area, if it's page 0. */
 	if (page->addr == 0) {
@@ -182,15 +185,13 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		    (u_long)desc.intlsize,
 		    (u_long)desc.leafsize, (u_long)desc.base_recno);
 		if (desc.root_addr == WT_ADDR_INVALID)
-			fprintf(fp, "root fragment (none), ");
+			fprintf(fp, "root addr (none), ");
 		else
-			fprintf(fp,
-			    "root fragment %lu, ", (u_long)desc.root_addr);
+			fprintf(fp, "root addr %lu, ", (u_long)desc.root_addr);
 		if (desc.free_addr == WT_ADDR_INVALID)
-			fprintf(fp, "free fragment (none), ");
+			fprintf(fp, "free addr (none), ");
 		else
-			fprintf(fp,
-			    "free fragment %lu, ", (u_long)desc.free_addr);
+			fprintf(fp, "free addr %lu, ", (u_long)desc.free_addr);
 		fprintf(fp, "\n");
 	}
 
@@ -284,7 +285,7 @@ __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		if (__wt_bt_ovfl_in(db,
 		    ovfl->addr, (u_int32_t)ovfl->len, &page) == 0) {
 			__wt_bt_print(WT_PAGE_BYTE(page), ovfl->len, fp);
-			(void)__wt_cache_db_out(db, page, 0);
+			(void)__wt_bt_page_out(db, page, 0);
 		}
 		break;
 	case WT_ITEM_OFFPAGE:

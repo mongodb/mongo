@@ -305,12 +305,12 @@ static void __wt_db_get_btree_pagesize(
 static void
 __wt_db_get_btree_pagesize(
 	DB *handle,
-	u_int32_t *fragsizep,
+	u_int32_t *allocsizep,
 	u_int32_t *intlsizep,
 	u_int32_t *leafsizep,
 	u_int32_t *extsizep)
 {
-	*fragsizep = handle->fragsize;
+	*allocsizep = handle->allocsize;
 	*intlsizep = handle->intlsize;
 	*leafsizep = handle->leafsize;
 	*extsizep = handle->extsize;
@@ -325,12 +325,12 @@ static int __wt_db_set_btree_pagesize(
 static int
 __wt_db_set_btree_pagesize(
 	DB *handle,
-	u_int32_t fragsize,
+	u_int32_t allocsize,
 	u_int32_t intlsize,
 	u_int32_t leafsize,
 	u_int32_t extsize)
 {
-	handle->fragsize = fragsize;
+	handle->allocsize = allocsize;
 	handle->intlsize = intlsize;
 	handle->leafsize = leafsize;
 	handle->extsize = extsize;

@@ -11,8 +11,9 @@
 extern "C" {
 #endif
 
-/* Useful constants. */
-#define	MEGABYTE	(1024 * 1024)
+/* Basic constants. */
+#define	WT_FRAGMENT	(512)
+#define	WT_MEGABYTE	(1024 * 1024)			/* MB */
 
 /* Align a number to a specified power-of-2. */
 #define	WT_ALIGN(n, v)							\
