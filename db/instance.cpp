@@ -409,6 +409,9 @@ namespace mongo {
     */
     void jniCallback(Message& m, Message& out)
     {
+        AuthenticationInfo *ai = new AuthenticationInfo();
+        authInfo.reset(ai);
+        
         Database *clientOld = database;
 
         JniMessagingPort jmp(out);

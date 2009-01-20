@@ -44,6 +44,7 @@
 #include "query.h"
 #include "db.h"
 #include "commands.h"
+#include "security.h"
 
 namespace mongo {
 
@@ -1050,6 +1051,9 @@ namespace mongo {
     void replSlaveThread() {
         sleepsecs(1);
 
+        AuthenticationInfo *ai = new AuthenticationInfo();
+        authInfo.reset(ai);
+        
         {
             dblock lk;
             BSONObj obj;
