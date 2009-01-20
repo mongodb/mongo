@@ -30,6 +30,9 @@ namespace mongo {
         virtual Nullstream& operator<<(const char *) {
             return *this;
         }
+        virtual Nullstream& operator<<(char x) {
+            return *this;
+        }
         virtual Nullstream& operator<<(int) {
             return *this;
         }
