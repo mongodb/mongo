@@ -144,8 +144,7 @@ namespace mongo {
 #if !defined(_WIN32)
             const char * otherEd = findEd();
             if ( otherEd ) {
-                if( verbose )
-                    log() << "found ed as well" << endl;
+                log( 1 ) << "found ed as well" << endl;
                 ed = otherEd;
 
                 ss << SYSTEM_COLON << ed << "/build/";
@@ -192,8 +191,7 @@ namespace mongo {
         _vmArgs->nOptions = 3;
         _vmArgs->ignoreUnrecognized = JNI_FALSE;
 
-        if( verbose )
-            log() << "loading JVM" << endl;
+        log(1) << "loading JVM" << endl;
         jint res = JNI_CreateJavaVM( &_jvm, (void**)&_mainEnv, _vmArgs );
 
         if ( res ) {
@@ -519,8 +517,7 @@ namespace mongo {
         DIR *testDir = opendir(path);
 
         if (testDir) {
-            if( verbose )
-                log() << "   found directory for appserver : " << path << endl;
+            log(1) << "   found directory for appserver : " << path << endl;
             closedir(testDir);
             return path;
         }
@@ -554,8 +551,7 @@ namespace mongo {
                 continue;
 
             closedir( test );
-            if( verbose ) 
-                log() << "found directory for appserver : " << temp << endl;
+            log(1) << "found directory for appserver : " << temp << endl;
             return temp;
         }
 
@@ -579,8 +575,7 @@ namespace mongo {
             if ( ! boost::filesystem::exists( p) )
                 continue;
 
-            if( verbose ) 
-                log() << "found directory for jars : " << jarDir << endl;
+            log(1) << "found directory for jars : " << jarDir << endl;
             return temp;
         }
 

@@ -775,7 +775,7 @@ namespace mongo {
             }
         }
         else if ( nextOpTime != syncedTo ) {
-            Logstream& l = log();
+            Nullstream& l = log();
             l << "pull:   nextOpTime " << nextOpTime.toStringLong() << ' ';
             if ( nextOpTime < syncedTo )
                 l << "<??";
