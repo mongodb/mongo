@@ -51,6 +51,7 @@ namespace mongo {
         case NumberInt:
             s.precision( 16 );
             s << fieldName() << ": " << number();
+            s << "(type:" << ( type() == NumberInt ? "int" : "double" ) << ")";
             break;
         case Bool:
             s << fieldName() << ": " << ( boolean() ? "true" : "false" );

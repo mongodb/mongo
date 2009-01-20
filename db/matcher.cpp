@@ -113,11 +113,11 @@ namespace mongo {
 
 namespace mongo {
 
-    /* _jsobj          - the query pattern
+    /* _jsobj          - the query pattern - This should not be destroyed before the matcher.
        indexKeyPattern - the "key pattern" / template of what is in the keys of the index we are using.
                          used to set indexMatches return value from matches()
     */
-    JSMatcher::JSMatcher(BSONObj &_jsobj, BSONObj indexKeyPattern) :
+    JSMatcher::JSMatcher(const BSONObj &_jsobj, BSONObj indexKeyPattern) :
             in(0), where(0), jsobj(_jsobj), nRegex(0)
     {
         checkInIndex = !indexKeyPattern.isEmpty();
@@ -264,7 +264,7 @@ namespace mongo {
         }
     }
 
-    inline int JSMatcher::valuesMatch(BSONElement& l, BSONElement& r, int op) {
+    inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op) {
         if ( op == 0 )
             return l.valuesEqual(r);
 
@@ -279,7 +279,7 @@ namespace mongo {
         }
 
         /* check LT, GTE, ... */
-        if ( l.type() != r.type() )
+        if ( !( l.isNumber() && r.isNumber() ) && ( l.type() != r.type() ) )
             return false;
         int c = compareElementValues(l, r);
         if ( c < -1 ) c = -1;
@@ -308,7 +308,7 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int JSMatcher::matchesDotted(const char *fieldName, BSONElement& toMatch, BSONObj& obj, int compareOp, bool *deep, bool isArr) {
+    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
         {
             const char *p = strchr(fieldName, '.');
             if ( p ) {
@@ -405,7 +405,7 @@ namespace mongo {
          if( !inIndex && !ok ) continue;
        in each loop to bypass those checks.  probably not worth checking as usually we are ok.
     */
-    bool JSMatcher::matches(BSONObj& jsobj, bool *deep) {
+    bool JSMatcher::matches(const BSONObj& jsobj, bool *deep) {
         if ( deep )
             *deep = false;
 
@@ -418,7 +418,6 @@ namespace mongo {
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
             int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, deep);
-
             if ( cmp < 0 )
                 return false;
             if ( cmp == 0 ) {
@@ -453,8 +452,8 @@ namespace mongo {
                 if ( where->jsScope ) {
                     JavaJS->scopeInit( where->scope , where->jsScope );
                 }
-                JavaJS->scopeSetThis(where->scope, &jsobj);
-                JavaJS->scopeSetObject(where->scope, "obj", &jsobj);
+                JavaJS->scopeSetThis( where->scope, const_cast< BSONObj * >( &jsobj ) );
+                JavaJS->scopeSetObject( where->scope, "obj", const_cast< BSONObj * >( &jsobj ) );
             }
             /*else {
             BSONObjBuilder b;

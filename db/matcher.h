@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include "jsobj.h"
 #include <pcrecpp.h>
 
 namespace mongo {
@@ -66,7 +67,7 @@ namespace mongo {
     class JSMatcher : boost::noncopyable {
         int matchesDotted(
             const char *fieldName,
-            BSONElement& toMatch, BSONObj& obj,
+            const BSONElement& toMatch, const BSONObj& obj,
             int compareOp, bool *deep, bool isArr = false);
 
         struct element_lt
@@ -94,13 +95,13 @@ namespace mongo {
             return op <= LTE ? -1 : 1;
         }
 
-        JSMatcher(BSONObj& pattern, BSONObj indexKeyPattern);
+        JSMatcher(const BSONObj& pattern, BSONObj indexKeyPattern);
 
         ~JSMatcher();
 
         /* deep - means we looked into arrays for a match
         */
-        bool matches(BSONObj& j, bool *deep = 0);
+        bool matches(const BSONObj& j, bool *deep = 0);
 
         int getN() {
             return n;
@@ -116,11 +117,11 @@ namespace mongo {
             n++;
         }
 
-        int valuesMatch(BSONElement& l, BSONElement& r, int op);
+        int valuesMatch(const BSONElement& l, const BSONElement& r, int op);
 
         set<BSONElement,element_lt> *in; // set if query uses $in
         Where *where;                    // set if query uses $where
-        BSONObj& jsobj;                  // the query pattern.  e.g., { name: "joe" }
+        const BSONObj& jsobj;                  // the query pattern.  e.g., { name: "joe" }
 
         vector<BasicMatcher> basics;
         int n;                           // # of basicmatcher items

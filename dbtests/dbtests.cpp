@@ -85,6 +85,7 @@ int main( int argc, char** argv ) {
     tests.add( btreeTests(), "btree" );
     tests.add( jsobjTests(), "jsobj" );
     tests.add( jsonTests(), "json" );
+    tests.add( matcherTests(), "matcher" );
     tests.add( namespaceTests(), "namespace" );
     tests.add( pairingTests(), "pairing" );
     tests.add( pdfileTests(), "pdfile" );
