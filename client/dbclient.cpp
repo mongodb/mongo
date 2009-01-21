@@ -183,7 +183,7 @@ namespace mongo {
             return;
         }
 
-        if( !c.auth("dwight", "foo", "apassw", err) ) { 
+        if( !c.auth("dwight", "u", "p", err) ) { 
             out() << "can't authenticate " << err << endl;
             return;
         }

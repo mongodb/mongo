@@ -18,16 +18,16 @@ namespace mongo {
 /* authentication
 
    system.users contains 
-     { user : <username>, pwd : <pwd_string>, ... }
+     { user : <username>, pwd : <pwd_digest>, ... }
 
    getnonce sends nonce to client
 
-   client then sends { authenticate:1, nonce:<nonce>, user:<username>, key:<key> }
+   client then sends { authenticate:1, nonce:<nonce_str>, user:<username>, key:<key> }
 
-   where <key> is md5(<nonce><username><pwd>) as a BinData type
+   where <key> is md5(<nonce_str><username><pwd_digest_str>) as a string
 */
 
-    boost::thread_specific_ptr<double> lastNonce;
+    boost::thread_specific_ptr<nonce> lastNonce;
 
     class CmdGetNonce : public Command {
     public:
@@ -40,12 +40,11 @@ namespace mongo {
         }
         CmdGetNonce() : Command("getnonce") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            double *d = new double((double) security.getNonce());
-
+            nonce *n = new nonce(security.getNonce());
             stringstream ss;
-            ss << *d;
+            ss << hex << *n;
             result.append("nonce", ss.str() );
-            lastNonce.reset(d);
+            lastNonce.reset(n);
             return true;
         }
     } cmdGetNonce;
@@ -83,9 +82,9 @@ namespace mongo {
 
             string user = cmdObj.getStringField("user");
             string key = cmdObj.getStringField("key");
-            string nonce = cmdObj.getStringField("nonce");
+            string received_nonce = cmdObj.getStringField("nonce");
             
-            if( user.empty() || key.empty() || nonce.empty() ) { 
+            if( user.empty() || key.empty() || received_nonce.empty() ) { 
                 log() << "field missing/wrong type in received authenticate command " << database->name << '\n';                log() << "field missing/wrong type in received authenticate command " << database->name << '\n';
                 errmsg = "auth fails";
                 sleepmillis(10);
@@ -95,10 +94,10 @@ namespace mongo {
             stringstream digestBuilder;
 
             {
-                double *ln = lastNonce.release();
-                digestBuilder << *ln;
+                nonce *ln = lastNonce.release();
+                digestBuilder << hex << *ln;
                 
-                if( ln == 0 || digestBuilder.str() != nonce ) {
+                if( ln == 0 || digestBuilder.str() != received_nonce ) {
                     log() << "auth: bad nonce received. could be a driver bug or a security attack. db:" << database->name << '\n';                log() << "field missing/wr " << database->name << '\n';
                     errmsg = "auth fails";
                     sleepmillis(30);
