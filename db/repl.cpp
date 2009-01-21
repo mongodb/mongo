@@ -796,6 +796,7 @@ namespace mongo {
 
         // apply operations
         {
+			time_t saveLast = time(0);
             while ( 1 ) {
                 if ( !c->more() ) {
                     log() << "pull:   applied " << n << " operations" << endl;
@@ -805,6 +806,14 @@ namespace mongo {
                     save(); // note how far we are synced up to now
                     break;
                 }
+
+				OCCASIONALLY if( time(0) - saveLast > 5 * 60 ) { 
+					// periodically note our progress, in case we are doing a lot of work and crash
+					dblock lk;
+					save();
+					saveLast = time(0);
+				}
+
                 /* todo: get out of the mutex for the next()? */
                 BSONObj op = c->next();
                 ts = op.findElement("ts");
