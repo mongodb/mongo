@@ -22,9 +22,12 @@
 namespace mongo {
 
     static boost::mutex sock_mutex;
-// .empty() if err
+
     string hostbyname(const char *hostname) {
         boostlock lk(sock_mutex);
+        struct in_addr temp;
+        if ( inet_aton( hostname, &temp ) )
+            return hostname;
         struct hostent *h;
         h = gethostbyname(hostname);
         if ( h == 0 ) return "";
