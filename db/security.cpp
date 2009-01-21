@@ -17,6 +17,8 @@ namespace mongo {
 
     bool noauth = true;
 
+	int AuthenticationInfo::warned;
+
     Security::Security(){
 #if defined(__linux__)
         devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);

@@ -162,6 +162,8 @@ namespace mongo {
 
         try {
 
+			ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
+
             Message m;
             while ( 1 ) {
                 m.reset();

@@ -50,11 +50,11 @@ namespace mongo {
         static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex=false);
 
         /* Get/put the first object from a collection.  Generally only useful if the collection
-        only ever has a single object -- which is a "singleton collection".
+           only ever has a single object -- which is a "singleton collection".
 
-        You do not need to set the database before calling.
-
-        Returns: true if object exists.
+		   You do not need to set the database before calling.
+		   
+		   Returns: true if object exists.
         */
         static bool getSingleton(const char *ns, BSONObj& result);
         static void putSingleton(const char *ns, BSONObj obj);

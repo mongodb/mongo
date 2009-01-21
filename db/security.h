@@ -19,6 +19,8 @@
 #pragma once
 
 #include <boost/thread/tss.hpp>
+#include "db.h"
+#include "dbhelpers.h"
 
 namespace mongo {
 
@@ -33,16 +35,35 @@ namespace mongo {
 
     class AuthenticationInfo : boost::noncopyable {
         map<string, Auth> m; // dbname -> auth
+		static int warned;
     public:
-        AuthenticationInfo() { }
+		bool isLocalHost;
+        AuthenticationInfo() { isLocalHost = false; }
         ~AuthenticationInfo() {
         }
-        void logout(const char *dbname) { m.erase(dbname); }
+        void logout(const char *dbname) { 
+			assert( dbMutexInfo.isLocked() );
+			m.erase(dbname); 
+		}
         void authorize(const char *dbname) { 
+			assert( dbMutexInfo.isLocked() );
             m[dbname].level = 2;
         }
         bool isAuthorized(const char *dbname) { 
-            return m[dbname].level == 2 || noauth;
+            if( m[dbname].level == 2 ) return true;
+			if( noauth ) return true;
+			if( isLocalHost ) { 
+				DBContext c("admin.system.users");
+				BSONObj result;
+				if( Helpers::getSingleton("admin.system.users", result) )
+					return false;
+				if( warned == 0 ) {
+					warned++;
+					log() << "warning: no users configured in admin.system.users, allowing localhost access" << endl;
+				}
+				return true;
+			}
+			return false;
         }
     };
 
