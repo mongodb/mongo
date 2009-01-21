@@ -78,14 +78,11 @@ namespace mongo {
             massert( "Remaining data too small for BSON object", theEnd - nextjsobj > 3 );
             BSONObj js(nextjsobj);
             massert( "Invalid object size", js.objsize() > 3 );
-            assert( js.objsize() < ( theEnd - data ) );
-            if ( js.objsize() <= 0 )
-                nextjsobj = null;
-            else {
-                nextjsobj += js.objsize();
-                if ( nextjsobj >= theEnd )
-                    nextjsobj = 0;
-            }
+            massert( "Next object larger than available space",
+                    js.objsize() < ( theEnd - data ) );
+            nextjsobj += js.objsize();
+            if ( nextjsobj >= theEnd )
+                nextjsobj = 0;
             return js;
         }
 
