@@ -52,6 +52,7 @@ namespace mongo {
         bool isAuthorized(const char *dbname) { 
             if( m[dbname].level == 2 ) return true;
 			if( noauth ) return true;
+			if( m["admin"].level == 2 ) return true;
 			if( isLocalHost ) { 
 				DBContext c("admin.system.users");
 				BSONObj result;
