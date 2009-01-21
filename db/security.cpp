@@ -38,9 +38,9 @@ namespace mongo {
         devrandom->read((char*)&n, sizeof(n));
         massert("devrandom failed", !devrandom->fail());
 #elif defined(_WIN32)
-        n = ((unsigned long long)rand())<<32 | rand();
+        n = (((unsigned long long)rand())<<32) | rand();
 #else
-        n = random();
+        n = (((unsigned long long)random())<<32) | random();
 #endif
         return n;
     }

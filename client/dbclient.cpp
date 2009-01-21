@@ -54,7 +54,20 @@ namespace mongo {
 
     BSONObj getnoncecmdobj = fromjson("{\"getnonce\":1}");
 
-    bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password, string& errmsg) {
+    bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password_text, string& errmsg) {
+		string password;
+		{
+            md5digest d;
+            {
+                md5_state_t st;
+                md5_init(&st);
+                md5_append(&st, (const md5_byte_t *) "mongo", 5 );
+                md5_append(&st, (const md5_byte_t *) password_text, strlen(password_text));
+                md5_finish(&st, d);
+            }
+			password = digestToString(d);
+		}
+
         BSONObj info;
         string nonce;
         if( !runCommand(dbname, getnoncecmdobj, info) ) {
@@ -78,7 +91,7 @@ namespace mongo {
                 md5_init(&st);
                 md5_append(&st, (const md5_byte_t *) nonce.c_str(), nonce.size() );
                 md5_append(&st, (const md5_byte_t *) username, strlen(username));
-                md5_append(&st, (const md5_byte_t *) password, strlen(password));
+                md5_append(&st, (const md5_byte_t *) password.c_str(), password.size() );
                 md5_finish(&st, d);
             }
             b << "key" << digestToString( d );
@@ -183,7 +196,7 @@ namespace mongo {
             return;
         }
 
-        if( !c.auth("dwight", "foo", "apassw", err) ) { 
+        if( !c.auth("dwight", "u", "p", err) ) { 
             out() << "can't authenticate " << err << endl;
             return;
         }
