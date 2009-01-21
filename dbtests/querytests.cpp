@@ -33,6 +33,18 @@ namespace QueryTests {
             setClient( ns() );
             addIndex( fromjson( "{\"a\":1}" ) );
         }
+        ~Base() {
+            try {
+                auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() );
+                vector< DiskLoc > toDelete;
+                for(; c->ok(); c->advance() )
+                    toDelete.push_back( c->currLoc() );
+                for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
+                    theDataFileMgr.deleteRecord( ns(), i->rec(), *i, false );
+            } catch ( ... ) {
+                FAIL( "Exception while cleaning up records" );
+            }
+        }
     protected:
         static const char *ns() {
             return "unittest.querytests";
@@ -46,6 +58,12 @@ namespace QueryTests {
             stringstream indexNs;
             indexNs << ns() << ".system.indexes";
             theDataFileMgr.insert( indexNs.str().c_str(), o.objdata(), o.objsize() );
+        }
+        static void insert( const char *s ) {
+            insert( fromjson( s ) );
+        }
+        static void insert( const BSONObj &o ) {
+            theDataFileMgr.insert( ns(), o.objdata(), o.objsize() );
         }
     };
     
@@ -107,6 +125,51 @@ namespace QueryTests {
         }        
     };
 
+    class CountBasic : public Base {
+    public:
+        void run() {
+            insert( "{\"a\":\"b\"}" );
+            BSONObj cmd = fromjson( "{\"query\":{}}" );
+            string err;
+            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+        }
+    };
+    
+    class CountQuery : public Base {
+    public:
+        void run() {
+            insert( "{\"a\":\"b\"}" );
+            insert( "{\"a\":\"b\",\"x\":\"y\"}" );
+            insert( "{\"a\":\"c\"}" );
+            BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"}}" );
+            string err;
+            ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
+        }        
+    };
+    
+    class CountFields : public Base {
+    public:
+        void run() {
+            insert( "{\"a\":\"b\"}" );
+            insert( "{\"c\":\"d\"}" );
+            BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
+            string err;
+            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+        }        
+    };
+
+    class CountQueryFields : public Base {
+    public:
+        void run() {
+            insert( "{\"a\":\"b\"}" );
+            insert( "{\"a\":\"c\"}" );
+            insert( "{\"d\":\"e\"}" );
+            BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"},\"fields\":{\"a\":1}}" );
+            string err;
+            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+        }        
+    };
+
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -115,6 +178,10 @@ namespace QueryTests {
             add< SimpleFindSort >();
             add< FindNumericNotSimple >();
             add< FindObjectNotSimple >();
+            add< CountBasic >();
+            add< CountQuery >();
+            add< CountFields >();
+            add< CountQueryFields >();
         }
     };
     

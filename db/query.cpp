@@ -442,8 +442,11 @@ namespace mongo {
         }
 
         BSONObj query = cmd.getObjectField("query");
+        
+        set< string > fields;
+        cmd.getObjectField("fields").getFieldNames( fields );
 
-        if ( query.isEmpty() ) {
+        if ( query.isEmpty() && fields.empty() ) {
             // count of all objects
             return (int) d->nrecords;
         }
@@ -454,7 +457,8 @@ namespace mongo {
         c = getIndexCursor(ns, query, empty_obj, &simpleKeyToMatch);
 
         if ( c.get() ) {
-            if ( simpleKeyToMatch ) {
+            // TODO We could check if all fields in the key are in 'fields'
+            if ( simpleKeyToMatch && fields.empty() ) {
                 /* Here we only look at the btree keys to determine if a match, instead of looking
                    into the records, which would be much slower.
                    */
@@ -483,8 +487,15 @@ namespace mongo {
             if ( !matcher->matches(js, &deep) ) {
             }
             else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
-                // got a match.
-                count++;
+                bool match = true;
+                for( set< string >::iterator i = fields.begin(); i != fields.end(); ++i ) {
+                    if ( js.getFieldDotted( i->c_str() ).eoo() ) {
+                        match = false;
+                        break;
+                    }
+                }
+                if ( match )
+                    ++count;
             }
             c->advance();
         }

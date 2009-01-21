@@ -83,6 +83,8 @@ namespace mongo {
     class Cursor;
     auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0, string *hint = 0);
 
+    int runCount(const char *ns, BSONObj& cmd, string& err);
+    
 } // namespace mongo
 
 #include "clientcursor.h"

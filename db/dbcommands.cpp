@@ -40,7 +40,6 @@ namespace mongo {
     extern int otherTraceLevel;
     extern int opLogging;
     void flushOpLog();
-    int runCount(const char *ns, BSONObj& cmd, string& err);
 
     void clean(const char *ns, NamespaceDetails *d) {
         for ( int i = 0; i < Buckets; i++ )
