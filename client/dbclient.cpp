@@ -54,19 +54,20 @@ namespace mongo {
 
     BSONObj getnoncecmdobj = fromjson("{\"getnonce\":1}");
 
+    string DBClientWithCommands::createPasswordDigest( const char * clearTextPassword ){
+        md5digest d;
+        {
+            md5_state_t st;
+            md5_init(&st);
+            md5_append(&st, (const md5_byte_t *) "mongo", 5 );
+            md5_append(&st, (const md5_byte_t *) clearTextPassword, strlen(clearTextPassword));
+            md5_finish(&st, d);
+        }
+        return digestToString( d );
+    }
+
     bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password_text, string& errmsg) {
-		string password;
-		{
-            md5digest d;
-            {
-                md5_state_t st;
-                md5_init(&st);
-                md5_append(&st, (const md5_byte_t *) "mongo", 5 );
-                md5_append(&st, (const md5_byte_t *) password_text, strlen(password_text));
-                md5_finish(&st, d);
-            }
-			password = digestToString(d);
-		}
+		string password = createPasswordDigest( password_text );
 
         BSONObj info;
         string nonce;

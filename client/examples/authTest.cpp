@@ -19,7 +19,7 @@ int main() {
         conn.remove( "test.system.users" , emptyObj );
     }
 
-    conn.insert( "test.system.users" , BUILDOBJ( "user" << "eliot" << "pwd" << "bar" ) );
+    conn.insert( "test.system.users" , BUILDOBJ( "user" << "eliot" << "pwd" << conn.createPasswordDigest( "bar" ) ) );
     
     errmsg.clear();
     bool ok = conn.auth( "test" , "eliot" , "bar" , errmsg );

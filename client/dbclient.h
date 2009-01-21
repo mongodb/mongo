@@ -195,6 +195,8 @@ namespace mongo {
         */
         bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg);
 
+        string createPasswordDigest( const char * clearTextPassword );
+
         /* returns true in isMaster parm if this db is the current master
            of a replica pair.
 
