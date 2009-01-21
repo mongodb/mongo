@@ -41,7 +41,10 @@ namespace mongo {
         CmdGetNonce() : Command("getnonce") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             double *d = new double((double) security.getNonce());
-            result.append("nonce", *d);
+
+            stringstream ss;
+            ss << *d;
+            result.append("nonce", ss.str() );
             lastNonce.reset(d);
             return true;
         }
@@ -79,20 +82,23 @@ namespace mongo {
             log(1) << " authenticate: " << cmdObj << endl;
 
             string user = cmdObj.getStringField("user");
-            BSONElement key = cmdObj.findElement("key");
-            BSONElement nonce = cmdObj.findElement("nonce");
-            if( user.empty() || key.type() != BinData || nonce.type() != NumberDouble ) { 
+            string key = cmdObj.getStringField("key");
+            string nonce = cmdObj.getStringField("nonce");
+            
+            if( user.empty() || key.empty() || nonce.empty() ) { 
                 log() << "field missing/wrong type in received authenticate command " << database->name << '\n';                log() << "field missing/wrong type in received authenticate command " << database->name << '\n';
                 errmsg = "auth fails";
                 sleepmillis(10);
                 return false;
             }
             
-            double n = nonce.number();
+            stringstream digestBuilder;
+
             {
                 double *ln = lastNonce.release();
-
-                if( ln == 0 || n != *ln ) {
+                digestBuilder << *ln;
+                
+                if( ln == 0 || digestBuilder.str() != nonce ) {
                     log() << "auth: bad nonce received. could be a driver bug or a security attack. db:" << database->name << '\n';                log() << "field missing/wr " << database->name << '\n';
                     errmsg = "auth fails";
                     sleepmillis(30);
@@ -115,22 +121,23 @@ namespace mongo {
                     return false;
                 }
             }
+            
             md5digest d;
             {
+                
+                string pwd = userObj.getStringField("pwd");
+                digestBuilder << user << pwd;
+                string done = digestBuilder.str();
+                
                 md5_state_t st;
                 md5_init(&st);
-                md5_append(&st, (const md5_byte_t *) &n, sizeof(n));
-                md5_append(&st, (const md5_byte_t *) user.c_str(), user.size());
-                string pwd = userObj.getStringField("pwd");
-                md5_append(&st, (const md5_byte_t *) pwd.c_str(), pwd.size());
+                md5_append(&st, (const md5_byte_t *) done.c_str(), done.size());
                 md5_finish(&st, d);
             }
-
-            int keylen;
-            const char *keydata = key.binData(keylen);
-            uassert( "bad key", keylen == 16 );
-
-            if( memcmp(d, keydata, 16) != 0 ) { 
+            
+            string computed = digestToString( d );
+            
+            if ( key != computed ){
                 log() << "auth: key mismatch " << user << ", ns:" << ns << '\n';
                 errmsg = "auth fails";
                 return false;
@@ -142,5 +149,5 @@ namespace mongo {
             return true;
         }
     } cmdAuthenticate;
-
+    
 } // namespace mongo

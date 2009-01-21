@@ -18,5 +18,15 @@ namespace mongo {
     inline void md5(const char *str, md5digest digest) {
         md5(str, strlen(str), digest);
     }
+    
+    inline std::string digestToString( md5digest digest ){
+        static const char * letters = "0123456789abcdef";
+        stringstream ss;
+        for ( int i=0; i<16; i++){
+            unsigned char c = digest[i];
+            ss << letters[ ( c >> 4 ) & 0xf ] << letters[ c & 0xf ];
+        }
+        return ss.str();
+    }
 
 } // namespace mongo
