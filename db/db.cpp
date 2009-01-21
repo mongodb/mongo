@@ -293,6 +293,10 @@ namespace mongo {
 
     void segvhandler(int x);
     void initAndListen(int listenPort, const char *appserverLoc = null) {
+        stringstream ss;
+        ss << "dbpath (" << dbpath << ") does not exist";
+        massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
+        
         clearTmpFiles();
 
         if ( opLogging )
