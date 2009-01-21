@@ -494,8 +494,8 @@ namespace mongo {
 
     /* ------------------------------------------------------------------------- */
 
-    map<const char *,NamespaceDetailsTransient*> NamespaceDetailsTransient::map;
-    typedef map<const char *,NamespaceDetailsTransient*>::iterator ouriter;
+    map<string,NamespaceDetailsTransient*> NamespaceDetailsTransient::map;
+    typedef map<string,NamespaceDetailsTransient*>::iterator ouriter;
 
     NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
         NamespaceDetailsTransient*& t = map[ns];
