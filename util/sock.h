@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "../stdafx.h"
+
 #include <stdio.h>
 #include <sstream>
 #include "goodies.h"
