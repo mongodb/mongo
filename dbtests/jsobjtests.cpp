@@ -214,6 +214,17 @@ namespace JsobjTests {
                 }
             };
 
+            class NegativeStringSize : public Base {
+                BSONObj valid() const {
+                    return fromjson( "{\"a\":\"b\"}" );
+                }
+                BSONObj invalid() const {
+                    BSONObj ret = valid();
+                    set( ret, 10, -100 );
+                    return ret;
+                }
+            };
+
             class WrongSubobjectSize : public Base {
                 BSONObj valid() const {
                     return fromjson( "{\"a\":{\"b\":1}}" );
@@ -447,6 +458,7 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::EooMissing >();
             add< BSONObjTests::Validation::WrongStringSize >();
             add< BSONObjTests::Validation::ZeroStringSize >();
+            add< BSONObjTests::Validation::NegativeStringSize >();
             add< BSONObjTests::Validation::WrongSubobjectSize >();
             add< BSONObjTests::Validation::WrongDbrefNsSize >();
             add< BSONObjTests::Validation::WrongSymbolSize >();
