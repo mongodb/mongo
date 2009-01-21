@@ -64,7 +64,6 @@ namespace mongo {
     int ctr = 0;
     bool quiet = false;
     bool cpu = false; // --cpu show cpu time periodically
-    bool verbose = false;
 
 // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse ) {
@@ -409,6 +408,9 @@ namespace mongo {
     */
     void jniCallback(Message& m, Message& out)
     {
+        AuthenticationInfo *ai = new AuthenticationInfo();
+        authInfo.reset(ai);
+        
         Database *clientOld = database;
 
         JniMessagingPort jmp(out);

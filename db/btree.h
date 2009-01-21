@@ -200,7 +200,7 @@ namespace mongo {
         BSONObj endKey;
 //    BSONObj query; // the query we are working on in association with the cursor -- see noMoreMatches()
     public:
-        BtreeCursor(IndexDetails&, const BSONObj& startKey, int direction, BSONObj& query);
+        BtreeCursor(IndexDetails&, const BSONObj& startKey, int direction, const BSONObj& query);
         virtual bool ok() {
             return !bucket.isNull();
         }

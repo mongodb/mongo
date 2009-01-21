@@ -22,6 +22,7 @@
 #include "repl.h"
 #include "replset.h"
 #include "instance.h"
+#include "security.h"
 
 namespace mongo {
 
@@ -364,6 +365,8 @@ namespace mongo {
 
     void webServerThread() {
         boost::thread thr(statsThread);
+        AuthenticationInfo *ai = new AuthenticationInfo();
+        authInfo.reset(ai);
         DbWebServer mini;
         if ( mini.init(port+1000) )
             mini.run();

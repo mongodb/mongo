@@ -639,8 +639,7 @@ namespace mongo {
        returns true if ran a cmd
     */
     bool _runCommands(const char *ns, BSONObj& _cmdobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl) {
-        if ( verbose )
-            log() << "run command " << ns << ' ' << _cmdobj.toString() << endl;
+            log(1) << "run command " << ns << ' ' << _cmdobj << endl;
 
         const char *p = strchr(ns, '.');
         if ( !p ) return false;

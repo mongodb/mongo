@@ -119,7 +119,7 @@ namespace mongo {
                 break;
             }
 
-        Logstream& l = log();
+        Nullstream& l = log();
         l << "connecting to griddb ";
 
         bool ok;

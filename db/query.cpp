@@ -78,7 +78,7 @@ namespace mongo {
          simpleKeyMatch - set to true if the query is purely for a single key value
                           unchanged otherwise.
     */
-    auto_ptr<Cursor> getIndexCursor(const char *ns, BSONObj& query, BSONObj& order, bool *simpleKeyMatch, bool *isSorted, string *hint) {
+    auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch, bool *isSorted, string *hint) {
         NamespaceDetails *d = nsdetails(ns);
         if ( d == 0 ) return auto_ptr<Cursor>();
 
@@ -144,10 +144,8 @@ namespace mongo {
                     BSONElement e = it.next();
                     if ( e.eoo() )
                         break;
-                    if ( e.type() == RegEx )                                                       
+                    if ( e.isNumber() || e.mayEncapsulate() || e.type() == RegEx )
                         simple = false;                                                            
-                    if ( e.type() == Object && getGtLtOp( e ) != JSMatcher::Equality )
-                        simple = false;
                 }
                 DEV out() << "using index " << d->indexes[i].indexNamespace() << endl;
                 if ( simple && simpleKeyMatch )

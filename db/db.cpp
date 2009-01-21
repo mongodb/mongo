@@ -29,7 +29,7 @@
 
 namespace mongo {
 
-    extern bool objcheck, quiet, quota, verbose, cpu;
+    extern bool objcheck, quiet, quota, cpu;
     bool useJNI = true;
 
     /* only off if --nocursors which is for debugging. */
@@ -447,7 +447,10 @@ int main(int argc, char* argv[], char *envp[] )
             else if ( s == "--auth" )
                 noauth = false;
             else if ( s == "--verbose" )
-                verbose = true;
+                logLevel = 1;
+            else if ( s.find( "-v" ) == 0 ){
+                logLevel = s.size() - 1;
+            }
             else if ( s == "--quota" )
                 quota = true;
             else if ( s == "--objcheck" )
@@ -481,7 +484,7 @@ int main(int argc, char* argv[], char *envp[] )
                 opLogging = x;
             }
         }
-
+        
         initAndListen(port, appsrvPath);
 
         exit(0);
@@ -509,6 +512,7 @@ usage:
     out() << " --noauth            run without security\n";
     out() << " --auth              run with security (temp - this will be default)\n";
     out() << " --verbose\n";
+    out() << " -v+                 increase verbose level -v = --verbose\n";
     out() << " --objcheck          inspect client data for validity on receipt\n";
     out() << " --quota             enable db quota management\n";
     out() << " --appsrvpath <path> root directory for the babble app server\n";

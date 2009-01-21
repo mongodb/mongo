@@ -51,6 +51,7 @@ namespace mongo {
         case NumberInt:
             s.precision( 16 );
             s << fieldName() << ": " << number();
+            s << "(" << ( type() == NumberInt ? "int" : "double" ) << ")";
             break;
         case Bool:
             s << fieldName() << ": " << ( boolean() ? "true" : "false" );
@@ -552,15 +553,18 @@ namespace mongo {
         while ( 1 ) {
             massert( "Object does not end with EOO or Undefined", i.more() );
             BSONElement e = i.next( true );
-            const char *objEnd = this->objdata() + this->objsize();
-            const char *eEnd = e.rawdata() + e.size();
-            massert( "Element extends past end of object", eEnd <= objEnd );
+            massert( "Invalid element size", e.size() > 0 );
+            massert( "Element too large", e.size() < ( 1 << 30 ) );
+            int offset = e.rawdata() - this->objdata();
+            massert( "Element extends past end of object",
+                    e.size() + offset <= this->objsize() );
             e.validate();
+            bool end = ( e.size() + offset == this->objsize() );
             if ( e.eoo() ) {
-                massert( "EOO Before end of object", eEnd == objEnd );
+                massert( "EOO Before end of object", end );
                 break;
             } else if ( e.type() == Undefined ) {
-                massert( "Undefined Before end of object", eEnd == objEnd );
+                massert( "Undefined Before end of object", end );
                 break;                
             }
             if ( first )
@@ -724,7 +728,7 @@ namespace mongo {
         }
         return b.done();
     }
-    BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) {
+    BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) const {
         BSONObjBuilder b;
         BSONObjIterator i(pattern);
         while ( i.more() ) {
@@ -775,7 +779,7 @@ namespace mongo {
         return t == Object || t == Array ? e.embeddedObject() : BSONObj();
     }
 
-    int BSONObj::nFields() {
+    int BSONObj::nFields() const {
         int n = 0;
         BSONObjIterator i(*this);
         while ( i.more() ) {
@@ -788,7 +792,7 @@ namespace mongo {
     }
 
     /* grab names of all the fields in this object */
-    int BSONObj::getFieldNames(set<string>& fields) {
+    int BSONObj::getFieldNames(set<string>& fields) const {
         int n = 0;
         BSONObjIterator i(*this);
         while ( i.more() ) {

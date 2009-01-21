@@ -202,6 +202,7 @@ env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
 # examples
 clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
 clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
+clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] )
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
