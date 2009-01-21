@@ -309,7 +309,7 @@ namespace mongo {
             haveIndexKeys=false;
         }
     private:
-        static std::map<const char *,NamespaceDetailsTransient*> map;
+        static std::map<string,NamespaceDetailsTransient*> map;
     public:
         static NamespaceDetailsTransient& get(const char *ns);
     };
