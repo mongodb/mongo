@@ -96,7 +96,8 @@ namespace mongo {
         }
     }
 
-// .empty() if err
+    // If an ip address is passed in, just return that.  If a hostname is passed
+    // in, look up its ip and return that.  Returns "" on failure.
     string hostbyname(const char *hostname);
 
     struct SockAddr {
