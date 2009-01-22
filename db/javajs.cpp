@@ -73,6 +73,7 @@ namespace mongo {
 #endif
 
     JavaJSImpl * JavaJS = 0;
+    extern string dbExecCommand;
 
 #if !defined(NOJNI)
 
@@ -135,8 +136,8 @@ namespace mongo {
         else {
 
 
-            const char * jars = findJars();
-            _addClassPath( jars , ss , "jars" );
+            const string jars = findJars();
+            _addClassPath( jars.c_str() , ss , "jars" );
 
             edTemp += (string)jars + "/jars/babble.jar";
             ed = edTemp.c_str();
@@ -559,17 +560,26 @@ namespace mongo {
 #endif
     };
 
-    const char * findJars() {
+    const string findJars() {
 
-        static list<const char*> possible;
+        static list<string> possible;
         if ( ! possible.size() ) {
             possible.push_back( "./" );
             possible.push_back( "../" );
+            
+            if ( dbExecCommand.find( "/" ) ){
+                string dbDir = dbExecCommand.substr( 0 , dbExecCommand.find_last_of( "/" ) );
+                cout << "dbDir [" << dbDir << "]";
+                possible.push_back( ( dbDir + "/../lib/mongo/" ));
+            }
+            
         }
 
-        for ( list<const char*>::iterator i = possible.begin() ; i != possible.end(); i++ ) {
-            const char * temp = *i;
+        for ( list<string>::iterator i = possible.begin() ; i != possible.end(); i++ ) {
+            const string temp = *i;
             const string jarDir = ((string)temp) + "jars/";
+            
+            log(5) << "possible jarDir [" << jarDir << "]" << endl;
 
             path p(jarDir );
             if ( ! boost::filesystem::exists( p) )

@@ -346,6 +346,8 @@ using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] )
 {
+    dbExecCommand = argv[0];
+    
     srand(curTimeMicros());
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 

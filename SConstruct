@@ -247,7 +247,7 @@ for id in [ "" , "client/" , "util/" , "grid/" , "db/" ]:
 
 #lib
 env.Install( installDir + "/" + nixLibPrefix , "libmongoclient.a" )
-env.Install( installDir + "/" + nixLibPrefix + "/mongo-jars" , Glob( "jars/*" ) )
+env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #final alias
 env.Alias( "install" , installDir )

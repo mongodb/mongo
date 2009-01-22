@@ -44,7 +44,7 @@ namespace mongo {
 
     const char * findEd();
     const char * findEd(const char *);
-    const char * findJars();
+    const string findJars();
 
     class BSONObj;
 

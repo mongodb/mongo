@@ -42,6 +42,8 @@ namespace mongo {
     MutexInfo dbMutexInfo;
 //int dbLocked = 0;
 
+    string dbExecCommand;
+
     int port = DBPort;
     /* 0 = off; 1 = writes, 2 = reads, 3 = both
        7 = log a few reads, and all writes.
