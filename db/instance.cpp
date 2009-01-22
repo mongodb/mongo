@@ -364,24 +364,20 @@ namespace mongo {
 
     void receivedInsert(Message& m, stringstream& ss) {
         DbMessage d(m);
-        //while ( d.moreJSObjs() ) {
-        assert( d.moreJSObjs() );
-        {
+		const char *ns = d.getns();
+		assert(*ns);
+		setClient(ns);
+		ss << ns;
+		
+        while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
-            const char *ns = d.getns();
-            assert(*ns);
-            setClient(ns);
-            ss << ns;
-
             if ( objcheck && !js.valid() ) {
-                problem() << "insert error ns: " << ns << '\n';
                 uassert("insert: bad object from client", false);
             }
 
             theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
             logOp("i", ns, js);
         }
-        assert( !d.moreJSObjs() ); // only currently supporting 1 object per message as authentication done above this call would be a security hole
     }
 
     extern int callDepth;
