@@ -23,6 +23,14 @@ AddOption( "--64",
            help="whether to force 64 bit" )
 
 
+AddOption( "--32",
+           dest="force32",
+           type="string",
+           nargs=0,
+           action="store",
+           help="whether to force 32 bit" )
+
+
 AddOption('--java',
           dest='javaHome',
           type='string',
@@ -54,7 +62,10 @@ allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
 force64 = not GetOption( "force64" ) is None
+force32 = not GetOption( "force32" ) is None
 
+installDir = "/usr/local"
+nixLibPrefix = "lib"
 
 javaHome = GetOption( "javaHome" )
 
@@ -84,6 +95,7 @@ elif "linux2" == os.sys.platform:
 
     if os.uname()[4] == "x86_64":
         javaVersion = "amd64"
+        nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64"] )
 
     env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
@@ -141,6 +153,8 @@ if nix:
     if force64:
         env.Append( CXXFLAGS="-m64" )
 
+    if force32:
+        env.Append( CXXFLAGS="-m32" )
 
 
 # --- check system ---
@@ -215,7 +229,6 @@ testEnv.AlwaysBuild( "smoke" )
 
 #  ----  INSTALL -------
 
-installDir = "/usr/local"
 if GetOption( "prefix" ):
     installDir = GetOption( "prefix" )
 
@@ -229,8 +242,8 @@ for id in [ "" , "client/" , "util/" , "grid/" , "db/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 
 #lib
-env.Install( installDir + "/lib" , "libmongoclient.a" )
-env.Install( installDir + "/lib/mongo-jars" , Glob( "jars/*" ) )
+env.Install( installDir + "/" + nixLibPrefix , "libmongoclient.a" )
+env.Install( installDir + "/" + nixLibPrefix + "/mongo-jars" , Glob( "jars/*" ) )
 
 #final alias
 env.Alias( "install" , installDir )
