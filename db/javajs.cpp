@@ -569,7 +569,7 @@ namespace mongo {
             
             if ( dbExecCommand.find( "/" ) ){
                 string dbDir = dbExecCommand.substr( 0 , dbExecCommand.find_last_of( "/" ) );
-                cout << "dbDir [" << dbDir << "]";
+                log(2) << "dbDir [" << dbDir << "]";
                 possible.push_back( ( dbDir + "/../lib/mongo/" ));
             }
             
