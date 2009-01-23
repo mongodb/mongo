@@ -55,7 +55,7 @@ namespace ReplTests {
         static const char *logNs() {
             return "local.oplog.$main";
         }
-        DBDirectClient *client() const { return &client_; }
+        DBClientInterface *client() const { return &client_; }
         BSONObj one( const BSONObj &query = emptyObj ) const {
             return client()->findOne( ns(), query );            
         }
@@ -288,6 +288,33 @@ namespace ReplTests {
             UpdateBase( fromjson( "{\"a\":\"b\"}" ),
                        fromjson( "{\"a\":\"b\",\"x\":\"y\"}" ) ) {}            
         };
+             
+        class Remove : public Base {
+        public:
+            Remove() : o_( fromjson( "{\"a\":\"b\"}" ) ) {}
+            void doIt() const {
+                client()->remove( ns(), o_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 0, count() );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( o_ );
+                insert( o_ );
+            }
+        protected:
+            BSONObj o_;            
+        };
+        
+        class RemoveOne : public Remove {
+            void doIt() const {
+                client()->remove( ns(), o_, true );
+            }            
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+            }
+        };
                 
     } // namespace Idempotence
     
@@ -303,6 +330,9 @@ namespace ReplTests {
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::UpdateSameField >();
             add< Idempotence::UpdateDifferentField >();
+            add< Idempotence::Remove >();
+            // FIXME Decide what is correct & uncomment
+//            add< Idempotence::RemoveOne >();
         }
     };
     
