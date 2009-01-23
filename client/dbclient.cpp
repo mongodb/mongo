@@ -347,7 +347,7 @@ namespace mongo {
 
         int flags = 0;
         if ( justOne || obj.hasField( "_id" ) )
-            flags &= 1;
+            flags |= 1;
         b.append( flags );
 
         obj.appendSelfToBufBuilder( b );

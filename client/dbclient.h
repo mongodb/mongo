@@ -166,7 +166,7 @@ namespace mongo {
         
         virtual void insert( const char * ns, const vector< BSONObj >& v ) = 0;
 
-        //virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 ) = 0;
+        virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 ) = 0;
 
         virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 ) = 0;
     };
@@ -498,6 +498,11 @@ namespace mongo {
 
         // Not yet implemented
         virtual void insert( const char * ns, const vector< BSONObj >& v ) {
+            assert( false );
+        }
+
+        // Not yet implemented
+        virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 ) {
             assert( false );
         }
 
