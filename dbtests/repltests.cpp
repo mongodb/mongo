@@ -31,6 +31,10 @@ namespace mongo {
 
 namespace ReplTests {
 
+    BSONObj f( const char *s ) {
+        return fromjson( s );
+    }    
+    
     class Base {
     public:
         Base() {
@@ -60,14 +64,21 @@ namespace ReplTests {
             return client()->findOne( ns(), query );            
         }
         void checkOne( const BSONObj &o ) const {
-            ASSERT( !one( o ).woCompare( o ) );
+            check( o, one( o ) );
         }
         void checkAll( const BSONObj &o ) const {
             auto_ptr< DBClientCursor > c = client()->query( ns(), o );
             assert( c->more() );
             while( c->more() ) {
-                ASSERT( !o.woCompare( c->next() ) );
+                check( o, c->next() );
             }
+        }
+        void check( const BSONObj &expected, const BSONObj &got ) const {
+            if ( expected.woCompare( got ) ) {
+                out() << "expected: " << expected.toString()
+                    << ", got: " << got.toString() << endl;
+            }
+            ASSERT( !expected.woCompare( got ) );
         }
         BSONObj oneOp() const { 
             return client()->findOne( logNs(), emptyObj );
@@ -95,6 +106,16 @@ namespace ReplTests {
             setClient( ns() );
             for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i )
                 Applier::apply( *i );
+        }
+        static void printAll( const char *ns ) {
+            dblock lk;
+            setClient( ns );
+            auto_ptr< Cursor > c = theDataFileMgr.findAll( ns );
+            vector< DiskLoc > toDelete;
+            out() << "all for " << ns << endl;
+            for(; c->ok(); c->advance() ) {
+                out() << c->current().toString() << endl;
+            }            
         }
         // These deletes don't get logged.
         static void deleteAll( const char *ns ) {
@@ -226,39 +247,61 @@ namespace ReplTests {
         public:
             void run() {
                 runOne< Update >();
+                runOne< UpdateMultiple >();
                 runOne< UpsertInsert >();
                 runOne< UpsertNoInsert >();
             }
+            class UpdateSpec {
+            public:
+                virtual BSONObj o() const = 0;
+                virtual BSONObj q() const = 0;                
+                virtual BSONObj u() const = 0;
+                virtual BSONObj ou() const = 0;
+            };
         protected:
-            UpdateBase( const BSONObj &q, const BSONObj &u ) : q_( q ), u_( u ) {} 
+            UpdateBase( UpdateSpec *s ) : s_( s ) {}
         private:
             template< class T >
             void runOne() const {
-                T test( q_, u_ );
+                T test( s_ );
                 test.run();
             }
             class Update : public Base {
             public:
-                Update( const BSONObj &q, const BSONObj &u ) : q_( q ), u_( u ) {}
+                Update( UpdateSpec *s ) : s_( s ) {}
             protected:
                 void doIt() const {
-                    client()->update( ns(), q_, u_ );
+                    client()->update( ns(), s_->q(), s_->u() );
                 }
                 void check() const {
                     ASSERT_EQUALS( 1, count() );
+                    checkOne( s_->ou() );
                 }
                 void reset() const {
                     deleteAll( ns() );
-                    insert( q_ );                    
+                    insert( s_->o() );                    
                 }
-                BSONObj q_, u_;
+                UpdateSpec *s_;
+            };
+            class UpdateMultiple : public Update {
+            public:
+                UpdateMultiple( UpdateSpec *s ) : Update( s ) {}
+                void check() const {
+                    ASSERT_EQUALS( 2, count() );
+                    checkOne( s_->ou() );
+                    checkOne( s_->o() );
+                }
+                void reset() const {
+                    deleteAll( ns() );
+                    insert( s_->o() );                    
+                    insert( s_->o() );                    
+                }                
             };
             class UpsertInsert : public Update {
             public:
-                UpsertInsert( const BSONObj &q, const BSONObj &u ) :
-                Update( q, u ) {}
+                UpsertInsert( UpdateSpec *s ) : Update( s ) {}
                 void doIt() const {
-                    client()->update( ns(), q_, u_, true );
+                    client()->update( ns(), s_->q(), s_->u(), true );
                 }
                 void reset() const {
                     deleteAll( ns() );
@@ -266,29 +309,98 @@ namespace ReplTests {
             };
             class UpsertNoInsert : public Update {
             public:
-                UpsertNoInsert( const BSONObj &q, const BSONObj &u ) :
-                Update( q, u ) {}
+                UpsertNoInsert( UpdateSpec *s ) : Update( s ) {}
                 void doIt() const {
-                    client()->update( ns(), q_, u_, true );
+                    client()->update( ns(), s_->q(), s_->u(), true );
                 }                
             };
-            BSONObj q_, u_;
+            UpdateSpec *s_;
         };
 
         class UpdateSameField : public UpdateBase {
         public:
+            class Spec : public UpdateSpec {
+                virtual BSONObj o() const { return f( "{\"a\":\"b\",\"m\":\"n\"}" ); }
+                virtual BSONObj q() const { return f( "{\"a\":\"b\"}" ); }
+                virtual BSONObj u() const { return f( "{\"a\":\"c\"}" ); }
+                virtual BSONObj ou() const { return u(); }
+            };
+            static Spec spec;
             UpdateSameField() :
-            UpdateBase( fromjson( "{\"a\":\"b\"}" ),
-                       fromjson( "{\"a\":\"c\"}" ) ) {}
+            UpdateBase( &spec ) {}
         };
+        UpdateSameField::Spec UpdateSameField::spec;
 
         class UpdateDifferentField : public UpdateBase {
         public:
+            class Spec : public UpdateSpec {
+                virtual BSONObj o() const { return f( "{\"a\":\"b\",\"m\":\"n\",\"x\":\"y\"}" ); }
+                virtual BSONObj q() const { return f( "{\"a\":\"b\"}" ); }
+                virtual BSONObj u() const { return f( "{\"a\":\"b\",\"x\":\"z\"}" ); }
+                virtual BSONObj ou() const { return u(); }
+            };
+            static Spec spec;
             UpdateDifferentField() :
-            UpdateBase( fromjson( "{\"a\":\"b\"}" ),
-                       fromjson( "{\"a\":\"b\",\"x\":\"y\"}" ) ) {}            
+            UpdateBase( &spec ) {}            
         };
-             
+        UpdateDifferentField::Spec UpdateDifferentField::spec;
+
+        class Set : public UpdateBase {
+        public:
+            class Spec : public UpdateSpec {
+                virtual BSONObj o() const { return f( "{\"a\":\"b\",\"m\":1}" ); }
+                virtual BSONObj q() const { return f( "{\"a\":\"b\"}" ); }
+                virtual BSONObj u() const { return f( "{\"$set\":{\"m\":5}}" ); }
+                virtual BSONObj ou() const { return f( "{\"a\":\"b\",\"m\":5}" ); }
+            };
+            static Spec spec;
+            Set() :
+            UpdateBase( &spec ) {}                        
+        };
+        Set::Spec Set::spec;
+        
+        class SetSame : public UpdateBase {
+        public:
+            class Spec : public UpdateSpec {
+                virtual BSONObj o() const { return f( "{\"a\":10,\"m\":1}" ); }
+                virtual BSONObj q() const { return f( "{\"a\":10}" ); }
+                virtual BSONObj u() const { return f( "{\"$set\":{\"a\":11}}" ); }
+                virtual BSONObj ou() const { return f( "{\"a\":11,\"m\":1}" ); }
+            };
+            static Spec spec;
+            SetSame() :
+            UpdateBase( &spec ) {}                        
+        };
+        SetSame::Spec SetSame::spec;
+
+        class Inc : public UpdateBase {
+        public:
+            class Spec : public UpdateSpec {
+                virtual BSONObj o() const { return f( "{\"a\":\"b\",\"m\":0}" ); }
+                virtual BSONObj q() const { return f( "{\"a\":\"b\"}" ); }
+                virtual BSONObj u() const { return f( "{\"$inc\":{\"m\":5}}" ); }
+                virtual BSONObj ou() const { return f( "{\"a\":\"b\",\"m\":5}" ); }
+            };
+            static Spec spec;
+            Inc() :
+            UpdateBase( &spec ) {}                        
+        };
+        Inc::Spec Inc::spec;
+
+        class IncSame : public UpdateBase {
+        public:
+            class Spec : public UpdateSpec {
+                virtual BSONObj o() const { return f( "{\"a\":0,\"m\":\"n\"}" ); }
+                virtual BSONObj q() const { return f( "{\"a\":0}" ); }
+                virtual BSONObj u() const { return f( "{\"$inc\":{\"a\":2}}" ); }
+                virtual BSONObj ou() const { return f( "{\"a\":2,\"m\":\"n\"}" ); }
+            };
+            static Spec spec;
+            IncSame() :
+            UpdateBase( &spec ) {}                        
+        };
+        IncSame::Spec IncSame::spec;
+
         class Remove : public Base {
         public:
             Remove() : o_( fromjson( "{\"a\":\"b\"}" ) ) {}
@@ -315,7 +427,27 @@ namespace ReplTests {
                 ASSERT_EQUALS( 1, count() );
             }
         };
-                
+          
+        class FailingUpdate : public Base {
+        public:
+            FailingUpdate() :
+            o_( fromjson( "{\"a\":\"b\"}" ) ),
+            u_( fromjson( "{\"c\":\"d\"}" ) ) {}
+            void doIt() const {
+                client()->update( ns(), o_, u_ );
+                client()->insert( ns(), o_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( o_ );
+            }
+            void reset() const {
+                deleteAll( ns() );
+            }
+        protected:
+            BSONObj o_, u_;
+        };
+        
     } // namespace Idempotence
     
     class All : public UnitTest::Suite {
@@ -329,10 +461,17 @@ namespace ReplTests {
 //            add< Idempotence::InsertTwoIdentical >();
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::UpdateSameField >();
-            add< Idempotence::UpdateDifferentField >();
+//            add< Idempotence::UpdateDifferentField >();
+            add< Idempotence::Set >();
+            // FIXME Decide what is correct & uncomment
+//            add< Idempotence::SetSame >();
+            add< Idempotence::Inc >();
+            // FIXME Decide what is correct & uncomment
+//            add< Idempotence::IncSame >();
             add< Idempotence::Remove >();
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::RemoveOne >();
+//            add< Idempotence::FailingUpdate >();
         }
     };
     
