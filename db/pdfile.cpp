@@ -1137,7 +1137,7 @@ namespace mongo {
         string reservedPathString = reservedPath.native_directory_string();
         assert( setClient( dbName, reservedPathString.c_str() ) );
 
-        bool res = cloneFrom(localhost.c_str(), errmsg, dbName, /*logForReplication=*/false, /*slaveok*/false);
+        bool res = cloneFrom(localhost.c_str(), errmsg, dbName, /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false);
         closeClient( dbName, reservedPathString.c_str() );
 
         if ( !res ) {

@@ -37,7 +37,8 @@ namespace mongo {
     extern bool slave;
     extern bool master;
 
-    bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, bool slaveOk);
+    bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
+				   bool slaveOk, bool useReplAuth);
 
 #pragma pack(push,4)
     class OpTime {

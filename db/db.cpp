@@ -518,7 +518,7 @@ usage:
     out() << " --quiet             quieter output\n";
     out() << " --cpu               show cpu+iowait utilization periodically\n";
     out() << " --noauth            run without security\n";
-    out() << " --auth              run with security (temp - this will be default)\n";
+    out() << " --auth              run with security\n";
     out() << " --verbose\n";
     out() << " -v+                 increase verbose level -v = --verbose\n";
     out() << " --objcheck          inspect client data for validity on receipt\n";

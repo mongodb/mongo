@@ -32,6 +32,8 @@ namespace mongo {
     void ensureHaveIdIndex(const char *ns);
     extern int port;
 
+    bool replAuthenticate(DBClientConnection *);
+
     class Cloner: boost::noncopyable {
         auto_ptr< DBClientInterface > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
@@ -40,8 +42,9 @@ namespace mongo {
         Cloner() { }
 
         /* slaveOk - if true it is ok if the source of the data is !ismaster.
+           useReplAuth - use the credentials we normally use as a replication slave for the cloning
         */
-        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk);
+        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth);
     };
 
     /* for index info object:
@@ -114,7 +117,10 @@ namespace mongo {
         }
     }
 
-    bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk) {
+    bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth) {
+
+		massert( "useReplAuth is not written to replication log", !useReplAuth || !logForRepl );
+
         string todb = database->name;
         stringstream a,b;
         a << "localhost:" << port;
@@ -139,6 +145,9 @@ namespace mongo {
                 auto_ptr< DBClientConnection > c( new DBClientConnection() );
                 if ( !c->connect( masterHost, errmsg ) )
                     return false;
+				if( !replAuthenticate(c.get()) )
+					return false;
+
                 conn = c;
             } else {
                 conn = auto_ptr< DBClientInterface >( new DBDirectClient() );
@@ -207,10 +216,11 @@ namespace mongo {
         return true;
     }
 
-    bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, bool slaveOk)
+    bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
+				   bool slaveOk, bool useReplAuth)
     {
         Cloner c;
-        return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk);
+        return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth);
     }
 
     /* Usage:
@@ -229,7 +239,7 @@ namespace mongo {
             /* replication note: we must logOp() not the command, but the cloned data -- if the slave
                were to clone it would get a different point-in-time and not match.
                */
-            return cloneFrom(from.c_str(), errmsg, database->name, /*logForReplication=*/!fromRepl, /*slaveok*/false);
+            return cloneFrom(from.c_str(), errmsg, database->name, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false);
         }
     } cmdclone;
 
@@ -260,7 +270,7 @@ namespace mongo {
                 return false;
             }
             setClient(todb.c_str());
-            bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false);
+            bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false);
             database = 0;
             return res;
         }

@@ -66,8 +66,10 @@ namespace mongo {
         return digestToString( d );
     }
 
-    bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password_text, string& errmsg) {
-		string password = createPasswordDigest( password_text );
+    bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password_text, string& errmsg, bool digestPassword) {
+		string password = password_text;
+		if( digestPassword ) 
+			password = createPasswordDigest( password_text );
 
         BSONObj info;
         string nonce;
@@ -98,7 +100,7 @@ namespace mongo {
             b << "key" << digestToString( d );
             //b.appendBinData("key", 16, MD5Type, (const char *) d);
             authCmd = b.done();
-            cout << "TEMP: authCmd: " << authCmd.toString() << endl;
+            //cout << "TEMP: authCmd: " << authCmd.toString() << endl;
         }
         
         if( runCommand(dbname, authCmd, info) ) 

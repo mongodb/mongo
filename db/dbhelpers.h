@@ -39,13 +39,13 @@ namespace mongo {
         */
         static void ensureIndex(const char *ns, BSONObj keyPattern, const char *name);
 
-        /* fetch a single object from collection ns that matches query 
-        set your db context first
+        /* fetch a single object from collection ns that matches query.
+           set your db context first.
 
-        @param requireIndex if true, complain if no index for the query.  a way to guard against
-        writing a slow query.
+           @param requireIndex if true, complain if no index for the query.  a way to guard against
+           writing a slow query.
 
-        @return true if object found
+           @return true if object found
         */
         static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex=false);
 

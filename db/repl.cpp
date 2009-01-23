@@ -74,9 +74,6 @@ namespace mongo {
 
 namespace mongo {
 
-#define debugrepl(z) log() << "debugrepl " << z << '\n'
-//define debugrepl
-
     PairSync *pairSync = new PairSync();
     bool getInitialSyncCompleted() {
         return pairSync->initialSyncCompleted();
@@ -532,7 +529,7 @@ namespace mongo {
             log() << "resync: cloning database " << db << endl;
             ReplInfo r("resync: cloning a database");
             string errmsg;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false, /*slaveok*/ true);
+            bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false, /*slaveok*/ true, /*replauth*/ true);
             if ( !ok ) {
                 problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
                 throw SyncException();
@@ -698,7 +695,7 @@ namespace mongo {
     /* note: not yet in mutex at this point. */
     bool ReplSource::sync_pullOpLog() {
         string ns = string("local.oplog.$") + sourceName();
-        debugrepl( "sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() );
+        log(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
 
         bool tailing = true;
         DBClientCursor *c = cursor.get();
@@ -715,13 +712,13 @@ namespace mongo {
             BSONObj queryObj = query.done();
             // queryObj = { ts: { $gte: syncedTo } }
 
-            debugrepl( ns << ".find(" << queryObj.toString() << ')' );
+            log(2) << "repl: " << ns << ".find(" << queryObj.toString() << ')' << '\n';
             cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable | Option_SlaveOk );
             c = cursor.get();
             tailing = false;
         }
         else {
-            debugrepl( "tailing=true" );
+            log(2) << "repl: tailing=true\n";
         }
 
         if ( c == 0 ) {
@@ -745,7 +742,7 @@ namespace mongo {
 
         if ( !c->more() ) {
             if ( tailing ) {
-                debugrepl( "tailing & no new activity" );
+                log(2) << "repl: tailing & no new activity\n";
             } else
                 log() << "pull:   " << ns << " oplog is empty\n";
             sleepsecs(3);
@@ -767,7 +764,7 @@ namespace mongo {
             }
         }
         OpTime nextOpTime( ts.date() );
-        debugrepl( "first op time received: " << nextOpTime.toString() );
+        log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
         bool initial = syncedTo.isNull();
         if ( initial || tailing ) {
             if ( tailing ) {
@@ -809,7 +806,7 @@ namespace mongo {
                 if ( !c->more() ) {
                     log() << "pull:   applied " << n << " operations" << endl;
                     syncedTo = nextOpTime;
-                    debugrepl( "end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() );
+                    log(2) << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << '\n';
                     dblock lk;
                     save(); // note how far we are synced up to now
                     break;
@@ -844,6 +841,43 @@ namespace mongo {
         return true;
     }
 
+	BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
+
+	bool replAuthenticate(DBClientConnection *conn) {
+		AuthenticationInfo *ai = authInfo.get();
+		if( ai && !ai->isAuthorized("admin") ) { 
+			log() << "replauthenticate: requires admin permissions, failing\n";
+			return false;
+		}
+
+		BSONObj user;
+		{
+			dblock lk;
+			DBContext ctxt("local.");
+			if( !Helpers::findOne("local.system.users", userReplQuery, user) ) { 
+				// try the first user is local
+				if( !Helpers::getSingleton("local.system.users", user) ) {
+					if( noauth ) 
+						return true; // presumably we are running a --noauth setup all around.
+
+					log() << "replauthenticate: no user in local.system.users to use for authentication\n";
+					return false;
+				}
+			}
+		}
+
+		string u = user.getStringField("user");
+		string p = user.getStringField("pwd");
+		massert("bad user object? [1]", !u.empty());
+		massert("bad user object? [2]", !p.empty());
+		string err;
+		if( !conn->auth("admin", u.c_str(), p.c_str(), err, false) ) {
+			log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
+			return false;
+		}
+		return true;
+	}
+
     /* note: not yet in mutex at this point.
        returns true if everything happy.  return false if you want to reconnect.
     */
@@ -863,7 +897,7 @@ namespace mongo {
             conn = auto_ptr<DBClientConnection>(new DBClientConnection());
             string errmsg;
             ReplInfo r("trying to connect to sync source");
-            if ( !conn->connect(hostName.c_str(), errmsg) ) {
+            if ( !conn->connect(hostName.c_str(), errmsg) || !replAuthenticate(conn.get()) ) {
                 resetConnection();
                 log() << "pull:   cantconn " << errmsg << endl;
                 if ( replPair && paired ) {
@@ -1070,11 +1104,13 @@ namespace mongo {
     void replSlaveThread() {
         sleepsecs(1);
 
-        AuthenticationInfo *ai = new AuthenticationInfo();
-        authInfo.reset(ai);
-        
         {
             dblock lk;
+
+			AuthenticationInfo *ai = new AuthenticationInfo();
+			ai->authorize("admin");
+			authInfo.reset(ai);
+        
             BSONObj obj;
             if ( Helpers::getSingleton("local.pair.startup", obj) ) {
                 // should be: {replacepeer:1}

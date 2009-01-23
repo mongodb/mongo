@@ -192,10 +192,11 @@ namespace mongo {
         */
         bool runCommand(const char *dbname, BSONObj cmd, BSONObj &info);
 
-        /** Authorize access.
+        /** Authorize access to a particular database.
+			@param digestPassword if password is plain text, set this to true.  otherwise assumed to be pre-digested
             @return true if successful
         */
-        bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg);
+        bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
         string createPasswordDigest( const char * clearTextPassword );
 
@@ -420,6 +421,12 @@ namespace mongo {
         */
         virtual bool connect(const char *serverHostname, string& errmsg);
 
+		bool authenticate(const char *dbname, const char *user, const char *password);
+		bool authenticateWithDigest(const char *dbname, const char *user, const char *passwordDigest);
+
+		/** Perform a query 
+			@return cursor
+		 */
         virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             checkConnection();
@@ -519,7 +526,6 @@ namespace mongo {
             master = ( ( master == Left ) ? NotSetR : NotSetL );
         }
     };
-
 
 
 } // namespace mongo
