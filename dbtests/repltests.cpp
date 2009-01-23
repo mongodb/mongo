@@ -297,8 +297,7 @@ namespace ReplTests {
             add< LogBasic >();
             add< Idempotence::Insert >();
             add< Idempotence::InsertWithId >();
-            // Multi inserts not allowed right now.
-//            add< Idempotence::InsertTwo >();
+            add< Idempotence::InsertTwo >();
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::InsertTwoIdentical >();
             // FIXME Decide what is correct & uncomment
