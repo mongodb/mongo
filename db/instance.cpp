@@ -527,7 +527,7 @@ namespace mongo {
         assembleResponse( toSend, dbResponse );
     }
 
-    DBDirectClient::AlwaysAuthorized DBDirectClient::Authorize::always;
+    DBDirectClient::AlwaysAuthorized DBDirectClient::Authorizer::always;
     
     /* not using log() herein in case we are called from segvhandler and we were already locked */
 #undef exit
