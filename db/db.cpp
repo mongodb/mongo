@@ -255,9 +255,6 @@ namespace mongo {
     }
 
     void repairDatabases() {
-        AuthenticationInfo *ai = new AuthenticationInfo();
-        authInfo.reset(ai);
-        
         dblock lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
@@ -276,8 +273,6 @@ namespace mongo {
                 closeClient( dbName.c_str() );
             }
         }
-        
-        authInfo.reset( 0 );
     }
 
     void clearTmpFiles() {
