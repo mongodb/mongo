@@ -29,4 +29,5 @@ UnitTest::TestPtr namespaceTests();
 UnitTest::TestPtr pairingTests();
 UnitTest::TestPtr pdfileTests();
 UnitTest::TestPtr queryTests();
+UnitTest::TestPtr replTests();
 UnitTest::TestPtr sockTests();

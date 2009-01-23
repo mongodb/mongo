@@ -186,7 +186,7 @@ namespace mongo {
             Record *r = c->_current();
             DiskLoc rloc = c->currLoc();
             BSONObj js(r);
-
+            
             bool deep;
             if ( !matcher.matches(js, &deep) ) {
                 c->advance(); // advance must be after noMoreMatches() because it uses currKey()
