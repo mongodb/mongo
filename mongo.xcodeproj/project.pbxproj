@@ -316,7 +316,7 @@
 		};
 		932F1DCC0F213B06008FA2E7 /* scons db */ = {
 			isa = PBXLegacyTarget;
-			buildArgumentsString = "";
+			buildArgumentsString = "-j2";
 			buildConfigurationList = 932F1DD40F213B0F008FA2E7 /* Build configuration list for PBXLegacyTarget "scons db" */;
 			buildPhases = (
 			);
@@ -358,7 +358,7 @@
 		};
 		93AF75120F213CC500994C66 /* scons all */ = {
 			isa = PBXLegacyTarget;
-			buildArgumentsString = .;
+			buildArgumentsString = "-j2 .";
 			buildConfigurationList = 93AF75250F213D2500994C66 /* Build configuration list for PBXLegacyTarget "scons all" */;
 			buildPhases = (
 			);
@@ -371,7 +371,7 @@
 		};
 		93AF75170F213CFB00994C66 /* scons test */ = {
 			isa = PBXLegacyTarget;
-			buildArgumentsString = test;
+			buildArgumentsString = "-j2 test";
 			buildConfigurationList = 93AF75260F213D2500994C66 /* Build configuration list for PBXLegacyTarget "scons test" */;
 			buildPhases = (
 			);
