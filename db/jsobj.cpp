@@ -18,7 +18,7 @@
 
 #include "stdafx.h"
 #include "jsobj.h"
-#include "security.h"
+#include "nonce.h"
 #include "../util/goodies.h"
 #include <limits>
 #include "../util/unittest.h"
