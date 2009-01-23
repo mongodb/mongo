@@ -31,6 +31,8 @@ namespace mongo {
 
     int getOpLogging();
 
+    extern string dbExecCommand;
+
 #define OPWRITE if( getOpLogging() & 1 ) _oplog.write((char *) m.data, m.data->len);
 #define OPREAD if( getOpLogging() & 2 ) _oplog.readop((char *) m.data, m.data->len);
 

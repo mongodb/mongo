@@ -93,7 +93,7 @@ elif "linux2" == os.sys.platform:
     
     javaVersion = "i386";
 
-    if os.uname()[4] == "x86_64":
+    if os.uname()[4] == "x86_64" and not force32:
         javaVersion = "amd64"
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64"] )
@@ -151,10 +151,14 @@ if nix:
     env.Append( LIBS=[ "pcrecpp" , "pcre" , "stdc++" ] )
 
     if force64:
+	env.Append( CFLAGS="-m64" )
         env.Append( CXXFLAGS="-m64" )
+        env.Append( LINKFLAGS="-m64" )
 
     if force32:
+	env.Append( CFLAGS="-m32" )
         env.Append( CXXFLAGS="-m32" )
+        env.Append( LINKFLAGS="-m32" )
 
 
 # --- check system ---
@@ -175,7 +179,7 @@ if nix:
         if not conf.CheckLib( l + "-mt" ):
             if not conf.CheckLib( l ):
                 print "can't find a required boost library [" + l + "]";
-                Exit(1)
+                #Exit(1)
 
 env = conf.Finish()
 
@@ -243,7 +247,7 @@ for id in [ "" , "client/" , "util/" , "grid/" , "db/" ]:
 
 #lib
 env.Install( installDir + "/" + nixLibPrefix , "libmongoclient.a" )
-env.Install( installDir + "/" + nixLibPrefix + "/mongo-jars" , Glob( "jars/*" ) )
+env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #final alias
 env.Alias( "install" , installDir )
