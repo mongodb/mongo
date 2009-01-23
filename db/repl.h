@@ -121,13 +121,17 @@ namespace mongo {
         bool resync(string db);
         bool sync_pullOpLog();
         void sync_pullOpLog_applyOperation(BSONObj& op);
-
+        
         auto_ptr<DBClientConnection> conn;
         auto_ptr<DBClientCursor> cursor;
 
         set<string> addDbNextPass;
 
         ReplSource();
+
+    protected:
+        static void applyOperation(const BSONObj& op);
+        
     public:
         bool replacing; // in "replace mode" -- see CmdReplacePeer
         bool paired; // --pair in use

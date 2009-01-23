@@ -650,6 +650,19 @@ namespace JsonTests {
             }
         };
         
+        class Oid2 : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                OID o;
+                memset( &o, 0x0f, 12 );
+                b.appendOID( "_id", &o );
+                return b.doneAndDecouple();
+            }
+            virtual string json() const {
+                return "{ \"_id\" : \"0f0f0f0f0f0f0f0f0f0f0f0f\" }";
+            }
+        };
+
         class BinData : public Base {
             virtual BSONObj bson() const {
                 char z[ 3 ];
@@ -845,6 +858,7 @@ namespace JsonTests {
             add< FromJsonTests::Utf8FirstByteOnes >();
             add< FromJsonTests::DBRef >();
             add< FromJsonTests::Oid >();
+            add< FromJsonTests::Oid2 >();
             add< FromJsonTests::BinData >();
             add< FromJsonTests::BinDataPaddedSingle >();
             add< FromJsonTests::BinDataPaddedDouble >();

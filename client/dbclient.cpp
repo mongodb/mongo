@@ -322,6 +322,21 @@ namespace mongo {
         say( toSend );
     }
 
+    void DBClientBase::insert( const char * ns , const vector< BSONObj > &v ) {
+        Message toSend;
+        
+        BufBuilder b;
+        int opts = 0;
+        b.append( opts );
+        b.append( ns );
+        for( vector< BSONObj >::const_iterator i = v.begin(); i != v.end(); ++i )
+            i->appendSelfToBufBuilder( b );
+        
+        toSend.setData( dbInsert, b.buf(), b.len() );
+        
+        say( toSend );
+    }
+
     void DBClientBase::remove( const char * ns , BSONObj obj , bool justOne ) {
         Message toSend;
 

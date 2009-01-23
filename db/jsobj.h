@@ -369,7 +369,7 @@ namespace mongo {
             }
         }
 
-        void appendSelfToBufBuilder(BufBuilder& b) {
+        void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
             b.append((void *) objdata(), objsize());
         }
@@ -410,13 +410,13 @@ namespace mongo {
         }
 
         // returns "" if DNE or wrong type
-        const char * getStringField(const char *name);
+        const char * getStringField(const char *name) const;
 
         BSONObj getObjectField(const char *name) const;
 
         int getIntField(const char *name) const; // INT_MIN if not present
 
-        bool getBoolField(const char *name);
+        bool getBoolField(const char *name) const;
 
         /** makes a new BSONObj with the fields specified in pattern.
            fields returned in the order they appear in pattern.

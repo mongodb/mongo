@@ -1,4 +1,4 @@
-// security.cpp
+// nonce.h
 
 /**
  *    Copyright (C) 2009 10gen Inc.
@@ -16,18 +16,18 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "stdafx.h"
-#include "security.h"
+#pragma once
 
 namespace mongo {
 
-    extern "C" int do_md5_test(void);
-
-    boost::thread_specific_ptr<AuthenticationInfo> authInfo;
-
-    bool noauth = true;
-
-	int AuthenticationInfo::warned;
-
+    typedef unsigned long long nonce;
+    
+    struct Security {
+        ifstream *devrandom;
+        Security();
+        nonce getNonce();
+    };
+    
+    extern Security security;
+        
 } // namespace mongo
-

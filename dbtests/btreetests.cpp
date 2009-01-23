@@ -18,6 +18,7 @@
  */
 
 #include "../db/btree.h"
+
 #include "../db/db.h"
 
 #include "dbtests.h"

@@ -44,7 +44,7 @@ namespace mongo {
 
     void dropDatabase(const char *ns);
     bool repairDatabase(const char *ns, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
-    void dropNS(string& dropNs);;
+    void dropNS(const string& dropNs);;
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
     auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, bool *isSorted=0);
 

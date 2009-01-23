@@ -269,7 +269,7 @@ namespace mongo {
         OID oid;
         char *oidP = (char *)( &oid );
         for ( int i = 0; i < 12; ++i )
-            oidP[ i ] = hex::val( s[ i * 2 ] );
+            oidP[ i ] = hex::val( s + ( i * 2 ) );
         return oid;
     }
 

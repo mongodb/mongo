@@ -21,6 +21,7 @@
 #include <boost/thread/tss.hpp>
 #include "db.h"
 #include "dbhelpers.h"
+#include "nonce.h"
 
 namespace mongo {
 
@@ -49,7 +50,7 @@ namespace mongo {
 			assert( dbMutexInfo.isLocked() );
             m[dbname].level = 2;
         }
-        bool isAuthorized(const char *dbname) { 
+        virtual bool isAuthorized(const char *dbname) { 
             if( m[dbname].level == 2 ) return true;
 			if( noauth ) return true;
 			if( m["admin"].level == 2 ) return true;
@@ -69,15 +70,4 @@ namespace mongo {
     };
 
     extern boost::thread_specific_ptr<AuthenticationInfo> authInfo;
-
-    typedef unsigned long long nonce;
-
-    struct Security {
-        ifstream *devrandom;
-        Security();
-        nonce getNonce();
-    };
-
-    extern Security security;
-
 } // namespace mongo

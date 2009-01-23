@@ -549,6 +549,56 @@ namespace mongo {
         return true;
     }
 
+    void ReplSource::applyOperation(const BSONObj& op) {
+        stringstream ss;
+        BSONObj o = op.getObjectField("o");
+        const char *ns = op.getStringField("ns");
+        // operation type -- see logOp() comments for types
+        const char *opType = op.getStringField("op");
+        try {
+            if ( *opType == 'i' ) {
+                const char *p = strchr(ns, '.');
+                if ( p && strcmp(p, ".system.indexes") == 0 ) {
+                    // updates aren't allowed for indexes -- so we will do a regular insert. if index already
+                    // exists, that is ok.
+                    theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
+                }
+                else {
+                    // do upserts for inserts as we might get replayed more than once
+                    OID *oid = o.getOID();
+                    if ( oid == 0 ) {
+                        _updateObjects(ns, o, o, true, ss);
+                    }
+                    else {
+                        BSONObjBuilder b;
+                        b.appendOID("_id", oid);
+                        RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
+                        _updateObjects(ns, o, b.done(), true, ss);
+                    }
+                }
+            }
+            else if ( *opType == 'u' ) {
+                RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
+                _updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), ss);
+            }
+            else if ( *opType == 'd' ) {
+                if ( opType[1] == 0 )
+                    deleteObjects(ns, o, op.getBoolField("b"));
+                else
+                    assert( opType[1] == 'b' ); // "db" advertisement
+            }
+            else {
+                BufBuilder bb;
+                BSONObjBuilder ob;
+                assert( *opType == 'c' );
+                _runCommands(ns, o, ss, bb, ob, true);
+            }
+        }
+        catch ( UserAssertionException& e ) {
+            log() << "sync: caught user assertion " << e.msg << '\n';
+        }        
+    }
+    
     /* local.$oplog.main is of the form:
          { ts: ..., op: <optype>, ns: ..., o: <obj> , o2: <extraobj>, b: <boolflag> }
          ...
@@ -641,50 +691,7 @@ namespace mongo {
             addDbNextPass.erase(clientName);
         }
 
-        stringstream ss;
-        BSONObj o = op.getObjectField("o");
-        try {
-            if ( *opType == 'i' ) {
-                const char *p = strchr(ns, '.');
-                if ( p && strcmp(p, ".system.indexes") == 0 ) {
-                    // updates aren't allowed for indexes -- so we will do a regular insert. if index already
-                    // exists, that is ok.
-                    theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
-                }
-                else {
-                    // do upserts for inserts as we might get replayed more than once
-                    OID *oid = o.getOID();
-                    if ( oid == 0 ) {
-                        _updateObjects(ns, o, o, true, ss);
-                    }
-                    else {
-                        BSONObjBuilder b;
-                        b.appendOID("_id", oid);
-                        RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
-                        _updateObjects(ns, o, b.done(), true, ss);
-                    }
-                }
-            }
-            else if ( *opType == 'u' ) {
-                RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
-                _updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), ss);
-            }
-            else if ( *opType == 'd' ) {
-                if ( opType[1] == 0 )
-                    deleteObjects(ns, o, op.getBoolField("b"));
-                else
-                    assert( opType[1] == 'b' ); // "db" advertisement
-            }
-            else {
-                BufBuilder bb;
-                BSONObjBuilder ob;
-                assert( *opType == 'c' );
-                _runCommands(ns, o, ss, bb, ob, true);
-            }
-        }
-        catch ( UserAssertionException& e ) {
-            log() << "sync: caught user assertion " << e.msg << '\n';
-        }
+        applyOperation( op );
         database = 0;
     }
 
@@ -1148,6 +1155,32 @@ namespace mongo {
         }
     }
 
+    void createOplog() {
+        dblock lk;
+        /* create an oplog collection, if it doesn't yet exist. */
+        BSONObjBuilder b;
+        double sz;
+        if ( oplogSize != 0 )
+            sz = (double) oplogSize;
+        else {
+            sz = 50.0 * 1000 * 1000;
+            if ( sizeof(int *) >= 8 ) {
+                sz = 990.0 * 1000 * 1000;
+                boost::intmax_t free = freeSpace(); //-1 if call not supported.
+                double fivePct = free * 0.05;
+                if ( fivePct > sz )
+                    sz = fivePct;
+            }
+        }
+        b.append("size", sz);
+        b.appendBool("capped", 1);
+        setClientTempNs("local.oplog.$main");
+        string err;
+        BSONObj o = b.done();
+        userCreateNS("local.oplog.$main", o, err, false);
+        database = 0;
+    }
+    
     void startReplication() {
         /* this was just to see if anything locks for longer than it should -- we need to be careful
            not to be locked when trying to connect() or query() the other side.
@@ -1173,32 +1206,7 @@ namespace mongo {
             if ( master && !quiet )
                 log() << "master=true" << endl;
             master = true;
-            {
-                dblock lk;
-                /* create an oplog collection, if it doesn't yet exist. */
-                BSONObjBuilder b;
-                double sz;
-                if ( oplogSize != 0 )
-                    sz = (double) oplogSize;
-                else {
-                    sz = 50.0 * 1000 * 1000;
-                    if ( sizeof(int *) >= 8 ) {
-                        sz = 990.0 * 1000 * 1000;
-                        boost::intmax_t free = freeSpace(); //-1 if call not supported.
-                        double fivePct = free * 0.05;
-                        if ( fivePct > sz )
-                            sz = fivePct;
-                    }
-                }
-                b.append("size", sz);
-                b.appendBool("capped", 1);
-                setClientTempNs("local.oplog.$main");
-                string err;
-                BSONObj o = b.done();
-                userCreateNS("local.oplog.$main", o, err, false);
-                database = 0;
-            }
-
+            createOplog();
             boost::thread mt(replMasterThread);
         }
     }
