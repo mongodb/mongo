@@ -162,11 +162,13 @@ namespace mongo {
 
         virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
-        virtual void insert( const char * ns , BSONObj obj ) = 0;
+        virtual void insert( const char * ns, BSONObj obj ) = 0;
+        
+        virtual void insert( const char * ns, const vector< BSONObj >& v ) = 0;
 
         //virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 ) = 0;
 
-        //virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 ) = 0;
+        virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 ) = 0;
     };
 
     /**
@@ -352,6 +354,10 @@ namespace mongo {
          */
         virtual void insert( const char * ns , BSONObj obj );
 
+        /**
+           insert a vector of objects into the database
+         */
+        virtual void insert( const char * ns, const vector< BSONObj >& v );
 
         /**
            remove matching objects from the database
@@ -485,11 +491,21 @@ namespace mongo {
         virtual
         BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        // Not implemented
+        // Not yet implemented
         virtual void insert( const char * ns , BSONObj obj ) {
             assert( false );
         }
 
+        // Not yet implemented
+        virtual void insert( const char * ns, const vector< BSONObj >& v ) {
+            assert( false );
+        }
+
+        // Not yet implemented
+        virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 ) {
+            assert( false );
+        }
+        
         string toString();
 
         /* notification that we got a "not master" error.
