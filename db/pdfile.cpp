@@ -425,7 +425,7 @@ namespace mongo {
     void aboutToDelete(const DiskLoc& dl);
 
     /* drop a collection/namespace */
-    void dropNS(string& nsToDrop) {
+    void dropNS(const string& nsToDrop) {
         assert( strstr(nsToDrop.c_str(), ".system.") == 0 );
         {
             // remove from the system catalog

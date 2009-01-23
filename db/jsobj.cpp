@@ -763,12 +763,12 @@ namespace mongo {
         return e.isNumber() ? (int) e.number() : INT_MIN;
     }
 
-    bool BSONObj::getBoolField(const char *name) {
+    bool BSONObj::getBoolField(const char *name) const {
         BSONElement e = getField(name);
         return e.type() == Bool ? e.boolean() : false;
     }
 
-    const char * BSONObj::getStringField(const char *name) {
+    const char * BSONObj::getStringField(const char *name) const {
         BSONElement e = getField(name);
         return e.type() == String ? e.valuestr() : "";
     }
