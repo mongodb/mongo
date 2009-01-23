@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "security.h"
+
 namespace mongo {
 
 // turn on or off the oplog.* files which the db can generate.
@@ -102,6 +104,26 @@ namespace mongo {
             // don't need to piggy back when connected locally
             return say( toSend );
         }
+        class AlwaysAuthorized : public AuthenticationInfo {
+            virtual bool isAuthorized( const char *dbname ) {
+                return true;   
+            }
+        };
+        class Authorizer {
+        public:
+            Authorizor() {
+                backup_.reset( authInfo.release() );
+                // careful, don't want to free this.
+                authInfo.reset( &always );
+            }
+            ~Authorizer() {
+                authInfo.release();
+                authInfo.reset( backup_.release() );
+            }
+        private:
+            static AlwaysAuthorized always;
+            boost::thread_specific_ptr< AuthenticationInfo > backup_;
+        };
     };
 
 } // namespace mongo

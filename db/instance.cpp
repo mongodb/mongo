@@ -515,6 +515,7 @@ namespace mongo {
     }
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
+        Authorizer a;
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
         assert( dbResponse.response );
@@ -523,10 +524,13 @@ namespace mongo {
     }
 
     void DBDirectClient::say( Message &toSend ) {
+        Authorizer a;
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
     }
 
+    DBDirectClient::AlwaysAuthorized DBDirectClient::Authorize::always;
+    
     /* not using log() herein in case we are called from segvhandler and we were already locked */
 #undef exit
     void dbexit(int rc, const char *why) {
