@@ -76,8 +76,8 @@ def findVersion( root , choices ):
     raise "can't find a version of [" + root + "] choices: " + choices
 
 if "darwin" == os.sys.platform:
-    env.Append( CPPPATH=[ "/sw/include" , "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
-    env.Append( LIBPATH=["/sw/lib/"] )
+    env.Append( CPPPATH=[ "/sw/include" , "/opt/local/include", "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
+    env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
 
     env.Append( CPPFLAGS=" -mmacosx-version-min=10.4 " )
     env.Append( FRAMEWORKS=["JavaVM"] )
