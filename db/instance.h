@@ -113,7 +113,7 @@ namespace mongo {
         };
         class Authorizer {
         public:
-            Authorizor() {
+            Authorizer() {
                 backup_.reset( authInfo.release() );
                 // careful, don't want to free this.
                 authInfo.reset( &always );
