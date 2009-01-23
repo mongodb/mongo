@@ -21,8 +21,6 @@
 
 namespace mongo {
 
-    extern "C" int do_md5_test(void);
-
     boost::thread_specific_ptr<AuthenticationInfo> authInfo;
 
     bool noauth = true;
