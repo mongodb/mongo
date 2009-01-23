@@ -673,7 +673,7 @@ namespace mongo {
             string errmsg;
             Command *c = i->second;
             AuthenticationInfo *ai = authInfo.get();
-
+			assert( ai );
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()) || !c->requiresAuth());
 
             if ( c->adminOnly() && !fromRepl && strncmp(ns, "admin", p-ns) != 0 ) {
@@ -695,6 +695,7 @@ namespace mongo {
         }
         else if ( e.type() == String ) {
             AuthenticationInfo *ai = authInfo.get();
+			assert( ai );
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
 
             /* { count: "collectionname"[, query: <query>] } */

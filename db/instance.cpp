@@ -406,8 +406,9 @@ namespace mongo {
     */
     void jniCallback(Message& m, Message& out)
     {
-        AuthenticationInfo *ai = new AuthenticationInfo();
-        authInfo.reset(ai);
+		/* we should be in the same thread as the original request, so authInfo should be available. */
+		AuthenticationInfo *ai = authInfo.get();
+		massert("no authInfo in eval", ai);
         
         Database *clientOld = database;
 
