@@ -159,8 +159,8 @@ namespace mongo {
         bool sync();
         void save(); // write ourself to local.sources
         void resetConnection() {
-            conn = auto_ptr<DBClientConnection>(0);
             cursor = auto_ptr<DBClientCursor>(0);
+            conn = auto_ptr<DBClientConnection>(0);
         }
 
         // make a jsobj from our member fields of the form
