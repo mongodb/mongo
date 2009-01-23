@@ -1196,15 +1196,15 @@ namespace mongo {
         }
 
         if ( slave || replPair ) {
-            if ( slave && !quiet )
-                log() << "slave=true" << endl;
+            if ( slave )
+                log(1) << "slave=true" << endl;
             slave = true;
             boost::thread repl_thread(replSlaveThread);
         }
 
         if ( master || replPair ) {
-            if ( master && !quiet )
-                log() << "master=true" << endl;
+            if ( master  )
+                log(1) << "master=true" << endl;
             master = true;
             createOplog();
             boost::thread mt(replMasterThread);
