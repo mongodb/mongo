@@ -49,7 +49,7 @@ namespace mongo {
 			assert( dbMutexInfo.isLocked() );
             m[dbname].level = 2;
         }
-        bool isAuthorized(const char *dbname) { 
+        virtual bool isAuthorized(const char *dbname) { 
             if( m[dbname].level == 2 ) return true;
 			if( noauth ) return true;
 			if( m["admin"].level == 2 ) return true;
