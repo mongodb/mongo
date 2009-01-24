@@ -24,9 +24,9 @@
 
 namespace mongo {
 
-    /* the query field 'options' can have these bits set: */
+    /** the query field 'options' can have these bits set: */
     enum QueryOptions {
-        /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
+        /** Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
            the final object's position.  you can resume using the cursor later, from where it was located,
            if more data were received.  Set on dbQuery and dbGetMore.
 
@@ -36,7 +36,7 @@ namespace mongo {
         */
         Option_CursorTailable = 2,
 
-        /* allow query of replica slave.  normally these return an error except for namespace "local".
+        /** allow query of replica slave.  normally these return an error except for namespace "local".
         */
         Option_SlaveOk = 4,
 
@@ -85,17 +85,21 @@ namespace mongo {
         virtual void checkResponse( const char *data, int nReturned ) {}
     };
 
+	/** Queries return a cursor object */
     class DBClientCursor : boost::noncopyable {
     public:
-        bool more(); // if true, safe to call next()
+		/** if true, safe to call next() */
+        bool more();
 
-        /* returns next object in the result cursor.
+        /** next
+		   @return next object in the result cursor.
            on an error at the remote server, you will get back:
              { $err: <string> }
            if you do not want to handle that yourself, call nextSafe().
         */
         BSONObj next();
 
+		/** throws AssertionException if get back { $err : ... } */
         BSONObj nextSafe() {
             BSONObj o = next();
             BSONElement e = o.firstElement();
@@ -103,7 +107,7 @@ namespace mongo {
             return o;
         }
 
-        /* cursor no longer valid -- use with tailable cursors.
+        /** cursor no longer valid -- use with tailable cursors.
            note you should only rely on this once more() returns false;
            'dead' may be preset yet some data still queued and locally
            available from the dbclientcursor.
@@ -153,7 +157,7 @@ namespace mongo {
 
 
     /**
-       the interface that any db connection should implement
+       The interface that any db connection should implement
      */
     class DBClientInterface : boost::noncopyable {
     public:
@@ -172,8 +176,8 @@ namespace mongo {
     };
 
     /**
-       db "commands"
-       basically just invocations of connection.$cmd.findOne({...});
+       DB "commands"
+       Basically just invocations of connection.$cmd.findOne({...});
     */
     class DBClientWithCommands : public DBClientInterface {
         bool isOk(const BSONObj&);
@@ -372,7 +376,7 @@ namespace mongo {
         virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 );
 
         /**
-           if name isn't specified, it will be created from the keys (reccomended)
+           if name isn't specified, it will be created from the keys (recommended)
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
@@ -421,10 +425,24 @@ namespace mongo {
         */
         virtual bool connect(const char *serverHostname, string& errmsg);
 
+		/** Authenticate with the server.
+			Authentication is separate for each database on the server -- you may authenticate for any 
+			number of databases on a single connection.
+			The "admin" database is special and once authenticated provides access to all databases on the 
+			server.
+			@return true if successful
+		*/
 		bool authenticate(const char *dbname, const char *user, const char *password);
 		bool authenticateWithDigest(const char *dbname, const char *user, const char *passwordDigest);
 
 		/** Perform a query 
+			@param query A query object.  {} matches all objects.
+			@param nToReturn limit on the number of results to return
+			@param nToSkip skip this many objects matched before returning objects
+			@param fieldsToReturn Template of which fields of the matched objects should be returned. By
+			  default all fields of the object are returned.  On large objects, for better performance, request 
+			  only those fields that you need.  If you plan to subsequentally call update(), you will need 
+			  all fields.
 			@return cursor
 		 */
         virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
@@ -466,7 +484,7 @@ namespace mongo {
     };
 
     /* Use this class to connect to a replica pair of servers.  The class will manage
-       checking for which is master, and do failover automatically.
+       checking for which server in a replica pair is master, and do failover automatically.
     */
     class DBClientPaired : public DBClientWithCommands {
         DBClientConnection left,right;
