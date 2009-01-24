@@ -197,10 +197,14 @@ namespace mongo {
         bool runCommand(const char *dbname, BSONObj cmd, BSONObj &info);
 
         /** Authorize access to a particular database.
+			Authentication is separate for each database on the server -- you may authenticate for any 
+			number of databases on a single connection.
+			The "admin" database is special and once authenticated provides access to all databases on the 
+			server.
 			@param digestPassword if password is plain text, set this to true.  otherwise assumed to be pre-digested
             @return true if successful
         */
-        bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
+        virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
         string createPasswordDigest( const char * clearTextPassword );
 
@@ -334,7 +338,7 @@ namespace mongo {
          ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
          query:         query to perform on the collection.  this is a BSONObj (binary JSON)
          You may format as
-         { query: { ... }, order: { ... } }
+           { query: { ... }, order: { ... } }
          to specify a sort order.
          nToReturn:     n to return.  0 = unlimited
          nToSkip:       start with the nth item
@@ -406,6 +410,7 @@ namespace mongo {
         time_t lastReconnectTry;
         string serverAddress; // remember for reconnects
         void checkConnection();
+		map< string, pair<string,string> > authCache;
     public:
 
         /**
@@ -413,7 +418,6 @@ namespace mongo {
          */
         DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) :
                 clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
-
 
         /**
            If autoReconnect is true, you can try to use the DBClientConnection even when
@@ -425,26 +429,9 @@ namespace mongo {
         */
         virtual bool connect(const char *serverHostname, string& errmsg);
 
-		/** Authenticate with the server.
-			Authentication is separate for each database on the server -- you may authenticate for any 
-			number of databases on a single connection.
-			The "admin" database is special and once authenticated provides access to all databases on the 
-			server.
-			@return true if successful
-		*/
-		bool authenticate(const char *dbname, const char *user, const char *password);
-		bool authenticateWithDigest(const char *dbname, const char *user, const char *passwordDigest);
+		/* overridden here to implement authCache for retries */
+        virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
-		/** Perform a query 
-			@param query A query object.  {} matches all objects.
-			@param nToReturn limit on the number of results to return
-			@param nToSkip skip this many objects matched before returning objects
-			@param fieldsToReturn Template of which fields of the matched objects should be returned. By
-			  default all fields of the object are returned.  On large objects, for better performance, request 
-			  only those fields that you need.  If you plan to subsequentally call update(), you will need 
-			  all fields.
-			@return cursor
-		 */
         virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             checkConnection();
@@ -485,6 +472,9 @@ namespace mongo {
 
     /* Use this class to connect to a replica pair of servers.  The class will manage
        checking for which server in a replica pair is master, and do failover automatically.
+
+	   On a failover situation, expect at least one operation to return an error (throw 
+	   an exception) before the failover is complete.  Operations are not retried.
     */
     class DBClientPaired : public DBClientWithCommands {
         DBClientConnection left,right;

@@ -228,12 +228,29 @@ namespace mongo {
         out() << ok << " retval:" << res << endl;
     }
 
+	void testPaired();
     int test2() {
-        testDbEval();
+		testPaired();
         return 0;
     }
 
     /* --- dbclientconnection --- */
+
+	bool DBClientConnection::auth(const char *dbname, const char *username, const char *password_text, string& errmsg, bool digestPassword) {
+		if( !autoReconnect ) 
+			return DBClientBase::auth(dbname, username, password_text, errmsg, digestPassword);
+
+		string password = password_text;
+		if( digestPassword ) 
+			password = createPasswordDigest( password_text );
+
+		if( !DBClientBase::auth(dbname, username, password.c_str(), errmsg, false) )
+			return false;
+
+		pair<string,string> p = pair<string,string>(username, password);
+		authCache[dbname] = p;
+		return true;
+	}
 
     BSONObj DBClientBase::findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c =
@@ -294,10 +311,20 @@ namespace mongo {
         string errmsg;
         string tmp = serverAddress;
         failed = false;
-        if ( !connect(tmp.c_str(), errmsg) )
+        if ( !connect(tmp.c_str(), errmsg) ) { 
             log() << "reconnect " << serverAddress << " failed " << errmsg << endl;
-        else
-            log() << "reconnect " << serverAddress << " ok" << endl;
+			return;
+		}
+
+		log() << "reconnect " << serverAddress << " ok" << endl;
+		//cout << "TEMP: authcache size: " << authCache.size() << endl;
+		for( map< string, pair<string,string> >::iterator i = authCache.begin(); i != authCache.end(); i++ ) { 
+			const char *dbname = i->first.c_str();
+			const char *username = i->second.first.c_str();
+			const char *password = i->second.second.c_str();
+			if( !DBClientBase::auth(dbname, username, password, errmsg, false) )
+				log() << "reconnect: auth failed db:" << dbname << " user:" << username << '\n';
+		}
     }
 
     auto_ptr<DBClientCursor> DBClientBase::query(const char *ns, BSONObj query, int nToReturn,
@@ -620,7 +647,7 @@ again:
     }
 
     DBClientPaired::DBClientPaired() :
-            left(true), right(true)
+		left(true, this), right(true, this)
     {
         master = NotSetL;
     }
@@ -697,6 +724,28 @@ again:
         return checkMaster().findOne(a,b,c,d);
     }
 
+	void testPaired() { 
+		//		DBClientPaired p;
+		//		log() << "connect returns " << p.connect("localhost:27017", "localhost:27018") << endl;
 
+		DBClientConnection p(true);
+		string errmsg;
+		log() << "connect " << p.connect("localhost", errmsg) << endl;
+		log() << "auth " << p.auth("dwight", "u", "p", errmsg) << endl;
+
+		while( 1 ) { 
+			sleepsecs(3);
+			try { 
+				log() << "findone returns " << p.findOne("dwight.foo", emptyObj).toString() << endl;
+				sleepsecs(3);
+				BSONObj info;
+				bool im;
+				log() << "ismaster returns " << p.isMaster(im,&info) << " info: " << info.toString() << endl;
+			}
+			catch(...) { 
+				cout << "caught exception" << endl;
+			}
+		}
+	}
 
 } // namespace mongo
