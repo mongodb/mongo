@@ -48,10 +48,22 @@ namespace mongo {
         }
         break;
         case NumberDouble:
+			{
+				s << fieldName() << ": ";
+				stringstream tmp;
+				tmp.precision( 16 );
+				tmp << number();
+				string n = tmp.str();
+				s << n;
+				// indicate this is a double:
+				if( strchr(n.c_str(), '.') == 0 && strchr(n.c_str(), 'E') == 0 && strchr(n.c_str(), 'N') == 0 )
+					s << ".0";
+			}
+            break;
         case NumberInt:
             s.precision( 16 );
             s << fieldName() << ": " << number();
-            s << "(" << ( type() == NumberInt ? "int" : "double" ) << ")";
+            //s << "(" << ( type() == NumberInt ? "int" : "double" ) << ")";
             break;
         case Bool:
             s << fieldName() << ": " << ( boolean() ? "true" : "false" );
