@@ -194,7 +194,7 @@ namespace mongo {
 #undef exit
     void dbexit(int rc, const char *why) {
         log() << "dbexit: " << why << " rc:" << rc << endl;
-        exit(rc);
+        ::exit(rc);
     }
 
 } // namespace mongo

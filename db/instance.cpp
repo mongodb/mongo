@@ -541,7 +541,7 @@ namespace mongo {
 
         MemoryMappedFile::closeAllFiles();
         out() << "dbexit: really exiting now" << endl;
-        exit(rc);
+        ::exit(rc);
     }
 
 
