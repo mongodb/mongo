@@ -67,6 +67,8 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password_text, string& errmsg, bool digestPassword) {
+		//cout << "TEMP AUTH " << toString() << dbname << ' ' << username << ' ' << password_text << ' ' << digestPassword << endl;
+
 		string password = password_text;
 		if( digestPassword ) 
 			password = createPasswordDigest( password_text );
@@ -98,9 +100,7 @@ namespace mongo {
                 md5_finish(&st, d);
             }
             b << "key" << digestToString( d );
-            //b.appendBinData("key", 16, MD5Type, (const char *) d);
             authCmd = b.done();
-            //cout << "TEMP: authCmd: " << authCmd.toString() << endl;
         }
         
         if( runCommand(dbname, authCmd, info) ) 
@@ -237,19 +237,19 @@ namespace mongo {
     /* --- dbclientconnection --- */
 
 	bool DBClientConnection::auth(const char *dbname, const char *username, const char *password_text, string& errmsg, bool digestPassword) {
-		if( !autoReconnect ) 
-			return DBClientBase::auth(dbname, username, password_text, errmsg, digestPassword);
-
 		string password = password_text;
 		if( digestPassword ) 
 			password = createPasswordDigest( password_text );
 
-		if( !DBClientBase::auth(dbname, username, password.c_str(), errmsg, false) )
-			return false;
+		if( autoReconnect ) {
+			/* note we remember the auth info before we attempt to auth -- if the connection is broken, we will 
+			   then have it for the next autoreconnect attempt. 
+			*/
+			pair<string,string> p = pair<string,string>(username, password);
+			authCache[dbname] = p;
+		}
 
-		pair<string,string> p = pair<string,string>(username, password);
-		authCache[dbname] = p;
-		return true;
+		return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
 	}
 
     BSONObj DBClientBase::findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn, int queryOptions) {
@@ -317,13 +317,12 @@ namespace mongo {
 		}
 
 		log() << "reconnect " << serverAddress << " ok" << endl;
-		//cout << "TEMP: authcache size: " << authCache.size() << endl;
 		for( map< string, pair<string,string> >::iterator i = authCache.begin(); i != authCache.end(); i++ ) { 
 			const char *dbname = i->first.c_str();
 			const char *username = i->second.first.c_str();
 			const char *password = i->second.second.c_str();
 			if( !DBClientBase::auth(dbname, username, password, errmsg, false) )
-				log() << "reconnect: auth failed db:" << dbname << " user:" << username << '\n';
+				log() << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
 		}
     }
 
@@ -708,11 +707,28 @@ again:
         try {
             checkMaster();
         }
-        catch (UserAssertionException&) {
+        catch (AssertionException&) {
             return false;
         }
         return true;
     }
+
+	bool DBClientPaired::auth(const char *dbname, const char *username, const char *pwd, string& errmsg) { 
+		DBClientConnection& m = checkMaster();
+		if( !m.auth(dbname, username, pwd, errmsg) )
+			return false;
+		/* we try to authentiate with the other half of the pair -- even if down, that way the authInfo is cached. */
+		string e;
+		try {
+			if( &m == &left ) 
+				right.auth(dbname, username, pwd, e);
+			else
+				left.auth(dbname, username, pwd, e);
+		}
+		catch( AssertionException&) { 
+		}
+		return true;
+	}
 
     auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, BSONObj b, int c, int d,
             BSONObj *e, int f)
@@ -725,12 +741,12 @@ again:
     }
 
 	void testPaired() { 
-		//		DBClientPaired p;
-		//		log() << "connect returns " << p.connect("localhost:27017", "localhost:27018") << endl;
+		DBClientPaired p;
+		log() << "connect returns " << p.connect("localhost:27017", "localhost:27018") << endl;
 
-		DBClientConnection p(true);
+		//DBClientConnection p(true);
 		string errmsg;
-		log() << "connect " << p.connect("localhost", errmsg) << endl;
+		//		log() << "connect " << p.connect("localhost", errmsg) << endl;
 		log() << "auth " << p.auth("dwight", "u", "p", errmsg) << endl;
 
 		while( 1 ) { 

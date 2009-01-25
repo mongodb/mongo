@@ -497,6 +497,8 @@ namespace mongo {
            */
         bool connect(const char *serverHostname1, const char *serverHostname2);
 
+        bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg);
+
         /* throws userassertion "no master found" */
         virtual
         auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,

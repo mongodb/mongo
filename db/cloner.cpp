@@ -181,7 +181,14 @@ namespace mongo {
             assert( !e.eoo() );
             assert( e.type() == String );
             const char *from_name = e.valuestr();
-            if ( strstr(from_name, ".system.") || strchr(from_name, '$') ) {
+
+            if( strstr(from_name, ".system.") ) { 
+				/* system.users is cloned -- but nothing else from system. */
+				if( strstr(from_name, ".system.users") == 0 ) 
+					continue;
+			}
+			else if( strchr(from_name, '$') ) {
+				log() << "clone: '$' char in namespaces outside of system???\n";
                 continue;
             }
             BSONObj options = collection.getObjectField("options");

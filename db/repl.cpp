@@ -884,7 +884,7 @@ namespace mongo {
 		massert("bad user object? [1]", !u.empty());
 		massert("bad user object? [2]", !p.empty());
 		string err;
-		if( !conn->auth("admin", u.c_str(), p.c_str(), err, false) ) {
+		if( !conn->auth("local", u.c_str(), p.c_str(), err, false) ) {
 			log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
 			return false;
 		}
