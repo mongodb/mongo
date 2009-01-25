@@ -52,21 +52,21 @@ int main( int argc, char** argv ) {
         if ( argv[ i ] == string( "-dbpath" ) ) {
             if ( i == argc - 1 ) {
                 usage();
-                exit( -1 );
+                dbexit( -1 );
             }
             dbpathSpec = argv[ ++i ];
             offset += 2;
         } else if ( argv[ i ] == string( "-seed" ) ) {
             if ( i == argc - 1 ) {
                 usage();
-                exit( -1 );
+                dbexit( -1 );
             }
             // Don't bother checking for conversion error
             seed = strtoll( argv[ ++i ], 0, 10 );
             offset += 2;
         } else if ( argv[ i ] == string( "-help" ) ) {
             usage();
-            exit( 0 );
+            dbexit( 0 );
         } else if ( offset ) {
             argv[ i - offset ] = argv[ i ];
         }

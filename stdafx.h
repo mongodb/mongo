@@ -42,6 +42,7 @@ namespace mongo {
 
     void sayDbContext(const char *msg = 0);
     void dbexit(int returnCode, const char *whyMsg = "");
+    void exit( int status );
 
     inline void * ourmalloc(size_t size) {
         void *x = malloc(size);
@@ -289,8 +290,6 @@ namespace mongo {
     }
 #define free our_debug_free
 #endif
-
-#define exit dbexit
 
 } // namespace mongo
 

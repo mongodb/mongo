@@ -487,7 +487,7 @@ int main(int argc, char* argv[], char *envp[] )
                 int x = s[7] - '0';
                 if ( x < 0 || x > 7 ) {
                     out() << "can't interpret --oplog setting" << endl;
-                    exit(13);
+                    dbexit(13);
                 }
                 opLogging = x;
             }
@@ -495,7 +495,7 @@ int main(int argc, char* argv[], char *envp[] )
         
         initAndListen(port, appsrvPath);
 
-        exit(0);
+        dbexit(0);
     }
 
 usage:
