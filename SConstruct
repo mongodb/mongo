@@ -76,8 +76,7 @@ def findVersion( root , choices ):
     raise "can't find a version of [" + root + "] choices: " + choices
 
 if "darwin" == os.sys.platform:
-    env.Append( CPPPATH=[ "/sw/include" , "/opt/local/include", "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
-    env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
+    env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
 
     env.Append( CPPFLAGS=" -mmacosx-version-min=10.4 " )
     env.Append( FRAMEWORKS=["JavaVM"] )
@@ -87,6 +86,13 @@ if "darwin" == os.sys.platform:
 
     nix = True
     
+    if force64:
+        env.Append( CPPPATH=["/usr/lib64/include"] )
+        env.Append( LIBPATH=["/usr/lib64/lib"] )
+    else:
+        env.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
+        env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
+
 elif "linux2" == os.sys.platform:
 
     env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/linux"] )
@@ -148,6 +154,7 @@ else:
 
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-compare -Wno-non-virtual-dtor" )
+    env.Append( LINKFLAGS=" -fPIC " )
     env.Append( LIBS=[ "pcrecpp" , "pcre" , "stdc++" ] )
 
     if force64:
@@ -173,13 +180,15 @@ if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
     print( "can't find boost headers" )
     Exit(1)
 
-if nix:
-    for b in boostLibs:
-        l = "boost_" + b
-        if not conf.CheckLib( l + "-mt" ):
-            if not conf.CheckLib( l ):
-                print "can't find a required boost library [" + l + "]";
-                #Exit(1)
+for b in boostLibs:
+    l = "boost_" + b
+    if not conf.CheckLib( l + "-mt" ):
+        if not conf.CheckLib( l ):
+            print "can't find a required boost library [" + l + "]";
+            Exit(1)
+
+# this will add it iff it exists and works
+conf.CheckLib( "libboost_system-mt" )
 
 env = conf.Finish()
 
