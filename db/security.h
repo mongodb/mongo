@@ -54,6 +54,7 @@ namespace mongo {
             if( m[dbname].level == 2 ) return true;
 			if( noauth ) return true;
 			if( m["admin"].level == 2 ) return true;
+			if( m["local"].level == 2 ) return true;
 			if( isLocalHost ) { 
 				DBContext c("admin.system.users");
 				BSONObj result;

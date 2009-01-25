@@ -24,9 +24,9 @@
 
 namespace mongo {
 
-    /* the query field 'options' can have these bits set: */
+    /** the query field 'options' can have these bits set: */
     enum QueryOptions {
-        /* Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
+        /** Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
            the final object's position.  you can resume using the cursor later, from where it was located,
            if more data were received.  Set on dbQuery and dbGetMore.
 
@@ -36,7 +36,7 @@ namespace mongo {
         */
         Option_CursorTailable = 2,
 
-        /* allow query of replica slave.  normally these return an error except for namespace "local".
+        /** allow query of replica slave.  normally these return an error except for namespace "local".
         */
         Option_SlaveOk = 4,
 
@@ -85,17 +85,21 @@ namespace mongo {
         virtual void checkResponse( const char *data, int nReturned ) {}
     };
 
+	/** Queries return a cursor object */
     class DBClientCursor : boost::noncopyable {
     public:
-        bool more(); // if true, safe to call next()
+		/** if true, safe to call next() */
+        bool more();
 
-        /* returns next object in the result cursor.
+        /** next
+		   @return next object in the result cursor.
            on an error at the remote server, you will get back:
              { $err: <string> }
            if you do not want to handle that yourself, call nextSafe().
         */
         BSONObj next();
 
+		/** throws AssertionException if get back { $err : ... } */
         BSONObj nextSafe() {
             BSONObj o = next();
             BSONElement e = o.firstElement();
@@ -103,7 +107,7 @@ namespace mongo {
             return o;
         }
 
-        /* cursor no longer valid -- use with tailable cursors.
+        /** cursor no longer valid -- use with tailable cursors.
            note you should only rely on this once more() returns false;
            'dead' may be preset yet some data still queued and locally
            available from the dbclientcursor.
@@ -153,7 +157,7 @@ namespace mongo {
 
 
     /**
-       the interface that any db connection should implement
+       The interface that any db connection should implement
      */
     class DBClientInterface : boost::noncopyable {
     public:
@@ -172,8 +176,8 @@ namespace mongo {
     };
 
     /**
-       db "commands"
-       basically just invocations of connection.$cmd.findOne({...});
+       DB "commands"
+       Basically just invocations of connection.$cmd.findOne({...});
     */
     class DBClientWithCommands : public DBClientInterface {
         bool isOk(const BSONObj&);
@@ -193,10 +197,14 @@ namespace mongo {
         bool runCommand(const char *dbname, BSONObj cmd, BSONObj &info);
 
         /** Authorize access to a particular database.
+			Authentication is separate for each database on the server -- you may authenticate for any 
+			number of databases on a single connection.
+			The "admin" database is special and once authenticated provides access to all databases on the 
+			server.
 			@param digestPassword if password is plain text, set this to true.  otherwise assumed to be pre-digested
             @return true if successful
         */
-        bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
+        virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
         string createPasswordDigest( const char * clearTextPassword );
 
@@ -330,7 +338,7 @@ namespace mongo {
          ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
          query:         query to perform on the collection.  this is a BSONObj (binary JSON)
          You may format as
-         { query: { ... }, order: { ... } }
+           { query: { ... }, order: { ... } }
          to specify a sort order.
          nToReturn:     n to return.  0 = unlimited
          nToSkip:       start with the nth item
@@ -372,7 +380,7 @@ namespace mongo {
         virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 );
 
         /**
-           if name isn't specified, it will be created from the keys (reccomended)
+           if name isn't specified, it will be created from the keys (recommended)
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
@@ -402,6 +410,7 @@ namespace mongo {
         time_t lastReconnectTry;
         string serverAddress; // remember for reconnects
         void checkConnection();
+		map< string, pair<string,string> > authCache;
     public:
 
         /**
@@ -409,7 +418,6 @@ namespace mongo {
          */
         DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) :
                 clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
-
 
         /**
            If autoReconnect is true, you can try to use the DBClientConnection even when
@@ -421,12 +429,9 @@ namespace mongo {
         */
         virtual bool connect(const char *serverHostname, string& errmsg);
 
-		bool authenticate(const char *dbname, const char *user, const char *password);
-		bool authenticateWithDigest(const char *dbname, const char *user, const char *passwordDigest);
+		/* overridden here to implement authCache for retries */
+        virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
-		/** Perform a query 
-			@return cursor
-		 */
         virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             checkConnection();
@@ -466,7 +471,10 @@ namespace mongo {
     };
 
     /* Use this class to connect to a replica pair of servers.  The class will manage
-       checking for which is master, and do failover automatically.
+       checking for which server in a replica pair is master, and do failover automatically.
+
+	   On a failover situation, expect at least one operation to return an error (throw 
+	   an exception) before the failover is complete.  Operations are not retried.
     */
     class DBClientPaired : public DBClientWithCommands {
         DBClientConnection left,right;
@@ -488,6 +496,8 @@ namespace mongo {
            try reconnects.
            */
         bool connect(const char *serverHostname1, const char *serverHostname2);
+
+        bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg);
 
         /* throws userassertion "no master found" */
         virtual

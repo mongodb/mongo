@@ -194,26 +194,39 @@ namespace mongo {
 
     class CmdIsMaster : public Command {
     public:
+        virtual bool requiresAuth() { return false; }
         virtual bool slaveOk() {
             return true;
         }
         CmdIsMaster() : Command("ismaster") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 
+			   authenticated.
+			   we allow unauthenticated ismaster but we aren't as verbose informationally if 
+			   one is not authenticated for admin db to be safe.
+			*/
+			AuthenticationInfo *ai = authInfo.get();
+			bool authed = ai == 0 || ai->isAuthorized("admin");
+
             if ( allDead ) {
                 result.append("ismaster", 0.0);
-                if ( replPair )
-                    result.append("remote", replPair->remote);
-                result.append("info", allDead);
+				if( authed ) { 
+					if ( replPair )
+						result.append("remote", replPair->remote);
+					result.append("info", allDead);
+				}
             }
             else if ( replPair ) {
                 result.append("ismaster", replPair->state);
-                result.append("remote", replPair->remote);
-                if ( replPair->info.empty() )
-                    result.append("info", replPair->info);
-            }
+				if( authed ) {
+					result.append("remote", replPair->remote);
+					if ( !replPair->info.empty() )
+						result.append("info", replPair->info);
+				}
+			}
             else {
                 result.append("ismaster", 1);
-                result.append("msg", "not paired");
+				result.append("msg", "not paired");
             }
 
             return true;
@@ -871,7 +884,7 @@ namespace mongo {
 		massert("bad user object? [1]", !u.empty());
 		massert("bad user object? [2]", !p.empty());
 		string err;
-		if( !conn->auth("admin", u.c_str(), p.c_str(), err, false) ) {
+		if( !conn->auth("local", u.c_str(), p.c_str(), err, false) ) {
 			log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
 			return false;
 		}
