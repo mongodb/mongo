@@ -184,6 +184,7 @@ namespace mongo {
             // Check for end of disk.
             lseek(fd, length - 1, SEEK_SET);
             write(fd, "", 1);
+            lseek(fd, 0, SEEK_SET);
             Nullstream &l = log();
             l << "new datafile " << filename << " filling with zeroes...";
             l.flush();
