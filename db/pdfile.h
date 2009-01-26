@@ -101,6 +101,9 @@ namespace mongo {
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
     private:
+
+        void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
+
         vector<PhysicalDataFile *> files;
     };
 

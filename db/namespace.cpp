@@ -25,8 +25,11 @@
 #include <algorithm>
 #include <list>
 #include "query.h"
+#include "json.h"
 
 namespace mongo {
+
+    BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
     /* deleted lists -- linked lists of deleted records -- tehy are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.

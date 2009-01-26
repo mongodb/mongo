@@ -83,6 +83,8 @@ namespace mongo {
     const int MaxBucket = 18;
     const int MaxIndexes = 10;
 
+    extern BSONObj idKeyPattern; // { _id : 1 } 
+
     class IndexDetails {
     public:
         DiskLoc head; /* btree head */
@@ -139,6 +141,11 @@ namespace mongo {
         string indexName() const { // e.g. "ts_1"
             BSONObj io = info.obj();
             return io.getStringField("name");
+        }
+
+        /* returns true if this is the _id index. */
+        bool isIdIndex() const { 
+            return idKeyPattern.woEqual(keyPattern());
         }
 
         /* gets not our namespace name (indexNamespace for that),
@@ -224,6 +231,14 @@ namespace mongo {
         int findIndexByName(const char *name) {
             for ( int i = 0; i < nIndexes; i++ ) {
                 if ( strcmp(indexes[i].info.obj().getStringField("name"),name) == 0 )
+                    return i;
+            }
+            return -1;
+        }
+
+        int findIdIndex() {
+            for( int i = 0; i < nIndexes; i++ ) {
+                if( indexes[i].isIdIndex() )
                     return i;
             }
             return -1;
