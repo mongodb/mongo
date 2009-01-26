@@ -102,4 +102,9 @@ namespace mongo {
         printStackTrace();
     }
     
+    void exit( int status ){
+        dbexit( status );
+    }
+
+
 } // namespace mongo
