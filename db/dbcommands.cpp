@@ -341,7 +341,9 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
-        CmdTimeInfo() : Command("timeinfo") {}
+        CmdTimeInfo() : Command("timeinfo") {
+            started = time(0);
+        }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             unsigned long long last, start, timeLocked;
             dbMutexInfo.timingInfo(start, timeLocked);
@@ -351,8 +353,10 @@ namespace mongo {
             result.append("totalTime", tt);
             result.append("lockTime", tl);
             result.append("ratio", tl/tt);
+            result.append("uptime",time(0)-started);
             return true;
         }
+        time_t started;
     } cmdTimeInfo;
 
     /* just to check if the db has asserted */
