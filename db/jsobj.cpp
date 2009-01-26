@@ -709,8 +709,10 @@ namespace mongo {
             return nullElement;
         else if ( sub.type() == Array || strlen( name ) == 0 )
             return sub;
-        else
+        else if ( sub.type() == Object )
             return sub.embeddedObject().getFieldDottedOrArray( name );
+        else
+            return nullElement;
     }
 
     /* makes a new BSONObj with the fields specified in pattern.
