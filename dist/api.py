@@ -31,7 +31,7 @@ def standalone():
 	global db_config, db_header, db_lockout, db_open
 	global env_config, env_header, env_lockout, env_open
 
-	if condition.count('methodV'):
+	if flags.count('methodV'):
 		rettype = 'void'
 	else:
 		rettype = 'int'
@@ -52,7 +52,7 @@ def standalone():
 	# XXX_config string.
 	s = '\t' + handle +\
 	    '->' + field + ' = __wt_' + handle + '_' + field + ';\n'
-	if condition.count('open'):
+	if flags.count('open'):
 		if handle.count('env'):
 			env_open += s
 		else:
@@ -80,8 +80,8 @@ def getset():
 	global env_config, env_header, env_lockout
 
 	name_re = re.compile(r'^.*=([a-z_]+)')
-	if name_re.match(condition):
-		field = name_re.match(condition).group(1)
+	if name_re.match(flags):
+		field = name_re.match(flags).group(1)
 	else:
 		field = list[0].split('\t')[0]
 
@@ -156,7 +156,7 @@ def getset():
 
 	# Verify means we call a standard verification routine because
 	# there are constraints or side-effects on setting the value.
-	if condition.count('verify'):
+	if flags.count('verify'):
 		s += '\tint ret;\n\n'
 		s += '\tif ((ret = __wt_' +\
 		    handle + '_set_' + field + '_verify(\n\t    handle'
@@ -191,20 +191,20 @@ list = []
 for line in open('api', 'r'):
 	if setter_re.match(line):
 		if list:
-			if condition.count('getset'):
+			if flags.count('getset'):
 				getset()
-			if condition.count('method'):
+			elif flags.count('method'):
 				standalone()
 			list=[]
 		s = line.split('\t')
 		handle = s[0]
-		condition = s[1]
+		flags = s[1]
 	elif field_re.match(line):
 		list.append(string.strip(line))
 if list:
-	if condition.count('getset'):
+	if flags.count('getset'):
 		getset()
-	if condition.count('method'):
+	elif flags.count('method'):
 		standalone()
 
 # Write out the configuration initialization and lockout functions.
@@ -230,7 +230,7 @@ tfile.write('}\n')
 	
 # Update the automatically generated function sources.
 tfile.close()
-compare_srcfile(tmp_file, '../support/getset.c')
+compare_srcfile(tmp_file, '../support/api.c')
 
 # Update the wiredtiger.in file with Env and Db handle information.
 tfile = open(tmp_file, 'w')
