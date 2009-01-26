@@ -25,9 +25,14 @@ namespace mongo {
 
     string hostbyname(const char *hostname) {
         boostlock lk(sock_mutex);
+#if defined(_WIN32)
+        if( inet_addr(hostname) != INADDR_NONE )
+            return hostname;
+#else
         struct in_addr temp;
         if ( inet_aton( hostname, &temp ) )
             return hostname;
+#endif
         struct hostent *h;
         h = gethostbyname(hostname);
         if ( h == 0 ) return "";

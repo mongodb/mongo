@@ -344,6 +344,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\nonce.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\pdfile.cpp"
 				>
 			</File>

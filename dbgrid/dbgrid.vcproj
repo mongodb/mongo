@@ -275,10 +275,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\db\security.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\shard.cpp"
 				>
 			</File>
@@ -359,6 +355,10 @@
 				</File>
 				<File
 					RelativePath="..\grid\message.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\nonce.cpp"
 					>
 				</File>
 				<File
