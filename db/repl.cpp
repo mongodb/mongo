@@ -575,14 +575,15 @@ namespace mongo {
                 }
                 else {
                     // do upserts for inserts as we might get replayed more than once
-                    OID *oid = o.getOID();
-                    if ( oid == 0 ) {
+					BSONElement _id;
+					if( !o.getObjectID(_id) ) {
+						/* No _id.  This will be very slow. */
                         _updateObjects(ns, o, o, true, ss);
                     }
                     else {
                         BSONObjBuilder b;
-                        b.appendOID("_id", oid);
-                        RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
+						b.append(_id);
+                        RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow
                         _updateObjects(ns, o, b.done(), true, ss);
                     }
                 }

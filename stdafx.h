@@ -42,7 +42,6 @@ namespace mongo {
 
     void sayDbContext(const char *msg = 0);
     void dbexit(int returnCode, const char *whyMsg = "");
-    void exit( int status );
 
     inline void * ourmalloc(size_t size) {
         void *x = malloc(size);

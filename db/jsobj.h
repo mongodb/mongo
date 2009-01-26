@@ -197,7 +197,7 @@ namespace mongo {
             if ( type() == NumberInt ) return *((int *) value());
             return 0;
         }
-        OID& oid() const {
+        OID& __oid() const {
             return *((OID*) value());
         }
 
@@ -326,7 +326,8 @@ namespace mongo {
     int getGtLtOp(BSONElement& e);
 
     /**
-       an actual bson object
+	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
+       object in a binary representation.
      */
     class BSONObj : public Stringable {
         friend class BSONObjIterator;
@@ -374,7 +375,7 @@ namespace mongo {
             b.append((void *) objdata(), objsize());
         }
 
-        // Readable representation of a 10gen object.
+        /** Readable representation of a BSON object in an extended JSON-style notation. */
         string toString() const;
 
         // Properly formatted JSON string.
@@ -405,6 +406,7 @@ namespace mongo {
         };
         BSONElement getField(const char *name) const; /* return has eoo() true if no match */
 
+		/** @return true if field exists */
         bool hasField( const char * name )const {
             return ! getField( name ).eoo();
         }
@@ -412,6 +414,7 @@ namespace mongo {
         // returns "" if DNE or wrong type
         const char * getStringField(const char *name) const;
 
+		/** @return subobject of the given name */
         BSONObj getObjectField(const char *name) const;
 
         int getIntField(const char *name) const; // INT_MIN if not present
@@ -435,7 +438,9 @@ namespace mongo {
         */
         BSONObj extractFieldsUnDotted(BSONObj pattern) const;
         
-        /**
+        /** extract items from object which match a pattern object.
+			e.g., if pattern is { x : 1, y : 1 }, builds an object with 
+			x and y elements of this object, if they are present.
            returns elements with original field names
         */
         BSONObj extractFields(BSONObj &pattern);
@@ -446,6 +451,8 @@ namespace mongo {
         int objsize() const {
             return details ? details->_objsize : 0;    // includes the embedded size field
         }
+
+		/** @return true if object is empty -- i.e.,  {} */
         bool isEmpty() const {
             return objsize() <= 5;
         }
@@ -468,14 +475,14 @@ namespace mongo {
         // Alternative output format
         string hexDump() const;
         
-        /* <0: l<r. 0:l==r. >0:l>r
-           wo='well ordered'.  fields must be in same order in each object.
+        /**wo='well ordered'.  fields must be in same order in each object.
            Ordering is with respect to the signs of the elements in idxKey.
+		   @return  <0 if l<r. 0 if l==r. >0 if l>r
         */
         int woCompare(const BSONObj& r, const BSONObj &idxKey = BSONObj(),
                       bool considerFieldName=true) const;
 
-        /* note this is "shallow equality" -- ints and doubles won't match.  for a
+        /** This is "shallow equality" -- ints and doubles won't match.  for a
            deep equality test use woCompare (which is slower).
         */
         bool woEqual(const BSONObj& r) const {
@@ -486,20 +493,39 @@ namespace mongo {
             return false;
         }
 
+		/** @return first field of the object */
         BSONElement firstElement() const {
             return BSONElement(objdata() + 4);
         }
+
+		/** @return element with fieldname "name".  returnvalue.eoo() is true if not found */
         BSONElement findElement(const char *name) const;
+
+		/** @return element with fieldname "name".  returnvalue.eoo() is true if not found */
         BSONElement findElement(string name) const {
             return findElement(name.c_str());
         }
+
+		/** @return true if field exists in the object */
         bool hasElement(const char *name);
 
-        OID* getOID() {
+		/** get the _id field from the object.  assumes _id is the first 
+			element of the object -- this is done for performance.  drivers should 
+			honor this convention.
+		*/
+		bool getObjectID(BSONElement& e) { 
+            BSONElement f = firstElement();
+			if( strcmp(f.fieldName(), "_id") )
+				return false;
+			e = f;
+			return true;
+		}
+
+        OID* __getOID() {
             BSONElement e = firstElement();
             if ( e.type() != jstOID )
                 return 0;
-            return &e.oid();
+            return &e.__oid();
         }
 
         BSONObj(const BSONObj& r) {
@@ -750,9 +776,10 @@ namespace mongo {
             return BSONObj(decouple(l), true);
         }
 
-        /* this version, jsobjbuilder still frees the jsobj
-        when the builder goes out of scope.  use it this way
-        by default, that's simplest.
+        /** Fetch the object we have built.
+			BSONObjBuilder still frees the object when the builder goes out of 
+			scope -- very important to keep in mind.  Use doneAndDecouple() if you 
+			would like the BSONObj to last longer than the builder.
         */
         BSONObj done() {
             return BSONObj(_done());

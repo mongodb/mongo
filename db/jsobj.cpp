@@ -115,7 +115,7 @@ namespace mongo {
             break;
         case jstOID:
             s << fieldName() << " : ObjId(";
-            s << oid() << ')';
+            s << __oid() << ')';
             break;
         case BinData:
             s << fieldName() << " : BinData";
@@ -244,7 +244,7 @@ namespace mongo {
         case jstOID:
             if ( format == TenGen )
                 s << "ObjectId( ";
-            s << '"' << oid() << '"';
+            s << '"' << __oid() << '"';
             if ( format == TenGen )
                 s << " )";
             break;
