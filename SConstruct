@@ -87,8 +87,9 @@ if "darwin" == os.sys.platform:
     nix = True
     
     if force64:
-        env.Append( CPPPATH=["/usr/lib64/include"] )
-        env.Append( LIBPATH=["/usr/lib64/lib"] )
+        env.Append( CPPPATH=["/usr/64/include"] )
+        env.Append( LIBPATH=["/usr/64/lib"] )
+        installDir = "/usr/64/"
     else:
         env.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
         env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
@@ -188,7 +189,7 @@ for b in boostLibs:
             Exit(1)
 
 # this will add it iff it exists and works
-conf.CheckLib( "libboost_system-mt" )
+conf.CheckLib( "boost_system-mt" )
 
 env = conf.Finish()
 
@@ -255,7 +256,9 @@ for id in [ "" , "client/" , "util/" , "grid/" , "db/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 
 #lib
-env.Install( installDir + "/" + nixLibPrefix , "libmongoclient.a" )
+# (Using InstallAs syntax so scons doesn't treat the install location as a
+# dependency for the client targets.)
+env.InstallAs( target=installDir + "/" + nixLibPrefix, source="libmongoclient.a" )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #final alias
@@ -280,5 +283,5 @@ env.AlwaysBuild( "checkSource" )
 def gitPush( env, target, source ):
     import subprocess
     return subprocess.call( [ "git", "push" ] )
-env.Alias( "push", [ "smoke", "checkSource" ], gitPush )
+env.Alias( "push", [ ".", "smoke", "checkSource" ], gitPush )
 env.AlwaysBuild( "push" )
