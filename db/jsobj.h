@@ -584,6 +584,7 @@ namespace mongo {
         bool valid() const;
     };
     ostream& operator<<( ostream &s, const BSONObj &o );
+    ostream& operator<<( ostream &s, const BSONElement &e );
 
     class BSONObjCmp {
     public:

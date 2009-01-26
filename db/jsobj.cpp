@@ -919,6 +919,10 @@ namespace mongo {
         return s << o.toString();
     }
 
+    ostream& operator<<( ostream &s, const BSONElement &e ) {
+        return s << e.toString();
+    }
+
     /*-- test things ----------------------------------------------------*/
 
 #pragma pack(push,1)
