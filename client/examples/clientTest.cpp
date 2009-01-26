@@ -11,6 +11,15 @@
 using namespace std;
 using namespace mongo;
 
+int count( auto_ptr<DBClientCursor> cursor ){
+    int num = 0;
+    while ( cursor->more() ){
+        BSONObj o = cursor->next();
+        num++;
+    }
+    return num;
+}
+
 int main() {
 
     DBClientConnection conn;
@@ -104,6 +113,12 @@ int main() {
     { // ensure index
         assert( conn.ensureIndex( ns , BUILDOBJ( "name" << 1 ) ) );
         assert( ! conn.ensureIndex( ns , BUILDOBJ( "name" << 1 ) ) );
+    }
+    
+    {
+        assert( 3 == count( conn.query( ns , emptyObj ) ) );
+        cout << count( conn.query( ns , emptyObj , 2 ) ) << endl;
+        assert( 2 == count( conn.query( ns , emptyObj , 2 ) ) );
     }
 
     cout << "client test finished!" << endl;
