@@ -180,6 +180,35 @@ namespace mongo {
         return ss.str();
     }
 
+    class CmdShutdown : public Command {
+    public:
+        virtual bool requiresAuth() { return true; }
+        virtual bool adminOnly() { return true; }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() {
+            return true;
+        }
+        CmdShutdown() : Command("shutdown") {}
+        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( noauth ) {
+                // if running without auth, you must be on localhost
+                AuthenticationInfo *ai = authInfo.get();
+                if( ai == 0 || !ai->isLocalHost ) {
+                    errmsg = "unauthorized [2]";
+                    return false;
+                }
+            } 
+            {
+                log() << "terminating, shutdown command received" << endl;
+                dbtemprelease r;
+                dbexit(EXIT_SUCCESS);
+            }
+            return true;
+        }
+    } cmdShutdown;
+
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
