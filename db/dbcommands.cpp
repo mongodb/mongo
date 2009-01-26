@@ -353,7 +353,7 @@ namespace mongo {
             result.append("totalTime", tt);
             result.append("lockTime", tl);
             result.append("ratio", tl/tt);
-            result.append("uptime",time(0)-started);
+            result.append("uptime",(double) (time(0)-started));
             return true;
         }
         time_t started;

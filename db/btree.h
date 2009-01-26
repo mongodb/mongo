@@ -159,9 +159,10 @@ namespace mongo {
         void dump();
 
         static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
-        int insert(DiskLoc thisLoc, DiskLoc recordLoc,
+
+        int bt_insert(DiskLoc thisLoc, DiskLoc recordLoc,
                    BSONObj& key, const BSONObj &order, bool dupsAllowed,
-                   IndexDetails& idx, bool toplevel);
+                   IndexDetails& idx, bool toplevel = true);
 
         bool unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc);
 
@@ -190,7 +191,7 @@ namespace mongo {
         int _insert(DiskLoc thisLoc, DiskLoc recordLoc,
                     BSONObj& key, const BSONObj &order, bool dupsAllowed,
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
-        bool find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos);
+        bool find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
     };
 

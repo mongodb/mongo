@@ -285,12 +285,20 @@ namespace mongo {
         }
     }
 
-    /* pos: for existing keys k0...kn-1.
+    /* Find a key withing this btree bucket.
+ 
+       When duplicate keys are allowed, we use the DiskLoc of the record as if it were part of the 
+       key.  That assures that even when there are many duplicates (e.g., 1 million) for a key,
+       our performance is still good.
+
+       assertIfDup: if the key exists (ignoring the recordLoc), uassert
+
+       pos: for existing keys k0...kn-1.
        returns # it goes BEFORE.  so key[pos-1] < key < key[pos]
        returns n if it goes after the last existing key.
-       note result might be Unused!
+       note result might be an Unused location!
     */
-    bool BtreeBucket::find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos) {
+    bool BtreeBucket::find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup) {
         /* binary search for this key */
         int l=0;
         int h=n-1;
@@ -298,36 +306,19 @@ namespace mongo {
             int m = (l+h)/2;
             KeyNode M = keyNode(m);
             int x = key.woCompare(M.key, order);
-            if ( x == 0 )
+            if ( x == 0 ) { 
+                uassert("duplicate key error", !assertIfDup);
+
+                // dup keys allowed.  use recordLoc as if it is part of the key
                 x = recordLoc.compare(M.recordLoc);
+            }
             if ( x < 0 ) // key < M.key
                 h = m-1;
             else if ( x > 0 )
                 l = m+1;
             else {
-                // found it.  however, if dup keys are here, be careful we might have
-                // found one in the middle.  we want find() to return the leftmost instance.
-                /*
-                			while( m >= 1 && keyNode(m-1).key.woEqual(key) )
-                				m--;
-                */
-
+                // found it.
                 pos = m;
-
-                /*
-                			DiskLoc ch = k(m).prevChildBucket;
-                			if( !ch.isNull() ) {
-                				// if dup keys, might be dups to the left.
-                				DiskLoc largestLoc;
-                				int largestKey;
-                				ch.btree()->findLargestKey(ch, largestLoc, largestKey);
-                				if( !largestLoc.isNull() ) {
-                					if( largestLoc.btree()->keyAt(largestKey).woEqual(key) )
-                						return false;
-                				}
-                			}
-                */
-
                 return true;
             }
         }
@@ -685,7 +676,7 @@ found:
 
     DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction) {
         int p;
-        found = find(key, recordLoc, order, p);
+        found = find(key, recordLoc, order, p, /*assertIfDup*/ false);
         if ( found ) {
             pos = p;
             return thisLoc;
@@ -717,7 +708,7 @@ found:
         assert( key.objsize() > 0 );
 
         int pos;
-        bool found = find(key, recordLoc, order, pos);
+        bool found = find(key, recordLoc, order, pos, !dupsAllowed);
         if ( insert_debug ) {
             out() << "  " << thisLoc.toString() << '.' << "_insert " <<
                  key.toString() << '/' << recordLoc.toString() <<
@@ -761,7 +752,7 @@ found:
             return 0;
         }
 
-        return child.btree()->insert(child, recordLoc, key, order, dupsAllowed, idx, false);
+        return child.btree()->bt_insert(child, recordLoc, key, order, dupsAllowed, idx, /*toplevel*/false);
     }
 
     void BtreeBucket::dump() {
@@ -779,7 +770,7 @@ found:
     }
 
     /* todo: meaning of return code unclear clean up */
-    int BtreeBucket::insert(DiskLoc thisLoc, DiskLoc recordLoc,
+    int BtreeBucket::bt_insert(DiskLoc thisLoc, DiskLoc recordLoc,
                             BSONObj& key, const BSONObj &order, bool dupsAllowed,
                             IndexDetails& idx, bool toplevel)
     {

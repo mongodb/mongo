@@ -34,6 +34,7 @@ _ disallow system* manipulations from the database.
 #include <list>
 #include "query.h"
 #include "repl.h"
+#include "dbhelpers.h"
 
 namespace mongo {
 
@@ -580,21 +581,11 @@ namespace mongo {
         }
     }
 
-    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK)
+    /* deletes a record, just the pdfile portion -- no index cleanup, no cursor cleanup, etc. 
+       caller must check if capped
+    */
+    void DataFileMgr::_deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl)
     {
-        dassert( todelete == dl.rec() );
-
-        NamespaceDetails* d = nsdetails(ns);
-        if ( d->capped && !cappedOK ) {
-            out() << "failing remove on a capped ns " << ns << endl;
-            return;
-        }
-
-        /* check if any cursors point to us.  if so, advance them. */
-        aboutToDelete(dl);
-
-        unindexRecord(ns, d, todelete, dl);
-
         /* remove ourself from the record next/prev chain */
         {
             if ( todelete->prevOfs != DiskLoc::NullOfs )
@@ -639,6 +630,24 @@ namespace mongo {
         }
     }
 
+    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK)
+    {
+        dassert( todelete == dl.rec() );
+
+        NamespaceDetails* d = nsdetails(ns);
+        if ( d->capped && !cappedOK ) {
+            out() << "failing remove on a capped ns " << ns << endl;
+            return;
+        }
+
+        /* check if any cursors point to us.  if so, advance them. */
+        aboutToDelete(dl);
+
+        unindexRecord(ns, d, todelete, dl);
+
+        _deleteRecord(d, ns, todelete, dl);
+    }
+
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
         BSONObjSetDefaultOrder::iterator i = l.begin();
         BSONObjSetDefaultOrder::iterator j = r.begin();
@@ -655,7 +664,8 @@ namespace mongo {
         }
     }
 
-    /** Note: as written so far, if the object shrinks a lot, we don't free up space. */
+    /** Note: as written so far, if the object shrinks a lot, we don't free up space. 
+    */
     void DataFileMgr::update(
         const char *ns,
         Record *toupdate, const DiskLoc& dl,
@@ -664,6 +674,32 @@ namespace mongo {
         dassert( toupdate == dl.rec() );
 
         NamespaceDetails *d = nsdetails(ns);
+
+        {
+            /* duplicate _id check... */
+            BSONObj objNew(buf);
+            BSONObj objOld(toupdate);
+            BSONElement idNew;
+            if( objNew.getObjectID(idNew) ) { 
+                BSONElement idOld;
+                objOld.getObjectID(idOld);
+                if( idOld == idNew ) 
+                    ; 
+                else {
+                    /* check if idNew would be a duplicate. very unusual that an _id would change, 
+                       so not worried about the bit of extra work here.
+                       */
+                    if( d->findIdIndex() >= 0 ) {
+                        BSONObj result;
+                        BSONObjBuilder b;
+                        b.append(idNew);
+                        uassert("duplicate _id key on update", 
+                                !Helpers::findOne(ns, b.done(), result));
+                    }
+                }
+            }
+
+        }
 
         if (  toupdate->netLength() < len ) {
             // doesn't fit.  must reallocate.
@@ -714,9 +750,9 @@ namespace mongo {
                     assert( !dl.isNull() );
                     for ( unsigned i = 0; i < added.size(); i++ ) {
                         try {
-                            idx.head.btree()->insert(
+                            idx.head.btree()->bt_insert(
                                 idx.head,
-                                dl, *added[i], idxKey, false, idx, true);
+                                dl, *added[i], idxKey, /*dupsAllowed*/true, idx);
                         }
                         catch (AssertionException&) {
                             ss << " exception update index ";
@@ -746,19 +782,22 @@ namespace mongo {
 
     int deb=0;
 
-    /* add keys to indexes for a new record */
-    void  _indexRecord(IndexDetails& idx, BSONObj& obj, DiskLoc newRecordLoc) {
-
+   /* add keys to indexes for a new record */
+    inline void  _indexRecord(IndexDetails& idx, BSONObj& obj, DiskLoc newRecordLoc, bool dupsAllowed) {
         BSONObjSetDefaultOrder keys;
         idx.getKeysFromObject(obj, keys);
         BSONObj order = idx.keyPattern();
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
             assert( !newRecordLoc.isNull() );
             try {
-                idx.head.btree()->insert(idx.head, newRecordLoc,
-                                         (BSONObj&) *i, order, false, idx, true);
+                idx.head.btree()->bt_insert(idx.head, newRecordLoc,
+                                         (BSONObj&) *i, order, dupsAllowed, idx);
             }
-            catch (AssertionException&) {
+            catch (AssertionException& e) {
+                if( !dupsAllowed ) {
+                    // dup key exception, presumably.
+                    throw e;
+                }
                 problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;
             }
         }
@@ -767,26 +806,53 @@ namespace mongo {
     /* note there are faster ways to build an index in bulk, that can be
        done eventually */
     void addExistingToIndex(const char *ns, IndexDetails& idx) {
+        bool dupsAllowed = !idx.isIdIndex();
+
         Timer t;
         Nullstream& l = log();
         l << "building new index for " << ns << "...";
         l.flush();
+        int err = 0;
         int n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         while ( c->ok() ) {
             BSONObj js = c->current();
-            _indexRecord(idx, js, c->currLoc());
+            try { 
+                _indexRecord(idx, js, c->currLoc(),dupsAllowed);
+            } catch( AssertionException&  ) { 
+                err++;
+            }
             c->advance();
             n++;
         };
-        l << "done for " << n << " records" << endl;
+        l << "done for " << n << " records";
+        if( err )
+            l << ' ' << err << " (dupkey) errors during indexing";
+        l << endl;
+
+        if( err ) { 
+            // if duplicate _id's, report the problem
+            stringstream ss;
+            ss << err << " dupkey errors building index for " << ns;
+            string s = ss.str();
+            uassert_nothrow(s.c_str());
+        }
     }
 
     /* add keys to indexes for a new record */
     void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) {
         BSONObj obj((const char *)buf);
+
+        /* we index _id first so that on a dup key error for it we don't have to roll back 
+           the other work.
+        */
+        int id = d->findIdIndex();
+        if( id >= 0 )
+            _indexRecord(d->indexes[id], obj, newRecordLoc, /*dupsAllowed*/false);
+
         for ( int i = 0; i < d->nIndexes; i++ ) {
-            _indexRecord(d->indexes[i], obj, newRecordLoc);
+            if( i != id ) 
+                _indexRecord(d->indexes[i], obj, newRecordLoc, /*dupsAllowed*/true);
         }
     }
 
@@ -943,10 +1009,27 @@ namespace mongo {
         }
 
         /* add this record to our indexes */
-        if ( d->nIndexes )
-            indexRecord(d, buf, len, loc);
+        if ( d->nIndexes ) {
+            try { 
+                indexRecord(d, buf, len, loc);
+            } 
+            catch( AssertionException& e ) { 
+                // should be a dup key error on _id index
+                if( tableToIndex || d->capped ) { 
+                    string s = e.toString();
+                    s += " : on addIndex/capped - collection and its index will not match";
+                    uassert_nothrow(s.c_str());
+                    log() << s << '\n';
+                }
+                else { 
+                    // normal case -- we can roll back
+                    _deleteRecord(d, ns, r, loc);
+                    throw e;
+                }
+            }
+        }
 
-//	out() << "   inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << ' ' << ns << endl;
+        //	out() << "   inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << ' ' << ns << endl;
         return loc;
     }
 
