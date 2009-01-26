@@ -300,19 +300,45 @@
 /* End PBXGroup section */
 
 /* Begin PBXLegacyTarget section */
-		2EFCA6830E5258770017B86A /* make */ = {
+		9302D74A0F2E6E4000DFA4EF /* scons db 64 */ = {
 			isa = PBXLegacyTarget;
-			buildArgumentsString = "";
-			buildConfigurationList = 2EFCA68B0E5258CA0017B86A /* Build configuration list for PBXLegacyTarget "make" */;
+			buildArgumentsString = "--64 -j2";
+			buildConfigurationList = 9302D74B0F2E6E4000DFA4EF /* Build configuration list for PBXLegacyTarget "scons db 64" */;
 			buildPhases = (
 			);
-			buildToolPath = /usr/bin/make;
-			buildWorkingDirectory = ./db;
+			buildToolPath = /usr/local/bin/scons;
+			buildWorkingDirectory = "";
 			dependencies = (
 			);
-			name = make;
+			name = "scons db 64";
 			passBuildSettingsInEnvironment = 1;
-			productName = make;
+			productName = "scons db";
+		};
+		9302D74E0F2E6E4400DFA4EF /* scons all 64 */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "--64 -j2 .";
+			buildConfigurationList = 9302D74F0F2E6E4400DFA4EF /* Build configuration list for PBXLegacyTarget "scons all 64" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/local/bin/scons;
+			dependencies = (
+			);
+			name = "scons all 64";
+			passBuildSettingsInEnvironment = 1;
+			productName = "scons all";
+		};
+		9302D7520F2E6E4600DFA4EF /* scons test 64 */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "--64 -j2 test";
+			buildConfigurationList = 9302D7530F2E6E4600DFA4EF /* Build configuration list for PBXLegacyTarget "scons test 64" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/local/bin/scons;
+			dependencies = (
+			);
+			name = "scons test 64";
+			passBuildSettingsInEnvironment = 1;
+			productName = "scons test";
 		};
 		932F1DCC0F213B06008FA2E7 /* scons db */ = {
 			isa = PBXLegacyTarget;
@@ -327,34 +353,6 @@
 			name = "scons db";
 			passBuildSettingsInEnvironment = 1;
 			productName = "scons db";
-		};
-		935B6AD90EF165720050E84E /* make dbtests */ = {
-			isa = PBXLegacyTarget;
-			buildArgumentsString = dbtests;
-			buildConfigurationList = 935B6ADA0EF165720050E84E /* Build configuration list for PBXLegacyTarget "make dbtests" */;
-			buildPhases = (
-			);
-			buildToolPath = /usr/bin/make;
-			buildWorkingDirectory = ./db;
-			dependencies = (
-			);
-			name = "make dbtests";
-			passBuildSettingsInEnvironment = 1;
-			productName = make;
-		};
-		936F11E40EF164E80076F896 /* make clean */ = {
-			isa = PBXLegacyTarget;
-			buildArgumentsString = clean;
-			buildConfigurationList = 936F11E50EF164E80076F896 /* Build configuration list for PBXLegacyTarget "make clean" */;
-			buildPhases = (
-			);
-			buildToolPath = /usr/bin/make;
-			buildWorkingDirectory = ./db;
-			dependencies = (
-			);
-			name = "make clean";
-			passBuildSettingsInEnvironment = 1;
-			productName = make;
 		};
 		93AF75120F213CC500994C66 /* scons all */ = {
 			isa = PBXLegacyTarget;
@@ -394,12 +392,12 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2EFCA6830E5258770017B86A /* make */,
-				936F11E40EF164E80076F896 /* make clean */,
-				935B6AD90EF165720050E84E /* make dbtests */,
 				932F1DCC0F213B06008FA2E7 /* scons db */,
 				93AF75120F213CC500994C66 /* scons all */,
 				93AF75170F213CFB00994C66 /* scons test */,
+				9302D74A0F2E6E4000DFA4EF /* scons db 64 */,
+				9302D74E0F2E6E4400DFA4EF /* scons all 64 */,
+				9302D7520F2E6E4600DFA4EF /* scons test 64 */,
 			);
 		};
 /* End PBXProject section */
@@ -429,23 +427,65 @@
 			};
 			name = Release;
 		};
-		2EFCA6840E5258780017B86A /* Debug */ = {
+		9302D74C0F2E6E4000DFA4EF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COPY_PHASE_STRIP = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				PRODUCT_NAME = make;
+				PRODUCT_NAME = "scons db";
 			};
 			name = Debug;
 		};
-		2EFCA6850E5258780017B86A /* Release */ = {
+		9302D74D0F2E6E4000DFA4EF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				PRODUCT_NAME = make;
+				PRODUCT_NAME = "scons db";
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+		9302D7500F2E6E4400DFA4EF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = "scons all";
+			};
+			name = Debug;
+		};
+		9302D7510F2E6E4400DFA4EF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = "scons all";
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+		9302D7540F2E6E4600DFA4EF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = "scons test";
+			};
+			name = Debug;
+		};
+		9302D7550F2E6E4600DFA4EF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = "scons test";
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -467,48 +507,6 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
 				PRODUCT_NAME = "scons db";
-				ZERO_LINK = NO;
-			};
-			name = Release;
-		};
-		935B6ADB0EF165720050E84E /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				COPY_PHASE_STRIP = NO;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				PRODUCT_NAME = make;
-			};
-			name = Debug;
-		};
-		935B6ADC0EF165720050E84E /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				COPY_PHASE_STRIP = YES;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				PRODUCT_NAME = make;
-				ZERO_LINK = NO;
-			};
-			name = Release;
-		};
-		936F11E60EF164E80076F896 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				COPY_PHASE_STRIP = NO;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				PRODUCT_NAME = make;
-			};
-			name = Debug;
-		};
-		936F11E70EF164E80076F896 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				COPY_PHASE_STRIP = YES;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				PRODUCT_NAME = make;
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -567,11 +565,29 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2EFCA68B0E5258CA0017B86A /* Build configuration list for PBXLegacyTarget "make" */ = {
+		9302D74B0F2E6E4000DFA4EF /* Build configuration list for PBXLegacyTarget "scons db 64" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2EFCA6840E5258780017B86A /* Debug */,
-				2EFCA6850E5258780017B86A /* Release */,
+				9302D74C0F2E6E4000DFA4EF /* Debug */,
+				9302D74D0F2E6E4000DFA4EF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9302D74F0F2E6E4400DFA4EF /* Build configuration list for PBXLegacyTarget "scons all 64" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9302D7500F2E6E4400DFA4EF /* Debug */,
+				9302D7510F2E6E4400DFA4EF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9302D7530F2E6E4600DFA4EF /* Build configuration list for PBXLegacyTarget "scons test 64" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9302D7540F2E6E4600DFA4EF /* Debug */,
+				9302D7550F2E6E4600DFA4EF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -581,24 +597,6 @@
 			buildConfigurations = (
 				932F1DCD0F213B06008FA2E7 /* Debug */,
 				932F1DCE0F213B06008FA2E7 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		935B6ADA0EF165720050E84E /* Build configuration list for PBXLegacyTarget "make dbtests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				935B6ADB0EF165720050E84E /* Debug */,
-				935B6ADC0EF165720050E84E /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		936F11E50EF164E80076F896 /* Build configuration list for PBXLegacyTarget "make clean" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				936F11E60EF164E80076F896 /* Debug */,
-				936F11E70EF164E80076F896 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
