@@ -14,8 +14,8 @@
 <li><b>Support for multi-core architectures</b>:
 architectures have 10's or 100's of cores, with multiple threads per
 core, and touching shared memory kills performance.  Berkeley DB's
-shared memory data mutex architecture (where mutexes serialize access
-to data structures), won't scale.
+architecture is based on shared memory data mutex architecture (where
+mutexes serialize access to data structures), which doesn't scale well.
 
 <p>Wired Tiger will have a "work queue architecture", that is, an
 interface outside of the database engine where threads of control queue
@@ -27,16 +27,17 @@ single thread of control.
 <p>Initial benchmarks show that schedulers/architectures are not
 uniform: for some, processes are better than threads and vice-versa, and
 polling is better than mutexing, and vice-versa.  For that reason, we
-will use run-time configuration to choose if the client/server pair
-polls or mutexes the work queue, and if the database engine uses a
-separate process or a separate thread to perform the work.   Mutexes
-will behave in the usual fashion: clients will write their work into the
-shared memory queue, wake the worker if necessary, then sleep on a
-mutex.  Workers will perform the work and wake the client.   Polling
-will be implemented using shared memory and a memory flush, in other
-words, the usual "lock; write the data structure; unlock" cycle is
-replaced with "write new task into a memory slot, flush memory, poll for
-new task to complete".  However, only the application knows how many
+will use a combination of polling and mutexes for the work queue, and
+configure at run-time if the database engine uses separate processes or
+threads to perform work.
+
+<p>Mutexes will behave in the usual fashion: clients will write their
+work into the shared memory queue, wake the worker if necessary, then
+sleep on a mutex.  Workers will perform the work and wake the client.
+Polling will be implemented using shared memory and a memory flush, in
+other words, the usual "lock; write the data structure; unlock" cycle
+is replaced with "write new task into a memory slot, flush memory, poll
+for new task to complete".  However, only the application knows how many
 threads it has and what they're doing, so the application will have to
 be responsible for binding threads to cores.  This means we will need
 to export controls so applications can bind threads of control to
@@ -139,7 +140,7 @@ recovery), and complicating recovery is a bad idea.
 
 <p><li><b>Per-thread handles</b>:
 Applications must allocate a per-thread object for any thread that will
-be calling a library function.  When crossing the library API, the
+be calling a WiredTiger function.  When crossing the library API, the
 per-thread handle will be updated to reference any current environment
 and database handles, then the per-thread handle will be the handle
 passed as the first argument of every internal database function.
@@ -206,7 +207,7 @@ disk support.
 
 </ol>
 
-<h3>Btree access method layout changes:</h3>
+<h3>Btree access method changes:</h3>
 
 <table width="100%" border="1" align=left>
 <tr valign="top">
@@ -215,32 +216,46 @@ disk support.
 <th align="left">Notes</th>
 </tr>
 
+</td></tr>
 <tr valign="top"><td>
-Large page sizes
+Bulk load
 </td><td>
 Yes
 </td><td>
-Wired Tiger supports page sizes larger than 64KB.  The goal is two-fold,
-to allow databases with key or data items larger than 16KB to be stored
-on-page, and to increase the data transferred from each read of the
-disk.  Large pages in Berkeley DB have a problem, however, because
-internal nodes are the same size as database pages, and a binary search
-of a large page will behave badly in the L1 cache.   To avoid this
-problem, Wired Tiger allows the size of internal nodes to be separately
-specified from the size of the leaf nodes.
+Wired Tiger supports bulk load, where sorted key/data pairs are read
+from a callback function, and a B+tree is built bottom-up in a new
+database.
+
+<tr valign="top"><td>
+Page size
+</td><td>
+Yes
+</td><td>
+Berkeley DB's maximum page size is 64KB, limiting on-page key/data items
+to roughly 16KB.  Wired Tiger supports pages of any practical size.  The
+goal is two-fold, to allow databases with key or data items larger than
+16KB to be stored on-page, and to increase the data transfer of a single
+disk read.  However, simply increasing the size of the database page has
+a problem: in Berkeley DB, internal nodes are the same size as leaf
+pages, and a binary search of large pages will behave badly in the L1/L2
+caches.  To avoid this problem, Wired Tiger supports configuration of
+different sizes for internal and leaf nodes.
 
 </td></tr>
 <tr valign="top"><td>
-Overflow objects
+Overflow items
 </td><td>
 Yes
 </td><td>
-Allocate overflow objects (key or data items too large to fit on a leaf
-page) directly from the file, using a unit other than "leaf page size"
-as the unit of allocation.  The goal is to eliminate the manipulation
-of multiple pages in order to store and/or retrieve large objects, and
-the wasted space from discarding, on average, half of a leaf page for
-every allocated large object.
+<p>
+In Berkeley DB, overflow items (key or data items too large to fit on a
+leaf page), are allocated in units of database page size.  This wastes,
+on average, half a database page for each overflow item.  Also, overflow
+items are then marshalled to/from those database pages.  WiredTiger
+allocates overflow objects directly from the underlying file, using a
+configurable value as the unit of allocation.  This eliminates the
+wasted space and the manipulation of multiple pages in order to store
+or retrieve overflow items.
 
 </td></tr>
 <tr valign="top"><td>
@@ -279,16 +294,6 @@ secondary, we can avoid the second lookup.
 
 </td></tr>
 <tr valign="top"><td>
-Bulk load
-</td><td>
-Yes
-</td><td>
-Wired Tiger supports bulk load, where sorted key/data pairs are read
-from a callback function, and a B+tree is built bottom-up in a new
-database.
-
-</td></tr>
-<tr valign="top"><td>
 Compression
 </td><td>
 </td><td>
@@ -298,33 +303,11 @@ memory, and trading CPU to keep the cache hotter is the right choice to
 make.
 
 </td></tr>
-</table>
-
-<h3>Btree access method API changes:</h3>
-
-<table width="100%" border="1" align=left>
-<tr valign="top">
-<th align="left" valign="top" width="15%">Feature</th>
-<th align="left" width="2%">Implemented</th>
-<th align="left">Notes</th>
-</tr>
-
-</td></tr>
 <tr valign="top"><td>
 Salvage
 </td><td>
 </td><td>
 Wired Tiger supports in-place database salvage.
-
-</td></tr>
-<tr valign="top"><td>
-Overflow object sizes
-</td><td>
-</td><td>
-Wired Tiger includes an API to set the size of overflow items on both
-internal and leaf pages.  The goal is to allow applications with known
-data sets greater control over how the size of an overflow object is
-determined.
 
 </td></tr>
 <tr valign="top"><td>
@@ -355,6 +338,47 @@ items.
 
 </td></tr>
 </table>
+
+<h3>Cache changes:</h3>
+
+<table width="100%" border="1" align=left>
+<tr valign="top">
+<th align="left" valign="top" width="15%">Feature</th>
+<th align="left" width="2%">Implemented</th>
+<th align="left">Notes</th>
+</tr>
+
+</td></tr>
+<tr valign="top"><td>
+Database page alignment
+</td><td>
+Yes
+</td><td>
+Database pages are separately allocated from their headers so direct I/O
+from the underlying file into memory is possible.
+
+</td></tr>
+<tr valign="top"><td>
+File identification
+</td><td>
+Yes
+</td><td>
+Berkeley DB encodes a file ID string in the file header; WiredTiger Use
+the file name itself, and expects it to be unique.
+
+</td></tr>
+<tr valign="top"><td>
+MVCC
+</td><td>
+</td><td>
+Remove MVCC's support for backing freeze files, applications must grow
+the cache if there's insufficient space for the transactional
+requirements.
+
+</td></tr>
+</table>
+
+
 
 <h3>Implementation changes:</h3>
 <ol>
@@ -421,19 +445,6 @@ backup is no different from the initialization of a replica.
 <p><li><b>Scripting language</b>:
 Use Python or Ruby as our initial scripting language, and possibly
 Erlang to write multi-threaded tests.
-
-<p><li><b>Cache</b>:
-Align pages in memory (write page header information after the page
-itself) so we can do direct I/O from the underlying file into memory.
-
-<p>
-Use the file name itself, and expect it to be unique (remove the file
-ID entirely).
-
-<p>
-Remove MVCC's support for backing freeze files, applications must grow
-the cache if there's insufficient space for the transactional
-requirements.
 
 <p><li><b>Cursor operations</b>:
 Split up the cursor get/pget functions into a group of methods, instead
