@@ -69,7 +69,7 @@ namespace BtreeTests {
             ASSERT_EQUALS( nKeys, bt()->fullValidate( dl(), order() ) );
         }
         void insert( BSONObj &key ) {
-            bt()->insert( dl(), recordLoc(), key, order(), true, id(), true );
+            bt()->bt_insert( dl(), recordLoc(), key, order(), true, id(), true );
         }
         void unindex( BSONObj &key ) {
             bt()->unindex( dl(), id(), key, recordLoc() );
