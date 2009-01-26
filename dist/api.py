@@ -8,231 +8,233 @@
 # Read the api file and output C for the Db/Env structures, getter/setter
 # functions, and other API initialization.
 
-import os, re, string
+import os, string, sys
+from collections import defaultdict
 from dist import compare_srcfile
 
-# func_cast --
-#	Function to initialize a method name to an error function.
-def func_cast(rettype, handle, field, func, args):
-	if field.count('get_'):
-		redirect = '*'
+# api is a dictionary of lists, with the handle + method name as the key.  The
+# list's first element is the flags, subsequent list elements are argument/type
+# pairs for getter/setter methods, and method prototypes for all other methods.
+api = defaultdict(list)
+
+# func_input --
+#	Read/parse the api file into the api dictionary.
+def func_input():
+	for line in open('api', 'r').readlines():
+		# Skip comments and empty lines.
+		if line[:1] == '#' or line[:1] == '\n':
+			continue
+
+		# Lines beginning with a tab are additional information for the
+		# current method, all other lines are new methods.
+		if line[:1] == '\t':
+			api[method].append(line.strip())
+		else:
+			method = line.strip()
+
+# func_stdcast --
+#	Set methods to reference a single underlying function (usually an
+#	error function).
+def func_stdcast(handle, method, flags, rettype, func, args, f):
+	f.write('\t' + handle + '->' + method +\
+	    ' = (' + rettype + ' (*)\n\t    (' + handle.upper() + ' *')
+	if flags.count('getset'):
+		if method.count('get_'):
+			for l in args:
+				f.write(', ' +\
+				    l.split('\t')[1].replace('@S', '*'))
+		else:
+			for l in args:
+				f.write(', ' +\
+				    l.split('\t')[1].replace('@S', ''))
 	else:
-		redirect = ''
-	s = '\t' + handle + '->' + field +\
-	    ' = (' + rettype + ' (*)\n\t    (' + handle.upper() + ' *'
-	for l in args:
-		s += ', ' + l.split('\t')[1].replace('@S', redirect)
-	s += '))\n\t    __wt_' + handle + '_' + func + ';\n'
-	return (s)
+		for l in args:
+			f.write(', ' + l)
+	f.write('))\n\t    __wt_' + handle + '_' + func + ';\n')
 
-# standalone --
-#	Standalone method code for the API.
-def standalone():
-	global db_config, db_header, db_lockout, db_open
-	global env_config, env_header, env_lockout, env_open
+# func_method_init --
+#	Set methods to reference their normal underlying function.
+def func_method_init(handle, method, flags, args, f):
+	# If it's a getter/setter, initialize both methods; ignore the open
+	# keyword, getter/setter functions are always OK.
+	if flags.count('getset'):
+		s = '\t' + handle + '->get_' +\
+		    method + ' = __wt_' + handle + '_get_' + method + ';\n'
+		f.write(s + s.replace('get_', 'set_'))
 
-	if flags.count('methodV'):
-		rettype = 'void'
+	# If the open keyword is set, lock out the function for now.
+	elif flags.count('open'):
+		func_stdcast(\
+		    handle, method, flags, 'int', 'lockout_open', args, f)
+
+	# Otherwise, initialize the method handle for real.
 	else:
-		rettype = 'int'
-	field = list[0].split('\t')[0]
+		f.write('\t' + handle +\
+		    '->' + method + ' = __wt_' + handle + '_' + method + ';\n')
 
-	# Store the handle's standalone methods into the XXX_header string. 
-	s = '\t' +\
-	    rettype + ' (*' + field + ')(\n\t    ' + handle.upper() + ' *, '
-	for l in list:
-		s += l.split('\t')[1].replace('@S', '*')
-	s += ');\n'
-	if handle.count('env'):
-		env_header += s
-	else:
-		db_header += s
-
-	# Store the initialization of the handle's standalone methods in the
-	# XXX_config string.
-	s = '\t' + handle +\
-	    '->' + field + ' = __wt_' + handle + '_' + field + ';\n'
+# func_method_open --
+#	Update methods to reference their normal underlying function (after
+#	the open method is called).
+def func_method_open(handle, method, flags, args, f):
+	# If the open keyword is set, we need to reset the method.
 	if flags.count('open'):
-		if handle.count('env'):
-			env_open += s
+		f.write('\t' + handle +\
+		    '->' + method + ' = __wt_' + handle + '_' + method + ';\n')
+
+# func_method_lockout --
+#	Set methods (other than destroy) to a single underlying error function.
+def func_method_lockout(handle, method, flags, args, f):
+	# Skip the destroy method, it's the only legal method.
+	if method.count('destroy'):
+		return;
+
+	if flags.count('getset'):
+		func_stdcast(handle,
+		    'get_' + method, flags, 'void', 'lockout_err', args, f)
+		func_stdcast(handle,
+		    'set_' + method, flags, 'int', 'lockout_err', args, f)
+	else:
+		if flags.count('methodV'):
+			rettype = 'void'
 		else:
-			db_open += s
-		s = func_cast('int', handle, field, 'lockout_open', list)
-	if handle.count('env'):
-		env_config += s
-	else:
-		db_config += s
+			rettype = 'int'
+		func_stdcast(handle,
+		    method, flags, rettype, 'lockout_err', args, f)
 
-	# Store the lockout of the handle's standalone methods in the
-	# XXX_lockout string.  Note we skip the destroy method, it's
-	# the only legal one.
-	if not field.count('destroy'):
-		s = func_cast(rettype, handle, field, 'lockout_err', list)
-		if handle.count('env'):
-			env_lockout += s
+# func_decl --
+#	Output method name and getter/setter variables for an include file.
+def func_decl(handle, method, flags, args, f):
+
+	if flags.count('getset'):
+		for l in args:
+			f.write('\t' + l.split\
+			    ('\t')[1].replace('@S', l.split('\t')[0]) + ';\n')
+		f.write('\tvoid (*get_' +\
+		    method + ')(\n\t    ' + handle.upper() + ' *')
+		for l in args:
+			f.write(', ' + l.split('\t')[1].replace('@S', '*'))
+		f.write(');\n')
+		f.write('\tint (*set_' +\
+		    method + ')(\n\t    ' + handle.upper() + ' *')
+		for l in args:
+			f.write(', ' + l.split('\t')[1].replace('@S', ''))
+		f.write(');\n\n')
+	else:
+		if flags.count('methodV'):
+			rettype = 'void'
 		else:
-			db_lockout += s
+			rettype = 'int'
+		f.write('\t' + rettype + \
+		    ' (*' + method + ')(\n\t    ' + handle.upper() + ' *, ')
+		for l in args:
+			f.write(l.replace('@S', '*'))
+		f.write(');\n\n')
 
-# getset --
-#	Getter/setter code for the API.
-def getset():
-	global db_config, db_header, db_lockout
-	global env_config, env_header, env_lockout
+# func_getset --
+#	Generate getter/setter code for the API.
+def func_getset(handle, method, flags, args, f):
+	# Write the getter function.
+	f.write('static void __wt_' +\
+	    handle + '_get_' + method + '(\n\t' + handle.upper() + ' *')
+	for l in args:
+		f.write(',\n\t' + \
+		    l.split('\t')[1].replace('@S', '*'))
+	f.write(');\n')
+	f.write('static void\n__wt_' +\
+	    handle + '_get_' + method + '(\n\t' + handle.upper() + ' *handle')
+	for l in args:
+		f.write(',\n\t' + l.split('\t')[1].\
+		    replace('@S', '*' + l.split('\t')[0] + 'p'))
+	f.write(')\n{\n')
+	for l in args:
+		f.write('\t*' + l.split('\t')[0] +\
+		    'p = ' + 'handle->' + l.split('\t')[0] + ';\n')
+	f.write('}\n\n')
 
-	name_re = re.compile(r'^.*=([a-z_]+)')
-	if name_re.match(flags):
-		field = name_re.match(flags).group(1)
-	else:
-		field = list[0].split('\t')[0]
+	# Write the setter function.
+	f.write('static int __wt_' +\
+	    handle + '_set_' + method + '(\n\t' + handle.upper() + ' *')
+	for l in args:
+		f.write(',\n\t' + l.split('\t')[1].replace('@S', ''))
+	f.write(');\n')
+	f.write('static int\n__wt_' +\
+	    handle + '_set_' + method + '(\n\t' + handle.upper() + ' *handle')
+	for l in args:
+		f.write(',\n\t' +\
+		    l.split('\t')[1].replace('@S', l.split('\t')[0]))
+	f.write(')\n{\n')
 
-	# Store the handle's getter/setter variables and methods into the
-	# XXX_header string.
-	s = ''
-	for l in list:
-		s += '\t' +\
-		    l.split('\t')[1].replace('@S', l.split('\t')[0]) + ';\n'
-	s += '\tvoid (*get_' + field + ')(\n\t    ' + handle.upper() + ' *'
-	for l in list:
-		s += ', ' + l.split('\t')[1].replace('@S', '*')
-	s += ');\n'
-	s += '\tint (*set_' + field + ')(\n\t    ' + handle.upper() + ' *'
-	for l in list:
-		s += ', ' + l.split('\t')[1].replace('@S', '')
-	s += ');\n\n'
-	if handle.count('env'):
-		env_header += s
-	else:
-		db_header += s
-
-	# Store the initialization of the handle's getter/setter methods in the
-	# XXX_config string.
-	s = '\t' + handle +\
-	    '->get_' + field + ' = __wt_' + handle + '_get_' + field + ';\n'
-	s += s.replace('get_', 'set_')
-	if handle.count('env'):
-		env_config += s
-	else:
-		db_config += s
-
-	# Store the lockout of the handle's getter/setter methods in the
-	# XXX_lockout string.
-	s = func_cast('void', handle, 'get_' + field, 'lockout_err', list) +\
-	    func_cast('int', handle, 'set_' + field, 'lockout_err', list)
-	if handle.count('env'):
-		env_lockout += s
-	else:
-		db_lockout += s
-
-	# Output the getter function.
-	s = 'static void __wt_' +\
-	    handle + '_get_' + field + '(\n\t' + handle.upper() + ' *'
-	for l in list:
-		s += ',\n\t' + \
-		    l.split('\t')[1].replace('@S', '*')
-	s += ');\n'
-	s += 'static void\n__wt_' +\
-	    handle + '_get_' + field + '(\n\t' + handle.upper() + ' *handle'
-	for l in list:
-		s += ',\n\t' +\
-		    l.split('\t')[1].replace('@S', '*' + l.split('\t')[0] + 'p')
-	s += ')\n{\n'
-	for l in list:
-		s += '\t*' + l.split('\t')[0] + 'p = ' +\
-		    'handle->' + l.split('\t')[0] + ';\n'
-	s += '}\n\n'
-	tfile.write(s)
-
-	# Output the setter function.
-	s = 'static int __wt_' +\
-	    handle + '_set_' + field + '(\n\t' + handle.upper() + ' *'
-	for l in list:
-		s += ',\n\t' + l.split('\t')[1].replace('@S', '')
-	s += ');\n'
-	s += 'static int\n__wt_' +\
-	    handle + '_set_' + field + '(\n\t' + handle.upper() + ' *handle'
-	for l in list:
-		s += ',\n\t' + l.split('\t')[1].replace('@S', l.split('\t')[0])
-	s += ')\n{\n'
-
-	# Verify means we call a standard verification routine because
-	# there are constraints or side-effects on setting the value.
+	# Verify means call a standard verification routine because there are
+	# constraints or side-effects on setting the value.  The setter fails
+	# if the verification routine fails.
 	if flags.count('verify'):
-		s += '\tint ret;\n\n'
-		s += '\tif ((ret = __wt_' +\
-		    handle + '_set_' + field + '_verify(\n\t    handle'
-		for l in list:
-			s += ', &' + l.split('\t')[0]
-		s += ')) != 0)\n\t\treturn (ret);\n\n'
+		f.write('\tint ret;\n\n')
+		f.write('\tif ((ret = __wt_' +\
+		    handle + '_set_' + method + '_verify(\n\t    handle')
+		for l in args:
+			f.write(', &' + l.split('\t')[0])
+		f.write(')) != 0)\n\t\treturn (ret);\n\n')
 
-	for l in list:
-		s += '\thandle->' +\
-		    l.split('\t')[0] + ' = ' + l.split('\t')[0] + ';\n'
-	s += '\treturn (0);\n}\n\n'
-	tfile.write(s)
+	for l in args:
+		f.write('\thandle->' +\
+		    l.split('\t')[0] + ' = ' + l.split('\t')[0] + ';\n')
+	f.write('\treturn (0);\n}\n\n')
 
-db_config = ''					# Db method init
-db_header = ''					# Db handle structure
-db_lockout = ''					# Db lockout function
-db_open = ''					# Db open initialize
+#####################################################################
+# Read in the api.py file.
+#####################################################################
+func_input()
 
-env_config = ''					# Env method init
-env_header = ''					# Env handle structure
-env_lockout = ''				# Env lockout function
-env_open = ''					# Env open initialize
-
+#####################################################################
+# Update api.c.
+#####################################################################
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
 tfile.write('#include "wt_internal.h"\n\n')
 
-setter_re = re.compile(r'^[a-z]')
-field_re = re.compile(r'^\t[a-z]')
-list = []
-for line in open('api', 'r'):
-	if setter_re.match(line):
-		if list:
-			if flags.count('getset'):
-				getset()
-			elif flags.count('method'):
-				standalone()
-			list=[]
-		s = line.split('\t')
-		handle = s[0]
-		flags = s[1]
-	elif field_re.match(line):
-		list.append(string.strip(line))
-if list:
-	if flags.count('getset'):
-		getset()
-	elif flags.count('method'):
-		standalone()
+# Write the Env/Db getter/setter functions.
+for i in filter(lambda _i:\
+    _i[0].count('env') and _i[1][0].count('getset'), api.iteritems()):
+	func_getset('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 
-# Write out the configuration initialization and lockout functions.
-tfile.write('void\n__wt_env_config_methods(ENV *env)\n{\n');
-tfile.write(env_config)
+for i in filter(lambda _i:\
+    _i[0].count('db') and _i[1][0].count('getset'), api.iteritems()):
+	func_getset('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+
+# Write the Env/Db method configuration functions.
+tfile.write('void\n__wt_env_config_methods(ENV *env)\n{\n')
+for i in filter(lambda _i: _i[0].count('env'), api.iteritems()):
+	func_method_init('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
-tfile.write('void\n__wt_env_config_methods_lockout(ENV *env)\n{\n');
-tfile.write(env_lockout)
+tfile.write('void\n__wt_env_config_methods_open(ENV *env)\n{\n')
+for i in filter(lambda _i: _i[0].count('env'), api.iteritems()):
+	func_method_open('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
-tfile.write('void\n__wt_env_config_methods_open(ENV *env)\n{\n');
-tfile.write(env_open)
+tfile.write('void\n__wt_env_config_methods_lockout(ENV *env)\n{\n')
+for i in filter(lambda _i: _i[0].count('env'), api.iteritems()):
+	func_method_lockout('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
 
-tfile.write('void\n__wt_db_config_methods(DB *db)\n{\n');
-tfile.write(db_config)
+tfile.write('void\n__wt_db_config_methods(DB *db)\n{\n')
+for i in filter(lambda _i: _i[0].count('db'), api.iteritems()):
+	func_method_init('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
-tfile.write('void\n__wt_db_config_methods_lockout(DB *db)\n{\n');
-tfile.write(db_lockout)
-tfile.write('}\n\n')
-tfile.write('void\n__wt_db_config_methods_open(DB *db)\n{\n');
-tfile.write(db_open)
+tfile.write('void\n__wt_db_config_methods_open(DB *db)\n{\n')
+for i in filter(lambda _i: _i[0].count('db'), api.iteritems()):
+	func_method_open('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n')
-	
-# Update the automatically generated function sources.
+tfile.write('void\n__wt_db_config_methods_lockout(DB *db)\n{\n')
+for i in filter(lambda _i: _i[0].count('db'), api.iteritems()):
+	func_method_lockout('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+tfile.write('}\n\n')
+
 tfile.close()
 compare_srcfile(tmp_file, '../support/api.c')
 
-# Update the wiredtiger.in file with Env and Db handle information.
+#####################################################################
+# Update wiredtiger.in file with Env and Db handle information.
+#####################################################################
 tfile = open(tmp_file, 'w')
 skip = 0
 for line in open('../inc_posix/wiredtiger.in', 'r'):
@@ -246,11 +248,16 @@ for line in open('../inc_posix/wiredtiger.in', 'r'):
 	if line.count('Env handle api section: BEGIN'):
 		skip = 1
 		tfile.write('\t */\n')
-		tfile.write(env_header)
+		for i in filter(lambda _i: _i[0].count('env'), api.iteritems()):
+			func_decl('env',
+			    i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 	elif line.count('Db handle api section: BEGIN'):
 		skip = 1
 		tfile.write('\t */\n')
-		tfile.write(db_header)
+		for i in filter(lambda _i: _i[0].count('db'), api.iteritems()):
+			func_decl('db',
+			    i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+
 tfile.close()
 compare_srcfile(tmp_file, '../inc_posix/wiredtiger.in')
 
