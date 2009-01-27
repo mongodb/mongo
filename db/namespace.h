@@ -83,7 +83,7 @@ namespace mongo {
     const int MaxBucket = 18;
     const int MaxIndexes = 10;
 
-    extern BSONObj idKeyPattern; // { _id : 1 } 
+    //extern BSONObj idKeyPattern; // { _id : 1 } 
 
     class IndexDetails {
     public:
@@ -145,7 +145,10 @@ namespace mongo {
 
         /* returns true if this is the _id index. */
         bool isIdIndex() const { 
-            return idKeyPattern.woEqual(keyPattern());
+            BSONObjIterator i(keyPattern());
+            BSONElement e = i.next();
+            if( strcmp(e.fieldName(), "_id") != 0 ) return false;
+            return i.next().eoo();
         }
 
         /* gets not our namespace name (indexNamespace for that),
