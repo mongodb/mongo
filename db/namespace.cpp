@@ -508,6 +508,7 @@ namespace mongo {
     }
 
     void NamespaceDetailsTransient::computeIndexKeys() {
+        allIndexKeys.clear();
         NamespaceDetails *d = nsdetails(ns.c_str());
         for ( int i = 0; i < d->nIndexes; i++ ) {
 //        set<string> fields;
