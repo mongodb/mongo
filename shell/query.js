@@ -140,7 +140,7 @@ DBQuery.prototype.explain = function(){
 DBQuery.prototype.shellPrint = function(){
     try {
         var n = 0;
-        while ( this.hasNext() && n < 10 ){
+        while ( this.hasNext() && n < 20 ){
             var s = tojson( this.next() );
             print( s );
             n++;
