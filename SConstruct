@@ -126,7 +126,7 @@ elif "linux2" == os.sys.platform:
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
 
     if force32:
-        env.Append( LIBPATH["/usr/lib32"] )
+        env.Append( LIBPATH=["/usr/lib32"] )
 
     nix = True
 
