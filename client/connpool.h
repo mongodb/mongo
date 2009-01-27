@@ -27,12 +27,24 @@ namespace mongo {
         queue<DBClientConnection*> pool;
     };
 
+    /** Database connection pool.
+        Generally, use ScopedDbConnection and do not call these directly.
+
+        This class, so far, is suitable for use with unauthenticated connections. 
+        Support for authenticated connections requires some adjustements: please 
+        request...
+
+        Usage:
+
+        {
+           ScopedDbConnection c("myserver");
+           c.conn()...
+        }
+    */
     class DBConnectionPool {
         boost::mutex poolMutex;
-        map<string,PoolForHost*> pools;
+        map<string,PoolForHost*> pools; // servername -> pool
     public:
-
-        /* generally, use ScopedDbConnection and do not call these directly */
         DBClientConnection *get(const string& host);
         void release(const string& host, DBClientConnection *c) {
             boostlock L(poolMutex);
@@ -42,7 +54,7 @@ namespace mongo {
 
     extern DBConnectionPool pool;
 
-    /* Use to get a connection from the pool.  On exceptions things
+    /** Use to get a connection from the pool.  On exceptions things
        clean up nicely.
     */
     class ScopedDbConnection {

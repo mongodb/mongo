@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    /* Model is a base class for defining objects which are serializable to the Mongo
+    /** Model is a base class for defining objects which are serializable to the Mongo
        database via the database driver.
 
        *Definition*
@@ -30,10 +30,9 @@ namespace mongo {
        below.
 
        *Loading*
-       To load, first construct an (empty) objet.  Then call load().  Do not load an object
+       To load, first construct an (empty) object.  Then call load().  Do not load an object
        more than once.
     */
-
     class Model {
     public:
         Model() { }
@@ -43,15 +42,17 @@ namespace mongo {
         virtual void serialize(BSONObjBuilder& to) = 0;
         virtual void unserialize(BSONObj& from) = 0;
 
-        /* Define this as you see fit if you are using the default conn() implementation. */
+        /** Define this as you see fit if you are using the default conn() implementation. */
         static DBClientWithCommands *globalConn;
 
-        /* Override this if you need to do fancier connection management than simply using globalConn. */
+        /** Override this if you need to do fancier connection management than simply using globalConn. */
         virtual DBClientWithCommands* conn() {
             return globalConn;
         }
 
-        /* true if successful */
+        /** Load a single object. 
+            @return true if successful.
+        */
         bool load(BSONObj& query);
     };
 
