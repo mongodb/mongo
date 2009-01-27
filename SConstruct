@@ -5,6 +5,7 @@
 # then just type scons
 
 import os
+import sys
 
 # --- options ----
 AddOption('--prefix',
@@ -315,6 +316,8 @@ env.Program( "mongogrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
 env.Library( "mongoclient" , allClientFiles )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
 
+env.Alias( "all" , [ "mongod" , "mongo" , "mongodump" , "mongoimport" ] )
+
 # examples
 clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
 clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
@@ -425,3 +428,30 @@ def gitPush( env, target, source ):
     return subprocess.call( [ "git", "push" ] )
 env.Alias( "push", [ ".", "smoke", "checkSource" ], gitPush )
 env.AlwaysBuild( "push" )
+
+
+# ---- deploying ---
+
+def s3push( localName , remoteName=None , remotePrefix="-latest" ):
+    sys.path.append( "." )
+
+    import simples3
+    import settings
+
+    s = simples3.S3Bucket( "mongodb" , settings.id , settings.key )
+    un = os.uname()
+
+    if remoteName is None:
+        remoteName = localName
+
+    name = remoteName + "-" + un[0] + "-" + un[4] + remotePrefix
+    name = name.lower()
+
+    s.put( name  , open( localName ).read() , acl="public-read" );
+    print( "uploaded " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
+
+def s3shellpush( env , target , source ):
+    s3push( "mongo" , "mongo-shell" )
+
+env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
+env.AlwaysBuild( "s3shell" )

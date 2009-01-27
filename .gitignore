@@ -15,12 +15,14 @@
 *.pch 
 *.jsh
 *.jsall
+*.pyc
 
 db/Debug
 db/oplog*
 db/.gdb*
 db/makefile.local
 config.log
+settings.py
 
 #temp dirs
 dump

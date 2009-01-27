@@ -470,7 +470,7 @@ namespace mongo {
         virtual void checkResponse( const char *data, int nReturned );
     };
 
-    /* Use this class to connect to a replica pair of servers.  The class will manage
+    /** Use this class to connect to a replica pair of servers.  The class will manage
        checking for which server in a replica pair is master, and do failover automatically.
 
 	   On a failover situation, expect at least one operation to return an error (throw 
