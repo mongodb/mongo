@@ -315,6 +315,8 @@ env.Program( "mongogrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
 env.Library( "mongoclient" , allClientFiles )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
 
+env.Alias( "all" , [ "mongod" , "mongo" , "mongodump" , "mongoimport" ] )
+
 # examples
 clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
 clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
@@ -341,6 +343,7 @@ if linux64:
     shellEnv.Append( CXXFLAGS="-m32" )
     shellEnv.Append( LINKFLAGS="-m32" )
     shellEnv.Append( LIBPATH=[ "/usr/lib32" ] )
+
     l = shellEnv["LIBS"]
     l.remove("java");
     l.remove("jvm");
