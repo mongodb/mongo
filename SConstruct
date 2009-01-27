@@ -30,6 +30,12 @@ AddOption( "--32",
            action="store",
            help="whether to force 32 bit" )
 
+AddOption( "--release",
+           dest="release",
+           type="string",
+           nargs=0,
+           action="store",
+           help="relase build")
 
 AddOption('--java',
           dest='javaHome',
@@ -40,6 +46,13 @@ AddOption('--java',
           metavar='DIR',
           help='java home')
 
+AddOption( "--v8" ,
+           dest="v8home",
+           type="string",
+           nargs=1,
+           action="store",
+           metavar="dir",
+           help="v8 location")
 
 # --- environment setup ---
 
@@ -111,6 +124,9 @@ elif "linux2" == os.sys.platform:
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
 
+    if force32:
+        env.Append( LIBPATH["/usr/lib32"] )
+
     nix = True
 
 elif "win32" == os.sys.platform:
@@ -168,6 +184,8 @@ if nix:
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
+    if not GetOption( "release" ) is None:
+        env.Append( LINKFLAGS=" -static " )
 
 # --- check system ---
 
@@ -193,6 +211,73 @@ conf.CheckLib( "boost_system-mt" )
 
 env = conf.Finish()
 
+# --- v8 ---
+
+v8Home = GetOption( "v8home" )
+
+if not v8Home:
+    for poss in [ "../v8" , "../open-source/v8" ]:
+        if os.path.exists( poss ):
+            v8Home = poss
+            break
+
+# --- js concat ---
+
+def concatjs(target, source, env):
+    
+    outFile = str( target[0] )
+    
+    fullSource = ""
+
+    for s in source:
+        f = open( str(s) , 'r' )
+        for l in f:
+            fullSource += l
+            
+    out = open( outFile , 'w' )
+    out.write( fullSource )
+
+    return None
+
+jsBuilder = Builder(action = concatjs,
+                    suffix = '.jsall',
+                    src_suffix = '.js')
+
+env.Append( BUILDERS={'JSConcat' : jsBuilder})
+
+# --- jsh ---
+
+def jsToH(target, source, env):
+    
+    outFile = str( target[0] )
+    if len( source ) != 1:
+        raise Exception( "wrong" )
+    
+    h = "const char * jsconcatcode = \n"
+    
+    for l in open( str(source[0]) , 'r' ):
+        l = l.strip()
+        l = l.partition( "//" )[0]
+        l = l.replace( '\\' , "\\\\" )
+        l = l.replace( '"' , "\\\"" )
+        
+
+        h += '"' + l + "\\n\"\n "
+        
+    h += ";\n\n"
+
+    out = open( outFile , 'w' )
+    out.write( h )
+
+    return None
+
+jshBuilder = Builder(action = jsToH,
+                    suffix = '.jsh',
+                    src_suffix = '.jsall')
+
+env.Append( BUILDERS={'JSHeader' : jshBuilder})
+
+
 # --- targets ----
 
 clientEnv = env.Clone();
@@ -205,9 +290,10 @@ testEnv.Append( CPPPATH=["../"] )
 testEnv.Append( LIBS=[ "unittest" , "libmongotestfiles.a" ] )
 testEnv.Append( LIBPATH=["."] )
 
-# SYSTEM CHECKS
-configure = env.Configure()
-
+shellEnv = env.Clone();
+shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
+shellEnv.Append( LIBS=[ "libmongoclient.a" , "v8" , "readline" , "history" ] )
+shellEnv.Append( LIBPATH=[ "." , v8Home] )
 
 
 # ----- TARGETS ------
@@ -235,6 +321,11 @@ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] )
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
+
+# shell
+shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
+shellEnv.JSHeader( "shell/mongo.jsall" )
+dbshell = shellEnv.Program( "dbshell" , Glob( "shell/*.cpp" ) );
 
 #  ---- RUNNING TESTS ----
 

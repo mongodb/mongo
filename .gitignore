@@ -1,5 +1,8 @@
 .jsdbshell
+.dbshell
 .sconsign.dblite
+.sconf_temp
+
 *~
 *.o
 *.aps
@@ -10,21 +13,31 @@
 *.obj 
 *.opt 
 *.pch 
+*.jsh
+*.jsall
+
 db/Debug
 db/db
 db/dbgrid
 db/dbtests
 db/oplog*
 db/.gdb*
+config.log
 
 #temp dirs
 dump
 log
 logs
+docs
 
 # binaryies
 mongodump
 mongoimport
 firstExample
+secondExample
 libmongoclient.*
+libmongotestfiles.*
 test
+authTest
+clientTest
+dbshell
