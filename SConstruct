@@ -209,7 +209,7 @@ for b in boostLibs:
         Exit(1)
 
 for j in javaLibs:
-    if not conf.CheckLib( l ):
+    if not conf.CheckLib( j ):
         print( "can't find java lib [" + j + "]" )
         Exit(1)
 
