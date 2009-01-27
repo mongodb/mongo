@@ -75,6 +75,7 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
+linux64  = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 
@@ -115,6 +116,7 @@ elif "linux2" == os.sys.platform:
     javaVersion = "i386";
 
     if os.uname()[4] == "x86_64" and not force32:
+        linux64 = True
         javaVersion = "amd64"
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64"] )
@@ -289,11 +291,6 @@ testEnv.Append( CPPPATH=["../"] )
 testEnv.Append( LIBS=[ "unittest" , "libmongotestfiles.a" ] )
 testEnv.Append( LIBPATH=["."] )
 
-shellEnv = env.Clone();
-shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
-shellEnv.Append( LIBS=[ "libmongoclient.a" , "v8" , "readline" , "history" ] )
-shellEnv.Append( LIBPATH=[ "." , v8Home] )
-
 
 # ----- TARGETS ------
 
@@ -321,10 +318,40 @@ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] )
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
 
-# shell
+
+# --- shell ---
+# shell is complicated by the fact that v8 doesn't work 64-bit yet
+
+shellEnv = env.Clone();
+shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
+shellEnv.Append( LIBS=[ "v8" , "readline" , "history" ] )
+shellEnv.Append( LIBPATH=[ v8Home] )
+
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
-dbshell = shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
+
+if linux64:
+    shellEnv.Append( CFLAGS="-m32" )
+    shellEnv.Append( CXXFLAGS="-m32" )
+    shellEnv.Append( LINKFLAGS="-m32" )
+    shellEnv.Append( LIBPATH=[ "/usr/lib32" ] )
+    l = shellEnv["LIBS"]
+    l.remove("java");
+    l.remove("jvm");
+    l.remove("pcre");
+    l.remove("pcrecpp");
+
+    shell32BitFiles = Glob( "shell/*.cpp" )
+    for f in allClientFiles:
+        shell32BitFiles.append( "32bit/" + str( f ) )
+
+    shellEnv.VariantDir( "32bit" , "." )
+    shellEnv.Program( "mongo" , shell32BitFiles )
+else:
+    shellEnv.Append( LIBPATH=[ "." ] )
+    shellEnv.Append( LIBS=[ "mongoclient"] )
+    shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
+
 
 #  ---- RUNNING TESTS ----
 
