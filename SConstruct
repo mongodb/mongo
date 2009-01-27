@@ -306,8 +306,9 @@ testEnv.Append( LIBPATH=["."] )
 Default( env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ]  ) )
 
 # tools
-env.Program( "mongodump" , allClientFiles + [ "tools/dump.cpp" ] )
-env.Program( "mongoimport" , allClientFiles + [ "tools/import.cpp" ] )
+allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
+env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
+env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
 
 # dbgrid
 env.Program( "mongogrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
