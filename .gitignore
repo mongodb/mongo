@@ -17,11 +17,9 @@
 *.jsall
 
 db/Debug
-db/db
-db/dbgrid
-db/dbtests
 db/oplog*
 db/.gdb*
+db/makefile.local
 config.log
 
 #temp dirs
@@ -31,13 +29,22 @@ logs
 docs
 
 # binaryies
+mongo
+mongod
+mongogrid
 mongodump
 mongoimport
-firstExample
-secondExample
+
+#libs
 libmongoclient.*
 libmongotestfiles.*
+
+# examples
+firstExample
+secondExample
+
+#tests
 test
 authTest
 clientTest
-dbshell
+

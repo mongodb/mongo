@@ -301,14 +301,14 @@ shellEnv.Append( LIBPATH=[ "." , v8Home] )
 
 
 # main db target
-Default( env.Program( "db/db" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ]  ) )
+Default( env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ]  ) )
 
 # tools
 env.Program( "mongodump" , allClientFiles + [ "tools/dump.cpp" ] )
 env.Program( "mongoimport" , allClientFiles + [ "tools/import.cpp" ] )
 
 # dbgrid
-env.Program( "db/dbgrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
+env.Program( "mongogrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
 
 # c++ library
 env.Library( "mongoclient" , allClientFiles )
@@ -326,7 +326,7 @@ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
 # shell
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
-dbshell = shellEnv.Program( "dbshell" , Glob( "shell/*.cpp" ) );
+dbshell = shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
 
 #  ---- RUNNING TESTS ----
 
@@ -341,8 +341,8 @@ if GetOption( "prefix" ):
 #binaries
 env.Install( installDir + "/bin" , "mongodump" )
 env.Install( installDir + "/bin" , "mongoimport" )
-env.Install( installDir + "/bin" , "db/db" )
-env.Install( installDir + "/bin" , "dbshell" )
+env.Install( installDir + "/bin" , "mongod" )
+env.Install( installDir + "/bin" , "mongo" )
 
 #headers
 for id in [ "" , "client/" , "util/" , "grid/" , "db/" ]:
