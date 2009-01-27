@@ -342,6 +342,7 @@ if GetOption( "prefix" ):
 env.Install( installDir + "/bin" , "mongodump" )
 env.Install( installDir + "/bin" , "mongoimport" )
 env.Install( installDir + "/bin" , "db/db" )
+env.Install( installDir + "/bin" , "dbshell" )
 
 #headers
 for id in [ "" , "client/" , "util/" , "grid/" , "db/" ]:
