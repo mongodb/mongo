@@ -330,22 +330,33 @@ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
 
 shellEnv = env.Clone();
 shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
-shellEnv.Append( LIBS=[ "v8" , "readline" , "history" ] )
+shellEnv.Append( LIBS=[ "v8" , "readline" ] )
 shellEnv.Append( LIBPATH=[ v8Home] )
 
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
 
-if linux64:
-    shellEnv.Append( CFLAGS="-m32" )
-    shellEnv.Append( CXXFLAGS="-m32" )
-    shellEnv.Append( LINKFLAGS="-m32" )
-    shellEnv.Append( LIBPATH=[ "/usr/lib32" ] )
+if linux64 or force64:
+    if linux64:
+        shellEnv.Append( CFLAGS="-m32" )
+        shellEnv.Append( CXXFLAGS="-m32" )
+        shellEnv.Append( LINKFLAGS="-m32" )
+        shellEnv.Append( LIBPATH=[ "/usr/lib32" ] )
+    else:
+        shellEnv["CFLAGS"].remove("-m64")
+        shellEnv["CXXFLAGS"].remove("-m64")
+        shellEnv["LINKFLAGS"].remove("-m64")
+        shellEnv["CPPPATH"].remove( "/usr/64/include" )
+        shellEnv["LIBPATH"].remove( "/usr/64/lib" )
+        shellEnv.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
+        shellEnv.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
+
     l = shellEnv["LIBS"]
-    l.remove("java");
-    l.remove("jvm");
-    l.remove("pcre");
-    l.remove("pcrecpp");
+    if linux64:
+        l.remove("java")
+        l.remove("jvm")
+    l.remove("pcre")
+    l.remove("pcrecpp")
 
     shell32BitFiles = Glob( "shell/*.cpp" )
     for f in allClientFiles:
@@ -375,13 +386,18 @@ env.Install( installDir + "/bin" , "mongoimport" )
 env.Install( installDir + "/bin" , "mongod" )
 env.Install( installDir + "/bin" , "mongo" )
 
+# NOTE: In some cases scons gets confused between installation targets and build
+# dependencies.  Here, we use InstallAs instead of Install to prevent such confusion
+# on a case-by-case basis.
+
 #headers
-for id in [ "" , "client/" , "util/" , "grid/" , "db/" ]:
+for id in [ "", "util/", "grid/", "db/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
+env.Install( installDir + "/include/mongo/client" , "client/connpool.h" )
+env.Install( installDir + "/include/mongo/client" , "client/model.h" )
+env.InstallAs( target=installDir + "/include/mongo/client" , source="client/dbclient.h" )
 
 #lib
-# (Using InstallAs syntax so scons doesn't treat the install location as a
-# dependency for the client targets.)
 env.InstallAs( target=installDir + "/" + nixLibPrefix, source="libmongoclient.a" )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
