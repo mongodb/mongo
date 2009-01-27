@@ -507,25 +507,6 @@ found:
 
         int mid = n / 2;
 
-        /* on duplicate key, we need to ensure that they all end up on the RHS */
-        if ( 0 ) {
-            assert(mid>0);
-            while ( 1 ) {
-                KeyNode mn = keyNode(mid);
-                KeyNode left = keyNode(mid-1);
-                if ( left.key.woCompare( mn.key, order ) < 0 )
-                    break;
-                mid--;
-                if ( mid < 3 ) {
-                    problem() << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
-                    out() << "Assertion failure - mid<3: duplicate key bug not fixed yet" << endl;
-                    out() << "  ns:" << idx.indexNamespace() << endl;
-                    out() << "  key:" << mn.key.toString() << endl;
-                    break;
-                }
-            }
-        }
-
         BtreeBucket *r = allocTemp();
         DiskLoc rLoc;
 
@@ -537,7 +518,7 @@ found:
         }
         r->nextChild = nextChild;
         r->assertValid( order );
-//r->dump();
+
         rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size(), true);
         if ( split_debug )
             out() << "     new rLoc:" << rLoc.toString() << endl;
@@ -549,7 +530,6 @@ found:
             KeyNode middle = keyNode(mid);
             nextChild = middle.prevChildBucket; // middle key gets promoted, its children will be thisLoc (l) and rLoc (r)
             if ( split_debug ) {
-                //rLoc.btree()->dump();
                 out() << "    middle key:" << middle.key.toString() << endl;
             }
 
@@ -567,42 +547,28 @@ found:
                 rLoc.btree()->parent = parent;
             }
             else {
-                /* set this before calling _insert - if it splits it will do fixParent() logic and fix the value,
-                   so we don't want to overwrite that if it happens.
+                /* set this before calling _insert - if it splits it will do fixParent() logic and change the value.
                 */
                 rLoc.btree()->parent = parent;
                 if ( split_debug )
                     out() << "    promoting middle key " << middle.key.toString() << endl;
-                parent.btree()->_insert(parent, middle.recordLoc, middle.key, order, false, thisLoc, rLoc, idx);
+                parent.btree()->_insert(parent, middle.recordLoc, middle.key, order, /*dupsallowed*/true, thisLoc, rLoc, idx);
             }
-//BtreeBucket *br = rLoc.btree();
-//br->dump();
-
-//parent.btree()->dump();
-//idx.head.btree()->dump();
-
         }
 
-        truncateTo(mid, order);  // note this may trash middle.key!  thus we had to promote it before finishing up here.
+        truncateTo(mid, order);  // note this may trash middle.key.  thus we had to promote it before finishing up here.
 
         // add our new key, there is room now
         {
 
-//dump();
-
             if ( keypos <= mid ) {
-//		if( keypos < mid ) {
                 if ( split_debug )
                     out() << "  keypos<mid, insertHere() the new key" << endl;
                 insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
-//dump();
             } else {
                 int kp = keypos-mid-1;
                 assert(kp>=0);
                 rLoc.btree()->insertHere(rLoc, kp, recordLoc, key, order, lchild, rchild, idx);
-// set a bp here.
-//			if( !lchild.isNull() ) out() << lchild.btree()->parent.toString() << endl;
-//			if( !rchild.isNull() ) out() << rchild.btree()->parent.toString() << endl;
             }
         }
 
