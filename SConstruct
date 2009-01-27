@@ -169,7 +169,6 @@ elif "win32" == os.sys.platform:
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
-
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-compare -Wno-non-virtual-dtor" )
     env.Append( LINKFLAGS=" -fPIC " )
@@ -202,10 +201,9 @@ if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
 
 for b in boostLibs:
     l = "boost_" + b
-    if not conf.CheckLib( l + "-mt" ):
-        if not conf.CheckLib( l ):
-            print "can't find a required boost library [" + l + "]";
-            Exit(1)
+    if not conf.CheckLib( [ l + "-mt" , l ] ):
+        print "can't find a required boost library [" + l + "]";
+        Exit(1)
 
 # this will add it iff it exists and works
 conf.CheckLib( "boost_system-mt" )
