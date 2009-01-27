@@ -65,6 +65,7 @@ end( { a: "b", b: 1 }, f.find( { b: 1, a: /^a/ } ) );
 
 start( { a: "z", b: 1 }, f.find( { a: /^z/, b: 1 } ) );
 end( { a: "{", b: 1 }, f.find( { a: /^z/, b: 1 } ) );
+noIndex( f.find( { a: /^\{/, b: 1 } ) );
 
 start( { a: "az", b: 1 }, f.find( { a: /^az/, b: 1 } ) );
 end( { a: "a{", b: 1 }, f.find( { a: /^az/, b: 1 } ) );
