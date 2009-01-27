@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "mongo/client/dbclient.h"
+#include "client/dbclient.h"
 
 void installMongoGlobals( v8::Handle<v8::ObjectTemplate>& global );
 
