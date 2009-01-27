@@ -189,7 +189,7 @@ void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const 
     }
     
     if ( value->IsDate() ){
-        b.appendDate( sname.c_str() , v8::Date::Cast( *value )->NumberValue() );
+        b.appendDate( sname.c_str() , (unsigned long long )(v8::Date::Cast( *value )->NumberValue()) );
         return;
     }
     
@@ -290,7 +290,7 @@ Handle<Value> mongoFind(const Arguments& args){
     if ( haveFields )
         fields = v8ToMongo( args[2]->ToObject() );
     
-    auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , args[3]->ToNumber()->Value() , args[4]->ToNumber()->Value() , haveFields ? &fields : 0 );
+    auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , (int)(args[3]->ToNumber()->Value()) , (int)(args[4]->ToNumber()->Value()) , haveFields ? &fields : 0 );
     
     Local<v8::Object> mongo = args.This();
     
