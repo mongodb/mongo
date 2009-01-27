@@ -282,6 +282,8 @@ namespace mongo {
         /* Check if the current key is beyond endKey. */
         void checkEnd();
 
+        static string simpleRegexEnd( string regex );
+
         IndexDetails& indexDetails;
         BSONObj order;
         DiskLoc bucket;

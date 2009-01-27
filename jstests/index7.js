@@ -56,7 +56,19 @@ index( f.find( { a: /^a/, b: 1 } ) );
 index( f.find( { b: 1, a: /^a/ } ) );
 start( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ) );
 start( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: 1, b: 1 } ) );
+start( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: -1, b: -1 } ) );
 start( { a: "a", b: 1 }, f.find( { b: 1, a: /^a/ } ) );
+end( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ) );
+end( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: 1, b: 1 } ) );
+end( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: -1, b: -1 } ) );
+end( { a: "b", b: 1 }, f.find( { b: 1, a: /^a/ } ) );
+
+start( { a: "z", b: 1 }, f.find( { a: /^z/, b: 1 } ) );
+end( { a: "{", b: 1 }, f.find( { a: /^z/, b: 1 } ) );
+noIndex( f.find( { a: /^\{/, b: 1 } ) );
+
+start( { a: "az", b: 1 }, f.find( { a: /^az/, b: 1 } ) );
+end( { a: "a{", b: 1 }, f.find( { a: /^az/, b: 1 } ) );
 
 noIndex( f.find( { a: /ab/, b: 1 } ) );
 noIndex( f.find( { a: /^ab/g, b: 1 } ) );
