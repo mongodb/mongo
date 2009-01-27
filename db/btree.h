@@ -271,6 +271,7 @@ namespace mongo {
             return getFields( indexDetails.keyPattern(), fields );
         }
         static void getFields( const BSONObj &key, vector< string > &fields );
+        static string simpleRegexEnd( string regex );
         void checkUnused();
         void checkEnd();
         IndexDetails& indexDetails;

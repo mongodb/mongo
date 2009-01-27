@@ -58,6 +58,11 @@ namespace mongo {
         checkUnused();
     }
 
+    string BtreeCursor::simpleRegexEnd( string regex ) {
+        ++regex[ regex.length() - 1 ];
+        return regex;
+    }
+    
 // Given a query, find the lowest and highest keys along our index that could
 // potentially match the query.  These lowest and highest keys will be mapped
 // to startKey and endKey based on the value of direction.
@@ -74,7 +79,7 @@ namespace mongo {
             BSONElement lowest = minKey.firstElement();
             BSONElement highest = maxKey.firstElement();
             BSONElement e = query.getFieldDotted( field );
-            BSONObjBuilder temp;
+            BSONObjBuilder temp, temp2;
             if ( !e.eoo() && e.type() != RegEx ) {
                 if ( getGtLtOp( e ) == JSMatcher::Equality )
                     lowest = highest = e;
@@ -84,7 +89,9 @@ namespace mongo {
                 const char *r = e.simpleRegex();
                 if ( r ) {                                                                         
                     temp.append( "", r );                                                          
-                    lowest = temp.done().firstElement();                                           
+                    lowest = temp.done().firstElement();
+                    temp2.append( "", simpleRegexEnd( r ) );
+                    highest = temp2.done().firstElement();
                 }
             }                  
             startBuilder.appendAs( forward ? lowest : highest, "" );
