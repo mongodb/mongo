@@ -583,8 +583,8 @@ namespace mongo {
         {
             dblock lk;
             log() << "now exiting" << endl;
-            exit(12);
         }
+        exit(12);
     }
 
     void setupSignals() {
