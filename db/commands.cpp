@@ -61,8 +61,10 @@ namespace mongo {
             else {
                 ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
             }
-            if ( !ok )
+            if ( !ok ) {
                 anObjBuilder.append("errmsg", errmsg);
+                uassert_nothrow(errmsg.c_str());
+            }
             return true;
         }
 
