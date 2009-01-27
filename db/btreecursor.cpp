@@ -49,13 +49,16 @@ namespace mongo {
         }
 
         findExtremeKeys( _query );
+
         if ( !k.isEmpty() )
             startKey = k.copy();
 
         bucket = indexDetails.head.btree()->
                  locate(indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
 
-        checkUnused();
+        skipUnusedKeys();
+
+        checkEnd(); 
     }
 
 // Given a query, find the lowest and highest keys along our index that could
@@ -137,7 +140,7 @@ namespace mongo {
     }
 
     /* skip unused keys. */
-    void BtreeCursor::checkUnused() {
+    void BtreeCursor::skipUnusedKeys() {
         int u = 0;
         while ( 1 ) {
             if ( !ok() )
@@ -146,7 +149,7 @@ namespace mongo {
             _KeyNode& kn = b->k(keyOfs);
             if ( kn.isUsed() )
                 break;
-            bucket = b->advance(bucket, keyOfs, direction, "checkUnused");
+            bucket = b->advance(bucket, keyOfs, direction, "skipUnusedKeys");
             u++;
         }
         if ( u > 10 )
@@ -160,7 +163,7 @@ namespace mongo {
         return i > 0 ? 1 : -1;
     }
 
-// Check if the current key is beyond endKey_.
+    // Check if the current key is beyond endKey.
     void BtreeCursor::checkEnd() {
         if ( bucket.isNull() )
             return;
@@ -173,7 +176,7 @@ namespace mongo {
         if ( bucket.isNull() )
             return false;
         bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");
-        checkUnused();
+        skipUnusedKeys();
         checkEnd();
         return !bucket.isNull();
     }
@@ -212,7 +215,7 @@ namespace mongo {
                     /* we were deleted but still exist as an unused
                        marker key. advance.
                     */
-                    checkUnused();
+                    skipUnusedKeys();
                 }
                 return;
             }
@@ -228,7 +231,7 @@ namespace mongo {
         bucket = indexDetails.head.btree()->locate(indexDetails.head, keyAtKeyOfs, order, keyOfs, found, locAtKeyOfs, direction);
         RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
         if ( found )
-            checkUnused();
+            skipUnusedKeys();
     }
 
     /* ----------------------------------------------------------------------------- */

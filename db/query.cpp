@@ -180,9 +180,13 @@ namespace mongo {
         auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
         if ( c.get() == 0 )
             c = theDataFileMgr.findAll(ns);
+
+        if( !c->ok() )
+            return nDeleted;
+
         JSMatcher matcher(pattern, c->indexKeyPattern());
 
-        while ( c->ok() ) {
+        do {
             Record *r = c->_current();
             DiskLoc rloc = c->currLoc();
             BSONObj js(r);
@@ -203,7 +207,7 @@ namespace mongo {
                     break;
                 c->checkLocation();
             }
-        }
+        } while ( c->ok() );
 
         return nDeleted;
     }
@@ -312,52 +316,55 @@ namespace mongo {
             auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
             if ( c.get() == 0 )
                 c = theDataFileMgr.findAll(ns);
-            JSMatcher matcher(pattern, c->indexKeyPattern());
-            while ( c->ok() ) {
-                Record *r = c->_current();
-                nscanned++;
-                BSONObj js(r);
-                if ( !matcher.matches(js) ) {
-                }
-                else {
-                    /* note: we only update one row and quit.  if you do multiple later,
-                       be careful or multikeys in arrays could break things badly.  best
-                       to only allow updating a single row with a multikey lookup.
-                       */
-
-                    if ( profile )
-                        ss << " nscanned:" << nscanned;
-
-                    /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
-                       regular ones at the moment. */
-                    const char *firstField = updateobj.firstElement().fieldName();
-                    if ( firstField[0] == '$' ) {
-                        vector<Mod> mods;
-                        Mod::getMods(mods, updateobj);
-                        NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
-                        set<string>& idxKeys = ndt.indexKeys();
-                        for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
-                            if ( idxKeys.count(i->fieldName) ) {
-                                uassert("can't $inc/$set an indexed field", false);
-                            }
-                        }
-
-                        Mod::applyMods(mods, c->currLoc().obj());
-                        if ( profile )
-                            ss << " fastmod ";
-                        if ( logop ) {
-                            if ( mods.size() ) {
-                                logOp("u", ns, updateobj, &pattern, &upsert);
-                                return 5;
-                            }
-                        }
-                        return 2;
+            /* we check ok first so we don't bother building the matcher if we don't need to */
+            if( c->ok() ) { 
+                JSMatcher matcher(pattern, c->indexKeyPattern());
+                do {
+                    Record *r = c->_current();
+                    nscanned++;
+                    BSONObj js(r);
+                    if ( !matcher.matches(js) ) {
                     }
+                    else {
+                        /* note: we only update one row and quit.  if you do multiple later,
+                        be careful or multikeys in arrays could break things badly.  best
+                        to only allow updating a single row with a multikey lookup.
+                        */
 
-                    theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
-                    return 1;
-                }
-                c->advance();
+                        if ( profile )
+                            ss << " nscanned:" << nscanned;
+
+                        /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
+                        regular ones at the moment. */
+                        const char *firstField = updateobj.firstElement().fieldName();
+                        if ( firstField[0] == '$' ) {
+                            vector<Mod> mods;
+                            Mod::getMods(mods, updateobj);
+                            NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
+                            set<string>& idxKeys = ndt.indexKeys();
+                            for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
+                                if ( idxKeys.count(i->fieldName) ) {
+                                    uassert("can't $inc/$set an indexed field", false);
+                                }
+                            }
+
+                            Mod::applyMods(mods, c->currLoc().obj());
+                            if ( profile )
+                                ss << " fastmod ";
+                            if ( logop ) {
+                                if ( mods.size() ) {
+                                    logOp("u", ns, updateobj, &pattern, &upsert);
+                                    return 5;
+                                }
+                            }
+                            return 2;
+                        }
+
+                        theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
+                        return 1;
+                    }
+                    c->advance();
+                } while( c->ok() );
             }
         }
 
@@ -602,12 +609,11 @@ namespace mongo {
             if ( c.get() == 0 )
                 c = findTableScan(ns, order, &isSorted);
 
-            auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
-            JSMatcher &debug1 = *matcher;
-            assert( debug1.getN() < 1000 );
-
             auto_ptr<ScanAndOrder> so;
             bool ordering = false;
+
+            auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
+
             if ( !order.isEmpty() && !isSorted ) {
                 ordering = true;
                 ss << " scanAndOrder ";
@@ -618,8 +624,6 @@ namespace mongo {
 
             while ( c->ok() ) {
                 BSONObj js = c->current();
-                //if( queryTraceLevel >= 50 )
-                //	out() << " checking against:\n " << js.toString() << endl;
                 nscanned++;
                 bool deep;
                 if ( !matcher->matches(js, &deep) ) {
