@@ -326,6 +326,9 @@ namespace mongo {
         void addedIndex() {
             haveIndexKeys=false;
         }
+        void deletedIndex() {
+            haveIndexKeys = false;
+        }
     private:
         static std::map<string,NamespaceDetailsTransient*> map;
     public:

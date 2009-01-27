@@ -35,6 +35,7 @@ _ disallow system* manipulations from the database.
 #include "query.h"
 #include "repl.h"
 #include "dbhelpers.h"
+#include "namespace.h"
 
 namespace mongo {
 
@@ -446,8 +447,10 @@ namespace mongo {
     */
     void IndexDetails::kill() {
         string ns = indexNamespace(); // e.g. foo.coll.$ts_1
-
+        
         {
+            // clean up parent namespace index cache
+            NamespaceDetailsTransient::get( parentNS().c_str() ).deletedIndex();
             // clean up in system.indexes
             BSONObjBuilder b;
             b.append("name", indexName().c_str());
