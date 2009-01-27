@@ -881,6 +881,17 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
     }
 
+    // should be { <something> : <simpletype[1|-1]>, .keyp.. } 
+    bool validKeyPattern(BSONObj kp) { 
+        BSONObjIterator i(kp);
+        while( i.more() ) { 
+            BSONElement e = i.next();
+            if( e.type() == Object || e.type() == Array ) 
+                return false;
+        }
+        return true;
+    }
+
     DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
         bool addIndex = false;
         const char *sys = strstr(ns, "system.");
@@ -927,11 +938,15 @@ namespace mongo {
             }
 
             BSONObj key = io.getObjectField("key");
+            if( !validKeyPattern(key) ) {
+                string s = string("bad index key pattern ") + key.toString();
+                uassert(s.c_str(), false);
+            }
             if ( *name == 0 || tabletoidxns.empty() || key.isEmpty() || key.objsize() > 2048 ) {
                 out() << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
                      tabletoidxns << "\n  ourns:" << ns;
                 out() << "\n  idxobj:" << io.toString() << endl;
-                return DiskLoc();
+                uassert("bad add index attempt", false);
             }
             tableToIndex = nsdetails(tabletoidxns.c_str());
             if ( tableToIndex == 0 ) {

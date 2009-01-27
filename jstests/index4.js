@@ -1,6 +1,6 @@
 // index4.js
 
-db = connect( "test" );
+//db = connect( "test" );
 
 t = db.index4;
 t.drop();
@@ -18,11 +18,17 @@ t.save( { name : "clusterstock" ,
           ]
         } );
 
+
+// this should fail, not allowed -- we confirm that.
 t.ensureIndex( { instances : { pool : 1 } } );
+assert( !t.getIndexes().hasNext(), "no indexes should be here yet");
+
+t.ensureIndex( { "instances.pool" : 1 } );
+
 sleep( 10 );
 
 a = t.find( { instances : { pool : "prod1" } } );
-assert( a.length() == 1 );
-assert( a[0].name == "alleyinsider" );
+assert( a.length() == 1, "len1" );
+assert( a[0].name == "alleyinsider", "alley" );
 
-assert(t.validate().valid);
+assert(t.validate().valid, "valid" );

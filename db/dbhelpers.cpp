@@ -60,16 +60,19 @@ namespace mongo {
             c = DataFileMgr::findAll(ns);
         }
 
+        if( !c->ok() ) 
+            return false;
+
         JSMatcher matcher(query, c->indexKeyPattern());
 
-        while ( c->ok() ) {
+        do {
             BSONObj js = c->current();
             if( matcher.matches(js) ) { 
                 result = js;
                 return true;
             }
             c->advance();
-        }
+        } while( c->ok() );
 
         return false;
     }

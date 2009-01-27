@@ -263,7 +263,9 @@ namespace mongo {
         }
         
     private:
+        /* set startKey and endKey -- the bounding keys for the query range. */
         void findExtremeKeys( const BSONObj &query );
+
         void findExtremeInequalityValues( const BSONElement &e,
                                           BSONElement &lowest,
                                           BSONElement &highest );
@@ -271,9 +273,17 @@ namespace mongo {
             return getFields( indexDetails.keyPattern(), fields );
         }
         static void getFields( const BSONObj &key, vector< string > &fields );
-        static string simpleRegexEnd( string regex );
-        void checkUnused();
+
+        /* Our btrees may (rarely) have "unused" keys when items are deleted.
+           Skip past them.
+        */
+        void skipUnusedKeys();
+
+        /* Check if the current key is beyond endKey. */
         void checkEnd();
+
+        static string simpleRegexEnd( string regex );
+
         IndexDetails& indexDetails;
         BSONObj order;
         DiskLoc bucket;
