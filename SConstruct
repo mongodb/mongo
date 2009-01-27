@@ -83,6 +83,7 @@ installDir = "/usr/local"
 nixLibPrefix = "lib"
 
 javaHome = GetOption( "javaHome" )
+javaLibs = []
 
 def findVersion( root , choices ):
     for c in choices:
@@ -122,7 +123,7 @@ elif "linux2" == os.sys.platform:
         env.Append( LIBPATH=["/usr/lib64"] )
 
     env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
-    env.Append( LIBS=[ "java" , "jvm" ] )
+    javaLibs += [ "java" , "jvm" ]
 
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
@@ -147,7 +148,7 @@ elif "win32" == os.sys.platform:
     env.Append( CPPDEFINES=["WIN32","_DEBUG","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
 
     env.Append( LIBPATH=[ boostDir + "/Lib" , javaHome + "/Lib" , winSDKHome + "/Lib" ] )
-    env.Append( LIBS=[ "jvm" ] )
+    javaLibs += [ "jvm" ];
 
     def pcreFilter(x):
         name = x.name
@@ -205,6 +206,11 @@ for b in boostLibs:
     l = "boost_" + b
     if not conf.CheckLib( [ l + "-mt" , l ] ):
         print "can't find a required boost library [" + l + "]";
+        Exit(1)
+
+for j in javaLibs:
+    if not conf.CheckLib( l ):
+        print( "can't find java lib [" + j + "]" )
         Exit(1)
 
 # this will add it iff it exists and works
