@@ -260,11 +260,15 @@ namespace mongo {
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
-        BSONObj deletedId;
+        BSONObj deletedId = emptyObj;
         deleteObjects(ns, pattern, justOne, &deletedId);
-        if ( justOne )
-            logOp("d", ns, deletedId, 0, &justOne);
-        else
+        if ( justOne ) {
+            if ( deletedId.isEmpty() ) {
+                problem() << "deleted object without id, not logging" << endl;
+            } else {
+                logOp("d", ns, deletedId, 0, &justOne);
+            }
+        } else
             logOp("d", ns, pattern, 0, &justOne);            
     }
 

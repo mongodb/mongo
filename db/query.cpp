@@ -206,10 +206,11 @@ namespace mongo {
                 if ( justOne ) {
                     if ( deletedId ) {
                         BSONElement e;
-                        js.getObjectID( e );
-                        BSONObjBuilder b;
-                        b.append( e );
-                        *deletedId = b.doneAndDecouple();
+                        if( js.getObjectID( e ) ) {
+                            BSONObjBuilder b;
+                            b.append( e );
+                            *deletedId = b.doneAndDecouple();
+                        }
                     }
                     break;
                 }
