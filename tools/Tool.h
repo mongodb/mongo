@@ -22,6 +22,9 @@ namespace mongo {
         boost::program_options::options_description_easy_init add_options(){
             return _options->add_options();
         }
+        void addPositionArg( const char * name , int pos ){
+            _positonalOptions.add( name , pos );
+        }
         
         string getParam( string name , string def="" ){
             if ( _params.count( name ) )
@@ -40,6 +43,8 @@ namespace mongo {
 
     private:
         boost::program_options::options_description * _options;
+        boost::program_options::positional_options_description _positonalOptions;
+
         boost::program_options::variables_map _params;
         
     };

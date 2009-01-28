@@ -31,7 +31,10 @@ mongo::Tool::~Tool(){
 int mongo::Tool::main( int argc , char ** argv ){
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
     
-    po::store( po::parse_command_line( argc, argv, *_options ), _params );
+    po::store( po::command_line_parser( argc , argv ).
+               options( *_options ).
+               positional( _positonalOptions ).run() , _params );
+
     po::notify( _params );
 
     if ( _params.count( "help" ) ){
