@@ -2,7 +2,7 @@ Mongo Database README
 
 DOCUMENTATION
 
-http://www.10gen.com/wiki/db
+http://mongodb.onconfluence.com/display/DOCS/Mongo+Documentation
 
 ORGANIZATION
 
@@ -12,8 +12,25 @@ util/           : util classes
 
 BUILDING
 
-cd db
-make clean && make
+- Pre-requisite for 'mongo', the MongoDB interactive shell:
+
+  The shell requires the library ../v8/libv8.  There is no v8 binary distro, so
+  we recommend you install and build V8 as follows:
+
+    $ cd ..
+    $ svn checkout http://v8.googlecode.com/svn/trunk/ v8
+    $ cd v8
+    $ scons libv8.a
+
+- Then use scons to build.  
+
+  If you want to build everything (mongod, mongo, tools, etc):
+
+     $ scons .
+
+  If you only want to build the database:
+
+     $ scons
 
 RUNNING
 
