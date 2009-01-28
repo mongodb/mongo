@@ -30,6 +30,12 @@ namespace mongo {
 // if you want trace output:
 #define mmm(x)
 
+#ifdef MSG_NOSIGNAL
+        const int portSendFlags = MSG_NOSIGNAL;
+#else
+        const int portSendFlags = 0;
+#endif
+
     /* listener ------------------------------------------------------------------- */
 
     void Listener::listen() {
@@ -219,6 +225,13 @@ namespace mongo {
         }
 
         disableNagle(sock);
+
+#ifdef SO_NOSIGPIPE
+        // osx
+        const int one = 1;
+        setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
+#endif
+
         return true;
     }
 
@@ -253,7 +266,7 @@ again:
             if ( len == -1 ) {
                 // Endian check from the database, after connecting, to see what mode server is running in.
                 unsigned foo = 0x10203040;
-                int x = ::send(sock, (char *) &foo, 4, 0);
+                int x = ::send(sock, (char *) &foo, 4,  portSendFlags );
                 if ( x <= 0 ) {
                     log() << "MessagingPort endian send() error " << errno << ' ' << farEnd.toString() << endl;
                     return false;
@@ -339,6 +352,7 @@ again:
         int x = -100;
 
         if ( piggyBackData && piggyBackData->len() ) {
+            mmm( out() << "*     have piggy back" << endl; )
             if ( ( piggyBackData->len() + toSend.data->len ) > 1300 ) {
                 // won't fit in a packet - so just send it off
                 piggyBackData->flush();
@@ -350,7 +364,7 @@ again:
         }
 
         if ( x == -100 )
-            x = ::send(sock, (char*)toSend.data, toSend.data->len , 0);
+            x = ::send(sock, (char*)toSend.data, toSend.data->len , portSendFlags );
 
         if ( x <= 0 ) {
             log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
