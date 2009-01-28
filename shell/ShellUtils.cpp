@@ -3,6 +3,7 @@
 #include "ShellUtils.h"
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <iostream>
 
 using namespace std;
@@ -101,6 +102,13 @@ v8::Handle<v8::Value> Version(const v8::Arguments& args) {
 }
 
 v8::Handle<v8::String> ReadFile(const char* name) {
+
+    boost::filesystem::path p(name);
+    if ( is_directory( p ) ){
+        cerr << "can't read directory [" << name << "]" << endl;
+        return v8::String::New( "" );
+    }
+                    
     FILE* file = fopen(name, "rb");
     if (file == NULL) return v8::Handle<v8::String>();
 
