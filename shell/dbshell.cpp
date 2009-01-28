@@ -44,7 +44,8 @@ int main(int argc, char* argv[]) {
     string password;
 
     bool runShell = false;
-
+    bool nodb = false;
+    
     int argNumber = 1;
     for ( ; argNumber < argc; argNumber++) {
         const char* str = argv[argNumber];
@@ -54,6 +55,11 @@ int main(int argc, char* argv[]) {
             continue;
         } 
         
+        if (strcmp(str, "--nodb") == 0) {
+            nodb = true;
+            continue;
+        } 
+
         if ( strcmp( str , "-u" ) == 0 ){
             username = argv[argNumber+1];
             argNumber++;
@@ -76,7 +82,7 @@ int main(int argc, char* argv[]) {
              strcmp(str, "-h" ) == 0 ) {
 
             cout 
-                << "usage: " << argv[0] << " [options] <db address> [file names]\n" 
+                << "usage: " << argv[0] << " [options] [db address] [file names]\n" 
                 << "db address can be:\n"
                 << "   foo   =   foo database on local machine\n" 
                 << "   192.169.0.5/foo   =   foo database on 192.168.0.5 machine\n" 
@@ -85,6 +91,7 @@ int main(int argc, char* argv[]) {
                 << " --shell run the shell after executing files\n"
                 << " -u <username>\n"
                 << " -p<password> - notice no space\n"
+                << " --nodb don't connect to mongod on startup.  No 'db address' arg expected.\n"
                 << "file names: a list of files to run.  will exit after unless --shell is specified\n"
                 ;
             
@@ -100,7 +107,9 @@ int main(int argc, char* argv[]) {
             continue;
         } 
         
-        {
+        if ( nodb )
+            break;
+        else {
             const char * last = strstr( str , "/" );
             if ( last )
                 last++;
@@ -117,7 +126,7 @@ int main(int argc, char* argv[]) {
         break;
     }
 
-    { // init mongo code
+    if ( !nodb ) { // init mongo code
         v8::HandleScope handle_scope;
         string setup = (string)"db = connect( \"" + host + "\")";
         if ( ! ExecuteString( v8::String::New( setup.c_str() ) , v8::String::New( "(connect)" ) , false , true ) ){

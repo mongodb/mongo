@@ -7,6 +7,19 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		9302D9930F30AB8C00DFA4EF /* collection.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = collection.js; sourceTree = "<group>"; };
+		9302D9940F30AB8C00DFA4EF /* db.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = db.js; sourceTree = "<group>"; };
+		9302D9950F30AB8C00DFA4EF /* dbshell.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbshell.cpp; sourceTree = "<group>"; };
+		9302D9970F30AB8C00DFA4EF /* md5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = md5.js; sourceTree = "<group>"; };
+		9302D9980F30AB8C00DFA4EF /* mongo.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = mongo.js; sourceTree = "<group>"; };
+		9302D9990F30AB8C00DFA4EF /* mongo.jsall */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = mongo.jsall; sourceTree = "<group>"; };
+		9302D99A0F30AB8C00DFA4EF /* mongo.jsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = mongo.jsh; sourceTree = "<group>"; };
+		9302D99B0F30AB8C00DFA4EF /* MongoJS.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MongoJS.cpp; sourceTree = "<group>"; };
+		9302D99C0F30AB8C00DFA4EF /* MongoJS.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MongoJS.h; sourceTree = "<group>"; };
+		9302D99E0F30AB8C00DFA4EF /* query.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = query.js; sourceTree = "<group>"; };
+		9302D99F0F30AB8C00DFA4EF /* ShellUtils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ShellUtils.cpp; sourceTree = "<group>"; };
+		9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ShellUtils.h; sourceTree = "<group>"; };
+		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
 		9342232B0EF16D4F00608550 /* connpool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = connpool.cpp; sourceTree = "<group>"; };
 		9342232C0EF16D4F00608550 /* connpool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = connpool.h; sourceTree = "<group>"; };
 		9342232D0EF16D4F00608550 /* dbclient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbclient.cpp; sourceTree = "<group>"; };
@@ -127,6 +140,7 @@
 		08FB7795FE84155DC02AAC07 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				9302D9920F30AB8C00DFA4EF /* shell */,
 				9342232A0EF16D4F00608550 /* client */,
 				9342238F0EF16DB400608550 /* db */,
 				934DD8680EFAD21900459CC1 /* dbgrid */,
@@ -142,6 +156,26 @@
 			children = (
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		9302D9920F30AB8C00DFA4EF /* shell */ = {
+			isa = PBXGroup;
+			children = (
+				9302D9930F30AB8C00DFA4EF /* collection.js */,
+				9302D9940F30AB8C00DFA4EF /* db.js */,
+				9302D9950F30AB8C00DFA4EF /* dbshell.cpp */,
+				9302D9970F30AB8C00DFA4EF /* md5.js */,
+				9302D9980F30AB8C00DFA4EF /* mongo.js */,
+				9302D9990F30AB8C00DFA4EF /* mongo.jsall */,
+				9302D99A0F30AB8C00DFA4EF /* mongo.jsh */,
+				9302D99B0F30AB8C00DFA4EF /* MongoJS.cpp */,
+				9302D99C0F30AB8C00DFA4EF /* MongoJS.h */,
+				9302D99E0F30AB8C00DFA4EF /* query.js */,
+				9302D99F0F30AB8C00DFA4EF /* ShellUtils.cpp */,
+				9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */,
+				9302D9A20F30AB8C00DFA4EF /* utils.js */,
+			);
+			path = shell;
 			sourceTree = "<group>";
 		};
 		9342232A0EF16D4F00608550 /* client */ = {

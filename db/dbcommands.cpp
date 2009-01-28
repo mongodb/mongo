@@ -59,6 +59,16 @@ namespace mongo {
         try {
             d->firstExtent.ext()->assertOk();
             d->lastExtent.ext()->assertOk();
+
+			DiskLoc el = d->firstExtent;
+			int ne = 0;
+			while( !el.isNull() ) {
+				Extent *e = el.ext();
+				e->assertOk();
+				el = e->xnext;
+				ne++;
+			}
+			ss << "  # extents:" << ne << '\n';
         } catch (...) {
             valid=false;
             ss << " extent asserted ";
