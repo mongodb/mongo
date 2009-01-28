@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
              strcmp(str, "-h" ) == 0 ) {
 
             cout 
-                << "usage: ./dbshell [options] <db address> [file names]\n" 
+                << "usage: " << argv[0] << " [options] <db address> [file names]\n" 
                 << "db address can be:\n"
                 << "   foo   =   foo database on local machine\n" 
                 << "   192.169.0.5/foo   =   foo database on 192.168.0.5 machine\n" 
