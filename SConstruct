@@ -78,7 +78,7 @@ allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
 linux64  = False
-dawrin = False
+darwin = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
