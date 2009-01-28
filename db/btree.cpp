@@ -298,7 +298,20 @@ namespace mongo {
        returns n if it goes after the last existing key.
        note result might be an Unused location!
     */
+	char foo;
     bool BtreeBucket::find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup) {
+#if defined(_EXPERIMENT1)
+		{
+			char *z = (char *) this;
+			int i = 0;
+			while( 1 ) {
+				i += 4096;
+				if( i >= BucketSize )
+					break;
+				foo += z[i];
+			}
+		}
+#endif
         /* binary search for this key */
         int l=0;
         int h=n-1;
