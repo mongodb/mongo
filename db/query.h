@@ -78,7 +78,8 @@ namespace mongo {
 
     void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss);
 
-    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god=false);
+    // If justOne is true, deletedId is set to the id of the deleted object.
+    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, BSONObj *deletedId = 0, bool god=false);
 
     class Cursor;
     auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0, string *hint = 0);

@@ -260,8 +260,12 @@ namespace mongo {
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
-        deleteObjects(ns, pattern, justOne);
-        logOp("d", ns, pattern, 0, &justOne);
+        BSONObj deletedId;
+        deleteObjects(ns, pattern, justOne, &deletedId);
+        if ( justOne )
+            logOp("d", ns, deletedId, 0, &justOne);
+        else
+            logOp("d", ns, pattern, 0, &justOne);            
     }
 
     void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit) {

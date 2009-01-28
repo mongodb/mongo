@@ -18,6 +18,7 @@
 
 #include "stdafx.h"
 #include "db.h"
+#include "query.h"
 
 namespace mongo {
 
@@ -33,11 +34,9 @@ namespace mongo {
         theDataFileMgr.insert(ns.c_str(), (void *) o.objdata(), o.objsize());
     }
 
-    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god);
-
     void DBInfo::dbDropped() {
         BSONObj empty;
-        deleteObjects(ns.c_str(), empty, false, false);
+        deleteObjects(ns.c_str(), empty, false);
 
         /* do we also need to clear the info in 'dbs' in local.sources if we
         are a slave?

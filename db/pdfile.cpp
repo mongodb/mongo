@@ -435,7 +435,7 @@ namespace mongo {
             b.append("name", nsToDrop.c_str());
             BSONObj cond = b.done(); // { name: "colltodropname" }
             string system_namespaces = database->name + ".system.namespaces";
-            int n = deleteObjects(system_namespaces.c_str(), cond, false, true);
+            int n = deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
             wassert( n == 1 );
         }
         // remove from the catalog hashtable
@@ -457,7 +457,7 @@ namespace mongo {
             b.append("ns", parentNS().c_str());
             BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
             string system_indexes = database->name + ".system.indexes";
-            int n = deleteObjects(system_indexes.c_str(), cond, false, true);
+            int n = deleteObjects(system_indexes.c_str(), cond, false, 0, true);
             wassert( n == 1 );
         }
 

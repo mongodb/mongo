@@ -161,7 +161,7 @@ namespace mongo {
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
     */
-    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool god) {
+    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, BSONObj *deletedId, bool god) {
         if ( strstr(ns, ".system.") && !god ) {
             /* note a delete from system.indexes would corrupt the db 
                if done here, as there are pointers into those objects in 
@@ -203,8 +203,16 @@ namespace mongo {
 
                 theDataFileMgr.deleteRecord(ns, r, rloc);
                 nDeleted++;
-                if ( justOne )
+                if ( justOne ) {
+                    if ( deletedId ) {
+                        BSONElement e;
+                        js.getObjectID( e );
+                        BSONObjBuilder b;
+                        b.append( e );
+                        *deletedId = b.doneAndDecouple();
+                    }
                     break;
+                }
                 c->checkLocation();
             }
         } while ( c->ok() );
@@ -397,7 +405,7 @@ namespace mongo {
     */
     void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss) {
         int rc = _updateObjects(ns, updateobj, pattern, upsert, ss, true);
-        if ( rc != 5 )
+        if ( rc != 5 && rc != 0 )
             logOp("u", ns, updateobj, &pattern, &upsert);
     }
 

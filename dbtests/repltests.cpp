@@ -403,25 +403,28 @@ namespace ReplTests {
 
         class Remove : public Base {
         public:
-            Remove() : o_( fromjson( "{\"a\":\"b\"}" ) ) {}
+            Remove() :
+            o1_( f( "{\"_id\":\"010101010101010101010101\",\"a\":\"b\"}" ) ),
+            o2_( f( "{\"_id\":\"010101010101010101010102\",\"a\":\"b\"}" ) ),
+            q_( f( "{\"a\":\"b\"}" ) ) {}
             void doIt() const {
-                client()->remove( ns(), o_ );
+                client()->remove( ns(), q_ );
             }
             void check() const {
                 ASSERT_EQUALS( 0, count() );
             }
             void reset() const {
                 deleteAll( ns() );
-                insert( o_ );
-                insert( o_ );
+                insert( o1_ );
+                insert( o2_ );
             }
         protected:
-            BSONObj o_;            
+            BSONObj o1_, o2_, q_;            
         };
         
         class RemoveOne : public Remove {
             void doIt() const {
-                client()->remove( ns(), o_, true );
+                client()->remove( ns(), q_, true );
             }            
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -469,9 +472,8 @@ namespace ReplTests {
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::IncSame >();
             add< Idempotence::Remove >();
-            // FIXME Decide what is correct & uncomment
-//            add< Idempotence::RemoveOne >();
-//            add< Idempotence::FailingUpdate >();
+            add< Idempotence::RemoveOne >();
+            add< Idempotence::FailingUpdate >();
         }
     };
     
