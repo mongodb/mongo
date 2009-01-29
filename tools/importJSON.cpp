@@ -78,7 +78,6 @@ public:
                 break;
             
             assert( len < BUF_SIZE );
-                
 
             try {
                 BSONObj o = fromjson( line );
@@ -86,7 +85,7 @@ public:
             }
             catch ( MsgAssertionException ma ){
                 cout << "exception:" << ma.toString() << endl;
-                //cout << line << endl;
+                cout << line << endl;
             }
             
             if ( ++num % 10000 == 0 ){
