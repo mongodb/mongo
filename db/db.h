@@ -50,7 +50,7 @@ namespace mongo {
         }
     };
 
-    extern boost::mutex dbMutex;
+    extern boost::mutex &dbMutex;
     extern MutexInfo dbMutexInfo;
 //extern int dbLocked;
 

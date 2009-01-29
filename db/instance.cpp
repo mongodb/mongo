@@ -40,7 +40,7 @@ namespace mongo {
     bool master = false; // true means keep an op log
     extern int curOp;
 
-    boost::mutex dbMutex;
+    boost::mutex &dbMutex( *(new boost::mutex) );
     MutexInfo dbMutexInfo;
 //int dbLocked = 0;
 
