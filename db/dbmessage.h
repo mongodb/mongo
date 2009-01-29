@@ -153,9 +153,11 @@ namespace mongo {
 } // namespace mongo
 
 //#include "bsonobj.h"
+#include "instance.h"
 
 namespace mongo {
 
+    /* object reply helper. */
     inline void replyToQuery(int queryResultFlags,
                              MessagingPort& p, Message& requestMsg,
                              BSONObj& responseObj)
@@ -163,6 +165,26 @@ namespace mongo {
         replyToQuery(queryResultFlags,
                      p, requestMsg,
                      (void *) responseObj.objdata(), responseObj.objsize(), 1);
+    }
+
+    /* helper to do a reply using a DbResponse object */
+    inline void replyToQuery(int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj) {
+        BufBuilder b;
+        b.skip(sizeof(QueryResult));
+        b.append((void*) obj.objdata(), obj.objsize());
+        QueryResult* msgdata = (QueryResult *) b.buf();
+        b.decouple();
+        QueryResult *qr = msgdata;
+        qr->resultFlags() = queryResultFlags;
+        qr->len = b.len();
+        qr->setOperation(opReply);
+        qr->cursorId = 0;
+        qr->startingFrom = 0;
+        qr->nReturned = 1;
+        Message *resp = new Message();
+        resp->setData(msgdata, true); // transport will free
+        dbresponse.response = resp;
+        dbresponse.responseTo = m.data->id;
     }
 
 } // namespace mongo
