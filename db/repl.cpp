@@ -49,7 +49,7 @@
 namespace mongo {
 
     extern bool quiet;
-    extern boost::mutex dbMutex;
+    extern boost::mutex &dbMutex;
     extern long long oplogSize;
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
     bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl);
@@ -256,7 +256,7 @@ namespace mongo {
                 result.append("ismaster", 1);
 				result.append("msg", "not paired");
             }
-
+            
             return true;
         }
     } cmdismaster;
