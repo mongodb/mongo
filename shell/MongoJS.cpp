@@ -167,7 +167,10 @@ Local<v8::Object> mongoToV8( BSONObj & m , bool array ){
 void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value ){
         
     if ( value->IsString() ){
-        b.append( sname.c_str() , toSTLString( value ).c_str() );
+        if ( sname == "$where" )
+            b.appendCode( sname.c_str() , toSTLString( value ).c_str() );
+        else
+            b.append( sname.c_str() , toSTLString( value ).c_str() );
         return;
     }
         
