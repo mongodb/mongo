@@ -20,11 +20,10 @@ for( i = 0; i < 1000; ++i )
 
 s = startMongodNoReset( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
 assert.soon( function() { return 1 == s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
-print( "did resync" );
 
 assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );
 as = s.getDB( baseName ).a
-assert.soon( function() { print( as.find().count() ); return 1001 == as.find().count(); } );
+assert.soon( function() { return 1001 == as.find().count(); } );
 assert.eq( 1, as.find( { i: 0 } ).count() );
 assert.eq( 1, as.find( { i: 999 } ).count() );
 
