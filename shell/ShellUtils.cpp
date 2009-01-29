@@ -8,6 +8,7 @@
 
 using namespace std;
 using namespace v8;
+using namespace boost::filesystem;
 
 Handle<v8::Value> Print(const Arguments& args) {
     bool first = true;
@@ -103,7 +104,7 @@ Handle<v8::Value> Version(const Arguments& args) {
 
 Handle<v8::String> ReadFile(const char* name) {
 
-    boost::filesystem::path p(name);
+    path p(name);
     if ( is_directory( p ) ){
         cerr << "can't read directory [" << name << "]" << endl;
         return v8::String::New( "" );
@@ -183,6 +184,33 @@ Handle<v8::Value> JSSleep(const Arguments& args){
     return v8::Undefined();
 }
 
+Handle<v8::Value> ListFiles(const Arguments& args){
+    jsassert( args.Length() == 1 , "need to specify 1 argument to listFiles" );
+    
+    Handle<v8::Array> lst = v8::Array::New();
+    
+    path root( toSTLString( args[0] ) );
+    
+    directory_iterator end;
+    directory_iterator i( root);
+    
+    int num =0;
+    while ( i != end ){
+        path p = *i;
+        
+        Handle<v8::Object> o = v8::Object::New();
+        o->Set( v8::String::New( "name" ) , v8::String::New( p.string().c_str() ) );
+        o->Set( v8::String::New( "isDirectory" ) , v8::Boolean::New( is_directory( p ) ) );
+
+        lst->Set( v8::Number::New( num ) , o );
+
+        num++;
+        i++;
+    }
+    
+    return lst;
+}
+
 void ReportException(v8::TryCatch* try_catch) {
     cout << try_catch << endl;
 }
@@ -191,6 +219,7 @@ void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("sleep"), v8::FunctionTemplate::New(JSSleep));
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
     global->Set(v8::String::New("load"), v8::FunctionTemplate::New(Load));
+    global->Set(v8::String::New("listFiles"), v8::FunctionTemplate::New(ListFiles));
     global->Set(v8::String::New("quit"), v8::FunctionTemplate::New(Quit));
     global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
 }
