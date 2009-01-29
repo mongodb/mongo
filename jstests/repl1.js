@@ -2,7 +2,8 @@
 
 var baseName = "jstests_repl1test";
 
-m = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-master", "--master" );
+// spec small oplog for fast startup on 64bit machines
+m = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", 1 );
 s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
 
 am = m.getDB( baseName ).a
