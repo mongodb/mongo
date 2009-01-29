@@ -84,7 +84,11 @@ namespace mongo {
 
     void killOp( Message &m, DbResponse &dbresponse ) {
         BSONObj obj;
-        if( !dbMutexInfo.isLocked() ) 
+        AuthenticationInfo *ai = authInfo.get();
+        if( ai == 0 || !ai->isAuthorized("admin") ) { 
+            obj = fromjson("{\"err\":\"unauthorized\"}");
+        }
+        else if( !dbMutexInfo.isLocked() ) 
             obj = fromjson("{\"info\":\"no op in progress/not locked\"}");
         else {
             killCurrentOp = 1;
