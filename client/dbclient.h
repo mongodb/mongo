@@ -240,6 +240,19 @@ namespace mongo {
         bool dropDatabase(const char *dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "dropDatabase");
         }
+        
+        bool dropCollection( const string ns ){
+            assert( ns.find( "." ) != string::npos );
+            int pos = ns.find( "." );
+            
+            string db = ns.substr( 0 , pos );
+            string coll = ns.substr( pos + 1 );
+            
+            BSONObj info;
+            
+            runCommand( db.c_str() , BUILDOBJ( "deleteIndexes" << coll << "index" << "*" ) , info );
+            return runCommand( db.c_str() , BUILDOBJ( "drop" << coll ) , info );
+        }
 
         /* Perform a repair and compaction of the specified database.  May take a long time to run.  Disk space
            must be available equal to the size of the database while repairing.
@@ -247,7 +260,7 @@ namespace mongo {
         bool repairDatabase(const char *dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "repairDatabase");
         }
-
+        
         /* Copy database from one server or name to another server or name.
 
            Generally, you should dropDatabase() first as otherwise the copied information will MERGE
