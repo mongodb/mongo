@@ -546,6 +546,9 @@ namespace mongo {
                           auto_ptr< set<string> > filter, stringstream& ss, int queryOptions)
     {
         Timer t;
+        
+        log(2) << "runQuery: " << ns << jsobj << endl;
+
         int nscanned = 0;
         bool wantMore = true;
         int ntoreturn = _ntoreturn;
