@@ -32,7 +32,7 @@ namespace mongo {
             return def;
         }
 
-        virtual void run() = 0;
+        virtual int run() = 0;
         
     protected:
         string _name;
