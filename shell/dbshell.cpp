@@ -16,6 +16,27 @@ void quitNicely( int sig ){
     exit(0);
 }
 
+string fixHost( string url , string host , string port ){
+    if ( host.size() == 0 && port.size() == 0 )
+        return url;
+    
+    if ( url.find( "/" ) != string::npos ){
+        cerr << "url can't have host or port if you specify them individually" << endl;
+        exit(-1);
+    }
+    
+    if ( host.size() == 0 )
+        host = "127.0.0.1";
+
+    string newurl = host;
+    if ( port.size() > 0 )
+        newurl += ":" + port;
+    
+    newurl += "/" + url;
+    
+    return newurl;
+}
+
 int main(int argc, char* argv[]) {
     signal( SIGINT , quitNicely );
     
@@ -40,7 +61,9 @@ int main(int argc, char* argv[]) {
             return -1;
     }
     
-    const char * host = "test";
+    string url = "test";
+    string dbhost;
+    string port;
     
     string username;
     string password;
@@ -61,6 +84,19 @@ int main(int argc, char* argv[]) {
             nodb = true;
             continue;
         } 
+
+        if ( strcmp( str , "--port" ) == 0 ){
+            port = argv[argNumber+1];
+            argNumber++;
+            continue;
+        }
+
+        if ( strcmp( str , "--host" ) == 0 ){
+            dbhost = argv[argNumber+1];
+            argNumber++;
+            continue;
+        }
+
 
         if ( strcmp( str , "-u" ) == 0 ){
             username = argv[argNumber+1];
@@ -93,6 +129,8 @@ int main(int argc, char* argv[]) {
                 << " --shell run the shell after executing files\n"
                 << " -u <username>\n"
                 << " -p<password> - notice no space\n"
+                << " --host <host> - server to connect to\n"
+                << " --port <port> - port to connect to\n"
                 << " --nodb don't connect to mongod on startup.  No 'db address' arg expected.\n"
                 << "file names: a list of files to run.  will exit after unless --shell is specified\n"
                 ;
@@ -119,7 +157,7 @@ int main(int argc, char* argv[]) {
                 last = str;
             
             if ( ! strstr( last , "." ) ){
-                host = str;
+                url = str;
                 continue;
             }
                 
@@ -130,7 +168,7 @@ int main(int argc, char* argv[]) {
 
     if ( !nodb ) { // init mongo code
         v8::HandleScope handle_scope;
-        string setup = (string)"db = connect( \"" + host + "\")";
+        string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
         if ( ! ExecuteString( v8::String::New( setup.c_str() ) , v8::String::New( "(connect)" ) , false , true ) ){
             cout << "error connecting!" << endl;
             return -1;

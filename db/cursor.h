@@ -20,6 +20,19 @@
 
 namespace mongo {
 
+    /* 0 = ok
+       1 = kill current operation and reset this to 0
+       future: maybe use this as a "going away" thing on process termination with a higher flag value 
+    */
+    extern int killCurrentOp;
+
+    inline void checkForInterrupt() {
+        if( killCurrentOp ) { 
+            killCurrentOp = 0;
+            uasserted("interrupted");
+        }
+    }
+
     /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
        concept and is for the user's cursor.
     */
@@ -128,6 +141,7 @@ namespace mongo {
         }
 
         bool advance() {
+            checkForInterrupt();
             if ( eof() )
                 return false;
             _current();

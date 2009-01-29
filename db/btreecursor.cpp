@@ -180,6 +180,7 @@ namespace mongo {
     }
 
     bool BtreeCursor::advance() {
+        checkForInterrupt();
         if ( bucket.isNull() )
             return false;
         bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");

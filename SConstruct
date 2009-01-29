@@ -6,6 +6,7 @@
 
 import os
 import sys
+import types 
 
 # --- options ----
 AddOption('--prefix',
@@ -77,8 +78,10 @@ allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
 linux64  = False
+darwin = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
+release = not GetOption( "release" ) is None
 
 installDir = "/usr/local"
 nixLibPrefix = "lib"
@@ -93,6 +96,8 @@ def findVersion( root , choices ):
     raise "can't find a version of [" + root + "] choices: " + choices
 
 if "darwin" == os.sys.platform:
+    darwin = True
+
     env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
 
     env.Append( CPPFLAGS=" -mmacosx-version-min=10.4 " )
@@ -131,6 +136,9 @@ elif "linux2" == os.sys.platform:
 
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
+
+    if release:
+        env.Append( LINKFLAGS=" -static " )
 
     nix = True
 
@@ -176,7 +184,7 @@ else:
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-compare -Wno-non-virtual-dtor" )
     env.Append( LINKFLAGS=" -fPIC " )
-    env.Append( LIBS=[ "pcrecpp" , "pcre" , "stdc++" ] )
+    env.Append( LIBS=[ "stdc++" ] )
 
     if force64:
 	env.Append( CFLAGS="-m64" )
@@ -188,12 +196,34 @@ if nix:
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
-    if not GetOption( "release" ) is None:
-        env.Append( LINKFLAGS=" -static " )
 
 # --- check system ---
 
 conf = Configure(env)
+
+def myCheckLib( poss , failIfNotFound=False ):
+    
+    if type( poss ) != types.ListType :
+        poss = [poss]
+
+    if darwin and release and not force64:
+        allPlaces = [];
+        allPlaces += env["LIBPATH"]
+        allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
+        
+        for p in poss:
+            for loc in allPlaces:
+                fullPath = loc + "/lib" + p + ".a"
+                if os.path.exists( fullPath ):
+                    env.Append( LINKFLAGS=" " + fullPath + " " )
+                    return True
+
+    res = conf.CheckLib( poss )
+    if not res and failIfNotFound:
+        print( "can't find " + poss )
+        Exit(1)
+        
+    return res
 
 if not conf.CheckCXXHeader( 'pcrecpp.h' ):
     print( "can't find pcre" )
@@ -205,17 +235,22 @@ if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
 
 for b in boostLibs:
     l = "boost_" + b
-    if not conf.CheckLib( [ l + "-mt" , l ] ):
+    if not myCheckLib( [ l + "-mt" , l ] ):
         print "can't find a required boost library [" + l + "]";
         Exit(1)
 
 for j in javaLibs:
-    if not conf.CheckLib( j ):
+    if not myCheckLib( j ):
         print( "can't find java lib [" + j + "]" )
         Exit(1)
 
+if nix:
+    myCheckLib( "pcrecpp" , True )
+    myCheckLib( "pcre" , True )
+    
+
 # this will add it iff it exists and works
-conf.CheckLib( "boost_system-mt" )
+myCheckLib( "boost_system-mt" )
 
 env = conf.Finish()
 
@@ -319,14 +354,17 @@ env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
 
 env.Alias( "all" , [ "mongod" , "mongo" , "mongodump" , "mongoimport" ] )
 
+clientTests = []
+
 # examples
-clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
-clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
-clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] )
+clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
-clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
+clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 
 # --- shell ---
@@ -353,7 +391,7 @@ if linux64 or force64:
         shellEnv["CPPPATH"].remove( "/usr/64/include" )
         shellEnv["LIBPATH"].remove( "/usr/64/lib" )
         shellEnv.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
-        shellEnv.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
+        shellEnv.Append( LIBPATH=[ "/sw/lib/", "/opt/local/lib"] )
 
     l = shellEnv["LIBS"]
     if linux64:
@@ -376,8 +414,14 @@ else:
 
 #  ---- RUNNING TESTS ----
 
-testEnv.Alias( "smoke", "test", test[ 0 ].abspath )
+def testSetup( env , target , source ):
+    Mkdir( "/tmp/unittest/" )
+
+testEnv.Alias( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
 testEnv.AlwaysBuild( "smoke" )
+
+testEnv.Alias( "smokeClient" , [] , [ x[0].abspath for x in clientTests ] );
+testEnv.AlwaysBuild( "smokeClient" )
 
 #  ----  INSTALL -------
 
@@ -402,7 +446,7 @@ env.Install( installDir + "/include/mongo/client" , "client/model.h" )
 env.InstallAs( target=installDir + "/include/mongo/client" , source="client/dbclient.h" )
 
 #lib
-env.InstallAs( target=installDir + "/" + nixLibPrefix, source="libmongoclient.a" )
+env.Install( installDir + "/" + nixLibPrefix, "libmongoclient.a" )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #final alias

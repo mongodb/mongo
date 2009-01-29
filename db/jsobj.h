@@ -747,6 +747,7 @@ namespace mongo {
             b.append( (char) type );
             b.append( (void *) data, len );
         }
+
         void appendCodeWScope( const char *fieldName, const char *code, const BSONObj &scope ) {
             b.append( (char) CodeWScope );
             b.append( fieldName );
@@ -754,6 +755,10 @@ namespace mongo {
             b.append( ( int ) strlen( code ) + 1 );
             b.append( code );
             b.append( ( void * )scope.objdata(), scope.objsize() );
+        }
+
+        void appendWhere( const char *code, const BSONObj &scope ){
+            appendCodeWScope( "$where" , code , scope );
         }
         
         template < class T >

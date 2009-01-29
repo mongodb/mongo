@@ -31,6 +31,7 @@
 #include "replset.h"
 #include "scanandorder.h"
 #include "security.h"
+#include "curop.h"
 
 namespace mongo {
 
@@ -545,6 +546,9 @@ namespace mongo {
                           auto_ptr< set<string> > filter, stringstream& ss, int queryOptions)
     {
         Timer t;
+        
+        log(2) << "runQuery: " << ns << jsobj << endl;
+
         int nscanned = 0;
         bool wantMore = true;
         int ntoreturn = _ntoreturn;
@@ -553,6 +557,10 @@ namespace mongo {
             wantMore = false;
         }
         ss << "query " << ns << " ntoreturn:" << ntoreturn;
+        {
+            string s = jsobj.toString();
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
+        }
 
         int n = 0;
         BufBuilder b(32768);

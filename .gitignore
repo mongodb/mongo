@@ -45,6 +45,7 @@ libmongotestfiles.*
 # examples
 firstExample
 secondExample
+whereExample
 
 #tests
 test

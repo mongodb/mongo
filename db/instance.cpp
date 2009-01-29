@@ -26,6 +26,8 @@
 #include "instance.h"
 #include "lasterror.h"
 #include "security.h"
+#include "curop.h"
+#include "json.h"
 
 namespace mongo {
 
@@ -67,24 +69,68 @@ namespace mongo {
     bool quiet = false;
     bool cpu = false; // --cpu show cpu time periodically
 
-// Returns false when request includes 'end'
+    /* 0 = ok
+       1 = kill current operation and reset this to 0
+       future: maybe use this as a "going away" thing on process termination with a higher flag value 
+    */
+    int killCurrentOp = 0;
+
+    CurOp currentOp;
+
+    void inProgCmd( Message &m, DbResponse &dbresponse ) {
+        BSONObj obj = currentOp.info();
+        replyToQuery(0, m, dbresponse, obj);
+    }
+
+    void killOp( Message &m, DbResponse &dbresponse ) {
+        BSONObj obj;
+        AuthenticationInfo *ai = authInfo.get();
+        if( ai == 0 || !ai->isAuthorized("admin") ) { 
+            obj = fromjson("{\"err\":\"unauthorized\"}");
+        }
+        else if( !dbMutexInfo.isLocked() ) 
+            obj = fromjson("{\"info\":\"no op in progress/not locked\"}");
+        else {
+            killCurrentOp = 1;
+            obj = fromjson("{\"info\":\"attempting to kill op\"}");
+        }
+        replyToQuery(0, m, dbresponse, obj);
+    }
+
+    // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse ) {
+        // before we lock...
+        if ( m.data->operation() == dbQuery ) {
+            const char *ns = m.data->_data + 4;
+            if( strstr(ns, "$cmd.sys.") ) { 
+                if( strstr(ns, "$cmd.sys.inprog") ) {
+                    inProgCmd(m, dbresponse);
+                    return true;
+                }
+                if( strstr(ns, "$cmd.sys.killop") ) { 
+                    killOp(m, dbresponse);
+                    return true;
+                }
+            }
+        }
+
         dblock lk;
 
         stringstream ss;
         char buf[64];
-        time_t_to_String(time(0), buf);
+        time_t now = time(0);
+        currentOp.reset(now);
+
+        time_t_to_String(now, buf);
         buf[20] = 0; // don't want the year
         ss << buf;
-        //		ss << curTimeMillis() % 10000 << ' ';
 
         Timer t;
         database = 0;
-        curOp = 0;
 
         int ms;
         bool log = false;
-        curOp = m.data->operation();
+        currentOp.op = curOp = m.data->operation();
 
 #if 0
         /* use this if you only want to process operations for a particular namespace.
@@ -99,7 +145,11 @@ namespace mongo {
         }
 #endif
 
-        if ( m.data->operation() == dbMsg ) {
+        if ( m.data->operation() == dbQuery ) {
+            // receivedQuery() does its own authorization processing.
+            receivedQuery(dbresponse, m, ss, true);
+        }
+        else if ( m.data->operation() == dbMsg ) {
             ss << "msg ";
             char *p = m.data->_data;
             int len = strlen(p);
@@ -116,10 +166,6 @@ namespace mongo {
             if ( end )
                 return false;
         }
-        else if ( m.data->operation() == dbQuery ) {
-            // receivedQuery() does its own authorization processing.
-            receivedQuery(dbresponse, m, ss, true);
-        }
         else if ( m.data->operation() == dbGetMore ) {
             // receivedQuery() does its own authorization processing.
             OPREAD;
@@ -131,6 +177,7 @@ namespace mongo {
             const char *ns = m.data->_data + 4;
             char cl[256];
             nsToClient(ns, cl);
+            strncpy(currentOp.ns, ns, Namespace::MaxNsLen);
             AuthenticationInfo *ai = authInfo.get();
             if( !ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
@@ -182,6 +229,7 @@ namespace mongo {
             }
             else {
                 out() << "    operation isn't supported: " << m.data->operation() << endl;
+                currentOp.active = false;
                 assert(false);
             }
         }
@@ -199,6 +247,7 @@ namespace mongo {
             }
         }
 
+        currentOp.active = false;
         return true;
     }
 
@@ -292,6 +341,7 @@ namespace mongo {
             }
 
             setClient(q.ns);
+            strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);
 
             msgdata = runQuery(m, q.ns, q.ntoskip, q.ntoreturn, q.query, q.fields, ss, q.queryOptions);
         }
@@ -312,8 +362,7 @@ namespace mongo {
             b.skip(sizeof(QueryResult));
             b.append((void*) errObj.objdata(), errObj.objsize());
 
-            // todo: call replyToQuery() from here instead of this.  needs a little tweaking
-            // though to do that.
+            // todo: call replyToQuery() from here instead of this!!! see dbmessage.h
             msgdata = (QueryResult *) b.buf();
             b.decouple();
             QueryResult *qr = msgdata;
