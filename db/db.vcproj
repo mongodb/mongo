@@ -577,6 +577,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\curop.h"
+					>
+				</File>
+				<File
 					RelativePath=".\cursor.h"
 					>
 				</File>

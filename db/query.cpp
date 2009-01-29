@@ -31,6 +31,7 @@
 #include "replset.h"
 #include "scanandorder.h"
 #include "security.h"
+#include "curop.h"
 
 namespace mongo {
 
@@ -553,6 +554,10 @@ namespace mongo {
             wantMore = false;
         }
         ss << "query " << ns << " ntoreturn:" << ntoreturn;
+        {
+            string s = jsobj.toString();
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
+        }
 
         int n = 0;
         BufBuilder b(32768);

@@ -445,7 +445,7 @@ env.Install( installDir + "/include/mongo/client" , "client/model.h" )
 env.InstallAs( target=installDir + "/include/mongo/client" , source="client/dbclient.h" )
 
 #lib
-env.InstallAs( target=installDir + "/" + nixLibPrefix, source="libmongoclient.a" )
+env.Install( installDir + "/" + nixLibPrefix, "libmongoclient.a" )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #final alias
