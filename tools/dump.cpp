@@ -84,7 +84,7 @@ public:
         if ( db == "*" ){
             cout << "all dbs" << endl;
 
-            BSONObj res = _conn.findOne( "admin.$cmd" , BUILDOBJ( "listDatabases" << 1 ) );
+            BSONObj res = _conn.findOne( "admin.$cmd" , BSON( "listDatabases" << 1 ) );
             BSONObj dbs = res.getField( "databases" ).embeddedObjectUserCheck();
             set<string> keys;
             dbs.getFieldNames( keys );

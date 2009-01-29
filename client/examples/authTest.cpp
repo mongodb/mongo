@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "mongo/client/dbclient.h"
+#include "client/dbclient.h"
 
 using namespace mongo;
 
@@ -19,7 +19,7 @@ int main() {
         conn.remove( "test.system.users" , emptyObj );
     }
 
-    conn.insert( "test.system.users" , BUILDOBJ( "user" << "eliot" << "pwd" << conn.createPasswordDigest( "bar" ) ) );
+    conn.insert( "test.system.users" , BSON( "user" << "eliot" << "pwd" << conn.createPasswordDigest( "bar" ) ) );
     
     errmsg.clear();
     bool ok = conn.auth( "test" , "eliot" , "bar" , errmsg );

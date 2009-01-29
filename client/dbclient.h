@@ -73,7 +73,33 @@ namespace mongo {
         }
     };
 #pragma pack(pop)
-    
+
+    /** Represents a query */    
+    class Query {
+    public:
+        BSONObj obj;
+        Query(const BSONObj& b) : obj(b) { }
+
+        /** Add a sort (ORDER BY) criteria to the query expression. 
+            @param sortPattern the sort order template.  For example to order by name ascending, time descending:
+              { name : 1, ts : -1 }
+            i.e.
+              BSON( "name" << 1 << "ts" << -1 )
+            or 
+              fromjson(" \"name\" : 1, \"ts\" : -1 ")
+        */
+        Query& sort(const BSONObj& sortPattern);
+
+        /** Add a sort (ORDER BY) criteria to the query expression. 
+            This version of sort() assumes you want to sort on a single field.
+            @asc = 1 for ascending order
+            asc = -1 for descending order
+        */
+        Query& sort(const char *field, int asc = 1) { sort( BSON( field << asc ) ); return *this; }
+    };
+
+#define QUERY(x) Query( BSON(x) )
+
     /**
        interface that handles communication with the db
      */
@@ -161,18 +187,18 @@ namespace mongo {
      */
     class DBClientInterface : boost::noncopyable {
     public:
-        virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+        virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
-        virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+        virtual BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
         virtual void insert( const char * ns, BSONObj obj ) = 0;
         
         virtual void insert( const char * ns, const vector< BSONObj >& v ) = 0;
 
-        virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 ) = 0;
+        virtual void remove( const char * ns , Query query, bool justOne = 0 ) = 0;
 
-        virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 ) = 0;
+        virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 ) = 0;
     };
 
     /**
@@ -250,8 +276,8 @@ namespace mongo {
             
             BSONObj info;
             
-            runCommand( db.c_str() , BUILDOBJ( "deleteIndexes" << coll << "index" << "*" ) , info );
-            return runCommand( db.c_str() , BUILDOBJ( "drop" << coll ) , info );
+            runCommand( db.c_str() , BSON( "deleteIndexes" << coll << "index" << "*" ) , info );
+            return runCommand( db.c_str() , BSON( "drop" << coll ) , info );
         }
 
         /* Perform a repair and compaction of the specified database.  May take a long time to run.  Disk space
@@ -362,14 +388,14 @@ namespace mongo {
          @return    cursor.   0 if error (connection failure)
          @throws AssertionException
         */
-        virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+        virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /**
            @return a single object that matches the query.  if none do, then the object is empty
            @throws AssertionException
         */
-        virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        virtual BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
         
         /**
            insert an object into the database
@@ -385,12 +411,12 @@ namespace mongo {
            remove matching objects from the database
            @param justOne if this true, then once a single match is found will stop
          */
-        virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 );
+        virtual void remove( const char * ns , Query q , bool justOne = 0 );
         
         /**
            updates objects matching query
          */
-        virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 );
+        virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 );
 
         /**
            if name isn't specified, it will be created from the keys (recommended)
@@ -445,7 +471,7 @@ namespace mongo {
 		/* overridden here to implement authCache for retries */
         virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
-        virtual auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+        virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             checkConnection();
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions );
@@ -514,12 +540,12 @@ namespace mongo {
 
         /* throws userassertion "no master found" */
         virtual
-        auto_ptr<DBClientCursor> query(const char *ns, BSONObj query, int nToReturn = 0, int nToSkip = 0,
+        auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                        BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /* throws userassertion "no master found" */
         virtual
-        BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         // Not yet implemented
         virtual void insert( const char * ns , BSONObj obj ) {
@@ -532,12 +558,12 @@ namespace mongo {
         }
 
         // Not yet implemented
-        virtual void remove( const char * ns , BSONObj obj , bool justOne = 0 ) {
+        virtual void remove( const char * ns , Query obj , bool justOne = 0 ) {
             assert( false );
         }
 
         // Not yet implemented
-        virtual void update( const char * ns , BSONObj query , BSONObj obj , bool upsert = 0 ) {
+        virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 ) {
             assert( false );
         }
         
