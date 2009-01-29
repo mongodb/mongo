@@ -31,6 +31,17 @@ namespace mongo {
                 return _params[name.c_str()].as<string>();
             return def;
         }
+        bool hasParam( string name ){
+            return _params.count( name );
+        }
+
+        string getNS(){
+            if ( _coll.size() == 0 ){
+                cerr << "no collection specified!" << endl;
+                throw -1;
+            }
+            return _db + "." + _coll;
+        }
 
         virtual int run() = 0;
         

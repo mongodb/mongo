@@ -38,6 +38,7 @@ mongod
 mongogrid
 mongodump
 mongoimport
+mongoimportjson
 
 #libs
 libmongoclient.*
