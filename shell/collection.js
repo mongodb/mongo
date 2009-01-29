@@ -71,7 +71,7 @@ DBCollection.prototype._massageObject = function( q ){
         if ( q.length == 24 )
             return { _id : q };
         
-        throw "don't know how to handle string [" + q + "]";
+        return { $where : q };
     }
 
     throw "don't know how to massage : " + type;

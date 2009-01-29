@@ -2,7 +2,7 @@
 //
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008 10gen Inc.info
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -146,6 +146,19 @@ namespace mongo {
 #include "security.h"
 
 namespace mongo {
+
+  void sysInfo() { 
+    out() << "sysinfo:\n";
+#if defined(_SC_PAGE_SIZE)
+    out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
+#endif
+#if defined(_SC_PHYS_PAGES)
+    out() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES) << endl;
+#endif
+#if defined(_SC_AVPHYS_PAGES)
+    out() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES) << endl;
+#endif
+  }
 
     /* we create one thread for each connection from an app server database.
        app server will open a pool of threads.
@@ -454,6 +467,10 @@ int main(int argc, char* argv[], char *envp[] )
                 noauth = true;
             else if ( s == "--auth" )
                 noauth = false;
+	    else if( s == "--sysinfo" ) { 
+	      sysInfo();
+	      return 0;
+	    }
             else if ( s == "--verbose" )
                 logLevel = 1;
             else if ( s.find( "-v" ) == 0 ){
@@ -528,6 +545,7 @@ usage:
     out() << " --nojni" << endl;
     out() << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     out() << " --oplogSize <size_in_megabytes>  custom size for replication operation log" << endl;
+    out() << " --sysinfo           print out some diagnostic system information\n";
     out() << "\nReplication:" << endl;
     out() << " --master\n";
     out() << " --slave" << endl;
