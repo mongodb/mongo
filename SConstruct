@@ -344,6 +344,7 @@ Default( env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [
 allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
 env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
 env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
+env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 
 # dbgrid
 env.Program( "mongogrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
@@ -351,8 +352,6 @@ env.Program( "mongogrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
 # c++ library
 env.Library( "mongoclient" , allClientFiles )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
-
-env.Alias( "all" , [ "mongod" , "mongo" , "mongodump" , "mongoimport" ] )
 
 clientTests = []
 
@@ -430,7 +429,7 @@ if GetOption( "prefix" ):
 
 #binaries
 env.Install( installDir + "/bin" , "mongodump" )
-env.Install( installDir + "/bin" , "mongoimport" )
+env.Install( installDir + "/bin" , "mongoimportjson" )
 env.Install( installDir + "/bin" , "mongod" )
 env.Install( installDir + "/bin" , "mongo" )
 

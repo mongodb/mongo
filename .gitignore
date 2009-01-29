@@ -30,6 +30,7 @@ log
 logs
 docs
 32bit
+scratch
 
 # binaryies
 mongo
@@ -37,6 +38,7 @@ mongod
 mongogrid
 mongodump
 mongoimport
+mongoimportjson
 
 #libs
 libmongoclient.*

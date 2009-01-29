@@ -5,6 +5,8 @@
 #include <boost/thread/xtime.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <iostream>
+#include <map>
+#include <sstream>
 
 using namespace std;
 using namespace v8;
@@ -228,6 +230,7 @@ void RecordMyLocation( const char *_argv0 ) { argv0 = _argv0; }
 #include <signal.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 map< int, pid_t > dbs;
 
