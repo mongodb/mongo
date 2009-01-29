@@ -38,8 +38,9 @@ public:
         addPositionArg( "dir" , 1 );
     }
     
-    void run(){
+    int run(){
         drillDown( getParam( "dir" ) );
+        return 0;
     }
     
     void drillDown( path root ) {

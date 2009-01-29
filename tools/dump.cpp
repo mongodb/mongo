@@ -76,7 +76,7 @@ public:
         
     }
 
-    void run(){
+    int run(){
 
         path root( getParam( "out" , "dump" ) );
         string db = _db;
@@ -103,7 +103,7 @@ public:
         else {
             go( db , root / db );
         }
-        
+        return 0;
     }
 };
 

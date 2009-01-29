@@ -60,7 +60,5 @@ int mongo::Tool::main( int argc , char ** argv ){
     if ( _params.count( "collection" ) )
         _coll = _params["collection"].as<string>();
 
-    run();
-
-    return 0;
+    return run();
 }
