@@ -47,6 +47,8 @@ namespace mongo {
         void updateLength( const char *filename, int &length ) const;
 
     private:
+        void created();
+        
         HANDLE fd;
         HANDLE maphandle;
         void *view;
