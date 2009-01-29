@@ -946,7 +946,8 @@ namespace mongo {
                 out() << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
                      tabletoidxns << "\n  ourns:" << ns;
                 out() << "\n  idxobj:" << io.toString() << endl;
-                uassert("bad add index attempt", false);
+                string s = "bad add index attempt " + tabletoidxns + " key:" + key.toString();
+                uasserted(s.c_str());
             }
             tableToIndex = nsdetails(tabletoidxns.c_str());
             if ( tableToIndex == 0 ) {
@@ -961,8 +962,11 @@ namespace mongo {
                 assert( tableToIndex );
             }
             if ( tableToIndex->nIndexes >= MaxIndexes ) {
-                log() << "user warning: bad add index attempt, too many indexes for:" << tabletoidxns << endl;
-                return DiskLoc();
+                stringstream ss;
+                ss << "add index fails, too many indexes for " << tabletoidxns << " key:" << key.toString();
+                string s = ss.str();
+                log() << s << '\n';
+                uasserted(s.c_str());
             }
             if ( tableToIndex->findIndexByName(name) >= 0 ) {
                 //out() << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;

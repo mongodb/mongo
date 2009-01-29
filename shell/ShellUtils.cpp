@@ -175,12 +175,12 @@ bool ExecuteString(Handle<v8::String> source, Handle<v8::Value> name,
 
 Handle<v8::Value> JSSleep(const Arguments& args){
     assert( args.Length() == 1 );
-    assert( args[0]->IsNumber() );
+    assert( args[0]->IsInt32() );
     
 
     boost::xtime xt;
     boost::xtime_get(&xt, boost::TIME_UTC);
-    int sleepMillisecs = args[0]->ToNumber()->Value();
+    int sleepMillisecs = args[0]->ToInt32()->Value();
     xt.sec += ( sleepMillisecs / 1000 );
     xt.nsec += ( sleepMillisecs % 1000 ) * 1000000;
     if ( xt.nsec >= 1000000000 ) {

@@ -27,6 +27,7 @@ namespace mongo {
     
     class Nullstream {
     public:
+      // todo: just use a template for all these
         virtual Nullstream& operator<<(const char *) {
             return *this;
         }
@@ -37,6 +38,9 @@ namespace mongo {
             return *this;
         }
         virtual Nullstream& operator<<(unsigned long) {
+            return *this;
+        }
+        virtual Nullstream& operator<<(long) {
             return *this;
         }
         virtual Nullstream& operator<<(unsigned) {
@@ -81,6 +85,7 @@ namespace mongo {
         Logstream& operator<<(const char *x) LOGIT
         Logstream& operator<<(char x) LOGIT
         Logstream& operator<<(int x) LOGIT
+        Logstream& operator<<(long x) LOGIT
         Logstream& operator<<(unsigned long x) LOGIT
         Logstream& operator<<(unsigned x) LOGIT
         Logstream& operator<<(double x) LOGIT
