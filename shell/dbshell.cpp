@@ -18,6 +18,8 @@ void quitNicely( int sig ){
 
 int main(int argc, char* argv[]) {
     signal( SIGINT , quitNicely );
+    
+    RecordMyLocation( argv[ 0 ] );
 
     //v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
     
@@ -161,6 +163,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
+        MongodScope s;
         if (!ExecuteString(source, file_name, false, true)){
             cout << "error processing: " << file_name << endl;
             return 1;
@@ -173,6 +176,8 @@ int main(int argc, char* argv[]) {
         runShell = true;
 
     if ( runShell ){
+        
+        MongodScope s;
         
         using_history();
         read_history( ".dbshell" );

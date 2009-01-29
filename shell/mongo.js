@@ -57,4 +57,47 @@ connect = function( url , user , pass ){
     return db;
 }
 
+_portAndDbpath = function() {
+    var port = "";
+    var dbpath = "";
+    for( i = 0; i < arguments.length; ++i )
+        if ( arguments[ i ] == "--port" )
+            port = arguments[ i + 1 ];
+        else if ( arguments[ i ] == "--dbpath" )
+            dbpath = arguments[ i + 1 ];
+    
+    if ( port == "" || dbpath == "" )
+        throw "Invalid command line options";
+    
+    return { port: port, dbpath: dbpath };
+}
+
+// Start a mongod instance and return a 'Mongo' object connected to it.
+// This function's arguments are passed as command line arguments to mongod.
+// The specified 'dbpath' is cleared if it exists, created if not.
+startMongod = function() {
+    var dbpath = _portAndDbpath.apply( null, arguments ).dbpath;
+    resetDbpath( dbpath );
+    return startMongodNoReset.apply( null, arguments );
+}
+
+// Same as startDb, but uses existing files in dbpath
+startMongodNoReset = function() {
+    var port = _portAndDbpath.apply( null, arguments ).port;
+    
+    _startMongod.apply( null, arguments );
+    
+    var m;
+    assert.soon
+    ( function() {
+        try {
+            m = new Mongo( "127.0.0.1:" + port );
+            return true;
+        } catch( e ) {
+        }
+        return false;
+    } );
+    
+    return m;
+}
 

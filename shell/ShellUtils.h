@@ -35,3 +35,12 @@ void installShellUtils( v8::Handle<v8::ObjectTemplate>& global );
 std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::Value> & o );
 std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::TryCatch> * try_catch );
 std::string toSTLString( const v8::Handle<v8::Value> & o );
+
+// Scoped management of mongod instances.  Simple implementation: destructor
+// kills all mongod instances created by the shell.
+struct MongodScope {
+    MongodScope() {} // Avoid 'unused variable' warning.
+    ~MongodScope();
+};
+
+void RecordMyLocation( const char *_argv0 );

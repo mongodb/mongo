@@ -177,7 +177,13 @@ v8::Handle<v8::Value> JSSleep(const v8::Arguments& args){
 
     boost::xtime xt;
     boost::xtime_get(&xt, boost::TIME_UTC);
-    xt.nsec += args[0]->ToNumber()->Value() * 1000000;
+    int sleepMillisecs = args[0]->ToNumber()->Value();
+    xt.sec += ( sleepMillisecs / 1000 );
+    xt.nsec += ( sleepMillisecs % 1000 ) * 1000000;
+    if ( xt.nsec >= 1000000000 ) {
+        xt.nsec -= 1000000000;
+        xt.sec++;
+    }
     boost::thread::sleep(xt);
     
     return v8::Undefined();
@@ -187,10 +193,119 @@ void ReportException(v8::TryCatch* try_catch) {
     cout << try_catch << endl;
 }
 
+const char *argv0 = 0;
+void RecordMyLocation( const char *_argv0 ) { argv0 = _argv0; }
+
+#if !defined(_WIN32)
+#include <signal.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+map< int, pid_t > dbs;
+
+char *copyString( const char *original ) {
+    char *ret = reinterpret_cast< char * >( malloc( strlen( original ) + 1 ) );
+    strcpy( ret, original );
+    return ret;
+}
+
+v8::Handle< v8::Value > StartMongod( const v8::Arguments &a ) {
+    assert( argv0 );
+    boost::filesystem::path mongod = ( boost::filesystem::path( argv0 ) ).branch_path() / "mongod";
+    assert( boost::filesystem::exists( mongod ) );
+    
+    int port = -1;
+    char * argv[ a.Length() + 2 ];
+    argv[ 0 ] = copyString( mongod.native_file_string().c_str() );
+    for( int i = 0; i < a.Length(); ++i ) {
+        v8::String::Utf8Value str( a[ i ] );
+        char *s = copyString( *str );
+        if ( string( "--port" ) == s )
+            port = -2;
+        else if ( port == -2 )
+            port = strtol( s, 0, 10 );
+        argv[ 1 + i ] = s;
+    }
+    argv[ a.Length() + 1 ] = 0;
+    
+    assert( port > 0 );
+    assert( dbs.count( port ) == 0 );
+
+    fflush( 0 );
+    pid_t pid = fork();
+    assert( pid != -1 );
+    
+    if ( pid == 0 ) {
+        stringstream ss;
+        ss << "mongod." << port << ".log";
+        string name = ss.str();
+        int d = open( name.c_str(), O_WRONLY | O_APPEND | O_CREAT );
+        assert( d != -1 );
+        assert( fchmod( d, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP ) == 0 );
+        const char *bar = "\n\n--- NEW INSTANCE ---\n\n";
+        write( d, bar, strlen( bar ) );
+        assert( dup2( d, STDOUT_FILENO ) != -1 );
+        assert( dup2( d, STDERR_FILENO ) != -1 );
+        execvp( argv[ 0 ], argv );
+        assert( false );
+    }
+
+    int i = 0;
+    while( argv[ i ] )
+        free( argv[ i++ ] );
+    
+    dbs.insert( make_pair( port, pid ) );
+    return v8::Undefined();
+}
+
+v8::Handle< v8::Value > ResetDbpath( const v8::Arguments &a ) {
+    assert( a.Length() == 1 );
+    v8::String::Utf8Value path( a[ 0 ] );
+    if ( boost::filesystem::exists( *path ) )
+        boost::filesystem::remove_all( *path );
+    boost::filesystem::create_directory( *path );    
+    return v8::Undefined();
+}
+
+void killDb( int port ) {
+    assert( dbs.count( port ) == 1 );
+    pid_t pid = dbs[ port ];
+    kill( pid, SIGTERM );
+    int temp;
+    waitpid( pid, &temp, 0 );
+    dbs.erase( port );
+}
+
+v8::Handle< v8::Value > StopMongod( const v8::Arguments &a ) {
+    assert( a.Length() == 1 );
+    assert( a[ 0 ]->IsInt32() );
+    int port = a[ 0 ]->ToInt32()->Value();
+    killDb( port );
+    return v8::Undefined();
+}
+
+MongodScope::~MongodScope() {
+    try {
+        for( map< int, pid_t >::iterator i = dbs.begin(); i != dbs.end(); ++i )
+            killDb( i->first );
+    } catch ( ... ) {
+        assert( false );
+    }
+}
+
+#else
+MongodScope::~MongodScope() {}
+#endif
+
 void installShellUtils( v8::Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("sleep"), v8::FunctionTemplate::New(JSSleep));
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
     global->Set(v8::String::New("load"), v8::FunctionTemplate::New(Load));
     global->Set(v8::String::New("quit"), v8::FunctionTemplate::New(Quit));
     global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
+#if !defined(_WIN32)
+    global->Set(v8::String::New("_startMongod"), v8::FunctionTemplate::New(StartMongod));
+    global->Set(v8::String::New("stopMongod"), v8::FunctionTemplate::New(StopMongod));
+    global->Set(v8::String::New("resetDbpath"), v8::FunctionTemplate::New(ResetDbpath));
+#endif
 }

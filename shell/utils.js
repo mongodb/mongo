@@ -13,6 +13,18 @@ assert.eq = function( a , b , msg ){
     throw "[" + a + "] != [" + b + "] are not equal : " + msg;
 }
 
+assert.soon = function( f ) {
+    var start = new Date();
+    var last;
+    while( 1 ) {
+        if ( f() )
+            return;
+        if ( ( new Date() ).getTime() - start.getTime() > 10000 )
+            throw "assert.soon failed: " + f;
+        sleep( 200 );
+    }
+}
+
 Object.extend = function( dst , src ){
     for ( var k in src ){
         dst[k] = src[k];

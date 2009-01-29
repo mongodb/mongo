@@ -38,7 +38,7 @@ void installMongoGlobals( Handle<ObjectTemplate>& global ){
 
 Handle<Value> mongoInject(const Arguments& args){
     jsassert( args.Length() == 1 , "mongoInject takes exactly 1 argument" );
-    jsassert( args[0]->IsObject() , "mongoInject needs to be massed a prototype" );
+    jsassert( args[0]->IsObject() , "mongoInject needs to be passed a prototype" );
 
     Local<v8::Object> o = args[0]->ToObject();
     
@@ -72,8 +72,7 @@ Handle<Value> mongoInit(const Arguments& args){
 
     string errmsg;
     if ( ! conn->connect( host , errmsg ) ){
-        cout << "couldn't connect: " << errmsg << endl;
-        jsassert( 0 , errmsg );
+        return v8::ThrowException( v8::String::New( "couldn't connect" ) );
     }
 
     args.This()->Set( CONN_STRING , External::New( conn ) );
