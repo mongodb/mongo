@@ -27,19 +27,9 @@
 
 #include <boost/program_options.hpp>
 
-#ifdef MODERN_BOOST
-#include <boost/iostreams/copy.hpp>
-#include <boost/iostreams/filtering_streambuf.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
-
-using namespace boost::iostreams;
-#endif
-
 using namespace mongo;
 
-
 namespace po = boost::program_options;
-
 
 class ImportJSON : public Tool {
 public:
@@ -58,18 +48,14 @@ public:
             return -1;
 
         }
+        
+        istream * in = &cin;
 
         ifstream file( filename.c_str() , ios_base::in | ios_base::binary);
-        
-#ifdef MODERN_BOOST
-        
-        filtering_streambuf<input> in;
-        in.push(gzip_decompressor());
-        in.push(file);
-        boost::iostreams::copy(in, cout);
-#else
-        istream & in = file;
-#endif
+            
+        if ( filename != "-" ){
+            in = &file;
+        }
         
         string ns = getNS();
 
@@ -78,20 +64,34 @@ public:
             _conn.dropCollection( ns.c_str() );
         }
         
-        while ( in ){
-            string line;
-            getline( in , line );
-            
-            if ( line.size() == 0 )
+        int num = 0;
+
+        time_t start = time(0);
+        
+        const int BUF_SIZE = 64000;
+        char line[64000 + 128];
+        while ( *in ){
+            in->getline( line , BUF_SIZE );
+
+            int len = strlen( line );
+            if ( ! len )
                 break;
             
+            assert( len < BUF_SIZE );
+                
+
             try {
                 BSONObj o = fromjson( line );
                 _conn.insert( ns.c_str() , o );
             }
             catch ( MsgAssertionException ma ){
                 cout << "exception:" << ma.toString() << endl;
-                cout << line << endl;
+                //cout << line << endl;
+            }
+            
+            if ( ++num % 10000 == 0 ){
+                cout << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
+                
             }
         }
         
