@@ -175,6 +175,9 @@ namespace mongo {
         bool haveMoreDbsToSync() const {
             return !addDbNextPass.empty();
         }
+        
+        // Trigger a resync, at user's request.
+        void userResync();
     };
 
     /* Write operation to the log (local.oplog.$main)

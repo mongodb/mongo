@@ -192,6 +192,34 @@ namespace mongo {
         }
     } cmdReplacePeer;
 
+    class CmdResync : public Command {
+    public:
+        virtual bool slaveOk() {
+            return true;
+        }
+        virtual bool adminOnly() {
+            return true;
+        }
+        virtual bool logTheOp() {
+            return false;
+        }
+        CmdResync() : Command("resync") { }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if ( !allDead ) {
+                errmsg = "not dead, no need to resync";
+                return false;
+            }
+            vector<ReplSource*> sources;
+            ReplSource::loadAll(sources);
+            for( vector< ReplSource * >::iterator i = sources.begin(); i != sources.end(); ++i ) {
+                (*i)->userResync();
+            }
+            allDead = 0;
+            result.append( "info", "triggered resync for all sources" );
+            return true;
+        }        
+    } cmdResync;
+    
     class CmdIsMaster : public Command {
     public:
         virtual bool requiresAuth() { return false; }
@@ -529,6 +557,18 @@ namespace mongo {
 
     BSONObj opTimeQuery = fromjson("{\"getoptime\":1}");
 
+    void ReplSource::userResync() {
+        for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+            log() << "user resync: dropping database " << *i << endl;
+            string dummyns = *i + ".";
+            setClientTempNs( dummyns.c_str() );
+            assert( database->name == *i );
+            dropDatabase( dummyns.c_str() );
+        }
+        dbs.clear();
+        syncedTo = OpTime();
+    }
+    
     bool ReplSource::resync(string db) {
         {
             log() << "resync: dropping database " << db << endl;
