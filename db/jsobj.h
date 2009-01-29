@@ -507,7 +507,7 @@ namespace mongo {
         }
 
 		/** @return true if field exists in the object */
-        bool hasElement(const char *name);
+        bool hasElement(const char *name) const;
 
 		/** get the _id field from the object.  assumes _id is the first 
 			element of the object -- this is done for performance.  drivers should 
@@ -603,7 +603,11 @@ namespace mongo {
 
     typedef set< BSONObj, BSONObjCmpDefaultOrder > BSONObjSetDefaultOrder;
 
-#define BUILDOBJ(x) ( BSONObjBuilder() << x ).doneAndDecouple()
+/** Use BSON macro to build a BSONObj from a stream 
+    e.g., 
+       BSON( "name" << "joe" << "age" << 33 )
+*/
+#define BSON(x) (( BSONObjBuilder() << x ).doneAndDecouple())
 
     class BSONObjBuilderValueStream {
     public:
@@ -952,7 +956,7 @@ namespace mongo {
         return b.doneAndDecouple();
     }
 
-    inline bool BSONObj::hasElement(const char *name) {
+    inline bool BSONObj::hasElement(const char *name) const {
         if ( !isEmpty() ) {
             BSONObjIterator it(*this);
             while ( it.more() ) {

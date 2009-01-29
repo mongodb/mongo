@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-#include "mongo/client/dbclient.h"
+#include "client/dbclient.h"
 
 void insert( mongo::DBClientConnection & conn , const char * name , int num ) {
     mongo::BSONObjBuilder obj;

@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-#include "mongo/client/dbclient.h"
+#include "client/dbclient.h"
 
 using namespace std;
 using namespace mongo;
@@ -102,8 +102,8 @@ int main() {
     }
 
     { // ensure index
-        assert( conn.ensureIndex( ns , BUILDOBJ( "name" << 1 ) ) );
-        assert( ! conn.ensureIndex( ns , BUILDOBJ( "name" << 1 ) ) );
+        assert( conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
+        assert( ! conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
     }
 
     cout << "client test finished!" << endl;

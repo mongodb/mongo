@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "mongo/client/dbclient.h"
+#include "client/dbclient.h"
 
 using namespace std;
 using namespace mongo;
@@ -20,8 +20,8 @@ int main() {
 
     conn.remove( ns , emptyObj );
 
-    conn.insert( ns , BUILDOBJ( "name" << "eliot" << "num" << 17 ) );
-    conn.insert( ns , BUILDOBJ( "name" << "sara" << "num" << 24 ) );
+    conn.insert( ns , BSON( "name" << "eliot" << "num" << 17 ) );
+    conn.insert( ns , BSON( "name" << "sara" << "num" << 24 ) );
     
     auto_ptr<DBClientCursor> cursor = conn.query( ns , emptyObj );
     
@@ -34,7 +34,7 @@ int main() {
 
     BSONObjBuilder query;
 
-    query.appendWhere( "this.name == name" , BUILDOBJ( "name" << "sara" ) );
+    query.appendWhere( "this.name == name" , BSON( "name" << "sara" ) );
 
     cursor = conn.query( ns , query.done() );
 
