@@ -354,14 +354,16 @@ env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
 
 env.Alias( "all" , [ "mongod" , "mongo" , "mongodump" , "mongoimport" ] )
 
+clientTests = []
+
 # examples
-clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] )
-clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] )
-clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] )
+clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
-clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] )
+clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 
 # --- shell ---
@@ -411,8 +413,14 @@ else:
 
 #  ---- RUNNING TESTS ----
 
-testEnv.Alias( "smoke", "test", test[ 0 ].abspath )
+def testSetup( env , target , source ):
+    Mkdir( "/tmp/unittest/" )
+
+testEnv.Alias( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
 testEnv.AlwaysBuild( "smoke" )
+
+testEnv.Alias( "smokeClient" , [] , [ x[0].abspath for x in clientTests ] );
+testEnv.AlwaysBuild( "smokeClient" )
 
 #  ----  INSTALL -------
 

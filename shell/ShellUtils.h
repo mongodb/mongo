@@ -18,6 +18,7 @@ bool ExecuteString(v8::Handle<v8::String> source,
 
 v8::Handle<v8::Value> Print(const v8::Arguments& args);
 v8::Handle<v8::Value> Load(const v8::Arguments& args);
+v8::Handle<v8::Value> ListFiles(const v8::Arguments& args);
 v8::Handle<v8::Value> Quit(const v8::Arguments& args);
 v8::Handle<v8::Value> Version(const v8::Arguments& args);
 v8::Handle<v8::Value> JSSleep(const v8::Arguments& args);
