@@ -137,8 +137,8 @@ elif "linux2" == os.sys.platform:
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
 
-    if release:
-        env.Append( LINKFLAGS=" -static " )
+    #if release:
+    #    env.Append( LINKFLAGS=" -static " )
 
     nix = True
 
