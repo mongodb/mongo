@@ -9,10 +9,10 @@
 using namespace std;
 using namespace v8;
 
-v8::Handle<v8::Value> Print(const v8::Arguments& args) {
+Handle<v8::Value> Print(const Arguments& args) {
     bool first = true;
     for (int i = 0; i < args.Length(); i++) {
-        v8::HandleScope handle_scope;
+        HandleScope handle_scope;
         if (first) {
             first = false;
         } else {
@@ -25,23 +25,23 @@ v8::Handle<v8::Value> Print(const v8::Arguments& args) {
     return v8::Undefined();
 }
 
-std::string toSTLString( const v8::Handle<v8::Value> & o ){
+std::string toSTLString( const Handle<v8::Value> & o ){
     v8::String::Utf8Value str(o);    
     const char * foo = *str;
     std::string s(foo);
     return s;
 }
 
-std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::Value> & o ){
+std::ostream& operator<<( std::ostream &s, const Handle<v8::Value> & o ){
     v8::String::Utf8Value str(o);    
     s << *str;
     return s;
 }
 
 std::ostream& operator<<( std::ostream &s, const v8::TryCatch * try_catch ){
-    v8::HandleScope handle_scope;
+    HandleScope handle_scope;
     v8::String::Utf8Value exception(try_catch->Exception());
-    v8::Handle<v8::Message> message = try_catch->Message();
+    Handle<v8::Message> message = try_catch->Message();
     
     if (message.IsEmpty()) {
         s << *exception << endl;
@@ -72,11 +72,11 @@ std::ostream& operator<<( std::ostream &s, const v8::TryCatch * try_catch ){
     return s;
 }
 
-v8::Handle<v8::Value> Load(const v8::Arguments& args) {
+Handle<v8::Value> Load(const Arguments& args) {
     for (int i = 0; i < args.Length(); i++) {
-        v8::HandleScope handle_scope;
+        HandleScope handle_scope;
         v8::String::Utf8Value file(args[i]);
-        v8::Handle<v8::String> source = ReadFile(*file);
+        Handle<v8::String> source = ReadFile(*file);
         if (source.IsEmpty()) {
             return v8::ThrowException(v8::String::New("Error loading file"));
         }
@@ -88,7 +88,7 @@ v8::Handle<v8::Value> Load(const v8::Arguments& args) {
 }
 
 
-v8::Handle<v8::Value> Quit(const v8::Arguments& args) {
+Handle<v8::Value> Quit(const Arguments& args) {
     // If not arguments are given args[0] will yield undefined which
     // converts to the integer value 0.
     int exit_code = args[0]->Int32Value();
@@ -97,11 +97,11 @@ v8::Handle<v8::Value> Quit(const v8::Arguments& args) {
 }
 
 
-v8::Handle<v8::Value> Version(const v8::Arguments& args) {
+Handle<v8::Value> Version(const Arguments& args) {
     return v8::String::New(v8::V8::GetVersion());
 }
 
-v8::Handle<v8::String> ReadFile(const char* name) {
+Handle<v8::String> ReadFile(const char* name) {
 
     boost::filesystem::path p(name);
     if ( is_directory( p ) ){
@@ -110,7 +110,7 @@ v8::Handle<v8::String> ReadFile(const char* name) {
     }
                     
     FILE* file = fopen(name, "rb");
-    if (file == NULL) return v8::Handle<v8::String>();
+    if (file == NULL) return Handle<v8::String>();
 
     fseek(file, 0, SEEK_END);
     int size = ftell(file);
@@ -123,26 +123,26 @@ v8::Handle<v8::String> ReadFile(const char* name) {
         i += read;
     }
     fclose(file);
-    v8::Handle<v8::String> result = v8::String::New(chars, size);
+    Handle<v8::String> result = v8::String::New(chars, size);
     delete[] chars;
     return result;
 }
 
 
-bool ExecuteString(v8::Handle<v8::String> source, v8::Handle<v8::Value> name,
+bool ExecuteString(Handle<v8::String> source, Handle<v8::Value> name,
                    bool print_result, bool report_exceptions ){
 
-    v8::HandleScope handle_scope;
+    HandleScope handle_scope;
     v8::TryCatch try_catch;
     
-    v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
+    Handle<v8::Script> script = v8::Script::Compile(source, name);
     if (script.IsEmpty()) {
         if (report_exceptions)
             ReportException(&try_catch);
         return false;
     } 
     
-    v8::Handle<v8::Value> result = script->Run();
+    Handle<v8::Value> result = script->Run();
     if ( result.IsEmpty() ){
         if (report_exceptions)
             ReportException(&try_catch);
@@ -158,7 +158,7 @@ bool ExecuteString(v8::Handle<v8::String> source, v8::Handle<v8::Value> name,
 
         if ( shellPrint->IsFunction() ){
             v8::Function * f = (v8::Function*)(*shellPrint);
-            v8::Handle<v8::Value> argv[1];
+            Handle<v8::Value> argv[1];
             argv[0] = result;
             f->Call( global , 1 , argv );
         }
@@ -170,7 +170,7 @@ bool ExecuteString(v8::Handle<v8::String> source, v8::Handle<v8::Value> name,
     return true;
 }
 
-v8::Handle<v8::Value> JSSleep(const v8::Arguments& args){
+Handle<v8::Value> JSSleep(const Arguments& args){
     assert( args.Length() == 1 );
     assert( args[0]->IsNumber() );
     
@@ -187,7 +187,7 @@ void ReportException(v8::TryCatch* try_catch) {
     cout << try_catch << endl;
 }
 
-void installShellUtils( v8::Handle<v8::ObjectTemplate>& global ){
+void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("sleep"), v8::FunctionTemplate::New(JSSleep));
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
     global->Set(v8::String::New("load"), v8::FunctionTemplate::New(Load));
