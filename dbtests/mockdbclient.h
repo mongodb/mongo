@@ -25,7 +25,7 @@ class MockDBClientConnection : public DBClientConnection {
 public:
     MockDBClientConnection() : connect_() {}
     virtual
-    BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+    BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
         return one_;
     }
     virtual
@@ -61,11 +61,11 @@ public:
             rp_( rp ),
             cc_( cc ) {
     }
-    virtual BSONObj findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+    virtual BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
         if ( cc_ ) cc_->beforeCommand();
         SetGlobalReplPair s( rp_ );
         BSONObjBuilder result;
-        result.append( "ok", runCommandAgainstRegistered( "admin.$cmd", query, result ) ? 1.0 : 0.0 );
+        result.append( "ok", runCommandAgainstRegistered( "admin.$cmd", query.obj, result ) ? 1.0 : 0.0 );
         if ( cc_ ) cc_->afterCommand();
         return result.doneAndDecouple();
     }
