@@ -45,3 +45,4 @@ struct MongodScope {
 };
 
 void RecordMyLocation( const char *_argv0 );
+void KillMongodbInstances();

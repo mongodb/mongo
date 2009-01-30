@@ -315,10 +315,14 @@ v8::Handle< v8::Value > StopMongod( const v8::Arguments &a ) {
     return v8::Undefined();
 }
 
+void KillMongodbInstances() {
+    for( map< int, pid_t >::iterator i = dbs.begin(); i != dbs.end(); ++i )
+        killDb( i->first );    
+}
+
 MongodScope::~MongodScope() {
     try {
-        for( map< int, pid_t >::iterator i = dbs.begin(); i != dbs.end(); ++i )
-            killDb( i->first );
+        KillMongodbInstances();
     } catch ( ... ) {
         assert( false );
     }

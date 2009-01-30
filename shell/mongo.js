@@ -1,5 +1,6 @@
 // mongo.js
 
+// NOTE 'Mongo' may be defined here or in MongoJS.cpp.  Add code to init, not to this constructor.
 if ( typeof Mongo == "undefined" ){
     Mongo = function( host ){
         this.init( host );
@@ -12,6 +13,10 @@ Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented
 Mongo.prototype.update = function( ns , query , obj ){ throw "update not implemented;" }
 
 mongoInject( Mongo.prototype );
+
+Mongo.prototype.setSlaveOk = function() {
+    this.slaveOk = true;
+}
 
 Mongo.prototype.getDB = function( name ){
     return new DB( this , name );

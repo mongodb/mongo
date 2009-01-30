@@ -42,6 +42,7 @@ namespace mongo {
     protected:
         string parseURL( const char * buf );
         string parseMethod( const char * headers );
+        string getHeader( const char * headers , string name );
         void parseParams( map<string,string> & params , string query );
         static const char *body( const char *buf );
 

@@ -35,7 +35,7 @@ DB.prototype.addUser = function( username , pass ){
     var c = this.getCollection( "system.users" );
     
     var u = c.findOne( { user : username } ) || { user : username };
-    u.pwd = hex_md5( "mongo" + pass );
+    u.pwd = hex_md5( username + ":mongo:" + pass );
     print( tojson( u ) );
 
     c.save( u );
@@ -49,7 +49,7 @@ DB.prototype.auth = function( username , pass ){
             authenticate : 1 , 
             user : username , 
             nonce : n.nonce , 
-            key : hex_md5( n.nonce + username + hex_md5( "mongo" + pass ) )
+            key : hex_md5( n.nonce + username + hex_md5( username + ":mongo:" + pass ) )
         }
     );
 
