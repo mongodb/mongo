@@ -136,6 +136,10 @@ if "darwin" == os.sys.platform:
         env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
 
 elif "linux2" == os.sys.platform:
+    
+    if ! os.path.exists( javaHome ):
+        #fedora standarm jvm location
+        javaHome = "/usr/lib/jvm/java/"
 
     env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/linux"] )
     
