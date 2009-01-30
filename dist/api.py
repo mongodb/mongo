@@ -200,10 +200,9 @@ def func_connect_api(handle, method, flags, args, f):
 	f.write('\t')
 	if rettype == 'int':
 		f.write('return (')
-	f.write('__wt_toc_sched(')
-	if not handle == "env":
-		f.write(handle + '->')
-	f.write('env, ' + handle + '->toc)')
+	else:
+		f.write('(void)')
+	f.write('__wt_toc_sched(' + handle + '->toc)')
 	if rettype == 'int':
 		f.write(')')
 	f.write(';\n')

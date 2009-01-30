@@ -36,7 +36,7 @@ wt_toc_create(WT_TOC **tocp, u_int32_t flags)
 	*tocp = toc;
 	return (0);
 
-err:	__wt_toc_destroy(toc, 0);
+err:	(void)__wt_toc_destroy(toc, 0);
 	return (ret);
 }
 
@@ -59,7 +59,7 @@ __wt_toc_destroy(WT_TOC *toc, u_int32_t flags)
  *	Schedule an operation.
  */
 int
-__wt_toc_sched(ENV *env, WT_TOC *toc)
+__wt_toc_sched(WT_TOC *toc)
 {
 	WT_TOC **q;
 
@@ -80,7 +80,7 @@ __wt_toc_sched(ENV *env, WT_TOC *toc)
 	*q = toc;
 	WT_FLUSH_MEMORY;
 
-	__wt_lock(toc->mtx);
+	(void)__wt_lock(toc->mtx);
 
 	return (toc->ret);
 }

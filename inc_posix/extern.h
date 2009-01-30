@@ -74,7 +74,7 @@ __wt_bt_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp);
 int
 __wt_toc_destroy(WT_TOC *toc, u_int32_t flags);
 int
-__wt_toc_sched(ENV *env, WT_TOC *toc);
+__wt_toc_sched(WT_TOC *toc);
 int
 __wt_db_close(wt_args_db_close *argp);
 void
@@ -128,6 +128,8 @@ int
 __wt_env_set_verbose_verify(wt_args_env_set_verbose *argp);
 int
 __wt_build_verify(void);
+int
+__wt_global_init(void);
 int
 __wt_breakpoint(void);
 int

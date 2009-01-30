@@ -20,7 +20,7 @@ static int __wt_api_db_bulk_load(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_close(
@@ -38,7 +38,7 @@ static int __wt_api_db_close(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_destroy(
@@ -56,7 +56,7 @@ static int __wt_api_db_destroy(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_dump(
@@ -77,7 +77,7 @@ static int __wt_api_db_dump(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_get(
@@ -104,7 +104,7 @@ static int __wt_api_db_get(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static void __wt_api_db_get_btree_compare(
@@ -122,7 +122,7 @@ static void __wt_api_db_get_btree_compare(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static void __wt_api_db_get_btree_compare_int(
@@ -140,7 +140,7 @@ static void __wt_api_db_get_btree_compare_int(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static void __wt_api_db_get_btree_dup_compare(
@@ -158,7 +158,7 @@ static void __wt_api_db_get_btree_dup_compare(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static void __wt_api_db_get_btree_dup_offpage(
@@ -176,7 +176,7 @@ static void __wt_api_db_get_btree_dup_offpage(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static void __wt_api_db_get_btree_itemsize(
@@ -197,7 +197,7 @@ static void __wt_api_db_get_btree_itemsize(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static void __wt_api_db_get_btree_pagesize(
@@ -224,7 +224,7 @@ static void __wt_api_db_get_btree_pagesize(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static void __wt_api_db_get_errcall(
@@ -242,7 +242,7 @@ static void __wt_api_db_get_errcall(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static void __wt_api_db_get_errfile(
@@ -260,7 +260,7 @@ static void __wt_api_db_get_errfile(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static void __wt_api_db_get_errpfx(
@@ -278,7 +278,7 @@ static void __wt_api_db_get_errpfx(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	__wt_toc_sched(db->env, db->toc);
+	(void)__wt_toc_sched(db->toc);
 }
 
 static int __wt_api_db_open(
@@ -302,7 +302,7 @@ static int __wt_api_db_open(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_btree_compare(
@@ -320,7 +320,7 @@ static int __wt_api_db_set_btree_compare(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_btree_compare_int(
@@ -338,7 +338,7 @@ static int __wt_api_db_set_btree_compare_int(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_btree_dup_compare(
@@ -356,7 +356,7 @@ static int __wt_api_db_set_btree_dup_compare(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_btree_dup_offpage(
@@ -374,7 +374,7 @@ static int __wt_api_db_set_btree_dup_offpage(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_btree_itemsize(
@@ -395,7 +395,7 @@ static int __wt_api_db_set_btree_itemsize(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_btree_pagesize(
@@ -422,7 +422,7 @@ static int __wt_api_db_set_btree_pagesize(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_errcall(
@@ -440,7 +440,7 @@ static int __wt_api_db_set_errcall(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_errfile(
@@ -458,7 +458,7 @@ static int __wt_api_db_set_errfile(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_set_errpfx(
@@ -476,7 +476,7 @@ static int __wt_api_db_set_errpfx(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_stat_clear(
@@ -494,7 +494,7 @@ static int __wt_api_db_stat_clear(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_stat_print(
@@ -515,7 +515,7 @@ static int __wt_api_db_stat_print(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_sync(
@@ -533,7 +533,7 @@ static int __wt_api_db_sync(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_db_verify(
@@ -551,7 +551,7 @@ static int __wt_api_db_verify(
 	db->toc->argp = &args;
 	db->toc->env = db->env;
 
-	return (__wt_toc_sched(db->env, db->toc));
+	return (__wt_toc_sched(db->toc));
 }
 
 static int __wt_api_env_close(
@@ -569,7 +569,7 @@ static int __wt_api_env_close(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static int __wt_api_env_destroy(
@@ -587,7 +587,7 @@ static int __wt_api_env_destroy(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static void __wt_api_env_get_cachesize(
@@ -605,7 +605,7 @@ static void __wt_api_env_get_cachesize(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	__wt_toc_sched(env, env->toc);
+	(void)__wt_toc_sched(env->toc);
 }
 
 static void __wt_api_env_get_errcall(
@@ -623,7 +623,7 @@ static void __wt_api_env_get_errcall(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	__wt_toc_sched(env, env->toc);
+	(void)__wt_toc_sched(env->toc);
 }
 
 static void __wt_api_env_get_errfile(
@@ -641,7 +641,7 @@ static void __wt_api_env_get_errfile(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	__wt_toc_sched(env, env->toc);
+	(void)__wt_toc_sched(env->toc);
 }
 
 static void __wt_api_env_get_errpfx(
@@ -659,7 +659,7 @@ static void __wt_api_env_get_errpfx(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	__wt_toc_sched(env, env->toc);
+	(void)__wt_toc_sched(env->toc);
 }
 
 static void __wt_api_env_get_verbose(
@@ -677,7 +677,7 @@ static void __wt_api_env_get_verbose(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	__wt_toc_sched(env, env->toc);
+	(void)__wt_toc_sched(env->toc);
 }
 
 static int __wt_api_env_open(
@@ -701,7 +701,7 @@ static int __wt_api_env_open(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static int __wt_api_env_set_cachesize(
@@ -719,7 +719,7 @@ static int __wt_api_env_set_cachesize(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static int __wt_api_env_set_errcall(
@@ -737,7 +737,7 @@ static int __wt_api_env_set_errcall(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static int __wt_api_env_set_errfile(
@@ -755,7 +755,7 @@ static int __wt_api_env_set_errfile(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static int __wt_api_env_set_errpfx(
@@ -773,7 +773,7 @@ static int __wt_api_env_set_errpfx(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static int __wt_api_env_set_verbose(
@@ -791,7 +791,7 @@ static int __wt_api_env_set_verbose(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static int __wt_api_env_stat_clear(
@@ -809,7 +809,7 @@ static int __wt_api_env_stat_clear(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static int __wt_api_env_stat_print(
@@ -830,7 +830,7 @@ static int __wt_api_env_stat_print(
 	env->toc->argp = &args;
 	env->toc->env = env;
 
-	return (__wt_toc_sched(env, env->toc));
+	return (__wt_toc_sched(env->toc));
 }
 
 static void __wt_db_get_btree_compare(

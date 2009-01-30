@@ -17,7 +17,6 @@ void
 __wt_sleep(long seconds, long micro_seconds)
 {
 	struct timeval t;
-	int ret;
 
 	t.tv_sec = (long)seconds;
 	t.tv_usec = (long)micro_seconds;
