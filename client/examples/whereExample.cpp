@@ -32,11 +32,9 @@ int main() {
 
     cout << "now using $where" << endl;
 
-    BSONObjBuilder query;
+    Query q = Query("{}").where("this.name == name" , BSON( "name" << "sara" ));
 
-    query.appendWhere( "this.name == name" , BSON( "name" << "sara" ) );
-
-    cursor = conn.query( ns , query.done() );
+    cursor = conn.query( ns , q );
 
     int num = 0;
     while ( cursor->more() ) {
