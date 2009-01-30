@@ -19,8 +19,9 @@ static int __wt_bt_promote(DB *, WT_PAGE *, WT_ITEM_OFFP *);
  *	Db.bulk_load method.
  */
 int
-__wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
+__wt_db_bulk_load(wt_args_db_bulk_load *argp)
 {
+	wt_args_db_bulk_load_unpack;
 	DBT *key, *data, *lastkey, lastkey_std, lastkey_ovfl;
 	ENV *env;
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;

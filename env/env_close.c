@@ -14,8 +14,9 @@
  *	Close an Env handle.
  */
 int
-__wt_env_close(ENV *env, u_int32_t flags)
+__wt_env_close(wt_args_env_close *argp)
 {
+	wt_args_env_close_unpack;
 	int ret, tret;
 
 	ret = 0;

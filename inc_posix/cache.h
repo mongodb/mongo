@@ -26,6 +26,7 @@ extern "C" {
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,20 +55,23 @@ struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 #include "bitstring.h"
 
 #include "misc.h"			/* Internal */
+#include "mutex.h"
 #include "fh.h"
 #include "global.h"
 #include "btree.h"
+#include "connect.h"
 #include "stat.h"
 
 /*******************************************
  * Database handle information that doesn't persist.
  *******************************************/
 struct __idb {
+	WT_TOC *toc;			/* Enclosing thread of control */
 	DB *db;				/* Public object */
 
 	DBT	  key, data;		/* Returned key/data pairs */
 
-	char	 *file_name;		/* Database file name */
+	char	 *dbname;		/* Database name */
 	mode_t	  mode;			/* Database file create mode */
 
 	u_int32_t file_id;		/* In-memory file id */
@@ -94,6 +98,7 @@ struct __idbc {
  * Environment handle information that doesn't persist.
  *******************************************/
 struct __ienv {
+	WT_TOC *toc;			/* Enclosing thread of control */
 	ENV *env;			/* Public object */
 
 	/*

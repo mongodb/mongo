@@ -8,7 +8,13 @@
 #	<tab>	Flag
 
 #############################################
-# Environment handles, methods and functions
+# Threads-of-control.
+#############################################
+wt_toc
+	RUNNING				# Thread of control is running
+
+#############################################
+# Environments.
 #############################################
 Env					# Public handle
 
@@ -29,7 +35,7 @@ Env.verbose
 	VERB_FILEOPS			# Verbose, major file operations
 	VERB_FILEOPS_ALL		# Verbose, all file operations
 #############################################
-# DB handles, methods and functions
+# Databases.
 #############################################
 Db					# Public handle
 	MAXKEY_NOTSET			# Application never set a maxkey size

@@ -14,8 +14,10 @@
  *	Flush a database to the backing file.
  */
 int
-__wt_db_sync(DB *db, u_int32_t flags)
+__wt_db_sync(wt_args_db_sync *argp)
 {
+	wt_args_db_sync_unpack;
+
 	DB_FLAG_CHK(db, "Db.sync", flags, WT_APIMASK_DB_SYNC);
 
 	return (__wt_cache_db_sync(db));

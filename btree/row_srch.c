@@ -16,8 +16,9 @@ static int __wt_bt_search(DB *, DBT *, WT_PAGE **, WT_INDX **);
  *	Db.get method.
  */
 int
-__wt_db_get(DB *db, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
+__wt_db_get(wt_args_db_get *argp)
 {
+	wt_args_db_get_unpack;
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;

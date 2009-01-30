@@ -10,17 +10,23 @@
 #include "wt_internal.h"
 
 WT_GLOBALS __wt_globals = {
-	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=",	/* sep */
-	{ 0 },							/* err_buf */
-	0							/* file_id */
+	0,						/* running */
+	0,						/* tid */
+	{ },						/* mtx */
+	0,						/* file_id */
+	NULL,						/* workq */
+	0,						/* workq_entries */
+	0,						/* workq_next */
+	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=",	/* sep */
+	{ },						/* err_buf */
 };
 
 /*
- * __wt_env_build_verify --
+ * __wt_build_verify --
  *	Verify the build itself.
  */
 int
-__wt_env_build_verify(void)
+__wt_build_verify(void)
 {
 	int ret;
 

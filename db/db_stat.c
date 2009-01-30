@@ -14,8 +14,9 @@
  *	Print DB handle statistics to a stream.
  */
 int
-__wt_db_stat_print(DB *db, FILE *fp, u_int32_t flags)
+__wt_db_stat_print(wt_args_db_stat_print *argp)
 {
+	wt_args_db_stat_print_unpack;
 	IDB *idb;
 	WT_STATS *stats;
 
@@ -23,13 +24,14 @@ __wt_db_stat_print(DB *db, FILE *fp, u_int32_t flags)
 
 	DB_FLAG_CHK(db, "Db.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
 
-	fprintf(fp, "%s\n", WT_GLOBAL(sep));
-	fprintf(fp, "Db: %s\n", db->idb->file_name);
+	fprintf(stream, "%s\n", WT_GLOBAL(sep));
+	fprintf(stream, "Db: %s\n", db->idb->dbname);
 	for (stats = db->stats; stats->desc != NULL; ++stats)
-		fprintf(fp, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+		fprintf(stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
 	if (idb->fh != NULL)
 		for (stats = idb->fh->stats; stats->desc != NULL; ++stats)
-			fprintf(fp, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+			fprintf(
+			    stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
 	return (0);
 }
 
@@ -38,8 +40,10 @@ __wt_db_stat_print(DB *db, FILE *fp, u_int32_t flags)
  *	Clear DB handle statistics.
  */
 int
-__wt_db_stat_clear(DB *db, u_int32_t flags)
+__wt_db_stat_clear(wt_args_db_stat_clear *argp)
 {
+	wt_args_db_stat_clear_unpack;
+
 	DB_FLAG_CHK(db, "Db.stat_clear", flags, WT_APIMASK_DB_STAT_CLEAR);
 
 	return (__wt_stat_clear_db(db->stats));

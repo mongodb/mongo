@@ -20,8 +20,10 @@ static int __wt_bt_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *, FILE *);
  *	Db.verify method.
  */
 int
-__wt_db_verify(DB *db, u_int32_t flags)
+__wt_db_verify(wt_args_db_verify *argp)
 {
+	wt_args_db_verify_unpack;
+
 	DB_FLAG_CHK(db, "Db.verify", flags, WT_APIMASK_DB_VERIFY);
 
 	return (__wt_bt_verify_int(db, NULL));

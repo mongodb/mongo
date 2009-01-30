@@ -16,8 +16,9 @@ static int __wt_db_idb_open(DB *, const char *, mode_t, u_int32_t);
  *	Open a DB handle.
  */
 int
-__wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
+__wt_db_open(wt_args_db_open *argp)
 {
+	wt_args_db_open_unpack;
 	ENV *env;
 	int ret;
 
@@ -26,7 +27,7 @@ __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 	DB_FLAG_CHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
 
 	/* Initialize the IDB structure. */
-	if ((ret = __wt_db_idb_open(db, file_name, mode, flags)) != 0)
+	if ((ret = __wt_db_idb_open(db, dbname, mode, flags)) != 0)
 		return (ret);
 
 	/* Open any private environment. */
@@ -52,7 +53,7 @@ __wt_db_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
  *	Routine to intialize any IDB values based on a DB value during open.
  */
 static int
-__wt_db_idb_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
+__wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 {
 	ENV *env;
 	IDB *idb;
@@ -61,7 +62,7 @@ __wt_db_idb_open(DB *db, const char *file_name, mode_t mode, u_int32_t flags)
 	env = db->env;
 	idb = db->idb;
 
-	if ((ret = __wt_strdup(env, file_name, &idb->file_name)) != 0)
+	if ((ret = __wt_strdup(env, dbname, &idb->dbname)) != 0)
 		return (ret);
 	idb->mode = mode;
 

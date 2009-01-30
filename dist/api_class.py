@@ -18,96 +18,179 @@
 #		db	-- Db handle
 #	flags:
 #		open    -- illegal until after the handle.open method call
-#		getset  -- an API getter/setter method pair; getters return
-#			   void, setters return int
-#		method  -- a method returning int
+#		getset  -- an API getter/setter method
+#		local	-- no need to connect to the server[1]
+#		method	-- a method returning an int
 #		methodV -- a method returning void
 #		verify  -- setters call a subroutine to validate the arguments
 #
-# For standalone methods (the method and methodV flags), the next line is the
-# prototype for the function.
+# [1]
+# Think carefully before marking API methods as "local".  The ENV/DB handles
+# are free-threaded, and can be used concurrently (for example, one thread is
+# calling Db.get while another thread is re-configuring the Db error prefix).
+# A race is unlikely since most fields are 32-bit and updated atomically, and
+# configuration is usually done once, before the handle is used (as one data
+# point, Berkeley DB has the same problem and I don't believe I ever saw a
+# failure in the field).  Regardless, handle configuration is a rarely done
+# operation, so I don't see performance reasons for making more methods local.
 #
-# For getter/setter methods (the getset flag), the next lines are the argument
-# names and declarations for the getter/setter.  In getter/setter declarations
-# @S is replaced by the argument name.
+# Subsequent lines are the argument names and declarations for the arguments;
+# @S is replaced by the argument name in the declaration.  We do that because
+# the name goes in different places in the declaration, and sometimes we want
+# the name, and sometimes we don't.
+
+###################################################
+# WT_TOC method declarations
+###################################################
+wt_toc.destroy
+	method,local
+	flags	u_int32_t @S
 
 ###################################################
 # Env getter/setter method declarations
 ###################################################
-env.errcall
-	getset
+env.get_errcall
+	methodV,getset
+	errcall	void (**@S)(const ENV *, const char *)
+env.set_errcall
+	method,getset
 	errcall	void (*@S)(const ENV *, const char *)
-env.errfile
-	getset
+
+env.get_errfile
+	methodV,getset
+	errfile	FILE **@S
+env.set_errfile
+	method,getset
 	errfile	FILE *@S
-env.errpfx
-	getset
+
+env.get_errpfx
+	methodV,getset
+	errpfx	const char **@S
+env.set_errpfx
+	method,getset
 	errpfx	const char *@S
-env.verbose
-	getset,verify
+
+env.get_verbose
+	methodV,getset
+	verbose	u_int32_t *@S
+env.set_verbose
+	method,getset,verify
 	verbose	u_int32_t @S
-env.cachesize
-	getset
+
+env.get_cachesize
+	methodV,getset
+	cachesize	u_int32_t *@S
+env.set_cachesize
+	method,getset
 	cachesize	u_int32_t @S
 
 ###################################################
-# Env standalone method declarations
+# Env standard method declarations
 ###################################################
 env.close
 	method
-	u_int32_t
+	flags	u_int32_t @S
+
 env.destroy
 	method
-	u_int32_t
+	flags	u_int32_t @S
+
 env.err
-	methodV
-	int, const char *, ...
+	methodV,local
+	err	int @S
+	fmt	const char *@S, ...
+
 env.errx
-	methodV
-	const char *, ...
+	methodV,local
+	fmt	const char *@S, ...
+
 env.open
 	method
-	const char *, mode_t, u_int32_t
+	home	const char *@S
+	mode	mode_t @S
+	flags	u_int32_t @S
+
 env.stat_clear
 	method
-	u_int32_t
+	flags	u_int32_t @S
+
 env.stat_print
 	method
-	FILE *, u_int32_t
+	stream	FILE *@S
+	flags	u_int32_t @S
 
 ###################################################
 # Db getter/setter method declarations
 ###################################################
-db.errcall
-	getset
+db.get_errcall
+	methodV,getset
+	errcall	void (**@S)(const DB *, const char *)
+db.set_errcall
+	method,getset
 	errcall	void (*@S)(const DB *, const char *)
-db.errfile
-	getset
+
+db.get_errfile
+	methodV,getset
+	errfile	FILE **@S
+db.set_errfile
+	method,getset
 	errfile	FILE *@S
-db.errpfx
-	getset
+
+db.get_errpfx
+	methodV,getset
+	errpfx	const char **@S
+db.set_errpfx
+	method,getset
 	errpfx	const char *@S
-db.btree_compare
-	getset
+
+db.get_btree_compare
+	methodV,getset
+	btree_compare	int (**@S)(DB *, const DBT *, const DBT *)
+db.set_btree_compare
+	method,getset
 	btree_compare	int (*@S)(DB *, const DBT *, const DBT *)
-db.btree_compare_int
-	getset,verify
+
+db.get_btree_compare_int
+	methodV,getset
+	btree_compare_int	int *@S
+db.set_btree_compare_int
+	method,getset,verify
 	btree_compare_int	int @S
-db.btree_dup_compare
-	getset
+
+db.get_btree_dup_compare
+	methodV,getset
+	btree_dup_compare	int (**@S)(DB *, const DBT *, const DBT *)
+db.set_btree_dup_compare
+	method,getset
 	btree_dup_compare	int (*@S)(DB *, const DBT *, const DBT *)
-db.btree_itemsize
-	getset
+
+db.get_btree_itemsize
+	methodV,getset
+	intlitemsize	u_int32_t *@S
+	leafitemsize	u_int32_t *@S
+db.set_btree_itemsize
+	method,getset
 	intlitemsize	u_int32_t @S
 	leafitemsize	u_int32_t @S
-db.btree_pagesize
-	getset
+
+db.get_btree_pagesize
+	methodV,getset
+	allocsize	u_int32_t *@S
+	intlsize	u_int32_t *@S
+	leafsize	u_int32_t *@S
+	extsize	u_int32_t *@S
+db.set_btree_pagesize
+	method,getset
 	allocsize	u_int32_t @S
 	intlsize	u_int32_t @S
 	leafsize	u_int32_t @S
 	extsize	u_int32_t @S
-db.btree_dup_offpage
-	getset
+
+db.get_btree_dup_offpage
+	methodV,getset
+	btree_dup_offpage	u_int32_t *@S
+db.set_btree_dup_offpage
+	method,getset
 	btree_dup_offpage	u_int32_t @S
 
 ###################################################
@@ -115,37 +198,57 @@ db.btree_dup_offpage
 ###################################################
 db.bulk_load
 	method
-	u_int32_t, int (*)(DB *, DBT **, DBT **)
+	flags	u_int32_t @S
+	cb	int (*@S)(DB *, DBT **, DBT **)
+
 db.close
 	method
-	u_int32_t
+	flags	u_int32_t @S
+
 db.destroy
 	method
-	u_int32_t
+	flags	u_int32_t @S
+
 db.dump
 	method,open
-	FILE *, u_int32_t
+	stream	FILE *@S
+	flags	u_int32_t @S
+
 db.err
-	methodV
-	int, const char *, ...
+	methodV,local
+	err	int @S
+	fmt	const char *@S, ...
+
 db.errx
-	methodV
-	const char *, ...
+	methodV,local
+	fmt	const char *@S, ...
+
 db.get
 	method,open
-	DBT *, DBT *, DBT *, u_int32_t
+	key	DBT *@S
+	pkey	DBT *@S
+	data	DBT *@S
+	flags	u_int32_t @S
+
 db.open
 	method
-	const char *, mode_t, u_int32_t
+	dbname	const char *@S
+	mode	mode_t @S
+	flags	u_int32_t @S
+
 db.stat_clear
 	method
-	u_int32_t
+	flags	u_int32_t @S
+
 db.stat_print
 	method
-	FILE *, u_int32_t
+	stream	FILE * @S
+	flags	u_int32_t @S
+
 db.sync
 	method,open
-	u_int32_t
+	flags	u_int32_t @S
+
 db.verify
 	method,open
-	u_int32_t
+	flags	u_int32_t @S

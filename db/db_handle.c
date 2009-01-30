@@ -17,7 +17,7 @@ static int __wt_idb_config_default(DB *);
  *	DB constructor.
  */
 int
-wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
+wt_db_create(DB **dbp, WT_TOC *toc, ENV *env, u_int32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -32,7 +32,7 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	 * before doing anything else.
 	 */
 	if (env == NULL) {
-		if ((ret = wt_env_create(&env, 0)) != 0)
+		if ((ret = wt_env_create(&env, toc, 0)) != 0)
 			return (ret);
 		F_SET(env, WT_PRIVATE_ENV);
 	}
@@ -51,6 +51,7 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	idb->db = db;
 	db->env = env;
 	db->ienv = env->ienv;
+	db->toc = idb->toc = toc;
 
 	/* We have an environment -- check the API flags. */
 	DB_FLAG_CHK_NOTFATAL(
@@ -67,7 +68,7 @@ wt_db_create(DB **dbp, ENV *env, u_int32_t flags)
 	*dbp = db;
 	return (0);
 
-err:	(void)__wt_db_destroy(db, 0);
+err:	(void)__wt_db_destroy_int(db, 0);
 	return (ret);
 }
 
@@ -76,7 +77,18 @@ err:	(void)__wt_db_destroy(db, 0);
  *	Db.destroy method (DB destructor).
  */
 int
-__wt_db_destroy(DB *db, u_int32_t flags)
+__wt_db_destroy(wt_args_db_destroy *argp)
+{
+	wt_args_db_destroy_unpack;
+	return (__wt_db_destroy_int(db, flags));
+}
+
+/*
+ * __wt_db_destroy_int --
+ *	Db.destroy method (DB destructor), internal version.
+ */
+int
+__wt_db_destroy_int(DB *db, u_int32_t flags)
 {
 	ENV *env;
 	int ret, tret;
@@ -148,7 +160,7 @@ __wt_idb_destroy(DB *db, int refresh)
 	/* Free allocated memory. */
 	WT_FREE_AND_CLEAR(env, idb->key.data);
 	WT_FREE_AND_CLEAR(env, idb->data.data);
-	WT_FREE_AND_CLEAR(env, idb->file_name);
+	WT_FREE_AND_CLEAR(env, idb->dbname);
 
 	/* If we're truly done, discard the actual memory. */
 	if (!refresh) {

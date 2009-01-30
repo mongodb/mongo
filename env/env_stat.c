@@ -14,20 +14,21 @@
  *	Print ENV handle statistics to a stream.
  */
 int
-__wt_env_stat_print(ENV *env, FILE *fp, u_int32_t flags)
+__wt_env_stat_print(wt_args_env_stat_print *argp)
 {
+	wt_args_env_stat_print_unpack;
 	DB *db;
 	WT_STATS *stats;
 	int ret;
 
 	ENV_FLAG_CHK(env, "Env.stat_print", flags, WT_APIMASK_ENV_STAT_PRINT);
 
-	fprintf(fp, "Environment statistics:\n");
+	fprintf(stream, "Environment statistics:\n");
 	for (stats = env->stats; stats->desc != NULL; ++stats)
-		fprintf(fp, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+		fprintf(stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
 
 	TAILQ_FOREACH(db, &env->dbqh, q)
-		if ((ret = __wt_db_stat_print(db, fp, flags)) != 0)
+		if ((ret = db->stat_print(db, stream, flags)) != 0)
 			return (ret);
 	return (0);
 }
@@ -37,8 +38,9 @@ __wt_env_stat_print(ENV *env, FILE *fp, u_int32_t flags)
  *	Clear ENV handle statistics.
  */
 int
-__wt_env_stat_clear(ENV *env, u_int32_t flags)
+__wt_env_stat_clear(wt_args_env_stat_clear *argp)
 {
+	wt_args_env_stat_clear_unpack;
 	DB *db;
 	int ret, tret;
 
@@ -46,7 +48,7 @@ __wt_env_stat_clear(ENV *env, u_int32_t flags)
 
 	ret = 0;
 	TAILQ_FOREACH(db, &env->dbqh, q)
-		if ((tret = __wt_db_stat_clear(db, flags)) != 0 && ret == 0)
+		if ((tret = db->stat_clear(db, flags)) != 0 && ret == 0)
 			ret = tret;
 	if ((tret = __wt_stat_clear_env(env->stats)) != 0 && ret == 0)
 		ret = tret;

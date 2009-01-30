@@ -17,22 +17,11 @@ static int __wt_ienv_config_default(ENV *);
  *	ENV constructor.
  */
 int
-wt_env_create(ENV **envp, u_int32_t flags)
+wt_env_create(ENV **envp, WT_TOC *toc, u_int32_t flags)
 {
-	static int build_verified = 0;
 	ENV *env;
 	IENV *ienv;
 	int ret;
-
-	/*
-	 * No matter what we're doing, we end up here before we do any
-	 * real work.   The very first time, check the build itself.
-	 */
-	if (!build_verified) {
-		if ((ret = __wt_env_build_verify()) != 0)
-			return (ret);
-		build_verified = 1;
-	}
 
 	/*
 	 * !!!
@@ -51,6 +40,7 @@ wt_env_create(ENV **envp, u_int32_t flags)
 	/* Connect everything together. */
 	env->ienv = ienv;
 	ienv->env = env;
+	env->toc = ienv->toc = toc;
 
 	/* We have an environment -- check the API flags. */
 	ENV_FLAG_CHK_NOTFATAL(
@@ -67,7 +57,7 @@ wt_env_create(ENV **envp, u_int32_t flags)
 	*envp = env;
 	return (0);
 
-err:	(void)__wt_env_destroy(env, 0);
+err:	(void)__wt_env_destroy_int(env, 0);
 	return (ret);
 }
 
@@ -76,7 +66,19 @@ err:	(void)__wt_env_destroy(env, 0);
  *	Env.destroy method (ENV destructor).
  */
 int
-__wt_env_destroy(ENV *env, u_int32_t flags)
+__wt_env_destroy(wt_args_env_destroy *argp)
+{
+	wt_args_env_destroy_unpack;
+
+	return (__wt_env_destroy_int(env, flags));
+}
+
+/*
+ * __wt_env_destroy_int --
+ *	Env.destroy method (ENV destructor), internal version.
+ */
+int
+__wt_env_destroy_int(ENV *env, u_int32_t flags)
 {
 	int ret, tret;
 

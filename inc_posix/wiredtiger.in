@@ -50,7 +50,9 @@ struct __env;			typedef struct __env ENV;
 struct __idb;			typedef struct __idb IDB;
 struct __idbc;			typedef struct __idbc IDBC;
 struct __ienv;			typedef struct __ienv IENV;
+struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
+struct __wt_toc;		typedef struct __wt_toc WT_TOC;
 
 /*******************************************
  * Exported types
@@ -70,6 +72,32 @@ struct __dbt {
 };
 
 /*******************************************
+ * Connection information
+ *******************************************/
+struct __wt_toc {
+	u_int slot;			/* Connection slot */
+
+	WT_MTX *mtx;			/* Thread's blocking mutex */
+
+	ENV *env;			/* Thread's environment */
+	int   op;			/* Operation code */
+	void *argp;			/* Operation parameters */
+	int   ret;			/* Operation result */
+	
+	/*
+	 * DO NOT EDIT: automatically built by dist/api.py.
+	 * WT_TOC handle api section: BEGIN
+	 */
+	int (*destroy)(
+	    WT_TOC *, u_int32_t );
+	/*
+	 * WT_TOC handle api section: END
+	 * DO NOT EDIT: automatically built by dist/api.py.
+	 */
+	 u_int32_t flags;
+};
+
+/*******************************************
  * Database handle
  *******************************************/
 struct __db {
@@ -83,8 +111,8 @@ struct __db {
 		struct __db **tqe_prev;
 	} q;
 
+	WT_TOC *toc;			/* Enclosing thread of control */
 	IDB *idb;			/* Private object */
-
 	ENV *env;			/* Enclosing environment */
 	IENV *ienv;			/* Private environment object */
 
@@ -94,46 +122,75 @@ struct __db {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * Db handle api section: BEGIN
 	 */
-	void (*errcall)(const DB *, const char *);
-	void (*get_errcall)(
-	    DB *, void (**)(const DB *, const char *));
-	int (*set_errcall)(
-	    DB *, void (*)(const DB *, const char *));
+	int (*bulk_load)(
+	    DB *, u_int32_t , int (*)(DB *, DBT **, DBT **));
 
-	FILE *errfile;
-	void (*get_errfile)(
-	    DB *, FILE **);
-	int (*set_errfile)(
-	    DB *, FILE *);
+	int (*close)(
+	    DB *, u_int32_t );
 
-	const char *errpfx;
-	void (*get_errpfx)(
-	    DB *, const char **);
-	int (*set_errpfx)(
-	    DB *, const char *);
+	int (*destroy)(
+	    DB *, u_int32_t );
 
-	int (*btree_compare)(DB *, const DBT *, const DBT *);
+	int (*dump)(
+	    DB *, FILE *, u_int32_t );
+
+	void (*err)(
+	    DB *, int , const char *, ...);
+
+	void (*errx)(
+	    DB *, const char *, ...);
+
+	int (*get)(
+	    DB *, DBT *, DBT *, DBT *, u_int32_t );
+
 	void (*get_btree_compare)(
 	    DB *, int (**)(DB *, const DBT *, const DBT *));
+
+	void (*get_btree_compare_int)(
+	    DB *, int *);
+
+	void (*get_btree_dup_compare)(
+	    DB *, int (**)(DB *, const DBT *, const DBT *));
+
+	void (*get_btree_dup_offpage)(
+	    DB *, u_int32_t *);
+
+	void (*get_btree_itemsize)(
+	    DB *, u_int32_t *, u_int32_t *);
+
+	void (*get_btree_pagesize)(
+	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
+
+	void (*get_errcall)(
+	    DB *, void (**)(const DB *, const char *));
+
+	void (*get_errfile)(
+	    DB *, FILE **);
+
+	void (*get_errpfx)(
+	    DB *, const char **);
+
+	int (*open)(
+	    DB *, const char *, mode_t , u_int32_t );
+
+	int (*btree_compare)(DB *, const DBT *, const DBT *);
 	int (*set_btree_compare)(
 	    DB *, int (*)(DB *, const DBT *, const DBT *));
 
 	int btree_compare_int;
-	void (*get_btree_compare_int)(
-	    DB *, int *);
 	int (*set_btree_compare_int)(
 	    DB *, int );
 
 	int (*btree_dup_compare)(DB *, const DBT *, const DBT *);
-	void (*get_btree_dup_compare)(
-	    DB *, int (**)(DB *, const DBT *, const DBT *));
 	int (*set_btree_dup_compare)(
 	    DB *, int (*)(DB *, const DBT *, const DBT *));
 
+	u_int32_t btree_dup_offpage;
+	int (*set_btree_dup_offpage)(
+	    DB *, u_int32_t );
+
 	u_int32_t intlitemsize;
 	u_int32_t leafitemsize;
-	void (*get_btree_itemsize)(
-	    DB *, u_int32_t *, u_int32_t *);
 	int (*set_btree_itemsize)(
 	    DB *, u_int32_t , u_int32_t );
 
@@ -141,41 +198,32 @@ struct __db {
 	u_int32_t intlsize;
 	u_int32_t leafsize;
 	u_int32_t extsize;
-	void (*get_btree_pagesize)(
-	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
 	int (*set_btree_pagesize)(
 	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
 
-	u_int32_t btree_dup_offpage;
-	void (*get_btree_dup_offpage)(
-	    DB *, u_int32_t *);
-	int (*set_btree_dup_offpage)(
+	void (*errcall)(const DB *, const char *);
+	int (*set_errcall)(
+	    DB *, void (*)(const DB *, const char *));
+
+	FILE *errfile;
+	int (*set_errfile)(
+	    DB *, FILE *);
+
+	const char *errpfx;
+	int (*set_errpfx)(
+	    DB *, const char *);
+
+	int (*stat_clear)(
 	    DB *, u_int32_t );
 
-	int (*bulk_load)(
-	    DB *, u_int32_t, int (*)(DB *, DBT **, DBT **));
-	int (*close)(
-	    DB *, u_int32_t);
-	int (*destroy)(
-	    DB *, u_int32_t);
-	int (*dump)(
-	    DB *, FILE *, u_int32_t);
-	void (*err)(
-	    DB *, int, const char *, ...);
-	void (*errx)(
-	    DB *, const char *, ...);
-	int (*get)(
-	    DB *, DBT *, DBT *, DBT *, u_int32_t);
-	int (*open)(
-	    DB *, const char *, mode_t, u_int32_t);
-	int (*stat_clear)(
-	    DB *, u_int32_t);
 	int (*stat_print)(
-	    DB *, FILE *, u_int32_t);
+	    DB *, FILE * , u_int32_t );
+
 	int (*sync)(
-	    DB *, u_int32_t);
+	    DB *, u_int32_t );
+
 	int (*verify)(
-	    DB *, u_int32_t);
+	    DB *, u_int32_t );
 	/*
 	 * Db handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -197,6 +245,7 @@ struct __dbc {
  * Database environment handle
  *******************************************/
 struct __env {
+	WT_TOC *toc;			/* Enclosing thread of control */
 	IENV *ienv;			/* Private object */
 
 					/* Linked list of databases */
@@ -216,50 +265,61 @@ struct __env {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * Env handle api section: BEGIN
 	 */
-	void (*errcall)(const ENV *, const char *);
+	int (*close)(
+	    ENV *, u_int32_t );
+
+	int (*destroy)(
+	    ENV *, u_int32_t );
+
+	void (*err)(
+	    ENV *, int , const char *, ...);
+
+	void (*errx)(
+	    ENV *, const char *, ...);
+
+	void (*get_cachesize)(
+	    ENV *, u_int32_t *);
+
 	void (*get_errcall)(
 	    ENV *, void (**)(const ENV *, const char *));
+
+	void (*get_errfile)(
+	    ENV *, FILE **);
+
+	void (*get_errpfx)(
+	    ENV *, const char **);
+
+	void (*get_verbose)(
+	    ENV *, u_int32_t *);
+
+	int (*open)(
+	    ENV *, const char *, mode_t , u_int32_t );
+
+	u_int32_t cachesize;
+	int (*set_cachesize)(
+	    ENV *, u_int32_t );
+
+	void (*errcall)(const ENV *, const char *);
 	int (*set_errcall)(
 	    ENV *, void (*)(const ENV *, const char *));
 
 	FILE *errfile;
-	void (*get_errfile)(
-	    ENV *, FILE **);
 	int (*set_errfile)(
 	    ENV *, FILE *);
 
 	const char *errpfx;
-	void (*get_errpfx)(
-	    ENV *, const char **);
 	int (*set_errpfx)(
 	    ENV *, const char *);
 
 	u_int32_t verbose;
-	void (*get_verbose)(
-	    ENV *, u_int32_t *);
 	int (*set_verbose)(
 	    ENV *, u_int32_t );
 
-	u_int32_t cachesize;
-	void (*get_cachesize)(
-	    ENV *, u_int32_t *);
-	int (*set_cachesize)(
+	int (*stat_clear)(
 	    ENV *, u_int32_t );
 
-	int (*close)(
-	    ENV *, u_int32_t);
-	int (*destroy)(
-	    ENV *, u_int32_t);
-	void (*err)(
-	    ENV *, int, const char *, ...);
-	void (*errx)(
-	    ENV *, const char *, ...);
-	int (*open)(
-	    ENV *, const char *, mode_t, u_int32_t);
-	int (*stat_clear)(
-	    ENV *, u_int32_t);
 	int (*stat_print)(
-	    ENV *, FILE *, u_int32_t);
+	    ENV *, FILE *, u_int32_t );
 	/*
 	 * Env handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -271,8 +331,9 @@ struct __env {
 /*******************************************
  * Prototypes.
  *******************************************/
-int	 wt_db_create(DB **, ENV *, u_int32_t);
-int	 wt_env_create(ENV **, u_int32_t);
+int	 wt_db_create(DB **, WT_TOC *, ENV *, u_int32_t);
+int	 wt_env_create(ENV **, WT_TOC *, u_int32_t);
+int	 wt_toc_create(WT_TOC **, u_int32_t);
 char	*wt_strerror(int);
 
 /*******************************************
@@ -290,6 +351,7 @@ char	*wt_strerror(int);
 #define	WT_MODIFIED					0x00000002
 #define	WT_PRINTABLES					0x00000001
 #define	WT_PRIVATE_ENV					0x00000001
+#define	WT_RUNNING					0x00000001
 #define	WT_SORTED_INPUT					0x00000001
 #define	WT_UNFORMATTED					0x00000001
 #define	WT_VERB_FILEOPS					0x00000002
@@ -322,6 +384,7 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_WT_ENV_CREATE			0x00000000
 #define	WT_APIMASK_WT_INDX				0x00000001
 #define	WT_APIMASK_WT_PAGE				0x00000003
+#define	WT_APIMASK_WT_TOC				0x00000001
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api.py.

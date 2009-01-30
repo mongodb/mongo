@@ -14,8 +14,9 @@
  *	Close a DB handle.
  */
 int
-__wt_db_close(DB *db, u_int32_t flags)
+__wt_db_close(wt_args_db_close *argp)
 {
+	wt_args_db_close_unpack;
 	ENV *env;
 	int ret, tret;
 

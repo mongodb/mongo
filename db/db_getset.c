@@ -14,15 +14,14 @@
  *	Verify arguments to the Db.set_btree_compare_int setter.
  */
 int
-__wt_db_set_btree_compare_int_verify(DB *db, int *bytesp)
+__wt_db_set_btree_compare_int_verify(wt_args_db_set_btree_compare_int *argp)
 {
-	int bytes;
+	DB *db;
 
-	bytes = *bytesp;
-	if (bytes >= 0 && bytes <= 8) {
-		db->btree_compare = __wt_bt_int_compare;
+	db = argp->db;
+
+	if (argp->btree_compare_int >= 0 && argp->btree_compare_int <= 8)
 		return (0);
-	}
 
 	__wt_db_errx(db,
 	    "The number of bytes must be an integral value between 1 and 8");

@@ -95,7 +95,7 @@ __wt_cache_db_open(DB *db)
 	idb = db->idb;
 
 	/* Try and open the fle. */
-	if ((ret = __wt_open(env, idb->file_name, idb->mode,
+	if ((ret = __wt_open(env, idb->dbname, idb->mode,
 	    F_ISSET(idb, WT_CREATE) ? WT_OPEN_CREATE : 0, &idb->fh)) != 0)
 		return (ret);
 

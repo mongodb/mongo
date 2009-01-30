@@ -14,8 +14,9 @@
  *	Open a Env handle.
  */
 int
-__wt_env_open(ENV *env, const char *home, mode_t mode, u_int32_t flags)
+__wt_env_open(wt_args_env_open *argp)
 {
+	wt_args_env_open_unpack;
 	int ret;
 
 	ENV_FLAG_CHK(env, "Env.open", flags, WT_APIMASK_ENV_OPEN);

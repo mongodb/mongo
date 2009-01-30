@@ -27,8 +27,9 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
  *	Db.dump method.
  */
 int
-__wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
+__wt_db_dump(wt_args_db_dump *argp)
 {
+	wt_args_db_dump_unpack;
 	DBT last_key_ovfl, last_key_std, *last_key;
 	ENV *env;
 	WT_ITEM *item;
