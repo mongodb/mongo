@@ -79,15 +79,14 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	if ((ret = bit_alloc(env, (int)frags, &fragbits)) != 0)
 		return (ret);
 
-
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
-		if ((ret =
-		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, &page)) != 0)
-			goto err;
+		if ((ret = __wt_cache_db_in(db, WT_ADDR_TO_OFF(
+		    db, WT_ADDR_FIRST_PAGE), db->leafsize, 0, &page)) != 0)
+			return (ret);
 		if ((ret = __wt_bt_verify_page(db, page, fragbits, fp)) != 0)
 			goto err;
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
+		if ((ret = __wt_cache_db_out(db, page, 0)) != 0)
 			goto err;
 		page = NULL;
 	} else {
@@ -343,7 +342,7 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		}
 
 		/*
-		 * If this is a primary root page, confirm the description
+		 * If this is the primary root page, confirm the description
 		 * record (which we've already read in) points to the right
 		 * place.
 		 */
@@ -362,7 +361,8 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 	 *
 	 * First, check to make sure we've verified the parent page -- if we
 	 * haven't, there's a problem because we verified levels down the tree,
-	 * starting at the top.
+	 * starting at the top.   Then, read the page in.  Since we've already
+	 * verified it, we can build the in-memory information.
 	 */
 	frags = WT_OFF_TO_ADDR(db, db->intlsize);
 	for (i = 0; i < frags; ++i)
