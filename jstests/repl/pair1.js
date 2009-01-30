@@ -1,6 +1,6 @@
 // Basic pairing test
 
-var baseName = "jstests_repl1test";
+var baseName = "jstests_pair1test";
 
 ismaster = function( n ) {
     im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
