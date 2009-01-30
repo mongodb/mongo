@@ -66,6 +66,13 @@ AddOption( "--v8" ,
            metavar="dir",
            help="v8 location")
 
+AddOption( "--noOptimization",
+           dest="noOptimization",
+           type="string",
+           nargs=0,
+           action="store",
+           help="don't compile with optimization" )
+
 # --- environment setup ---
 
 env = Environment()
@@ -101,6 +108,7 @@ darwin = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
+noOptimization = not GetOption( "noOptimization" ) is None
 
 installDir = "/usr/local"
 nixLibPrefix = "lib"
@@ -205,17 +213,22 @@ else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
 if nix:
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -O3 -Wall -Wsign-compare -Wno-non-virtual-dtor" )
+    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-non-virtual-dtor" )
     env.Append( LINKFLAGS=" -fPIC " )
     env.Append( LIBS=[ "stdc++" ] )
 
+    if noOptimization:
+        env.Append( CPPFLAGS=" -O0" )
+    else:
+        env.Append( CPPFLAGS=" -O3" )
+
     if force64:
-	env.Append( CFLAGS="-m64" )
+        env.Append( CFLAGS="-m64" )
         env.Append( CXXFLAGS="-m64" )
         env.Append( LINKFLAGS="-m64" )
 
     if force32:
-	env.Append( CFLAGS="-m32" )
+        env.Append( CFLAGS="-m32" )
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
