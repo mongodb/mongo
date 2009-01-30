@@ -11,8 +11,6 @@
 
 static void *__wt_engine(void *);
 
-void *__wt_addr;				/* Memory flush address. */
-
 /*
  * wt_start --
  *	Start the engine.
@@ -20,23 +18,21 @@ void *__wt_addr;				/* Memory flush address. */
 int
 wt_start(u_int32_t flags)
 {
-	static int build_verified = 0;
+	static int initial_tasks = 0;
 	int ret;
 
-	__wt_addr = &build_verified;
-
 	/*
-	 * No matter what we're doing, we end up here before we do any
-	 * real work.   The very first time, check the build itself.
+	 * No matter what we're doing, we end up here before we do any real
+	 * work.   The first time, check the build itself and initialize the
+	 * global structure.
 	 */
-	if (!build_verified) {
+	if (!initial_tasks) {
 		if ((ret = __wt_build_verify()) != 0)
 			return (ret);
-		build_verified = 1;
+		if ((ret = __wt_global_init()) != 0)
+			return (ret);
+		initial_tasks = 1;
 	}
-
-	if ((ret = __wt_mtx_init(NULL, &WT_GLOBAL(mtx))) != 0)
-		return (ret);
 
 	/* Spawn the engine, and wait until it's ready to proceed. */
 	if (pthread_create(&WT_GLOBAL(tid), NULL, __wt_engine, NULL) != 0)
@@ -102,7 +98,7 @@ __wt_engine(void *notused)
 			WT_FLUSH_MEMORY;
 
 			/* Wake the waiting thread. */
-			__wt_unlock(toc->env, toc->mtx);
+			__wt_unlock(toc->mtx);
 		}
 		if (++q == eq) {
 			/*

@@ -24,13 +24,10 @@ wt_toc_create(WT_TOC **tocp, u_int32_t flags)
 	if ((ret = __wt_calloc(NULL, 1, sizeof(WT_MTX), &toc->mtx)) != 0)
 		goto err;
 
-	/*
-	 * The mutex is used for self-blocking, so it's normal state is
-	 * locked.
-	 */
-	if ((ret = __wt_mtx_init(NULL, toc->mtx)) != 0)
+	/* The mutex is self-blocking, so it's normal state is locked. */
+	if ((ret = __wt_mtx_init(toc->mtx)) != 0)
 		goto err;
-	if ((ret = __wt_lock(NULL, toc->mtx)) != 0)
+	if ((ret = __wt_lock(toc->mtx)) != 0)
 		goto err;
 
 	toc->slot = WT_GLOBAL(workq_next)++;
@@ -83,7 +80,7 @@ __wt_toc_sched(ENV *env, WT_TOC *toc)
 	*q = toc;
 	WT_FLUSH_MEMORY;
 
-	__wt_lock(toc->env, toc->mtx);
+	__wt_lock(toc->mtx);
 
 	return (toc->ret);
 }

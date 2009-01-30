@@ -159,13 +159,13 @@ __wt_free(ENV *env, void *p);
 int
 __wt_filesize(ENV *env, WT_FH *fh, off_t *sizep);
 int
-__wt_mtx_init(ENV *env, WT_MTX *mtx);
+__wt_mtx_init(WT_MTX *mtx);
 int
-__wt_lock(ENV *env, WT_MTX *mtx);
+__wt_lock(WT_MTX *mtx);
 int
-__wt_unlock(ENV *env, WT_MTX *mtx);
+__wt_unlock(WT_MTX *mtx);
 int
-__wt_mtx_destroy(ENV *env, WT_MTX *mtx);
+__wt_mtx_destroy(WT_MTX *mtx);
 int
 __wt_open(ENV *env,
     const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp);

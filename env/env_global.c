@@ -9,17 +9,7 @@
 
 #include "wt_internal.h"
 
-WT_GLOBALS __wt_globals = {
-	0,						/* running */
-	0,						/* tid */
-	{ },						/* mtx */
-	0,						/* file_id */
-	NULL,						/* workq */
-	0,						/* workq_entries */
-	0,						/* workq_next */
-	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=",	/* sep */
-	{ },						/* err_buf */
-};
+WT_GLOBALS __wt_globals;
 
 /*
  * __wt_build_verify --
@@ -41,6 +31,27 @@ __wt_build_verify(void)
 	if ((ret = __wt_breakpoint()) != 0)
 		return (ret);
 #endif
+
+	return (0);
+}
+
+void *__wt_addr;				/* Memory flush address. */
+
+/*
+ * __wt_global_init --
+ *	Initialize the globals.
+ */
+int
+__wt_global_init(void)
+{
+	int ret;
+
+	__wt_addr = &WT_GLOBAL(running);
+
+	if ((ret = __wt_mtx_init(&WT_GLOBAL(mtx))) != 0)
+		return (ret);
+
+	WT_GLOBAL(sep) = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
 
 	return (0);
 }

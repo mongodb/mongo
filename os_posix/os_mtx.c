@@ -14,7 +14,7 @@
  *	Initialize a pthread mutex.
  */
 int
-__wt_mtx_init(ENV *env, WT_MTX *mtx)
+__wt_mtx_init(WT_MTX *mtx)
 {
 	pthread_condattr_t condattr;
 	pthread_mutexattr_t mutexattr;
@@ -31,34 +31,29 @@ __wt_mtx_init(ENV *env, WT_MTX *mtx)
 	 * Mutexes are shared between processes.
 	 */
 	if ((ret = pthread_mutexattr_init(&mutexattr)) != 0)
-		goto err;
+		return (WT_ERROR);
 #if 0
 	if ((ret = pthread_mutexattr_setpshared(
 	    &mutexattr, PTHREAD_PROCESS_SHARED)) != 0)
-		goto err;
+		return (WT_ERROR);
 #endif
 	if ((ret = pthread_mutex_init(&mtx->mtx, &mutexattr)) != 0)
-		goto err;
+		return (WT_ERROR);
 	(void)pthread_mutexattr_destroy(&mutexattr);
 
 	/* Initialize the condition variable (mutexes are self-blocking). */
 	if ((ret = pthread_condattr_init(&condattr)) != 0)
-		goto err;
+		return (WT_ERROR);
 #if 0
 	if ((ret = pthread_condattr_setpshared(
 	    &condattr, PTHREAD_PROCESS_SHARED)) != 0)
-		goto err;
+		return (WT_ERROR);
 #endif
 	if ((ret = pthread_cond_init(&mtx->cond, &condattr)) != 0)
-		goto err;
+		return (WT_ERROR);
 	(void)pthread_condattr_destroy(&condattr);
 
 	return (0);
-
-err:	if (env != NULL)
-		__wt_env_errx(env,
-		    "Mutex initialization error: %s", strerror(ret));
-	return (WT_ERROR);
 }
 
 /*
@@ -66,12 +61,12 @@ err:	if (env != NULL)
  *	Lock a mutex.
  */
 int
-__wt_lock(ENV *env, WT_MTX *mtx)
+__wt_lock(WT_MTX *mtx)
 {
 	int ret;
 
 	if ((ret = pthread_mutex_lock(&mtx->mtx)) != 0)
-		goto err;
+		return (WT_ERROR);
 
 	/*
 	 * Check pthread_cond_wait() return for EINTR, ETIME and ETIMEDOUT,
@@ -86,20 +81,16 @@ __wt_lock(ENV *env, WT_MTX *mtx)
 #endif
 		    ret != ETIMEDOUT) {
 			(void)pthread_mutex_unlock(&mtx->mtx);
-			goto err;
+			return (WT_ERROR);
 		}
 	}
 
 	mtx->locked = 1;
 
 	if ((ret = pthread_mutex_unlock(&mtx->mtx)) != 0)
-		goto err;
+		return (WT_ERROR);
 
 	return (0);
-
-err:	if (env != NULL)
-		__wt_env_errx(env, "Mutex lock error: %s", strerror(ret));
-	return (WT_ERROR);
 }
 
 /*
@@ -107,24 +98,20 @@ err:	if (env != NULL)
  *	Release a mutex.
  */
 int
-__wt_unlock(ENV *env, WT_MTX *mtx)
+__wt_unlock(WT_MTX *mtx)
 {
 	int ret;
 
 	if ((ret = pthread_mutex_lock(&mtx->mtx)) != 0)
-		goto err;
+		return (WT_ERROR);
 	mtx->locked = 0;
 	if ((ret = pthread_cond_signal(&mtx->cond)) != 0)
-		goto err;
+		return (WT_ERROR);
 
 	if ((ret = pthread_mutex_unlock(&mtx->mtx)) != 0)
-		goto err;
+		return (WT_ERROR);
 
 	return (0);
-
-err:	if (env != NULL)
-		__wt_env_errx(env, "Mutex unlock error: %s", strerror(ret));
-	return (WT_ERROR);
 }
 
 /*
@@ -132,7 +119,7 @@ err:	if (env != NULL)
  *	Destroy a mutex.
  */
 int
-__wt_mtx_destroy(ENV *env, WT_MTX *mtx)
+__wt_mtx_destroy(WT_MTX *mtx)
 {
 	int ret, tret;
 
@@ -141,10 +128,5 @@ __wt_mtx_destroy(ENV *env, WT_MTX *mtx)
 	if ((tret = pthread_mutex_destroy(&mtx->mtx)) != 0 && ret == 0)
 		ret = tret;
 
-	if (ret == 0)
-		return (0);
-
-err:	if (env != NULL)
-		__wt_env_errx(env, "Mutex destroy error: %s", strerror(ret));
-	return (WT_ERROR);
+	return (ret == 0 ? 0 : WT_ERROR);
 }
