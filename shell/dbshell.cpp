@@ -17,8 +17,11 @@ void quitNicely( int sig ){
 }
 
 string fixHost( string url , string host , string port ){
-    if ( host.size() == 0 && port.size() == 0 )
+    if ( host.size() == 0 && port.size() == 0 ){
+        if ( url.find( "/" ) == string::npos && url.find( "." ) != string::npos )
+            return url + "/test";
         return url;
+    }
     
     if ( url.find( "/" ) != string::npos ){
         cerr << "url can't have host or port if you specify them individually" << endl;
@@ -141,7 +144,7 @@ int main(int argc, char* argv[]) {
         if (strcmp(str, "-f") == 0) {
             continue;
         } 
-
+        
         if (strncmp(str, "--", 2) == 0) {
             printf("Warning: unknown flag %s.\nTry --help for options\n", str);
             continue;
@@ -149,25 +152,34 @@ int main(int argc, char* argv[]) {
         
         if ( nodb )
             break;
-        else {
-            const char * last = strstr( str , "/" );
-            if ( last )
-                last++;
-            else
-                last = str;
-            
-            if ( ! strstr( last , "." ) ){
-                url = str;
-                continue;
-            }
-                
+
+        const char * last = strstr( str , "/" );
+        if ( last )
+            last++;
+        else
+            last = str;
+        
+        if ( ! strstr( last , "." ) ){
+            url = str;
+            continue;
         }
         
+        if ( strstr( last , ".js" ) )
+            break;
+
+        path p( str );
+        if ( ! boost::filesystem::exists( p ) ){
+            url = str;
+            continue;
+        }
+            
+
         break;
     }
 
     if ( !nodb ) { // init mongo code
         v8::HandleScope handle_scope;
+        cout << "url: " << url << endl;
         string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
         if ( ! ExecuteString( v8::String::New( setup.c_str() ) , v8::String::New( "(connect)" ) , false , true ) ){
             return -1;
