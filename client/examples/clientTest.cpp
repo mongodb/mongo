@@ -111,13 +111,15 @@ int main() {
     { // hint related tests
         assert( conn.findOne(ns, "{}")["name"].str() == "sara" );
 
-        assert( conn.findOne(ns, "{name:\"eliot\"}")["name"].str() == "eliot" );
+        assert( conn.findOne(ns, "{ name : 'eliot' }")["name"].str() == "eliot" );
+        assert( conn.getLastError("test") == "" );
 
         // nonexistent index test
         assert( conn.findOne(ns, Query("{name:\"eliot\"}").hint("{foo:1}")).hasElement("$err") );
+        assert( conn.getLastError("test") == "hint index not found" );
 
         //existing index
-        assert( conn.findOne(ns, Query("{name:\"eliot\"}").hint("{name:1}")).hasElement("name") );
+        assert( conn.findOne(ns, Query("{name:'eliot'}").hint("{name:1}")).hasElement("name") );
     }
 
     cout << "client test finished!" << endl;

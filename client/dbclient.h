@@ -236,7 +236,7 @@ namespace mongo {
 
            @return true if the command returned "ok".
         */
-        bool runCommand(const char *dbname, BSONObj cmd, BSONObj &info);
+        bool runCommand(const char *dbname, const BSONObj& cmd, BSONObj &info);
 
         /** Authorize access to a particular database.
 			Authentication is separate for each database on the server -- you may authenticate for any 
@@ -277,6 +277,21 @@ namespace mongo {
            returns true if successful.
         */
         bool createCollection(const char *ns, unsigned size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
+
+        /** Get error result from the last operation on this connection. 
+            @return error or empty string if no error.
+        */
+        string getLastError(const char *dbname);
+
+
+        /* Return the last error which has occurred, even if not the very last operation.
+
+           Returns: 
+             { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
+
+           result.err will be null if no error has occurred.
+        */        
+        BSONObj getPrevError(const char *dbname);
 
         /* Erase / drop an entire database */
         bool dropDatabase(const char *dbname, BSONObj *info = 0) {
