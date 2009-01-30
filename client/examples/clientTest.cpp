@@ -15,7 +15,7 @@ int main() {
 
     DBClientConnection conn;
     string errmsg;
-    if ( ! conn.connect( "127.0.0.1" , errmsg ) ) {
+    if ( ! conn.connect(/* "192.168.58.1"*/"127.0.0.1" , errmsg ) ) {
         cout << "couldn't connect : " << errmsg << endl;
         throw -11;
     }

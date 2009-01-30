@@ -892,14 +892,24 @@ namespace mongo {
         return true;
     }
 
-    DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
+#pragma pack(push,1)
+    struct IDToInsert { 
+        char type;
+        char _id[4];
+        OID oid;
+        IDToInsert() { 
+            type = (char) jstOID;
+            strcpy(_id, "_id");
+            assert( sizeof(IDToInsert) == 17 );
+        }
+    } idToInsert;
+#pragma pack(pop)
+
+    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god) {
         bool addIndex = false;
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
-            if ( sys == ns ) {
-                out() << "ERROR: attempt to insert for invalid database 'system': " << ns << endl;
-                return DiskLoc();
-            }
+            uassert("attempt to insert in reserved database name 'system'", sys != ns);
             if ( strstr(ns, ".system.") ) {
                 // todo later: check for dba-type permissions here.
                 if ( strstr(ns, ".system.indexes") )
@@ -911,6 +921,8 @@ namespace mongo {
                     return DiskLoc();
                 }
             }
+            else
+                sys = 0;
         }
 
         NamespaceDetails *d = nsdetails(ns);
@@ -928,7 +940,7 @@ namespace mongo {
 
         string tabletoidxns;
         if ( addIndex ) {
-            BSONObj io((const char *) buf);
+            BSONObj io((const char *) obuf);
             const char *name = io.getStringField("name"); // name of the index
             tabletoidxns = io.getStringField("ns");  // table it indexes
 
@@ -977,6 +989,18 @@ namespace mongo {
             //indexFullNS += name; // database.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
         }
 
+        int addID = 0;
+        if( !god ) {
+            /* Check if we have an _id field. If we don't, we'll add it. 
+               Note that btree buckets which we insert aren't BSONObj's, but in that case god==true.
+            */
+            BSONObj io((const char *) obuf);
+            if( !io.hasField("_id") && !addIndex && strstr(ns, ".local.") == 0 ) {
+                addID = len;
+                len += sizeof(IDToInsert);
+            }
+        }
+
         DiskLoc extentLoc;
         int lenWHdr = len + Record::HeaderSize;
         lenWHdr = (int) (lenWHdr * d->paddingFactor);
@@ -1003,7 +1027,19 @@ namespace mongo {
 
         Record *r = loc.rec();
         assert( r->lengthWithHeaders >= lenWHdr );
-        memcpy(r->data, buf, len);
+        if( addID ) { 
+            /* a little effort was made here to avoid a double copy when we add an ID */
+            idToInsert.oid.init();
+            ((int&)*r->data) = *((int*) obuf) + sizeof(idToInsert);
+            memcpy(r->data+4, &idToInsert, sizeof(idToInsert));
+            memcpy(r->data+4+sizeof(idToInsert), ((char *)obuf)+4, addID-4);
+// TEMP:
+            BSONObj foo(r->data);
+            cout << "TEMP:" << foo.toString() << endl;
+        }
+        else {
+            memcpy(r->data, obuf, len);
+        }
         Extent *e = r->myExtent(loc);
         if ( e->lastRecord.isNull() ) {
             e->firstRecord = e->lastRecord = loc;
@@ -1033,7 +1069,7 @@ namespace mongo {
         /* add this record to our indexes */
         if ( d->nIndexes ) {
             try { 
-                indexRecord(d, buf, len, loc);
+                indexRecord(d, r->data/*buf*/, len, loc);
             } 
             catch( AssertionException& e ) { 
                 // should be a dup key error on _id index

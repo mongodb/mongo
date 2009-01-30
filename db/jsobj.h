@@ -55,7 +55,7 @@ namespace mongo {
        bdtCustom and above are ones that the JS compiler understands, but are
        opaque to the database.
     */
-    enum BinDataType { Function=1, ByteArray=2, MD5Type=5, bdtCustom=128 };
+    enum BinDataType { Function=1, ByteArray=2, bdtUUID = 3, MD5Type=5, bdtCustom=128 };
     
     /**	Object id's are optional for BSONObjects.
     	When present they should be the first object member added.
@@ -64,9 +64,14 @@ namespace mongo {
         the db server has the same endianness.
     */
     class OID {
-        long long a;
+        union {
+            long long a;
+            unsigned char data[8];
+        };
         unsigned b;
     public:
+        const unsigned char *getData() const { return data; }
+
         bool operator==(const OID& r) {
             return a==r.a&&b==r.b;
         }
@@ -76,20 +81,30 @@ namespace mongo {
         string str() const {
             stringstream s;
             s << hex;
-            s.fill( '0' );
+            //            s.fill( '0' );
+            //            s.width( 2 );
+            // fill wasn't working so doing manually...
+            for( int i = 0; i < 12; i++ ) {
+                unsigned u = data[i];
+                if( u < 16 ) s << '0';
+                s << u;
+            }
+            /*
             s.width( 16 );
             s << a;
             s.width( 8 );
             s << b;
             s << dec;
+            */
             return s.str();
         }
         
         /**
-           sets the contents to a new oid
+           sets the contents to a new oid / randomized value
          */
         void init();
 
+        /** Set to the hex string value specified. */
         void init( string s );
         
     };
