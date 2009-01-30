@@ -328,6 +328,9 @@ namespace mongo {
     /**
 	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
        object in a binary representation.
+
+       Note that BSONObj's have a smart pointer capability built in -- so you can 
+       pass them around by value safely.
      */
     class BSONObj : public Stringable {
         friend class BSONObjIterator;
