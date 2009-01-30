@@ -220,6 +220,7 @@ namespace mongo {
         const char *valuestrsafe() const {
             return type() == String ? valuestr() : "";
         }
+        string str() const { return valuestrsafe(); }
 
         const char * codeWScopeCode() const {
             return value() + 8;
@@ -409,6 +410,10 @@ namespace mongo {
             return getField( name.c_str() );
         };
         BSONElement getField(const char *name) const; /* return has eoo() true if no match */
+
+        BSONElement operator[] (const char *field) const { 
+            return getField(field);
+        }
 
 		/** @return true if field exists */
         bool hasField( const char * name )const {

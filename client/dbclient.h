@@ -80,6 +80,8 @@ namespace mongo {
     public:
         BSONObj obj;
         Query(const BSONObj& b) : obj(b) { }
+        Query(const char *json) : 
+          obj(fromjson(json)) { }
 
         /** Add a sort (ORDER BY) criteria to the query expression. 
             @param sortPattern the sort order template.  For example to order by name ascending, time descending:

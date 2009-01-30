@@ -22,6 +22,8 @@ int main() {
 
     const char * ns = "test.test1";
 
+    conn.dropCollection(ns);
+
     // clean up old data from any previous tests
     conn.remove( ns, BSONObjBuilder().doneAndDecouple() );
     assert( conn.findOne( ns , BSONObjBuilder().doneAndDecouple() ).isEmpty() );
@@ -104,6 +106,18 @@ int main() {
     { // ensure index
         assert( conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
         assert( ! conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
+    }
+
+    { // hint related tests
+        assert( conn.findOne(ns, "{}")["name"].str() == "sara" );
+
+        assert( conn.findOne(ns, "{name:\"eliot\"}")["name"].str() == "eliot" );
+
+        // nonexistent index test
+        assert( conn.findOne(ns, Query("{name:\"eliot\"}").hint("{foo:1}")).hasElement("$err") );
+
+        //existing index
+        assert( conn.findOne(ns, Query("{name:\"eliot\"}").hint("{name:1}")).hasElement("name") );
     }
 
     cout << "client test finished!" << endl;
