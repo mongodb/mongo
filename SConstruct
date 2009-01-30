@@ -83,7 +83,7 @@ env.Append( CPPPATH=[ "." ] )
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
 commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp" )
-commonFiles += [ "util/background.cpp" , "util/miniwebserver.cpp" ,  "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/UUID.cpp" ]
+commonFiles += [ "util/background.cpp" , "util/miniwebserver.cpp" ,  "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" ]
 commonFiles += Glob( "util/*.c" ) + Glob( "grid/*.cpp" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
 
