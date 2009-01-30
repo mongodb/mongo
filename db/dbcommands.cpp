@@ -46,7 +46,11 @@ namespace mongo {
             d->deletedList[i].Null();
     }
 
-    string validateNS(const char *ns, NamespaceDetails *d) {
+    /* { validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] } */
+    string validateNS(const char *ns, NamespaceDetails *d, BSONObj *cmdObj) {
+        bool scanData = true;
+        if( cmdObj && cmdObj->hasElement("scandata") && !cmdObj->getBoolField("scandata") )
+            scanData = false;
         bool valid = true;
         stringstream ss;
         ss << "\nvalidate\n";
@@ -87,42 +91,44 @@ namespace mongo {
                 ss << "\n    exception firstextent\n" << endl;
             }
 
-            auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-            int n = 0;
-            long long len = 0;
-            long long nlen = 0;
             set<DiskLoc> recs;
-            int outOfOrder = 0;
-            DiskLoc cl_last;
-            while ( c->ok() ) {
-                n++;
+            if( scanData ) { 
+                auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+                int n = 0;
+                long long len = 0;
+                long long nlen = 0;
+                int outOfOrder = 0;
+                DiskLoc cl_last;
+                while ( c->ok() ) {
+                    n++;
 
-                DiskLoc cl = c->currLoc();
-                if ( n < 1000000 )
-                    recs.insert(cl);
+                    DiskLoc cl = c->currLoc();
+                    if ( n < 1000000 )
+                        recs.insert(cl);
+                    if ( d->capped ) {
+                        if ( cl < cl_last )
+                            outOfOrder++;
+                        cl_last = cl;
+                    }
+
+                    Record *r = c->_current();
+                    len += r->lengthWithHeaders;
+                    nlen += r->netLength();
+                    c->advance();
+                }
                 if ( d->capped ) {
-                    if ( cl < cl_last )
-                        outOfOrder++;
-                    cl_last = cl;
+                    ss << "  capped outOfOrder:" << outOfOrder;
+                    if ( outOfOrder > 1 ) {
+                        valid = false;
+                        ss << " ???";
+                    }
+                    else ss << " (OK)";
+                    ss << '\n';
                 }
-
-                Record *r = c->_current();
-                len += r->lengthWithHeaders;
-                nlen += r->netLength();
-                c->advance();
+                ss << "  " << n << " objects found, nobj:" << d->nrecords << "\n";
+                ss << "  " << len << " bytes data w/headers\n";
+                ss << "  " << nlen << " bytes data wout/headers\n";
             }
-            if ( d->capped ) {
-                ss << "  capped outOfOrder:" << outOfOrder;
-                if ( outOfOrder > 1 ) {
-                    valid = false;
-                    ss << " ???";
-                }
-                else ss << " (OK)";
-                ss << '\n';
-            }
-            ss << "  " << n << " objects found, nobj:" << d->nrecords << "\n";
-            ss << "  " << len << " bytes data w/headers\n";
-            ss << "  " << nlen << " bytes data wout/headers\n";
 
             ss << "  deletedList: ";
             for ( int i = 0; i < Buckets; i++ ) {
@@ -784,7 +790,7 @@ namespace mongo {
                 if ( d ) {
                     ok = true;
                     anObjBuilder.append("ns", toValidateNs.c_str());
-                    string s = validateNS(toValidateNs.c_str(), d);
+                    string s = validateNS(toValidateNs.c_str(), d, &jsobj);
                     anObjBuilder.append("result", s.c_str());
                 }
                 else {
