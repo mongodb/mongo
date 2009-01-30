@@ -19,6 +19,7 @@
 
 #include "../db/jsobj.h"
 #include "../db/json.h"
+#include "../util/UUID.h"
 
 #include "dbtests.h"
 
@@ -429,7 +430,7 @@ namespace JsobjTests {
         class initParse1 {
         public:
             void run(){
-
+                
                 OID a;
                 OID b;
                 
@@ -438,6 +439,25 @@ namespace JsobjTests {
                 b.init( a.str() );
                 
                 ASSERT( a == b );
+            }
+        };
+
+    }
+    
+    namespace UUIDTests {
+        class basic {
+        public:
+            void run(){        
+                UUID a;
+                UUID b;
+                assert( a != b );
+                assert( ! ( a == b ) );
+                
+                b = a;
+                assert( a == b );
+                
+                UUID c( a.string() );
+                assert( a == c );
             }
         };
     }
@@ -487,6 +507,7 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::Fuzz >( .001 );
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
+            add< UUIDTests::basic >();
         }
     };
     
