@@ -92,12 +92,23 @@ namespace mongo {
 
         /** Add a sort (ORDER BY) criteria to the query expression. 
             This version of sort() assumes you want to sort on a single field.
-            @asc = 1 for ascending order
+            @param asc = 1 for ascending order
             asc = -1 for descending order
         */
         Query& sort(const char *field, int asc = 1) { sort( BSON( field << asc ) ); return *this; }
 
-//        Query& hint();
+        /* Todo: implement version of hint() that takes a query pattern -- most of that should just 
+                  be done on the db side.
+        */
+        /** Provide a hint to the query.
+            @param indexName Name of the index to use.  That is, This isthe name field in db.system.indexes.
+        */
+        Query& hint(const char *indexName);
+
+        /** Return explain information about execution of this query instead of the actual query results.
+            Normally it is easier to use the mongo shell to run db.find(...).explain().
+        */
+        Query& explain();
     };
 
 #define QUERY(x) Query( BSON(x) )
