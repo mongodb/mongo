@@ -32,6 +32,15 @@ AddOption( "--32",
            action="store",
            help="whether to force 32 bit" )
 
+
+AddOption( "--mm",
+           dest="mm",
+           type="string",
+           nargs=0,
+           action="store",
+           help="use main memory instead of memory mapped files" )
+
+
 AddOption( "--release",
            dest="release",
            type="string",
@@ -67,8 +76,18 @@ env.Append( CPPPATH=[ "." ] )
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
 commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp" )
-commonFiles += Glob( "util/*.cpp" ) + Glob( "util/*.c" ) + Glob( "grid/*.cpp" )
+commonFiles += [ "util/background.cpp" , "util/miniwebserver.cpp" ,  "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" ]
+commonFiles += Glob( "util/*.c" ) + Glob( "grid/*.cpp" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
+
+#mmap stuff
+
+if GetOption( "mm" ) != None:
+    commonFiles += [ "util/mmap_mm.cpp" ]
+elif os.sys.platform == "win32":
+    commonFiles += [ "util/mmap_win.cpp" ]
+else:
+    commonFiles += [ "util/mmap_posix.cpp" ]
 
 coreDbFiles = Split( "" )
 
@@ -117,6 +136,10 @@ if "darwin" == os.sys.platform:
         env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
 
 elif "linux2" == os.sys.platform:
+    
+    if not os.path.exists( javaHome ):
+        #fedora standarm jvm location
+        javaHome = "/usr/lib/jvm/java/"
 
     env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/linux"] )
     

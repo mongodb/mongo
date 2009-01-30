@@ -20,8 +20,6 @@
 #include "stdafx.h"
 #include "mmap.h"
 
-#if defined(_WIN32)
-
 namespace mongo {
 
     MemoryMappedFile::MemoryMappedFile() {
@@ -87,10 +85,3 @@ namespace mongo {
     }
 
 } 
-
-#endif
-
-namespace mongo {
-    int mmap_win_no_warnings;
-}
-

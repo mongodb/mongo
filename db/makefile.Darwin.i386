@@ -1,5 +1,0 @@
-
-FLAGS += -I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/ -I/sw/include -L/sw/lib -mmacosx-version-min=10.4
-
-JVM_LIBS += -L/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Libraries/  -framework JavaVM
-

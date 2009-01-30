@@ -16,8 +16,6 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _WIN32
-
 #include "stdafx.h"
 #include "mmap.h"
 
@@ -111,6 +109,3 @@ namespace mongo {
 
 } // namespace mongo
 
-#endif
-
-int mmap_posix_no_warnings;
