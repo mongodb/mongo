@@ -20,6 +20,8 @@
 #include "stdafx.h"
 #include "miniwebserver.h"
 
+#include <pcrecpp.h>
+
 namespace mongo {
 
     MiniWebServer::MiniWebServer() {
@@ -167,7 +169,23 @@ namespace mongo {
 
         ::send(s, response.c_str(), response.size(), 0);
     }
-
+    
+    string MiniWebServer::getHeader( const char * req , string wanted ){
+        const char * headers = strstr( req , "\n" );
+        if ( ! headers )
+            return "";
+        pcrecpp::StringPiece input( headers + 1 );
+        
+        string name;
+        string val;
+        pcrecpp::RE re("([\\w\\-]+): (.*?)\r?\n");
+        while ( re.Consume( &input, &name, &val) ){
+            if ( name == wanted )
+                return val;
+        }
+        return "";
+    }
+    
     void MiniWebServer::run() {
         SockAddr from;
         while ( 1 ) {
