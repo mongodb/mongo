@@ -442,7 +442,8 @@ def testSetup( env , target , source ):
 testEnv.Alias( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
 testEnv.AlwaysBuild( "smoke" )
 
-testEnv.Alias( "smokeClient" , [] , [ x[0].abspath for x in clientTests ] );
+clientExec = [ x[0].abspath for x in clientTests ];
+testEnv.Alias( "smokeClient" , clientExec , clientExec )
 testEnv.AlwaysBuild( "smokeClient" )
 
 #  ----  INSTALL -------
