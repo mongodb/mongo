@@ -112,6 +112,22 @@ namespace mongo {
             Normally it is easier to use the mongo shell to run db.find(...).explain().
         */
         Query& explain();
+
+        /** Queries to the Mongo database support a $where parameter option which contains 
+            a javascript function that is evaluated to see whether objects being queried match 
+            its criteria.  Use this helper to append such a function to a query object. 
+            Your query may also contain other traditional Mongo query terms.
+
+            @param jscode The javascript code to execute.
+            @param scope Context for the javascript object.  List in a BSON object any 
+                   variables you would like defined when the jscode executes.  One can think 
+                   of these as "bind variables".
+
+            Example:
+              conn.findOne("test.coll", Query("a==3").where("this.b == 2 || this.c == 3"));
+        */
+        Query& where(const char *jscode, BSONObj scope);
+        Query& where(const char *jscode) { return where(jscode, BSONObj()); }
     };
 
 #define QUERY(x) Query( BSON(x) )
@@ -248,7 +264,7 @@ namespace mongo {
         */
         virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
-        string createPasswordDigest( const char * clearTextPassword );
+        string createPasswordDigest( const char * username , const char * clearTextPassword );
 
         /* returns true in isMaster parm if this db is the current master
            of a replica pair.
