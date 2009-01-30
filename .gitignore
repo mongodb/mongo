@@ -16,6 +16,8 @@
 *.jsh
 *.jsall
 *.pyc
+*#
+.#*
 
 db/Debug
 db/oplog*
