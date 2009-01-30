@@ -130,17 +130,18 @@ namespace mongo {
 
 #pragma pack(pop)
 
-    /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
-       'a : 3' is the first element (key+value).
-       
-       The BSONElement object points into the BSONObj's data.  Thus the BSONObj must stay in scope
-       for the life of the BSONElement.
-
+    /* internals
        <type><fieldName    ><value>
        -------- size() ------------
              -fieldNameSize-
                             value()
        type()
+    */
+    /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
+       'a : 3' is the first element (key+value).
+       
+       The BSONElement object points into the BSONObj's data.  Thus the BSONObj must stay in scope
+       for the life of the BSONElement.
     */
     class BSONElement {
         friend class BSONObjIterator;

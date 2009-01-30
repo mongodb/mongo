@@ -39,13 +39,13 @@ namespace mongo {
         return *this; 
     }
 
-    Query& Query::hint(const char *h) {
+    Query& Query::hint(BSONObj keyPattern) {
         BSONObjBuilder b;
         if( obj.hasElement("query") )
             b.appendElements(obj);
         else
             b.append("query", obj);
-        b.append("$hint", h);
+        b.append("$hint", keyPattern);
         obj = b.doneAndDecouple();
         return *this; 
     }

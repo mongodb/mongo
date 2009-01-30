@@ -82,7 +82,7 @@ namespace mongo {
     int deleteObjects(const char *ns, BSONObj pattern, bool justOne, BSONObj *deletedId = 0, bool god=false);
 
     class Cursor;
-    auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0, string *hint = 0);
+    auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0, BSONElement *hint = 0);
 
     int runCount(const char *ns, BSONObj& cmd, string& err);
     

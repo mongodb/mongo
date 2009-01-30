@@ -21,6 +21,7 @@
 #include "../stdafx.h"
 #include "../grid/message.h"
 #include "../db/jsobj.h"
+#include "../db/json.h"
 
 namespace mongo {
 
@@ -86,7 +87,7 @@ namespace mongo {
             i.e.
               BSON( "name" << 1 << "ts" << -1 )
             or 
-              fromjson(" \"name\" : 1, \"ts\" : -1 ")
+              fromjson(" name : 1, ts : -1 ")
         */
         Query& sort(const BSONObj& sortPattern);
 
@@ -97,13 +98,13 @@ namespace mongo {
         */
         Query& sort(const char *field, int asc = 1) { sort( BSON( field << asc ) ); return *this; }
 
-        /* Todo: implement version of hint() that takes a query pattern -- most of that should just 
-                  be done on the db side.
-        */
         /** Provide a hint to the query.
-            @param indexName Name of the index to use.  That is, This isthe name field in db.system.indexes.
+            @param keyPattern Key pattern for the index to use.
+            Example:
+              hint("{ts:1}")
         */
-        Query& hint(const char *indexName);
+        Query& hint(BSONObj keyPattern);
+        Query& hint(const char *jsonKeyPatt) { return hint(fromjson(jsonKeyPatt)); }
 
         /** Return explain information about execution of this query instead of the actual query results.
             Normally it is easier to use the mongo shell to run db.find(...).explain().
