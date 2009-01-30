@@ -137,7 +137,7 @@ if "darwin" == os.sys.platform:
 
 elif "linux2" == os.sys.platform:
     
-    if ! os.path.exists( javaHome ):
+    if not os.path.exists( javaHome ):
         #fedora standarm jvm location
         javaHome = "/usr/lib/jvm/java/"
 
