@@ -1,0 +1,10 @@
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2009 WiredTiger Software.
+ *	All rights reserved.
+ *
+ * $Id$
+ */
+
+#include "wt_internal.h"
