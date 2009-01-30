@@ -826,6 +826,17 @@ namespace JsonTests {
             }            
         };
 
+        class SingleQuotes : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "ab'c\"", "bb\b '\"" );
+                return b.doneAndDecouple();
+            }
+            virtual string json() const {
+                return "{ 'ab\\'c\"' : 'bb\\b \\'\"' }";
+            }            
+        };
+
     } // namespace FromJsonTests
     
     class All : public UnitTest::Suite {
@@ -896,6 +907,7 @@ namespace JsonTests {
             add< FromJsonTests::Malformed >();            
             add< FromJsonTests::UnquotedFieldName >();            
             add< FromJsonTests::UnquotedFieldNameDollar >();            
+            add< FromJsonTests::SingleQuotes >();            
         }
     };
     

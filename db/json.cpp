@@ -109,6 +109,9 @@ namespace mongo {
             case '\"':
                 o = '\"';
                 break;
+            case '\'':
+                o = '\'';
+                break;
             case '\\':
                 o = '\\';
                 break;
@@ -419,6 +422,7 @@ public:
                     fieldName >> ':' >> value;
                 fieldName =
                     str[ fieldNameEnd( self.b ) ] |
+                    singleQuoteStr[ fieldNameEnd( self.b ) ] |
                     unquotedFieldName[ unquotedFieldNameEnd( self.b ) ];
                 array = ch_p( '[' )[ arrayStart( self.b ) ] >> !elements >> ']';
                 elements = value >> !( ch_p( ',' )[ arrayNext( self.b ) ] >> elements );
@@ -428,6 +432,7 @@ public:
                     date[ dateEnd( self.b ) ] |
                     regex[ regexEnd( self.b ) ] |
                     str[ stringEnd( self.b ) ] |
+                    singleQuoteStr[ stringEnd( self.b ) ] |
                     number |
                     object[ subobjectEnd( self.b ) ] |
                     array[ arrayEnd( self.b ) ] |
@@ -448,10 +453,26 @@ public:
                                        ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
                                    ch_p( '\x7f' )[ ch( self.b ) ] |
                                    ( ~cntrl_p & ~ch_p( '"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
+
+                singleQuoteStr = lexeme_d[ ch_p( '\'' )[ chClear( self.b ) ] >>
+                                *( ( ch_p( '\\' ) >>
+                                     ( ch_p( '\'' )[ chE( self.b ) ] |
+                                       ch_p( '\\' )[ chE( self.b ) ] |
+                                       ch_p( '/' )[ chE( self.b ) ] |
+                                       ch_p( 'b' )[ chE( self.b ) ] |
+                                       ch_p( 'f' )[ chE( self.b ) ] |
+                                       ch_p( 'n' )[ chE( self.b ) ] |
+                                       ch_p( 'r' )[ chE( self.b ) ] |
+                                       ch_p( 't' )[ chE( self.b ) ] |
+                                       ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
+                                   ch_p( '\x7f' )[ ch( self.b ) ] |
+                                   ( ~cntrl_p & ~ch_p( '\'' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '\'' ];
+
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
                 number = real_p[ numberValue( self.b ) ];
                 
+                // We allow a subset of valid js identifier names here.
                 unquotedFieldName = lexeme_d[ ( alpha_p | ch_p( '$' ) ) >> *( ( alnum_p | ch_p( '$' ) | ch_p( '_' ) ) ) ];
 
                 dbref = dbrefS | dbrefT;
@@ -495,7 +516,7 @@ public:
             }
             rule< ScannerT > object, members, pair, array, elements, value, str, number,
             dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
-            regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName;
+            regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName, singleQuoteStr;
             const rule< ScannerT > &start() const {
                 return object;
             }
