@@ -200,7 +200,7 @@ __wt_cache_db_sync(DB *db)
 		return ((ret));						\
 	}								\
 	(env)->ienv->cache_bytes += (bytes);				\
-	WT_STAT_INCR(env->hstats, CACHE_CLEAN, NULL);			\
+	WT_STAT_INCR((env)->hstats, CACHE_CLEAN, NULL);			\
 } while (0)
 
 /*
