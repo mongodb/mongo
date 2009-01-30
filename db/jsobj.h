@@ -518,17 +518,12 @@ namespace mongo {
 		/** @return true if field exists in the object */
         bool hasElement(const char *name) const;
 
-		/** get the _id field from the object.  assumes _id is the first 
-			element of the object -- this is done for performance.  drivers should 
-			honor this convention.
+		/** Get the _id field from the object.  For good performance drivers should 
+            assure that _id is the first element of the object; however, correct operation 
+            is assured regardless.
+            @return true if found
 		*/
-		bool getObjectID(BSONElement& e) { 
-            BSONElement f = firstElement();
-			if( strcmp(f.fieldName(), "_id") )
-				return false;
-			e = f;
-			return true;
-		}
+		bool getObjectID(BSONElement& e);
 
         OID* __getOID() {
             BSONElement e = firstElement();
@@ -732,10 +727,13 @@ namespace mongo {
             b.append((int) strlen(symbol)+1);
             b.append(symbol);
         }
+
+        /** Add Null element to the object */
         void appendNull( const char *fieldName ) {
             b.append( (char) jstNULL );
             b.append( fieldName );
         }
+
         // Append an element that is less than all other keys.
         void appendMinKey( const char *fieldName ) {
             b.append( (char) MinKey );
@@ -746,6 +744,8 @@ namespace mongo {
             b.append( (char) MaxKey );
             b.append( fieldName );
         }
+
+        /* Deprecated (but supported) */
         void appendDBRef( const char *fieldName, const char *ns, const OID &oid ) {
             b.append( (char) DBRef );
             b.append( fieldName );
@@ -753,6 +753,7 @@ namespace mongo {
             b.append( ns );
             b.append( (void *) &oid, 12 );
         }
+
         void appendBinData( const char *fieldName, int len, BinDataType type, const char *data ) {
             b.append( (char) BinData );
             b.append( fieldName );
@@ -761,6 +762,9 @@ namespace mongo {
             b.append( (void *) data, len );
         }
 
+        /** Append to the BSON object a field of type CodeWScope.  This is a javascript code 
+            fragment accompanied by some scope that goes with it.
+            */
         void appendCodeWScope( const char *fieldName, const char *code, const BSONObj &scope ) {
             b.append( (char) CodeWScope );
             b.append( fieldName );
@@ -770,6 +774,7 @@ namespace mongo {
             b.append( ( void * )scope.objdata(), scope.objsize() );
         }
 
+        /* helper function -- see Query::where() for primary way to do this. */
         void appendWhere( const char *code, const BSONObj &scope ){
             appendCodeWScope( "$where" , code , scope );
         }
@@ -1007,5 +1012,13 @@ namespace mongo {
             *this = emptyObj;
     }
 
+    inline bool BSONObj::getObjectID(BSONElement& e) { 
+        BSONElement f = findElement("_id");
+        if( !f.eoo() ) { 
+            e = f;
+            return true;
+        }
+        return false;
+    }
 
 } // namespace mongo

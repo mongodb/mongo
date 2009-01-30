@@ -299,11 +299,27 @@ v8::Handle< v8::Value > ResetDbpath( const v8::Arguments &a ) {
 }
 
 void killDb( int port ) {
-    assert( dbs.count( port ) == 1 );
+    if( dbs.count( port ) != 1 ) {
+        cout << "No db started on port: " << port << endl;
+        return;
+    }
+
     pid_t pid = dbs[ port ];
     kill( pid, SIGTERM );
-    int temp;
-    waitpid( pid, &temp, 0 );
+
+    boost::xtime xt;
+    boost::xtime_get(&xt, boost::TIME_UTC);
+    ++xt.sec;
+    int i = 0;
+    for( ; i < 5; ++i, ++xt.sec ) {
+        int temp;
+        if( waitpid( pid, &temp, WNOHANG ) != 0 )
+            break;
+        boost::thread::sleep( xt );
+    }
+    if ( i == 5 )
+        kill( pid, SIGKILL );
+    
     dbs.erase( port );
 }
 

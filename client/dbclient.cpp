@@ -28,6 +28,16 @@
 
 namespace mongo {
 
+    Query& Query::where(const char *jscode, BSONObj scope) { 
+        /* use where() before sort() and hint() and explain(), else this will assert. */
+        assert( !obj.hasField("query") );
+        BSONObjBuilder b;
+        b.appendElements(obj);
+        b.appendWhere(jscode, scope);
+        obj = b.doneAndDecouple();
+        return *this;
+    }
+
     Query& Query::sort(const BSONObj& s) { 
         BSONObjBuilder b;
         if( obj.hasElement("query") )
