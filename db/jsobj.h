@@ -518,17 +518,12 @@ namespace mongo {
 		/** @return true if field exists in the object */
         bool hasElement(const char *name) const;
 
-		/** get the _id field from the object.  assumes _id is the first 
-			element of the object -- this is done for performance.  drivers should 
-			honor this convention.
+		/** Get the _id field from the object.  For good performance drivers should 
+            assure that _id is the first element of the object; however, correct operation 
+            is assured regardless.
+            @return true if found
 		*/
-		bool getObjectID(BSONElement& e) { 
-            BSONElement f = firstElement();
-			if( strcmp(f.fieldName(), "_id") )
-				return false;
-			e = f;
-			return true;
-		}
+		bool getObjectID(BSONElement& e);
 
         OID* __getOID() {
             BSONElement e = firstElement();
@@ -1017,5 +1012,13 @@ namespace mongo {
             *this = emptyObj;
     }
 
+    inline bool BSONObj::getObjectID(BSONElement& e) { 
+        BSONElement f = findElement("_id");
+        if( !f.eoo() ) { 
+            e = f;
+            return true;
+        }
+        return false;
+    }
 
 } // namespace mongo
