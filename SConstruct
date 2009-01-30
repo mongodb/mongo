@@ -32,6 +32,15 @@ AddOption( "--32",
            action="store",
            help="whether to force 32 bit" )
 
+
+AddOption( "--mm",
+           dest="mm",
+           type="string",
+           nargs=0,
+           action="store",
+           help="use main memory instead of memory mapped files" )
+
+
 AddOption( "--release",
            dest="release",
            type="string",
@@ -73,7 +82,9 @@ commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp"
 
 #mmap stuff
 
-if os.sys.platform == "win32":
+if GetOption( "mm" ) != None:
+    commonFiles += [ "util/mmap_mm.cpp" ]
+elif os.sys.platform == "win32":
     commonFiles += [ "util/mmap_win.cpp" ]
 else:
     commonFiles += [ "util/mmap_posix.cpp" ]
