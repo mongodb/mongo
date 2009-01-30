@@ -112,11 +112,13 @@ int main() {
         assert( conn.findOne(ns, "{}")["name"].str() == "sara" );
 
         assert( conn.findOne(ns, "{ name : 'eliot' }")["name"].str() == "eliot" );
-        assert( conn.getLastError("test") == "" );
+        assert( conn.getLastError() == "" );
 
         // nonexistent index test
         assert( conn.findOne(ns, Query("{name:\"eliot\"}").hint("{foo:1}")).hasElement("$err") );
-        assert( conn.getLastError("test") == "hint index not found" );
+        assert( conn.getLastError() == "hint index not found" );
+        conn.resetError();
+        assert( conn.getLastError() == "" );
 
         //existing index
         assert( conn.findOne(ns, Query("{name:'eliot'}").hint("{name:1}")).hasElement("name") );

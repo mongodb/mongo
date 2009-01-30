@@ -281,23 +281,29 @@ namespace mongo {
         /** Get error result from the last operation on this connection. 
             @return error or empty string if no error.
         */
-        string getLastError(const char *dbname);
+        string getLastError();
 
 
-        /* Return the last error which has occurred, even if not the very last operation.
+        /** Return the last error which has occurred, even if not the very last operation.
 
-           Returns: 
-             { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
+           @return { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
 
            result.err will be null if no error has occurred.
         */        
-        BSONObj getPrevError(const char *dbname);
+        BSONObj getPrevError();
+
+        /** Reset the previous error state for this connection (accessed via getLastError and 
+            getPrevError).  Useful when performing several operations at once and then checking 
+            for an error after attempting all operations.
+        */
+        bool resetError() { return simpleCommand("admin", 0, "reseterror"); }
 
         /* Erase / drop an entire database */
         bool dropDatabase(const char *dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "dropDatabase");
         }
-        
+
+        /** Delete the specified collection. */        
         bool dropCollection( const string ns ){
             assert( ns.find( "." ) != string::npos );
             int pos = ns.find( "." );

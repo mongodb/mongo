@@ -87,9 +87,9 @@ namespace mongo {
 
     BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
 
-    string DBClientWithCommands::getLastError(const char *dbname) { 
+    string DBClientWithCommands::getLastError() { 
         BSONObj info;
-        runCommand(dbname, getlasterrorcmdobj, info);
+        runCommand("admin", getlasterrorcmdobj, info);
         BSONElement e = info["err"];
         if( e.eoo() ) return "";
         if( e.type() == Object ) return e.toString();
@@ -98,9 +98,9 @@ namespace mongo {
 
     BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
 
-    BSONObj DBClientWithCommands::getPrevError(const char *dbname) { 
+    BSONObj DBClientWithCommands::getPrevError() { 
         BSONObj info;
-        runCommand(dbname, getpreverrorcmdobj, info);
+        runCommand("admin", getpreverrorcmdobj, info);
         return info;
     }
 
