@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static int __wt_toc_destroy(WT_TOC *, u_int32_t);
+
 /*
  * wt_toc_create --
  *	WT_TOC constructor.
@@ -44,7 +46,7 @@ err:	(void)__wt_toc_destroy(toc, 0);
  * __wt_toc_destroy --
  *	toc.destroy method (WT_TOC destructor).
  */
-int
+static int
 __wt_toc_destroy(WT_TOC *toc, u_int32_t flags)
 {
 	WT_FREE_AND_CLEAR(NULL, toc->mtx);
