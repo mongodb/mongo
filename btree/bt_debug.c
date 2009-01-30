@@ -34,11 +34,9 @@ __wt_bt_dump_debug(DB *db, char *ofile, FILE *fp)
 		fp = stdout;
 
 	/*
-	 * We use the verification code to do debugging dumps for two reasons:
-	 * First, if we're dumping in debugging mode, it's best to check that
-	 * the page is OK before walking it.  Second, the verification code has
-	 * to walk the entire tree anyway, and there's a fair amount of effort
-	 * involved in walking every page of a file safely.
+	 * We use the verification code to do debugging dumps because if we're
+	 * dumping in debugging mode, we want to confirm the page is OK before
+	 * walking it.
 	 */
 	ret = __wt_bt_verify_int(db, fp);
 
