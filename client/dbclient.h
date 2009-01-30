@@ -96,6 +96,8 @@ namespace mongo {
             asc = -1 for descending order
         */
         Query& sort(const char *field, int asc = 1) { sort( BSON( field << asc ) ); return *this; }
+
+//        Query& hint();
     };
 
 #define QUERY(x) Query( BSON(x) )
