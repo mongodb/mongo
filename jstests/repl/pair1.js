@@ -14,21 +14,20 @@ writeOne = function( n ) {
     n.getDB( baseName ).z.save( { _id: new ObjectId(), i: ++writeOneIdx } );
 }
 
-getOne = function( n ) {
-    print( tojson( n.getDB( baseName ).z.find( { i: writeOneIdx } ).toArray() ) );
+getCount = function( n ) {
     return n.getDB( baseName ).z.find( { i: writeOneIdx } ).toArray().length;
 }
 
 checkWrite = function( m, s ) {
     writeOne( m );
-    assert.eq( 1, getOne( m ) );
+    assert.eq( 1, getCount( m ) );
     s.setSlaveOk();
     assert.soon( function() {
                 if ( -1 == s.getDBNames().indexOf( baseName ) )
                     return false;
                 if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "z" ) )
                     return false;
-                return 1 == getOne( s );
+                return 1 == getCount( s );
                 } );
 }
 
@@ -36,8 +35,6 @@ checkWrite = function( m, s ) {
 a = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-arbiter" );
 l = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27020", "127.0.0.1:27018", "--oplogSize", "1" );
 r = startMongod( "--port", "27020", "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:27019", "127.0.0.1:27018", "--oplogSize", "1" );
-
-print( a.slaveOk );
 
 assert.soon( function() {
             am = ismaster( a );
