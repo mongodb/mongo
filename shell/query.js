@@ -121,6 +121,13 @@ DBQuery.prototype.sort = function( sortBy ){
     return this;
 }
 
+DBQuery.prototype.hint = function( hint ){
+    this._ensureSpecial();
+    this._query["$hint"] = hint;
+    return this;
+}
+
+
 DBQuery.prototype.forEach = function( func ){
     while ( this.hasNext() )
         func( this.next() );
