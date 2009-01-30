@@ -106,12 +106,13 @@ namespace mongo {
 
     BSONObj getnoncecmdobj = fromjson("{getnonce:1}");
 
-    string DBClientWithCommands::createPasswordDigest( const char * clearTextPassword ){
+    string DBClientWithCommands::createPasswordDigest( const char * username , const char * clearTextPassword ){
         md5digest d;
         {
             md5_state_t st;
             md5_init(&st);
-            md5_append(&st, (const md5_byte_t *) "mongo", 5 );
+            md5_append(&st, (const md5_byte_t *) username, strlen(username));
+            md5_append(&st, (const md5_byte_t *) ":mongo:", 5 );
             md5_append(&st, (const md5_byte_t *) clearTextPassword, strlen(clearTextPassword));
             md5_finish(&st, d);
         }
@@ -123,7 +124,7 @@ namespace mongo {
 
 		string password = password_text;
 		if( digestPassword ) 
-			password = createPasswordDigest( password_text );
+			password = createPasswordDigest( username , password_text );
 
         BSONObj info;
         string nonce;
@@ -305,7 +306,7 @@ namespace mongo {
 	bool DBClientConnection::auth(const char *dbname, const char *username, const char *password_text, string& errmsg, bool digestPassword) {
 		string password = password_text;
 		if( digestPassword ) 
-			password = createPasswordDigest( password_text );
+			password = createPasswordDigest( username , password_text );
 
 		if( autoReconnect ) {
 			/* note we remember the auth info before we attempt to auth -- if the connection is broken, we will 

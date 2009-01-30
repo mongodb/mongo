@@ -248,7 +248,7 @@ namespace mongo {
         */
         virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
-        string createPasswordDigest( const char * clearTextPassword );
+        string createPasswordDigest( const char * username , const char * clearTextPassword );
 
         /* returns true in isMaster parm if this db is the current master
            of a replica pair.
