@@ -660,12 +660,27 @@ namespace mongo {
             vector< string > dbNames;
             getDatabaseNames( dbNames );
             vector< BSONObj > dbInfos;
+
+            set<string> seen;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
                 BSONObjBuilder b;
                 b.append( "name", i->c_str() );
                 b.append( "sizeOnDisk", (double) dbSize( i->c_str() ) );
                 dbInfos.push_back( b.doneAndDecouple() );
+
+                seen.insert( i->c_str() );
             }
+            
+            for ( map<string,Database*>::iterator i = databases.begin(); i != databases.end(); i++ ){
+                string name = i->first;
+                name = name.substr( 0 , name.find( ":" ) );
+
+                if ( seen.count( name ) )
+                    continue;
+                
+                dbInfos.push_back( BSON( "name" << name ) );
+            }
+
             result.append( "databases", dbInfos );
             return true;
         }
