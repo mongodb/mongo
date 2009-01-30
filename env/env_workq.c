@@ -70,7 +70,7 @@ static void *
 __wt_engine(void *notused)
 {
 	WT_TOC **q, **eq, *toc;
-	int not_found, ret, tenths;
+	int not_found, tenths;
 
 	/* Allocate the work queue. */
 #define	WT_WORKQ_SIZE	32
@@ -98,7 +98,7 @@ __wt_engine(void *notused)
 			WT_FLUSH_MEMORY;
 
 			/* Wake the waiting thread. */
-			__wt_unlock(toc->mtx);
+			(void)__wt_unlock(toc->mtx);
 		}
 		if (++q == eq) {
 			/*
