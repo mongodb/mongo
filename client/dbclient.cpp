@@ -30,11 +30,33 @@ namespace mongo {
 
     Query& Query::sort(const BSONObj& s) { 
         BSONObjBuilder b;
-        if( s.hasElement("query") )
+        if( obj.hasElement("query") )
             b.appendElements(obj);
         else
             b.append("query", obj);
         b.append("orderby", s);
+        obj = b.doneAndDecouple();
+        return *this; 
+    }
+
+    Query& Query::hint(BSONObj keyPattern) {
+        BSONObjBuilder b;
+        if( obj.hasElement("query") )
+            b.appendElements(obj);
+        else
+            b.append("query", obj);
+        b.append("$hint", keyPattern);
+        obj = b.doneAndDecouple();
+        return *this; 
+    }
+
+    Query& Query::explain() {
+        BSONObjBuilder b;
+        if( obj.hasElement("query") )
+            b.appendElements(obj);
+        else
+            b.append("query", obj);
+        b.append("$explain", true);
         obj = b.doneAndDecouple();
         return *this; 
     }
@@ -45,7 +67,7 @@ namespace mongo {
         return o.getIntField("ok") == 1;
     }
 
-    inline bool DBClientWithCommands::runCommand(const char *dbname, BSONObj cmd, BSONObj &info) {
+    inline bool DBClientWithCommands::runCommand(const char *dbname, const BSONObj& cmd, BSONObj &info) {
         string ns = string(dbname) + ".$cmd";
         info = findOne(ns.c_str(), cmd);
         return isOk(info);
@@ -63,7 +85,26 @@ namespace mongo {
         return runCommand(dbname, b.done(), *info);
     }
 
-    BSONObj getnoncecmdobj = fromjson("{\"getnonce\":1}");
+    BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
+
+    string DBClientWithCommands::getLastError() { 
+        BSONObj info;
+        runCommand("admin", getlasterrorcmdobj, info);
+        BSONElement e = info["err"];
+        if( e.eoo() ) return "";
+        if( e.type() == Object ) return e.toString();
+        return e.str();
+    }
+
+    BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
+
+    BSONObj DBClientWithCommands::getPrevError() { 
+        BSONObj info;
+        runCommand("admin", getpreverrorcmdobj, info);
+        return info;
+    }
+
+    BSONObj getnoncecmdobj = fromjson("{getnonce:1}");
 
     string DBClientWithCommands::createPasswordDigest( const char * clearTextPassword ){
         md5digest d;

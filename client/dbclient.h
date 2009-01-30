@@ -21,6 +21,7 @@
 #include "../stdafx.h"
 #include "../grid/message.h"
 #include "../db/jsobj.h"
+#include "../db/json.h"
 
 namespace mongo {
 
@@ -79,6 +80,8 @@ namespace mongo {
     public:
         BSONObj obj;
         Query(const BSONObj& b) : obj(b) { }
+        Query(const char *json) : 
+          obj(fromjson(json)) { }
 
         /** Add a sort (ORDER BY) criteria to the query expression. 
             @param sortPattern the sort order template.  For example to order by name ascending, time descending:
@@ -86,16 +89,29 @@ namespace mongo {
             i.e.
               BSON( "name" << 1 << "ts" << -1 )
             or 
-              fromjson(" \"name\" : 1, \"ts\" : -1 ")
+              fromjson(" name : 1, ts : -1 ")
         */
         Query& sort(const BSONObj& sortPattern);
 
         /** Add a sort (ORDER BY) criteria to the query expression. 
             This version of sort() assumes you want to sort on a single field.
-            @asc = 1 for ascending order
+            @param asc = 1 for ascending order
             asc = -1 for descending order
         */
         Query& sort(const char *field, int asc = 1) { sort( BSON( field << asc ) ); return *this; }
+
+        /** Provide a hint to the query.
+            @param keyPattern Key pattern for the index to use.
+            Example:
+              hint("{ts:1}")
+        */
+        Query& hint(BSONObj keyPattern);
+        Query& hint(const char *jsonKeyPatt) { return hint(fromjson(jsonKeyPatt)); }
+
+        /** Return explain information about execution of this query instead of the actual query results.
+            Normally it is easier to use the mongo shell to run db.find(...).explain().
+        */
+        Query& explain();
     };
 
 #define QUERY(x) Query( BSON(x) )
@@ -220,7 +236,7 @@ namespace mongo {
 
            @return true if the command returned "ok".
         */
-        bool runCommand(const char *dbname, BSONObj cmd, BSONObj &info);
+        bool runCommand(const char *dbname, const BSONObj& cmd, BSONObj &info);
 
         /** Authorize access to a particular database.
 			Authentication is separate for each database on the server -- you may authenticate for any 
@@ -262,11 +278,32 @@ namespace mongo {
         */
         bool createCollection(const char *ns, unsigned size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
 
+        /** Get error result from the last operation on this connection. 
+            @return error or empty string if no error.
+        */
+        string getLastError();
+
+
+        /** Return the last error which has occurred, even if not the very last operation.
+
+           @return { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
+
+           result.err will be null if no error has occurred.
+        */        
+        BSONObj getPrevError();
+
+        /** Reset the previous error state for this connection (accessed via getLastError and 
+            getPrevError).  Useful when performing several operations at once and then checking 
+            for an error after attempting all operations.
+        */
+        bool resetError() { return simpleCommand("admin", 0, "reseterror"); }
+
         /* Erase / drop an entire database */
         bool dropDatabase(const char *dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "dropDatabase");
         }
-        
+
+        /** Delete the specified collection. */        
         bool dropCollection( const string ns ){
             assert( ns.find( "." ) != string::npos );
             int pos = ns.find( "." );

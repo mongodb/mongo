@@ -14,7 +14,7 @@ int main() {
     if ( ! conn.connect( "127.0.0.1" , errmsg ) ) {
         cout << "couldn't connect : " << errmsg << endl;
         throw -11;
-    }
+    } 
 
     const char * ns = "test.where";
 

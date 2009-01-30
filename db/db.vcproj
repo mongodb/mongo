@@ -289,10 +289,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\client\dbclient.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\dbcommands.cpp"
 				>
 			</File>
@@ -489,6 +485,14 @@
 				</File>
 				<File
 					RelativePath="..\util\util.cpp"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="client"
+				>
+				<File
+					RelativePath="..\client\dbclient.cpp"
 					>
 				</File>
 			</Filter>

@@ -5,6 +5,30 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "db", "db.vcproj", "{215B2D6
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dbgrid", "..\dbgrid\dbgrid.vcproj", "{E03717ED-69B4-4D21-BC55-DF6690B585C6}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "clienttests", "clienttests", "{4082881B-EB00-486F-906C-843B8EC06E18}"
+	ProjectSection(SolutionItems) = preProject
+		..\client\examples\authTest.cpp = ..\client\examples\authTest.cpp
+		..\client\examples\clientTest.cpp = ..\client\examples\clientTest.cpp
+		..\client\examples\first.cpp = ..\client\examples\first.cpp
+		..\client\examples\second.cpp = ..\client\examples\second.cpp
+		..\client\examples\whereExample.cpp = ..\client\examples\whereExample.cpp
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72EBEDD-342D-4371-8B0D-D7505902FA69}"
+	ProjectSection(SolutionItems) = preProject
+		..\dbtests\btreetests.cpp = ..\dbtests\btreetests.cpp
+		..\dbtests\dbtests.cpp = ..\dbtests\dbtests.cpp
+		..\dbtests\jsobjtests.cpp = ..\dbtests\jsobjtests.cpp
+		..\dbtests\jsontests.cpp = ..\dbtests\jsontests.cpp
+		..\dbtests\matchertests.cpp = ..\dbtests\matchertests.cpp
+		..\dbtests\namespacetests.cpp = ..\dbtests\namespacetests.cpp
+		..\dbtests\pairingtests.cpp = ..\dbtests\pairingtests.cpp
+		..\dbtests\pdfiletests.cpp = ..\dbtests\pdfiletests.cpp
+		..\dbtests\querytests.cpp = ..\dbtests\querytests.cpp
+		..\dbtests\repltests.cpp = ..\dbtests\repltests.cpp
+		..\dbtests\socktests.cpp = ..\dbtests\socktests.cpp
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32

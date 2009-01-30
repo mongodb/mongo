@@ -79,26 +79,48 @@ namespace mongo {
          simpleKeyMatch - set to true if the query is purely for a single key value
                           unchanged otherwise.
     */
-    auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch, bool *isSorted, string *hint) {
+    auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch, bool *isSorted, BSONElement *hint) {
         NamespaceDetails *d = nsdetails(ns);
         if ( d == 0 ) return auto_ptr<Cursor>();
 
-        if ( hint && !hint->empty() ) {
+        if ( hint && !hint->eoo() ) {
             /* todo: more work needed.  doesn't handle $lt & $gt for example.
                      waiting for query optimizer rewrite (see queryoptimizer.h) before finishing the work.
             */
-            for (int i = 0; i < d->nIndexes; i++ ) {
-                IndexDetails& ii = d->indexes[i];
-                if ( ii.indexName() == *hint ) {
-                    BSONObj startKey = ii.getKeyFromQuery(query);
-                    int direction = 1;
-                    if ( simpleKeyMatch )
-                        *simpleKeyMatch = query.nFields() == startKey.nFields();
-                    if ( isSorted ) *isSorted = false;
-                    return auto_ptr<Cursor>(
-                               new BtreeCursor(ii, startKey, direction, query));
+            if( hint->type() == String ) {
+                string hintstr = hint->valuestr();
+                for (int i = 0; i < d->nIndexes; i++ ) {
+                    IndexDetails& ii = d->indexes[i];
+                    if ( ii.indexName() == hintstr ) {
+                        BSONObj startKey = ii.getKeyFromQuery(query);
+                        int direction = 1;
+                        if ( simpleKeyMatch )
+                            *simpleKeyMatch = query.nFields() == startKey.nFields();
+                        if ( isSorted ) *isSorted = false;
+                        return auto_ptr<Cursor>(
+                            new BtreeCursor(ii, startKey, direction, query));
+                    }
                 }
             }
+            else if( hint->type() == Object ) { 
+                BSONObj hintobj = hint->embeddedObject();
+                for (int i = 0; i < d->nIndexes; i++ ) {
+                    IndexDetails& ii = d->indexes[i];
+                    if( ii.keyPattern().woCompare(hintobj) == 0 ) {
+                        BSONObj startKey = ii.getKeyFromQuery(query);
+                        int direction = 1;
+                        if ( simpleKeyMatch )
+                            *simpleKeyMatch = query.nFields() == startKey.nFields();
+                        if ( isSorted ) *isSorted = false;
+                        return auto_ptr<Cursor>(
+                            new BtreeCursor(ii, startKey, direction, query));
+                    }
+                }
+            }
+            else { 
+                uasserted("bad hint object");
+            }
+            uasserted("hint index not found");
         }
 
         if ( !order.isEmpty() ) {
@@ -580,7 +602,7 @@ namespace mongo {
 
             uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
 
-            string hint;
+            BSONElement hint;
             bool explain = false;
             bool _gotquery = false;
             BSONObj query;// = jsobj.getObjectField("query");
@@ -604,7 +626,7 @@ namespace mongo {
                 query = jsobj;
             else {
                 explain = jsobj.getBoolField("$explain");
-                hint = jsobj.getStringField("$hint");
+                hint = jsobj.getField("$hint");
             }
 
             /* The ElemIter will not be happy if this isn't really an object. So throw exception
