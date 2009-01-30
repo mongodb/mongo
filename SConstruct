@@ -77,7 +77,7 @@ AddOption( "--noOptimization",
 
 env = Environment()
 
-env.Append( CPPPATH=[ "." ] )
+env.Append( CPPPATH=[ "." , "/usr/include/uuid/" ] )
 
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
@@ -265,6 +265,10 @@ if not conf.CheckCXXHeader( 'pcrecpp.h' ):
     print( "can't find pcre" )
     Exit(1)
 
+if not conf.CheckCXXHeader( 'uuid.h' ):
+    print( "can't find uuid" )
+    Exit(1)
+
 if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
     print( "can't find boost headers" )
     Exit(1)
@@ -360,7 +364,7 @@ env.Append( BUILDERS={'JSHeader' : jshBuilder})
 # --- targets ----
 
 clientEnv = env.Clone();
-clientEnv.Append( CPPPATH=["../"] )
+clientEnv.Append( CPPPATH=["../" ] )
 clientEnv.Append( LIBS=[ "libmongoclient.a"] )
 clientEnv.Append( LIBPATH=["."] )
 
