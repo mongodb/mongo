@@ -18,11 +18,14 @@
 
 #include "stdafx.h"
 #include "../util/miniwebserver.h"
+#include "../util/md5.hpp"
 #include "db.h"
 #include "repl.h"
 #include "replset.h"
 #include "instance.h"
 #include "security.h"
+
+#include <pcrecpp.h>
 
 namespace mongo {
 
@@ -152,6 +155,62 @@ namespace mongo {
 
             ss << "\nreplInfo:  " << replInfo << '\n';
         }
+        
+        bool allowed( const char * rq , vector<string>& headers ){
+            
+            if ( db.findOne( "admin.system.users" , emptyObj ).isEmpty() )
+                return true;
+            
+            string auth = getHeader( rq , "Authorization" );
+
+            if ( auth.size() > 0 && auth.find( "Digest " ) == 0 ){
+                auth = auth.substr( 7 ) + ", ";
+
+                map<string,string> parms;
+                pcrecpp::StringPiece input( auth );
+                
+                string name, val;
+                pcrecpp::RE re("(\\w+)=\"?(.*?)\"?, ");
+                while ( re.Consume( &input, &name, &val) ){
+                    parms[name] = val;
+                }
+
+                BSONObj user = db.findOne( "admin.system.users" , BSON( "user" << parms["username"] ) );
+                if ( ! user.isEmpty() ){
+                    string ha1 = user["pwd"].str();
+                    string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
+                    
+                    string r = ha1 + ":" + parms["nonce"];
+                    if ( parms["nc"].size() && parms["cnonce"].size() && parms["qop"].size() ){
+                        r += ":";
+                        r += parms["nc"];
+                        r += ":";
+                        r += parms["cnonce"];
+                        r += ":";
+                        r += parms["qop"];
+                    }
+                    r += ":";
+                    r += ha2;
+                    r = md5simpledigest( r );
+                    
+                    if ( r == parms["response"] )
+                        return true;
+                }
+
+                
+            }
+            
+            stringstream authHeader;
+            authHeader 
+                << "WWW-Authenticate: "
+                << "Digest realm=\"mongo\", "
+                << "nonce=\"abc\", " 
+                << "algorithm=MD5, qop=\"auth\" "
+                ;
+            
+            headers.push_back( authHeader.str() );
+            return 0;
+        }
 
         virtual void doRequest(
             const char *rq, // the full request
@@ -163,6 +222,12 @@ namespace mongo {
         )
         {
             //out() << "url [" << url << "]" << endl;
+            
+            if ( ! allowed( rq , headers ) ){
+                responseCode = 401;
+                responseMsg = "not allowed\n";
+                return;
+            }
 
             if ( url.size() > 1 ) {
                 handleRESTRequest( rq , url , responseMsg , responseCode , headers );
