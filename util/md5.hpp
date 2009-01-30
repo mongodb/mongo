@@ -29,4 +29,10 @@ namespace mongo {
         return ss.str();
     }
 
+    inline std::string md5simpledigest( string s ){
+        md5digest d;
+        md5( s.c_str() , d );
+        return digestToString( d );
+    }
+
 } // namespace mongo
