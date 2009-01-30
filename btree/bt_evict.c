@@ -200,6 +200,7 @@ __wt_cache_db_sync(DB *db)
 		return ((ret));						\
 	}								\
 	(env)->ienv->cache_bytes += (bytes);				\
+	WT_STAT_INCR(env->hstats, CACHE_CLEAN, NULL);			\
 } while (0)
 
 /*
@@ -223,8 +224,9 @@ __wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep)
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
-	WT_STAT_INCR(env, CACHE_ALLOC, "pages allocated in the cache");
-	WT_STAT_INCR(db, DB_CACHE_ALLOC, "pages allocated in the cache");
+	WT_STAT_INCR(env->hstats, CACHE_ALLOC, "pages allocated in the cache");
+	WT_STAT_INCR(
+	    db->hstats, DB_CACHE_ALLOC, "pages allocated in the cache");
 
 	/* Check for exceeding the size of the cache. */
 	if (ienv->cache_bytes > ienv->cache_bytes_max) {
@@ -299,15 +301,19 @@ __wt_cache_db_in(DB *db,
 		TAILQ_REMOVE(&ienv->lqh, page, q);
 		TAILQ_INSERT_TAIL(&ienv->lqh, page, q);
 
-		WT_STAT_INCR(env, CACHE_HIT, "reads found in the cache");
-		WT_STAT_INCR(db, DB_CACHE_HIT, "reads found in the cache");
+		WT_STAT_INCR(env->hstats,
+		    CACHE_HIT, "cache hit: reads found in the cache");
+		WT_STAT_INCR(db->hstats,
+		    DB_CACHE_HIT, "cache hit: reads found in the cache");
 
 		*pagep = page;
 		return (0);
 	}
 
-	WT_STAT_INCR(env, CACHE_MISS, "reads not found in the cache");
-	WT_STAT_INCR(db, DB_CACHE_MISS, "reads not found in the cache");
+	WT_STAT_INCR(env->hstats,
+	    CACHE_MISS, "cache miss: reads not found in the cache");
+	WT_STAT_INCR(db->hstats,
+	    DB_CACHE_MISS, "cache miss: reads not found in the cache");
 
 	/* Check for exceeding the size of the cache. */
 	if (ienv->cache_bytes > ienv->cache_bytes_max) {
@@ -376,11 +382,19 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 	WT_ASSERT(env, page->ref > 0);
 	--page->ref;
 
+	/* Set modify flag, and update clean/dirty statistics. */
+	if (LF_ISSET(WT_MODIFIED) && !F_ISSET(page, WT_MODIFIED)) {
+		F_SET(page, WT_MODIFIED);
+
+		WT_STAT_INCR(
+		    env->hstats, CACHE_DIRTY, "dirty pages in the cache");
+		WT_STAT_DECR(
+		    env->hstats, CACHE_CLEAN, "clean pages in the cache");
+	}
+
 	/*
-	 * If the page isn't to be retained in the cache, discard it, writing
-	 * it first, if it has been modified.
-	 *
-	 * Otherwise, if the page has been modified, set the appropriate flag.
+	 * If the page isn't to be retained in the cache, write it if it's
+	 * dirty, and discard it.
 	 */
 	if (LF_ISSET(WT_UNFORMATTED)) {
 		if (F_ISSET(page, WT_MODIFIED) &&
@@ -388,12 +402,6 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 			return (ret);
 		if ((ret = __wt_cache_discard(env, page)) != 0)
 			return (ret);
-	} else if (LF_ISSET(WT_MODIFIED)) {
-		F_SET(page, WT_MODIFIED);
-		WT_STAT_INCR(env, CACHE_DIRTY, "dirty pages in the cache");
-		WT_STAT_INCR(db, DB_CACHE_DIRTY, "dirty pages in the cache");
-		WT_STAT_DECR(env, CACHE_CLEAN, "clean pages in the cache");
-		WT_STAT_DECR(db, DB_CACHE_CLEAN, "clean pages in the cache");
 	}
 
 	return (0);
@@ -428,14 +436,14 @@ __wt_cache_clean(ENV *env, u_int32_t bytes, WT_PAGE **pagep)
 
 		/* Write the page if it's been modified. */
 		if (F_ISSET(page, WT_MODIFIED)) {
-			WT_STAT_INCR(env, CACHE_WRITE_EVICT,
+			WT_STAT_INCR(env->hstats, CACHE_WRITE_EVICT,
 			    "dirty pages evicted from the cache");
 
 			if ((ret = __wt_cache_write(env, NULL, page)) != 0)
 				return (ret);
 		} else
-			WT_STAT_INCR(env,
-			    CACHE_EVICT, "clean pages evicted from the cache");
+			WT_STAT_INCR(env->hstats, CACHE_EVICT,
+			    "clean pages evicted from the cache");
 
 		/* Return the page if it's the right size. */
 		if (page->bytes == bytes) {
@@ -480,7 +488,7 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 	WT_PAGE_HDR *hdr;
 	int ret;
 
-	WT_STAT_INCR(env, CACHE_WRITE, "writes from the cache");
+	WT_STAT_INCR(env->hstats, CACHE_WRITE, "writes from the cache");
 
 	/* If not included, find the underlying DB handle. */
 	if (db == NULL) {
@@ -499,10 +507,9 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 	if ((ret = __wt_write(
 	    env, db->idb->fh, page->offset, page->bytes, hdr)) == 0) {
 		F_CLR(page, WT_MODIFIED);
-		WT_STAT_DECR(env, CACHE_DIRTY, NULL);
-		WT_STAT_DECR(db, DB_CACHE_DIRTY, NULL);
-		WT_STAT_INCR(env, CACHE_CLEAN, NULL);
-		WT_STAT_INCR(db, DB_CACHE_CLEAN, NULL);
+
+		WT_STAT_DECR(env->hstats, CACHE_DIRTY, NULL);
+		WT_STAT_INCR(env->hstats, CACHE_CLEAN, NULL);
 	}
 
 	return (ret);
@@ -529,6 +536,8 @@ __wt_cache_discard(ENV *env, WT_PAGE *page)
 
 	if (page->indx != NULL)
 		__wt_bt_page_indx_clean(env, page, 1);
+
+	WT_STAT_DECR(env->hstats, CACHE_CLEAN, NULL);
 
 	__wt_free(env, page->hdr);
 	__wt_free(env, page);

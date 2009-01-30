@@ -103,7 +103,8 @@ __wt_db_destroy_int(DB *db, u_int32_t flags)
 	ret = __wt_idb_destroy(db, 0);
 
 	/* Free any allocated memory. */
-	WT_FREE_AND_CLEAR(env, db->stats);
+	WT_FREE_AND_CLEAR(env, db->hstats);
+	WT_FREE_AND_CLEAR(env, db->dstats);
 
 	/* Free the DB structure. */
 	memset(db, OVERWRITE_BYTE, sizeof(db));
@@ -133,7 +134,9 @@ __wt_db_config_default(DB *db)
 
 	db->btree_compare = db->btree_dup_compare = __wt_bt_lex_compare;
 
-	if ((ret = __wt_stat_alloc_db(env, &db->stats)) != 0)
+	if ((ret = __wt_stat_alloc_db_hstats(env, &db->hstats)) != 0)
+		return (ret);
+	if ((ret = __wt_stat_alloc_db_dstats(env, &db->dstats)) != 0)
 		return (ret);
 
 	return (0);

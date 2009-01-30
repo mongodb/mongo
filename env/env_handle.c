@@ -100,7 +100,7 @@ __wt_env_destroy_int(ENV *env, u_int32_t flags)
 		ret = tret;
 
 	/* Free any allocated memory. */
-	WT_FREE_AND_CLEAR(env, env->stats);
+	WT_FREE_AND_CLEAR(env, env->hstats);
 
 	/* Complain if DB handles weren't closed. */
 	if (TAILQ_FIRST(&env->dbqh) != NULL) {
@@ -130,7 +130,7 @@ __wt_env_config_default(ENV *env)
 
 	TAILQ_INIT(&env->dbqh);
 
-	if ((ret = __wt_stat_alloc_env(env, &env->stats)) != 0)
+	if ((ret = __wt_stat_alloc_env_hstats(env, &env->hstats)) != 0)
 		return (ret);
 
 	if ((ret = env->set_cachesize(env, WT_CACHE_DEFAULT_SIZE)) != 0)

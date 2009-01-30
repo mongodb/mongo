@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_item_walk(DB *, WT_PAGE *, bitstr_t *, FILE *);
+static int __wt_bt_verify_item(DB *, WT_PAGE *, bitstr_t *, FILE *);
 static int __wt_bt_verify_checkfrag(DB *, bitstr_t *);
 static int __wt_bt_verify_connections(DB *, WT_PAGE *, bitstr_t *);
 static int __wt_bt_verify_level(DB *, WT_ITEM_OFFP *, bitstr_t *, FILE *);
@@ -209,13 +209,14 @@ __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 	 * get the next page we're verifying.
 	 */
 	bytes = offp->level == WT_LEAF_LEVEL ? db->leafsize : db->intlsize;
-	for (addr = offp->addr, page = prev = NULL, first = 1;
+	for (first = 1, page = prev = NULL,
+	    addr = offp->addr;
 	    addr != WT_ADDR_INVALID;
 	    addr = hdr->nextaddr, prev = page, page = NULL) {
 		/* Get the next page and set the address. */
 		if ((ret = __wt_cache_db_in(
 		    db, WT_ADDR_TO_OFF(db, addr), bytes, 0, &page)) != 0)
-			return (ret);
+			goto err;
 
 		/* Verify the page. */
 		if ((ret = __wt_bt_verify_page(db, page, fragbits, fp)) != 0)
@@ -608,25 +609,25 @@ __wt_bt_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 	 * page.
 	 */
 
-	/* Page 0 has a descriptor record. */
+	/* Page 0 has the descriptor record. */
 	if (addr == WT_ADDR_FIRST_PAGE &&
 	    (ret = __wt_bt_desc_verify(db, page)) != 0)
 		return (ret);
 
 	/* Verify the items on the page. */
 	if (hdr->type != WT_PAGE_OVFL &&
-	    (ret = __wt_bt_item_walk(db, page, fragbits, fp)) != 0)
+	    (ret = __wt_bt_verify_item(db, page, fragbits, fp)) != 0)
 		return (ret);
 
 	return (0);
 }
 
 /*
- * __wt_bt_item_walk --
+ * __wt_bt_verify_item --
  *	Walk the items on a page and verify them.
  */
 static int
-__wt_bt_item_walk(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
+__wt_bt_verify_item(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 {
 	struct {
 		u_int32_t indx;			/* Item number */
@@ -769,7 +770,7 @@ eop:			__wt_db_errx(db,
 		 */
 		if (fragbits != NULL) {
 			if (item->type == WT_ITEM_OFFPAGE &&
-			    page->hdr->type == WT_PAGE_LEAF) {
+			    hdr->type == WT_PAGE_LEAF) {
 				/*
 				 * !!!
 				 * Don't pass __wt_bt_verify_level a pointer

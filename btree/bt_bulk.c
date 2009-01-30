@@ -59,7 +59,7 @@ __wt_db_bulk_load(wt_args_db_bulk_load *argp)
 			__wt_db_errx(db, "zero-length keys are not supported");
 			goto err;
 		}
-		WT_STAT_INCR(db,
+		WT_STAT_INCR(db->hstats,
 		    BULK_PAIRS_READ, "bulk key/data pairs inserted");
 
 		/*
@@ -91,7 +91,7 @@ skip_read:
 				    dup_data->type == WT_ITEM_DATA ?
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL;
 
-			WT_STAT_INCR(db, BULK_DUP_DATA_READ,
+			WT_STAT_INCR(db->hstats, BULK_DUP_DATA_READ,
 			    "bulk duplicate data pairs read");
 
 			key = NULL;
@@ -120,7 +120,7 @@ skip_read:
 			key->size = sizeof(key_ovfl);
 
 			key_item.type = WT_ITEM_KEY_OVFL;
-			WT_STAT_INCR(db, BULK_OVERFLOW_KEY,
+			WT_STAT_INCR(db->hstats, BULK_OVERFLOW_KEY,
 			    "bulk overflow key items read");
 		} else
 			key_item.type = WT_ITEM_KEY;
@@ -136,7 +136,7 @@ skip_read:
 			data_item.type =
 			    key == NULL ? WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL;
 
-			WT_STAT_INCR(db, BULK_OVERFLOW_DATA,
+			WT_STAT_INCR(db->hstats, BULK_OVERFLOW_DATA,
 			    "bulk overflow data items read");
 		} else
 			data_item.type =
@@ -426,8 +426,8 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 			__wt_db_errx(db, "zero-length keys are not supported");
 			goto err;
 		}
-		WT_STAT_INCR(db, BULK_PAIRS_READ, NULL);
-		WT_STAT_INCR(db, BULK_DUP_DATA_READ, NULL);
+		WT_STAT_INCR(db->hstats, BULK_PAIRS_READ, NULL);
+		WT_STAT_INCR(db->hstats, BULK_DUP_DATA_READ, NULL);
 
 		/* Loading duplicates, so a key change means we're done. */
 		if (lastkey->size != key->size ||
@@ -446,7 +446,7 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 			data->data = &data_local;
 			data->size = sizeof(data_local);
 			data_item.type = WT_ITEM_DUP_OVFL;
-			WT_STAT_INCR(db, BULK_OVERFLOW_DATA, NULL);
+			WT_STAT_INCR(db->hstats, BULK_OVERFLOW_DATA, NULL);
 		} else
 			data_item.type = WT_ITEM_DUP;
 

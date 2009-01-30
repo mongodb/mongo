@@ -142,7 +142,7 @@ struct __wt_page {
  * the structure.
  */
 struct __wt_page_desc {
-#define	WT_BTREE_MAGIC		0x120897
+#define	WT_BTREE_MAGIC		120897
 	u_int32_t magic;		/* 00-03: Magic number */
 #define	WT_BTREE_MAJOR_VERSION	1
 	u_int32_t majorv;		/* 04-07: Major version */
@@ -294,7 +294,7 @@ struct __wt_item {
 	 * a WT_ITEM_INT followed by a single WT_ITEM_KEY or WT_ITEM_KEY_OVFL.
 	 *
 	 * On primary leaf pages, there is either a WT_ITEM_KEY followed by a
-	 * single WT_ITEM_DATA, WT_ITEM_DATA_OVFL or WT_ITEM_DUP_OFFPAGE item,
+	 * single WT_ITEM_DATA, WT_ITEM_DATA_OVFL or WT_ITEM_OFFPAGE item,
 	 * or a WT_ITEM_KEY followed by some number of either WT_ITEM_DUP or
 	 * WT_ITEM_DUP_OVFL items.
 	 *

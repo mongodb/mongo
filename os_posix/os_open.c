@@ -40,7 +40,7 @@ __wt_open(ENV *env,
 
 	if ((ret = __wt_calloc(env, 1, sizeof(WT_FH), &fh)) != 0)
 		return (ret);
-	if ((ret = __wt_stat_alloc_fh(env, &fh->stats)) != 0)
+	if ((ret = __wt_stat_alloc_fh_stats(env, &fh->stats)) != 0)
 		goto err;
 	if ((ret = __wt_strdup(env, name, &fh->name)) != 0)
 		goto err;

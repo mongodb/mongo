@@ -14,6 +14,8 @@ int
 __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp);
 void
 __wt_bt_desc_init(DB *db, WT_PAGE *page);
+void
+__wt_bt_desc_stats(DB *db, WT_PAGE *page);
 int
 __wt_bt_desc_verify(DB *db, WT_PAGE *page);
 int
@@ -65,6 +67,8 @@ __wt_bt_page_inmem_append(DB *db,
     WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *off_item);
 int
 __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx);
+int
+__wt_bt_stat(DB *db);
 int
 __wt_db_verify(wt_args_db_verify *argp);
 int
@@ -209,14 +213,18 @@ __wt_database_format(DB *db);
 u_int32_t
 __wt_prime(u_int32_t n);
 int
-__wt_stat_alloc_fh(ENV *env, WT_STATS **statsp);
+__wt_stat_alloc_db_dstats(ENV *env, WT_STATS **statsp);
 int
-__wt_stat_clear_fh(WT_STATS *stats);
+__wt_stat_clear_db_dstats(WT_STATS *stats);
 int
-__wt_stat_alloc_db(ENV *env, WT_STATS **statsp);
+__wt_stat_alloc_db_hstats(ENV *env, WT_STATS **statsp);
 int
-__wt_stat_clear_db(WT_STATS *stats);
+__wt_stat_clear_db_hstats(WT_STATS *stats);
 int
-__wt_stat_alloc_env(ENV *env, WT_STATS **statsp);
+__wt_stat_alloc_env_hstats(ENV *env, WT_STATS **statsp);
 int
-__wt_stat_clear_env(WT_STATS *stats);
+__wt_stat_clear_env_hstats(WT_STATS *stats);
+int
+__wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp);
+int
+__wt_stat_clear_fh_stats(WT_STATS *stats);

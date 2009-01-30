@@ -116,7 +116,8 @@ struct __db {
 	ENV *env;			/* Enclosing environment */
 	IENV *ienv;			/* Private environment object */
 
-	WT_STATS *stats;		/* Statistics */
+	WT_STATS *hstats;		/* Handle statistics */
+	WT_STATS *dstats;		/* Database statistics */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -259,7 +260,7 @@ struct __env {
 		struct __db **tqh_last;
 	} dbqh;
 
-	WT_STATS *stats;		/* Statistics */
+	WT_STATS *hstats;		/* Handle statistics */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.

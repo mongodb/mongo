@@ -38,6 +38,26 @@ __wt_bt_desc_init(DB *db, WT_PAGE *page)
 }
 
 /*
+ * __wt_bt_desc_stats --
+ *	Fill in the statistics from the database description on page 0.
+ */
+void
+__wt_bt_desc_stats(DB *db, WT_PAGE *page)
+{
+	WT_PAGE_DESC desc;
+
+	memcpy(&desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
+
+	WT_STAT_SET(db->dstats, MAGIC, "magic number", desc.magic);
+	WT_STAT_SET(db->dstats, MAJOR, "major version number", desc.majorv);
+	WT_STAT_SET(db->dstats, MINOR, "minor version number", desc.minorv);
+	WT_STAT_SET(db->dstats, LEAFSIZE, "leaf page size", desc.leafsize);
+	WT_STAT_SET(db->dstats, INTLSIZE, "internal page size", desc.intlsize);
+	WT_STAT_SET(
+	    db->dstats, BASE_RECNO, "base record number", desc.base_recno);
+}
+
+/*
  * __wt_bt_desc_verify --
  *	Verify the database description on page 0.
  */
@@ -95,8 +115,8 @@ __wt_bt_desc_read(DB *db)
 	db->intlsize = desc.intlsize;
 	idb->root_addr = desc.root_addr;
 
-	if ((ret =
-	    __wt_cache_db_out(db, page, WT_MODIFIED | WT_UNFORMATTED)) != 0)
+	/* Then discard it from the cache, it's probably the wrong size. */
+	if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
 		return (ret);
 
 	return (0);
