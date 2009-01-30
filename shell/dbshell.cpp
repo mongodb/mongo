@@ -16,6 +16,17 @@ void quitNicely( int sig ){
     exit(0);
 }
 
+void quitAbruptly( int sig ) {
+    KillMongodbInstances();
+    exit(14);    
+}
+
+void setupSignals() {
+    signal( SIGINT , quitNicely );
+    signal( SIGABRT , quitAbruptly );
+    signal( SIGSEGV , quitAbruptly );    
+}
+
 string fixHost( string url , string host , string port ){
     if ( host.size() == 0 && port.size() == 0 ){
         if ( url.find( "/" ) == string::npos && url.find( "." ) != string::npos )
@@ -41,7 +52,7 @@ string fixHost( string url , string host , string port ){
 }
 
 int main(int argc, char* argv[]) {
-    signal( SIGINT , quitNicely );
+    setupSignals();
     
     RecordMyLocation( argv[ 0 ] );
 

@@ -76,7 +76,7 @@ Handle<Value> mongoInit(const Arguments& args){
     }
 
     args.This()->Set( CONN_STRING , External::New( conn ) );
-    
+    args.This()->Set( String::New( "slaveOk" ) , Boolean::New( false ) );
     
     return v8::Undefined();
 }
@@ -292,9 +292,12 @@ Handle<Value> mongoFind(const Arguments& args){
     if ( haveFields )
         fields = v8ToMongo( args[2]->ToObject() );
     
-    auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , (int)(args[3]->ToNumber()->Value()) , (int)(args[4]->ToNumber()->Value()) , haveFields ? &fields : 0 );
-    
     Local<v8::Object> mongo = args.This();
+    Local<v8::Value> slaveOkVal = mongo->Get( String::New( "slaveOk" ) );
+    jsassert( slaveOkVal->IsBoolean(), "slaveOk member invalid" );
+    bool slaveOk = slaveOkVal->BooleanValue();
+    
+    auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , (int)(args[3]->ToNumber()->Value()) , (int)(args[4]->ToNumber()->Value()) , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
     
     v8::Function * cons = (v8::Function*)( *( mongo->Get( String::New( "internalCursor" ) ) ) );
     Local<v8::Object> c = cons->NewInstance();
