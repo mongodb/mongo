@@ -198,6 +198,15 @@ namespace mongo {
         ObjectBuilder &b;
     };
 
+    struct unquotedFieldNameEnd {
+        unquotedFieldNameEnd( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            string name( start, end );
+            b.fieldNames.back() = name;
+        }
+        ObjectBuilder &b;
+    };
+
     struct stringEnd {
         stringEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
@@ -407,7 +416,10 @@ public:
                 members = pair >> !( ',' >> members );
                 pair =
                     oid[ oidEnd( self.b ) ] |
-                    str[ fieldNameEnd( self.b ) ] >> ':' >> value;
+                    fieldName >> ':' >> value;
+                fieldName =
+                    str[ fieldNameEnd( self.b ) ] |
+                    unquotedFieldName[ unquotedFieldNameEnd( self.b ) ];
                 array = ch_p( '[' )[ arrayStart( self.b ) ] >> !elements >> ']';
                 elements = value >> !( ch_p( ',' )[ arrayNext( self.b ) ] >> elements );
                 value =
@@ -439,6 +451,8 @@ public:
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
                 number = real_p[ numberValue( self.b ) ];
+                
+                unquotedFieldName = lexeme_d[ ( alpha_p | ch_p( '$' ) ) >> *( ( alnum_p | ch_p( '$' ) | ch_p( '_' ) ) ) ];
 
                 dbref = dbrefS | dbrefT;
                 dbrefS = ch_p( '{' ) >> "\"$ns\"" >> ':' >>
@@ -481,7 +495,7 @@ public:
             }
             rule< ScannerT > object, members, pair, array, elements, value, str, number,
             dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
-            regex, regexS, regexT, quotedOid;
+            regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName;
             const rule< ScannerT > &start() const {
                 return object;
             }

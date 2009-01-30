@@ -28,6 +28,17 @@
 
 namespace mongo {
 
+    Query& Query::sort(const BSONObj& s) { 
+        BSONObjBuilder b;
+        if( s.hasElement("query") )
+            b.appendElements(obj);
+        else
+            b.append("query", obj);
+        b.append("orderby", s);
+        obj = b.doneAndDecouple();
+        return *this; 
+    }
+
     /* --- dbclientcommands --- */
 
     inline bool DBClientWithCommands::isOk(const BSONObj& o) {
@@ -190,6 +201,20 @@ namespace mongo {
         return eval(dbname, jscode, info, retValue);
     }
 
+    void testSort() { 
+        DBClientConnection c;
+        string err;
+        if ( !c.connect("localhost", err) ) {
+            out() << "can't connect to server " << err << endl;
+            return;
+        }
+
+        cout << "findOne returns:" << endl;
+        cout << c.findOne("test.foo", QUERY( "x" << 3 ) ).toString() << endl;
+        cout << c.findOne("test.foo", QUERY( "x" << 3 ).sort("name") ).toString() << endl;
+
+    }
+
     /* TODO: unit tests should run this? */
     void testDbEval() {
         DBClientConnection c;
@@ -230,7 +255,7 @@ namespace mongo {
 
 	void testPaired();
     int test2() {
-		testPaired();
+        testSort();
         return 0;
     }
 
@@ -252,7 +277,7 @@ namespace mongo {
 		return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
 	}
 
-    BSONObj DBClientBase::findOne(const char *ns, BSONObj query, BSONObj *fieldsToReturn, int queryOptions) {
+    BSONObj DBClientBase::findOne(const char *ns, Query query, BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
@@ -326,10 +351,10 @@ namespace mongo {
 		}
     }
 
-    auto_ptr<DBClientCursor> DBClientBase::query(const char *ns, BSONObj query, int nToReturn,
+    auto_ptr<DBClientCursor> DBClientBase::query(const char *ns, Query query, int nToReturn,
             int nToSkip, BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c( new DBClientCursor( this,
-                                    ns, query, nToReturn, nToSkip,
+                                    ns, query.obj, nToReturn, nToSkip,
                                     fieldsToReturn, queryOptions ) );
         if ( c->init() )
             return c;
@@ -365,7 +390,7 @@ namespace mongo {
         say( toSend );
     }
 
-    void DBClientBase::remove( const char * ns , BSONObj obj , bool justOne ) {
+    void DBClientBase::remove( const char * ns , Query obj , bool justOne ) {
         Message toSend;
 
         BufBuilder b;
@@ -374,18 +399,18 @@ namespace mongo {
         b.append( ns );
 
         int flags = 0;
-        if ( justOne || obj.hasField( "_id" ) )
+        if ( justOne || obj.obj.hasField( "_id" ) )
             flags |= 1;
         b.append( flags );
 
-        obj.appendSelfToBufBuilder( b );
+        obj.obj.appendSelfToBufBuilder( b );
 
         toSend.setData( dbDelete , b.buf() , b.len() );
 
         say( toSend );
     }
 
-    void DBClientBase::update( const char * ns , BSONObj query , BSONObj obj , bool upsert ) {
+    void DBClientBase::update( const char * ns , Query query , BSONObj obj , bool upsert ) {
 
         BufBuilder b;
         b.append( (int)0 ); // reserverd
@@ -393,7 +418,7 @@ namespace mongo {
 
         b.append( (int)upsert );
 
-        query.appendSelfToBufBuilder( b );
+        query.obj.appendSelfToBufBuilder( b );
         obj.appendSelfToBufBuilder( b );
 
         Message toSend;
@@ -645,11 +670,13 @@ again:
         return ss.str();
     }
 
+#pragma warning(disable: 4355)
     DBClientPaired::DBClientPaired() :
 		left(true, this), right(true, this)
     {
         master = NotSetL;
     }
+#pragma warning(default: 4355)
 
     /* find which server, the left or right, is currently master mode */
     void DBClientPaired::_checkMaster() {
@@ -730,13 +757,13 @@ again:
 		return true;
 	}
 
-    auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, BSONObj b, int c, int d,
+    auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, Query b, int c, int d,
             BSONObj *e, int f)
     {
         return checkMaster().query(a,b,c,d,e,f);
     }
 
-    BSONObj DBClientPaired::findOne(const char *a, BSONObj b, BSONObj *c, int d) {
+    BSONObj DBClientPaired::findOne(const char *a, Query b, BSONObj *c, int d) {
         return checkMaster().findOne(a,b,c,d);
     }
 

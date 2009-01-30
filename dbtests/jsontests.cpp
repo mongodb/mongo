@@ -804,6 +804,28 @@ namespace JsonTests {
             }
         };
         
+        class UnquotedFieldName : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a_b", 1 );
+                return b.doneAndDecouple();
+            }
+            virtual string json() const {
+                return "{ a_b : 1 }";
+            }            
+        };
+        
+        class UnquotedFieldNameDollar : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "$a_b", 1 );
+                return b.doneAndDecouple();
+            }
+            virtual string json() const {
+                return "{ $a_b : 1 }";
+            }            
+        };
+
     } // namespace FromJsonTests
     
     class All : public UnitTest::Suite {
@@ -872,6 +894,8 @@ namespace JsonTests {
             add< FromJsonTests::RegexInvalidOption >();
             add< FromJsonTests::RegexInvalidOption2 >();
             add< FromJsonTests::Malformed >();            
+            add< FromJsonTests::UnquotedFieldName >();            
+            add< FromJsonTests::UnquotedFieldNameDollar >();            
         }
     };
     

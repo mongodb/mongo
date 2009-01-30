@@ -341,6 +341,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\util\mmap_win.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\namespace.cpp"
 				>
 			</File>
