@@ -170,7 +170,6 @@ int main(int argc, char* argv[]) {
         v8::HandleScope handle_scope;
         string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
         if ( ! ExecuteString( v8::String::New( setup.c_str() ) , v8::String::New( "(connect)" ) , false , true ) ){
-            cout << "error connecting!" << endl;
             return -1;
         }
 
