@@ -99,6 +99,7 @@ namespace mongo {
                                new BtreeCursor(ii, startKey, direction, query));
                 }
             }
+            uasserted("hint index not found");
         }
 
         if ( !order.isEmpty() ) {

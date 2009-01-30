@@ -30,11 +30,33 @@ namespace mongo {
 
     Query& Query::sort(const BSONObj& s) { 
         BSONObjBuilder b;
-        if( s.hasElement("query") )
+        if( obj.hasElement("query") )
             b.appendElements(obj);
         else
             b.append("query", obj);
         b.append("orderby", s);
+        obj = b.doneAndDecouple();
+        return *this; 
+    }
+
+    Query& Query::hint(const char *h) {
+        BSONObjBuilder b;
+        if( obj.hasElement("query") )
+            b.appendElements(obj);
+        else
+            b.append("query", obj);
+        b.append("$hint", h);
+        obj = b.doneAndDecouple();
+        return *this; 
+    }
+
+    Query& Query::explain() {
+        BSONObjBuilder b;
+        if( obj.hasElement("query") )
+            b.appendElements(obj);
+        else
+            b.append("query", obj);
+        b.append("$explain", true);
         obj = b.doneAndDecouple();
         return *this; 
     }
