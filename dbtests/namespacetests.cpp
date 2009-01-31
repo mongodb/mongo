@@ -487,8 +487,10 @@ namespace NamespaceTests {
                 }
 
                 // Too big
-                char ch2[ 800 ];
-                ASSERT( theDataFileMgr.insert( ns(), ch2, 800 ).isNull() );
+                BSONObjBuilder bob;
+                bob.append( "a", string( 787, 'a' ) );
+                BSONObj bigger = bob.done();
+                ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
                 ASSERT_EQUALS( 0, nRecords() );
             }
         private:
