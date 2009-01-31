@@ -75,7 +75,7 @@ namespace mongo {
 
         MemoryMappedFile mmf;
         PDFHeader *header;
-        int __unUsEd;
+//        int __unUsEd;
         //	int length;
         int fileNo;
     };
