@@ -78,9 +78,7 @@ namespace mongo {
         friend class KeyNode;
     public:
         void dumpTree(DiskLoc thisLoc, const BSONObj &order);
-        bool isHead() {
-            return parent.isNull();
-        }
+        bool isHead() { return parent.isNull(); }
         void assertValid(const BSONObj &order, bool force = false);
         int fullValidate(const DiskLoc& thisLoc, const BSONObj &order); /* traverses everything */
     protected:

@@ -274,8 +274,8 @@ namespace mongo {
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
             assert( !setClientTempNs( dbName.c_str() ) );
-            PhysicalDataFile *p = database->getFile( 0 );
-            PDFHeader *h = p->getHeader();
+            MongoDataFile *p = database->getFile( 0 );
+            MDFHeader *h = p->getHeader();
             if ( !h->currentVersion() ) {
                 // QUESTION: Repair even if file format is higher version than code?
                 log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "

@@ -22,8 +22,9 @@
 
 namespace mongo {
 
-    /* it is easy to do custom sizes for a namespace - all the same for now */
-    const int BucketSize = 8192;
+    /* this will be an assertion check later for RecStoreInterface compliance checking */
+    inline void written() { }
+
     const int KeyMax = BucketSize / 10;
 
     int ninserts = 0;
@@ -178,6 +179,7 @@ namespace mongo {
        the keynodes grow from the front.
     */
     inline int BucketBasics::_alloc(int bytes) {
+        written();
         topSize += bytes;
         emptySize -= bytes;
         int ofs = totalDataSize() - topSize;
@@ -188,6 +190,7 @@ namespace mongo {
     void BucketBasics::_delKeyAtPos(int keypos) {
         assert( keypos >= 0 && keypos <= n );
         assert( childForPos(keypos).isNull() );
+        written();
         n--;
         assert( n > 0 || nextChild.isNull() );
         for ( int j = keypos; j < n; j++ )
@@ -198,6 +201,7 @@ namespace mongo {
 
     /* add a key.  must be > all existing.  be careful to set next ptr right. */
     void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild) {
+        written();
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
         assert( bytesNeeded <= emptySize );
         assert( n == 0 || keyNode(n-1).key.woCompare(key, order) <= 0 );
@@ -211,6 +215,7 @@ namespace mongo {
     }
 
     bool BucketBasics::basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order) {
+        written();
         assert( keypos >= 0 && keypos <= n );
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
         if ( bytesNeeded > emptySize ) {
@@ -238,6 +243,7 @@ namespace mongo {
         if ( flags & Packed )
             return;
 
+        written();
         int tdz = totalDataSize();
         char temp[BucketSize];
         int ofs = tdz;
@@ -263,6 +269,7 @@ namespace mongo {
         n = N;
         setNotPacked();
         pack( order );
+        written();
     }
 
     /* - BtreeBucket --------------------------------------------------- */
@@ -351,8 +358,8 @@ namespace mongo {
     void aboutToDeleteBucket(const DiskLoc&);
     void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) {
         aboutToDeleteBucket(thisLoc);
-
         assert( !isHead() );
+        written();
 
         BtreeBucket *p = parent.btree();
         if ( p->nextChild == thisLoc ) {
@@ -375,20 +382,24 @@ namespace mongo {
 found:
 #if 1
         /* as a temporary defensive measure, we zap the whole bucket, AND don't truly delete
-           it (meaning it is ineligible for reuse).  temporary to see if it helps with some
-           issues.
+           it (meaning it is ineligible for reuse).
            */
         memset(this, 0, Size());
 #else
         //defensive:
         n = -1;
         parent.Null();
-        theDataFileMgr.deleteRecord(id.indexNamespace().c_str(), thisLoc.rec(), thisLoc);
+        massert("todo: use RecStoreInterface instead", false);
+        // TODO: this was broken anyway as deleteRecord does unindexRecord() call which assumes the data is a BSONObj, 
+        // and it isn't.
+        assert(false);
+//        theDataFileMgr.deleteRecord(id.indexNamespace().c_str(), thisLoc.rec(), thisLoc);
 #endif
     }
 
     /* note: may delete the entire bucket!  this invalid upon return sometimes. */
     void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p) {
+        written();
         dassert( thisLoc.btree() == this );
         assert(n>0);
         DiskLoc left = childForPos(p);
@@ -413,6 +424,7 @@ found:
 
     int qqq = 0;
 
+    /* remove a key from the index */
     bool BtreeBucket::unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc ) {
         if ( key.objsize() > KeyMax ) {
             OCCASIONALLY problem() << "unindex: key too large to index, skipping " << id.indexNamespace() << /* ' ' << key.toString() << */ '\n';
@@ -532,7 +544,7 @@ found:
         r->nextChild = nextChild;
         r->assertValid( order );
 
-        rLoc = theDataFileMgr.insert(idx.indexNamespace().c_str(), r, r->Size(), true);
+        rLoc = BtreeStore::insert(idx.indexNamespace().c_str(), r, r->Size(), true);
         if ( split_debug )
             out() << "     new rLoc:" << rLoc.toString() << endl;
         free(r);
@@ -553,7 +565,7 @@ found:
                 p->pushBack(middle.recordLoc, middle.key, order, thisLoc);
                 p->nextChild = rLoc;
                 p->assertValid( order );
-                parent = idx.head = theDataFileMgr.insert(idx.indexNamespace().c_str(), p, p->Size(), true);
+                parent = idx.head = BtreeStore::insert(idx.indexNamespace().c_str(), p, p->Size(), true);
                 if ( split_debug )
                     out() << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
                 free(p);
@@ -592,7 +604,7 @@ found:
     /* start a new index off, empty */
     DiskLoc BtreeBucket::addHead(IndexDetails& id) {
         BtreeBucket *p = allocTemp();
-        DiskLoc loc = theDataFileMgr.insert(id.indexNamespace().c_str(), p, p->Size(), true);
+        DiskLoc loc = BtreeStore::insert(id.indexNamespace().c_str(), p, p->Size(), true);
         free(p);
         return loc;
     }

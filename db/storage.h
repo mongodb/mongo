@@ -31,7 +31,7 @@ namespace mongo {
     class Extent;
     class BtreeBucket;
     class BSONObj;
-    class PhysicalDataFile;
+    class MongoDataFile;
 
     class DiskLoc {
         int fileNo; /* this will be volume, file #, etc. */
@@ -141,7 +141,7 @@ namespace mongo {
         Extent* ext() const;
         BtreeBucket* btree() const;
 
-        PhysicalDataFile& pdf() const;
+        MongoDataFile& pdf() const;
     };
 
 #pragma pack(pop)

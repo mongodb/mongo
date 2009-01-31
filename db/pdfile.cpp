@@ -140,7 +140,7 @@ namespace mongo {
             }
         } else
             while ( size > 0 ) {
-                int max = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
+                int max = MongoDataFile::maxSize() - MDFHeader::headerSize();
                 int desiredExtentSize = (int) (size > max ? max : size);
                 Extent *e = database->suitableFile( desiredExtentSize )->newExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
@@ -167,14 +167,14 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    int PhysicalDataFile::maxSize() {
+    int MongoDataFile::maxSize() {
         if ( sizeof( int* ) == 4 )
             return 512 * 1024 * 1024;
         else
             return 0x7ff00000;
     }
 
-    int PhysicalDataFile::defaultSize( const char *filename ) const {
+    int MongoDataFile::defaultSize( const char *filename ) const {
         int size;
 
         if ( fileNo <= 4 )
@@ -193,7 +193,7 @@ namespace mongo {
         return size;
     }
 
-    void PhysicalDataFile::open( const char *filename, int minSize ) {
+    void MongoDataFile::open( const char *filename, int minSize ) {
         {
             /* check quotas
                very simple temporary implementation - we will in future look up
@@ -227,14 +227,14 @@ namespace mongo {
         assert( ( size >= 64*1024*1024 ) || ( strstr( filename, "_hudsonSmall" ) ) );
         assert( size % 4096 == 0 );
 
-        header = (PDFHeader *) mmf.map(filename, size);
+        header = (MDFHeader *) mmf.map(filename, size);
         uassert("can't map file memory", header);
         // If opening an existing file, this is a no-op.
         header->init(fileNo, size);
     }
 
     /* prev - previous extent for this namespace.  null=this is the first one. */
-    Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, bool newCapped, int loops) {
+    Extent* MongoDataFile::newExtent(const char *ns, int approxSize, bool newCapped, int loops) {
         assert( approxSize >= 0 && approxSize <= 0x7ff00000 );
 
         assert( header ); // null if file open failed

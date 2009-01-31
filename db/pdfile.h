@@ -37,7 +37,7 @@ const int VERSION_MINOR = 4;
 
 namespace mongo {
 
-    class PDFHeader;
+    class MDFHeader;
     class Extent;
     class Record;
     class Cursor;
@@ -53,16 +53,16 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    class PDFHeader;
-    class PhysicalDataFile {
+    class MDFHeader;
+    class MongoDataFile {
         friend class DataFileMgr;
         friend class BasicCursor;
     public:
-        PhysicalDataFile(int fn) : fileNo(fn) { }
+        MongoDataFile(int fn) : fileNo(fn) { }
         void open(const char *filename, int requestedDataSize = 0);
 
         Extent* newExtent(const char *ns, int approxSize, bool newCapped = false, int loops = 0);
-        PDFHeader *getHeader() {
+        MDFHeader *getHeader() {
             return header;
         }
         static int maxSize();
@@ -74,7 +74,7 @@ namespace mongo {
         Record* recordAt(DiskLoc dl);
 
         MemoryMappedFile mmf;
-        PDFHeader *header;
+        MDFHeader *header;
         int __unUsEd;
         //	int length;
         int fileNo;
@@ -105,7 +105,7 @@ namespace mongo {
 
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
 
-        vector<PhysicalDataFile *> files;
+        vector<MongoDataFile *> files;
     };
 
     extern DataFileMgr theDataFileMgr;
@@ -228,7 +228,7 @@ namespace mongo {
     */
 
     /* data file header */
-    class PDFHeader {
+    class MDFHeader {
     public:
         int version;
         int versionMinor;
@@ -240,7 +240,7 @@ namespace mongo {
         char data[4];
 
         static int headerSize() {
-            return sizeof(PDFHeader) - 4;
+            return sizeof(MDFHeader) - 4;
         }
 
         bool currentVersion() const {
@@ -275,13 +275,13 @@ namespace mongo {
 
 #pragma pack(pop)
 
-    inline Extent* PhysicalDataFile::_getExtent(DiskLoc loc) {
+    inline Extent* MongoDataFile::_getExtent(DiskLoc loc) {
         loc.assertOk();
         Extent *e = (Extent *) (((char *)header) + loc.getOfs());
         return e;
     }
 
-    inline Extent* PhysicalDataFile::getExtent(DiskLoc loc) {
+    inline Extent* MongoDataFile::getExtent(DiskLoc loc) {
         Extent *e = _getExtent(loc);
         e->assertOk();
         return e;
@@ -293,7 +293,7 @@ namespace mongo {
 
 namespace mongo {
 
-    inline Record* PhysicalDataFile::recordAt(DiskLoc dl) {
+    inline Record* MongoDataFile::recordAt(DiskLoc dl) {
         return header->getRecord(dl);
     }
 
@@ -341,15 +341,11 @@ namespace mongo {
         return DataFileMgr::getExtent(*this);
     }
 
-    inline BtreeBucket* DiskLoc::btree() const {
-        assert( fileNo != -1 );
-        return (BtreeBucket*) rec()->data;
-    }
-
     /*---------------------------------------------------------------------*/
 
 } // namespace mongo
 
+#include "rec.h"
 #include "queryoptimizer.h"
 #include "database.h"
 
@@ -433,7 +429,7 @@ namespace mongo {
         return nsindex(ns)->details(ns);
     }
 
-    inline PhysicalDataFile& DiskLoc::pdf() const {
+    inline MongoDataFile& DiskLoc::pdf() const {
         assert( fileNo != -1 );
         return *database->getFile(fileNo);
     }
