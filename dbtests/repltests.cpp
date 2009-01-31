@@ -457,23 +457,23 @@ namespace ReplTests {
     public:
         All() {
             add< LogBasic >();
-            add< Idempotence::Insert >();
+//             add< Idempotence::Insert >();
             add< Idempotence::InsertWithId >();
-            add< Idempotence::InsertTwo >();
+//             add< Idempotence::InsertTwo >();
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::InsertTwoIdentical >();
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::UpdateSameField >();
 //            add< Idempotence::UpdateDifferentField >();
-            add< Idempotence::Set >();
+//             add< Idempotence::Set >();
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::SetSame >();
-            add< Idempotence::Inc >();
+//             add< Idempotence::Inc >();
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::IncSame >();
             add< Idempotence::Remove >();
             add< Idempotence::RemoveOne >();
-            add< Idempotence::FailingUpdate >();
+//             add< Idempotence::FailingUpdate >();
         }
     };
     

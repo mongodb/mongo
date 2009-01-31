@@ -75,7 +75,7 @@ namespace mongo {
 
         MemoryMappedFile mmf;
         PDFHeader *header;
-        int __unUsEd;
+//        int __unUsEd;
         //	int length;
         int fileNo;
     };
@@ -95,6 +95,7 @@ namespace mongo {
 
         /* special version of insert for transaction logging -- streamlined a bit.
            assumes ns is capped and no indexes
+           no _id field check
         */
         Record* fast_oplog_insert(NamespaceDetails *d, const char *ns, int len);
 

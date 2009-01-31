@@ -420,6 +420,12 @@ namespace NamespaceTests {
             NamespaceDetails *nsd() const {
                 return nsdetails( ns() );
             }
+            static BSONObj bigObj() {
+                string as( 187, 'a' );
+                BSONObjBuilder b;
+                b.append( "a", as );
+                return b.doneAndDecouple();
+            }
         private:
             const char *ns_;
         };
@@ -441,9 +447,8 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                char ch[ 200 ];
-                memset( ch, 0, 200 );
-                ASSERT( !theDataFileMgr.insert( ns(), ch, 200 ).isNull() );
+                BSONObj b = bigObj();
+                ASSERT( !theDataFileMgr.insert( ns(), b.objdata(), b.objsize() ).isNull() );
                 ASSERT_EQUALS( 1, nRecords() );
             }
         };
@@ -452,11 +457,11 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                char ch[ 200 ];
+                BSONObj b = bigObj();
 
                 DiskLoc l[ 6 ];
                 for ( int i = 0; i < 6; ++i ) {
-                    l[ i ] = theDataFileMgr.insert( ns(), ch, 200 );
+                    l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
                     ASSERT_EQUALS( 1 + i % 2, nRecords() );
                     if ( i > 1 )
@@ -470,11 +475,11 @@ namespace NamespaceTests {
             void run() {
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
-                char ch[ 200 ];
+                BSONObj b = bigObj();
 
                 DiskLoc l[ 8 ];
                 for ( int i = 0; i < 8; ++i ) {
-                    l[ i ] = theDataFileMgr.insert( ns(), ch, 200 );
+                  l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
                     ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
                     if ( i > 3 )
@@ -482,8 +487,10 @@ namespace NamespaceTests {
                 }
 
                 // Too big
-                char ch2[ 800 ];
-                ASSERT( theDataFileMgr.insert( ns(), ch2, 800 ).isNull() );
+                BSONObjBuilder bob;
+                bob.append( "a", string( 787, 'a' ) );
+                BSONObj bigger = bob.done();
+                ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
                 ASSERT_EQUALS( 0, nRecords() );
             }
         private:
