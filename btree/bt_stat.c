@@ -123,8 +123,8 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 	}
 
 	/* Count the free space. */
-	WT_STAT_INCRV(
-	    db->dstats, PAGE_FREE, "unused on-page space", page->space_avail);
+	WT_STAT_INCRV(db->dstats,
+	    PAGE_FREE, "unused on-page space in bytes", page->space_avail);
 
 	/* Count the page type. */
 	switch (hdr->type) {
