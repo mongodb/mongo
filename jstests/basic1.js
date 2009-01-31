@@ -1,5 +1,4 @@
 
-db = connect( "test" );
 t = db.getCollection( "basic1" );
 assert( t.drop() );
 

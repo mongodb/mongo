@@ -13,5 +13,4 @@ function testObjectIdFind( db ) {
     assert( f[ 1 ]._id < f[ 2 ]._id );
 }
 
-db = connect( "test" );
 testObjectIdFind( db );

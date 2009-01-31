@@ -1,5 +1,4 @@
 
-db = connect( "test" );
 t = db.sort3;
 t.drop();
 

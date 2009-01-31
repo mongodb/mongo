@@ -2,7 +2,6 @@
  *   Tests for the db collection 
  */
 
-db = connect( "test" )
 
 
 /*

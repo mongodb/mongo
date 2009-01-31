@@ -1,5 +1,4 @@
 
-db = connect( "foo" );
 t = db.jni2;
 t.remove( {} );
 

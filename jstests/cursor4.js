@@ -44,5 +44,4 @@ function testConstrainedFindMultiFieldSorting( db ) {
     checkResults( reverseEntries.slice( 1, 4 ), r.find( { a: { $lt: 2 }, b: { $gt: 0 } } ).sort( { a: -1, b: -1 } ) );
 }
 
-db = connect( "test" );
 testConstrainedFindMultiFieldSorting( db );

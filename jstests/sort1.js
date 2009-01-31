@@ -1,6 +1,5 @@
 // test sorting, mainly a test ver simple with no index
 
-db = connect( "test" );
 t = db.sorrrt;
 t.drop();
 

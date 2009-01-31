@@ -1,5 +1,4 @@
 
-db = connect( "test" );
 t = db.getCollection( "foo" );
 
 t.find( { "a.b" : 1 } ).toArray();

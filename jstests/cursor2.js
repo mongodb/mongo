@@ -25,5 +25,4 @@ function testCursorCountVsArrLen(dbConn) {
 }
 
 
-db = connect("test")
 testCursorCountVsArrLen(db);

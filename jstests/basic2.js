@@ -1,5 +1,4 @@
 
-db = connect( "test" );
 t = db.getCollection( "basic2" );
 t.drop();
 

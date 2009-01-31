@@ -1,7 +1,6 @@
 /* test indexing where the key is an embedded object.
  */
 
-db = connect( "test" );
 t = db.embeddedIndexTest2;
 
 t.drop();

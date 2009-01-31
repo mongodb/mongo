@@ -1,4 +1,3 @@
-db = connect("ed_db_update");
 
 
 asdf = db.getCollection( "asdf" );

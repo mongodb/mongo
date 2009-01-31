@@ -8,7 +8,6 @@ dd = function( x ){
 
 dd( "a" );
 
-db = connect( "test" )
 
 dd( "b" ); 
 

@@ -1,4 +1,3 @@
-db = connect( "test" ); 
 
 // test 1
 db.$cmd.findOne({reseterror:1});

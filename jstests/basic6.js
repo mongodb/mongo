@@ -1,5 +1,4 @@
 
-db = connect( "test" );
 t = db.basic6;
 
 t.findOne();
