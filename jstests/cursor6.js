@@ -68,7 +68,6 @@ function check( indexed ) {
     eq( z[ 0 ], f[ 3 ] );
 }
 
-db = connect( "test" );
 db.setProfilingLevel( 1 );
 r = db.ed_db_cursor6;
 r.drop();

@@ -1,6 +1,5 @@
 // index4.js
 
-//db = connect( "test" );
 
 t = db.index4;
 t.drop();

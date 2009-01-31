@@ -1,4 +1,3 @@
-db = connect( "test" );
 t = db.find1;
 t.drop();
 

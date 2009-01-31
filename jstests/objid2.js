@@ -1,4 +1,3 @@
-db = connect( "test" );
 t = db.objid2;
 t.drop();
 

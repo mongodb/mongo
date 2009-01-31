@@ -1,5 +1,4 @@
 
-db = connect( "foo");
 t = db.jni3;
 
 for( z = 0; z < 2; z++ ) {

@@ -1,5 +1,4 @@
 
-db = connect( "test" )
 
 users = db.getCollection( "system.users" );
 users.remove( {} );

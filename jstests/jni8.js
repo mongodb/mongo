@@ -1,4 +1,3 @@
-db = connect( "test" );
 t = db.jni8;
 t.drop();
 

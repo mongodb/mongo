@@ -1,5 +1,4 @@
 
-db = connect( "test" );
 t = db.sort_numeric;
 t.drop();
 

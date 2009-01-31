@@ -1,7 +1,6 @@
 // remove.js
 // unit test for db remove
 
-db = connect( "test" );
 t = db.removetest;
 
 function f(n,dir) {

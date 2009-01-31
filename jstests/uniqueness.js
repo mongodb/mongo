@@ -1,4 +1,3 @@
-//db=connect("192.168.58.1/test", u , p);
 
 t = db.foo;
 

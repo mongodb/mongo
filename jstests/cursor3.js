@@ -31,5 +31,4 @@ function testConstrainedFindWithOrdering( db ) {
     checkResults( [ 1, 0 ], r.find( { a: { $lte: 1 } } ).sort( { a: -1 } ) );
 }
 
-db = connect( "test" );
 testConstrainedFindWithOrdering( db );

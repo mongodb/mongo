@@ -1,4 +1,3 @@
-db = connect( "test" );
 t = db.remove4;
 t.drop();
 

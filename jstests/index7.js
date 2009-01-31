@@ -25,7 +25,6 @@ function both( k, q ) {
     end( k, q );
 }
 
-db = connect( "test" );
 f = db.ed_db_index7;
 f.drop();
 

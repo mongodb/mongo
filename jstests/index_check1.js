@@ -1,4 +1,3 @@
-db = connect("ed_db_index_check1");
 
 db.somecollection.drop();
 

@@ -1,7 +1,6 @@
 // remove2.js
 // a unit test for db remove
 
-db = connect( "test" );
 t = db.removetest2;
 
 function f() {
