@@ -312,7 +312,7 @@ using namespace boost::filesystem;
 
 #if defined(__linux__)
 #include "stdint.h"
-#else if( !defined(uint64_t) )
+#elif ( !defined(uint64_t) )
 typedef unsigned long long uint64_t;
 #endif
 
