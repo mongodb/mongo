@@ -38,6 +38,7 @@ namespace mongo {
         int ofs;
     public:
         enum { NullOfs = -1, MaxFiles=4000 };
+
         int a() const {
             return fileNo;
         }
