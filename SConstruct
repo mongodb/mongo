@@ -263,7 +263,7 @@ if nix:
 
 # --- check system ---
 
-def doConfigure( myenv ):
+def doConfigure( myenv , java=True , pcre=True):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = myenv["LINKFLAGS"]
     myenv["LIBS_CLEAN"] = myenv["LIBS"]
@@ -288,12 +288,12 @@ def doConfigure( myenv ):
 
         res = conf.CheckLib( poss )
         if not res and failIfNotFound:
-            print( "can't find " + poss )
+            print( "can't find " + str( poss ) )
             Exit(1)
 
         return res
 
-    if not conf.CheckCXXHeader( 'pcrecpp.h' ):
+    if pcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
         print( "can't find pcre" )
         Exit(1)
 
@@ -307,12 +307,13 @@ def doConfigure( myenv ):
             print "can't find a required boost library [" + l + "]";
             Exit(1)
 
-    for j in javaLibs:
-        if not myCheckLib( j ):
-            print( "can't find java lib [" + j + "]" )
-            Exit(1)
+    if java:
+        for j in javaLibs:
+            if not myCheckLib( j ):
+                print( "can't find java lib [" + j + "]" )
+                Exit(1)
 
-    if nix:
+    if nix and pcre:
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
@@ -475,7 +476,7 @@ if linux64 or force64:
     if linux64:
         l.remove("java")
         l.remove("jvm")
-        javaLibs = []
+
     removeIfInList( l , "pcre" )
     removeIfInList( l , "pcrecpp" )
 
@@ -485,7 +486,7 @@ if linux64 or force64:
 
     shellEnv.VariantDir( "32bit" , "." )
 
-    shellEnv = doConfigure( shellEnv )
+    shellEnv = doConfigure( shellEnv , pcre=False , java=False )
 
     shellEnv.Program( "mongo" , shell32BitFiles )
 else:
