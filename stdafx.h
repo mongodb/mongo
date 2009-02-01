@@ -312,12 +312,5 @@ namespace mongo {
 #define yassert 1
 using namespace boost::filesystem;
 
-// boost::uint64_T is defined, don't need this
-//#if defined(__linux__)
-//#include "stdint.h"
-//#else if( !defined(uint64_t) )
-//typedef unsigned long long uint64_t;
-//#endif
-
 #include "util/goodies.h"
 #include "util/log.h"

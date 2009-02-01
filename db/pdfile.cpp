@@ -435,7 +435,8 @@ namespace mongo {
             b.append("name", nsToDrop.c_str());
             BSONObj cond = b.done(); // { name: "colltodropname" }
             string system_namespaces = database->name + ".system.namespaces";
-            int n = deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
+            /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
+			// no check of return code as this ns won't exist for some of the new storage engines
         }
         // remove from the catalog hashtable
         database->namespaceIndex.kill(nsToDrop.c_str());
