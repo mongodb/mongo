@@ -4,7 +4,7 @@ users = db.getCollection( "system.users" );
 users.remove( {} );
 
 pass = "a" + Math.random();
-print( "password [" + pass + "]" );
+//print( "password [" + pass + "]" );
 
 db.addUser( "eliot" , pass );
 

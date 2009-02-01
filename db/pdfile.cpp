@@ -208,7 +208,7 @@ namespace mongo {
                 string s = "db disk space quota exceeded ";
                 if ( database )
                     s += database->name;
-                uasserted(s.c_str());
+                uasserted(s);
             }
         }
 
@@ -435,8 +435,8 @@ namespace mongo {
             b.append("name", nsToDrop.c_str());
             BSONObj cond = b.done(); // { name: "colltodropname" }
             string system_namespaces = database->name + ".system.namespaces";
-            int n = deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
-            wassert( n == 1 );
+            /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
+			// no check of return code as this ns won't exist for some of the new storage engines
         }
         // remove from the catalog hashtable
         database->namespaceIndex.kill(nsToDrop.c_str());
@@ -959,7 +959,7 @@ namespace mongo {
                      tabletoidxns << "\n  ourns:" << ns;
                 out() << "\n  idxobj:" << io.toString() << endl;
                 string s = "bad add index attempt " + tabletoidxns + " key:" + key.toString();
-                uasserted(s.c_str());
+                uasserted(s);
             }
             tableToIndex = nsdetails(tabletoidxns.c_str());
             if ( tableToIndex == 0 ) {
@@ -978,7 +978,7 @@ namespace mongo {
                 ss << "add index fails, too many indexes for " << tabletoidxns << " key:" << key.toString();
                 string s = ss.str();
                 log() << s << '\n';
-                uasserted(s.c_str());
+                uasserted(s);
             }
             if ( tableToIndex->findIndexByName(name) >= 0 ) {
                 //out() << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;

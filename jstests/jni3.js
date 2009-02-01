@@ -1,8 +1,12 @@
 
 t = db.jni3;
 
+debug = function( s ){
+    //print( s );
+}
+
 for( z = 0; z < 2; z++ ) {
-    print(z);
+    debug(z);
     
     t.drop();
     
@@ -35,8 +39,8 @@ for( z = 0; z < 2; z++ ) {
                               asdf.asdf.f.s.s();
 			  } 
 	                } );
-        print( x.length() );
-        print( tojson( x ) );
+        debug( x.length() );
+        debug( tojson( x ) );
     }
     catch(e) { 
 	ok = true;

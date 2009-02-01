@@ -528,7 +528,7 @@ namespace mongo {
                     }
                 }
                 else {
-		    mongo::out() << "    jnicall: operation isn't supported: " << m.data->operation() << endl;
+                    mongo::out() << "    jnicall: operation isn't supported: " << m.data->operation() << endl;
                     assert(false);
                 }
 
