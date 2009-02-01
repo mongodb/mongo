@@ -208,7 +208,7 @@ namespace mongo {
                 string s = "db disk space quota exceeded ";
                 if ( database )
                     s += database->name;
-                uasserted(s.c_str());
+                uasserted(s);
             }
         }
 
@@ -958,7 +958,7 @@ namespace mongo {
                      tabletoidxns << "\n  ourns:" << ns;
                 out() << "\n  idxobj:" << io.toString() << endl;
                 string s = "bad add index attempt " + tabletoidxns + " key:" + key.toString();
-                uasserted(s.c_str());
+                uasserted(s);
             }
             tableToIndex = nsdetails(tabletoidxns.c_str());
             if ( tableToIndex == 0 ) {
@@ -977,7 +977,7 @@ namespace mongo {
                 ss << "add index fails, too many indexes for " << tabletoidxns << " key:" << key.toString();
                 string s = ss.str();
                 log() << s << '\n';
-                uasserted(s.c_str());
+                uasserted(s);
             }
             if ( tableToIndex->findIndexByName(name) >= 0 ) {
                 //out() << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;

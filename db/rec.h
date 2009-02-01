@@ -26,9 +26,12 @@ class InMem_RecStore : public RecStoreInterface {
 public:
     static char* get(DiskLoc d, unsigned len) { 
         assert( d.a() == INMEMFILE );
-		//return (char *) d.getOfs();
+#ifdef __LP64__
 		massert("64 bit not done", false);
 		return 0;
+#else
+		return (char *) d.getOfs();
+#endif
     }
 
     static DiskLoc insert(const char *ns, const void *obuf, int len, bool god) {
@@ -61,3 +64,5 @@ inline BtreeBucket* DiskLoc::btree() const {
 }
 
 }
+
+#include "recstore.h"

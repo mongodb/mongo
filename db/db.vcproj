@@ -662,6 +662,18 @@
 					>
 				</File>
 				<File
+					RelativePath=".\rec.h"
+					>
+				</File>
+				<File
+					RelativePath=".\reci.h"
+					>
+				</File>
+				<File
+					RelativePath=".\recstore.h"
+					>
+				</File>
+				<File
 					RelativePath=".\repl.h"
 					>
 				</File>
