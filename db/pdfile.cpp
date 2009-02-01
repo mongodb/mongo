@@ -235,9 +235,8 @@ namespace mongo {
 
     /* prev - previous extent for this namespace.  null=this is the first one. */
     Extent* MongoDataFile::newExtent(const char *ns, int approxSize, bool newCapped, int loops) {
-        assert( approxSize >= 0 && approxSize <= 0x7ff00000 );
-
-        assert( header ); // null if file open failed
+        massert( "bad new extent size", approxSize >= 0 && approxSize <= 0x7ff00000 );
+        massert( "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
         int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
         DiskLoc loc;
         if ( ExtentSize <= 0 ) {
