@@ -19,7 +19,6 @@ public:
 };
 
 /* An in memory RecStoreInterface implementation
-   Note: first cut here is just a test implementation that works on 32 bit only!
 */
 
 class InMem_RecStore : public RecStoreInterface { 
@@ -27,7 +26,9 @@ class InMem_RecStore : public RecStoreInterface {
 public:
     static char* get(DiskLoc d, unsigned len) { 
         assert( d.a() == INMEMFILE );
-        return (char *) d.getOfs();
+		//return (char *) d.getOfs();
+		massert("64 bit not done", false);
+		return 0;
     }
 
     static DiskLoc insert(const char *ns, const void *obuf, int len, bool god) {
