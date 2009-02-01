@@ -24,7 +24,7 @@
 namespace mongo {
 
     struct PoolForHost {
-        queue<DBClientConnection*> pool;
+        std::queue<DBClientConnection*> pool;
     };
 
     /** Database connection pool.

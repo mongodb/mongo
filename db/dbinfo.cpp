@@ -20,11 +20,6 @@
 #include "db.h"
 #include "query.h"
 
-#if 0 
-#else asdfl(0)
-
-#endif
-
 namespace mongo {
 
     void DBInfo::setHaveLogged() {
