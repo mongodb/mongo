@@ -103,6 +103,7 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
+useJavaHome = False
 linux64  = False
 darwin = False
 force64 = not GetOption( "force64" ) is None
@@ -114,6 +115,7 @@ installDir = "/usr/local"
 nixLibPrefix = "lib"
 
 javaHome = GetOption( "javaHome" )
+javaVersion = "i386";
 javaLibs = []
 
 def findVersion( root , choices ):
@@ -144,27 +146,19 @@ if "darwin" == os.sys.platform:
         env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
 
 elif "linux2" == os.sys.platform:
-    
+    useJavaHome = True
+    javaOS = "linux"
+
     if not os.path.exists( javaHome ):
         #fedora standarm jvm location
         javaHome = "/usr/lib/jvm/java/"
-
-    env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/linux"] )
-    
-    javaVersion = "i386";
 
     if os.uname()[4] == "x86_64" and not force32:
         linux64 = True
         javaVersion = "amd64"
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64"] )
-
-    env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
-    javaLibs += [ "java" , "jvm" ]
-
-    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
-    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
-
+    
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
 
@@ -172,6 +166,13 @@ elif "linux2" == os.sys.platform:
     #    env.Append( LINKFLAGS=" -static " )
 
     nix = True
+
+elif "sunos5" == os.sys.platform:
+     nix = True
+     useJavaHome = True
+     javaHome = "/usr/lib/jvm/java-6-sun/"
+     javaOS = "solaris"
+     env.Append( CPPDEFINES=[ "__linux__" ] )
 
 elif "win32" == os.sys.platform:
     boostDir = "C:/Program Files/Boost/boost_1_35_0"
@@ -211,6 +212,16 @@ elif "win32" == os.sys.platform:
 
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
+
+if useJavaHome:
+    env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/" + javaOS ] )
+    env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
+
+    javaLibs += [ "java" , "jvm" ]
+
+    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
+    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
+
 
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-non-virtual-dtor" )
