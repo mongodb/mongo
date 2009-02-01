@@ -470,11 +470,12 @@ if linux64 or force64:
         shellEnv["LIBPATH"].remove( "/usr/64/lib" )
         shellEnv.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
         shellEnv.Append( LIBPATH=[ "/sw/lib/", "/opt/local/lib"] )
-
+        
     l = shellEnv["LIBS"]
     if linux64:
         l.remove("java")
         l.remove("jvm")
+        javaLibs = []
     removeIfInList( l , "pcre" )
     removeIfInList( l , "pcrecpp" )
 
@@ -584,10 +585,14 @@ def s3dist( env , target , source ):
     if not distBuild:
         print( "can't do s3dist without --dist" )
         Exit(1)
+        
+    p = installDir
+    if p.endswith( "/" ):
+        p = p.substring( 0 , p.size() - 1 )
+        
+    dir,slash,name = p.rpartition( "/" )
 
-    
-
-env.Alias( "s3dist" , [ "install" , installDir + ".tar.gz" ] , [ s3dist ] )
+env.Alias( "s3dist" , [ "install" ] , [ s3dist ] )
 env.AlwaysBuild( "s3dist" )
 
 
