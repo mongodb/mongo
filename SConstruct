@@ -49,6 +49,15 @@ AddOption( "--release",
            action="store",
            help="relase build")
 
+
+AddOption( "--dist",
+           dest="dist",
+           type="string",
+           nargs=1,
+           action="store",
+           help="dist name")
+
+
 AddOption('--java',
           dest='javaHome',
           type='string',
@@ -112,12 +121,21 @@ force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 noOptimization = not GetOption( "noOptimization" ) is None
 
-installDir = "/usr/local"
+DEFAULT_INSTALl_DIR = "/usr/local"
+installDir = DEFAULT_INSTALl_DIR
 nixLibPrefix = "lib"
 
 javaHome = GetOption( "javaHome" )
 javaVersion = "i386";
 javaLibs = []
+
+distBuild = GetOption( "dist" ) is not None
+if distBuild:
+    release = True
+    installDir = "/tmp/mongo-db-" + GetOption( "dist" ) + "-latest"
+
+if GetOption( "prefix" ):
+    installDir = GetOption( "prefix" )
 
 def findVersion( root , choices ):
     for c in choices:
@@ -141,7 +159,8 @@ if "darwin" == os.sys.platform:
     if force64:
         env.Append( CPPPATH=["/usr/64/include"] )
         env.Append( LIBPATH=["/usr/64/lib"] )
-        installDir = "/usr/64/"
+        if installDir == DEFAULT_INSTALl_DIR:
+            installDir = "/usr/64/"
     else:
         env.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
         env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
@@ -487,8 +506,6 @@ testEnv.AlwaysBuild( "smokeClient" )
 
 #  ----  INSTALL -------
 
-if GetOption( "prefix" ):
-    installDir = GetOption( "prefix" )
 
 #binaries
 env.Install( installDir + "/bin" , "mongodump" )
