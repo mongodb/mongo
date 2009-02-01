@@ -7,6 +7,7 @@
 import os
 import sys
 import types 
+import re
 
 # --- options ----
 AddOption('--prefix',
@@ -168,9 +169,6 @@ elif "linux2" == os.sys.platform:
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
 
-    #if release:
-    #    env.Append( LINKFLAGS=" -static " )
-
     nix = True
 
 elif "win32" == os.sys.platform:
@@ -235,61 +233,66 @@ if nix:
 
 # --- check system ---
 
-conf = Configure(env)
-
-def myCheckLib( poss , failIfNotFound=False ):
+def doConfigure( myenv ):
+    conf = Configure(myenv)
+    myenv["LINKFLAGS_CLEAN"] = myenv["LINKFLAGS"]
+    myenv["LIBS_CLEAN"] = myenv["LIBS"]
     
-    if type( poss ) != types.ListType :
-        poss = [poss]
+    def myCheckLib( poss , failIfNotFound=False ):
 
-    if darwin and release and not force64:
-        allPlaces = [];
-        allPlaces += env["LIBPATH"]
-        allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
-        
-        for p in poss:
-            for loc in allPlaces:
-                fullPath = loc + "/lib" + p + ".a"
-                if os.path.exists( fullPath ):
-                    env.Append( LINKFLAGS=" " + fullPath + " " )
-                    return True
+        if type( poss ) != types.ListType :
+            poss = [poss]
 
-    res = conf.CheckLib( poss )
-    if not res and failIfNotFound:
-        print( "can't find " + poss )
-        Exit(1)
-        
-    return res
+        if darwin and release:
+            allPlaces = [];
+            allPlaces += myenv["LIBPATH"]
+            if not force64:
+                allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
 
-if not conf.CheckCXXHeader( 'pcrecpp.h' ):
-    print( "can't find pcre" )
-    Exit(1)
+            for p in poss:
+                for loc in allPlaces:
+                    fullPath = loc + "/lib" + p + ".a"
+                    if os.path.exists( fullPath ):
+                        myenv.Append( LINKFLAGS=" " + fullPath + " " )
+                        return True
 
-if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
-    print( "can't find boost headers" )
-    Exit(1)
+        res = conf.CheckLib( poss )
+        if not res and failIfNotFound:
+            print( "can't find " + poss )
+            Exit(1)
 
-for b in boostLibs:
-    l = "boost_" + b
-    if not myCheckLib( [ l + "-mt" , l ] ):
-        print "can't find a required boost library [" + l + "]";
+        return res
+
+    if not conf.CheckCXXHeader( 'pcrecpp.h' ):
+        print( "can't find pcre" )
         Exit(1)
 
-for j in javaLibs:
-    if not myCheckLib( j ):
-        print( "can't find java lib [" + j + "]" )
+    if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
+        print( "can't find boost headers" )
         Exit(1)
 
-if nix:
-    myCheckLib( "pcrecpp" , True )
-    myCheckLib( "pcre" , True )
-    
+    for b in boostLibs:
+        l = "boost_" + b
+        if not myCheckLib( [ l + "-mt" , l ] ):
+            print "can't find a required boost library [" + l + "]";
+            Exit(1)
 
-# this will add it iff it exists and works
-myCheckLib( "boost_system-mt" )
+    for j in javaLibs:
+        if not myCheckLib( j ):
+            print( "can't find java lib [" + j + "]" )
+            Exit(1)
 
-env = conf.Finish()
+    if nix:
+        myCheckLib( "pcrecpp" , True )
+        myCheckLib( "pcre" , True )
 
+
+    # this will add it iff it exists and works
+    myCheckLib( "boost_system-mt" )
+
+    return conf.Finish()
+
+env = doConfigure( env )
 # --- v8 ---
 
 v8Home = GetOption( "v8home" )
@@ -406,12 +409,22 @@ clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest
 # shell is complicated by the fact that v8 doesn't work 64-bit yet
 
 shellEnv = env.Clone();
+
 shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
-shellEnv.Append( LIBS=[ "v8" , "readline" ] )
 shellEnv.Append( LIBPATH=[ v8Home] )
+
+if darwin and release and force64:
+    shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
+    shellEnv["LIBS"] = env["LIBS_CLEAN"]
+
+shellEnv.Append( LIBS=[ "v8" , "readline" ] )
 
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
+
+def removeIfInList( lst , thing ):
+    if thing in lst:
+        lst.remove( thing )
 
 if linux64 or force64:
     if linux64:
@@ -432,8 +445,8 @@ if linux64 or force64:
     if linux64:
         l.remove("java")
         l.remove("jvm")
-    l.remove("pcre")
-    l.remove("pcrecpp")
+    removeIfInList( l , "pcre" )
+    removeIfInList( l , "pcrecpp" )
 
     shell32BitFiles = Glob( "shell/*.cpp" )
     for f in allClientFiles:
@@ -445,6 +458,8 @@ else:
     shellEnv.Append( LIBPATH=[ "." ] )
     shellEnv.Append( LIBS=[ "mongoclient"] )
     shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
+
+shellEnv = doConfigure( shellEnv )
 
 
 #  ---- RUNNING TESTS ----
