@@ -32,12 +32,17 @@ public:
     }
 
     static DiskLoc insert(const char *ns, const void *obuf, int len, bool god) {
+#ifdef __LP64__
+      assert( 0 );
+      throw -1;
+#else
         char *p = (char *) malloc(len);
         assert( p );
         memcpy(p, obuf, len);
         int b = (int) p;
         assert( b > 0 );
         return DiskLoc(INMEMFILE, b);
+#endif
     }
 };
 
