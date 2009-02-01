@@ -492,8 +492,6 @@ else:
     shellEnv.Append( LIBS=[ "mongoclient"] )
     shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
 
-
-
 #  ---- RUNNING TESTS ----
 
 def testSetup( env , target , source ):
@@ -581,3 +579,16 @@ def s3shellpush( env , target , source ):
 
 env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
 env.AlwaysBuild( "s3shell" )
+
+def s3dist( env , target , source ):
+    if not distBuild:
+        print( "can't do s3dist without --dist" )
+        Exit(1)
+
+    
+
+env.Alias( "s3dist" , [ "install" , installDir + ".tar.gz" ] , [ s3dist ] )
+env.AlwaysBuild( "s3dist" )
+
+
+
