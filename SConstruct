@@ -483,13 +483,15 @@ if linux64 or force64:
         shell32BitFiles.append( "32bit/" + str( f ) )
 
     shellEnv.VariantDir( "32bit" , "." )
+
+    shellEnv = doConfigure( shellEnv )
+
     shellEnv.Program( "mongo" , shell32BitFiles )
 else:
     shellEnv.Append( LIBPATH=[ "." ] )
     shellEnv.Append( LIBS=[ "mongoclient"] )
     shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
 
-shellEnv = doConfigure( shellEnv )
 
 
 #  ---- RUNNING TESTS ----
