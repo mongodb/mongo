@@ -75,7 +75,7 @@ namespace mongo {
         friend class PiggyBackData;
     };
 
-#pragma pack()
+    //#pragma pack()
 #pragma pack(1)
 
     enum Operations {
