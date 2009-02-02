@@ -37,19 +37,16 @@ namespace mongo {
         int fileNo; /* this will be volume, file #, etc. */
         int ofs;
     public:
-        enum { NullOfs = -1, MaxFiles=4000 };
+        enum { MaxFiles=4000, NullOfs = -1 };
 
         int a() const {
             return fileNo;
         }
-        DiskLoc(int a, int b) : fileNo(a), ofs(b) {
-            assert(ofs!=0);
-        }
-        DiskLoc() {
-            fileNo = -1;
-            ofs = NullOfs;
-        }
 
+        DiskLoc(int a, int b) : fileNo(a), ofs(b) {
+            //assert(ofs!=0);
+        }
+        DiskLoc() { Null(); }
         DiskLoc(const DiskLoc& l) {
             fileNo=l.fileNo;
             ofs=l.ofs;
@@ -62,11 +59,12 @@ namespace mongo {
         }
 
         bool isNull() const {
-            return ofs == NullOfs;
+            return fileNo == -1;
+            //            return ofs == NullOfs;
         }
         void Null() {
             fileNo = -1;
-            ofs = NullOfs;
+            ofs = 0;
         }
         void assertOk() {
             assert(!isNull());
@@ -119,7 +117,7 @@ namespace mongo {
         const DiskLoc& operator=(const DiskLoc& b) {
             fileNo=b.fileNo;
             ofs = b.ofs;
-            assert(ofs!=0);
+            //assert(ofs!=0);
             return *this;
         }
         int compare(const DiskLoc& b) const {
@@ -141,6 +139,7 @@ namespace mongo {
         DeletedRecord* drec() const;
         Extent* ext() const;
         BtreeBucket* btree() const;
+        BtreeBucket* btreemod() const; // marks modified / dirty
 
         MongoDataFile& pdf() const;
     };

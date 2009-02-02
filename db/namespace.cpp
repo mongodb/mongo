@@ -195,11 +195,12 @@ namespace mongo {
                 cur.Null();
             }
             else {
-                if ( r->nextDeleted.getOfs() == 0 ) {
+                /*this defensive check only made sense for the mmap storage engine: 
+                  if ( r->nextDeleted.getOfs() == 0 ) {
                     problem() << "~~ Assertion - bad nextDeleted " << r->nextDeleted.toString() <<
                     " b:" << b << " chain:" << chain << ", fixing.\n";
                     r->nextDeleted.Null();
-                }
+                }*/
                 cur = r->nextDeleted;
                 prev = &r->nextDeleted;
             }

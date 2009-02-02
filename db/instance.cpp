@@ -28,6 +28,7 @@
 #include "security.h"
 #include "curop.h"
 #include "json.h"
+#include "reccache.h"
 
 namespace mongo {
 
@@ -51,6 +52,7 @@ namespace mongo {
        7 = log a few reads, and all writes.
     */
     int opLogging = 0;
+
     int getOpLogging() {
         return opLogging;
     }
@@ -62,7 +64,10 @@ namespace mongo {
 
     void closeAllSockets();
     void flushOpLog() {
-        _oplog.flush();
+        if( _oplog.f && _oplog.f->is_open() ) {
+            out() << "flushing op log and files" << endl;
+            _oplog.flush();
+        }
     }
 
     int ctr = 0;
@@ -586,17 +591,20 @@ namespace mongo {
     }
 
     DBDirectClient::AlwaysAuthorized DBDirectClient::Authorizer::always;
+
+    void recCacheCloseAll();
     
     /* not using log() herein in case we are called from segvhandler and we were already locked */
 #undef exit
     void dbexit(int rc, const char *why) {
-        out() << "dbexit: " << why << "; flushing op log and files" << endl;
+        if( why && *why ) out() << "dbexit: " << why << endl;
         flushOpLog();
 
         /* must do this before unmapping mem or you may get a seg fault */
         closeAllSockets();
 
         MemoryMappedFile::closeAllFiles();
+        recCacheCloseAll();
         out() << "dbexit: really exiting now" << endl;
         ::exit(rc);
     }

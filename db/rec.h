@@ -3,6 +3,7 @@
 #pragma once
 
 #include "reci.h"
+#include "reccache.h"
 
 namespace mongo { 
 
@@ -16,6 +17,8 @@ public:
     static DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
         return theDataFileMgr.insert(ns, obuf, len, god);
     }
+
+    static void modified(DiskLoc d) { }
 };
 
 /* An in memory RecStoreInterface implementation
@@ -47,6 +50,8 @@ public:
         return DiskLoc(INMEMFILE, b);
 #endif
     }
+
+    static void modified(DiskLoc d) { }
 };
 
 /* Glue btree to RecStoreInterface
@@ -54,6 +59,7 @@ public:
 
 // pick your store for indexes by setting this typedef
 typedef MongoMemMapped_RecStore BtreeStore;
+//typedef BasicCached_RecStore BtreeStore;
 //typedef InMem_RecStore BtreeStore;
 
 const int BucketSize = 8192;
@@ -63,6 +69,12 @@ inline BtreeBucket* DiskLoc::btree() const {
     return (BtreeBucket*) BtreeStore::get(*this, BucketSize);
 }
 
+inline BtreeBucket* DiskLoc::btreemod() const {
+    assert( fileNo != -1 );
+    BtreeBucket *b = (BtreeBucket*) BtreeStore::get(*this, BucketSize);
+    BtreeStore::modified(*this);
+    return b;
 }
 
-#include "recstore.h"
+}
+

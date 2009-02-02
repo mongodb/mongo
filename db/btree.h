@@ -82,6 +82,7 @@ namespace mongo {
         void assertValid(const BSONObj &order, bool force = false);
         int fullValidate(const DiskLoc& thisLoc, const BSONObj &order); /* traverses everything */
     protected:
+        void modified(const DiskLoc& thisLoc);
         DiskLoc& getChild(int pos) {
             assert( pos >= 0 && pos <= n );
             return pos == n ? nextChild : k(pos).prevChildBucket;
@@ -100,7 +101,7 @@ namespace mongo {
         /* returns false if node is full and must be split
            keypos is where to insert -- inserted after that key #.  so keypos=0 is the leftmost one.
         */
-        bool basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order);
+        bool basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order);
         void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild);
         void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs.
 

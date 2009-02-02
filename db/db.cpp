@@ -313,6 +313,8 @@ namespace mongo {
             log() << "opLogging = " << opLogging << endl;
         _oplog.init();
 
+        RecCache::tempStore.init("/data/db/indexes.dat", BucketSize);
+
 #if !defined(_WIN32)
         assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
 #endif
@@ -619,3 +621,6 @@ namespace mongo {
 #endif
 
 } // namespace mongo
+
+#include "recstore.h"
+#include "reccache.h"

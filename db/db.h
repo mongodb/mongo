@@ -67,9 +67,15 @@ namespace mongo {
         }
     };
 
+    void dbunlocked();
+
     struct dblock : public lock {
         dblock() :
                 lock( dbMutex, dbMutexInfo ) {
+        }
+        ~dblock() { 
+            /* todo: this should be inlined */
+            dbunlocked();
         }
     };
 

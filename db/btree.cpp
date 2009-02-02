@@ -22,9 +22,6 @@
 
 namespace mongo {
 
-    /* this will be an assertion check later for RecStoreInterface compliance checking */
-    inline void written() { }
-
     const int KeyMax = BucketSize / 10;
 
     int ninserts = 0;
@@ -38,6 +35,11 @@ namespace mongo {
     { }
 
     /* BucketBasics --------------------------------------------------- */
+
+    inline void BucketBasics::modified(const DiskLoc& thisLoc) {
+        dassert( thisLoc.btree() == this );
+        BtreeStore::modified(thisLoc);
+    }
 
     int BucketBasics::Size() const {
         assert( _Size == BucketSize );
@@ -179,7 +181,6 @@ namespace mongo {
        the keynodes grow from the front.
     */
     inline int BucketBasics::_alloc(int bytes) {
-        written();
         topSize += bytes;
         emptySize -= bytes;
         int ofs = totalDataSize() - topSize;
@@ -190,7 +191,6 @@ namespace mongo {
     void BucketBasics::_delKeyAtPos(int keypos) {
         assert( keypos >= 0 && keypos <= n );
         assert( childForPos(keypos).isNull() );
-        written();
         n--;
         assert( n > 0 || nextChild.isNull() );
         for ( int j = keypos; j < n; j++ )
@@ -201,7 +201,6 @@ namespace mongo {
 
     /* add a key.  must be > all existing.  be careful to set next ptr right. */
     void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild) {
-        written();
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
         assert( bytesNeeded <= emptySize );
         assert( n == 0 || keyNode(n-1).key.woCompare(key, order) <= 0 );
@@ -214,8 +213,9 @@ namespace mongo {
         memcpy(p, key.objdata(), key.objsize());
     }
 
-    bool BucketBasics::basicInsert(int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order) {
-        written();
+    /* insert a key in a bucket with no complexity -- no splits required */
+    bool BucketBasics::basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order) {
+        modified(thisLoc);
         assert( keypos >= 0 && keypos <= n );
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
         if ( bytesNeeded > emptySize ) {
@@ -243,7 +243,6 @@ namespace mongo {
         if ( flags & Packed )
             return;
 
-        written();
         int tdz = totalDataSize();
         char temp[BucketSize];
         int ofs = tdz;
@@ -269,7 +268,6 @@ namespace mongo {
         n = N;
         setNotPacked();
         pack( order );
-        written();
     }
 
     /* - BtreeBucket --------------------------------------------------- */
@@ -359,9 +357,8 @@ namespace mongo {
     void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) {
         aboutToDeleteBucket(thisLoc);
         assert( !isHead() );
-        written();
 
-        BtreeBucket *p = parent.btree();
+        BtreeBucket *p = parent.btreemod();
         if ( p->nextChild == thisLoc ) {
             p->nextChild.Null();
         }
@@ -385,6 +382,7 @@ found:
            it (meaning it is ineligible for reuse).
            */
         memset(this, 0, Size());
+        modified(thisLoc);
 #else
         //defensive:
         n = -1;
@@ -399,8 +397,7 @@ found:
 
     /* note: may delete the entire bucket!  this invalid upon return sometimes. */
     void BtreeBucket::delKeyAtPos(const DiskLoc& thisLoc, IndexDetails& id, int p) {
-        written();
-        dassert( thisLoc.btree() == this );
+        modified(thisLoc);
         assert(n>0);
         DiskLoc left = childForPos(p);
 
@@ -451,7 +448,7 @@ found:
         if ( !child.isNull() ) {
             if ( insert_debug )
                 out() << "      " << child.toString() << ".parent=" << thisLoc.toString() << endl;
-            child.btree()->parent = thisLoc;
+            child.btreemod()->parent = thisLoc;
         }
     }
 
@@ -463,20 +460,21 @@ found:
             fix(thisLoc, k(i).prevChildBucket);
     }
 
-    /* keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
+    /* insert a key in this bucket, splitting if necessary.
+       keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
     */
     void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
                                  DiskLoc recordLoc, BSONObj& key, const BSONObj& order,
                                  DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
     {
-        dassert( thisLoc.btree() == this );
+        modified(thisLoc);
         if ( insert_debug )
             out() << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' '
                  << lchild.toString() << ' ' << rchild.toString() << " keypos:" << keypos << endl;
 
         DiskLoc oldLoc = thisLoc;
 
-        if ( basicInsert(keypos, recordLoc, key, order) ) {
+        if ( basicInsert(thisLoc, keypos, recordLoc, key, order) ) {
             _KeyNode& kn = k(keypos);
             if ( keypos+1 == n ) { // last key
                 if ( nextChild != lchild ) {
@@ -499,7 +497,7 @@ found:
                 assert( kn.prevChildBucket == lchild );
                 nextChild = rchild;
                 if ( !rchild.isNull() )
-                    rchild.btree()->parent = thisLoc;
+                    rchild.btreemod()->parent = thisLoc;
             }
             else {
                 k(keypos).prevChildBucket = lchild;
@@ -521,12 +519,13 @@ found:
                 }
                 k(keypos+1).prevChildBucket = rchild;
                 if ( !rchild.isNull() )
-                    rchild.btree()->parent = thisLoc;
+                    rchild.btreemod()->parent = thisLoc;
             }
             return;
         }
 
-        // split
+        /* ---------- split ---------------- */
+
         if ( split_debug )
             out() << "    " << thisLoc.toString() << ".split" << endl;
 
@@ -569,12 +568,12 @@ found:
                 if ( split_debug )
                     out() << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
                 free(p);
-                rLoc.btree()->parent = parent;
+                rLoc.btreemod()->parent = parent;
             }
             else {
                 /* set this before calling _insert - if it splits it will do fixParent() logic and change the value.
                 */
-                rLoc.btree()->parent = parent;
+                rLoc.btreemod()->parent = parent;
                 if ( split_debug )
                     out() << "    promoting middle key " << middle.key.toString() << endl;
                 parent.btree()->_insert(parent, middle.recordLoc, middle.key, order, /*dupsallowed*/true, thisLoc, rLoc, idx);

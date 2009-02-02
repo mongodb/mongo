@@ -191,7 +191,11 @@ namespace mongo {
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
     */
+#if defined(_DEBUG)
 #define dassert assert
+#else
+#define dassert(x) 
+#endif
 
 } // namespace mongo
 
