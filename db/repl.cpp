@@ -975,6 +975,7 @@ namespace mongo {
             log() << "pull: " << sourceName() << '@' << hostName << endl;
         nClonedThisPass = 0;
 
+        // FIXME Handle cases where this db isn't on default port, or default port is spec'd in hostName.
         if ( (string("localhost") == hostName || string("127.0.0.1") == hostName) && port == DBPort ) {
             log() << "pull:   can't sync from self (localhost). sources configuration may be wrong." << endl;
             sleepsecs(5);
