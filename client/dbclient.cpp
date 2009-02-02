@@ -344,21 +344,19 @@ namespace mongo {
     bool DBClientConnection::connect(const char *_serverAddress, string& errmsg) {
         serverAddress = _serverAddress;
 
-        int port = DBPort;
-        string ip = hostbyname(_serverAddress);
-        if ( ip.empty() )
-            ip = serverAddress;
-
-        size_t idx = ip.find( ":" );
+        string ip;
+        int port;
+        size_t idx = serverAddress.find( ":" );
         if ( idx != string::npos ) {
             //out() << "port string:" << ip.substr( idx ) << endl;
-            port = atoi( ip.substr( idx + 1 ).c_str() );
-            ip = ip.substr( 0 , idx );
+            port = strtol( serverAddress.substr( idx + 1 ).c_str(), 0, 10 );
+            ip = serverAddress.substr( 0 , idx );
             ip = hostbyname(ip.c_str());
-
+        } else {
+            port = DBPort;
+            ip = hostbyname( serverAddress.c_str() );
         }
-        if ( ip.empty() )
-            ip = serverAddress;
+        massert( "Unable to parse hostname", !ip.empty() );
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
