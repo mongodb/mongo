@@ -132,7 +132,7 @@ javaLibs = []
 distBuild = GetOption( "dist" ) is not None
 if distBuild:
     release = True
-    installDir = "/tmp/mongo-db-" + GetOption( "dist" ) + "-latest"
+    installDir = "mongo-db-" + GetOption( "dist" ) + "-latest"
 
 if GetOption( "prefix" ):
     installDir = GetOption( "prefix" )
@@ -587,13 +587,13 @@ def s3dist( env , target , source ):
         print( "can't do s3dist without --dist" )
         Exit(1)
         
-    p = installDir
-    if p.endswith( "/" ):
-        p = p.substring( 0 , p.size() - 1 )
-        
-    dir,slash,name = p.rpartition( "/" )
+    s3push( distFile )
 
-env.Alias( "s3dist" , [ "install" ] , [ s3dist ] )
+distFile = installDir + ".tgz" 
+env.Append( TARFLAGS=" -z " )
+env.Tar( distFile , installDir )
+
+env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
 env.AlwaysBuild( "s3dist" )
 
 
