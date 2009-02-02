@@ -9,3 +9,4 @@
 
 WT_ERROR	non-specific error
 WT_NOTFOUND	item not found
+WT_TOOSMALL	user-supplied DBT buffer is too small for returned item

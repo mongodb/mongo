@@ -63,10 +63,10 @@ typedef u_int64_t wt_recno_t;		/* logical record numbers */
  * Key/data structure -- a Data-Base Thang
  *******************************************/
 struct __dbt {
-	void	*data;			/* data */
-	size_t	 size;			/* data length */
+	void	 *data;			/* data */
+	u_int32_t size;			/* data length */
 
-	size_t	 alloc_size;		/* bytes allocated for data */
+	u_int32_t data_len;		/* associated memory size */
 
 	u_int32_t flags;
 };
@@ -346,6 +346,8 @@ char	*wt_strerror(int);
  */
 #define	WT_ALLOCATED					0x00000001
 #define	WT_CREATE					0x00000001
+#define	WT_DBT_ALLOC					0x00000002
+#define	WT_DBT_APPMEM					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MAXKEY_NOTSET				0x00000002
@@ -369,7 +371,7 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000
 #define	WT_APIMASK_DB_SYNC				0x00000000
 #define	WT_APIMASK_DB_VERIFY				0x00000000
-#define	WT_APIMASK_DBT					0x00000000
+#define	WT_APIMASK_DBT					0x00000003
 #define	WT_APIMASK_ENV					0x00000000
 #define	WT_APIMASK_ENV_CLOSE				0x00000000
 #define	WT_APIMASK_ENV_DESTROY				0x00000000
@@ -400,6 +402,7 @@ char	*wt_strerror(int);
  */
 #define	WT_ERROR	-31800
 #define	WT_NOTFOUND	-31801
+#define	WT_TOOSMALL	-31802
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

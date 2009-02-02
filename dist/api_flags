@@ -74,6 +74,8 @@ Db.verify
 # Structures
 #############################################
 Dbt
+	DBT_ALLOC			# Allocate application-owned DBT memory
+	DBT_APPMEM			# Application-supplied DBT memory
 
 wt_indx
 	ALLOCATED			# Index key in allocated memory

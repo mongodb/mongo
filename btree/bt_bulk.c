@@ -772,10 +772,10 @@ __wt_bt_dbt_copy(ENV *env, DBT *orig, DBT *copy)
 {
 	int ret;
 
-	if (copy->data == NULL || copy->alloc_size < orig->size) {
+	if (copy->data == NULL || copy->data_len < orig->size) {
 		if ((ret = __wt_realloc(env, orig->size, &copy->data)) != 0)
 			return (ret);
-		copy->alloc_size = orig->size;
+		copy->data_len = orig->size;
 	}
 	memcpy(copy->data, orig->data, copy->size = orig->size);
 

@@ -50,8 +50,7 @@ __wt_db_get(wt_args_db_get *argp)
 		goto err;
 	}
 
-	ret = __wt_bt_dbt_return(db, &idb->data, page, indx);
-	*data = idb->data;
+	ret = __wt_bt_dbt_return(db, data, page, indx);
 
 	if (0) {
 err:		ret = WT_ERROR;

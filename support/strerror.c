@@ -20,6 +20,8 @@ wt_strerror(int error)
 		return ("WT_ERROR: non-specific error");
 	case WT_NOTFOUND:
 		return ("WT_NOTFOUND: item not found");
+	case WT_TOOSMALL:
+		return ("WT_TOOSMALL: user-supplied DBT buffer is too small for returned item");
 	default:
 		if (error > 0 && (p = strerror(error)) != NULL)
 			return (p);
