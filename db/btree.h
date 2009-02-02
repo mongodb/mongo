@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     struct _KeyNode {
         DiskLoc prevChildBucket;
@@ -58,7 +58,7 @@ namespace mongo {
         }
     };
 
-#pragma pack(pop)
+#pragma pack()
 
     class BucketBasics;
 
@@ -71,16 +71,14 @@ namespace mongo {
         BSONObj key;
     };
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     /* this class is all about the storage management */
     class BucketBasics {
         friend class KeyNode;
     public:
         void dumpTree(DiskLoc thisLoc, const BSONObj &order);
-        bool isHead() {
-            return parent.isNull();
-        }
+        bool isHead() { return parent.isNull(); }
         void assertValid(const BSONObj &order, bool force = false);
         int fullValidate(const DiskLoc& thisLoc, const BSONObj &order); /* traverses everything */
     protected:
@@ -293,6 +291,6 @@ namespace mongo {
         DiskLoc locAtKeyOfs;
     };
 
-#pragma pack(pop)
+#pragma pack()
 
 } // namespace mongo;

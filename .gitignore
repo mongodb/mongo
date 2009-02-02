@@ -41,6 +41,7 @@ mongogrid
 mongodump
 mongoimport
 mongoimportjson
+*.tgz
 
 #libs
 libmongoclient.*

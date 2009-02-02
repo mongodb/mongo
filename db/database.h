@@ -49,7 +49,7 @@ namespace mongo {
                 delete files[i];
         }
 
-        PhysicalDataFile* getFile( int n, int sizeNeeded = 0 ) {
+        MongoDataFile* getFile( int n, int sizeNeeded = 0 ) {
             assert(this);
 
             if ( n < 0 || n >= DiskLoc::MaxFiles ) {
@@ -62,19 +62,19 @@ namespace mongo {
             }
             while ( n >= (int) files.size() )
                 files.push_back(0);
-            PhysicalDataFile* p = files[n];
+            MongoDataFile* p = files[n];
             if ( p == 0 ) {
                 stringstream ss;
                 ss << name << '.' << n;
                 boost::filesystem::path fullName;
                 fullName = boost::filesystem::path(path) / ss.str();
                 string fullNameString = fullName.string();
-                p = new PhysicalDataFile(n);
+                p = new MongoDataFile(n);
                 int minSize = 0;
                 if ( n != 0 && files[ n - 1 ] )
                     minSize = files[ n - 1 ]->getHeader()->fileLength;
-                if ( sizeNeeded + PDFHeader::headerSize() > minSize )
-                    minSize = sizeNeeded + PDFHeader::headerSize();
+                if ( sizeNeeded + MDFHeader::headerSize() > minSize )
+                    minSize = sizeNeeded + MDFHeader::headerSize();
                 try {
                     p->open( fullNameString.c_str(), minSize );
                 }
@@ -87,24 +87,24 @@ namespace mongo {
             return p;
         }
 
-        PhysicalDataFile* addAFile( int sizeNeeded = 0 ) {
+        MongoDataFile* addAFile( int sizeNeeded = 0 ) {
             int n = (int) files.size();
             return getFile( n, sizeNeeded );
         }
 
-        PhysicalDataFile* suitableFile( int sizeNeeded ) {
-            PhysicalDataFile* f = newestFile();
+        MongoDataFile* suitableFile( int sizeNeeded ) {
+            MongoDataFile* f = newestFile();
             for ( int i = 0; i < 8; i++ ) {
                 if ( f->getHeader()->unusedLength >= sizeNeeded )
                     break;
                 f = addAFile( sizeNeeded );
-                if ( f->getHeader()->fileLength >= PhysicalDataFile::maxSize() ) // this is as big as they get so might as well stop
+                if ( f->getHeader()->fileLength >= MongoDataFile::maxSize() ) // this is as big as they get so might as well stop
                     break;
             }
             return f;
         }
 
-        PhysicalDataFile* newestFile() {
+        MongoDataFile* newestFile() {
             int n = (int) files.size();
             if ( n > 0 ) n--;
             return getFile(n);
@@ -112,7 +112,7 @@ namespace mongo {
 
         void finishInit(); // ugly...
 
-        vector<PhysicalDataFile*> files;
+        vector<MongoDataFile*> files;
         string name; // "alleyinsider"
         string path;
         NamespaceIndex namespaceIndex;

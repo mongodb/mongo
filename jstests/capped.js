@@ -1,4 +1,3 @@
-db=connect("test");
 db.capped.drop();
 db.createCollection("cptest", {capped:true, size:30000});
 t = db.cptest;

@@ -33,5 +33,4 @@ function testBoundsWithSubobjectIndexes( db ) {
     checkResults( [ z[ 3 ], z[ 1 ] ], r.find( { e: { $gt: 4 }, "a.b": 1 } ).sort( rIdx ) );
 }
 
-db = connect( "test" );
 testBoundsWithSubobjectIndexes( db );

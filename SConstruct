@@ -4,9 +4,15 @@
 # you can get from http://www.scons.org
 # then just type scons
 
+# some common tasks
+#   build 64-bit mac and pushing to s3
+#      scons --64 --dist=osx-x86_64 s3dist
+#      all s3 pushes require settings.py
+
 import os
 import sys
 import types 
+import re
 
 # --- options ----
 AddOption('--prefix',
@@ -47,6 +53,15 @@ AddOption( "--release",
            nargs=0,
            action="store",
            help="relase build")
+
+
+AddOption( "--dist",
+           dest="dist",
+           type="string",
+           nargs=1,
+           action="store",
+           help="dist name")
+
 
 AddOption('--java',
           dest='javaHome',
@@ -103,6 +118,7 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
 
 nix = False
+useJavaHome = False
 linux64  = False
 darwin = False
 force64 = not GetOption( "force64" ) is None
@@ -110,11 +126,21 @@ force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 noOptimization = not GetOption( "noOptimization" ) is None
 
-installDir = "/usr/local"
+DEFAULT_INSTALl_DIR = "/usr/local"
+installDir = DEFAULT_INSTALl_DIR
 nixLibPrefix = "lib"
 
 javaHome = GetOption( "javaHome" )
+javaVersion = "i386";
 javaLibs = []
+
+distBuild = GetOption( "dist" ) is not None
+if distBuild:
+    release = True
+    installDir = "mongo-db-" + GetOption( "dist" ) + "-latest"
+
+if GetOption( "prefix" ):
+    installDir = GetOption( "prefix" )
 
 def findVersion( root , choices ):
     for c in choices:
@@ -138,40 +164,37 @@ if "darwin" == os.sys.platform:
     if force64:
         env.Append( CPPPATH=["/usr/64/include"] )
         env.Append( LIBPATH=["/usr/64/lib"] )
-        installDir = "/usr/64/"
+        if installDir == DEFAULT_INSTALl_DIR:
+            installDir = "/usr/64/"
     else:
         env.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
         env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
 
 elif "linux2" == os.sys.platform:
-    
+    useJavaHome = True
+    javaOS = "linux"
+
     if not os.path.exists( javaHome ):
         #fedora standarm jvm location
         javaHome = "/usr/lib/jvm/java/"
-
-    env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/linux"] )
-    
-    javaVersion = "i386";
 
     if os.uname()[4] == "x86_64" and not force32:
         linux64 = True
         javaVersion = "amd64"
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64"] )
-
-    env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
-    javaLibs += [ "java" , "jvm" ]
-
-    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
-    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
-
+    
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
 
-    #if release:
-    #    env.Append( LINKFLAGS=" -static " )
-
     nix = True
+
+elif "sunos5" == os.sys.platform:
+     nix = True
+     useJavaHome = True
+     javaHome = "/usr/lib/jvm/java-6-sun/"
+     javaOS = "solaris"
+     env.Append( CPPDEFINES=[ "__linux__" ] )
 
 elif "win32" == os.sys.platform:
     boostDir = "C:/Program Files/Boost/boost_1_35_0"
@@ -212,6 +235,16 @@ elif "win32" == os.sys.platform:
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
+if useJavaHome:
+    env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/" + javaOS ] )
+    env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
+
+    javaLibs += [ "java" , "jvm" ]
+
+    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
+    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
+
+
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-non-virtual-dtor" )
     env.Append( LINKFLAGS=" -fPIC " )
@@ -235,61 +268,63 @@ if nix:
 
 # --- check system ---
 
-conf = Configure(env)
-
-def myCheckLib( poss , failIfNotFound=False ):
+def doConfigure( myenv , java=True , pcre=True , shell=False ):
+    conf = Configure(myenv)
+    myenv["LINKFLAGS_CLEAN"] = myenv["LINKFLAGS"]
+    myenv["LIBS_CLEAN"] = myenv["LIBS"]
     
-    if type( poss ) != types.ListType :
-        poss = [poss]
+    def myCheckLib( poss , failIfNotFound=False ):
 
-    if darwin and release and not force64:
-        allPlaces = [];
-        allPlaces += env["LIBPATH"]
-        allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
-        
-        for p in poss:
-            for loc in allPlaces:
-                fullPath = loc + "/lib" + p + ".a"
-                if os.path.exists( fullPath ):
-                    env.Append( LINKFLAGS=" " + fullPath + " " )
-                    return True
+        if type( poss ) != types.ListType :
+            poss = [poss]
 
-    res = conf.CheckLib( poss )
-    if not res and failIfNotFound:
-        print( "can't find " + poss )
-        Exit(1)
-        
-    return res
+        if darwin and release:
+            allPlaces = [];
+            allPlaces += myenv["LIBPATH"]
+            if not force64:
+                allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
 
-if not conf.CheckCXXHeader( 'pcrecpp.h' ):
-    print( "can't find pcre" )
-    Exit(1)
+            for p in poss:
+                for loc in allPlaces:
+                    fullPath = loc + "/lib" + p + ".a"
+                    if os.path.exists( fullPath ):
+                        myenv.Append( LINKFLAGS=" " + fullPath + " " )
+                        return True
 
-if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
-    print( "can't find boost headers" )
-    Exit(1)
+        res = conf.CheckLib( poss )
+        if not res and failIfNotFound:
+            print( "can't find " + str( poss ) )
+            Exit(1)
 
-for b in boostLibs:
-    l = "boost_" + b
-    if not myCheckLib( [ l + "-mt" , l ] ):
-        print "can't find a required boost library [" + l + "]";
+        return res
+
+    if pcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
+        print( "can't find pcre" )
         Exit(1)
 
-for j in javaLibs:
-    if not myCheckLib( j ):
-        print( "can't find java lib [" + j + "]" )
+    if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
+        print( "can't find boost headers" )
         Exit(1)
 
-if nix:
-    myCheckLib( "pcrecpp" , True )
-    myCheckLib( "pcre" , True )
-    
+    for b in boostLibs:
+        l = "boost_" + b
+        myCheckLib( [ l + "-mt" , l ] , not shell)
 
-# this will add it iff it exists and works
-myCheckLib( "boost_system-mt" )
+    if java:
+        for j in javaLibs:
+            myCheckLib( j , True )
 
-env = conf.Finish()
+    if nix and pcre:
+        myCheckLib( "pcrecpp" , True )
+        myCheckLib( "pcre" , True )
 
+
+    # this will add it iff it exists and works
+    myCheckLib( "boost_system-mt" )
+
+    return conf.Finish()
+
+env = doConfigure( env )
 # --- v8 ---
 
 v8Home = GetOption( "v8home" )
@@ -406,19 +441,29 @@ clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest
 # shell is complicated by the fact that v8 doesn't work 64-bit yet
 
 shellEnv = env.Clone();
+
 shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
-shellEnv.Append( LIBS=[ "v8" , "readline" ] )
 shellEnv.Append( LIBPATH=[ v8Home] )
+
+if darwin and release and force64:
+    shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
+    shellEnv["LIBS"] = env["LIBS_CLEAN"]
+
+shellEnv.Append( LIBS=[ "v8" , "readline" ] )
 
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
+
+def removeIfInList( lst , thing ):
+    if thing in lst:
+        lst.remove( thing )
 
 if linux64 or force64:
     if linux64:
         shellEnv.Append( CFLAGS="-m32" )
         shellEnv.Append( CXXFLAGS="-m32" )
         shellEnv.Append( LINKFLAGS="-m32" )
-        shellEnv.Append( LIBPATH=[ "/usr/lib32" ] )
+        shellEnv.Append( LIBPATH=[ "/usr/lib32" , "/usr/lib" ] )
     else:
         shellEnv["CFLAGS"].remove("-m64")
         shellEnv["CXXFLAGS"].remove("-m64")
@@ -427,25 +472,28 @@ if linux64 or force64:
         shellEnv["LIBPATH"].remove( "/usr/64/lib" )
         shellEnv.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
         shellEnv.Append( LIBPATH=[ "/sw/lib/", "/opt/local/lib"] )
-
+        
     l = shellEnv["LIBS"]
     if linux64:
         l.remove("java")
         l.remove("jvm")
-    l.remove("pcre")
-    l.remove("pcrecpp")
+
+    removeIfInList( l , "pcre" )
+    removeIfInList( l , "pcrecpp" )
 
     shell32BitFiles = Glob( "shell/*.cpp" )
     for f in allClientFiles:
         shell32BitFiles.append( "32bit/" + str( f ) )
 
     shellEnv.VariantDir( "32bit" , "." )
+
+    shellEnv = doConfigure( shellEnv , pcre=False , java=False , shell=True )
+
     shellEnv.Program( "mongo" , shell32BitFiles )
 else:
     shellEnv.Append( LIBPATH=[ "." ] )
     shellEnv.Append( LIBS=[ "mongoclient"] )
     shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
-
 
 #  ---- RUNNING TESTS ----
 
@@ -461,8 +509,6 @@ testEnv.AlwaysBuild( "smokeClient" )
 
 #  ----  INSTALL -------
 
-if GetOption( "prefix" ):
-    installDir = GetOption( "prefix" )
 
 #binaries
 env.Install( installDir + "/bin" , "mongodump" )
@@ -513,20 +559,23 @@ env.AlwaysBuild( "push" )
 
 # ---- deploying ---
 
-def s3push( localName , remoteName=None , remotePrefix="-latest" ):
+def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True ):
     sys.path.append( "." )
 
     import simples3
     import settings
 
-    s = simples3.S3Bucket( "mongodb" , settings.id , settings.key )
+    s = simples3.S3Bucket( settings.bucket , settings.id , settings.key )
     un = os.uname()
 
     if remoteName is None:
         remoteName = localName
-
-    name = remoteName + "-" + un[0] + "-" + un[4] + remotePrefix
-    name = name.lower()
+        
+    if fixName:
+        name = remoteName + "-" + un[0] + "-" + un[4] + remotePrefix
+        name = name.lower()
+    else:
+        name = remoteName
 
     s.put( name  , open( localName ).read() , acl="public-read" );
     print( "uploaded " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
@@ -536,3 +585,20 @@ def s3shellpush( env , target , source ):
 
 env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
 env.AlwaysBuild( "s3shell" )
+
+def s3dist( env , target , source ):
+    if not distBuild:
+        print( "can't do s3dist without --dist" )
+        Exit(1)
+        
+    s3push( distFile , fixName=False )
+
+distFile = installDir + ".tgz" 
+env.Append( TARFLAGS=" -z " )
+env.Tar( distFile , installDir )
+
+env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
+env.AlwaysBuild( "s3dist" )
+
+
+

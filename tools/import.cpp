@@ -79,6 +79,9 @@ public:
             ns += "." + l;
         }
         
+	if ( boost::filesystem::file_size( root ) == 0 )
+	  return;
+
         out() << "\t going into namespace [" << ns << "]" << endl;
         
         MemoryMappedFile mmf;

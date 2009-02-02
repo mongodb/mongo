@@ -24,20 +24,21 @@
 
 namespace mongo {
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     class Record;
     class DeletedRecord;
     class Extent;
     class BtreeBucket;
     class BSONObj;
-    class PhysicalDataFile;
+    class MongoDataFile;
 
     class DiskLoc {
         int fileNo; /* this will be volume, file #, etc. */
         int ofs;
     public:
         enum { NullOfs = -1, MaxFiles=4000 };
+
         int a() const {
             return fileNo;
         }
@@ -141,9 +142,9 @@ namespace mongo {
         Extent* ext() const;
         BtreeBucket* btree() const;
 
-        PhysicalDataFile& pdf() const;
+        MongoDataFile& pdf() const;
     };
 
-#pragma pack(pop)
+#pragma pack()
 
 } // namespace mongo

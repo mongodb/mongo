@@ -1,5 +1,4 @@
 
-db = connect( "foo");
 
 t = db.index3;
 t.dropIndexes();

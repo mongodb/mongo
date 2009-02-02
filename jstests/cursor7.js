@@ -39,5 +39,4 @@ function testMultipleInequalities( db ) {
     checkResults( [ z[ 2 ], z[ 1 ] ], r.find( { a: { $gte: 1, $lte: 7, $gt: 2, $lt: 6 }, b: { $gte: 2, $lte: 8, $gt: 3, $lt: 7 } } ).sort( rIdx ) );
 }
 
-db = connect( "test" );
 testMultipleInequalities( db );

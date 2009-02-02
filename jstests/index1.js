@@ -1,5 +1,4 @@
 
-db = connect( "test" );
 t = db.embeddedIndexTest;
 
 t.remove( {} );

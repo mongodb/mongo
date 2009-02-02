@@ -12,7 +12,6 @@ function validate() {
     assert.eq( 1, r[ 1 ].a );
 }
 
-db = connect( "test" );
 t = db.index5;
 t.drop();
 

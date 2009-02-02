@@ -1,5 +1,6 @@
-/* jsobj.h
+/* jsobj.h */
 
+/**
    BSONObj and its helpers
 
    "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
@@ -36,12 +37,17 @@ namespace mongo {
     class Record;
     class BSONObjBuilder;
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     /** 
         the complete list of valie BSON types
-        BinData = binary data types.
-        EOO = end of object
+        EOO - end of object
+        Object - an embedded object
+        BinData - binary data
+        DBRef - deprecated / will be redesigned
+        Code - deprecated / use CodeWScope
+        Symbol - a programming language (e.g., Python) symbol
+        CodeWScope - javascript code that can execute on the database server, with context
     */
     enum BSONType {MinKey=-1, EOO=0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5,
                    Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
@@ -55,47 +61,61 @@ namespace mongo {
        bdtCustom and above are ones that the JS compiler understands, but are
        opaque to the database.
     */
-    enum BinDataType { Function=1, ByteArray=2, MD5Type=5, bdtCustom=128 };
+    enum BinDataType { Function=1, ByteArray=2, bdtUUID = 3, MD5Type=5, bdtCustom=128 };
     
-    /**	Object id's are optional for BSONObjects.
+    /**	Object id's for BSON objects.
     	When present they should be the first object member added.
-        The app server serializes OIDs as <8-byte-int><4-byte-int>) using the machine's
-        native endianness.  We deserialize by casting as an OID object, assuming
-        the db server has the same endianness.
     */
     class OID {
-        long long a;
+        union {
+            long long a;
+            unsigned char data[8];
+        };
         unsigned b;
     public:
+        const unsigned char *getData() const { return data; }
+
         bool operator==(const OID& r) {
             return a==r.a&&b==r.b;
         }
         bool operator!=(const OID& r) {
             return a!=r.a||b!=r.b;
         }
+
+        /** The object ID output as 24 hex digits. */
         string str() const {
             stringstream s;
             s << hex;
-            s.fill( '0' );
+            //            s.fill( '0' );
+            //            s.width( 2 );
+            // fill wasn't working so doing manually...
+            for( int i = 0; i < 12; i++ ) {
+                unsigned u = data[i];
+                if( u < 16 ) s << '0';
+                s << u;
+            }
+            /*
             s.width( 16 );
             s << a;
             s.width( 8 );
             s << b;
             s << dec;
+            */
             return s.str();
         }
         
         /**
-           sets the contents to a new oid
+           sets the contents to a new oid / randomized value
          */
         void init();
 
+        /** Set to the hex string value specified. */
         void init( string s );
         
     };
     ostream& operator<<( ostream &s, const OID &o );
 
-    /* marshalled js object format:
+    /** BSON object format:
        
        <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
           totalSize includes itself.
@@ -120,7 +140,7 @@ namespace mongo {
          Code With Scope: <total size><String><Object>
     */
 
-    /* Formatting mode for generating a JSON from the 10gen representation.
+    /** Formatting mode for generating a JSON from BSON.
          Strict - strict RFC format
     	 TenGen - 10gen format, which is close to JS format.  This form is understandable by
      	          javascript running inside the Mongo server via eval()
@@ -128,7 +148,7 @@ namespace mongo {
      */
     enum JsonStringFormat { Strict, TenGen, JS };
 
-#pragma pack(pop)
+#pragma pack()
 
     /* internals
        <type><fieldName    ><value>
@@ -149,27 +169,41 @@ namespace mongo {
     public:
         string toString() const;
         string jsonString( JsonStringFormat format, bool includeFieldNames = true ) const;
+
+        /** Returns the type of the element */
         BSONType type() const {
             return (BSONType) *data;
         }
+
+        /** Indicates if it is the end-of-object element, which is present at the end of 
+            every BSON object. 
+        */
         bool eoo() const {
             return type() == EOO;
         }
-        // If maxLen is specified, don't scan more than maxLen bytes to calculate size.
+
+        /** Size of the element.
+            @param maxLen If maxLen is specified, don't scan more than maxLen bytes to calculate size. 
+        */
         int size( int maxLen = -1 ) const;
 
-        // wrap this element up as a singleton object.
+        /** Wrap this element up as a singleton object. */
         BSONObj wrap();
 
+        /** field name of the element.  e.g., for 
+           name : "Joe"
+           "name" is the fieldname
+        */
         const char * fieldName() const {
             if ( eoo() ) return ""; // no fieldname for it.
             return data + 1;
         }
 
-        // raw data be careful:
+        /** raw data of the element's value (so be careful). */
         const char * value() const {
             return (data + fieldNameSize + 1);
         }
+        /** size in bytes of the element's value (when applicable). */
         int valuesize() const {
             return size() - fieldNameSize - 1;
         }
@@ -177,32 +211,44 @@ namespace mongo {
         bool isBoolean() const {
             return type() == Bool;
         }
+
+        /** @return value of a boolean element.  
+            You must assure element is a boolean before 
+            calling. */
         bool boolean() const {
             return *value() ? true : false;
         }
 
+        /** Retrieve a java style data value from the element. 
+            Ensure element is of type Date before calling.
+        */
         unsigned long long date() const {
             return *((unsigned long long*) value());
         }
-        //double& number() { return *((double *) value()); }
 
+        /** True if element is of a numeric type. */
         bool isNumber() const {
             return type() == NumberDouble || type() == NumberInt;
         }
+        /** Change the value, in place, of the number. */
         void setNumber(double d) {
             if ( type() == NumberDouble ) *((double *) value()) = d;
             else if ( type() == NumberInt ) *((int *) value()) = (int) d;
         }
+        /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0. */
         double number() const {
             if ( type() == NumberDouble ) return *((double *) value());
             if ( type() == NumberInt ) return *((int *) value());
             return 0;
         }
+        /** Retrieve the object ID stored in the object. 
+            You must ensure the element is of type jstOID first. */
         OID& __oid() const {
             return *((OID*) value());
         }
 
-        // for strings
+        /** Size (length) of a string element.  
+            You must assure of type String first.  */
         int valuestrsize() const {
             return *((int *) value());
         }
@@ -212,24 +258,31 @@ namespace mongo {
             return *((int *) value());
         }
 
-        // for strings.  also gives you start of the real data for an embedded object
+        /** Get a string's value.  Also gives you start of the real data for an embedded object. 
+            You must assure data is of an appropriate type first -- see also valuestrsafe().
+        */
         const char * valuestr() const {
             return value() + 4;
         }
 
+        /** Get the string value of the element.  If not a string returns "". */
         const char *valuestrsafe() const {
             return type() == String ? valuestr() : "";
         }
+        /** Get the string value of the element.  If not a string returns "". */
         string str() const { return valuestrsafe(); }
 
+        /** Get javascript code of a CodeWScope data element. */
         const char * codeWScopeCode() const {
             return value() + 8;
         }
+        /** Get the scope context of a CodeWScope data element. */
         const char * codeWScopeScopeData() const {
             // TODO fix
             return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;
         }
 
+        /** Get the embedded object this element holds. */
         BSONObj embeddedObject() const;
 
         /* uasserts if not an object */
@@ -237,6 +290,7 @@ namespace mongo {
 
         BSONObj codeWScopeObject() const;
 
+        /** Get binary data.  Element must be of type BinData */
         const char *binData(int& len) { 
             // BinData: <int len> <byte subtype> <byte[len] data>
             assert( type() == BinData );
@@ -244,19 +298,21 @@ namespace mongo {
             return value() + 5;
         }
 
+        /** Retrieve the regex string for a Regex element */
         const char *regex() const {
             assert(type() == RegEx);
             return value();
         }
         const char *simpleRegex() const;
+        /** Retrieve the regex flags (options) for a Regex element */
         const char *regexFlags() const {
             const char *p = regex();
             return p + strlen(p) + 1;
         }
 
-        /* like operator== but doesn't check the fieldname,
+        /** like operator== but doesn't check the fieldname,
            just the value.
-           */
+        */
         bool valuesEqual(const BSONElement& r) const {
             if ( isNumber() )
                 return number() == r.number() && r.isNumber();
@@ -266,19 +322,16 @@ namespace mongo {
             // todo: make "0" == 0.0, undefined==null
         }
 
+        /** Returns true if elements are equal. */
         bool operator==(const BSONElement& r) const {
             if ( strcmp(fieldName(), r.fieldName()) != 0 )
                 return false;
             return valuesEqual(r);
-            /*
-            		int sz = size();
-            		return sz == r.size() &&
-            			memcmp(data, r.data, sz) == 0;
-            */
         }
 
 
-        /* <0: l<r. 0:l==r. >0:l>r
+        /** Well ordered comparison.
+         @return <0: l<r. 0:l==r. >0:l>r
          order by type, field name, and field value.
          If considerFieldName is true, pay attention to the field name.
          */
@@ -290,12 +343,13 @@ namespace mongo {
 
         int getGtLtOp() const;
 
+        /** Constructs an empty element */
         BSONElement();
         
-        // Check that data is internally consistent.
+        /** Check that data is internally consistent. */
         void validate() const;
 
-        // True if this element may contain subobjects.
+        /** True if this element may contain subobjects. */
         bool mayEncapsulate() const {
             return type() == Object ||
                 type() == Array ||
@@ -362,10 +416,15 @@ namespace mongo {
             details->refCount = ifree ? 1 : -1;
         }
     public:
+        /** Construct a BSONObj from data in the proper format. 
+            @param ifree true if the BSONObj should free() the msgdata when 
+            it destructs. 
+            */
         explicit BSONObj(const char *msgdata, bool ifree = false) {
             init(msgdata, ifree);
         }
         BSONObj(Record *r);
+        /** Construct an empty BSONObj -- that is, {}. */
         BSONObj() : details(0) { }
         ~BSONObj() {
             if ( details ) {
@@ -380,10 +439,12 @@ namespace mongo {
             b.append((void *) objdata(), objsize());
         }
 
-        /** Readable representation of a BSON object in an extended JSON-style notation. */
+        /** Readable representation of a BSON object in an extended JSON-style notation. 
+            This is an abbreviated representation which might be used for logging.
+        */
         string toString() const;
 
-        // Properly formatted JSON string.
+        /** Properly formatted JSON string. */
         string jsonString( JsonStringFormat format = Strict ) const;
 
         /** note: addFields always adds _id even if not specified */
@@ -401,16 +462,26 @@ namespace mongo {
            supports "." notation to reach into embedded objects
         */
         BSONElement getFieldDotted(const char *name) const;
-        // Like above, but returns first array encountered while traversing the
-        // dotted fields of name.  The name variable is updated to represent field
-        // names with respect to the returned element.
+        /** Like getFieldDotted(), but returns first array encountered while traversing the
+            dotted fields of name.  The name variable is updated to represent field
+            names with respect to the returned element. */
         BSONElement getFieldDottedOrArray(const char *&name) const;
 
+        /** Get the field of the specified name. eoo() is true on the returned 
+            element if not found. 
+        */
         BSONElement getField(const string name) const {
             return getField( name.c_str() );
         };
+
+        /** Get the field of the specified name. eoo() is true on the returned 
+            element if not found. 
+        */
         BSONElement getField(const char *name) const; /* return has eoo() true if no match */
 
+        /** Get the field of the specified name. eoo() is true on the returned 
+            element if not found. 
+        */
         BSONElement operator[] (const char *field) const { 
             return getField(field);
         }
@@ -420,14 +491,16 @@ namespace mongo {
             return ! getField( name ).eoo();
         }
 
-        // returns "" if DNE or wrong type
+        /** @return "" if DNE or wrong type */
         const char * getStringField(const char *name) const;
 
 		/** @return subobject of the given name */
         BSONObj getObjectField(const char *name) const;
 
-        int getIntField(const char *name) const; // INT_MIN if not present
+        /** @return INT_MIN if not present */
+        int getIntField(const char *name) const;
 
+        /** @return false if not present */
         bool getBoolField(const char *name) const;
 
         /** makes a new BSONObj with the fields specified in pattern.
@@ -454,9 +527,11 @@ namespace mongo {
         */
         BSONObj extractFields(BSONObj &pattern);
 
+        /** @return the raw data of the object */
         const char *objdata() const {
             return details->_objdata;
         }
+        /** @return total size of the BSON object in bytes */
         int objsize() const {
             return details ? details->_objsize : 0;    // includes the embedded size field
         }
@@ -525,13 +600,9 @@ namespace mongo {
 		*/
 		bool getObjectID(BSONElement& e);
 
-        OID* __getOID() {
-            BSONElement e = firstElement();
-            if ( e.type() != jstOID )
-                return 0;
-            return &e.__oid();
-        }
-
+        /** copy constructor.  uses smart pointers so both objects will refer to the 
+            same underlying data -- use copy() if you need a separate copy to manipulate.
+        */
         BSONObj(const BSONObj& r) {
             if ( r.details == 0 )
                 details = 0;
@@ -543,6 +614,9 @@ namespace mongo {
                 details = new Details(*r.details);
             }
         }
+        /** uses smart pointers so both objects will refer to the 
+            same underlying data -- use copy() if you need a separate copy to manipulate.
+        */
         BSONObj& operator=(const BSONObj& r) {
             if ( details && details->owned() ) {
                 if ( --details->refCount == 0 )
@@ -561,12 +635,11 @@ namespace mongo {
             return *this;
         }
 
-        /* makes a copy of the object.  Normally, a jsobj points to data "owned"
-           by something else.  this is a useful way to get your own copy of the buffer
-           data (which is freed when the new jsobj destructs).
-           */
+        /** makes a copy of the object. 
+        */
         BSONObj copy() const;
 
+        /** @return A hash code for the object */
         int hash() const {
             unsigned x = 0;
             const char *p = objdata();
@@ -581,10 +654,10 @@ namespace mongo {
         // TODO Support conversion of element types other than min and max.
         BSONObj clientReadable() const;
         
-        // Return new object with the field names replaced.
+        /** Return new object with the field names replaced. */
         BSONObj replaceFieldNames( const vector< string > &names ) const;
         
-        // true unless corrupt
+        /** true unless corrupt */
         bool valid() const;
     };
     ostream& operator<<( ostream &s, const BSONObj &o );
@@ -909,7 +982,7 @@ namespace mongo {
 
     /*- just for testing -- */
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct JSObj1 {
         JSObj1() {
             totsize=sizeof(JSObj1);
@@ -935,7 +1008,7 @@ namespace mongo {
 
         char eoo;
     };
-#pragma pack(pop)
+#pragma pack()
     extern JSObj1 js1;
 
     inline BSONObj BSONElement::embeddedObjectUserCheck() {

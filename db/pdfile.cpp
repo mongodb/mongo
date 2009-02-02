@@ -140,7 +140,7 @@ namespace mongo {
             }
         } else
             while ( size > 0 ) {
-                int max = PhysicalDataFile::maxSize() - PDFHeader::headerSize();
+                int max = MongoDataFile::maxSize() - MDFHeader::headerSize();
                 int desiredExtentSize = (int) (size > max ? max : size);
                 Extent *e = database->suitableFile( desiredExtentSize )->newExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
@@ -167,14 +167,14 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    int PhysicalDataFile::maxSize() {
+    int MongoDataFile::maxSize() {
         if ( sizeof( int* ) == 4 )
             return 512 * 1024 * 1024;
         else
             return 0x7ff00000;
     }
 
-    int PhysicalDataFile::defaultSize( const char *filename ) const {
+    int MongoDataFile::defaultSize( const char *filename ) const {
         int size;
 
         if ( fileNo <= 4 )
@@ -193,7 +193,7 @@ namespace mongo {
         return size;
     }
 
-    void PhysicalDataFile::open( const char *filename, int minSize ) {
+    void MongoDataFile::open( const char *filename, int minSize ) {
         {
             /* check quotas
                very simple temporary implementation - we will in future look up
@@ -208,7 +208,7 @@ namespace mongo {
                 string s = "db disk space quota exceeded ";
                 if ( database )
                     s += database->name;
-                uasserted(s.c_str());
+                uasserted(s);
             }
         }
 
@@ -227,17 +227,16 @@ namespace mongo {
         assert( ( size >= 64*1024*1024 ) || ( strstr( filename, "_hudsonSmall" ) ) );
         assert( size % 4096 == 0 );
 
-        header = (PDFHeader *) mmf.map(filename, size);
+        header = (MDFHeader *) mmf.map(filename, size);
         uassert("can't map file memory", header);
         // If opening an existing file, this is a no-op.
         header->init(fileNo, size);
     }
 
     /* prev - previous extent for this namespace.  null=this is the first one. */
-    Extent* PhysicalDataFile::newExtent(const char *ns, int approxSize, bool newCapped, int loops) {
-        assert( approxSize >= 0 && approxSize <= 0x7ff00000 );
-
-        assert( header ); // null if file open failed
+    Extent* MongoDataFile::newExtent(const char *ns, int approxSize, bool newCapped, int loops) {
+        massert( "bad new extent size", approxSize >= 0 && approxSize <= 0x7ff00000 );
+        massert( "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
         int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
         DiskLoc loc;
         if ( ExtentSize <= 0 ) {
@@ -435,8 +434,8 @@ namespace mongo {
             b.append("name", nsToDrop.c_str());
             BSONObj cond = b.done(); // { name: "colltodropname" }
             string system_namespaces = database->name + ".system.namespaces";
-            int n = deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
-            wassert( n == 1 );
+            /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
+			// no check of return code as this ns won't exist for some of the new storage engines
         }
         // remove from the catalog hashtable
         database->namespaceIndex.kill(nsToDrop.c_str());
@@ -892,14 +891,24 @@ namespace mongo {
         return true;
     }
 
-    DiskLoc DataFileMgr::insert(const char *ns, const void *buf, int len, bool god) {
+#pragma pack(1)
+    struct IDToInsert { 
+        char type;
+        char _id[4];
+        OID oid;
+        IDToInsert() { 
+            type = (char) jstOID;
+            strcpy(_id, "_id");
+            assert( sizeof(IDToInsert) == 17 );
+        }
+    } idToInsert;
+#pragma pack()
+
+    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god) {
         bool addIndex = false;
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
-            if ( sys == ns ) {
-                out() << "ERROR: attempt to insert for invalid database 'system': " << ns << endl;
-                return DiskLoc();
-            }
+            uassert("attempt to insert in reserved database name 'system'", sys != ns);
             if ( strstr(ns, ".system.") ) {
                 // todo later: check for dba-type permissions here.
                 if ( strstr(ns, ".system.indexes") )
@@ -911,6 +920,8 @@ namespace mongo {
                     return DiskLoc();
                 }
             }
+            else
+                sys = 0;
         }
 
         NamespaceDetails *d = nsdetails(ns);
@@ -928,7 +939,7 @@ namespace mongo {
 
         string tabletoidxns;
         if ( addIndex ) {
-            BSONObj io((const char *) buf);
+            BSONObj io((const char *) obuf);
             const char *name = io.getStringField("name"); // name of the index
             tabletoidxns = io.getStringField("ns");  // table it indexes
 
@@ -947,7 +958,7 @@ namespace mongo {
                      tabletoidxns << "\n  ourns:" << ns;
                 out() << "\n  idxobj:" << io.toString() << endl;
                 string s = "bad add index attempt " + tabletoidxns + " key:" + key.toString();
-                uasserted(s.c_str());
+                uasserted(s);
             }
             tableToIndex = nsdetails(tabletoidxns.c_str());
             if ( tableToIndex == 0 ) {
@@ -966,7 +977,7 @@ namespace mongo {
                 ss << "add index fails, too many indexes for " << tabletoidxns << " key:" << key.toString();
                 string s = ss.str();
                 log() << s << '\n';
-                uasserted(s.c_str());
+                uasserted(s);
             }
             if ( tableToIndex->findIndexByName(name) >= 0 ) {
                 //out() << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;
@@ -975,6 +986,18 @@ namespace mongo {
             //indexFullNS = tabletoidxns;
             //indexFullNS += ".$";
             //indexFullNS += name; // database.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
+        }
+
+        int addID = 0;
+        if( !god ) {
+            /* Check if we have an _id field. If we don't, we'll add it. 
+               Note that btree buckets which we insert aren't BSONObj's, but in that case god==true.
+            */
+            BSONObj io((const char *) obuf);
+            if( !io.hasField("_id") && !addIndex && strstr(ns, ".local.") == 0 ) {
+                addID = len;
+                len += sizeof(IDToInsert);
+            }
         }
 
         DiskLoc extentLoc;
@@ -1003,7 +1026,19 @@ namespace mongo {
 
         Record *r = loc.rec();
         assert( r->lengthWithHeaders >= lenWHdr );
-        memcpy(r->data, buf, len);
+        if( addID ) { 
+            /* a little effort was made here to avoid a double copy when we add an ID */
+            idToInsert.oid.init();
+            ((int&)*r->data) = *((int*) obuf) + sizeof(idToInsert);
+            memcpy(r->data+4, &idToInsert, sizeof(idToInsert));
+            memcpy(r->data+4+sizeof(idToInsert), ((char *)obuf)+4, addID-4);
+// TEMP:
+            BSONObj foo(r->data);
+            cout << "TEMP:" << foo.toString() << endl;
+        }
+        else {
+            memcpy(r->data, obuf, len);
+        }
         Extent *e = r->myExtent(loc);
         if ( e->lastRecord.isNull() ) {
             e->firstRecord = e->lastRecord = loc;
@@ -1033,7 +1068,7 @@ namespace mongo {
         /* add this record to our indexes */
         if ( d->nIndexes ) {
             try { 
-                indexRecord(d, buf, len, loc);
+                indexRecord(d, r->data/*buf*/, len, loc);
             } 
             catch( AssertionException& e ) { 
                 // should be a dup key error on _id index

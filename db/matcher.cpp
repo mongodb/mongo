@@ -476,7 +476,7 @@ namespace mongo {
 
     struct JSObj1 js1;
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct JSObj2 {
         JSObj2() {
             totsize=sizeof(JSObj2);
@@ -515,7 +515,7 @@ namespace mongo {
         }
     } jsunittest;
 
-#pragma pack(pop)
+#pragma pack()
 
     struct RXTest : public UnitTest {
 

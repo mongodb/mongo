@@ -927,7 +927,7 @@ namespace mongo {
 
     /*-- test things ----------------------------------------------------*/
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct MaxKeyData {
         MaxKeyData() {
             totsize=7;
@@ -964,7 +964,7 @@ namespace mongo {
         int totsize;
         char eoo;
     } js0;
-#pragma pack(pop)
+#pragma pack()
 
     BSONElement::BSONElement() {
         data = &js0.eoo;
@@ -972,7 +972,7 @@ namespace mongo {
         totalSize = -1;
     }
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct EmptyObject {
         EmptyObject() {
             len = 5;
@@ -981,7 +981,7 @@ namespace mongo {
         int len;
         char jstype;
     } emptyObject;
-#pragma pack(pop)
+#pragma pack()
 
     BSONObj emptyObj((char *) &emptyObject);
 
@@ -998,6 +998,19 @@ namespace mongo {
             assert( !o.woEqual( p ) );
             assert( o.woCompare( p ) < 0 );
         }
+        void testoid() { 
+            OID id;
+            id.init();
+            //            sleepsecs(3);
+
+            OID b;
+            // goes with sleep above... 
+            // b.init();
+            // assert( memcmp(id.getData(), b.getData(), 12) < 0 );
+
+            b.init( id.str() );
+            assert( b == id );
+        }
         void run() {
             testRegex();
             BSONObjBuilder A,B,C;
@@ -1012,6 +1025,7 @@ namespace mongo {
             assert( cmp == 0 );
             cmp = a.woCompare(c);
             assert( cmp < 0 );
+            testoid();
         }
     } bson_unittest;
 
@@ -1038,21 +1052,42 @@ namespace mongo {
         return *_builder;
     }
 
-    void OID::init(){
-        // note: this isn't correct - but we're probably deprecating anyway, so not worrying so much right now
-        
-        static unsigned long long machine = security.getNonce();
-        static int inc = (int)security.getNonce();
+    void OID::init() {
+        static unsigned machine = (unsigned) security.getNonce();
+        static unsigned inc = (unsigned) security.getNonce();
 
-        a = time(0);
-        a = a << 32;
-        a += machine & 0xffffffff;
-        
-        b = ++inc;
+        unsigned t = (unsigned) time(0);
+        char *T = (char *) &t;
+        data[0] = T[3];
+        data[1] = T[2];
+        data[2] = T[1];
+        data[3] = T[0];
+
+        (unsigned&) data[4] = machine;
+        ++inc;
+        T = (char *) &inc;
+        data[8] = T[3];
+        data[9] = T[2];
+        data[10] = T[1];
+        data[11] = T[0];
     }
     
     void OID::init( string s ){
         assert( s.size() == 24 );
+        const char *p = s.c_str();
+        char buf[3];
+        buf[2] = 0;
+        for( int i = 0; i < 12; i++ ) {
+            buf[0] = p[0]; 
+            buf[1] = p[1];
+            p += 2;
+            stringstream ss(buf);
+            unsigned z;
+            ss >> hex >> z;
+            data[i] = z;
+        }
+
+/*
         string as = s.substr( 0 , 16 );
         string bs = s.substr( 16 );
         
@@ -1061,6 +1096,7 @@ namespace mongo {
 
         stringstream ssb(bs);
         ssb >> hex >> b;
+*/
     }
 
 } // namespace mongo

@@ -1,4 +1,3 @@
-db = connect( "test" );
 f = db.ed_db_update2;
 
 f.drop();

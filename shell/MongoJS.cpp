@@ -484,7 +484,7 @@ v8::Handle<v8::Value> collectionFallback( v8::Local<v8::String> name, const v8::
     return f->Call( info.This() , 1 , argv );
 }
 
-v8::Handle<v8::Value> dbQueryIndexAccess( uint32_t index , const v8::AccessorInfo& info ){
+v8::Handle<v8::Value> dbQueryIndexAccess( unsigned int index , const v8::AccessorInfo& info ){
     v8::Handle<v8::Value> arrayAccess = info.This()->GetPrototype()->ToObject()->Get( String::New( "arrayAccess" ) );
     assert( arrayAccess->IsFunction() );
 

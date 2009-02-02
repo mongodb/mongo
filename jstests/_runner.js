@@ -3,16 +3,21 @@
 //
 var files = listFiles("jstests");
 
-files.forEach(function(x) {
-
-    if (!/_runner/.test(x.name)) { 
+files.forEach(
+    function(x) {
+        
+        if ( /_runner/.test(x.name) || 
+             ! /\.js$/.test(x.name ) ){ 
+            print(" >>>>>>>>>>>>>>> skipping " + x.name);
+            return;
+        }
+        
+        
         print(" *******************************************");
         print("         Test : " + x.name + " ...");
         print("                " + Date.timeFunc( function() { load(x.name); }, 1) + "ms");
+        
     }
-    else { 
-        print(" >>>>>>>>>>>>>>> skipping " + x.name);
-    }
-});
+);
 
 
