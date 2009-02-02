@@ -376,7 +376,8 @@ int main(int argc, char* argv[], char *envp[] )
         if ( strcmp(argv[1], "javatest") == 0 ) {
 #if !defined(NOJNI)
             JavaJS = new JavaJSImpl();
-            javajstest();
+            // This take a bit of time to run, so commenting:
+//            javajstest();
 #else
             out() << "NOJNI build cannot test" << endl;
 #endif
