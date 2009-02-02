@@ -22,7 +22,7 @@ namespace mongo {
 
     class MemoryMappedFile {
     public:
-        static void closeAllFiles();
+        static void closeAllFiles( stringstream &message );
         MemoryMappedFile();
         ~MemoryMappedFile(); /* closes the file if open */
         void close();

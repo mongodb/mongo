@@ -587,17 +587,34 @@ namespace mongo {
 
     DBDirectClient::AlwaysAuthorized DBDirectClient::Authorizer::always;
     
-    /* not using log() herein in case we are called from segvhandler and we were already locked */
-#undef exit
-    void dbexit(int rc, const char *why) {
-        out() << "dbexit: " << why << "; flushing op log and files" << endl;
+    boost::mutex &exitMutex( *( new boost::mutex ) );
+    bool firstExit = true;
+    
+    /* not using log() herein in case we are already locked */
+    void dbexit(int rc, const char *why) {        
+        {
+            boostlock lk( exitMutex );
+            if ( !firstExit ) {
+                stringstream ss;
+                ss << "dbexit: " << why << "; exiting immediately" << endl;
+                rawOut( ss.str() );
+                ::exit( rc );                
+            }
+            firstExit = false;
+        }
+            
+        stringstream ss;
+        ss << "dbexit: " << why << "; flushing op log and files" << endl;
+        rawOut( ss.str() );
         flushOpLog();
 
         /* must do this before unmapping mem or you may get a seg fault */
         closeAllSockets();
-
-        MemoryMappedFile::closeAllFiles();
-        out() << "dbexit: really exiting now" << endl;
+            
+        stringstream ss2;
+        MemoryMappedFile::closeAllFiles( ss2 );
+        rawOut( ss2.str() );
+        rawOut( "dbexit: really exiting now\n" );
         ::exit(rc);
     }
 

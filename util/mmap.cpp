@@ -34,15 +34,15 @@ namespace mongo {
 
     /*static*/
     int closingAllFiles = 0;
-    void MemoryMappedFile::closeAllFiles() {
+    void MemoryMappedFile::closeAllFiles( stringstream &message ) {
         if ( closingAllFiles ) {
-            out() << "warning closingAllFiles=" << closingAllFiles << endl;
+            message << "warning closingAllFiles=" << closingAllFiles << endl;
             return;
         }
         ++closingAllFiles;
         for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             (*i)->close();
-        log() << "  closeAllFiles() finished" << endl;
+        message << "  closeAllFiles() finished" << endl;
         --closingAllFiles;
     }
 

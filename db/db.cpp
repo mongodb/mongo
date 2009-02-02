@@ -314,10 +314,6 @@ namespace mongo {
         _oplog.init();
 
 #if !defined(_WIN32)
-        assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
-#endif
-
-#if !defined(_WIN32)
         pid_t pid = 0;
         pid = getpid();
 #else
@@ -333,9 +329,7 @@ namespace mongo {
             javajstest();
         }
 #endif
-
-        setupSignals();
-
+      
         repairDatabases();
 
         /* this is for security on certain platforms */
@@ -346,7 +340,6 @@ namespace mongo {
 
     int test2();
     void testClient();
-    void pipeSigHandler( int signal );
 
 } // namespace mongo
 
@@ -354,6 +347,8 @@ using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] )
 {
+    setupSignals();
+    
     dbExecCommand = argv[0];
     
     srand(curTimeMicros());
@@ -369,10 +364,7 @@ int main(int argc, char* argv[], char *envp[] )
     }
 
     DEV out() << "warning: DEV mode enabled\n";
-
-#if !defined(_WIN32)
-    signal(SIGPIPE, pipeSigHandler);
-#endif
+    
     UnitTest::runTests();
 
     if ( argc >= 2 ) {
@@ -577,37 +569,40 @@ namespace mongo {
         psignal( signal, "Signal Received : ");
     }
 
-    int segvs = 0;
-    void segvhandler(int x) {
-        if ( ++segvs > 1 ) {
-            signal(x, SIG_DFL);
-            if ( segvs == 2 ) {
-                out() << "\n\n\n got 2nd SIGSEGV" << endl;
-                sayDbContext();
-            }
-            return;
-        }
-        out() << "got SIGSEGV " << x << ", terminating :-(" << endl;
-        sayDbContext();
-//	closeAllSockets();
-//	MemoryMappedFile::closeAllFiles();
-//	flushOpLog();
-        dbexit(14);
+    void abruptQuit(int x) {
+        ostringstream oss;
+        oss << "Got signal: " << x << ", printing backtrace:" << endl;
+        printStackTrace( oss );
+        rawOut( oss.str() );
+        exit(14);
     }
 
-    void mysighandler(int x) {
-        signal(x, SIG_IGN);
-        out() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+    sigset_t asyncSignals;
+    // The above signals will be processed by this thread only, in order to
+    // ensure the db and log mutexes aren't held.
+    void interruptThread() {
+        int x;
+        sigwait( &asyncSignals, &x );
+        log() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
         {
             dblock lk;
             log() << "now exiting" << endl;
             exit(12);
         }
     }
-
+        
     void setupSignals() {
-        assert( signal(SIGINT, mysighandler) != SIG_ERR );
-        assert( signal(SIGTERM, mysighandler) != SIG_ERR );
+        assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
+        assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
+        assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
+        assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
+        assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
+
+        sigemptyset( &asyncSignals );
+        sigaddset( &asyncSignals, SIGINT );
+        sigaddset( &asyncSignals, SIGTERM );
+        pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 );
+        boost::thread it( interruptThread );
     }
 
 #else
