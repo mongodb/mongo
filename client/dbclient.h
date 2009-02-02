@@ -321,12 +321,10 @@ namespace mongo {
 
         /** Delete the specified collection. */        
         bool dropCollection( const string ns ){
-            assert( ns.find( "." ) != string::npos );
-            int pos = ns.find( "." );
-            
-            string db = ns.substr( 0 , pos );
-            string coll = ns.substr( pos + 1 );
-            
+            string db = nsGetDB( ns );
+            string coll = nsGetCollection( ns );
+            assert( coll.size() );
+
             BSONObj info;
             
             runCommand( db.c_str() , BSON( "deleteIndexes" << coll << "index" << "*" ) , info );
@@ -390,6 +388,15 @@ namespace mongo {
         */
         bool eval(const char *dbname, const char *jscode, BSONObj& info, BSONElement& retValue, BSONObj *args = 0);
 
+        /**
+           
+         */
+        bool validate( const char * ns , bool scandata=true ){
+            BSONObj cmd = BSON( "validate" << nsGetCollection( ns ) << "scandata" << scandata );
+            BSONObj info;
+            return runCommand( nsGetDB( ns ).c_str() , cmd , info );
+        }
+
         /* The following helpers are simply more convenient forms of eval() for certain common cases */
 
         /* invocation with no return value of interest -- with or without one simple parameter */
@@ -417,8 +424,25 @@ namespace mongo {
             ret = (NumType) retValue.number();
             return true;
         }
-
+        
         virtual string toString() = 0;
+
+        string nsGetDB( string ns ){
+            unsigned int pos = ns.find( "." );
+            if ( pos == string::npos )
+                return ns;
+            
+            return ns.substr( 0 , pos );
+        }
+        
+        string nsGetCollection( string ns ){
+            unsigned int pos = ns.find( "." );
+            if ( pos == string::npos )
+                return "";
+
+            return ns.substr( pos + 1 );            
+        }
+
     };
     
     /**
