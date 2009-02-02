@@ -23,8 +23,12 @@ void quitAbruptly( int sig ) {
 
 void setupSignals() {
     signal( SIGINT , quitNicely );
+    signal( SIGTERM , quitNicely );
+    signal( SIGPIPE , quitNicely ); // Maybe just log and continue?
     signal( SIGABRT , quitAbruptly );
-    signal( SIGSEGV , quitAbruptly );    
+    signal( SIGSEGV , quitAbruptly );
+    signal( SIGBUS , quitAbruptly );
+    signal( SIGFPE , quitAbruptly );
 }
 
 string fixHost( string url , string host , string port ){
