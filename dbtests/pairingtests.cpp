@@ -156,20 +156,20 @@ namespace PairingTests {
                 MockDBClientConnection cc;
 
                 cc.one( res( 0, 0 ) );
-                rp.negotiate( &cc );
+                rp.negotiate( &cc, "dummy" );
                 ASSERT( rp.state == ReplPair::State_Confused );
 
                 rp.state = ReplPair::State_Negotiating;
                 cc.one( res( 1, 2 ) );
-                rp.negotiate( &cc );
+                rp.negotiate( &cc, "dummy" );
                 ASSERT( rp.state == ReplPair::State_Negotiating );
 
                 cc.one( res( 1, ReplPair::State_Slave ) );
-                rp.negotiate( &cc );
+                rp.negotiate( &cc, "dummy" );
                 ASSERT( rp.state == ReplPair::State_Slave );
 
                 cc.one( res( 1, ReplPair::State_Master ) );
-                rp.negotiate( &cc );
+                rp.negotiate( &cc, "dummy" );
                 ASSERT( rp.state == ReplPair::State_Master );
             }
         private:
@@ -188,34 +188,45 @@ namespace PairingTests {
                 rp1.arbitrate();
                 ASSERT( rp1.state == ReplPair::State_Master );
 
-                TestableReplPair rp2( false, false );
+                TestableReplPair rp2( false, emptyObj );
                 rp2.arbitrate();
                 ASSERT( rp2.state == ReplPair::State_CantArb );
 
-                BSONObjBuilder b;
-                b.append( "foo", 1 );
-                TestableReplPair rp3( true, true );
+                TestableReplPair rp3( true, fromjson( "{ok:0}" ) );
                 rp3.arbitrate();
-                ASSERT( rp3.state == ReplPair::State_Master );
+                ASSERT( rp3.state == ReplPair::State_Confused );
+
+                TestableReplPair rp4( true, fromjson( "{ok:1,you_are:1}" ) );
+                rp4.arbitrate();
+                ASSERT( rp4.state == ReplPair::State_Master );                
+
+                TestableReplPair rp5( true, fromjson( "{ok:1,you_are:0}" ) );
+                rp5.arbitrate();
+                ASSERT( rp5.state == ReplPair::State_Slave );                
+
+                TestableReplPair rp6( true, fromjson( "{ok:1,you_are:-1}" ) );
+                rp6.arbitrate();
+                // unchanged from initial value
+                ASSERT( rp6.state == ReplPair::State_Negotiating );           
             }
         private:
             class TestableReplPair : public ReplPair {
             public:
-                TestableReplPair( bool connect, bool isMaster ) :
+                TestableReplPair( bool connect, const BSONObj &one ) :
                         ReplPair( "a", "z" ),
                         connect_( connect ),
-                        isMaster_( isMaster ) {
+                        one_( one ) {
                 }
                 virtual
                 DBClientConnection *newClientConnection() const {
                     MockDBClientConnection * c = new MockDBClientConnection();
                     c->connect( connect_ );
-                    c->setIsMaster( isMaster_ );
+                    c->one( one_ );
                     return c;
                 }
             private:
                 bool connect_;
-                bool isMaster_;
+                BSONObj one_;
             };
         };
     } // namespace ReplPairTests
@@ -224,20 +235,8 @@ namespace PairingTests {
     protected:
         void negotiate( ReplPair &a, ReplPair &b ) {
             auto_ptr< DBClientConnection > c( new DirectDBClientConnection( &b, cc() ) );
-            a.negotiate( c.get() );
+            a.negotiate( c.get(), "dummy" );
         }
-        class DirectConnectionReplPair : public ReplPair {
-        public:
-            DirectConnectionReplPair( ReplPair *dest ) :
-                    ReplPair( "a", "c" ),
-                    dest_( dest ) {
-            }
-            virtual DBClientConnection *newClientConnection() const {
-                return new DirectDBClientConnection( dest_ );
-            }
-        private:
-            ReplPair *dest_;
-        };
         virtual DirectDBClientConnection::ConnectionCallback *cc() {
             return 0;
         }
@@ -322,21 +321,6 @@ namespace PairingTests {
         }
     };
 
-    class Arbitrate : public DirectConnectBase {
-    public:
-        void run() {
-            ReplPair arb( "c", "-" );
-            DirectConnectionReplPair m( &arb );
-            m.arbitrate();
-            ASSERT( m.state == ReplPair::State_Master );
-
-            setNotSynced();
-            m.state = ReplPair::State_Negotiating;
-            m.arbitrate();
-            ASSERT( m.state == ReplPair::State_Negotiating );
-        }
-    };
-
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -348,7 +332,6 @@ namespace PairingTests {
             add< Negotiate >();
             add< NegotiateWithCatchup >();
             add< NobodyCaughtUp >();
-            add< Arbitrate >();
         }
     };
 } // namespace PairingTests

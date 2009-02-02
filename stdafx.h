@@ -241,6 +241,11 @@ namespace mongo {
 
 #define null (0)
 
+    inline void rawOut( const string &s ) {
+        write( STDOUT_FILENO, s.c_str(), s.length() );
+        fsync( STDOUT_FILENO );        
+    }
+    
 } // namespace mongo
 
 #include <vector>

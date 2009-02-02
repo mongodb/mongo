@@ -115,7 +115,7 @@ coreDbFiles = Split( "" )
 
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp" )
 
-allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
+allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
 nix = False
 useJavaHome = False
@@ -295,7 +295,9 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
         if not res and failIfNotFound:
             print( "can't find " + str( poss ) )
             Exit(1)
-
+            
+        if release:
+            print( "WARNING: can't find static version of: " + str( poss ) )
         return res
 
     if pcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
@@ -414,6 +416,8 @@ Default( env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [
 # tools
 allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
 env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
+env.Program( "mongoexport" , allToolFiles + [ "tools/export.cpp" ] )
+env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
 env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 
@@ -512,7 +516,9 @@ testEnv.AlwaysBuild( "smokeClient" )
 
 #binaries
 env.Install( installDir + "/bin" , "mongodump" )
+env.Install( installDir + "/bin" , "mongoexport" )
 env.Install( installDir + "/bin" , "mongoimportjson" )
+env.Install( installDir + "/bin" , "mongofiles" )
 env.Install( installDir + "/bin" , "mongod" )
 env.Install( installDir + "/bin" , "mongo" )
 
@@ -565,7 +571,7 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
     import simples3
     import settings
 
-    s = simples3.S3Bucket( "mongodb" , settings.id , settings.key )
+    s = simples3.S3Bucket( settings.bucket , settings.id , settings.key )
     un = os.uname()
 
     if remoteName is None:

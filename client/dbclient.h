@@ -80,6 +80,8 @@ namespace mongo {
     public:
         BSONObj obj;
         Query(const BSONObj& b) : obj(b) { }
+        Query(const string json) : 
+            obj(fromjson(json)) { }
         Query(const char *json) : 
           obj(fromjson(json)) { }
 
@@ -321,12 +323,10 @@ namespace mongo {
 
         /** Delete the specified collection. */        
         bool dropCollection( const string ns ){
-            assert( ns.find( "." ) != string::npos );
-            int pos = ns.find( "." );
-            
-            string db = ns.substr( 0 , pos );
-            string coll = ns.substr( pos + 1 );
-            
+            string db = nsGetDB( ns );
+            string coll = nsGetCollection( ns );
+            assert( coll.size() );
+
             BSONObj info;
             
             runCommand( db.c_str() , BSON( "deleteIndexes" << coll << "index" << "*" ) , info );
@@ -390,6 +390,15 @@ namespace mongo {
         */
         bool eval(const char *dbname, const char *jscode, BSONObj& info, BSONElement& retValue, BSONObj *args = 0);
 
+        /**
+           
+         */
+        bool validate( const char * ns , bool scandata=true ){
+            BSONObj cmd = BSON( "validate" << nsGetCollection( ns ) << "scandata" << scandata );
+            BSONObj info;
+            return runCommand( nsGetDB( ns ).c_str() , cmd , info );
+        }
+
         /* The following helpers are simply more convenient forms of eval() for certain common cases */
 
         /* invocation with no return value of interest -- with or without one simple parameter */
@@ -417,8 +426,25 @@ namespace mongo {
             ret = (NumType) retValue.number();
             return true;
         }
-
+        
         virtual string toString() = 0;
+
+        string nsGetDB( string ns ){
+            string::size_type pos = ns.find( "." );
+            if ( pos == string::npos )
+                return ns;
+            
+            return ns.substr( 0 , pos );
+        }
+        
+        string nsGetCollection( string ns ){
+            string::size_type pos = ns.find( "." );
+            if ( pos == string::npos )
+                return "";
+
+            return ns.substr( pos + 1 );            
+        }
+
     };
     
     /**
@@ -476,7 +502,7 @@ namespace mongo {
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
-        virtual bool ensureIndex( const char * ns , BSONObj keys , const char * name = 0 );
+        virtual bool ensureIndex( const string ns , BSONObj keys , const char * name = 0 );
 
         /**
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server

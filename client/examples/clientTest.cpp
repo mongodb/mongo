@@ -122,7 +122,10 @@ int main() {
 
         //existing index
         assert( conn.findOne(ns, Query("{name:'eliot'}").hint("{name:1}")).hasElement("name") );
-    }
 
+        // run validate
+        assert( conn.validate( ns ) );
+    }
+    
     cout << "client test finished!" << endl;
 }

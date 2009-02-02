@@ -37,6 +37,7 @@ namespace mongo {
 
     extern int port;
     extern int curOp;
+    extern bool autoresync;
     extern string dashDashSource;
     extern int opLogging;
     extern long long oplogSize;
@@ -316,10 +317,6 @@ namespace mongo {
         RecCache::tempStore.init("/data/db/indexes.dat", BucketSize);
 
 #if !defined(_WIN32)
-        assert( signal(SIGSEGV, segvhandler) != SIG_ERR );
-#endif
-
-#if !defined(_WIN32)
         pid_t pid = 0;
         pid = getpid();
 #else
@@ -332,12 +329,11 @@ namespace mongo {
 #if !defined(NOJNI)
         if ( useJNI ) {
             JavaJS = new JavaJSImpl(appserverLoc);
-            javajstest();
+            // This takes a bit of time, so comenting
+//            javajstest();
         }
 #endif
-
-        setupSignals();
-
+      
         repairDatabases();
 
         /* this is for security on certain platforms */
@@ -348,7 +344,6 @@ namespace mongo {
 
     int test2();
     void testClient();
-    void pipeSigHandler( int signal );
 
 } // namespace mongo
 
@@ -356,6 +351,8 @@ using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] )
 {
+    setupSignals();
+    
     dbExecCommand = argv[0];
     
     srand(curTimeMicros());
@@ -371,10 +368,7 @@ int main(int argc, char* argv[], char *envp[] )
     }
 
     DEV out() << "warning: DEV mode enabled\n";
-
-#if !defined(_WIN32)
-    signal(SIGPIPE, pipeSigHandler);
-#endif
+    
     UnitTest::runTests();
 
     if ( argc >= 2 ) {
@@ -459,6 +453,8 @@ int main(int argc, char* argv[], char *envp[] )
                 master = true;
             else if ( s == "--slave" )
                 slave = true;
+            else if ( s == "--autoresync" )
+                autoresync = true;
             else if ( s == "--help" || s == "-?" || s == "--?" )
                 goto usage;
             else if ( s == "--quiet" )
@@ -469,10 +465,10 @@ int main(int argc, char* argv[], char *envp[] )
                 noauth = true;
             else if ( s == "--auth" )
                 noauth = false;
-	    else if( s == "--sysinfo" ) { 
-	      sysInfo();
-	      return 0;
-	    }
+            else if( s == "--sysinfo" ) { 
+                sysInfo();
+                return 0;
+            }
             else if ( s == "--verbose" )
                 logLevel = 1;
             else if ( s.find( "-v" ) == 0 ){
@@ -496,7 +492,7 @@ int main(int argc, char* argv[], char *envp[] )
                 appsrvPath = argv[++i];
             else if ( s == "--nocursors" )
                 useCursors = false;
-            else if ( strncmp(s.c_str(), "--oplogSize", 11) == 0 ) {
+            else if ( s == "--oplogSize" ) {
                 long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad arg", x > 0);
                 oplogSize = x * 1024 * 1024;
@@ -546,13 +542,14 @@ usage:
     out() << " --nocursors         diagnostic/debugging option\n";
     out() << " --nojni" << endl;
     out() << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-    out() << " --oplogSize <size_in_megabytes>  custom size for replication operation log" << endl;
+    out() << " --oplogSize <size_in_megabytes>  custom size if creating new replication operation log" << endl;
     out() << " --sysinfo           print out some diagnostic system information\n";
     out() << "\nReplication:" << endl;
     out() << " --master\n";
     out() << " --slave" << endl;
     out() << " --source <server:port>" << endl;
     out() << " --pairwith <server:port> <arbiter>" << endl;
+    out() << " --autoresync" << endl;
     out() << endl;
 
     return 0;
@@ -583,37 +580,40 @@ namespace mongo {
 #endif
     }
 
-    int segvs = 0;
-    void segvhandler(int x) {
-        if ( ++segvs > 1 ) {
-            signal(x, SIG_DFL);
-            if ( segvs == 2 ) {
-                out() << "\n\n\n got 2nd SIGSEGV" << endl;
-                sayDbContext();
-            }
-            return;
-        }
-        out() << "got SIGSEGV " << x << ", terminating :-(" << endl;
-        sayDbContext();
-//	closeAllSockets();
-//	MemoryMappedFile::closeAllFiles();
-//	flushOpLog();
-        dbexit(14);
+    void abruptQuit(int x) {
+        ostringstream oss;
+        oss << "Got signal: " << x << ", printing backtrace:" << endl;
+        printStackTrace( oss );
+        rawOut( oss.str() );
+        exit(14);
     }
 
-    void mysighandler(int x) {
-        signal(x, SIG_IGN);
-        out() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+    sigset_t asyncSignals;
+    // The above signals will be processed by this thread only, in order to
+    // ensure the db and log mutexes aren't held.
+    void interruptThread() {
+        int x;
+        sigwait( &asyncSignals, &x );
+        log() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
         {
             dblock lk;
             log() << "now exiting" << endl;
             exit(12);
         }
     }
-
+        
     void setupSignals() {
-        assert( signal(SIGINT, mysighandler) != SIG_ERR );
-        assert( signal(SIGTERM, mysighandler) != SIG_ERR );
+        assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
+        assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
+        assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
+        assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
+        assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
+
+        sigemptyset( &asyncSignals );
+        sigaddset( &asyncSignals, SIGINT );
+        sigaddset( &asyncSignals, SIGTERM );
+        pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 );
+        boost::thread it( interruptThread );
     }
 
 #else

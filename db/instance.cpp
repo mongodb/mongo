@@ -40,7 +40,8 @@ namespace mongo {
     bool slave = false;
     bool master = false; // true means keep an op log
     extern int curOp;
-
+    bool autoresync = false;
+    
     boost::mutex &dbMutex( *(new boost::mutex) );
     MutexInfo dbMutexInfo;
 //int dbLocked = 0;
@@ -594,18 +595,36 @@ namespace mongo {
 
     void recCacheCloseAll();
     
-    /* not using log() herein in case we are called from segvhandler and we were already locked */
-#undef exit
-    void dbexit(int rc, const char *why) {
-        if( why && *why ) out() << "dbexit: " << why << endl;
+
+    boost::mutex &exitMutex( *( new boost::mutex ) );
+    bool firstExit = true;
+    
+    /* not using log() herein in case we are already locked */
+    void dbexit(int rc, const char *why) {        
+        {
+            boostlock lk( exitMutex );
+            if ( !firstExit ) {
+                stringstream ss;
+                ss << "dbexit: " << why << "; exiting immediately" << endl;
+                rawOut( ss.str() );
+                ::exit( rc );                
+            }
+            firstExit = false;
+        }
+            
+        stringstream ss;
+        ss << "dbexit: " << why << "; flushing op log and files" << endl;
+        rawOut( ss.str() );
+
         flushOpLog();
 
         /* must do this before unmapping mem or you may get a seg fault */
         closeAllSockets();
-
-        MemoryMappedFile::closeAllFiles();
+        stringstream ss2;
+        MemoryMappedFile::closeAllFiles( ss2 );
         recCacheCloseAll();
-        out() << "dbexit: really exiting now" << endl;
+        rawOut( ss2.str() );
+        rawOut( "dbexit: really exiting now\n" );
         ::exit(rc);
     }
 

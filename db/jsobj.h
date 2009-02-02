@@ -694,6 +694,7 @@ namespace mongo {
         BSONObjBuilder& operator<<( const string& v ) { return (*this << v.c_str()); }
         BSONObjBuilder& operator<<( const int value );
         BSONObjBuilder& operator<<( const double value );
+        BSONObjBuilder& operator<<( const unsigned long value ){ return (*this << (double)value); }
 
     private:
         const char * _fieldName;
@@ -817,7 +818,7 @@ namespace mongo {
             b.append( (char) MaxKey );
             b.append( fieldName );
         }
-
+        
         /* Deprecated (but supported) */
         void appendDBRef( const char *fieldName, const char *ns, const OID &oid ) {
             b.append( (char) DBRef );
@@ -833,6 +834,18 @@ namespace mongo {
             b.append( len );
             b.append( (char) type );
             b.append( (void *) data, len );
+        }
+        
+        /**
+           @param len the length of data
+         */
+        void appendBinDataArray( const char * fieldName , const char * data , int len ){
+            b.append( (char) BinData );
+            b.append( fieldName );
+            b.append( len + 4 );
+            b.append( (char)0x2 );
+            b.append( len );
+            b.append( (void *) data, len );            
         }
 
         /** Append to the BSON object a field of type CodeWScope.  This is a javascript code 

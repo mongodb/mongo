@@ -42,7 +42,7 @@ namespace mongo {
 namespace mongo {
 
     /* use "addr2line -CFe <exe>" to parse. */
-    inline void printStackTrace() {
+    inline void printStackTrace( ostream &o = cout ) {
         void *b[12];
         size_t size;
         char **strings;
@@ -52,10 +52,10 @@ namespace mongo {
         strings = backtrace_symbols(b, size);
 
         for (i = 0; i < size; i++)
-            cout << hex << b[i] << ' ';
-        cout << '\n';
+            o << hex << b[i] << ' ';
+        o << '\n';
         for (i = 0; i < size; i++)
-            cout << ' ' << strings[i] << '\n';
+            o << ' ' << strings[i] << '\n';
 
         free (strings);
     }
