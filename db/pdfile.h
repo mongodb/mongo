@@ -108,7 +108,7 @@ namespace mongo {
 
     extern DataFileMgr theDataFileMgr;
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     class DeletedRecord {
     public:
@@ -271,7 +271,7 @@ namespace mongo {
         }
     };
 
-#pragma pack(pop)
+#pragma pack()
 
     inline Extent* MongoDataFile::_getExtent(DiskLoc loc) {
         loc.assertOk();

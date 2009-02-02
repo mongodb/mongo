@@ -30,7 +30,7 @@ namespace mongo {
 
     class Cursor;
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     class Namespace {
     public:
@@ -292,7 +292,7 @@ namespace mongo {
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
     };
 
-#pragma pack(pop)
+#pragma pack()
 
     /* these are things we know / compute about a namespace that are transient -- things
        we don't actually store in the .ns file.  so mainly caching of frequently used

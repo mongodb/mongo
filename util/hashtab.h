@@ -28,7 +28,7 @@
 
 namespace mongo {
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     /* you should define:
 
@@ -128,6 +128,6 @@ namespace mongo {
 
     };
 
-#pragma pack(pop)
+#pragma pack()
 
 } // namespace mongo

@@ -37,7 +37,7 @@ namespace mongo {
     class Record;
     class BSONObjBuilder;
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     /** 
         the complete list of valie BSON types
@@ -148,7 +148,7 @@ namespace mongo {
      */
     enum JsonStringFormat { Strict, TenGen, JS };
 
-#pragma pack(pop)
+#pragma pack()
 
     /* internals
        <type><fieldName    ><value>
@@ -982,7 +982,7 @@ namespace mongo {
 
     /*- just for testing -- */
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct JSObj1 {
         JSObj1() {
             totsize=sizeof(JSObj1);
@@ -1008,7 +1008,7 @@ namespace mongo {
 
         char eoo;
     };
-#pragma pack(pop)
+#pragma pack()
     extern JSObj1 js1;
 
     inline BSONObj BSONElement::embeddedObjectUserCheck() {

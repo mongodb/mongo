@@ -891,7 +891,7 @@ namespace mongo {
         return true;
     }
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct IDToInsert { 
         char type;
         char _id[4];
@@ -902,7 +902,7 @@ namespace mongo {
             assert( sizeof(IDToInsert) == 17 );
         }
     } idToInsert;
-#pragma pack(pop)
+#pragma pack()
 
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god) {
         bool addIndex = false;

@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     struct _KeyNode {
         DiskLoc prevChildBucket;
@@ -58,7 +58,7 @@ namespace mongo {
         }
     };
 
-#pragma pack(pop)
+#pragma pack()
 
     class BucketBasics;
 
@@ -71,7 +71,7 @@ namespace mongo {
         BSONObj key;
     };
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     /* this class is all about the storage management */
     class BucketBasics {
@@ -291,6 +291,6 @@ namespace mongo {
         DiskLoc locAtKeyOfs;
     };
 
-#pragma pack(pop)
+#pragma pack()
 
 } // namespace mongo;

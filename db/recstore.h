@@ -4,6 +4,9 @@
 
 namespace mongo { 
 
+    using boost::uint32_t;
+    using boost::uint64_t;
+
 typedef uint64_t fileofs;
 
 struct RecStoreHeader { 

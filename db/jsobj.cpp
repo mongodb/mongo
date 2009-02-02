@@ -927,7 +927,7 @@ namespace mongo {
 
     /*-- test things ----------------------------------------------------*/
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct MaxKeyData {
         MaxKeyData() {
             totsize=7;
@@ -964,7 +964,7 @@ namespace mongo {
         int totsize;
         char eoo;
     } js0;
-#pragma pack(pop)
+#pragma pack()
 
     BSONElement::BSONElement() {
         data = &js0.eoo;
@@ -972,7 +972,7 @@ namespace mongo {
         totalSize = -1;
     }
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct EmptyObject {
         EmptyObject() {
             len = 5;
@@ -981,7 +981,7 @@ namespace mongo {
         int len;
         char jstype;
     } emptyObject;
-#pragma pack(pop)
+#pragma pack()
 
     BSONObj emptyObj((char *) &emptyObject);
 

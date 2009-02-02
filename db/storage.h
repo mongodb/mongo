@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-#pragma pack(push,1)
+#pragma pack(1)
 
     class Record;
     class DeletedRecord;
@@ -145,6 +145,6 @@ namespace mongo {
         MongoDataFile& pdf() const;
     };
 
-#pragma pack(pop)
+#pragma pack()
 
 } // namespace mongo

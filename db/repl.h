@@ -40,7 +40,7 @@ namespace mongo {
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth);
 
-#pragma pack(push,4)
+#pragma pack(4)
     class OpTime {
         unsigned i;
         unsigned secs;
@@ -102,7 +102,7 @@ namespace mongo {
             return i < r.i;
         }
     };
-#pragma pack(pop)
+#pragma pack()
 
     /* A replication exception */
     struct SyncException {

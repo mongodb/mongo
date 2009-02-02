@@ -574,7 +574,11 @@ namespace mongo {
 namespace mongo {
 
     void pipeSigHandler( int signal ) {
+#ifdef psignal
         psignal( signal, "Signal Received : ");
+#else
+        cout << "got pipe signal:" << signal << endl;
+#endif
     }
 
     int segvs = 0;

@@ -75,7 +75,7 @@ namespace mongo {
         friend class PiggyBackData;
     };
 
-#pragma pack(push)
+#pragma pack()
 #pragma pack(1)
 
     enum Operations {
@@ -114,7 +114,7 @@ namespace mongo {
         return len - MsgDataHeaderSize;
     }
 
-#pragma pack(pop)
+#pragma pack()
 
     class Message {
     public:

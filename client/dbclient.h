@@ -56,7 +56,7 @@ namespace mongo {
           list of marshalled JSObjects;
     */
 
-#pragma pack(push,1)
+#pragma pack(1)
     struct QueryResult : public MsgData {
         enum {
             ResultFlag_CursorNotFound = 1, /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
@@ -73,7 +73,7 @@ namespace mongo {
             return dataAsInt();
         }
     };
-#pragma pack(pop)
+#pragma pack()
 
     /** Represents a query */    
     class Query {
