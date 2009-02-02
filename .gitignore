@@ -39,6 +39,7 @@ mongo
 mongod
 mongogrid
 mongodump
+mongofiles
 mongoexport
 mongoimport
 mongoimportjson

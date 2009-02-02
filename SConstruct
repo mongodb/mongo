@@ -115,7 +115,7 @@ coreDbFiles = Split( "" )
 
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp" )
 
-allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" ];
+allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
 nix = False
 useJavaHome = False
@@ -415,6 +415,7 @@ Default( env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [
 allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
 env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
 env.Program( "mongoexport" , allToolFiles + [ "tools/export.cpp" ] )
+env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
 env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 
@@ -515,6 +516,7 @@ testEnv.AlwaysBuild( "smokeClient" )
 env.Install( installDir + "/bin" , "mongodump" )
 env.Install( installDir + "/bin" , "mongoexport" )
 env.Install( installDir + "/bin" , "mongoimportjson" )
+env.Install( installDir + "/bin" , "mongofiles" )
 env.Install( installDir + "/bin" , "mongod" )
 env.Install( installDir + "/bin" , "mongo" )
 
