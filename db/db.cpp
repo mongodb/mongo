@@ -540,7 +540,7 @@ usage:
     out() << " --nocursors         diagnostic/debugging option\n";
     out() << " --nojni" << endl;
     out() << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-    out() << " --oplogSize <size_in_megabytes>  custom size for replication operation log" << endl;
+    out() << " --oplogSize <size_in_megabytes>  custom size if creating new replication operation log" << endl;
     out() << " --sysinfo           print out some diagnostic system information\n";
     out() << "\nReplication:" << endl;
     out() << " --master\n";
