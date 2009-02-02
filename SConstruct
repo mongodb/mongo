@@ -414,6 +414,7 @@ Default( env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [
 # tools
 allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
 env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
+env.Program( "mongoexport" , allToolFiles + [ "tools/export.cpp" ] )
 env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
 env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 
@@ -512,6 +513,7 @@ testEnv.AlwaysBuild( "smokeClient" )
 
 #binaries
 env.Install( installDir + "/bin" , "mongodump" )
+env.Install( installDir + "/bin" , "mongoexport" )
 env.Install( installDir + "/bin" , "mongoimportjson" )
 env.Install( installDir + "/bin" , "mongod" )
 env.Install( installDir + "/bin" , "mongo" )

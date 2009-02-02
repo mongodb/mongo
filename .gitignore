@@ -39,6 +39,7 @@ mongo
 mongod
 mongogrid
 mongodump
+mongoexport
 mongoimport
 mongoimportjson
 *.tgz
