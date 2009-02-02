@@ -559,7 +559,7 @@ env.AlwaysBuild( "push" )
 
 # ---- deploying ---
 
-def s3push( localName , remoteName=None , remotePrefix="-latest" ):
+def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True ):
     sys.path.append( "." )
 
     import simples3
@@ -570,9 +570,12 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" ):
 
     if remoteName is None:
         remoteName = localName
-
-    name = remoteName + "-" + un[0] + "-" + un[4] + remotePrefix
-    name = name.lower()
+        
+    if fixName:
+        name = remoteName + "-" + un[0] + "-" + un[4] + remotePrefix
+        name = name.lower()
+    else:
+        name = remoteName
 
     s.put( name  , open( localName ).read() , acl="public-read" );
     print( "uploaded " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
@@ -588,7 +591,7 @@ def s3dist( env , target , source ):
         print( "can't do s3dist without --dist" )
         Exit(1)
         
-    s3push( distFile )
+    s3push( distFile , fixName=False )
 
 distFile = installDir + ".tgz" 
 env.Append( TARFLAGS=" -z " )
