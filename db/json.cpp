@@ -525,6 +525,8 @@ public:
     };
 
     BSONObj fromjson( const char *str ) {
+        if ( ! strlen(str) )
+            return emptyObj;
         ObjectBuilder b;
         JsonGrammar parser( b );
         massert( "Unable to parse JSON string", parse( str, parser, space_p ).full );
