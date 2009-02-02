@@ -80,6 +80,8 @@ namespace mongo {
     public:
         BSONObj obj;
         Query(const BSONObj& b) : obj(b) { }
+        Query(const string json) : 
+            obj(fromjson(json)) { }
         Query(const char *json) : 
           obj(fromjson(json)) { }
 
