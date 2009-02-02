@@ -36,7 +36,7 @@ namespace mongo {
     class DBClientCursor;
     extern bool slave;
     extern bool master;
-
+    
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth);
 
@@ -176,8 +176,9 @@ namespace mongo {
             return !addDbNextPass.empty();
         }
         
-        // Trigger a resync, at user's request.
-        void userResync();
+        static bool throttledForceResyncDead( const char *requester );
+        static void forceResyncDead( const char *requester );
+        void forceResync( const char *requester );
     };
 
     /* Write operation to the log (local.oplog.$main)

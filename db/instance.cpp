@@ -39,7 +39,8 @@ namespace mongo {
     bool slave = false;
     bool master = false; // true means keep an op log
     extern int curOp;
-
+    bool autoresync = false;
+    
     boost::mutex &dbMutex( *(new boost::mutex) );
     MutexInfo dbMutexInfo;
 //int dbLocked = 0;

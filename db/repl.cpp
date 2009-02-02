@@ -68,6 +68,9 @@ namespace mongo {
     */
     const char *allDead = 0;
 
+    extern bool autoresync;
+    time_t lastForcedResync = 0;
+    
 } // namespace mongo
 
 #include "replset.h"
@@ -201,14 +204,9 @@ namespace mongo {
                 errmsg = "not dead, no need to resync";
                 return false;
             }
-            vector<ReplSource*> sources;
-            ReplSource::loadAll(sources);
-            for( vector< ReplSource * >::iterator i = sources.begin(); i != sources.end(); ++i ) {
-                (*i)->userResync();
-            }
-            allDead = 0;
+            ReplSource::forceResyncDead( "user" );
             result.append( "info", "triggered resync for all sources" );
-            return true;
+            return true;                
         }        
     } cmdResync;
     
@@ -573,9 +571,29 @@ namespace mongo {
 
     BSONObj opTimeQuery = fromjson("{\"getoptime\":1}");
 
-    void ReplSource::userResync() {
+    bool ReplSource::throttledForceResyncDead( const char *requester ) {
+        if ( time( 0 ) - lastForcedResync > 600 ) {
+            forceResyncDead( requester );
+            lastForcedResync = time( 0 );
+            return true;
+        }
+        return false;
+    }
+    
+    void ReplSource::forceResyncDead( const char *requester ) {
+        if ( !allDead )
+            return;
+        vector<ReplSource*> sources;
+        ReplSource::loadAll(sources);
+        for( vector< ReplSource * >::iterator i = sources.begin(); i != sources.end(); ++i ) {
+            (*i)->forceResync( requester );
+        }
+        allDead = 0;        
+    }
+    
+    void ReplSource::forceResync( const char *requester ) {
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
-            log() << "user resync: dropping database " << *i << endl;
+            log() << requester << " resync: dropping database " << *i << endl;
             string dummyns = *i + ".";
             setClientTempNs( dummyns.c_str() );
             assert( database->name == *i );
@@ -1141,8 +1159,10 @@ namespace mongo {
             int s = 0;
             {
                 dblock lk;
-                if ( allDead )
-                    break;
+                if ( allDead ) {
+                    if ( !autoresync || !ReplSource::throttledForceResyncDead( "auto" ) )
+                        break;
+                }
                 assert( syncing == 0 );
                 syncing++;
             }

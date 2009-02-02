@@ -37,6 +37,7 @@ namespace mongo {
 
     extern int port;
     extern int curOp;
+    extern bool autoresync;
     extern string dashDashSource;
     extern int opLogging;
     extern long long oplogSize;
@@ -449,6 +450,8 @@ int main(int argc, char* argv[], char *envp[] )
                 master = true;
             else if ( s == "--slave" )
                 slave = true;
+            else if ( s == "--autoresync" )
+                autoresync = true;
             else if ( s == "--help" || s == "-?" || s == "--?" )
                 goto usage;
             else if ( s == "--quiet" )
@@ -459,10 +462,10 @@ int main(int argc, char* argv[], char *envp[] )
                 noauth = true;
             else if ( s == "--auth" )
                 noauth = false;
-	    else if( s == "--sysinfo" ) { 
-	      sysInfo();
-	      return 0;
-	    }
+            else if( s == "--sysinfo" ) { 
+                sysInfo();
+                return 0;
+            }
             else if ( s == "--verbose" )
                 logLevel = 1;
             else if ( s.find( "-v" ) == 0 ){
@@ -486,7 +489,7 @@ int main(int argc, char* argv[], char *envp[] )
                 appsrvPath = argv[++i];
             else if ( s == "--nocursors" )
                 useCursors = false;
-            else if ( strncmp(s.c_str(), "--oplogSize", 11) == 0 ) {
+            else if ( s == "--oplogSize" ) {
                 long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad arg", x > 0);
                 oplogSize = x * 1024 * 1024;
@@ -543,6 +546,7 @@ usage:
     out() << " --slave" << endl;
     out() << " --source <server:port>" << endl;
     out() << " --pairwith <server:port> <arbiter>" << endl;
+    out() << " --autoresync" << endl;
     out() << endl;
 
     return 0;
