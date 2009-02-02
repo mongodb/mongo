@@ -295,7 +295,9 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
         if not res and failIfNotFound:
             print( "can't find " + str( poss ) )
             Exit(1)
-
+            
+        if release:
+            print( "WARNING: can't find static version of: " + str( poss ) )
         return res
 
     if pcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
