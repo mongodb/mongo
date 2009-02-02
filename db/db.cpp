@@ -327,7 +327,8 @@ namespace mongo {
 #if !defined(NOJNI)
         if ( useJNI ) {
             JavaJS = new JavaJSImpl(appserverLoc);
-            javajstest();
+            // This takes a bit of time, so comenting
+//            javajstest();
         }
 #endif
       
@@ -376,8 +377,7 @@ int main(int argc, char* argv[], char *envp[] )
         if ( strcmp(argv[1], "javatest") == 0 ) {
 #if !defined(NOJNI)
             JavaJS = new JavaJSImpl();
-            // This take a bit of time to run, so commenting:
-//            javajstest();
+            javajstest();
 #else
             out() << "NOJNI build cannot test" << endl;
 #endif
