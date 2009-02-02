@@ -502,7 +502,7 @@ namespace mongo {
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
-        virtual bool ensureIndex( const char * ns , BSONObj keys , const char * name = 0 );
+        virtual bool ensureIndex( const string ns , BSONObj keys , const char * name = 0 );
 
         /**
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server

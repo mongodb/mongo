@@ -479,7 +479,7 @@ namespace mongo {
         say( toSend );
     }
 
-    bool DBClientBase::ensureIndex( const char * ns , BSONObj keys , const char * name ) {
+    bool DBClientBase::ensureIndex( const string ns , BSONObj keys , const char * name ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
@@ -522,7 +522,7 @@ namespace mongo {
             return 0;
         _seenIndexes.insert( cacheKey );
 
-        insert( Namespace( ns ).getSisterNS( "system.indexes"  ).c_str() , toSave.doneAndDecouple() );
+        insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes"  ).c_str() , toSave.doneAndDecouple() );
         return 1;
     }
 
