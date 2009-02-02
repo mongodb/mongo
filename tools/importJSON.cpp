@@ -36,6 +36,8 @@ public:
     ImportJSON() : Tool( "importjson" ){
         add_options()
             ("file",po::value<string>() , "file to import from" )
+            ("idbefore", "create id index before importing " )
+            ("id", "create id index after importing (reccomended) " )
             ("drop", "drop collection first " )
             ;
         addPositionArg( "file" , 1 );
@@ -64,6 +66,10 @@ public:
             _conn.dropCollection( ns.c_str() );
         }
         
+        if ( hasParam( "idbefore" ) ){
+            _conn.ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
+        }
+
         int num = 0;
 
         time_t start = time(0);
@@ -94,6 +100,10 @@ public:
             }
         }
         
+        if ( hasParam( "id" ) ){
+            _conn.ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
+        }
+
         return 0;
     }
 };
