@@ -27,7 +27,7 @@ __wt_stat_alloc_db_dstats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_MINOR].desc = "minor version number";
 	stats[WT_STAT_PAGE_DUP_INTERNAL].desc = "duplicate internal pages";
 	stats[WT_STAT_PAGE_DUP_LEAF].desc = "duplicate leaf pages";
-	stats[WT_STAT_PAGE_FREE].desc = "unused on-page space";
+	stats[WT_STAT_PAGE_FREE].desc = "unused on-page space in bytes";
 	stats[WT_STAT_PAGE_INTERNAL].desc = "primary internal pages";
 	stats[WT_STAT_PAGE_LEAF].desc = "primary leaf pages";
 	stats[WT_STAT_PAGE_OVERFLOW].desc = "overflow pages";
