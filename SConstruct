@@ -4,6 +4,11 @@
 # you can get from http://www.scons.org
 # then just type scons
 
+# some common tasks
+#   build 64-bit mac and pushing to s3
+#      scons --64 --dist=osx-x86_64 s3dist
+#      all s3 pushes require settings.py
+
 import os
 import sys
 import types 
