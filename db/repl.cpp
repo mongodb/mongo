@@ -108,7 +108,7 @@ namespace mongo {
         ReplInfo r("arbitrate");
 
         if ( arbHost == "-" ) {
-            // no arbiter. we are up, let's assume he is down and network is not partitioned.
+            // no arbiter. we are up, let's assume partner is down and network is not partitioned.
             setMasterLocked(State_Master, "remote unreachable");
             return;
         }
@@ -120,15 +120,7 @@ namespace mongo {
             return;
         }
 
-        /* todo: make an arbitrate command we send to the arbiter instead of this */
-        bool is_master;
-        bool ok = conn->isMaster(is_master);
-        if ( !ok ) {
-            setMasterLocked(State_CantArb, "can't arb 2");
-            return;
-        }
-
-        setMasterLocked(State_Master, "remote down, arbiter reached");
+        negotiate( conn.get(), "arbiter" );
     }
 
     /* --------------------------------------------- */
@@ -290,9 +282,32 @@ namespace mongo {
 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             if ( replPair == 0 ) {
-                problem() << "got negotiatemaster cmd but we are not in paired mode." << endl;
-                errmsg = "not paired";
-                return false;
+                // assume that we are an arbiter and should forward the request
+                string host = cmdObj.getStringField("your_name");
+                int port = cmdObj.getIntField( "your_port" );
+                if ( port == INT_MIN ) {
+                    errmsg = "no port specified";
+                    problem() << errmsg << endl;
+                    return false;
+                }
+                stringstream ss;
+                ss << host << ":" << port;
+                string remote = ss.str();
+                auto_ptr<DBClientConnection> conn( new DBClientConnection() );
+                if ( !conn->connect( remote.c_str(), errmsg ) ) {
+                    result.append( "you_are", ReplPair::State_Master );
+                    return true;
+                }
+                BSONObj ret = conn->findOne( "admin.$cmd", cmdObj );
+                BSONObjIterator i( ret );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    if ( e.fieldName() != string( "ok" ) )
+                        result.append( e );
+                }
+                return ( ret.getIntField("ok") == 1 );
             }
 
             int was = cmdObj.getIntField("i_was");
@@ -329,30 +344,31 @@ namespace mongo {
             return true;
         }
     } cmdnegotiatemaster;
-
-    void ReplPair::negotiate(DBClientConnection *conn) {
+    
+    void ReplPair::negotiate(DBClientConnection *conn, string method) {
         BSONObjBuilder b;
         b.append("negotiatemaster",1);
         b.append("i_was", state);
         b.append("your_name", remoteHost);
+        b.append("your_port", remotePort);
         BSONObj cmd = b.done();
         BSONObj res = conn->findOne("admin.$cmd", cmd);
         if ( res.getIntField("ok") != 1 ) {
-            problem() << "negotiate fails: " << res.toString() << '\n';
-            setMasterLocked(State_Confused);
+            string message = method + " negotiate failed";
+            problem() << message << ": " << res.toString() << '\n';
+            setMasterLocked(State_Confused, message.c_str());
             return;
         }
         int x = res.getIntField("you_are");
         // State_Negotiating means the remote node is not dominant and cannot
         // choose who is master.
         if ( x != State_Slave && x != State_Master && x != State_Negotiating ) {
-            problem() << "negotiate: bad you_are value " << res.toString() << endl;
+            problem() << method << " negotiate: bad you_are value " << res.toString() << endl;
             return;
         }
         if ( x != State_Negotiating ) {
-            // Don't actually have to lock here, since we only get here if not the
-            // dominant node.
-            setMaster(x);
+            string message = method + " negotiation";
+            setMasterLocked(x, message.c_str());
         }
     }
 
@@ -967,7 +983,7 @@ namespace mongo {
         }
 
         if ( paired )
-            replPair->negotiate(conn.get());
+            replPair->negotiate(conn.get(), "direct");
 
         /*
         	// get current mtime at the server.
