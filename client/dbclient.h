@@ -428,7 +428,7 @@ namespace mongo {
         virtual string toString() = 0;
 
         string nsGetDB( string ns ){
-            unsigned int pos = ns.find( "." );
+            string::size_type pos = ns.find( "." );
             if ( pos == string::npos )
                 return ns;
             
@@ -436,7 +436,7 @@ namespace mongo {
         }
         
         string nsGetCollection( string ns ){
-            unsigned int pos = ns.find( "." );
+            string::size_type pos = ns.find( "." );
             if ( pos == string::npos )
                 return "";
 
