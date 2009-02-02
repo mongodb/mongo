@@ -268,7 +268,7 @@ if nix:
 
 # --- check system ---
 
-def doConfigure( myenv , java=True , pcre=True):
+def doConfigure( myenv , java=True , pcre=True , shell=False ):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = myenv["LINKFLAGS"]
     myenv["LIBS_CLEAN"] = myenv["LIBS"]
@@ -308,15 +308,11 @@ def doConfigure( myenv , java=True , pcre=True):
 
     for b in boostLibs:
         l = "boost_" + b
-        if not myCheckLib( [ l + "-mt" , l ] ):
-            print "can't find a required boost library [" + l + "]";
-            Exit(1)
+        myCheckLib( [ l + "-mt" , l ] , not shell)
 
     if java:
         for j in javaLibs:
-            if not myCheckLib( j ):
-                print( "can't find java lib [" + j + "]" )
-                Exit(1)
+            myCheckLib( j , True )
 
     if nix and pcre:
         myCheckLib( "pcrecpp" , True )
@@ -467,7 +463,7 @@ if linux64 or force64:
         shellEnv.Append( CFLAGS="-m32" )
         shellEnv.Append( CXXFLAGS="-m32" )
         shellEnv.Append( LINKFLAGS="-m32" )
-        shellEnv.Append( LIBPATH=[ "/usr/lib32" ] )
+        shellEnv.Append( LIBPATH=[ "/usr/lib32" , "/usr/lib" ] )
     else:
         shellEnv["CFLAGS"].remove("-m64")
         shellEnv["CXXFLAGS"].remove("-m64")
@@ -491,7 +487,7 @@ if linux64 or force64:
 
     shellEnv.VariantDir( "32bit" , "." )
 
-    shellEnv = doConfigure( shellEnv , pcre=False , java=False )
+    shellEnv = doConfigure( shellEnv , pcre=False , java=False , shell=True )
 
     shellEnv.Program( "mongo" , shell32BitFiles )
 else:
