@@ -565,7 +565,7 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
     import simples3
     import settings
 
-    s = simples3.S3Bucket( "mongodb" , settings.id , settings.key )
+    s = simples3.S3Bucket( settings.bucket , settings.id , settings.key )
     un = os.uname()
 
     if remoteName is None:
