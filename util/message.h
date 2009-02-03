@@ -177,4 +177,8 @@ namespace mongo {
         bool freeIt;
     };
 
+    class SocketException {
+        
+    };
+
 } // namespace mongo
