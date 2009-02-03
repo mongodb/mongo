@@ -306,7 +306,10 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
 
     if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
         print( "can't find boost headers" )
-        Exit(1)
+        if shell:
+            print( "\tshell might not compile" )
+        else:
+            Exit(1)
 
     for b in boostLibs:
         l = "boost_" + b
