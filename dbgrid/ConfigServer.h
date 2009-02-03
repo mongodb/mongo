@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "client/dbclient.h"
+#include "../client/dbclient.h"
 
 namespace mongo {
 

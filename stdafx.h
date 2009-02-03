@@ -242,6 +242,7 @@ namespace mongo {
 #define null (0)
 
     inline void rawOut( const string &s ) {
+cout << "rawout ";
 #if defined(_WIN32)
         (std::cout << s).flush();
 #else
