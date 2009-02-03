@@ -44,6 +44,8 @@ namespace mongo {
         }
 
         virtual int run() = 0;
+
+        virtual void printExtraHelp( ostream & out );
         
     protected:
         string _name;

@@ -35,11 +35,27 @@ class Files : public Tool {
 public:
     Files() : Tool( "files" ){
         add_options()
-            ( "command" , po::value<string>() , "command (list|put|get)" )
+            ( "command" , po::value<string>() , "command (list|search|put|get)" )
             ( "file" , po::value<string>() , "filename for get|put" )
             ;
         addPositionArg( "command" , 1 );
         addPositionArg( "file" , 2 );
+    }
+
+    virtual void printExtraHelp( ostream & out ){
+        out << "\t list - list all files.  takes an optional filename.  the file has to start with the filename" << endl;
+        out << "\t search - search all files for something that contains the string" << endl;
+    }
+    
+    void display( GridFS * grid , BSONObj obj ){
+        auto_ptr<DBClientCursor> c = grid->list( obj );
+        while ( c->more() ){
+            BSONObj obj = c->next();
+            cout 
+                << obj["filename"].str() << "\t" 
+                << (long)obj["length"].number() 
+                << endl;
+        }
     }
     
     int run(){
@@ -50,23 +66,26 @@ public:
         }
         
         GridFS g( _conn , _db );
+        string filename = getParam( "file" );
 
         if ( cmd == "list" ){
-            auto_ptr<DBClientCursor> c = g.list();
-            while ( c->more() ){
-                BSONObj obj = c->next();
-                cout 
-                    << obj["filename"].str() << "\t" 
-                    << (long)obj["length"].number() 
-                    << endl;
-            }
+            BSONObjBuilder b;
+            if ( filename.size() )
+                b.appendRegex( "filename" , ( (string)"^" + filename ).c_str() );
+            display( &g , b.doneAndDecouple() );
             return 0;
         }
-        
-        string filename = getParam( "file" );
+
         if ( filename.size() == 0 ){
             cerr << "need a filename" << endl;
             return -1;
+        }
+
+        if ( cmd == "search" ){
+            BSONObjBuilder b;
+            b.appendRegex( "filename" , filename.c_str() );
+            display( &g , b.doneAndDecouple() );
+            return 0;
         }
 
         if ( cmd == "get" ){

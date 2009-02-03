@@ -28,6 +28,9 @@ mongo::Tool::~Tool(){
     delete( _options );
 }
 
+void mongo::Tool::printExtraHelp( ostream & out ){
+}
+
 int mongo::Tool::main( int argc , char ** argv ){
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
     
@@ -39,6 +42,7 @@ int mongo::Tool::main( int argc , char ** argv ){
 
     if ( _params.count( "help" ) ){
         _options->print( cerr );
+        printExtraHelp( cerr );
         return 0;
     }
     
