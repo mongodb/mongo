@@ -315,11 +315,13 @@ namespace mongo {
             log() << "opLogging = " << opLogging << endl;
         _oplog.init();
 
+#if defined(_RECSTORE)
         {
             stringstream indexpath;
             indexpath << dbpath << "/indexes.dat";
             RecCache::tempStore.init(indexpath.str().c_str(), BucketSize);
         }
+#endif
 
 #if !defined(_WIN32)
         pid_t pid = 0;

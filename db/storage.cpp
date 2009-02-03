@@ -79,14 +79,15 @@ void RecCache::writeDirty() {
     dirtyl.clear();
 }
 
-const unsigned LIMIT = 3; // 10000
+// 10k * 8KB = 80MB
+const unsigned RECCACHELIMIT = 10000;
 
 inline void RecCache::ejectOld() { 
-    if( nnodes <= LIMIT )
+    if( nnodes <= RECCACHELIMIT )
         return;
     Node *n = oldest;
     while( 1 ) {
-        if( nnodes <= LIMIT ) { 
+        if( nnodes <= RECCACHELIMIT ) { 
             n->older = 0;
             oldest = n;
             break;
