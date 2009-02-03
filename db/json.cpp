@@ -527,7 +527,15 @@ public:
             return emptyObj;
         ObjectBuilder b;
         JsonGrammar parser( b );
-        massert( "Unable to parse JSON string", parse( str, parser, space_p ).full );
+        parse_info<> result = parse( str, parser, space_p );
+        if ( !result.full ) {
+            int len = strlen( result.stop );
+            if ( len > 10 )
+                len = 10;
+            stringstream ss;
+            ss << "Failure parsing JSON string near: " << string( result.stop, len );
+            massert( ss.str(), false );
+        }
         return b.pop();
     }
 
