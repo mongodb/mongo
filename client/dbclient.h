@@ -80,7 +80,7 @@ namespace mongo {
     public:
         BSONObj obj;
         Query(const BSONObj& b) : obj(b) { }
-        Query(const string json) : 
+        Query(const string &json) : 
             obj(fromjson(json)) { }
         Query(const char *json) : 
           obj(fromjson(json)) { }
@@ -322,7 +322,7 @@ namespace mongo {
         }
 
         /** Delete the specified collection. */        
-        bool dropCollection( const string ns ){
+        bool dropCollection( const string &ns ){
             string db = nsGetDB( ns );
             string coll = nsGetCollection( ns );
             assert( coll.size() );
@@ -429,7 +429,7 @@ namespace mongo {
         
         virtual string toString() = 0;
 
-        string nsGetDB( string ns ){
+        string nsGetDB( const string &ns ){
             string::size_type pos = ns.find( "." );
             if ( pos == string::npos )
                 return ns;
@@ -437,7 +437,7 @@ namespace mongo {
             return ns.substr( 0 , pos );
         }
         
-        string nsGetCollection( string ns ){
+        string nsGetCollection( const string &ns ){
             string::size_type pos = ns.find( "." );
             if ( pos == string::npos )
                 return "";
@@ -502,7 +502,7 @@ namespace mongo {
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
-        virtual bool ensureIndex( const string ns , BSONObj keys , const char * name = 0 );
+        virtual bool ensureIndex( const string &ns , BSONObj keys , const char * name = 0 );
 
         /**
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server

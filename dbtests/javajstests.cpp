@@ -26,6 +26,11 @@ namespace JavaJSTests {
     class Fundamental {
     public:
         void run() {
+            // By calling JavaJSImpl() inside run(), we ensure the unit test framework's
+            // signal handlers are pre-installed from JNI's perspective.  This allows
+            // JNI to catch signals generated within the JVM and forward other signals
+            // as appropriate.
+            JavaJS = new JavaJSImpl();
             javajstest();
         }
     };
