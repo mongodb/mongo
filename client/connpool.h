@@ -62,6 +62,7 @@ namespace mongo {
         DBClientConnection *_conn;
     public:
         DBClientConnection& conn() {
+            uassert( "did you call done already" , _conn );
             return *_conn;
         }
 
@@ -81,6 +82,9 @@ namespace mongo {
              Why?  See note in the destructor below.
         */
         void done() {
+            if ( ! _conn )
+                return;
+
             if ( _conn->isFailed() )
                 kill();
             else
