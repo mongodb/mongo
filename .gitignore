@@ -38,6 +38,7 @@ scratch
 mongo
 mongod
 mongogrid
+mongos
 mongodump
 mongofiles
 mongoexport
