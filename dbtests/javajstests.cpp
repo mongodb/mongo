@@ -1,8 +1,8 @@
-// socktests.cpp : sock.{h,cpp} unit tests.
+// javajstests.cpp : Btree unit tests
 //
 
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -17,29 +17,28 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../util/sock.h"
+#include "../db/javajs.h"
 
 #include "dbtests.h"
 
-namespace SockTests {
+namespace JavaJSTests {
 
-    class HostByName {
+    class Fundamental {
     public:
         void run() {
-            ASSERT_EQUALS( "127.0.0.1", hostbyname( "localhost" ) );
-            ASSERT_EQUALS( "127.0.0.1", hostbyname( "127.0.0.1" ) );
+            javajstest();
         }
     };
     
     class All : public UnitTest::Suite {
     public:
         All() {
-            add< HostByName >();
+            add< Fundamental >();
         }
     };
     
-} // namespace SockTests
+} // namespace JavaJSTests
 
-UnitTest::TestPtr sockTests() {
-    return UnitTest::createSuite< SockTests::All >();
+UnitTest::TestPtr javajsTests() {
+    return UnitTest::createSuite< JavaJSTests::All >();
 }

@@ -397,11 +397,15 @@ namespace NamespaceTests {
             }
             int nRecords() const {
                 int count = 0;
-                for ( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext )
-                    for ( DiskLoc j = i.ext()->firstRecord; !j.isNull();
-                            j.setOfs( j.a(), j.rec()->nextOfs ) ) {
+                for ( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext ) {
+                    int fileNo = i.ext()->firstRecord.a();
+                    if ( fileNo == -1 )
+                        continue;
+                    for ( int j = i.ext()->firstRecord.getOfs(); j != DiskLoc::NullOfs;
+                            j = DiskLoc( fileNo, j ).rec()->nextOfs ) {
                         ++count;
                     }
+                }
                 ASSERT_EQUALS( count, nsd()->nrecords );
                 return count;
             }
@@ -505,6 +509,7 @@ namespace NamespaceTests {
                 create();
                 nsd()->deletedList[ 2 ] = nsd()->deletedList[ 0 ].drec()->nextDeleted.drec()->nextDeleted;
                 nsd()->deletedList[ 0 ].drec()->nextDeleted.drec()->nextDeleted = DiskLoc();
+                nsd()->deletedList[ 1 ].Null();
                 NamespaceDetails *d = nsd();
                 zero( &d->capExtent );
                 zero( &d->capFirstNewRecord );

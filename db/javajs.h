@@ -50,8 +50,7 @@ namespace mongo {
 
     class JavaJSImpl {
     public:
-        JavaJSImpl();
-        JavaJSImpl(const char *);
+        JavaJSImpl(const char * = 0);
         ~JavaJSImpl();
 
         jlong scopeCreate();

@@ -82,7 +82,7 @@ namespace PdfileTests {
                 r->lengthWithHeaders = Record::HeaderSize + len;
                 r->extentOfs = e->myLoc.getOfs();
                 r->nextOfs = DiskLoc::NullOfs;
-                r->prevOfs = e->lastRecord.getOfs();
+                r->prevOfs = e->lastRecord.isNull() ? DiskLoc::NullOfs : e->lastRecord.getOfs();
                 memcpy( r->data, o.objdata(), len );
                 if ( e->firstRecord.isNull() )
                     e->firstRecord = dl;
