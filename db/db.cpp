@@ -303,7 +303,8 @@ namespace mongo {
     Timer startupSrandTimer;
 
     void segvhandler(int x);
-    void initAndListen(int listenPort, const char *appserverLoc = null) {
+
+    void _initAndListen(int listenPort, const char *appserverLoc = null) {
         stringstream ss;
         ss << "dbpath (" << dbpath << ") does not exist";
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
@@ -314,11 +315,11 @@ namespace mongo {
             log() << "opLogging = " << opLogging << endl;
         _oplog.init();
 
-        //  HELP!  FIX ME!  I'm A TEMP HACK!
-        stringstream indexpath;
-        indexpath << dbpath << "/indexes.dat";
-        //RecCache::tempStore.init("/data/db/indexes.dat", BucketSize);
-        RecCache::tempStore.init(indexpath.str().c_str(), BucketSize);
+        {
+            stringstream indexpath;
+            indexpath << dbpath << "/indexes.dat";
+            RecCache::tempStore.init(indexpath.str().c_str(), BucketSize);
+        }
 
 #if !defined(_WIN32)
         pid_t pid = 0;
@@ -344,6 +345,13 @@ namespace mongo {
         srand(curTimeMicros() ^ startupSrandTimer.micros());
 
         listen(listenPort);
+    }
+    void initAndListen(int listenPort, const char *appserverLoc = null) {
+        try { _initAndListen(listenPort, appserverLoc); }
+        catch(...) { 
+            log(1) << "assertion exception in initAndListen, terminating" << endl;
+            dbexit(1);
+        }
     }
 
     int test2();
