@@ -20,15 +20,17 @@
 #include "../util/message.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
+
+#include "ConfigServer.h"
 #include "gridconfig.h"
 
 namespace mongo {
 
-    bool dashDashInfer = false;
-    vector<string> dashDashGridDb;
     int port = 27017;
     const char *curNs = "";
     Database *database = 0;
+    DBClientWithCommands* Model::globalConn;
+    string ourHostname;
 
     string getDbContext() {
         return "?";
@@ -87,28 +89,6 @@ namespace mongo {
     };
 
     void start() {
-        gridDatabase.init();
-        /*
-            try {
-        out() << "TEMP" << endl;
-        {
-            ScopedDbConnection c("localhost");
-            out() << c.conn().findOne("dwight.bar", emptyObj).toString() << endl;
-            c.done();
-            out() << "OK1" << endl;
-        }
-        {
-            ScopedDbConnection c("localhost");
-            c.conn().findOne("dwight.bar", emptyObj);
-            c.done();
-            out() << "OK1" << endl;
-        }
-        out() << "OK2" << endl;
-            } catch(...) {
-        out() << "exception" << endl;
-            }
-        */
-
         log() << "waiting for connections on port " << port << "..." << endl;
         DbGridListener l(port);
         l.listen();
@@ -119,12 +99,15 @@ namespace mongo {
 using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] ) {
-
+    
     if ( argc <= 1 ) {
         usage( argv );
         return 3;
     }
 
+    bool infer = false;
+    vector<string> gridDBs;
+    
     for (int i = 1; i < argc; i++)  {
         if ( argv[i] == 0 ) continue;
         string s = argv[i];
@@ -132,20 +115,20 @@ int main(int argc, char* argv[], char *envp[] ) {
             port = atoi(argv[++i]);
         }
         else if ( s == "--infer" ) {
-            dashDashInfer = true;
+            infer = true;
         }
         else if ( s == "--griddb" ) {
-            assert( !dashDashInfer );
-            int n = 0;
-            while ( ++i < argc ) {
-                dashDashGridDb.push_back(argv[i]);
-                n++;
-            }
-            if ( n == 0 ) {
+            assert( ! infer );
+
+            while ( ++i < argc ) 
+                gridDBs.push_back(argv[i]);
+
+            if ( gridDBs.size() == 0 ) {
                 out() << "error: no args for --griddb\n";
                 return 4;
             }
-            if ( n > 2 ) {
+            
+            if ( gridDBs.size() > 2 ) {
                 out() << "error: --griddb does not support more than 2 parameters yet\n";
                 return 5;
             }
@@ -155,9 +138,9 @@ int main(int argc, char* argv[], char *envp[] ) {
             return 3;
         }
     }
-
+    
     bool ok = port != 0;
-
+    
     if ( !ok ) {
         usage( argv );
         return 1;
@@ -165,11 +148,19 @@ int main(int argc, char* argv[], char *envp[] ) {
 
     log() << argv[0] << " starting (--help for usage)" << endl;
     UnitTest::runTests();
+
+    if ( ! configServer.init( gridDBs , infer ) ){
+        cerr << "couldn't connectd to config db" << endl;
+        return 7;
+    }
+
+    assert( configServer.ok() );
+    Model::globalConn = configServer.conn();
+
     start();
     dbexit(0);
     return 0;
 }
-
 
 #undef exit
 void mongo::dbexit(int rc, const char *why) {

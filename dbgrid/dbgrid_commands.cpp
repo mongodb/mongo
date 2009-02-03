@@ -35,6 +35,7 @@
 #include "../client/connpool.h"
 #include "../db/commands.h"
 #include "gridconfig.h"
+#include "ConfigServer.h"
 
 namespace mongo {
 
@@ -49,7 +50,7 @@ namespace mongo {
             }
             NetStatCmd() : Command("netstat") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-                result.append("griddb", gridDatabase.toString());
+                result.append("griddb", configServer.toString());
                 result.append("isdbgrid", 1);
                 return true;
             }

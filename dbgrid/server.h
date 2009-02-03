@@ -1,9 +1,4 @@
-/* griddatabase.h
-
-   The grid database is where we get:
-   - name of each shard
-   - "home" shard for each database
-*/
+// server.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -21,27 +16,10 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
-
-#include "shard.h"
+#include <string>
 
 namespace mongo {
 
-    class GridDatabase {
-    public:
-        DBClientWithCommands *conn;
-//    DBClientPaired conn;
-        enum { Port = 27016 }; /* standard port # for a grid db */
-        GridDatabase();
-        ~GridDatabase();
-        string toString() {
-            return conn->toString();
-        }
-
-        /* call at startup, this will initiate connection to the grid db */
-        void init();
-    };
-    extern GridDatabase gridDatabase;
-
-
-} // namespace mongo
+    extern std::string ourHostname;
+    
+}

@@ -18,12 +18,12 @@
 
 #include "stdafx.h"
 #include "shard.h"
-#include "griddatabase.h"
+#include "ConfigServer.h"
 
 namespace mongo {
-
+    
     DBClientWithCommands* Shard::conn() {
-        return gridDatabase.conn;
+        return configServer.conn();
     }
 
     void Shard::serialize(BSONObjBuilder& to) {
