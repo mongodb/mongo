@@ -37,7 +37,7 @@ namespace mongo {
             DBClientConnection *c = new DBClientConnection();
             if ( !c->connect(host.c_str(), errmsg) ) {
                 delete c;
-                uassert("dbconnectionpool: connect failed", false);
+                uassert( (string)"dbconnectionpool: connect failed" + host , false);
                 return 0;
             }
             return c;
