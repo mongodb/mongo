@@ -532,22 +532,23 @@ namespace mongo {
     public:
 
         /**
-           @param _autoReconnect whether or not to reconnect on a db or socket failure
+           @param _autoReconnect if true, automatically reconnect on a connection failure
+           @param cp used by DBClientPaired.  You do not need to specify this parameter
          */
         DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) :
                 clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
 
-        /**
+        /**Connect to a Mongo database server.
+
            If autoReconnect is true, you can try to use the DBClientConnection even when
            false was returned -- it will try to connect again.
 
            @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
-           @param errmsg any relevant error message will appneded to the string
+           @param errmsg any relevant error message will appended to the string
            @return false if fails to connect.
         */
         virtual bool connect(const char *serverHostname, string& errmsg);
 
-		/* overridden here to implement authCache for retries */
         virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
         virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
@@ -557,16 +558,13 @@ namespace mongo {
         }
 
         /**
-           @return whether or not this connection is in a failed state
+           @return true if this connection is currently in a failed state.  When autoreconnect is on, 
+                   a connection will transition back to an ok state after reconnecting.
          */
         bool isFailed() const {
             return failed;
         }
 
-        /**
-           this gives you access to the low level interface.
-           not reccomented to use
-         */
         MessagingPort& port() {
             return *p.get();
         }
@@ -577,6 +575,8 @@ namespace mongo {
             if ( failed ) ss << " failed";
             return ss.str();
         }
+
+        /** Returns the address of the server */
         string toString() {
             return serverAddress;
         }
