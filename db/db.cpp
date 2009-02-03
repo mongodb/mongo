@@ -314,7 +314,11 @@ namespace mongo {
             log() << "opLogging = " << opLogging << endl;
         _oplog.init();
 
-        RecCache::tempStore.init("/data/db/indexes.dat", BucketSize);
+        //  HELP!  FIX ME!  I'm A TEMP HACK!
+        stringstream indexpath;
+        indexpath << dbpath << "/indexes.dat";
+        //RecCache::tempStore.init("/data/db/indexes.dat", BucketSize);
+        RecCache::tempStore.init(indexpath.str().c_str(), BucketSize);
 
 #if !defined(_WIN32)
         pid_t pid = 0;
