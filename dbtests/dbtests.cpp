@@ -21,6 +21,8 @@
 
 #include "dbtests.h"
 
+#include "../db/javajs.h"
+
 #include <unittest/Registry.hpp>
 
 using namespace std;
@@ -79,10 +81,15 @@ int main( int argc, char** argv ) {
 
     srand( seed );
     out() << "random seed: " << seed << endl;
+
+    // NOTE Starting JNI changes global state (for example, locale and FPU precision);
+    // make sure we test with this setup.
+    JavaJS = new JavaJSImpl();
     
     UnitTest::Registry tests;
 
     tests.add( btreeTests(), "btree" );
+    tests.add( javajsTests(), "javajs" );
     tests.add( jsobjTests(), "jsobj" );
     tests.add( jsonTests(), "json" );
     tests.add( matcherTests(), "matcher" );

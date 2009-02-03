@@ -439,7 +439,8 @@ public:
                     lexeme_d[ str_p( "true" ) ][ trueValue( self.b ) ] |
                     lexeme_d[ str_p( "false" ) ][ falseValue( self.b ) ] |
                     lexeme_d[ str_p( "null" ) ][ nullValue( self.b ) ];
-                // lexeme_d and rules don't mix well, so we have this mess
+                // NOTE lexeme_d and rules don't mix well, so we have this mess.
+                // NOTE We use range_p rather than cntrl_p, because the latter is locale dependent.
                 str = lexeme_d[ ch_p( '"' )[ chClear( self.b ) ] >>
                                 *( ( ch_p( '\\' ) >>
                                      ( ch_p( '"' )[ chE( self.b ) ] |
@@ -451,8 +452,7 @@ public:
                                        ch_p( 'r' )[ chE( self.b ) ] |
                                        ch_p( 't' )[ chE( self.b ) ] |
                                        ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
-                                   ch_p( '\x7f' )[ ch( self.b ) ] |
-                                   ( ~cntrl_p & ~ch_p( '"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
+                                   ( ~range_p( 0x00, 0x1f ) & ~ch_p( '"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
 
                 singleQuoteStr = lexeme_d[ ch_p( '\'' )[ chClear( self.b ) ] >>
                                 *( ( ch_p( '\\' ) >>
@@ -465,8 +465,7 @@ public:
                                        ch_p( 'r' )[ chE( self.b ) ] |
                                        ch_p( 't' )[ chE( self.b ) ] |
                                        ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
-                                   ch_p( '\x7f' )[ ch( self.b ) ] |
-                                   ( ~cntrl_p & ~ch_p( '\'' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '\'' ];
+                                   ( ~range_p( 0x00, 0x1f ) & ~ch_p( '\'' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '\'' ];
 
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
@@ -510,8 +509,7 @@ public:
                                           ch_p( 'r' )[ chE( self.b ) ] |
                                           ch_p( 't' )[ chE( self.b ) ] |
                                           ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
-                                      ch_p( '\x7f' )[ ch( self.b ) ] |
-                                      ( ~cntrl_p & ~ch_p( '/' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> str_p( "/" )[ regexValue( self.b ) ]
+                                      ( ~range_p( 0x00, 0x1f ) & ~ch_p( '/' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> str_p( "/" )[ regexValue( self.b ) ]
                                    >> ( *( ch_p( 'i' ) | ch_p( 'g' ) | ch_p( 'm' ) ) )[ regexOptions( self.b ) ] ];
             }
             rule< ScannerT > object, members, pair, array, elements, value, str, number,

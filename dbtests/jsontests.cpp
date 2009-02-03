@@ -428,8 +428,8 @@ namespace JsonTests {
         class FancyNumber {
         public:
             void run() {
-                ASSERT_EQUALS( bson().firstElement().number(),
-                              fromjson( json() ).firstElement().number() );
+                ASSERT_EQUALS( int( 1000000 * bson().firstElement().number() ),
+                              int( 1000000 * fromjson( json() ).firstElement().number() ) );
             }
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
