@@ -81,10 +81,6 @@ namespace mongo {
         JavaJS->detach( env );
     }
 
-    JavaJSImpl::JavaJSImpl() {
-        JavaJSImpl(null);
-    }
-
 #if defined(_WIN32)
     const char SYSTEM_COLON = ';';
 #else
