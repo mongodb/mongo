@@ -422,7 +422,7 @@ env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
 env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 
 # dbgrid
-env.Program( "mongogrid" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
+env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
 
 # c++ library
 env.Library( "mongoclient" , allClientFiles )
