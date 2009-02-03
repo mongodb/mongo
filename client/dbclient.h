@@ -268,7 +268,7 @@ namespace mongo {
 
         string createPasswordDigest( const char * username , const char * clearTextPassword );
 
-        /* returns true in isMaster parm if this db is the current master
+        /** returns true in isMaster parm if this db is the current master
            of a replica pair.
 
            pass in info for more details e.g.:
@@ -278,7 +278,7 @@ namespace mongo {
         */
         virtual bool isMaster(bool& isMaster, BSONObj *info=0);
 
-        /*
+        /**
            Create a new collection in the database.  Normally, collection creation is automatic.  You would
            use this function if you wish to specify special options on creation.
 
@@ -301,7 +301,6 @@ namespace mongo {
         */
         string getLastError();
 
-
         /** Return the last error which has occurred, even if not the very last operation.
 
            @return { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
@@ -316,7 +315,7 @@ namespace mongo {
         */
         bool resetError() { return simpleCommand("admin", 0, "reseterror"); }
 
-        /* Erase / drop an entire database */
+        /** Erase / drop an entire database */
         bool dropDatabase(const char *dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "dropDatabase");
         }
@@ -333,14 +332,14 @@ namespace mongo {
             return runCommand( db.c_str() , BSON( "drop" << coll ) , info );
         }
 
-        /* Perform a repair and compaction of the specified database.  May take a long time to run.  Disk space
+        /** Perform a repair and compaction of the specified database.  May take a long time to run.  Disk space
            must be available equal to the size of the database while repairing.
         */
         bool repairDatabase(const char *dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "repairDatabase");
         }
         
-        /* Copy database from one server or name to another server or name.
+        /** Copy database from one server or name to another server or name.
 
            Generally, you should dropDatabase() first as otherwise the copied information will MERGE
            into whatever data is already present in this database.
@@ -361,7 +360,7 @@ namespace mongo {
         */
         bool copyDatabase(const char *fromdb, const char *todb, const char *fromhost = "", BSONObj *info = 0);
 
-        /* The Mongo database provides built-in performance profiling capabilities.  Uset setDbProfilingLevel()
+        /** The Mongo database provides built-in performance profiling capabilities.  Uset setDbProfilingLevel()
            to enable.  Profiling information is then written to the system.profiling collection, which one can
            then query.
         */
@@ -373,7 +372,7 @@ namespace mongo {
         bool setDbProfilingLevel(const char *dbname, ProfilingLevel level, BSONObj *info = 0);
         bool getDbProfilingLevel(const char *dbname, ProfilingLevel& level, BSONObj *info = 0);
 
-        /* Run javascript code on the database server.
+        /** Run javascript code on the database server.
            dbname    database context in which the code runs. The javascript variable 'db' will be assigned
                      to this database when the function is invoked.
            jscode    source code for a javascript function.
@@ -413,7 +412,7 @@ namespace mongo {
             return eval(dbname, jscode, info, retValue, &args);
         }
 
-        /* invocation with one parm to server and one numeric field (either int or double) returned */
+        /** eval invocation with one parm to server and one numeric field (either int or double) returned */
         template< class T, class NumType >
         bool eval(const char *dbname, const char *jscode, T parm1, NumType& ret) {
             BSONObj info;
@@ -429,6 +428,7 @@ namespace mongo {
         
         virtual string toString() = 0;
 
+        /** @return the database name portion of an ns string */
         string nsGetDB( const string &ns ){
             string::size_type pos = ns.find( "." );
             if ( pos == string::npos )
@@ -437,6 +437,7 @@ namespace mongo {
             return ns.substr( 0 , pos );
         }
         
+        /** @return the collection name portion of an ns string */
         string nsGetCollection( const string &ns ){
             string::size_type pos = ns.find( "." );
             if ( pos == string::npos )
