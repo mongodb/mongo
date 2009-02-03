@@ -477,7 +477,7 @@ namespace mongo {
         say( toSend );
     }
 
-    bool DBClientBase::ensureIndex( const string ns , BSONObj keys , const char * name ) {
+    bool DBClientBase::ensureIndex( const string &ns , BSONObj keys , const char * name ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
