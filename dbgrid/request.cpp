@@ -58,12 +58,13 @@ namespace mongo {
         bool ok = c.port().call(m, response);
         uassert("dbgrid: getmore: error calling db", ok);
         p.reply(m, response, m.data->id);
-
+        
         dbcon.done();
     }
 
     /* got query operation from a database */
     void queryOp(Message& m, MessagingPort& p) {
+        const MSGID originalID = m.data->id;
         DbMessage d(m);
         QueryMessage q(d);
         bool lateAssert = false;
@@ -85,7 +86,7 @@ namespace mongo {
             bool ok = c.port().call(m, response);
             uassert("dbgrid: error calling db", ok);
             lateAssert = true;
-            p.reply(m, response, m.data->id);
+            p.reply(m, response, originalID );
             dbcon.done();
         }
         catch ( AssertionException& e ) {
@@ -97,7 +98,7 @@ namespace mongo {
             return;
         }
     }
-
+    
     void writeOp(int op, Message& m, MessagingPort& p) {
         DbMessage d(m);
         const char *ns = d.getns();
