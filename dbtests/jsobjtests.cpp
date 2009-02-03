@@ -119,8 +119,8 @@ namespace JsobjTests {
                     ASSERT( !invalid().valid() );
                 }
             protected:
-                virtual BSONObj valid() const = 0;
-                virtual BSONObj invalid() const = 0;
+                virtual BSONObj valid() const { return emptyObj; }
+                virtual BSONObj invalid() const { return emptyObj; }
                 static char get( const BSONObj &o, int i ) {
                     return o.objdata()[ i ];
                 }
@@ -153,6 +153,17 @@ namespace JsobjTests {
                 }
             };
 
+            class Undefined : public Base {
+            public:
+                void run() {
+                    BSONObjBuilder b;
+                    b.appendNull( "a" );
+                    BSONObj o = b.done();
+                    set( o, 4, mongo::Undefined );
+                    ASSERT( o.valid() );
+                }
+            };
+            
             class TotalSizeTooSmall : public Base {
                 BSONObj valid() const {
                     return fromjson( "{\"a\":1}" );
@@ -442,6 +453,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareOrdered >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
+            add< BSONObjTests::Validation::Undefined >();
             add< BSONObjTests::Validation::TotalSizeTooSmall >();
             add< BSONObjTests::Validation::EooMissing >();
             add< BSONObjTests::Validation::WrongStringSize >();
