@@ -3,7 +3,7 @@
 # Project related configuration options
 #---------------------------------------------------------------------------
 DOXYFILE_ENCODING      = UTF-8
-PROJECT_NAME           = mongo
+PROJECT_NAME           = MongoDB
 PROJECT_NUMBER         = 0.8
 OUTPUT_DIRECTORY       = docs
 CREATE_SUBDIRS         = NO
