@@ -563,7 +563,7 @@ namespace mongo {
         BSONObjIterator i(*this);
         bool first = true;
         while ( 1 ) {
-            massert( "Object does not end with EOO or Undefined", i.more() );
+            massert( "Object does not end with EOO", i.more() );
             BSONElement e = i.next( true );
             massert( "Invalid element size", e.size() > 0 );
             massert( "Element too large", e.size() < ( 1 << 30 ) );
@@ -575,9 +575,6 @@ namespace mongo {
             if ( e.eoo() ) {
                 massert( "EOO Before end of object", end );
                 break;
-            } else if ( e.type() == Undefined ) {
-                massert( "Undefined Before end of object", end );
-                break;                
             }
             if ( first )
                 first = false;
