@@ -17,7 +17,7 @@
 */
 
 #include "stdafx.h"
-#include "../grid/message.h"
+#include "../util/message.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../db/pdfile.h"

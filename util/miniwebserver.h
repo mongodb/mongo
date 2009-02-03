@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../grid/message.h"
+#include "message.h"
 
 namespace mongo {
 

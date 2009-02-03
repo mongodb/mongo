@@ -386,7 +386,9 @@ namespace mongo {
        object in a binary representation.
 
        Note that BSONObj's have a smart pointer capability built in -- so you can 
-       pass them around by value safely.
+       pass them around by value.  The reference counts used to implement this
+       do not use locking, so copying and destroying BSONObj's are not thread-safe
+       operations.
      */
     class BSONObj : public Stringable {
         friend class BSONObjIterator;

@@ -30,7 +30,7 @@
 */
 
 #include "stdafx.h"
-#include "../grid/message.h"
+#include "../util/message.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"

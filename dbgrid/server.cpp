@@ -1,4 +1,4 @@
-// dbgrid.cpp
+// server.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -17,7 +17,7 @@
 */
 
 #include "stdafx.h"
-#include "../grid/message.h"
+#include "../util/message.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "gridconfig.h"
@@ -34,8 +34,8 @@ namespace mongo {
         return "?";
     }
 
-    void usage() {
-        out() << "Mongo dbgrid usage:\n\n";
+    void usage( char * argv[] ){
+        out() << argv[0] << " usage:\n\n";
         out() << " --port <portno>\n";
         out() << " --griddb <griddbname> [<griddbname>...]\n";
         out() << " --infer                                   infer griddbname by replacing \"-n<n>\"\n";
@@ -121,7 +121,7 @@ using namespace mongo;
 int main(int argc, char* argv[], char *envp[] ) {
 
     if ( argc <= 1 ) {
-        usage();
+        usage( argv );
         return 3;
     }
 
@@ -151,7 +151,7 @@ int main(int argc, char* argv[], char *envp[] ) {
             }
         }
         else {
-            usage();
+            usage( argv );
             return 3;
         }
     }
@@ -159,11 +159,11 @@ int main(int argc, char* argv[], char *envp[] ) {
     bool ok = port != 0;
 
     if ( !ok ) {
-        usage();
+        usage( argv );
         return 1;
     }
 
-    log() << "dbgrid starting (--help for usage)" << endl;
+    log() << argv[0] << " starting (--help for usage)" << endl;
     UnitTest::runTests();
     start();
     dbexit(0);
