@@ -255,10 +255,6 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\dbgrid.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\dbgrid_commands.cpp"
 				>
 			</File>
@@ -272,6 +268,10 @@
 			</File>
 			<File
 				RelativePath=".\request.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\server.cpp"
 				>
 			</File>
 			<File
@@ -354,7 +354,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\grid\message.cpp"
+					RelativePath="..\util\message.cpp"
 					>
 				</File>
 				<File

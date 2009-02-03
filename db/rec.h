@@ -1,5 +1,13 @@
 // rec.h
 
+/* TODO for _RECSTORE
+
+   _ support > 2GB data per file
+   _ multiple files, not just indexes.dat
+   _ lazier writes?
+   _ configurable cache size
+*/
+
 #pragma once
 
 #include "reci.h"
@@ -80,4 +88,3 @@ inline BtreeBucket* DiskLoc::btreemod() const {
 }
 
 }
-
