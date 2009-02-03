@@ -89,7 +89,6 @@ namespace mongo {
         // If we have just gotten to beginning of capExtent, skip to capFirstNewRecord
         if ( i == nsd->capExtent.ext()->firstRecord )
             i = nsd->capFirstNewRecord;
-
         return i;
     }
 
