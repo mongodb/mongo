@@ -86,9 +86,9 @@ int main( int argc, char** argv ) {
     tests.add( jsobjTests(), "jsobj" );
     tests.add( jsonTests(), "json" );
     tests.add( matcherTests(), "matcher" );
-    tests.add( namespaceTests(), "namespace" );
+//     tests.add( namespaceTests(), "namespace" );
     tests.add( pairingTests(), "pairing" );
-    tests.add( pdfileTests(), "pdfile" );
+//     tests.add( pdfileTests(), "pdfile" );
     tests.add( queryTests(), "query" );
     tests.add( replTests(), "repl" );
     tests.add( sockTests(), "sock" );
