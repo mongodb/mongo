@@ -153,17 +153,6 @@ namespace JsobjTests {
                 }
             };
 
-            class UndefinedBeforeEnd : public Base {
-                BSONObj valid() const {
-                    return fromjson( "{\"a\":1}" );
-                }
-                BSONObj invalid() const {
-                    BSONObj ret = valid();
-                    set( ret, 4, Undefined );
-                    return ret;
-                }
-            };
-            
             class TotalSizeTooSmall : public Base {
                 BSONObj valid() const {
                     return fromjson( "{\"a\":1}" );
@@ -453,7 +442,6 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareOrdered >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
-            add< BSONObjTests::Validation::UndefinedBeforeEnd >();
             add< BSONObjTests::Validation::TotalSizeTooSmall >();
             add< BSONObjTests::Validation::EooMissing >();
             add< BSONObjTests::Validation::WrongStringSize >();
