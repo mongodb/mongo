@@ -6,6 +6,7 @@
    _ multiple files, not just indexes.dat
    _ lazier writes?
    _ configurable cache size
+   _ fix on abnormal terminations to be able to restart some
 */
 
 #pragma once

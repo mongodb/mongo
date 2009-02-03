@@ -200,8 +200,10 @@ shellHelper.show = function( what ){
     if ( what == "users" )
 	return db.system.users.find();
 
-    if ( what == "collections" || what == "tables" )
-        return db.getCollectionNames();
+    if ( what == "collections" || what == "tables" ) {
+        db.getCollectionNames().forEach( function(x){print(x)} );
+	return "";
+    }
     
     if ( what == "dbs" )
         return db.getMongo().getDBNames();
