@@ -58,8 +58,11 @@ public:
 */
 
 // pick your store for indexes by setting this typedef
+#if defined(_RECSTORE)
+typedef BasicCached_RecStore BtreeStore;
+#else
 typedef MongoMemMapped_RecStore BtreeStore;
-//typedef BasicCached_RecStore BtreeStore;
+#endif
 //typedef InMem_RecStore BtreeStore;
 
 const int BucketSize = 8192;
