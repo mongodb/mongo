@@ -38,7 +38,7 @@
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include "repl.h"
-#include "../grid/message.h"
+#include "../util/message.h"
 #include "../client/dbclient.h"
 #include "pdfile.h"
 #include "query.h"

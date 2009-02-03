@@ -41,7 +41,7 @@ namespace mongo {
 #include "jsobj.h"
 #endif
 
-#include "../grid/message.h"
+#include "../util/message.h"
 #include "db.h"
 
 using namespace std;

@@ -98,8 +98,8 @@ env.Append( CPPPATH=[ "." ] )
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
 commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp" )
-commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" ]
-commonFiles += Glob( "util/*.c" ) + Glob( "grid/*.cpp" )
+commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ]
+commonFiles += Glob( "util/*.c" );
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
 
 #mmap stuff
@@ -527,7 +527,7 @@ env.Install( installDir + "/bin" , "mongo" )
 # on a case-by-case basis.
 
 #headers
-for id in [ "", "util/", "grid/", "db/" ]:
+for id in [ "", "util/", "db/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 env.Install( installDir + "/include/mongo/client" , "client/connpool.h" )
 env.Install( installDir + "/include/mongo/client" , "client/model.h" )

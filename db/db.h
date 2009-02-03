@@ -17,7 +17,7 @@
 #pragma once
 
 #include "../stdafx.h"
-#include "../grid/message.h"
+#include "../util/message.h"
 
 namespace mongo {
 
