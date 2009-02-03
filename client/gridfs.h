@@ -74,6 +74,11 @@ namespace mongo {
          */
         auto_ptr<DBClientCursor> list();
 
+        /**
+         * convenience method to get all the files with a filter
+         */
+        auto_ptr<DBClientCursor> list( BSONObj query );
+
     private:
         DBClientBase& _client;
         string _filesNS;

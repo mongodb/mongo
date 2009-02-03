@@ -94,6 +94,10 @@ namespace mongo {
         return _client.query( _filesNS.c_str() , emptyObj );
     }
 
+    auto_ptr<DBClientCursor> GridFS::list( BSONObj o ){
+        return _client.query( _filesNS.c_str() , o );
+    }
+
     Chunk GridFile::getChunk( int n ){
         _exists();
         BSONObjBuilder b;
