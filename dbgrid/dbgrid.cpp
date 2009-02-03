@@ -34,22 +34,6 @@ namespace mongo {
         return "?";
     }
 
-#if !defined(_WIN32)
-
-} // namespace mongo
-
-#include <signal.h>
-
-namespace mongo {
-
-    void pipeSigHandler( int signal ) {
-        psignal( signal, "Signal Received : ");
-    }
-
-#else
-    void setupSignals() {}
-#endif
-
     void usage() {
         out() << "Mongo dbgrid usage:\n\n";
         out() << " --port <portno>\n";
@@ -135,9 +119,6 @@ namespace mongo {
 using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] ) {
-#if !defined(_WIN32)
-    signal(SIGPIPE, pipeSigHandler);
-#endif
 
     if ( argc <= 1 ) {
         usage();
@@ -189,12 +170,9 @@ int main(int argc, char* argv[], char *envp[] ) {
     return 0;
 }
 
-namespace mongo {
 
 #undef exit
-    void dbexit(int rc, const char *why) {
-        log() << "dbexit: " << why << " rc:" << rc << endl;
-        ::exit(rc);
-    }
-
-} // namespace mongo
+void mongo::dbexit(int rc, const char *why) {
+    log() << "dbexit: " << why << " rc:" << rc << endl;
+    ::exit(rc);
+}
