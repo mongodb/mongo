@@ -278,8 +278,8 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
         if type( poss ) != types.ListType :
             poss = [poss]
 
-        if darwin and release:
-            allPlaces = [];
+        allPlaces = [];
+        if nix and release:
             allPlaces += myenv["LIBPATH"]
             if not force64:
                 allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
@@ -288,7 +288,11 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
                 for loc in allPlaces:
                     fullPath = loc + "/lib" + p + ".a"
                     if os.path.exists( fullPath ):
-                        myenv.Append( LINKFLAGS=" " + fullPath + " " )
+                        if darwin:
+                            myenv.Append( LINKFLAGS=" " + fullPath + " " )
+                        else:
+                            myenv['_LIBFLAGS']='${_stripixes(LIBLINKPREFIX, LIBS, LIBLINKSUFFIX, LIBPREFIXES, LIBSUFFIXES, __env__)} $SLIBS'
+                            myenv.Append( SLIBS=" " + fullPath + " " )
                         return True
 
         res = conf.CheckLib( poss )
@@ -297,7 +301,11 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
             Exit(1)
             
         if release:
-            print( "WARNING: can't find static version of: " + str( poss ) )
+            if not java and not shell:
+                print( "ERROR: can't find static version of: " + str( poss ) + " needed for mongod in:" + str( allPlaces ) )
+                Exit(1)
+            print( "WARNING: can't find static version of: " + str( poss ) + " for shell.  mongo might not be portable" )
+
         return res
 
     if pcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
