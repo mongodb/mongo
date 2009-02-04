@@ -21,8 +21,9 @@ static void storeThread() {
     }
 }
 
+// Currently only called on program exit.
 void recCacheCloseAll() { 
-    BasicCached_RecStore::rc.writeDirty();
+    BasicCached_RecStore::rc.writeDirty( true );
     RecCache::tempStore.flush();
 }
 
@@ -67,7 +68,7 @@ inline void RecCache::writeIfDirty(Node *n) {
 }
 
 /* note that this is written in order, as much as possible, given that dirtyl is of type set. */
-void RecCache::writeDirty() { 
+void RecCache::writeDirty( bool rawLog ) { 
     try { 
         for( set<DiskLoc>::iterator i = dirtyl.begin(); i != dirtyl.end(); i++ ) { 
             map<DiskLoc, Node*>::iterator j = m.find(*i);
@@ -76,7 +77,11 @@ void RecCache::writeDirty() {
         }
     }
     catch(...) {
-        log() << "Problem: bad() in RecCache::writeDirty, file io error\n";
+        const char *message = "Problem: bad() in RecCache::writeDirty, file io error\n";
+        if ( rawLog )
+            rawOut( message );
+        else
+            ( log() << message ).flush();
     }
     dirtyl.clear();
 }
