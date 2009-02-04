@@ -563,9 +563,10 @@ namespace mongo {
             possible.push_back( "./" );
             possible.push_back( "../" );
             
+            log(2) << "dbExecCommand: " << endl;
             if ( dbExecCommand.find( "/" ) ){
                 string dbDir = dbExecCommand.substr( 0 , dbExecCommand.find_last_of( "/" ) );
-                log(2) << "dbDir [" << dbDir << "]";
+                log(2) << "dbDir [" << dbDir << "]" << endl;
                 possible.push_back( ( dbDir + "/../lib/mongo/" ));
                 possible.push_back( ( dbDir + "/../lib64/mongo/" ));
                 possible.push_back( ( dbDir + "/../lib32/mongo/" ));
