@@ -323,7 +323,12 @@ v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args){
     BSONObj o = v8ToMongo( in );
 
     DDD( "want to save : " << o.jsonString() );
-    conn->insert( ns , o );
+    try {
+        conn->insert( ns , o );
+    }
+    catch ( ... ){
+        return v8::ThrowException( v8::String::New( "socket error on insert" ) );
+    }
 
     return args[1];
 }
@@ -339,7 +344,12 @@ v8::Handle<v8::Value> mongoRemove(const v8::Arguments& args){
     BSONObj o = v8ToMongo( in );
     
     DDD( "want to remove : " << o.jsonString() );
-    conn->remove( ns , o );
+    try {
+        conn->remove( ns , o );
+    }
+    catch ( ... ){
+        return v8::ThrowException( v8::String::New( "socket error on remove" ) );
+    }
 
     return v8::Undefined();
 }
@@ -356,8 +366,13 @@ v8::Handle<v8::Value> mongoUpdate(const v8::Arguments& args){
     v8::Handle<v8::Object> o = args[2]->ToObject();
     
     bool upsert = args.Length() > 3 && args[3]->IsBoolean() && args[3]->ToBoolean()->Value();
-    
-    conn->update( ns , v8ToMongo( q ) , v8ToMongo( o ) , upsert );
+
+    try {
+        conn->update( ns , v8ToMongo( q ) , v8ToMongo( o ) , upsert );
+    }
+    catch ( ... ){
+        return v8::ThrowException( v8::String::New( "socket error on remove" ) );
+    }
 
     return v8::Undefined();
 }
