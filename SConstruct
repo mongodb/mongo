@@ -268,12 +268,12 @@ if nix:
 
 # --- check system ---
 
-def doConfigure( myenv , java=True , pcre=True , shell=False ):
+def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = myenv["LINKFLAGS"]
     myenv["LIBS_CLEAN"] = myenv["LIBS"]
     
-    def myCheckLib( poss , failIfNotFound=False ):
+    def myCheckLib( poss , failIfNotFound=False , java=False ):
 
         if type( poss ) != types.ListType :
             poss = [poss]
@@ -308,7 +308,7 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
 
         return res
 
-    if pcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
+    if needPcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
         print( "can't find pcre" )
         Exit(1)
 
@@ -323,11 +323,11 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
         l = "boost_" + b
         myCheckLib( [ l + "-mt" , l ] , not shell)
 
-    if java:
+    if needJava:
         for j in javaLibs:
-            myCheckLib( j , True )
+            myCheckLib( j , True , True )
 
-    if nix and pcre:
+    if nix and needPcre:
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
