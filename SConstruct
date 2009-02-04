@@ -270,8 +270,8 @@ if nix:
 
 def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)
-    myenv["LINKFLAGS_CLEAN"] = myenv["LINKFLAGS"]
-    myenv["LIBS_CLEAN"] = myenv["LIBS"]
+    myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
+    myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
     
     def myCheckLib( poss , failIfNotFound=False , java=False ):
 
@@ -296,8 +296,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                         return True
 
 
-        if release and failIfNotFound:
-            if not java and not shell:
+        if release:
+            if not java and not shell and failIfNotFound:
                 print( "ERROR: can't find static version of: " + str( poss ) + " needed for mongod in:" + str( allPlaces ) )
                 Exit(1)
             print( "WARNING: can't find static version of: " + str( poss ) + " for shell.  mongo might not be portable" )
@@ -483,6 +483,7 @@ if linux64 or force64:
         shellEnv.Append( CXXFLAGS="-m32" )
         shellEnv.Append( LINKFLAGS="-m32" )
         shellEnv.Append( LIBPATH=[ "/usr/lib32" , "/usr/lib" ] )
+        shellEnv["LIBPATH"].remove( "/usr/lib64" )
     else:
         shellEnv["CFLAGS"].remove("-m64")
         shellEnv["CXXFLAGS"].remove("-m64")
