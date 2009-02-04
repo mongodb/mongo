@@ -31,6 +31,7 @@ private:
             return;
         if( n == oldest ) {
             oldest = oldest->newer;
+            assert( oldest || nnodes == 1 );
         }
         if( n->older ) 
             n->older->newer = n->newer;
@@ -38,16 +39,19 @@ private:
             n->newer->older = n->older;
         n->newer = 0;        
         n->older = newest;
+        newest->newer = n;
         newest = n;
     }
     Node* mkNode() { 
         Node *n = new Node();
         n->data = (char *) calloc(recsize,1); // calloc is TEMP for testing.  change to malloc
         n->older = newest;
-        if( nnodes )
+        if( newest )
             newest->newer = n;
-        else
+        else {
+            assert( oldest == 0 );
             oldest = n;
+        }
         newest = n;
         nnodes++;
         return n;
@@ -56,6 +60,9 @@ private:
         // temp impl
         return d.getOfs();
     }
+
+    void dump();
+
 public:
     RecCache(unsigned sz) : recsize(sz) { 
         nnodes = 0;

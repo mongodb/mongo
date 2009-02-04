@@ -49,7 +49,11 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
         f.read((char *) &h, sizeof(RecStoreHeader));
         massert(string("recstore recsize mismatch, file:")+fn, h.recsize == recsize);
         massert(string("bad recstore [1], file:")+fn, (h.leof-sizeof(RecStoreHeader)) % recsize == 0);        
-        massert(string("bad recstore [2], file:")+fn, h.leof <= len);
+        if( h.leof > len ) { 
+            stringstream ss;
+            ss << "bad recstore, file:" << fn << " leof:" << h.leof << " len:" << len;
+            massert(ss.str(), false);
+        }
         if( h.cleanShutdown )
             log() << "warning: non-clean shutdown for file " << fn << '\n';
         h.cleanShutdown = 2;
@@ -58,6 +62,8 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
     f.flush();
     //    boost::thread t(storeThread);
 }
+
+/* -------------------------------------------------------- */
 
 inline void RecCache::writeIfDirty(Node *n) {
     if( n->dirty ) {
@@ -83,20 +89,22 @@ void RecCache::writeDirty() {
 
 // 100k * 8KB = 800MB
 const unsigned RECCACHELIMIT = 150000;
+//const unsigned RECCACHELIMIT = 25;
 
 inline void RecCache::ejectOld() { 
     if( nnodes <= RECCACHELIMIT )
         return;
     Node *n = oldest;
     while( 1 ) {
-        if( nnodes <= RECCACHELIMIT ) { 
+        if( nnodes <= RECCACHELIMIT - 4 ) { 
             n->older = 0;
             oldest = n;
+            assert( oldest ) ;
             break;
         }
         nnodes--;
-        Node *nxt = n->newer;
         assert(n);
+        Node *nxt = n->newer;
         writeIfDirty(n);
         m.erase(n->loc);
         delete n;
@@ -104,7 +112,21 @@ inline void RecCache::ejectOld() {
     }
 }
 
-void dbunlocked() { 
+void RecCache::dump() { 
+    Node *n = oldest;
+    Node *last = 0;
+    while( n ) { 
+        assert( n->older == last );
+        last = n;
+//        cout << n << ' ' << n->older << ' ' << n->newer << '\n';
+        n=n->newer;
+    }
+    assert( newest == last );
+//    cout << endl;
+}
+
+void dbunlocking() { 
+    assert( dbMutexInfo.isLocked() );
     BasicCached_RecStore::rc.ejectOld();
 }
 
