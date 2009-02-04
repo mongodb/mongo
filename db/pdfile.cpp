@@ -677,14 +677,15 @@ namespace mongo {
 
         NamespaceDetails *d = nsdetails(ns);
 
+        BSONObj objOld(toupdate);
+        BSONElement idOld;
+        int addID = 0;
         {
             /* duplicate _id check... */
             BSONObj objNew(buf);
-            BSONObj objOld(toupdate);
             BSONElement idNew;
+            objOld.getObjectID(idOld);
             if( objNew.getObjectID(idNew) ) { 
-                BSONElement idOld;
-                objOld.getObjectID(idOld);
                 if( idOld == idNew ) 
                     ; 
                 else {
@@ -699,8 +700,12 @@ namespace mongo {
                                 !Helpers::findOne(ns, b.done(), result));
                     }
                 }
+            } else {
+                if ( !idOld.eoo() ) {
+                    addID = len;
+                    len += idOld.size();
+                }
             }
-
         }
 
         if (  toupdate->netLength() < len ) {
@@ -715,7 +720,7 @@ namespace mongo {
             if ( database->profile )
                 ss << " moved ";
             deleteRecord(ns, toupdate, dl);
-            insert(ns, buf, len);
+            insert(ns, buf, len, false, idOld);
             return;
         }
 
@@ -770,7 +775,13 @@ namespace mongo {
         }
 
         //	update in place
-        memcpy(toupdate->data, buf, len);
+        if ( addID ) {
+            ((int&)*toupdate->data) = *((int*) buf) + idOld.size();
+            memcpy(toupdate->data+4, idOld.rawdata(), idOld.size());
+            memcpy(toupdate->data+4+idOld.size(), ((char *)buf)+4, addID-4);
+        } else {
+            memcpy(toupdate->data, buf, len);
+        }
     }
 
     int followupExtentSize(int len, int lastExtentLen) {
@@ -892,19 +903,22 @@ namespace mongo {
     }
 
 #pragma pack(1)
-    struct IDToInsert { 
+    struct IDToInsert_ { 
         char type;
         char _id[4];
         OID oid;
-        IDToInsert() { 
+        IDToInsert_() {
             type = (char) jstOID;
             strcpy(_id, "_id");
-            assert( sizeof(IDToInsert) == 17 );
+            assert( sizeof(IDToInsert_) == 17 );
         }
+    } idToInsert_;
+    struct IDToInsert : public BSONElement {
+        IDToInsert() : BSONElement( ( char * )( &idToInsert_ ) ) {}
     } idToInsert;
 #pragma pack()
-
-    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god) {
+    
+    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId) {
         bool addIndex = false;
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
@@ -988,6 +1002,7 @@ namespace mongo {
             //indexFullNS += name; // database.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
         }
 
+        const BSONElement *newId = &writeId;
         int addID = 0;
         if( !god ) {
             /* Check if we have an _id field. If we don't, we'll add it. 
@@ -996,7 +1011,12 @@ namespace mongo {
             BSONObj io((const char *) obuf);
             if( !io.hasField("_id") && !addIndex && strstr(ns, ".local.") == 0 ) {
                 addID = len;
-                len += sizeof(IDToInsert);
+                if ( writeId.eoo() ) {
+                    // Very likely we'll add this elt, so little harm in init'ing here.
+                    idToInsert_.oid.init();
+                    newId = &idToInsert;
+                }
+                len += newId->size();
             }
         }
 
@@ -1028,10 +1048,9 @@ namespace mongo {
         assert( r->lengthWithHeaders >= lenWHdr );
         if( addID ) { 
             /* a little effort was made here to avoid a double copy when we add an ID */
-            idToInsert.oid.init();
-            ((int&)*r->data) = *((int*) obuf) + sizeof(idToInsert);
-            memcpy(r->data+4, &idToInsert, sizeof(idToInsert));
-            memcpy(r->data+4+sizeof(idToInsert), ((char *)obuf)+4, addID-4);
+            ((int&)*r->data) = *((int*) obuf) + newId->size();
+            memcpy(r->data+4, newId->rawdata(), newId->size());
+            memcpy(r->data+4+newId->size(), ((char *)obuf)+4, addID-4);
 // TEMP:
             BSONObj foo(r->data);
             cout << "TEMP:" << foo.toString() << endl;

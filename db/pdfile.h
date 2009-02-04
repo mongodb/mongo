@@ -87,7 +87,7 @@ namespace mongo {
             const char *ns,
             Record *toupdate, const DiskLoc& dl,
             const char *buf, int len, stringstream& profiling);
-        DiskLoc insert(const char *ns, const void *buf, int len, bool god = false);
+        DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, const BSONElement &writeId = BSONElement());
         void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false);
         static auto_ptr<Cursor> findAll(const char *ns);
 
