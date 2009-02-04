@@ -108,7 +108,7 @@ DBQuery.prototype.count = function(){
     
     var res = this._db.runCommand( cmd );
     if( res && res.n != null ) return res.n;
-    throw { exception: "count failed", res: res };
+    throw "count failed: " + tojson( res );
 }
 
 DBQuery.prototype.length = function(){
