@@ -241,14 +241,7 @@ namespace mongo {
 
 #define null (0)
 
-    inline void rawOut( const string &s ) {
-#if defined(_WIN32)
-        (std::cout << s).flush();
-#else
-        write( STDOUT_FILENO, s.c_str(), s.length() );
-        fsync( STDOUT_FILENO );        
-#endif
-    }
+    void rawOut( const string &s );
     
 } // namespace mongo
 
