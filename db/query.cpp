@@ -322,14 +322,7 @@ namespace mongo {
         }
     }
 
-    /* todo:
-         _ smart requery find record immediately
-       returns:
-         2: we did applyMods() but didn't logOp()
-    	 5: we did applyMods() and did logOp() (so don't do it again)
-         (clean these up later...)
-    */
-    int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
+    int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
         int profile = database->profile;
 
         if ( strstr(ns, ".system.") ) {
@@ -358,6 +351,12 @@ namespace mongo {
                     if ( !matcher.matches(js) ) {
                     }
                     else {
+                        BSONObjBuilder idPattern;
+                        BSONElement id;
+                        if ( js.getObjectID( id ) )
+                            idPattern.append( id );
+                        pattern = idPattern.doneAndDecouple();
+                        
                         /* note: we only update one row and quit.  if you do multiple later,
                         be careful or multikeys in arrays could break things badly.  best
                         to only allow updating a single row with a multikey lookup.
@@ -425,10 +424,22 @@ namespace mongo {
         }
         return 0;
     }
+
+    /* todo:
+     _ smart requery find record immediately
+     returns:
+     2: we did applyMods() but didn't logOp()
+     5: we did applyMods() and did logOp() (so don't do it again)
+     (clean these up later...)
+     */
+    int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
+        return __updateObjects( ns, updateobj, pattern, upsert, ss, logop );
+    }
+        
     /* todo: we can optimize replication by just doing insert when an upsert triggers.
     */
     void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss) {
-        int rc = _updateObjects(ns, updateobj, pattern, upsert, ss, true);
+        int rc = __updateObjects(ns, updateobj, pattern, upsert, ss, true);
         if ( rc != 5 && rc != 0 )
             logOp("u", ns, updateobj, &pattern, &upsert);
     }

@@ -708,7 +708,7 @@ namespace mongo {
             }
         }
 
-        if (  toupdate->netLength() < len ) {
+        if ( toupdate->netLength() < len ) {
             // doesn't fit.  must reallocate.
 
             if ( d && d->capped ) {
@@ -917,6 +917,13 @@ namespace mongo {
         IDToInsert() : BSONElement( ( char * )( &idToInsert_ ) ) {}
     } idToInsert;
 #pragma pack()
+    
+    DiskLoc DataFileMgr::insert(const char *ns, BSONObj &o) {
+        DiskLoc loc = insert( ns, o.objdata(), o.objsize() );
+        if ( !loc.isNull() )
+            o = BSONObj( loc.rec() );
+        return loc;
+    }
     
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId) {
         bool addIndex = false;
