@@ -307,6 +307,7 @@ namespace mongo {
                     Mod m;
                     m.op = op;
                     m.fieldName = f.fieldName();
+                    uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
                     if ( f.isNumber() ) {
                         if ( f.type() == NumberDouble ) {
                             m.ndouble = (double *) f.value();
