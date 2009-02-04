@@ -88,11 +88,21 @@ AddOption( "--noOptimization",
            action="store",
            help="don't compile with optimization" )
 
+
+AddOption( "--recstore",
+           dest="recstore",
+           type="string",
+           nargs=0,
+           action="store",
+           help="use new recstore" )
+
+
 # --- environment setup ---
 
 env = Environment()
 
-#env.Append( CPPDEFINES=[ "_RECSTORE" ] )
+if GetOption( "recstore" ) != None:
+    env.Append( CPPDEFINES=[ "_RECSTORE" ] )
 env.Append( CPPPATH=[ "." ] )
 
 
