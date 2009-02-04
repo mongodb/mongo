@@ -265,7 +265,7 @@ namespace mongo {
     void Mod::applyMods(vector<Mod>& mods, BSONObj obj) {
         for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
             Mod& m = *i;
-            BSONElement e = obj.findElement(m.fieldName);
+            BSONElement e = obj.getFieldDotted(m.fieldName);
             if ( e.isNumber() ) {
                 if ( m.op == INC ) {
                     e.setNumber( e.number() + m.getn() );
