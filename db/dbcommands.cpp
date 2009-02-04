@@ -39,7 +39,7 @@ namespace mongo {
     extern int queryTraceLevel;
     extern int otherTraceLevel;
     extern int opLogging;
-    void flushOpLog();
+    void flushOpLog( stringstream &ss );
 
     void clean(const char *ns, NamespaceDetails *d) {
         for ( int i = 0; i < Buckets; i++ )
@@ -456,7 +456,9 @@ namespace mongo {
         }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             opLogging = (int) cmdObj.findElement(name).number();
-            flushOpLog();
+            stringstream ss;
+            flushOpLog( ss );
+            out() << ss << endl;
             if ( !quiet )
                 log() << "CMD: opLogging set to " << opLogging << endl;
             return true;
