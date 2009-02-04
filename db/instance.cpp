@@ -438,7 +438,7 @@ namespace mongo {
                 uassert("insert: bad object from client", false);
             }
 
-            theDataFileMgr.insert(ns, (void*) js.objdata(), js.objsize());
+            theDataFileMgr.insert(ns, js);
             logOp("i", ns, js);
         }
     }

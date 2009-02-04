@@ -176,15 +176,14 @@ namespace ReplTests {
             virtual void reset() const = 0;
         };
         
-        class Insert : public Base {
+        class InsertAutoId : public Base {
         public:
-            Insert() : o_( fromjson( "{\"a\":\"b\"}" ) ) {}
+            InsertAutoId() : o_( fromjson( "{\"a\":\"b\"}" ) ) {}
             void doIt() const {
                 client()->insert( ns(), o_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( o_ );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -193,18 +192,22 @@ namespace ReplTests {
             BSONObj o_;
         };
 
-        class InsertWithId : public Insert {
+        class InsertWithId : public InsertAutoId {
         public:
             InsertWithId() {
                 o_ = fromjson( "{\"_id\":ObjectId(\"0f0f0f0f0f0f0f0f0f0f0f0f\"),\"a\":\"b\"}" );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( o_ );
             }
         };
         
         class InsertTwo : public Base {
         public:
             InsertTwo() : 
-            o_( fromjson( "{\"a\":\"b\"}" ) ),
-            t_( fromjson( "{\"c\":\"d\"}" ) ) {}
+            o_( fromjson( "{'_id':1,a:'b'}" ) ),
+            t_( fromjson( "{'_id':2,c:'d'}" ) ) {}
             void doIt() const {
                 vector< BSONObj > v;
                 v.push_back( o_ );
@@ -233,7 +236,6 @@ namespace ReplTests {
             }
             void check() const {
                 ASSERT_EQUALS( 2, count() );
-                checkAll( o_ );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -317,20 +319,114 @@ namespace ReplTests {
             UpdateSpec *s_;
         };
 
-        class UpdateSameField : public UpdateBase {
+        class UpdateSameField : public Base {
         public:
-            class Spec : public UpdateSpec {
-                virtual BSONObj o() const { return f( "{\"a\":\"b\",\"m\":\"n\"}" ); }
-                virtual BSONObj q() const { return f( "{\"a\":\"b\"}" ); }
-                virtual BSONObj u() const { return f( "{\"a\":\"c\"}" ); }
-                virtual BSONObj ou() const { return u(); }
-            };
-            static Spec spec;
             UpdateSameField() :
-            UpdateBase( &spec ) {}
-        };
-        UpdateSameField::Spec UpdateSameField::spec;
+            o_( fromjson( "{a:'b'}" ) ),
+            u_( fromjson( "{a:'c'}" ) ){}
+            void doIt() const {
+                client()->update( ns(), o_, u_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 2, count() );
+                ASSERT( !client()->findOne( ns(), o_ ).isEmpty() );
+                ASSERT( !client()->findOne( ns(), u_ ).isEmpty() );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( o_ );
+                insert( o_ );
+            }
+        private:
+            BSONObj o_, u_;            
+        };        
+        
+        class UpdateSameFieldWithId : public Base {
+        public:
+            UpdateSameFieldWithId() :
+            o_( fromjson( "{'_id':1,a:'b'}" ) ),
+            q_( fromjson( "{a:'b'}" ) ),
+            u_( fromjson( "{'_id':1,a:'c'}" ) ){}
+            void doIt() const {
+                client()->update( ns(), q_, u_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 2, count() );
+                ASSERT( !client()->findOne( ns(), q_ ).isEmpty() );
+                ASSERT( !client()->findOne( ns(), u_ ).isEmpty() );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( o_ );
+                insert( fromjson( "{'_id':2,a:'b'}" ) );
+            }
+        private:
+            BSONObj o_, q_, u_;            
+        };        
 
+        class UpdateSameFieldExplicitId : public Base {
+        public:
+            UpdateSameFieldExplicitId() :
+            o_( fromjson( "{'_id':1,a:'b'}" ) ),
+            u_( fromjson( "{'_id':1,a:'c'}" ) ){}
+            void doIt() const {
+                client()->update( ns(), o_, u_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( u_ );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( o_ );
+            }
+        protected:
+            BSONObj o_, u_;            
+        };
+        
+        class UpdateId : public UpdateSameFieldExplicitId {
+        public:
+            UpdateId() {
+                o_ = fromjson( "{'_id':1}" );
+                u_ = fromjson( "{'_id':2}" );
+            }
+        };
+        
+        //        class UpdateSameField : public UpdateBase {
+//        public:
+//            class Spec : public UpdateSpec {
+//                virtual BSONObj o() const { return f( "{\"a\":\"b\",\"m\":\"n\"}" ); }
+//                virtual BSONObj q() const { return f( "{\"a\":\"b\"}" ); }
+//                virtual BSONObj u() const { return f( "{\"a\":\"c\"}" ); }
+//                virtual BSONObj ou() const { return u(); }
+//            };
+//            static Spec spec;
+//            UpdateSameField() :
+//            UpdateBase( &spec ) {}
+//        };
+//        UpdateSameField::Spec UpdateSameField::spec;
+
+        class UpdateDifferentFieldExplicitId : public Base {
+        public:
+            UpdateDifferentFieldExplicitId() :
+            o_( fromjson( "{'_id':1,a:'b'}" ) ),
+            q_( fromjson( "{'_id':1}" ) ),
+            u_( fromjson( "{'_id':1,a:'c'}" ) ){}
+            void doIt() const {
+                client()->update( ns(), q_, u_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( u_ );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( o_ );
+            }
+        protected:
+            BSONObj o_, q_, u_;            
+        };        
+        
         class UpdateDifferentField : public UpdateBase {
         public:
             class Spec : public UpdateSpec {
@@ -434,8 +530,8 @@ namespace ReplTests {
         class FailingUpdate : public Base {
         public:
             FailingUpdate() :
-            o_( fromjson( "{\"a\":\"b\"}" ) ),
-            u_( fromjson( "{\"c\":\"d\"}" ) ) {}
+            o_( fromjson( "{'_id':1,a:'b'}" ) ),
+            u_( fromjson( "{'_id':1,c:'d'}" ) ) {}
             void doIt() const {
                 client()->update( ns(), o_, u_ );
                 client()->insert( ns(), o_ );
@@ -457,14 +553,16 @@ namespace ReplTests {
     public:
         All() {
             add< LogBasic >();
-//             add< Idempotence::Insert >();
+            add< Idempotence::InsertAutoId >();
             add< Idempotence::InsertWithId >();
-//             add< Idempotence::InsertTwo >();
-            // FIXME Decide what is correct & uncomment
-//            add< Idempotence::InsertTwoIdentical >();
-            // FIXME Decide what is correct & uncomment
+            add< Idempotence::InsertTwo >();
+            add< Idempotence::InsertTwoIdentical >();
 //            add< Idempotence::UpdateSameField >();
+            add< Idempotence::UpdateSameFieldWithId >();
+            add< Idempotence::UpdateSameFieldExplicitId >();
+            add< Idempotence::UpdateId >();
 //            add< Idempotence::UpdateDifferentField >();
+            add< Idempotence::UpdateDifferentFieldExplicitId >();
 //             add< Idempotence::Set >();
             // FIXME Decide what is correct & uncomment
 //            add< Idempotence::SetSame >();
@@ -473,7 +571,7 @@ namespace ReplTests {
 //            add< Idempotence::IncSame >();
             add< Idempotence::Remove >();
             add< Idempotence::RemoveOne >();
-//             add< Idempotence::FailingUpdate >();
+            add< Idempotence::FailingUpdate >();
         }
     };
     

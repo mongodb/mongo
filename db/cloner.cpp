@@ -111,7 +111,7 @@ namespace mongo {
                 js = fixindex(tmp);
             }
 
-            theDataFileMgr.insert(to_collection, (void*) js.objdata(), js.objsize());
+            theDataFileMgr.insert(to_collection, js);
             if ( logForRepl )
                 logOp("i", to_collection, js);
         }
