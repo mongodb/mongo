@@ -181,12 +181,15 @@ shellHelper = function( command , rest ){
 
 help = shellHelper.help = function(){
     print( "HELP" );
-    print( "\t" + "show (dbs|collections|users)" );
-    print( "\t" + "use <db name>" );
+    print( "\t" + "show dbs                     show database names");
+    print( "\t" + "show collections             show collections in current database");
+    print( "\t" + "show users                   show users in current database");
+    print( "\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+    print( "\t" + "use <db name>                set curent database to <db name>" );
     print( "\t" + "db.help()                    help on DB methods");
-    print( "\t" + "db.foo.find()" );
-    print( "\t" + "db.foo.find( { a : 1 } )" );
     print( "\t" + "db.foo.help()                help on collection methods");
+    print( "\t" + "db.foo.find()                list objects in collection foo" );
+    print( "\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1" );
 }
 
 shellHelper.use = function( dbname ){
@@ -197,6 +200,19 @@ shellHelper.use = function( dbname ){
 shellHelper.show = function( what ){
     assert( typeof what == "string" );
     
+    if( what == "profile" ) { 
+	if( db.system.profile.count() == 0 ) { 
+	    print("db.system.profile is empty");
+	    print("Use db.setProfilingLevel(2) will enable profiling");
+	    print("Use db.system.profile.find() to show raw profile entries");
+	} 
+	else { 
+	    print(); 
+	    db.system.profile.find({ millis : { $gt : 0 } }).sort({$natural:-1}).limit(5).forEach( function(x){print(""+x.millis+"ms " + String(x.ts).substring(0,24)); print(x.info); print("\n");} )
+        }
+	return "";
+    }
+
     if ( what == "users" )
 	return db.system.users.find();
 
