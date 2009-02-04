@@ -539,6 +539,9 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual bool slaveOverrideOk() {
+            return true;
+        }
         virtual bool adminOnly() {
             return false;
         }
@@ -703,7 +706,7 @@ namespace mongo {
 
        returns true if ran a cmd
     */
-    bool _runCommands(const char *ns, BSONObj& _cmdobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl) {
+    bool _runCommands(const char *ns, BSONObj& _cmdobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
             log(1) << "run command " << ns << ' ' << _cmdobj << endl;
 
         const char *p = strchr(ns, '.');
@@ -746,15 +749,17 @@ namespace mongo {
                 ok = false;
                 errmsg = "access denied";
             }
-            else if ( !isMaster() && !c->slaveOk() && !fromRepl ) {
-                /* todo: allow if Option_SlaveOk was set on the query */
-                ok = false;
-                errmsg = "not master";
-            }
-            else {
+            else if ( isMaster() ||
+                     c->slaveOk() ||
+                     ( c->slaveOverrideOk() && ( queryOptions | Option_SlaveOk ) ) ||
+                     fromRepl ) {
                 ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
                 if ( ok && c->logTheOp() && !fromRepl )
                     logOp("c", ns, jsobj);
+            }
+            else {
+                ok = false;
+                errmsg = "not master";
             }
             if ( !ok )
                 anObjBuilder.append("errmsg", errmsg);

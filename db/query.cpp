@@ -32,6 +32,7 @@
 #include "scanandorder.h"
 #include "security.h"
 #include "curop.h"
+#include "commands.h"
 
 namespace mongo {
 
@@ -466,11 +467,9 @@ namespace mongo {
 
     int initialExtentSize(int len);
 
-    bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl);
-
-    bool runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl) {
+    bool runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
         try {
-            return _runCommands(ns, jsobj, ss, b, anObjBuilder, fromRepl);
+            return _runCommands(ns, jsobj, ss, b, anObjBuilder, fromRepl, queryOptions);
         }
         catch ( AssertionException e ) {
             if ( !e.msg.empty() )
@@ -620,7 +619,7 @@ namespace mongo {
         b.skip(sizeof(QueryResult));
 
         /* we assume you are using findOne() for running a cmd... */
-        if ( ntoreturn == 1 && runCommands(ns, jsobj, ss, b, cmdResBuf, false) ) {
+        if ( ntoreturn == 1 && runCommands(ns, jsobj, ss, b, cmdResBuf, false, queryOptions) ) {
             n = 1;
         }
         else {

@@ -20,7 +20,7 @@ lz = l.getDB( baseName ).z
 rz = r.getDB( baseName ).z
 
 rz.save( { _id: new ObjectId() } );
-assert.soon( function() { return lz.find().toArray().length == 1; } );
+assert.soon( function() { return lz.find().count() == 1; } );
 assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
 
 stopMongod( 27019 );
@@ -35,8 +35,8 @@ assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( { "resync" 
 
 assert.soon( function() { return l.getDBNames().indexOf( baseName ) != -1; } );
 lz = l.getDB( baseName ).z
-assert.soon( function() { return 1001 == lz.find().toArray().length; } );
-assert.eq( 1, lz.find( { i: 0 } ).toArray().length );
-assert.eq( 1, lz.find( { i: 999 } ).toArray().length );
+assert.soon( function() { return 1001 == lz.find().count(); } );
+assert.eq( 1, lz.find( { i: 0 } ).count() );
+assert.eq( 1, lz.find( { i: 999 } ).count() );
 
 assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );

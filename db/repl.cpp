@@ -52,7 +52,6 @@ namespace mongo {
     extern boost::mutex &dbMutex;
     extern long long oplogSize;
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
-    bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl);
     void ensureHaveIdIndex(const char *ns);
 
     /* if 1 sync() is running */
@@ -676,7 +675,7 @@ namespace mongo {
                 BufBuilder bb;
                 BSONObjBuilder ob;
                 assert( *opType == 'c' );
-                _runCommands(ns, o, ss, bb, ob, true);
+                _runCommands(ns, o, ss, bb, ob, true, 0);
             }
         }
         catch ( UserAssertionException& e ) {

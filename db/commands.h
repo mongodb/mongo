@@ -21,7 +21,8 @@ namespace mongo {
 
     class BSONObj;
     class BSONObjBuilder;
-
+    class BufBuilder;
+    
 // db "commands" (sent via db.$cmd.findOne(...))
 // subclass to make a command.
     class Command {
@@ -47,6 +48,13 @@ namespace mongo {
            (the command directly from a client -- if fromRepl, always allowed).
         */
         virtual bool slaveOk() = 0;
+        
+        /* Return true if the client force a command to be run on a slave by
+           turning on the 'slaveok' option in the command query.
+        */
+        virtual bool slaveOverrideOk() {
+            return false;
+        }
 
         /* Override and return true to if true,log the operation (logOp()) to the replication log.
            (not done if fromRepl of course)
@@ -66,5 +74,7 @@ namespace mongo {
     };
 
     bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
+
+    bool _runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);
 
 } // namespace mongo
