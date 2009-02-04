@@ -644,7 +644,10 @@ namespace mongo {
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );
+
+        // should we be locked here?  we aren't. might be ok as-is.
         recCacheCloseAll();
+
         rawOut( "dbexit: really exiting now\n" );
         ::exit(rc);
     }

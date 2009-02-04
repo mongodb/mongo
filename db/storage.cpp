@@ -24,8 +24,11 @@ RecCache BasicCached_RecStore::rc(BucketSize);
 // Currently only called on program exit.
 void recCacheCloseAll() { 
 #if defined(_RECSTORE)
+    assert( dbMutexInfo.isLocked() );
+    (cout << "TEMP: writing dirty pages...\n").flush();
     BasicCached_RecStore::rc.writeDirty( true );
     RecCache::tempStore.flush();
+    (cout << "TEMP: write dirty done\n").flush();
 #endif
 }
 
@@ -68,8 +71,11 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
 
 /* -------------------------------------------------------- */
 
+int ndirtywritten;
+
 inline void RecCache::writeIfDirty(Node *n) {
     if( n->dirty ) {
+        ndirtywritten++;
         n->dirty = false;
         tempStore.update(fileOfs(n->loc), n->data, recsize);
     }
@@ -78,11 +84,13 @@ inline void RecCache::writeIfDirty(Node *n) {
 /* note that this is written in order, as much as possible, given that dirtyl is of type set. */
 void RecCache::writeDirty( bool rawLog ) { 
     try { 
+        ndirtywritten=0;
         for( set<DiskLoc>::iterator i = dirtyl.begin(); i != dirtyl.end(); i++ ) { 
             map<DiskLoc, Node*>::iterator j = m.find(*i);
             if( j != m.end() )
                 writeIfDirty(j->second);
         }
+        out() << "TEMP: ndirtywritten: " << ndirtywritten << endl;
     }
     catch(...) {
         const char *message = "Problem: bad() in RecCache::writeDirty, file io error\n";
