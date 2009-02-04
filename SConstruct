@@ -268,12 +268,12 @@ if nix:
 
 # --- check system ---
 
-def doConfigure( myenv , java=True , pcre=True , shell=False ):
+def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)
-    myenv["LINKFLAGS_CLEAN"] = myenv["LINKFLAGS"]
-    myenv["LIBS_CLEAN"] = myenv["LIBS"]
+    myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
+    myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
     
-    def myCheckLib( poss , failIfNotFound=False ):
+    def myCheckLib( poss , failIfNotFound=False , java=False ):
 
         if type( poss ) != types.ListType :
             poss = [poss]
@@ -295,20 +295,24 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
                             myenv.Append( SLIBS=" " + fullPath + " " )
                         return True
 
-        res = conf.CheckLib( poss )
-        if not res and failIfNotFound:
-            print( "can't find " + str( poss ) )
-            Exit(1)
-            
+
         if release:
-            if not java and not shell:
+            if not java and not shell and failIfNotFound:
                 print( "ERROR: can't find static version of: " + str( poss ) + " needed for mongod in:" + str( allPlaces ) )
                 Exit(1)
             print( "WARNING: can't find static version of: " + str( poss ) + " for shell.  mongo might not be portable" )
 
-        return res
+        res = conf.CheckLib( poss )
+        if res:
+            return True
 
-    if pcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
+        if failIfNotFound:
+            print( "can't find " + str( poss ) )
+            Exit(1)
+            
+        return False
+
+    if needPcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
         print( "can't find pcre" )
         Exit(1)
 
@@ -323,11 +327,11 @@ def doConfigure( myenv , java=True , pcre=True , shell=False ):
         l = "boost_" + b
         myCheckLib( [ l + "-mt" , l ] , not shell)
 
-    if java:
+    if needJava:
         for j in javaLibs:
-            myCheckLib( j , True )
+            myCheckLib( j , True , True )
 
-    if nix and pcre:
+    if nix and needPcre:
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
@@ -479,6 +483,7 @@ if linux64 or force64:
         shellEnv.Append( CXXFLAGS="-m32" )
         shellEnv.Append( LINKFLAGS="-m32" )
         shellEnv.Append( LIBPATH=[ "/usr/lib32" , "/usr/lib" ] )
+        shellEnv["LIBPATH"].remove( "/usr/lib64" )
     else:
         shellEnv["CFLAGS"].remove("-m64")
         shellEnv["CXXFLAGS"].remove("-m64")
@@ -502,7 +507,7 @@ if linux64 or force64:
 
     shellEnv.VariantDir( "32bit" , "." )
 
-    shellEnv = doConfigure( shellEnv , pcre=False , java=False , shell=True )
+    shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
 
     shellEnv.Program( "mongo" , shell32BitFiles )
 else:

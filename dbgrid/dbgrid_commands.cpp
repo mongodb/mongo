@@ -35,7 +35,7 @@
 #include "../client/connpool.h"
 #include "../db/commands.h"
 #include "gridconfig.h"
-#include "ConfigServer.h"
+#include "configserver.h"
 
 namespace mongo {
 

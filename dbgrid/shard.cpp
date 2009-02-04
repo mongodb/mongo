@@ -18,7 +18,7 @@
 
 #include "stdafx.h"
 #include "shard.h"
-#include "ConfigServer.h"
+#include "configserver.h"
 
 namespace mongo {
     
