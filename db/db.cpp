@@ -626,7 +626,7 @@ namespace mongo {
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
-        pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 );
+        assert( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( interruptThread );
     }
 
