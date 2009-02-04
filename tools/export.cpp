@@ -91,7 +91,8 @@ public:
                     if ( i != fields.begin() )
                         cout << ",";
                     const BSONElement & e = obj[i->c_str()];
-                    cout << e.jsonString( TenGen , false );
+                    if ( ! e.eoo() )
+                        cout << e.jsonString( TenGen , false );
                 }              
                 cout << endl;
             }
