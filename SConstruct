@@ -92,7 +92,7 @@ AddOption( "--noOptimization",
 
 env = Environment()
 
-env.Append( CPPDEFINES=[ "_RECSTORE" ] )
+#env.Append( CPPDEFINES=[ "_RECSTORE" ] )
 env.Append( CPPPATH=[ "." ] )
 
 
