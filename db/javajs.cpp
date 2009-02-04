@@ -176,16 +176,19 @@ namespace mongo {
         }
 #endif
 
-        JavaVMOption * options = new JavaVMOption[3];
+        JavaVMOption * options = new JavaVMOption[4];
         options[0].optionString = q;
         options[1].optionString = (char*)"-Djava.awt.headless=true";
         options[2].optionString = (char*)"-Xmx300m";
+        // Prevent JVM from using async signals internally, since on linux the pre-installed handlers for these
+        // signals don't seem to be respected by JNI.
+        options[3].optionString = (char*)"-Xrs";
 // -Xcheck:jni
 
         _vmArgs = new JavaVMInitArgs();
         _vmArgs->version = JNI_VERSION_1_4;
         _vmArgs->options = options;
-        _vmArgs->nOptions = 3;
+        _vmArgs->nOptions = 4;
         _vmArgs->ignoreUnrecognized = JNI_FALSE;
 
         log(1) << "loading JVM" << endl;
