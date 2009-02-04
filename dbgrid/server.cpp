@@ -21,7 +21,7 @@
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 
-#include "ConfigServer.h"
+#include "configserver.h"
 #include "gridconfig.h"
 
 namespace mongo {
