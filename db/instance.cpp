@@ -64,9 +64,9 @@ namespace mongo {
     bool useCursors = true;
 
     void closeAllSockets();
-    void flushOpLog() {
+    void flushOpLog( stringstream &ss ) {
         if( _oplog.f && _oplog.f->is_open() ) {
-            out() << "flushing op log and files" << endl;
+            ss << "flushing op log and files";
             _oplog.flush();
         }
     }
@@ -613,17 +613,20 @@ namespace mongo {
         }
             
         stringstream ss;
-        ss << "dbexit: " << why << "; flushing op log and files" << endl;
+        ss << "dbexit: " << why << endl;
         rawOut( ss.str() );
 
-        flushOpLog();
+        stringstream ss2;
+        flushOpLog( ss2 );
+        ss2 << "\n";
+        rawOut( ss2.str() );
 
         /* must do this before unmapping mem or you may get a seg fault */
         closeAllSockets();
-        stringstream ss2;
-        MemoryMappedFile::closeAllFiles( ss2 );
+        stringstream ss3;
+        MemoryMappedFile::closeAllFiles( ss3 );
+        rawOut( ss3.str() );
         recCacheCloseAll();
-        rawOut( ss2.str() );
         rawOut( "dbexit: really exiting now\n" );
         ::exit(rc);
     }

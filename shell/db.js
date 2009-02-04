@@ -304,7 +304,7 @@ DB.prototype.getCollectionNames = function(){
 
     var nsLength = this._name.length + 1;
     
-    this.getCollection( "system.namespaces" ).find().forEach(
+    this.getCollection( "system.namespaces" ).find().sort({name:1}).forEach(
         function(z){
             var name = z.name;
             

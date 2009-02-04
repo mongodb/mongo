@@ -1,4 +1,4 @@
-// griddb.cpp
+// ConfigServer.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -17,33 +17,22 @@
 */
 
 #include "stdafx.h"
-#include "../util/message.h"
-#include "../util/unittest.h"
-#include "../client/connpool.h"
-#include "../db/pdfile.h"
-#include "../client/model.h"
-#include "../util/background.h"
-#include "griddatabase.h"
+#include "configserver.h"
+#include "server.h"
 
 namespace mongo {
 
-    static boost::mutex griddb_mutex;
-    GridDatabase gridDatabase;
-    DBClientWithCommands *Model::globalConn = gridDatabase.conn;
-    string ourHostname;
-    extern vector<string> dashDashGridDb;
-    extern bool dashDashInfer;
-
-    GridDatabase::GridDatabase() {
-        conn = 0;
+    ConfigServer::ConfigServer() {
+        _conn = 0;
     }
 
-    GridDatabase::~GridDatabase() {
-        delete conn;
-        conn = 0; // defensive
+    ConfigServer::~ConfigServer() {
+        if ( _conn )
+            delete _conn;
+        _conn = 0; // defensive
     }
 
-    void GridDatabase::init() {
+    bool ConfigServer::init( vector<string> configHosts , bool infer ){
         string hn = getHostName();
         if ( hn.empty() ) {
             sleepsecs(5);
@@ -54,7 +43,7 @@ namespace mongo {
         char buf[256];
         strcpy(buf, hn.c_str());
 
-        if ( dashDashGridDb.empty() ) {
+        if ( configHosts.empty() ) {
             char *p = strchr(buf, '-');
             if ( p )
                 p = strchr(p+1, '-');
@@ -69,8 +58,8 @@ namespace mongo {
         string left, right; // with :port#
         string hostLeft, hostRight;
 
-        if ( dashDashGridDb.empty() ) {
-            if ( !dashDashInfer ) {
+        if ( configHosts.empty() ) {
+            if ( ! infer ) {
                 out() << "--griddb or --infer required\n";
                 exit(7);
             }
@@ -86,13 +75,13 @@ namespace mongo {
         }
         else {
             stringstream sl, sr;
-            sl << dashDashGridDb[0];
+            sl << configHosts[0];
             hostLeft = sl.str();
             sl << ":" << Port;
             left = sl.str();
 
-            if ( dashDashGridDb.size() > 1 ) {
-                sr << dashDashGridDb[1];
+            if ( configHosts.size() > 1 ) {
+                sr << configHosts[1];
                 hostRight = sr.str();
                 sr << ":" << Port;
                 right = sr.str();
@@ -128,24 +117,21 @@ namespace mongo {
             l << "L:" << left << " R:" << right << "...";
             l.flush();
             DBClientPaired *dbp = new DBClientPaired();
-            conn = dbp;
+            _conn = dbp;
             ok = dbp->connect(left.c_str(),right.c_str());
         }
         else {
             l << left << "...";
             l.flush();
             DBClientConnection *dcc = new DBClientConnection(/*autoreconnect=*/true);
-            conn = dcc;
+            _conn = dcc;
             string errmsg;
             ok = dcc->connect(left.c_str(), errmsg);
         }
-
-        if ( !ok ) {
-            l << '\n';
-            log() << "  griddb connect failure at startup (will retry)" << endl;
-        } else {
-            l << "ok" << endl;
-        }
+        
+        return ok;
     }
+
+    ConfigServer configServer;
 
 } // namespace mongo

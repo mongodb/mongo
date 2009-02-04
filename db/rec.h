@@ -1,5 +1,14 @@
 // rec.h
 
+/* TODO for _RECSTORE
+
+   _ support > 2GB data per file
+   _ multiple files, not just indexes.dat
+   _ lazier writes?
+   _ configurable cache size
+   _ fix on abnormal terminations to be able to restart some
+*/
+
 #pragma once
 
 #include "reci.h"
@@ -58,8 +67,11 @@ public:
 */
 
 // pick your store for indexes by setting this typedef
+#if defined(_RECSTORE)
+typedef BasicCached_RecStore BtreeStore;
+#else
 typedef MongoMemMapped_RecStore BtreeStore;
-//typedef BasicCached_RecStore BtreeStore;
+#endif
 //typedef InMem_RecStore BtreeStore;
 
 const int BucketSize = 8192;
@@ -77,4 +89,3 @@ inline BtreeBucket* DiskLoc::btreemod() const {
 }
 
 }
-

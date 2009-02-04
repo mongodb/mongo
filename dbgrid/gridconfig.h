@@ -25,7 +25,6 @@
 
 #include "../client/dbclient.h"
 #include "../client/model.h"
-#include "griddatabase.h"
 
 namespace mongo {
 

@@ -17,12 +17,12 @@ class RecCache {
     };
     unsigned recsize;
     map<DiskLoc, Node*> m;
-    list<DiskLoc> dirtyl;
+    set<DiskLoc> dirtyl;
     Node *newest, *oldest;
     unsigned nnodes;
 public:
     static BasicRecStore tempStore;
-    void writeDirty();
+    void writeDirty( bool rawLog = false );
     void ejectOld();
 private:
     void writeIfDirty(Node *n);
@@ -68,7 +68,7 @@ public:
             Node *n = i->second;
             if( !n->dirty ) { 
                 n->dirty = true;
-                dirtyl.push_back(n->loc);
+                dirtyl.insert(n->loc);
             }
         }
     }

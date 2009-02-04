@@ -365,9 +365,10 @@ again:
 
         if ( x == -100 )
             x = ::send(sock, (char*)toSend.data, toSend.data->len , portSendFlags );
-
+        
         if ( x <= 0 ) {
             log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
+            throw SocketException();
         }
 
     }

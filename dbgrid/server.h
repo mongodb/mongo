@@ -1,4 +1,4 @@
-// shard.cpp
+// server.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -16,23 +16,10 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stdafx.h"
-#include "shard.h"
-#include "configserver.h"
+#include <string>
 
 namespace mongo {
+
+    extern std::string ourHostname;
     
-    DBClientWithCommands* Shard::conn() {
-        return configServer.conn();
-    }
-
-    void Shard::serialize(BSONObjBuilder& to) {
-        to.append("name", name);
-    }
-
-    void Shard::unserialize(BSONObj& from) {
-        name = from.getStringField("name");
-        uassert("bad grid.shards.name", !name.empty());
-    }
-
-} // namespace mongo
+}

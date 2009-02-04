@@ -17,8 +17,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72EBEDD-342D-4371-8B0D-D7505902FA69}"
 	ProjectSection(SolutionItems) = preProject
 		..\dbtests\btreetests.cpp = ..\dbtests\btreetests.cpp
-		..\dbtests\dbtests.cpp = ..\dbtests\dbtests.cpp
-		..\dbtests\jsobjtests.cpp = ..\dbtests\jsobjtests.cpp
 		..\dbtests\matchertests.cpp = ..\dbtests\matchertests.cpp
 		..\dbtests\namespacetests.cpp = ..\dbtests\namespacetests.cpp
 		..\dbtests\pairingtests.cpp = ..\dbtests\pairingtests.cpp

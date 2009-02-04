@@ -12,16 +12,18 @@ BasicRecStore RecCache::tempStore;
 RecCache BasicCached_RecStore::rc(BucketSize);
 
 static void storeThread() { 
+    massert("not using", false);
     while( 1 ) { 
-        sleepsecs(1);
+        sleepsecs(100);
         dblock lk;
         BasicCached_RecStore::rc.writeDirty();
         RecCache::tempStore.flush();
     }
 }
 
+// Currently only called on program exit.
 void recCacheCloseAll() { 
-    BasicCached_RecStore::rc.writeDirty();
+    BasicCached_RecStore::rc.writeDirty( true );
     RecCache::tempStore.flush();
 }
 
@@ -55,7 +57,7 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
         writeHeader();
     }
     f.flush();
-    boost::thread t(storeThread);
+    //    boost::thread t(storeThread);
 }
 
 inline void RecCache::writeIfDirty(Node *n) {
@@ -65,28 +67,34 @@ inline void RecCache::writeIfDirty(Node *n) {
     }
 }
 
-void RecCache::writeDirty() { 
+/* note that this is written in order, as much as possible, given that dirtyl is of type set. */
+void RecCache::writeDirty( bool rawLog ) { 
     try { 
-        for( list<DiskLoc>::iterator i = dirtyl.begin(); i != dirtyl.end(); i++ ) { 
+        for( set<DiskLoc>::iterator i = dirtyl.begin(); i != dirtyl.end(); i++ ) { 
             map<DiskLoc, Node*>::iterator j = m.find(*i);
             if( j != m.end() )
                 writeIfDirty(j->second);
         }
     }
     catch(...) {
-        log() << "Problem: bad() in RecCache::writeDirty, file io error\n";
+        const char *message = "Problem: bad() in RecCache::writeDirty, file io error\n";
+        if ( rawLog )
+            rawOut( message );
+        else
+            ( log() << message ).flush();
     }
     dirtyl.clear();
 }
 
-const unsigned LIMIT = 3; // 10000
+// 100k * 8KB = 800MB
+const unsigned RECCACHELIMIT = 150000;
 
 inline void RecCache::ejectOld() { 
-    if( nnodes <= LIMIT )
+    if( nnodes <= RECCACHELIMIT )
         return;
     Node *n = oldest;
     while( 1 ) {
-        if( nnodes <= LIMIT ) { 
+        if( nnodes <= RECCACHELIMIT ) { 
             n->older = 0;
             oldest = n;
             break;

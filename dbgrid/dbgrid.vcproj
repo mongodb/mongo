@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="dbgrid"
+	Name="mongos"
 	ProjectGUID="{E03717ED-69B4-4D21-BC55-DF6690B585C6}"
 	RootNamespace="dbgrid"
 	Keyword="Win32Proj"
@@ -255,7 +255,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\dbgrid.cpp"
+				RelativePath=".\ConfigServer.cpp"
 				>
 			</File>
 			<File
@@ -267,11 +267,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\griddatabase.cpp"
+				RelativePath=".\request.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\request.cpp"
+				RelativePath=".\server.cpp"
 				>
 			</File>
 			<File
@@ -354,7 +354,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\grid\message.cpp"
+					RelativePath="..\util\message.cpp"
 					>
 				</File>
 				<File

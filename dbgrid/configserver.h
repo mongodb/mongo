@@ -1,5 +1,6 @@
-/* griddatabase.h
+// ConfigServer.h
 
+/*
    The grid database is where we get:
    - name of each shard
    - "home" shard for each database
@@ -23,25 +24,41 @@
 
 #pragma once
 
-#include "shard.h"
+#include "../client/dbclient.h"
 
 namespace mongo {
 
-    class GridDatabase {
+    class ConfigServer {
     public:
-        DBClientWithCommands *conn;
-//    DBClientPaired conn;
+
         enum { Port = 27016 }; /* standard port # for a grid db */
-        GridDatabase();
-        ~GridDatabase();
-        string toString() {
-            return conn->toString();
+        
+        ConfigServer();
+        ~ConfigServer();
+
+        bool ok(){
+            return _conn != 0;
+        }
+        
+        DBClientWithCommands* conn(){
+            assert( _conn );
+            return _conn;
         }
 
-        /* call at startup, this will initiate connection to the grid db */
-        void init();
+        /**
+           call at startup, this will initiate connection to the grid db 
+        */
+        bool init( vector<string> configHosts , bool infer );
+        
+        string toString() {
+            return _conn->toString();
+        }
+        
+    private:
+        DBClientWithCommands* _conn;
+
     };
-    extern GridDatabase gridDatabase;
 
+    extern ConfigServer configServer;
 
-} // namespace mongo
+} 
