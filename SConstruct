@@ -296,11 +296,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                         return True
 
 
-        if release:
-            if not java and not shell and failIfNotFound:
-                print( "ERROR: can't find static version of: " + str( poss ) + " needed for mongod in:" + str( allPlaces ) )
-                Exit(1)
-            print( "WARNING: can't find static version of: " + str( poss ) + " for shell.  mongo might not be portable" )
+        if release and not java and failIfNotFound:
+            print( "ERROR: can't find static version of: " + str( poss ) )
+            Exit(1)
 
         res = conf.CheckLib( poss )
         if res:
@@ -325,7 +323,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     for b in boostLibs:
         l = "boost_" + b
-        myCheckLib( [ l + "-mt" , l ] , not shell)
+        myCheckLib( [ l + "-mt" , l ] , release or not shell)
 
     if needJava:
         for j in javaLibs:

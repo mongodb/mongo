@@ -337,7 +337,7 @@ namespace mongo {
          */
         int woCompare( const BSONElement &e, bool considerFieldName = true ) const;
 
-        const char * rawdata() {
+        const char * rawdata() const {
             return data;
         }
 
@@ -356,7 +356,7 @@ namespace mongo {
                 type() == CodeWScope;
         }
         
-    private:
+    protected:
         // If maxLen is specified, don't scan more than maxLen bytes.
         BSONElement(const char *d, int maxLen = -1) : data(d) {
             if ( eoo() )
@@ -372,6 +372,7 @@ namespace mongo {
             }
             totalSize = -1;
         }
+    private:
         const char *data;
         int fieldNameSize;
         mutable int totalSize; /* caches the computed size */

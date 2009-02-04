@@ -22,7 +22,7 @@ class RecCache {
     unsigned nnodes;
 public:
     static BasicRecStore tempStore;
-    void writeDirty();
+    void writeDirty( bool rawLog = false );
     void ejectOld();
 private:
     void writeIfDirty(Node *n);
