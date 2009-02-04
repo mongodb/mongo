@@ -768,7 +768,7 @@ namespace mongo {
                         }
                     }
                     if ( database->profile )
-                        ss << "<br>" << added.size() << " key updates ";
+                        ss << '\n' << added.size() << " key updates ";
 
                 }
             }

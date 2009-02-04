@@ -163,7 +163,7 @@ namespace mongo {
                 out() << curTimeMillis() % 10000 <<
                      " long msg received, len:" << len <<
                      " ends with: " << p + len - 10 << endl;
-            bool end = strcmp("end", p) == 0;
+            bool end = false; //strcmp("end", p) == 0;
             Message *resp = new Message();
             resp->setData(opReply, "i am fine");
             dbresponse.response = resp;

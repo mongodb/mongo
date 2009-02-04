@@ -784,7 +784,7 @@ namespace mongo {
             if ( ntoskip )
                 ss << " ntoskip:" << ntoskip;
             if ( database && database->profile )
-                ss << " <br>query: ";
+                ss << " \nquery: ";
             ss << jsobj.toString() << ' ';
         }
         ss << " nreturned:" << n;

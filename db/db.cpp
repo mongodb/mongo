@@ -534,7 +534,7 @@ usage:
 #endif
     out() << "usage:\n";
     out() << "  run                run db" << endl;
-    out() << "  msg end [port]     shut down db server listening on port (or default)" << endl;
+//    out() << "  msg end [port]     shut down db server listening on port (or default)" << endl;
     out() << "  msg [msg] [port]   send a request to the db server listening on port (or default)" << endl;
     out() << "  msglots            send a bunch of test messages, and then wait for answer on the last one" << endl;
     out() << "  longmsg            send a long test message to the db server" << endl;
