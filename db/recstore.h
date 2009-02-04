@@ -45,6 +45,7 @@ private:
     void write(fileofs ofs, const char *data, unsigned len) { 
         f.seekp((std::streamoff)ofs);
         f.write(data, len);
+        f.flush();
         massert("basicrecstore write io error", !f.bad());
     }
 public:

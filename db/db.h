@@ -67,7 +67,7 @@ namespace mongo {
         }
     };
 
-    void dbunlocked();
+    void dbunlocking();
 
     struct dblock : public lock {
         dblock() :
@@ -75,7 +75,7 @@ namespace mongo {
         }
         ~dblock() { 
             /* todo: this should be inlined */
-            dbunlocked();
+            dbunlocking();
         }
     };
 
