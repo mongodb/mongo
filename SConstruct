@@ -295,18 +295,22 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                             myenv.Append( SLIBS=" " + fullPath + " " )
                         return True
 
-        res = conf.CheckLib( poss )
-        if not res and failIfNotFound:
-            print( "can't find " + str( poss ) )
-            Exit(1)
-            
-        if release:
+
+        if release and failIfNotFound:
             if not java and not shell:
                 print( "ERROR: can't find static version of: " + str( poss ) + " needed for mongod in:" + str( allPlaces ) )
                 Exit(1)
             print( "WARNING: can't find static version of: " + str( poss ) + " for shell.  mongo might not be portable" )
 
-        return res
+        res = conf.CheckLib( poss )
+        if res:
+            return True
+
+        if failIfNotFound:
+            print( "can't find " + str( poss ) )
+            Exit(1)
+            
+        return False
 
     if needPcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
         print( "can't find pcre" )
@@ -502,7 +506,7 @@ if linux64 or force64:
 
     shellEnv.VariantDir( "32bit" , "." )
 
-    shellEnv = doConfigure( shellEnv , pcre=False , java=False , shell=True )
+    shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
 
     shellEnv.Program( "mongo" , shell32BitFiles )
 else:
