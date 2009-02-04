@@ -351,11 +351,13 @@ namespace mongo {
                     if ( !matcher.matches(js) ) {
                     }
                     else {
-                        BSONObjBuilder idPattern;
-                        BSONElement id;
-                        if ( js.getObjectID( id ) )
-                            idPattern.append( id );
-                        pattern = idPattern.doneAndDecouple();
+                        if ( logop ) {
+                            BSONObjBuilder idPattern;
+                            BSONElement id;
+                            if ( js.getObjectID( id ) )
+                                idPattern.append( id );
+                            pattern = idPattern.doneAndDecouple();
+                        }
                         
                         /* note: we only update one row and quit.  if you do multiple later,
                         be careful or multikeys in arrays could break things badly.  best
@@ -408,18 +410,33 @@ namespace mongo {
                 vector<Mod> mods;
                 Mod::getMods(mods, updateobj);
                 BSONObjBuilder b;
-                b.appendElements(pattern);
+                BSONObjIterator i( pattern );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    // Presumably the number of mods is small, so this loop isn't too expensive.
+                    for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); ++i ) {
+                        if ( strcmp( e.fieldName(), i->fieldName ) == 0 )
+                            continue;
+                        b.append( e );
+                    }
+                }
                 for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
                     b.append(i->fieldName, i->getn());
                 BSONObj obj = b.done();
-                theDataFileMgr.insert(ns, (void*) obj.objdata(), obj.objsize());
+                theDataFileMgr.insert(ns, obj);
                 if ( profile )
                     ss << " fastmodinsert ";
+                if ( logOp )
+                    logOp( "i", ns, obj );
                 return 3;
             }
             if ( profile )
                 ss << " upsert ";
-            theDataFileMgr.insert(ns, (void*) updateobj.objdata(), updateobj.objsize());
+            theDataFileMgr.insert(ns, updateobj);
+            if ( logOp )
+                logOp( "i", ns, updateobj );
             return 4;
         }
         return 0;
@@ -440,7 +457,7 @@ namespace mongo {
     */
     void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss) {
         int rc = __updateObjects(ns, updateobj, pattern, upsert, ss, true);
-        if ( rc != 5 && rc != 0 )
+        if ( rc != 5 && rc != 0 && rc != 4 && rc != 3 )
             logOp("u", ns, updateobj, &pattern, &upsert);
     }
 
