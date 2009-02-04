@@ -563,8 +563,8 @@ namespace mongo {
             possible.push_back( "./" );
             possible.push_back( "../" );
             
-            log(2) << "dbExecCommand: " << endl;
-            if ( dbExecCommand.find( "/" ) ){
+            log(2) << "dbExecCommand: " << dbExecCommand << endl;
+            if ( dbExecCommand.find( "/" ) != std::string::npos ){
                 string dbDir = dbExecCommand.substr( 0 , dbExecCommand.find_last_of( "/" ) );
                 log(2) << "dbDir [" << dbDir << "]" << endl;
                 possible.push_back( ( dbDir + "/../lib/mongo/" ));
