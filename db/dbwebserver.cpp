@@ -141,8 +141,8 @@ namespace mongo {
             ss << "port:      " << port << '\n';
             ss << "dblocked:  " << dbMutexInfo.isLocked() << " (initial)\n";
             ss << "uptime:    " << time(0)-started << " seconds\n";
-            if ( allDead )
-                ss << "<b>replication allDead=" << allDead << "</b>\n";
+            if ( replAllDead )
+                ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
             ss << "\nassertions:\n";
             for ( int i = 0; i < 4; i++ ) {
                 if ( lastAssert[i].isSet() ) {

@@ -113,7 +113,7 @@ namespace mongo {
         }
 
         int getNumChunks(){
-            return ceil( (double)getContentLength() / (double)getChunkSize() );
+            return (int) ceil( (double)getContentLength() / (double)getChunkSize() );
         }
 
         Chunk getChunk( int n );

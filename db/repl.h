@@ -40,6 +40,8 @@ namespace mongo {
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth);
 
+    /* Operation sequence #.  A combination of current second plus an ordinal value.
+    */
 #pragma pack(4)
     class OpTime {
         unsigned i;
@@ -61,11 +63,11 @@ namespace mongo {
         }
         static OpTime now();
 
-        /* We store OpTime's in the database as Javascript Date datatype -- we needed some sort of
+        /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
            64 bit "container" for these values.  While these are not really "Dates", that seems a
            better choice for now than say, Number, which is floating point.  Note the BinData type
-           is perhaps the cleanest choice, lacking a true unsigned64 datatype, but BinData has a
-           couple bytes of overhead.
+           is perhaps the cleanest choice, lacking a true unsigned64 datatype, but BinData has 5 
+           bytes of overhead.
         */
         unsigned long long asDate() const {
             return *((unsigned long long *) &i);
@@ -172,10 +174,8 @@ namespace mongo {
             return hostName == r.hostName && sourceName() == r.sourceName();
         }
 
-        bool haveMoreDbsToSync() const {
-            return !addDbNextPass.empty();
-        }
-        
+        bool haveMoreDbsToSync() const { return !addDbNextPass.empty(); }        
+
         static bool throttledForceResyncDead( const char *requester );
         static void forceResyncDead( const char *requester );
         void forceResync( const char *requester );

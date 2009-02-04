@@ -11,7 +11,7 @@ namespace mongo {
 BasicRecStore RecCache::tempStore;
 RecCache BasicCached_RecStore::rc(BucketSize);
 
-static void storeThread() { 
+/*static void storeThread() { 
     massert("not using", false);
     while( 1 ) { 
         sleepsecs(100);
@@ -19,12 +19,14 @@ static void storeThread() {
         BasicCached_RecStore::rc.writeDirty();
         RecCache::tempStore.flush();
     }
-}
+}*/
 
 // Currently only called on program exit.
 void recCacheCloseAll() { 
+#if defined(_RECSTORE)
     BasicCached_RecStore::rc.writeDirty( true );
     RecCache::tempStore.flush();
+#endif
 }
 
 void BasicRecStore::init(const char *fn, unsigned recsize)

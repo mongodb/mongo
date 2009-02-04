@@ -24,7 +24,7 @@
 namespace mongo {
 
     extern int port;
-    extern const char *allDead;
+    extern const char *replAllDead;
 
     /* ReplPair is a pair of db servers replicating to one another and cooperating.
 
@@ -108,7 +108,7 @@ namespace mongo {
 
     */
     inline bool isMaster() {
-        if ( allDead ) {
+        if ( replAllDead ) {
             return database->name == "local";
         }
 

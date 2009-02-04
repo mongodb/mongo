@@ -66,7 +66,7 @@ namespace mongo {
     /* "dead" means something really bad happened like replication falling completely out of sync.
        when non-null, we are dead and the string is informational
     */
-    const char *allDead = 0;
+    const char *replAllDead = 0;
 
     extern bool autoresync;
     time_t lastForcedResync = 0;
@@ -181,7 +181,7 @@ namespace mongo {
                 Helpers::putSingleton("local.pair.startup", o);
             }
             syncing = -1;
-            allDead = "replacepeer invoked -- adjust local.sources hostname then restart this db process";
+            replAllDead = "replacepeer invoked -- adjust local.sources hostname then restart this db process";
             result.append("info", "adjust local.sources hostname; db restart now required");
             return true;
         }
@@ -200,7 +200,7 @@ namespace mongo {
         }
         CmdResync() : Command("resync") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if ( !allDead ) {
+            if ( !replAllDead ) {
                 errmsg = "not dead, no need to resync";
                 return false;
             }
@@ -226,12 +226,12 @@ namespace mongo {
 			AuthenticationInfo *ai = authInfo.get();
 			bool authed = ai == 0 || ai->isAuthorized("admin");
 
-            if ( allDead ) {
+            if ( replAllDead ) {
                 result.append("ismaster", 0.0);
 				if( authed ) { 
 					if ( replPair )
 						result.append("remote", replPair->remote);
-					result.append("info", allDead);
+					result.append("info", replAllDead);
 				}
             }
             else if ( replPair ) {
@@ -581,14 +581,14 @@ namespace mongo {
     }
     
     void ReplSource::forceResyncDead( const char *requester ) {
-        if ( !allDead )
+        if ( !replAllDead )
             return;
         vector<ReplSource*> sources;
         ReplSource::loadAll(sources);
         for( vector< ReplSource * >::iterator i = sources.begin(); i != sources.end(); ++i ) {
             (*i)->forceResync( requester );
         }
-        allDead = 0;        
+        replAllDead = 0;        
     }
     
     void ReplSource::forceResync( const char *requester ) {
@@ -700,7 +700,7 @@ namespace mongo {
         }
         else if ( *ns == 0 ) {
             problem() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
-            allDead = "bad object in oplog";
+            replAllDead = "bad object in oplog";
             throw SyncException();
         }
 
@@ -728,9 +728,9 @@ namespace mongo {
             return;
         }
 
-        if ( allDead ) {
+        if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
-            log() << "allDead, throwing SyncException\n";
+            log() << "replAllDead, throwing SyncException\n";
             throw SyncException();
         }
 
@@ -759,8 +759,8 @@ namespace mongo {
                     /* the other half of our pair has some operations. yet we already had a db on our
                     disk even though the db in question is not listed in the source.
                     */
-                    allDead = "pair: historical image missing for a db";
-                    problem() << "pair: historical image missing for " << clientName << ", setting allDead=true" << endl;
+                    replAllDead = "pair: historical image missing for a db";
+                    problem() << "pair: historical image missing for " << clientName << ", setting replAllDead=true" << endl;
                     log() << "op:" << op.toString() << endl;
                     /*
                     log() << "TEMP: pair: assuming we have the historical image for: " <<
@@ -878,7 +878,7 @@ namespace mongo {
             log() << "pull:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
             log() << "pull:   tailing: " << tailing << '\n';
             log() << "pull:   data too stale, halting replication" << endl;
-            replInfo = allDead = "data too stale halted replication";
+            replInfo = replAllDead = "data too stale halted replication";
             assert( syncedTo < nextOpTime );
             throw SyncException();
         }
@@ -1160,7 +1160,7 @@ namespace mongo {
             int s = 0;
             {
                 dblock lk;
-                if ( allDead ) {
+                if ( replAllDead ) {
                     if ( !autoresync || !ReplSource::throttledForceResyncDead( "auto" ) )
                         break;
                 }
