@@ -287,43 +287,59 @@ namespace mongo {
         BSONObjIterator it(from);
         while ( it.more() ) {
             BSONElement e = it.next();
+            if ( e.eoo() )
+                break;
             const char *fn = e.fieldName();
-            if ( *fn == '$' && e.type() == Object &&
-                    fn[4] == 0 ) {
-                BSONObj j = e.embeddedObject();
-                BSONObjIterator jt(j);
-                Op op = Mod::SET;
-                if ( strcmp("$inc",fn) == 0 ) {
-                    op = Mod::INC;
-                    // we rename to $SET instead of $set so that on an op like
-                    //   { $set: {x:1}, $inc: {y:1} }
-                    // we don't get two "$set" fields which isn't allowed
-                    strcpy((char *) fn, "$SET");
+            uassert( "Invalid modifier specified",
+                    *fn == '$' && e.type() == Object && fn[4] == 0 );
+            BSONObj j = e.embeddedObject();
+            BSONObjIterator jt(j);
+            Op op = Mod::SET;
+            if ( strcmp("$inc",fn) == 0 ) {
+                op = Mod::INC;
+                // we rename to $SET instead of $set so that on an op like
+                //   { $set: {x:1}, $inc: {y:1} }
+                // we don't get two "$set" fields which isn't allowed
+                strcpy((char *) fn, "$SET");
+            } else {
+                uassert( "Invalid modifier specified", strcasecmp("$set",fn ) == 0 );
+            }
+            while ( jt.more() ) {
+                BSONElement f = jt.next();
+                if ( f.eoo() )
+                    break;
+                Mod m;
+                m.op = op;
+                m.fieldName = f.fieldName();
+                uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
+                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
+                    uassert( "Field name duplication not allowed with modifiers",
+                            strcmp( m.fieldName, i->fieldName ) != 0 );
                 }
-                while ( jt.more() ) {
-                    BSONElement f = jt.next();
-                    if ( f.eoo() )
-                        break;
-                    Mod m;
-                    m.op = op;
-                    m.fieldName = f.fieldName();
-                    uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
-                    if ( f.isNumber() ) {
-                        if ( f.type() == NumberDouble ) {
-                            m.ndouble = (double *) f.value();
-                            m.nint = 0;
-                        }
-                        else {
-                            m.ndouble = 0;
-                            m.nint = (int *) f.value();
-                        }
-                        mods.push_back( m );
-                    }
+                uassert( "Modifiers allowed for numbers only", f.isNumber() );
+                if ( f.type() == NumberDouble ) {
+                    m.ndouble = (double *) f.value();
+                    m.nint = 0;
                 }
+                else {
+                    m.ndouble = 0;
+                    m.nint = (int *) f.value();
+                }
+                mods.push_back( m );
             }
         }
     }
 
+    void checkNoMods( BSONObj o ) {
+        BSONObjIterator i( o );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            massert( "Modifiers and non-modifiers cannot be mixed", e.fieldName()[ 0 ] != '$' );
+        }
+    }
+    
     int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
         int profile = database->profile;
 
@@ -398,6 +414,8 @@ namespace mongo {
                                 }
                             }
                             return 2;
+                        } else {
+                            checkNoMods( updateobj );
                         }
 
                         theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);

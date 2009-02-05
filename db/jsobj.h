@@ -247,6 +247,11 @@ namespace mongo {
             return *((OID*) value());
         }
 
+        /** True if element is null. */
+        bool isNull() const {
+            return type() == jstNULL;
+        }
+        
         /** Size (length) of a string element.  
             You must assure of type String first.  */
         int valuestrsize() const {
