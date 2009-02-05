@@ -27,7 +27,7 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
  *	Db.dump method.
  */
 int
-__wt_db_dump(wt_args_db_dump *argp)
+__wt_db_dump(WT_TOC *toc)
 {
 	wt_args_db_dump_unpack;
 	DBT last_key_ovfl, last_key_std, *last_key;
@@ -40,12 +40,19 @@ __wt_db_dump(wt_args_db_dump *argp)
 	int dup_ahead, ret;
 	void (*func)(u_int8_t *, u_int32_t, FILE *);
 
-	DB_FLAG_CHK(db, "Db.dump", flags, WT_APIMASK_DB_DUMP);
+	env = toc->env;
 
-	if (LF_ISSET(WT_DEBUG))
+	WT_DB_FCHK(db, "Db.dump", flags, WT_APIMASK_DB_DUMP);
+
+	if (LF_ISSET(WT_DEBUG)) {
+#ifdef HAVE_DIAGNOSTIC
 		return (__wt_bt_dump_debug(db, NULL, stream));
+#else
+		__wt_db_errx(db, "library not built for debugging");
+		return (WT_ERROR);
+#endif
+	}
 
-	env = db->env;
 	dup_ahead = ret = 0;
 	func = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;
 
