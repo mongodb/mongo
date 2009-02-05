@@ -751,7 +751,7 @@ namespace mongo {
             }
             else if ( isMaster() ||
                      c->slaveOk() ||
-                     ( c->slaveOverrideOk() && ( queryOptions | Option_SlaveOk ) ) ||
+                     ( c->slaveOverrideOk() && ( queryOptions & Option_SlaveOk ) ) ||
                      fromRepl ) {
                 ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
                 if ( ok && c->logTheOp() && !fromRepl )
