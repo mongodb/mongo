@@ -75,6 +75,8 @@ AC_DEFUN([AM_TYPES], [
 	# First, figure out the sizes of the standard types.
 	AC_CHECK_SIZEOF(char,, $std_includes)
 	AC_CHECK_SIZEOF(unsigned char,, $std_includes)
+	AC_CHECK_SIZEOF(short,, $std_includes)
+	AC_CHECK_SIZEOF(unsigned short,, $std_includes)
 	AC_CHECK_SIZEOF(int,, $std_includes)
 	AC_CHECK_SIZEOF(unsigned int,, $std_includes)
 	AC_CHECK_SIZEOF(long,, $std_includes)
