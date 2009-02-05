@@ -9,6 +9,7 @@ f()
 	    "-emacro(776,WT_ALIGN)" \
 	    "-emacro(776,WT_OVERFLOW_BYTES_TO_FRAGS)" \
 	    "-emacro(737,WT_ALIGN)" \
+	    "-e773" \
 	    "-e506" \
 	    "-e613" \
 	    "-e717" \
