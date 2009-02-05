@@ -19,7 +19,7 @@ static int __wt_bt_promote(DB *, WT_PAGE *, WT_ITEM_OFFP *);
  *	Db.bulk_load method.
  */
 int
-__wt_db_bulk_load(wt_args_db_bulk_load *argp)
+__wt_db_bulk_load(WT_TOC *toc)
 {
 	wt_args_db_bulk_load_unpack;
 	DBT *key, *data, *lastkey, lastkey_std, lastkey_ovfl;
@@ -30,9 +30,9 @@ __wt_db_bulk_load(wt_args_db_bulk_load *argp)
 	u_int32_t dup_count, dup_space, len;
 	int ret, tret;
 
-	env = db->env;
+	env = toc->env;
 
-	DB_FLAG_CHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
+	WT_DB_FCHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
 	WT_ASSERT(env, LF_ISSET(WT_SORTED_INPUT));
 
 	dup_space = dup_count = 0;
@@ -327,11 +327,14 @@ skip_read:
 			if ((tret = __wt_bt_page_out(
 			    db, page, WT_MODIFIED)) != 0 && ret == 0)
 				ret = tret;
+			page = NULL;
 		}
 	}
 
 	if (0) {
 err:		ret = WT_ERROR;
+		if (page != NULL)
+			(void)__wt_bt_page_out(db, page, 0);
 	}
 
 	WT_FREE_AND_CLEAR(env, lastkey_ovfl.data);
