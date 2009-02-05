@@ -14,10 +14,10 @@
  *	Verify an argument to the Env.set_verbose setter.
  */
 int
-__wt_env_set_verbose_verify(wt_args_env_set_verbose *argp)
+__wt_env_set_verbose_verify(WT_TOC *toc)
 {
 	wt_args_env_set_verbose_unpack;
 
-	ENV_FLAG_CHK(env, "Env.set_verbose", verbose, WT_APIMASK_ENV_VERBOSE);
+	WT_ENV_FCHK(env, "Env.set_verbose", verbose, WT_APIMASK_ENV_VERBOSE);
 	return (0);
 }

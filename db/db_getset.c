@@ -14,13 +14,11 @@
  *	Verify arguments to the Db.set_btree_compare_int setter.
  */
 int
-__wt_db_set_btree_compare_int_verify(wt_args_db_set_btree_compare_int *argp)
+__wt_db_set_btree_compare_int_verify(WT_TOC *toc)
 {
-	DB *db;
+	wt_args_db_set_btree_compare_int_unpack;
 
-	db = argp->db;
-
-	if (argp->btree_compare_int >= 0 && argp->btree_compare_int <= 8)
+	if (btree_compare_int >= 0 && btree_compare_int <= 8)
 		return (0);
 
 	__wt_db_errx(db,

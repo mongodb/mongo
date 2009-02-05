@@ -14,12 +14,12 @@
  *	Open a Env handle.
  */
 int
-__wt_env_open(wt_args_env_open *argp)
+__wt_env_open(WT_TOC *toc)
 {
 	wt_args_env_open_unpack;
 	int ret;
 
-	ENV_FLAG_CHK(env, "Env.open", flags, WT_APIMASK_ENV_OPEN);
+	WT_ENV_FCHK(env, "Env.open", flags, WT_APIMASK_ENV_OPEN);
 
 	/* Turn on the methods that require open. */
 	__wt_env_config_methods_open(env);

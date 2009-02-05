@@ -14,7 +14,7 @@
  *	Print DB handle statistics to a stream.
  */
 int
-__wt_db_stat_print(wt_args_db_stat_print *argp)
+__wt_db_stat_print(WT_TOC *toc)
 {
 	wt_args_db_stat_print_unpack;
 	IDB *idb;
@@ -23,7 +23,7 @@ __wt_db_stat_print(wt_args_db_stat_print *argp)
 
 	idb = db->idb;
 
-	DB_FLAG_CHK(db, "Db.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
+	WT_DB_FCHK(db, "Db.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
 
 	fprintf(stream, "%s\n", WT_GLOBAL(sep));
 	fprintf(stream, "Database handle statistics: %s\n", db->idb->dbname);
@@ -57,7 +57,7 @@ __wt_db_stat_print(wt_args_db_stat_print *argp)
  *	Clear DB handle statistics.
  */
 int
-__wt_db_stat_clear(wt_args_db_stat_clear *argp)
+__wt_db_stat_clear(WT_TOC *toc)
 {
 	wt_args_db_stat_clear_unpack;
 	IDB *idb;
@@ -65,7 +65,7 @@ __wt_db_stat_clear(wt_args_db_stat_clear *argp)
 
 	idb = db->idb;
 
-	DB_FLAG_CHK(db, "Db.stat_clear", flags, WT_APIMASK_DB_STAT_CLEAR);
+	WT_DB_FCHK(db, "Db.stat_clear", flags, WT_APIMASK_DB_STAT_CLEAR);
 
 	ret = __wt_stat_clear_db_hstats(db->hstats);
 	if ((tret = __wt_stat_clear_db_dstats(db->dstats)) != 0 && ret == 0)

@@ -14,16 +14,16 @@
  *	Close a DB handle.
  */
 int
-__wt_db_close(wt_args_db_close *argp)
+__wt_db_close(WT_TOC *toc)
 {
 	wt_args_db_close_unpack;
 	ENV *env;
 	int ret, tret;
 
-	env = db->env;
+	env = toc->env;
 	ret = 0;
 
-	DB_FLAG_CHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
+	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
 
 	/* Close the underlying Btree. */
 	if ((tret = __wt_bt_close(db)) != 0 && ret == 0)
@@ -38,7 +38,7 @@ __wt_db_close(wt_args_db_close *argp)
 
 	/* Close any private environment. */
 	if (F_ISSET(env, WT_PRIVATE_ENV) &&
-	    (tret = env->close(env, 0)) != 0 && ret == 0)
+	    (tret = env->close(env, toc, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	/*

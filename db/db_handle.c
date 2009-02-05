@@ -10,6 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_db_config_default(DB *);
+static int __wt_db_destroy_int(WT_TOC *, u_int32_t);
 static int __wt_idb_config_default(DB *);
 
 /*
@@ -47,14 +48,14 @@ wt_db_create(DB **dbp, WT_TOC *toc, ENV *env, u_int32_t flags)
 		goto err;
 
 	/* Connect everything together. */
+	toc->db = db;
 	db->idb = idb;
 	idb->db = db;
 	db->env = env;
 	db->ienv = env->ienv;
-	db->toc = idb->toc = toc;
 
 	/* We have an environment -- check the API flags. */
-	DB_FLAG_CHK_NOTFATAL(
+	WT_DB_FCHK_NOTFATAL(
 	    db, "wt_db_create", flags, WT_APIMASK_WT_DB_CREATE, ret);
 	if (ret != 0)
 		goto err;
@@ -68,7 +69,7 @@ wt_db_create(DB **dbp, WT_TOC *toc, ENV *env, u_int32_t flags)
 	*dbp = db;
 	return (0);
 
-err:	(void)__wt_db_destroy_int(db, 0);
+err:	(void)__wt_db_destroy_int(toc, 0);
 	return (ret);
 }
 
@@ -77,26 +78,29 @@ err:	(void)__wt_db_destroy_int(db, 0);
  *	Db.destroy method (DB destructor).
  */
 int
-__wt_db_destroy(wt_args_db_destroy *argp)
+__wt_db_destroy(WT_TOC *toc)
 {
 	wt_args_db_destroy_unpack;
-	return (__wt_db_destroy_int(db, flags));
+
+	return (__wt_db_destroy_int(toc, flags));
 }
 
 /*
  * __wt_db_destroy_int --
  *	Db.destroy method (DB destructor), internal version.
  */
-int
-__wt_db_destroy_int(DB *db, u_int32_t flags)
+static int
+__wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 {
+	DB *db;
 	ENV *env;
 	int ret, tret;
 
-	env = db->env;
+	db = toc->db;
+	env = toc->env;
 	ret = 0;
 
-	DB_FLAG_CHK_NOTFATAL(
+	WT_DB_FCHK_NOTFATAL(
 	    db, "Db.destroy", flags, WT_APIMASK_DB_DESTROY, ret);
 
 	/* Discard the underlying IDB structure. */
@@ -112,7 +116,7 @@ __wt_db_destroy_int(DB *db, u_int32_t flags)
 
 	/* We have to destroy the environment too, if it was private. */
 	if (env != NULL && F_ISSET(env, WT_PRIVATE_ENV) &&
-	    (tret = env->destroy(env, 0)) != 0 && ret == 0)
+	    (tret = env->destroy(env, toc, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);

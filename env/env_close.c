@@ -14,14 +14,14 @@
  *	Close an Env handle.
  */
 int
-__wt_env_close(wt_args_env_close *argp)
+__wt_env_close(WT_TOC *toc)
 {
 	wt_args_env_close_unpack;
 	int ret, tret;
 
 	ret = 0;
 
-	ENV_FLAG_CHK_NOTFATAL(
+	WT_ENV_FCHK_NOTFATAL(
 	    env, "ENV.close", flags, WT_APIMASK_ENV_CLOSE, ret);
 
 	/* Destroy the cache. */

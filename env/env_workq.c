@@ -21,6 +21,8 @@ wt_start(u_int32_t flags)
 	static int initial_tasks = 0;
 	int ret;
 
+	WT_ENV_FCHK(NULL, "wt_start", flags, WT_APIMASK_WT_START);
+
 	/*
 	 * No matter what we're doing, we end up here before we do any real
 	 * work.   The first time, check the build itself and initialize the
@@ -34,9 +36,24 @@ wt_start(u_int32_t flags)
 		initial_tasks = 1;
 	}
 
-	/* Spawn the engine, and wait until it's ready to proceed. */
-	if (pthread_create(&WT_GLOBAL(tid), NULL, __wt_engine, NULL) != 0)
+	/* We don't have any handles, just use stderr if there's a problem. */
+	if (flags & ~WT_APIMASK_WT_START) {
+		fprintf(stderr, "wt_start: illegal API flag specified");
 		return (WT_ERROR);
+	}
+
+	/* If we're single-threaded, we're done. */
+	if (LF_ISSET(WT_SINGLE_THREADED)) {
+		WT_GLOBAL(single_threaded) = WT_GLOBAL(running) = 1;
+		return (0);
+	}
+
+	/* Spawn the engine, and wait until it's ready to proceed. */
+	if (pthread_create(&WT_GLOBAL(tid), NULL, __wt_engine, NULL) != 0) {
+		fprintf(stderr,
+		    "wt_start: engine thread: %s\n", strerror(errno));
+		return (WT_ERROR);
+	}
 	while (!WT_GLOBAL(running))
 		__wt_sleep(0, 1000);
 
@@ -50,6 +67,8 @@ wt_start(u_int32_t flags)
 int
 wt_stop(u_int32_t flags)
 {
+	WT_ENV_FCHK(NULL, "wt_start", flags, WT_APIMASK_WT_STOP);
+
 	/*
 	 * We'll need real cleanup at some point, but for now, just flag the
 	 * engine to quit and wait for the thread to exit.
@@ -90,7 +109,7 @@ __wt_engine(void *notused)
 			not_found = 0;
 
 			F_SET(toc, WT_RUNNING);
-			toc->ret = __wt_api_switch(toc);
+			__wt_api_switch(toc);
 			F_CLR(toc, WT_RUNNING);
 
 			/* Clear the slot and flush memory. */
@@ -116,7 +135,7 @@ __wt_engine(void *notused)
 				__wt_sleep(0, tenths * 100000);
 			} else {
 				++not_found;
-				pthread_yield();
+				__wt_yield();
 			}
 			q = WT_GLOBAL(workq);
 		}
@@ -125,4 +144,6 @@ __wt_engine(void *notused)
 	}
 
 	WT_FREE_AND_CLEAR(NULL, WT_GLOBAL(workq));
+
+	return (NULL);
 }

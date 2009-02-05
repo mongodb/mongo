@@ -9,7 +9,8 @@
 
 #include "wt_internal.h"
 
-static int __wt_env_config_default(ENV *);
+static int __wt_env_config_default(WT_TOC *);
+static int __wt_env_destroy_int(ENV *, u_int32_t);
 static int __wt_ienv_config_default(ENV *);
 
 /*
@@ -38,18 +39,18 @@ wt_env_create(ENV **envp, WT_TOC *toc, u_int32_t flags)
 	}
 
 	/* Connect everything together. */
+	toc->env = env;
 	env->ienv = ienv;
 	ienv->env = env;
-	env->toc = ienv->toc = toc;
 
 	/* We have an environment -- check the API flags. */
-	ENV_FLAG_CHK_NOTFATAL(
+	WT_ENV_FCHK_NOTFATAL(
 	    env, "wt_env_create", flags, WT_APIMASK_WT_ENV_CREATE, ret);
 	if (ret != 0)
 		goto err;
 
 	/* Configure the ENV and the IENV. */
-	if ((ret = __wt_env_config_default(env)) != 0)
+	if ((ret = __wt_env_config_default(toc)) != 0)
 		goto err;
 	if ((ret = __wt_ienv_config_default(env)) != 0)
 		goto err;
@@ -66,7 +67,7 @@ err:	(void)__wt_env_destroy_int(env, 0);
  *	Env.destroy method (ENV destructor).
  */
 int
-__wt_env_destroy(wt_args_env_destroy *argp)
+__wt_env_destroy(WT_TOC *toc)
 {
 	wt_args_env_destroy_unpack;
 
@@ -77,14 +78,14 @@ __wt_env_destroy(wt_args_env_destroy *argp)
  * __wt_env_destroy_int --
  *	Env.destroy method (ENV destructor), internal version.
  */
-int
+static int
 __wt_env_destroy_int(ENV *env, u_int32_t flags)
 {
 	int ret, tret;
 
 	ret = 0;
 
-	ENV_FLAG_CHK_NOTFATAL(
+	WT_ENV_FCHK_NOTFATAL(
 	    env, "Env.destroy", flags, WT_APIMASK_ENV_DESTROY, ret);
 
 	/*
@@ -122,9 +123,12 @@ __wt_env_destroy_int(ENV *env, u_int32_t flags)
  *	Set default configuration for a just-created ENV handle.
  */
 static int
-__wt_env_config_default(ENV *env)
+__wt_env_config_default(WT_TOC *toc)
 {
+	ENV *env;
 	int ret;
+
+	env = toc->env;
 
 	__wt_env_config_methods(env);
 
@@ -133,7 +137,7 @@ __wt_env_config_default(ENV *env)
 	if ((ret = __wt_stat_alloc_env_hstats(env, &env->hstats)) != 0)
 		return (ret);
 
-	if ((ret = env->set_cachesize(env, WT_CACHE_DEFAULT_SIZE)) != 0)
+	if ((ret = env->set_cachesize(env, toc, WT_CACHE_DEFAULT_SIZE)) != 0)
 		return (ret);
 
 	return (0);
@@ -184,10 +188,6 @@ __wt_ienv_destroy(ENV *env, int refresh)
 static int
 __wt_ienv_config_default(ENV *env)
 {
-	IENV *ienv;
-
-	ienv = env->ienv;
-
 	return (0);
 }
 

@@ -16,15 +16,15 @@ static int __wt_db_idb_open(DB *, const char *, mode_t, u_int32_t);
  *	Open a DB handle.
  */
 int
-__wt_db_open(wt_args_db_open *argp)
+__wt_db_open(WT_TOC *toc)
 {
 	wt_args_db_open_unpack;
 	ENV *env;
 	int ret;
 
-	env = db->env;
+	env = toc->env;
 
-	DB_FLAG_CHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
+	WT_DB_FCHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
 
 	/* Initialize the IDB structure. */
 	if ((ret = __wt_db_idb_open(db, dbname, mode, flags)) != 0)
@@ -32,7 +32,7 @@ __wt_db_open(wt_args_db_open *argp)
 
 	/* Open any private environment. */
 	if (F_ISSET(env, WT_PRIVATE_ENV) &&
-	    (ret = env->open(env, NULL, 0, 0)) != 0)
+	    (ret = env->open(env, toc, NULL, 0, 0)) != 0)
 		return (ret);
 
 	/* Insert the database on the environment's list. */
