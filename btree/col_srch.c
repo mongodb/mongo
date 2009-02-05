@@ -16,20 +16,18 @@ static int __wt_bt_search(DB *, DBT *, WT_PAGE **, WT_INDX **);
  *	Db.get method.
  */
 int
-__wt_db_get(wt_args_db_get *argp)
+__wt_db_get(WT_TOC *toc)
 {
 	wt_args_db_get_unpack;
 	ENV *env;
-	IDB *idb;
 	WT_PAGE *page;
 	WT_INDX *indx;
 	WT_ITEM *item;
 	int ret, tret;
 
-	env = db->env;
-	idb = db->idb;
+	env = toc->env;
 
-	DB_FLAG_CHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
+	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
 
 	WT_ASSERT(env, pkey == NULL);
 
