@@ -30,6 +30,8 @@ namespace mongo {
      to optionally be used when specifying field names and string values instead
      of double quotes.  JSON unicode escape sequences (of the form \uXXXX) are
      converted to utf8.
+     \throws MsgAssertionException if parsing fails.  The message included with
+     this assertion includes a rough indication of where parsing failed.
     */
     BSONObj fromjson(const string &str);
 

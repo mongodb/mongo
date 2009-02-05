@@ -300,9 +300,9 @@ namespace mongo {
                 // we rename to $SET instead of $set so that on an op like
                 //   { $set: {x:1}, $inc: {y:1} }
                 // we don't get two "$set" fields which isn't allowed
-                strcpy((char *) fn, "$SET");
+                /* aaron said to remove this: strcpy((char *) fn, "$SET"); */
             } else {
-                uassert( "Invalid modifier specified", strcasecmp("$set",fn ) == 0 );
+                uassert( "Invalid modifier specified", strcmp("$set",fn ) == 0 );
             }
             while ( jt.more() ) {
                 BSONElement f = jt.next();

@@ -6,6 +6,10 @@
 
 namespace mongo { 
 
+/* Subclass this and implement your real storage interface.
+   Currently we just use a single storage interface at compile time.  Later if desired to be runtime 
+   configurable we will make these pure virtual functions / nonstatic.
+*/
 class RecStoreInterface {
 public:
     static char* get(DiskLoc d, unsigned len) { assert(false); return 0; }

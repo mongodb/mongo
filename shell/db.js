@@ -110,6 +110,66 @@ DB.prototype.dropDatabase = function() {
 }
 
 
+/**
+  Clone database on another server to here.
+  <p>
+  Generally, you should dropDatabase() first as otherwise the cloned information will MERGE 
+  into whatever data is already present in this database.  (That is however a valid way to use 
+  clone if you are trying to do something intentionally, such as union three non-overlapping
+  databases into one.)
+  <p>
+  This is a low level administrative function will is not typically used.
+
+ * @param {String} from Where to clone from (dbhostname[:port]).  May not be this database 
+                   (self) as you cannot clone to yourself.
+ * @return Object returned has member ok set to true if operation succeeds, false otherwise.
+ * See also: db.copyDatabase()
+*/
+DB.prototype.cloneDatabase = function(from) { 
+    assert( isString(from) && from.length );
+    //this.resetIndexCache();
+    return this._dbCommand( { clone: from } );
+}
+
+
+/**
+  Copy database from one server or name to another server or name.
+
+  Generally, you should dropDatabase() first as otherwise the copied information will MERGE 
+  into whatever data is already present in this database (and you will get duplicate objects 
+  in collections potentially.)
+
+  For security reasons this function only works when executed on the "admin" db.  However, 
+  if you have access to said db, you can copy any database from one place to another.
+
+  This method provides a way to "rename" a database by copying it to a new db name and 
+  location.  Additionally, it effectively provides a repair facility.
+
+  * @param {String} fromdb database name from which to copy.
+  * @param {String} todb database name to copy to.
+  * @param {String} fromhost hostname of the database (and optionally, ":port") from which to 
+                    copy the data.  default if unspecified is to copy from self.
+  * @return Object returned has member ok set to true if operation succeeds, false otherwise.
+  * See also: db.clone()
+*/
+DB.prototype.copyDatabase = function(fromdb, todb, fromhost) { 
+    assert( isString(fromdb) && fromdb.length );
+    assert( isString(todb) && todb.length );
+    fromhost = fromhost || "";
+    //this.resetIndexCache();
+    return this._dbCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
+}
+
+/**
+  Repair database.
+ 
+ * @return Object returned has member ok set to true if operation succeeds, false otherwise.
+*/
+DB.prototype.repairDatabase = function() {
+    return this._dbCommand( { repairDatabase: 1 } );
+}
+
+
 DB.prototype.help = function() {
     print("DB methods:");
     print("\tdb.auth(username, password)");
@@ -119,8 +179,13 @@ DB.prototype.help = function() {
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
     print("\tdb.addUser(username, password)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
+    print("\tdb.getReplicationInfo()");
     print("\tdb.getProfilingLevel()");
     print("\tdb.setProfilingLevel(level) 0=off 1=slow 2=all");
+    print("\tdb.cloneDatabase(fromhost)");
+    print("\tdb.copyDatabase(fromdb, todb, fromhost)");
+    print("\tdb.dropDatabase()");
+    print("\tdb.repairDatabase()");
     print("\tdb.eval(func, args) run code server-side");
     print("\tdb.getLastError()");
     print("\tdb.getPrevError()");
@@ -325,3 +390,64 @@ DB.prototype.toString = function(){
     return this._name;
 }
 
+
+/** 
+  Get a replication log information summary.
+  <p>
+  This command is for the database/cloud administer and not applicable to most databases.
+  It is only used with the local database.  One might invoke from the JS shell:
+  <pre>
+       use local
+       db.getReplicationInfo();
+  </pre>
+  It is assumed that this database is a replication master -- the information returned is 
+  about the operation log stored at local.oplog.$main on the replication master.  (It also 
+  works on a machine in a replica pair: for replica pairs, both machines are "masters" from 
+  an internal database perspective.
+  <p>
+  * @return Object timeSpan: time span of the oplog from start to end  if slave is more out 
+  *                          of date than that, it can't recover without a complete resync
+*/
+DB.prototype.getReplicationInfo = function() { 
+    if( "local" != this )
+	return { errmsg : "this command only works for database local" };
+
+    var result = { };
+    var db = this;
+    var ol = db.system.namespaces.findOne({name:"local.oplog.$main"});
+    if( ol && ol.options ) {
+	result.logSizeMB = ol.options.size / 1000 / 1000;
+    } else {
+	result.errmsg  = "local.oplog.$main, or its options, not found in system.namespaces collection";
+	return result;
+    }
+
+    var firstc = db.oplog.$main.find().sort({$natural:1}).limit(1);
+    var lastc = db.oplog.$main.find().sort({$natural:-1}).limit(1);
+    if( !firstc.hasNext() || !lastc.hasNext() ) { 
+	result.errmsg = "objects not found in local.oplog.$main -- is this a new and empty db instance?";
+	result.oplogMainRowCount = db.oplog.$main.count();
+	return result;
+    }
+
+    var first = firstc.next();
+    var last = lastc.next();
+    {
+	var tfirst = first.ts;
+	var tlast = last.ts;
+	if( tfirst && tlast ) { 
+	    tfirst = tfirst / 4294967296; // low 32 bits are ordinal #s within a second
+	    tlast = tlast / 4294967296;
+	    result.timeDiff = tlast - tfirst;
+	    result.timeDiffHours = result.timeDiff / 3600;
+	    result.tFirst = (new Date(tfirst*1000)).toString();
+	    result.tLast  = (new Date(tlast*1000)).toString();
+	    result.now = Date();
+	}
+	else { 
+	    result.errmsg = "ts element not found in oplog objects";
+	}
+    }
+
+    return result;
+}
