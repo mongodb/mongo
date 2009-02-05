@@ -253,9 +253,13 @@ struct __wt_page_hdr {
 	u_int32_t nextaddr;		/* 28-31: next page */
 };
 /*
- * WT_HDR_SIZE is the expected WT_HDR size --  we check this on startup
- * to make sure the compiler hasn't inserted padding (which would break
- * the world).  The size must be a multiple of a 4-byte boundary.
+ * WT_HDR_SIZE is the expected WT_HDR size.  We check the size on startup to
+ * ensure the compiler hasn't inserted padding (which would break the world).
+ * The size must be a multiple of a 4-byte boundary.   It would be possible
+ * to reduce this by two bytes, by moving the odd-sized fields to the end of
+ * the structure (and using something other than "sizeof" for the check, as
+ * compilers usually pad the sizeof() operator to the next 4-byte boundary),
+ * but I don't think two bytes are worth the effort.
  */
 #define	WT_HDR_SIZE		32
 
@@ -281,7 +285,12 @@ struct __wt_page_hdr {
  * overflow items).
  */
 struct __wt_item {
-	u_int32_t len;			/* Trailing data length, in bytes */
+	/*
+	 * Trailing data length, in bytes.   Each WT_ITEM, in its entirety, is
+	 * aligned on a 4-byte boundary, so it's OK to directly access the len
+	 * field on the page.
+	 */
+	u_int32_t len;
 
 	/*
 	 * Item type.  There are 3 basic types: keys, data items and duplicate
@@ -315,6 +324,9 @@ struct __wt_item {
 #define	WT_ITEM_OFFPAGE		7	/* Offpage reference */
 	u_int8_t  type;
 
+	/* 
+	 * XXX GET RID OF THIS, IT'S TOO EXPENSIVE.
+	 */
 	u_int8_t  unused[3];		/* Spacer to force 4-byte alignment */
 
 	/*
