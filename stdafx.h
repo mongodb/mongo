@@ -290,6 +290,7 @@ namespace mongo {
 #define ONCE if( ++once == 1 )
 
 #if defined(_WIN32)
+#define strcasecmp _stricmp
     inline void our_debug_free(void *p) {
         unsigned *u = (unsigned *) p;
         u[0] = 0xEEEEEEEE;

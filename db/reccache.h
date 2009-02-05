@@ -9,7 +9,11 @@ namespace mongo {
 
 class RecCache {
     struct Node { 
-        Node() { dirty = false; newer = 0; }
+        Node(void* _data) : data((char *) _data) { dirty = false; newer = 0; }
+        ~Node() { 
+            free(data);
+            data = 0;
+        }
         char *data;
         DiskLoc loc;
         bool dirty;
@@ -43,8 +47,7 @@ private:
         newest = n;
     }
     Node* mkNode() { 
-        Node *n = new Node();
-        n->data = (char *) calloc(recsize,1); // calloc is TEMP for testing.  change to malloc
+        Node *n = new Node(calloc(recsize,1)); // calloc is TEMP for testing.  change to malloc
         n->older = newest;
         if( newest )
             newest->newer = n;
