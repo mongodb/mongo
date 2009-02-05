@@ -128,6 +128,7 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
+onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "mongod" )
 nix = False
 useJavaHome = False
 linux64  = False
@@ -194,6 +195,7 @@ elif "linux2" == os.sys.platform:
         javaVersion = "amd64"
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64"] )
+        env.Append( LIBS=["pthread"] )
     
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
@@ -294,7 +296,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             allPlaces += myenv["LIBPATH"]
             if not force64:
                 allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
-
+                
             for p in poss:
                 for loc in allPlaces:
                     fullPath = loc + "/lib" + p + ".a"
@@ -308,7 +310,10 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
 
         if release and not java and failIfNotFound:
-            print( "ERROR: can't find static version of: " + str( poss ) )
+            extra = ""
+            if linux64 and shell:
+                extra += " 32 bit version for shell"
+            print( "ERROR: can't find static version of: " + str( poss ) + extra + " in: " + str( allPlaces ) )
             Exit(1)
 
         res = conf.CheckLib( poss )
@@ -473,9 +478,10 @@ shellEnv = env.Clone();
 shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
 shellEnv.Append( LIBPATH=[ v8Home] )
 
-if darwin and release and force64:
+if release and ( ( darwin and force64 ) or linux64 ):
     shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
     shellEnv["LIBS"] = env["LIBS_CLEAN"]
+    shellEnv["SLIBS"] = ""
 
 shellEnv.Append( LIBS=[ "v8" , "readline" ] )
 
@@ -486,7 +492,7 @@ def removeIfInList( lst , thing ):
     if thing in lst:
         lst.remove( thing )
 
-if linux64 or force64:
+if not onlyServer and ( linux64 or force64 ):
     if linux64:
         shellEnv.Append( CFLAGS="-m32" )
         shellEnv.Append( CXXFLAGS="-m32" )
@@ -504,8 +510,8 @@ if linux64 or force64:
         
     l = shellEnv["LIBS"]
     if linux64:
-        l.remove("java")
-        l.remove("jvm")
+        removeIfInList( l , "java" )
+        removeIfInList( l , "jvm" )
 
     removeIfInList( l , "pcre" )
     removeIfInList( l , "pcrecpp" )
