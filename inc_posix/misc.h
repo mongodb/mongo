@@ -22,16 +22,16 @@ extern "C" {
 /*
  * Flag checking for API functions.
  */
-#define	DB_FLAG_CHK(db, name, f, mask)					\
+#define	WT_DB_FCHK(db, name, f, mask)					\
 	if ((f) & ~(mask))						\
 		return (__wt_api_flags((db)->env, name));
-#define	DB_FLAG_CHK_NOTFATAL(db, name, f, mask, ret)			\
+#define	WT_DB_FCHK_NOTFATAL(db, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
 		(ret) = __wt_api_flags((db)->env, name);
-#define	ENV_FLAG_CHK(env, name, f, mask)				\
+#define	WT_ENV_FCHK(env, name, f, mask)					\
 	if ((f) & ~(mask))						\
 		return (__wt_api_flags(env, name));
-#define	ENV_FLAG_CHK_NOTFATAL(env, name, f, mask, ret)			\
+#define	WT_ENV_FCHK_NOTFATAL(env, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
 		(ret) = __wt_api_flags(env, name);
 

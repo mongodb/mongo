@@ -277,7 +277,7 @@ __wt_cache_db_in(DB *db,
 
 	*pagep = NULL;
 
-	DB_FLAG_CHK(db, "__wt_cache_in", flags, WT_APIMASK_WT_CACHE_DB_IN);
+	WT_DB_FCHK(db, "__wt_cache_in", flags, WT_APIMASK_WT_CACHE_DB_IN);
 
 	env = db->env;
 	ienv = db->ienv;
@@ -376,7 +376,7 @@ __wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags)
 
 	env = db->env;
 
-	DB_FLAG_CHK(db, "__wt_cache_db_out", flags, WT_APIMASK_WT_CACHE_DB_OUT);
+	WT_DB_FCHK(db, "__wt_cache_db_out", flags, WT_APIMASK_WT_CACHE_DB_OUT);
 
 	/* Check and decrement the reference count. */
 	WT_ASSERT(env, page->ref > 0);
