@@ -15,7 +15,7 @@ clean()
 	rm -rf \
 	    ChangeLog COPYING INSTALL Makefile.am Makefile.in NEWS \
 	    README aclocal.m4 autom4te.cache config.hin config.hin~ \
-	    configure mklog
+	    configure flexlint.out mklog
 }
 
 while :
@@ -88,7 +88,7 @@ sed -e "s/__EDIT_WIREDTIGER_VERSION_MAJOR__/$WIREDTIGER_VERSION_MAJOR/g" \
 cp $t configure
 
 # Build make files.
-automake --add-missing
+automake --add-missing --copy
 
 # Cleanup
 rm -rf autom4te.cache config.hin~
