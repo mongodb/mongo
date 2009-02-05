@@ -10,8 +10,18 @@
 #############################################
 # Threads-of-control.
 #############################################
+wt_start
+	SINGLE_THREADED			# Single-threaded access only
+
+wt_stop
+
+wt_toc_create
+
+wt_toc.destroy
+
 wt_toc
 	RUNNING				# Thread of control is running
+	SINGLE_THREADED			# Single-threaded access only
 
 #############################################
 # Environments.
@@ -38,7 +48,6 @@ Env.verbose
 # Databases.
 #############################################
 Db					# Public handle
-	MAXKEY_NOTSET			# Application never set a maxkey size
 	PRIVATE_ENV			# Application never created an Env
 
 IDb					# Private handle
