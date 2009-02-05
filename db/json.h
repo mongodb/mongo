@@ -23,7 +23,18 @@
 
 namespace mongo {
 
-    BSONObj fromjson(const char *str);
+    /** Create a BSONObj from a JSON <http://www.json.org> string.  In addition
+     to the JSON extensions extensions described here
+     <http://mongodb.onconfluence.com/display/DOCS/Mongo+Extended+JSON>,
+     this function accepts certain unquoted field names and allows single quotes
+     to optionally be used when specifying field names and string values instead
+     of double quotes.  JSON unicode escape sequences (of the form \uXXXX) are
+     converted to utf8.
+     \throws MsgAssertionException if parsing fails.  The message included with
+     this assertion includes a rough indication of where parsing failed.
+    */
     BSONObj fromjson(const string &str);
+
+    BSONObj fromjson(const char *str);
 
 } // namespace mongo

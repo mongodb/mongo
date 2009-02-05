@@ -20,7 +20,9 @@
 #include "../db/query.h"
 
 #include "../db/db.h"
+#include "../db/instance.h"
 #include "../db/json.h"
+#include "../db/lasterror.h"
 
 #include "dbtests.h"
 
@@ -170,6 +172,82 @@ namespace QueryTests {
         }        
     };
 
+    class ClientBase {
+    public:
+        // NOTE: Not bothering to backup the old error record.
+        ClientBase() {
+            mongo::lastError.reset( new LastError() );
+        }
+        ~ClientBase() {
+            mongo::lastError.release();
+        }
+    protected:
+        static void insert( const char *ns, BSONObj o ) {
+            client_.insert( ns, o );
+        }
+        static void update( const char *ns, BSONObj q, BSONObj o, bool upsert = 0 ) {
+            client_.update( ns, Query( q ), o, upsert );
+        }
+        static bool error() {
+            return !client_.getPrevError().getField( "err" ).isNull();
+        }
+    private:
+        static DBDirectClient client_;
+    };
+    DBDirectClient ClientBase::client_;
+    
+    class Fail : public ClientBase {
+    public:
+        void run() {
+            prep();
+            ASSERT( !error() );
+            doIt();
+            ASSERT( error() );
+        }
+    protected:
+        const char *ns() { return "QueryTests_Fail"; }
+        virtual void prep() {
+            insert( ns(), fromjson( "{a:1}" ) );   
+        }
+        virtual void doIt() = 0;
+    };
+    
+    class ModId : public Fail {
+        void doIt() {
+            update( ns(), emptyObj, fromjson( "{$set:{'_id':4}}" ) );
+        }
+    };
+    
+    class ModNonmodMix : public Fail {
+        void doIt() {
+            update( ns(), emptyObj, fromjson( "{$set:{a:4},z:3}" ) );
+        }        
+    };
+    
+    class InvalidMod : public Fail {
+        void doIt() {
+            update( ns(), emptyObj, fromjson( "{$awk:{a:4}}" ) );
+        }        
+    };
+
+    class ModNotFirst : public Fail {
+        void doIt() {
+            update( ns(), emptyObj, fromjson( "{z:3,$set:{a:4}}" ) );
+        }        
+    };
+    
+    class ModDuplicateFieldSpec : public Fail {
+        void doIt() {
+            update( ns(), emptyObj, fromjson( "{$set:{a:4},$inc:{a:1}}" ) );
+        }        
+    };
+
+    class ModNonNumber : public Fail {
+        void doIt() {
+            update( ns(), emptyObj, fromjson( "{$set:{a:'d'}}" ) );
+        }        
+    };
+
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -182,6 +260,12 @@ namespace QueryTests {
             add< CountQuery >();
             add< CountFields >();
             add< CountQueryFields >();
+            add< ModId >();
+            add< ModNonmodMix >();
+            add< InvalidMod >();
+            add< ModNotFirst >();
+            add< ModDuplicateFieldSpec >();
+            add< ModNonNumber >();
         }
     };
     

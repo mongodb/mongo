@@ -36,7 +36,7 @@
 */
 
 #include "stdafx.h"
-#include "../util/message.h"
+#include "server.h"
 #include "../db/commands.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
@@ -49,7 +49,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
 
-        out() << "TEMP: getmore: " << ns << endl;
+        log(3) << "getmore: " << ns << endl;
 
         ScopedDbConnection dbcon(tempHost);
         DBClientConnection &c = dbcon.conn();
@@ -61,13 +61,16 @@ namespace mongo {
         
         dbcon.done();
     }
-
+    
     /* got query operation from a database */
     void queryOp(Message& m, MessagingPort& p) {
         const MSGID originalID = m.data->id;
         DbMessage d(m);
         QueryMessage q(d);
         bool lateAssert = false;
+        
+        log(3) << "query: " << q.query << endl;
+
         try {
             if ( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
                 BSONObjBuilder builder;
@@ -97,12 +100,15 @@ namespace mongo {
             replyToQuery(QueryResult::ResultFlag_ErrSet, p, m, errObj);
             return;
         }
+
     }
     
     void writeOp(int op, Message& m, MessagingPort& p) {
         DbMessage d(m);
         const char *ns = d.getns();
         assert( *ns );
+        
+        log(3) << "write: " << ns << endl;
 
         ScopedDbConnection dbcon(tempHost);
         DBClientConnection &c = dbcon.conn();

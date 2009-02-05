@@ -40,22 +40,50 @@ namespace mongo {
 #pragma pack(1)
 
     /** 
-        the complete list of valie BSON types
-        EOO - end of object
-        Object - an embedded object
-        BinData - binary data
-        DBRef - deprecated / will be redesigned
-        Code - deprecated / use CodeWScope
-        Symbol - a programming language (e.g., Python) symbol
-        CodeWScope - javascript code that can execute on the database server, with context
+        the complete list of valid BSON types
     */
-    enum BSONType {MinKey=-1, EOO=0, NumberDouble=1, String=2, Object=3, Array=4, BinData=5,
-                   Undefined=6, jstOID=7, Bool=8, Date=9 , jstNULL=10, RegEx=11 ,
-                   DBRef=12, Code=13, Symbol=14, CodeWScope=15 ,
-                   NumberInt = 16,
-                   JSTypeMax=16,
-                   MaxKey=127
-                  };
+    enum BSONType {
+        /** smaller than all other types */
+        MinKey=-1,
+        /** end of object */
+        EOO=0,
+        /** double precision floating point value */
+        NumberDouble=1,
+        /** character string, stored in utf8 */
+        String=2,
+        /** an embedded object */
+        Object=3,
+        /** an embedded array */
+        Array=4,
+        /** binary data */
+        BinData=5,
+        /** Undefined type */
+        Undefined=6,
+        /** ObjectId */
+        jstOID=7,
+        /** boolean type */
+        Bool=8,
+        /** date type */
+        Date=9,
+        /** null type */
+        jstNULL=10,
+        /** regular expression, a pattern with options */
+        RegEx=11,
+        /** deprecated / will be redesigned */
+        DBRef=12,
+        /** deprecated / use CodeWScope */
+        Code=13,
+        /** a programming language (e.g., Python) symbol */
+        Symbol=14,
+        /** javascript code that can execute on the database server, with context */
+        CodeWScope=15,
+        /** 32 bit signed integer */
+        NumberInt = 16,
+        /** max type that is not MaxKey */
+        JSTypeMax=16,
+        /** larger than all other types */
+        MaxKey=127
+    };
 
     /* subtypes of BinData.
        bdtCustom and above are ones that the JS compiler understands, but are
@@ -115,38 +143,19 @@ namespace mongo {
     };
     ostream& operator<<( ostream &s, const OID &o );
 
-    /** BSON object format:
-       
-       <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
-          totalSize includes itself.
-
-       Data:
-         Bool:      <byte>
-         EOO:       nothing follows
-         Undefined: nothing follows
-         OID:       an OID object
-         NumberDouble: <double>
-         NumberInt: <int32>
-         String:    <unsigned32 strsizewithnull><cstring>
-         Date:      <8bytes>
-         Regex:     <cstring regex><cstring options>
-         Object:    a nested object, leading with its entire size, which terminates with EOO.
-         Array:     same as object
-         DBRef:     <strlen> <cstring ns> <oid>
-                    DBRef is a database reference: basically a collection name plus an Object ID
-         BinData:   <int len> <byte subtype> <byte[len] data>
-         Code:      a function (not a closure): same format as String.
-         Symbol:    a language symbol (say a python symbol).  same format as String.
-         Code With Scope: <total size><String><Object>
-    */
-
-    /** Formatting mode for generating a JSON from BSON.
-         Strict - strict RFC format
-    	 TenGen - 10gen format, which is close to JS format.  This form is understandable by
-     	          javascript running inside the Mongo server via eval()
-         JS     - Javascript JSON compatible
+    /** Formatting mode for generating JSON from BSON.
+        See <http://mongodb.onconfluence.com/display/DOCS/Mongo+Extended+JSON>
+        for details.
      */
-    enum JsonStringFormat { Strict, TenGen, JS };
+    enum JsonStringFormat {
+        /** strict RFC format */
+        Strict,
+        /** 10gen format, which is close to JS format.  This form is understandable by
+        javascript running inside the Mongo server via eval() */
+        TenGen,
+        /** Javascript JSON compatible */
+        JS
+    };
 
 #pragma pack()
 
@@ -247,6 +256,11 @@ namespace mongo {
             return *((OID*) value());
         }
 
+        /** True if element is null. */
+        bool isNull() const {
+            return type() == jstNULL;
+        }
+        
         /** Size (length) of a string element.  
             You must assure of type String first.  */
         int valuestrsize() const {
@@ -390,6 +404,33 @@ namespace mongo {
        pass them around by value.  The reference counts used to implement this
        do not use locking, so copying and destroying BSONObj's are not thread-safe
        operations.
+
+     BSON object format:
+     
+     \code
+     <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
+     
+     totalSize includes itself.
+     
+     Data:
+     Bool:      <byte>
+     EOO:       nothing follows
+     Undefined: nothing follows
+     OID:       an OID object
+     NumberDouble: <double>
+     NumberInt: <int32>
+     String:    <unsigned32 strsizewithnull><cstring>
+     Date:      <8bytes>
+     Regex:     <cstring regex><cstring options>
+     Object:    a nested object, leading with its entire size, which terminates with EOO.
+     Array:     same as object
+     DBRef:     <strlen> <cstring ns> <oid>
+     DBRef:     a database reference: basically a collection name plus an Object ID
+     BinData:   <int len> <byte subtype> <byte[len] data>
+     Code:      a function (not a closure): same format as String.
+     Symbol:    a language symbol (say a python symbol).  same format as String.
+     Code With Scope: <total size><String><Object>
+     \endcode
      */
     class BSONObj : public Stringable {
         friend class BSONObjIterator;
