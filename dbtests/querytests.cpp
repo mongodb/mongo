@@ -205,7 +205,7 @@ namespace QueryTests {
             ASSERT( error() );
         }
     protected:
-        const char *ns() { return "QueryTests::Fail"; }
+        const char *ns() { return "QueryTests_Fail"; }
         virtual void prep() {
             insert( ns(), fromjson( "{a:1}" ) );   
         }
