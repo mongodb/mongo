@@ -102,7 +102,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = client db/jsobj.h
+INPUT                  = client db/jsobj.h db/json.h
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c \
                          *.cc \

@@ -140,11 +140,13 @@ namespace mongo {
          Code With Scope: <total size><String><Object>
     */
 
-    /** Formatting mode for generating a JSON from BSON.
+    /** Formatting mode for generating JSON from BSON.
          Strict - strict RFC format
     	 TenGen - 10gen format, which is close to JS format.  This form is understandable by
      	          javascript running inside the Mongo server via eval()
          JS     - Javascript JSON compatible
+        See <http://mongodb.onconfluence.com/display/DOCS/Mongo+Extended+JSON>
+        for details.
      */
     enum JsonStringFormat { Strict, TenGen, JS };
 
