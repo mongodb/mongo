@@ -79,11 +79,12 @@ struct __wt_toc {
 
 	WT_MTX *mtx;			/* Thread's blocking mutex */
 
-	ENV *env;			/* Thread's environment */
-	int   op;			/* Operation code */
-	void *argp;			/* Operation parameters */
-	int   ret;			/* Operation result */
-	
+	int	 op;			/* Operation code */
+	ENV	*env;			/* Operation environment */
+	DB	*db;			/* Operation database */
+	void	*argp;			/* Operation parameters */
+	int	 ret;			/* Operation result */
+
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * WT_TOC handle api section: BEGIN
@@ -111,7 +112,6 @@ struct __db {
 		struct __db **tqe_prev;
 	} q;
 
-	WT_TOC *toc;			/* Enclosing thread of control */
 	IDB *idb;			/* Private object */
 	ENV *env;			/* Enclosing environment */
 	IENV *ienv;			/* Private environment object */
@@ -124,16 +124,16 @@ struct __db {
 	 * Db handle api section: BEGIN
 	 */
 	int (*bulk_load)(
-	    DB *, u_int32_t , int (*)(DB *, DBT **, DBT **));
+	    DB *, WT_TOC *, u_int32_t , int (*)(DB *, DBT **, DBT **));
 
 	int (*close)(
-	    DB *, u_int32_t );
+	    DB *, WT_TOC *, u_int32_t );
 
 	int (*destroy)(
-	    DB *, u_int32_t );
+	    DB *, WT_TOC *, u_int32_t );
 
 	int (*dump)(
-	    DB *, FILE *, u_int32_t );
+	    DB *, WT_TOC *, FILE *, u_int32_t );
 
 	void (*err)(
 	    DB *, int , const char *, ...);
@@ -142,89 +142,89 @@ struct __db {
 	    DB *, const char *, ...);
 
 	int (*get)(
-	    DB *, DBT *, DBT *, DBT *, u_int32_t );
+	    DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t );
 
-	void (*get_btree_compare)(
-	    DB *, int (**)(DB *, const DBT *, const DBT *));
+	int (*get_btree_compare)(
+	    DB *, WT_TOC *, int (**)(DB *, const DBT *, const DBT *));
 
-	void (*get_btree_compare_int)(
-	    DB *, int *);
+	int (*get_btree_compare_int)(
+	    DB *, WT_TOC *, int *);
 
-	void (*get_btree_dup_compare)(
-	    DB *, int (**)(DB *, const DBT *, const DBT *));
+	int (*get_btree_dup_compare)(
+	    DB *, WT_TOC *, int (**)(DB *, const DBT *, const DBT *));
 
-	void (*get_btree_dup_offpage)(
-	    DB *, u_int32_t *);
+	int (*get_btree_dup_offpage)(
+	    DB *, WT_TOC *, u_int32_t *);
 
-	void (*get_btree_itemsize)(
-	    DB *, u_int32_t *, u_int32_t *);
+	int (*get_btree_itemsize)(
+	    DB *, WT_TOC *, u_int32_t *, u_int32_t *);
 
-	void (*get_btree_pagesize)(
-	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
+	int (*get_btree_pagesize)(
+	    DB *, WT_TOC *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
 
-	void (*get_errcall)(
-	    DB *, void (**)(const DB *, const char *));
+	int (*get_errcall)(
+	    DB *, WT_TOC *, void (**)(const DB *, const char *));
 
-	void (*get_errfile)(
-	    DB *, FILE **);
+	int (*get_errfile)(
+	    DB *, WT_TOC *, FILE **);
 
-	void (*get_errpfx)(
-	    DB *, const char **);
+	int (*get_errpfx)(
+	    DB *, WT_TOC *, const char **);
 
 	int (*open)(
-	    DB *, const char *, mode_t , u_int32_t );
+	    DB *, WT_TOC *, const char *, mode_t , u_int32_t );
 
 	int (*btree_compare)(DB *, const DBT *, const DBT *);
 	int (*set_btree_compare)(
-	    DB *, int (*)(DB *, const DBT *, const DBT *));
+	    DB *, WT_TOC *, int (*)(DB *, const DBT *, const DBT *));
 
 	int btree_compare_int;
 	int (*set_btree_compare_int)(
-	    DB *, int );
+	    DB *, WT_TOC *, int );
 
 	int (*btree_dup_compare)(DB *, const DBT *, const DBT *);
 	int (*set_btree_dup_compare)(
-	    DB *, int (*)(DB *, const DBT *, const DBT *));
+	    DB *, WT_TOC *, int (*)(DB *, const DBT *, const DBT *));
 
 	u_int32_t btree_dup_offpage;
 	int (*set_btree_dup_offpage)(
-	    DB *, u_int32_t );
+	    DB *, WT_TOC *, u_int32_t );
 
 	u_int32_t intlitemsize;
 	u_int32_t leafitemsize;
 	int (*set_btree_itemsize)(
-	    DB *, u_int32_t , u_int32_t );
+	    DB *, WT_TOC *, u_int32_t , u_int32_t );
 
 	u_int32_t allocsize;
 	u_int32_t intlsize;
 	u_int32_t leafsize;
 	u_int32_t extsize;
 	int (*set_btree_pagesize)(
-	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
+	    DB *, WT_TOC *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
 
 	void (*errcall)(const DB *, const char *);
 	int (*set_errcall)(
-	    DB *, void (*)(const DB *, const char *));
+	    DB *, WT_TOC *, void (*)(const DB *, const char *));
 
 	FILE *errfile;
 	int (*set_errfile)(
-	    DB *, FILE *);
+	    DB *, WT_TOC *, FILE *);
 
 	const char *errpfx;
 	int (*set_errpfx)(
-	    DB *, const char *);
+	    DB *, WT_TOC *, const char *);
 
 	int (*stat_clear)(
-	    DB *, u_int32_t );
+	    DB *, WT_TOC *, u_int32_t );
 
 	int (*stat_print)(
-	    DB *, FILE * , u_int32_t );
+	    DB *, WT_TOC *, FILE * , u_int32_t );
 
 	int (*sync)(
-	    DB *, u_int32_t );
+	    DB *, WT_TOC *, u_int32_t );
 
 	int (*verify)(
-	    DB *, u_int32_t );
+	    DB *, WT_TOC *, u_int32_t );
 	/*
 	 * Db handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -246,7 +246,6 @@ struct __dbc {
  * Database environment handle
  *******************************************/
 struct __env {
-	WT_TOC *toc;			/* Enclosing thread of control */
 	IENV *ienv;			/* Private object */
 
 					/* Linked list of databases */
@@ -267,10 +266,10 @@ struct __env {
 	 * Env handle api section: BEGIN
 	 */
 	int (*close)(
-	    ENV *, u_int32_t );
+	    ENV *, WT_TOC *, u_int32_t );
 
 	int (*destroy)(
-	    ENV *, u_int32_t );
+	    ENV *, WT_TOC *, u_int32_t );
 
 	void (*err)(
 	    ENV *, int , const char *, ...);
@@ -278,49 +277,49 @@ struct __env {
 	void (*errx)(
 	    ENV *, const char *, ...);
 
-	void (*get_cachesize)(
-	    ENV *, u_int32_t *);
+	int (*get_cachesize)(
+	    ENV *, WT_TOC *, u_int32_t *);
 
-	void (*get_errcall)(
-	    ENV *, void (**)(const ENV *, const char *));
+	int (*get_errcall)(
+	    ENV *, WT_TOC *, void (**)(const ENV *, const char *));
 
-	void (*get_errfile)(
-	    ENV *, FILE **);
+	int (*get_errfile)(
+	    ENV *, WT_TOC *, FILE **);
 
-	void (*get_errpfx)(
-	    ENV *, const char **);
+	int (*get_errpfx)(
+	    ENV *, WT_TOC *, const char **);
 
-	void (*get_verbose)(
-	    ENV *, u_int32_t *);
+	int (*get_verbose)(
+	    ENV *, WT_TOC *, u_int32_t *);
 
 	int (*open)(
-	    ENV *, const char *, mode_t , u_int32_t );
+	    ENV *, WT_TOC *, const char *, mode_t , u_int32_t );
 
 	u_int32_t cachesize;
 	int (*set_cachesize)(
-	    ENV *, u_int32_t );
+	    ENV *, WT_TOC *, u_int32_t );
 
 	void (*errcall)(const ENV *, const char *);
 	int (*set_errcall)(
-	    ENV *, void (*)(const ENV *, const char *));
+	    ENV *, WT_TOC *, void (*)(const ENV *, const char *));
 
 	FILE *errfile;
 	int (*set_errfile)(
-	    ENV *, FILE *);
+	    ENV *, WT_TOC *, FILE *);
 
 	const char *errpfx;
 	int (*set_errpfx)(
-	    ENV *, const char *);
+	    ENV *, WT_TOC *, const char *);
 
 	u_int32_t verbose;
 	int (*set_verbose)(
-	    ENV *, u_int32_t );
+	    ENV *, WT_TOC *, u_int32_t );
 
 	int (*stat_clear)(
-	    ENV *, u_int32_t );
+	    ENV *, WT_TOC *, u_int32_t );
 
 	int (*stat_print)(
-	    ENV *, FILE *, u_int32_t );
+	    ENV *, WT_TOC *, FILE *, u_int32_t );
 	/*
 	 * Env handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -336,6 +335,7 @@ int	 wt_db_create(DB **, WT_TOC *, ENV *, u_int32_t);
 int	 wt_env_create(ENV **, WT_TOC *, u_int32_t);
 int	 wt_toc_create(WT_TOC **, u_int32_t);
 char	*wt_strerror(int);
+char	*wt_version(int *, int *, int *);
 
 /*******************************************
  * API flags
@@ -350,17 +350,17 @@ char	*wt_strerror(int);
 #define	WT_DBT_APPMEM					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
-#define	WT_MAXKEY_NOTSET				0x00000002
 #define	WT_MODIFIED					0x00000002
 #define	WT_PRINTABLES					0x00000001
 #define	WT_PRIVATE_ENV					0x00000001
-#define	WT_RUNNING					0x00000001
+#define	WT_RUNNING					0x00000002
+#define	WT_SINGLE_THREADED				0x00000001
 #define	WT_SORTED_INPUT					0x00000001
 #define	WT_UNFORMATTED					0x00000001
 #define	WT_VERB_FILEOPS					0x00000002
 #define	WT_VERB_FILEOPS_ALL				0x00000001
 
-#define	WT_APIMASK_DB					0x00000003
+#define	WT_APIMASK_DB					0x00000001
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000003
 #define	WT_APIMASK_DB_CLOSE				0x00000000
 #define	WT_APIMASK_DB_DESTROY				0x00000000
@@ -387,7 +387,11 @@ char	*wt_strerror(int);
 #define	WT_APIMASK_WT_ENV_CREATE			0x00000000
 #define	WT_APIMASK_WT_INDX				0x00000001
 #define	WT_APIMASK_WT_PAGE				0x00000003
-#define	WT_APIMASK_WT_TOC				0x00000001
+#define	WT_APIMASK_WT_START				0x00000001
+#define	WT_APIMASK_WT_STOP				0x00000000
+#define	WT_APIMASK_WT_TOC				0x00000003
+#define	WT_APIMASK_WT_TOC_DESTROY			0x00000000
+#define	WT_APIMASK_WT_TOC_CREATE			0x00000000
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api.py.

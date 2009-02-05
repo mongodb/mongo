@@ -17,11 +17,12 @@
 #		env	-- DbEnv handle
 #		db	-- Db handle
 #	flags:
-#		open    -- illegal until after the handle.open method call
 #		getset  -- an API getter/setter method
 #		local	-- no need to connect to the server[1]
 #		method	-- a method returning an int
 #		methodV -- a method returning void
+#		open    -- illegal until after the handle.open method call
+#		notoc	-- method doesn't take a WT_TOC reference
 #		verify  -- setters call a subroutine to validate the arguments
 #
 # [1]
@@ -43,42 +44,42 @@
 # WT_TOC method declarations
 ###################################################
 wt_toc.destroy
-	method,local
+	method,local,notoc
 	flags	u_int32_t @S
 
 ###################################################
 # Env getter/setter method declarations
 ###################################################
 env.get_errcall
-	methodV,getset
+	methodv,getset
 	errcall	void (**@S)(const ENV *, const char *)
 env.set_errcall
 	method,getset
 	errcall	void (*@S)(const ENV *, const char *)
 
 env.get_errfile
-	methodV,getset
+	methodv,getset
 	errfile	FILE **@S
 env.set_errfile
 	method,getset
 	errfile	FILE *@S
 
 env.get_errpfx
-	methodV,getset
+	methodv,getset
 	errpfx	const char **@S
 env.set_errpfx
 	method,getset
 	errpfx	const char *@S
 
 env.get_verbose
-	methodV,getset
+	methodv,getset
 	verbose	u_int32_t *@S
 env.set_verbose
 	method,getset,verify
 	verbose	u_int32_t @S
 
 env.get_cachesize
-	methodV,getset
+	methodv,getset
 	cachesize	u_int32_t *@S
 env.set_cachesize
 	method,getset
@@ -96,12 +97,12 @@ env.destroy
 	flags	u_int32_t @S
 
 env.err
-	methodV,local
+	methodV,local,notoc
 	err	int @S
 	fmt	const char *@S, ...
 
 env.errx
-	methodV,local
+	methodV,local,notoc
 	fmt	const char *@S, ...
 
 env.open
@@ -123,49 +124,49 @@ env.stat_print
 # Db getter/setter method declarations
 ###################################################
 db.get_errcall
-	methodV,getset
+	methodv,getset
 	errcall	void (**@S)(const DB *, const char *)
 db.set_errcall
 	method,getset
 	errcall	void (*@S)(const DB *, const char *)
 
 db.get_errfile
-	methodV,getset
+	methodv,getset
 	errfile	FILE **@S
 db.set_errfile
 	method,getset
 	errfile	FILE *@S
 
 db.get_errpfx
-	methodV,getset
+	methodv,getset
 	errpfx	const char **@S
 db.set_errpfx
 	method,getset
 	errpfx	const char *@S
 
 db.get_btree_compare
-	methodV,getset
+	methodv,getset
 	btree_compare	int (**@S)(DB *, const DBT *, const DBT *)
 db.set_btree_compare
 	method,getset
 	btree_compare	int (*@S)(DB *, const DBT *, const DBT *)
 
 db.get_btree_compare_int
-	methodV,getset
+	methodv,getset
 	btree_compare_int	int *@S
 db.set_btree_compare_int
 	method,getset,verify
 	btree_compare_int	int @S
 
 db.get_btree_dup_compare
-	methodV,getset
+	methodv,getset
 	btree_dup_compare	int (**@S)(DB *, const DBT *, const DBT *)
 db.set_btree_dup_compare
 	method,getset
 	btree_dup_compare	int (*@S)(DB *, const DBT *, const DBT *)
 
 db.get_btree_itemsize
-	methodV,getset
+	methodv,getset
 	intlitemsize	u_int32_t *@S
 	leafitemsize	u_int32_t *@S
 db.set_btree_itemsize
@@ -174,7 +175,7 @@ db.set_btree_itemsize
 	leafitemsize	u_int32_t @S
 
 db.get_btree_pagesize
-	methodV,getset
+	methodv,getset
 	allocsize	u_int32_t *@S
 	intlsize	u_int32_t *@S
 	leafsize	u_int32_t *@S
@@ -187,7 +188,7 @@ db.set_btree_pagesize
 	extsize	u_int32_t @S
 
 db.get_btree_dup_offpage
-	methodV,getset
+	methodv,getset
 	btree_dup_offpage	u_int32_t *@S
 db.set_btree_dup_offpage
 	method,getset
@@ -215,12 +216,12 @@ db.dump
 	flags	u_int32_t @S
 
 db.err
-	methodV,local
+	methodV,local,notoc
 	err	int @S
 	fmt	const char *@S, ...
 
 db.errx
-	methodV,local
+	methodV,local,notoc
 	fmt	const char *@S, ...
 
 db.get

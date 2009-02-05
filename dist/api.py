@@ -41,6 +41,8 @@ def func_input():
 def func_stdcast(handle, method, flags, rettype, func, args, f):
 	f.write('\t' + handle + '->' + method +\
 	    ' = (' + rettype + ' (*)\n\t    (' + handle.upper() + ' *')
+	if not flags.count('notoc'):
+		f.write(', WT_TOC *')
 	for l in args:
 		f.write(', ' + l.split('\t')[1].replace('@S', ''))
 	f.write('))\n\t    __wt_' + handle + '_' + func + ';\n')
@@ -101,6 +103,8 @@ def func_decl(handle, method, flags, args, f):
 		rettype = 'int'
 	f.write('\t' + rettype + \
 	    ' (*' + method + ')(\n\t    ' + handle.upper() + ' *')
+	if not flags.count('notoc'):
+		f.write(', WT_TOC *')
 	for l in args:
 		f.write(', ' + l.split('\t')[1].replace('@S', ''))
 	f.write(');\n')
@@ -113,10 +117,11 @@ def func_getset(handle, method, flags, args, f):
 	else:
 		rettype = 'int'
 	
-	s = 'static ' + rettype + ' __wt_' + handle + '_' + method +\
-	    '(\n    wt_args_' + handle + '_' + method  + ' *argp)'
+	s = 'static ' +\
+	    rettype + ' __wt_' + handle + '_' + method + '(WT_TOC *toc)'
 	f.write(s + ';\n')
 	f.write(s + '\n{\n')
+	f.write('\twt_args_' + handle + '_' + method  + '_unpack;\n')
 
 	# Verify means call a standard verification routine because there are
 	# constraints or side-effects on setting the value.  The setter fails
@@ -124,20 +129,19 @@ def func_getset(handle, method, flags, args, f):
 	if flags.count('verify'):
 		f.write('\tint ret;\n\n')
 		f.write('\tif ((ret = __wt_' + handle + '_' +\
-		    method + '_verify(argp)) != 0)\n\t\treturn (ret);\n\n')
+		    method + '_verify(toc)) != 0)\n\t\treturn (ret);\n\n')
+	else:
+		f.write('\n')
 
 	if flags.count('getset') and method.count('get_'):
 		for l in args:
-			f.write('\t*(argp->' + l.split('\t')[0] + ')' +\
-			    ' = ' + 'argp->' + handle +\
-			    '->' + l.split('\t')[0] + ';\n')
-		f.write('}\n\n')
+			f.write('\t*(' + l.split('\t')[0] + ')' +\
+			    ' = ' + handle + '->' + l.split('\t')[0] + ';\n')
 	else:
 		for l in args:
-			f.write('\targp->' + handle + '->' +\
-			    l.split('\t')[0] + ' = argp->' +\
-			    l.split('\t')[0] + ';\n')
-		f.write('\treturn (0);\n}\n\n')
+			f.write('\t' + handle + '->' +\
+			    l.split('\t')[0] + ' = ' + l.split('\t')[0] + ';\n')
+	f.write('\treturn (0);\n}\n\n')
 
 # func_connect_hdr --
 #	Generate #defines and structures for the connection API.
@@ -145,26 +149,33 @@ op_cnt = 1
 def func_connect_hdr(handle, method, flags, args, f):
 	global op_cnt
 	uv = handle.upper() + '_' + method.upper()
-	lv = handle + '_' + method
+	lv = 'wt_args_' + handle + '_' + method
 
 	f.write('\n#define\t' + 'WT_OP_' + uv + '\t' + str(op_cnt) + '\n')
 	op_cnt += 1
 	f.write('typedef struct {\n')
-	f.write('\tint op;\n')
-	f.write('\tint ret;\n')
-	f.write('\t' + handle.upper() + ' *' + handle + ';\n')
 	for l in args:
 		f.write('\t' +\
 		    l.split('\t')[1].replace('@S', l.split('\t')[0]) + ';\n')
-	f.write('} wt_args_' + lv + ';\n')
-	f.write('#define\twt_args_' + lv + '_unpack\\\n')
-	f.write('\t' + handle.upper() +\
-	    ' *' + handle + ' = argp->' + handle + ';\\\n')
+	f.write('} ' + lv + ';\n')
+
+	f.write('#define\t' + lv + '_pack\\\n')
+
+	sep = ''
+	for l in args:
+		f.write(sep + '\t' +\
+		    'args.' + l.split('\t')[0] + ' = ' + l.split('\t')[0])
+		sep = ';\\\n'
+	f.write('\n')
+
+	f.write('#define\t' + lv + '_unpack\\\n')
+	f.write('\t' +\
+	    handle.upper() + ' *' + handle + ' = toc->' + handle + ';\\\n')
 	sep = ''
 	for l in args:
 		f.write(sep + '\t' +\
 		    l.split('\t')[1].replace('@S', l.split('\t')[0]) +\
-		    ' = argp->' + l.split('\t')[0])
+		    ' = ((' + lv + ' *)(toc->argp))->' + l.split('\t')[0])
 		sep = ';\\\n'
 	f.write('\n')
 
@@ -178,34 +189,21 @@ def func_connect_api(handle, method, flags, args, f):
 	
 	s = 'static ' + rettype + ' __wt_api_' +\
 	    handle + '_' + method + '(\n\t' + handle.upper() + ' *' + handle
+	if not flags.count('notoc'):
+		s += ',\n\tWT_TOC *toc'
 	for l in args:
 		s += ',\n\t' +\
 		    l.split('\t')[1].replace('@S', l.split('\t')[0])
 	s += ')'
 	f.write(s + ';\n')
 	f.write(s + '\n{\n')
-	f.write('\twt_args_' + handle + '_' + method + ' args;\n\n')
-	f.write('\targs.' + handle + ' = ' + handle + ';\n')
-	for l in args:
-		f.write('\targs.' +\
-		    l.split('\t')[0] + ' = ' + l.split('\t')[0] + ';\n')
-	f.write('\t' + handle + '->toc->op = WT_OP_' +\
-	    handle.upper() + '_' + method.upper() + ';\n')
-	f.write('\t' + handle + '->toc->argp = &args;\n')
-	f.write('\t' + handle + '->toc->env = ')
-	if not handle == "env":
-		f.write(handle + '->')
-	f.write('env;\n')
-	f.write('\n')
-	f.write('\t')
-	if rettype == 'int':
-		f.write('return (')
-	else:
-		f.write('(void)')
-	f.write('__wt_toc_sched(' + handle + '->toc)')
-	if rettype == 'int':
-		f.write(')')
-	f.write(';\n')
+
+	s = '\twt_args_' + handle + '_' + method
+	f.write(s + ' args;\n\n')
+	f.write(s + '_pack;\n\n')
+
+	f.write('\twt_args_' + handle + '_toc_sched(WT_OP_' + 
+	    handle.upper() + '_' + method.upper() + ');\n')
 	f.write('}\n\n')
 
 # func_connect_switch --
@@ -215,7 +213,7 @@ def func_connect_switch(handle, method, flags, args, f):
 	f.write('\t\t')
 	if not flags.count('methodV'):
 		f.write('ret = ')
-	f.write('__wt_' + handle + '_' + method + '(argp);\n')
+	f.write('__wt_' + handle + '_' + method + '(toc);\n')
 	f.write('\t\tbreak;\n')
 
 #####################################################################
@@ -227,7 +225,21 @@ func_input()
 # Update connect.h with ENV, DB, WT_TOC handle information.
 #####################################################################
 tfile = open(tmp_file, 'w')
-tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n')
+tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
+
+tfile.write('#define\twt_args_env_toc_sched(oparg)\\\n')
+tfile.write('\ttoc->op = (oparg);\\\n')
+tfile.write('\ttoc->env = env;\\\n')
+tfile.write('\ttoc->db = NULL;\\\n')
+tfile.write('\ttoc->argp = &args;\\\n')
+tfile.write('\treturn (__wt_toc_sched(toc))\n')
+
+tfile.write('#define\twt_args_db_toc_sched(oparg)\\\n')
+tfile.write('\ttoc->op = (oparg);\\\n')
+tfile.write('\ttoc->env = db->env;\\\n')
+tfile.write('\ttoc->db = db;\\\n')
+tfile.write('\ttoc->argp = &args;\\\n')
+tfile.write('\treturn (__wt_toc_sched(toc))\n')
 
 # Write the connect structures.
 for i in sorted(\
@@ -284,11 +296,8 @@ for i in sorted(filter(lambda _i: _i[0].count('db'), api.iteritems())):
 tfile.write('}\n\n')
 
 # Write the API connection switch.
-tfile.write('int\n__wt_api_switch(WT_TOC *toc)\n{\n')
-tfile.write('\tvoid *argp;\n')
+tfile.write('void\n__wt_api_switch(WT_TOC *toc)\n{\n')
 tfile.write('\tint ret;\n\n')
-tfile.write('\targp = toc->argp;\n')
-tfile.write('\tret = 0;\n\n')
 tfile.write('\tswitch (toc->op) {\n')
 for i in sorted(
     filter(lambda _i: _i[1][0].count('local') == 0, api.iteritems())):
@@ -298,7 +307,7 @@ tfile.write('\tdefault:\n')
 tfile.write('\t\tret = WT_ERROR;\n')
 tfile.write('\t\tbreak;\n')
 tfile.write('\t}\n\n')
-tfile.write('\treturn (ret);\n')
+tfile.write('\ttoc->ret = ret;\n')
 tfile.write('}\n')
 
 tfile.close()

@@ -4,90 +4,82 @@
 
 static int __wt_api_db_bulk_load(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags,
 	int (*cb)(DB *, DBT **, DBT **));
 static int __wt_api_db_bulk_load(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags,
 	int (*cb)(DB *, DBT **, DBT **))
 {
 	wt_args_db_bulk_load args;
 
-	args.db = db;
-	args.flags = flags;
-	args.cb = cb;
-	db->toc->op = WT_OP_DB_BULK_LOAD;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_bulk_load_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_BULK_LOAD);
 }
 
 static int __wt_api_db_close(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags);
 static int __wt_api_db_close(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags)
 {
 	wt_args_db_close args;
 
-	args.db = db;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_CLOSE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_close_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_CLOSE);
 }
 
 static int __wt_api_db_destroy(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags);
 static int __wt_api_db_destroy(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags)
 {
 	wt_args_db_destroy args;
 
-	args.db = db;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_DESTROY;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_destroy_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_DESTROY);
 }
 
 static int __wt_api_db_dump(
 	DB *db,
+	WT_TOC *toc,
 	FILE *stream,
 	u_int32_t flags);
 static int __wt_api_db_dump(
 	DB *db,
+	WT_TOC *toc,
 	FILE *stream,
 	u_int32_t flags)
 {
 	wt_args_db_dump args;
 
-	args.db = db;
-	args.stream = stream;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_DUMP;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_dump_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_DUMP);
 }
 
 static int __wt_api_db_get(
 	DB *db,
+	WT_TOC *toc,
 	DBT *key,
 	DBT *pkey,
 	DBT *data,
 	u_int32_t flags);
 static int __wt_api_db_get(
 	DB *db,
+	WT_TOC *toc,
 	DBT *key,
 	DBT *pkey,
 	DBT *data,
@@ -95,119 +87,103 @@ static int __wt_api_db_get(
 {
 	wt_args_db_get args;
 
-	args.db = db;
-	args.key = key;
-	args.pkey = pkey;
-	args.data = data;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_GET;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_GET);
 }
 
-static void __wt_api_db_get_btree_compare(
+static int __wt_api_db_get_btree_compare(
 	DB *db,
+	WT_TOC *toc,
 	int (**btree_compare)(DB *, const DBT *, const DBT *));
-static void __wt_api_db_get_btree_compare(
+static int __wt_api_db_get_btree_compare(
 	DB *db,
+	WT_TOC *toc,
 	int (**btree_compare)(DB *, const DBT *, const DBT *))
 {
 	wt_args_db_get_btree_compare args;
 
-	args.db = db;
-	args.btree_compare = btree_compare;
-	db->toc->op = WT_OP_DB_GET_BTREE_COMPARE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_btree_compare_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_BTREE_COMPARE);
 }
 
-static void __wt_api_db_get_btree_compare_int(
+static int __wt_api_db_get_btree_compare_int(
 	DB *db,
+	WT_TOC *toc,
 	int *btree_compare_int);
-static void __wt_api_db_get_btree_compare_int(
+static int __wt_api_db_get_btree_compare_int(
 	DB *db,
+	WT_TOC *toc,
 	int *btree_compare_int)
 {
 	wt_args_db_get_btree_compare_int args;
 
-	args.db = db;
-	args.btree_compare_int = btree_compare_int;
-	db->toc->op = WT_OP_DB_GET_BTREE_COMPARE_INT;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_btree_compare_int_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_BTREE_COMPARE_INT);
 }
 
-static void __wt_api_db_get_btree_dup_compare(
+static int __wt_api_db_get_btree_dup_compare(
 	DB *db,
+	WT_TOC *toc,
 	int (**btree_dup_compare)(DB *, const DBT *, const DBT *));
-static void __wt_api_db_get_btree_dup_compare(
+static int __wt_api_db_get_btree_dup_compare(
 	DB *db,
+	WT_TOC *toc,
 	int (**btree_dup_compare)(DB *, const DBT *, const DBT *))
 {
 	wt_args_db_get_btree_dup_compare args;
 
-	args.db = db;
-	args.btree_dup_compare = btree_dup_compare;
-	db->toc->op = WT_OP_DB_GET_BTREE_DUP_COMPARE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_btree_dup_compare_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_BTREE_DUP_COMPARE);
 }
 
-static void __wt_api_db_get_btree_dup_offpage(
+static int __wt_api_db_get_btree_dup_offpage(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t *btree_dup_offpage);
-static void __wt_api_db_get_btree_dup_offpage(
+static int __wt_api_db_get_btree_dup_offpage(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t *btree_dup_offpage)
 {
 	wt_args_db_get_btree_dup_offpage args;
 
-	args.db = db;
-	args.btree_dup_offpage = btree_dup_offpage;
-	db->toc->op = WT_OP_DB_GET_BTREE_DUP_OFFPAGE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_btree_dup_offpage_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_BTREE_DUP_OFFPAGE);
 }
 
-static void __wt_api_db_get_btree_itemsize(
+static int __wt_api_db_get_btree_itemsize(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t *intlitemsize,
 	u_int32_t *leafitemsize);
-static void __wt_api_db_get_btree_itemsize(
+static int __wt_api_db_get_btree_itemsize(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t *intlitemsize,
 	u_int32_t *leafitemsize)
 {
 	wt_args_db_get_btree_itemsize args;
 
-	args.db = db;
-	args.intlitemsize = intlitemsize;
-	args.leafitemsize = leafitemsize;
-	db->toc->op = WT_OP_DB_GET_BTREE_ITEMSIZE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_btree_itemsize_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_BTREE_ITEMSIZE);
 }
 
-static void __wt_api_db_get_btree_pagesize(
+static int __wt_api_db_get_btree_pagesize(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t *allocsize,
 	u_int32_t *intlsize,
 	u_int32_t *leafsize,
 	u_int32_t *extsize);
-static void __wt_api_db_get_btree_pagesize(
+static int __wt_api_db_get_btree_pagesize(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t *allocsize,
 	u_int32_t *intlsize,
 	u_int32_t *leafsize,
@@ -215,197 +191,171 @@ static void __wt_api_db_get_btree_pagesize(
 {
 	wt_args_db_get_btree_pagesize args;
 
-	args.db = db;
-	args.allocsize = allocsize;
-	args.intlsize = intlsize;
-	args.leafsize = leafsize;
-	args.extsize = extsize;
-	db->toc->op = WT_OP_DB_GET_BTREE_PAGESIZE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_btree_pagesize_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_BTREE_PAGESIZE);
 }
 
-static void __wt_api_db_get_errcall(
+static int __wt_api_db_get_errcall(
 	DB *db,
+	WT_TOC *toc,
 	void (**errcall)(const DB *, const char *));
-static void __wt_api_db_get_errcall(
+static int __wt_api_db_get_errcall(
 	DB *db,
+	WT_TOC *toc,
 	void (**errcall)(const DB *, const char *))
 {
 	wt_args_db_get_errcall args;
 
-	args.db = db;
-	args.errcall = errcall;
-	db->toc->op = WT_OP_DB_GET_ERRCALL;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_errcall_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_ERRCALL);
 }
 
-static void __wt_api_db_get_errfile(
+static int __wt_api_db_get_errfile(
 	DB *db,
+	WT_TOC *toc,
 	FILE **errfile);
-static void __wt_api_db_get_errfile(
+static int __wt_api_db_get_errfile(
 	DB *db,
+	WT_TOC *toc,
 	FILE **errfile)
 {
 	wt_args_db_get_errfile args;
 
-	args.db = db;
-	args.errfile = errfile;
-	db->toc->op = WT_OP_DB_GET_ERRFILE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_errfile_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_ERRFILE);
 }
 
-static void __wt_api_db_get_errpfx(
+static int __wt_api_db_get_errpfx(
 	DB *db,
+	WT_TOC *toc,
 	const char **errpfx);
-static void __wt_api_db_get_errpfx(
+static int __wt_api_db_get_errpfx(
 	DB *db,
+	WT_TOC *toc,
 	const char **errpfx)
 {
 	wt_args_db_get_errpfx args;
 
-	args.db = db;
-	args.errpfx = errpfx;
-	db->toc->op = WT_OP_DB_GET_ERRPFX;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_get_errpfx_pack;
 
-	(void)__wt_toc_sched(db->toc);
+	wt_args_db_toc_sched(WT_OP_DB_GET_ERRPFX);
 }
 
 static int __wt_api_db_open(
 	DB *db,
+	WT_TOC *toc,
 	const char *dbname,
 	mode_t mode,
 	u_int32_t flags);
 static int __wt_api_db_open(
 	DB *db,
+	WT_TOC *toc,
 	const char *dbname,
 	mode_t mode,
 	u_int32_t flags)
 {
 	wt_args_db_open args;
 
-	args.db = db;
-	args.dbname = dbname;
-	args.mode = mode;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_OPEN;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_open_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_OPEN);
 }
 
 static int __wt_api_db_set_btree_compare(
 	DB *db,
+	WT_TOC *toc,
 	int (*btree_compare)(DB *, const DBT *, const DBT *));
 static int __wt_api_db_set_btree_compare(
 	DB *db,
+	WT_TOC *toc,
 	int (*btree_compare)(DB *, const DBT *, const DBT *))
 {
 	wt_args_db_set_btree_compare args;
 
-	args.db = db;
-	args.btree_compare = btree_compare;
-	db->toc->op = WT_OP_DB_SET_BTREE_COMPARE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_btree_compare_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_BTREE_COMPARE);
 }
 
 static int __wt_api_db_set_btree_compare_int(
 	DB *db,
+	WT_TOC *toc,
 	int btree_compare_int);
 static int __wt_api_db_set_btree_compare_int(
 	DB *db,
+	WT_TOC *toc,
 	int btree_compare_int)
 {
 	wt_args_db_set_btree_compare_int args;
 
-	args.db = db;
-	args.btree_compare_int = btree_compare_int;
-	db->toc->op = WT_OP_DB_SET_BTREE_COMPARE_INT;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_btree_compare_int_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_BTREE_COMPARE_INT);
 }
 
 static int __wt_api_db_set_btree_dup_compare(
 	DB *db,
+	WT_TOC *toc,
 	int (*btree_dup_compare)(DB *, const DBT *, const DBT *));
 static int __wt_api_db_set_btree_dup_compare(
 	DB *db,
+	WT_TOC *toc,
 	int (*btree_dup_compare)(DB *, const DBT *, const DBT *))
 {
 	wt_args_db_set_btree_dup_compare args;
 
-	args.db = db;
-	args.btree_dup_compare = btree_dup_compare;
-	db->toc->op = WT_OP_DB_SET_BTREE_DUP_COMPARE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_btree_dup_compare_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_BTREE_DUP_COMPARE);
 }
 
 static int __wt_api_db_set_btree_dup_offpage(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t btree_dup_offpage);
 static int __wt_api_db_set_btree_dup_offpage(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t btree_dup_offpage)
 {
 	wt_args_db_set_btree_dup_offpage args;
 
-	args.db = db;
-	args.btree_dup_offpage = btree_dup_offpage;
-	db->toc->op = WT_OP_DB_SET_BTREE_DUP_OFFPAGE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_btree_dup_offpage_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_BTREE_DUP_OFFPAGE);
 }
 
 static int __wt_api_db_set_btree_itemsize(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t intlitemsize,
 	u_int32_t leafitemsize);
 static int __wt_api_db_set_btree_itemsize(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t intlitemsize,
 	u_int32_t leafitemsize)
 {
 	wt_args_db_set_btree_itemsize args;
 
-	args.db = db;
-	args.intlitemsize = intlitemsize;
-	args.leafitemsize = leafitemsize;
-	db->toc->op = WT_OP_DB_SET_BTREE_ITEMSIZE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_btree_itemsize_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_BTREE_ITEMSIZE);
 }
 
 static int __wt_api_db_set_btree_pagesize(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t allocsize,
 	u_int32_t intlsize,
 	u_int32_t leafsize,
 	u_int32_t extsize);
 static int __wt_api_db_set_btree_pagesize(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t allocsize,
 	u_int32_t intlsize,
 	u_int32_t leafsize,
@@ -413,679 +363,636 @@ static int __wt_api_db_set_btree_pagesize(
 {
 	wt_args_db_set_btree_pagesize args;
 
-	args.db = db;
-	args.allocsize = allocsize;
-	args.intlsize = intlsize;
-	args.leafsize = leafsize;
-	args.extsize = extsize;
-	db->toc->op = WT_OP_DB_SET_BTREE_PAGESIZE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_btree_pagesize_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_BTREE_PAGESIZE);
 }
 
 static int __wt_api_db_set_errcall(
 	DB *db,
+	WT_TOC *toc,
 	void (*errcall)(const DB *, const char *));
 static int __wt_api_db_set_errcall(
 	DB *db,
+	WT_TOC *toc,
 	void (*errcall)(const DB *, const char *))
 {
 	wt_args_db_set_errcall args;
 
-	args.db = db;
-	args.errcall = errcall;
-	db->toc->op = WT_OP_DB_SET_ERRCALL;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_errcall_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_ERRCALL);
 }
 
 static int __wt_api_db_set_errfile(
 	DB *db,
+	WT_TOC *toc,
 	FILE *errfile);
 static int __wt_api_db_set_errfile(
 	DB *db,
+	WT_TOC *toc,
 	FILE *errfile)
 {
 	wt_args_db_set_errfile args;
 
-	args.db = db;
-	args.errfile = errfile;
-	db->toc->op = WT_OP_DB_SET_ERRFILE;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_errfile_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_ERRFILE);
 }
 
 static int __wt_api_db_set_errpfx(
 	DB *db,
+	WT_TOC *toc,
 	const char *errpfx);
 static int __wt_api_db_set_errpfx(
 	DB *db,
+	WT_TOC *toc,
 	const char *errpfx)
 {
 	wt_args_db_set_errpfx args;
 
-	args.db = db;
-	args.errpfx = errpfx;
-	db->toc->op = WT_OP_DB_SET_ERRPFX;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_set_errpfx_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SET_ERRPFX);
 }
 
 static int __wt_api_db_stat_clear(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags);
 static int __wt_api_db_stat_clear(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags)
 {
 	wt_args_db_stat_clear args;
 
-	args.db = db;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_STAT_CLEAR;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_stat_clear_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_STAT_CLEAR);
 }
 
 static int __wt_api_db_stat_print(
 	DB *db,
+	WT_TOC *toc,
 	FILE * stream,
 	u_int32_t flags);
 static int __wt_api_db_stat_print(
 	DB *db,
+	WT_TOC *toc,
 	FILE * stream,
 	u_int32_t flags)
 {
 	wt_args_db_stat_print args;
 
-	args.db = db;
-	args.stream = stream;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_STAT_PRINT;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_stat_print_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_STAT_PRINT);
 }
 
 static int __wt_api_db_sync(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags);
 static int __wt_api_db_sync(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags)
 {
 	wt_args_db_sync args;
 
-	args.db = db;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_SYNC;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_sync_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_SYNC);
 }
 
 static int __wt_api_db_verify(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags);
 static int __wt_api_db_verify(
 	DB *db,
+	WT_TOC *toc,
 	u_int32_t flags)
 {
 	wt_args_db_verify args;
 
-	args.db = db;
-	args.flags = flags;
-	db->toc->op = WT_OP_DB_VERIFY;
-	db->toc->argp = &args;
-	db->toc->env = db->env;
+	wt_args_db_verify_pack;
 
-	return (__wt_toc_sched(db->toc));
+	wt_args_db_toc_sched(WT_OP_DB_VERIFY);
 }
 
 static int __wt_api_env_close(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t flags);
 static int __wt_api_env_close(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t flags)
 {
 	wt_args_env_close args;
 
-	args.env = env;
-	args.flags = flags;
-	env->toc->op = WT_OP_ENV_CLOSE;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_close_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_CLOSE);
 }
 
 static int __wt_api_env_destroy(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t flags);
 static int __wt_api_env_destroy(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t flags)
 {
 	wt_args_env_destroy args;
 
-	args.env = env;
-	args.flags = flags;
-	env->toc->op = WT_OP_ENV_DESTROY;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_destroy_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_DESTROY);
 }
 
-static void __wt_api_env_get_cachesize(
+static int __wt_api_env_get_cachesize(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t *cachesize);
-static void __wt_api_env_get_cachesize(
+static int __wt_api_env_get_cachesize(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t *cachesize)
 {
 	wt_args_env_get_cachesize args;
 
-	args.env = env;
-	args.cachesize = cachesize;
-	env->toc->op = WT_OP_ENV_GET_CACHESIZE;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_get_cachesize_pack;
 
-	(void)__wt_toc_sched(env->toc);
+	wt_args_env_toc_sched(WT_OP_ENV_GET_CACHESIZE);
 }
 
-static void __wt_api_env_get_errcall(
+static int __wt_api_env_get_errcall(
 	ENV *env,
+	WT_TOC *toc,
 	void (**errcall)(const ENV *, const char *));
-static void __wt_api_env_get_errcall(
+static int __wt_api_env_get_errcall(
 	ENV *env,
+	WT_TOC *toc,
 	void (**errcall)(const ENV *, const char *))
 {
 	wt_args_env_get_errcall args;
 
-	args.env = env;
-	args.errcall = errcall;
-	env->toc->op = WT_OP_ENV_GET_ERRCALL;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_get_errcall_pack;
 
-	(void)__wt_toc_sched(env->toc);
+	wt_args_env_toc_sched(WT_OP_ENV_GET_ERRCALL);
 }
 
-static void __wt_api_env_get_errfile(
+static int __wt_api_env_get_errfile(
 	ENV *env,
+	WT_TOC *toc,
 	FILE **errfile);
-static void __wt_api_env_get_errfile(
+static int __wt_api_env_get_errfile(
 	ENV *env,
+	WT_TOC *toc,
 	FILE **errfile)
 {
 	wt_args_env_get_errfile args;
 
-	args.env = env;
-	args.errfile = errfile;
-	env->toc->op = WT_OP_ENV_GET_ERRFILE;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_get_errfile_pack;
 
-	(void)__wt_toc_sched(env->toc);
+	wt_args_env_toc_sched(WT_OP_ENV_GET_ERRFILE);
 }
 
-static void __wt_api_env_get_errpfx(
+static int __wt_api_env_get_errpfx(
 	ENV *env,
+	WT_TOC *toc,
 	const char **errpfx);
-static void __wt_api_env_get_errpfx(
+static int __wt_api_env_get_errpfx(
 	ENV *env,
+	WT_TOC *toc,
 	const char **errpfx)
 {
 	wt_args_env_get_errpfx args;
 
-	args.env = env;
-	args.errpfx = errpfx;
-	env->toc->op = WT_OP_ENV_GET_ERRPFX;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_get_errpfx_pack;
 
-	(void)__wt_toc_sched(env->toc);
+	wt_args_env_toc_sched(WT_OP_ENV_GET_ERRPFX);
 }
 
-static void __wt_api_env_get_verbose(
+static int __wt_api_env_get_verbose(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t *verbose);
-static void __wt_api_env_get_verbose(
+static int __wt_api_env_get_verbose(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t *verbose)
 {
 	wt_args_env_get_verbose args;
 
-	args.env = env;
-	args.verbose = verbose;
-	env->toc->op = WT_OP_ENV_GET_VERBOSE;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_get_verbose_pack;
 
-	(void)__wt_toc_sched(env->toc);
+	wt_args_env_toc_sched(WT_OP_ENV_GET_VERBOSE);
 }
 
 static int __wt_api_env_open(
 	ENV *env,
+	WT_TOC *toc,
 	const char *home,
 	mode_t mode,
 	u_int32_t flags);
 static int __wt_api_env_open(
 	ENV *env,
+	WT_TOC *toc,
 	const char *home,
 	mode_t mode,
 	u_int32_t flags)
 {
 	wt_args_env_open args;
 
-	args.env = env;
-	args.home = home;
-	args.mode = mode;
-	args.flags = flags;
-	env->toc->op = WT_OP_ENV_OPEN;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_open_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_OPEN);
 }
 
 static int __wt_api_env_set_cachesize(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t cachesize);
 static int __wt_api_env_set_cachesize(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t cachesize)
 {
 	wt_args_env_set_cachesize args;
 
-	args.env = env;
-	args.cachesize = cachesize;
-	env->toc->op = WT_OP_ENV_SET_CACHESIZE;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_set_cachesize_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_SET_CACHESIZE);
 }
 
 static int __wt_api_env_set_errcall(
 	ENV *env,
+	WT_TOC *toc,
 	void (*errcall)(const ENV *, const char *));
 static int __wt_api_env_set_errcall(
 	ENV *env,
+	WT_TOC *toc,
 	void (*errcall)(const ENV *, const char *))
 {
 	wt_args_env_set_errcall args;
 
-	args.env = env;
-	args.errcall = errcall;
-	env->toc->op = WT_OP_ENV_SET_ERRCALL;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_set_errcall_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_SET_ERRCALL);
 }
 
 static int __wt_api_env_set_errfile(
 	ENV *env,
+	WT_TOC *toc,
 	FILE *errfile);
 static int __wt_api_env_set_errfile(
 	ENV *env,
+	WT_TOC *toc,
 	FILE *errfile)
 {
 	wt_args_env_set_errfile args;
 
-	args.env = env;
-	args.errfile = errfile;
-	env->toc->op = WT_OP_ENV_SET_ERRFILE;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_set_errfile_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_SET_ERRFILE);
 }
 
 static int __wt_api_env_set_errpfx(
 	ENV *env,
+	WT_TOC *toc,
 	const char *errpfx);
 static int __wt_api_env_set_errpfx(
 	ENV *env,
+	WT_TOC *toc,
 	const char *errpfx)
 {
 	wt_args_env_set_errpfx args;
 
-	args.env = env;
-	args.errpfx = errpfx;
-	env->toc->op = WT_OP_ENV_SET_ERRPFX;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_set_errpfx_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_SET_ERRPFX);
 }
 
 static int __wt_api_env_set_verbose(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t verbose);
 static int __wt_api_env_set_verbose(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t verbose)
 {
 	wt_args_env_set_verbose args;
 
-	args.env = env;
-	args.verbose = verbose;
-	env->toc->op = WT_OP_ENV_SET_VERBOSE;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_set_verbose_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_SET_VERBOSE);
 }
 
 static int __wt_api_env_stat_clear(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t flags);
 static int __wt_api_env_stat_clear(
 	ENV *env,
+	WT_TOC *toc,
 	u_int32_t flags)
 {
 	wt_args_env_stat_clear args;
 
-	args.env = env;
-	args.flags = flags;
-	env->toc->op = WT_OP_ENV_STAT_CLEAR;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_stat_clear_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_STAT_CLEAR);
 }
 
 static int __wt_api_env_stat_print(
 	ENV *env,
+	WT_TOC *toc,
 	FILE *stream,
 	u_int32_t flags);
 static int __wt_api_env_stat_print(
 	ENV *env,
+	WT_TOC *toc,
 	FILE *stream,
 	u_int32_t flags)
 {
 	wt_args_env_stat_print args;
 
-	args.env = env;
-	args.stream = stream;
-	args.flags = flags;
-	env->toc->op = WT_OP_ENV_STAT_PRINT;
-	env->toc->argp = &args;
-	env->toc->env = env;
+	wt_args_env_stat_print_pack;
 
-	return (__wt_toc_sched(env->toc));
+	wt_args_env_toc_sched(WT_OP_ENV_STAT_PRINT);
 }
 
-static void __wt_db_get_btree_compare(
-    wt_args_db_get_btree_compare *argp);
-static void __wt_db_get_btree_compare(
-    wt_args_db_get_btree_compare *argp)
+static int __wt_db_get_btree_compare(WT_TOC *toc);
+static int __wt_db_get_btree_compare(WT_TOC *toc)
 {
-	*(argp->btree_compare) = argp->db->btree_compare;
-}
+	wt_args_db_get_btree_compare_unpack;
 
-static void __wt_db_get_btree_compare_int(
-    wt_args_db_get_btree_compare_int *argp);
-static void __wt_db_get_btree_compare_int(
-    wt_args_db_get_btree_compare_int *argp)
-{
-	*(argp->btree_compare_int) = argp->db->btree_compare_int;
-}
-
-static void __wt_db_get_btree_dup_compare(
-    wt_args_db_get_btree_dup_compare *argp);
-static void __wt_db_get_btree_dup_compare(
-    wt_args_db_get_btree_dup_compare *argp)
-{
-	*(argp->btree_dup_compare) = argp->db->btree_dup_compare;
-}
-
-static void __wt_db_get_btree_dup_offpage(
-    wt_args_db_get_btree_dup_offpage *argp);
-static void __wt_db_get_btree_dup_offpage(
-    wt_args_db_get_btree_dup_offpage *argp)
-{
-	*(argp->btree_dup_offpage) = argp->db->btree_dup_offpage;
-}
-
-static void __wt_db_get_btree_itemsize(
-    wt_args_db_get_btree_itemsize *argp);
-static void __wt_db_get_btree_itemsize(
-    wt_args_db_get_btree_itemsize *argp)
-{
-	*(argp->intlitemsize) = argp->db->intlitemsize;
-	*(argp->leafitemsize) = argp->db->leafitemsize;
-}
-
-static void __wt_db_get_btree_pagesize(
-    wt_args_db_get_btree_pagesize *argp);
-static void __wt_db_get_btree_pagesize(
-    wt_args_db_get_btree_pagesize *argp)
-{
-	*(argp->allocsize) = argp->db->allocsize;
-	*(argp->intlsize) = argp->db->intlsize;
-	*(argp->leafsize) = argp->db->leafsize;
-	*(argp->extsize) = argp->db->extsize;
-}
-
-static void __wt_db_get_errcall(
-    wt_args_db_get_errcall *argp);
-static void __wt_db_get_errcall(
-    wt_args_db_get_errcall *argp)
-{
-	*(argp->errcall) = argp->db->errcall;
-}
-
-static void __wt_db_get_errfile(
-    wt_args_db_get_errfile *argp);
-static void __wt_db_get_errfile(
-    wt_args_db_get_errfile *argp)
-{
-	*(argp->errfile) = argp->db->errfile;
-}
-
-static void __wt_db_get_errpfx(
-    wt_args_db_get_errpfx *argp);
-static void __wt_db_get_errpfx(
-    wt_args_db_get_errpfx *argp)
-{
-	*(argp->errpfx) = argp->db->errpfx;
-}
-
-static int __wt_db_set_btree_compare(
-    wt_args_db_set_btree_compare *argp);
-static int __wt_db_set_btree_compare(
-    wt_args_db_set_btree_compare *argp)
-{
-	argp->db->btree_compare = argp->btree_compare;
+	*(btree_compare) = db->btree_compare;
 	return (0);
 }
 
-static int __wt_db_set_btree_compare_int(
-    wt_args_db_set_btree_compare_int *argp);
-static int __wt_db_set_btree_compare_int(
-    wt_args_db_set_btree_compare_int *argp)
+static int __wt_db_get_btree_compare_int(WT_TOC *toc);
+static int __wt_db_get_btree_compare_int(WT_TOC *toc)
 {
+	wt_args_db_get_btree_compare_int_unpack;
+
+	*(btree_compare_int) = db->btree_compare_int;
+	return (0);
+}
+
+static int __wt_db_get_btree_dup_compare(WT_TOC *toc);
+static int __wt_db_get_btree_dup_compare(WT_TOC *toc)
+{
+	wt_args_db_get_btree_dup_compare_unpack;
+
+	*(btree_dup_compare) = db->btree_dup_compare;
+	return (0);
+}
+
+static int __wt_db_get_btree_dup_offpage(WT_TOC *toc);
+static int __wt_db_get_btree_dup_offpage(WT_TOC *toc)
+{
+	wt_args_db_get_btree_dup_offpage_unpack;
+
+	*(btree_dup_offpage) = db->btree_dup_offpage;
+	return (0);
+}
+
+static int __wt_db_get_btree_itemsize(WT_TOC *toc);
+static int __wt_db_get_btree_itemsize(WT_TOC *toc)
+{
+	wt_args_db_get_btree_itemsize_unpack;
+
+	*(intlitemsize) = db->intlitemsize;
+	*(leafitemsize) = db->leafitemsize;
+	return (0);
+}
+
+static int __wt_db_get_btree_pagesize(WT_TOC *toc);
+static int __wt_db_get_btree_pagesize(WT_TOC *toc)
+{
+	wt_args_db_get_btree_pagesize_unpack;
+
+	*(allocsize) = db->allocsize;
+	*(intlsize) = db->intlsize;
+	*(leafsize) = db->leafsize;
+	*(extsize) = db->extsize;
+	return (0);
+}
+
+static int __wt_db_get_errcall(WT_TOC *toc);
+static int __wt_db_get_errcall(WT_TOC *toc)
+{
+	wt_args_db_get_errcall_unpack;
+
+	*(errcall) = db->errcall;
+	return (0);
+}
+
+static int __wt_db_get_errfile(WT_TOC *toc);
+static int __wt_db_get_errfile(WT_TOC *toc)
+{
+	wt_args_db_get_errfile_unpack;
+
+	*(errfile) = db->errfile;
+	return (0);
+}
+
+static int __wt_db_get_errpfx(WT_TOC *toc);
+static int __wt_db_get_errpfx(WT_TOC *toc)
+{
+	wt_args_db_get_errpfx_unpack;
+
+	*(errpfx) = db->errpfx;
+	return (0);
+}
+
+static int __wt_db_set_btree_compare(WT_TOC *toc);
+static int __wt_db_set_btree_compare(WT_TOC *toc)
+{
+	wt_args_db_set_btree_compare_unpack;
+
+	db->btree_compare = btree_compare;
+	return (0);
+}
+
+static int __wt_db_set_btree_compare_int(WT_TOC *toc);
+static int __wt_db_set_btree_compare_int(WT_TOC *toc)
+{
+	wt_args_db_set_btree_compare_int_unpack;
 	int ret;
 
-	if ((ret = __wt_db_set_btree_compare_int_verify(argp)) != 0)
+	if ((ret = __wt_db_set_btree_compare_int_verify(toc)) != 0)
 		return (ret);
 
-	argp->db->btree_compare_int = argp->btree_compare_int;
+	db->btree_compare_int = btree_compare_int;
 	return (0);
 }
 
-static int __wt_db_set_btree_dup_compare(
-    wt_args_db_set_btree_dup_compare *argp);
-static int __wt_db_set_btree_dup_compare(
-    wt_args_db_set_btree_dup_compare *argp)
+static int __wt_db_set_btree_dup_compare(WT_TOC *toc);
+static int __wt_db_set_btree_dup_compare(WT_TOC *toc)
 {
-	argp->db->btree_dup_compare = argp->btree_dup_compare;
+	wt_args_db_set_btree_dup_compare_unpack;
+
+	db->btree_dup_compare = btree_dup_compare;
 	return (0);
 }
 
-static int __wt_db_set_btree_dup_offpage(
-    wt_args_db_set_btree_dup_offpage *argp);
-static int __wt_db_set_btree_dup_offpage(
-    wt_args_db_set_btree_dup_offpage *argp)
+static int __wt_db_set_btree_dup_offpage(WT_TOC *toc);
+static int __wt_db_set_btree_dup_offpage(WT_TOC *toc)
 {
-	argp->db->btree_dup_offpage = argp->btree_dup_offpage;
+	wt_args_db_set_btree_dup_offpage_unpack;
+
+	db->btree_dup_offpage = btree_dup_offpage;
 	return (0);
 }
 
-static int __wt_db_set_btree_itemsize(
-    wt_args_db_set_btree_itemsize *argp);
-static int __wt_db_set_btree_itemsize(
-    wt_args_db_set_btree_itemsize *argp)
+static int __wt_db_set_btree_itemsize(WT_TOC *toc);
+static int __wt_db_set_btree_itemsize(WT_TOC *toc)
 {
-	argp->db->intlitemsize = argp->intlitemsize;
-	argp->db->leafitemsize = argp->leafitemsize;
+	wt_args_db_set_btree_itemsize_unpack;
+
+	db->intlitemsize = intlitemsize;
+	db->leafitemsize = leafitemsize;
 	return (0);
 }
 
-static int __wt_db_set_btree_pagesize(
-    wt_args_db_set_btree_pagesize *argp);
-static int __wt_db_set_btree_pagesize(
-    wt_args_db_set_btree_pagesize *argp)
+static int __wt_db_set_btree_pagesize(WT_TOC *toc);
+static int __wt_db_set_btree_pagesize(WT_TOC *toc)
 {
-	argp->db->allocsize = argp->allocsize;
-	argp->db->intlsize = argp->intlsize;
-	argp->db->leafsize = argp->leafsize;
-	argp->db->extsize = argp->extsize;
+	wt_args_db_set_btree_pagesize_unpack;
+
+	db->allocsize = allocsize;
+	db->intlsize = intlsize;
+	db->leafsize = leafsize;
+	db->extsize = extsize;
 	return (0);
 }
 
-static int __wt_db_set_errcall(
-    wt_args_db_set_errcall *argp);
-static int __wt_db_set_errcall(
-    wt_args_db_set_errcall *argp)
+static int __wt_db_set_errcall(WT_TOC *toc);
+static int __wt_db_set_errcall(WT_TOC *toc)
 {
-	argp->db->errcall = argp->errcall;
+	wt_args_db_set_errcall_unpack;
+
+	db->errcall = errcall;
 	return (0);
 }
 
-static int __wt_db_set_errfile(
-    wt_args_db_set_errfile *argp);
-static int __wt_db_set_errfile(
-    wt_args_db_set_errfile *argp)
+static int __wt_db_set_errfile(WT_TOC *toc);
+static int __wt_db_set_errfile(WT_TOC *toc)
 {
-	argp->db->errfile = argp->errfile;
+	wt_args_db_set_errfile_unpack;
+
+	db->errfile = errfile;
 	return (0);
 }
 
-static int __wt_db_set_errpfx(
-    wt_args_db_set_errpfx *argp);
-static int __wt_db_set_errpfx(
-    wt_args_db_set_errpfx *argp)
+static int __wt_db_set_errpfx(WT_TOC *toc);
+static int __wt_db_set_errpfx(WT_TOC *toc)
 {
-	argp->db->errpfx = argp->errpfx;
+	wt_args_db_set_errpfx_unpack;
+
+	db->errpfx = errpfx;
 	return (0);
 }
 
-static void __wt_env_get_cachesize(
-    wt_args_env_get_cachesize *argp);
-static void __wt_env_get_cachesize(
-    wt_args_env_get_cachesize *argp)
+static int __wt_env_get_cachesize(WT_TOC *toc);
+static int __wt_env_get_cachesize(WT_TOC *toc)
 {
-	*(argp->cachesize) = argp->env->cachesize;
-}
+	wt_args_env_get_cachesize_unpack;
 
-static void __wt_env_get_errcall(
-    wt_args_env_get_errcall *argp);
-static void __wt_env_get_errcall(
-    wt_args_env_get_errcall *argp)
-{
-	*(argp->errcall) = argp->env->errcall;
-}
-
-static void __wt_env_get_errfile(
-    wt_args_env_get_errfile *argp);
-static void __wt_env_get_errfile(
-    wt_args_env_get_errfile *argp)
-{
-	*(argp->errfile) = argp->env->errfile;
-}
-
-static void __wt_env_get_errpfx(
-    wt_args_env_get_errpfx *argp);
-static void __wt_env_get_errpfx(
-    wt_args_env_get_errpfx *argp)
-{
-	*(argp->errpfx) = argp->env->errpfx;
-}
-
-static void __wt_env_get_verbose(
-    wt_args_env_get_verbose *argp);
-static void __wt_env_get_verbose(
-    wt_args_env_get_verbose *argp)
-{
-	*(argp->verbose) = argp->env->verbose;
-}
-
-static int __wt_env_set_cachesize(
-    wt_args_env_set_cachesize *argp);
-static int __wt_env_set_cachesize(
-    wt_args_env_set_cachesize *argp)
-{
-	argp->env->cachesize = argp->cachesize;
+	*(cachesize) = env->cachesize;
 	return (0);
 }
 
-static int __wt_env_set_errcall(
-    wt_args_env_set_errcall *argp);
-static int __wt_env_set_errcall(
-    wt_args_env_set_errcall *argp)
+static int __wt_env_get_errcall(WT_TOC *toc);
+static int __wt_env_get_errcall(WT_TOC *toc)
 {
-	argp->env->errcall = argp->errcall;
+	wt_args_env_get_errcall_unpack;
+
+	*(errcall) = env->errcall;
 	return (0);
 }
 
-static int __wt_env_set_errfile(
-    wt_args_env_set_errfile *argp);
-static int __wt_env_set_errfile(
-    wt_args_env_set_errfile *argp)
+static int __wt_env_get_errfile(WT_TOC *toc);
+static int __wt_env_get_errfile(WT_TOC *toc)
 {
-	argp->env->errfile = argp->errfile;
+	wt_args_env_get_errfile_unpack;
+
+	*(errfile) = env->errfile;
 	return (0);
 }
 
-static int __wt_env_set_errpfx(
-    wt_args_env_set_errpfx *argp);
-static int __wt_env_set_errpfx(
-    wt_args_env_set_errpfx *argp)
+static int __wt_env_get_errpfx(WT_TOC *toc);
+static int __wt_env_get_errpfx(WT_TOC *toc)
 {
-	argp->env->errpfx = argp->errpfx;
+	wt_args_env_get_errpfx_unpack;
+
+	*(errpfx) = env->errpfx;
 	return (0);
 }
 
-static int __wt_env_set_verbose(
-    wt_args_env_set_verbose *argp);
-static int __wt_env_set_verbose(
-    wt_args_env_set_verbose *argp)
+static int __wt_env_get_verbose(WT_TOC *toc);
+static int __wt_env_get_verbose(WT_TOC *toc)
 {
+	wt_args_env_get_verbose_unpack;
+
+	*(verbose) = env->verbose;
+	return (0);
+}
+
+static int __wt_env_set_cachesize(WT_TOC *toc);
+static int __wt_env_set_cachesize(WT_TOC *toc)
+{
+	wt_args_env_set_cachesize_unpack;
+
+	env->cachesize = cachesize;
+	return (0);
+}
+
+static int __wt_env_set_errcall(WT_TOC *toc);
+static int __wt_env_set_errcall(WT_TOC *toc)
+{
+	wt_args_env_set_errcall_unpack;
+
+	env->errcall = errcall;
+	return (0);
+}
+
+static int __wt_env_set_errfile(WT_TOC *toc);
+static int __wt_env_set_errfile(WT_TOC *toc)
+{
+	wt_args_env_set_errfile_unpack;
+
+	env->errfile = errfile;
+	return (0);
+}
+
+static int __wt_env_set_errpfx(WT_TOC *toc);
+static int __wt_env_set_errpfx(WT_TOC *toc)
+{
+	wt_args_env_set_errpfx_unpack;
+
+	env->errpfx = errpfx;
+	return (0);
+}
+
+static int __wt_env_set_verbose(WT_TOC *toc);
+static int __wt_env_set_verbose(WT_TOC *toc)
+{
+	wt_args_env_set_verbose_unpack;
 	int ret;
 
-	if ((ret = __wt_env_set_verbose_verify(argp)) != 0)
+	if ((ret = __wt_env_set_verbose_verify(toc)) != 0)
 		return (ret);
 
-	argp->env->verbose = argp->verbose;
+	env->verbose = verbose;
 	return (0);
 }
 
@@ -1120,7 +1027,7 @@ void
 __wt_env_config_methods_lockout(ENV *env)
 {
 	env->close = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, WT_TOC *, u_int32_t ))
 	    __wt_env_lockout_err;
 	env->err = (void (*)
 	    (ENV *, int , const char *, ...))
@@ -1128,44 +1035,44 @@ __wt_env_config_methods_lockout(ENV *env)
 	env->errx = (void (*)
 	    (ENV *, const char *, ...))
 	    __wt_env_lockout_err;
-	env->get_cachesize = (void (*)
-	    (ENV *, u_int32_t *))
+	env->get_cachesize = (int (*)
+	    (ENV *, WT_TOC *, u_int32_t *))
 	    __wt_env_lockout_err;
-	env->get_errcall = (void (*)
-	    (ENV *, void (**)(const ENV *, const char *)))
+	env->get_errcall = (int (*)
+	    (ENV *, WT_TOC *, void (**)(const ENV *, const char *)))
 	    __wt_env_lockout_err;
-	env->get_errfile = (void (*)
-	    (ENV *, FILE **))
+	env->get_errfile = (int (*)
+	    (ENV *, WT_TOC *, FILE **))
 	    __wt_env_lockout_err;
-	env->get_errpfx = (void (*)
-	    (ENV *, const char **))
+	env->get_errpfx = (int (*)
+	    (ENV *, WT_TOC *, const char **))
 	    __wt_env_lockout_err;
-	env->get_verbose = (void (*)
-	    (ENV *, u_int32_t *))
+	env->get_verbose = (int (*)
+	    (ENV *, WT_TOC *, u_int32_t *))
 	    __wt_env_lockout_err;
 	env->open = (int (*)
-	    (ENV *, const char *, mode_t , u_int32_t ))
+	    (ENV *, WT_TOC *, const char *, mode_t , u_int32_t ))
 	    __wt_env_lockout_err;
 	env->set_cachesize = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, WT_TOC *, u_int32_t ))
 	    __wt_env_lockout_err;
 	env->set_errcall = (int (*)
-	    (ENV *, void (*)(const ENV *, const char *)))
+	    (ENV *, WT_TOC *, void (*)(const ENV *, const char *)))
 	    __wt_env_lockout_err;
 	env->set_errfile = (int (*)
-	    (ENV *, FILE *))
+	    (ENV *, WT_TOC *, FILE *))
 	    __wt_env_lockout_err;
 	env->set_errpfx = (int (*)
-	    (ENV *, const char *))
+	    (ENV *, WT_TOC *, const char *))
 	    __wt_env_lockout_err;
 	env->set_verbose = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, WT_TOC *, u_int32_t ))
 	    __wt_env_lockout_err;
 	env->stat_clear = (int (*)
-	    (ENV *, u_int32_t ))
+	    (ENV *, WT_TOC *, u_int32_t ))
 	    __wt_env_lockout_err;
 	env->stat_print = (int (*)
-	    (ENV *, FILE *, u_int32_t ))
+	    (ENV *, WT_TOC *, FILE *, u_int32_t ))
 	    __wt_env_lockout_err;
 }
 
@@ -1176,12 +1083,12 @@ __wt_db_config_methods(DB *db)
 	db->close = __wt_api_db_close;
 	db->destroy = __wt_api_db_destroy;
 	db->dump = (int (*)
-	    (DB *, FILE *, u_int32_t ))
+	    (DB *, WT_TOC *, FILE *, u_int32_t ))
 	    __wt_db_lockout_open;
 	db->err = __wt_db_err;
 	db->errx = __wt_db_errx;
 	db->get = (int (*)
-	    (DB *, DBT *, DBT *, DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t ))
 	    __wt_db_lockout_open;
 	db->get_btree_compare = __wt_api_db_get_btree_compare;
 	db->get_btree_compare_int = __wt_api_db_get_btree_compare_int;
@@ -1205,10 +1112,10 @@ __wt_db_config_methods(DB *db)
 	db->stat_clear = __wt_api_db_stat_clear;
 	db->stat_print = __wt_api_db_stat_print;
 	db->sync = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t ))
 	    __wt_db_lockout_open;
 	db->verify = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t ))
 	    __wt_db_lockout_open;
 }
 
@@ -1224,13 +1131,13 @@ void
 __wt_db_config_methods_lockout(DB *db)
 {
 	db->bulk_load = (int (*)
-	    (DB *, u_int32_t , int (*)(DB *, DBT **, DBT **)))
+	    (DB *, WT_TOC *, u_int32_t , int (*)(DB *, DBT **, DBT **)))
 	    __wt_db_lockout_err;
 	db->close = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t ))
 	    __wt_db_lockout_err;
 	db->dump = (int (*)
-	    (DB *, FILE *, u_int32_t ))
+	    (DB *, WT_TOC *, FILE *, u_int32_t ))
 	    __wt_db_lockout_err;
 	db->err = (void (*)
 	    (DB *, int , const char *, ...))
@@ -1239,222 +1146,218 @@ __wt_db_config_methods_lockout(DB *db)
 	    (DB *, const char *, ...))
 	    __wt_db_lockout_err;
 	db->get = (int (*)
-	    (DB *, DBT *, DBT *, DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t ))
 	    __wt_db_lockout_err;
-	db->get_btree_compare = (void (*)
-	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
+	db->get_btree_compare = (int (*)
+	    (DB *, WT_TOC *, int (**)(DB *, const DBT *, const DBT *)))
 	    __wt_db_lockout_err;
-	db->get_btree_compare_int = (void (*)
-	    (DB *, int *))
+	db->get_btree_compare_int = (int (*)
+	    (DB *, WT_TOC *, int *))
 	    __wt_db_lockout_err;
-	db->get_btree_dup_compare = (void (*)
-	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
+	db->get_btree_dup_compare = (int (*)
+	    (DB *, WT_TOC *, int (**)(DB *, const DBT *, const DBT *)))
 	    __wt_db_lockout_err;
-	db->get_btree_dup_offpage = (void (*)
-	    (DB *, u_int32_t *))
+	db->get_btree_dup_offpage = (int (*)
+	    (DB *, WT_TOC *, u_int32_t *))
 	    __wt_db_lockout_err;
-	db->get_btree_itemsize = (void (*)
-	    (DB *, u_int32_t *, u_int32_t *))
+	db->get_btree_itemsize = (int (*)
+	    (DB *, WT_TOC *, u_int32_t *, u_int32_t *))
 	    __wt_db_lockout_err;
-	db->get_btree_pagesize = (void (*)
-	    (DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *))
+	db->get_btree_pagesize = (int (*)
+	    (DB *, WT_TOC *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *))
 	    __wt_db_lockout_err;
-	db->get_errcall = (void (*)
-	    (DB *, void (**)(const DB *, const char *)))
+	db->get_errcall = (int (*)
+	    (DB *, WT_TOC *, void (**)(const DB *, const char *)))
 	    __wt_db_lockout_err;
-	db->get_errfile = (void (*)
-	    (DB *, FILE **))
+	db->get_errfile = (int (*)
+	    (DB *, WT_TOC *, FILE **))
 	    __wt_db_lockout_err;
-	db->get_errpfx = (void (*)
-	    (DB *, const char **))
+	db->get_errpfx = (int (*)
+	    (DB *, WT_TOC *, const char **))
 	    __wt_db_lockout_err;
 	db->open = (int (*)
-	    (DB *, const char *, mode_t , u_int32_t ))
+	    (DB *, WT_TOC *, const char *, mode_t , u_int32_t ))
 	    __wt_db_lockout_err;
 	db->set_btree_compare = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
+	    (DB *, WT_TOC *, int (*)(DB *, const DBT *, const DBT *)))
 	    __wt_db_lockout_err;
 	db->set_btree_compare_int = (int (*)
-	    (DB *, int ))
+	    (DB *, WT_TOC *, int ))
 	    __wt_db_lockout_err;
 	db->set_btree_dup_compare = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
+	    (DB *, WT_TOC *, int (*)(DB *, const DBT *, const DBT *)))
 	    __wt_db_lockout_err;
 	db->set_btree_dup_offpage = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t ))
 	    __wt_db_lockout_err;
 	db->set_btree_itemsize = (int (*)
-	    (DB *, u_int32_t , u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t , u_int32_t ))
 	    __wt_db_lockout_err;
 	db->set_btree_pagesize = (int (*)
-	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
 	    __wt_db_lockout_err;
 	db->set_errcall = (int (*)
-	    (DB *, void (*)(const DB *, const char *)))
+	    (DB *, WT_TOC *, void (*)(const DB *, const char *)))
 	    __wt_db_lockout_err;
 	db->set_errfile = (int (*)
-	    (DB *, FILE *))
+	    (DB *, WT_TOC *, FILE *))
 	    __wt_db_lockout_err;
 	db->set_errpfx = (int (*)
-	    (DB *, const char *))
+	    (DB *, WT_TOC *, const char *))
 	    __wt_db_lockout_err;
 	db->stat_clear = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t ))
 	    __wt_db_lockout_err;
 	db->stat_print = (int (*)
-	    (DB *, FILE * , u_int32_t ))
+	    (DB *, WT_TOC *, FILE * , u_int32_t ))
 	    __wt_db_lockout_err;
 	db->sync = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t ))
 	    __wt_db_lockout_err;
 	db->verify = (int (*)
-	    (DB *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int32_t ))
 	    __wt_db_lockout_err;
 }
 
-int
+void
 __wt_api_switch(WT_TOC *toc)
 {
-	void *argp;
 	int ret;
-
-	argp = toc->argp;
-	ret = 0;
 
 	switch (toc->op) {
 	case WT_OP_DB_BULK_LOAD:
-		ret = __wt_db_bulk_load(argp);
+		ret = __wt_db_bulk_load(toc);
 		break;
 	case WT_OP_DB_CLOSE:
-		ret = __wt_db_close(argp);
+		ret = __wt_db_close(toc);
 		break;
 	case WT_OP_DB_DESTROY:
-		ret = __wt_db_destroy(argp);
+		ret = __wt_db_destroy(toc);
 		break;
 	case WT_OP_DB_DUMP:
-		ret = __wt_db_dump(argp);
+		ret = __wt_db_dump(toc);
 		break;
 	case WT_OP_DB_GET:
-		ret = __wt_db_get(argp);
+		ret = __wt_db_get(toc);
 		break;
 	case WT_OP_DB_GET_BTREE_COMPARE:
-		__wt_db_get_btree_compare(argp);
+		ret = __wt_db_get_btree_compare(toc);
 		break;
 	case WT_OP_DB_GET_BTREE_COMPARE_INT:
-		__wt_db_get_btree_compare_int(argp);
+		ret = __wt_db_get_btree_compare_int(toc);
 		break;
 	case WT_OP_DB_GET_BTREE_DUP_COMPARE:
-		__wt_db_get_btree_dup_compare(argp);
+		ret = __wt_db_get_btree_dup_compare(toc);
 		break;
 	case WT_OP_DB_GET_BTREE_DUP_OFFPAGE:
-		__wt_db_get_btree_dup_offpage(argp);
+		ret = __wt_db_get_btree_dup_offpage(toc);
 		break;
 	case WT_OP_DB_GET_BTREE_ITEMSIZE:
-		__wt_db_get_btree_itemsize(argp);
+		ret = __wt_db_get_btree_itemsize(toc);
 		break;
 	case WT_OP_DB_GET_BTREE_PAGESIZE:
-		__wt_db_get_btree_pagesize(argp);
+		ret = __wt_db_get_btree_pagesize(toc);
 		break;
 	case WT_OP_DB_GET_ERRCALL:
-		__wt_db_get_errcall(argp);
+		ret = __wt_db_get_errcall(toc);
 		break;
 	case WT_OP_DB_GET_ERRFILE:
-		__wt_db_get_errfile(argp);
+		ret = __wt_db_get_errfile(toc);
 		break;
 	case WT_OP_DB_GET_ERRPFX:
-		__wt_db_get_errpfx(argp);
+		ret = __wt_db_get_errpfx(toc);
 		break;
 	case WT_OP_DB_OPEN:
-		ret = __wt_db_open(argp);
+		ret = __wt_db_open(toc);
 		break;
 	case WT_OP_DB_SET_BTREE_COMPARE:
-		ret = __wt_db_set_btree_compare(argp);
+		ret = __wt_db_set_btree_compare(toc);
 		break;
 	case WT_OP_DB_SET_BTREE_COMPARE_INT:
-		ret = __wt_db_set_btree_compare_int(argp);
+		ret = __wt_db_set_btree_compare_int(toc);
 		break;
 	case WT_OP_DB_SET_BTREE_DUP_COMPARE:
-		ret = __wt_db_set_btree_dup_compare(argp);
+		ret = __wt_db_set_btree_dup_compare(toc);
 		break;
 	case WT_OP_DB_SET_BTREE_DUP_OFFPAGE:
-		ret = __wt_db_set_btree_dup_offpage(argp);
+		ret = __wt_db_set_btree_dup_offpage(toc);
 		break;
 	case WT_OP_DB_SET_BTREE_ITEMSIZE:
-		ret = __wt_db_set_btree_itemsize(argp);
+		ret = __wt_db_set_btree_itemsize(toc);
 		break;
 	case WT_OP_DB_SET_BTREE_PAGESIZE:
-		ret = __wt_db_set_btree_pagesize(argp);
+		ret = __wt_db_set_btree_pagesize(toc);
 		break;
 	case WT_OP_DB_SET_ERRCALL:
-		ret = __wt_db_set_errcall(argp);
+		ret = __wt_db_set_errcall(toc);
 		break;
 	case WT_OP_DB_SET_ERRFILE:
-		ret = __wt_db_set_errfile(argp);
+		ret = __wt_db_set_errfile(toc);
 		break;
 	case WT_OP_DB_SET_ERRPFX:
-		ret = __wt_db_set_errpfx(argp);
+		ret = __wt_db_set_errpfx(toc);
 		break;
 	case WT_OP_DB_STAT_CLEAR:
-		ret = __wt_db_stat_clear(argp);
+		ret = __wt_db_stat_clear(toc);
 		break;
 	case WT_OP_DB_STAT_PRINT:
-		ret = __wt_db_stat_print(argp);
+		ret = __wt_db_stat_print(toc);
 		break;
 	case WT_OP_DB_SYNC:
-		ret = __wt_db_sync(argp);
+		ret = __wt_db_sync(toc);
 		break;
 	case WT_OP_DB_VERIFY:
-		ret = __wt_db_verify(argp);
+		ret = __wt_db_verify(toc);
 		break;
 	case WT_OP_ENV_CLOSE:
-		ret = __wt_env_close(argp);
+		ret = __wt_env_close(toc);
 		break;
 	case WT_OP_ENV_DESTROY:
-		ret = __wt_env_destroy(argp);
+		ret = __wt_env_destroy(toc);
 		break;
 	case WT_OP_ENV_GET_CACHESIZE:
-		__wt_env_get_cachesize(argp);
+		ret = __wt_env_get_cachesize(toc);
 		break;
 	case WT_OP_ENV_GET_ERRCALL:
-		__wt_env_get_errcall(argp);
+		ret = __wt_env_get_errcall(toc);
 		break;
 	case WT_OP_ENV_GET_ERRFILE:
-		__wt_env_get_errfile(argp);
+		ret = __wt_env_get_errfile(toc);
 		break;
 	case WT_OP_ENV_GET_ERRPFX:
-		__wt_env_get_errpfx(argp);
+		ret = __wt_env_get_errpfx(toc);
 		break;
 	case WT_OP_ENV_GET_VERBOSE:
-		__wt_env_get_verbose(argp);
+		ret = __wt_env_get_verbose(toc);
 		break;
 	case WT_OP_ENV_OPEN:
-		ret = __wt_env_open(argp);
+		ret = __wt_env_open(toc);
 		break;
 	case WT_OP_ENV_SET_CACHESIZE:
-		ret = __wt_env_set_cachesize(argp);
+		ret = __wt_env_set_cachesize(toc);
 		break;
 	case WT_OP_ENV_SET_ERRCALL:
-		ret = __wt_env_set_errcall(argp);
+		ret = __wt_env_set_errcall(toc);
 		break;
 	case WT_OP_ENV_SET_ERRFILE:
-		ret = __wt_env_set_errfile(argp);
+		ret = __wt_env_set_errfile(toc);
 		break;
 	case WT_OP_ENV_SET_ERRPFX:
-		ret = __wt_env_set_errpfx(argp);
+		ret = __wt_env_set_errpfx(toc);
 		break;
 	case WT_OP_ENV_SET_VERBOSE:
-		ret = __wt_env_set_verbose(argp);
+		ret = __wt_env_set_verbose(toc);
 		break;
 	case WT_OP_ENV_STAT_CLEAR:
-		ret = __wt_env_stat_clear(argp);
+		ret = __wt_env_stat_clear(toc);
 		break;
 	case WT_OP_ENV_STAT_PRINT:
-		ret = __wt_env_stat_print(argp);
+		ret = __wt_env_stat_print(toc);
 		break;
 	default:
 		ret = WT_ERROR;
 		break;
 	}
 
-	return (ret);
+	toc->ret = ret;
 }
