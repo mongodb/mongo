@@ -132,10 +132,10 @@ namespace ReplTests {
                 theDataFileMgr.deleteRecord( ns, i->rec(), *i, true );            
             }
         }
-        static void insert( const BSONObj &o ) {
+        static void insert( const BSONObj &o, bool god = false ) {
             dblock lk;
             setClient( ns() );
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize() );
+            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
         }
         static BSONObj wid( const char *json ) {
             class BSONObjBuilder b;
@@ -467,6 +467,29 @@ namespace ReplTests {
             BSONObj o_, q_, u_, ou_;            
         };
 
+        class UpdateWithoutPreexistingId : public Base {
+        public:
+            UpdateWithoutPreexistingId() :
+            o_( fromjson( "{a:5}" ) ),
+            u_( fromjson( "{a:5}" ) ),
+            ot_( fromjson( "{b:4}" ) ) {}
+            void doIt() const {
+                client()->update( ns(), o_, u_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 2, count() );
+                checkOne( u_ );
+                checkOne( ot_ );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( ot_, true );
+                insert( o_, true );
+            }
+        protected:
+            BSONObj o_, u_, ot_;            
+        };        
+        
         class Remove : public Base {
         public:
             Remove() :
@@ -539,6 +562,7 @@ namespace ReplTests {
             add< Idempotence::UpsertInsertIdMod >();
             add< Idempotence::UpsertInsertSet >();
             add< Idempotence::UpsertInsertInc >();
+            add< Idempotence::UpdateWithoutPreexistingId >();
             add< Idempotence::Remove >();
             add< Idempotence::RemoveOne >();
             add< Idempotence::FailingUpdate >();

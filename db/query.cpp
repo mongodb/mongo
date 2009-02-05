@@ -356,11 +356,16 @@ namespace mongo {
                         if ( logop ) {
                             BSONObjBuilder idPattern;
                             BSONElement id;
-                            if ( js.getObjectID( id ) )
+                            // NOTE: If the matching object lacks an id, we'll log
+                            // with the original pattern.  This isn't replay-safe.
+                            // It might make sense to suppress the log instead
+                            // if there's no id.
+                            if ( js.getObjectID( id ) ) {
                                 idPattern.append( id );
-                            pattern = idPattern.doneAndDecouple();
+                                pattern = idPattern.doneAndDecouple();
+                            }
                         }
-                        
+
                         /* note: we only update one row and quit.  if you do multiple later,
                         be careful or multikeys in arrays could break things badly.  best
                         to only allow updating a single row with a multikey lookup.
