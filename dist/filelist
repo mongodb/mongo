@@ -41,9 +41,11 @@ os_posix/os_mtx.c
 os_posix/os_open.c
 os_posix/os_rw.c
 os_posix/os_sleep.c
+os_posix/os_yield.c
 support/api.c
 support/cksum.c
 support/err.c
 support/prime.c
 support/stat.c
 support/strerror.c
+support/version.c
