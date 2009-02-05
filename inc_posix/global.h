@@ -15,9 +15,10 @@ extern "C" {
  * Global data.
  */
 struct __wt_globals {
-	u_int  running;				/* Engine is running. */
+	u_int  running;				/* Engine is running */
 
 	pthread_t tid;				/* Engine thread ID */
+	u_int single_threaded;			/* Engine is single-threaded */
 
 	WT_MTX mtx;				/* Global mutex */
 
