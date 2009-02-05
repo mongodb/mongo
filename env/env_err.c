@@ -11,13 +11,24 @@
 
 #define	WT_ENV_ERR(env, error, fmt) {					\
 	va_list __ap;							\
+	/*								\
+	 * Support error messages even when we don't yet have an ENV	\
+	 * handle.							\
+	 */								\
+	if ((env) == NULL) {						\
+		va_start(__ap, fmt);					\
+		__wt_errfile(stderr, NULL, NULL, error, fmt, __ap);	\
+		va_end(__ap);						\
+		return;							\
+	}								\
 									\
 	/* Application-specified callback function. */			\
-	va_start(__ap, fmt);						\
-	if ((env)->errcall != NULL)					\
+	if ((env)->errcall != NULL) {					\
+		va_start(__ap, fmt);					\
 		__wt_errcall((env)->errcall, (env),			\
 		    (env)->errpfx, NULL, error, fmt, __ap);		\
-	va_end(__ap);							\
+		va_end(__ap);						\
+	}								\
 									\
 	/*								\
 	 * If the application set an error callback function but not an	\
