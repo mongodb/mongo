@@ -128,6 +128,7 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
+onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "mongod" )
 nix = False
 useJavaHome = False
 linux64  = False
@@ -308,7 +309,10 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
 
         if release and not java and failIfNotFound:
-            print( "ERROR: can't find static version of: " + str( poss ) )
+            extra = ""
+            if linux64 and shell:
+                extra += " 32 bit version for shell"
+            print( "ERROR: can't find static version of: " + str( poss ) + extra + " in: " + str( allPlaces ) )
             Exit(1)
 
         res = conf.CheckLib( poss )
@@ -486,7 +490,7 @@ def removeIfInList( lst , thing ):
     if thing in lst:
         lst.remove( thing )
 
-if linux64 or force64:
+if not onlyServer and ( linux64 or force64 ):
     if linux64:
         shellEnv.Append( CFLAGS="-m32" )
         shellEnv.Append( CXXFLAGS="-m32" )
