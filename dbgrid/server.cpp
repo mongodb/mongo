@@ -21,6 +21,7 @@
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 
+#include "server.h"
 #include "configserver.h"
 #include "gridconfig.h"
 
@@ -38,15 +39,15 @@ namespace mongo {
 
     void usage( char * argv[] ){
         out() << argv[0] << " usage:\n\n";
+        out() << " -v+  verbose\n";
         out() << " --port <portno>\n";
-        out() << " --griddb <griddbname> [<griddbname>...]\n";
-        out() << " --infer                                   infer griddbname by replacing \"-n<n>\"\n";
+        out() << " --configdb <configdbname> [<configdbname>...]\n";
+        out() << " --infer                                   infer configdbname by replacing \"-n<n>\"\n";
         out() << "                                           in our hostname with \"-grid\".\n";
         out() << endl;
     }
 
     MessagingPort *grab = 0;
-    void processRequest(Message&, MessagingPort&);
 
     void _dbGridConnThread() {
         MessagingPort& dbMsgPort = *grab;
@@ -106,7 +107,7 @@ int main(int argc, char* argv[], char *envp[] ) {
     }
 
     bool infer = false;
-    vector<string> gridDBs;
+    vector<string> configdbs;
     
     for (int i = 1; i < argc; i++)  {
         if ( argv[i] == 0 ) continue;
@@ -117,21 +118,24 @@ int main(int argc, char* argv[], char *envp[] ) {
         else if ( s == "--infer" ) {
             infer = true;
         }
-        else if ( s == "--griddb" ) {
+        else if ( s == "--configdb" ) {
             assert( ! infer );
 
             while ( ++i < argc ) 
-                gridDBs.push_back(argv[i]);
+                configdbs.push_back(argv[i]);
 
-            if ( gridDBs.size() == 0 ) {
-                out() << "error: no args for --griddb\n";
+            if ( configdbs.size() == 0 ) {
+                out() << "error: no args for --configdb\n";
                 return 4;
             }
             
-            if ( gridDBs.size() > 2 ) {
-                out() << "error: --griddb does not support more than 2 parameters yet\n";
+            if ( configdbs.size() > 2 ) {
+                out() << "error: --configdb does not support more than 2 parameters yet\n";
                 return 5;
             }
+        }
+        else if ( s.find( "-v" ) == 0 ){
+            logLevel = s.size() - 1;
         }
         else {
             usage( argv );
@@ -149,7 +153,7 @@ int main(int argc, char* argv[], char *envp[] ) {
     log() << argv[0] << " starting (--help for usage)" << endl;
     UnitTest::runTests();
 
-    if ( ! configServer.init( gridDBs , infer ) ){
+    if ( ! configServer.init( configdbs , infer ) ){
         cerr << "couldn't connectd to config db" << endl;
         return 7;
     }

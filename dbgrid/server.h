@@ -17,9 +17,12 @@
 */
 
 #include <string>
+#include "../util/message.h"
 
 namespace mongo {
 
     extern std::string ourHostname;
     
+    // from request.cpp
+    void processRequest(Message& m, MessagingPort& p);
 }
