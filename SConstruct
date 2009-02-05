@@ -195,6 +195,7 @@ elif "linux2" == os.sys.platform:
         javaVersion = "amd64"
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64"] )
+        env.Append( LIBS=["pthread"] )
     
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
@@ -295,7 +296,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             allPlaces += myenv["LIBPATH"]
             if not force64:
                 allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
-
+                
             for p in poss:
                 for loc in allPlaces:
                     fullPath = loc + "/lib" + p + ".a"
@@ -477,9 +478,10 @@ shellEnv = env.Clone();
 shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
 shellEnv.Append( LIBPATH=[ v8Home] )
 
-if darwin and release and force64:
+if release and ( ( darwin and force64 ) or linux64 ):
     shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
     shellEnv["LIBS"] = env["LIBS_CLEAN"]
+    shellEnv["SLIBS"] = ""
 
 shellEnv.Append( LIBS=[ "v8" , "readline" ] )
 
@@ -508,8 +510,8 @@ if not onlyServer and ( linux64 or force64 ):
         
     l = shellEnv["LIBS"]
     if linux64:
-        l.remove("java")
-        l.remove("jvm")
+        removeIfInList( l , "java" )
+        removeIfInList( l , "jvm" )
 
     removeIfInList( l , "pcre" )
     removeIfInList( l , "pcrecpp" )
