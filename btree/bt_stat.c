@@ -107,7 +107,7 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 	WT_ITEM *item;
 	WT_ITEM_OFFP offp;
 	WT_PAGE_HDR *hdr;
-	u_int32_t addr, frags, i;
+	u_int32_t addr, i;
 	int ret;
 
 	hdr = page->hdr;
@@ -163,6 +163,8 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 			WT_STAT_INCR(
 			    db->dstats, ITEM_DATA_OVFL, "overflow data items");
 			break;
+		default:
+			break;
 		}
 		switch (item->type) {
 		case WT_ITEM_KEY:
@@ -192,6 +194,8 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 			offp = *(WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
 			if ((ret = __wt_bt_stat_level(db, &offp)) != 0)
 				return (ret);
+			break;
+		default:
 			break;
 		}
 	}
