@@ -21,12 +21,13 @@ class RecCache {
     };
     unsigned recsize;
     map<DiskLoc, Node*> m;
-    set<DiskLoc> dirtyl;
     Node *newest, *oldest;
     unsigned nnodes;
 public:
+    set<DiskLoc> dirtyl;
     static BasicRecStore tempStore;
-    void writeDirty( bool rawLog = false );
+    void writeDirty( set<DiskLoc>::iterator i, bool rawLog = false );
+    void writeLazily();
     void ejectOld();
 private:
     void writeIfDirty(Node *n);
@@ -72,6 +73,10 @@ public:
         newest = oldest = 0;
     }
 
+    /* Note that this may be called BEFORE the actual writing to the node 
+       takes place.  We do flushing later on a dbunlocking() call, which happens 
+       after the writing.
+    */
     void dirty(DiskLoc d) {
         map<DiskLoc, Node*>::iterator i = m.find(d);
         if( i != m.end() ) {
@@ -111,20 +116,21 @@ public:
     }
 };
 
+extern RecCache theRecCache;
+
 class BasicCached_RecStore : public RecStoreInterface { 
 public:
-    static RecCache rc;
     static char* get(DiskLoc d, unsigned len) { 
-        return rc.get(d, len);
+        return theRecCache.get(d, len);
     }
 
     static DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
-        return rc.insert(ns, obuf, len, god);
+        return theRecCache.insert(ns, obuf, len, god);
     }
 
     static void modified(DiskLoc d) { 
         assert( d.a() == 9999 );
-        rc.dirty(d);
+        theRecCache.dirty(d);
     }
 };
 

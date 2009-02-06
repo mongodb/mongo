@@ -55,7 +55,7 @@ namespace mongo {
         len = length;
 
         fd = open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
-        if ( !fd ) {
+        if ( fd <= 0 ) {
             out() << "couldn't open " << filename << ' ' << errno << endl;
             return 0;
         }
