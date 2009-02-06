@@ -363,6 +363,8 @@ namespace mongo {
 
 using namespace mongo;
 
+int q;
+
 int main(int argc, char* argv[], char *envp[] )
 {
     setupSignals();

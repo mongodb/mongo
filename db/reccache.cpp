@@ -26,10 +26,7 @@ void writerThread() {
 // called on program exit.
 void recCacheCloseAll() { 
 #if defined(_RECSTORE)
-    assert( dbMutexInfo.isLocked() );
-    (cout << "TEMP: recCacheCloseAll() writing dirty pages...\n").flush();
-    theRecCache.writeDirty( theRecCache.dirtyl.begin(), true );
-    (cout << "TEMP: write dirty done\n").flush();
+    theRecCache.closing();
 #endif
 }
 
@@ -68,7 +65,7 @@ void RecCache::writeLazily() {
     int sleep = 0;
     int k;
     {
-        dblock lk;
+        boostlock lk(rcmutex);
         Timer t;
         set<DiskLoc>::iterator i = dirtyl.end();
         for( k = 0; k < 100; k++ ) {
@@ -93,6 +90,9 @@ void RecCache::writeLazily() {
 const unsigned RECCACHELIMIT = 150000;
 
 inline void RecCache::ejectOld() { 
+    if( nnodes <= RECCACHELIMIT )
+        return;
+    boostlock lk(rcmutex);
     if( nnodes <= RECCACHELIMIT )
         return;
     Node *n = oldest;

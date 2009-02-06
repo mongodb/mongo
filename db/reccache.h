@@ -1,5 +1,14 @@
 // reccache.h
 
+/* LOCK HIERARCHY
+     
+     dblock
+       RecCache::rcmutex
+
+     i.e. always lock dblock first if you lock both
+
+*/
+
 #pragma once
 
 #include "reci.h"
@@ -19,17 +28,16 @@ class RecCache {
         bool dirty;
         Node *older, *newer;
     };
+    boost::mutex rcmutex;
     unsigned recsize;
     map<DiskLoc, Node*> m;
     Node *newest, *oldest;
     unsigned nnodes;
-public:
     set<DiskLoc> dirtyl;
+public:
     static BasicRecStore tempStore;
-    void writeDirty( set<DiskLoc>::iterator i, bool rawLog = false );
-    void writeLazily();
-    void ejectOld();
 private:
+    void writeDirty( set<DiskLoc>::iterator i, bool rawLog = false );
     void writeIfDirty(Node *n);
     void touch(Node* n) { 
         if( n == newest )
@@ -68,16 +76,27 @@ private:
     void dump();
 
 public:
+    /* all public functions (except constructor) use the mutex */
+
     RecCache(unsigned sz) : recsize(sz) { 
         nnodes = 0;
         newest = oldest = 0;
     }
+
+    /* call this after doing some work, after you are sure you are done with modifications.
+       we call it from dbunlocking().
+    */
+    void ejectOld();
+
+    /* bg writer thread invokes this */
+    void writeLazily();
 
     /* Note that this may be called BEFORE the actual writing to the node 
        takes place.  We do flushing later on a dbunlocking() call, which happens 
        after the writing.
     */
     void dirty(DiskLoc d) {
+        boostlock lk(rcmutex);
         map<DiskLoc, Node*>::iterator i = m.find(d);
         if( i != m.end() ) {
             Node *n = i->second;
@@ -91,6 +110,8 @@ public:
     char* get(DiskLoc d, unsigned len) { 
         assert( d.a() == 9999 );
         assert( len == recsize );
+
+        boostlock lk(rcmutex);
         map<DiskLoc, Node*>::iterator i = m.find(d);
         if( i != m.end() ) {
             touch(i->second);
@@ -105,6 +126,7 @@ public:
     }
 
     DiskLoc insert(const char *ns, const void *obuf, int len, bool god) {
+        boostlock lk(rcmutex);
         fileofs o = tempStore.insert((const char *) obuf, len);
         assert( o <= 0x7fffffff );
         Node *n = mkNode();
@@ -113,6 +135,13 @@ public:
         n->loc = d;
         m[d] = n;
         return d;
+    }
+
+    void closing() { 
+        boostlock lk(rcmutex);
+        (cout << "TEMP: recCacheCloseAll() writing dirty pages...\n").flush();
+        writeDirty( dirtyl.begin(), true );
+        (cout << "TEMP: write dirty done\n").flush();
     }
 };
 
