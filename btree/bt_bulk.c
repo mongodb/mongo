@@ -736,6 +736,7 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 	offp.addr = page->addr;
 	offp.level = page->hdr->level;
 	offp.records = 0;
+	offp.unused[0] = offp.unused[1] = offp.unused[2] = 0;
 
 	/* Store the internal page reference. */
 	++parent->hdr->u.entries;
