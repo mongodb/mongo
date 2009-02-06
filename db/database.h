@@ -41,6 +41,10 @@ namespace mongo {
             }
 
             newDb = namespaceIndex.exists();
+            // If already exists, open.  Otherwise behave as if empty until
+            // there's a write, then open.
+            if ( !newDb )
+                namespaceIndex.init();            
             profile = 0;
             profileName = name + ".system.profile";
         }
