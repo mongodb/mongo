@@ -6,7 +6,7 @@
 
 # some common tasks
 #   build 64-bit mac and pushing to s3
-#      scons --64 --dist=osx-x86_64 s3dist
+#      scons --64 s3dist
 #      all s3 pushes require settings.py
 
 import os
@@ -637,6 +637,7 @@ distFile = installDir + ".tgz"
 env.Append( TARFLAGS=" -z " )
 env.Tar( distFile , installDir )
 
+env.Alias( "dist" , distFile )
 env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
 env.AlwaysBuild( "s3dist" )
 
