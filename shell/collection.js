@@ -105,7 +105,7 @@ DBCollection.prototype.insert = function( obj ){
     if ( ! obj )
         throw "no object!";
     this._validateForStorage( obj );
-    this._mongo.insert( this._fullName , obj );
+    return this._mongo.insert( this._fullName , obj );
 }
 
 DBCollection.prototype.remove = function( t ){
@@ -120,10 +120,10 @@ DBCollection.prototype.update = function( query , obj , upsert ){
 
 DBCollection.prototype.save = function( obj ){
     if ( ! obj._id ){
-        this.insert( obj );
+        return this.insert( obj );
     }
     else {
-        this.update( { _id : obj._id } , obj , true );
+        return this.update( { _id : obj._id } , obj , true );
     }
 }
 

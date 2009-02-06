@@ -44,7 +44,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;..\pcre-7.4&quot;;&quot;c:\Program Files\boost\boost_1_35_0&quot;;&quot;c:\program files\java\jdk\include&quot;;&quot;c:\program files\java\jdk\include\win32&quot;"
-				PreprocessorDefinitions="_RECSTORE;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -279,10 +279,6 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath=".\makefile"
-				>
-			</File>
-			<File
 				RelativePath="..\pcre-7.4\pcrecpp.cc"
 				>
 				<FileConfiguration
@@ -312,6 +308,10 @@
 			</File>
 			<File
 				RelativePath="..\pcre-7.4\pcrecpp.h"
+				>
+			</File>
+			<File
+				RelativePath="..\SConstruct"
 				>
 			</File>
 			<File
@@ -1003,6 +1003,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\reccache.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\reccache.h"
 				>
 			</File>
@@ -1302,6 +1306,10 @@
 			>
 			<File
 				RelativePath="..\util\builder.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\file.h"
 				>
 			</File>
 			<File

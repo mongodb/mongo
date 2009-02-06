@@ -10,6 +10,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "clienttests", "clienttests"
 		..\client\examples\authTest.cpp = ..\client\examples\authTest.cpp
 		..\client\examples\clientTest.cpp = ..\client\examples\clientTest.cpp
 		..\client\examples\first.cpp = ..\client\examples\first.cpp
+		..\client\gridfs.cpp = ..\client\gridfs.cpp
+		..\client\gridfs.h = ..\client\gridfs.h
 		..\client\examples\second.cpp = ..\client\examples\second.cpp
 		..\client\examples\whereExample.cpp = ..\client\examples\whereExample.cpp
 	EndProjectSection

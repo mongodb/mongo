@@ -8,27 +8,27 @@
  *  test drop
  */
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).find().length() == 0);
+assert(db.getCollection( "test_db" ).find().length() == 0,1);
 
 db.getCollection( "test_db" ).save({a:1});
-assert(db.getCollection( "test_db" ).find().length() == 1);
+assert(db.getCollection( "test_db" ).find().length() == 1,2);
 
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).find().length() == 0);
+assert(db.getCollection( "test_db" ).find().length() == 0,3);
 
 /*
  * test count
  */
  
-assert(db.getCollection( "test_db" ).count() == 0);
+assert(db.getCollection( "test_db" ).count() == 0,4);
 db.getCollection( "test_db" ).save({a:1});
-assert(db.getCollection( "test_db" ).count() == 1);
+assert(db.getCollection( "test_db" ).count() == 1,5);
 for (i = 0; i < 100; i++) {
     db.getCollection( "test_db" ).save({a:1});
 }
-assert(db.getCollection( "test_db" ).count() == 101);
+assert(db.getCollection( "test_db" ).count() == 101,6);
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).count() == 0);
+assert(db.getCollection( "test_db" ).count() == 0,7);
  
 /*
  *  test clean (not sure... just be sure it doen't blow up, I guess
@@ -41,26 +41,30 @@ assert(db.getCollection( "test_db" ).count() == 0);
   */
 
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).count() == 0);
+assert(db.getCollection( "test_db" ).count() == 0,8);
 
 for (i = 0; i < 100; i++) {
     db.getCollection( "test_db" ).save({a:1});
 }
   
 var v = db.getCollection( "test_db" ).validate();
-assert (v.ns == "test.test_db");
-assert (v.ok == 1);
+if( v.ns != "test.test_db" ) { 
+    print("Error: wrong ns name");
+    print(tojson(v));
+}
+assert (v.ns == "test.test_db",9);
+assert (v.ok == 1,10);
 
-assert(v.result.toString().match(/nrecords\?:(\d+)/)[1] == 100);
+assert(v.result.toString().match(/nrecords\?:(\d+)/)[1] == 100,11);
 
 /*
  * test deleteIndex, deleteIndexes
  */
  
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).count() == 0);
+assert(db.getCollection( "test_db" ).count() == 0,12);
 db.getCollection( "test_db" ).dropIndexes();
-assert(db.getCollection( "test_db" ).getIndexes().length() == 0);  
+assert(db.getCollection( "test_db" ).getIndexes().length() == 0,13);  
 
 db.getCollection( "test_db" ).save({a:10});
 db.getCollection( "test_db" ).ensureIndex({a:1});

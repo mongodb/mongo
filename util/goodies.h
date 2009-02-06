@@ -176,6 +176,10 @@ namespace mongo {
     inline void sleepmillis(int s) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
+        if( s >= 1000 ) { 
+            xt.sec += s/1000;
+            s-=1000;
+        }
         xt.nsec += s * 1000000;
         boost::thread::sleep(xt);
     }

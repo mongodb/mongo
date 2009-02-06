@@ -19,6 +19,8 @@
 #include "stdafx.h"
 #include "mmap.h"
 
+/* in memory (no file) version */
+
 namespace mongo {
 
     MemoryMappedFile::MemoryMappedFile() {

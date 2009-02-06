@@ -306,6 +306,10 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\strategy_single.cpp"
+				>
+			</File>
 			<Filter
 				Name="Shared Source Files"
 				>

@@ -25,8 +25,16 @@
 
 #include "../client/dbclient.h"
 #include "../client/model.h"
+#include "configserver.h"
 
 namespace mongo {
+
+    class GridConfigModel : public Model {
+    public:
+        virtual DBClientWithCommands* conn(){
+            return configServer.conn();
+        }
+    };
 
     /* Machine is the concept of a host that runs the db process.
     */
@@ -55,7 +63,7 @@ namespace mongo {
 //typedef map<string,Machine*> ObjLocs;
 
     /* top level grid configuration for an entire database */
-    class DBConfig : public Model {
+    class DBConfig : public GridConfigModel {
     public:
         string name; // e.g. "alleyinsider"
         Machine *primary;

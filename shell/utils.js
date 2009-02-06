@@ -138,6 +138,7 @@ tojsonObject = function( x ){
 }
 
 shellPrint = function( x ){
+    it = x;
     if ( x != undefined )
         shellPrintHelper( x );
     
@@ -190,6 +191,7 @@ help = shellHelper.help = function(){
     print( "\t" + "db.foo.help()                help on collection methods");
     print( "\t" + "db.foo.find()                list objects in collection foo" );
     print( "\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1" );
+    print( "\t" + "it                           result of the last line evaluated; use to further iterate");
 }
 
 shellHelper.use = function( dbname ){

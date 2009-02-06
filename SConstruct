@@ -54,15 +54,6 @@ AddOption( "--release",
            action="store",
            help="relase build")
 
-
-AddOption( "--dist",
-           dest="dist",
-           type="string",
-           nargs=1,
-           action="store",
-           help="dist name")
-
-
 AddOption('--java',
           dest='javaHome',
           type='string',
@@ -124,7 +115,7 @@ else:
 
 coreDbFiles = Split( "" )
 
-serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp" )
+serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp" )
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
@@ -138,6 +129,14 @@ force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 noOptimization = not GetOption( "noOptimization" ) is None
 
+platform = os.sys.platform
+processor = os.uname()[4]
+
+if force32:
+    processor = "i386"
+if force64:
+    processor = "x86_64"
+
 DEFAULT_INSTALl_DIR = "/usr/local"
 installDir = DEFAULT_INSTALl_DIR
 nixLibPrefix = "lib"
@@ -146,10 +145,9 @@ javaHome = GetOption( "javaHome" )
 javaVersion = "i386";
 javaLibs = []
 
-distBuild = GetOption( "dist" ) is not None
+distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
 if distBuild:
     release = True
-    installDir = "mongo-db-" + GetOption( "dist" ) + "-latest"
 
 if GetOption( "prefix" ):
     installDir = GetOption( "prefix" )
@@ -162,6 +160,7 @@ def findVersion( root , choices ):
 
 if "darwin" == os.sys.platform:
     darwin = True
+    platform = "osx" # prettier than darwin
 
     env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
 
@@ -176,7 +175,7 @@ if "darwin" == os.sys.platform:
     if force64:
         env.Append( CPPPATH=["/usr/64/include"] )
         env.Append( LIBPATH=["/usr/64/lib"] )
-        if installDir == DEFAULT_INSTALl_DIR:
+        if installDir == DEFAULT_INSTALl_DIR and not distBuild:
             installDir = "/usr/64/"
     else:
         env.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
@@ -544,6 +543,8 @@ testEnv.AlwaysBuild( "smokeClient" )
 
 #  ----  INSTALL -------
 
+if distBuild:
+    installDir = "mongo-db-" + platform + "-" + processor + "-latest"
 
 #binaries
 env.Install( installDir + "/bin" , "mongodump" )
@@ -596,7 +597,7 @@ env.AlwaysBuild( "push" )
 
 # ---- deploying ---
 
-def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True ):
+def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True , platformDir=True ):
     sys.path.append( "." )
 
     import simples3
@@ -609,10 +610,16 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
         remoteName = localName
         
     if fixName:
-        name = remoteName + "-" + un[0] + "-" + un[4] + remotePrefix
+        (root,dot,suffix) = localName.rpartition( "." )
+        name = remoteName + "-" + platform + "-" + processor + remotePrefix
+        if dot == "." :
+            name += "." + suffix
         name = name.lower()
     else:
         name = remoteName
+
+    if platformDir:
+        name = platform + "/" + name
 
     s.put( name  , open( localName ).read() , acl="public-read" );
     print( "uploaded " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
@@ -624,11 +631,7 @@ env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
 env.AlwaysBuild( "s3shell" )
 
 def s3dist( env , target , source ):
-    if not distBuild:
-        print( "can't do s3dist without --dist" )
-        Exit(1)
-        
-    s3push( distFile , fixName=False )
+    s3push( distFile , "mongo-db" )
 
 distFile = installDir + ".tgz" 
 env.Append( TARFLAGS=" -z " )

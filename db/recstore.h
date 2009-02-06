@@ -2,12 +2,12 @@
 
 #pragma once
 
+#include "../util/file.h"
+
 namespace mongo { 
 
 using boost::uint32_t;
 using boost::uint64_t;
-
-typedef uint64_t fileofs;
 
 /* Current version supports only consistent record sizes within a store. */
 
@@ -39,17 +39,13 @@ public:
 private:
 
     void writeHeader();
-    fstream f;
+    File f;
     fileofs len;
     RecStoreHeader h; // h.reserved is wasteful here; fix later.
     void write(fileofs ofs, const char *data, unsigned len) { 
-        f.seekp((std::streamoff)ofs);
-        f.write(data, len);
-        f.flush();
+        f.write(ofs, data, len);
         massert("basicrecstore write io error", !f.bad());
     }
-public:
-    void flush() { f.flush(); }
 };
 
 /* --- implementation --- */
@@ -93,8 +89,7 @@ inline void BasicRecStore::update(fileofs o, const char *buf, unsigned len) {
 
 inline void BasicRecStore::get(fileofs o, char *buf, unsigned len) { 
     assert(o <= h.leof && o >= sizeof(RecStoreHeader));
-    f.seekp((std::streamoff)o);
-    f.read(buf, len);
+    f.read(o, buf, len);
     massert("basicrestore::get I/O error", !f.bad());
 }
 

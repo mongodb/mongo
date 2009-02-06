@@ -16,7 +16,9 @@
 
 namespace mongo { 
 
-/* A RecStoreInterface for the normal mongo mem mapped file (MongoDataFile) storage
+/* --------------------------------------------------------------------------
+   A RecStoreInterface for the normal mongo mem mapped file (MongoDataFile) 
+   storage
 */
 
 class MongoMemMapped_RecStore : public RecStoreInterface { 
@@ -30,7 +32,7 @@ public:
     static void modified(DiskLoc d) { }
 };
 
-/* An in memory RecStoreInterface implementation
+/* An in memory RecStoreInterface implementation ----------------------------
 */
 
 class InMem_RecStore : public RecStoreInterface { 
@@ -71,8 +73,8 @@ public:
 typedef BasicCached_RecStore BtreeStore;
 #else
 typedef MongoMemMapped_RecStore BtreeStore;
-#endif
 //typedef InMem_RecStore BtreeStore;
+#endif
 
 const int BucketSize = 8192;
 

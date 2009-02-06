@@ -88,7 +88,7 @@ namespace mongo {
     };
     
     /**
-       wrapper for a file stored in grids
+       wrapper for a file stored in the Mongo database
      */
     class GridFile {
     public:
