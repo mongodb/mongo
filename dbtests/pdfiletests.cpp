@@ -31,7 +31,6 @@ namespace PdfileTests {
         class Base {
         public:
             Base() {
-                dblock lk;
                 setClient( ns() );
             }
             ~Base() {
@@ -97,6 +96,8 @@ namespace PdfileTests {
             static NamespaceDetails *nsd() {
                 return nsdetails( ns() );
             }
+        private:
+            dblock lk_;
         };
 
         class Empty : public Base {
