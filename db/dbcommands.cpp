@@ -745,7 +745,7 @@ namespace mongo {
 			assert( ai );
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()) || !c->requiresAuth());
 
-            if ( c->adminOnly() && !fromRepl && strncmp(ns, "admin", p-ns) != 0 ) {
+            if ( c->adminOnly() && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {
                 ok = false;
                 errmsg = "access denied";
             }
