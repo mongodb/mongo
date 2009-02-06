@@ -32,6 +32,14 @@ namespace mongo {
 
 #pragma pack(1)
 
+    class NamespaceString {
+    public:
+        NamespaceString( const char * c ) : _str( c ){}
+        NamespaceString( const string& s ) : _str( s.c_str() ){}
+
+        const char * _str;
+    };
+
     class Namespace {
     public:
         enum { MaxNsLen = 128 };
