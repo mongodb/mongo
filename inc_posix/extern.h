@@ -180,7 +180,7 @@ __wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
 void
 __wt_sleep(long seconds, long micro_seconds);
 void
-__wt_yield();
+__wt_yield(void);
 void
 __wt_env_config_methods(ENV *env);
 void
