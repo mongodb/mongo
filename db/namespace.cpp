@@ -42,31 +42,34 @@ namespace mongo {
 
 //NamespaceIndexMgr namespaceIndexMgr;
 
-    /* returns true if we created (did not exist) during init() */
-    bool NamespaceIndex::init(const char *dir, const char *database) {
-        boost::filesystem::path path( dir );
-        path /= string( database ) + ".ns";
-
-        bool created = !boost::filesystem::exists(path);
-
+    bool NamespaceIndex::exists() const {
+        return !boost::filesystem::exists(path());        
+    }
+    
+    boost::filesystem::path NamespaceIndex::path() const {
+        return boost::filesystem::path( dir_ ) / ( database_ + ".ns" );
+    }
+    
+    void NamespaceIndex::init() {
+        if ( ht )
+            return;
         /* if someone manually deleted the datafiles for a database,
            we need to be sure to clear any cached info for the database in
            local.*.
         */
-        if ( string("local") != database ) {
-            DBInfo i(database);
+        if ( "local" != database_ ) {
+            DBInfo i(database_.c_str());
             i.dbDropped();
         }
 
         const int LEN = 16 * 1024 * 1024;
-        string pathString = path.string();
+        string pathString = path().string();
         void *p = f.map(pathString.c_str(), LEN);
         if ( p == 0 ) {
             problem() << "couldn't open file " << pathString << " terminating" << endl;
             exit(-3);
         }
         ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
-        return created;
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {

@@ -346,9 +346,8 @@ namespace mongo {
                 }
             }
 
-            setClient(q.ns);
+            setClient( q.ns );
             strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);
-
             msgdata = runQuery(m, q.ns, q.ntoskip, q.ntoreturn, q.query, q.fields, ss, q.queryOptions);
         }
         catch ( AssertionException& e ) {
@@ -392,7 +391,6 @@ namespace mongo {
             if ( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
                 log() << "ERROR: receiveQuery: database is null; ns=" << q.ns << endl;
         }
-        //	dbMsgPort.reply(m, resp, responseTo);
     }
 
     QueryResult* emptyMoreResult(long long);

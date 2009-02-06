@@ -341,12 +341,18 @@ namespace mongo {
     class NamespaceIndex {
         friend class NamespaceCursor;
     public:
-        NamespaceIndex() { }
+        NamespaceIndex(const string &dir, const string &database) :
+        ht( 0 ),
+        dir_( dir ),
+        database_( database ) {}
 
-        /* returns true if we created (did not exist) during init() */
-        bool init(const char *dir, const char *database);
+        /* returns true if new db will be created if we init lazily */
+        bool exists() const;
+        
+        void init();
 
         void add(const char *ns, DiskLoc& loc, bool capped) {
+            init();
             Namespace n(ns);
             NamespaceDetails details( loc, capped );
             ht->put(n, details);
@@ -354,10 +360,14 @@ namespace mongo {
 
         /* just for diagnostics */
         size_t detailsOffset(NamespaceDetails *d) {
+            if ( !ht )
+                return -1;
             return ((char *) d) -  (char *) ht->nodes;
         }
 
         NamespaceDetails* details(const char *ns) {
+            if ( !ht )
+                return 0;
             Namespace n(ns);
             NamespaceDetails *d = ht->get(n);
             if ( d )
@@ -366,6 +376,8 @@ namespace mongo {
         }
 
         void kill(const char *ns) {
+            if ( !ht )
+                return;
             Namespace n(ns);
             ht->kill(n);
         }
@@ -380,8 +392,12 @@ namespace mongo {
         }
 
     private:
+        boost::filesystem::path path() const;
+        
         MemoryMappedFile f;
         HashTable<Namespace,NamespaceDetails> *ht;
+        string dir_;
+        string database_;
     };
 
     extern const char *dbpath;

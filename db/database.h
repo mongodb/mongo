@@ -26,9 +26,10 @@ namespace mongo {
 
     class Database {
     public:
-        Database(const char *nm, bool& justCreated, const char *_path = dbpath) :
-                name(nm),
-                path(_path)
+        Database(const char *nm, bool& newDb, const char *_path = dbpath) :
+        name(nm),
+        path(_path),
+        namespaceIndex( path, name )
         {
             {
                 int L = strlen(nm);
@@ -39,7 +40,7 @@ namespace mongo {
                 uassert( "db name too long", L < 64 );
             }
 
-            justCreated = namespaceIndex.init(_path, nm);
+            newDb = namespaceIndex.exists();
             profile = 0;
             profileName = name + ".system.profile";
         }
@@ -52,6 +53,7 @@ namespace mongo {
         MongoDataFile* getFile( int n, int sizeNeeded = 0 ) {
             assert(this);
 
+            namespaceIndex.init();
             if ( n < 0 || n >= DiskLoc::MaxFiles ) {
                 out() << "getFile(): n=" << n << endl;
                 assert( n >= 0 && n < DiskLoc::MaxFiles );
