@@ -455,8 +455,8 @@ namespace mongo {
             details = new Details();
             details->_objdata = data;
             details->_objsize = *((int*) data);
-            assert( details->_objsize > 0 );
-            assert( details->_objsize <= 1024 * 1024 * 16 );
+            massert( "BSONObj size spec too small", details->_objsize > 0 );
+            massert( "BSONObj size spec too large", details->_objsize <= 1024 * 1024 * 16 );
             details->refCount = ifree ? 1 : -1;
         }
     public:
