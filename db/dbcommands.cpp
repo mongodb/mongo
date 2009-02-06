@@ -689,7 +689,7 @@ namespace mongo {
                 if ( seen.count( name ) )
                     continue;
                 
-                dbInfos.push_back( BSON( "name" << name ) );
+                dbInfos.push_back( BSON( "name" << name << "sizeOnDisk" << double( 1 ) ) );
             }
 
             result.append( "databases", dbInfos );
