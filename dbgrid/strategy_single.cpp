@@ -7,9 +7,6 @@
 
 namespace mongo {
 
-
-    const char *tempHost = "localhost:27018";
-
     class SingleStrategy : public Strategy {
 
         virtual void queryOp( Request& r ){
@@ -31,7 +28,7 @@ namespace mongo {
                     }
                 }
 
-                ScopedDbConnection dbcon(tempHost);
+                ScopedDbConnection dbcon( r.primaryName() );
                 DBClientConnection &c = dbcon.conn();
                 Message response;
                 bool ok = c.port().call( r.m(), response);
@@ -56,7 +53,7 @@ namespace mongo {
         
             log(3) << "getmore: " << ns << endl;
 
-            ScopedDbConnection dbcon(tempHost);
+            ScopedDbConnection dbcon( r.primaryName() );
             DBClientConnection &c = dbcon.conn();
 
             Message response;
@@ -72,7 +69,7 @@ namespace mongo {
             const char *ns = r.getns();
             log(3) << "write: " << ns << endl;
 
-            ScopedDbConnection dbcon(tempHost);
+            ScopedDbConnection dbcon( r.primaryName() );
             DBClientConnection &c = dbcon.conn();
 
             c.port().say( r.m() );

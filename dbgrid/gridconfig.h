@@ -23,20 +23,22 @@
 
 #pragma once
 
+#include "../db/namespace.h"
 #include "../client/dbclient.h"
 #include "../client/model.h"
-#include "configserver.h"
 
 namespace mongo {
 
+    /**
+       abstract class for Models that need to talk to the config db
+     */
     class GridConfigModel : public Model {
     public:
-        virtual DBClientWithCommands* conn(){
-            return configServer.conn();
-        }
+        virtual DBClientWithCommands* conn();
     };
 
-    /* Machine is the concept of a host that runs the db process.
+    /**
+       Machine is the concept of a host that runs the db process.
     */
     class Machine {
         static map<string, Machine*> machines;
@@ -60,49 +62,44 @@ namespace mongo {
         }
     };
 
-//typedef map<string,Machine*> ObjLocs;
-
-    /* top level grid configuration for an entire database */
+    /**
+       top level grid configuration for an entire database
+    */
     class DBConfig : public GridConfigModel {
     public:
-        string name; // e.g. "alleyinsider"
-        Machine *primary;
-        bool partitioned;
+        DBConfig() : _primary(0), _partitioned(false){ }
 
-        DBConfig() : primary(0), partitioned(false) { }
-
-        virtual const char * getNS() {
-            return "grid.db.database";
-        }
-        virtual void serialize(BSONObjBuilder& to) {
-            to.append("name", name);
-            to.appendBool("partitioned", partitioned);
-            if ( primary )
-                to.append("primary", primary->getName());
-        }
-        virtual void unserialize(BSONObj& from) {
-            name = from.getStringField("name");
-            partitioned = from.getBoolField("partitioned");
-            string p = from.getStringField("primary");
-            if ( !p.empty() )
-                primary = Machine::get(p);
+        /**
+         * @return whether or not this partition is partitioned
+         */
+        bool partitioned( const NamespaceString& ns );
+        
+        /**
+         * returns the correct for machine for the ns
+         * if this namespace is partitioned, will return NULL
+         */
+        Machine * getMachine( const NamespaceString& ns );
+        
+        Machine * getPrimary(){
+            uassert( "no primary" , _primary );
+            return _primary;
         }
 
-        bool loadByName(const char *nm) {
-            BSONObjBuilder b;
-            b.append("name", nm);
-            BSONObj q = b.done();
-            return load(q);
-        }
+        // model stuff
+
+        virtual const char * getNS(){ return "grid.db.database"; }
+        virtual void serialize(BSONObjBuilder& to);
+        virtual void unserialize(BSONObj& from);
+        bool loadByName(const char *nm);
+
+    protected:
+        string _name; // e.g. "alleyinsider"
+        Machine * _primary;
+        bool _partitioned;
     };
 
     class Grid {
     public:
-        /* return which machine "owns" the object in question -- ie which partition
-           we should go to.
-        */
-        Machine* owner(const char *ns, BSONObj& objOrKey);
-        
         /**
            gets the config the db.
            will return an empty DBConfig if not in db already

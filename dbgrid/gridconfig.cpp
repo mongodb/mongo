@@ -20,9 +20,10 @@
 #include "../util/message.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
+#include "../client/model.h"
 #include "../db/pdfile.h"
 #include "gridconfig.h"
-#include "../client/model.h"
+#include "configserver.h"
 
 namespace mongo {
 
@@ -30,10 +31,51 @@ namespace mongo {
 
     map<string, Machine*> Machine::machines;
 
+    /* --- DBConfig --- */
+
+    bool DBConfig::partitioned( const NamespaceString& ns ){
+        if ( ! _partitioned )
+            return false;
+        uassert( "don't know what to do!" , 0 );
+        return 0;
+    }
+
+    Machine * DBConfig::getMachine( const NamespaceString& ns ){
+        if ( partitioned( ns ) )
+            return 0;
+        
+        uassert( "no primary!" , _primary );
+        return _primary;
+    }
+
+    void DBConfig::serialize(BSONObjBuilder& to){
+        to.append("name", _name);
+        to.appendBool("partitioned", _partitioned );
+        if ( _primary )
+            to.append("primary", _primary->getName() );
+    }
+    
+    void DBConfig::unserialize(BSONObj& from){
+        _name = from.getStringField("name");
+        _partitioned = from.getBoolField("partitioned");
+        string p = from.getStringField("primary");
+        if ( ! p.empty() )
+            _primary = Machine::get(p);
+    }
+    
+    bool DBConfig::loadByName(const char *nm){
+        BSONObjBuilder b;
+        b.append("name", nm);
+        BSONObj q = b.done();
+        return load(q);
+    }
+    
+    DBClientWithCommands* GridConfigModel::conn(){
+        return configServer.conn();
+    }
+
     /* --- Grid --- */
 
-    Grid grid;
-    
     DBConfig* Grid::getDBConfig( string database ){
         {
             string::size_type i = database.find( "." );
@@ -41,6 +83,9 @@ namespace mongo {
                 database = database.substr( 0 , i );
         }
         
+        if ( database == "grid" )
+            return &configServer;
+
         DBConfig*& cc = _databases[database];
         if ( cc == 0 ) {
             cc = new DBConfig();
@@ -53,18 +98,6 @@ namespace mongo {
         return cc;
     }
     
-    Machine* Grid::owner(const char *ns, BSONObj& objOrKey) {
-        DBConfig *cc = getDBConfig( nsToClient(ns) );
-        uassert( string("dbgrid: no config for db for ") + ns , cc );
 
-        if ( !cc->partitioned ) {
-            if ( !cc->primary )
-                throw UserAssertionException(string("dbgrid: no primary for ")+ns);
-            return cc->primary;
-        }
-
-        uassert("dbgrid: not implemented 100", false);
-        return 0;
-    }
-
+    Grid grid;
 } 

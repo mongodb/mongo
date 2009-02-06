@@ -5,15 +5,13 @@
 #include "../stdafx.h"
 #include "../util/message.h"
 #include "../db/dbmessage.h"
+#include "gridconfig.h"
 
 namespace mongo {
     
     class Request {
     public:
-        Request( Message& m, MessagingPort& p ) : _m(m) , _d( m ) , _p(p){
-            assert( _d.getns() );
-            _id = _m.data->id;
-        }
+        Request( Message& m, MessagingPort& p );
 
         const char * getns(){
             return _d.getns();
@@ -21,6 +19,14 @@ namespace mongo {
         
         MSGID id(){
             return _id;
+        }
+
+        DBConfig * getConfig(){
+            return _config;
+        }
+
+        const char * primaryName(){
+            return _config->getPrimary()->getName().c_str();
         }
 
         void reply( Message & response ){
@@ -37,6 +43,7 @@ namespace mongo {
         MessagingPort& _p;
 
         MSGID _id;
+        DBConfig * _config;
     };
 
     class Strategy {

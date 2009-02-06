@@ -25,10 +25,11 @@
 #pragma once
 
 #include "../client/dbclient.h"
+#include "gridconfig.h"
 
 namespace mongo {
 
-    class ConfigServer {
+    class ConfigServer : public DBConfig {
     public:
 
         enum { Port = 27016 }; /* standard port # for a grid db */
@@ -39,7 +40,7 @@ namespace mongo {
         bool ok(){
             return _conn != 0;
         }
-        
+
         DBClientWithCommands* conn(){
             assert( _conn );
             return _conn;

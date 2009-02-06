@@ -24,6 +24,10 @@ namespace mongo {
 
     ConfigServer::ConfigServer() {
         _conn = 0;
+
+        _partitioned = false;
+        _primary = 0;
+        _name = "grid";
     }
 
     ConfigServer::~ConfigServer() {
@@ -119,6 +123,7 @@ namespace mongo {
             DBClientPaired *dbp = new DBClientPaired();
             _conn = dbp;
             ok = dbp->connect(left.c_str(),right.c_str());
+            uassert( "paired config server not supported yet" , 0 );
         }
         else {
             l << left << "...";
@@ -127,6 +132,7 @@ namespace mongo {
             _conn = dcc;
             string errmsg;
             ok = dcc->connect(left.c_str(), errmsg);
+            _primary = Machine::get( left.c_str() );
         }
         
         return ok;

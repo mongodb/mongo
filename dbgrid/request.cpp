@@ -43,8 +43,15 @@
 
 #include "request.h"
 #include "gridconfig.h"
+#include "configserver.h"
 
 namespace mongo {
+
+    Request::Request( Message& m, MessagingPort& p ) : _m(m) , _d( m ) , _p(p){
+        assert( _d.getns() );
+        _id = _m.data->id;
+        _config = grid.getDBConfig( getns() );
+    }
 
     void processRequest(Message& m, MessagingPort& p) {
         Request r( m , p );
@@ -52,16 +59,22 @@ namespace mongo {
         int op = m.data->operation();
         assert( op > dbMsg );
         
-        grid.getDBConfig( r.getns() );
-        
-        if ( op == dbQuery ) {
-            SINGLE->queryOp( r );
-        }
-        else if ( op == dbGetMore ) {
-            SINGLE->getMore( r );
+        Strategy * s = 0;
+        if ( r.getConfig()->partitioned( r.getns() ) ){
+            uassert( "partitioned not supported" , 0 );
         }
         else {
-            SINGLE->writeOp( op, r );
+            s = SINGLE;
+        }
+        
+        if ( op == dbQuery ) {
+            s->queryOp( r );
+        }
+        else if ( op == dbGetMore ) {
+            s->getMore( r );
+        }
+        else {
+            s->writeOp( op, r );
         }
     }
     
