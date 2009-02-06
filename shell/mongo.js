@@ -67,7 +67,7 @@ connect = function( url , user , pass ){
 _portAndDbpath = function() {
     var port = "";
     var dbpath = "";
-    for( i = 0; i < arguments.length; ++i )
+    for( var i = 0; i < arguments.length; ++i )
         if ( arguments[ i ] == "--port" )
             port = arguments[ i + 1 ];
         else if ( arguments[ i ] == "--dbpath" )
