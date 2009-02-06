@@ -140,30 +140,31 @@ struct __wt_page {
 /*
  * The database itself needs a chunk of memory that describes it.   Here's
  * the structure.
+ *
+ * !!!
+ * The order is important: there's a 8-byte type in the middle, and the
+ * Solaris compiler will insert space into the structure if we don't put
+ * it on an 8-byte boundary.
  */
 struct __wt_page_desc {
 #define	WT_BTREE_MAGIC		120897
 	u_int32_t magic;		/* 00-03: Magic number */
 #define	WT_BTREE_MAJOR_VERSION	1
-	u_int32_t majorv;		/* 04-07: Major version */
+	u_int16_t majorv;		/* 04-05: Major version */
 #define	WT_BTREE_MINOR_VERSION	1
-	u_int32_t minorv;		/* 08-11: Minor version */
-	u_int32_t leafsize;		/* 12-15: Leaf page size */
-	u_int32_t intlsize;		/* 16-19: Internal page size */
-	u_int64_t base_recno;		/* 20-23: Base record number */
-	u_int32_t root_addr;		/* 28-31: Root address */
-	u_int32_t free_addr;		/* 32-35: Freelist address */
-	u_int32_t unused[7];		/* 36-63: Spare */
+	u_int16_t minorv;		/* 06-07: Minor version */
+	u_int32_t leafsize;		/* 08-11: Leaf page size */
+	u_int32_t intlsize;		/* 12-15: Internal page size */
+	u_int64_t base_recno;		/* 16-23: Base record number */
+	u_int32_t root_addr;		/* 24-27: Root address */
+	u_int32_t free_addr;		/* 28-31: Freelist address */
+	u_int32_t unused[8];		/* 32-63: Spare */
 };
-
 /*
- * WT_DESC_SIZE is the expected WT_DESC size --  we check this on startup
- * to make sure the compiler hasn't inserted padding (which would break
- * the world).
- *
- * The size must be a multiple of a 4-byte boundary.
+ * WT_PAGE_DESC_SIZE is the expected structure size --  we check at startup to
+ * make sure the compiler hasn't inserted padding (which would break the world).
  */
-#define	WT_DESC_SIZE		64
+#define	WT_PAGE_DESC_SIZE		64
 
 /*
  * All database pages have a common header.  There is no version number or
@@ -253,15 +254,16 @@ struct __wt_page_hdr {
 	u_int32_t nextaddr;		/* 28-31: next page */
 };
 /*
- * WT_HDR_SIZE is the expected WT_HDR size.  We check the size on startup to
- * ensure the compiler hasn't inserted padding (which would break the world).
- * The size must be a multiple of a 4-byte boundary.   It would be possible
- * to reduce this by two bytes, by moving the odd-sized fields to the end of
- * the structure (and using something other than "sizeof" for the check, as
- * compilers usually pad the sizeof() operator to the next 4-byte boundary),
- * but I don't think two bytes are worth the effort.
+ * WT_PAGE_HDR_SIZE is the expected structure size --  we check at startup to
+ * make sure the compiler hasn't inserted padding (which would break the world).
+ * The size must be a multiple of a 4-byte boundary.
+ *
+ * It would be possible to reduce this by two bytes, by moving the odd-sized
+ * fields to the end of the structure (and using something other than "sizeof"
+ * for the check, as compilers usually pad the sizeof() operator to the next
+ * 4-byte boundary), but I don't think two bytes are worth the effort.
  */
-#define	WT_HDR_SIZE		32
+#define	WT_PAGE_HDR_SIZE		32
 
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.  Note the correction
@@ -271,68 +273,78 @@ struct __wt_page_hdr {
  */
 #define	WT_PAGE_BYTE(page)						\
 	(((u_int8_t *)(page)->hdr) +					\
-	WT_HDR_SIZE + ((page)->addr == 0 ? WT_DESC_SIZE : 0))
+	WT_PAGE_HDR_SIZE + ((page)->addr == 0 ? WT_PAGE_DESC_SIZE : 0))
 
 /*
- * After the header, there is a list of WT_ITEMs in sorted order.
- *
- * Internal pages are lists of single key items (which may be overflow items).
- *
- * Leaf pages contain paired key/data items or a single duplicate data items
- * (which may be overflow items).
- *
- * Off-page duplicate pages are lists of single data items (which may be
- * overflow items).
+ * After the page header, there is a list of WT_ITEMs in sorted order.
  */
 struct __wt_item {
 	/*
-	 * Trailing data length, in bytes.   Each WT_ITEM, in its entirety, is
-	 * aligned on a 4-byte boundary, so it's OK to directly access the len
-	 * field on the page.
-	 */
-	u_int32_t len;
-
-	/*
-	 * Item type.  There are 3 basic types: keys, data items and duplicate
-	 * data items, each of which has an overflow form.  Each of the items
-	 * is followed by additional information, which varies by type: a data
-	 * or dup item is followed by a set of bytes, a WT_ITEM_OVFL structure
-	 * follows an overflow item, and so on.
+	 * Trailing data length (in bytes) plus item type.
 	 *
-	 * On internal (primary or duplicate) pages, there are pairs of items:
-	 * a WT_ITEM_INT followed by a single WT_ITEM_KEY or WT_ITEM_KEY_OVFL.
+	 * We encode the length and type in a single 4-byte value in order to
+	 * minimize our on-page footprint as well as maintain alignment of the
+	 * bytes that follow the item.   (The trade-off is this limits on-page
+	 * database items to 16MB.)   The bottom 24-bits are the length of the
+	 * trailing data, the next 4-bits are unused, and the top 4-bits are
+	 * the type.   We could use the unused 4-bits to provide more length,
+	 * but 16MB seems sufficient for on-page items.
 	 *
-	 * On primary leaf pages, there is either a WT_ITEM_KEY followed by a
-	 * single WT_ITEM_DATA, WT_ITEM_DATA_OVFL or WT_ITEM_OFFPAGE item,
-	 * or a WT_ITEM_KEY followed by some number of either WT_ITEM_DUP or
-	 * WT_ITEM_DUP_OVFL items.
+	 * The __item_chunk field should never be directly accessed, there are
+	 * macros to extract the type and length.
 	 *
-	 * On duplicate leaf pages, there are WT_ITEM_DUP or WT_ITEM_DUP_OVFL
-	 * items.
-	 *
-	 * Again, we could compress the values (and/or use a separate flag to
-	 * indicate overflow), but it's simpler this way if only because we
-	 * don't have to use the page type to figure out what "WT_ITEM_KEY"
-	 * really means.
+	 * WT_ITEMs are aligned to a 4-byte boundary, so it's OK to directly
+	 * access the __item_chunk field on the page.
 	 */
-#define	WT_ITEM_KEY		1	/* Leaf/internal page key */
-#define	WT_ITEM_KEY_OVFL	2	/* Leaf/internal page overflow key */
-#define	WT_ITEM_DATA		3	/* Leaf page data item */
-#define	WT_ITEM_DATA_OVFL	4	/* Leaf page overflow data item */
-#define	WT_ITEM_DUP		5	/* Duplicate data item */
-#define	WT_ITEM_DUP_OVFL	6	/* Duplicate overflow data item */
-#define	WT_ITEM_OFFPAGE		7	/* Offpage reference */
-	u_int8_t  type;
-
-	/* 
-	 * XXX GET RID OF THIS, IT'S TOO EXPENSIVE.
-	 */
-	u_int8_t  unused[3];		/* Spacer to force 4-byte alignment */
-
-	/*
-	 * A variable length chunk of data.
-	 */
+#define	WT_ITEM_MAX_LEN	(16 * 1024 * 1024 - 1)
+	u_int32_t __item_chunk;
 };
+
+/*
+ * Item type.  There are 3 basic types: keys, data items and duplicate data
+ * items, each of which has an overflow form.  Each of the items is followed
+ * by additional information, which varies by type: a key, data or duplicate
+ * item is followed by a set of bytes; a WT_ITEM_OVFL structure follows an
+ * overflow item.
+ *
+ * On internal (primary or duplicate) pages, there are pairs of items: a
+ * WT_ITEM_KEY/KEY_OVFL item followed by a WT_ITEM_OFFPAGE item.
+ *
+ * On primary leaf pages, there's a WT_ITEM_KEY/KEY_OVFL item followed by one
+ * WT_ITEM_DATA, WT_ITEM_DATA_OVFL or WT_ITEM_OFFPAGE item, or a WT_ITEM_KEY/
+ * KEY_OVFL item followed by some number of WT_ITEM_DUP or WT_ITEM_DUP_OVFL
+ * items.
+ *
+ * On duplicate leaf pages, there are WT_ITEM_DUP or WT_ITEM_DUP_OVFL items.
+ *
+ * We could compress the item types (for example, use a bit to mean overflow),
+ * but it's simpler this way because we don't need the page type to know what
+ * "WT_ITEM_KEY" really means.  We express the item types as bit masks because
+ * it makes the macro for assignment faster, but they are integer values, not
+ * unique bits.
+ */
+#define	WT_ITEM_KEY		0x01000000 /* Leaf/internal page key */
+#define	WT_ITEM_KEY_OVFL	0x02000000 /* Leaf/internal page overflow key */
+#define	WT_ITEM_DATA		0x03000000 /* Leaf page data item */
+#define	WT_ITEM_DATA_OVFL	0x04000000 /* Leaf page overflow data item */
+#define	WT_ITEM_DUP		0x05000000 /* Duplicate data item */
+#define	WT_ITEM_DUP_OVFL	0x06000000 /* Duplicate overflow data item */
+#define	WT_ITEM_OFFPAGE		0x07000000 /* Offpage reference */
+
+#define	WT_ITEM_LEN(item)						\
+	((item)->__item_chunk & 0x00ffffff)
+#define	WT_ITEM_LEN_SET(item, len)					\
+	((item)->__item_chunk = WT_ITEM_TYPE(item) | (len))
+#define	WT_ITEM_TYPE(item)						\
+	((item)->__item_chunk & 0x0f000000)
+#define	WT_ITEM_TYPE_SET(item, type)					\
+	((item)->__item_chunk = WT_ITEM_LEN(item) | (type))
+
+/*
+ * WT_ITEM_SIZE is the expected structure size --  we check at startup to make
+ * sure the compiler hasn't inserted padding (which would break the world).
+ */
+#define	WT_ITEM_SIZE	4
 
 /* WT_ITEM_BYTE is the first data byte for the item. */
 #define	WT_ITEM_BYTE(item)						\
@@ -341,14 +353,14 @@ struct __wt_item {
 /*
  * The number of bytes required to store a WT_ITEM followed by len additional
  * bytes.  Align the entry and the data itself to a 4-byte boundary so it's
- * possible to directly access the item on the page.
+ * possible to directly access WT_ITEMs on the page.
  */
 #define	WT_ITEM_SPACE_REQ(len)						\
 	WT_ALIGN(sizeof(WT_ITEM) + (len), sizeof(u_int32_t))
 
 /* WT_ITEM_NEXT is the first byte of the next item. */
 #define	WT_ITEM_NEXT(item)						\
-	((WT_ITEM *)((u_int8_t *)(item) + WT_ITEM_SPACE_REQ((item)->len)))
+	((WT_ITEM *)((u_int8_t *)(item) + WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item))))
 
 /* WT_ITEM_FOREACH is a for loop that walks the items on a page */
 #define	WT_ITEM_FOREACH(page, item, i)					\
@@ -359,10 +371,26 @@ struct __wt_item {
  * Btree internal items and off-page duplicates reference another page.
  */
 struct __wt_item_offp {
-	u_int32_t  addr;		/* Subtree address */
-	wt_recno_t records;		/* Subtree record count */
-	u_int8_t   level;		/* Subtree level */
+	u_int64_t records;		/* Subtree record count */
+	u_int32_t addr;			/* Subtree address */
+	u_int8_t  level;		/* Subtree level */
+	/*
+	 * We could compress this structure by incorporating the btree level
+	 * into the records field, the same we we did for the length and the
+	 * type fields of the WT_ITEM structure.  I'm not doing so for a two
+	 * reasons: (1) WT_ITEM_OFFPs only occur commonly in internal pages,
+	 * and so anything we save by compressing this structure we'll lose
+	 * by aligning the pairs of WT_ITEM and WT_ITEM_OFFP structures; (2)
+	 * this is the structure that references off-page trees, and it's the
+	 * structure I think we might want to extend some day.
+	 */
+	u_int8_t  unused[3];
 };
+/*
+ * WT_ITEM_OFFP_SIZE is the expected structure size --  we check at startup to
+ * make sure the compiler hasn't inserted padding (which would break the world).
+ */
+#define	WT_ITEM_OFFP_SIZE	16
 
 /*
  * Btree overflow items reference another page, and so the data is another
@@ -372,6 +400,12 @@ struct __wt_item_ovfl {
 	u_int32_t len;			/* Overflow length */
 	u_int32_t addr;			/* Overflow address */
 };
+/*
+ * WT_ITEM_OVFL_SIZE is the expected structure size --  we check at startup to
+ * make sure the compiler hasn't inserted padding (which would break the world).
+ * The size must be a multiple of a 4-byte boundary.
+ */
+#define	WT_ITEM_OVFL_SIZE	8
 
 #if defined(__cplusplus)
 }

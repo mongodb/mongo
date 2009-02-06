@@ -153,7 +153,7 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 		return (0);
 
 	WT_ITEM_FOREACH(page, item, i) {
-		switch (item->type) {
+		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY_OVFL:
 			WT_STAT_INCR(
 			    db->dstats, ITEM_KEY_OVFL, "overflow keys");
@@ -166,7 +166,7 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 		default:
 			break;
 		}
-		switch (item->type) {
+		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
 			WT_STAT_INCR(

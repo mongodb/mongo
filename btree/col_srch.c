@@ -22,7 +22,7 @@ __wt_db_get(WT_TOC *toc)
 	ENV *env;
 	WT_PAGE *page;
 	WT_INDX *indx;
-	WT_ITEM *item;
+	u_int32_t type;
 	int ret, tret;
 
 	env = toc->env;
@@ -39,8 +39,8 @@ __wt_db_get(WT_TOC *toc)
 	 * The Db.get method can only return single key/data pairs.
 	 * If that's not what we found, we're done.
 	 */
-	item = indx->ditem;
-	if (item->type != WT_ITEM_DATA && item->type != WT_ITEM_DATA_OVFL) {
+	type = WT_ITEM_TYPE(indx->ditem);
+	if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
 		__wt_db_errx(db,
 		    "the Db.get method cannot return keys with duplicate "
 		    "data items; use the Db.cursor method to return keys "

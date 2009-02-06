@@ -16,10 +16,10 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
 
 /* Check if the next page entry is part of a duplicate data set. */
 #define	WT_DUP_AHEAD(item, yesno) {					\
-	WT_ITEM *__item = WT_ITEM_NEXT(item);				\
-	(yesno) = __item->type == WT_ITEM_DUP ||			\
-	    __item->type == WT_ITEM_DUP_OVFL ||				\
-	    __item->type == WT_ITEM_OFFPAGE ? 1 : 0;			\
+	u_int32_t __type = WT_ITEM_TYPE(WT_ITEM_NEXT(item));		\
+	(yesno) = __type == WT_ITEM_DUP ||				\
+	    __type == WT_ITEM_DUP_OVFL ||				\
+	    __type == WT_ITEM_OFFPAGE ? 1 : 0;				\
 }
 
 /*
@@ -36,7 +36,7 @@ __wt_db_dump(WT_TOC *toc)
 	WT_ITEM_OVFL *ovfl;
 	WT_ITEM_OFFP offp;
 	WT_PAGE *page, *ovfl_page;
-	u_int32_t addr, i;
+	u_int32_t addr, i, item_len;
 	int dup_ahead, ret;
 	void (*func)(u_int8_t *, u_int32_t, FILE *);
 
@@ -68,11 +68,12 @@ __wt_db_dump(WT_TOC *toc)
 		if ((ret = __wt_bt_page_in(db, addr, 1, &page)) != 0)
 			return (ret);
 
-		WT_ITEM_FOREACH(page, item, i)
-			switch (item->type) {
+		WT_ITEM_FOREACH(page, item, i) {
+			item_len = WT_ITEM_LEN(item);
+			switch (WT_ITEM_TYPE(item)) {
 			case WT_ITEM_KEY:
 				last_key_std.data = WT_ITEM_BYTE(item);
-				last_key_std.size = item->len;
+				last_key_std.size = item_len;
 				last_key = &last_key_std;
 				/*
 				 * If we're about to dump an off-page duplicate
@@ -82,14 +83,14 @@ __wt_db_dump(WT_TOC *toc)
 				WT_DUP_AHEAD(item, dup_ahead);
 				if (!dup_ahead)
 					func(WT_ITEM_BYTE(item),
-					    item->len, stream);
+					    item_len, stream);
 				break;
 			case WT_ITEM_DATA:
-				func(WT_ITEM_BYTE(item), item->len, stream);
+				func(WT_ITEM_BYTE(item), item_len, stream);
 				break;
 			case WT_ITEM_DUP:
 				func(last_key->data, last_key->size, stream);
-				func(WT_ITEM_BYTE(item), item->len, stream);
+				func(WT_ITEM_BYTE(item), item_len, stream);
 				break;
 			case WT_ITEM_KEY_OVFL:
 				/*
@@ -111,7 +112,7 @@ __wt_db_dump(WT_TOC *toc)
 				 * If we're already in a duplicate set, dump
 				 * the key.
 				 */
-				if (item->type == WT_ITEM_DUP_OVFL)
+				if (WT_ITEM_TYPE(item) == WT_ITEM_DUP_OVFL)
 					func(last_key->data,
 					    last_key->size, stream);
 
@@ -149,6 +150,7 @@ __wt_db_dump(WT_TOC *toc)
 				break;
 			WT_DEFAULT_FORMAT(db);
 			}
+		}
 
 		addr = page->hdr->nextaddr;
 		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
@@ -201,9 +203,10 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM_OFFP *offp,
 	for (;;) {
 		WT_ITEM_FOREACH(page, item, i) {
 			func(key->data, key->size, stream);
-			switch (item->type) {
+			switch (WT_ITEM_TYPE(item)) {
 			case WT_ITEM_DUP:
-				func(WT_ITEM_BYTE(item), item->len, stream);
+				func(WT_ITEM_BYTE(item),
+				    WT_ITEM_LEN(item), stream);
 				break;
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);

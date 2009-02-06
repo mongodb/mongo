@@ -87,9 +87,9 @@ skip_read:
 			 * WT_ITEM_DATA_OVFL.  Correct the type.
 			 */
 			if (dup_count == 1)
-				dup_data->type =
-				    dup_data->type == WT_ITEM_DATA ?
-				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL;
+				WT_ITEM_TYPE_SET(dup_data,
+				    WT_ITEM_TYPE(dup_data) == WT_ITEM_DATA ?
+				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
 
 			WT_STAT_INCR(db->hstats, BULK_DUP_DATA_READ,
 			    "bulk duplicate data pairs read");
@@ -119,11 +119,11 @@ skip_read:
 			key->data = &key_ovfl;
 			key->size = sizeof(key_ovfl);
 
-			key_item.type = WT_ITEM_KEY_OVFL;
+			WT_ITEM_TYPE_SET(&key_item, WT_ITEM_KEY_OVFL);
 			WT_STAT_INCR(db->hstats, BULK_OVERFLOW_KEY,
 			    "bulk overflow key items read");
 		} else
-			key_item.type = WT_ITEM_KEY;
+			WT_ITEM_TYPE_SET(&key_item, WT_ITEM_KEY);
 
 		if (data->size > db->leafitemsize) {
 			data_ovfl.len = data->size;
@@ -133,14 +133,14 @@ skip_read:
 			data->data = &data_ovfl;
 			data->size = sizeof(data_ovfl);
 
-			data_item.type =
-			    key == NULL ? WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL;
+			WT_ITEM_TYPE_SET(&data_item,
+			    key == NULL ? WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL);
 
 			WT_STAT_INCR(db->hstats, BULK_OVERFLOW_DATA,
 			    "bulk overflow data items read");
 		} else
-			data_item.type =
-			    key == NULL ? WT_ITEM_DUP : WT_ITEM_DATA;
+			WT_ITEM_TYPE_SET(&data_item,
+			    key == NULL ? WT_ITEM_DUP : WT_ITEM_DATA);
 
 		/*
 		 * We now have the key/data items to store on the page.  If
@@ -201,7 +201,7 @@ skip_read:
 				dup_key = (WT_ITEM *)WT_PAGE_BYTE(next);
 				dup_data =
 				    (WT_ITEM *)((u_int8_t *)dup_key +
-				    WT_ITEM_SPACE_REQ(dup_key->len));
+				    WT_ITEM_SPACE_REQ(WT_ITEM_LEN(dup_key)));
 
 				/*
 				 * The "lastkey" value just moved to a new page.
@@ -211,7 +211,7 @@ skip_read:
 				if (lastkey == &lastkey_std) {
 					lastkey_std.data =
 					    WT_ITEM_BYTE(dup_key);
-					lastkey_std.size = dup_key->len;
+					lastkey_std.size = WT_ITEM_LEN(dup_key);
 				}
 			}
 
@@ -235,7 +235,7 @@ skip_read:
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
 			++page->hdr->u.entries;
-			key_item.len = key->size;
+			WT_ITEM_LEN_SET(&key_item, key->size);
 			memcpy(page->first_free, &key_item, sizeof(key_item));
 			memcpy(page->first_free +
 			    sizeof(key_item), key->data, key->size);
@@ -253,7 +253,8 @@ skip_read:
 			 * but doesn't entirely fit on this page).
 			 */
 			if (LF_ISSET(WT_DUPLICATES)) {
-				if (key_item.type != WT_ITEM_KEY_OVFL) {
+				if (WT_ITEM_TYPE(
+				    &key_item) != WT_ITEM_KEY_OVFL) {
 					lastkey = &lastkey_std;
 					lastkey_std.data =
 					    WT_ITEM_BYTE(page->first_free);
@@ -266,7 +267,7 @@ skip_read:
 
 		/* Copy the data item onto the page. */
 		++page->hdr->u.entries;
-		data_item.len = data->size;
+		WT_ITEM_LEN_SET(&data_item, data->size);
 		memcpy(page->first_free, &data_item, sizeof(data_item));
 		memcpy(page->first_free +
 		    sizeof(data_item), data->data, data->size);
@@ -280,8 +281,8 @@ skip_read:
 		 * space calculation.
 		 */
 		if (LF_ISSET(WT_DUPLICATES) &&
-		    data_item.type != WT_ITEM_DUP &&
-		    data_item.type != WT_ITEM_DUP_OVFL) {
+		    WT_ITEM_TYPE(&data_item) != WT_ITEM_DUP &&
+		    WT_ITEM_TYPE(&data_item) != WT_ITEM_DUP_OVFL) {
 			dup_count = 1;
 			dup_space = data->size;
 			dup_data = (WT_ITEM *)page->first_free;
@@ -294,8 +295,8 @@ skip_read:
 		 * move it offpage.
 		 */
 		if (LF_ISSET(WT_DUPLICATES) &&
-		    data_item.type == WT_ITEM_DUP ||
-		    data_item.type == WT_ITEM_DUP_OVFL) {
+		    WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP ||
+		    WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP_OVFL) {
 			++dup_count;
 			dup_space += data->size;
 
@@ -448,10 +449,10 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 				goto err;
 			data->data = &data_local;
 			data->size = sizeof(data_local);
-			data_item.type = WT_ITEM_DUP_OVFL;
+			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DUP_OVFL);
 			WT_STAT_INCR(db->hstats, BULK_OVERFLOW_DATA, NULL);
 		} else
-			data_item.type = WT_ITEM_DUP;
+			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DUP);
 
 		/*
 		 * If there's insufficient space available, allocate a new
@@ -489,7 +490,7 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 		/* Copy the data item onto the page. */
 		++dup_count;
 		++page->hdr->u.entries;
-		data_item.len = data->size;
+		WT_ITEM_LEN_SET(&data_item, data->size);
 		memcpy(page->first_free, &data_item, sizeof(data_item));
 		memcpy(page->first_free +
 		    sizeof(data_item), data->data, data->size);
@@ -514,8 +515,8 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	 * Replace the caller's duplicate set with a WT_ITEM_OFFP structure,
 	 * and reset the caller's page information.
 	 */
-	data_item.len = sizeof(WT_ITEM_OFFP);
-	data_item.type = WT_ITEM_OFFPAGE;
+	WT_ITEM_LEN_SET(&data_item, sizeof(WT_ITEM_OFFP));
+	WT_ITEM_TYPE_SET(&data_item, WT_ITEM_OFFPAGE);
 	offpage_item.records = dup_count;
 	p = (u_int8_t *)dup_data;
 	memcpy(p, &data_item, sizeof(data_item));
@@ -558,12 +559,13 @@ __wt_bt_promote(DB *db, WT_PAGE *page, WT_ITEM_OFFP *root_offp)
 	 * to get right, so I'm not doing it again.
 	 */
 	key_item = (WT_ITEM *)WT_PAGE_BYTE(page);
-	switch (key_item->type) {
+	switch (WT_ITEM_TYPE(key_item)) {
 	case WT_ITEM_DUP:
 	case WT_ITEM_KEY:
 		key.data = WT_ITEM_BYTE(key_item);
-		item.type = WT_ITEM_KEY;
-		item.len = key.size = key_item->len;
+		key.size = WT_ITEM_LEN(key_item);
+		WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY);
+		WT_ITEM_LEN_SET(&item, key.size);
 		break;
 	case WT_ITEM_DUP_OVFL:
 	case WT_ITEM_KEY_OVFL:
@@ -573,8 +575,9 @@ __wt_bt_promote(DB *db, WT_PAGE *page, WT_ITEM_OFFP *root_offp)
 		    &tmp_ovfl)) != 0)
 			return (ret);
 		key.data = &tmp_ovfl;
-		item.type = WT_ITEM_KEY_OVFL;
-		item.len = key.size = sizeof(tmp_ovfl);
+		key.size = sizeof(tmp_ovfl);
+		WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
+		WT_ITEM_LEN_SET(&item, sizeof(tmp_ovfl));
 		break;
 	WT_DEFAULT_FORMAT(db);
 	}
@@ -728,8 +731,8 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 	parent->space_avail -= WT_ITEM_SPACE_REQ(key.size);
 
 	/* Create the internal page reference. */
-	item.type = WT_ITEM_OFFPAGE;
-	item.len = sizeof(WT_ITEM_OFFP);
+	WT_ITEM_TYPE_SET(&item, WT_ITEM_OFFPAGE);
+	WT_ITEM_LEN_SET(&item, sizeof(WT_ITEM_OFFP));
 	offp.addr = page->addr;
 	offp.level = page->hdr->level;
 	offp.records = 0;

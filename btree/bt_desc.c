@@ -34,7 +34,8 @@ __wt_bt_desc_init(DB *db, WT_PAGE *page)
 	desc.unused[5] = 0;
 	desc.unused[6] = 0;
 
-	memcpy((u_int8_t *)page->hdr + WT_HDR_SIZE, &desc, WT_DESC_SIZE);
+	memcpy(
+	    (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, &desc, WT_PAGE_DESC_SIZE);
 }
 
 /*
@@ -46,7 +47,8 @@ __wt_bt_desc_stats(DB *db, WT_PAGE *page)
 {
 	WT_PAGE_DESC desc;
 
-	memcpy(&desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
+	memcpy(
+	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 
 	WT_STAT_SET(db->dstats, MAGIC, "magic number", desc.magic);
 	WT_STAT_SET(db->dstats, MAJOR, "major version number", desc.majorv);
@@ -66,7 +68,8 @@ __wt_bt_desc_verify(DB *db, WT_PAGE *page)
 {
 	WT_PAGE_DESC desc;
 
-	memcpy(&desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
+	memcpy(
+	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 
 	return (desc.magic != WT_BTREE_MAGIC ||
 	    desc.majorv != WT_BTREE_MAJOR_VERSION ||
@@ -82,6 +85,36 @@ __wt_bt_desc_verify(DB *db, WT_PAGE *page)
 	    desc.unused[5] != 0 ||
 	    desc.unused[6] != 0 ? WT_ERROR : 0);
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_bt_desc_dump --
+ *	Verify the database description on page 0.
+ */
+void
+__wt_bt_desc_dump(WT_PAGE *page, FILE *fp)
+{
+	WT_PAGE_DESC desc;
+
+	memcpy(
+	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
+
+	fprintf(fp, "magic: %#lx, major: %lu, minor: %lu\n",
+	    (u_long)desc.magic, (u_long)desc.majorv, (u_long)desc.minorv);
+	fprintf(fp, "intlsize: %lu, leafsize: %lu, base record: %lu\n",
+	    (u_long)desc.intlsize,
+	    (u_long)desc.leafsize, (u_long)desc.base_recno);
+	if (desc.root_addr == WT_ADDR_INVALID)
+		fprintf(fp, "root addr (none), ");
+	else
+		fprintf(fp, "root addr %lu, ", (u_long)desc.root_addr);
+	if (desc.free_addr == WT_ADDR_INVALID)
+		fprintf(fp, "free addr (none), ");
+	else
+		fprintf(fp, "free addr %lu, ", (u_long)desc.free_addr);
+	fprintf(fp, "\n");
+}
+#endif
 
 /*
  * __wt_bt_desc_read --
@@ -110,7 +143,8 @@ __wt_bt_desc_read(DB *db)
 	    (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)) != 0)
 		return (ret);
 
-	memcpy(&desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
+	memcpy(
+	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 	db->leafsize = desc.leafsize;
 	db->intlsize = desc.intlsize;
 	idb->root_addr = desc.root_addr;
@@ -142,11 +176,13 @@ __wt_bt_desc_write(DB *db, u_int32_t root_addr)
 
 	idb->root_addr = root_addr;
 
-	memcpy(&desc, (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
+	memcpy(
+	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 	desc.root_addr = root_addr;
 	desc.leafsize = db->leafsize;
 	desc.intlsize = db->intlsize;
-	memcpy((u_int8_t *)page->hdr + WT_HDR_SIZE, &desc, WT_DESC_SIZE);
+	memcpy(
+	    (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, &desc, WT_PAGE_DESC_SIZE);
 
 	return (__wt_cache_db_out(db, page, WT_MODIFIED));
 }

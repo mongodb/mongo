@@ -31,9 +31,9 @@ __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx)
 	switch (page->hdr->type) {
 	case WT_PAGE_LEAF:
 		item = indx->ditem;
-		if (item->type == WT_ITEM_DATA) {
+		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA) {
 			p = WT_ITEM_BYTE(item);
-			size = item->len;
+			size = WT_ITEM_LEN(item);
 			break;
 		}
 		goto ovfl;

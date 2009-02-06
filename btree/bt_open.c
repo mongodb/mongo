@@ -131,6 +131,15 @@ unexpected:	__wt_db_errx(db,
 		else
 			db->leafitemsize = db->leafsize / 40;
 
+	/*
+	 * We only have 3 bytes of length for on-page items, so the maximum
+	 * on-page item size is limited to 16MB.
+	 */
+	if (db->intlitemsize > WT_ITEM_MAX_LEN)
+		db->intlitemsize = WT_ITEM_MAX_LEN;
+	if (db->leafitemsize > WT_ITEM_MAX_LEN)
+		db->leafitemsize = WT_ITEM_MAX_LEN;
+
 	/* Extents are 10MB by default. */
 	if (db->extsize == 0)
 		db->extsize = WT_MEGABYTE;
@@ -167,7 +176,7 @@ unexpected:	__wt_db_errx(db,
 	 * way I can skip the suspense.
 	 */
 #define	WT_MINIMUM_DATA_SPACE(db, s)					\
-	    (((s) - (WT_HDR_SIZE + WT_DESC_SIZE + 10)) / 4)
+	    (((s) - (WT_PAGE_HDR_SIZE + WT_PAGE_DESC_SIZE + 10)) / 4)
 	if (db->intlitemsize > WT_MINIMUM_DATA_SPACE(db, db->intlsize)) {
 		__wt_db_errx(db,
 		    "The internal page size is too small for its maximum item "

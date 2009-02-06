@@ -153,7 +153,6 @@ int
 __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	WT_ITEM *item;
-	WT_PAGE_DESC desc;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
 	u_int8_t *p;
@@ -172,28 +171,11 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->bytes) - 1));
 
 	/* Dump the description area, if it's page 0. */
-	if (page->addr == 0) {
-		memcpy(&desc,
-		    (u_int8_t *)page->hdr + WT_HDR_SIZE, WT_DESC_SIZE);
-		fprintf(fp, "magic: %#lx, major: %lu, minor: %lu\n",
-		    (u_long)desc.magic,
-		    (u_long)desc.majorv, (u_long)desc.minorv);
-		fprintf(fp, "intlsize: %lu, leafsize: %lu, base record: %lu\n",
-		    (u_long)desc.intlsize,
-		    (u_long)desc.leafsize, (u_long)desc.base_recno);
-		if (desc.root_addr == WT_ADDR_INVALID)
-			fprintf(fp, "root addr (none), ");
-		else
-			fprintf(fp, "root addr %lu, ", (u_long)desc.root_addr);
-		if (desc.free_addr == WT_ADDR_INVALID)
-			fprintf(fp, "free addr (none), ");
-		else
-			fprintf(fp, "free addr %lu, ", (u_long)desc.free_addr);
-		fprintf(fp, "\n");
-	}
+	if (page->addr == 0)
+		__wt_bt_desc_dump(page, fp);
 
 	hdr = page->hdr;
-	fprintf(fp, "%s: ", __wt_bt_hdr_type(hdr->type));
+	fprintf(fp, "%s: ", __wt_bt_hdr_type(hdr));
 	if (hdr->type == WT_PAGE_OVFL)
 		fprintf(fp, "%lu bytes", (u_long)hdr->u.datalen);
 	else
@@ -224,11 +206,11 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 	for (p = WT_PAGE_BYTE(page), i = 1; i <= hdr->u.entries; ++i) {
 		item = (WT_ITEM *)p;
 		fprintf(fp, "%6lu: {type %s; len %lu; off %lu}\n\t{",
-		    (u_long)i, __wt_bt_item_type(item->type),
-		    (u_long)item->len, (u_long)(p - (u_int8_t *)hdr));
+		    (u_long)i, __wt_bt_item_type(item),
+		    (u_long)WT_ITEM_LEN(item), (u_long)(p - (u_int8_t *)hdr));
 		__wt_bt_dump_item_data(db, item, fp);
 		fprintf(fp, "}\n");
-		p += WT_ITEM_SPACE_REQ(item->len);
+		p += WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item));
 	}
 	fprintf(fp, "\n");
 
@@ -248,7 +230,7 @@ __wt_bt_dump_item(DB *db, WT_ITEM *item, FILE *fp)
 	if (fp == NULL)
 		fp = stdout;
 
-	fprintf(fp, "%s {", __wt_bt_item_type(item->type));
+	fprintf(fp, "%s {", __wt_bt_item_type(item));
 
 	__wt_bt_dump_item_data(db, item, fp);
 
@@ -266,11 +248,11 @@ __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 	WT_ITEM_OFFP *offp;
 	WT_PAGE *page;
 
-	switch (item->type) {
+	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
 	case WT_ITEM_DATA:
 	case WT_ITEM_DUP:
-		__wt_bt_print(WT_ITEM_BYTE(item), item->len, fp);
+		__wt_bt_print(WT_ITEM_BYTE(item), WT_ITEM_LEN(item), fp);
 		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:

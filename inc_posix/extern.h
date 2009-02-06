@@ -18,6 +18,8 @@ void
 __wt_bt_desc_stats(DB *db, WT_PAGE *page);
 int
 __wt_bt_desc_verify(DB *db, WT_PAGE *page);
+void
+__wt_bt_desc_dump(WT_PAGE *page, FILE *fp);
 int
 __wt_bt_desc_read(DB *db);
 int
@@ -37,9 +39,9 @@ __wt_bt_first_offp(WT_PAGE *page, WT_ITEM_OFFP *offp);
 void
 __wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr);
 const char *
-__wt_bt_hdr_type(u_int32_t type);
+__wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *
-__wt_bt_item_type(u_int32_t type);
+__wt_bt_item_type(WT_ITEM *item);
 int
 __wt_bt_open(DB *db);
 int

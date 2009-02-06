@@ -641,7 +641,7 @@ __wt_bt_verify_item(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 	WT_ITEM_OFFP offp;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
-	u_int32_t addr, i, item_no;
+	u_int32_t addr, i, item_num, item_len,item_type;
 	int (*func)(DB *, const DBT *, const DBT *), ret;
 
 	env = db->env;
@@ -675,16 +675,18 @@ __wt_bt_verify_item(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 	else
 		func = db->btree_compare;
 
-	item_no = 0;
+	item_num = 0;
 	WT_ITEM_FOREACH(page, item, i) {
-		++item_no;
+		++item_num;
+		item_type = WT_ITEM_TYPE(item);
+		item_len = WT_ITEM_LEN(item);
 
 		/* Check if this item is entirely on the page. */
 		if ((u_int8_t *)item + sizeof(WT_ITEM) > end)
 			goto eop;
 
 		/* Check the item's type. */
-		switch (item->type) {
+		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
 			if (hdr->type != WT_PAGE_INT &&
@@ -710,9 +712,9 @@ __wt_bt_verify_item(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 item_vs_page:			__wt_db_errx(db,
 				    "item %lu on page at addr %lu is a %s "
 				    "type on a %s page",
-				    (u_long)item_no, (u_long)addr,
-				    __wt_bt_item_type(item->type),
-				    __wt_bt_hdr_type(hdr->type));
+				    (u_long)item_num, (u_long)addr,
+				    __wt_bt_item_type(item),
+				    __wt_bt_hdr_type(hdr));
 				goto err;
 			}
 			break;
@@ -721,7 +723,7 @@ item_vs_page:			__wt_db_errx(db,
 		}
 
 		/* Check the item's length. */
-		switch (item->type) {
+		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_DATA:
 		case WT_ITEM_DUP:
@@ -730,15 +732,15 @@ item_vs_page:			__wt_db_errx(db,
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
-			if (item->len != sizeof(WT_ITEM_OVFL))
+			if (item_len != sizeof(WT_ITEM_OVFL))
 				goto item_len;
 			break;
 		case WT_ITEM_OFFPAGE:
-			if (item->len != sizeof(WT_ITEM_OFFP)) {
+			if (item_len != sizeof(WT_ITEM_OFFP)) {
 item_len:			__wt_db_errx(db,
 				    "item %lu on page at addr %lu has an "
 				    "incorrect length",
-				    (u_long)item_no, (u_long)addr);
+				    (u_long)item_num, (u_long)addr);
 				goto err;
 			}
 			break;
@@ -746,21 +748,12 @@ item_len:			__wt_db_errx(db,
 			goto item_type;
 		}
 
-		/* Check the unused fields. */
-		if (item->unused[0] != 0 || item->unused[1] != 0) {
-			__wt_db_errx(db,
-			    "item %lu on page at addr %lu has non-zero "
-			    "unused item fields",
-			    (u_long)item_no, (u_long)addr);
-			goto err;
-		}
-
 		/* Check if the item's data is entirely on the page. */
 		if ((u_int8_t *)WT_ITEM_NEXT(item) > end) {
 eop:			__wt_db_errx(db,
 			    "item %lu on page at addr %lu extends past the end "
 			    " of the page",
-			    (u_long)item_no, (u_long)addr);
+			    (u_long)item_num, (u_long)addr);
 			goto err;
 		}
 
@@ -769,7 +762,7 @@ eop:			__wt_db_errx(db,
 		 * and overflow page references.
 		 */
 		if (fragbits != NULL) {
-			if (item->type == WT_ITEM_OFFPAGE &&
+			if (item_type == WT_ITEM_OFFPAGE &&
 			    hdr->type == WT_PAGE_LEAF) {
 				/*
 				 * !!!
@@ -783,9 +776,9 @@ eop:			__wt_db_errx(db,
 					goto err;
 			}
 
-			if ((item->type == WT_ITEM_KEY_OVFL ||
-			    item->type == WT_ITEM_DATA_OVFL ||
-			    item->type == WT_ITEM_DUP_OVFL) &&
+			if ((item_type == WT_ITEM_KEY_OVFL ||
+			    item_type == WT_ITEM_DATA_OVFL ||
+			    item_type == WT_ITEM_DUP_OVFL) &&
 			    (ret = __wt_bt_verify_ovfl(db,
 			    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item),
 			    fragbits, fp)) != 0)
@@ -793,23 +786,23 @@ eop:			__wt_db_errx(db,
 		}
 
 		/* Some items aren't sorted on the page, so we're done. */
-		if (item->type == WT_ITEM_DATA ||
-		    item->type == WT_ITEM_DATA_OVFL ||
-		    item->type == WT_ITEM_OFFPAGE)
+		if (item_type == WT_ITEM_DATA ||
+		    item_type == WT_ITEM_DATA_OVFL ||
+		    item_type == WT_ITEM_OFFPAGE)
 			continue;
 
 		/* Get a DBT that represents this item. */
-		switch (item->type) {
+		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_DUP:
-			current->indx = item_no;
+			current->indx = item_num;
 			current->item = &current->item_std;
 			current->item_std.data = WT_ITEM_BYTE(item);
-			current->item_std.size = item->len;
+			current->item_std.size = item_len;
 			break;
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DUP_OVFL:
-			current->indx = item_no;
+			current->indx = item_num;
 			current->item = &current->item_ovfl;
 			if ((ret = __wt_bt_ovfl_copy_to_dbt(db, (WT_ITEM_OVFL *)
 			    WT_ITEM_BYTE(item), current->item)) != 0)
@@ -820,7 +813,7 @@ eop:			__wt_db_errx(db,
 		}
 
 		/* Check the sort order. */
-		switch (item->type) {
+		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
 			if (last_key->item != NULL &&
@@ -859,7 +852,7 @@ eop:			__wt_db_errx(db,
 	if (0) {
 item_type:	__wt_db_errx(db,
 		    "item %lu on page at addr %lu has an illegal type of %lu",
-		    (u_long)item_no, (u_long)addr, (u_long)item->type);
+		    (u_long)item_num, (u_long)addr, (u_long)item_type);
 err:		ret = WT_ERROR;
 	}
 

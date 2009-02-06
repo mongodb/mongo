@@ -195,8 +195,8 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 
 /*
  * __wt_bt_page_inmem_append --
- *	Append a new item/WT_ITEM_OFFP pair to an internal page's in-memory
- *	information.
+ *	Append a new WT_ITEM_KEY/WT_ITEM_OFFP pair to an internal page's
+ *	in-memory information.
  */
 int
 __wt_bt_page_inmem_append(DB *db,
@@ -231,10 +231,10 @@ __wt_bt_page_inmem_append(DB *db,
 	indx = page->indx + page->indx_count;
 	++page->indx_count;
 
-	switch (key_item->type) {
+	switch (WT_ITEM_TYPE(key_item)) {
 	case WT_ITEM_KEY:
 		indx->data = WT_ITEM_BYTE(key_item);
-		indx->size = key_item->len;
+		indx->size = WT_ITEM_LEN(key_item);
 		indx->addr = WT_ADDR_INVALID;
 		break;
 	case WT_ITEM_KEY_OVFL:
@@ -278,10 +278,10 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 	 *	Offpage references are WT_ITEM_OFFPAGE items.
 	 */
 	WT_ITEM_FOREACH(page, item, i)
-		switch (item->type) {
+		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 			indx->data = WT_ITEM_BYTE(item);
-			indx->size = item->len;
+			indx->size = WT_ITEM_LEN(item);
 			indx->addr = WT_ADDR_INVALID;
 			break;
 		case WT_ITEM_KEY_OVFL:
@@ -328,7 +328,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 	 */
 	indx = NULL;
 	WT_ITEM_FOREACH(page, item, i)
-		switch (item->type) {
+		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 			if (indx == NULL)
 				indx = page->indx;
@@ -336,7 +336,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 				++indx;
 
 			indx->data = WT_ITEM_BYTE(item);
-			indx->size = item->len;
+			indx->size = WT_ITEM_LEN(item);
 			indx->addr = WT_ADDR_INVALID;
 
 			++page->indx_count;
@@ -393,10 +393,10 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	 */
 	indx = page->indx;
 	WT_ITEM_FOREACH(page, item, i) {
-		switch (item->type) {
+		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DUP:
 			indx->data = WT_ITEM_BYTE(item);
-			indx->size = item->len;
+			indx->size = WT_ITEM_LEN(item);
 			indx->addr = WT_ADDR_INVALID;
 			break;
 		case WT_ITEM_DATA_OVFL:

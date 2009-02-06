@@ -16,19 +16,33 @@
 int
 __wt_bt_build_verify(void)
 {
+	static struct {
+		u_int s, c;
+		char *name;
+	} list[] = {
+		{ sizeof(WT_ITEM), WT_ITEM_SIZE, "WT_ITEM" },
+		{ sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE, "WT_PAGE_DESC" },
+		{ sizeof(WT_PAGE_HDR), WT_PAGE_HDR_SIZE, "WT_PAGE_HDR" },
+		{ sizeof(WT_ITEM_OFFP), WT_ITEM_OFFP_SIZE, "WT_ITEM_OFFP" },
+		{ sizeof(WT_ITEM_OVFL), WT_ITEM_OVFL_SIZE, "WT_ITEM_OVFL" }
+	}, *lp;
+		
 	/*
 	 * The compiler had better not have padded our structures -- make
 	 * sure the page header structure is exactly what we expect.
 	 */
-	if (sizeof(WT_PAGE_HDR) != WT_HDR_SIZE ||
-	    sizeof(WT_PAGE_DESC) != WT_DESC_SIZE) {
-		fprintf(stderr,
-		    "WiredTiger build failed, the header structures are not "
-		    "the correct size");
+	for (lp = list; lp < list + sizeof(list) / sizeof(list[0]); ++lp) {
+		if (lp->s == lp->c)
+			continue;
+		__wt_env_errx(NULL,
+		    "WiredTiger build failed, the %s header structure is not "
+		    "the correct size (expected %u, got %u)",
+		    lp->name, lp->c, lp->s);
 		return (WT_ERROR);
 	}
-	if (WT_ALIGN(sizeof(WT_PAGE_HDR), sizeof(u_int32_t)) != WT_HDR_SIZE) {
-		fprintf(stderr,
+	if (WT_ALIGN(
+	    sizeof(WT_PAGE_HDR), sizeof(u_int32_t)) != WT_PAGE_HDR_SIZE) {
+		__wt_env_errx(NULL,
 		    "Build verification failed, the WT_PAGE_HDR structure"
 		    " isn't aligned correctly");
 		return (WT_ERROR);
@@ -41,9 +55,9 @@ __wt_bt_build_verify(void)
 	 * check, just to be sure.
 	 */
 	if (sizeof(size_t) < sizeof(u_int32_t)) {
-		fprintf(stderr,
+		__wt_env_errx(NULL, "%s",
 		    "Build verification failed, a size_t is smaller than "
-		    "32-bits");
+		    "4-bytes");
 		return (WT_ERROR);
 	}
 
@@ -105,9 +119,9 @@ __wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr)
  *	Return a string representing the page type.
  */
 const char *
-__wt_bt_hdr_type(u_int32_t type)
+__wt_bt_hdr_type(WT_PAGE_HDR *hdr)
 {
-	switch (type) {
+	switch (hdr->type) {
 	case WT_PAGE_INVALID:
 		return ("invalid");
 	case WT_PAGE_OVFL:
@@ -131,9 +145,9 @@ __wt_bt_hdr_type(u_int32_t type)
  *	Return a string representing the item type.
  */
 const char *
-__wt_bt_item_type(u_int32_t type)
+__wt_bt_item_type(WT_ITEM *item)
 {
-	switch (type) {
+	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
 		return ("key");
 	case WT_ITEM_DATA:
