@@ -86,6 +86,7 @@ public:
         }
         return li.QuadPart;
     }
+    void fsync() { FlushFileBuffers(fd); }
 };
 
 #else
@@ -137,6 +138,7 @@ public:
     fileofs len() {
         return lseek(fd, 0, SEEK_END);
     }
+    void fsync() { ::fsync(fd); }
 };
 
 
