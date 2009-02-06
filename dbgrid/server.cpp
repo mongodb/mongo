@@ -159,7 +159,7 @@ int main(int argc, char* argv[], char *envp[] ) {
     }
 
     assert( configServer.ok() );
-    Model::globalConn = configServer.conn();
+    Model::globalConn = 0;
 
     start();
     dbexit(0);
