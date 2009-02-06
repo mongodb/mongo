@@ -247,8 +247,6 @@ elif "win32" == os.sys.platform:
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
-print( "platform: " + platform + " processor: " + processor )
-
 if useJavaHome:
     env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/" + javaOS ] )
     env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
