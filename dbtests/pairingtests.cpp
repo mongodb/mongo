@@ -94,16 +94,16 @@ namespace PairingTests {
                 checkFields( rp3, "", "", DBPort, "bar" );
 
                 ASSERT_EXCEPTION( ReplPair( "foo:", "bar" ),
-                                  UserAssertionException );
+                                  UserException );
 
                 ASSERT_EXCEPTION( ReplPair( "foo:0", "bar" ),
-                                  UserAssertionException );
+                                  UserException );
 
                 ASSERT_EXCEPTION( ReplPair( "foo:10000000", "bar" ),
-                                  UserAssertionException );
+                                  UserException );
 
                 ASSERT_EXCEPTION( ReplPair( "foo", "" ),
-                                  UserAssertionException );
+                                  UserException );
             }
         private:
             void checkFields( const ReplPair &rp,

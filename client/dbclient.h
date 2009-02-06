@@ -516,6 +516,11 @@ namespace mongo {
     
     class DBClientPaired;
     
+    class ConnectException : public UserException { 
+    public:
+        ConnectException(string msg) : UserException(msg) { }
+    };
+
     /** 
         A basic connection to the database. 
         This is the main entry point for talking to a simple Mongo setup
@@ -539,7 +544,7 @@ namespace mongo {
         DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) :
                 clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
 
-        /**Connect to a Mongo database server.
+        /** Connect to a Mongo database server.
 
            If autoReconnect is true, you can try to use the DBClientConnection even when
            false was returned -- it will try to connect again.
@@ -549,6 +554,20 @@ namespace mongo {
            @return false if fails to connect.
         */
         virtual bool connect(const char *serverHostname, string& errmsg);
+
+        /** Connect to a Mongo database server.  Exception throwing version.
+            Throws a UserException if cannot connect.
+
+           If autoReconnect is true, you can try to use the DBClientConnection even when
+           false was returned -- it will try to connect again.
+
+           @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
+        */
+        void connect(string serverHostname) { 
+            string errmsg;
+            if( !connect(serverHostname.c_str(), errmsg) ) 
+                throw new ConnectException(string("can't connect ") + errmsg);
+        }
 
         virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
