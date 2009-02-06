@@ -251,7 +251,7 @@ namespace NamespaceTests {
 
                 BSONObjSetDefaultOrder keys;
                 ASSERT_EXCEPTION( id().getKeysFromObject( b.done(), keys ),
-                                  UserAssertionException );
+                                  UserException );
             }
         private:
             virtual BSONObj key() const {

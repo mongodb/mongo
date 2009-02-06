@@ -678,7 +678,7 @@ namespace mongo {
                 _runCommands(ns, o, ss, bb, ob, true, 0);
             }
         }
-        catch ( UserAssertionException& e ) {
+        catch ( UserException& e ) {
             log() << "sync: caught user assertion " << e.msg << '\n';
         }        
     }

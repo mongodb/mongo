@@ -69,7 +69,7 @@ namespace mongo {
             RARELY log() << "User Assertion " << msg << endl;
         lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msg);
-        throw UserAssertionException(msg);
+        throw UserException(msg);
     }
 
     void msgasserted(const char *msg) {

@@ -129,13 +129,13 @@ namespace mongo {
         virtual const char* what() const throw() { return msg.c_str(); }
     };
 
-    /* we use the same mechanism for bad things the user does -- which are really just errors */
-    class UserAssertionException : public AssertionException {
+    /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */
+    class UserException : public AssertionException {
     public:
-        UserAssertionException(const char *_msg) {
+        UserException(const char *_msg) {
             msg = _msg;
         }
-        UserAssertionException(string _msg) {
+        UserException(string _msg) {
             msg = _msg;
         }
         virtual bool severe() {
