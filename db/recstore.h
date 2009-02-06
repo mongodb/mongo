@@ -17,7 +17,7 @@ class BasicRecStore {
         uint32_t recsize;
         uint64_t leof; // logical eof, actual file might be prealloc'd further
         uint64_t firstDeleted; // 0 = no deleted recs
-        uint32_t cleanShutdown; //  = clean
+        uint32_t cleanShutdown; // 0 = clean
         char reserved[8192-8-8-4-4-4]; // we want our records page-aligned in the file if they are a multiple of a page's size -- so we make this 8KB with that goal
         RecStoreHeader() { 
             version = 65;
@@ -52,8 +52,10 @@ private:
 
 inline BasicRecStore::~BasicRecStore() { 
     h.cleanShutdown = 0;
-    if( f.is_open() ) 
+    if( f.is_open() ) {
         writeHeader();
+        f.fsync();
+    }
 }
 
 inline void BasicRecStore::writeHeader() { 
