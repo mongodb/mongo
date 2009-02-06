@@ -55,13 +55,13 @@ namespace mongo {
 //typedef map<string,Machine*> ObjLocs;
 
     /* top level grid configuration for an entire database */
-    class ClientConfig : public Model {
+    class DBConfig : public Model {
     public:
         string name; // e.g. "alleyinsider"
         Machine *primary;
         bool partitioned;
 
-        ClientConfig() : primary(0), partitioned(false) { }
+        DBConfig() : primary(0), partitioned(false) { }
 
         virtual const char * getNS() {
             return "grid.db.database";
@@ -88,19 +88,21 @@ namespace mongo {
         }
     };
 
-    class GridConfig {
-        map<string,ClientConfig*> databases;
-    public:
-        ClientConfig* getClientConfig(string database);
-    };
-
     class Grid {
-        GridConfig gc;
     public:
         /* return which machine "owns" the object in question -- ie which partition
            we should go to.
-               */
+        */
         Machine* owner(const char *ns, BSONObj& objOrKey);
+        
+        /**
+           gets the config the db.
+           will return an empty DBConfig if not in db already
+         */
+        DBConfig * getDBConfig( string ns );
+
+    private:
+        map<string,DBConfig*> _databases;
     };
 
     extern Grid grid;

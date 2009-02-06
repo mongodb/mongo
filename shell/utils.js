@@ -138,6 +138,7 @@ tojsonObject = function( x ){
 }
 
 shellPrint = function( x ){
+    it = x;
     if ( x != undefined )
         shellPrintHelper( x );
     

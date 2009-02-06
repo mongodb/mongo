@@ -297,10 +297,7 @@ namespace mongo {
             Op op = Mod::SET;
             if ( strcmp("$inc",fn) == 0 ) {
                 op = Mod::INC;
-                // we rename to $SET instead of $set so that on an op like
-                //   { $set: {x:1}, $inc: {y:1} }
-                // we don't get two "$set" fields which isn't allowed
-                /* aaron said to remove this: strcpy((char *) fn, "$SET"); */
+                strcpy((char *) fn, "$set");
             } else {
                 uassert( "Invalid modifier specified", strcmp("$set",fn ) == 0 );
             }

@@ -41,14 +41,15 @@
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 
+#include "gridconfig.h"
+
 namespace mongo {
 
     const char *tempHost = "localhost:27018";
 
-    void getMore(Message& m, MessagingPort& p) {
-        DbMessage d(m);
+    void getMore(Message& m,  DbMessage& d, MessagingPort& p) {
         const char *ns = d.getns();
-
+        
         log(3) << "getmore: " << ns << endl;
 
         ScopedDbConnection dbcon(tempHost);
@@ -63,16 +64,15 @@ namespace mongo {
     }
     
     /* got query operation from a database */
-    void queryOp(Message& m, MessagingPort& p) {
+    void queryOp(Message& m, DbMessage& d, MessagingPort& p) {
         const MSGID originalID = m.data->id;
-        DbMessage d(m);
         QueryMessage q(d);
         bool lateAssert = false;
         
-        log(3) << "query: " << q.query << endl;
+        log(3) << "query: " << q.ns << "  " << q.query << endl;
 
         try {
-            if ( q.ntoreturn == -1 && strstr(q.ns, ".$cmd") ) {
+            if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") ) {
                 BSONObjBuilder builder;
                 out() << q.query.toString() << endl;
                 bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
@@ -103,11 +103,8 @@ namespace mongo {
 
     }
     
-    void writeOp(int op, Message& m, MessagingPort& p) {
-        DbMessage d(m);
+    void writeOp(int op, Message& m, DbMessage& d, MessagingPort& p) {
         const char *ns = d.getns();
-        assert( *ns );
-        
         log(3) << "write: " << ns << endl;
 
         ScopedDbConnection dbcon(tempHost);
@@ -116,27 +113,28 @@ namespace mongo {
         c.port().say(m);
 
         dbcon.done();
-        /*
-          while( d.mmoreJSObjs() ) {
-            BSONObj js = d.nextJsObj();
-            const char *ns = d.getns();
-            assert(*ns);
-          }
-        */
     }
-
+    
     void processRequest(Message& m, MessagingPort& p) {
+        DbMessage d(m);
+
         int op = m.data->operation();
         assert( op > dbMsg );
+        
+        const char *ns = d.getns();
+        assert( *ns );
+
+        grid.getDBConfig( ns );
+        
         if ( op == dbQuery ) {
-            queryOp(m,p);
+            queryOp(m,d,p);
         }
         else if ( op == dbGetMore ) {
-            getMore(m,p);
+            getMore(m,d,p);
         }
         else {
-            writeOp(op, m, p);
+            writeOp(op, m,d,p);
         }
     }
-
+    
 } // namespace mongo

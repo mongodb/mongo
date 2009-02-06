@@ -30,31 +30,32 @@ namespace mongo {
 
     map<string, Machine*> Machine::machines;
 
-    /* --- GridConfig --- */
-
-//static boost::mutex loc_mutex;
-    Grid grid;
-
-    ClientConfig* GridConfig::getClientConfig(string database) {
-        ClientConfig*& cc = databases[database];
-        if ( cc == 0 ) {
-            cc = new ClientConfig();
-            if ( !cc->loadByName(database.c_str()) ) {
-                log() << "couldn't find database " << database << " in grid db" << endl;
-                // note here that cc->primary == 0.
-            }
-        }
-        return cc;
-    }
-
     /* --- Grid --- */
 
-    Machine* Grid::owner(const char *ns, BSONObj& objOrKey) {
-        ClientConfig *cc = gc.getClientConfig( nsToClient(ns) );
-        if ( cc == 0 ) {
-            throw UserAssertionException(
-                string("dbgrid: no config for db for ") + ns);
+    Grid grid;
+    
+    DBConfig* Grid::getDBConfig( string database ){
+        {
+            string::size_type i = database.find( "." );
+            if ( i != string::npos )
+                database = database.substr( 0 , i );
         }
+        
+        DBConfig*& cc = _databases[database];
+        if ( cc == 0 ) {
+            cc = new DBConfig();
+            if ( !cc->loadByName(database.c_str()) ) {
+                // note here that cc->primary == 0.
+                log() << "couldn't find database [" << database << "] in config db" << endl;
+            }
+        }
+        
+        return cc;
+    }
+    
+    Machine* Grid::owner(const char *ns, BSONObj& objOrKey) {
+        DBConfig *cc = getDBConfig( nsToClient(ns) );
+        uassert( string("dbgrid: no config for db for ") + ns , cc );
 
         if ( !cc->partitioned ) {
             if ( !cc->primary )
@@ -66,4 +67,4 @@ namespace mongo {
         return 0;
     }
 
-} // namespace mongo
+} 

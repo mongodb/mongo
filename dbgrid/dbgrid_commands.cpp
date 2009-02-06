@@ -40,21 +40,44 @@
 namespace mongo {
 
     extern string ourHostname;
-
+    
     namespace dbgrid_cmds {
+        
+        // --- internal commands ---
 
-        class NetStatCmd : public Command {
+        class GridAdminCmd : public Command {
         public:
-            virtual bool slaveOk() {
+            GridAdminCmd( const char * n ) : Command( n ){}
+            virtual bool slaveOk(){
                 return true;
             }
-            NetStatCmd() : Command("netstat") { }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool adminOnly() {
+                return true;
+            }
+        };
+        
+        class NetStatCmd : public GridAdminCmd {
+        public:
+            NetStatCmd() : GridAdminCmd("netstat") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 result.append("griddb", configServer.toString());
                 result.append("isdbgrid", 1);
                 return true;
             }
         } netstat;
+
+        class ListDatabaseCommand : public GridAdminCmd {
+        public:
+            ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                // TODO
+                result.append("not done", 1);
+                return false;
+            }
+        } gridListDatabase;
+
+
+        // --- public commands ---
 
         class IsDbGridCmd : public Command {
         public:
