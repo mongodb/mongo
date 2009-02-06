@@ -200,7 +200,7 @@ skip_read:
 				 */
 				dup_key = (WT_ITEM *)WT_PAGE_BYTE(next);
 				dup_data =
-				    (WT_ITEM *)(dup_key +
+				    (WT_ITEM *)((u_int8_t *)dup_key +
 				    WT_ITEM_SPACE_REQ(dup_key->len));
 
 				/*
