@@ -107,7 +107,9 @@ namespace mongo {
 #pragma pack()
 
     /* A replication exception */
-    struct SyncException {
+    class SyncException : public DBException {
+    public:
+        virtual const char* what() const throw() { return "sync exception"; }
     };
 
     /* A Source is a source from which we can pull (replicate) data.

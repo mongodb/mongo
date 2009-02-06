@@ -107,11 +107,16 @@ namespace mongo {
     /* last assert of diff types: regular, wassert, msgassert, uassert: */
     extern Assertion lastAssert[4];
 
-// you can catch these
-    class AssertionException {
+    class DBException : public exception { 
+    public:
+        virtual const char* what() const throw() = 0;
+    };
+
+    class AssertionException : public DBException {
     public:
         string msg;
         AssertionException() { }
+        ~AssertionException() throw() { }
         virtual bool severe() {
             return true;
         }
@@ -121,6 +126,7 @@ namespace mongo {
         virtual string toString() {
             return msg;
         }
+        virtual const char* what() const throw() { return msg.c_str(); }
     };
 
     /* we use the same mechanism for bad things the user does -- which are really just errors */
