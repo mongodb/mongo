@@ -1,5 +1,6 @@
 // strategy_simple.cpp
 
+#include "stdafx.h"
 #include "request.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
@@ -9,7 +10,7 @@ namespace mongo {
 
     const char *tempHost = "localhost:27018";
 
-    class SingleStragey : public Strategy {
+    class SingleStrategy : public Strategy {
 
         virtual void queryOp( Request& r ){
             QueryMessage q( r.d() );
@@ -81,5 +82,5 @@ namespace mongo {
         }
     };
     
-    Strategy * SINGLE = new SingleStragey();
+    Strategy * SINGLE = new SingleStrategy();
 }
