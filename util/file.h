@@ -111,8 +111,6 @@ public:
     }
 
 #ifndef O_NOATIME
-// OSX only, presumably.
-#warning NO O_NOATIME
 #define O_NOATIME 0
 #define lseek64 lseek
 #endif

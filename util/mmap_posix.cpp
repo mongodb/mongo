@@ -46,7 +46,6 @@ namespace mongo {
     }
 
 #ifndef O_NOATIME
-#warning NO O_NOATIME
 #define O_NOATIME 0
 #endif
 
