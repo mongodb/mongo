@@ -105,6 +105,7 @@ DBQuery.prototype.count = function(){
         else 
             cmd.query = this._query;
     }
+    cmd.fields = this._fields || {};
     
     var res = this._db.runCommand( cmd );
     if( res && res.n != null ) return res.n;
