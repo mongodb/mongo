@@ -184,6 +184,7 @@ if "darwin" == os.sys.platform:
 elif "linux2" == os.sys.platform:
     useJavaHome = True
     javaOS = "linux"
+    platform = "linux"
 
     if not os.path.exists( javaHome ):
         #fedora standarm jvm location
