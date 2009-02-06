@@ -41,99 +41,27 @@
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 
+#include "request.h"
 #include "gridconfig.h"
 
 namespace mongo {
 
-    const char *tempHost = "localhost:27018";
-
-    void getMore(Message& m,  DbMessage& d, MessagingPort& p) {
-        const char *ns = d.getns();
-        
-        log(3) << "getmore: " << ns << endl;
-
-        ScopedDbConnection dbcon(tempHost);
-        DBClientConnection &c = dbcon.conn();
-
-        Message response;
-        bool ok = c.port().call(m, response);
-        uassert("dbgrid: getmore: error calling db", ok);
-        p.reply(m, response, m.data->id);
-        
-        dbcon.done();
-    }
-    
-    /* got query operation from a database */
-    void queryOp(Message& m, DbMessage& d, MessagingPort& p) {
-        const MSGID originalID = m.data->id;
-        QueryMessage q(d);
-        bool lateAssert = false;
-        
-        log(3) << "query: " << q.ns << "  " << q.query << endl;
-
-        try {
-            if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") ) {
-                BSONObjBuilder builder;
-                out() << q.query.toString() << endl;
-                bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
-                if ( ok ) {
-                    BSONObj x = builder.done();
-                    replyToQuery(0, p, m, x);
-                    return;
-                }
-            }
-
-            ScopedDbConnection dbcon(tempHost);
-            DBClientConnection &c = dbcon.conn();
-            Message response;
-            bool ok = c.port().call(m, response);
-            uassert("dbgrid: error calling db", ok);
-            lateAssert = true;
-            p.reply(m, response, originalID );
-            dbcon.done();
-        }
-        catch ( AssertionException& e ) {
-            assert( !lateAssert );
-            BSONObjBuilder err;
-            err.append("$err", string("dbgrid ") + (e.msg.empty() ? "dbgrid assertion during query" : e.msg));
-            BSONObj errObj = err.done();
-            replyToQuery(QueryResult::ResultFlag_ErrSet, p, m, errObj);
-            return;
-        }
-
-    }
-    
-    void writeOp(int op, Message& m, DbMessage& d, MessagingPort& p) {
-        const char *ns = d.getns();
-        log(3) << "write: " << ns << endl;
-
-        ScopedDbConnection dbcon(tempHost);
-        DBClientConnection &c = dbcon.conn();
-
-        c.port().say(m);
-
-        dbcon.done();
-    }
-    
     void processRequest(Message& m, MessagingPort& p) {
-        DbMessage d(m);
+        Request r( m , p );
 
         int op = m.data->operation();
         assert( op > dbMsg );
         
-        const char *ns = d.getns();
-        assert( *ns );
-
-        grid.getDBConfig( ns );
+        grid.getDBConfig( r.getns() );
         
         if ( op == dbQuery ) {
-            queryOp(m,d,p);
+            SINGLE->queryOp( r );
         }
         else if ( op == dbGetMore ) {
-            getMore(m,d,p);
+            SINGLE->getMore( r );
         }
         else {
-            writeOp(op, m,d,p);
+            SINGLE->writeOp( op, r );
         }
     }
     

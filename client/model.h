@@ -46,7 +46,8 @@ namespace mongo {
         static DBClientWithCommands *globalConn;
 
         /** Override this if you need to do fancier connection management than simply using globalConn. */
-        virtual DBClientWithCommands* conn() {
+        virtual DBClientWithCommands* conn(){
+            uassert( "globalConn not set" , globalConn );
             return globalConn;
         }
 
