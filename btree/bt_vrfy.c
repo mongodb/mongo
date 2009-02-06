@@ -649,7 +649,7 @@ __wt_bt_verify_item(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 	WT_ITEM_OFFP *offp;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
-	u_int32_t addr, i, item_num, item_len,item_type;
+	u_int32_t addr, i, item_num, item_len, item_type;
 	int (*func)(DB *, const DBT *, const DBT *), ret;
 
 	env = db->env;
@@ -727,7 +727,11 @@ item_vs_page:			__wt_db_errx(db,
 			}
 			break;
 		default:
-			goto item_type;
+			__wt_db_errx(db,
+			    "item %lu on page at addr %lu has an illegal type "
+			    "of %lu",
+			    (u_long)item_num, (u_long)addr, (u_long)item_type);
+			goto err;
 		}
 
 		/* Check the item's length. */
@@ -753,7 +757,7 @@ item_len:			__wt_db_errx(db,
 			}
 			break;
 		default:
-			goto item_type;
+			break;
 		}
 
 		/* Check if the item's data is entirely on the page. */
@@ -830,7 +834,7 @@ eop:			__wt_db_errx(db,
 				goto err;
 			break;
 		default:
-			goto item_type;
+			break;
 		}
 
 		/* Check the sort order. */
@@ -866,14 +870,11 @@ eop:			__wt_db_errx(db,
 			current = swap_tmp;
 			break;
 		default:
-			goto item_type;
+			break;
 		}
 	}
 
 	if (0) {
-item_type:	__wt_db_errx(db,
-		    "item %lu on page at addr %lu has an illegal type of %lu",
-		    (u_long)item_num, (u_long)addr, (u_long)item_type);
 err:		ret = WT_ERROR;
 	}
 
