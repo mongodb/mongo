@@ -14,7 +14,7 @@
  *	Yield the thread of control.
  */
 void
-__wt_yield()
+__wt_yield(void)
 {
 #ifdef HAVE_PTHREAD_YIELD
 	pthread_yield();
