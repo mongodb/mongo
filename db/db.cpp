@@ -214,6 +214,10 @@ namespace mongo {
             problem() << "AssertionException in connThread, closing client connection" << endl;
             dbMsgPort.shutdown();
         }
+        catch ( SocketException& ) {
+            problem() << "SocketException in connThread, closing client connection" << endl;
+            dbMsgPort.shutdown();
+        }
         catch ( std::exception &e ) {
             problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
             exit( 15 );
