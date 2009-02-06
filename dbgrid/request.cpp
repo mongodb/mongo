@@ -124,6 +124,8 @@ namespace mongo {
         const char *ns = d.getns();
         assert( *ns );
 
+        grid.getDBConfig( ns );
+        
         if ( op == dbQuery ) {
             queryOp(m,d,p);
         }
