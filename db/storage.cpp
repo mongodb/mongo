@@ -38,6 +38,7 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
             log() << "warning: non-clean shutdown for file " << fn << '\n';
         h.cleanShutdown = 2;
         writeHeader();
+        f.fsync();
     }
 #if defined(_RECSTORE)
     boost::thread t(writerThread);

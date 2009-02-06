@@ -177,8 +177,9 @@ namespace mongo {
         bool freeIt;
     };
 
-    class SocketException {
-        
+    class SocketException : public DBException {
+    public:
+        virtual const char* what() const throw() { return "socket exception"; }
     };
 
 } // namespace mongo
