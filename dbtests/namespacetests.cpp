@@ -30,7 +30,6 @@ namespace NamespaceTests {
         class Base {
         public:
             Base() {
-                dblock lk;
                 setClient( ns() );
             }
             ~Base() {
@@ -96,6 +95,7 @@ namespace NamespaceTests {
                 ASSERT( a.woCompare( b ) == 0 );
             }
         private:
+            dblock lk_;
             IndexDetails id_;
         };
 

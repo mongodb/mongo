@@ -28,10 +28,7 @@ namespace BtreeTests {
     class Base {
     public:
         Base() {
-            {
-                dblock lk;
-                setClient( ns() );
-            }
+            setClient( ns() );
             BSONObjBuilder builder;
             builder.append( "ns", ns() );
             builder.append( "name", "testIndex" );
@@ -95,6 +92,7 @@ namespace BtreeTests {
             return idx_.keyPattern();
         }
     private:
+        dblock lk_;
         IndexDetails idx_;
     };
 
