@@ -26,6 +26,7 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
     }    
     else { 
         f.read(0, (char *) &h, sizeof(RecStoreHeader));
+        massert(string("recstore was not closed cleanly: ")+fn, h.cleanShutdown==0);
         massert(string("recstore recsize mismatch, file:")+fn, h.recsize == recsize);
         massert(string("bad recstore [1], file:")+fn, (h.leof-sizeof(RecStoreHeader)) % recsize == 0);        
         if( h.leof > len ) { 

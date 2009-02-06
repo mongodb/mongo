@@ -86,6 +86,7 @@ public:
         }
         return li.QuadPart;
     }
+    void fsync() { FlushFileBuffers(fd); }
 };
 
 #else
@@ -108,6 +109,14 @@ public:
         if( is_open() ) ::close(fd);
         fd = -1;
     }
+
+#ifndef O_NOATIME
+// OSX only, presumably.
+#warning NO O_NOATIME
+#define O_NOATIME 0
+#define lseek64 lseek
+#endif
+
     void open(const char *filename) {
         fd = ::open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
         if ( fd <= 0 ) {
@@ -129,6 +138,7 @@ public:
     fileofs len() {
         return lseek(fd, 0, SEEK_END);
     }
+    void fsync() { ::fsync(fd); }
 };
 
 
