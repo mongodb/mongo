@@ -118,14 +118,22 @@ err:	if (page != NULL &&
 static int
 __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 {
+	WT_INDX *page_indx, *prev_indx;
+	WT_ITEM_OFFP local_offp;
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
-	WT_INDX *page_indx, *prev_indx;
 	u_int32_t addr, bytes;
 	int first, ret, tret;
 	int (*func)(DB *, const DBT *, const DBT *);
 
 	ret = 0;
+
+	/*
+	 * Callers pass us a reference to an on-page WT_ITEM_OFFP structure and
+	 * we don't want to overwrite it.
+	 */
+	local_offp = *offp;
+	offp = &local_offp;
 
 	/*
 	 * The plan is pretty simple.  We read through the levels of the tree,
@@ -638,7 +646,7 @@ __wt_bt_verify_item(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 	} *current, *last_data, *last_key, *swap_tmp, _a, _b, _c;
 	ENV *env;
 	WT_ITEM *item;
-	WT_ITEM_OFFP offp;
+	WT_ITEM_OFFP *offp;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
 	u_int32_t addr, i, item_num, item_len,item_type;
@@ -758,32 +766,45 @@ eop:			__wt_db_errx(db,
 		}
 
 		/*
-		 * When walking the whole file, verify off-page duplicate sets
-		 * and overflow page references.
+		 * WT_ITEM_OFFP and WT_ITEM_OVFL structures may follow this
+		 * WT_ITEM -- check what we can check.
 		 */
-		if (fragbits != NULL) {
-			if (item_type == WT_ITEM_OFFPAGE &&
-			    hdr->type == WT_PAGE_LEAF) {
-				/*
-				 * !!!
-				 * Don't pass __wt_bt_verify_level a pointer
-				 * to the on-page OFFP structure, it writes
-				 * the offp passed in.
-				 */
-				offp = *(WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_bt_verify_level(
-				    db, &offp, fragbits, fp)) != 0)
-					goto err;
-			}
-
-			if ((item_type == WT_ITEM_KEY_OVFL ||
-			    item_type == WT_ITEM_DATA_OVFL ||
-			    item_type == WT_ITEM_DUP_OVFL) &&
-			    (ret = __wt_bt_verify_ovfl(db,
-			    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item),
-			    fragbits, fp)) != 0)
+		if (item_type == WT_ITEM_OFFPAGE) {
+			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+			if (offp->unused[0] != 0 ||
+			    offp->unused[1] != 0 || offp->unused[2] != 0) {
+				__wt_db_errx(db,
+				    "offpage item %lu on page at addr %lu has "
+				    "non-zero unused header fields",
+				    (u_long)item_num, (u_long)addr);
 				goto err;
+			}
 		}
+
+		/*
+		 * When walking the whole file, verify off-page and overflow
+		 * references.
+		 */
+		if (fragbits != NULL)
+			switch (item_type) {
+			case WT_ITEM_KEY_OVFL:
+			case WT_ITEM_DATA_OVFL:
+			case WT_ITEM_DUP_OVFL:
+				if ((ret = __wt_bt_verify_ovfl(db,
+				    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item),
+				    fragbits, fp)) != 0)
+					goto err;
+				break;
+			case WT_ITEM_OFFPAGE:
+				if (hdr->type == WT_PAGE_LEAF &&
+				    (ret = __wt_bt_verify_level(db,
+				    (WT_ITEM_OFFP *)WT_ITEM_BYTE(item),
+				    fragbits, fp)) != 0)
+					goto err;
+				break;
+			default:
+				break;
+			}
 
 		/* Some items aren't sorted on the page, so we're done. */
 		if (item_type == WT_ITEM_DATA ||
