@@ -65,7 +65,7 @@ namespace mongo {
                 return true;
             }
         } netstat;
-
+        
         class ListDatabaseCommand : public GridAdminCmd {
         public:
             ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
@@ -76,7 +76,50 @@ namespace mongo {
             }
         } gridListDatabase;
 
+        
+        class ListServers : public GridAdminCmd {
+        public:
+            ListServers() : GridAdminCmd("listservers") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                DBClientWithCommands * conn = configServer.conn();
 
+                vector<BSONObj> all;
+                auto_ptr<DBClientCursor> cursor = conn->query( "grid.servers" , emptyObj );
+                while ( cursor->more() ){
+                    BSONObj o = cursor->next();
+                    all.push_back( o );
+                }
+                
+                result.append("servers" , all );
+                result.append("ok" , 1 );
+                return true;
+            }
+        } listServers;
+        
+        
+        class AddServer : public GridAdminCmd {
+        public:
+            AddServer() : GridAdminCmd("addserver") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                DBClientWithCommands * conn = configServer.conn();
+                
+                BSONObj server = BSON( "host" << cmdObj["addserver"].valuestrsafe() );
+                
+                BSONObj old = conn->findOne( "grid.servers" , server );
+                if ( ! old.isEmpty() ){
+                    result.append( "ok" , 0.0 );
+                    result.append( "msg" , "already exists" );
+                    return false;
+                }
+                
+                conn->insert( "grid.servers" , server );
+                result.append( "ok", 1 );
+                result.append( "added" , server["host"].valuestrsafe() );
+                return true;
+            }
+        } listMachines;
+        
+        
         // --- public commands ---
 
         class IsDbGridCmd : public Command {
