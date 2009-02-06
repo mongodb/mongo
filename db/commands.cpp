@@ -54,7 +54,7 @@ namespace mongo {
             valid = true;
             string errmsg;
             Command *c = i->second;
-            if ( c->adminOnly() && strncmp(ns, "admin", p-ns) != 0 ) {
+            if ( c->adminOnly() && strncmp(ns, "admin", 5) != 0 ) {
                 ok = false;
                 errmsg = "access denied";
             }
