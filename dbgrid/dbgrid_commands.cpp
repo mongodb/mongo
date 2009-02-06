@@ -45,9 +45,13 @@ namespace mongo {
         
         // --- internal commands ---
 
+        set<string> dbgridCommands;
+
         class GridAdminCmd : public Command {
         public:
-            GridAdminCmd( const char * n ) : Command( n ){}
+            GridAdminCmd( const char * n ) : Command( n ){
+                dbgridCommands.insert( n );
+            }
             virtual bool slaveOk(){
                 return true;
             }
@@ -76,7 +80,24 @@ namespace mongo {
             }
         } gridListDatabase;
 
-        
+        class ListGridCommands : public GridAdminCmd {
+        public:
+            ListGridCommands() : GridAdminCmd("gridcommands") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+                BSONObjBuilder arr;
+                int num=0;
+                for ( set<string>::iterator i = dbgridCommands.begin(); i != dbgridCommands.end(); i++ ){
+                    string s = BSONObjBuilder::numStr( num++ );
+                    arr.append( s.c_str() , *i );
+                }
+                
+                result.appendArray( "commands" , arr.done() );
+                result.append("ok" , 1 );
+                return true;
+            }
+        } listGridCommands;        
+
         class ListServers : public GridAdminCmd {
         public:
             ListServers() : GridAdminCmd("listservers") { }
