@@ -614,7 +614,7 @@ namespace mongo {
 	   On a failover situation, expect at least one operation to return an error (throw 
 	   an exception) before the failover is complete.  Operations are not retried.
     */
-    class DBClientPaired : public DBClientWithCommands {
+    class DBClientPaired : public DBClientBase {
         DBClientConnection left,right;
         enum State {
             NotSetL=0,
@@ -634,6 +634,15 @@ namespace mongo {
            try reconnects.
            */
         bool connect(const char *serverHostname1, const char *serverHostname2);
+
+        /** Connect to a server pair using a host pair string of the form
+              hostname[:port],hostname[:port]
+              */
+        bool connect(string hostpairstring) { 
+            uassert("bad hostpairstring", hostpairstring.find(',') != string::npos);
+            massert("not yet implemented", false);
+            return false;
+        }
 
         bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg);
 
@@ -673,6 +682,13 @@ namespace mongo {
         void isntMaster() {
             master = ( ( master == Left ) ? NotSetR : NotSetL );
         }
+
+        /* TODO */
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { assert(false); return false; }
+        virtual void say( Message &toSend ) { assert(false); }
+        virtual void sayPiggyBack( Message &toSend ) { assert(false); }
+        virtual void checkResponse( const char *data, int nReturned ) { assert(false); }
+
     };
 
 

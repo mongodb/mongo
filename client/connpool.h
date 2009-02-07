@@ -24,7 +24,7 @@
 namespace mongo {
 
     struct PoolForHost {
-        std::queue<DBClientConnection*> pool;
+        std::queue<DBClientBase*> pool;
     };
 
     /** Database connection pool.
@@ -45,8 +45,8 @@ namespace mongo {
         boost::mutex poolMutex;
         map<string,PoolForHost*> pools; // servername -> pool
     public:
-        DBClientConnection *get(const string& host);
-        void release(const string& host, DBClientConnection *c) {
+        DBClientBase *get(const string& host);
+        void release(const string& host, DBClientBase *c) {
             boostlock L(poolMutex);
             pools[host]->pool.push(c);
         }
@@ -59,9 +59,9 @@ namespace mongo {
     */
     class ScopedDbConnection {
         const string host;
-        DBClientConnection *_conn;
+        DBClientBase *_conn;
     public:
-        DBClientConnection& conn() {
+        DBClientBase& conn() {
             uassert( "did you call done already" , _conn );
             return *_conn;
         }
@@ -78,16 +78,18 @@ namespace mongo {
             _conn = 0;
         }
 
-        /* Call this when you are done with the ocnnection.
+        /* Call this when you are done with the connection.
              Why?  See note in the destructor below.
         */
         void done() {
             if ( ! _conn )
                 return;
 
+            /* we could do this, but instead of assume one is using autoreconnect mode on the connection 
             if ( _conn->isFailed() )
                 kill();
             else
+            */
                 pool.release(host, _conn);
             _conn = 0;
         }

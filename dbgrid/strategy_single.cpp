@@ -29,7 +29,9 @@ namespace mongo {
                 }
 
                 ScopedDbConnection dbcon( r.primaryName() );
-                DBClientConnection &c = dbcon.conn();
+                DBClientBase &_c = dbcon.conn();
+/** Todo: This will not work with Paired connections.  Fix. */
+                DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
                 Message response;
                 bool ok = c.port().call( r.m(), response);
                 uassert("dbgrid: error calling db", ok);
@@ -54,7 +56,9 @@ namespace mongo {
             log(3) << "getmore: " << ns << endl;
 
             ScopedDbConnection dbcon( r.primaryName() );
-            DBClientConnection &c = dbcon.conn();
+            DBClientBase& _c = dbcon.conn();
+/* TODO */
+            DBClientConnection &c = dynamic_cast<DBClientConnection&>(_c);
 
             Message response;
             bool ok = c.port().call( r.m() , response);
@@ -70,7 +74,10 @@ namespace mongo {
             log(3) << "write: " << ns << endl;
 
             ScopedDbConnection dbcon( r.primaryName() );
-            DBClientConnection &c = dbcon.conn();
+            DBClientBase &_c = dbcon.conn();
+            /* TODO FIX - do not case and call DBClientBase::say() */
+            DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
+
 
             c.port().say( r.m() );
 

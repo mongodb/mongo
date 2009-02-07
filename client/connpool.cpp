@@ -26,7 +26,7 @@ namespace mongo {
 
     DBConnectionPool pool;
 
-    DBClientConnection* DBConnectionPool::get(const string& host) {
+    DBClientBase* DBConnectionPool::get(const string& host) {
         boostlock L(poolMutex);
 
         PoolForHost *&p = pools[host];
@@ -34,15 +34,28 @@ namespace mongo {
             p = new PoolForHost();
         if ( p->pool.empty() ) {
             string errmsg;
-            DBClientConnection *c = new DBClientConnection();
-            if ( !c->connect(host.c_str(), errmsg) ) {
-                delete c;
-                uassert( (string)"dbconnectionpool: connect failed" + host , false);
-                return 0;
+            DBClientBase *c;
+            if( host.find(',') == string::npos ) {
+                DBClientConnection *cc = new DBClientConnection(true);
+                if ( !cc->connect(host.c_str(), errmsg) ) {
+                    delete cc;
+                    uassert( (string)"dbconnectionpool: connect failed" + host , false);
+                    return 0;
+                }
+                c = cc;
+            }
+            else { 
+                DBClientPaired *p = new DBClientPaired();
+                if( !p->connect(host) ) { 
+                    delete p;
+                    uassert( (string)"dbconnectionpool: connect failed [2] " + host , false);
+                    return 0;
+                }
+                c = p;
             }
             return c;
         }
-        DBClientConnection *c = p->pool.front();
+        DBClientBase *c = p->pool.front();
         p->pool.pop();
         return c;
     }
