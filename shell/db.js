@@ -41,6 +41,10 @@ DB.prototype.addUser = function( username , pass ){
     c.save( u );
 }
 
+DB.prototype.removeUser = function( username ){
+    this.getCollection( "system.users" ).remove( { user : username } );
+}
+
 DB.prototype.auth = function( username , pass ){
     var n = this.runCommand( { getnonce : 1 } );
 
@@ -178,6 +182,7 @@ DB.prototype.help = function() {
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
     print("\tdb.addUser(username, password)");
+    print("\tdb.removeUser(username)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getProfilingLevel()");
