@@ -16,6 +16,7 @@
 *.jsh
 *.jsall
 *.pyc
+*.log
 *#
 .#*
 

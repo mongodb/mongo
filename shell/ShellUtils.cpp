@@ -247,7 +247,13 @@ v8::Handle< v8::Value > StartMongod( const v8::Arguments &a ) {
     
     int port = -1;
     char * argv[ a.Length() + 2 ];
-    argv[ 0 ] = copyString( mongod.native_file_string().c_str() );
+    {
+        string s = mongod.native_file_string();
+        if ( s == "mongod" )
+            s = "./" + s;
+        argv[ 0 ] = copyString( s.c_str() );
+    }
+
     for( int i = 0; i < a.Length(); ++i ) {
         v8::String::Utf8Value str( a[ i ] );
         char *s = copyString( *str );
