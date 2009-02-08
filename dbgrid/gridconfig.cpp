@@ -83,7 +83,7 @@ namespace mongo {
                 database = database.substr( 0 , i );
         }
         
-        if ( database == "grid" )
+        if ( database == "config" )
             return &configServer;
 
         DBConfig*& cc = _databases[database];

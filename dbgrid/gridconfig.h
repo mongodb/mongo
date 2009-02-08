@@ -87,7 +87,7 @@ namespace mongo {
 
         // model stuff
 
-        virtual const char * getNS(){ return "grid.db.database"; }
+        virtual const char * getNS(){ return "config.db.database"; }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);
         bool loadByName(const char *nm);

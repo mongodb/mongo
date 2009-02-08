@@ -27,7 +27,7 @@
 
 namespace mongo {
 
-    /* grid.shards
+    /* config.shards
          { name: 'hostname'
          }
     */
@@ -36,7 +36,7 @@ namespace mongo {
         string name; // hostname (less -l, -r)
 
         virtual const char * getNS() {
-            return "grid.shards";
+            return "config.shards";
         }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);

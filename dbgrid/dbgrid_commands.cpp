@@ -105,7 +105,7 @@ namespace mongo {
                 DBClientWithCommands * conn = configServer.conn();
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn->query( "grid.servers" , emptyObj );
+                auto_ptr<DBClientCursor> cursor = conn->query( "config.servers" , emptyObj );
                 while ( cursor->more() ){
                     BSONObj o = cursor->next();
                     all.push_back( o );
@@ -126,14 +126,14 @@ namespace mongo {
                 
                 BSONObj server = BSON( "host" << cmdObj["addserver"].valuestrsafe() );
                 
-                BSONObj old = conn->findOne( "grid.servers" , server );
+                BSONObj old = conn->findOne( "config.servers" , server );
                 if ( ! old.isEmpty() ){
                     result.append( "ok" , 0.0 );
                     result.append( "msg" , "already exists" );
                     return false;
                 }
                 
-                conn->insert( "grid.servers" , server );
+                conn->insert( "config.servers" , server );
                 result.append( "ok", 1 );
                 result.append( "added" , server["host"].valuestrsafe() );
                 return true;

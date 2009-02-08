@@ -32,7 +32,7 @@ namespace mongo {
 
     void Shard::unserialize(BSONObj& from) {
         name = from.getStringField("name");
-        uassert("bad grid.shards.name", !name.empty());
+        uassert("bad config.shards.name", !name.empty());
     }
 
 } // namespace mongo
