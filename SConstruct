@@ -544,7 +544,10 @@ testEnv.AlwaysBuild( "smokeClient" )
 #  ----  INSTALL -------
 
 if distBuild:
-    installDir = "mongo-db-" + platform + "-" + processor + "-latest"
+    from datetime import date
+    today = date.today()
+    installDir = "mongo-db-" + platform + "-" + processor + "-" + today.strftime( "%Y-%m-%d" )
+    print "going to make dist: " + installDir
 
 # binaries
 
