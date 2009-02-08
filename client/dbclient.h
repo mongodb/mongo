@@ -566,7 +566,7 @@ namespace mongo {
         void connect(string serverHostname) { 
             string errmsg;
             if( !connect(serverHostname.c_str(), errmsg) ) 
-                throw new ConnectException(string("can't connect ") + errmsg);
+                throw ConnectException(string("can't connect ") + errmsg);
         }
 
         virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);

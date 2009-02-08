@@ -13,6 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "clienttests", "clienttests"
 		..\client\gridfs.cpp = ..\client\gridfs.cpp
 		..\client\gridfs.h = ..\client\gridfs.h
 		..\client\examples\second.cpp = ..\client\examples\second.cpp
+		..\client\examples\tutorial.cpp = ..\client\examples\tutorial.cpp
 		..\client\examples\whereExample.cpp = ..\client\examples\whereExample.cpp
 	EndProjectSection
 EndProject
@@ -25,6 +26,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72E
 		..\dbtests\querytests.cpp = ..\dbtests\querytests.cpp
 		..\dbtests\socktests.cpp = ..\dbtests\socktests.cpp
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tutorial", "..\client\examples\tutorial\tutorial.vcproj", "{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -49,6 +52,14 @@ Global
 		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.release_nojni|Win32.Build.0 = Debug|Win32
 		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|Win32.ActiveCfg = Release|Win32
 		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|Win32.Build.0 = Release|Win32
+		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Debug Recstore|Win32.ActiveCfg = Debug|Win32
+		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Debug Recstore|Win32.Build.0 = Debug|Win32
+		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Debug|Win32.Build.0 = Debug|Win32
+		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.release_nojni|Win32.ActiveCfg = Release|Win32
+		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.release_nojni|Win32.Build.0 = Release|Win32
+		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Release|Win32.ActiveCfg = Release|Win32
+		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
