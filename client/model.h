@@ -43,12 +43,12 @@ namespace mongo {
         virtual void unserialize(BSONObj& from) = 0;
 
         /** Define this as you see fit if you are using the default conn() implementation. */
-        static DBClientWithCommands *globalConn;
+        static string defaultServer;
 
         /** Override this if you need to do fancier connection management than simply using globalConn. */
-        virtual DBClientWithCommands* conn(){
-            uassert( "globalConn not set" , globalConn );
-            return globalConn;
+        virtual string modelServer(){
+            uassert( "defaultServer not set" , defaultServer.size() );
+            return defaultServer;
         }
 
         /** Load a single object. 
