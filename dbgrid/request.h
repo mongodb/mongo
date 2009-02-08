@@ -26,7 +26,7 @@ namespace mongo {
         }
 
         const char * primaryName(){
-            return _config->getPrimary()->getName().c_str();
+            return _config->getPrimary().c_str();
         }
 
         void reply( Message & response ){

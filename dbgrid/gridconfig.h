@@ -30,44 +30,11 @@
 namespace mongo {
 
     /**
-       abstract class for Models that need to talk to the config db
-     */
-    class GridConfigModel : public Model {
-    public:
-        virtual DBClientWithCommands* conn();
-    };
-
-    /**
-       Machine is the concept of a host that runs the db process.
-    */
-    class Machine {
-        static map<string, Machine*> machines;
-        string name;
-    public:
-        string getName() const {
-            return name;
-        }
-
-        Machine(string _name) : name(_name) { }
-
-        enum {
-            Port = 27018 /* default port # for dbs that are downstream of a dbgrid */
-        };
-
-        static Machine* get(string name) {
-            map<string,Machine*>::iterator i = machines.find(name);
-            if ( i != machines.end() )
-                return i->second;
-            return machines[name] = new Machine(name);
-        }
-    };
-
-    /**
        top level grid configuration for an entire database
     */
-    class DBConfig : public GridConfigModel {
+    class DBConfig : public Model {
     public:
-        DBConfig() : _primary(0), _partitioned(false){ }
+        DBConfig( string name = "" ) : _name( name ) , _primary("") , _partitioned(false){ }
 
         /**
          * @return whether or not this partition is partitioned
@@ -78,12 +45,15 @@ namespace mongo {
          * returns the correct for machine for the ns
          * if this namespace is partitioned, will return NULL
          */
-        Machine * getMachine( const NamespaceString& ns );
+        string getServer( const NamespaceString& ns );
         
-        Machine * getPrimary(){
-            uassert( "no primary" , _primary );
+        string getPrimary(){
+            if ( _primary.size() == 0 )
+                throw UserException( (string)"no primary server configured for db: " + _name );
             return _primary;
         }
+
+        virtual string modelServer();
 
         // model stuff
 
@@ -94,7 +64,7 @@ namespace mongo {
 
     protected:
         string _name; // e.g. "alleyinsider"
-        Machine * _primary;
+        string _primary; // e.g. localhost , mongo.foo.com:9999
         bool _partitioned;
     };
 
