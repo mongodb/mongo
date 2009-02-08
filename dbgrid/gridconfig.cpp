@@ -69,6 +69,20 @@ namespace mongo {
     
     /* --- Grid --- */
 
+    string Grid::pickServerForNewDB(){
+        ScopedDbConnection dbcon( configServer.getPrimary() );
+        DBClientWithCommands& conn = dbcon.conn();
+        
+        // TODO: this is temporary
+
+        BSONObj s = conn.findOne( "config.servers" , emptyObj );
+        uassert( "can't find server for new db" , ! s.isEmpty() );
+        
+        string name = s["host"].valuestrsafe();
+        dbcon.done();
+        return name;
+    }
+
     DBConfig* Grid::getDBConfig( string database ){
         {
             string::size_type i = database.find( "." );
@@ -85,6 +99,10 @@ namespace mongo {
             if ( !cc->loadByName(database.c_str()) ) {
                 // note here that cc->primary == 0.
                 log() << "couldn't find database [" << database << "] in config db" << endl;
+                
+                cc->_primary = pickServerForNewDB();
+                cc->save();
+                log() << "\t put [" << database << "] on: " << cc->_primary << endl;
             }
         }
         

@@ -19,7 +19,6 @@ namespace mongo {
             try {
                 if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") ) {
                     BSONObjBuilder builder;
-                    out() << q.query.toString() << endl;
                     bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
                     if ( ok ) {
                         BSONObj x = builder.done();

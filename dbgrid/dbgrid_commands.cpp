@@ -144,8 +144,23 @@ namespace mongo {
                 dbcon.done();
                 return true;
             }
-        } listMachines;
+        } addServer;
         
+        class RemoveServer : public GridAdminCmd {
+        public:
+            RemoveServer() : GridAdminCmd("removeserver") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                ScopedDbConnection dbcon( configServer.getPrimary() );
+                DBClientWithCommands& conn = dbcon.conn();
+                
+                BSONObj server = BSON( "host" << cmdObj["removeserver"].valuestrsafe() );
+                conn.remove( "config.servers" , server );
+                
+                dbcon.done();
+                return true;
+            }
+        } removeServer;
+
         
         // --- public commands ---
 

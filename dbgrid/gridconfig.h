@@ -29,6 +29,8 @@
 
 namespace mongo {
 
+    class Grid;
+
     /**
        top level grid configuration for an entire database
     */
@@ -57,7 +59,7 @@ namespace mongo {
 
         // model stuff
 
-        virtual const char * getNS(){ return "config.db.database"; }
+        virtual const char * getNS(){ return "config.databases"; }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);
         bool loadByName(const char *nm);
@@ -66,6 +68,8 @@ namespace mongo {
         string _name; // e.g. "alleyinsider"
         string _primary; // e.g. localhost , mongo.foo.com:9999
         bool _partitioned;
+
+        friend class Grid;
     };
 
     class Grid {
@@ -75,7 +79,9 @@ namespace mongo {
            will return an empty DBConfig if not in db already
          */
         DBConfig * getDBConfig( string ns );
-
+        
+        string pickServerForNewDB();
+        
     private:
         map<string,DBConfig*> _databases;
     };
