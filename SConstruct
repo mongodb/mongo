@@ -301,11 +301,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 for loc in allPlaces:
                     fullPath = loc + "/lib" + p + ".a"
                     if os.path.exists( fullPath ):
-                        if darwin:
-                            myenv.Append( LINKFLAGS=" " + fullPath + " " )
-                        else:
-                            myenv['_LIBFLAGS']='${_stripixes(LIBLINKPREFIX, LIBS, LIBLINKSUFFIX, LIBPREFIXES, LIBSUFFIXES, __env__)} $SLIBS'
-                            myenv.Append( SLIBS=" " + fullPath + " " )
+                        myenv['_LIBFLAGS']='${_stripixes(LIBLINKPREFIX, LIBS, LIBLINKSUFFIX, LIBPREFIXES, LIBSUFFIXES, __env__)} $SLIBS'
+                        myenv.Append( SLIBS=" " + fullPath + " " )
                         return True
 
 
