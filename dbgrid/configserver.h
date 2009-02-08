@@ -38,26 +38,19 @@ namespace mongo {
         ~ConfigServer();
 
         bool ok(){
-            return _conn != 0;
+            // TODO: check can connect
+            return _primary.size() > 0;
         }
-
-        DBClientWithCommands* conn(){
-            assert( _conn );
-            return _conn;
+        
+        virtual string modelServer(){
+            uassert( "ConfigServer not setup" , _primary.size() );
+            return _primary;
         }
 
         /**
            call at startup, this will initiate connection to the grid db 
         */
         bool init( vector<string> configHosts , bool infer );
-        
-        string toString() {
-            return _conn->toString();
-        }
-        
-    private:
-        DBClientWithCommands* _conn;
-
     };
 
     extern ConfigServer configServer;

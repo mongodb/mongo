@@ -64,7 +64,7 @@ namespace mongo {
         public:
             NetStatCmd() : GridAdminCmd("netstat") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                result.append("griddb", configServer.toString());
+                result.append("configserver", configServer.getPrimary() );
                 result.append("isdbgrid", 1);
                 return true;
             }
@@ -102,10 +102,11 @@ namespace mongo {
         public:
             ListServers() : GridAdminCmd("listservers") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                DBClientWithCommands * conn = configServer.conn();
+                ScopedDbConnection dbcon( configServer.getPrimary() );
+                DBClientWithCommands& conn = dbcon.conn();
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn->query( "config.servers" , emptyObj );
+                auto_ptr<DBClientCursor> cursor = conn.query( "config.servers" , emptyObj );
                 while ( cursor->more() ){
                     BSONObj o = cursor->next();
                     all.push_back( o );
@@ -113,6 +114,8 @@ namespace mongo {
                 
                 result.append("servers" , all );
                 result.append("ok" , 1 );
+                dbcon.done();
+
                 return true;
             }
         } listServers;
@@ -122,20 +125,23 @@ namespace mongo {
         public:
             AddServer() : GridAdminCmd("addserver") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                DBClientWithCommands * conn = configServer.conn();
+                ScopedDbConnection dbcon( configServer.getPrimary() );
+                DBClientWithCommands& conn = dbcon.conn();
                 
                 BSONObj server = BSON( "host" << cmdObj["addserver"].valuestrsafe() );
                 
-                BSONObj old = conn->findOne( "config.servers" , server );
+                BSONObj old = conn.findOne( "config.servers" , server );
                 if ( ! old.isEmpty() ){
                     result.append( "ok" , 0.0 );
                     result.append( "msg" , "already exists" );
+                    dbcon.done();
                     return false;
                 }
                 
-                conn->insert( "config.servers" , server );
+                conn.insert( "config.servers" , server );
                 result.append( "ok", 1 );
                 result.append( "added" , server["host"].valuestrsafe() );
+                dbcon.done();
                 return true;
             }
         } listMachines;

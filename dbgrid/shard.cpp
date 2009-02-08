@@ -22,8 +22,9 @@
 
 namespace mongo {
     
-    DBClientWithCommands* Shard::conn() {
-        return configServer.conn();
+    string Shard::modelServer() {
+        // TODO: this could move around?
+        return configServer.modelServer();
     }
 
     void Shard::serialize(BSONObjBuilder& to) {

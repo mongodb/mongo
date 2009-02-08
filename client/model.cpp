@@ -18,11 +18,16 @@
 
 #include "stdafx.h"
 #include "model.h"
+#include "connpool.h"
 
 namespace mongo {
 
     bool Model::load(BSONObj& query) {
-        BSONObj b = conn()->findOne(getNS(), query);
+        ScopedDbConnection scoped( modelServer() );
+        DBClientWithCommands& conn = scoped.conn();
+        BSONObj b = conn.findOne(getNS(), query);
+        scoped.done();
+        
         if ( b.isEmpty() )
             return false;
 

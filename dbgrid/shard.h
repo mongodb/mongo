@@ -40,7 +40,7 @@ namespace mongo {
         }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);
-        virtual DBClientWithCommands* conn();
+        virtual string modelServer();
     };
 
 } // namespace mongo

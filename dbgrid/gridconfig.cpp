@@ -27,11 +27,11 @@
 
 namespace mongo {
 
-    /* --- Machine --- */
-
-    map<string, Machine*> Machine::machines;
-
     /* --- DBConfig --- */
+
+    string DBConfig::modelServer() {
+        return configServer.modelServer();
+    }
 
     bool DBConfig::partitioned( const NamespaceString& ns ){
         if ( ! _partitioned )
@@ -40,27 +40,24 @@ namespace mongo {
         return 0;
     }
 
-    Machine * DBConfig::getMachine( const NamespaceString& ns ){
+    string DBConfig::getServer( const NamespaceString& ns ){
         if ( partitioned( ns ) )
             return 0;
         
-        uassert( "no primary!" , _primary );
+        uassert( "no primary!" , _primary.size() );
         return _primary;
     }
 
     void DBConfig::serialize(BSONObjBuilder& to){
         to.append("name", _name);
         to.appendBool("partitioned", _partitioned );
-        if ( _primary )
-            to.append("primary", _primary->getName() );
+        to.append("primary", _primary );
     }
     
     void DBConfig::unserialize(BSONObj& from){
         _name = from.getStringField("name");
         _partitioned = from.getBoolField("partitioned");
-        string p = from.getStringField("primary");
-        if ( ! p.empty() )
-            _primary = Machine::get(p);
+        _primary = from.getStringField("primary");
     }
     
     bool DBConfig::loadByName(const char *nm){
@@ -70,10 +67,6 @@ namespace mongo {
         return load(q);
     }
     
-    DBClientWithCommands* GridConfigModel::conn(){
-        return configServer.conn();
-    }
-
     /* --- Grid --- */
 
     DBConfig* Grid::getDBConfig( string database ){
@@ -88,7 +81,7 @@ namespace mongo {
 
         DBConfig*& cc = _databases[database];
         if ( cc == 0 ) {
-            cc = new DBConfig();
+            cc = new DBConfig( database );
             if ( !cc->loadByName(database.c_str()) ) {
                 // note here that cc->primary == 0.
                 log() << "couldn't find database [" << database << "] in config db" << endl;

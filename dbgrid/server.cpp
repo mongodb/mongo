@@ -30,7 +30,7 @@ namespace mongo {
     int port = 27017;
     const char *curNs = "";
     Database *database = 0;
-    DBClientWithCommands* Model::globalConn;
+    string Model::defaultServer;
     string ourHostname;
 
     string getDbContext() {
@@ -159,7 +159,6 @@ int main(int argc, char* argv[], char *envp[] ) {
     }
 
     assert( configServer.ok() );
-    Model::globalConn = 0;
 
     start();
     dbexit(0);

@@ -23,17 +23,12 @@
 namespace mongo {
 
     ConfigServer::ConfigServer() {
-        _conn = 0;
-
         _partitioned = false;
-        _primary = 0;
+        _primary = "";
         _name = "grid";
     }
 
     ConfigServer::~ConfigServer() {
-        if ( _conn )
-            delete _conn;
-        _conn = 0; // defensive
     }
 
     bool ConfigServer::init( vector<string> configHosts , bool infer ){
@@ -114,28 +109,20 @@ namespace mongo {
 
         Nullstream& l = log();
         l << "connecting to griddb ";
-
-        bool ok;
+        
         if ( !hostRight.empty() ) {
             // connect in paired mode
             l << "L:" << left << " R:" << right << "...";
             l.flush();
-            DBClientPaired *dbp = new DBClientPaired();
-            _conn = dbp;
-            ok = dbp->connect(left.c_str(),right.c_str());
-            uassert( "paired config server not supported yet" , 0 );
+            _primary = left + "," + right;
         }
         else {
             l << left << "...";
             l.flush();
-            DBClientConnection *dcc = new DBClientConnection(/*autoreconnect=*/true);
-            _conn = dcc;
-            string errmsg;
-            ok = dcc->connect(left.c_str(), errmsg);
-            _primary = Machine::get( left.c_str() );
+            _primary = left;
         }
         
-        return ok;
+        return true;
     }
 
     ConfigServer configServer;
