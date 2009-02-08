@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    bool Model::load(BSONObj& query) {
+    bool Model::load(BSONObj& query){
         ScopedDbConnection scoped( modelServer() );
         DBClientWithCommands& conn = scoped.conn();
         BSONObj b = conn.findOne(getNS(), query);
@@ -30,9 +30,39 @@ namespace mongo {
         
         if ( b.isEmpty() )
             return false;
-
+        
         unserialize(b);
+        _id = b["_id"];
         return true;
+    }
+
+    void Model::save(){
+        ScopedDbConnection scoped( modelServer() );
+        DBClientWithCommands& conn = scoped.conn();
+
+        BSONObjBuilder b;
+        serialize( b );
+        
+        if ( _id.eoo() ){
+            OID oid;
+            b.appendOID( "_id" , &oid );
+            
+            BSONObj o = b.doneAndDecouple();
+            conn.insert( getNS() , o );
+            _id = o["_id"];
+
+            log(4) << "inserted new model" << endl;
+        }
+        else {
+            b.append( _id );
+            BSONObjBuilder id;
+            id.append( _id );
+            conn.update( getNS() , id.doneAndDecouple() , b.doneAndDecouple() );
+            
+            log(4) << "updated old model" << endl;
+        }
+
+        scoped.done();
     }
 
 } // namespace mongo

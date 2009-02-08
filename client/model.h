@@ -55,6 +55,10 @@ namespace mongo {
             @return true if successful.
         */
         bool load(BSONObj& query);
+        void save();
+        
+    private:
+        BSONElement _id;
     };
 
 } // namespace mongo
