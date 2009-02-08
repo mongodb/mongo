@@ -560,11 +560,8 @@ env.Install( installDir + "/bin" , "mongo" )
 # on a case-by-case basis.
 
 #headers
-for id in [ "", "util/", "db/" ]:
+for id in [ "", "util/", "db/" , "client/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
-env.Install( installDir + "/include/mongo/client" , "client/connpool.h" )
-env.Install( installDir + "/include/mongo/client" , "client/model.h" )
-env.InstallAs( target=installDir + "/include/mongo/client" , source="client/dbclient.h" )
 
 #lib
 env.Install( installDir + "/" + nixLibPrefix, "libmongoclient.a" )
