@@ -50,6 +50,8 @@ namespace mongo {
     void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e);
 
     int matchDirection( const BSONObj &index, const BSONObj &sort ) {
+        if ( index.isEmpty() || sort.isEmpty() )
+            return 0;
         int direction = 0;
         BSONObjIterator i( index );
         BSONObjIterator s( sort );
