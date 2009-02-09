@@ -61,6 +61,11 @@ namespace mongo {
         const string host;
         DBClientBase *_conn;
     public:
+        DBClientBase* operator->(){ 
+            uassert( "did you call done already" , _conn );
+            return _conn; 
+        }
+
         DBClientBase& conn() {
             uassert( "did you call done already" , _conn );
             return *_conn;

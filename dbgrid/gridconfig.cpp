@@ -70,16 +70,15 @@ namespace mongo {
     /* --- Grid --- */
 
     string Grid::pickServerForNewDB(){
-        ScopedDbConnection dbcon( configServer.getPrimary() );
-        DBClientWithCommands& conn = dbcon.conn();
+        ScopedDbConnection conn( configServer.getPrimary() );
         
         // TODO: this is temporary
 
-        BSONObj s = conn.findOne( "config.servers" , emptyObj );
+        BSONObj s = conn->findOne( "config.servers" , emptyObj );
         uassert( "can't find server for new db" , ! s.isEmpty() );
         
         string name = s["host"].valuestrsafe();
-        dbcon.done();
+        conn.done();
         return name;
     }
 

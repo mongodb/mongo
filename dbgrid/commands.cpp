@@ -102,11 +102,10 @@ namespace mongo {
         public:
             ListServers() : GridAdminCmd("listservers") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection dbcon( configServer.getPrimary() );
-                DBClientWithCommands& conn = dbcon.conn();
+                ScopedDbConnection conn( configServer.getPrimary() );
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn.query( "config.servers" , emptyObj );
+                auto_ptr<DBClientCursor> cursor = conn->query( "config.servers" , emptyObj );
                 while ( cursor->more() ){
                     BSONObj o = cursor->next();
                     all.push_back( o );
@@ -114,7 +113,7 @@ namespace mongo {
                 
                 result.append("servers" , all );
                 result.append("ok" , 1 );
-                dbcon.done();
+                conn.done();
 
                 return true;
             }
@@ -125,23 +124,22 @@ namespace mongo {
         public:
             AddServer() : GridAdminCmd("addserver") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection dbcon( configServer.getPrimary() );
-                DBClientWithCommands& conn = dbcon.conn();
+                ScopedDbConnection conn( configServer.getPrimary() );
                 
                 BSONObj server = BSON( "host" << cmdObj["addserver"].valuestrsafe() );
                 
-                BSONObj old = conn.findOne( "config.servers" , server );
+                BSONObj old = conn->findOne( "config.servers" , server );
                 if ( ! old.isEmpty() ){
                     result.append( "ok" , 0.0 );
                     result.append( "msg" , "already exists" );
-                    dbcon.done();
+                    conn.done();
                     return false;
                 }
                 
-                conn.insert( "config.servers" , server );
+                conn->insert( "config.servers" , server );
                 result.append( "ok", 1 );
                 result.append( "added" , server["host"].valuestrsafe() );
-                dbcon.done();
+                conn.done();
                 return true;
             }
         } addServer;
@@ -150,13 +148,12 @@ namespace mongo {
         public:
             RemoveServer() : GridAdminCmd("removeserver") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection dbcon( configServer.getPrimary() );
-                DBClientWithCommands& conn = dbcon.conn();
+                ScopedDbConnection conn( configServer.getPrimary() );
                 
                 BSONObj server = BSON( "host" << cmdObj["removeserver"].valuestrsafe() );
-                conn.remove( "config.servers" , server );
+                conn->remove( "config.servers" , server );
                 
-                dbcon.done();
+                conn.done();
                 return true;
             }
         } removeServer;
