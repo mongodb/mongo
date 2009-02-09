@@ -36,7 +36,7 @@ namespace mongo {
             AuthenticationInfo *ai = authInfo.get();
             if( ai == 0 || !ai->isAuthorized("admin") ) { 
                 b.append("err", "unauthorized");
-                return b.doneAndDecouple();
+                return b.obj();
             }
 
             b.append("opid", opNum);
@@ -58,7 +58,7 @@ namespace mongo {
             b.append("ns", ns);
             b.append("query", query);
             b.append("inLock",  dbMutexInfo.isLocked());
-            return b.doneAndDecouple();
+            return b.obj();
         }
     } currentOp;
 

@@ -72,7 +72,7 @@ public:
             BSONObjBuilder b;
             if ( filename.size() )
                 b.appendRegex( "filename" , ( (string)"^" + filename ).c_str() );
-            display( &g , b.doneAndDecouple() );
+            display( &g , b.obj() );
             return 0;
         }
 
@@ -84,7 +84,7 @@ public:
         if ( cmd == "search" ){
             BSONObjBuilder b;
             b.appendRegex( "filename" , filename.c_str() );
-            display( &g , b.doneAndDecouple() );
+            display( &g , b.obj() );
             return 0;
         }
 

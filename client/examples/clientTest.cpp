@@ -25,22 +25,22 @@ int main() {
     conn.dropCollection(ns);
 
     // clean up old data from any previous tests
-    conn.remove( ns, BSONObjBuilder().doneAndDecouple() );
-    assert( conn.findOne( ns , BSONObjBuilder().doneAndDecouple() ).isEmpty() );
+    conn.remove( ns, BSONObjBuilder().obj() );
+    assert( conn.findOne( ns , BSONObjBuilder().obj() ).isEmpty() );
 
     // test insert
-    conn.insert( ns ,BSONObjBuilder().append( "name" , "eliot" ).append( "num" , 1 ).doneAndDecouple() );
-    assert( ! conn.findOne( ns , BSONObjBuilder().doneAndDecouple() ).isEmpty() );
+    conn.insert( ns ,BSONObjBuilder().append( "name" , "eliot" ).append( "num" , 1 ).obj() );
+    assert( ! conn.findOne( ns , BSONObjBuilder().obj() ).isEmpty() );
 
     // test remove
-    conn.remove( ns, BSONObjBuilder().doneAndDecouple() );
-    assert( conn.findOne( ns , BSONObjBuilder().doneAndDecouple() ).isEmpty() );
+    conn.remove( ns, BSONObjBuilder().obj() );
+    assert( conn.findOne( ns , BSONObjBuilder().obj() ).isEmpty() );
 
 
     // insert, findOne testing
-    conn.insert( ns , BSONObjBuilder().append( "name" , "eliot" ).append( "num" , 1 ).doneAndDecouple() );
+    conn.insert( ns , BSONObjBuilder().append( "name" , "eliot" ).append( "num" , 1 ).obj() );
     {
-        BSONObj res = conn.findOne( ns , BSONObjBuilder().doneAndDecouple() );
+        BSONObj res = conn.findOne( ns , BSONObjBuilder().obj() );
         assert( strstr( res.getStringField( "name" ) , "eliot" ) );
         assert( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
         assert( 1 == res.getIntField( "num" ) );
@@ -48,9 +48,9 @@ int main() {
 
 
     // cursor
-    conn.insert( ns ,BSONObjBuilder().append( "name" , "sara" ).append( "num" , 2 ).doneAndDecouple() );
+    conn.insert( ns ,BSONObjBuilder().append( "name" , "sara" ).append( "num" , 2 ).obj() );
     {
-        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().doneAndDecouple() );
+        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().obj() );
         int count = 0;
         while ( cursor->more() ) {
             count++;
@@ -60,7 +60,7 @@ int main() {
     }
 
     {
-        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().append( "num" , 1 ).doneAndDecouple() );
+        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().append( "num" , 1 ).obj() );
         int count = 0;
         while ( cursor->more() ) {
             count++;
@@ -70,7 +70,7 @@ int main() {
     }
 
     {
-        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().append( "num" , 3 ).doneAndDecouple() );
+        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().append( "num" , 3 ).obj() );
         int count = 0;
         while ( cursor->more() ) {
             count++;
@@ -81,25 +81,25 @@ int main() {
 
     // update
     {
-        BSONObj res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).doneAndDecouple() );
+        BSONObj res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() );
         assert( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
 
-        BSONObj after = BSONObjBuilder().appendElements( res ).append( "name2" , "h" ).doneAndDecouple();
+        BSONObj after = BSONObjBuilder().appendElements( res ).append( "name2" , "h" ).obj();
 
-        conn.update( ns , BSONObjBuilder().append( "name" , "eliot2" ).doneAndDecouple() , after );
-        res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).doneAndDecouple() );
+        conn.update( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() , after );
+        res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() );
         assert( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
-        assert( conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot2" ).doneAndDecouple() ).isEmpty() );
+        assert( conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() ).isEmpty() );
 
-        conn.update( ns , BSONObjBuilder().append( "name" , "eliot" ).doneAndDecouple() , after );
-        res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).doneAndDecouple() );
+        conn.update( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() , after );
+        res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() );
         assert( strstr( res.getStringField( "name" ) , "eliot" ) );
         assert( strstr( res.getStringField( "name2" ) , "h" ) );
-        assert( conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot2" ).doneAndDecouple() ).isEmpty() );
+        assert( conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() ).isEmpty() );
 
         // upsert
-        conn.update( ns , BSONObjBuilder().append( "name" , "eliot2" ).doneAndDecouple() , after , 1 );
-        assert( ! conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).doneAndDecouple() ).isEmpty() );
+        conn.update( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() , after , 1 );
+        assert( ! conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() ).isEmpty() );
 
     }
 

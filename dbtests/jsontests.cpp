@@ -358,7 +358,7 @@ namespace JsonTests {
         class Empty : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{}";
@@ -368,7 +368,7 @@ namespace JsonTests {
         class EmptyWithSpace : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ }";
@@ -379,7 +379,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "a", "b" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : \"b\" }";
@@ -390,7 +390,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "", "" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"\" : \"\" }";
@@ -407,7 +407,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "$where", 1 );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"$where\" : 1 }";
@@ -418,7 +418,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "a", 1 );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : 1 }";
@@ -434,7 +434,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "a", -4.4433e-2 );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : -4.4433e-2 }";
@@ -446,7 +446,7 @@ namespace JsonTests {
                 BSONObjBuilder b;
                 b.append( "a", 1 );
                 b.append( "b", "foo" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : 1, \"b\" : \"foo\" }";
@@ -459,7 +459,7 @@ namespace JsonTests {
                 b.append( "a", 1 );
                 BSONObjBuilder c;
                 c.append( "z", b.done() );
-                return c.doneAndDecouple();
+                return c.obj();
             }
             virtual string json() const {
                 return "{ \"z\" : { \"a\" : 1 } }";
@@ -471,7 +471,7 @@ namespace JsonTests {
                 vector< int > arr;
                 BSONObjBuilder b;
                 b.append( "a", arr );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : [] }";
@@ -486,7 +486,7 @@ namespace JsonTests {
                 arr.push_back( 3 );
                 BSONObjBuilder b;
                 b.append( "a", arr );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : [ 1, 2, 3 ] }";
@@ -497,7 +497,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendBool( "a", true );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : true }";
@@ -508,7 +508,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendBool( "a", false );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : false }";
@@ -519,7 +519,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendNull( "a" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : null }";
@@ -530,7 +530,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "a", "\" \\ / \b \f \n \r \t" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }";
@@ -541,7 +541,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "a", "\x7f" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : \"\x7f\" }";
@@ -552,7 +552,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "\n", "b" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"\\n\" : \"b\" }";
@@ -572,7 +572,7 @@ namespace JsonTests {
                 u[ 6 ] = 0;
                 b.append( "a", u );
                 ASSERT_EQUALS( string( u ), b.done().firstElement().valuestr() );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : \"\\ua000\\uA000\" }";
@@ -597,7 +597,7 @@ namespace JsonTests {
                 u[ 7 ] = 0;
                 
                 b.append( "a", u );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : \"\\u0001\\u007f\\u07ff\\uffff\" }";
@@ -618,7 +618,7 @@ namespace JsonTests {
                 u[ 5 ] = 0;
                 
                 b.append( "a", u );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : \"\\u0700\\uff00\" }";
@@ -631,7 +631,7 @@ namespace JsonTests {
                 OID o;
                 memset( &o, 0, 12 );
                 b.appendDBRef( "a", "foo", o );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             // NOTE Testing other formats handled by by Base class.
             virtual string json() const {
@@ -643,7 +643,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendOID( "_id" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"_id\" : \"000000000000000000000000\" }";
@@ -656,7 +656,7 @@ namespace JsonTests {
                 OID o;
                 memset( &o, 0x0f, 12 );
                 b.appendOID( "_id", &o );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"_id\" : \"0f0f0f0f0f0f0f0f0f0f0f0f\" }";
@@ -671,7 +671,7 @@ namespace JsonTests {
                 z[ 2 ] = 'c';
                 BSONObjBuilder b;
                 b.appendBinData( "a", 3, ByteArray, z );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$binary\" : \"YWJj\", \"$type\" : \"02\" } }";
@@ -685,7 +685,7 @@ namespace JsonTests {
                 z[ 1 ] = 'b';
                 BSONObjBuilder b;
                 b.appendBinData( "a", 2, ByteArray, z );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$binary\" : \"YWI=\", \"$type\" : \"02\" } }";
@@ -698,7 +698,7 @@ namespace JsonTests {
                 z[ 0 ] = 'a';
                 BSONObjBuilder b;
                 b.appendBinData( "a", 1, ByteArray, z );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$binary\" : \"YQ==\", \"$type\" : \"02\" } }";
@@ -716,7 +716,7 @@ namespace JsonTests {
                 };
                 BSONObjBuilder b;
                 b.appendBinData( "a", 48, ByteArray, z );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$binary\" : \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/\", \"$type\" : \"02\" } }";
@@ -727,7 +727,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendDate( "a", 0 );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$date\" : 0 } }";
@@ -738,7 +738,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendDate( "a", 100 );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$date\" : 100 } }";
@@ -757,7 +757,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendRegex( "a", "b", "i" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$regex\" : \"b\", \"$options\" : \"i\" } }";
@@ -768,7 +768,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendRegex( "a", "\t", "i" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$regex\" : \"\\t\", \"$options\" : \"i\" } }";
@@ -779,7 +779,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.appendRegex( "a", "\"", "" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ \"a\" : /\"/ }";
@@ -808,7 +808,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "a_b", 1 );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ a_b : 1 }";
@@ -819,7 +819,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "$a_b", 1 );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ $a_b : 1 }";
@@ -830,7 +830,7 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 b.append( "ab'c\"", "bb\b '\"" );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             virtual string json() const {
                 return "{ 'ab\\'c\"' : 'bb\\b \\'\"' }";

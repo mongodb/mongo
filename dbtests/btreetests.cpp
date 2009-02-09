@@ -75,7 +75,7 @@ namespace BtreeTests {
             BSONObjBuilder builder;
             string val( n, c );
             builder.append( "a", val );
-            return builder.doneAndDecouple();
+            return builder.obj();
         }
         void locate( BSONObj &key, int expectedPos,
                      bool expectedFound, const DiskLoc &expectedLocation,

@@ -751,7 +751,7 @@ namespace mongo {
                 return BSONObj();
             b.appendAs(x, "");
         }
-        return b.doneAndDecouple();
+        return b.obj();
     }
 
     BSONObj BSONObj::extractFields(BSONObj& pattern) {
@@ -766,7 +766,7 @@ namespace mongo {
                 return BSONObj();
             b.append(x);
         }
-        return b.doneAndDecouple();
+        return b.obj();
     }
 
     int BSONObj::getIntField(const char *name) const {
@@ -877,7 +877,7 @@ namespace mongo {
                     b.append( e );
             }
         }
-        return b.doneAndDecouple();
+        return b.obj();
     }
     
     BSONObj BSONObj::replaceFieldNames( const vector< string > &names ) const {
@@ -895,7 +895,7 @@ namespace mongo {
                 b.append( e );
             }
         }
-        return b.doneAndDecouple();
+        return b.obj();
     }
     
     string BSONObj::hexDump() const {

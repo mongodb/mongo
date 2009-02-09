@@ -63,7 +63,7 @@ public:
                 b.append( f.c_str() , 1 );
             }
             
-            realFieldsToReturn = b.doneAndDecouple();
+            realFieldsToReturn = b.obj();
             fieldsToReturn = &realFieldsToReturn;
         }
         

@@ -507,7 +507,7 @@ namespace mongo {
                     break;
                 b.append( f );
             }
-            BSONObj o = b.doneAndDecouple();
+            BSONObj o = b.obj();
             assert( !o.isEmpty() );
             keys.insert(o);
             return;
@@ -536,7 +536,7 @@ namespace mongo {
                     b.appendAs( e, "" );
             }
 
-            BSONObj o = b.doneAndDecouple();
+            BSONObj o = b.obj();
             assert( !o.isEmpty() );
             keys.insert(o);
         }

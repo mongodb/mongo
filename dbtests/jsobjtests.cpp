@@ -37,18 +37,18 @@ namespace JsobjTests {
             static BSONObj basic( const char *name, int val ) {
                 BSONObjBuilder b;
                 b.appendInt( name, val );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             static BSONObj basic( const char *name, vector< int > val ) {
                 BSONObjBuilder b;
                 b.appendIntArray( name, val );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             template< class T >
             static BSONObj basic( const char *name, T val ) {
                 BSONObjBuilder b;
                 b.append( name, val );
-                return b.doneAndDecouple();
+                return b.obj();
             }
         };
 
@@ -314,7 +314,7 @@ namespace JsobjTests {
                     BSONObjBuilder scope;
                     scope.append( "a", "b" );
                     b.appendCodeWScope( "c", "d", scope.done() );
-                    return b.doneAndDecouple();
+                    return b.obj();
                 }
                 BSONObj invalid() const {
                     BSONObj ret = valid();

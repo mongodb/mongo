@@ -67,7 +67,7 @@ public:
         BSONObjBuilder result;
         result.append( "ok", runCommandAgainstRegistered( "admin.$cmd", query.obj, result ) ? 1.0 : 0.0 );
         if ( cc_ ) cc_->afterCommand();
-        return result.doneAndDecouple();
+        return result.obj();
     }
     virtual bool connect( const char *serverHostname, string& errmsg ) {
         return true;

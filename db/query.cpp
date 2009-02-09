@@ -243,7 +243,7 @@ namespace mongo {
                         if( js.getObjectID( e ) ) {
                             BSONObjBuilder b;
                             b.append( e );
-                            *deletedId = b.doneAndDecouple();
+                            *deletedId = b.obj();
                         }
                     }
                     break;
@@ -385,7 +385,7 @@ namespace mongo {
                             // if there's no id.
                             if ( js.getObjectID( id ) ) {
                                 idPattern.append( id );
-                                pattern = idPattern.doneAndDecouple();
+                                pattern = idPattern.obj();
                             }
                         }
 
@@ -619,7 +619,7 @@ namespace mongo {
             uassert("too many ordering elements", *p <= '9');
         }
 
-        return b.doneAndDecouple();
+        return b.obj();
     }
 
     QueryResult* runQuery(Message& message, const char *ns, int ntoskip, int _ntoreturn, BSONObj jsobj,

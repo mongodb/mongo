@@ -100,8 +100,8 @@ namespace mongo {
             startBuilder.appendAs( forward ? lowest : highest, "" );
             endBuilder.appendAs( forward ? highest : lowest, "" );
         }
-        startKey = startBuilder.doneAndDecouple();
-        endKey = endBuilder.doneAndDecouple();
+        startKey = startBuilder.obj();
+        endKey = endBuilder.obj();
     }
 
 // Find lowest and highest possible key values given all $gt, $gte, $lt, and

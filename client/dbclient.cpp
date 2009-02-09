@@ -34,7 +34,7 @@ namespace mongo {
         BSONObjBuilder b;
         b.appendElements(obj);
         b.appendWhere(jscode, scope);
-        obj = b.doneAndDecouple();
+        obj = b.obj();
         return *this;
     }
 
@@ -45,7 +45,7 @@ namespace mongo {
         else
             b.append("query", obj);
         b.append("orderby", s);
-        obj = b.doneAndDecouple();
+        obj = b.obj();
         return *this; 
     }
 
@@ -56,7 +56,7 @@ namespace mongo {
         else
             b.append("query", obj);
         b.append("$hint", keyPattern);
-        obj = b.doneAndDecouple();
+        obj = b.obj();
         return *this; 
     }
 
@@ -67,7 +67,7 @@ namespace mongo {
         else
             b.append("query", obj);
         b.append("$explain", true);
-        obj = b.doneAndDecouple();
+        obj = b.obj();
         return *this; 
     }
 
@@ -520,7 +520,7 @@ namespace mongo {
             return 0;
         _seenIndexes.insert( cacheKey );
 
-        insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes"  ).c_str() , toSave.doneAndDecouple() );
+        insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes"  ).c_str() , toSave.obj() );
         return 1;
     }
 

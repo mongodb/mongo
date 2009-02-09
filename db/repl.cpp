@@ -450,7 +450,7 @@ namespace mongo {
         if ( n )
             b.append("dbs", dbs_builder.done());
 
-        return b.doneAndDecouple();
+        return b.obj();
     }
 
     void ReplSource::save() {

@@ -69,7 +69,7 @@ namespace mongo {
             else
                 b.append(e);
         }
-        BSONObj res= b.doneAndDecouple();
+        BSONObj res= b.obj();
 
         /*    if( mod ) {
             out() << "before: " << o.toString() << endl;

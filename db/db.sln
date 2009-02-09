@@ -20,14 +20,37 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72EBEDD-342D-4371-8B0D-D7505902FA69}"
 	ProjectSection(SolutionItems) = preProject
 		..\dbtests\btreetests.cpp = ..\dbtests\btreetests.cpp
+		..\dbtests\dbtests.cpp = ..\dbtests\dbtests.cpp
+		..\dbtests\javajstests.cpp = ..\dbtests\javajstests.cpp
+		..\dbtests\jsobjtests.cpp = ..\dbtests\jsobjtests.cpp
+		..\dbtests\jsontests.cpp = ..\dbtests\jsontests.cpp
 		..\dbtests\matchertests.cpp = ..\dbtests\matchertests.cpp
 		..\dbtests\namespacetests.cpp = ..\dbtests\namespacetests.cpp
 		..\dbtests\pairingtests.cpp = ..\dbtests\pairingtests.cpp
+		..\dbtests\pdfiletests.cpp = ..\dbtests\pdfiletests.cpp
 		..\dbtests\querytests.cpp = ..\dbtests\querytests.cpp
+		..\dbtests\repltests.cpp = ..\dbtests\repltests.cpp
 		..\dbtests\socktests.cpp = ..\dbtests\socktests.cpp
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tutorial", "..\client\examples\tutorial\tutorial.vcproj", "{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{2CABB3B8-C9A6-478D-9463-0B37799ED708}"
+	ProjectSection(SolutionItems) = preProject
+		..\shell\dbshell.cpp = ..\shell\dbshell.cpp
+		..\shell\MongoJS.cpp = ..\shell\MongoJS.cpp
+		..\shell\ShellUtils.cpp = ..\shell\ShellUtils.cpp
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59-9DC7-4BF1-A431-1BD4966899A5}"
+	ProjectSection(SolutionItems) = preProject
+		..\tools\dump.cpp = ..\tools\dump.cpp
+		..\tools\export.cpp = ..\tools\export.cpp
+		..\tools\files.cpp = ..\tools\files.cpp
+		..\tools\importJSON.cpp = ..\tools\importJSON.cpp
+		..\tools\restore.cpp = ..\tools\restore.cpp
+		..\tools\Tool.cpp = ..\tools\Tool.cpp
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

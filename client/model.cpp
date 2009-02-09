@@ -47,7 +47,7 @@ namespace mongo {
             OID oid;
             b.appendOID( "_id" , &oid );
             
-            BSONObj o = b.doneAndDecouple();
+            BSONObj o = b.obj();
             conn.insert( getNS() , o );
             _id = o["_id"];
 
@@ -57,7 +57,7 @@ namespace mongo {
             b.append( _id );
             BSONObjBuilder id;
             id.append( _id );
-            conn.update( getNS() , id.doneAndDecouple() , b.doneAndDecouple() );
+            conn.update( getNS() , id.obj() , b.obj() );
             
             log(4) << "updated old model" << endl;
         }

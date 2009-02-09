@@ -12,7 +12,7 @@ void insert( mongo::DBClientConnection & conn , const char * name , int num ) {
     mongo::BSONObjBuilder obj;
     obj.append( "name" , name );
     obj.append( "num" , num );
-    conn.insert( "test.people" , obj.doneAndDecouple() );
+    conn.insert( "test.people" , obj.obj() );
 }
 
 int main() {
@@ -26,7 +26,7 @@ int main() {
 
     { // clean up old data from any previous tests
         mongo::BSONObjBuilder query;
-        conn.remove( "test.people" , query.doneAndDecouple() );
+        conn.remove( "test.people" , query.obj() );
     }
 
     insert( conn , "eliot" , 15 );
@@ -34,7 +34,7 @@ int main() {
     
     {
         mongo::BSONObjBuilder query;
-        auto_ptr<mongo::DBClientCursor> cursor = conn.query( "test.people" , query.doneAndDecouple() );
+        auto_ptr<mongo::DBClientCursor> cursor = conn.query( "test.people" , query.obj() );
         cout << "using cursor" << endl;
         while ( cursor->more() ) {
             mongo::BSONObj obj = cursor->next();
@@ -46,14 +46,14 @@ int main() {
     {
         mongo::BSONObjBuilder query;
         query.append( "name" , "eliot" );
-        mongo::BSONObj res = conn.findOne( "test.people" , query.doneAndDecouple() );
+        mongo::BSONObj res = conn.findOne( "test.people" , query.obj() );
         cout << res.isEmpty() << "\t" << res.jsonString() << endl;
     }
     
     {
         mongo::BSONObjBuilder query;
         query.append( "name" , "asd" );
-        mongo::BSONObj res = conn.findOne( "test.people" , query.doneAndDecouple() );
+        mongo::BSONObj res = conn.findOne( "test.people" , query.obj() );
         cout << res.isEmpty() << "\t" << res.jsonString() << endl;
     }
 

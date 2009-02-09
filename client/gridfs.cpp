@@ -21,7 +21,7 @@ namespace mongo {
         b.appendAs( fileId , "files_id" );
         b.appendInt( "n" , chunkNumber );
         b.appendBinDataArray( "data" , data , len );
-        _data = b.doneAndDecouple();
+        _data = b.obj();
     }
 
 
@@ -54,7 +54,7 @@ namespace mongo {
             id.init();
             b.appendOID( "_id" , &id );
             
-            fileObject = b.doneAndDecouple();
+            fileObject = b.obj();
         }
         
         char buf[DEFAULT_CHUNK_SIZE];
@@ -104,7 +104,7 @@ namespace mongo {
         b.appendAs( _obj["_id"] , "files_id" );
         b.appendInt( "n" , n );
 
-        BSONObj o = _grid->_client.findOne( _grid->_chunksNS.c_str() , b.doneAndDecouple() );
+        BSONObj o = _grid->_client.findOne( _grid->_chunksNS.c_str() , b.obj() );
         assert( ! o.isEmpty() );
         return Chunk(o);
     }

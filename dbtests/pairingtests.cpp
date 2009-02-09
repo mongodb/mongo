@@ -177,7 +177,7 @@ namespace PairingTests {
                 BSONObjBuilder b;
                 b.appendInt( "ok", ok );
                 b.appendInt( "you_are", youAre );
-                return b.doneAndDecouple();
+                return b.obj();
             }
         };
 

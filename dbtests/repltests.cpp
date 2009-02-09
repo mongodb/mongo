@@ -143,7 +143,7 @@ namespace ReplTests {
             id.init();
             b.appendOID( "_id", &id );
             b.appendElements( fromjson( json ) );
-            return b.doneAndDecouple();
+            return b.obj();
         }
     private:
         static DBDirectClient client_;

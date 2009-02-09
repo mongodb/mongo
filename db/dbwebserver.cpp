@@ -366,7 +366,7 @@ namespace mongo {
                     queryBuilder.append( field , val );
             }
 
-            BSONObj query = queryBuilder.doneAndDecouple();
+            BSONObj query = queryBuilder.obj();
 
             auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
 

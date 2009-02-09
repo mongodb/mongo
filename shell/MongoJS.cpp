@@ -257,7 +257,7 @@ BSONObj v8ToMongo( v8::Handle<v8::Object> o ){
 
         v8ToMongoElement( b , name , sname , value );
     }
-    return b.doneAndDecouple();
+    return b.obj();
 }
 
 #define GETNS char ns[args[0]->ToString()->Utf8Length()];  args[0]->ToString()->WriteUtf8( ns ); 

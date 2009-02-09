@@ -728,7 +728,7 @@ namespace mongo {
     e.g., 
        BSON( "name" << "joe" << "age" << 33 )
 */
-#define BSON(x) (( BSONObjBuilder() << x ).doneAndDecouple())
+#define BSON(x) (( BSONObjBuilder() << x ).obj())
 
     class BSONObjBuilderValueStream {
     public:
@@ -946,15 +946,15 @@ namespace mongo {
             marshalArray( fieldName, arrBuilder.done() );
         }
 
-        /** BSONObj will free the buffer when it is finished. */
-        BSONObj doneAndDecouple() {
+        /** The returned BSONObj will free the buffer when it is finished. */
+        BSONObj obj() {
             int l;
             return BSONObj(decouple(l), true);
         }
 
         /** Fetch the object we have built.
 			BSONObjBuilder still frees the object when the builder goes out of 
-			scope -- very important to keep in mind.  Use doneAndDecouple() if you 
+			scope -- very important to keep in mind.  Use obj() if you 
 			would like the BSONObj to last longer than the builder.
         */
         BSONObj done() {
@@ -1125,7 +1125,7 @@ namespace mongo {
     inline BSONObj BSONElement::wrap() {
         BSONObjBuilder b;
         b.append(*this);
-        return b.doneAndDecouple();
+        return b.obj();
     }
 
     inline bool BSONObj::hasElement(const char *name) const {

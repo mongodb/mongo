@@ -58,18 +58,18 @@ namespace NamespaceTests {
             virtual BSONObj key() const {
                 BSONObjBuilder k;
                 k.append( "a", 1 );
-                return k.doneAndDecouple();
+                return k.obj();
             }
             BSONObj aDotB() const {
                 BSONObjBuilder k;
                 k.append( "a.b", 1 );
-                return k.doneAndDecouple();
+                return k.obj();
             }
             BSONObj aAndB() const {
                 BSONObjBuilder k;
                 k.append( "a", 1 );
                 k.append( "b", 1 );
-                return k.doneAndDecouple();
+                return k.obj();
             }
             static vector< int > shortArray() {
                 vector< int > a;
@@ -82,7 +82,7 @@ namespace NamespaceTests {
                 BSONObjBuilder b;
                 b.append( "b", i );
                 b.append( "c", 4 );
-                return b.doneAndDecouple();
+                return b.obj();
             }
             static void checkSize( int expected, const BSONObjSetDefaultOrder  &objs ) {
                 ASSERT_EQUALS( BSONObjSetDefaultOrder::size_type( expected ), objs.size() );
@@ -120,7 +120,7 @@ namespace NamespaceTests {
                 BSONObjSetDefaultOrder keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 1, keys );
-                assertEquals( e.doneAndDecouple(), *keys.begin() );
+                assertEquals( e.obj(), *keys.begin() );
             }
         };
 
@@ -136,7 +136,7 @@ namespace NamespaceTests {
                 BSONObjSetDefaultOrder keys;
                 id().getKeysFromObject( a.done(), keys );
                 checkSize( 1, keys );
-                assertEquals( e.doneAndDecouple(), *keys.begin() );
+                assertEquals( e.obj(), *keys.begin() );
             }
         private:
             virtual BSONObj key() const {
@@ -158,7 +158,7 @@ namespace NamespaceTests {
                 for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
-                    assertEquals( b.doneAndDecouple(), *i );
+                    assertEquals( b.obj(), *i );
                 }
             }
         };
@@ -179,7 +179,7 @@ namespace NamespaceTests {
                     BSONObjBuilder b;
                     b.append( "", j );
                     b.append( "", 2 );
-                    assertEquals( b.doneAndDecouple(), *i );
+                    assertEquals( b.obj(), *i );
                 }
             }
         private:
@@ -204,7 +204,7 @@ namespace NamespaceTests {
                     BSONObjBuilder b;
                     b.append( "", 5 );
                     b.append( "", j );
-                    assertEquals( b.doneAndDecouple(), *i );
+                    assertEquals( b.obj(), *i );
                 }
             }
         private:
@@ -212,7 +212,7 @@ namespace NamespaceTests {
                 BSONObjBuilder k;
                 k.append( "first", 1 );
                 k.append( "a", 1 );
-                return k.doneAndDecouple();
+                return k.obj();
             }
         };
 
@@ -232,7 +232,7 @@ namespace NamespaceTests {
                 for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
-                    assertEquals( b.doneAndDecouple(), *i );
+                    assertEquals( b.obj(), *i );
                 }
             }
         private:
@@ -276,7 +276,7 @@ namespace NamespaceTests {
                 for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
-                    assertEquals( b.doneAndDecouple(), *i );
+                    assertEquals( b.obj(), *i );
                 }
             }
         private:
@@ -304,7 +304,7 @@ namespace NamespaceTests {
                     BSONObjBuilder c;
                     c.append( "", j );
                     c.append( "", 99 );
-                    assertEquals( c.doneAndDecouple(), *i );
+                    assertEquals( c.obj(), *i );
                 }
             }
         private:
@@ -312,7 +312,7 @@ namespace NamespaceTests {
                 BSONObjBuilder k;
                 k.append( "a.b", 1 );
                 k.append( "d", 1 );
-                return k.doneAndDecouple();
+                return k.obj();
             }
         };
 
@@ -323,7 +323,7 @@ namespace NamespaceTests {
                 vector< BSONObj > elts;
                 BSONObjBuilder s;
                 s.append( "foo", 41 );
-                elts.push_back( s.doneAndDecouple() );
+                elts.push_back( s.obj() );
                 for ( int i = 1; i < 4; ++i )
                     elts.push_back( simpleBC( i ) );
                 BSONObjBuilder b;
@@ -336,7 +336,7 @@ namespace NamespaceTests {
                 for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
-                    assertEquals( b.doneAndDecouple(), *i );
+                    assertEquals( b.obj(), *i );
                 }
             }
         private:
@@ -428,7 +428,7 @@ namespace NamespaceTests {
                 string as( 187, 'a' );
                 BSONObjBuilder b;
                 b.append( "a", as );
-                return b.doneAndDecouple();
+                return b.obj();
             }
         private:
             const char *ns_;

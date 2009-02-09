@@ -39,7 +39,7 @@ namespace mongo {
             indexes.push_back( 0 );
         }
         BSONObj pop() {
-            BSONObj ret = back()->doneAndDecouple();
+            BSONObj ret = back()->obj();
             builders.pop_back();
             fieldNames.pop_back();
             indexes.pop_back();
