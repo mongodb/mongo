@@ -93,13 +93,17 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if ( ii.indexName() == hintstr ) {
+                        int direction = matchDirection( ii.keyPattern(), order );
+                        if ( isSorted ) *isSorted = ( direction != 0 );
+                        if ( direction == 0 )
+                            direction = 1;
+                        // NOTE This startKey is incorrect, preserving for the moment so
+                        // we can preserve simpleKeyMatch behavior.
                         BSONObj startKey = ii.getKeyFromQuery(query);
-                        int direction = 1;
                         if ( simpleKeyMatch )
                             *simpleKeyMatch = query.nFields() == startKey.nFields();
-                        if ( isSorted ) *isSorted = false;
                         return auto_ptr<Cursor>(
-                            new BtreeCursor(ii, startKey, direction, query));
+                            new BtreeCursor(ii, emptyObj, direction, query));
                     }
                 }
             }
@@ -108,13 +112,17 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if( ii.keyPattern().woCompare(hintobj) == 0 ) {
+                        int direction = matchDirection( ii.keyPattern(), order );
+                        if ( isSorted ) *isSorted = ( direction != 0 );
+                        if ( direction == 0 )
+                            direction = 1;
+                        // NOTE This startKey is incorrect, preserving for the moment so
+                        // we can preserve simpleKeyMatch behavior.
                         BSONObj startKey = ii.getKeyFromQuery(query);
-                        int direction = 1;
                         if ( simpleKeyMatch )
                             *simpleKeyMatch = query.nFields() == startKey.nFields();
-                        if ( isSorted ) *isSorted = false;
                         return auto_ptr<Cursor>(
-                            new BtreeCursor(ii, startKey, direction, query));
+                            new BtreeCursor(ii, emptyObj, direction, query));
                     }
                 }
             }
