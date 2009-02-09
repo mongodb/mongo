@@ -529,7 +529,8 @@ namespace mongo {
     BSONObj empty_obj = fromjson("{}");
 
     /* { count: "collectionname"[, query: <query>] }
-       returns -1 on error.
+       returns -1 on ns does not exist error.
+               -2 on other errors
     */
     int runCount(const char *ns, BSONObj& cmd, string& err) {
         NamespaceDetails *d = nsdetails(ns);

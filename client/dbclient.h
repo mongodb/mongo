@@ -269,7 +269,7 @@ namespace mongo {
         /** count number of objects in collection ns that match the query criteria specified
             throws UserAssertion if database returns an error
         */
-        unsigned long long count(const char *ns, BSONObj query);
+        unsigned long long count(const char *ns, BSONObj query = emptyObj);
 
         string createPasswordDigest( const char * username , const char * clearTextPassword );
 

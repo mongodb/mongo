@@ -7,12 +7,12 @@ using namespace mongo;
 
 void run() {
   DBClientConnection c;
-  c.connect("localhost");
+  c.connect("192.168.58.1");
   cout << "connected ok" << endl;
   BSONObj p = BSON( "name" << "Joe" << "age" << 33 );
   c.insert("tutorial.persons", p);
 
-  cout << "count:" << c.count(
+  cout << "count:" << c.count("tutorial.persons") << endl;
 }
 
 int main() { 

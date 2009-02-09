@@ -32,12 +32,42 @@ namespace mongo {
 
 #pragma pack(1)
 
+// "database.a.b.c" -> "database"
+    const int MaxClientLen = 256;
+    inline void nsToClient(const char *ns, char *database) {
+        const char *p = ns;
+        char *q = database;
+        while ( *p != '.' ) {
+            if ( *p == 0 )
+                break;
+            *q++ = *p++;
+        }
+        *q = 0;
+        if (q-database>=MaxClientLen) {
+            problem() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
+            dbexit(60);
+        }
+    }
+    inline string nsToClient(const char *ns) {
+        char buf[MaxClientLen];
+        nsToClient(ns, buf);
+        return buf;
+    }
+
     class NamespaceString {
     public:
-        NamespaceString( const char * c ) : _str( c ){}
-        NamespaceString( const string& s ) : _str( s.c_str() ){}
-
-        const char * _str;
+        string db;
+        string coll;
+    private:
+        void init(const char *ns) { 
+            const char *p = strchr(ns, '.');
+            if( p == 0 ) return;
+            db = string(ns, p - ns);
+            coll = p + 1;
+        }
+    public:
+        NamespaceString( const char * ns ) { init(ns); }
+        NamespaceString( const string& ns ) { init(ns.c_str()); }
     };
 
     class Namespace {
@@ -409,27 +439,5 @@ namespace mongo {
     };
 
     extern const char *dbpath;
-
-// "database.a.b.c" -> "database"
-    const int MaxClientLen = 256;
-    inline void nsToClient(const char *ns, char *database) {
-        const char *p = ns;
-        char *q = database;
-        while ( *p != '.' ) {
-            if ( *p == 0 )
-                break;
-            *q++ = *p++;
-        }
-        *q = 0;
-        if (q-database>=MaxClientLen) {
-            problem() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
-            dbexit(60);
-        }
-    }
-    inline string nsToClient(const char *ns) {
-        char buf[MaxClientLen];
-        nsToClient(ns, buf);
-        return buf;
-    }
 
 } // namespace mongo
