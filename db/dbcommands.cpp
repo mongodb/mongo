@@ -663,6 +663,9 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
+        virtual bool slaveOverrideOk() {
+            return true;
+        }
         virtual bool adminOnly() {
             return true;
         }
