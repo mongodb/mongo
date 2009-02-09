@@ -442,7 +442,7 @@ Default( env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [
 # tools
 allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
 env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
-env.Program( "mongorestore" , allToolFiles + [ "tools/import.cpp" ] )
+env.Program( "mongorestore" , allToolFiles + [ "tools/restore.cpp" ] )
 
 env.Program( "mongoexport" , allToolFiles + [ "tools/export.cpp" ] )
 env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
