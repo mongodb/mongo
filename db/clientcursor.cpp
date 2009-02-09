@@ -186,8 +186,8 @@ namespace mongo {
             return new CursInspector();
         }
         void fill() {
-            b.append("byLocation_size", byLoc.size());
-            b.append("clientCursors_size", clientCursorsById.size());
+            b.append("byLocation_size", unsigned( byLoc.size() ) );
+            b.append("clientCursors_size", unsigned( clientCursorsById.size() ) );
             /* todo update for new impl:
             		stringstream ss;
             		ss << '\n';
