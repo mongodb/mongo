@@ -188,6 +188,7 @@
 		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
 		93D6BBF70F265E1100FE5722 /* matchertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = matchertests.cpp; sourceTree = "<group>"; };
 		93D6BC9B0F266FC300FE5722 /* querytests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = querytests.cpp; sourceTree = "<group>"; };
+		93F386400F40E27800967EFA /* hint1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = hint1.js; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -403,6 +404,7 @@
 		93A8D1D10F37544800C92B85 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				93F386400F40E27800967EFA /* hint1.js */,
 				936ABBAA0F3CBE5400D5015F /* recovery */,
 				936AB9350F3C8AB800D5015F /* _lodeRunner.js */,
 				936AB4BB0F3A5B0300D5015F /* update3.js */,
