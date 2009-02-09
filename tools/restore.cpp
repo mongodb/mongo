@@ -1,4 +1,4 @@
-// import.cpp
+// restore.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -29,11 +29,11 @@ using namespace mongo;
 
 namespace po = boost::program_options;
 
-class Import : public Tool {
+class Restore : public Tool {
 public:
-    Import() : Tool( "import" ){
+    Restore() : Tool( "restore" ){
         add_options()
-            ("dir",po::value<string>() , "directory to import from" )
+            ("dir",po::value<string>() , "directory to restore from" )
             ;
         addPositionArg( "dir" , 1 );
     }
@@ -109,6 +109,6 @@ public:
 };
 
 int main( int argc , char ** argv ) {
-    Import import;
-    return import.main( argc , argv );
+    Restore restore;
+    return restore.main( argc , argv );
 }
