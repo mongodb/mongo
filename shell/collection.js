@@ -162,7 +162,15 @@ DBCollection.prototype.resetIndexCache = function(){
     this._indexCache = {};
 }
 
-DBCollection.prototype.dropIndexes = function() {
+DBCollection.prototype.reIndex = function(){
+    var keys = this.getIndexKeys();
+    this.dropIndexes();
+    for ( var i in keys ){
+        this.ensureIndex( keys[i] );
+    }
+}
+
+DBCollection.prototype.dropIndexes = function(){
     this.resetIndexCache();
 
     var res = this._db.runCommand( { deleteIndexes: this.getName(), index: "*" } );
