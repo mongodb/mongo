@@ -631,6 +631,10 @@ namespace mongo {
         bool wantMore = true;
         int ntoreturn = _ntoreturn;
         if ( _ntoreturn < 0 ) {
+            /* _ntoreturn greater than zero is simply a hint on how many objects to send back per 
+                "cursor batch".
+                A negative number indicates a hard limit.
+            */
             ntoreturn = -_ntoreturn;
             wantMore = false;
         }

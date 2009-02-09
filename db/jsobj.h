@@ -746,37 +746,39 @@ namespace mongo {
     };
 
     /**
-       utility for creating BSONObj
+       utility for creating a BSONObj
      */
     class BSONObjBuilder {
     public:
+        /** @param initsize this is just a hint as to the final size of the object */
         BSONObjBuilder(int initsize=512) : b(initsize) {
             b.skip(4); /*leave room for size field*/
         }
 
-        /* add all the fields from the object specified to this object */
+        /** add all the fields from the object specified to this object */
         BSONObjBuilder& appendElements(BSONObj x);
 
+        /** append element to the object we are building */
         void append(BSONElement& e) {
             assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
             b.append((void*) e.rawdata(), e.size());
         }
 
-        /* append an element but with a new name */
+        /** append an element but with a new name */
         void appendAs(const BSONElement& e, const char *as) {
             b.append((char) e.type());
             b.append(as);
             b.append((void *) e.value(), e.valuesize());
         }
 
-        /* add a subobject as a member */
+        /** add a subobject as a member */
         void append(const char *fieldName, BSONObj subObj) {
             b.append((char) Object);
             b.append(fieldName);
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
-        /* add a subobject as a member with type Array.  Thus arr object should have "0", "1", ...
+        /** add a subobject as a member with type Array.  Thus arr object should have "0", "1", ...
            style fields in it.
         */
         void appendArray(const char *fieldName, BSONObj subObj) {
@@ -785,22 +787,26 @@ namespace mongo {
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
+        /** Append a boolean element */
         void appendBool(const char *fieldName, int val) {
             b.append((char) Bool);
             b.append(fieldName);
             b.append((char) (val?1:0));
         }
+        /** Append a 32 bit integer element */
         void appendInt(const char *fieldName, int n) {
             b.append((char) NumberInt);
             b.append(fieldName);
             b.append(n);
         }
+        /** Append a double element */
         BSONObjBuilder& append(const char *fieldName, double n) {
             b.append((char) NumberDouble);
             b.append(fieldName);
             b.append(n);
             return *this;
         }
+        /** Append a BSON Object ID (OID type). */
         void appendOID(const char *fieldName, OID *oid = 0) {
             b.append((char) jstOID);
             b.append(fieldName);
@@ -812,11 +818,16 @@ namespace mongo {
                 b.append( (void *) &tmp, 12 );
             }
         }
+        /** Append a date.  Data is a Java-style 64 bit date value. */
         void appendDate(const char *fieldName, unsigned long long dt) {
             b.append((char) Date);
             b.append(fieldName);
             b.append(dt);
         }
+        /** Append a regular expression value
+            @param regex the regular expression pattern
+            @param regex options such as "i" or "g"
+        */
         void appendRegex(const char *fieldName, const char *regex, const char *options = "") {
             b.append((char) RegEx);
             b.append(fieldName);
@@ -829,6 +840,7 @@ namespace mongo {
             b.append((int) strlen(code)+1);
             b.append(code);
         }
+        /** Append a string element */
         BSONObjBuilder& append(const char *fieldName, const char *str) {
             b.append((char) String);
             b.append(fieldName);
@@ -836,6 +848,7 @@ namespace mongo {
             b.append(str);
             return *this;
         }
+        /** Append a string element */
         void append(const char *fieldName, string str) {
             append(fieldName, str.c_str());
         }
@@ -846,7 +859,7 @@ namespace mongo {
             b.append(symbol);
         }
 
-        /** Add Null element to the object */
+        /** Append a Null element to the object */
         void appendNull( const char *fieldName ) {
             b.append( (char) jstNULL );
             b.append( fieldName );
@@ -872,6 +885,13 @@ namespace mongo {
             b.append( (void *) &oid, 12 );
         }
 
+        /** Append a binary data element 
+            @param fieldName name of the field
+            @param len length of the binary data in bytes
+            @param type type information for the data. @see BinDataType.  Use ByteArray if you 
+                   don't care about the type.
+            @param data the byte array
+        */
         void appendBinData( const char *fieldName, int len, BinDataType type, const char *data ) {
             b.append( (char) BinData );
             b.append( fieldName );
@@ -909,6 +929,7 @@ namespace mongo {
             appendCodeWScope( "$where" , code , scope );
         }
         
+        /** Append an array of values. */
         template < class T >
         void append( const char *fieldName, const vector< T >& vals ) {
             BSONObjBuilder arrBuilder;
@@ -917,6 +938,7 @@ namespace mongo {
             marshalArray( fieldName, arrBuilder.done() );
         }
 
+        /** Append an array of ints */
         void appendIntArray( const char *fieldName, const vector< int >& vals ) {
             BSONObjBuilder arrBuilder;
             for ( unsigned i = 0; i < vals.size(); ++i )
@@ -924,7 +946,7 @@ namespace mongo {
             marshalArray( fieldName, arrBuilder.done() );
         }
 
-        /* BSONObj will free the buffer when it is finished. */
+        /** BSONObj will free the buffer when it is finished. */
         BSONObj doneAndDecouple() {
             int l;
             return BSONObj(decouple(l), true);
@@ -957,10 +979,12 @@ namespace mongo {
             return o.str();
         }
 
+        /** Stream oriented way to add field names and values. */
         BSONObjBuilderValueStream operator<<(const char * name ) {
             return BSONObjBuilderValueStream( name , this );
         }
 
+        /** Stream oriented way to add field names and values. */
         BSONObjBuilderValueStream operator<<( string name ) {
             return BSONObjBuilderValueStream( name.c_str() , this );
         }
