@@ -9,6 +9,8 @@ void run() {
   DBClientConnection c;
   c.connect("localhost");
   cout << "connected ok" << endl;
+  BSONObj p = BSON( "name" << "Joe" << "age" << 33 );
+  c.insert("tutorial.persons", p);
 }
 
 int main() { 
