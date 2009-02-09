@@ -127,5 +127,5 @@ namespace mongo {
             boost::thread_specific_ptr< AuthenticationInfo > backup_;
         };
     };
-
+    
 } // namespace mongo

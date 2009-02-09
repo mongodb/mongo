@@ -650,5 +650,4 @@ namespace mongo {
         ::exit(rc);
     }
 
-
 } // namespace mongo

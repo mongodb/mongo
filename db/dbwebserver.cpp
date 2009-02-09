@@ -67,6 +67,7 @@ namespace mongo {
             {
                 Timer lktm;
                 dblock lk;
+                Top::completeSnapshot();
                 q = (q+1)%NStats;
                 Timing timing;
                 dbMutexInfo.timingInfo(timing.start, timing.timeLocked);
@@ -127,6 +128,14 @@ namespace mongo {
             if ( !seemCaughtUp ) ss << "</b>";
             ss << '\n';
 
+            ss << "\n<b>DBTOP</b>\n";
+            ss << "<table border=1><tr align='left'><th>Namespace</th><th>%</th><th>Time</th>";
+            vector< Top::Usage > usage;
+            Top::usage( usage );
+            for( vector< Top::Usage >::iterator i = usage.begin(); i != usage.end(); ++i )
+                ss << setprecision( 2 ) << fixed << "<tr><td>" << i->ns << "</td><td>" << i->pct << "</td><td>" << i->time << "</td></tr>\n";
+            ss << "</table>";
+            
             ss << "\n<b>dt\ttlocked</b>\n";
             unsigned i = q;
             while ( 1 ) {
