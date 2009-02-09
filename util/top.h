@@ -49,7 +49,7 @@ public:
         for( map< string, D >::iterator i = snapshot_.begin(); i != snapshot_.end(); ++i )
             sorted.insert( make_pair( i->second, i->first ) );
         set< string > already;
-        for( multimap< D, string >::iterator i = sorted.begin(); i != sorted.end(); ++i ) {
+        for( multimap< D, string, more >::iterator i = sorted.begin(); i != sorted.end(); ++i ) {
             Usage u;
             already.insert( i->second );
             u.ns = i->second;
