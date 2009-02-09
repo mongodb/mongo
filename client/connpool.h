@@ -28,6 +28,7 @@ namespace mongo {
     };
 
     /** Database connection pool.
+
         Generally, use ScopedDbConnection and do not call these directly.
 
         This class, so far, is suitable for use with unauthenticated connections. 
@@ -61,30 +62,35 @@ namespace mongo {
         const string host;
         DBClientBase *_conn;
     public:
+        /** get the associated connection object */
         DBClientBase* operator->(){ 
             uassert( "did you call done already" , _conn );
             return _conn; 
         }
 
+        /** get the associated connection object */
         DBClientBase& conn() {
             uassert( "did you call done already" , _conn );
             return *_conn;
         }
 
-        /* throws UserAssertionAcception if can't connect */
+        /** throws UserException if can't connect */
         ScopedDbConnection(const string& _host) :
                 host(_host), _conn( pool.get(_host) ) { }
 
-        /* Force closure of the connection.  You should call this if you leave it in
-           a bad state.  Destructor will do this too, but it is verbose.
+        /** Force closure of the connection.  You should call this if you leave it in
+            a bad state.  Destructor will do this too, but it is verbose.
         */
         void kill() {
             delete _conn;
             _conn = 0;
         }
 
-        /* Call this when you are done with the connection.
-             Why?  See note in the destructor below.
+        /** Call this when you are done with the connection.
+            
+            If you do not call done() before this object goes out of scope, 
+            we can't be sure we fully read all expected data of a reply on the socket.  so
+            we don't try to reuse the connection in that situation.
         */
         void done() {
             if ( ! _conn )
@@ -101,11 +107,7 @@ namespace mongo {
 
         ~ScopedDbConnection() {
             if ( _conn ) {
-                /* you are supposed to call done().  if you did that, correctly, we
-                   only get here if an exception was thrown.  in such a scenario, we can't
-                   be sure we fully read all expected data of a reply on the socket.  so
-                   we don't try to reuse the connection.  The out() is just informational.
-                   */
+                /* see done() comments above for why we log this line */
                 out() << "~ScopedDBConnection: _conn != null\n";
                 kill();
             }
