@@ -48,17 +48,15 @@ public:
         multimap< D, string, more > sorted;
         for( map< string, D >::iterator i = snapshot_.begin(); i != snapshot_.end(); ++i )
             sorted.insert( make_pair( i->second, i->first ) );
-        set< string > already;
         for( multimap< D, string, more >::iterator i = sorted.begin(); i != sorted.end(); ++i ) {
             Usage u;
-            already.insert( i->second );
             u.ns = i->second;
             u.time = totalUsage_[ u.ns ];
             u.pct = snapshotDuration_ != D() ? 100.0 * i->first.ticks() / snapshotDuration_.ticks() : 0;
             res.push_back( u );
         }
         for( map< string, D >::iterator i = totalUsage_.begin(); i != totalUsage_.end(); ++i ) {
-            if ( already.count( i->first ) != 0 )
+            if ( snapshot_.count( i->first ) != 0 )
                 continue;
             Usage u;
             u.ns = i->first;
