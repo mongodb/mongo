@@ -74,6 +74,19 @@ namespace mongo {
         }
     }
 
+    auto_ptr< Cursor > getHintCursor( const IndexDetails &ii, BSONObj query, BSONObj order, bool *simpleKeyMatch, bool *isSorted ) {
+        int direction = matchDirection( ii.keyPattern(), order );
+        if ( isSorted ) *isSorted = ( direction != 0 );
+        if ( direction == 0 )
+            direction = 1;
+        // NOTE This startKey is incorrect, preserving for the moment so
+        // we can preserve simpleKeyMatch behavior.
+        BSONObj startKey = ii.getKeyFromQuery(query);
+        if ( simpleKeyMatch )
+            *simpleKeyMatch = query.nFields() == startKey.nFields();
+        return auto_ptr<Cursor>(new BtreeCursor(ii, emptyObj, direction, query));        
+    }
+    
     /* todo: _ use index on partial match with the query
 
        parameters
@@ -95,17 +108,7 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if ( ii.indexName() == hintstr ) {
-                        int direction = matchDirection( ii.keyPattern(), order );
-                        if ( isSorted ) *isSorted = ( direction != 0 );
-                        if ( direction == 0 )
-                            direction = 1;
-                        // NOTE This startKey is incorrect, preserving for the moment so
-                        // we can preserve simpleKeyMatch behavior.
-                        BSONObj startKey = ii.getKeyFromQuery(query);
-                        if ( simpleKeyMatch )
-                            *simpleKeyMatch = query.nFields() == startKey.nFields();
-                        return auto_ptr<Cursor>(
-                            new BtreeCursor(ii, emptyObj, direction, query));
+                        return getHintCursor( ii, query, order, simpleKeyMatch, isSorted );
                     }
                 }
             }
@@ -114,17 +117,7 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if( ii.keyPattern().woCompare(hintobj) == 0 ) {
-                        int direction = matchDirection( ii.keyPattern(), order );
-                        if ( isSorted ) *isSorted = ( direction != 0 );
-                        if ( direction == 0 )
-                            direction = 1;
-                        // NOTE This startKey is incorrect, preserving for the moment so
-                        // we can preserve simpleKeyMatch behavior.
-                        BSONObj startKey = ii.getKeyFromQuery(query);
-                        if ( simpleKeyMatch )
-                            *simpleKeyMatch = query.nFields() == startKey.nFields();
-                        return auto_ptr<Cursor>(
-                            new BtreeCursor(ii, emptyObj, direction, query));
+                        return getHintCursor( ii, query, order, simpleKeyMatch, isSorted );
                     }
                 }
             }

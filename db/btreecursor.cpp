@@ -28,7 +28,7 @@ namespace mongo {
     DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
     DiskLoc minDiskLoc(0, 1);
 
-    BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, const BSONObj& _query) :
+    BtreeCursor::BtreeCursor(const IndexDetails& _id, const BSONObj& k, int _direction, const BSONObj& _query) :
 //    query(_query),
             indexDetails(_id),
             order(_id.keyPattern()),
