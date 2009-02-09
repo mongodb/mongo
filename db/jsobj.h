@@ -985,13 +985,15 @@ namespace mongo {
     };
 
 
-    /* iterator for a BSONObj
+    /** iterator for a BSONObj
 
        Note each BSONObj ends with an EOO element: so you will get more() on an empty
        object, although next().eoo() will be true.
     */
     class BSONObjIterator {
     public:
+        /** Create an iterator for a BSON object. 
+        */
         BSONObjIterator(const BSONObj& jso) {
             int sz = jso.objsize();
             if ( sz == 0 ) {
@@ -1001,9 +1003,11 @@ namespace mongo {
             pos = jso.objdata() + 4;
             theend = jso.objdata() + sz;
         }
+        /** @return true if more elements exist to be enumerated. */
         bool more() {
             return pos < theend;
         }
+        /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd = false ) {
             assert( pos < theend );
             BSONElement e( pos, checkEnd ? theend - pos : -1 );

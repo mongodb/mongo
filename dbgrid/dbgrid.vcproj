@@ -330,11 +330,11 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\ConfigServer.cpp"
+				RelativePath=".\commands.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\dbgrid_commands.cpp"
+				RelativePath=".\ConfigServer.cpp"
 				>
 			</File>
 			<File
