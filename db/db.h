@@ -18,6 +18,7 @@
 
 #include "../stdafx.h"
 #include "../util/message.h"
+#include "../util/top.h"
 
 namespace mongo {
 
@@ -76,6 +77,7 @@ namespace mongo {
         ~dblock() { 
             /* todo: this should be inlined */
             dbunlocking();
+            Top::clientStop();
         }
     };
 
@@ -129,7 +131,8 @@ namespace mongo {
            variables.
         */
         assert( dbMutexInfo.isLocked() );
-
+        Top::clientStart( ns );
+        
         curNs = ns;
         string key = getKey( ns, path );
         map<string,Database*>::iterator it = databases.find(key);
@@ -191,6 +194,7 @@ namespace mongo {
 #else
             boost::detail::thread::lock_ops<boost::mutex>::unlock(dbMutex);
 #endif
+            Top::clientStop();
         }
         ~dbtemprelease() {
 #if BOOST_VERSION >= 103500

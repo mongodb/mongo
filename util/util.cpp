@@ -19,6 +19,7 @@
 #include "stdafx.h"
 #include "goodies.h"
 #include "unittest.h"
+#include "top.h"
 
 namespace mongo {
 
@@ -81,5 +82,15 @@ namespace mongo {
 
         }
     } utilTest;
-
+    
+    string Top::current_;
+    Top::T Top::currentStart_;
+    Top::T Top::snapshotStart_ = Top::currentTime();
+    Top::D Top::snapshotDuration_;
+    Top::UsageMap Top::totalUsage_;
+    Top::UsageMap Top::snapshotA_;
+    Top::UsageMap Top::snapshotB_;
+    Top::UsageMap &Top::snapshot_ = Top::snapshotA_;
+    Top::UsageMap &Top::nextSnapshot_ = Top::snapshotB_;
+    
 } // namespace mongo
