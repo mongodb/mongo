@@ -93,18 +93,13 @@ public:
         int num = 0;
         
         while ( read < mmf.length() ) {
-            if ( ! *data ) {
-                out() << "\t ** got unexpected end of file **  continuing..." << endl;
-                break;
-            }
-            
             BSONObj o( data );
             
             _conn.insert( ns.c_str() , o );
             
             read += o.objsize();
             data += o.objsize();
-            
+
             if ( ! ( ++num % 1000 ) )
                 out() << "read " << read << "/" << mmf.length() << " bytes so far. " << num << " objects" << endl;
         }
