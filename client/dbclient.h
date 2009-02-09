@@ -75,7 +75,10 @@ namespace mongo {
     };
 #pragma pack()
 
-    /** Represents a query */    
+    /** Represents a query.  Typically one uses the QUERY(...) macro to construct a query object. 
+        Example:
+           QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
+    */    
     class Query {
     public:
         BSONObj obj;
@@ -503,8 +506,11 @@ namespace mongo {
          */
         virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 );
 
-        /**
-           if name isn't specified, it will be created from the keys (recommended)
+        /** Create an index if it does not already exist.
+            ensureIndex calls are remembered so it is safe/fast to call this function many 
+            times in your code.
+           @param name if not isn't specified, it will be created from the keys (recommended)
+           @param keys the "key pattern" for the index.  e.g., { name : 1 }
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
