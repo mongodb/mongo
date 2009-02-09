@@ -734,11 +734,15 @@ namespace mongo {
     public:
         BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder );
 
+        template<class T> 
+        BSONObjBuilder& operator<<( T value );
+/*
         BSONObjBuilder& operator<<( const char * value );
         BSONObjBuilder& operator<<( const string& v ) { return (*this << v.c_str()); }
         BSONObjBuilder& operator<<( const int value );
         BSONObjBuilder& operator<<( const double value );
         BSONObjBuilder& operator<<( const unsigned long value ){ return (*this << (double)value); }
+*/
 
     private:
         const char * _fieldName;
@@ -794,11 +798,12 @@ namespace mongo {
             b.append((char) (val?1:0));
         }
         /** Append a 32 bit integer element */
-        void appendInt(const char *fieldName, int n) {
+        void append(const char *fieldName, int n) {
             b.append((char) NumberInt);
             b.append(fieldName);
             b.append(n);
         }
+        void append(const char *fieldName, unsigned n) { append(fieldName, (int) n); }
         /** Append a double element */
         BSONObjBuilder& append(const char *fieldName, double n) {
             b.append((char) NumberDouble);
@@ -938,13 +943,13 @@ namespace mongo {
             marshalArray( fieldName, arrBuilder.done() );
         }
 
-        /** Append an array of ints */
-        void appendIntArray( const char *fieldName, const vector< int >& vals ) {
+        /* Append an array of ints 
+        void appendArray( const char *fieldName, const vector< int >& vals ) {
             BSONObjBuilder arrBuilder;
             for ( unsigned i = 0; i < vals.size(); ++i )
-                arrBuilder.appendInt( numStr( i ).c_str(), vals[ i ] );
+                arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
             marshalArray( fieldName, arrBuilder.done() );
-        }
+        }*/
 
         /** The returned BSONObj will free the buffer when it is finished. */
         BSONObj obj() {
@@ -1013,6 +1018,9 @@ namespace mongo {
 
        Note each BSONObj ends with an EOO element: so you will get more() on an empty
        object, although next().eoo() will be true.
+
+       todo: we may want to make a more stl-like iterator interface for this
+             with things like begin() and end()
     */
     class BSONObjIterator {
     public:
@@ -1177,6 +1185,17 @@ namespace mongo {
             return true;
         }
         return false;
+    }
+
+    inline BSONObjBuilderValueStream::BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder ) {
+        _fieldName = fieldName;
+        _builder = builder;
+    }
+
+    template<class T> inline 
+    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) { 
+        _builder->append(_fieldName, value);
+        return *_builder;
     }
 
 } // namespace mongo

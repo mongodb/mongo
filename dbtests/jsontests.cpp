@@ -86,7 +86,7 @@ namespace JsonTests {
         public:
             void run() {
                 BSONObjBuilder b;
-                b.appendInt( "a", 1 );
+                b.append( "a", 1 );
                 ASSERT_EQUALS( "{ \"a\" : 1 }", b.done().jsonString( Strict ) );
             }
         };

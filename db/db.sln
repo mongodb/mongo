@@ -5,7 +5,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "db", "db.vcproj", "{215B2D6
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongos", "..\dbgrid\dbgrid.vcproj", "{E03717ED-69B4-4D21-BC55-DF6690B585C6}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "clienttests", "clienttests", "{4082881B-EB00-486F-906C-843B8EC06E18}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{4082881B-EB00-486F-906C-843B8EC06E18}"
 	ProjectSection(SolutionItems) = preProject
 		..\client\examples\authTest.cpp = ..\client\examples\authTest.cpp
 		..\client\examples\clientTest.cpp = ..\client\examples\clientTest.cpp
@@ -32,8 +32,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72E
 		..\dbtests\repltests.cpp = ..\dbtests\repltests.cpp
 		..\dbtests\socktests.cpp = ..\dbtests\socktests.cpp
 	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tutorial", "..\client\examples\tutorial\tutorial.vcproj", "{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{2CABB3B8-C9A6-478D-9463-0B37799ED708}"
 	ProjectSection(SolutionItems) = preProject
@@ -75,14 +73,6 @@ Global
 		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.release_nojni|Win32.Build.0 = Debug|Win32
 		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|Win32.ActiveCfg = Release|Win32
 		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|Win32.Build.0 = Release|Win32
-		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Debug Recstore|Win32.ActiveCfg = Debug|Win32
-		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Debug Recstore|Win32.Build.0 = Debug|Win32
-		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Debug|Win32.ActiveCfg = Debug|Win32
-		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Debug|Win32.Build.0 = Debug|Win32
-		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.release_nojni|Win32.ActiveCfg = Release|Win32
-		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.release_nojni|Win32.Build.0 = Release|Win32
-		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Release|Win32.ActiveCfg = Release|Win32
-		{C5EC52B2-1E28-4AF1-A244-CBB514C361C0}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

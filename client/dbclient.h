@@ -266,6 +266,11 @@ namespace mongo {
         */
         virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
 
+        /** count number of objects in collection ns that match the query criteria specified
+            throws UserAssertion if database returns an error
+        */
+        unsigned long long count(const char *ns, BSONObj query);
+
         string createPasswordDigest( const char * username , const char * clearTextPassword );
 
         /** returns true in isMaster parm if this db is the current master

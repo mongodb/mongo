@@ -47,7 +47,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObjBuilder query;
-            query.appendInt( "a", 5 );
+            query.append( "a", 5 );
             JSMatcher m( query.done(), fromjson( "{\"a\":1}" ) );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );            
         }        
@@ -59,7 +59,7 @@ namespace MatcherTests {
             BSONObj query = fromjson( "{\"a\":{\"$gt\":4}}" );
             JSMatcher m( query, fromjson( "{\"a\":1}" ) );
             BSONObjBuilder b;
-            b.appendInt( "a", 5 );
+            b.append( "a", 5 );
             ASSERT( m.matches( b.done() ) );
         }        
     };

@@ -10,7 +10,7 @@
 
 namespace mongo {
 
-    const gridfs_offset DEFAULT_CHUNK_SIZE = 256 * 1024;
+    const unsigned DEFAULT_CHUNK_SIZE = 256 * 1024;
 
     Chunk::Chunk( BSONObj o ){
         _data = o;
@@ -19,7 +19,7 @@ namespace mongo {
     Chunk::Chunk( BSONElement fileId , int chunkNumber , const char * data , int len ){
         BSONObjBuilder b;
         b.appendAs( fileId , "files_id" );
-        b.appendInt( "n" , chunkNumber );
+        b.append( "n" , chunkNumber );
         b.appendBinDataArray( "data" , data , len );
         _data = b.obj();
     }
@@ -47,7 +47,8 @@ namespace mongo {
         {
             BSONObjBuilder b;
             b << "filename" << filename ;
-            b << "length" << length ;
+            massert("large files not yet implemented", length <= 0xffffffff);
+            b << "length" << (unsigned) length ;
             b << "chunkSize" << DEFAULT_CHUNK_SIZE ;
             
             OID id;
@@ -102,7 +103,7 @@ namespace mongo {
         _exists();
         BSONObjBuilder b;
         b.appendAs( _obj["_id"] , "files_id" );
-        b.appendInt( "n" , n );
+        b.append( "n" , n );
 
         BSONObj o = _grid->_client.findOne( _grid->_chunksNS.c_str() , b.obj() );
         assert( ! o.isEmpty() );

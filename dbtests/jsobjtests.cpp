@@ -36,12 +36,12 @@ namespace JsobjTests {
         protected:
             static BSONObj basic( const char *name, int val ) {
                 BSONObjBuilder b;
-                b.appendInt( name, val );
+                b.append( name, val );
                 return b.obj();
             }
             static BSONObj basic( const char *name, vector< int > val ) {
                 BSONObjBuilder b;
-                b.appendIntArray( name, val );
+                b.append( name, val );
                 return b.obj();
             }
             template< class T >

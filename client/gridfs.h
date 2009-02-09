@@ -6,7 +6,7 @@
 
 namespace mongo {
 
-    typedef unsigned long gridfs_offset;
+    typedef unsigned long long gridfs_offset;
 
     class GridFS;
     class GridFile;

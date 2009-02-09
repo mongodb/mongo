@@ -175,8 +175,8 @@ namespace PairingTests {
         private:
             BSONObj res( int ok, int youAre ) {
                 BSONObjBuilder b;
-                b.appendInt( "ok", ok );
-                b.appendInt( "you_are", youAre );
+                b.append( "ok", ok );
+                b.append( "you_are", youAre );
                 return b.obj();
             }
         };

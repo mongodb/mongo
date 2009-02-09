@@ -11,6 +11,8 @@ void run() {
   cout << "connected ok" << endl;
   BSONObj p = BSON( "name" << "Joe" << "age" << 33 );
   c.insert("tutorial.persons", p);
+
+  cout << "count:" << c.count(
 }
 
 int main() { 

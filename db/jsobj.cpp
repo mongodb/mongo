@@ -1011,7 +1011,7 @@ namespace mongo {
         void run() {
             testRegex();
             BSONObjBuilder A,B,C;
-            A.appendInt("x", 2);
+            A.append("x", 2);
             B.append("x", 2.0);
             C.append("x", 2.1);
             BSONObj a = A.done();
@@ -1026,21 +1026,14 @@ namespace mongo {
         }
     } bson_unittest;
 
-
-
-
-    BSONObjBuilderValueStream::BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder ) {
-        _fieldName = fieldName;
-        _builder = builder;
-    }
-
+/*
     BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const char * value ) {
         _builder->append( _fieldName , value );
         return *_builder;
     }
 
     BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const int value ) {
-        _builder->appendInt( _fieldName , value );
+        _builder->append( _fieldName , value );
         return *_builder;
     }
 
@@ -1048,6 +1041,7 @@ namespace mongo {
         _builder->append( _fieldName , value );
         return *_builder;
     }
+*/
 
     void OID::init() {
         static unsigned machine = (unsigned) security.getNonce();

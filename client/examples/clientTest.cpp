@@ -29,7 +29,7 @@ int main() {
     assert( conn.findOne( ns , BSONObjBuilder().obj() ).isEmpty() );
 
     // test insert
-    conn.insert( ns ,BSONObjBuilder().append( "name" , "eliot" ).append( "num" , 1 ).obj() );
+    conn.insert( ns ,BSON( "name" << "eliot" << "num" << 1 ) );
     assert( ! conn.findOne( ns , BSONObjBuilder().obj() ).isEmpty() );
 
     // test remove
@@ -38,7 +38,7 @@ int main() {
 
 
     // insert, findOne testing
-    conn.insert( ns , BSONObjBuilder().append( "name" , "eliot" ).append( "num" , 1 ).obj() );
+    conn.insert( ns , BSON( "name" << "eliot" << "num" << 1 ) );
     {
         BSONObj res = conn.findOne( ns , BSONObjBuilder().obj() );
         assert( strstr( res.getStringField( "name" ) , "eliot" ) );
@@ -48,7 +48,7 @@ int main() {
 
 
     // cursor
-    conn.insert( ns ,BSONObjBuilder().append( "name" , "sara" ).append( "num" , 2 ).obj() );
+    conn.insert( ns ,BSON( "name" << "sara" << "num" << 2 ) );
     {
         auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().obj() );
         int count = 0;
@@ -60,7 +60,7 @@ int main() {
     }
 
     {
-        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().append( "num" , 1 ).obj() );
+        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSON( "num" << 1 ) );
         int count = 0;
         while ( cursor->more() ) {
             count++;
@@ -70,7 +70,7 @@ int main() {
     }
 
     {
-        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObjBuilder().append( "num" , 3 ).obj() );
+        auto_ptr<DBClientCursor> cursor = conn.query( ns , BSON( "num" << 3 ) );
         int count = 0;
         while ( cursor->more() ) {
             count++;

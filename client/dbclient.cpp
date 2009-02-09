@@ -91,8 +91,17 @@ namespace mongo {
         if ( info == 0 )
             info = &o;
         BSONObjBuilder b;
-        b.appendInt(command, 1);
+        b.append(command, 1);
         return runCommand(dbname, b.done(), *info);
+    }
+
+    unsigned long long DBClientWithCommands::count(const char *ns, BSONObj query) { 
+        BSONObj cmd = BSON( "count" << ns << "query" << query );
+        string db = nsToClient(ns);
+        BSONObj res;
+        if( !runCommand(db.c_str(), cmd, res) )
+            uasserted(string("count fails:") + res.toString());
+        return res.getIntField("n");
     }
 
     BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
