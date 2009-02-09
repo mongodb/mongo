@@ -87,6 +87,12 @@ AddOption( "--recstore",
            action="store",
            help="use new recstore" )
 
+AddOption( "--noshell",
+           dest="noshell",
+           type="string",
+           nargs=0,
+           action="store",
+           help="don't build shell" )
 
 # --- environment setup ---
 
@@ -127,7 +133,9 @@ darwin = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
+
 noOptimization = not GetOption( "noOptimization" ) is None
+noshell = not GetOption( "noshell" ) is None
 
 platform = os.sys.platform
 processor = os.uname()[4]
@@ -491,7 +499,9 @@ def removeIfInList( lst , thing ):
     if thing in lst:
         lst.remove( thing )
 
-if not onlyServer and ( linux64 or force64 ):
+if noshell:
+    print( "not building shell" )
+elif not onlyServer and ( linux64 or force64 ):
     if linux64:
         shellEnv.Append( CFLAGS="-m32" )
         shellEnv.Append( CXXFLAGS="-m32" )
@@ -560,7 +570,8 @@ env.Install( installDir + "/bin" , "mongoimportjson" )
 env.Install( installDir + "/bin" , "mongofiles" )
 
 env.Install( installDir + "/bin" , "mongod" )
-env.Install( installDir + "/bin" , "mongo" )
+if not noshell:
+    env.Install( installDir + "/bin" , "mongo" )
 
 # NOTE: In some cases scons gets confused between installation targets and build
 # dependencies.  Here, we use InstallAs instead of Install to prevent such confusion
