@@ -76,7 +76,8 @@ wt_stop(u_int32_t flags)
 	WT_GLOBAL(running) = 0;
 	WT_FLUSH_MEMORY;
 
-	(void)pthread_join(WT_GLOBAL(tid), NULL);
+	if (!LF_ISSET(WT_SINGLE_THREADED))
+		(void)pthread_join(WT_GLOBAL(tid), NULL);
 
 	return (0);
 }
