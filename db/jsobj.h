@@ -92,8 +92,12 @@ namespace mongo {
     */
     enum BinDataType { Function=1, ByteArray=2, bdtUUID = 3, MD5Type=5, bdtCustom=128 };
     
-    /**	Object id's for BSON objects.
-    	When present they should be the first object member added.
+    /**	Object ID type.
+        BSON objects typically have an _id field for the object id.  This field should be the first 
+        member of the object when present.  class OID is a special type that is a 12 byte id which 
+        is likely to be unique to the system.  You may also use other types for _id's.
+        When _id field is missing from a BSON object, on an insert the database may insert one 
+        automatically in certain circumstances.
     */
     class OID {
         union {

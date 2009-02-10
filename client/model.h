@@ -25,11 +25,11 @@ namespace mongo {
     /** Model is a base class for defining objects which are serializable to the Mongo
        database via the database driver.
 
-       *Definition*
+       Definition
        Your serializable class should inherit from Model and implement the abstract methods
        below.
 
-       *Loading*
+       Loading
        To load, first construct an (empty) object.  Then call load().  Do not load an object
        more than once.
     */

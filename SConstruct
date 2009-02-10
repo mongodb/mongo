@@ -130,6 +130,7 @@ nix = False
 useJavaHome = False
 linux64  = False
 darwin = False
+windows = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
@@ -138,7 +139,10 @@ noOptimization = not GetOption( "noOptimization" ) is None
 noshell = not GetOption( "noshell" ) is None
 
 platform = os.sys.platform
-processor = os.uname()[4]
+if "uname" in dir(os):
+    processor = os.uname()[4]
+else:
+    processor = "i386"
 
 if force32:
     processor = "i386"
@@ -218,7 +222,15 @@ elif "sunos5" == os.sys.platform:
      env.Append( CPPDEFINES=[ "__linux__" ] )
 
 elif "win32" == os.sys.platform:
+    windows = True
     boostDir = "C:/Program Files/Boost/boost_1_35_0"
+    
+    if not os.path.exists( boostDir ):
+        print( "can't find boost" )
+        Exit(1)
+
+    boostLibs = []
+
     javaHome = findVersion( "C:/Program Files/java/" , 
                             [ "jdk" , "jdk1.6.0_10" ] )
     winSDKHome = findVersion( "C:/Program Files/Microsoft SDKs/Windows/" , 
@@ -248,8 +260,11 @@ elif "win32" == os.sys.platform:
             return False
         return True
 
-    commonFiles += filter( pcreFilter , Glob( "pcre-7.4/*.c"  ) )
-    commonFiles += filter( pcreFilter , Glob( "pcre-7.4/*.cc" ) )
+    pcreFiles = []
+    pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.c"  ) )
+    pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.cc" ) )
+    commonFiles += pcreFiles
+    allClientFiles += pcreFiles
     
     env.Append( LIBS=Split("ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib" ) )
 
@@ -461,7 +476,7 @@ env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
 
 # c++ library
-env.Library( "mongoclient" , allClientFiles )
+clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
 
 clientTests = []
@@ -561,17 +576,23 @@ if distBuild:
 
 # binaries
 
-env.Install( installDir + "/bin" , "mongodump" )
-env.Install( installDir + "/bin" , "mongorestore" )
+def installBinary( e , name ):
+    if windows:
+        name += ".exe"
+    env.Install( installDir + "/bin" , name )
 
-env.Install( installDir + "/bin" , "mongoexport" )
-env.Install( installDir + "/bin" , "mongoimportjson" )
+installBinary( env , "mongodump" )
+installBinary( env , "mongorestore" )
 
-env.Install( installDir + "/bin" , "mongofiles" )
+installBinary( env , "mongoexport" )
+installBinary( env , "mongoimportjson" )
 
-env.Install( installDir + "/bin" , "mongod" )
+installBinary( env , "mongofiles" )
+
+installBinary( env , "mongod" )
+
 if not noshell:
-    env.Install( installDir + "/bin" , "mongo" )
+    installBinary( env , "mongo" )
 
 # NOTE: In some cases scons gets confused between installation targets and build
 # dependencies.  Here, we use InstallAs instead of Install to prevent such confusion
@@ -582,7 +603,7 @@ for id in [ "", "util/", "db/" , "client/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 
 #lib
-env.Install( installDir + "/" + nixLibPrefix, "libmongoclient.a" )
+env.Install( installDir + "/" + nixLibPrefix, clientLibName )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #final alias
@@ -620,7 +641,6 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
     import settings
 
     s = simples3.S3Bucket( settings.bucket , settings.id , settings.key )
-    un = os.uname()
 
     if remoteName is None:
         remoteName = localName
@@ -637,7 +657,7 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
     if platformDir:
         name = platform + "/" + name
 
-    s.put( name  , open( localName ).read() , acl="public-read" );
+    s.put( name  , open( localName , "rb" ).read() , acl="public-read" );
     print( "uploaded " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
 
 def s3shellpush( env , target , source ):
@@ -649,9 +669,13 @@ env.AlwaysBuild( "s3shell" )
 def s3dist( env , target , source ):
     s3push( distFile , "mongo-db" )
 
-distFile = installDir + ".tgz" 
 env.Append( TARFLAGS=" -z " )
-env.Tar( distFile , installDir )
+if windows:
+    distFile = installDir + ".zip"
+    env.Zip( distFile , installDir )
+else:
+    distFile = installDir + ".tgz"
+    env.Tar( distFile , installDir )
 
 env.Alias( "dist" , distFile )
 env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
