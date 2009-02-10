@@ -260,8 +260,11 @@ elif "win32" == os.sys.platform:
             return False
         return True
 
-    commonFiles += filter( pcreFilter , Glob( "pcre-7.4/*.c"  ) )
-    commonFiles += filter( pcreFilter , Glob( "pcre-7.4/*.cc" ) )
+    pcreFiles = []
+    pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.c"  ) )
+    pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.cc" ) )
+    commonFiles += pcreFiles
+    allClientFiles += pcreFiles
     
     env.Append( LIBS=Split("ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib" ) )
 
@@ -473,7 +476,7 @@ env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
 
 # c++ library
-env.Library( "mongoclient" , allClientFiles )
+clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles )
 
 clientTests = []
@@ -573,17 +576,23 @@ if distBuild:
 
 # binaries
 
-env.Install( installDir + "/bin" , "mongodump" )
-env.Install( installDir + "/bin" , "mongorestore" )
+def installBinary( e , name ):
+    if windows:
+        name += ".exe"
+    env.Install( installDir + "/bin" , name )
 
-env.Install( installDir + "/bin" , "mongoexport" )
-env.Install( installDir + "/bin" , "mongoimportjson" )
+installBinary( env , "mongodump" )
+installBinary( env , "mongorestore" )
 
-env.Install( installDir + "/bin" , "mongofiles" )
+installBinary( env , "mongoexport" )
+installBinary( env , "mongoimportjson" )
 
-env.Install( installDir + "/bin" , "mongod" )
+installBinary( env , "mongofiles" )
+
+installBinary( env , "mongod" )
+
 if not noshell:
-    env.Install( installDir + "/bin" , "mongo" )
+    installBinary( env , "mongo" )
 
 # NOTE: In some cases scons gets confused between installation targets and build
 # dependencies.  Here, we use InstallAs instead of Install to prevent such confusion
@@ -594,7 +603,7 @@ for id in [ "", "util/", "db/" , "client/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 
 #lib
-env.Install( installDir + "/" + nixLibPrefix, "libmongoclient.a" )
+env.Install( installDir + "/" + nixLibPrefix, clientLibName )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #final alias
@@ -632,7 +641,6 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
     import settings
 
     s = simples3.S3Bucket( settings.bucket , settings.id , settings.key )
-    un = os.uname()
 
     if remoteName is None:
         remoteName = localName
