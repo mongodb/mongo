@@ -657,7 +657,7 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
     if platformDir:
         name = platform + "/" + name
 
-    s.put( name  , open( localName ).read() , acl="public-read" );
+    s.put( name  , open( localName , "rb" ).read() , acl="public-read" );
     print( "uploaded " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
 
 def s3shellpush( env , target , source ):
