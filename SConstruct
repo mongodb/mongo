@@ -243,7 +243,7 @@ elif "win32" == os.sys.platform:
 
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MD /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
+        env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
         # /Yu"stdafx.h" /Fp"Release\db.pch" /Fo"Release\\" /Fd"Release\vc90.pdb" 
     else:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )
