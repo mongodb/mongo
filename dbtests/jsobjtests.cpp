@@ -446,8 +446,6 @@ namespace JsobjTests {
         class LabelBase {
         public:
             void run() {
-                cout << expected().toString() << endl;
-                cout << actual().toString() << endl;
                 ASSERT( !expected().woCompare( actual() ) );
             }
         protected:
