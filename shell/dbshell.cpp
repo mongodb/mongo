@@ -2,8 +2,15 @@
 
 #include <v8.h>
 
+#ifdef _WIN32
+#else
+#define USE_READLINE
+#endif
+
+#ifdef USE_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
+#endif
 
 #include "ShellUtils.h"
 #include "MongoJS.h"
@@ -11,8 +18,36 @@
 #include "mongo.jsh"
 
 
-void quitNicely( int sig ){
+void shellHistoryInit(){
+#ifdef USE_READLINE
+    using_history();
+    read_history( ".dbshell" );
+#endif
+}
+void shellHistoryDone(){
+#ifdef USE_READLINE
     write_history( ".dbshell" );
+#endif
+}
+void shellHistoryAdd( const char * line ){
+    if ( strlen(line) == 0 )
+        return;
+#ifdef USE_READLINE
+    add_history( line );
+#endif
+}
+char * shellReadline( const char * prompt ){
+#ifdef USE_READLINE
+  return readline( "> " );
+#else
+  printf( "> " );
+  char * buf = new char[1024];
+  return fgets( buf , 1024 , stdin );
+#endif
+}
+
+void quitNicely( int sig ){
+    shellHistoryDone();
     exit(0);
 }
 
@@ -22,6 +57,7 @@ void quitAbruptly( int sig ) {
 }
 
 void setupSignals() {
+#ifndef _WIN32
     signal( SIGINT , quitNicely );
     signal( SIGTERM , quitNicely );
     signal( SIGPIPE , quitNicely ); // Maybe just log and continue?
@@ -29,6 +65,7 @@ void setupSignals() {
     signal( SIGSEGV , quitAbruptly );
     signal( SIGBUS , quitAbruptly );
     signal( SIGFPE , quitAbruptly );
+#endif
 }
 
 string fixHost( string url , string host , string port ){
@@ -242,9 +279,8 @@ int main(int argc, char* argv[]) {
     if ( runShell ){
         
         MongodScope s;
-        
-        using_history();
-        read_history( ".dbshell" );
+
+	shellHistoryInit();
         
         cout << "type \"help\" for help" << endl;
         
@@ -252,7 +288,7 @@ int main(int argc, char* argv[]) {
 
         while ( 1 ){
             
-            char * line = readline( "> " );
+            char * line = shellReadline( "> " );
             
             if ( ! line || ( strlen(line) == 4 && strstr( line , "exit" ) ) ){
                 cout << "bye" << endl;
@@ -281,11 +317,10 @@ int main(int argc, char* argv[]) {
                           true);
 
             
-            if ( strlen( line ) )
-                add_history( line );
+	    shellHistoryAdd( line );
         }
         
-        write_history( ".dbshell" );
+	shellHistoryDone();
     }
     
     return 0;

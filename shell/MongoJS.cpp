@@ -260,7 +260,11 @@ BSONObj v8ToMongo( v8::Handle<v8::Object> o ){
     return b.obj();
 }
 
+#ifdef _WIN32
+#define GETNS char * ns = new char[args[0]->ToString()->Utf8Length()];  args[0]->ToString()->WriteUtf8( ns ); 
+#else
 #define GETNS char ns[args[0]->ToString()->Utf8Length()];  args[0]->ToString()->WriteUtf8( ns ); 
+#endif
 
 DBClientConnection * getConnection( const Arguments& args ){
     Local<External> c = External::Cast( *(args.This()->Get( CONN_STRING )) );
@@ -316,7 +320,7 @@ v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args){
     v8::Handle<v8::Object> in = args[1]->ToObject();
     
     if ( ! in->Has( String::New( "_id" ) ) ){
-        v8::Handle<v8::Value> argv[0];
+        v8::Handle<v8::Value> argv[1];
         in->Set( String::New( "_id" ) , getObjectIdCons()->NewInstance( 0 , argv ) );
     }
 
