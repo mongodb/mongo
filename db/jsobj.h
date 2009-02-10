@@ -36,6 +36,7 @@ namespace mongo {
     class BSONObj;
     class Record;
     class BSONObjBuilder;
+    class BSONObjBuilderValueStream;
 
 #pragma pack(1)
 
@@ -734,12 +735,36 @@ namespace mongo {
 */
 #define BSON(x) (( BSONObjBuilder() << x ).obj())
 
+    class Labeler {
+    public:
+        struct Label {
+            Label( const char *l ) : l_( l ) {}
+            const char *l_;
+        };
+        Labeler( const Label &l, BSONObjBuilderValueStream *s ) : l_( l ), s_( s ) {}
+        template<class T>
+        BSONObjBuilder& operator<<( T value );
+    private:
+        const Label &l_;
+        BSONObjBuilderValueStream *s_;
+    };
+    
+    extern Labeler::Label GT;
+    extern Labeler::Label GTE;
+    extern Labeler::Label LT;
+    extern Labeler::Label LTE;
+    extern Labeler::Label NE;
+    extern Labeler::Label IN;
+    
     class BSONObjBuilderValueStream {
     public:
-        BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder );
+        friend class Labeler;
+        BSONObjBuilderValueStream( BSONObjBuilder * builder );
 
         template<class T> 
         BSONObjBuilder& operator<<( T value );
+        
+        Labeler operator<<( const Labeler::Label &l );
 /*
         BSONObjBuilder& operator<<( const char * value );
         BSONObjBuilder& operator<<( const string& v ) { return (*this << v.c_str()); }
@@ -748,11 +773,15 @@ namespace mongo {
         BSONObjBuilder& operator<<( const unsigned long value ){ return (*this << (double)value); }
 */
 
+        void endField( const char *nextFieldName = 0 );
+        bool subobjStarted() const { return _fieldName; }
+        
     private:
         const char * _fieldName;
         BSONObjBuilder * _builder;
+        auto_ptr< BSONObjBuilder > _subobj;
     };
-
+    
     /**
        utility for creating a BSONObj
      */
@@ -989,15 +1018,23 @@ namespace mongo {
         }
 
         /** Stream oriented way to add field names and values. */
-        BSONObjBuilderValueStream operator<<(const char * name ) {
-            return BSONObjBuilderValueStream( name , this );
+        BSONObjBuilderValueStream &operator<<(const char * name ) {
+            if ( !s_.get() )
+                s_.reset( new BSONObjBuilderValueStream( this ) );
+            s_->endField( name );
+            return *s_;
         }
 
         /** Stream oriented way to add field names and values. */
-        BSONObjBuilderValueStream operator<<( string name ) {
-            return BSONObjBuilderValueStream( name.c_str() , this );
+        BSONObjBuilderValueStream &operator<<( string name ) {
+            return operator<<( name.c_str() );
         }
 
+        Labeler operator<<( const Labeler::Label &l ) {
+            massert( "Value stream expected", s_.get() );
+            massert( "No subobject started", s_->subobjStarted() );
+            return *s_ << l;
+        }
 
     private:
         // Append the provided arr object as an array.
@@ -1008,6 +1045,8 @@ namespace mongo {
         }
 
         char* _done() {
+            if ( s_.get() )
+                s_->endField();
             b.append((char) EOO);
             char *data = b.buf();
             *((int*)data) = b.len();
@@ -1015,6 +1054,7 @@ namespace mongo {
         }
 
         BufBuilder b;
+        auto_ptr< BSONObjBuilderValueStream > s_;
     };
 
 
@@ -1191,15 +1231,35 @@ namespace mongo {
         return false;
     }
 
-    inline BSONObjBuilderValueStream::BSONObjBuilderValueStream( const char * fieldName , BSONObjBuilder * builder ) {
-        _fieldName = fieldName;
+    inline BSONObjBuilderValueStream::BSONObjBuilderValueStream( BSONObjBuilder * builder ) {
+        _fieldName = 0;
         _builder = builder;
+        _subobj.reset( new BSONObjBuilder() );
     }
-
+    
     template<class T> inline 
     BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) { 
         _builder->append(_fieldName, value);
+        _fieldName = 0;
         return *_builder;
     }
 
+    inline Labeler BSONObjBuilderValueStream::operator<<( const Labeler::Label &l ) { 
+        return Labeler( l, this );
+    }
+
+    inline void BSONObjBuilderValueStream::endField( const char *nextFieldName ) {
+        if ( _fieldName ) {
+            _builder->append( _fieldName, _subobj->done() );
+            _subobj.reset( new BSONObjBuilder() );
+        }
+        _fieldName = nextFieldName;
+    }    
+
+    template<class T> inline
+    BSONObjBuilder& Labeler::operator<<( T value ) {
+        s_->_subobj->append( l_.l_, value );
+        return *s_->_builder;
+    }    
+        
 } // namespace mongo

@@ -1090,4 +1090,11 @@ namespace mongo {
 */
     }
 
+    Labeler::Label GT( "$gt" );
+    Labeler::Label GTE( "$gte" );
+    Labeler::Label LT( "$lt" );
+    Labeler::Label LTE( "$lte" );
+    Labeler::Label NE( "$ne" );
+    Labeler::Label IN( "$in" );
+    
 } // namespace mongo

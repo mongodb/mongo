@@ -433,15 +433,87 @@ namespace JsobjTests {
                 OID a;
                 OID b;
                 
-                cout << endl;
                 a.init();
                 b.init( a.str() );
                 
                 ASSERT( a == b );
             }
         };
-    }
+    } // namespace OIDTests
+    
+    namespace ValueStreamTests {
+        
+        class LabelBase {
+        public:
+            void run() {
+                ASSERT( !expected().woCompare( actual() ) );
+            }
+        protected:
+            virtual BSONObj expected() = 0;
+            virtual BSONObj actual() = 0;
+        };
+        
+        class LabelBasic : public LabelBase {
+            BSONObj expected() {
+                return BSON( "a" << ( BSON( "$gt" << 1 ) ) );
+            }
+            BSONObj actual() {
+                return BSON( "a" << GT << 1 );
+            }            
+        };
 
+        class LabelShares : public LabelBase {
+            BSONObj expected() {
+                return BSON( "z" << "q" << "a" << ( BSON( "$gt" << 1 ) ) << "x" << "p" );
+            }
+            BSONObj actual() {
+                return BSON( "z" << "q" << "a" << GT << 1 << "x" << "p" );
+            }            
+        };        
+        
+        class LabelDouble : public LabelBase {
+            BSONObj expected() {
+                return BSON( "a" << ( BSON( "$gt" << 1 << "$lte" << "x" ) ) );
+            }
+            BSONObj actual() {
+                return BSON( "a" << GT << 1 << LTE << "x" );
+            }            
+        };        
+
+        class LabelDoubleShares : public LabelBase {
+            BSONObj expected() {
+                return BSON( "z" << "q" << "a" << ( BSON( "$gt" << 1 << "$lte" << "x" ) ) << "x" << "p" );
+            }
+            BSONObj actual() {
+                return BSON( "z" << "q" << "a" << GT << 1 << LTE << "x" << "x" << "p" );
+            }            
+        };        
+
+        class LabelMulti : public LabelBase {
+            BSONObj expected() {
+                return BSON( "z" << "q"
+                            << "a" << BSON( "$gt" << 1 << "$lte" << "x" )
+                            << "b" << BSON( "$ne" << 1 << "$ne" << "f" << "$ne" << 22.3 )
+                            << "x" << "p" );
+            }
+            BSONObj actual() {
+                return BSON( "z" << "q"
+                            << "a" << GT << 1 << LTE << "x"
+                            << "b" << NE << 1 << NE << "f" << NE << 22.3
+                            << "x" << "p" );
+            }            
+        };        
+        
+        class Unallowed {
+        public:
+            void run() {
+                ASSERT_EXCEPTION( BSON( GT << 4 ), MsgAssertionException );
+                ASSERT_EXCEPTION( BSON( "a" << 1 << GT << 4 ), MsgAssertionException );
+            }
+        };
+        
+    } // namespace ValueStreamTests
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -487,6 +559,12 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::Fuzz >( .001 );
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
+            add< ValueStreamTests::LabelBasic >();
+            add< ValueStreamTests::LabelShares >();
+            add< ValueStreamTests::LabelDouble >();
+            add< ValueStreamTests::LabelDoubleShares >();
+            add< ValueStreamTests::LabelMulti >();
+            add< ValueStreamTests::Unallowed >();
         }
     };
     

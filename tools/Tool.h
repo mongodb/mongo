@@ -6,6 +6,10 @@
 
 #include <boost/program_options.hpp>
 
+#if defined(_WIN32)
+#include <io.h>
+#endif
+
 #include "client/dbclient.h"
 
 using std::string;
