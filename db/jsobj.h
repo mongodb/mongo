@@ -754,7 +754,6 @@ namespace mongo {
     extern Labeler::Label LT;
     extern Labeler::Label LTE;
     extern Labeler::Label NE;
-    extern Labeler::Label In;
     
     class BSONObjBuilderValueStream {
     public:

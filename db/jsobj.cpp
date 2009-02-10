@@ -1095,6 +1095,5 @@ namespace mongo {
     Labeler::Label LT( "$lt" );
     Labeler::Label LTE( "$lte" );
     Labeler::Label NE( "$ne" );
-    Labeler::Label In( "$in" );
 
 } // namespace mongo
