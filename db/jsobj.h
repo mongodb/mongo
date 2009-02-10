@@ -1,4 +1,4 @@
-/* jsobj.h */
+/** @file jsobj.h */
 
 /**
    BSONObj and its helpers
@@ -732,6 +732,11 @@ namespace mongo {
 /** Use BSON macro to build a BSONObj from a stream 
     e.g., 
        BSON( "name" << "joe" << "age" << 33 )
+ 
+    The labels GT, GTE, LT, LTE, NE can be helpful for stream-oriented construction
+    of a BSONObj, particularly when assembling a Query.  For example,
+    BSON( "a" << GT << 23.4 << NE << 3 << "b" << 2 ) produces the object
+    { a: { \$gt: 23.4, \$ne: 3 }, b: 2 }.
 */
 #define BSON(x) (( BSONObjBuilder() << x ).obj())
 
@@ -754,7 +759,6 @@ namespace mongo {
     extern Labeler::Label LT;
     extern Labeler::Label LTE;
     extern Labeler::Label NE;
-    extern Labeler::Label In;
     
     class BSONObjBuilderValueStream {
     public:

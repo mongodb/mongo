@@ -1,4 +1,4 @@
-// dbclient.h - connect to a Mongo database as a database, from C++
+/** @file dbclient.h - connect to a Mongo database as a database, from C++ */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -75,7 +75,7 @@ namespace mongo {
     };
 #pragma pack()
 
-    /** Represents a query.  Typically one uses the QUERY(...) macro to construct a query object. 
+    /** Represents a query.  Typically one uses the QUERY(...) macro to construct a Query object. 
         Example:
            QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
     */    
@@ -135,6 +135,9 @@ namespace mongo {
         Query& where(const char *jscode) { return where(jscode, BSONObj()); }
     };
 
+/** Typically one uses the QUERY(...) macro to construct a Query object.
+    Example: QUERY( "age" << 33 << "school" << "UCLA" )
+*/
 #define QUERY(x) Query( BSON(x) )
 
     /**

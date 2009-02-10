@@ -1,4 +1,4 @@
-// json.h
+/** @file json.h */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
