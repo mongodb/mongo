@@ -507,7 +507,7 @@ if release and ( ( darwin and force64 ) or linux64 ):
 
 shellEnv.Append( LIBS=[ "v8" ] )
 if not windows:
-    shellEnv.Append( ["readline" ] )
+    shellEnv.Append( LIBS=["readline" ] )
 
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
