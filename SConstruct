@@ -130,6 +130,7 @@ nix = False
 useJavaHome = False
 linux64  = False
 darwin = False
+windows = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
@@ -138,7 +139,10 @@ noOptimization = not GetOption( "noOptimization" ) is None
 noshell = not GetOption( "noshell" ) is None
 
 platform = os.sys.platform
-processor = os.uname()[4]
+if "uname" in dir(os):
+    processor = os.uname()[4]
+else:
+    processor = "i386"
 
 if force32:
     processor = "i386"
@@ -218,7 +222,15 @@ elif "sunos5" == os.sys.platform:
      env.Append( CPPDEFINES=[ "__linux__" ] )
 
 elif "win32" == os.sys.platform:
+    windows = True
     boostDir = "C:/Program Files/Boost/boost_1_35_0"
+    
+    if not os.path.exists( boostDir ):
+        print( "can't find boost" )
+        Exit(1)
+
+    boostLibs = []
+
     javaHome = findVersion( "C:/Program Files/java/" , 
                             [ "jdk" , "jdk1.6.0_10" ] )
     winSDKHome = findVersion( "C:/Program Files/Microsoft SDKs/Windows/" , 
@@ -649,9 +661,13 @@ env.AlwaysBuild( "s3shell" )
 def s3dist( env , target , source ):
     s3push( distFile , "mongo-db" )
 
-distFile = installDir + ".tgz" 
 env.Append( TARFLAGS=" -z " )
-env.Tar( distFile , installDir )
+if windows:
+    distFile = installDir + ".zip"
+    env.Zip( distFile , installDir )
+else:
+    distFile = installDir + ".tgz"
+    env.Tar( distFile , installDir )
 
 env.Alias( "dist" , distFile )
 env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
