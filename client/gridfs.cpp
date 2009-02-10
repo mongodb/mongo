@@ -1,8 +1,13 @@
 // gridfs.cpp
 
+#include "../stdafx.h"
 #include <fcntl.h>
 
 #include "gridfs.h"
+
+#if defined(_WIN32)
+#include <io.h>
+#endif
 
 #ifndef MIN
 #define MIN(a,b) ( (a) < (b) ? (a) : (b) )
