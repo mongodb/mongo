@@ -325,6 +325,7 @@ namespace mongo {
             KeyNode M = keyNode(m);
             int x = key.woCompare(M.key, order);
             if ( x == 0 ) { 
+                //uassert("duplicate key error", k(m).isUnused() || !assertIfDup);
                 uassert("duplicate key error", !assertIfDup);
 
                 // dup keys allowed.  use recordLoc as if it is part of the key
