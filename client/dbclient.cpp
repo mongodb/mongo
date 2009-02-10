@@ -131,7 +131,7 @@ namespace mongo {
             md5_state_t st;
             md5_init(&st);
             md5_append(&st, (const md5_byte_t *) username, strlen(username));
-            md5_append(&st, (const md5_byte_t *) ":mongo:", 5 );
+            md5_append(&st, (const md5_byte_t *) ":mongo:", 7 );
             md5_append(&st, (const md5_byte_t *) clearTextPassword, strlen(clearTextPassword));
             md5_finish(&st, d);
         }
