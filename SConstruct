@@ -238,10 +238,17 @@ elif "win32" == os.sys.platform:
 
     env.Append( CPPPATH=[ boostDir , javaHome + "/include" , javaHome + "/include/win32" , "pcre-7.4" , winSDKHome + "/Include" ] )
 
-    # /Fo"Debug\\" /Fd"Debug\vc90.pdb" 
+    env.Append( CPPFLAGS=" /EHsc /W3 " )
+    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
 
-    env.Append( CPPFLAGS=" /Od /EHsc /Gm /RTC1 /MDd /ZI  /W3 " )
-    env.Append( CPPDEFINES=["WIN32","_DEBUG","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
+    if release:
+        env.Append( CPPDEFINES=[ "NDEBUG" ] )
+        env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
+        # /Yu"stdafx.h" /Fp"Release\db.pch" /Fo"Release\\" /Fd"Release\vc90.pdb" 
+    else:
+        env.Append( CPPDEFINES=[ "_DEBUG" ] )
+        env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
+        # /Fo"Debug\\" /Fd"Debug\vc90.pdb" 
 
     env.Append( LIBPATH=[ boostDir + "/Lib" , javaHome + "/Lib" , winSDKHome + "/Lib" ] )
     javaLibs += [ "jvm" ];
