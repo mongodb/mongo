@@ -161,7 +161,7 @@ namespace mongo {
         BSONObjBuilder b;
         {
 
-            b << "authenticate" << 1 << "nonce" << nonce << "user" << username << "key";
+            b << "authenticate" << 1 << "nonce" << nonce << "user" << username;
             md5digest d;
             {
                 md5_state_t st;
