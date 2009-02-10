@@ -774,7 +774,7 @@ namespace mongo {
 */
 
         void endField( const char *nextFieldName = 0 );
-        bool subobjStarted() const { return _fieldName; }
+        bool subobjStarted() const { return _fieldName != 0; }
         
     private:
         const char * _fieldName;
