@@ -301,13 +301,18 @@ Handle<Value> mongoFind(const Arguments& args){
     jsassert( slaveOkVal->IsBoolean(), "slaveOk member invalid" );
     bool slaveOk = slaveOkVal->BooleanValue();
     
-    auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , (int)(args[3]->ToNumber()->Value()) , (int)(args[4]->ToNumber()->Value()) , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
-    
-    v8::Function * cons = (v8::Function*)( *( mongo->Get( String::New( "internalCursor" ) ) ) );
-    Local<v8::Object> c = cons->NewInstance();
-    
-    c->Set( v8::String::New( "cursor" ) , External::New( cursor.release() ) );
-    return c;
+    try {
+        auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , (int)(args[3]->ToNumber()->Value()) , (int)(args[4]->ToNumber()->Value()) , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
+        
+        v8::Function * cons = (v8::Function*)( *( mongo->Get( String::New( "internalCursor" ) ) ) );
+        Local<v8::Object> c = cons->NewInstance();
+        
+        c->Set( v8::String::New( "cursor" ) , External::New( cursor.release() ) );
+        return c;
+    }
+    catch ( ... ){
+        return v8::ThrowException( v8::String::New( "socket error on insert" ) );        
+    }
 }
 
 v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args){
@@ -333,7 +338,7 @@ v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args){
     catch ( ... ){
         return v8::ThrowException( v8::String::New( "socket error on insert" ) );
     }
-
+    
     return args[1];
 }
 
