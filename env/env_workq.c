@@ -36,11 +36,7 @@ wt_start(u_int32_t flags)
 		initial_tasks = 1;
 	}
 
-	/* We don't have any handles, just use stderr if there's a problem. */
-	if (flags & ~WT_APIMASK_WT_START) {
-		fprintf(stderr, "wt_start: illegal API flag specified");
-		return (WT_ERROR);
-	}
+	WT_ENV_FCHK(NULL, "wt_start", flags, WT_APIMASK_WT_START);
 
 	/* If we're single-threaded, we're done. */
 	if (LF_ISSET(WT_SINGLE_THREADED)) {
@@ -50,8 +46,7 @@ wt_start(u_int32_t flags)
 
 	/* Spawn the engine, and wait until it's ready to proceed. */
 	if (pthread_create(&WT_GLOBAL(tid), NULL, __wt_engine, NULL) != 0) {
-		fprintf(stderr,
-		    "wt_start: engine thread: %s\n", strerror(errno));
+		__wt_env_err(NULL, errno, "wt_start: engine thread");
 		return (WT_ERROR);
 	}
 	while (!WT_GLOBAL(running))
