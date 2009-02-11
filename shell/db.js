@@ -114,6 +114,12 @@ DB.prototype.dropDatabase = function() {
 }
 
 
+DB.prototype.shutdownServer = function() { 
+    if( "admin" != db )
+	return "shutdown command only works with the admin database; try 'use admin'";
+    return this._dbCommand("shutdown");
+}
+
 /**
   Clone database on another server to here.
   <p>
@@ -189,6 +195,7 @@ DB.prototype.help = function() {
     print("\tdb.setProfilingLevel(level) 0=off 1=slow 2=all");
     print("\tdb.cloneDatabase(fromhost)");
     print("\tdb.copyDatabase(fromdb, todb, fromhost)");
+    print("\tdb.shutdownServer()");
     print("\tdb.dropDatabase()");
     print("\tdb.repairDatabase()");
     print("\tdb.eval(func, args) run code server-side");
