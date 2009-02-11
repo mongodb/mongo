@@ -20,6 +20,8 @@
 		9302D99F0F30AB8C00DFA4EF /* ShellUtils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ShellUtils.cpp; sourceTree = "<group>"; };
 		9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ShellUtils.h; sourceTree = "<group>"; };
 		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
+		933E22110F4327B2000209E3 /* perftest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = perftest.cpp; sourceTree = "<group>"; };
+		933E22120F4327B2000209E3 /* perftest.o */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.objfile"; path = perftest.o; sourceTree = "<group>"; };
 		9342232B0EF16D4F00608550 /* connpool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = connpool.cpp; sourceTree = "<group>"; };
 		9342232C0EF16D4F00608550 /* connpool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = connpool.h; sourceTree = "<group>"; };
 		9342232D0EF16D4F00608550 /* dbclient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbclient.cpp; sourceTree = "<group>"; };
@@ -245,6 +247,15 @@
 			path = shell;
 			sourceTree = "<group>";
 		};
+		933E22100F4327B2000209E3 /* perf */ = {
+			isa = PBXGroup;
+			children = (
+				933E22110F4327B2000209E3 /* perftest.cpp */,
+				933E22120F4327B2000209E3 /* perftest.o */,
+			);
+			path = perf;
+			sourceTree = "<group>";
+		};
 		9342232A0EF16D4F00608550 /* client */ = {
 			isa = PBXGroup;
 			children = (
@@ -261,6 +272,7 @@
 		934223850EF16D7000608550 /* dbtests */ = {
 			isa = PBXGroup;
 			children = (
+				933E22100F4327B2000209E3 /* perf */,
 				937D0E340F28CB070071FFA9 /* repltests.cpp */,
 				937CACE90F27BF4900C57AA6 /* socktests.cpp */,
 				93D6BC9B0F266FC300FE5722 /* querytests.cpp */,

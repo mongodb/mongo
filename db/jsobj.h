@@ -860,6 +860,9 @@ namespace mongo {
                 b.append( (void *) &tmp, 12 );
             }
         }
+        void append( const char *fieldName, OID oid ) {
+            appendOID( fieldName, &oid );
+        }
         /** Append a date.  Data is a Java-style 64 bit date value. */
         void appendDate(const char *fieldName, unsigned long long dt) {
             b.append((char) Date);

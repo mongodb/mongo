@@ -122,28 +122,28 @@ namespace mongo {
     };
     extern Logstream logstream;
 
-    inline Nullstream& problem() {
+    extern int logLevel;
+
+    inline Nullstream& problem( int level = 0 ) {
+        if ( level > logLevel )
+            return nullstream;
         return logstream.prolog(true);
     }
-
-    inline Nullstream& log() {
-        return logstream.prolog();
-    }
-    inline Nullstream& out() {
+    
+    inline Nullstream& out( int level = 0 ) {
+        if ( level > logLevel )
+            return nullstream;
         return logstream;
     }
     
+    inline Nullstream& log( int level = 0 ){
+        if ( level > logLevel )
+            return nullstream;
+        return logstream.prolog();
+    }
+
     inline ostream& stdcout() {
         return cout;
     }
-
-    extern int logLevel;
-
-    inline Nullstream& log( int level ){
-        if ( level > logLevel )
-            return nullstream;
-        return log();
-    }
-    
 
 } // namespace mongo

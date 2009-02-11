@@ -508,8 +508,8 @@ clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
+perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
-
 
 # --- shell ---
 # shell is complicated by the fact that v8 doesn't work 64-bit yet
@@ -585,6 +585,9 @@ def testSetup( env , target , source ):
 
 testEnv.Alias( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
 testEnv.AlwaysBuild( "smoke" )
+
+testEnv.Alias( "smokePerf", [ "perftest" ] , [ testSetup , perftest[ 0 ].abspath ] )
+testEnv.AlwaysBuild( "smokePerf" )
 
 clientExec = [ x[0].abspath for x in clientTests ];
 testEnv.Alias( "smokeClient" , clientExec , clientExec )
