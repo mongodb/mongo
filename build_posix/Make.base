@@ -2,10 +2,10 @@ wtdir = $(prefix)/wt
 wt_LIBRARIES = libwiredtiger.a
 
 wt_PROGRAMS = db_dump db_load db_stat db_verify
-db_dump_SOURCES = ../db_dump/util_dump.c ../db_load/setup.c
-db_load_SOURCES = ../db_load/util_load.c ../db_load/setup.c
-db_stat_SOURCES = ../db_stat/util_stat.c ../db_load/setup.c
-db_verify_SOURCES = ../db_verify/util_verify.c ../db_load/setup.c
+db_dump_SOURCES = ../db_dump/util_dump.c ../support/single_setup.c
+db_load_SOURCES = ../db_load/util_load.c ../support/single_setup.c
+db_stat_SOURCES = ../db_stat/util_stat.c ../support/single_setup.c
+db_verify_SOURCES = ../db_verify/util_verify.c ../support/single_setup.c
 LDADD = libwiredtiger.a -lpthread
 
 include_HEADERS= wiredtiger.h

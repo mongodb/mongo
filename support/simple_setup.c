@@ -13,11 +13,11 @@
 extern const char *progname;
 
 /*
- * __wt_util_setup --
- *	Standard setup for utilities.
+ * __wt_single_thread_setup --
+ *	Standard setup for single-threaded applications.
  */
 int
-__wt_util_setup(WT_TOC **toc, DB **db)
+__wt_single_thread_setup(WT_TOC **toc, DB **db)
 {
 	int ret;
 
@@ -43,11 +43,11 @@ __wt_util_setup(WT_TOC **toc, DB **db)
 }
 
 /*
- * __wt_util_teardown --
- *	Standard teardown for utilities.
+ * __wt_single_thread_teardown --
+ *	Standard teardown for single-threaded applications.
  */
 int
-__wt_util_teardown(WT_TOC *toc, DB *db)
+__wt_single_thread_teardown(WT_TOC *toc, DB *db)
 {
 	int ret, tret;
 
