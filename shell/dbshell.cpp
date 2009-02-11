@@ -22,6 +22,8 @@ void shellHistoryInit(){
 #ifdef USE_READLINE
     using_history();
     read_history( ".dbshell" );
+#else
+    cout << "type \"exit\" to exit" << endl;
 #endif
 }
 void shellHistoryDone(){
@@ -42,7 +44,10 @@ char * shellReadline( const char * prompt ){
 #else
   printf( "> " );
   char * buf = new char[1024];
-  return fgets( buf , 1024 , stdin );
+  char *l = fgets( buf , 1024 , stdin );
+  int len = strlen( buf );
+  buf[len-1] = 0;
+  return buf;
 #endif
 }
 
@@ -296,7 +301,10 @@ int main(int argc, char* argv[]) {
             }
             
             string code = line;
-            
+            if ( code == "exit" ){
+	        break;
+	    }
+
             {
                 string cmd = line;
                 if ( cmd.find( " " ) > 0 )
