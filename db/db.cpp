@@ -633,7 +633,9 @@ namespace mongo {
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
-        sigaddset( &asyncSignals, SIGQUIT );
+        // This signal is typically issued when the user requests a core dump.
+        // Let's stick with the default handler.
+//        sigaddset( &asyncSignals, SIGQUIT );
         assert( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( interruptThread );
     }
