@@ -7,6 +7,7 @@
 # some common tasks
 #   build 64-bit mac and pushing to s3
 #      scons --64 s3dist
+#      scons --distname=0.8 s3dist
 #      all s3 pushes require settings.py
 
 import os
@@ -22,6 +23,15 @@ AddOption('--prefix',
           action='store',
           metavar='DIR',
           help='installation prefix')
+
+AddOption('--distname',
+          dest='distname',
+          type='string',
+          nargs=1,
+          action='store',
+          metavar='DIR',
+          help='dist name (0.8.0)')
+
 
 AddOption( "--64",
            dest="force64",
@@ -152,6 +162,8 @@ if force64:
 DEFAULT_INSTALl_DIR = "/usr/local"
 installDir = DEFAULT_INSTALl_DIR
 nixLibPrefix = "lib"
+
+distName = GetOption( "distname" )
 
 javaHome = GetOption( "javaHome" )
 javaVersion = "i386";
@@ -580,7 +592,11 @@ testEnv.AlwaysBuild( "smokeClient" )
 if distBuild:
     from datetime import date
     today = date.today()
-    installDir = "mongo-db-" + platform + "-" + processor + "-" + today.strftime( "%Y-%m-%d" )
+    installDir = "mongo-db-" + platform + "-" + processor + "-";
+    if distName is None:
+        installDir += today.strftime( "%Y-%m-%d" )
+    else:
+        installDir += distName
     print "going to make dist: " + installDir
 
 # binaries
@@ -643,7 +659,14 @@ env.AlwaysBuild( "push" )
 
 # ---- deploying ---
 
-def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True , platformDir=True ):
+def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True ):
+
+    if remotePrefix is None:
+        if distName is None:
+            remotePrefix = "-latest"
+        else:
+            remotePrefix = "-" + distName
+
     sys.path.append( "." )
 
     import simples3
@@ -666,8 +689,9 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
     if platformDir:
         name = platform + "/" + name
 
+    print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
     s.put( name  , open( localName , "rb" ).read() , acl="public-read" );
-    print( "uploaded " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
+    print( "  done uploading!" )
 
 def s3shellpush( env , target , source ):
     s3push( "mongo" , "mongo-shell" )
