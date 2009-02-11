@@ -37,7 +37,7 @@ public:
         add_options()
             ("file",po::value<string>() , "file to import from" )
             ("idbefore", "create id index before importing " )
-            ("id", "create id index after importing (reccomended) " )
+            ("id", "create id index after importing (recommended) " )
             ("drop", "drop collection first " )
             ;
         addPositionArg( "file" , 1 );
