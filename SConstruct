@@ -574,6 +574,9 @@ else:
     shellEnv.Append( LIBPATH=[ "." ] )
     shellEnv.Append( LIBS=[ "mongoclient"] )
     shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
+    
+    if windows:
+        shellEnv.Append( LIBS=["winmm.lib"] )
 
 #  ---- RUNNING TESTS ----
 
