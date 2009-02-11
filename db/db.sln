@@ -33,7 +33,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72E
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{2CABB3B8-C9A6-478D-9463-0B37799ED708}"
 	ProjectSection(SolutionItems) = preProject
-		..\shell\dbshell.cpp = ..\shell\dbshell.cpp
 		..\shell\ShellUtils.cpp = ..\shell\ShellUtils.cpp
 	EndProjectSection
 EndProject
