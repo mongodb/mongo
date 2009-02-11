@@ -37,12 +37,12 @@ public:
         add_options()
             ("file",po::value<string>() , "file to import from" )
             ("idbefore", "create id index before importing " )
-            ("id", "create id index after importing (reccomended) " )
+            ("id", "create id index after importing (recommended) " )
             ("drop", "drop collection first " )
             ;
         addPositionArg( "file" , 1 );
     }
-    
+
     int run(){
         string filename = getParam( "file" );
         if ( filename.size() == 0 ){
@@ -50,22 +50,22 @@ public:
             return -1;
 
         }
-        
+
         istream * in = &cin;
 
         ifstream file( filename.c_str() , ios_base::in | ios_base::binary);
-            
+
         if ( filename != "-" ){
             in = &file;
         }
-        
+
         string ns = getNS();
 
         if ( hasParam( "drop" ) ){
             cout << "dropping: " << ns << endl;
             _conn.dropCollection( ns.c_str() );
         }
-        
+
         if ( hasParam( "idbefore" ) ){
             _conn.ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
         }
@@ -73,7 +73,7 @@ public:
         int num = 0;
 
         time_t start = time(0);
-        
+
         const int BUF_SIZE = 64000;
         char line[64000 + 128];
         while ( *in ){
@@ -82,7 +82,7 @@ public:
             int len = strlen( line );
             if ( ! len )
                 break;
-            
+
             assert( len < BUF_SIZE );
 
             try {
@@ -93,13 +93,13 @@ public:
                 cout << "exception:" << ma.toString() << endl;
                 cout << line << endl;
             }
-            
+
             if ( ++num % 10000 == 0 ){
                 cout << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
-                
+
             }
         }
-        
+
         if ( hasParam( "id" ) ){
             _conn.ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
         }
