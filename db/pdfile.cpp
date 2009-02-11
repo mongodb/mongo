@@ -228,7 +228,10 @@ namespace mongo {
         assert( size % 4096 == 0 );
 
         header = (MDFHeader *) mmf.map(filename, size);
-        uassert("can't map file memory", header);
+        if( sizeof(char *) == 4 ) 
+            uassert("can't map file memory - mongo requires 64 bit build for larger datasets", header);
+        else
+            uassert("can't map file memory", header);
         // If opening an existing file, this is a no-op.
         header->init(fileNo, size);
     }

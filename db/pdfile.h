@@ -426,6 +426,7 @@ namespace mongo {
     }
 
     inline NamespaceDetails* nsdetails(const char *ns) {
+        // if this faults, did you set the current db first?  (DBContext + dblock)
         return nsindex(ns)->details(ns);
     }
 
