@@ -1136,13 +1136,17 @@ namespace mongo {
             }
             catch ( AssertionException& e ) {
                 if ( e.severe() ) {
-                    log() << "replMain caught AssertionException, sleeping 1 minutes" << endl;
+                    log() << "replMain exception " << e.what() << ", sleeping 1 minutes" << endl;
                     return 60;
                 }
                 else {
-                    log() << e.toString() << '\n';
+                    log() << "replMain exception " << e.what() << '\n';
                 }
                 replInfo = "replMain caught AssertionException";
+            }
+            catch ( ... ) { 
+                log() << "unexpected assertion during replication.  replication will halt" << endl;
+                replAllDead = "caught unexpected assertion during replication";
             }
             if ( !ok )
                 s->resetConnection();
