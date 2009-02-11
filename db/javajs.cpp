@@ -565,16 +565,27 @@ namespace mongo {
         if ( ! possible.size() ) {
             possible.push_back( "./" );
             possible.push_back( "../" );
-            
+
             log(2) << "dbExecCommand: " << dbExecCommand << endl;
-            if ( dbExecCommand.find( "/" ) != std::string::npos ){
-                string dbDir = dbExecCommand.substr( 0 , dbExecCommand.find_last_of( "/" ) );
-                log(2) << "dbDir [" << dbDir << "]" << endl;
-                possible.push_back( ( dbDir + "/../lib/mongo/" ));
-                possible.push_back( ( dbDir + "/../lib64/mongo/" ));
-                possible.push_back( ( dbDir + "/../lib32/mongo/" ));
-            }
             
+	    string dbDir = dbExecCommand;
+#ifdef WIN32
+	    if ( dbDir.find( "\\" ) != string::npos ){
+	      dbDir = dbDir.substr( 0 , dbDir.find_last_of( "\\" ) );
+	    }
+#else
+	    if ( dbDir.find( "/" ) != string::npos ){
+	      dbDir = dbDir.substr( 0 , dbDir.find_last_of( "/" ) );
+	    }
+#endif
+	    else {
+	      dbDir = ".";
+	    }
+
+	    log(2) << "dbDir [" << dbDir << "]" << endl;
+	    possible.push_back( ( dbDir + "/../lib/mongo/" ));
+	    possible.push_back( ( dbDir + "/../lib64/mongo/" ));
+	    possible.push_back( ( dbDir + "/../lib32/mongo/" ));
         }
 
         for ( list<string>::iterator i = possible.begin() ; i != possible.end(); i++ ) {
