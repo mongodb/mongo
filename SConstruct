@@ -595,7 +595,7 @@ testEnv.AlwaysBuild( "smokeClient" )
 if distBuild:
     from datetime import date
     today = date.today()
-    installDir = "mongo-db-" + platform + "-" + processor + "-";
+    installDir = "mongodb-" + platform + "-" + processor + "-";
     if distName is None:
         installDir += today.strftime( "%Y-%m-%d" )
     else:
@@ -635,7 +635,7 @@ env.Install( installDir + "/" + nixLibPrefix, clientLibName )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #textfiles
-if distBuild:
+if distBuild or release:
     #don't want to install these /usr/local/ for example
     env.Install( installDir , "distsrc/README" )
     env.Install( installDir , "distsrc/THIRD-PARTY-NOTICES" )
@@ -710,7 +710,7 @@ env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
 env.AlwaysBuild( "s3shell" )
 
 def s3dist( env , target , source ):
-    s3push( distFile , "mongo-db" )
+    s3push( distFile , "mongodb" )
 
 env.Append( TARFLAGS=" -z " )
 if windows:

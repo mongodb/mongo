@@ -24,6 +24,7 @@
 #include "introspect.h"
 #include "btree.h"
 #include "../util/lruishmap.h"
+#include "../util/md5.hpp"
 #include "json.h"
 #include "repl.h"
 #include "replset.h"
@@ -654,7 +655,7 @@ namespace mongo {
             return true;
         }
     } cmdDeleteIndexes;
-
+    
     class CmdListDatabases : public Command {
     public:
         virtual bool logTheOp() {
@@ -674,7 +675,7 @@ namespace mongo {
             vector< string > dbNames;
             getDatabaseNames( dbNames );
             vector< BSONObj > dbInfos;
-
+            
             set<string> seen;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
                 BSONObjBuilder b;
@@ -700,6 +701,52 @@ namespace mongo {
         }
     } cmdListDatabases;
 
+    class CmdFileMD5 : public Command {
+    public:
+        CmdFileMD5() : Command( "filemd5" ){}
+        virtual bool slaveOk() {
+            return true;
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            static DBDirectClient db;
+            
+            string ns = nsToClient( dbname );
+            ns += ".fs.chunks"; // make this an option in jsobj
+
+            BSONObjBuilder query;
+            query.appendAs( jsobj["filemd5"] , "files_id" );
+            Query q( query.obj() );
+            q.sort( BSON( "files_id" << 1 << "n" << 1 ) ); 
+
+            md5digest d;
+            md5_state_t st;
+            md5_init(&st);
+
+            dbtemprelease temp;
+            
+            auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , q );
+            int n = 0;
+            while ( cursor->more() ){
+                BSONObj c = cursor->next();
+                int myn = c.getIntField( "n" );
+                if ( n != myn ){
+                    log() << "should have chunk: " << n << " have:" << myn << endl;
+                    uassert( "chunks out of order" , n == myn );
+                }
+                
+                int len;
+                const char * data = c["data"].binData( len );
+                md5_append( &st , (const md5_byte_t*)(data + 4) , len - 4 );
+
+                n++;
+            }
+            md5_finish(&st, d);
+            
+            result.append( "md5" , digestToString( d ) );
+            return true;
+        }
+    } cmdFileMD5;
+    
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here
