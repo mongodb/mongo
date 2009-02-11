@@ -11,13 +11,15 @@
 extern "C" {
 #endif
 
-#define	WT_OPEN_CREATE	0x01			/* Create the file */
-
 struct __wt_fh {
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
+	off_t	file_size;			/* File size */
+
 	char	*name;				/* File name */
-	int	 fd;				/* POSIX file handle */
+	int	fd;				/* POSIX file handle */
+
+	u_int	refcnt;				/* Reference count */
 
 	WT_STATS *stats;			/* Statistics */
 };

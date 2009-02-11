@@ -102,3 +102,6 @@ wt_cache_db_in
 wt_cache_db_out
 	MODIFIED			# Page is modified
 	UNFORMATTED			# Page may not be a valid database page.
+
+wt_open
+	CREATE				# Create the file

@@ -32,7 +32,7 @@ __wt_db_stat_print(WT_TOC *toc)
 	if (idb->fh != NULL) {
 		fprintf(stream, "%s\n", WT_GLOBAL(sep));
 		fprintf(stream,
-		    "Database handle I/O statistics: %s\n", db->idb->dbname);
+		    "Underlying file I/O statistics: %s\n", db->idb->dbname);
 		for (stats = idb->fh->stats; stats->desc != NULL; ++stats)
 			fprintf(
 			    stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);

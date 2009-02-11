@@ -30,7 +30,7 @@ __wt_open(ENV *env,
 	/* Windows clones: we always want to treat the file as a binary. */
 	f |= O_BINARY;
 #endif
-	if (LF_ISSET(WT_OPEN_CREATE))
+	if (LF_ISSET(WT_CREATE))
 		f |= O_CREAT;
 
 	if ((fd = open(name, f, mode)) == -1) {
@@ -60,7 +60,13 @@ __wt_open(ENV *env,
 #endif
 
 	fh->fd = fd;
+	fh->refcnt = 1;
 	*fhp = fh;
+
+	/* Set the file's size. */
+	if ((ret = __wt_filesize(env, fh, &fh->file_size)) != 0)
+		goto err;
+
 	return (0);
 
 err:	if (fh != NULL) {
@@ -79,8 +85,10 @@ err:	if (fh != NULL) {
 int
 __wt_close(ENV *env, WT_FH *fh)
 {
-	__wt_free(env, fh->name);
-	__wt_free(env, fh->stats);
-	__wt_free(env, fh);
+	if (--fh->refcnt == 0) {
+		__wt_free(env, fh->name);
+		__wt_free(env, fh->stats);
+		__wt_free(env, fh);
+	}
 	return (0);
 }

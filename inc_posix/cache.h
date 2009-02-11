@@ -78,7 +78,6 @@ struct __idb {
 	WT_FH	 *fh;			/* Backing file handle */
 
 	u_int32_t root_addr;		/* Root address */
-	off_t	  file_size;		/* File size */
 
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
 

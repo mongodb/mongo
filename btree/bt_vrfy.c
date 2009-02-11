@@ -71,7 +71,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	 * don't overflow.   I don't ever expect to see this error message, but
 	 * better safe than sorry.
 	 */
-	frags = WT_OFF_TO_ADDR(db, idb->file_size);
+	frags = WT_OFF_TO_ADDR(db, idb->fh->file_size);
 	if (frags > INT_MAX) {
 		__wt_db_errx(db, "file is too large to verify");
 		return (WT_ERROR);
@@ -926,7 +926,7 @@ __wt_bt_verify_checkfrag(DB *db, bitstr_t *fragbits)
 	ret = 0;
 
 	/* Check for page fragments we haven't verified. */
-	frags = (int)WT_OFF_TO_ADDR(db, idb->file_size);
+	frags = (int)WT_OFF_TO_ADDR(db, idb->fh->file_size);
 	for (ffc_start = ffc_end = -1;;) {
 		bit_ffc(fragbits, frags, &ffc);
 		if (ffc != -1) {

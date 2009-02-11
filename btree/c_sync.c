@@ -87,25 +87,26 @@ __wt_cache_close(ENV *env)
 int
 __wt_cache_db_open(DB *db)
 {
+	WT_FH *fh;
+	DB *tdb;
 	ENV *env;
 	IDB *idb;
-	int ret;
 
 	env = db->env;
 	idb = db->idb;
 
-	/* Try and open the fle. */
-	if ((ret = __wt_open(env, idb->dbname, idb->mode,
-	    F_ISSET(idb, WT_CREATE) ? WT_OPEN_CREATE : 0, &idb->fh)) != 0)
-		return (ret);
+	/* Increment the reference count if we already have the file open. */
+	TAILQ_FOREACH(tdb, &env->dbqh, q)
+		if ((fh = tdb->idb->fh) != NULL &&
+		    strcmp(fh->name, idb->dbname) == 0) {
+			++fh->refcnt;
+			idb->fh = fh;
+			return (0);
+		}
 
-	if ((ret = __wt_filesize(env, idb->fh, &idb->file_size)) != 0)
-		goto err;
-
-	return (0);
-
-err:	(void)__wt_close(env, idb->fh);
-	return (ret);
+	/* Open the fle. */
+	return (__wt_open(env, idb->dbname, idb->mode,
+	    F_ISSET(idb, WT_CREATE) ? WT_CREATE : 0, &idb->fh));
 }
 
 /*
@@ -245,7 +246,7 @@ __wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep)
 		memset(page->hdr, 0, (size_t)bytes);
 
 	/* Initialize the page. */
-	page->offset = idb->file_size;
+	page->offset = idb->fh->file_size;
 	page->addr = WT_OFF_TO_ADDR(db, page->offset);
 	page->bytes = bytes;
 	page->file_id = idb->file_id;
@@ -253,7 +254,7 @@ __wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep)
 	TAILQ_INSERT_TAIL(&ienv->lqh, page, q);
 	TAILQ_INSERT_HEAD(&ienv->hqh[WT_HASH(ienv, page->offset)], page, hq);
 
-	idb->file_size += bytes;
+	idb->fh->file_size += bytes;
 
 	*pagep = page;
 	return (0);

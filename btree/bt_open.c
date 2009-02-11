@@ -36,7 +36,7 @@ __wt_bt_open(DB *db)
 	 * in the on-disk WT_PAGE_DESC structure.  (If the file is not empty,
 	 * there had better be a description record.)
 	 */
-	if (idb->file_size != 0) {
+	if (idb->fh->file_size != 0) {
 		if ((ret = __wt_bt_desc_read(db)) != 0)
 			return (ret);
 	} else
