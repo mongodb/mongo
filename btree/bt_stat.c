@@ -122,6 +122,11 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 		    EXTSIZE, "database extent size", db->extsize);
 	}
 
+	/* The root page has the maximum level of the tree. */
+	if (addr == db->idb->root_addr)
+		WT_STAT_SET(
+		    db->dstats, LEVEL, "levels in the Btree", hdr->level);
+
 	/* Count the free space. */
 	WT_STAT_INCRV(db->dstats,
 	    PAGE_FREE, "unused on-page space in bytes", page->space_avail);

@@ -48,16 +48,17 @@ struct __wt_stats {
 #define	WT_STAT_ITEM_TOTAL_DATA		    7
 #define	WT_STAT_ITEM_TOTAL_KEY		    8
 #define	WT_STAT_LEAFSIZE		    9
-#define	WT_STAT_MAGIC			   10
-#define	WT_STAT_MAJOR			   11
-#define	WT_STAT_MINOR			   12
-#define	WT_STAT_PAGE_DUP_INTERNAL	   13
-#define	WT_STAT_PAGE_DUP_LEAF		   14
-#define	WT_STAT_PAGE_FREE		   15
-#define	WT_STAT_PAGE_INTERNAL		   16
-#define	WT_STAT_PAGE_LEAF		   17
-#define	WT_STAT_PAGE_OVERFLOW		   18
-#define	WT_STAT_DB_DSTATS_TOTAL		   19
+#define	WT_STAT_LEVEL			   10
+#define	WT_STAT_MAGIC			   11
+#define	WT_STAT_MAJOR			   12
+#define	WT_STAT_MINOR			   13
+#define	WT_STAT_PAGE_DUP_INTERNAL	   14
+#define	WT_STAT_PAGE_DUP_LEAF		   15
+#define	WT_STAT_PAGE_FREE		   16
+#define	WT_STAT_PAGE_INTERNAL		   17
+#define	WT_STAT_PAGE_LEAF		   18
+#define	WT_STAT_PAGE_OVERFLOW		   19
+#define	WT_STAT_DB_DSTATS_TOTAL		   20
 
 /*
  * Statistics entries for DB_HSTATS

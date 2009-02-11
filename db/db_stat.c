@@ -25,6 +25,17 @@ __wt_db_stat_print(WT_TOC *toc)
 
 	WT_DB_FCHK(db, "Db.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
 
+	fprintf(stream, "Database statistics: %s\n", db->idb->dbname);
+
+	/* Clear the database stats, then call Btree stat to fill them in. */
+	if ((ret = __wt_stat_clear_db_dstats(db->dstats)) != 0)
+		return (ret);
+	if ((ret = __wt_bt_stat(db)) != 0)
+		return (ret);
+
+	for (stats = db->dstats; stats->desc != NULL; ++stats)
+		fprintf(stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+
 	fprintf(stream, "%s\n", WT_GLOBAL(sep));
 	fprintf(stream, "Database handle statistics: %s\n", db->idb->dbname);
 	for (stats = db->hstats; stats->desc != NULL; ++stats)
@@ -38,17 +49,6 @@ __wt_db_stat_print(WT_TOC *toc)
 			    stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
 	}
 
-	fprintf(stream, "%s\n", WT_GLOBAL(sep));
-	fprintf(stream, "Database statistics: %s\n", db->idb->dbname);
-
-	/* Clear the database stats, then call Btree stat to fill them in. */
-	if ((ret = __wt_stat_clear_db_dstats(db->dstats)) != 0)
-		return (ret);
-	if ((ret = __wt_bt_stat(db)) != 0)
-		return (ret);
-
-	for (stats = db->dstats; stats->desc != NULL; ++stats)
-		fprintf(stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
 	return (0);
 }
 
