@@ -635,7 +635,7 @@ env.Install( installDir + "/" + nixLibPrefix, clientLibName )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #textfiles
-if distBuild:
+if distBuild or release:
     #don't want to install these /usr/local/ for example
     env.Install( installDir , "distsrc/README" )
     env.Install( installDir , "distsrc/THIRD-PARTY-NOTICES" )
