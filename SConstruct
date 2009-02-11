@@ -631,6 +631,13 @@ for id in [ "", "util/", "db/" , "client/" ]:
 env.Install( installDir + "/" + nixLibPrefix, clientLibName )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
+#textfiles
+if distBuild:
+    #don't want to install these /usr/local/ for example
+    env.Install( installDir , "distsrc/README" )
+    env.Install( installDir , "distsrc/THIRD-PARTY-NOTICES" )
+    env.Install( installDir , "distsrc/GNU-AGPL-3.0" )
+
 #final alias
 env.Alias( "install" , installDir )
 
