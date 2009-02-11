@@ -739,6 +739,13 @@ namespace mongo {
         }
         return b.done();
     }
+
+    /**
+     sets element field names to empty string
+     If a field in pattern is missing, it is omitted from the returned
+     object.  Unlike extractFieldsDotted, it does not return an empty
+     object on missing pattern field.
+     */
     BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) const {
         BSONObjBuilder b;
         BSONObjIterator i(pattern);
@@ -747,9 +754,8 @@ namespace mongo {
             if ( e.eoo() )
                 break;
             BSONElement x = getField(e.fieldName());
-            if ( x.eoo() )
-                return BSONObj();
-            b.appendAs(x, "");
+            if ( !x.eoo() )
+                b.appendAs(x, "");
         }
         return b.obj();
     }

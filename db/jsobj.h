@@ -566,6 +566,9 @@ namespace mongo {
         
         /**
            sets element field names to empty string
+           If a field in pattern is missing, it is omitted from the returned
+           object.  Unlike extractFieldsDotted, it does not return an empty
+           object on missing pattern field.
         */
         BSONObj extractFieldsUnDotted(BSONObj pattern) const;
         

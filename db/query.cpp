@@ -58,11 +58,11 @@ namespace mongo {
         while ( 1 ) {
             BSONElement ie = i.next();
             BSONElement se = s.next();
-            if ( ie.eoo() ) {
-                if ( !se.eoo() )
-                    return 0;
+            if ( ie.eoo() && !se.eoo() )
+                return 0;
+            if ( ie.eoo() || se.eoo() )
                 return direction;
-            }
+
             if ( strcmp( ie.fieldName(), se.fieldName() ) != 0 )
                 return 0;
 
@@ -146,6 +146,11 @@ namespace mongo {
 
         set<string> queryFields;
         query.getFieldNames(queryFields);
+        if ( queryFields.size() == 0 ) {
+            DEV out() << "getIndexCursor fail " << ns << '\n';
+            return auto_ptr<Cursor>();            
+        }
+        
         // regular query without order by
         for (int i = 0; i < d->nIndexes; i++ ) {
             BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
@@ -153,7 +158,12 @@ namespace mongo {
             set<string> keyFields;
             idxKey.getFieldNames(keyFields);
 
-            if ( keyFields == queryFields ) {
+            bool subset = true;
+            for( set<string>::iterator j = queryFields.begin(); subset && j != queryFields.end(); ++j )
+                if ( keyFields.count( *j ) == 0 )
+                    subset = false;
+            
+            if ( subset ) {
                 BSONObj q = query.extractFieldsUnDotted(idxKey);
                 assert(q.objsize() != 0); // guard against a seg fault if details is 0
                                                                                                                

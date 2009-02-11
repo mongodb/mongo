@@ -42,12 +42,14 @@ f.drop();
 f.ensureIndex( { a: 1, b: 1 } );
 index( f.find().sort( { a: 1, b: 1 } ) );
 index( f.find().sort( { a: -1, b: -1 } ) );
+index( f.find().sort( { a: 1 } ) );
+index( f.find().sort( { a: 1 } ).hint( { a: 1, b: 1 } ) );
 noIndex( f.find().sort( { a: 1, b: -1 } ) );
 noIndex( f.find().sort( { b: 1, a: 1 } ) );
 
 noIndex( f.find() );
 noIndex( f.find( { c: 1 } ) );
-noIndex( f.find( { a: 1 } ) ); // Once we enhance the query optimizer, this should get an index.
+index( f.find( { a: 1 } ) );
 index( f.find( { a: 1, b: 1 } ) );
 index( f.find( { b: 1, a: 1 } ) );
 
