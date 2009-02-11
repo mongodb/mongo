@@ -352,6 +352,7 @@ MongodScope::~MongodScope() {
 
 #else
 MongodScope::~MongodScope() {}
+void KillMongodbInstances() {}
 #endif
 
 void installShellUtils( Handle<v8::ObjectTemplate>& global ){
