@@ -118,7 +118,7 @@ namespace mongo {
        115 replay, opLogging
     */
     void listen(int port) {
-        const char *Version = "db version 122";
+        const char *Version = "db version v0.8.0";
         log() << Version << ", pdfile version " << VERSION << "." << VERSION_MINOR << endl;
         pdfileInit();
         //testTheDb();
@@ -364,6 +364,7 @@ namespace mongo {
     void testClient();
 
 } // namespace mongo
+
 
 using namespace mongo;
 

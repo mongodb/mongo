@@ -289,10 +289,11 @@ namespace mongo {
 #define DEBUGGING if( 0 )
 
     extern unsigned occasion;
+    extern unsigned occasionR;
     extern unsigned once;
 
 #define OCCASIONALLY if( ++occasion % 16 == 0 )
-#define RARELY if( ++occasion % 128 == 0 )
+#define RARELY if( ++occasionR % 128 == 0 )
 #define ONCE if( ++once == 1 )
 
 #if defined(_WIN32)

@@ -71,6 +71,10 @@ namespace mongo {
         return *this; 
     }
 
+    string Query::toString() const{
+        return obj.toString();
+    }
+
     /* --- dbclientcommands --- */
 
     inline bool DBClientWithCommands::isOk(const BSONObj& o) {

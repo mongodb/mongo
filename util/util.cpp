@@ -31,6 +31,7 @@ namespace mongo {
     boost::mutex Logstream::mutex;
 
     unsigned occasion = 0;
+    unsigned occasionR = 0;
     unsigned once = 0;
     bool goingAway = false;
 
