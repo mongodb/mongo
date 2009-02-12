@@ -609,13 +609,35 @@ namespace mongo {
         exit(14);
     }
 
+    extern const char *replAllDead;
+    extern int syncing;
+    
     sigset_t asyncSignals;
     // The above signals will be processed by this thread only, in order to
     // ensure the db and log mutexes aren't held.
     void interruptThread() {
         int x;
         sigwait( &asyncSignals, &x );
-        log() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+
+        log() << "got kill or ctrl c signal " << x << endl;
+
+        replAllDead = "server exiting"; // tell replication to stop
+        /* wait for replication to finish */
+        if( syncing == 1 ) { 
+            log() << "waiting for replication to finish" << endl;
+            int n = 60 * 4;
+            while( 1 ) { 
+                sleepmillis(250);
+                if( syncing != 1 )
+                    break;
+                if( --n <= 0 ) { 
+                    log() << "timeout waiting for replication to finish -- attempting to exit anyway" << endl;
+                    break;
+                }
+            }
+        }
+
+        log() << "will terminate after current cmd ends" << endl;
         {
             dblock lk;
             log() << "now exiting" << endl;
