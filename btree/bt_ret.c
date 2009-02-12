@@ -23,6 +23,7 @@ __wt_bt_dbt_return(DB *db, DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip)
 	DBT *local_dbt;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
+	u_int32_t size;
 	int ret;
 
 	idb = db->idb;

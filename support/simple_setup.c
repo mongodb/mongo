@@ -8,7 +8,6 @@
  */
 
 #include "wt_internal.h"
-#include "util.h"
 
 extern const char *progname;
 

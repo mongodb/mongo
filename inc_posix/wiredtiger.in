@@ -336,8 +336,10 @@ struct __env {
  *******************************************/
 int	 wt_db_create(DB **, WT_TOC *, ENV *, u_int32_t);
 int	 wt_env_create(ENV **, WT_TOC *, u_int32_t);
-int	 wt_toc_create(WT_TOC **, u_int32_t);
+int	 wt_start(u_int32_t);
+int	 wt_stop(u_int32_t);
 char	*wt_strerror(int);
+int	 wt_toc_create(WT_TOC **, u_int32_t);
 char	*wt_version(int *, int *, int *);
 
 /*******************************************
