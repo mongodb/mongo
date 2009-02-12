@@ -430,8 +430,8 @@ __wt_cache_clean(ENV *env, u_int32_t bytes, WT_PAGE **pagep)
 
 	for (;;) {
 		TAILQ_FOREACH(page, &ienv->lqh, q)
-			if (page->ref != 0)
-				continue;
+			if (page->ref == 0)
+				break;
 		if (page == NULL)
 			break;
 
