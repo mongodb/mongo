@@ -391,6 +391,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if shell:
         if myCheckLib( "readline" ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
+        else:
+            print( "WARNING: no readline, shell will be a bit ugly" )
 
     # this will add it iff it exists and works
     myCheckLib( "boost_system-mt" )
