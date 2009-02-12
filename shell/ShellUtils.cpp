@@ -173,22 +173,22 @@ bool ExecuteString(Handle<v8::String> source, Handle<v8::Value> name,
     return true;
 }
 
-Handle<v8::Value> JSSleep(const Arguments& args){
-    assert( args.Length() == 1 );
-    assert( args[0]->IsInt32() );
-    
-
+void sleepms( int ms ) {
     boost::xtime xt;
     boost::xtime_get(&xt, boost::TIME_UTC);
-    int sleepMillisecs = args[0]->ToInt32()->Value();
-    xt.sec += ( sleepMillisecs / 1000 );
-    xt.nsec += ( sleepMillisecs % 1000 ) * 1000000;
+    xt.sec += ( ms / 1000 );
+    xt.nsec += ( ms % 1000 ) * 1000000;
     if ( xt.nsec >= 1000000000 ) {
         xt.nsec -= 1000000000;
         xt.sec++;
     }
-    boost::thread::sleep(xt);
-    
+    boost::thread::sleep(xt);    
+}
+
+Handle<v8::Value> JSSleep(const Arguments& args){
+    assert( args.Length() == 1 );
+    assert( args[0]->IsInt32() );
+    sleepms( args[0]->ToInt32()->Value() );
     return v8::Undefined();
 }
 
@@ -240,22 +240,31 @@ char *copyString( const char *original ) {
     return ret;
 }
 
-v8::Handle< v8::Value > StartMongod( const v8::Arguments &a ) {
+boost::mutex &mongodOutputMutex( *( new boost::mutex ) );
+const v8::Arguments *mongodArgs = 0;
+
+void writeMongodOutputLine( int port, const char *line ) {
+    boost::mutex::scoped_lock lk( mongodOutputMutex );
+    cout << "d" << port << "| " << line << endl;
+}
+
+void mongodThread() {
     assert( argv0 );
     boost::filesystem::path mongod = ( boost::filesystem::path( argv0 ) ).branch_path() / "mongod";
     assert( boost::filesystem::exists( mongod ) );
     
     int port = -1;
-    char * argv[ a.Length() + 2 ];
+    char * argv[ mongodArgs->Length() + 2 ];
     {
         string s = mongod.native_file_string();
         if ( s == "mongod" )
             s = "./" + s;
         argv[ 0 ] = copyString( s.c_str() );
     }
-
-    for( int i = 0; i < a.Length(); ++i ) {
-        v8::String::Utf8Value str( a[ i ] );
+    
+    for( int i = 0; i < mongodArgs->Length(); ++i ) {
+        v8::String::Utf8Value str( (*mongodArgs)[ i ] );
+        assert( *str );
         char *s = copyString( *str );
         if ( string( "--port" ) == s )
             port = -2;
@@ -263,35 +272,69 @@ v8::Handle< v8::Value > StartMongod( const v8::Arguments &a ) {
             port = strtol( s, 0, 10 );
         argv[ 1 + i ] = s;
     }
-    argv[ a.Length() + 1 ] = 0;
+    argv[ mongodArgs->Length() + 1 ] = 0;
     
     assert( port > 0 );
     assert( dbs.count( port ) == 0 );
 
+    int pipeEnds[ 2 ];
+    assert( pipe( pipeEnds ) != -1 );
+    
     fflush( 0 );
     pid_t pid = fork();
     assert( pid != -1 );
     
     if ( pid == 0 ) {
-        stringstream ss;
-        ss << "mongod." << port << ".log";
-        string name = ss.str();
-        int d = open( name.c_str(), O_WRONLY | O_APPEND | O_CREAT );
-        assert( d != -1 );
-        assert( fchmod( d, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP ) == 0 );
-        const char *bar = "\n\n--- NEW INSTANCE ---\n\n";
-        write( d, bar, strlen( bar ) );
-        assert( dup2( d, STDOUT_FILENO ) != -1 );
-        assert( dup2( d, STDERR_FILENO ) != -1 );
+        assert( dup2( pipeEnds[ 1 ], STDOUT_FILENO ) != -1 );
+        assert( dup2( pipeEnds[ 1 ], STDERR_FILENO ) != -1 );
         execvp( argv[ 0 ], argv );
         assert( false );
     }
-
+    
     int i = 0;
     while( argv[ i ] )
         free( argv[ i++ ] );
     
     dbs.insert( make_pair( port, pid ) );
+
+    // Allow caller to return -- this is our low rent lock
+    mongodArgs = 0;
+
+    // This assumes there aren't any 0's in the mongod output.  Hope that's ok.
+    char buf[ 1024 ];
+    char temp[ 1024 ];
+    char *start = buf;
+    while( 1 ) {
+        int lenToRead = 1023 - ( start - buf );
+        int ret = read( pipeEnds[ 0 ], (void *)start, lenToRead );
+        assert( ret != -1 );
+        start[ ret ] = '\0';
+        char *last = buf;
+        for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
+            *i = '\0';
+            writeMongodOutputLine( port, last );
+        }
+        if ( ret == 0 ) {
+            writeMongodOutputLine( port, last );
+            break;
+        }
+        if ( last != buf ) {
+            strcpy( temp, last );
+            strcpy( buf, temp );
+        } else {
+            assert( strlen( buf ) < 1023 );
+        }
+        start = buf + strlen( buf );
+    }
+}
+
+// Relies on global mongodArgs; not thread-safe
+v8::Handle< v8::Value > StartMongod( const v8::Arguments &a ) {
+    assert( !mongodArgs );
+    mongodArgs = &a;
+    boost::thread t( mongodThread );
+    while( mongodArgs )
+        sleepms( 2 );
     return v8::Undefined();
 }
 
