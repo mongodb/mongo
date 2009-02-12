@@ -578,9 +578,10 @@ elif not onlyServer:
         shellEnv.VariantDir( "32bit" , "." )
     else:
         shellEnv.Append( LIBPATH=[ "." ] )
-        shellEnv.Append( LIBS=[ "mongoclient"] )
 
     shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
+    
+    shellEnv.Append( LIBS=[ "mongoclient"] )
 
     if weird:
         shellEnv.Program( "mongo" , shell32BitFiles )
