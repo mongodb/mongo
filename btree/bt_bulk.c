@@ -22,7 +22,8 @@ int
 __wt_db_bulk_load(WT_TOC *toc)
 {
 	wt_args_db_bulk_load_unpack;
-	DBT *key, *data, *lastkey, lastkey_std, lastkey_ovfl;
+	DBT *key, *data, key_copy, data_copy;
+	DBT *lastkey, lastkey_std, lastkey_ovfl;
 	ENV *env;
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
@@ -40,10 +41,12 @@ __wt_db_bulk_load(WT_TOC *toc)
 	dup_space = dup_count = 0;
 
 	lastkey = &lastkey_std;
-	WT_CLEAR(lastkey_std);
-	WT_CLEAR(lastkey_ovfl);
-	WT_CLEAR(key_item);
+	WT_CLEAR(data_copy);
 	WT_CLEAR(data_item);
+	WT_CLEAR(key_copy);
+	WT_CLEAR(key_item);
+	WT_CLEAR(lastkey_ovfl);
+	WT_CLEAR(lastkey_std);
 
 	/*
 	 * Allocate our first page -- we do this before we look at any keys
@@ -57,6 +60,17 @@ __wt_db_bulk_load(WT_TOC *toc)
 	page->hdr->level = WT_LEAF_LEVEL;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
+		/*
+		 * Copy the caller's DBTs, we don't want to modify them.  But,
+		 * copy them carefully, all we want is a pointer and a length.
+		 */
+		key_copy.data = key->data;
+		key_copy.size = key->size;
+		key = &key_copy;
+		data_copy.data = data->data;
+		data_copy.size = data->size;
+		data = &data_copy;
+
 		if (key->size == 0) {
 			__wt_db_errx(db, "zero-length keys are not supported");
 			goto err;
