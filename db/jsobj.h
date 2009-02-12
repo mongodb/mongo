@@ -759,6 +759,13 @@ namespace mongo {
         Labeler( const Label &l, BSONObjBuilderValueStream *s ) : l_( l ), s_( s ) {}
         template<class T>
         BSONObjBuilder& operator<<( T value );
+
+        /* the value of the element e is appended i.e. for 
+             "age" << GT << someElement
+           one gets 
+             { age : { $gt : someElement's value } } 
+        */
+        BSONObjBuilder& operator<<( BSONElement& e );
     private:
         const Label &l_;
         BSONObjBuilderValueStream *s_;
@@ -1286,6 +1293,12 @@ namespace mongo {
     template<class T> inline
     BSONObjBuilder& Labeler::operator<<( T value ) {
         s_->_subobj->append( l_.l_, value );
+        return *s_->_builder;
+    }    
+
+    inline
+    BSONObjBuilder& Labeler::operator<<( BSONElement& e ) {
+        s_->_subobj->appendAs( e, l_.l_ );
         return *s_->_builder;
     }    
         
