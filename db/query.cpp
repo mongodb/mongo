@@ -456,14 +456,14 @@ namespace mongo {
                 theDataFileMgr.insert(ns, obj);
                 if ( profile )
                     ss << " fastmodinsert ";
-                if ( logOp )
+                if ( logop )
                     logOp( "i", ns, obj );
                 return 3;
             }
             if ( profile )
                 ss << " upsert ";
             theDataFileMgr.insert(ns, updateobj);
-            if ( logOp )
+            if ( logop )
                 logOp( "i", ns, updateobj );
             return 4;
         }
