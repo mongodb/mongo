@@ -391,6 +391,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if shell:
         if myCheckLib( "readline" ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
+            myCheckLib( "tinfo" )
         else:
             print( "WARNING: no readline, shell will be a bit ugly" )
 
@@ -580,12 +581,11 @@ elif not onlyServer:
         shellEnv.Append( LIBPATH=[ "." ] )
 
     shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
-    
-    shellEnv.Append( LIBS=[ "mongoclient"] )
 
     if weird:
         shellEnv.Program( "mongo" , shell32BitFiles )
     else:
+        shellEnv.Append( LIBS=[ "mongoclient"] )
         shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
 
 
