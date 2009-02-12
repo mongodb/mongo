@@ -389,7 +389,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcre" , True )
 
     if shell:
-        if myCheckLib( "readline" ):
+        haveReadLine = False
+        if darwin:
+            myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
+            myenv.Append( LIBS=["readline"] )
+        elif myCheckLib( "readline" ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
             myCheckLib( "tinfo" )
         else:
