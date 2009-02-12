@@ -243,7 +243,6 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 	 * page.   We don't know the real height of the tree, but level gets
 	 * re-set as soon as we have a real page to look at.
 	 */
-#define	WT_ISLEAF(l)	((l) == WT_LEAF_LEVEL ? 1 : 0)
 	level = addr == WT_ADDR_FIRST_PAGE ?
 	    WT_LEAF_LEVEL : WT_FIRST_INTERNAL_LEVEL;
 
