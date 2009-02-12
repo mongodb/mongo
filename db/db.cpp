@@ -310,7 +310,7 @@ namespace mongo {
 
     void _initAndListen(int listenPort, const char *appserverLoc = null) {
         stringstream ss;
-        ss << "dbpath (" << dbpath << ") does not exist";
+        ss << "dbpath (" << dbpath << ") does not exist -- create directory or specify --dbpath option";
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         
         clearTmpFiles();
