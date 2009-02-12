@@ -267,7 +267,7 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 
 		/* Walk the page, counting records. */
 		WT_INDX_FOREACH(page, ip, i) {
-			offp = WT_ITEM_BYTE(ip->ditem);
+			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(ip->ditem);
 			if (total + offp->records >= recno)
 				break;
 			total += offp->records;

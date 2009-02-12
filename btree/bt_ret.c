@@ -49,9 +49,9 @@ __wt_bt_dbt_return(DB *db, DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip)
 	/*
 	 * Handle the data item.
 	 */
+	item = ip->ditem;
 	switch (page->hdr->type) {
 	case WT_PAGE_LEAF:
-		item = ip->ditem;
 		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA)
 			return (__wt_bt_dbt_copy(db, data, &idb->data,
 			    WT_ITEM_BYTE(item), (u_int32_t)WT_ITEM_LEN(item)));

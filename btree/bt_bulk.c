@@ -561,7 +561,7 @@ __wt_bt_promote(
 	WT_ITEM_OFFP offp, tmp_root_offp, *parent_offp;
 	WT_ITEM_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
-	u_int32_t addr, parent_addr;
+	u_int32_t parent_addr;
 	int need_promotion, ret, root_split, tret;
 
 	WT_CLEAR(key);
@@ -796,7 +796,6 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 		ret = __wt_bt_promote(db, parent, parent->records, root_offp);
 	else
 		for (;;) {
-			addr = parent->addr;
 			parent_addr = parent->hdr->prntaddr;
 			if ((ret =
 			    __wt_bt_page_out(db, parent, WT_MODIFIED)) != 0)
