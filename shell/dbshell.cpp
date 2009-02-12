@@ -2,11 +2,6 @@
 
 #include <v8.h>
 
-#ifdef _WIN32
-#else
-#define USE_READLINE
-#endif
-
 #ifdef USE_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
