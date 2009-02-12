@@ -316,6 +316,13 @@ namespace mongo {
             len = valuestrsize();
             return value() + 5;
         }
+        
+        BinDataType binDataType(){
+            // BinData: <int len> <byte subtype> <byte[len] data>
+            assert( type() == BinData );
+            char c = (value() + 4)[0];
+            return (BinDataType)c;
+        }
 
         /** Retrieve the regex string for a Regex element */
         const char *regex() const {

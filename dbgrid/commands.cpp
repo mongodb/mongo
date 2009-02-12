@@ -74,9 +74,24 @@ namespace mongo {
         public:
             ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                // TODO
-                result.append("not done", 1);
-                return false;
+                ScopedDbConnection conn( configServer.getPrimary() );                
+        
+
+                auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , emptyObj );
+
+                BSONObjBuilder list;                
+                int num = 0;
+                while ( cursor->more() ){
+                    string s = BSONObjBuilder::numStr( num++ );
+                    
+                    BSONObj o = cursor->next();
+                    list.append( s.c_str() , o["name"].valuestrsafe() );
+                }
+                
+                result.appendArray("databases" , list.obj() );
+                conn.done();
+
+                return true;        
             }
         } gridListDatabase;
 

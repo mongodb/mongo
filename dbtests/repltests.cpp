@@ -93,6 +93,14 @@ namespace ReplTests {
             }
             return count;
         }
+        static int opCount() {
+            dblock lk;
+            setClient( logNs() );
+            int count = 0;
+            for( auto_ptr< Cursor > c = theDataFileMgr.findAll( logNs() ); c->ok(); c->advance() )
+                ++count;
+            return count;
+        }
         static void applyAllOperations() {
             class Applier : public ReplSource {
             public:
@@ -170,15 +178,19 @@ namespace ReplTests {
             void run() {
                 reset();
                 doIt();
+                int nOps = opCount();
                 check();
                 applyAllOperations();
                 check();
+                ASSERT_EQUALS( nOps, opCount() );
                 
                 reset();
                 applyAllOperations();
                 check();
+                ASSERT_EQUALS( nOps, opCount() );
                 applyAllOperations();
                 check();
+                ASSERT_EQUALS( nOps, opCount() );
             }
         protected:
             virtual void doIt() const = 0;
