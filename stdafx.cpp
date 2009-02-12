@@ -64,9 +64,9 @@ namespace mongo {
     int uacount = 0;
     void uasserted(const char *msg) {
         if ( ++uacount < 100 )
-            log() << "User Assertion " << msg << endl;
+            log() << "User Exception " << msg << endl;
         else
-            RARELY log() << "User Assertion " << msg << endl;
+            RARELY log() << "User Exception " << msg << endl;
         lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msg);
         throw UserException(msg);

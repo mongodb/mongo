@@ -176,6 +176,8 @@ namespace mongo {
 
         /* get tree shape */
         void shape(stringstream&);
+
+        static void a_test();
     private:
         void fixParentPtrs(const DiskLoc& thisLoc);
         void delBucket(const DiskLoc& thisLoc, IndexDetails&);

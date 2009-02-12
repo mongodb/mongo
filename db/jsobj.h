@@ -866,7 +866,10 @@ namespace mongo {
         void append( const char *fieldName, OID oid ) {
             appendOID( fieldName, &oid );
         }
-        /** Append a date.  Data is a Java-style 64 bit date value. */
+        /** Append a date.  
+            @param dt a Java-style 64 bit date value, that is 
+                      the number of milliseconds since January 1, 1970, 00:00:00 GMT
+        */
         void appendDate(const char *fieldName, unsigned long long dt) {
             b.append((char) Date);
             b.append(fieldName);
@@ -881,6 +884,13 @@ namespace mongo {
             b.append(fieldName);
             b.append(regex);
             b.append(options);
+        }
+        /** Append a regular expression value
+            @param regex the regular expression pattern
+            @param regex options such as "i" or "g"
+        */
+        void appendRegex(string fieldName, string regex, string options = "") {
+            appendRegex(fieldName.c_str(), regex.c_str(), options.c_str());
         }
         void appendCode(const char *fieldName, const char *code) {
             b.append((char) Code);
