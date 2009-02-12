@@ -561,7 +561,7 @@ __wt_bt_promote(
 	WT_ITEM_OFFP offp, tmp_root_offp, *parent_offp;
 	WT_ITEM_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
-	u_int32_t addr, i, parent_addr;
+	u_int32_t addr, parent_addr;
 	int need_promotion, ret, root_split, tret;
 
 	WT_CLEAR(key);
