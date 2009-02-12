@@ -388,6 +388,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
+    if shell:
+        if myCheckLib( "readline" ):
+            myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
 
     # this will add it iff it exists and works
     myCheckLib( "boost_system-mt" )
@@ -525,8 +528,6 @@ if release and ( ( darwin and force64 ) or linux64 ):
     shellEnv["SLIBS"] = ""
 
 shellEnv.Append( LIBS=[ "v8" ] )
-if not windows:
-    shellEnv.Append( LIBS=["readline" ] )
 
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
@@ -537,14 +538,17 @@ def removeIfInList( lst , thing ):
 
 if noshell:
     print( "not building shell" )
-elif not onlyServer and ( linux64 or force64 ):
+elif not onlyServer:
+    weird = linux64 or force64
+
     if linux64:
         shellEnv.Append( CFLAGS="-m32" )
         shellEnv.Append( CXXFLAGS="-m32" )
         shellEnv.Append( LINKFLAGS="-m32" )
         shellEnv.Append( LIBPATH=[ "/usr/lib32" , "/usr/lib" ] )
         shellEnv["LIBPATH"].remove( "/usr/lib64" )
-    else:
+
+    if force64:
         shellEnv["CFLAGS"].remove("-m64")
         shellEnv["CXXFLAGS"].remove("-m64")
         shellEnv["LINKFLAGS"].remove("-m64")
@@ -561,22 +565,26 @@ elif not onlyServer and ( linux64 or force64 ):
     removeIfInList( l , "pcre" )
     removeIfInList( l , "pcrecpp" )
 
-    shell32BitFiles = Glob( "shell/*.cpp" )
-    for f in allClientFiles:
-        shell32BitFiles.append( "32bit/" + str( f ) )
+    if windows:
+        shellEnv.Append( LIBS=["winmm.lib"] )
+    
+    if weird:
+        shell32BitFiles = Glob( "shell/*.cpp" )
+        for f in allClientFiles:
+            shell32BitFiles.append( "32bit/" + str( f ) )
 
-    shellEnv.VariantDir( "32bit" , "." )
+        shellEnv.VariantDir( "32bit" , "." )
+    else:
+        shellEnv.Append( LIBPATH=[ "." ] )
+        shellEnv.Append( LIBS=[ "mongoclient"] )
 
     shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
 
-    shellEnv.Program( "mongo" , shell32BitFiles )
-else:
-    shellEnv.Append( LIBPATH=[ "." ] )
-    shellEnv.Append( LIBS=[ "mongoclient"] )
-    shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
-    
-    if windows:
-        shellEnv.Append( LIBS=["winmm.lib"] )
+    if weird:
+        shellEnv.Program( "mongo" , shell32BitFiles )
+    else:
+        shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
+
 
 #  ---- RUNNING TESTS ----
 
