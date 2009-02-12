@@ -155,15 +155,8 @@ namespace mongo {
         for (int i = 0; i < d->nIndexes; i++ ) {
             BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
             BSONObj idxKey = idxInfo.getObjectField("key");
-            set<string> keyFields;
-            idxKey.getFieldNames(keyFields);
 
-            bool subset = true;
-            for( set<string>::iterator j = queryFields.begin(); subset && j != queryFields.end(); ++j )
-                if ( keyFields.count( *j ) == 0 )
-                    subset = false;
-            
-            if ( subset ) {
+            if ( queryFields.count( idxKey.firstElement().fieldName() ) > 0 ) {
                 BSONObj q = query.extractFieldsUnDotted(idxKey);
                 assert(q.objsize() != 0); // guard against a seg fault if details is 0
                                                                                                                

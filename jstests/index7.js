@@ -50,6 +50,12 @@ noIndex( f.find().sort( { b: 1, a: 1 } ) );
 noIndex( f.find() );
 noIndex( f.find( { c: 1 } ) );
 index( f.find( { a: 1 } ) );
+assert.eq( 1, f.find( { a: 1 } ).explain().startKey.a );
+assert.eq( 1, f.find( { a: 1 } ).explain().endKey.a );
+index( f.find( { a: 1, c: 1 } ) );
+assert.eq( 1, f.find( { a: 1, c: 1 } ).explain().startKey.a );
+assert.eq( 1, f.find( { a: 1, c: 1 } ).explain().endKey.a );
+noIndex( f.find( { b: 1 } ) );
 index( f.find( { a: 1, b: 1 } ) );
 index( f.find( { b: 1, a: 1 } ) );
 
