@@ -84,9 +84,9 @@ namespace mongo {
                 try {
                     p->open( fullNameString.c_str(), minSize );
                 }
-                catch ( AssertionException& u ) {
+                catch ( AssertionException& ) {
                     delete p;
-                    throw u;
+                    throw;
                 }
                 files[n] = p;
             }

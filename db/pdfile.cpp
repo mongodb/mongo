@@ -809,10 +809,10 @@ namespace mongo {
                 idx.head.btree()->bt_insert(idx.head, newRecordLoc,
                                          (BSONObj&) *i, order, dupsAllowed, idx);
             }
-            catch (AssertionException& e) {
+            catch (AssertionException& ) {
                 if( !dupsAllowed ) {
                     // dup key exception, presumably.
-                    throw e;
+                    throw;
                 }
                 problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;
             }
@@ -1110,7 +1110,7 @@ namespace mongo {
                 else { 
                     // normal case -- we can roll back
                     _deleteRecord(d, ns, r, loc);
-                    throw e;
+                    throw;
                 }
             }
         }
@@ -1177,7 +1177,7 @@ namespace mongo {
         // ns is of the form "<dbname>.$cmd"
         char cl[256];
         nsToClient(ns, cl);
-        problem() << "dropDatabase " << cl << endl;
+        log(1) << "dropDatabase " << cl << endl;
         assert( database->name == cl );
 
         closeClient( cl );

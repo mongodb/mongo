@@ -150,6 +150,19 @@ Local<v8::Object> mongoToV8( BSONObj & m , bool array ){
             o->Set( v8::String::New( f.fieldName() ) , regex->NewInstance( 2 , argv ) );
             break;
         }
+            
+        case mongo::BinData: {
+            Local<v8::Object> b = v8::Object::New();
+
+            int len;
+            f.binData( len );
+            
+            b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
+            b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
+
+            o->Set( v8::String::New( f.fieldName() ) , b );
+            break;
+        };
 
         default:
             cout << "can't handle type: ";

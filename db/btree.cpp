@@ -326,7 +326,7 @@ namespace mongo {
             int x = key.woCompare(M.key, order);
             if ( x == 0 ) { 
                 //uassert("duplicate key error", k(m).isUnused() || !assertIfDup);
-                uassert("duplicate key error", !assertIfDup);
+                uassert("E11000 duplicate key error", !assertIfDup);
 
                 // dup keys allowed.  use recordLoc as if it is part of the key
                 x = recordLoc.compare(M.recordLoc);
@@ -790,6 +790,16 @@ found:
 
     void BtreeBucket::shape(stringstream& ss) {
         _shape(0, ss);
+    }
+
+    void BtreeBucket::a_test() { 
+        BtreeBucket b;
+        b.init();
+//        b.insertHere(
+    }
+
+    void testClient() { 
+        BtreeBucket::a_test();
     }
 
 } // namespace mongo
