@@ -105,7 +105,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	ret = __wt_bt_verify_checkfrag(db, fragbits);
 
 err:	if (page != NULL &&
-	    (tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
+	    (tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 	__wt_free(env, fragbits);
 	return (ret);
@@ -138,10 +138,10 @@ __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 	/*
 	 * The plan is pretty simple.  We read through the levels of the tree,
 	 * from top to bottom (root level to leaf level), and from left to
-	 * right (smallest to greatest), verifying each page as we go.  After
-	 * a page is verified, we know that it is correctly formed, and any
-	 * keys it contains are correctly ordered.  After we verify a page, we
-	 * check its connections.
+	 * right (smallest to greatest), verifying each page as we go.  First
+	 * we verify each page, so we know it is correctly formed, and any
+	 * keys it contains are correctly ordered.  After page verification,
+	 * we check its connections within the tree.
 	 *
 	 * Most connection checks are done in the __wt_bt_verify_connections
 	 * function, but one of them is done here.  The following comment
@@ -300,10 +300,10 @@ __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 	}
 
 err:	if (prev != NULL &&
-	    (tret = __wt_bt_page_out(db, prev, 0)) != 0 && ret == 0)
+	    (tret = __wt_cache_db_out(db, prev, 0)) != 0 && ret == 0)
 		ret = tret;
 	if (page != NULL &&
-	    (tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
+	    (tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	if (ret == 0 && offp != NULL)
@@ -320,6 +320,7 @@ static int
 __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 {
 	IDB *idb;
+	WT_ITEM_OFFP *offp;
 	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
 	WT_PAGE_HDR *hdr;
@@ -357,8 +358,8 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		 */
 		if (hdr->type == WT_PAGE_INT && idb->root_addr != addr) {
 			__wt_db_errx(db,
-			    "page at addr %lu doesn't match the database "
-			    "description information",
+			    "page at addr %lu appears to be a root page which "
+			    "doesn't match the database descriptor record",
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
@@ -385,12 +386,13 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 	if ((ret = __wt_bt_page_in(db, hdr->prntaddr, 0, &parent)) != 0)
 		return (ret);
 
-	/* Check the levels match up. */
+	/* Check that the levels match up. */
 	if (hdr->level + 1 != parent->hdr->level) {
 		__wt_db_errx(db,
 		    "parent's level of page at addr %lu is not one more than "
-		    "the page's level",
-		    (u_long)addr);
+		    "the page's level (parent level: %lu, child level %lu)",
+		    (u_long)addr,
+		    (u_long)parent->hdr->level, (u_long)hdr->level);
 		return (WT_ERROR);
 	}
 
@@ -407,6 +409,16 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		    "parent of page at addr %lu doesn't reference it",
 		    (u_long)addr);
 		goto err;
+	}
+
+	/* Check that the record counts are correct. */
+	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(parent_indx->ditem);
+	if (child->records != offp->records) {
+		__wt_db_errx(db,
+		    "parent of page at addr %lu has incorrect record count "
+		    "(parent: %lu, child: %lu)",
+		    (u_long)addr,
+		    (u_long)offp->records, (u_long)child->records);
 	}
 
 	/* Set the comparison function. */
