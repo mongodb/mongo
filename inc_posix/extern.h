@@ -66,7 +66,7 @@ int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
 __wt_bt_page_inmem_append(DB *db,
-    WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *off_item);
+    WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *data_item);
 int
 __wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx);
 int

@@ -108,12 +108,11 @@ __wt_bt_page_indx_clean(ENV *env, WT_PAGE *page, int free_indx)
 	 */
 	if (F_ISSET(page, WT_ALLOCATED)) {
 		F_CLR(page, WT_ALLOCATED);
-		WT_INDX_FOREACH(page, indx, i) {
+		WT_INDX_FOREACH(page, indx, i)
 			if (F_ISSET(indx, WT_ALLOCATED)) {
 				F_CLR(indx, WT_ALLOCATED);
 				__wt_free(env, indx->data);
 			}
-		}
 	}
 	memset(page->indx, 0, sizeof(WT_INDX) * page->indx_size);
 	page->indx_count = 0;
@@ -200,7 +199,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
  */
 int
 __wt_bt_page_inmem_append(DB *db,
-    WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *off_item)
+    WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *data_item)
 {
 	ENV *env;
 	IDB *idb;
@@ -245,9 +244,9 @@ __wt_bt_page_inmem_append(DB *db,
 	WT_DEFAULT_FORMAT(db);
 	}
 
-	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(off_item);
+	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(data_item);
 	indx->addr = offp->addr;
-	indx->ditem = off_item;
+	indx->ditem = data_item;
 
 	return (0);
 }
@@ -265,10 +264,12 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 	WT_ITEM_OFFP *offp;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE_HDR *hdr;
+	u_int64_t records;
 	u_int32_t i;
 
 	hdr = page->hdr;
 	indx = page->indx;
+	records = 0;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -291,6 +292,7 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 			break;
 		case WT_ITEM_OFFPAGE:
 			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+			records += offp->records;
 			indx->addr = offp->addr;
 			indx->ditem = item;
 			++indx;
@@ -299,8 +301,9 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 		}
 
 	page->indx_count = hdr->u.entries / 2;
-	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
+	page->records = records;
 
+	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -314,7 +317,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 	WT_INDX *indx;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
-	u_int32_t i;
+	u_int32_t i, indx_count;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -327,6 +330,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 	 *	(WT_ITEM_DUP_OVFL) item; an offpage reference (WT_ITEM_OFFPAGE).
 	 */
 	indx = NULL;
+	indx_count = 0;
 	WT_ITEM_FOREACH(page, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
@@ -339,7 +343,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 			indx->size = WT_ITEM_LEN(item);
 			indx->addr = WT_ADDR_INVALID;
 
-			++page->indx_count;
+			++indx_count;
 			break;
 		case WT_ITEM_KEY_OVFL:
 			if (indx == NULL)
@@ -351,7 +355,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 			indx->size = ovfl->len;
 			indx->addr = ovfl->addr;
 
-			++page->indx_count;
+			++indx_count;
 			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
@@ -365,6 +369,9 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 			break;
 		WT_DEFAULT_FORMAT(db);
 		}
+
+	page->indx_count = indx_count;
+	page->records = indx_count;
 
 	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
 	return (0);
@@ -411,7 +418,8 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	}
 
 	page->indx_count = hdr->u.entries;
-	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
+	page->records = hdr->u.entries;
 
+	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
 	return (0);
 }

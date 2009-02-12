@@ -92,30 +92,30 @@ struct __wt_page {
 	/*********************************************************
 	 * The following fields are owned by the cache layer.
 	 *********************************************************/
-	off_t     offset;			/* Page's file offset */
-	u_int32_t addr;				/* Page's allocation address */
+	off_t     offset;		/* Page's file offset */
+	u_int32_t addr;			/* Page's allocation address */
 
 	/*
 	 * The page size is limited to 4GB by this type -- we could use
 	 * off_t's here if we need something bigger, but the page-sizing
 	 * code limits page sizes to 128MB.
 	 */
-	u_int32_t bytes;			/* Page size */
+	u_int32_t bytes;		/* Page size */
 
-	u_int32_t file_id;			/* File ID */
+	u_int32_t file_id;		/* File ID */
 
-	u_int8_t ref;				/* Reference count */
+	u_int8_t ref;			/* Reference count */
 
-	TAILQ_ENTRY(__wt_page) q;		/* LRU queue */
-	TAILQ_ENTRY(__wt_page) hq;		/* Hash queue */
+	TAILQ_ENTRY(__wt_page) q;	/* LRU queue */
+	TAILQ_ENTRY(__wt_page) hq;	/* Hash queue */
 
-	WT_PAGE_HDR *hdr;			/* On-disk page */
+	WT_PAGE_HDR *hdr;		/* On-disk page */
 
 	/*********************************************************
 	 * The following fields are owned by the btree layer.
 	 *********************************************************/
-	u_int8_t *first_free;			/* First free byte address */
-	u_int32_t space_avail;			/* Available page memory */
+	u_int8_t *first_free;		/* First free byte address */
+	u_int32_t space_avail;		/* Available page memory */
 
 	/*
 	 * Each page has an associated, in-memory structure describing it.
@@ -125,17 +125,19 @@ struct __wt_page {
 	 * where the data is the interesting stuff.  For simplicity, and as
 	 * it's always a sorted list, we call it a key,
 	 */
-	WT_INDX	 *indx;				/* Key items  on the page */
-	u_int32_t indx_count;			/* Entries in key index */
-	u_int32_t indx_size;			/* Size of key index */
+	WT_INDX	 *indx;			/* Key items  on the page */
+	u_int32_t indx_count;		/* Entries in key index */
+	u_int32_t indx_size;		/* Size of key index */
+
+	u_int64_t records;		/* Records in this page and below */
 
 	u_int32_t flags;
 };
 
 /* Macro to walk the indexes of an in-memory page. */
 #define	WT_INDX_FOREACH(page, ip, i)					\
-	for ((i) = 0,							\
-	    (ip) = (page)->indx; (i) < (page)->indx_count; ++(ip), ++(i))
+	for ((i) = (page)->indx_count,					\
+	    (ip) = (page)->indx; (i) > 0; ++(ip), --(i))
 
 /*
  * The database itself needs a chunk of memory that describes it.   Here's
