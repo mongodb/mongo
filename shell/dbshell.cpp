@@ -39,10 +39,10 @@ char * shellReadline( const char * prompt ){
 #else
   printf( "> " );
   char * buf = new char[1024];
-  char *l = fgets( buf , 1024 , stdin );
+  char * l = fgets( buf , 1024 , stdin );
   int len = strlen( buf );
   buf[len-1] = 0;
-  return buf;
+  return l;
 #endif
 }
 
