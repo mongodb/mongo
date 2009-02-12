@@ -8,7 +8,7 @@
 #   build 64-bit mac and pushing to s3
 #      scons --64 s3dist
 #      scons --distname=0.8 s3dist
-#      all s3 pushes require settings.py
+#      all s3 pushes require settings.py and simples3
 
 import os
 import sys
