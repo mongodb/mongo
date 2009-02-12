@@ -231,6 +231,14 @@ db.get
 	data	DBT *@S
 	flags	u_int32_t @S
 
+db.get_recno
+	method,open
+	recno	u_int64_t @S
+	key	DBT *@S
+	pkey	DBT *@S
+	data	DBT *@S
+	flags	u_int32_t @S
+
 db.open
 	method
 	dbname	const char *@S

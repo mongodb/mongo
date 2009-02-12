@@ -171,6 +171,9 @@ struct __db {
 	int (*get_errpfx)(
 	    DB *, WT_TOC *, const char **);
 
+	int (*get_recno)(
+	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
+
 	int (*open)(
 	    DB *, WT_TOC *, const char *, mode_t , u_int32_t );
 
@@ -366,6 +369,7 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_DB_DESTROY				0x00000000
 #define	WT_APIMASK_DB_DUMP				0x00000003
 #define	WT_APIMASK_DB_GET				0x00000000
+#define	WT_APIMASK_DB_GET_RECNO				0x00000000
 #define	WT_APIMASK_DB_OPEN				0x00000001
 #define	WT_APIMASK_DB_STAT_CLEAR			0x00000000
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000

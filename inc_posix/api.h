@@ -180,7 +180,29 @@ typedef struct {
 	DB *db = toc->db;\
 	const char **errpfx = ((wt_args_db_get_errpfx *)(toc->argp))->errpfx
 
-#define	WT_OP_DB_OPEN	15
+#define	WT_OP_DB_GET_RECNO	15
+typedef struct {
+	u_int64_t recno;
+	DBT *key;
+	DBT *pkey;
+	DBT *data;
+	u_int32_t flags;
+} wt_args_db_get_recno;
+#define	wt_args_db_get_recno_pack\
+	args.recno = recno;\
+	args.key = key;\
+	args.pkey = pkey;\
+	args.data = data;\
+	args.flags = flags
+#define	wt_args_db_get_recno_unpack\
+	DB *db = toc->db;\
+	u_int64_t recno = ((wt_args_db_get_recno *)(toc->argp))->recno;\
+	DBT *key = ((wt_args_db_get_recno *)(toc->argp))->key;\
+	DBT *pkey = ((wt_args_db_get_recno *)(toc->argp))->pkey;\
+	DBT *data = ((wt_args_db_get_recno *)(toc->argp))->data;\
+	u_int32_t flags = ((wt_args_db_get_recno *)(toc->argp))->flags
+
+#define	WT_OP_DB_OPEN	16
 typedef struct {
 	const char *dbname;
 	mode_t mode;
@@ -196,7 +218,7 @@ typedef struct {
 	mode_t mode = ((wt_args_db_open *)(toc->argp))->mode;\
 	u_int32_t flags = ((wt_args_db_open *)(toc->argp))->flags
 
-#define	WT_OP_DB_SET_BTREE_COMPARE	16
+#define	WT_OP_DB_SET_BTREE_COMPARE	17
 typedef struct {
 	int (*btree_compare)(DB *, const DBT *, const DBT *);
 } wt_args_db_set_btree_compare;
@@ -206,7 +228,7 @@ typedef struct {
 	DB *db = toc->db;\
 	int (*btree_compare)(DB *, const DBT *, const DBT *) = ((wt_args_db_set_btree_compare *)(toc->argp))->btree_compare
 
-#define	WT_OP_DB_SET_BTREE_COMPARE_INT	17
+#define	WT_OP_DB_SET_BTREE_COMPARE_INT	18
 typedef struct {
 	int btree_compare_int;
 } wt_args_db_set_btree_compare_int;
@@ -216,7 +238,7 @@ typedef struct {
 	DB *db = toc->db;\
 	int btree_compare_int = ((wt_args_db_set_btree_compare_int *)(toc->argp))->btree_compare_int
 
-#define	WT_OP_DB_SET_BTREE_DUP_COMPARE	18
+#define	WT_OP_DB_SET_BTREE_DUP_COMPARE	19
 typedef struct {
 	int (*btree_dup_compare)(DB *, const DBT *, const DBT *);
 } wt_args_db_set_btree_dup_compare;
@@ -226,7 +248,7 @@ typedef struct {
 	DB *db = toc->db;\
 	int (*btree_dup_compare)(DB *, const DBT *, const DBT *) = ((wt_args_db_set_btree_dup_compare *)(toc->argp))->btree_dup_compare
 
-#define	WT_OP_DB_SET_BTREE_DUP_OFFPAGE	19
+#define	WT_OP_DB_SET_BTREE_DUP_OFFPAGE	20
 typedef struct {
 	u_int32_t btree_dup_offpage;
 } wt_args_db_set_btree_dup_offpage;
@@ -236,7 +258,7 @@ typedef struct {
 	DB *db = toc->db;\
 	u_int32_t btree_dup_offpage = ((wt_args_db_set_btree_dup_offpage *)(toc->argp))->btree_dup_offpage
 
-#define	WT_OP_DB_SET_BTREE_ITEMSIZE	20
+#define	WT_OP_DB_SET_BTREE_ITEMSIZE	21
 typedef struct {
 	u_int32_t intlitemsize;
 	u_int32_t leafitemsize;
@@ -249,7 +271,7 @@ typedef struct {
 	u_int32_t intlitemsize = ((wt_args_db_set_btree_itemsize *)(toc->argp))->intlitemsize;\
 	u_int32_t leafitemsize = ((wt_args_db_set_btree_itemsize *)(toc->argp))->leafitemsize
 
-#define	WT_OP_DB_SET_BTREE_PAGESIZE	21
+#define	WT_OP_DB_SET_BTREE_PAGESIZE	22
 typedef struct {
 	u_int32_t allocsize;
 	u_int32_t intlsize;
@@ -268,7 +290,7 @@ typedef struct {
 	u_int32_t leafsize = ((wt_args_db_set_btree_pagesize *)(toc->argp))->leafsize;\
 	u_int32_t extsize = ((wt_args_db_set_btree_pagesize *)(toc->argp))->extsize
 
-#define	WT_OP_DB_SET_ERRCALL	22
+#define	WT_OP_DB_SET_ERRCALL	23
 typedef struct {
 	void (*errcall)(const DB *, const char *);
 } wt_args_db_set_errcall;
@@ -278,7 +300,7 @@ typedef struct {
 	DB *db = toc->db;\
 	void (*errcall)(const DB *, const char *) = ((wt_args_db_set_errcall *)(toc->argp))->errcall
 
-#define	WT_OP_DB_SET_ERRFILE	23
+#define	WT_OP_DB_SET_ERRFILE	24
 typedef struct {
 	FILE *errfile;
 } wt_args_db_set_errfile;
@@ -288,7 +310,7 @@ typedef struct {
 	DB *db = toc->db;\
 	FILE *errfile = ((wt_args_db_set_errfile *)(toc->argp))->errfile
 
-#define	WT_OP_DB_SET_ERRPFX	24
+#define	WT_OP_DB_SET_ERRPFX	25
 typedef struct {
 	const char *errpfx;
 } wt_args_db_set_errpfx;
@@ -298,7 +320,7 @@ typedef struct {
 	DB *db = toc->db;\
 	const char *errpfx = ((wt_args_db_set_errpfx *)(toc->argp))->errpfx
 
-#define	WT_OP_DB_STAT_CLEAR	25
+#define	WT_OP_DB_STAT_CLEAR	26
 typedef struct {
 	u_int32_t flags;
 } wt_args_db_stat_clear;
@@ -308,7 +330,7 @@ typedef struct {
 	DB *db = toc->db;\
 	u_int32_t flags = ((wt_args_db_stat_clear *)(toc->argp))->flags
 
-#define	WT_OP_DB_STAT_PRINT	26
+#define	WT_OP_DB_STAT_PRINT	27
 typedef struct {
 	FILE * stream;
 	u_int32_t flags;
@@ -321,7 +343,7 @@ typedef struct {
 	FILE * stream = ((wt_args_db_stat_print *)(toc->argp))->stream;\
 	u_int32_t flags = ((wt_args_db_stat_print *)(toc->argp))->flags
 
-#define	WT_OP_DB_SYNC	27
+#define	WT_OP_DB_SYNC	28
 typedef struct {
 	u_int32_t flags;
 } wt_args_db_sync;
@@ -331,7 +353,7 @@ typedef struct {
 	DB *db = toc->db;\
 	u_int32_t flags = ((wt_args_db_sync *)(toc->argp))->flags
 
-#define	WT_OP_DB_VERIFY	28
+#define	WT_OP_DB_VERIFY	29
 typedef struct {
 	u_int32_t flags;
 } wt_args_db_verify;
@@ -341,7 +363,7 @@ typedef struct {
 	DB *db = toc->db;\
 	u_int32_t flags = ((wt_args_db_verify *)(toc->argp))->flags
 
-#define	WT_OP_ENV_CLOSE	29
+#define	WT_OP_ENV_CLOSE	30
 typedef struct {
 	u_int32_t flags;
 } wt_args_env_close;
@@ -351,7 +373,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	u_int32_t flags = ((wt_args_env_close *)(toc->argp))->flags
 
-#define	WT_OP_ENV_DESTROY	30
+#define	WT_OP_ENV_DESTROY	31
 typedef struct {
 	u_int32_t flags;
 } wt_args_env_destroy;
@@ -361,7 +383,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	u_int32_t flags = ((wt_args_env_destroy *)(toc->argp))->flags
 
-#define	WT_OP_ENV_GET_CACHESIZE	31
+#define	WT_OP_ENV_GET_CACHESIZE	32
 typedef struct {
 	u_int32_t *cachesize;
 } wt_args_env_get_cachesize;
@@ -371,7 +393,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	u_int32_t *cachesize = ((wt_args_env_get_cachesize *)(toc->argp))->cachesize
 
-#define	WT_OP_ENV_GET_ERRCALL	32
+#define	WT_OP_ENV_GET_ERRCALL	33
 typedef struct {
 	void (**errcall)(const ENV *, const char *);
 } wt_args_env_get_errcall;
@@ -381,7 +403,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	void (**errcall)(const ENV *, const char *) = ((wt_args_env_get_errcall *)(toc->argp))->errcall
 
-#define	WT_OP_ENV_GET_ERRFILE	33
+#define	WT_OP_ENV_GET_ERRFILE	34
 typedef struct {
 	FILE **errfile;
 } wt_args_env_get_errfile;
@@ -391,7 +413,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	FILE **errfile = ((wt_args_env_get_errfile *)(toc->argp))->errfile
 
-#define	WT_OP_ENV_GET_ERRPFX	34
+#define	WT_OP_ENV_GET_ERRPFX	35
 typedef struct {
 	const char **errpfx;
 } wt_args_env_get_errpfx;
@@ -401,7 +423,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	const char **errpfx = ((wt_args_env_get_errpfx *)(toc->argp))->errpfx
 
-#define	WT_OP_ENV_GET_VERBOSE	35
+#define	WT_OP_ENV_GET_VERBOSE	36
 typedef struct {
 	u_int32_t *verbose;
 } wt_args_env_get_verbose;
@@ -411,7 +433,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	u_int32_t *verbose = ((wt_args_env_get_verbose *)(toc->argp))->verbose
 
-#define	WT_OP_ENV_OPEN	36
+#define	WT_OP_ENV_OPEN	37
 typedef struct {
 	const char *home;
 	mode_t mode;
@@ -427,7 +449,7 @@ typedef struct {
 	mode_t mode = ((wt_args_env_open *)(toc->argp))->mode;\
 	u_int32_t flags = ((wt_args_env_open *)(toc->argp))->flags
 
-#define	WT_OP_ENV_SET_CACHESIZE	37
+#define	WT_OP_ENV_SET_CACHESIZE	38
 typedef struct {
 	u_int32_t cachesize;
 } wt_args_env_set_cachesize;
@@ -437,7 +459,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	u_int32_t cachesize = ((wt_args_env_set_cachesize *)(toc->argp))->cachesize
 
-#define	WT_OP_ENV_SET_ERRCALL	38
+#define	WT_OP_ENV_SET_ERRCALL	39
 typedef struct {
 	void (*errcall)(const ENV *, const char *);
 } wt_args_env_set_errcall;
@@ -447,7 +469,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	void (*errcall)(const ENV *, const char *) = ((wt_args_env_set_errcall *)(toc->argp))->errcall
 
-#define	WT_OP_ENV_SET_ERRFILE	39
+#define	WT_OP_ENV_SET_ERRFILE	40
 typedef struct {
 	FILE *errfile;
 } wt_args_env_set_errfile;
@@ -457,7 +479,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	FILE *errfile = ((wt_args_env_set_errfile *)(toc->argp))->errfile
 
-#define	WT_OP_ENV_SET_ERRPFX	40
+#define	WT_OP_ENV_SET_ERRPFX	41
 typedef struct {
 	const char *errpfx;
 } wt_args_env_set_errpfx;
@@ -467,7 +489,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	const char *errpfx = ((wt_args_env_set_errpfx *)(toc->argp))->errpfx
 
-#define	WT_OP_ENV_SET_VERBOSE	41
+#define	WT_OP_ENV_SET_VERBOSE	42
 typedef struct {
 	u_int32_t verbose;
 } wt_args_env_set_verbose;
@@ -477,7 +499,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	u_int32_t verbose = ((wt_args_env_set_verbose *)(toc->argp))->verbose
 
-#define	WT_OP_ENV_STAT_CLEAR	42
+#define	WT_OP_ENV_STAT_CLEAR	43
 typedef struct {
 	u_int32_t flags;
 } wt_args_env_stat_clear;
@@ -487,7 +509,7 @@ typedef struct {
 	ENV *env = toc->env;\
 	u_int32_t flags = ((wt_args_env_stat_clear *)(toc->argp))->flags
 
-#define	WT_OP_ENV_STAT_PRINT	43
+#define	WT_OP_ENV_STAT_PRINT	44
 typedef struct {
 	FILE *stream;
 	u_int32_t flags;

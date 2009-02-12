@@ -31,6 +31,8 @@ __wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream);
 int
 __wt_db_get(WT_TOC *toc);
 int
+__wt_db_get_recno(WT_TOC *toc);
+int
 __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
@@ -68,7 +70,7 @@ int
 __wt_bt_page_inmem_append(DB *db,
     WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *data_item);
 int
-__wt_bt_dbt_return(DB *db, DBT *data, WT_PAGE *page, WT_INDX *indx);
+__wt_bt_dbt_return(DB *db, DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip);
 int
 __wt_bt_stat(DB *db);
 int

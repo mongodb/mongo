@@ -10,6 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_bt_search(DB *, DBT *, WT_PAGE **, WT_INDX **);
+static int __wt_bt_search_recno(DB *, u_int64_t, WT_PAGE **, WT_INDX **);
 
 /*
  * __wt_db_get --
@@ -26,10 +27,9 @@ __wt_db_get(WT_TOC *toc)
 	int ret, tret;
 
 	env = toc->env;
+	WT_ASSERT(env, pkey == NULL);			/* NOT YET */
 
 	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
-
-	WT_ASSERT(env, pkey == NULL);
 
 	/* Search the primary btree for the key. */
 	if ((ret = __wt_bt_search(db, key, &page, &indx)) != 0)
@@ -43,16 +43,53 @@ __wt_db_get(WT_TOC *toc)
 	if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
 		__wt_db_errx(db,
 		    "the Db.get method cannot return keys with duplicate "
-		    "data items; use the Db.cursor method to return keys "
-		    "with duplicate data items");
-		goto err;
-	}
+		    "data items; use the Db.cursor method instead");
+		ret = WT_ERROR;
+	} else
+		ret = __wt_bt_dbt_return(db, NULL, data, page, indx);
 
-	ret = __wt_bt_dbt_return(db, data, page, indx);
+	if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
+		ret = tret;
+	return (ret);
 
-	if (0) {
-err:		ret = WT_ERROR;
-	}
+}
+
+/*
+ * __wt_db_get_recno --
+ *	Db.get_recno method.
+ */
+int
+__wt_db_get_recno(WT_TOC *toc)
+{
+	wt_args_db_get_recno_unpack;
+	ENV *env;
+	WT_PAGE *page;
+	WT_INDX *indx;
+	u_int32_t type;
+	int ret, tret;
+
+	env = toc->env;
+	WT_ASSERT(env, pkey == NULL);			/* NOT YET */
+
+	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
+
+	/* Search the primary btree for the key. */
+	if ((ret = __wt_bt_search_recno(db, recno, &page, &indx)) != 0)
+		return (ret);
+
+	/*
+	 * The Db.get_recno method can only return single key/data pairs.
+	 * If that's not what we found, we're done.
+	 */
+	type = WT_ITEM_TYPE(indx->ditem);
+	if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
+		__wt_db_errx(db,
+		    "the Db.get_recno method cannot return keys with duplicate "
+		    "data items; use the Db.cursor method instead");
+		ret = WT_ERROR;
+	} else
+		ret = __wt_bt_dbt_return(db, key, data, page, indx);
+
 	if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 	return (ret);
@@ -177,4 +214,73 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 
 err:	(void)__wt_bt_page_out(db, page, 0);
 	return (ret);
+}
+
+/*
+ * __wt_bt_search_recno --
+ *	Search the tree for a specific record-based key.
+ */
+static int
+__wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
+{
+	IDB *idb;
+	WT_INDX *ip;
+	WT_ITEM_OFFP *offp;
+	WT_PAGE *page;
+	u_int64_t total;
+	u_int32_t addr, i;
+	int level, ret;
+
+	idb = db->idb;
+
+	/* Check for an empty tree. */
+	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
+		return (WT_NOTFOUND);
+
+	/*
+	 * The level value tells us how big a page to read.  If the tree has
+	 * split, the root page is an internal page, otherwise it's a leaf
+	 * page.   We don't know the real height of the tree, but level gets
+	 * re-set as soon as we have a real page to look at.
+	 */
+#define	WT_ISLEAF(l)	((l) == WT_LEAF_LEVEL ? 1 : 0)
+	level = addr == WT_ADDR_FIRST_PAGE ?
+	    WT_LEAF_LEVEL : WT_FIRST_INTERNAL_LEVEL;
+
+	/* Search the tree. */
+	for (total = 0;; --level) {
+		if ((ret =
+		    __wt_bt_page_in(db, addr, WT_ISLEAF(level), &page)) != 0)
+			return (ret);
+		level = page->hdr->level;
+
+		/* Check for a record past the end of the database. */
+		if (total == 0 && page->records < recno)
+			break;
+
+		/* If it's a leaf page, return the page and index. */
+		if (WT_ISLEAF(level)) {
+			*pagep = page;
+			*indxp = page->indx + ((recno - total) - 1);
+			return (0);
+		}
+
+		/* Walk the page, counting records. */
+		WT_INDX_FOREACH(page, ip, i) {
+			offp = WT_ITEM_BYTE(ip->ditem);
+			if (total + offp->records >= recno)
+				break;
+			total += offp->records;
+		}
+
+		/* ip references the subtree containing the record. */
+		addr = ip->addr;
+
+		/* We're done with the page. */
+		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
+			return (ret);
+	}
+
+	(void)__wt_bt_page_out(db, page, 0);
+	return (WT_NOTFOUND);
 }

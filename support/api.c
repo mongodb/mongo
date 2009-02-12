@@ -244,6 +244,30 @@ static int __wt_api_db_get_errpfx(
 	wt_args_db_toc_sched(WT_OP_DB_GET_ERRPFX);
 }
 
+static int __wt_api_db_get_recno(
+	DB *db,
+	WT_TOC *toc,
+	u_int64_t recno,
+	DBT *key,
+	DBT *pkey,
+	DBT *data,
+	u_int32_t flags);
+static int __wt_api_db_get_recno(
+	DB *db,
+	WT_TOC *toc,
+	u_int64_t recno,
+	DBT *key,
+	DBT *pkey,
+	DBT *data,
+	u_int32_t flags)
+{
+	wt_args_db_get_recno args;
+
+	wt_args_db_get_recno_pack;
+
+	wt_args_db_toc_sched(WT_OP_DB_GET_RECNO);
+}
+
 static int __wt_api_db_open(
 	DB *db,
 	WT_TOC *toc,
@@ -1099,6 +1123,9 @@ __wt_db_config_methods(DB *db)
 	db->get_errcall = __wt_api_db_get_errcall;
 	db->get_errfile = __wt_api_db_get_errfile;
 	db->get_errpfx = __wt_api_db_get_errpfx;
+	db->get_recno = (int (*)
+	    (DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t ))
+	    __wt_db_lockout_open;
 	db->open = __wt_api_db_open;
 	db->set_btree_compare = __wt_api_db_set_btree_compare;
 	db->set_btree_compare_int = __wt_api_db_set_btree_compare_int;
@@ -1124,6 +1151,7 @@ __wt_db_config_methods_open(DB *db)
 {
 	db->dump = __wt_api_db_dump;
 	db->get = __wt_api_db_get;
+	db->get_recno = __wt_api_db_get_recno;
 	db->sync = __wt_api_db_sync;
 	db->verify = __wt_api_db_verify;
 }
@@ -1174,6 +1202,9 @@ __wt_db_config_methods_lockout(DB *db)
 	    __wt_db_lockout_err;
 	db->get_errpfx = (int (*)
 	    (DB *, WT_TOC *, const char **))
+	    __wt_db_lockout_err;
+	db->get_recno = (int (*)
+	    (DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t ))
 	    __wt_db_lockout_err;
 	db->open = (int (*)
 	    (DB *, WT_TOC *, const char *, mode_t , u_int32_t ))
@@ -1266,6 +1297,9 @@ __wt_api_switch(WT_TOC *toc)
 		break;
 	case WT_OP_DB_GET_ERRPFX:
 		ret = __wt_db_get_errpfx(toc);
+		break;
+	case WT_OP_DB_GET_RECNO:
+		ret = __wt_db_get_recno(toc);
 		break;
 	case WT_OP_DB_OPEN:
 		ret = __wt_db_open(toc);
