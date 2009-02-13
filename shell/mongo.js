@@ -64,25 +64,35 @@ connect = function( url , user , pass ){
     return db;
 }
 
-_portAndDbpath = function() {
-    var port = "";
+_parsePath = function() {
     var dbpath = "";
+    for( var i = 0; i < arguments.length; ++i )
+        if ( arguments[ i ] == "--dbpath" )
+            dbpath = arguments[ i + 1 ];
+    
+    if ( dbpath == "" )
+        throw "No dbpath specified";
+    
+    return dbpath;
+}
+
+_parsePort = function() {
+    var port = "";
     for( var i = 0; i < arguments.length; ++i )
         if ( arguments[ i ] == "--port" )
             port = arguments[ i + 1 ];
-        else if ( arguments[ i ] == "--dbpath" )
-            dbpath = arguments[ i + 1 ];
     
-    if ( port == "" || dbpath == "" )
-        throw "Invalid command line options";
-    
-    return { port: port, dbpath: dbpath };
+    if ( port == "" )
+        throw "No port specified";
+    return port;
 }
 
 // Start a mongod instance and return a 'Mongo' object connected to it.
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
 startMongod = function() {
+    var dbpath = _parsePath.apply( null, arguments );
+    resetDbpath( dbpath );
     var fullArgs = Array();
     fullArgs[ 0 ] = "mongod";
     for( i = 0; i < arguments.length; ++i )
@@ -96,14 +106,12 @@ startMongod = function() {
 // command line arguments to the program.  The specified 'dbpath' is cleared if
 // it exists, created if not.
 startMongoProgram = function() {
-    var dbpath = _portAndDbpath.apply( null, arguments ).dbpath;
-    resetDbpath( dbpath );
     return startMongoProgramNoReset.apply( null, arguments );    
 }
 
 // Same as startMongoProgram, but uses existing files in dbpath
 startMongoProgramNoReset = function() {
-    var port = _portAndDbpath.apply( null, arguments ).port;
+    var port = _parsePort.apply( null, arguments );
 
     _startMongoProgram.apply( null, arguments );
     
