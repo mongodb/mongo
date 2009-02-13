@@ -521,6 +521,12 @@ test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
+# --- sniffer ---
+if nix:
+    sniffEnv = clientEnv.Clone()
+    sniffEnv.Append( LIBS=[ "pcap" ] )
+    sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
+
 # --- shell ---
 # shell is complicated by the fact that v8 doesn't work 64-bit yet
 
