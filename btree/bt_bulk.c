@@ -12,7 +12,7 @@
 static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int __wt_bt_dup_offpage(DB *, WT_PAGE *, DBT **, DBT **,
     DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
-static int __wt_bt_promote(DB *, WT_PAGE *, u_int64_t, WT_ITEM_OFFP *);
+static int __wt_bt_promote(DB *, WT_PAGE *, u_int32_t, WT_ITEM_OFFP *);
 
 /*
  * __wt_db_bulk_load --
@@ -28,7 +28,6 @@ __wt_db_bulk_load(WT_TOC *toc)
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
-	u_int64_t records;
 	u_int32_t dup_count, dup_space, len;
 	int ret, tret;
 
@@ -37,7 +36,6 @@ __wt_db_bulk_load(WT_TOC *toc)
 	WT_DB_FCHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
 	WT_ASSERT(env, LF_ISSET(WT_SORTED_INPUT));
 
-	records = 0;
 	dup_space = dup_count = 0;
 
 	lastkey = &lastkey_std;
@@ -237,8 +235,8 @@ skip_read:
 			 * sets the page's parent address, which is the same for
 			 * the newly allocated page.
 			 */
-			if ((ret =
-			    __wt_bt_promote(db, page, records, NULL)) != 0)
+			if ((ret = __wt_bt_promote(
+			    db, page, page->records, NULL)) != 0)
 				goto err;
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			if ((ret =
@@ -247,15 +245,13 @@ skip_read:
 
 			/* Switch to the next page. */
 			page = next;
-			records = 0;
 		}
-
-		/* Count total key/data pairs on this page. */
-		++records;
 
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
+			++page->records;
 			++page->hdr->u.entries;
+
 			WT_ITEM_LEN_SET(&key_item, key->size);
 			memcpy(page->first_free, &key_item, sizeof(key_item));
 			memcpy(page->first_free +
@@ -267,11 +263,11 @@ skip_read:
 			 * comparison with the next key.  Not an overflow
 			 * object, so we can just use the on-page memory.
 			 *
-			 * We also save the location for the key of any
-			 * current duplicate set in case we have to move
-			 * the set to a different page (the case where the
-			 * duplicate set isn't large enough to move offpag,
-			 * but doesn't entirely fit on this page).
+			 * We also save the location for the key of any current
+			 * duplicate set in case we have to move the set to a
+			 * different page (the case where a duplicate set isn't
+			 * large enough to move offpage, but doesn't entirely
+			 * fit on this page).
 			 */
 			if (LF_ISSET(WT_DUPLICATES)) {
 				if (WT_ITEM_TYPE(
@@ -336,7 +332,6 @@ skip_read:
 			 * Reset local counters -- on-page information was
 			 * reset by __wt_bt_dup_offpage.
 			 */
-			records -= dup_count;
 			dup_count = dup_space = 0;
 
 			goto skip_read;
@@ -349,7 +344,7 @@ skip_read:
 
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
-			ret = __wt_bt_promote(db, page, records, NULL);
+			ret = __wt_bt_promote(db, page, page->records, NULL);
 			if ((tret = __wt_bt_page_out(
 			    db, page, WT_MODIFIED)) != 0 && ret == 0)
 				ret = tret;
@@ -383,7 +378,6 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	WT_ITEM_OFFP offpage_item;
 	WT_ITEM_OVFL data_local;
 	WT_PAGE *next, *page;
-	u_int64_t records;
 	u_int32_t len;
 	u_int8_t *p;
 	int ret, tret;
@@ -421,12 +415,19 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	WT_CLEAR(data_item);
 	ret = 0;
 
-	/* Allocate and initialize a new page. */
+	/*
+	 * Allocate and initialize a new page, and copy the duplicate set into
+	 * place.
+	 */
 	if ((ret = __wt_bt_page_alloc(db, 1, &page)) != 0)
 		return (ret);
 	page->hdr->type = WT_PAGE_DUP_LEAF;
 	page->hdr->level = WT_LEAF_LEVEL;
 	page->hdr->u.entries = dup_count;
+	page->records = dup_count;
+	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
+	memcpy(page->first_free, dup_data, (size_t)len);
+	__wt_set_ff_and_sa_from_addr(db, page, WT_PAGE_BYTE(page) + len);
 
 	/*
 	 * Unless we have enough duplicates to split this page, it will be the
@@ -435,16 +436,10 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	offpage_item.addr = page->addr;
 	offpage_item.level = WT_LEAF_LEVEL;
 
-	/* Copy the duplicate data set into place, and set page information. */
-	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
-	memcpy(page->first_free, dup_data, (size_t)len);
-	__wt_set_ff_and_sa_from_addr(db, page, WT_PAGE_BYTE(page) + len);
-	records = dup_count;
-
 	/*
 	 * Reset the caller's page entry count.   Once we know the final root
 	 * page and record count we'll replace the duplicate set with a single
-	 * WT_ITEM_OFFP structure, that is, we've reaplced dup_count entries
+	 * WT_ITEM_OFFP structure, that is, we've replaced dup_count entries
 	 * with a single entry.
 	 */
 	leaf_page->hdr->u.entries -= (dup_count - 1);
@@ -501,7 +496,7 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 			 * there may be a new offpage duplicates root page.
 			 */
 			if ((ret = __wt_bt_promote(
-			    db, page, records, &offpage_item)) != 0)
+			    db, page, page->records, &offpage_item)) != 0)
 				goto err;
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			if ((ret =
@@ -510,17 +505,13 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 
 			/* Switch to the next page. */
 			page = next;
-			records = 0;
 		}
 
-		/* Count total key/data pairs on this page. */
-		++records;
-
-		/* Count total key/data pairs in this off-page tree. */
-		++dup_count;
+		++dup_count;			/* Total duplicate count. */
+		++page->records;		/* On-page key/data count. */
+		++page->hdr->u.entries;		/* On-page entry count. */
 
 		/* Copy the data item onto the page. */
-		++page->hdr->u.entries;
 		WT_ITEM_LEN_SET(&data_item, data->size);
 		memcpy(page->first_free, &data_item, sizeof(data_item));
 		memcpy(page->first_free +
@@ -535,8 +526,8 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	 *
 	 * Promote a key from any partially-filled page and write it.
 	 */
-	if ((tret = __wt_bt_promote(
-	    db, page, records, &offpage_item)) != 0 && (ret == 0 || ret == 1))
+	if ((tret = __wt_bt_promote(db,
+	    page, page->records, &offpage_item)) != 0 && (ret == 0 || ret == 1))
 		ret = tret;
 	if ((tret = __wt_bt_page_out(
 	    db, page, WT_MODIFIED)) != 0 && (ret == 0 || ret == 1))
@@ -567,7 +558,7 @@ err:		ret = WT_ERROR;
  */
 static int
 __wt_bt_promote(
-    DB *db, WT_PAGE *page, u_int64_t records, WT_ITEM_OFFP *root_offp)
+    DB *db, WT_PAGE *page, u_int32_t increment, WT_ITEM_OFFP *root_offp)
 {
 	DBT key;
 	WT_INDX *ip;
@@ -710,8 +701,8 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 			 */
 			if (parent->hdr->prntaddr == WT_ADDR_INVALID) {
 				root_split = 1;
-				if ((ret = __wt_bt_promote(db,
-				    parent, parent->records, root_offp)) != 0)
+				if ((ret = __wt_bt_promote(
+				    db, parent, increment, root_offp)) != 0)
 					goto err;
 			} else
 				root_split = 0;
@@ -775,7 +766,7 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 	WT_ITEM_LEN_SET(&item, sizeof(WT_ITEM_OFFP));
 	offp.addr = page->addr;
 	offp.level = page->hdr->level;
-	offp.records = records;
+	offp.records = page->records;
 	offp.unused[0] = offp.unused[1] = offp.unused[2] = 0;
 
 	/* Store the data item. */
@@ -786,49 +777,45 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 	parent->first_free += WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
 	parent->space_avail -= WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
 
-	/*
-	 * Append the new parent key index to the in-memory page structures,
-	 * and update the page's record count.
-	 */
+	/* Append the new parent key index to the in-memory page structures. */
 	if ((ret = __wt_bt_page_inmem_append(
 	    db, parent, parent_key, parent_data)) != 0)
 		goto err;
-	parent->records += records;
+	parent->records += page->records;
 
 	/*
 	 * The promotion for case #2 and the second part of case #3 -- promote
-	 * the key from the newly allocated internal page to its parent.  If
-	 * we are promoting records up the tree, the record counts are updated
-	 * as part of the promotion, because we pass the current record count
-	 * in the promote call.
-	 *
-	 * If we are not promoting further up the tree, we still need to update
-	 * the record counts the rest of the way up the tree, because we added
-	 * a page of records.
+	 * the key from the newly allocated internal page to its parent.
 	 */
 	if (need_promotion)
-		ret = __wt_bt_promote(db, parent, parent->records, root_offp);
-	else
+		ret = __wt_bt_promote(db, parent, increment, root_offp);
+	else	/*
+		 * We've finished promoting the new page's key into the tree.
+		 * What remains is to push the new record counts all the way
+		 * to the root.  We've already corrected our current "parent"
+		 * page, so proceed from there to the root.
+		 */
 		for (;;) {
-			parent_addr = parent->hdr->prntaddr;
+			if ((parent_addr =
+			    parent->hdr->prntaddr) == WT_ADDR_INVALID)
+				break;
 			if ((ret =
 			    __wt_bt_page_out(db, parent, WT_MODIFIED)) != 0)
 				goto err;
 			parent = NULL;
-			if (parent_addr == WT_ADDR_INVALID)
-				break;
 			if ((ret =
 			    __wt_bt_page_in(db, parent_addr, 0, &parent)) != 0)
 				goto err;
+
 			/*
-			 * Because of the bulk load pattern, we know we're
-			 * adding records to the subtree referenced by the
-			 * last entry in the parent page.
+			 * Because of the bulk load pattern, we're always adding
+			 * records to the subtree referenced by the last entry
+			 * in each parent page.
 			 */
 			ip = parent->indx + (parent->indx_count - 1);
 			parent_offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(ip->ditem);
-			parent_offp->records += records;
-			parent->records += records;
+			parent_offp->records += increment;
+			parent->records += increment;
 		}
 
 err:	/* Discard the parent page. */
