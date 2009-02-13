@@ -24,6 +24,7 @@
 namespace mongo {
 
     vector<UnitTest*> *UnitTest::tests = 0;
+    bool UnitTest::running = false;
 
     Nullstream nullstream;
     Logstream logstream;

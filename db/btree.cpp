@@ -19,8 +19,14 @@
 #include "stdafx.h"
 #include "btree.h"
 #include "pdfile.h"
+#include "../util/unittest.h"
+#include "json.h"
 
 namespace mongo {
+
+    extern bool startupUnitTesting = true;
+
+#define VERIFYTHISLOC dassert( thisLoc.btree() == this );
 
     const int KeyMax = BucketSize / 10;
 
@@ -37,7 +43,7 @@ namespace mongo {
     /* BucketBasics --------------------------------------------------- */
 
     inline void BucketBasics::modified(const DiskLoc& thisLoc) {
-        dassert( thisLoc.btree() == this );
+        VERIFYTHISLOC
         BtreeStore::modified(thisLoc);
     }
 
@@ -325,11 +331,13 @@ namespace mongo {
             KeyNode M = keyNode(m);
             int x = key.woCompare(M.key, order);
             if ( x == 0 ) { 
-                //uassert("duplicate key error", k(m).isUnused() || !assertIfDup);
-                uassert("E11000 duplicate key error", !assertIfDup);
+                uassert("E11000 duplicate key error", k(m).isUnused() || !assertIfDup);
+                //uassert("E11000 duplicate key error", !assertIfDup);
 
                 // dup keys allowed.  use recordLoc as if it is part of the key
-                x = recordLoc.compare(M.recordLoc);
+                DiskLoc unusedRL = M.recordLoc;
+                unusedRL.GETOFS() &= ~1; // so we can test equality without the used bit messing us up
+                x = recordLoc.compare(unusedRL);
             }
             if ( x < 0 ) // key < M.key
                 h = m-1;
@@ -455,7 +463,7 @@ found:
 
     /* this sucks.  maybe get rid of parent ptrs. */
     void BtreeBucket::fixParentPtrs(const DiskLoc& thisLoc) {
-        dassert( thisLoc.btree() == this );
+        VERIFYTHISLOC
         fix(thisLoc, nextChild);
         for ( int i = 0; i < n; i++ )
             fix(thisLoc, k(i).prevChildBucket);
@@ -708,9 +716,13 @@ found:
         }
 
         if ( found ) {
-            if ( k(pos).isUnused() ) {
-                out() << "an unused already occupying keyslot, write more code.\n";
-                out() << "  index may be corrupt (missing data) now.\n";
+            _KeyNode& kn = k(pos);
+            if ( kn.isUnused() ) {
+                DEBUGGING out() << "reusing unused key" << endl;
+                massert( "btree reuse unused key error?", kn.prevChildBucket == lChild );
+                // check rchild too?
+                kn.setUsed();
+                return 0;
             }
 
             out() << "_insert(): key already exists in index\n";
@@ -719,10 +731,10 @@ found:
             out() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
             out() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
             out() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
-            assert(false);
+            massert("btree: key+recloc already in index", false);
 
             // on a dup key always insert on the right or else you will be broken.
-//		pos++;
+            //		pos++;
             // on a promotion, find the right point to update if dup keys.
             /* not needed: we always insert right after the first key so we are ok with just pos++...
             if( !rChild.isNull() ) {
@@ -747,13 +759,13 @@ found:
     }
 
     void BtreeBucket::dump() {
-        out() << "DUMP btreebucket: ";
+        out() << "DUMP btreebucket n:" << n;
         out() << " parent:" << hex << parent.getOfs() << dec;
         for ( int i = 0; i < n; i++ ) {
             out() << '\n';
             KeyNode k = keyNode(i);
             out() << '\t' << i << '\t' << k.key.toString() << "\tleft:" << hex <<
-                 k.prevChildBucket.getOfs() << "\trec:" << k.recordLoc.getOfs() << dec;
+                 k.prevChildBucket.getOfs() << "\tRecLoc:" << k.recordLoc.getOfs() << dec;
             if ( this->k(i).isUnused() )
                 out() << " UNUSED";
         }
@@ -792,14 +804,41 @@ found:
         _shape(0, ss);
     }
 
-    void BtreeBucket::a_test() { 
-        BtreeBucket b;
-        b.init();
-//        b.insertHere(
+} // namespace mongo
+
+#include "db.h"
+#include "dbhelpers.h"
+
+namespace mongo {
+
+    void BtreeBucket::a_test(IndexDetails& id) {
+        BtreeBucket *b = id.head.btree();
+        DiskLoc rl;
+        BSONObj key = fromjson("{x:9}");
+        BSONObj order = fromjson("{}");
+        b->bt_insert(id.head, rl, key, order, false, id);
+
+        assert( b->k(0).isUsed() );
+        b->k(0).setUnused();
+
+//        b->delKeyAtPos(id.head, id, 0);
+        b->dumpTree(id.head, order);
+        cout << "---\n";
+
+        b->bt_insert(id.head, rl, key, order, false, id);
+        b->dumpTree(id.head, order);
     }
 
     void testClient() { 
-        BtreeBucket::a_test();
+        /* first do: 
+            test.foo.drop();
+            test.foo.ensureIndex({x:9});
+        */
+        dblock lk;
+        DBContext ctxt("test.foo");
+        assert( nsdetails("test.foo") );
+        assert( nsdetails("test.foo")->nIndexes > 0 );
+        BtreeBucket::a_test( nsdetails("test.foo")->indexes[0] );
     }
 
-} // namespace mongo
+}
