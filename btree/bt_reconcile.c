@@ -93,11 +93,11 @@ __wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
 }
 
 /*
- * __wt_bt_page_indx_clean --
+ * __wt_bt_page_recycle --
  *	Discard any in-memory allocated memory and reset the counters.
  */
 void
-__wt_bt_page_indx_clean(ENV *env, WT_PAGE *page, int free_indx)
+__wt_bt_page_recycle(ENV *env, WT_PAGE *page, int free_indx)
 {
 	WT_INDX *indx;
 	u_int32_t i;
