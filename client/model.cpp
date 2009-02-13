@@ -50,15 +50,20 @@ namespace mongo {
             conn->insert( getNS() , o );
             _id = o["_id"];
 
-            log(4) << "inserted new model" << endl;
+            log(4) << "inserted new model " << getNS() << "  " << o << endl;
         }
         else {
             b.append( _id );
             BSONObjBuilder id;
             id.append( _id );
-            conn->update( getNS() , id.obj() , b.obj() );
             
-            log(4) << "updated old model" << endl;
+            BSONObj q = id.obj();
+            BSONObj o = b.obj();
+
+            log(4) << "updated old model" << getNS() << "  " << q << " " << o << endl;
+
+            conn->update( getNS() , q , o );
+            
         }
 
         conn.done();
