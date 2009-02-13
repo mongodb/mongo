@@ -419,6 +419,7 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		    "(parent: %lu, child: %lu)",
 		    (u_long)addr,
 		    (u_long)offp->records, (u_long)child->records);
+		goto err;
 	}
 
 	/* Set the comparison function. */
