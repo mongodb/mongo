@@ -178,7 +178,7 @@ int main(int argc, char **argv){
         cerr << "don't know how to handle datalink type: " << pcap_datalink( handle ) << endl;
     }
 
-	assert( pcap_compile(handle, &fp, "tcp" , 0, net) != -1 );
+	assert( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, net) != -1 );
 	assert( pcap_setfilter(handle, &fp) != -1 );
 
 	pcap_loop(handle, 0 , got_packet, NULL);
