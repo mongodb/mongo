@@ -18,10 +18,6 @@
 
 /* TODO
    _ concurrency control.
-     _ connection pool
-     _ hostbyname_nonreentrant() problem
-   _ gridconfig object which gets config from the grid db.
-     connect to iad-sb-grid
    _ limit() works right?
    _ KillCursors
 
@@ -34,8 +30,7 @@
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
-#include "gridconfig.h"
-#include "configserver.h"
+#include "config.h"
 
 namespace mongo {
 
@@ -43,8 +38,6 @@ namespace mongo {
     
     namespace dbgrid_cmds {
         
-        // --- internal commands ---
-
         set<string> dbgridCommands;
 
         class GridAdminCmd : public Command {
@@ -60,6 +53,8 @@ namespace mongo {
             }
         };
         
+        // --------------- misc commands ----------------------
+
         class NetStatCmd : public GridAdminCmd {
         public:
             NetStatCmd() : GridAdminCmd("netstat") { }
@@ -69,6 +64,27 @@ namespace mongo {
                 return true;
             }
         } netstat;
+
+        class ListGridCommands : public GridAdminCmd {
+        public:
+            ListGridCommands() : GridAdminCmd("gridcommands") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+                BSONObjBuilder arr;
+                int num=0;
+                for ( set<string>::iterator i = dbgridCommands.begin(); i != dbgridCommands.end(); i++ ){
+                    string s = BSONObjBuilder::numStr( num++ );
+                    arr.append( s.c_str() , *i );
+                }
+                
+                result.appendArray( "commands" , arr.done() );
+                result.append("ok" , 1 );
+                return true;
+            }
+        } listGridCommands;        
+
+
+        // ------------ database level commands -------------
         
         class ListDatabaseCommand : public GridAdminCmd {
         public:
@@ -95,23 +111,7 @@ namespace mongo {
             }
         } gridListDatabase;
 
-        class ListGridCommands : public GridAdminCmd {
-        public:
-            ListGridCommands() : GridAdminCmd("gridcommands") { }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                
-                BSONObjBuilder arr;
-                int num=0;
-                for ( set<string>::iterator i = dbgridCommands.begin(); i != dbgridCommands.end(); i++ ){
-                    string s = BSONObjBuilder::numStr( num++ );
-                    arr.append( s.c_str() , *i );
-                }
-                
-                result.appendArray( "commands" , arr.done() );
-                result.append("ok" , 1 );
-                return true;
-            }
-        } listGridCommands;        
+        // ------------ server level commands -------------
 
         class ListServers : public GridAdminCmd {
         public:
@@ -174,7 +174,7 @@ namespace mongo {
         } removeServer;
 
         
-        // --- public commands ---
+        // --------------- public commands ----------------
 
         class IsDbGridCmd : public Command {
         public:

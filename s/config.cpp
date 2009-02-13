@@ -1,4 +1,4 @@
-// ConfigServer.cpp
+// config.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -17,17 +17,117 @@
 */
 
 #include "stdafx.h"
-#include "configserver.h"
+#include "../util/message.h"
+#include "../util/unittest.h"
+#include "../client/connpool.h"
+#include "../client/model.h"
+#include "../db/pdfile.h"
+
 #include "server.h"
+#include "config.h"
 
 namespace mongo {
+
+    /* --- DBConfig --- */
+
+    string DBConfig::modelServer() {
+        return configServer.modelServer();
+    }
+
+    bool DBConfig::partitioned( const NamespaceString& ns ){
+        if ( ! _partitioned )
+            return false;
+        uassert( "don't know what to do!" , 0 );
+        return 0;
+    }
+
+    string DBConfig::getServer( const NamespaceString& ns ){
+        if ( partitioned( ns ) )
+            return 0;
+        
+        uassert( "no primary!" , _primary.size() );
+        return _primary;
+    }
+
+    void DBConfig::serialize(BSONObjBuilder& to){
+        to.append("name", _name);
+        to.appendBool("partitioned", _partitioned );
+        to.append("primary", _primary );
+    }
+    
+    void DBConfig::unserialize(BSONObj& from){
+        _name = from.getStringField("name");
+        _partitioned = from.getBoolField("partitioned");
+        _primary = from.getStringField("primary");
+    }
+    
+    bool DBConfig::loadByName(const char *nm){
+        BSONObjBuilder b;
+        b.append("name", nm);
+        BSONObj q = b.done();
+        return load(q);
+    }
+    
+    /* --- Grid --- */
+
+    string Grid::pickServerForNewDB(){
+        ScopedDbConnection conn( configServer.getPrimary() );
+        
+        // TODO: this is temporary
+        
+        vector<string> all;
+        auto_ptr<DBClientCursor> c = conn->query( "config.servers" , Query() );
+        while ( c->more() ){
+            BSONObj s = c->next();
+            all.push_back( s["host"].valuestrsafe() );
+        }
+        conn.done();
+                
+        uassert( "can't find server for new db" , all.size() );
+        
+        return all[ rand() % all.size() ];
+    }
+
+    DBConfig* Grid::getDBConfig( string database , bool create ){
+        {
+            string::size_type i = database.find( "." );
+            if ( i != string::npos )
+                database = database.substr( 0 , i );
+        }
+        
+        if ( database == "config" )
+            return &configServer;
+
+        DBConfig*& cc = _databases[database];
+        if ( cc == 0 ){
+            cc = new DBConfig( database );
+            if ( ! cc->loadByName(database.c_str()) ){
+                if ( create ){
+                    // note here that cc->primary == 0.
+                    log() << "couldn't find database [" << database << "] in config db" << endl;
+                    
+                    cc->_primary = pickServerForNewDB();
+                    cc->save();
+                    log() << "\t put [" << database << "] on: " << cc->_primary << endl;
+                }
+                else {
+                    cc = 0;
+                }
+            }
+            
+        }
+        
+        return cc;
+    }
+
+    /* --- ConfigServer ---- */
 
     ConfigServer::ConfigServer() {
         _partitioned = false;
         _primary = "";
         _name = "grid";
     }
-
+    
     ConfigServer::~ConfigServer() {
     }
 
@@ -125,6 +225,6 @@ namespace mongo {
         return true;
     }
 
-    ConfigServer configServer;
-
-} // namespace mongo
+    ConfigServer configServer;    
+    Grid grid;
+} 
