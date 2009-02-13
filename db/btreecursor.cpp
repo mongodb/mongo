@@ -244,8 +244,8 @@ namespace mongo {
 
     /* ----------------------------------------------------------------------------- */
 
-    struct BtreeUnitTest {
-        BtreeUnitTest() {
+    struct BtreeCursorUnitTest {
+        BtreeCursorUnitTest() {
             assert( minDiskLoc.compare(maxDiskLoc) < 0 );
         }
     } btut;

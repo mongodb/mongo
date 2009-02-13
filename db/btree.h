@@ -42,6 +42,9 @@ namespace mongo {
             _kdo = s;
             assert(s>=0);
         }
+        void setUsed() { 
+            recordLoc.GETOFS() &= ~1;
+        }
         void setUnused() {
             /* Setting ofs to odd is the sentinel for unused, as real recordLoc's are always
                even numbers.
@@ -177,7 +180,7 @@ namespace mongo {
         /* get tree shape */
         void shape(stringstream&);
 
-        static void a_test();
+        static void a_test(IndexDetails&);
     private:
         void fixParentPtrs(const DiskLoc& thisLoc);
         void delBucket(const DiskLoc& thisLoc, IndexDetails&);
