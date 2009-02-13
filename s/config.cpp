@@ -74,13 +74,18 @@ namespace mongo {
         ScopedDbConnection conn( configServer.getPrimary() );
         
         // TODO: this is temporary
-
-        BSONObj s = conn->findOne( "config.servers" , emptyObj );
-        uassert( "can't find server for new db" , ! s.isEmpty() );
         
-        string name = s["host"].valuestrsafe();
+        vector<string> all;
+        auto_ptr<DBClientCursor> c = conn->query( "config.servers" , Query() );
+        while ( c->more() ){
+            BSONObj s = c->next();
+            all.push_back( s["host"].valuestrsafe() );
+        }
         conn.done();
-        return name;
+                
+        uassert( "can't find server for new db" , all.size() );
+        
+        return all[ rand() % all.size() ];
     }
 
     DBConfig* Grid::getDBConfig( string database , bool create ){
