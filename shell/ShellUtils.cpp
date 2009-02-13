@@ -134,7 +134,7 @@ Handle<v8::String> ReadFile(const char* name) {
 
 bool ExecuteString(Handle<v8::String> source, Handle<v8::Value> name,
                    bool print_result, bool report_exceptions ){
-
+    
     HandleScope handle_scope;
     v8::TryCatch try_catch;
     
@@ -232,7 +232,7 @@ void RecordMyLocation( const char *_argv0 ) { argv0 = _argv0; }
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-map< int, pid_t > dbs;
+map< int, pair< pid_t, int > > dbs;
 
 char *copyString( const char *original ) {
     char *ret = reinterpret_cast< char * >( malloc( strlen( original ) + 1 ) );
@@ -295,7 +295,7 @@ void mongodThread() {
     while( argv[ i ] )
         free( argv[ i++ ] );
     
-    dbs.insert( make_pair( port, pid ) );
+    dbs.insert( make_pair( port, make_pair( pid, pipeEnds[ 1 ] ) ) );
 
     // Allow caller to return -- this is our low rent lock
     mongodArgs = 0;
@@ -315,7 +315,8 @@ void mongodThread() {
             writeMongodOutputLine( port, last );
         }
         if ( ret == 0 ) {
-            writeMongodOutputLine( port, last );
+            if ( *last )
+                writeMongodOutputLine( port, last );
             break;
         }
         if ( last != buf ) {
@@ -353,7 +354,7 @@ void killDb( int port ) {
         return;
     }
 
-    pid_t pid = dbs[ port ];
+    pid_t pid = dbs[ port ].first;
     kill( pid, SIGTERM );
 
     boost::xtime xt;
@@ -368,7 +369,8 @@ void killDb( int port ) {
     }
     if ( i == 5 )
         kill( pid, SIGKILL );
-    
+
+    close( dbs[ port ].second );
     dbs.erase( port );
 }
 
@@ -381,7 +383,7 @@ v8::Handle< v8::Value > StopMongod( const v8::Arguments &a ) {
 }
 
 void KillMongodbInstances() {
-    for( map< int, pid_t >::iterator i = dbs.begin(); i != dbs.end(); ++i )
+    for( map< int, pair< pid_t, int > >::iterator i = dbs.begin(); i != dbs.end(); ++i )
         killDb( i->first );    
 }
 
