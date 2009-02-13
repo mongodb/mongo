@@ -12,6 +12,10 @@ DB.prototype.getMongo = function(){
     return this._mongo;
 }
 
+DB.prototype.getSisterDB = function( name ){
+    return this.getMongo().getDB( name );
+}
+
 DB.prototype.getName = function(){
     return this._name;
 }
@@ -191,6 +195,7 @@ DB.prototype.help = function() {
     print("DB methods:");
     print("\tdb.auth(username, password)");
     print("\tdb.getMongo() get the server connection object");
+    print("\tdb.getSisterDB(name) get the db at the same server as this onew");
     print("\tdb.getName()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
