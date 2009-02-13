@@ -22,7 +22,6 @@
 #include "../client/connpool.h"
 
 #include "server.h"
-#include "configserver.h"
 #include "config.h"
 
 namespace mongo {

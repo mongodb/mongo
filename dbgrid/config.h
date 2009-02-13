@@ -30,7 +30,10 @@
 namespace mongo {
 
     class Grid;
+    class ConfigServer;
 
+    extern ConfigServer configServer;
+    extern Grid grid;
     /**
        top level grid configuration for an entire database
     */
@@ -86,6 +89,28 @@ namespace mongo {
         map<string,DBConfig*> _databases;
     };
 
-    extern Grid grid;
+    class ConfigServer : public DBConfig {
+    public:
+
+        enum { Port = 27016 }; /* standard port # for a grid db */
+        
+        ConfigServer();
+        ~ConfigServer();
+
+        bool ok(){
+            // TODO: check can connect
+            return _primary.size() > 0;
+        }
+        
+        virtual string modelServer(){
+            uassert( "ConfigServer not setup" , _primary.size() );
+            return _primary;
+        }
+
+        /**
+           call at startup, this will initiate connection to the grid db 
+        */
+        bool init( vector<string> configHosts , bool infer );
+    };
 
 } // namespace mongo

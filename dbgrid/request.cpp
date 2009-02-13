@@ -27,7 +27,6 @@
 
 #include "request.h"
 #include "config.h"
-#include "configserver.h"
 
 namespace mongo {
 

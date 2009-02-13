@@ -22,8 +22,9 @@
 #include "../client/connpool.h"
 #include "../client/model.h"
 #include "../db/pdfile.h"
+
+#include "server.h"
 #include "config.h"
-#include "configserver.h"
 
 namespace mongo {
 
@@ -107,7 +108,112 @@ namespace mongo {
         
         return cc;
     }
-    
 
+    /* --- ConfigServer ---- */
+
+    ConfigServer::ConfigServer() {
+        _partitioned = false;
+        _primary = "";
+        _name = "grid";
+    }
+    
+    ConfigServer::~ConfigServer() {
+    }
+
+    bool ConfigServer::init( vector<string> configHosts , bool infer ){
+        string hn = getHostName();
+        if ( hn.empty() ) {
+            sleepsecs(5);
+            exit(16);
+        }
+        ourHostname = hn;
+
+        char buf[256];
+        strcpy(buf, hn.c_str());
+
+        if ( configHosts.empty() ) {
+            char *p = strchr(buf, '-');
+            if ( p )
+                p = strchr(p+1, '-');
+            if ( !p ) {
+                log() << "can't parse server's hostname, expect <city>-<locname>-n<nodenum>, got: " << buf << endl;
+                sleepsecs(5);
+                exit(17);
+            }
+            p[1] = 0;
+        }
+
+        string left, right; // with :port#
+        string hostLeft, hostRight;
+
+        if ( configHosts.empty() ) {
+            if ( ! infer ) {
+                out() << "--griddb or --infer required\n";
+                exit(7);
+            }
+            stringstream sl, sr;
+            sl << buf << "grid-l";
+            sr << buf << "grid-r";
+            hostLeft = sl.str();
+            hostRight = sr.str();
+            sl << ":" << Port;
+            sr << ":" << Port;
+            left = sl.str();
+            right = sr.str();
+        }
+        else {
+            stringstream sl, sr;
+            sl << configHosts[0];
+            hostLeft = sl.str();
+            sl << ":" << Port;
+            left = sl.str();
+
+            if ( configHosts.size() > 1 ) {
+                sr << configHosts[1];
+                hostRight = sr.str();
+                sr << ":" << Port;
+                right = sr.str();
+            }
+        }
+
+
+        if ( !isdigit(left[0]) )
+            /* this loop is not really necessary, we we print out if we can't connect
+               but it gives much prettier error msg this way if the config is totally
+               wrong so worthwhile.
+               */
+            while ( 1 ) {
+                if ( hostbyname(hostLeft.c_str()).empty() ) {
+                    log() << "can't resolve DNS for " << hostLeft << ", sleeping and then trying again" << endl;
+                    sleepsecs(15);
+                    continue;
+                }
+                if ( !hostRight.empty() && hostbyname(hostRight.c_str()).empty() ) {
+                    log() << "can't resolve DNS for " << hostRight << ", sleeping and then trying again" << endl;
+                    sleepsecs(15);
+                    continue;
+                }
+                break;
+            }
+
+        Nullstream& l = log();
+        l << "connecting to griddb ";
+        
+        if ( !hostRight.empty() ) {
+            // connect in paired mode
+            l << "L:" << left << " R:" << right << "...";
+            l.flush();
+            _primary = left + "," + right;
+        }
+        else {
+            l << left << "...";
+            l.flush();
+            _primary = left;
+        }
+        
+        return true;
+    }
+
+    ConfigServer configServer;    
     Grid grid;
 } 
