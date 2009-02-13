@@ -1,5 +1,16 @@
 // sniffer.cpp
 
+/*
+  TODO:
+    large messages - need to track what's left and ingore
+    single object over packet size - can only display begging of object
+    
+    getmore
+    delete
+    killcursors
+
+ */
+
 #include "../util/message.h"
 #include "../db/dbmessage.h"
 #include "../client/dbclient.h"
@@ -22,10 +33,12 @@ using namespace std;
 using mongo::asserted;
 using mongo::Message;
 using mongo::DbMessage;
+using mongo::BSONObj;
 
 #define SNAP_LEN 1518
 
 int captureHeaderSize;
+set<int> serverPorts;
 
 /* IP header */
 struct sniff_ip {
@@ -90,8 +103,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 		return;
 	}
 
-    if ( ntohs( tcp->th_sport ) != 27017 &&
-         ntohs( tcp->th_dport ) != 27017 ){
+    if ( ! ( serverPorts.count( ntohs( tcp->th_sport ) ) ||
+             serverPorts.count( ntohs( tcp->th_dport ) ) ) ){
         return;
     }
 	
@@ -106,12 +119,15 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     DbMessage d( m );
     
     cout << inet_ntoa(ip->ip_src) << ":" << ntohs( tcp->th_sport ) 
-         << "  -->> "
+         << ( serverPorts.count( ntohs( tcp->th_dport ) ) ? "  -->> " : "  <<--  " )
          << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport ) 
          << " " << d.getns() 
          << "  " << m.data->len << " bytes "
-         << m.data->id << " - " << m.data->responseTo
-         << endl;
+         << m.data->id;
+    
+    if ( m.data->operation() == mongo::opReply )
+        cout << " - " << m.data->responseTo;
+    cout << endl;
 
     switch( m.data->operation() ){
     case mongo::opReply:{
@@ -126,6 +142,19 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     case mongo::dbQuery:{
         mongo::QueryMessage q(d);
         cout << "\tquery: " << q.query << endl;
+        break;
+    }
+    case mongo::dbUpdate:{
+        int flags = d.pullInt();
+        BSONObj q = d.nextJsObj();
+        BSONObj o = d.nextJsObj();
+        cout << "\tupdate  flags:" << flags << " q:" << q  << " o:" << o << endl;
+        break;
+    }
+    case mongo::dbInsert:{
+        cout << "\tinsert: " << d.nextJsObj() << endl;
+        while ( d.moreJSObjs() )
+            cout << "\t\t" << d.nextJsObj() << endl;
         break;
     }
     default:
@@ -155,6 +184,11 @@ int main(int argc, char **argv){
 		}
 	}
     
+    for ( int i=2; i<argc; i++ )
+        serverPorts.insert( atoi( argv[i] ) );
+    if ( ! serverPorts.size() )
+        serverPorts.insert( 27017 );
+
 	if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1){
         cerr << "can't get netmask!" << endl;
         return -1;
@@ -180,7 +214,12 @@ int main(int argc, char **argv){
 
 	assert( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, net) != -1 );
 	assert( pcap_setfilter(handle, &fp) != -1 );
-
+    
+    cout << "sniffing... ";
+    for ( set<int>::iterator i = serverPorts.begin(); i != serverPorts.end(); i++ )
+        cout << *i << " ";
+    cout << endl;
+    
 	pcap_loop(handle, 0 , got_packet, NULL);
 
 	pcap_freecode(&fp);
