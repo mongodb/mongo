@@ -1063,7 +1063,7 @@ namespace mongo {
             memcpy(r->data+4+newId->size(), ((char *)obuf)+4, addID-4);
 // TEMP:
 //            BSONObj foo(r->data);
-//            cout << "TEMP:" << foo.toString() << endl;
+//            cout << "tmp:" << foo.toString() << endl;
         }
         else {
             memcpy(r->data, obuf, len);

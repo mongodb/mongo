@@ -160,6 +160,8 @@ namespace mongo {
     public:
         void dump();
 
+        bool exists(IndexDetails& idx, DiskLoc thisLoc, BSONObj& key, BSONObj order);
+
         static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
 
         int bt_insert(DiskLoc thisLoc, DiskLoc recordLoc,
@@ -171,7 +173,8 @@ namespace mongo {
         /* locate may return an "unused" key that is just a marker.  so be careful.
              looks for a key:recordloc pair.
         */
-        DiskLoc locate(const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction=1);
+        DiskLoc locate(IndexDetails& , const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, 
+                       int& pos, bool& found, DiskLoc recordLoc, int direction=1);
 
         /* advance one key position in the index: */
         DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
@@ -195,7 +198,7 @@ namespace mongo {
         int _insert(DiskLoc thisLoc, DiskLoc recordLoc,
                     BSONObj& key, const BSONObj &order, bool dupsAllowed,
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
-        bool find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
+        bool find(IndexDetails& idx, BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
     };
 
@@ -203,9 +206,8 @@ namespace mongo {
         friend class BtreeBucket;
         BSONObj startKey;
         BSONObj endKey;
-//    BSONObj query; // the query we are working on in association with the cursor -- see noMoreMatches()
     public:
-        BtreeCursor(const IndexDetails&, const BSONObj& startKey, int direction, const BSONObj& query);
+        BtreeCursor(IndexDetails&, const BSONObj& startKey, int direction, const BSONObj& query);
         virtual bool ok() {
             return !bucket.isNull();
         }
@@ -288,7 +290,7 @@ namespace mongo {
 
         static string simpleRegexEnd( string regex );
 
-        const IndexDetails& indexDetails;
+        IndexDetails& indexDetails;
         BSONObj order;
         DiskLoc bucket;
         int keyOfs;

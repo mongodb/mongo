@@ -52,7 +52,7 @@ namespace NamespaceTests {
             static const char* ns() {
                 return "sys.unittest.indexdetailstests";
             }
-            const IndexDetails& id() {
+            IndexDetails& id() {
                 return id_;
             }
             virtual BSONObj key() const {

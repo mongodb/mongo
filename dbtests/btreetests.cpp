@@ -83,7 +83,7 @@ namespace BtreeTests {
             int pos;
             bool found;
             DiskLoc location =
-                bt()->locate( dl(), key, order(), pos, found, recordLoc(), direction );
+                bt()->locate( id(), dl(), key, order(), pos, found, recordLoc(), direction );
             ASSERT_EQUALS( expectedFound, found );
             ASSERT( location == expectedLocation );
             ASSERT_EQUALS( expectedPos, pos );

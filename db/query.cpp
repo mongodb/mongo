@@ -74,7 +74,7 @@ namespace mongo {
         }
     }
 
-    auto_ptr< Cursor > getHintCursor( const IndexDetails &ii, BSONObj query, BSONObj order, bool *simpleKeyMatch, bool *isSorted ) {
+    auto_ptr< Cursor > getHintCursor( IndexDetails &ii, BSONObj query, BSONObj order, bool *simpleKeyMatch, bool *isSorted ) {
         int direction = matchDirection( ii.keyPattern(), order );
         if ( isSorted ) *isSorted = ( direction != 0 );
         if ( direction == 0 )
