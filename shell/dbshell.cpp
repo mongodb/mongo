@@ -52,7 +52,7 @@ void quitNicely( int sig ){
 }
 
 void quitAbruptly( int sig ) {
-    KillMongodbInstances();
+    KillMongoProgramInstances();
     exit(14);    
 }
 
@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) {
                 << " -p<password> - notice no space\n"
                 << " --host <host> - server to connect to\n"
                 << " --port <port> - port to connect to\n"
-                << " --nodb don't connect to mongod on startup.  No 'db address' arg expected.\n"
+                << " --nodb don't connect to mongo program on startup.  No 'db address' arg expected.\n"
                 << "file names: a list of files to run.  will exit after unless --shell is specified\n"
                 ;
             
@@ -264,7 +264,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        MongodScope s;
+        MongoProgramScope s;
         if (!ExecuteString(source, file_name, false, true)){
             cout << "error processing: " << file_name << endl;
             return 1;
@@ -278,9 +278,9 @@ int main(int argc, char* argv[]) {
 
     if ( runShell ){
         
-        MongodScope s;
+        MongoProgramScope s;
 
-	shellHistoryInit();
+        shellHistoryInit();
         
         cout << "type \"help\" for help" << endl;
         

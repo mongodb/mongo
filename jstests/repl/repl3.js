@@ -17,7 +17,7 @@ big = new Array( 2000 ).toString();
 for( i = 0; i < 1000; ++i )
     am.save( { _id: new ObjectId(), i: i, b: big } );
 
-s = startMongodNoReset( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018", "--autoresync" );
+s = startMongoProgramNoReset( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018", "--autoresync" );
 
 // after SyncException, mongod waits 10 secs.
 sleep( 12000 );
