@@ -38,8 +38,6 @@ namespace mongo {
     
     namespace dbgrid_cmds {
         
-        // --- internal commands ---
-
         set<string> dbgridCommands;
 
         class GridAdminCmd : public Command {
@@ -55,6 +53,8 @@ namespace mongo {
             }
         };
         
+        // --------------- misc commands ----------------------
+
         class NetStatCmd : public GridAdminCmd {
         public:
             NetStatCmd() : GridAdminCmd("netstat") { }
@@ -64,6 +64,27 @@ namespace mongo {
                 return true;
             }
         } netstat;
+
+        class ListGridCommands : public GridAdminCmd {
+        public:
+            ListGridCommands() : GridAdminCmd("gridcommands") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+                BSONObjBuilder arr;
+                int num=0;
+                for ( set<string>::iterator i = dbgridCommands.begin(); i != dbgridCommands.end(); i++ ){
+                    string s = BSONObjBuilder::numStr( num++ );
+                    arr.append( s.c_str() , *i );
+                }
+                
+                result.appendArray( "commands" , arr.done() );
+                result.append("ok" , 1 );
+                return true;
+            }
+        } listGridCommands;        
+
+
+        // ------------ database level commands -------------
         
         class ListDatabaseCommand : public GridAdminCmd {
         public:
@@ -90,23 +111,7 @@ namespace mongo {
             }
         } gridListDatabase;
 
-        class ListGridCommands : public GridAdminCmd {
-        public:
-            ListGridCommands() : GridAdminCmd("gridcommands") { }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                
-                BSONObjBuilder arr;
-                int num=0;
-                for ( set<string>::iterator i = dbgridCommands.begin(); i != dbgridCommands.end(); i++ ){
-                    string s = BSONObjBuilder::numStr( num++ );
-                    arr.append( s.c_str() , *i );
-                }
-                
-                result.appendArray( "commands" , arr.done() );
-                result.append("ok" , 1 );
-                return true;
-            }
-        } listGridCommands;        
+        // ------------ server level commands -------------
 
         class ListServers : public GridAdminCmd {
         public:
@@ -169,7 +174,7 @@ namespace mongo {
         } removeServer;
 
         
-        // --- public commands ---
+        // --------------- public commands ----------------
 
         class IsDbGridCmd : public Command {
         public:
