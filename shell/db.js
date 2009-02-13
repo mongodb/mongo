@@ -20,6 +20,13 @@ DB.prototype.getCollection = function( name ){
     return new DBCollection( this._mongo , this , name , this._name + "." + name );
 }
 
+DB.prototype.commandHelp = function( name ){
+    var c = {};
+    c[name] = 1;
+    c.help = true;
+    return this.runCommand( c ).help;
+}
+
 DB.prototype.runCommand = function( obj ){
     if ( typeof( obj ) == "string" ){
         var n = {};
@@ -187,6 +194,7 @@ DB.prototype.help = function() {
     print("\tdb.getName()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
+    print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.addUser(username, password)");
     print("\tdb.removeUser(username)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
