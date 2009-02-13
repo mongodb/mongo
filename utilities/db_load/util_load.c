@@ -183,8 +183,8 @@ format:		fprintf(stderr,
 int
 bulk_read(DBT *dbt, int iskey)
 {
-	static u_int32_t line;
-	u_int32_t len;
+	static u_int64_t line = 0;
+	size_t len;
 	int ch, ret;
 
 	++line;
@@ -192,7 +192,7 @@ bulk_read(DBT *dbt, int iskey)
 		if ((ch = getchar()) == EOF) {
 			if (iskey && len == 0)
 				return (1);
-			fprintf(stderr, "%s: corrupted input at line %lu\n",
+			fprintf(stderr, "%s: corrupted input at line %llu\n",
 			    progname, line);
 			return (WT_ERROR);
 		}
