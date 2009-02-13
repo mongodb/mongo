@@ -24,8 +24,6 @@
 
 namespace mongo {
 
-    extern bool startupUnitTesting = true;
-
 #define VERIFYTHISLOC dassert( thisLoc.btree() == this );
 
     const int KeyMax = BucketSize / 10;
@@ -296,6 +294,26 @@ namespace mongo {
         }
     }
 
+    extern DiskLoc minDiskLoc;
+
+    bool BtreeBucket::exists(IndexDetails& idx, DiskLoc thisLoc, BSONObj& key, BSONObj order) { 
+        int pos;
+        bool found;
+        DiskLoc b = locate(idx, thisLoc, key, order, pos, found, minDiskLoc);
+
+        // skip unused keys
+        while ( 1 ) {
+            if( b.isNull() )
+                break;
+            BtreeBucket *bucket = b.btree();
+            _KeyNode& kn = bucket->k(pos);
+            if ( kn.isUsed() )
+                return bucket->keyAt(pos).woEqual(key);
+            b = bucket->advance(b, pos, 1, "BtreeBucket::exists");
+        }
+        return false;
+    }
+
     /* Find a key withing this btree bucket.
  
        When duplicate keys are allowed, we use the DiskLoc of the record as if it were part of the 
@@ -310,7 +328,7 @@ namespace mongo {
        note result might be an Unused location!
     */
 	char foo;
-    bool BtreeBucket::find(BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup) {
+    bool BtreeBucket::find(IndexDetails& idx, BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup) {
 #if defined(_EXPERIMENT1)
 		{
 			char *z = (char *) this;
@@ -324,6 +342,7 @@ namespace mongo {
 		}
 #endif
         /* binary search for this key */
+        bool dupsChecked = false;
         int l=0;
         int h=n-1;
         while ( l <= h ) {
@@ -331,8 +350,20 @@ namespace mongo {
             KeyNode M = keyNode(m);
             int x = key.woCompare(M.key, order);
             if ( x == 0 ) { 
-                uassert("E11000 duplicate key error", k(m).isUnused() || !assertIfDup);
-                //uassert("E11000 duplicate key error", !assertIfDup);
+                if( assertIfDup ) {
+                    if( k(m).isUnused() ) { 
+                        // ok that key is there if unused.  but we need to check that there aren't other 
+                        // entries for the key then.  as it is very rare that we get here, we don't put any 
+                        // coding effort in here to make this particularly fast
+                        if( !dupsChecked ) { 
+                            dupsChecked = true;
+                            if( idx.head.btree()->exists(idx, idx.head, key, order) )
+                                uasserted("E11000 duplicate key error");
+                        }
+                    }
+                    else
+                        uasserted("E11000 duplicate key error");
+                }
 
                 // dup keys allowed.  use recordLoc as if it is part of the key
                 DiskLoc unusedRL = M.recordLoc;
@@ -439,7 +470,7 @@ found:
 
         int pos;
         bool found;
-        DiskLoc loc = locate(thisLoc, key, id.keyPattern(), pos, found, recordLoc, 1);
+        DiskLoc loc = locate(id, thisLoc, key, id.keyPattern(), pos, found, recordLoc, 1);
         if ( found ) {
             loc.btree()->delKeyAtPos(loc, id, pos);
             return true;
@@ -673,9 +704,9 @@ found:
         return DiskLoc();
     }
 
-    DiskLoc BtreeBucket::locate(const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction) {
+    DiskLoc BtreeBucket::locate(IndexDetails& idx, const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction) {
         int p;
-        found = find(key, recordLoc, order, p, /*assertIfDup*/ false);
+        found = find(idx, key, recordLoc, order, p, /*assertIfDup*/ false);
         if ( found ) {
             pos = p;
             return thisLoc;
@@ -684,7 +715,7 @@ found:
         DiskLoc child = childForPos(p);
 
         if ( !child.isNull() ) {
-            DiskLoc l = child.btree()->locate(child, key, order, pos, found, recordLoc, direction);
+            DiskLoc l = child.btree()->locate(idx, child, key, order, pos, found, recordLoc, direction);
             if ( !l.isNull() )
                 return l;
         }
@@ -707,7 +738,7 @@ found:
         assert( key.objsize() > 0 );
 
         int pos;
-        bool found = find(key, recordLoc, order, pos, !dupsAllowed);
+        bool found = find(idx, key, recordLoc, order, pos, !dupsAllowed);
         if ( insert_debug ) {
             out() << "  " << thisLoc.toString() << '.' << "_insert " <<
                  key.toString() << '/' << recordLoc.toString() <<
@@ -765,7 +796,7 @@ found:
             out() << '\n';
             KeyNode k = keyNode(i);
             out() << '\t' << i << '\t' << k.key.toString() << "\tleft:" << hex <<
-                 k.prevChildBucket.getOfs() << "\tRecLoc:" << k.recordLoc.getOfs() << dec;
+                 k.prevChildBucket.getOfs() << "\tRecLoc:" << k.recordLoc.toString() << dec;
             if ( this->k(i).isUnused() )
                 out() << " UNUSED";
         }
@@ -813,19 +844,46 @@ namespace mongo {
 
     void BtreeBucket::a_test(IndexDetails& id) {
         BtreeBucket *b = id.head.btree();
+
+        // record locs for testing
+        DiskLoc A(1, 20);
+        DiskLoc B(1, 30);
+        DiskLoc C(1, 40);
+
         DiskLoc rl;
         BSONObj key = fromjson("{x:9}");
         BSONObj order = fromjson("{}");
-        b->bt_insert(id.head, rl, key, order, false, id);
 
+        b->bt_insert(id.head, A, key, order, true, id);
+        A.GETOFS() += 2;
+        b->bt_insert(id.head, A, key, order, true, id);
+        A.GETOFS() += 2;
+        b->bt_insert(id.head, A, key, order, true, id);
+        A.GETOFS() += 2;
+        b->bt_insert(id.head, A, key, order, true, id);
+        A.GETOFS() += 2;
         assert( b->k(0).isUsed() );
-        b->k(0).setUnused();
+//        b->k(0).setUnused();
+        b->k(1).setUnused();
+        b->k(2).setUnused();
+        b->k(3).setUnused();
 
-//        b->delKeyAtPos(id.head, id, 0);
+        b->dumpTree(id.head, order);
+
+/*        b->bt_insert(id.head, B, key, order, false, id);
+        b->k(1).setUnused();
+
         b->dumpTree(id.head, order);
         cout << "---\n";
 
-        b->bt_insert(id.head, rl, key, order, false, id);
+        b->bt_insert(id.head, A, key, order, false, id);
+
+        b->dumpTree(id.head, order);
+        cout << "---\n";*/
+
+        // this should assert.  does it? (it might "accidentally" though, not asserting proves a problem, asserting proves nothing)
+        b->bt_insert(id.head, C, key, order, false, id);
+
         b->dumpTree(id.head, order);
     }
 
