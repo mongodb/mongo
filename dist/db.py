@@ -11,7 +11,7 @@
 import getopt, random, sys
 
 dmin = 7			# Minimum data size
-dmax = 37			# Maximum data size
+dmax = 837			# Maximum data size
 
 seed = None			# Random number seed
 pairs = 100000			# Key/data pairs to output
