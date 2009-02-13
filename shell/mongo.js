@@ -83,16 +83,29 @@ _portAndDbpath = function() {
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
 startMongod = function() {
-    var dbpath = _portAndDbpath.apply( null, arguments ).dbpath;
-    resetDbpath( dbpath );
-    return startMongodNoReset.apply( null, arguments );
+    var fullArgs = Array();
+    fullArgs[ 0 ] = "mongod";
+    for( i = 0; i < arguments.length; ++i )
+        fullArgs[ i + 1 ] = arguments[ i ];
+    return startMongoProgram.apply( null, fullArgs );
 }
 
-// Same as startDb, but uses existing files in dbpath
-startMongodNoReset = function() {
+// Start a mongo program instance (generally mongod or mongos) and return a
+// 'Mongo' object connected to it.  This function's first argument is the
+// program name, and subsequent arguments to this function are passed as
+// command line arguments to the program.  The specified 'dbpath' is cleared if
+// it exists, created if not.
+startMongoProgram = function() {
+    var dbpath = _portAndDbpath.apply( null, arguments ).dbpath;
+    resetDbpath( dbpath );
+    return startMongoProgramNoReset.apply( null, arguments );    
+}
+
+// Same as startMongoProgram, but uses existing files in dbpath
+startMongoProgramNoReset = function() {
     var port = _portAndDbpath.apply( null, arguments ).port;
-    
-    _startMongod.apply( null, arguments );
+
+    _startMongoProgram.apply( null, arguments );
     
     var m;
     assert.soon
