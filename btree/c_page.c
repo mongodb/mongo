@@ -215,6 +215,7 @@ __wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep)
 	IDB *idb;
 	IENV *ienv;
 	WT_PAGE *page;
+	WT_PAGE_HDR *hdr;
 	int ret;
 
 	*pagep = NULL;
@@ -242,8 +243,6 @@ __wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep)
 
 	if (page == NULL)
 		WT_PAGE_ALLOC(env, bytes, page, ret);
-	else
-		memset(page->hdr, 0, (size_t)bytes);
 
 	/* Initialize the page. */
 	page->offset = idb->fh->file_size;
@@ -417,6 +416,7 @@ __wt_cache_clean(ENV *env, u_int32_t bytes, WT_PAGE **pagep)
 {
 	IENV *ienv;
 	WT_PAGE *page;
+	WT_PAGE_HDR *hdr;
 	u_int64_t bytes_free, bytes_need_free;
 	int ret;
 
@@ -452,8 +452,14 @@ __wt_cache_clean(ENV *env, u_int32_t bytes, WT_PAGE **pagep)
 			    &ienv->hqh[WT_HASH(ienv, page->offset)], page, hq);
 			TAILQ_REMOVE(&ienv->lqh, page, q);
 
+			/* Clear the page. */
 			if (page->indx != NULL)
-			    __wt_bt_page_indx_clean(env, page, 0);
+			    __wt_bt_page_recycle(env, page, 0);
+			hdr = page->hdr;
+			memset(hdr, 0, (size_t)bytes);
+			memset(page, 0, sizeof(WT_PAGE));
+			page->hdr = hdr;
+			page->bytes = bytes;
 
 			*pagep = page;
 			return (0);
@@ -536,7 +542,7 @@ __wt_cache_discard(ENV *env, WT_PAGE *page)
 	TAILQ_REMOVE(&ienv->lqh, page, q);
 
 	if (page->indx != NULL)
-		__wt_bt_page_indx_clean(env, page, 1);
+		__wt_bt_page_recycle(env, page, 1);
 
 	WT_STAT_DECR(env->hstats, CACHE_CLEAN, NULL);
 
