@@ -164,7 +164,7 @@ struct __wt_page_desc {
 };
 /*
  * WT_PAGE_DESC_SIZE is the expected structure size --  we check at startup to
- * make sure the compiler hasn't inserted padding (which would break the world).
+ * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_PAGE_DESC_SIZE		64
 
@@ -257,7 +257,7 @@ struct __wt_page_hdr {
 };
 /*
  * WT_PAGE_HDR_SIZE is the expected structure size --  we check at startup to
- * make sure the compiler hasn't inserted padding (which would break the world).
+ * ensure the compiler hasn't inserted padding (which would break the world).
  * The size must be a multiple of a 4-byte boundary.
  *
  * It would be possible to reduce this by two bytes, by moving the odd-sized
@@ -390,7 +390,7 @@ struct __wt_item_offp {
 };
 /*
  * WT_ITEM_OFFP_SIZE is the expected structure size --  we check at startup to
- * make sure the compiler hasn't inserted padding (which would break the world).
+ * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_ITEM_OFFP_SIZE	16
 
@@ -404,7 +404,7 @@ struct __wt_item_ovfl {
 };
 /*
  * WT_ITEM_OVFL_SIZE is the expected structure size --  we check at startup to
- * make sure the compiler hasn't inserted padding (which would break the world).
+ * ensure the compiler hasn't inserted padding (which would break the world).
  * The size must be a multiple of a 4-byte boundary.
  */
 #define	WT_ITEM_OVFL_SIZE	8
