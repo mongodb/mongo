@@ -1,4 +1,4 @@
-// gridconfig.cpp
+// config.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -22,7 +22,7 @@
 #include "../client/connpool.h"
 #include "../client/model.h"
 #include "../db/pdfile.h"
-#include "gridconfig.h"
+#include "config.h"
 #include "configserver.h"
 
 namespace mongo {

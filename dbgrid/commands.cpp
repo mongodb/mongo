@@ -18,10 +18,6 @@
 
 /* TODO
    _ concurrency control.
-     _ connection pool
-     _ hostbyname_nonreentrant() problem
-   _ gridconfig object which gets config from the grid db.
-     connect to iad-sb-grid
    _ limit() works right?
    _ KillCursors
 
@@ -34,7 +30,7 @@
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
-#include "gridconfig.h"
+#include "config.h"
 #include "configserver.h"
 
 namespace mongo {

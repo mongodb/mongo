@@ -25,7 +25,7 @@
 #pragma once
 
 #include "../client/dbclient.h"
-#include "gridconfig.h"
+#include "config.h"
 
 namespace mongo {
 
