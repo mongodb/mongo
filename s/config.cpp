@@ -83,7 +83,7 @@ namespace mongo {
         return name;
     }
 
-    DBConfig* Grid::getDBConfig( string database ){
+    DBConfig* Grid::getDBConfig( string database , bool create ){
         {
             string::size_type i = database.find( "." );
             if ( i != string::npos )
@@ -94,16 +94,22 @@ namespace mongo {
             return &configServer;
 
         DBConfig*& cc = _databases[database];
-        if ( cc == 0 ) {
+        if ( cc == 0 ){
             cc = new DBConfig( database );
-            if ( !cc->loadByName(database.c_str()) ) {
-                // note here that cc->primary == 0.
-                log() << "couldn't find database [" << database << "] in config db" << endl;
-                
-                cc->_primary = pickServerForNewDB();
-                cc->save();
-                log() << "\t put [" << database << "] on: " << cc->_primary << endl;
+            if ( ! cc->loadByName(database.c_str()) ){
+                if ( create ){
+                    // note here that cc->primary == 0.
+                    log() << "couldn't find database [" << database << "] in config db" << endl;
+                    
+                    cc->_primary = pickServerForNewDB();
+                    cc->save();
+                    log() << "\t put [" << database << "] on: " << cc->_primary << endl;
+                }
+                else {
+                    cc = 0;
+                }
             }
+            
         }
         
         return cc;

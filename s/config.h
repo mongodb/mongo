@@ -81,7 +81,7 @@ namespace mongo {
            gets the config the db.
            will return an empty DBConfig if not in db already
          */
-        DBConfig * getDBConfig( string ns );
+        DBConfig * getDBConfig( string ns , bool create=true);
         
         string pickServerForNewDB();
         
