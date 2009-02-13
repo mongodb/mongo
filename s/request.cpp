@@ -19,22 +19,6 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* TODO
-   _ GridD
-
-
-   _ concurrency control.
-     _ connection pool
-     _ hostbyname_nonreentrant() problem
-   _ gridconfig object which gets config from the grid db.
-     connect to iad-sb-grid
-   _ limit() works right?
-   _ KillCursors
-
-   later
-   _ secondary indexes
-*/
-
 #include "stdafx.h"
 #include "server.h"
 #include "../db/commands.h"
@@ -42,8 +26,7 @@
 #include "../client/connpool.h"
 
 #include "request.h"
-#include "gridconfig.h"
-#include "configserver.h"
+#include "config.h"
 
 namespace mongo {
 

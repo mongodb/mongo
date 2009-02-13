@@ -63,5 +63,6 @@ whereExample
 #tests
 test
 authTest
+perftest
 clientTest
 

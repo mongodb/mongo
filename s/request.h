@@ -5,7 +5,7 @@
 #include "../stdafx.h"
 #include "../util/message.h"
 #include "../db/dbmessage.h"
-#include "gridconfig.h"
+#include "config.h"
 
 namespace mongo {
     

@@ -65,6 +65,8 @@ namespace mongo {
             return false;
         }
 
+        virtual void help( stringstream& help ) const;
+
         /* Return true if authentication and security applies to the commands.  Some commands 
            (e.g., getnonce, authenticate) can be done by anyone even unauthorized.
         */
