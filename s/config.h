@@ -57,6 +57,10 @@ namespace mongo {
                 throw UserException( (string)"no primary server configured for db: " + _name );
             return _primary;
         }
+        
+        void setPrimary( string s ){
+            _primary = s;
+        }
 
         virtual string modelServer();
 

@@ -111,6 +111,89 @@ namespace mongo {
             }
         } gridListDatabase;
 
+        class MoveDatabasePrimaryCommand : public GridAdminCmd {
+        public:
+            MoveDatabasePrimaryCommand() : GridAdminCmd("moveprimary") { }
+            virtual void help( stringstream& help ) const {
+                help << " example: { moveprimary : 'foo' , to : 'localhost:9999' } TODO: locking? ";
+            }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string dbname = cmdObj["moveprimary"].valuestrsafe();
+
+                if ( dbname.size() == 0 ){
+                    errmsg = "no db";
+                    return false;
+                }
+
+                if ( dbname == "config" ){
+                    errmsg = "can't move config db";
+                    return false;
+                }
+                
+                DBConfig * config = grid.getDBConfig( dbname , false );
+                if ( ! config ){
+                    errmsg = "can't find db!";
+                    return false;
+                }
+                
+                string to = cmdObj["to"].valuestrsafe();
+                if ( ! to.size()  ){
+                    errmsg = "you have to specify where you want to move it";
+                    return false;
+                }
+
+                if ( to == config->getPrimary() ){
+                    errmsg = "thats already the primary";
+                    return false;
+                }
+
+                ScopedDbConnection conn( configServer.getPrimary() );                
+                
+                BSONObj server = conn->findOne( "config.servers" , BSON( "host" << to ) );
+                if ( server.isEmpty() ){
+                    errmsg = "that server isn't known to me";
+                    conn.done();
+                    return false;
+                }
+                
+                log() << "moving " << dbname << " primary from: " << config->getPrimary() << " to: " << to << endl;
+                
+                // TODO LOCKING: this is not safe with multiple mongos
+                
+
+                ScopedDbConnection toconn( to );
+
+                // TODO AARON - we need a clone command which replays operations from clone start to now
+                //              using a seperate smaller oplog
+                BSONObj cloneRes;
+                bool worked = toconn->runCommand( "admin" , BSON( "clone" << config->getPrimary() ) , cloneRes );
+                toconn.done();
+                if ( ! worked ){
+                    log() << "clone failed" << cloneRes << endl;
+                    errmsg = "clone failed";
+                    conn.done();
+                    return false;
+                }
+
+                ScopedDbConnection fromconn( config->getPrimary() );
+                
+                config->setPrimary( to );
+                config->save();
+                
+                log() << " dropping " << dbname << " from old" << endl;
+
+                fromconn->dropDatabase( dbname.c_str() );
+                fromconn.done();
+
+                result << "ok" << 1;
+                result << "primary" << to;
+
+                conn.done();
+                return true;
+            }
+        } movePrimary;
+
+
         // ------------ server level commands -------------
 
         class ListServers : public GridAdminCmd {
