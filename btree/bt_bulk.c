@@ -839,7 +839,8 @@ __wt_bt_dbt_copy(ENV *env, DBT *orig, DBT *copy)
 	int ret;
 
 	if (copy->data == NULL || copy->data_len < orig->size) {
-		if ((ret = __wt_realloc(env, orig->size, &copy->data)) != 0)
+		if ((ret = __wt_realloc(
+		    env, copy->data_len, orig->size, &copy->data)) != 0)
 			return (ret);
 		copy->data_len = orig->size;
 	}

@@ -64,11 +64,20 @@ __wt_open_mfp(ENV *env)
 #endif
 
 /*
+ * __wt_malloc --
+ *
+ * There's no malloc interface, WiredTiger never calls malloc.  The problem is
+ * an application might: allocate memory, write secret stuff into it, free the
+ * memory, we allocate the memory, and then use it for a database page or log
+ * record and write it to disk.  That would result in the secret stuff being
+ * protected by the WiredTiger permission mechanisms, potentially inappropriate
+ * for the secret stuff.
+ *
  * __wt_calloc --
  *	ANSI calloc function.
  */
 int
-__wt_calloc(ENV *env, size_t number, size_t size, void *retp)
+__wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
 {
 	void *p;
 
@@ -79,7 +88,7 @@ __wt_calloc(ENV *env, size_t number, size_t size, void *retp)
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
-	if ((p = calloc(number, size)) == NULL)
+	if ((p = calloc(number, (size_t)size)) == NULL)
 		return (WT_ERROR);
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
@@ -88,40 +97,6 @@ __wt_calloc(ENV *env, size_t number, size_t size, void *retp)
 	if (debug_addr == p)
 		__wt_debug_loadme("allocation", p);
 	fprintf(__wt_mfp, "A\t%lx\n", (u_long)p);
-#endif
-
-	*(void **)retp = p;
-	return (0);
-}
-
-/*
- * __wt_malloc --
- *	ANSI malloc function.
- */
-int
-__wt_malloc(ENV *env, size_t bytes_to_allocate, void *retp)
-{
-	void *p;
-
-	/*
-	 * !!!
-	 * This function MUST handle a NULL ENV structure reference.
-	 */
-	WT_ASSERT(env, env == NULL || bytes_to_allocate != 0);
-
-	if ((p = malloc(bytes_to_allocate)) == NULL)
-		return (WT_ERROR);
-
-#ifdef HAVE_DIAGNOSTIC_MEMORY
-	if (__wt_mfp == NULL && __wt_open_mfp(env) != 0)
-		return (WT_ERROR);
-	if (debug_addr == p)
-		__wt_debug_loadme("allocation", p);
-	fprintf(__wt_mfp, "A\t%lx\n", (u_long)p);
-#endif
-
-#ifdef HAVE_DIAGNOSTIC
-	memset(p, OVERWRITE_BYTE, bytes_to_allocate);
 #endif
 
 	*(void **)retp = p;
@@ -133,7 +108,8 @@ __wt_malloc(ENV *env, size_t bytes_to_allocate, void *retp)
  *	ANSI realloc function.
  */
 int
-__wt_realloc(ENV *env, size_t bytes_to_allocate, void *retp)
+__wt_realloc(ENV *env,
+    u_int32_t bytes_allocated, u_int32_t bytes_to_allocate, void *retp)
 {
 	void *p;
 
@@ -147,7 +123,6 @@ __wt_realloc(ENV *env, size_t bytes_to_allocate, void *retp)
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
-	WT_ASSERT(env, env == NULL || bytes_to_allocate != 0);
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (p != NULL) {
@@ -156,8 +131,15 @@ __wt_realloc(ENV *env, size_t bytes_to_allocate, void *retp)
 		fprintf(__wt_mfp, "F\t%lx\n", (u_long)p);
 	}
 #endif
-	if ((p = realloc(p, bytes_to_allocate)) == NULL)
+	if ((p = realloc(p, (size_t)bytes_to_allocate)) == NULL)
 		return (WT_ERROR);
+
+	/*
+	 * Clear allocated memory -- see comment above concerning __wt_malloc
+	 * as to why this is required.
+	 */
+	memset((u_int8_t *)
+	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
@@ -186,7 +168,7 @@ __wt_strdup(ENV *env, const char *str, void *retp)
 	 */
 
 	len = strlen(str) + 1;
-	if ((ret = __wt_malloc(env, len, &p)) != 0)
+	if ((ret = __wt_calloc(env, len, 1, &p)) != 0)
 		return (ret);
 
 	memcpy(p, str, len);

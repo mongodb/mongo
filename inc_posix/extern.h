@@ -153,9 +153,8 @@ __wt_abort(ENV *env);
 int
 __wt_calloc(ENV *env, size_t number, size_t size, void *retp);
 int
-__wt_malloc(ENV *env, size_t bytes_to_allocate, void *retp);
-int
-__wt_realloc(ENV *env, size_t bytes_to_allocate, void *retp);
+__wt_realloc(ENV *env,
+    size_t bytes_allocated, size_t bytes_to_allocate, void *retp);
 int
 __wt_strdup(ENV *env, const char *str, void *retp);
 void

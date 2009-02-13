@@ -222,8 +222,9 @@ __wt_bt_page_inmem_append(DB *db,
 			idb->indx_size_hint = n;
 		else
 			n = idb->indx_size_hint;
-		if ((ret = __wt_realloc(
-		    env, n * sizeof(page->indx[0]), &page->indx)) != 0)
+		if ((ret = __wt_realloc(env,
+		    page->indx_size * sizeof(page->indx[0]),
+		    n * sizeof(page->indx[0]), &page->indx)) != 0)
 			return (ret);
 		page->indx_size = n;
 	}

@@ -77,7 +77,8 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 	env = db->env;
 
 	if (copy->data == NULL || copy->data_len < len) {
-		if ((ret = __wt_realloc(env, len, &copy->data)) != 0)
+		if ((ret =
+		    __wt_realloc(env, copy->data_len, len, &copy->data)) != 0)
 			return (ret);
 		copy->data_len = len;
 	}

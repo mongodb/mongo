@@ -23,7 +23,6 @@ __wt_bt_dbt_return(DB *db, DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip)
 	DBT *local_dbt;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
-	u_int32_t size;
 	int ret;
 
 	idb = db->idb;
@@ -106,16 +105,19 @@ __wt_bt_dbt_copy(DB *db, DBT *dbt, DBT *local_dbt, u_int8_t *p, u_int32_t size)
 	 * for the appropriate flags.
 	 */
 	if (F_ISSET(dbt, WT_DBT_ALLOC)) {
-		if (dbt->data_len < size &&
-		    (ret = __wt_realloc(env, size, &dbt->data)) != 0)
-			return (ret);
+		if (dbt->data_len < size) {
+			if ((ret = __wt_realloc(
+			    env, dbt->data_len, size, &dbt->data)) != 0)
+				return (ret);
+			dbt->data_len = size;
+		}
 	} else if (F_ISSET(dbt, WT_DBT_APPMEM)) {
 		if (dbt->data_len < size)
 			return (WT_TOOSMALL);
 	} else {
 		if (local_dbt->data_len < size) {
 			if ((ret = __wt_realloc(
-			    env, size + 40, &local_dbt->data)) != 0)
+			    env, size, size + 40, &local_dbt->data)) != 0)
 				return (ret);
 			local_dbt->data_len = size + 40;
 		}

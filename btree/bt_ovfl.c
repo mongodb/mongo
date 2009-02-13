@@ -138,7 +138,7 @@ __wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
 	if ((ret = __wt_bt_ovfl_in(db, ip->addr, ip->size, &ovfl_page)) != 0)
 		return (ret);
 
-	if ((ret = __wt_realloc(env, ip->size, &ip->data)) != 0)
+	if ((ret = __wt_calloc(env, ip->size, 1, &ip->data)) != 0)
 		return (ret);
 	memcpy(ip->data, WT_PAGE_BYTE(ovfl_page), ip->size);
 
