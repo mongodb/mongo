@@ -63,7 +63,7 @@ __wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep);
 int
 __wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags);
 void
-__wt_bt_page_indx_clean(ENV *env, WT_PAGE *page, int free_indx);
+__wt_bt_page_recycle(ENV *env, WT_PAGE *page, int free_indx);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int

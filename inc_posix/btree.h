@@ -234,6 +234,7 @@ struct __wt_page_hdr {
 	 */
 #define	WT_LEAF_LEVEL		0	/* Level 0: the leaf page */
 #define	WT_FIRST_INTERNAL_LEVEL	1	/* Level 1: the bottom internal level */
+#define	WT_ISLEAF(l)	((l) == WT_LEAF_LEVEL)
 	u_int8_t level;			/* 09: tree level */
 
 	u_int8_t unused[2];		/* 10-11: unused padding */
