@@ -37,6 +37,13 @@ extern "C" {
 @u_int32_decl@
 @int64_decl@
 @u_int64_decl@
+
+@u_char_decl@
+@u_short_decl@
+@u_int_decl@
+@u_long_decl@
+@u_quad_decl@
+
 @uintmax_t_decl@
 @uintptr_t_decl@
 

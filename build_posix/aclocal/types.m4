@@ -68,6 +68,9 @@ AC_DEFUN([AM_TYPES], [
 	AC_SUBST(u_long_decl)
 	AC_CHECK_TYPE(u_long,,
 	    [u_long_decl="typedef unsigned long u_long;"], $std_includes)
+	AC_SUBST(u_quad_decl)
+	AC_CHECK_TYPE(u_quad,,
+	    [u_quad_decl="typedef unsigned long long u_quad;"], $std_includes)
 
 	# Look for fixed-size type names, and if we don't find them, create
 	# our own.

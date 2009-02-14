@@ -348,9 +348,9 @@ __wt_cache_db_in(DB *db,
 		hdr->checksum = 0;
 		if (checksum != __wt_cksum(hdr, bytes)) {
 			__wt_db_errx(db,
-			    "file offset %lu with length %lu was read and "
+			    "file offset %llu with length %lu was read and "
 			    "had a checksum error",
-			    (u_long)offset, (u_long)bytes);
+			    (u_quad)offset, (u_long)bytes);
 			ret = WT_ERROR;
 			goto err;
 		}

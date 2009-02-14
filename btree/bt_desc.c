@@ -101,9 +101,9 @@ __wt_bt_desc_dump(WT_PAGE *page, FILE *fp)
 
 	fprintf(fp, "magic: %#lx, major: %lu, minor: %lu\n",
 	    (u_long)desc.magic, (u_long)desc.majorv, (u_long)desc.minorv);
-	fprintf(fp, "intlsize: %lu, leafsize: %lu, base record: %lu\n",
+	fprintf(fp, "intlsize: %lu, leafsize: %lu, base record: %llu\n",
 	    (u_long)desc.intlsize,
-	    (u_long)desc.leafsize, (u_long)desc.base_recno);
+	    (u_long)desc.leafsize, desc.base_recno);
 	if (desc.root_addr == WT_ADDR_INVALID)
 		fprintf(fp, "root addr (none), ");
 	else

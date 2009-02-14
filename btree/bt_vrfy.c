@@ -416,9 +416,8 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 	if (child->records != offp->records) {
 		__wt_db_errx(db,
 		    "parent of page at addr %lu has incorrect record count "
-		    "(parent: %lu, child: %lu)",
-		    (u_long)addr,
-		    (u_long)offp->records, (u_long)child->records);
+		    "(parent: %llu, child: %llu)",
+		    (u_long)addr, offp->records, child->records);
 		goto err;
 	}
 
