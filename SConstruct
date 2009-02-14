@@ -522,7 +522,7 @@ perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
-if nix:
+if nix and darwin:
     sniffEnv = clientEnv.Clone()
     sniffEnv.Append( LIBS=[ "pcap" ] )
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
