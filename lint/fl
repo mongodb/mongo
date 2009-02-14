@@ -41,6 +41,10 @@ done
 # List of source files.
 l="../btree/*.c ../connect/*.c ../db/*.c ../env/*.c ../os_posix/*.c
    ../support/*.c"
+
+# Don't lint all of them.
+l=`echo $l |
+    sed -e 's/\.\.\/support\/single_setup.c//'`
 l=`ls $l`
 
 if [ $# -ne 0 ]; then
