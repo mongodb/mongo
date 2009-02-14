@@ -304,14 +304,17 @@ struct __wt_item {
 };
 
 /*
- * Item type.  There are 3 basic types: keys, data items and duplicate data
+ * Item type: there are 3 basic types: keys, data items and duplicate data
  * items, each of which has an overflow form.  Each of the items is followed
  * by additional information, which varies by type: a key, data or duplicate
  * item is followed by a set of bytes; a WT_ITEM_OVFL structure follows an
  * overflow item.
  *
  * On internal (primary or duplicate) pages, there are pairs of items: a
- * WT_ITEM_KEY/KEY_OVFL item followed by a WT_ITEM_OFFPAGE item.
+ * WT_ITEM_KEY/KEY_OVFL item followed by a WT_ITEM_OFFP_LEAF/INTL item.
+ * We use different values for references to internal pages (OFFP_INTL)
+ * vs. references to leaf pages (OFFP_LEAF) because we need to know the
+ * size of the page we're about to read.
  *
  * On primary leaf pages, there's a WT_ITEM_KEY/KEY_OVFL item followed by one
  * WT_ITEM_DATA, WT_ITEM_DATA_OVFL or WT_ITEM_OFFPAGE item, or a WT_ITEM_KEY/
@@ -332,7 +335,8 @@ struct __wt_item {
 #define	WT_ITEM_DATA_OVFL	0x04000000 /* Leaf page overflow data item */
 #define	WT_ITEM_DUP		0x05000000 /* Duplicate data item */
 #define	WT_ITEM_DUP_OVFL	0x06000000 /* Duplicate overflow data item */
-#define	WT_ITEM_OFFPAGE		0x07000000 /* Offpage reference */
+#define	WT_ITEM_OFFP_INTL	0x07000000 /* Offpage internal page reference */
+#define	WT_ITEM_OFFP_LEAF	0x08000000 /* Offpage leaf page reference */
 
 #define	WT_ITEM_LEN(item)						\
 	((item)->__item_chunk & 0x00ffffff)
@@ -372,28 +376,26 @@ struct __wt_item {
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))		\
 /*
  * Btree internal items and off-page duplicates reference another page.
+ *
+ * !!!
+ * There's some ugliness here.  We need a page's size before reading it, and as
+ * internal and leaf nodes are potentially of different sizes, we have to know
+ * the page's tree level to know its size.  We could store the level or type of
+ * the root of the off-page tree in the WT_ITEM_OFFP structure, but that costs
+ * another 4 bytes, with alignment.  Instead of paying that cost, we encode the
+ * information in the item type, using WT_ITEM_OFFP_INTL for an internal page
+ * reference, and WT_ITEM_OFFP_LEAF for a leaf page reference.  It complicates
+ * the code of course, but paying 4 bytes per internal page item pair is real.
  */
 struct __wt_item_offp {
 	u_int64_t records;		/* Subtree record count */
 	u_int32_t addr;			/* Subtree address */
-	u_int8_t  level;		/* Subtree level */
-	/*
-	 * We could compress this structure by incorporating the btree level
-	 * into the records field, the same we we did for the length and the
-	 * type fields of the WT_ITEM structure.  I'm not doing so for a two
-	 * reasons: (1) WT_ITEM_OFFPs only occur commonly in internal pages,
-	 * and so anything we save by compressing this structure we'll lose
-	 * by aligning the pairs of WT_ITEM and WT_ITEM_OFFP structures; (2)
-	 * this is the structure that references off-page trees, and it's the
-	 * structure I think we might want to extend some day.
-	 */
-	u_int8_t  unused[3];
 };
 /*
  * WT_ITEM_OFFP_SIZE is the expected structure size --  we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
-#define	WT_ITEM_OFFP_SIZE	16
+#define	WT_ITEM_OFFP_SIZE	12
 
 /*
  * Btree overflow items reference another page, and so the data is another

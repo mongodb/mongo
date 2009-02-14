@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_stat_level(DB *, WT_ITEM_OFFP *);
+static int __wt_bt_stat_level(DB *, WT_ITEM_OFFP *, int);
 static int __wt_bt_stat_page(DB *, WT_PAGE *);
 
 /*
@@ -37,14 +37,8 @@ __wt_bt_stat(DB *db)
 		return (ret);
 	}
 
-	/*
-	 * Construct an OFFP for __wt_bt_stat_level -- the addr is correct,
-	 * but the level is not.   We don't store the level in the DESC
-	 * structure, so there's no way to know what the correct level is yet.
-	 */
 	offp.addr = idb->root_addr;
-	offp.level = WT_FIRST_INTERNAL_LEVEL;
-	return (__wt_bt_stat_level(db, &offp));
+	return (__wt_bt_stat_level(db, &offp, 0));
 }
 
 /*
@@ -52,16 +46,15 @@ __wt_bt_stat(DB *db)
  *	Stat a level of a tree.
  */
 static int
-__wt_bt_stat_level(DB *db, WT_ITEM_OFFP *offp)
+__wt_bt_stat_level(DB *db, WT_ITEM_OFFP *offp, int isleaf)
 {
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr;
-	int first, isleaf, ret, tret;
+	int first, isleaf_arg, ret, tret;
 
 	ret = 0;
 
-	isleaf = offp->level == WT_LEAF_LEVEL ? 1 : 0;
 	for (first = 1, addr = offp->addr; addr != WT_ADDR_INVALID;) {
 		/* Get the next page and stat it. */
 		if ((ret = __wt_bt_page_in(db, addr, isleaf, &page)) != 0)
@@ -79,9 +72,11 @@ __wt_bt_stat_level(DB *db, WT_ITEM_OFFP *offp)
 		if (first) {
 			first = 0;
 			if (hdr->type == WT_PAGE_INT ||
-			    hdr->type == WT_PAGE_DUP_INT)
+			    hdr->type == WT_PAGE_DUP_INT) {
 				__wt_bt_first_offp(page, offp);
-			else
+				isleaf_arg = hdr->level ==
+				    WT_FIRST_INTERNAL_LEVEL ? 1 : 0;
+			} else
 				offp = NULL;
 		}
 
@@ -92,7 +87,7 @@ __wt_bt_stat_level(DB *db, WT_ITEM_OFFP *offp)
 	}
 
 	if (offp != NULL)
-		ret = __wt_bt_stat_level(db, offp);
+		ret = __wt_bt_stat_level(db, offp, isleaf_arg);
 
 	return (ret);
 }
@@ -105,7 +100,6 @@ static int
 __wt_bt_stat_page(DB *db, WT_PAGE *page)
 {
 	WT_ITEM *item;
-	WT_ITEM_OFFP offp;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, i;
 	int ret;
@@ -187,17 +181,14 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 			WT_STAT_INCR(db->dstats,
 			    ITEM_TOTAL_DATA, "total database data items");
 			break;
-		case WT_ITEM_OFFPAGE:
+		case WT_ITEM_OFFP_INTL:
+		case WT_ITEM_OFFP_LEAF:
 			if (hdr->type != WT_PAGE_LEAF)
 				break;
-			/*
-			 * !!!
-			 * Don't pass __wt_bt_stat_level a pointer
-			 * to the on-page OFFP structure, it writes
-			 * the offp passed in.
-			 */
-			offp = *(WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-			if ((ret = __wt_bt_stat_level(db, &offp)) != 0)
+			if ((ret = __wt_bt_stat_level(db,
+			    (WT_ITEM_OFFP *)WT_ITEM_BYTE(item),
+			    WT_ITEM_TYPE(item) ==
+			    WT_ITEM_OFFP_LEAF ? 1 : 0)) != 0)
 				return (ret);
 			break;
 		default:

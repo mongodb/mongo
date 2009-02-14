@@ -293,7 +293,8 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 			indx->size = ovfl->len;
 			indx->addr = ovfl->addr;
 			break;
-		case WT_ITEM_OFFPAGE:
+		case WT_ITEM_OFFP_INTL:
+		case WT_ITEM_OFFP_LEAF:
 			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
 			records += offp->records;
 			indx->addr = offp->addr;
@@ -364,7 +365,8 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
-		case WT_ITEM_OFFPAGE:
+		case WT_ITEM_OFFP_INTL:
+		case WT_ITEM_OFFP_LEAF:
 			if (indx->ditem == NULL) {
 				indx->ditem = item;
 				indx->addr = WT_ADDR_INVALID;

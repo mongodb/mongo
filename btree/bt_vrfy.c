@@ -12,7 +12,7 @@
 static int __wt_bt_verify_item(DB *, WT_PAGE *, bitstr_t *, FILE *);
 static int __wt_bt_verify_checkfrag(DB *, bitstr_t *);
 static int __wt_bt_verify_connections(DB *, WT_PAGE *, bitstr_t *);
-static int __wt_bt_verify_level(DB *, WT_ITEM_OFFP *, bitstr_t *, FILE *);
+static int __wt_bt_verify_level(DB *, WT_ITEM_OFFP *, int, bitstr_t *, FILE *);
 static int __wt_bt_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *, FILE *);
 
 /*
@@ -97,8 +97,8 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 		 * what the correct level is yet.
 		 */
 		offp.addr = idb->root_addr;
-		offp.level = WT_FIRST_INTERNAL_LEVEL;
-		if ((ret = __wt_bt_verify_level(db, &offp, fragbits, fp)) != 0)
+		if ((ret =
+		    __wt_bt_verify_level(db, &offp, 0, fragbits, fp)) != 0)
 			goto err;
 	}
 
@@ -116,14 +116,15 @@ err:	if (page != NULL &&
  *	Verify a level of a tree.
  */
 static int
-__wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
+__wt_bt_verify_level(DB *db,
+    WT_ITEM_OFFP *offp, int isleaf, bitstr_t *fragbits, FILE *fp)
 {
 	WT_INDX *page_indx, *prev_indx;
 	WT_ITEM_OFFP local_offp;
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, bytes;
-	int first, ret, tret;
+	int first, isleaf_arg, ret, tret;
 	int (*func)(DB *, const DBT *, const DBT *);
 
 	ret = 0;
@@ -216,7 +217,7 @@ __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 	 * level fit into the cache, we'll not move the disk heads except to
 	 * get the next page we're verifying.
 	 */
-	bytes = offp->level == WT_LEAF_LEVEL ? db->leafsize : db->intlsize;
+	bytes = isleaf ? db->leafsize : db->intlsize;
 	for (first = 1, page = prev = NULL,
 	    addr = offp->addr;
 	    addr != WT_ADDR_INVALID;
@@ -239,9 +240,11 @@ __wt_bt_verify_level(DB *db, WT_ITEM_OFFP *offp, bitstr_t *fragbits, FILE *fp)
 		if (first) {
 			first = 0;
 			if (hdr->type == WT_PAGE_INT ||
-			    hdr->type == WT_PAGE_DUP_INT)
+			    hdr->type == WT_PAGE_DUP_INT) {
 				__wt_bt_first_offp(page, offp);
-			else
+				isleaf_arg = hdr->level ==
+				    WT_FIRST_INTERNAL_LEVEL ? 1 : 0;
+			} else
 				offp = NULL;
 
 			/*
@@ -307,7 +310,7 @@ err:	if (prev != NULL &&
 		ret = tret;
 
 	if (ret == 0 && offp != NULL)
-		ret = __wt_bt_verify_level(db, offp, fragbits, fp);
+		ret = __wt_bt_verify_level(db, offp, isleaf_arg, fragbits, fp);
 
 	return (ret);
 }
@@ -725,7 +728,8 @@ __wt_bt_verify_item(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 			    hdr->type != WT_PAGE_DUP_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_OFFPAGE:
+		case WT_ITEM_OFFP_INTL:
+		case WT_ITEM_OFFP_LEAF:
 			if (hdr->type != WT_PAGE_INT &&
 			    hdr->type != WT_PAGE_LEAF &&
 			    hdr->type != WT_PAGE_DUP_INT) {
@@ -759,7 +763,8 @@ item_vs_page:			__wt_db_errx(db,
 			if (item_len != sizeof(WT_ITEM_OVFL))
 				goto item_len;
 			break;
-		case WT_ITEM_OFFPAGE:
+		case WT_ITEM_OFFP_INTL:
+		case WT_ITEM_OFFP_LEAF:
 			if (item_len != sizeof(WT_ITEM_OFFP)) {
 item_len:			__wt_db_errx(db,
 				    "item %lu on page at addr %lu has an "
@@ -782,22 +787,6 @@ eop:			__wt_db_errx(db,
 		}
 
 		/*
-		 * WT_ITEM_OFFP and WT_ITEM_OVFL structures may follow this
-		 * WT_ITEM -- check what we can check.
-		 */
-		if (item_type == WT_ITEM_OFFPAGE) {
-			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-			if (offp->unused[0] != 0 ||
-			    offp->unused[1] != 0 || offp->unused[2] != 0) {
-				__wt_db_errx(db,
-				    "offpage item %lu on page at addr %lu has "
-				    "non-zero unused header fields",
-				    (u_long)item_num, (u_long)addr);
-				goto err;
-			}
-		}
-
-		/*
 		 * When walking the whole file, verify off-page and overflow
 		 * references.
 		 */
@@ -811,10 +800,12 @@ eop:			__wt_db_errx(db,
 				    fragbits, fp)) != 0)
 					goto err;
 				break;
-			case WT_ITEM_OFFPAGE:
+			case WT_ITEM_OFFP_INTL:
+			case WT_ITEM_OFFP_LEAF:
 				if (hdr->type == WT_PAGE_LEAF &&
 				    (ret = __wt_bt_verify_level(db,
 				    (WT_ITEM_OFFP *)WT_ITEM_BYTE(item),
+				    item_type == WT_ITEM_OFFP_LEAF ? 1 : 0,
 				    fragbits, fp)) != 0)
 					goto err;
 				break;
@@ -825,7 +816,8 @@ eop:			__wt_db_errx(db,
 		/* Some items aren't sorted on the page, so we're done. */
 		if (item_type == WT_ITEM_DATA ||
 		    item_type == WT_ITEM_DATA_OVFL ||
-		    item_type == WT_ITEM_OFFPAGE)
+		    item_type == WT_ITEM_OFFP_INTL ||
+		    item_type == WT_ITEM_OFFP_LEAF)
 			continue;
 
 		/* Get a DBT that represents this item. */

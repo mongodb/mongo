@@ -161,8 +161,10 @@ __wt_bt_item_type(WT_ITEM *item)
 		return ("data-overflow");
 	case WT_ITEM_DUP_OVFL:
 		return ("duplicate-overflow");
-	case WT_ITEM_OFFPAGE:
-		return ("offpage");
+	case WT_ITEM_OFFP_INTL:
+		return ("offpage-tree");
+	case WT_ITEM_OFFP_LEAF:
+		return ("offpage-leaf");
 	default:
 		break;
 	}
