@@ -34,19 +34,18 @@ __wt_db_stat_print(WT_TOC *toc)
 		return (ret);
 
 	for (stats = db->dstats; stats->desc != NULL; ++stats)
-		fprintf(stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
 	fprintf(stream, "%s\n", WT_GLOBAL(sep));
 	fprintf(stream, "Database handle statistics: %s\n", db->idb->dbname);
 	for (stats = db->hstats; stats->desc != NULL; ++stats)
-		fprintf(stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 	if (idb->fh != NULL) {
 		fprintf(stream, "%s\n", WT_GLOBAL(sep));
 		fprintf(stream,
 		    "Underlying file I/O statistics: %s\n", db->idb->dbname);
 		for (stats = idb->fh->stats; stats->desc != NULL; ++stats)
-			fprintf(
-			    stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+			fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 	}
 
 	return (0);

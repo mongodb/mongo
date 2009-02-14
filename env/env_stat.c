@@ -25,7 +25,7 @@ __wt_env_stat_print(WT_TOC *toc)
 
 	fprintf(stream, "Environment handle statistics:\n");
 	for (stats = env->hstats; stats->desc != NULL; ++stats)
-		fprintf(stream, "%lu\t%s\n", (u_long)stats->v, stats->desc);
+		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
 	TAILQ_FOREACH(db, &env->dbqh, q)
 		if ((ret = db->stat_print(db, toc, stream, flags)) != 0)
