@@ -215,7 +215,6 @@ __wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep)
 	IDB *idb;
 	IENV *ienv;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
 	int ret;
 
 	*pagep = NULL;
