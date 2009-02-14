@@ -24,7 +24,7 @@ f()
 	    "+libh(queue.h)" \
 	    "+libh(wiredtiger_config.h)" \
 	    "-wlib(0)" \
-	     "-i." "-i../inc_posix" "-i/usr/include" $1
+	     "-i../build_posix" "-i../inc_posix" "-i/usr/include" $1
 }
 
 update=0
