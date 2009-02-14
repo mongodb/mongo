@@ -103,14 +103,8 @@ startMongod = function() {
 // Start a mongo program instance (generally mongod or mongos) and return a
 // 'Mongo' object connected to it.  This function's first argument is the
 // program name, and subsequent arguments to this function are passed as
-// command line arguments to the program.  The specified 'dbpath' is cleared if
-// it exists, created if not.
+// command line arguments to the program.
 startMongoProgram = function() {
-    return startMongoProgramNoReset.apply( null, arguments );    
-}
-
-// Same as startMongoProgram, but uses existing files in dbpath
-startMongoProgramNoReset = function() {
     var port = _parsePort.apply( null, arguments );
 
     _startMongoProgram.apply( null, arguments );

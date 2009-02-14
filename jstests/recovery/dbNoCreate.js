@@ -15,5 +15,5 @@ t.drop();
 
 stopMongod( 27018 );
 
-var m = startMongoProgramNoReset( "mongod", "--port", "27018", "--dbpath", "/data/db/" + baseName );
+var m = startMongoProgram( "mongod", "--port", "27018", "--dbpath", "/data/db/" + baseName );
 assert.eq( -1, m.getDBNames().indexOf( baseName ) );
