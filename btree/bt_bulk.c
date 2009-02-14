@@ -12,7 +12,7 @@
 static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int __wt_bt_dup_offpage(DB *, WT_PAGE *, DBT **, DBT **,
     DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
-static int __wt_bt_promote(DB *, WT_PAGE *, u_int32_t, WT_ITEM_OFFP *);
+static int __wt_bt_promote(DB *, WT_PAGE *, u_int64_t, WT_ITEM_OFFP *);
 
 /*
  * __wt_db_bulk_load --
@@ -558,7 +558,7 @@ err:		ret = WT_ERROR;
  */
 static int
 __wt_bt_promote(
-    DB *db, WT_PAGE *page, u_int32_t increment, WT_ITEM_OFFP *root_offp)
+    DB *db, WT_PAGE *page, u_int64_t increment, WT_ITEM_OFFP *root_offp)
 {
 	DBT key;
 	WT_INDX *ip;

@@ -151,10 +151,10 @@ __wt_env_stat_clear(WT_TOC *toc);
 void
 __wt_abort(ENV *env);
 int
-__wt_calloc(ENV *env, size_t number, size_t size, void *retp);
+__wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp);
 int
 __wt_realloc(ENV *env,
-    size_t bytes_allocated, size_t bytes_to_allocate, void *retp);
+    u_int32_t bytes_allocated, u_int32_t bytes_to_allocate, void *retp);
 int
 __wt_strdup(ENV *env, const char *str, void *retp);
 void
