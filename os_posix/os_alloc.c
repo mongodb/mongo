@@ -11,53 +11,58 @@
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 #if 0
-How to use the memory debugger included in the WiredTiger sources.
+The memory debugger included in the WiredTiger sources tracks allocations and
+frees, but doesn't do any kind of overrun detection.
 
 1. Build the WiredTiger library with the --enable-diagnostic_memory 
    configuration option.
-2. Run the test program.
+2. Run your test program.
 3. A file will have been created named "memory.out".
 4. Run the python script dist/memory.py.
-5. Any memory problems will be displayed.
+5. Any memory problems it finds will be displayed.
 
-To show memory usage of a problematic address:
+Debuggers can change memory pattern allocations, so it can be hard to get
+a repeatable pattern of allocations.  To get a stack trace to review:
 
-1. Set the environment variable MALLOC_DEBUG_VALUE to one of the
-   problematic addresses.
-2. Run the test program, and there will be messages on stdout when
-   the address is used.
+1. Set the environment variable WT_MEMORY_VALUE or the debug_addr variable
+   to the interesting address (for example, env WT_MEMORY_VALUE=0x1e502fb3).
+2. Set the environment variable WT_MEMORY_N or the debug_count variable to
+   the number of touches (for example, env WT_MEMORY_N=3).
+3. Run the test program, and it will drop core when the address is touched
+   for the N'th time.
 
-To debug memory usage of a problematic address:
-1. Set the environment variable MALLOC_DEBUG_VALUE to one of the
-   problematic addresses.
-2. Start a debugger on the test program, and set a breakpoint in
-   __wt_debug_loadme().
-3. The debugger should stop every time the problematic address is
-   being used.
+If your debugger doesn't change memory allocation patterns from run to run,
+you can also set a breakpoint in the __wt_debug_loadme function and run the
+program under a debugger.
 #endif
 
 #define	WT_MEMORY_FILE	"memory.out"
 static FILE *__wt_mfp;
 static void *debug_addr;
+static int debug_count;
 
 static void
 __wt_debug_loadme(const char *msg, void *addr)
 {
 	fprintf(stderr, "memory: %lx: %s\n", (u_long)addr, msg);
+	if (debug_count > 0 && --debug_count == 0)
+		abort();
 }
 
 static int
 __wt_open_mfp(ENV *env)
 {
-	char *debug_value;
+	char *v;
 
 	if ((__wt_mfp = fopen(WT_MEMORY_FILE, "w")) == NULL) {
 		__wt_env_err(env, errno, "%s: open", WT_MEMORY_FILE);
 		return (1);
 	}
 
-	if ((debug_value = getenv("MALLOC_DEBUG_VALUE")) != NULL)
-		debug_addr = (void *)strtol(debug_value, NULL, 0);
+	if (debug_addr == 0 && (v = getenv("WT_MEMORY_VALUE")) != NULL)
+		debug_addr = (void *)strtoul(v, NULL, 0);
+	if (debug_count == 0 && (v = getenv("WT_MEMORY_N")) != NULL)
+		debug_count = (int)atoi(v);
 		
 	return (0);
 }
