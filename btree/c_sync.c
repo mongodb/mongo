@@ -452,8 +452,7 @@ __wt_cache_clean(ENV *env, u_int32_t bytes, WT_PAGE **pagep)
 			TAILQ_REMOVE(&ienv->lqh, page, q);
 
 			/* Clear the page. */
-			if (page->indx != NULL)
-			    __wt_bt_page_recycle(env, page, 0);
+			__wt_bt_page_recycle(env, page);
 			hdr = page->hdr;
 			memset(hdr, 0, (size_t)bytes);
 			memset(page, 0, sizeof(WT_PAGE));
@@ -540,8 +539,7 @@ __wt_cache_discard(ENV *env, WT_PAGE *page)
 	TAILQ_REMOVE(&ienv->hqh[WT_HASH(ienv, page->addr)], page, hq);
 	TAILQ_REMOVE(&ienv->lqh, page, q);
 
-	if (page->indx != NULL)
-		__wt_bt_page_recycle(env, page, 1);
+	__wt_bt_page_recycle(env, page);
 
 	WT_STAT_DECR(env->hstats, CACHE_CLEAN, NULL);
 

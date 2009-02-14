@@ -97,10 +97,13 @@ __wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
  *	Discard any in-memory allocated memory and reset the counters.
  */
 void
-__wt_bt_page_recycle(ENV *env, WT_PAGE *page, int free_indx)
+__wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 {
 	WT_INDX *indx;
 	u_int32_t i;
+
+	if (page->indx == NULL)
+		return;
 
 	/*
 	 * Release any allocated in-memory information, but keep the
@@ -117,8 +120,7 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page, int free_indx)
 	memset(page->indx, 0, sizeof(WT_INDX) * page->indx_size);
 	page->indx_count = 0;
 
-	if (free_indx)
-		WT_FREE_AND_CLEAR(env, page->indx);
+	WT_FREE_AND_CLEAR(env, page->indx);
 }
 
 /*
