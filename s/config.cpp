@@ -82,8 +82,9 @@ namespace mongo {
             all.push_back( s["host"].valuestrsafe() );
         }
         conn.done();
-                
-        uassert( "can't find server for new db" , all.size() );
+        
+        if ( all.size() == 0 )
+            return "";
         
         return all[ rand() % all.size() ];
     }
@@ -106,9 +107,19 @@ namespace mongo {
                     // note here that cc->primary == 0.
                     log() << "couldn't find database [" << database << "] in config db" << endl;
                     
-                    cc->_primary = pickServerForNewDB();
-                    cc->save();
-                    log() << "\t put [" << database << "] on: " << cc->_primary << endl;
+                    if ( database == "admin" )
+                        cc->_primary = configServer.getPrimary();
+                    else
+                        cc->_primary = pickServerForNewDB();
+                    
+                    if ( cc->_primary.size() ){
+                        cc->save();
+                        log() << "\t put [" << database << "] on: " << cc->_primary << endl;
+                    }
+                    else {
+                        log() << "\t can't find a server" << endl;
+                        cc = 0;
+                    }
                 }
                 else {
                     cc = 0;
