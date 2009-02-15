@@ -130,28 +130,11 @@ namespace mongo {
             _addClassPath( ed , ss , "include/jython/javalib" );
         }
         else {
-
-
             const string jars = findJars();
             _addClassPath( jars.c_str() , ss , "jars" );
 
-            edTemp += (string)jars + "/jars/babble.jar";
+            edTemp += (string)jars + "/jars/mongojs-js.jar";
             ed = edTemp.c_str();
-
-#if !defined(_WIN32)
-            const char * otherEd = findEd();
-            if ( otherEd ) {
-                log( 1 ) << "found ed as well" << endl;
-                ed = otherEd;
-
-                ss << SYSTEM_COLON << ed << "/build/";
-
-                _addClassPath( ed , ss , "include" );
-                _addClassPath( ed , ss , "include/jython/" );
-                _addClassPath( ed , ss , "include/jython/javalib" );
-            }
-
-#endif
         }
 
 
@@ -176,14 +159,17 @@ namespace mongo {
         }
 #endif
 
+        log(1) << "classpath: " << q << endl;
+
         JavaVMOption * options = new JavaVMOption[4];
         options[0].optionString = q;
         options[1].optionString = (char*)"-Djava.awt.headless=true";
         options[2].optionString = (char*)"-Xmx300m";
+
         // Prevent JVM from using async signals internally, since on linux the pre-installed handlers for these
         // signals don't seem to be respected by JNI.
         options[3].optionString = (char*)"-Xrs";
-// -Xcheck:jni
+        // -Xcheck:jni
 
         _vmArgs = new JavaVMInitArgs();
         _vmArgs->version = JNI_VERSION_1_4;
