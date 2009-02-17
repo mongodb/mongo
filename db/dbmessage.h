@@ -22,6 +22,35 @@
 
 namespace mongo {
 
+    /* db response format
+
+       Query or GetMore: // see struct QueryResult
+          int resultFlags;
+          int64 cursorID;
+          int startingFrom;
+          int nReturned;
+          list of marshalled JSObjects;
+    */
+
+#pragma pack(1)
+    struct QueryResult : public MsgData {
+        enum {
+            ResultFlag_CursorNotFound = 1, /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
+            ResultFlag_ErrSet = 2          /* { $err : ... } is being returned */
+        };
+
+        long long cursorId;
+        int startingFrom;
+        int nReturned;
+        const char *data() {
+            return (char *) (((int *)&nReturned)+1);
+        }
+        int& resultFlags() {
+            return dataAsInt();
+        }
+    };
+#pragma pack()
+
     /* For the database/server protocol, these objects and functions encapsulate
        the various messages transmitted over the connection.
     */
