@@ -18,8 +18,34 @@
 
 #pragma once
 
+#include "cursor.h"
+#include "jsobj.h"
+
 namespace mongo {
 
+    class FieldBound {
+    public:
+        FieldBound( BSONElement e = emptyObj.firstElement() );
+        FieldBound &operator&=( const FieldBound &other );
+        BSONElement lower() const { return lower_; }
+        BSONElement upper() const { return upper_; }
+    private:
+        BSONObj addObj( BSONObj o );
+        string simpleRegexEnd( string regex );
+        BSONElement lower_;
+        BSONElement upper_;
+        vector< BSONObj > objData_;
+    };
+    
+    class FieldBoundSet {
+    public:
+        FieldBoundSet( BSONObj query );
+        FieldBound &bound( const char *fieldName ) { return bounds_[ fieldName ]; }
+    private:
+        map< string, FieldBound > bounds_;
+        BSONObj query_;
+    };
+    
     class QueryPlan {
     public:
         QueryPlan() {
@@ -43,7 +69,7 @@ namespace mongo {
     */
     class QueryOptimizer {
     public:
-        QueryPlan getPlan(
+        static QueryPlan getPlan(
             const char *ns,
             BSONObj* query,
             BSONObj* order = 0,

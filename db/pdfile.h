@@ -346,7 +346,6 @@ namespace mongo {
 } // namespace mongo
 
 #include "rec.h"
-#include "queryoptimizer.h"
 #include "database.h"
 
 namespace mongo {

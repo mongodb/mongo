@@ -124,7 +124,6 @@ namespace mongo {
         NamespaceIndex namespaceIndex;
         int profile; // 0=off.
         string profileName; // "alleyinsider.system.profile"
-        QueryOptimizer optimizer;
 
         bool haveLogged() {
             return _haveLogged;
