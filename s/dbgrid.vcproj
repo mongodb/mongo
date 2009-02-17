@@ -334,11 +334,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\ConfigServer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\gridconfig.cpp"
+				RelativePath=".\config.cpp"
 				>
 			</File>
 			<File
