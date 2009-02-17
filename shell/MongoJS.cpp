@@ -150,6 +150,19 @@ Local<v8::Object> mongoToV8( BSONObj & m , bool array ){
             o->Set( v8::String::New( f.fieldName() ) , regex->NewInstance( 2 , argv ) );
             break;
         }
+            
+        case mongo::BinData: {
+            Local<v8::Object> b = v8::Object::New();
+
+            int len;
+            f.binData( len );
+            
+            b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
+            b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
+
+            o->Set( v8::String::New( f.fieldName() ) , b );
+            break;
+        };
 
         default:
             cout << "can't handle type: ";
@@ -260,7 +273,11 @@ BSONObj v8ToMongo( v8::Handle<v8::Object> o ){
     return b.obj();
 }
 
+#ifdef _WIN32
+#define GETNS char * ns = new char[args[0]->ToString()->Utf8Length()];  args[0]->ToString()->WriteUtf8( ns ); 
+#else
 #define GETNS char ns[args[0]->ToString()->Utf8Length()];  args[0]->ToString()->WriteUtf8( ns ); 
+#endif
 
 DBClientConnection * getConnection( const Arguments& args ){
     Local<External> c = External::Cast( *(args.This()->Get( CONN_STRING )) );
@@ -297,13 +314,18 @@ Handle<Value> mongoFind(const Arguments& args){
     jsassert( slaveOkVal->IsBoolean(), "slaveOk member invalid" );
     bool slaveOk = slaveOkVal->BooleanValue();
     
-    auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , (int)(args[3]->ToNumber()->Value()) , (int)(args[4]->ToNumber()->Value()) , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
-    
-    v8::Function * cons = (v8::Function*)( *( mongo->Get( String::New( "internalCursor" ) ) ) );
-    Local<v8::Object> c = cons->NewInstance();
-    
-    c->Set( v8::String::New( "cursor" ) , External::New( cursor.release() ) );
-    return c;
+    try {
+        auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , (int)(args[3]->ToNumber()->Value()) , (int)(args[4]->ToNumber()->Value()) , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
+        
+        v8::Function * cons = (v8::Function*)( *( mongo->Get( String::New( "internalCursor" ) ) ) );
+        Local<v8::Object> c = cons->NewInstance();
+        
+        c->Set( v8::String::New( "cursor" ) , External::New( cursor.release() ) );
+        return c;
+    }
+    catch ( ... ){
+        return v8::ThrowException( v8::String::New( "socket error on insert" ) );        
+    }
 }
 
 v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args){
@@ -316,7 +338,7 @@ v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args){
     v8::Handle<v8::Object> in = args[1]->ToObject();
     
     if ( ! in->Has( String::New( "_id" ) ) ){
-        v8::Handle<v8::Value> argv[0];
+        v8::Handle<v8::Value> argv[1];
         in->Set( String::New( "_id" ) , getObjectIdCons()->NewInstance( 0 , argv ) );
     }
 
@@ -329,7 +351,7 @@ v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args){
     catch ( ... ){
         return v8::ThrowException( v8::String::New( "socket error on insert" ) );
     }
-
+    
     return args[1];
 }
 

@@ -58,11 +58,11 @@ namespace mongo {
         while ( 1 ) {
             BSONElement ie = i.next();
             BSONElement se = s.next();
-            if ( ie.eoo() ) {
-                if ( !se.eoo() )
-                    return 0;
+            if ( ie.eoo() && !se.eoo() )
+                return 0;
+            if ( ie.eoo() || se.eoo() )
                 return direction;
-            }
+
             if ( strcmp( ie.fieldName(), se.fieldName() ) != 0 )
                 return 0;
 
@@ -74,7 +74,7 @@ namespace mongo {
         }
     }
 
-    auto_ptr< Cursor > getHintCursor( const IndexDetails &ii, BSONObj query, BSONObj order, bool *simpleKeyMatch, bool *isSorted ) {
+    auto_ptr< Cursor > getHintCursor( IndexDetails &ii, BSONObj query, BSONObj order, bool *simpleKeyMatch, bool *isSorted ) {
         int direction = matchDirection( ii.keyPattern(), order );
         if ( isSorted ) *isSorted = ( direction != 0 );
         if ( direction == 0 )
@@ -146,14 +146,17 @@ namespace mongo {
 
         set<string> queryFields;
         query.getFieldNames(queryFields);
+        if ( queryFields.size() == 0 ) {
+            DEV out() << "getIndexCursor fail " << ns << '\n';
+            return auto_ptr<Cursor>();            
+        }
+        
         // regular query without order by
         for (int i = 0; i < d->nIndexes; i++ ) {
             BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
             BSONObj idxKey = idxInfo.getObjectField("key");
-            set<string> keyFields;
-            idxKey.getFieldNames(keyFields);
 
-            if ( keyFields == queryFields ) {
+            if ( queryFields.count( idxKey.firstElement().fieldName() ) > 0 ) {
                 BSONObj q = query.extractFieldsUnDotted(idxKey);
                 assert(q.objsize() != 0); // guard against a seg fault if details is 0
                                                                                                                
@@ -453,14 +456,14 @@ namespace mongo {
                 theDataFileMgr.insert(ns, obj);
                 if ( profile )
                     ss << " fastmodinsert ";
-                if ( logOp )
+                if ( logop )
                     logOp( "i", ns, obj );
                 return 3;
             }
             if ( profile )
                 ss << " upsert ";
             theDataFileMgr.insert(ns, updateobj);
-            if ( logOp )
+            if ( logop )
                 logOp( "i", ns, updateobj );
             return 4;
         }

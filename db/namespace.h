@@ -140,12 +140,10 @@ namespace mongo {
         /* extract key value from the query object
            e.g., if key() == { x : 1 },
                  { x : 70, y : 3 } -> { x : 70 }
-           handles our embedded dot notation too.
         */
         BSONObj getKeyFromQuery(const BSONObj& query) const {
             BSONObj k = keyPattern();
             BSONObj res = query.extractFieldsUnDotted(k);
-            assert(res.objsize() != 0); // guard against a seg fault if details is 0
             return res;
         }
 

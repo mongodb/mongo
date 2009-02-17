@@ -7,7 +7,8 @@
 # some common tasks
 #   build 64-bit mac and pushing to s3
 #      scons --64 s3dist
-#      all s3 pushes require settings.py
+#      scons --distname=0.8 s3dist
+#      all s3 pushes require settings.py and simples3
 
 import os
 import sys
@@ -22,6 +23,15 @@ AddOption('--prefix',
           action='store',
           metavar='DIR',
           help='installation prefix')
+
+AddOption('--distname',
+          dest='distname',
+          type='string',
+          nargs=1,
+          action='store',
+          metavar='DIR',
+          help='dist name (0.8.0)')
+
 
 AddOption( "--64",
            dest="force64",
@@ -153,6 +163,8 @@ DEFAULT_INSTALl_DIR = "/usr/local"
 installDir = DEFAULT_INSTALl_DIR
 nixLibPrefix = "lib"
 
+distName = GetOption( "distname" )
+
 javaHome = GetOption( "javaHome" )
 javaVersion = "i386";
 javaLibs = []
@@ -238,10 +250,17 @@ elif "win32" == os.sys.platform:
 
     env.Append( CPPPATH=[ boostDir , javaHome + "/include" , javaHome + "/include/win32" , "pcre-7.4" , winSDKHome + "/Include" ] )
 
-    # /Fo"Debug\\" /Fd"Debug\vc90.pdb" 
+    env.Append( CPPFLAGS=" /EHsc /W3 " )
+    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
 
-    env.Append( CPPFLAGS=" /Od /EHsc /Gm /RTC1 /MDd /ZI  /W3 " )
-    env.Append( CPPDEFINES=["WIN32","_DEBUG","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
+    if release:
+        env.Append( CPPDEFINES=[ "NDEBUG" ] )
+        env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
+        # /Yu"stdafx.h" /Fp"Release\db.pch" /Fo"Release\\" /Fd"Release\vc90.pdb" 
+    else:
+        env.Append( CPPDEFINES=[ "_DEBUG" ] )
+        env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
+        # /Fo"Debug\\" /Fd"Debug\vc90.pdb" 
 
     env.Append( LIBPATH=[ boostDir + "/Lib" , javaHome + "/Lib" , winSDKHome + "/Lib" ] )
     javaLibs += [ "jvm" ];
@@ -369,6 +388,16 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
+    if shell:
+        haveReadLine = False
+        if darwin:
+            myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
+            myenv.Append( LIBS=["readline"] )
+        elif myCheckLib( "readline" ):
+            myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
+            myCheckLib( "tinfo" )
+        else:
+            print( "WARNING: no readline, shell will be a bit ugly" )
 
     # this will add it iff it exists and works
     myCheckLib( "boost_system-mt" )
@@ -472,8 +501,8 @@ env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
-# dbgrid
-env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
+# mongos
+env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "s/*.cpp" ) )
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
@@ -489,8 +518,14 @@ clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
+perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
+# --- sniffer ---
+if nix and darwin:
+    sniffEnv = clientEnv.Clone()
+    sniffEnv.Append( LIBS=[ "pcap" ] )
+    sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
 # --- shell ---
 # shell is complicated by the fact that v8 doesn't work 64-bit yet
@@ -505,7 +540,7 @@ if release and ( ( darwin and force64 ) or linux64 ):
     shellEnv["LIBS"] = env["LIBS_CLEAN"]
     shellEnv["SLIBS"] = ""
 
-shellEnv.Append( LIBS=[ "v8" , "readline" ] )
+shellEnv.Append( LIBS=[ "v8" ] )
 
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
@@ -516,14 +551,17 @@ def removeIfInList( lst , thing ):
 
 if noshell:
     print( "not building shell" )
-elif not onlyServer and ( linux64 or force64 ):
+elif not onlyServer:
+    weird = linux64 or force64
+
     if linux64:
         shellEnv.Append( CFLAGS="-m32" )
         shellEnv.Append( CXXFLAGS="-m32" )
         shellEnv.Append( LINKFLAGS="-m32" )
         shellEnv.Append( LIBPATH=[ "/usr/lib32" , "/usr/lib" ] )
         shellEnv["LIBPATH"].remove( "/usr/lib64" )
-    else:
+
+    if force64:
         shellEnv["CFLAGS"].remove("-m64")
         shellEnv["CXXFLAGS"].remove("-m64")
         shellEnv["LINKFLAGS"].remove("-m64")
@@ -540,19 +578,26 @@ elif not onlyServer and ( linux64 or force64 ):
     removeIfInList( l , "pcre" )
     removeIfInList( l , "pcrecpp" )
 
-    shell32BitFiles = Glob( "shell/*.cpp" )
-    for f in allClientFiles:
-        shell32BitFiles.append( "32bit/" + str( f ) )
+    if windows:
+        shellEnv.Append( LIBS=["winmm.lib"] )
+    
+    if weird:
+        shell32BitFiles = Glob( "shell/*.cpp" )
+        for f in allClientFiles:
+            shell32BitFiles.append( "32bit/" + str( f ) )
 
-    shellEnv.VariantDir( "32bit" , "." )
+        shellEnv.VariantDir( "32bit" , "." )
+    else:
+        shellEnv.Append( LIBPATH=[ "." ] )
 
     shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
 
-    shellEnv.Program( "mongo" , shell32BitFiles )
-else:
-    shellEnv.Append( LIBPATH=[ "." ] )
-    shellEnv.Append( LIBS=[ "mongoclient"] )
-    shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
+    if weird:
+        shellEnv.Program( "mongo" , shell32BitFiles )
+    else:
+        shellEnv.Append( LIBS=[ "mongoclient"] )
+        shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
+
 
 #  ---- RUNNING TESTS ----
 
@@ -561,6 +606,9 @@ def testSetup( env , target , source ):
 
 testEnv.Alias( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
 testEnv.AlwaysBuild( "smoke" )
+
+testEnv.Alias( "smokePerf", [ "perftest" ] , [ testSetup , perftest[ 0 ].abspath ] )
+testEnv.AlwaysBuild( "smokePerf" )
 
 clientExec = [ x[0].abspath for x in clientTests ];
 testEnv.Alias( "smokeClient" , clientExec , clientExec )
@@ -571,7 +619,11 @@ testEnv.AlwaysBuild( "smokeClient" )
 if distBuild:
     from datetime import date
     today = date.today()
-    installDir = "mongo-db-" + platform + "-" + processor + "-" + today.strftime( "%Y-%m-%d" )
+    installDir = "mongodb-" + platform + "-" + processor + "-";
+    if distName is None:
+        installDir += today.strftime( "%Y-%m-%d" )
+    else:
+        installDir += distName
     print "going to make dist: " + installDir
 
 # binaries
@@ -606,6 +658,13 @@ for id in [ "", "util/", "db/" , "client/" ]:
 env.Install( installDir + "/" + nixLibPrefix, clientLibName )
 env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
+#textfiles
+if distBuild or release:
+    #don't want to install these /usr/local/ for example
+    env.Install( installDir , "distsrc/README" )
+    env.Install( installDir , "distsrc/THIRD-PARTY-NOTICES" )
+    env.Install( installDir , "distsrc/GNU-AGPL-3.0" )
+
 #final alias
 env.Alias( "install" , installDir )
 
@@ -634,7 +693,14 @@ env.AlwaysBuild( "push" )
 
 # ---- deploying ---
 
-def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True , platformDir=True ):
+def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True ):
+
+    if remotePrefix is None:
+        if distName is None:
+            remotePrefix = "-latest"
+        else:
+            remotePrefix = "-" + distName
+
     sys.path.append( "." )
 
     import simples3
@@ -657,8 +723,9 @@ def s3push( localName , remoteName=None , remotePrefix="-latest" , fixName=True 
     if platformDir:
         name = platform + "/" + name
 
+    print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
     s.put( name  , open( localName , "rb" ).read() , acl="public-read" );
-    print( "uploaded " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
+    print( "  done uploading!" )
 
 def s3shellpush( env , target , source ):
     s3push( "mongo" , "mongo-shell" )
@@ -667,7 +734,7 @@ env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
 env.AlwaysBuild( "s3shell" )
 
 def s3dist( env , target , source ):
-    s3push( distFile , "mongo-db" )
+    s3push( distFile , "mongodb" )
 
 env.Append( TARFLAGS=" -z " )
 if windows:

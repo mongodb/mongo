@@ -71,6 +71,10 @@ namespace mongo {
         return *this; 
     }
 
+    string Query::toString() const{
+        return obj.toString();
+    }
+
     /* --- dbclientcommands --- */
 
     inline bool DBClientWithCommands::isOk(const BSONObj& o) {
@@ -673,7 +677,7 @@ namespace mongo {
 
 // "./db testclient" to invoke
     extern BSONObj emptyObj;
-    void testClient() {
+    void testClient3() {
         out() << "testClient()" << endl;
 //	DBClientConnection c(true);
         DBClientPaired c;

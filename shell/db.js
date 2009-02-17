@@ -12,12 +12,23 @@ DB.prototype.getMongo = function(){
     return this._mongo;
 }
 
+DB.prototype.getSisterDB = function( name ){
+    return this.getMongo().getDB( name );
+}
+
 DB.prototype.getName = function(){
     return this._name;
 }
 
 DB.prototype.getCollection = function( name ){
     return new DBCollection( this._mongo , this , name , this._name + "." + name );
+}
+
+DB.prototype.commandHelp = function( name ){
+    var c = {};
+    c[name] = 1;
+    c.help = true;
+    return this.runCommand( c ).help;
 }
 
 DB.prototype.runCommand = function( obj ){
@@ -114,6 +125,12 @@ DB.prototype.dropDatabase = function() {
 }
 
 
+DB.prototype.shutdownServer = function() { 
+    if( "admin" != db )
+	return "shutdown command only works with the admin database; try 'use admin'";
+    return this._dbCommand("shutdown");
+}
+
 /**
   Clone database on another server to here.
   <p>
@@ -178,9 +195,11 @@ DB.prototype.help = function() {
     print("DB methods:");
     print("\tdb.auth(username, password)");
     print("\tdb.getMongo() get the server connection object");
+    print("\tdb.getSisterDB(name) get the db at the same server as this onew");
     print("\tdb.getName()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
+    print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.addUser(username, password)");
     print("\tdb.removeUser(username)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
@@ -189,6 +208,7 @@ DB.prototype.help = function() {
     print("\tdb.setProfilingLevel(level) 0=off 1=slow 2=all");
     print("\tdb.cloneDatabase(fromhost)");
     print("\tdb.copyDatabase(fromdb, todb, fromhost)");
+    print("\tdb.shutdownServer()");
     print("\tdb.dropDatabase()");
     print("\tdb.repairDatabase()");
     print("\tdb.eval(func, args) run code server-side");

@@ -39,6 +39,7 @@ namespace mongo {
     extern int curOp;
     extern bool autoresync;
     extern string dashDashSource;
+    extern string dashDashOnly;
     extern int opLogging;
     extern long long oplogSize;
     extern OpLog _oplog;
@@ -118,7 +119,7 @@ namespace mongo {
        115 replay, opLogging
     */
     void listen(int port) {
-        const char *Version = "db version 122";
+        const char *Version = "db version v0.8.0.1";
         log() << Version << ", pdfile version " << VERSION << "." << VERSION_MINOR << endl;
         pdfileInit();
         //testTheDb();
@@ -365,6 +366,7 @@ namespace mongo {
 
 } // namespace mongo
 
+
 using namespace mongo;
 
 int q;
@@ -498,6 +500,8 @@ int main(int argc, char* argv[], char *envp[] )
                 quota = true;
             else if ( s == "--objcheck" )
                 objcheck = true;
+            else if( s == "--only" ) 
+                dashDashOnly = argv[++i];
             else if ( s == "--source" ) {
                 /* specifies what the source in local.sources should be */
                 dashDashSource = argv[++i];
@@ -539,35 +543,35 @@ usage:
     out() << "[nojni build] ";
 #endif
     out() << "usage:\n";
-    out() << "  run                run db" << endl;
-//    out() << "  msg end [port]     shut down db server listening on port (or default)" << endl;
-    out() << "  msg [msg] [port]   send a request to the db server listening on port (or default)" << endl;
-    out() << "  msglots            send a bunch of test messages, and then wait for answer on the last one" << endl;
-    out() << "  longmsg            send a long test message to the db server" << endl;
-    out() << "  quicktest          just check basic assertions and exit" << endl;
-    out() << "  test2              run test2() - see code" << endl;
+    out() << "  run                      run db" << endl;
+    out() << "  msg [msg] [port]         send a request to the db server listening on port (or default)" << endl;
+    out() << "  msglots                  send many test messages, and then wait for answer on the last one" << endl;
+    out() << "  longmsg                  send a long test message to the db server" << endl;
+    out() << "  quicktest                just check basic assertions and exit" << endl;
+    out() << "  test2                    run test2() - see code" << endl;
     out() << "\nOptions:\n";
-    out() << " --help              show this usage information\n";
-    out() << " --port <portno>     specify port number, default is 27017\n";
-    out() << " --dbpath <root>     directory for datafiles, default is /data/db/\n";
-    out() << " --quiet             quieter output\n";
-    out() << " --cpu               show cpu+iowait utilization periodically\n";
-    out() << " --noauth            run without security\n";
-    out() << " --auth              run with security\n";
+    out() << " --help                    show this usage information\n";
+    out() << " --port <portno>           specify port number, default is 27017\n";
+    out() << " --dbpath <root>           directory for datafiles, default is /data/db/\n";
+    out() << " --quiet                   quieter output\n";
+    out() << " --cpu                     show cpu+iowait utilization periodically\n";
+    out() << " --noauth                  run without security\n";
+    out() << " --auth                    run with security\n";
     out() << " --verbose\n";
-    out() << " -v+                 increase verbose level -v = --verbose\n";
-    out() << " --objcheck          inspect client data for validity on receipt\n";
-    out() << " --quota             enable db quota management\n";
-    out() << " --appsrvpath <path> root directory for the babble app server\n";
-    out() << " --nocursors         diagnostic/debugging option\n";
+    out() << " -v+                       increase verbose level -v = --verbose\n";
+    out() << " --objcheck                inspect client data for validity on receipt\n";
+    out() << " --quota                   enable db quota management\n";
+    out() << " --appsrvpath <path>       root directory for the babble app server\n";
+    out() << " --nocursors               diagnostic/debugging option\n";
     out() << " --nojni" << endl;
-    out() << " --oplog<n> 0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-    out() << " --oplogSize <size_in_megabytes>  custom size if creating new replication operation log" << endl;
-    out() << " --sysinfo           print out some diagnostic system information\n";
+    out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
+    out() << " --oplogSize <size_in_MB>  custom size if creating new replication operation log" << endl;
+    out() << " --sysinfo                 print some diagnostic system information\n";
     out() << "\nReplication:" << endl;
     out() << " --master\n";
     out() << " --slave" << endl;
-    out() << " --source <server:port>" << endl;
+    out() << " --source <server:port>    when a slave, specifies master" << endl;
+    out() << " --only <dbname>           when a slave, only replicate db <dbname>" << endl;
     out() << " --pairwith <server:port> <arbiter>" << endl;
     out() << " --autoresync" << endl;
     out() << endl;

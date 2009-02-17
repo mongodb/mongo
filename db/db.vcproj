@@ -124,7 +124,7 @@
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="&quot;..\pcre-7.4&quot;;&quot;c:\Program Files\boost\boost_1_35_0&quot;;&quot;c:\program files\java\jdk\include&quot;;&quot;c:\program files\java\jdk\include\win32&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC"
-				RuntimeLibrary="2"
+				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="2"
 				PrecompiledHeaderThrough="stdafx.h"
@@ -1659,6 +1659,7 @@
 						<Tool
 							Name="VCCLCompilerTool"
 							UsePrecompiledHeader="0"
+							PrecompiledHeaderThrough=""
 						/>
 					</FileConfiguration>
 					<FileConfiguration
@@ -1695,6 +1696,7 @@
 						<Tool
 							Name="VCCLCompilerTool"
 							UsePrecompiledHeader="0"
+							PrecompiledHeaderThrough=""
 						/>
 					</FileConfiguration>
 					<FileConfiguration

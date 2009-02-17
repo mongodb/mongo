@@ -228,7 +228,10 @@ namespace mongo {
         assert( size % 4096 == 0 );
 
         header = (MDFHeader *) mmf.map(filename, size);
-        uassert("can't map file memory", header);
+        if( sizeof(char *) == 4 ) 
+            uassert("can't map file memory - mongo requires 64 bit build for larger datasets", header);
+        else
+            uassert("can't map file memory", header);
         // If opening an existing file, this is a no-op.
         header->init(fileNo, size);
     }
@@ -806,10 +809,10 @@ namespace mongo {
                 idx.head.btree()->bt_insert(idx.head, newRecordLoc,
                                          (BSONObj&) *i, order, dupsAllowed, idx);
             }
-            catch (AssertionException& e) {
+            catch (AssertionException& ) {
                 if( !dupsAllowed ) {
                     // dup key exception, presumably.
-                    throw e;
+                    throw;
                 }
                 problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;
             }
@@ -1060,7 +1063,7 @@ namespace mongo {
             memcpy(r->data+4+newId->size(), ((char *)obuf)+4, addID-4);
 // TEMP:
 //            BSONObj foo(r->data);
-//            cout << "TEMP:" << foo.toString() << endl;
+//            cout << "tmp:" << foo.toString() << endl;
         }
         else {
             memcpy(r->data, obuf, len);
@@ -1107,7 +1110,7 @@ namespace mongo {
                 else { 
                     // normal case -- we can roll back
                     _deleteRecord(d, ns, r, loc);
-                    throw e;
+                    throw;
                 }
             }
         }
@@ -1174,7 +1177,7 @@ namespace mongo {
         // ns is of the form "<dbname>.$cmd"
         char cl[256];
         nsToClient(ns, cl);
-        problem() << "dropDatabase " << cl << endl;
+        log(1) << "dropDatabase " << cl << endl;
         assert( database->name == cl );
 
         closeClient( cl );

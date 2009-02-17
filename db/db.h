@@ -188,13 +188,13 @@ namespace mongo {
                 clientname = database->name;
                 clientpath = database->path;
             }
+            Top::clientStop();
             dbMutexInfo.leaving();
 #if BOOST_VERSION >= 103500
             dbMutex.unlock();
 #else
             boost::detail::thread::lock_ops<boost::mutex>::unlock(dbMutex);
 #endif
-            Top::clientStop();
         }
         ~dbtemprelease() {
 #if BOOST_VERSION >= 103500

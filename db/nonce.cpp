@@ -34,8 +34,10 @@ namespace mongo {
 #endif
         assert( sizeof(nonce) == 8 );
         
+#ifndef NDEBUG
         if ( do_md5_test() )
-            massert("md5 unit test fails", false);
+	    massert("md5 unit test fails", false);
+#endif
     }
     
     nonce Security::getNonce(){

@@ -119,7 +119,7 @@ tojson = function( x ){
 }
 
 tojsonObject = function( x ){
-    assert( typeof x == "object" , "tojsonObject needs object" );
+    assert( typeof x == "object" , "tojsonObject needs object, not: " + typeof x );
     
     if ( x.tojson )
         return x.tojson();
@@ -223,8 +223,10 @@ shellHelper.show = function( what ){
 	return "";
     }
     
-    if ( what == "dbs" )
-        return db.getMongo().getDBNames();
+    if ( what == "dbs" ) {
+        db.getMongo().getDBNames().sort().forEach( function(x){print(x)} );
+	return "";
+    }
     
     throw "don't know how to show [" + what + "]";
 

@@ -1,4 +1,4 @@
-// dbclient.h - connect to a Mongo database as a database, from C++
+/** @file dbclient.h - connect to a Mongo database as a database, from C++ */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -75,13 +75,14 @@ namespace mongo {
     };
 #pragma pack()
 
-    /** Represents a query.  Typically one uses the QUERY(...) macro to construct a query object. 
+    /** Represents a query.  Typically one uses the QUERY(...) macro to construct a Query object. 
         Example:
            QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
     */    
-    class Query {
+    class Query : public Stringable {
     public:
         BSONObj obj;
+        Query() : obj(emptyObj) { }
         Query(const BSONObj& b) : obj(b) { }
         Query(const string &json) : 
             obj(fromjson(json)) { }
@@ -133,8 +134,13 @@ namespace mongo {
         */
         Query& where(const char *jscode, BSONObj scope);
         Query& where(const char *jscode) { return where(jscode, BSONObj()); }
-    };
 
+        virtual string toString() const;
+    };
+    
+/** Typically one uses the QUERY(...) macro to construct a Query object.
+    Example: QUERY( "age" << 33 << "school" << "UCLA" )
+*/
 #define QUERY(x) Query( BSON(x) )
 
     /**
@@ -637,9 +643,10 @@ namespace mongo {
         DBClientConnection& checkMaster();
 
     public:
+        /** Call connect() after constructing. autoReconnect is always on for DBClientPaired connections. */
         DBClientPaired();
 
-        /* Returns false is neither member of the pair were reachable, or neither is
+        /** Returns false is neither member of the pair were reachable, or neither is
            master, although,
            when false returned, you can still try to use this connection object, it will
            try reconnects.
@@ -655,46 +662,49 @@ namespace mongo {
             return false;
         }
 
+        /** Authorize.  Authorizes both sides of the pair as needed. 
+        */
         bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg);
 
-        /* throws userassertion "no master found" */
+        /** throws userassertion "no master found" */
         virtual
         auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                        BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        /* throws userassertion "no master found" */
+        /** throws userassertion "no master found" */
         virtual
         BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        // Not yet implemented
+        /** insert */
         virtual void insert( const char * ns , BSONObj obj ) {
-            assert( false );
+            checkMaster().insert(ns, obj);
         }
 
-        // Not yet implemented
+        /** insert multiple objects.  Note that single object insert is asynchronous, so this version 
+            is only nominally faster and not worth a special effort to try to use.  */
         virtual void insert( const char * ns, const vector< BSONObj >& v ) {
-            assert( false );
+            checkMaster().insert(ns, v);
         }
 
-        // Not yet implemented
+        /** remove */
         virtual void remove( const char * ns , Query obj , bool justOne = 0 ) {
-            assert( false );
+            checkMaster().remove(ns, obj, justOne);
         }
 
-        // Not yet implemented
+        /** update */
         virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 ) {
-            assert( false );
+            return checkMaster().update(ns, query, obj, upsert);
         }
         
         string toString();
 
-        /* notification that we got a "not master" error.
+        /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
         void isntMaster() {
             master = ( ( master == Left ) ? NotSetR : NotSetL );
         }
 
-        /* TODO */
+        /* TODO - not yet implemented. mongos may need these. */
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { assert(false); return false; }
         virtual void say( Message &toSend ) { assert(false); }
         virtual void sayPiggyBack( Message &toSend ) { assert(false); }

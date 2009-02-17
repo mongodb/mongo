@@ -48,6 +48,7 @@ mongofiles
 mongoexport
 
 mongoimportjson
+mongosniff
 
 *.tgz
 
@@ -63,5 +64,6 @@ whereExample
 #tests
 test
 authTest
+perftest
 clientTest
 

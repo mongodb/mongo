@@ -1,4 +1,4 @@
-// model.h
+/** @file model.h */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -58,7 +58,7 @@ namespace mongo {
         void save();
         
     private:
-        BSONElement _id;
+        BSONObj _id;
     };
 
 } // namespace mongo

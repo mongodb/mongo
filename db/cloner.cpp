@@ -111,9 +111,14 @@ namespace mongo {
                 js = fixindex(tmp);
             }
 
-            theDataFileMgr.insert(to_collection, js);
-            if ( logForRepl )
-                logOp("i", to_collection, js);
+            try { 
+                theDataFileMgr.insert(to_collection, js);
+                if ( logForRepl )
+                    logOp("i", to_collection, js);
+            }
+            catch( UserException& e ) { 
+                log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
+            }
         }
     }
 
@@ -188,7 +193,7 @@ namespace mongo {
 					continue;
 			}
 			else if( strchr(from_name, '$') ) {
-				log() << "clone: '$' char in namespaces outside of system???\n";
+                // don't clone index namespaces -- we take care of those separately below.
                 continue;
             }
             BSONObj options = collection.getObjectField("options");

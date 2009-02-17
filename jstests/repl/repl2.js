@@ -18,7 +18,7 @@ big = new Array( 2000 ).toString();
 for( i = 0; i < 1000; ++i )
     am.save( { _id: new ObjectId(), i: i, b: big } );
 
-s = startMongodNoReset( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
+s = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
 assert.soon( function() { return 1 == s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
 
 assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );

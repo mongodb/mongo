@@ -32,6 +32,10 @@ namespace mongo {
         (*commands)[name] = this;
     }
 
+    void Command::help( stringstream& help ) const {
+        help << "no help defined";
+    }
+
     bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
         const char *p = strchr(ns, '.');
         if ( !p ) return false;
@@ -58,16 +62,23 @@ namespace mongo {
                 ok = false;
                 errmsg = "access denied";
             }
+            else if ( jsobj.getBoolField( "help" ) ){
+                stringstream help;
+                help << "help for: " << e.fieldName() << " ";
+                c->help( help );
+                anObjBuilder.append( "help" , help.str() );
+            }
             else {
                 ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
             }
+
             if ( !ok ) {
                 anObjBuilder.append("errmsg", errmsg);
                 uassert_nothrow(errmsg.c_str());
             }
             return true;
         }
-
+        
         return false;
     }
 

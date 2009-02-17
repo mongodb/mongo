@@ -1,4 +1,4 @@
-// gridfs.h
+/** @file gridfs.h */
 
 #pragma once
 

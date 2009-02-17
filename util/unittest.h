@@ -35,8 +35,11 @@ namespace mongo {
         // assert if fails
         virtual void run() = 0;
 
+        static bool testsInProgress() { return running; }
+    private:
         static vector<UnitTest*> *tests;
-
+        static bool running;
+    public:
         static void registerTest(UnitTest *t) {
             if ( tests == 0 )
                 tests = new vector<UnitTest*>();
@@ -44,9 +47,11 @@ namespace mongo {
         }
 
         static void runTests() {
+            running = true;
             for ( vector<UnitTest*>::iterator i = tests->begin(); i != tests->end(); i++ ) {
                 (*i)->run();
             }
+            running = false;
         }
     };
 

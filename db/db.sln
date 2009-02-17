@@ -10,7 +10,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{40
 		..\client\examples\authTest.cpp = ..\client\examples\authTest.cpp
 		..\client\examples\clientTest.cpp = ..\client\examples\clientTest.cpp
 		..\client\examples\first.cpp = ..\client\examples\first.cpp
-		..\client\gridfs.h = ..\client\gridfs.h
 		..\client\examples\second.cpp = ..\client\examples\second.cpp
 		..\client\examples\tutorial.cpp = ..\client\examples\tutorial.cpp
 		..\client\examples\whereExample.cpp = ..\client\examples\whereExample.cpp
@@ -28,16 +27,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72E
 		..\dbtests\pairingtests.cpp = ..\dbtests\pairingtests.cpp
 		..\dbtests\pdfiletests.cpp = ..\dbtests\pdfiletests.cpp
 		..\dbtests\querytests.cpp = ..\dbtests\querytests.cpp
-		..\dbtests\repltests.cpp = ..\dbtests\repltests.cpp
 		..\dbtests\socktests.cpp = ..\dbtests\socktests.cpp
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{2CABB3B8-C9A6-478D-9463-0B37799ED708}"
-	ProjectSection(SolutionItems) = preProject
-		..\shell\dbshell.cpp = ..\shell\dbshell.cpp
-		..\shell\MongoJS.cpp = ..\shell\MongoJS.cpp
-		..\shell\ShellUtils.cpp = ..\shell\ShellUtils.cpp
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59-9DC7-4BF1-A431-1BD4966899A5}"
 	ProjectSection(SolutionItems) = preProject
