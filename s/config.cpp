@@ -200,11 +200,7 @@ namespace mongo {
                wrong so worthwhile.
                */
             while ( 1 ) {
-                string hostLeftServer = hostLeft;
-                if ( hostLeftServer.find( ":" ) != string::npos )
-                    hostLeftServer = hostLeftServer.substr( 0 , hostLeftServer.find( ":" ) );
-
-                if ( hostbyname(hostLeftServer.c_str()).empty() ) {
+                if ( hostbyname(hostLeft.c_str()).empty() ) {
                     log() << "can't resolve DNS for " << hostLeft << ", sleeping and then trying again" << endl;
                     sleepsecs(15);
                     continue;
@@ -216,7 +212,7 @@ namespace mongo {
                 }
                 break;
             }
-
+        
         Nullstream& l = log();
         l << "connecting to griddb ";
         
