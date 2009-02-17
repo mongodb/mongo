@@ -33,8 +33,8 @@ namespace mongo {
     string DBConfig::modelServer() {
         return configServer.modelServer();
     }
-
-    bool DBConfig::partitioned( const NamespaceString& ns ){
+    
+    bool DBConfig::sharded( const NamespaceString& ns ){
         if ( ! _partitioned )
             return false;
         uassert( "don't know what to do!" , 0 );
@@ -42,8 +42,8 @@ namespace mongo {
     }
 
     string DBConfig::getServer( const NamespaceString& ns ){
-        if ( partitioned( ns ) )
-            return 0;
+        if ( sharded( ns ) )
+            return "";
         
         uassert( "no primary!" , _primary.size() );
         return _primary;
