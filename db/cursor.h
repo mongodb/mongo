@@ -38,6 +38,7 @@ namespace mongo {
     */
     class Cursor {
     public:
+        virtual ~Cursor() {}
         virtual bool ok() = 0;
         bool eof() {
             return !ok();
