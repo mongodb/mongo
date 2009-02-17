@@ -197,7 +197,7 @@ namespace mongo {
                 right = sr.str();
             }
         }
-
+        
 
         if ( !isdigit(left[0]) )
             /* this loop is not really necessary, we we print out if we can't connect
@@ -205,7 +205,11 @@ namespace mongo {
                wrong so worthwhile.
                */
             while ( 1 ) {
-                if ( hostbyname(hostLeft.c_str()).empty() ) {
+                string hostLeftServer = hostLeft;
+                if ( hostLeftServer.find( ":" ) != string::npos )
+                    hostLeftServer = hostLeftServer.substr( 0 , hostLeftServer.find( ":" ) );
+
+                if ( hostbyname(hostLeftServer.c_str()).empty() ) {
                     log() << "can't resolve DNS for " << hostLeft << ", sleeping and then trying again" << endl;
                     sleepsecs(15);
                     continue;
