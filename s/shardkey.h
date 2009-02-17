@@ -25,10 +25,11 @@ namespace mongo {
     class ShardKey {
     public:
         ShardKey( BSONObj fieldsAndOrder = emptyObj );
-        
+        void init( BSONObj fieldsAndOrder );
+
         void globalMin( BSONObjBuilder & b );
         BSONObj globalMin(){ BSONObjBuilder b; globalMin( b ); return b.obj(); }
-
+        
         void globalMax( BSONObjBuilder & b );
         BSONObj globalMax(){ BSONObjBuilder b; globalMax( b ); return b.obj(); }
         
@@ -37,7 +38,12 @@ namespace mongo {
 
         int compare( BSONObj& l , BSONObj& r );
         
+        BSONObj& key(){
+            return _fieldsAndOrder;
+        }
+
     private:
+        void _init();
         BSONObj _fieldsAndOrder;
         const char * _fieldName;
     };

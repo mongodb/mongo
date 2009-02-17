@@ -47,17 +47,17 @@ namespace mongo {
     private:
         Shard( ShardInfo * info , BSONObj data );
 
+        ShardInfo * _info;
+        BSONObj _data;
+
         void _split( BSONObj& middle );
         
-        BSONObj _data;
-        ShardInfo * _info;
-
         friend class ShardInfo;
     };
 
     /* config.sharding
          { ns: 'alleyinsider.fs.chunks' , 
-           shardType: { ts : 1 } ,
+           key: { ts : 1 } ,
            shards: [ { min: 1, max: 100, server: a } , { min: 101, max: 200 , server : b } ]
          }
     */

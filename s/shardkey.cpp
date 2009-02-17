@@ -26,17 +26,27 @@
 */
 
 namespace mongo {
-  
+    
     ShardKey::ShardKey( BSONObj fieldsAndOrder ) : _fieldsAndOrder( fieldsAndOrder ){
         if ( _fieldsAndOrder.nFields() > 0 ){
-            _fieldName = fieldsAndOrder.firstElement().fieldName();
-            uassert( "shard key only supports 1 field right now" , 1 == fieldsAndOrder.nFields() );
-            uassert( "shard key has to be a number right now" , fieldsAndOrder.firstElement().isNumber() );
+            _init();
         }
         else {
             _fieldName = 0;
         }
     }
+
+    void ShardKey::init( BSONObj fieldsAndOrder ){
+        _fieldsAndOrder = fieldsAndOrder;
+        _init();
+    }
+
+    void ShardKey::_init(){
+        _fieldName = _fieldsAndOrder.firstElement().fieldName();
+        uassert( "shard key only supports 1 field right now" , 1 == _fieldsAndOrder.nFields() );
+        uassert( "shard key has to be a number right now" , _fieldsAndOrder.firstElement().isNumber() );
+    }
+
     
     void ShardKey::globalMin( BSONObjBuilder& b ){
         uassert( "not valid yet" , _fieldName );
