@@ -115,6 +115,9 @@ namespace mongo {
            call at startup, this will initiate connection to the grid db 
         */
         bool init( vector<string> configHosts , bool infer );
-    };
 
+    private:
+        string getHost( string name , bool withPort );
+    };
+    
 } // namespace mongo

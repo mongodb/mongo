@@ -170,7 +170,7 @@ namespace mongo {
 
         if ( configHosts.empty() ) {
             if ( ! infer ) {
-                out() << "--griddb or --infer required\n";
+                out() << "--configdb or --infer required\n";
                 exit(7);
             }
             stringstream sl, sr;
@@ -184,17 +184,12 @@ namespace mongo {
             right = sr.str();
         }
         else {
-            stringstream sl, sr;
-            sl << configHosts[0];
-            hostLeft = sl.str();
-            sl << ":" << Port;
-            left = sl.str();
+            hostLeft = getHost( configHosts[0] , false );
+            left = getHost( configHosts[0] , true );
 
             if ( configHosts.size() > 1 ) {
-                sr << configHosts[1];
-                hostRight = sr.str();
-                sr << ":" << Port;
-                right = sr.str();
+                hostRight = getHost( configHosts[1] , false );
+                right = getHost( configHosts[1] , true );
             }
         }
         
@@ -238,6 +233,22 @@ namespace mongo {
         }
         
         return true;
+    }
+
+    string ConfigServer::getHost( string name , bool withPort ){
+        if ( name.find( ":" ) ){
+            if ( withPort )
+                return name;
+            return name.substr( 0 , name.find( ":" ) );
+        }
+
+        if ( withPort ){
+            stringstream ss;
+            ss << name << ":" << Port;
+            return ss.str();
+        }
+        
+        return name;
     }
 
     ConfigServer configServer;    
