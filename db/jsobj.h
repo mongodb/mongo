@@ -316,6 +316,13 @@ namespace mongo {
             len = valuestrsize();
             return value() + 5;
         }
+        
+        BinDataType binDataType(){
+            // BinData: <int len> <byte subtype> <byte[len] data>
+            assert( type() == BinData );
+            char c = (value() + 4)[0];
+            return (BinDataType)c;
+        }
 
         /** Retrieve the regex string for a Regex element */
         const char *regex() const {
@@ -752,6 +759,13 @@ namespace mongo {
         Labeler( const Label &l, BSONObjBuilderValueStream *s ) : l_( l ), s_( s ) {}
         template<class T>
         BSONObjBuilder& operator<<( T value );
+
+        /* the value of the element e is appended i.e. for 
+             "age" << GT << someElement
+           one gets 
+             { age : { $gt : someElement's value } } 
+        */
+        BSONObjBuilder& operator<<( BSONElement& e );
     private:
         const Label &l_;
         BSONObjBuilderValueStream *s_;
@@ -866,7 +880,10 @@ namespace mongo {
         void append( const char *fieldName, OID oid ) {
             appendOID( fieldName, &oid );
         }
-        /** Append a date.  Data is a Java-style 64 bit date value. */
+        /** Append a date.  
+            @param dt a Java-style 64 bit date value, that is 
+                      the number of milliseconds since January 1, 1970, 00:00:00 GMT
+        */
         void appendDate(const char *fieldName, unsigned long long dt) {
             b.append((char) Date);
             b.append(fieldName);
@@ -881,6 +898,13 @@ namespace mongo {
             b.append(fieldName);
             b.append(regex);
             b.append(options);
+        }
+        /** Append a regular expression value
+            @param regex the regular expression pattern
+            @param regex options such as "i" or "g"
+        */
+        void appendRegex(string fieldName, string regex, string options = "") {
+            appendRegex(fieldName.c_str(), regex.c_str(), options.c_str());
         }
         void appendCode(const char *fieldName, const char *code) {
             b.append((char) Code);
@@ -1269,6 +1293,12 @@ namespace mongo {
     template<class T> inline
     BSONObjBuilder& Labeler::operator<<( T value ) {
         s_->_subobj->append( l_.l_, value );
+        return *s_->_builder;
+    }    
+
+    inline
+    BSONObjBuilder& Labeler::operator<<( BSONElement& e ) {
+        s_->_subobj->appendAs( e, l_.l_ );
         return *s_->_builder;
     }    
         

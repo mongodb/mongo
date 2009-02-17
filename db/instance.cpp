@@ -595,8 +595,6 @@ namespace mongo {
 
     boost::mutex &exitMutex( *( new boost::mutex ) );
     bool firstExit = true;
-    extern const char *replAllDead;
-    extern int syncing;
 
     /* not using log() herein in case we are already locked */
     void dbexit(int rc, const char *why) {        
@@ -611,8 +609,6 @@ namespace mongo {
             firstExit = false;
         }
             
-        replAllDead = "server exiting"; // tell replication to stop
-
         stringstream ss;
         ss << "dbexit: " << why << endl;
         rawOut( ss.str() );
@@ -620,21 +616,6 @@ namespace mongo {
         stringstream ss2;
         flushOpLog( ss2 );
         rawOut( ss2.str() );
-
-        /* wait for replication to finish */
-        if( syncing == 1 ) { 
-            rawOut("waiting for replication to finish");
-            int n = 60 * 4;
-            while( 1 ) { 
-                sleepmillis(250);
-                if( syncing != 1 )
-                    break;
-                if( --n <= 0 ) { 
-                    rawOut("timeout waiting for replication to finish -- attempting to exit anyway");
-                    break;
-                }
-            }
-        }
 
         /* must do this before unmapping mem or you may get a seg fault */
         closeAllSockets();

@@ -74,7 +74,7 @@ namespace mongo {
         }
     }
 
-    auto_ptr< Cursor > getHintCursor( const IndexDetails &ii, BSONObj query, BSONObj order, bool *simpleKeyMatch, bool *isSorted ) {
+    auto_ptr< Cursor > getHintCursor( IndexDetails &ii, BSONObj query, BSONObj order, bool *simpleKeyMatch, bool *isSorted ) {
         int direction = matchDirection( ii.keyPattern(), order );
         if ( isSorted ) *isSorted = ( direction != 0 );
         if ( direction == 0 )
@@ -155,15 +155,8 @@ namespace mongo {
         for (int i = 0; i < d->nIndexes; i++ ) {
             BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
             BSONObj idxKey = idxInfo.getObjectField("key");
-            set<string> keyFields;
-            idxKey.getFieldNames(keyFields);
 
-            bool subset = true;
-            for( set<string>::iterator j = queryFields.begin(); subset && j != queryFields.end(); ++j )
-                if ( keyFields.count( *j ) == 0 )
-                    subset = false;
-            
-            if ( subset ) {
+            if ( queryFields.count( idxKey.firstElement().fieldName() ) > 0 ) {
                 BSONObj q = query.extractFieldsUnDotted(idxKey);
                 assert(q.objsize() != 0); // guard against a seg fault if details is 0
                                                                                                                
@@ -463,14 +456,14 @@ namespace mongo {
                 theDataFileMgr.insert(ns, obj);
                 if ( profile )
                     ss << " fastmodinsert ";
-                if ( logOp )
+                if ( logop )
                     logOp( "i", ns, obj );
                 return 3;
             }
             if ( profile )
                 ss << " upsert ";
             theDataFileMgr.insert(ns, updateobj);
-            if ( logOp )
+            if ( logop )
                 logOp( "i", ns, updateobj );
             return 4;
         }

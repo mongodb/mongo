@@ -193,7 +193,7 @@ namespace mongo {
 					continue;
 			}
 			else if( strchr(from_name, '$') ) {
-				log() << "clone: '$' char in namespaces outside of system???\n";
+                // don't clone index namespaces -- we take care of those separately below.
                 continue;
             }
             BSONObj options = collection.getObjectField("options");

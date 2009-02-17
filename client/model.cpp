@@ -32,7 +32,7 @@ namespace mongo {
             return false;
         
         unserialize(b);
-        _id = b["_id"];
+        _id = b["_id"].wrap();
         return true;
     }
 
@@ -42,23 +42,30 @@ namespace mongo {
         BSONObjBuilder b;
         serialize( b );
         
-        if ( _id.eoo() ){
+        if ( _id.isEmpty() ){
             OID oid;
             b.appendOID( "_id" , &oid );
             
             BSONObj o = b.obj();
             conn->insert( getNS() , o );
-            _id = o["_id"];
+            _id = o["_id"].wrap();
 
-            log(4) << "inserted new model" << endl;
+            log(4) << "inserted new model " << getNS() << "  " << o << endl;
         }
         else {
-            b.append( _id );
-            BSONObjBuilder id;
-            id.append( _id );
-            conn->update( getNS() , id.obj() , b.obj() );
+            BSONElement id = _id["_id"];
+            b.append( id );
+
+            BSONObjBuilder qb;
+            qb.append( id );
             
-            log(4) << "updated old model" << endl;
+            BSONObj q = qb.obj();
+            BSONObj o = b.obj();
+
+            log(4) << "updated old model" << getNS() << "  " << q << " " << o << endl;
+
+            conn->update( getNS() , q , o );
+            
         }
 
         conn.done();

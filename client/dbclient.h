@@ -54,6 +54,7 @@ namespace mongo {
     class Query : public Stringable {
     public:
         BSONObj obj;
+        Query() : obj(emptyObj) { }
         Query(const BSONObj& b) : obj(b) { }
         Query(const string &json) : 
             obj(fromjson(json)) { }

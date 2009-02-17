@@ -487,6 +487,7 @@ namespace mongo {
     }
 
     string dashDashSource;
+    string dashDashOnly;
 
     static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, vector<ReplSource*>&old) {
         for ( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
@@ -521,20 +522,30 @@ namespace mongo {
                 n++;
                 ReplSource tmp(c->current());
                 if ( tmp.hostName != dashDashSource ) {
-                    problem() << "--source " << dashDashSource << " != " << tmp.hostName << " from local.sources collection" << endl;
+                    log() << "E10000 --source " << dashDashSource << " != " << tmp.hostName << " from local.sources collection" << endl;
+                    log() << "terminating after 30 seconds" << endl;
+                    sleepsecs(30);
+                    dbexit(18);
+                }
+                if ( tmp.only != dashDashOnly ) {
+                    log() << "E10001 --only " << dashDashOnly << " != " << tmp.only << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit(18);
                 }
                 c->advance();
             }
-            uassert( "local.sources collection corrupt?", n<2 );
+            uassert( "E10002 local.sources collection corrupt?", n<2 );
             if ( n == 0 ) {
                 // source missing.  add.
                 ReplSource s;
                 s.hostName = dashDashSource;
+                s.only = dashDashOnly;
                 s.save();
             }
+        }
+        else { 
+            massert("--only requires use of --source", dashDashOnly.empty());
         }
 
         setClient("local.sources");
@@ -604,7 +615,7 @@ namespace mongo {
     
     bool ReplSource::resync(string db) {
         {
-            log() << "resync: dropping database " << db << endl;
+            log(1) << "resync: dropping database " << db << endl;
             string dummyns = db + ".";
             assert( database->name == db );
             dropDatabase(dummyns.c_str());
@@ -800,6 +811,10 @@ namespace mongo {
             q.appendDate("$gte", syncedTo.asDate());
             BSONObjBuilder query;
             query.append("ts", q.done());
+            if ( !only.empty() ) {
+                // note we may here skip a LOT of data table scanning, a lot of work for the master.
+                query.appendRegex("ns", string("^") + only);
+            }
             BSONObj queryObj = query.done();
             // queryObj = { ts: { $gte: syncedTo } }
 
@@ -862,7 +877,7 @@ namespace mongo {
                 assert( syncedTo < nextOpTime );
             }
             else {
-                log() << "pull:   initial run\n";
+                log(1) << "pull:   initial run\n";
             }
             {
                 sync_pullOpLog_applyOperation(op);

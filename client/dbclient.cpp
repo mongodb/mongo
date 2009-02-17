@@ -677,7 +677,7 @@ namespace mongo {
 
 // "./db testclient" to invoke
     extern BSONObj emptyObj;
-    void testClient() {
+    void testClient3() {
         out() << "testClient()" << endl;
 //	DBClientConnection c(true);
         DBClientPaired c;

@@ -303,7 +303,7 @@ if useJavaHome:
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-non-virtual-dtor" )
     env.Append( LINKFLAGS=" -fPIC " )
-    env.Append( LIBS=[ "stdc++" ] )
+    env.Append( LIBS=[] )
 
     if noOptimization:
         env.Append( CPPFLAGS=" -O0" )
@@ -328,6 +328,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
     myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
     
+    if nix and not shell:
+        if not conf.CheckLib( "stdc++" ):
+            print( "can't find stdc++ library which is needed" );
+            Exit(1)
+
     def myCheckLib( poss , failIfNotFound=False , java=False ):
 
         if type( poss ) != types.ListType :
@@ -360,7 +365,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             return True
 
         if failIfNotFound:
-            print( "can't find " + str( poss ) )
+            print( "can't find " + str( poss ) + " in " + str( myenv["LIBPATH"] ) )
             Exit(1)
             
         return False
@@ -501,8 +506,8 @@ env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
-# dbgrid
-env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "dbgrid/*.cpp" ) )
+# mongos
+env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "s/*.cpp" ) )
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
@@ -520,6 +525,12 @@ clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
 perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
+
+# --- sniffer ---
+if nix and darwin:
+    sniffEnv = clientEnv.Clone()
+    sniffEnv.Append( LIBS=[ "pcap" ] )
+    sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
 # --- shell ---
 # shell is complicated by the fact that v8 doesn't work 64-bit yet

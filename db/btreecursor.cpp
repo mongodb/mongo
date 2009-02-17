@@ -28,7 +28,7 @@ namespace mongo {
     DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
     DiskLoc minDiskLoc(0, 1);
 
-    BtreeCursor::BtreeCursor(const IndexDetails& _id, const BSONObj& k, int _direction, const BSONObj& _query) :
+    BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, const BSONObj& _query) :
 //    query(_query),
             indexDetails(_id),
             order(_id.keyPattern()),
@@ -54,7 +54,7 @@ namespace mongo {
             startKey = k.copy();
 
         bucket = indexDetails.head.btree()->
-                 locate(indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
+                 locate(indexDetails, indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
 
         skipUnusedKeys();
 
@@ -236,7 +236,7 @@ namespace mongo {
         bool found;
 
         /* TODO: Switch to keep indexdetails and do idx.head! */
-        bucket = indexDetails.head.btree()->locate(indexDetails.head, keyAtKeyOfs, order, keyOfs, found, locAtKeyOfs, direction);
+        bucket = indexDetails.head.btree()->locate(indexDetails, indexDetails.head, keyAtKeyOfs, order, keyOfs, found, locAtKeyOfs, direction);
         RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
         if ( found )
             skipUnusedKeys();
@@ -244,8 +244,8 @@ namespace mongo {
 
     /* ----------------------------------------------------------------------------- */
 
-    struct BtreeUnitTest {
-        BtreeUnitTest() {
+    struct BtreeCursorUnitTest {
+        BtreeCursorUnitTest() {
             assert( minDiskLoc.compare(maxDiskLoc) < 0 );
         }
     } btut;

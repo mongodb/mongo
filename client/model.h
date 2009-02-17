@@ -58,7 +58,7 @@ namespace mongo {
         void save();
         
     private:
-        BSONElement _id;
+        BSONObj _id;
     };
 
 } // namespace mongo
