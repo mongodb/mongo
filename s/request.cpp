@@ -43,7 +43,7 @@ namespace mongo {
         assert( op > dbMsg );
         
         Strategy * s = 0;
-        if ( r.getConfig()->partitioned( r.getns() ) ){
+        if ( r.getConfig()->isPartitioned() ){
             uassert( "partitioned not supported" , 0 );
         }
         else {

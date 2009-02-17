@@ -33,8 +33,8 @@ namespace mongo {
     string DBConfig::modelServer() {
         return configServer.modelServer();
     }
-
-    bool DBConfig::partitioned( const NamespaceString& ns ){
+    
+    bool DBConfig::sharded( const NamespaceString& ns ){
         if ( ! _partitioned )
             return false;
         uassert( "don't know what to do!" , 0 );
@@ -42,8 +42,8 @@ namespace mongo {
     }
 
     string DBConfig::getServer( const NamespaceString& ns ){
-        if ( partitioned( ns ) )
-            return 0;
+        if ( sharded( ns ) )
+            return "";
         
         uassert( "no primary!" , _primary.size() );
         return _primary;
@@ -82,8 +82,9 @@ namespace mongo {
             all.push_back( s["host"].valuestrsafe() );
         }
         conn.done();
-                
-        uassert( "can't find server for new db" , all.size() );
+        
+        if ( all.size() == 0 )
+            return "";
         
         return all[ rand() % all.size() ];
     }
@@ -106,9 +107,19 @@ namespace mongo {
                     // note here that cc->primary == 0.
                     log() << "couldn't find database [" << database << "] in config db" << endl;
                     
-                    cc->_primary = pickServerForNewDB();
-                    cc->save();
-                    log() << "\t put [" << database << "] on: " << cc->_primary << endl;
+                    if ( database == "admin" )
+                        cc->_primary = configServer.getPrimary();
+                    else
+                        cc->_primary = pickServerForNewDB();
+                    
+                    if ( cc->_primary.size() ){
+                        cc->save();
+                        log() << "\t put [" << database << "] on: " << cc->_primary << endl;
+                    }
+                    else {
+                        log() << "\t can't find a server" << endl;
+                        cc = 0;
+                    }
                 }
                 else {
                     cc = 0;
@@ -159,7 +170,7 @@ namespace mongo {
 
         if ( configHosts.empty() ) {
             if ( ! infer ) {
-                out() << "--griddb or --infer required\n";
+                out() << "--configdb or --infer required\n";
                 exit(7);
             }
             stringstream sl, sr;
@@ -173,20 +184,15 @@ namespace mongo {
             right = sr.str();
         }
         else {
-            stringstream sl, sr;
-            sl << configHosts[0];
-            hostLeft = sl.str();
-            sl << ":" << Port;
-            left = sl.str();
+            hostLeft = getHost( configHosts[0] , false );
+            left = getHost( configHosts[0] , true );
 
             if ( configHosts.size() > 1 ) {
-                sr << configHosts[1];
-                hostRight = sr.str();
-                sr << ":" << Port;
-                right = sr.str();
+                hostRight = getHost( configHosts[1] , false );
+                right = getHost( configHosts[1] , true );
             }
         }
-
+        
 
         if ( !isdigit(left[0]) )
             /* this loop is not really necessary, we we print out if we can't connect
@@ -206,7 +212,7 @@ namespace mongo {
                 }
                 break;
             }
-
+        
         Nullstream& l = log();
         l << "connecting to griddb ";
         
@@ -223,6 +229,22 @@ namespace mongo {
         }
         
         return true;
+    }
+
+    string ConfigServer::getHost( string name , bool withPort ){
+        if ( name.find( ":" ) ){
+            if ( withPort )
+                return name;
+            return name.substr( 0 , name.find( ":" ) );
+        }
+
+        if ( withPort ){
+            stringstream ss;
+            ss << name << ":" << Port;
+            return ss.str();
+        }
+        
+        return name;
     }
 
     ConfigServer configServer;    

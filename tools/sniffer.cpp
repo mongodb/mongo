@@ -116,6 +116,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
 
     Message m( (void*)payload , 0 );
+    assert( size_payload == m.data->len );
     DbMessage d( m );
     
     cout << inet_ntoa(ip->ip_src) << ":" << ntohs( tcp->th_sport ) 

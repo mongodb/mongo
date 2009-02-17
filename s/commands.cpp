@@ -166,7 +166,7 @@ namespace mongo {
                 // TODO AARON - we need a clone command which replays operations from clone start to now
                 //              using a seperate smaller oplog
                 BSONObj cloneRes;
-                bool worked = toconn->runCommand( "admin" , BSON( "clone" << config->getPrimary() ) , cloneRes );
+                bool worked = toconn->runCommand( dbname.c_str() , BSON( "clone" << config->getPrimary() ) , cloneRes );
                 toconn.done();
                 if ( ! worked ){
                     log() << "clone failed" << cloneRes << endl;

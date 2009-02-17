@@ -29,6 +29,12 @@ namespace mongo {
             return _config->getPrimary().c_str();
         }
 
+        string singleServerName(){
+            string s = _config->getServer( getns() );
+            uassert( "sharded!" , s.size() > 0 );
+            return s;
+        }
+
         void reply( Message & response ){
             _p.reply( _m , response , _id );
         }

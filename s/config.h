@@ -42,13 +42,20 @@ namespace mongo {
         DBConfig( string name = "" ) : _name( name ) , _primary("") , _partitioned(false){ }
 
         /**
+         * @return if anything in this db is partitioned or not
+         */
+        bool isPartitioned(){
+            return _partitioned;
+        }
+
+        /**
          * @return whether or not this partition is partitioned
          */
-        bool partitioned( const NamespaceString& ns );
+        bool sharded( const NamespaceString& ns );
         
         /**
-         * returns the correct for machine for the ns
-         * if this namespace is partitioned, will return NULL
+         * @return the correct for machine for the ns
+         * if the namespace is partitioned, will return an empty string
          */
         string getServer( const NamespaceString& ns );
         
@@ -115,6 +122,9 @@ namespace mongo {
            call at startup, this will initiate connection to the grid db 
         */
         bool init( vector<string> configHosts , bool infer );
-    };
 
+    private:
+        string getHost( string name , bool withPort );
+    };
+    
 } // namespace mongo

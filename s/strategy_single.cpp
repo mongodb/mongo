@@ -26,10 +26,11 @@ namespace mongo {
                         return;
                     }
                 }
-
-                ScopedDbConnection dbcon( r.primaryName() );
+                
+                ScopedDbConnection dbcon( r.singleServerName() );
                 DBClientBase &_c = dbcon.conn();
-/** Todo: This will not work with Paired connections.  Fix. */
+                
+                // TODO: This will not work with Paired connections.  Fix. 
                 DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
                 Message response;
                 bool ok = c.port().call( r.m(), response);
@@ -54,9 +55,10 @@ namespace mongo {
         
             log(3) << "getmore: " << ns << endl;
 
-            ScopedDbConnection dbcon( r.primaryName() );
+            ScopedDbConnection dbcon( r.singleServerName() );
             DBClientBase& _c = dbcon.conn();
-/* TODO */
+
+            // TODO 
             DBClientConnection &c = dynamic_cast<DBClientConnection&>(_c);
 
             Message response;
@@ -72,7 +74,7 @@ namespace mongo {
             const char *ns = r.getns();
             log(3) << "write: " << ns << endl;
 
-            ScopedDbConnection dbcon( r.primaryName() );
+            ScopedDbConnection dbcon( r.singleServerName() );
             DBClientBase &_c = dbcon.conn();
             /* TODO FIX - do not case and call DBClientBase::say() */
             DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
