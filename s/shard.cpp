@@ -22,18 +22,39 @@
 
 namespace mongo {
     
-    string Shard::modelServer() {
+    string ShardInfo::modelServer() {
         // TODO: this could move around?
         return configServer.modelServer();
     }
 
-    void Shard::serialize(BSONObjBuilder& to) {
-        to.append("name", name);
+    void ShardInfo::serialize(BSONObjBuilder& to) {
+        to.append( "ns", _ns );
+        
     }
 
-    void Shard::unserialize(BSONObj& from) {
-        name = from.getStringField("name");
-        uassert("bad config.shards.name", !name.empty());
+    void ShardInfo::unserialize(BSONObj& from) {
+        _ns = from.getStringField("ns");
+        uassert("bad config.shards.name", !_ns.empty());
+
+        _shards.clear();
+    }
+
+    void shardObjTest(){
+        string ns = "alleyinsider.blog.posts";
+        BSONObj o = BSON( "ns" << ns );
+
+        ShardInfo si;
+        si.unserialize( o );
+        assert( si.getns() == ns );
+        
+        
+
+        BSONObjBuilder b;
+        si.serialize( b );
+        BSONObj a = b.obj();
+        assert( ns == a.getStringField( "ns" ) );
+
+        log(1) << "shardObjTest passed" << endl;
     }
 
 } // namespace mongo

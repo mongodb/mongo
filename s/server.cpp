@@ -23,6 +23,7 @@
 
 #include "server.h"
 #include "config.h"
+#include "shard.h"
 
 namespace mongo {
 
@@ -99,11 +100,6 @@ namespace mongo {
 using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] ) {
-    
-    if ( argc <= 1 ) {
-        usage( argv );
-        return 3;
-    }
 
     bool infer = false;
     vector<string> configdbs;
@@ -142,6 +138,16 @@ int main(int argc, char* argv[], char *envp[] ) {
         }
     }
     
+    { // run some unit tesst
+        shardKeyTest();
+        shardObjTest();
+    }
+
+    if ( argc <= 1 ) {
+        usage( argv );
+        return 3;
+    }
+
     bool ok = port != 0;
     
     if ( !ok ) {

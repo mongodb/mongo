@@ -1,5 +1,6 @@
-/* shard.h
+// shard.h
 
+/*
    A "shard" is a database (replica pair typically) which represents
    one partition of the overall database.
 */
@@ -24,23 +25,63 @@
 
 #include "../client/dbclient.h"
 #include "../client/model.h"
+#include "shardkey.h"
 
 namespace mongo {
 
-    /* config.shards
-         { name: 'hostname'
+    class ShardInfo;
+    
+    class Shard {
+    public:
+        
+        BSONObj getMin(){
+            return _data.getObjectField( "min" );
+        }
+        BSONObj getMax(){
+            return _data.getObjectField( "max" );
+        }
+        string getServer(){
+            return _data.getStringField( "server" );
+        }
+        
+    private:
+        Shard( ShardInfo * info , BSONObj data );
+
+        void _split( BSONObj& middle );
+        
+        BSONObj _data;
+        ShardInfo * _info;
+
+        friend class ShardInfo;
+    };
+
+    /* config.sharding
+         { ns: 'alleyinsider.fs.chunks' , 
+           shardType: { ts : 1 } ,
+           shards: [ { min: 1, max: 100, server: a } , { min: 101, max: 200 , server : b } ]
          }
     */
-    class Shard : public Model {
+    class ShardInfo : public Model {
     public:
-        string name; // hostname (less -l, -r)
+
+        string getns(){
+            return _ns;
+        }
 
         virtual const char * getNS() {
-            return "config.shards";
+            return "config.sharding";
         }
+        
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);
         virtual string modelServer();
+        
+    private:
+        string _ns;
+        ShardKey _key;
+        vector<Shard> _shards;
     };
+    
+    void shardObjTest();
 
 } // namespace mongo
