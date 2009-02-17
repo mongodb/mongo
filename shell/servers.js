@@ -23,24 +23,46 @@ _parsePort = function() {
     return port;
 }
 
+createMongoArgs = function( binaryName , args ){
+    var fullArgs = [ binaryName ];
+
+    if ( args.length == 1 && isObject( args[0] ) ){
+        var o = args[0];
+        for ( var k in o ){
+            fullArgs.push( "--" + k );
+            fullArgs.push( "" + o[k] );
+        }
+    }
+    else {
+        for ( var i=0; i<args.length; i++ )
+            fullArgs.push( args[i] )
+    }
+
+    return fullArgs;
+}
+
 // Start a mongod instance and return a 'Mongo' object connected to it.
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
-startMongod = function() {
-    var dbpath = _parsePath.apply( null, arguments );
+startMongod = function(){
+
+    var args = createMongoArgs( "mongod" , arguments );
+    
+    var dbpath = _parsePath.apply( null, args );
     resetDbpath( dbpath );
-    var fullArgs = Array();
-    fullArgs[ 0 ] = "mongod";
-    for( i = 0; i < arguments.length; ++i )
-        fullArgs[ i + 1 ] = arguments[ i ];
-    return startMongoProgram.apply( null, fullArgs );
+
+    return startMongoProgram.apply( null, args );
+}
+
+startMongos = function(){
+    return startMongoProgram.apply( null, createMongoArgs( "mongos" , arguments ) );
 }
 
 // Start a mongo program instance (generally mongod or mongos) and return a
 // 'Mongo' object connected to it.  This function's first argument is the
 // program name, and subsequent arguments to this function are passed as
 // command line arguments to the program.
-startMongoProgram = function() {
+startMongoProgram = function(){
     var port = _parsePort.apply( null, arguments );
 
     _startMongoProgram.apply( null, arguments );
