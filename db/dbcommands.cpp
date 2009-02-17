@@ -700,6 +700,26 @@ namespace mongo {
         }
     } cmdListDatabases;
 
+    class CmdCloseAllDatabases : public Command {
+    public:
+        virtual bool adminOnly() { return true; }
+        virtual bool slaveOk() { return false; }
+        CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {}
+        bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+            set< string > dbs;
+            for ( map<string,Database*>::iterator i = databases.begin(); i != databases.end(); i++ ) {
+                string name = i->first;
+                name = name.substr( 0 , name.find( ":" ) );
+                dbs.insert( name );
+            }
+            for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+                setClientTempNs( i->c_str() );
+                closeClient( i->c_str() );
+            }
+            return true;
+        }
+    } cmdCloseAllDatabases;
+    
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here
