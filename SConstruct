@@ -303,7 +303,7 @@ if useJavaHome:
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-non-virtual-dtor" )
     env.Append( LINKFLAGS=" -fPIC " )
-    env.Append( LIBS=[ "stdc++" ] )
+    env.Append( LIBS=[] )
 
     if noOptimization:
         env.Append( CPPFLAGS=" -O0" )
@@ -328,6 +328,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
     myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
     
+    if nix and not shell:
+        if not conf.CheckLib( "stdc++" ):
+            print( "can't find stdc++ library which is needed" );
+            Exit(1)
+
     def myCheckLib( poss , failIfNotFound=False , java=False ):
 
         if type( poss ) != types.ListType :
