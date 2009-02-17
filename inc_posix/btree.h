@@ -388,7 +388,16 @@ struct __wt_item {
  * the code of course, but paying 4 bytes per internal page item pair is real.
  */
 struct __wt_item_offp {
-	u_int64_t records;		/* Subtree record count */
+/*
+ * Solaris and the gcc compiler on Linux pad the WT_ITEM_OFFP structure because
+ * of the 64-bit records field.   This is an on-disk structure, which means we
+ * have to have a fixed size, without padding, so we declare it as two 32-bit
+ * fields and cast it.  We haven't yet found a compiler that aligns the 32-bit
+ * fields such that a cast won't work; if we find one, we'll have to go to bit
+ * masks
+ */
+#define	WT_64_CAST(array)	(*(u_int64_t *)(&array[0]))
+	u_int32_t records[2];		/* Subtree record count */
 	u_int32_t addr;			/* Subtree address */
 };
 /*

@@ -539,7 +539,7 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	WT_ITEM_LEN_SET(&data_item, sizeof(WT_ITEM_OFFP));
 	WT_ITEM_TYPE_SET(&data_item,
 	    root_addr == page->addr ? WT_ITEM_OFFP_LEAF : WT_ITEM_OFFP_INTL);
-	offpage_item.records = dup_count;
+	WT_64_CAST(offpage_item.records) = dup_count, 
 	offpage_item.addr = root_addr;
 	p = (u_int8_t *)dup_data;
 	memcpy(p, &data_item, sizeof(data_item));
@@ -567,6 +567,7 @@ __wt_bt_promote(
 	WT_ITEM_OFFP offp, *parent_offp;
 	WT_ITEM_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
+	u_int64_t records;
 	u_int32_t parent_addr, tmp_root_addr;
 	int need_promotion, ret, root_split, tret;
 
@@ -763,7 +764,7 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 	WT_ITEM_LEN_SET(&item, sizeof(WT_ITEM_OFFP));
 	WT_ITEM_TYPE_SET(&item, WT_ISLEAF(
 	    page->hdr->level) ? WT_ITEM_OFFP_LEAF : WT_ITEM_OFFP_INTL);
-	offp.records = page->records;
+	WT_64_CAST(offp.records) = page->records;
 	offp.addr = page->addr;
 
 	/* Store the data item. */
@@ -811,8 +812,8 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 			 */
 			ip = parent->indx + (parent->indx_count - 1);
 			parent_offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(ip->ditem);
-			parent_offp->records += increment;
-			parent->records += increment;
+			WT_64_CAST(parent_offp->records) =
+			    WT_64_CAST(parent_offp->records) + increment;
 		}
 
 err:	/* Discard the parent page. */

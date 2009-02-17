@@ -270,8 +270,8 @@ __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_OFFP_INTL:
 	case WT_ITEM_OFFP_LEAF:
 		offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-		fprintf(fp, "addr: %lu, records %lu",
-		    (u_long)offp->addr, (u_long)offp->records);
+		fprintf(fp, "addr: %lu, records %llu",
+		    (u_long)offp->addr, WT_64_CAST(offp->records));
 		break;
 	default:
 		fprintf(fp, "unsupported type");

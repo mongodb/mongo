@@ -296,7 +296,7 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 		case WT_ITEM_OFFP_INTL:
 		case WT_ITEM_OFFP_LEAF:
 			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-			records += offp->records;
+			records += WT_64_CAST(offp->records);
 			indx->addr = offp->addr;
 			indx->ditem = item;
 			++indx;
