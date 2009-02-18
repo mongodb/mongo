@@ -102,7 +102,7 @@ public:
         }
         
         if ( cmd == "put" ){
-            g.storeFile( filename );
+            cout << "file object: " << g.storeFile( filename ) << endl;
             cout << "done!";
             return 0;
         }

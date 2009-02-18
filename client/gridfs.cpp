@@ -21,16 +21,16 @@ namespace mongo {
         _data = o;
     }
 
-    Chunk::Chunk( BSONElement fileId , int chunkNumber , const char * data , int len ){
+    Chunk::Chunk( BSONObj fileObject , int chunkNumber , const char * data , int len ){
         BSONObjBuilder b;
-        b.appendAs( fileId , "files_id" );
+        b.appendAs( fileObject["_id"] , "files_id" );
         b.append( "n" , chunkNumber );
         b.appendBinDataArray( "data" , data , len );
         _data = b.obj();
     }
 
 
-    GridFS::GridFS( DBClientBase& client , string dbName , string prefix ) : _client( client ){
+    GridFS::GridFS( DBClientBase& client , string dbName , string prefix ) : _client( client ) , _dbName( dbName ){
         _filesNS = dbName + "." + prefix + ".files";
         _chunksNS = dbName + "." + prefix + ".chunks";
 
@@ -43,24 +43,27 @@ namespace mongo {
         
     }
     
-    BSONElement GridFS::storeFile( string filename ){
+    BSONObj GridFS::storeFile( string filename ){
         uassert( "file doesn't exist" , boost::filesystem::exists( filename ) );
         
         gridfs_offset length = boost::filesystem::file_size( filename );
         
-        BSONObj fileObject;
+        BSONObjBuilder fileObject;
+        BSONObj idObj;
+        OID id;
         {
-            BSONObjBuilder b;
-            b << "filename" << filename ;
-            massert("large files not yet implemented", length <= 0xffffffff);
-            b << "length" << (unsigned) length ;
-            b << "chunkSize" << DEFAULT_CHUNK_SIZE ;
             
-            OID id;
             id.init();
+            fileObject.appendOID( "_id" , &id );
+
+            fileObject << "filename" << filename ;
+            massert("large files not yet implemented", length <= 0xffffffff);
+            fileObject << "length" << (unsigned) length ;
+            fileObject << "chunkSize" << DEFAULT_CHUNK_SIZE ;
+
+            BSONObjBuilder b;
             b.appendOID( "_id" , &id );
-            
-            fileObject = b.obj();
+            idObj = b.obj();
         }
         
         char buf[DEFAULT_CHUNK_SIZE];
@@ -71,16 +74,25 @@ namespace mongo {
         while ( pos < length ){
             int l = read( fd , buf , MIN( DEFAULT_CHUNK_SIZE , length - pos ) );
             
-            Chunk c( fileObject["_id"] , chunkNumber , buf , l );
+            Chunk c( idObj , chunkNumber , buf , l );
             _client.insert( _chunksNS.c_str() , c._data );
             
             pos += l;
             chunkNumber++;
         }
 
-        _client.insert( _filesNS.c_str() , fileObject );
+        BSONObj res;
+        if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id ) , res ) )
+            throw UserException( "filemd5 failed" );
+        
+        log() << "res : " << res << endl;
 
-        return fileObject["_id"];
+        fileObject.appendAs( res["md5"] , "md5" );
+
+        BSONObj real = fileObject.obj();
+        _client.insert( _filesNS.c_str() , real );
+
+        return real;
     }
 
     GridFile::GridFile( GridFS * grid , BSONObj obj ){

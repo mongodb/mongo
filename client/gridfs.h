@@ -14,7 +14,7 @@ namespace mongo {
     class Chunk {
     public:
         Chunk( BSONObj data );
-        Chunk( BSONElement fileId , int chunkNumber , const char * data , int len );
+        Chunk( BSONObj fileId , int chunkNumber , const char * data , int len );
         
         int len(){
             int len;
@@ -55,9 +55,9 @@ namespace mongo {
         /**
          * puts the file reference by fileName into the db
          * @param fileName relative to process
-         * @return the id file
+         * @return the file object
          */
-        BSONElement storeFile( string fileName );
+        BSONObj storeFile( string fileName );
         
         /**
          * returns a file object matching the query
@@ -81,6 +81,7 @@ namespace mongo {
 
     private:
         DBClientBase& _client;
+        string _dbName;
         string _filesNS;
         string _chunksNS;
 
