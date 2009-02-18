@@ -717,6 +717,9 @@ namespace mongo {
                 setClientTempNs( i->c_str() );
                 closeClient( i->c_str() );
             }
+
+            log()  << "closeAllDatabases : All databases closed" << endl;
+
             return true;
         }
     } cmdCloseAllDatabases;
