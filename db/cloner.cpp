@@ -276,9 +276,6 @@ namespace mongo {
      */
     class CmdCloneCollection : public Command {
     public:
-        virtual bool adminOnly() {
-            return true;
-        }
         virtual bool slaveOk() {
             return false;
         }
