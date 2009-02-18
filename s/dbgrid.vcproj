@@ -350,6 +350,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\shardkey.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\stdafx.cpp"
 				>
 				<FileConfiguration
