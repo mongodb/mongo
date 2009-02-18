@@ -52,6 +52,12 @@ namespace mongo {
                 return trivialBound();
             return f->second;
         }
+        int nBounds() const {
+            int count = 0;
+            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
+                ++count;
+            return count;
+        }
         int nNontrivialBounds() const {
             int count = 0;
             for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
@@ -69,6 +75,7 @@ namespace mongo {
     class QueryPlan {
     public:
         QueryPlan( const FieldBoundSet &fbs, BSONObj order, BSONObj idxKey );
+        /* If true, no other plan can do better unless it is also an exactKeyMatch() */
         bool optimal() const { return optimal_; }
         /* ScanAndOrder processing will be required if true */
         bool scanAndOrderRequired() const { return scanAndOrderRequired_; }

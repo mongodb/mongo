@@ -481,6 +481,7 @@ namespace mongo {
         }
         BSONObj(Record *r);
         /** Construct an empty BSONObj -- that is, {}. */
+        // TODO: Unify this with 'emptyObj'
         BSONObj() : details(0) { }
         ~BSONObj() { cleanup(); }
 

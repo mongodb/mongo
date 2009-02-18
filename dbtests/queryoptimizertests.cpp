@@ -209,12 +209,76 @@ namespace QueryOptimizerTests {
                 ASSERT( p3.scanAndOrderRequired() );                
             }                        
         };
+
+        class NoOrder {
+        public:
+            void run() {
+                QueryPlan p( FieldBoundSet( BSON( "a" << 3 ) ), emptyObj, BSON( "a" << -1 << "b" << 1 ) );
+                ASSERT( !p.scanAndOrderRequired() );                
+                QueryPlan p2( FieldBoundSet( BSON( "a" << 3 ) ), BSONObj(), BSON( "a" << -1 << "b" << 1 ) );
+                ASSERT( !p2.scanAndOrderRequired() );                
+            }            
+        };
         
-        class EqualThenOrder {
+        class EqualWithOrder {
         public:
             void run() {
                 QueryPlan p( FieldBoundSet( BSON( "a" << 4 ) ), BSON( "b" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
+                QueryPlan p2( FieldBoundSet( BSON( "b" << 4 ) ), BSON( "a" << 1 << "c" << 1 ), BSON( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                ASSERT( !p2.scanAndOrderRequired() );                
+                QueryPlan p3( FieldBoundSet( BSON( "b" << 4 ) ), BSON( "a" << 1 << "c" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( p3.scanAndOrderRequired() );                
+            }
+        };
+        
+        class Optimal {
+        public:
+            void run() {
+                QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "a" << 1 ) );
+                ASSERT( p.optimal() );
+                QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( p2.optimal() );
+                QueryPlan p3( FieldBoundSet( BSON( "a" << 1 ) ), BSON( "a" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( p3.optimal() );
+                QueryPlan p4( FieldBoundSet( BSON( "b" << 1 ) ), BSON( "a" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( !p4.optimal() );
+                QueryPlan p5( FieldBoundSet( BSON( "a" << 1 << "b" << 1 ) ), BSON( "a" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( p5.optimal() );
+                QueryPlan p6( FieldBoundSet( BSON( "a" << 1 << "b" << LT << 1 ) ), BSON( "a" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( p6.optimal() );
+                QueryPlan p7( FieldBoundSet( BSON( "a" << 1 << "b" << LT << 1 ) ), BSON( "a" << 1 ), BSON( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                ASSERT( p7.optimal() );
+            }
+        };
+        
+        class KeyMatch {
+        public:
+            void run() {
+                QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "a" << 1 ) );
+                ASSERT( p.keyMatch() );
+                ASSERT( p.exactKeyMatch() );
+                QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "b" << 1 << "a" << 1 ) );
+                ASSERT( p2.keyMatch() );
+                ASSERT( p2.exactKeyMatch() );
+                QueryPlan p3( FieldBoundSet( BSON( "b" << 5 ) ), BSON( "a" << 1 ), BSON( "b" << 1 << "a" << 1 ) );
+                ASSERT( p3.keyMatch() );
+                ASSERT( p3.exactKeyMatch() );
+                QueryPlan p4( FieldBoundSet( BSON( "c" << 4 << "b" << 5 ) ), BSON( "a" << 1 ), BSON( "b" << 1 << "a" << 1 << "c" << 1 ) );
+                ASSERT( p4.keyMatch() );
+                ASSERT( p4.exactKeyMatch() );
+                QueryPlan p5( FieldBoundSet( BSON( "c" << 4 << "b" << 5 ) ), emptyObj, BSON( "b" << 1 << "a" << 1 << "c" << 1 ) );
+                ASSERT( p5.keyMatch() );
+                ASSERT( p5.exactKeyMatch() );
+                QueryPlan p6( FieldBoundSet( BSON( "c" << LT << 4 << "b" << GT << 5 ) ), emptyObj, BSON( "b" << 1 << "a" << 1 << "c" << 1 ) );
+                ASSERT( p6.keyMatch() );
+                ASSERT( !p6.exactKeyMatch() );
+                QueryPlan p7( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "b" << 1 ) );
+                ASSERT( !p7.keyMatch() );
+                ASSERT( !p7.exactKeyMatch() );
+                QueryPlan p8( FieldBoundSet( BSON( "d" << 4 ) ), BSON( "a" << 1 ), BSON( "a" << 1 ) );
+                ASSERT( !p8.keyMatch() );
+                ASSERT( !p8.exactKeyMatch() );
             }
         };
         
@@ -242,7 +306,10 @@ namespace QueryOptimizerTests {
             add< QueryPlanTests::MoreIndexThanNeeded >();
             add< QueryPlanTests::IndexSigns >();
             add< QueryPlanTests::IndexReverse >();
-//            add< QueryPlanTests::EqualThenOrder >();
+            add< QueryPlanTests::NoOrder >();
+            add< QueryPlanTests::EqualWithOrder >();
+            add< QueryPlanTests::Optimal >();
+            add< QueryPlanTests::KeyMatch >();
         }
     };
     

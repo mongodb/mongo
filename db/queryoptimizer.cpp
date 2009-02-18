@@ -139,23 +139,65 @@ namespace mongo {
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
         int direction = 0;
+        int eqCount = 0;
+        if ( !o.more() )
+            scanAndOrderRequired_ = false;
         while( o.more() ) {
-            if ( !k.more() )
-                break;
             BSONElement oe = o.next();
-            BSONElement ke = k.next();
             if ( oe.eoo() ) {
                 scanAndOrderRequired_ = false;
                 break;
             }
-            if ( strcmp( oe.fieldName(), ke.fieldName() ) != 0 )
+            if ( eqCount != -1 ) {
+                if ( fbs.bound( oe.fieldName() ).equality() ) {
+                    ++eqCount;
+                } else {
+                    eqCount = -1;
+                }
+            }
+            if ( !k.more() )
                 break;
-            
+            BSONElement ke;
+            while( 1 ) {
+                ke = k.next();
+                if ( ke.eoo() )
+                    goto doneCheckOrder;
+                if ( strcmp( oe.fieldName(), ke.fieldName() ) == 0 )
+                    break;
+                if ( !fbs.bound( ke.fieldName() ).equality() )
+                    goto doneCheckOrder;
+            }
             int d = oe.number() == ke.number() ? 1 : -1;
             if ( direction == 0 )
                 direction = d;
             else if ( direction != d )
                 break;          
+        }
+    doneCheckOrder:
+        if ( !scanAndOrderRequired_ &&
+            eqCount + 1 >= fbs.nBounds() )
+            optimal_ = true;
+        
+        BSONObjIterator i( idxKey );
+        int indexedQueryCount = 0;
+        int eqIndexedQueryCount = 0;
+        set< string > orderFieldsUnindexed;
+        order.getFieldNames( orderFieldsUnindexed );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            if ( fbs.bound( e.fieldName() ).nontrivial() )
+                ++indexedQueryCount;
+            if ( fbs.bound( e.fieldName() ).equality() )
+                ++eqIndexedQueryCount;
+            orderFieldsUnindexed.erase( e.fieldName() );
+        }
+        if ( indexedQueryCount == fbs.nNontrivialBounds() &&
+            orderFieldsUnindexed.size() == 0 ) {
+            keyMatch_ = true;
+            if ( eqIndexedQueryCount == fbs.nNontrivialBounds() )
+                exactKeyMatch_ = true;
         }
     }
     
