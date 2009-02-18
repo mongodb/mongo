@@ -81,3 +81,61 @@ startMongoProgram = function(){
     return m;
 }
 
+ShardingTest = function( testName , numServers ){
+    this._connections = [];
+    this._serverNames = [];
+
+    for ( var i=0; i<numServers; i++){
+        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i } );
+        conn.name = "localhost:" + ( 30000 + i );
+        
+        this._connections.push( conn );
+        this._serverNames.push( conn.name );
+    }
+
+    this.s = startMongos( { port : 39999 , configdb : "localhost:30000" } );
+    
+    var admin = this.admin = this.s.getDB( "admin" );
+    this.config = this.s.getDB( "config" );
+    
+    this._serverNames.forEach( 
+        function(z){
+            admin.runCommand( { addserver : z } );
+        }
+    );
+}
+
+ShardingTest.prototype.getDB = function( name ){
+    return this.s.getDB( name );
+}
+
+ShardingTest.prototype.getServerName = function( dbname ){
+    return this.config.databases.findOne( { name : dbname } ).primary;
+}
+
+ShardingTest.prototype.getServer = function( dbname ){
+    var name = this.getServerName( dbname );
+    for ( var i=0; i<this._serverNames.length; i++ ){
+        if ( name == this._serverNames[i] )
+            return this._connections[i];
+    }
+    throw "can't find server for: " + dbname + " name:" + name;
+
+}
+
+ShardingTest.prototype.getOther = function( one ){
+    if ( this._connections.length != 2 )
+        throw "getOther only works with 2 servers";
+    
+    if ( this._connections[0] == one )
+        return this._connections[1];
+    return this._connections[0];
+}
+
+ShardingTest.prototype.stop = function(){
+    stopMongoProgram( 39999 );
+    for ( var i=0; i<this._connections.length; i++){
+        stopMongod( 30000 + i );
+    }
+}
+

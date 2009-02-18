@@ -204,8 +204,6 @@ namespace mongo {
                 si.findShard( num ).split();
                 log(2) << "after split: " << si << endl;
                 
-                log() << "-1 : " << si.findShard( BSON( "num" << -1 ) ) << endl;
-                log() << " 1 : " << si.findShard( BSON( "num" << 1 ) ) << endl;
                 assert( si.findShard( BSON( "num" << -1 ) ) != 
                         si.findShard( BSON( "num" << 1 ) ) );
                 

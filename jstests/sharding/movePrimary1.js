@@ -1,16 +1,6 @@
 
 
-
-a = startMongod( { port : 30000 , dbpath : "/data/db/movePrimary1a" } )
-b = startMongod( { port : 30001 , dbpath : "/data/db/movePrimary1b" } )
-
-s = startMongos( { port : 30002 , configdb : "localhost:30000" } );
-
-config = s.getDB( "config" );
-admin = s.getDB( "admin" );
-
-admin.runCommand( { addserver : "localhost:30000" } )
-admin.runCommand( { addserver : "localhost:30001" } )
+s = new ShardingTest( "movePrimary1" , 2 );
 
 initDB = function( name ){
     var db = s.getDB( name );
@@ -20,34 +10,22 @@ initDB = function( name ){
     c.save( { a : 3 } );
     assert( 3 , c.count() );
     
-    return config.databases.findOne( { name : name } ).primary;
+    return s.getServer( name );
 }
 
 from = initDB( "test1" );
-if ( from == "localhost:30000" ){
-    to = "localhost:30001";
-    fromMongo = a;
-    toMongo = b;
-}
-else if ( from == "localhost:30001" ){
-    to = "localhost:30000";
-    fromMongo = b;
-    toMongo = a;
-}
-else 
-    throw "what: " + from;
+to = s.getOther( from );
 
-assert.eq( 3 , fromMongo.getDB( "test1" ).foo.count() , "from doesn't have data before move" );
-assert.eq( 0 , toMongo.getDB( "test1" ).foo.count() , "to has data before move" );
+assert.eq( 3 , from.getDB( "test1" ).foo.count() , "from doesn't have data before move" );
+assert.eq( 0 , to.getDB( "test1" ).foo.count() , "to has data before move" );
 
-admin.runCommand( { moveprimary : "test1" , to : to } );
-assert.eq( config.databases.findOne( { name : "test1" } ).primary , to , "to in config db didn't change" );
+assert.eq( s.config.databases.findOne( { name : "test1" } ).primary , from.name , "not in db correctly to start" );
+s.admin.runCommand( { moveprimary : "test1" , to : to.name } );
+assert.eq( s.config.databases.findOne( { name : "test1" } ).primary , to.name , "to in config db didn't change" );
 
 
-assert.eq( 0 , fromMongo.getDB( "test1" ).foo.count() , "from still has data after move" );
-assert.eq( 3 , toMongo.getDB( "test1" ).foo.count() , "to doesn't have data after move" );
+assert.eq( 0 , from.getDB( "test1" ).foo.count() , "from still has data after move" );
+assert.eq( 3 , to.getDB( "test1" ).foo.count() , "to doesn't have data after move" );
 
-stopMongoProgram( 30002 );
-stopMongod( 30000 );
-stopMongod( 30001 );
+s.stop();
 
