@@ -121,6 +121,7 @@ namespace BtreeTests {
 
     class SplitUnevenBucketBase : public Base {
     public:
+        virtual ~SplitUnevenBucketBase() {}
         void run() {
             for ( int i = 0; i < 10; ++i ) {
                 BSONObj shortKey = simpleKey( shortToken( i ), 1 );

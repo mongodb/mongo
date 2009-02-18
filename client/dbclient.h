@@ -123,6 +123,7 @@ namespace mongo {
      */
     class DBConnector {
     public:
+        virtual ~DBConnector() {}
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) = 0;
         virtual void say( Message &toSend ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;

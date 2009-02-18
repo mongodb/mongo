@@ -175,6 +175,7 @@ namespace ReplTests {
         
         class Base : public ReplTests::Base {
         public:
+            virtual ~Base() {}
             void run() {
                 reset();
                 doIt();

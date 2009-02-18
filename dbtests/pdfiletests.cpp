@@ -33,7 +33,7 @@ namespace PdfileTests {
             Base() {
                 setClient( ns() );
             }
-            ~Base() {
+            virtual ~Base() {
                 if ( !nsd() )
                     return;
                 string n( ns() );

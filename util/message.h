@@ -31,6 +31,7 @@ namespace mongo {
     class Listener {
     public:
         Listener(int p) : port(p) { }
+        virtual ~Listener() {}
         void listen(); // never returns (start a thread)
 
         /* spawn a thread, etc., then return */

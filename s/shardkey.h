@@ -26,6 +26,7 @@ namespace mongo {
     public:
         ShardKey( BSONObj fieldsAndOrder = emptyObj );
         void init( BSONObj fieldsAndOrder );
+        virtual ~ShardKey() {}
 
         void globalMin( BSONObjBuilder & b );
         BSONObj globalMin(){ BSONObjBuilder b; globalMin( b ); return b.obj(); }

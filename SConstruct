@@ -301,7 +301,7 @@ if useJavaHome:
 
 
 if nix:
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-non-virtual-dtor" )
+    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wnon-virtual-dtor" )
     env.Append( LINKFLAGS=" -fPIC " )
     env.Append( LIBS=[] )
 

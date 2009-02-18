@@ -54,6 +54,7 @@ private:
 class DirectDBClientConnection : public DBClientConnection {
 public:
     struct ConnectionCallback {
+        virtual ~ConnectionCallback() {}
         virtual void beforeCommand() {}
         virtual void afterCommand() {}
     };

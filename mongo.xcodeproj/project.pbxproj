@@ -111,6 +111,14 @@
 		936AB4BB0F3A5B0300D5015F /* update3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = update3.js; sourceTree = "<group>"; };
 		936AB9350F3C8AB800D5015F /* _lodeRunner.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = _lodeRunner.js; sourceTree = "<group>"; };
 		936ABBAB0F3CBE5400D5015F /* dbNoCreate.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = dbNoCreate.js; sourceTree = "<group>"; };
+		936B89590F4C899400934AF2 /* file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = file.h; sourceTree = "<group>"; };
+		936B895A0F4C899400934AF2 /* md5.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = md5.c; sourceTree = "<group>"; };
+		936B895B0F4C899400934AF2 /* md5.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = md5.h; sourceTree = "<group>"; };
+		936B895C0F4C899400934AF2 /* md5.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = md5.hpp; sourceTree = "<group>"; };
+		936B895D0F4C899400934AF2 /* md5main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = md5main.c; sourceTree = "<group>"; };
+		936B895E0F4C899400934AF2 /* message.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = message.cpp; sourceTree = "<group>"; };
+		936B895F0F4C899400934AF2 /* message.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = message.h; sourceTree = "<group>"; };
+		936B89600F4C899400934AF2 /* top.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = top.h; sourceTree = "<group>"; };
 		937CACE90F27BF4900C57AA6 /* socktests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = socktests.cpp; sourceTree = "<group>"; };
 		937D0E340F28CB070071FFA9 /* repltests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = repltests.cpp; sourceTree = "<group>"; };
 		937D14AB0F2A225F0071FFA9 /* nonce.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nonce.h; sourceTree = "<group>"; };
@@ -400,6 +408,14 @@
 		934DD87B0EFAD23B00459CC1 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				936B89590F4C899400934AF2 /* file.h */,
+				936B895A0F4C899400934AF2 /* md5.c */,
+				936B895B0F4C899400934AF2 /* md5.h */,
+				936B895C0F4C899400934AF2 /* md5.hpp */,
+				936B895D0F4C899400934AF2 /* md5main.c */,
+				936B895E0F4C899400934AF2 /* message.cpp */,
+				936B895F0F4C899400934AF2 /* message.h */,
+				936B89600F4C899400934AF2 /* top.h */,
 				934DD87C0EFAD23B00459CC1 /* background.cpp */,
 				934DD87D0EFAD23B00459CC1 /* background.h */,
 				934DD87F0EFAD23B00459CC1 /* builder.h */,
@@ -614,7 +630,7 @@
 		};
 		93A8D0700F36AE0200C92B85 /* scons debug test */ = {
 			isa = PBXLegacyTarget;
-			buildArgumentsString = "-j2 --noOptimization test";
+			buildArgumentsString = "-j2 --d test";
 			buildConfigurationList = 93A8D0710F36AE0200C92B85 /* Build configuration list for PBXLegacyTarget "scons debug test" */;
 			buildPhases = (
 			);

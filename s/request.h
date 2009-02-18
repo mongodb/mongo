@@ -54,6 +54,7 @@ namespace mongo {
 
     class Strategy {
     public:
+        virtual ~Strategy() {}
         virtual void queryOp( Request& r ) = 0;
         virtual void getMore( Request& r ) = 0;
         virtual void writeOp( int op , Request& r ) = 0;

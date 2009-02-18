@@ -25,6 +25,7 @@ namespace mongo {
     class MiniWebServer {
     public:
         MiniWebServer();
+        virtual ~MiniWebServer() {}
 
         bool init(int port);
         void run();

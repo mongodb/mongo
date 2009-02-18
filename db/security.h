@@ -40,7 +40,7 @@ namespace mongo {
     public:
 		bool isLocalHost;
         AuthenticationInfo() { isLocalHost = false; }
-        ~AuthenticationInfo() {
+        virtual ~AuthenticationInfo() {
         }
         void logout(const char *dbname) { 
 			assert( dbMutexInfo.isLocked() );
