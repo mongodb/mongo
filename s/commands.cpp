@@ -228,7 +228,7 @@ namespace mongo {
         public:
             ShardCmd() : GridAdminCmd( "shard" ){}
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                
+                return false;
             }            
         } shardCmd;
             
@@ -240,7 +240,7 @@ namespace mongo {
                 help << " example: { shard : 'alleyinsider.blog.posts' , key : { ts : 1 } }";
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                
+                return false;
             }            
             
 
