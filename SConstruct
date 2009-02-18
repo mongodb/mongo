@@ -507,7 +507,7 @@ env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
 # mongos
-env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "s/*.cpp" ) )
+mongos = env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "s/*.cpp" ) )
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
@@ -618,6 +618,9 @@ testEnv.AlwaysBuild( "smokePerf" )
 clientExec = [ x[0].abspath for x in clientTests ];
 testEnv.Alias( "smokeClient" , clientExec , clientExec )
 testEnv.AlwaysBuild( "smokeClient" )
+
+env.Alias( "mongosTest" , [ mongos[0].abspath ] , [ mongos[0].abspath + " --test" ] )
+env.AlwaysBuild( "mongosTest" )
 
 #  ----  INSTALL -------
 

@@ -100,7 +100,8 @@ namespace mongo {
 using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] ) {
-
+    
+    bool justTests = false;
     bool infer = false;
     vector<string> configdbs;
     
@@ -115,7 +116,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         }
         else if ( s == "--configdb" ) {
             assert( ! infer );
-
+            
             while ( ++i < argc ) 
                 configdbs.push_back(argv[i]);
 
@@ -132,17 +133,22 @@ int main(int argc, char* argv[], char *envp[] ) {
         else if ( s.find( "-v" ) == 0 ){
             logLevel = s.size() - 1;
         }
+        else if ( s == "--test" ) {
+            justTests = true;
+            logLevel = 5;
+        }
         else {
             usage( argv );
             return 3;
         }
     }
     
-    { // run some unit tesst
-        shardKeyTest();
-        shardObjTest();
+    UnitTest::runTests();
+    if ( justTests ){
+        cout << "tests passed" << endl;
+        return 0;
     }
-
+    
     if ( argc <= 1 ) {
         usage( argv );
         return 3;
@@ -156,7 +162,6 @@ int main(int argc, char* argv[], char *envp[] ) {
     }
 
     log() << argv[0] << " starting (--help for usage)" << endl;
-    UnitTest::runTests();
 
     if ( ! configServer.init( configdbs , infer ) ){
         cerr << "couldn't connectd to config db" << endl;

@@ -1,24 +1,25 @@
 // shard.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ *    Copyright (C) 2008 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "stdafx.h"
 #include "shard.h"
 #include "config.h"
+#include "../util/unittest.h"
 
 namespace mongo {
 
@@ -165,52 +166,62 @@ namespace mongo {
         return ss.str();
     }
 
-
-    void shardObjTest(){
-        string ns = "alleyinsider.blog.posts";
-        BSONObj o = BSON( "ns" << ns << "key" << BSON( "num" << 1 ) );
-
-        ShardInfo si(0);
-        si.unserialize( o );
-        assert( si.getns() == ns );
-        
-        BSONObjBuilder b;
-        si.serialize( b );
-        BSONObj a = b.obj();
-        assert( ns == a.getStringField( "ns" ) );
-        assert( 1 == a.getObjectField( "key" )["num"].number() );
-
-        log(2) << a << endl;
-        
-        {
-            ShardInfo si2(0);
-            si2.unserialize( a );
-            BSONObjBuilder b2;
-            si2.serialize( b2 );
-            assert( b2.obj().jsonString() == a.jsonString() );
-        }
-
-        {
-            BSONObj num = BSON( "num" << 5 );
-            si.findShard( num );
+    
+    class ShardObjUnitTest : public UnitTest {
+    public:
+        void run(){
+            string ns = "alleyinsider.blog.posts";
+            BSONObj o = BSON( "ns" << ns << "key" << BSON( "num" << 1 ) );
             
-            assert( si.findShard( BSON( "num" << -1 ) ) == 
-                    si.findShard( BSON( "num" << 1 ) ) );
+            ShardInfo si(0);
+            si.unserialize( o );
+            assert( si.getns() == ns );
+            
+            BSONObjBuilder b;
+            si.serialize( b );
+            BSONObj a = b.obj();
+            assert( ns == a.getStringField( "ns" ) );
+            assert( 1 == a.getObjectField( "key" )["num"].number() );
+            
+            log(2) << a << endl;
+            
+            {
+                ShardInfo si2(0);
+                si2.unserialize( a );
+                BSONObjBuilder b2;
+                si2.serialize( b2 );
+                assert( b2.obj().jsonString() == a.jsonString() );
+            }
+            
+            {
+                BSONObj num = BSON( "num" << 5 );
+                si.findShard( num );
+                
+                assert( si.findShard( BSON( "num" << -1 ) ) == 
+                        si.findShard( BSON( "num" << 1 ) ) );
+                
+                log(2) << "before split: " << si << endl;
+                si.findShard( num ).split();
+                log(2) << "after split: " << si << endl;
+                
+                log() << "-1 : " << si.findShard( BSON( "num" << -1 ) ) << endl;
+                log() << " 1 : " << si.findShard( BSON( "num" << 1 ) ) << endl;
+                assert( si.findShard( BSON( "num" << -1 ) ) != 
+                        si.findShard( BSON( "num" << 1 ) ) );
+                
+                string s1 = si.toString();
+                BSONObjBuilder b2;
+                si.serialize( b2 );
+                ShardInfo s3(0);
+                BSONObj temp = b2.obj();
+                s3.unserialize( temp );
+                assert( s1 == s3.toString() );
+                
+            }
 
-            log(2) << "before split: " << si << endl;
-            si.findShard( num ).split();
-            log(2) << "after split: " << si << endl;
-
-            log() << "-1 : " << si.findShard( BSON( "num" << -1 ) ) << endl;
-            log() << " 1 : " << si.findShard( BSON( "num" << 1 ) ) << endl;
-            assert( si.findShard( BSON( "num" << -1 ) ) != 
-                    si.findShard( BSON( "num" << 1 ) ) );
-   
+            log(1) << "shardObjTest passed" << endl;
         }
+    } shardObjTest;
 
-
-
-        log(1) << "shardObjTest passed" << endl;
-    }
 
 } // namespace mongo

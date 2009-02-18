@@ -19,6 +19,7 @@
 #include "stdafx.h"
 #include "shard.h"
 #include "../db/jsobj.h"
+#include "../util/unittest.h"
 
 /**
    TODO: this only works with numbers right now
@@ -93,21 +94,25 @@ namespace mongo {
     string ShardKey::toString() const {
         return _fieldsAndOrder.toString();
     }
-    
-    void shardKeyTest(){
-        ShardKey k( BSON( "key" << 1 ) );
-        
-        BSONObj min = k.globalMin();
-        BSONObj max = k.globalMax();
 
-        log(3) << "globalMin: " << min << endl;
-        log(3) << "globalMax: " << max << endl;
+    class ShardKeyUnitTest : public UnitTest {
+    public:
+        void run(){
+            ShardKey k( BSON( "key" << 1 ) );
+            
+            BSONObj min = k.globalMin();
+            BSONObj max = k.globalMax();
+            
+            log(3) << "globalMin: " << min << endl;
+            log(3) << "globalMax: " << max << endl;
+            
+            assert( k.compare( min , max ) < 0 );
+            assert( k.compare( max , min ) > 0 );
+            assert( k.compare( min , min ) == 0 );
+            
+        }
+    } shardKeyTest;
 
-        assert( k.compare( min , max ) < 0 );
-        assert( k.compare( max , min ) > 0 );
-        assert( k.compare( min , min ) == 0 );
-        
-    }
 
     
 } // namespace mongo

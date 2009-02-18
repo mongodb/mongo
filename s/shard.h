@@ -113,7 +113,5 @@ namespace mongo {
         
         friend class Shard;
     };
-    
-    void shardObjTest();
 
 } // namespace mongo

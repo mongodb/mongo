@@ -49,6 +49,4 @@ namespace mongo {
         BSONObj _fieldsAndOrder;
         const char * _fieldName;
     };
-
-    void shardKeyTest();
 } 
