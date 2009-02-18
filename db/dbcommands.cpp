@@ -773,11 +773,7 @@ namespace mongo {
             }
             md5_finish(&st, d);
             
-            if ( n == 0 )
-                result.append( "md5" , "" );
-            else
-                result.append( "md5" , digestToString( d ) );                
-
+            result.append( "md5" , digestToString( d ) );                
             return true;
         }
     } cmdFileMD5;
