@@ -217,6 +217,8 @@ namespace mongo {
         virtual void remove( const char * ns , Query query, bool justOne = 0 ) = 0;
 
         virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 ) = 0;
+
+        virtual ~DBClientInterface() { }
     };
 
     /**

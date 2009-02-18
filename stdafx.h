@@ -116,7 +116,7 @@ namespace mongo {
     public:
         string msg;
         AssertionException() { }
-        ~AssertionException() throw() { }
+        virtual ~AssertionException() throw() { }
         virtual bool severe() {
             return true;
         }
