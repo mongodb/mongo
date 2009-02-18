@@ -136,6 +136,13 @@ namespace mongo {
         return logstream;
     }
     
+    /* flush the log stream if the log level is 
+       at the specified level or higher. */
+    inline void logflush(int level = 0) { 
+        if( level > logLevel )
+            logstream.flush();
+    }
+
     inline Nullstream& log( int level = 0 ){
         if ( level > logLevel )
             return nullstream;
