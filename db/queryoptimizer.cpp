@@ -39,12 +39,9 @@ namespace mongo {
             return;
         if ( e.type() == RegEx ) {
             const char *r = e.simpleRegex();
-            cout << "r: " << r << endl;
             if ( r ) {
                 lower_ = addObj( BSON( "" << r ) ).firstElement();
                 upper_ = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
-                cout << "lower_: " << lower_ << endl;
-                cout << "upper_: " << upper_ << endl;
             }            
             return;
         }
@@ -61,11 +58,26 @@ namespace mongo {
             case JSMatcher::GTE:
                 lower_ = e;
                 break;
+            case JSMatcher::opIN: {
+                massert( "$in requires array", e.type() == Array );
+                BSONElement max = minKey.firstElement();
+                BSONElement min = maxKey.firstElement();
+                BSONObjIterator i( e.embeddedObject() );
+                while( i.more() ) {
+                    BSONElement f = i.next();
+                    if ( f.eoo() )
+                        break;
+                    if ( max.woCompare( f, false ) < 0 )
+                        max = f;
+                    if ( min.woCompare( f, false ) > 0 )
+                        min = f;
+                }
+                lower_ = min;
+                upper_ = max;
+            }
             default:
                 break;
         }
-        cout << "lower_: " << lower_ << endl;
-        cout << "upper_: " << upper_ << endl;
     }
     
     FieldBound &FieldBound::operator&=( const FieldBound &other ) {
@@ -73,6 +85,8 @@ namespace mongo {
             upper_ = other.upper_;
         if ( other.lower_.woCompare( lower_, false ) > 0 )
             lower_ = other.lower_;
+        for( vector< BSONObj >::const_iterator i = other.objData_.begin(); i != other.objData_.end(); ++i )
+            objData_.push_back( *i );
         massert( "Invalid bounds", lower_.woCompare( upper_, false ) <= 0 );
         return *this;
     }
@@ -83,7 +97,6 @@ namespace mongo {
     }    
     
     BSONObj FieldBound::addObj( BSONObj o ) {
-        cout << "o: " << o.toString() << endl;
         objData_.push_back( o );
         return o;
     }
@@ -95,8 +108,9 @@ namespace mongo {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
-            if ( getGtLtOp( e ) == JSMatcher::Equality )
+            if ( getGtLtOp( e ) == JSMatcher::Equality ) {
                 bounds_[ e.fieldName() ] &= FieldBound( e );
+            }
             else {
                 BSONObjIterator i( e.embeddedObject() );
                 while( i.more() ) {
