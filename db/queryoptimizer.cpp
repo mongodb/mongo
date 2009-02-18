@@ -123,17 +123,48 @@ namespace mongo {
         }
     }
     
-    QueryPlan QueryOptimizer::getPlan(
-        const char *ns,
-        BSONObj* query,
-        BSONObj* order,
-        BSONObj* hint)
-    {
-        QueryPlan plan;
-
-
-
-        return plan;
+    FieldBound FieldBoundSet::trivialBound_;
+    
+    QueryPlan::QueryPlan( const FieldBoundSet &fbs, BSONObj order, BSONObj idxKey ) :
+    optimal_( false ),
+    scanAndOrderRequired_( true ),
+    keyMatch_( false ),
+    exactKeyMatch_( false ) {
+        massert( "Index unhelpful", fbs.nNontrivialBounds() != 0 || !order.isEmpty() );
+        BSONObjIterator o( order );
+        BSONObjIterator k( idxKey );
+        int direction = 0;
+        while( o.more() ) {
+            if ( !k.more() )
+                break;
+            BSONElement oe = o.next();
+            BSONElement ke = k.next();
+            if ( oe.eoo() ) {
+                scanAndOrderRequired_ = false;
+                break;
+            }
+            if ( strcmp( oe.fieldName(), ke.fieldName() ) != 0 )
+                break;
+            
+            int d = oe.number() == ke.number() ? 1 : -1;
+            if ( direction == 0 )
+                direction = d;
+            else if ( direction != d )
+                break;          
+        }
     }
+    
+//    QueryPlan QueryOptimizer::getPlan(
+//        const char *ns,
+//        BSONObj* query,
+//        BSONObj* order,
+//        BSONObj* hint)
+//    {
+//        QueryPlan plan;
+//
+//
+//
+//        return plan;
+//    }
 
 } // namespace mongo

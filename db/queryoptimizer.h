@@ -29,6 +29,12 @@ namespace mongo {
         FieldBound &operator&=( const FieldBound &other );
         BSONElement lower() const { return lower_; }
         BSONElement upper() const { return upper_; }
+        bool equality() const { return lower_.woCompare( upper_, false ) == 0; }
+        bool nontrivial() const {
+            return
+            minKey.firstElement().woCompare( lower_, false ) != 0 ||
+            maxKey.firstElement().woCompare( upper_, false ) != 0;
+        }
     private:
         BSONObj addObj( BSONObj o );
         string simpleRegexEnd( string regex );
@@ -40,40 +46,53 @@ namespace mongo {
     class FieldBoundSet {
     public:
         FieldBoundSet( BSONObj query );
-        FieldBound &bound( const char *fieldName ) { return bounds_[ fieldName ]; }
+        const FieldBound &bound( const char *fieldName ) const {
+            map< string, FieldBound >::const_iterator f = bounds_.find( fieldName );
+            if ( f == bounds_.end() )
+                return trivialBound_;
+            return f->second;
+        }
+        int nNontrivialBounds() const {
+            int count = 0;
+            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
+                if ( i->second.nontrivial() )
+                    ++count;
+            return count;
+        }
     private:
+        static FieldBound trivialBound_;
         map< string, FieldBound > bounds_;
         BSONObj query_;
     };
     
     class QueryPlan {
     public:
-        QueryPlan() {
-            scanAndOrderRequired = false;
-            simpleKeyMatch = false;
-        }
-
-        auto_ptr<Cursor> cursor;
-
+        QueryPlan( const FieldBoundSet &fbs, BSONObj order, BSONObj idxKey );
+        bool optimal() const { return optimal_; }
         /* ScanAndOrder processing will be required if true */
-        bool scanAndOrderRequired;
-
+        bool scanAndOrderRequired() const { return scanAndOrderRequired_; }
         /* When true, the index we are using has keys such that it can completely resolve the
-           query expression to match by itself without ever checking the main object.
-           */
-        bool simpleKeyMatch;
+         query expression to match by itself without ever checking the main object.
+         */
+        bool keyMatch() const { return keyMatch_; }
+        bool exactKeyMatch() const { return exactKeyMatch_; }
+    private:
+        bool optimal_;
+        bool scanAndOrderRequired_;
+        bool keyMatch_;
+        bool exactKeyMatch_;
     };
 
-    /* We put these objects inside the Database objects: that way later if we want to do
-       stats, it's in the right place.
-    */
-    class QueryOptimizer {
-    public:
-        static QueryPlan getPlan(
-            const char *ns,
-            BSONObj* query,
-            BSONObj* order = 0,
-            BSONObj* hint = 0);
-    };
+//    /* We put these objects inside the Database objects: that way later if we want to do
+//       stats, it's in the right place.
+//    */
+//    class QueryOptimizer {
+//    public:
+//        static QueryPlan getPlan(
+//            const char *ns,
+//            BSONObj* query,
+//            BSONObj* order = 0,
+//            BSONObj* hint = 0);
+//    };
 
 } // namespace mongo

@@ -157,12 +157,66 @@ namespace QueryOptimizerTests {
         
     } // namespace FieldBoundTests
     
-    class NoIndex {
-    public:
-        void run() {
-            ASSERT( !QueryOptimizer::getPlan( "db.foo", &emptyObj ).cursor.get() );
-        }
-    };
+    namespace QueryPlanTests {
+        class NoSpec {
+        public:
+            void run() {
+                ASSERT_EXCEPTION( QueryPlan p( FieldBoundSet( emptyObj ), emptyObj, emptyObj ),
+                                 AssertionException );
+            }
+        };
+        
+        class SimpleOrder {
+        public:
+            void run() {
+                QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "a" << 1 ) );
+                ASSERT( !p.scanAndOrderRequired() );
+                QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( !p2.scanAndOrderRequired() );
+                QueryPlan p3( FieldBoundSet( emptyObj ), BSON( "b" << 1 ), BSON( "a" << 1 ) );
+                ASSERT( p3.scanAndOrderRequired() );
+            }
+        };
+        
+        class MoreIndexThanNeeded {
+        public:
+            void run() {
+                QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( !p.scanAndOrderRequired() );                
+            }
+        };
+        
+        class IndexSigns {
+        public:
+            void run() {
+                QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << 1 << "b" << -1 ) );
+                ASSERT( !p.scanAndOrderRequired() );                
+                QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( p2.scanAndOrderRequired() );                
+            }            
+        };
+        
+        class IndexReverse {
+        public:
+            void run() {
+                QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << -1 << "b" << 1 ) );
+                ASSERT( !p.scanAndOrderRequired() );                
+                QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << -1 << "b" << -1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( !p2.scanAndOrderRequired() );                
+                QueryPlan p3( FieldBoundSet( emptyObj ), BSON( "a" << -1 << "b" << -1 ), BSON( "a" << 1 << "b" << -1 ) );
+                ASSERT( p3.scanAndOrderRequired() );                
+            }                        
+        };
+        
+        class EqualThenOrder {
+        public:
+            void run() {
+                QueryPlan p( FieldBoundSet( BSON( "a" << 4 ) ), BSON( "b" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
+                ASSERT( !p.scanAndOrderRequired() );                
+            }
+        };
+        
+    } // namespace QueryPlanTests
     
     class All : public UnitTest::Suite {
     public:
@@ -181,7 +235,12 @@ namespace QueryOptimizerTests {
             add< FieldBoundTests::Regex >();
             add< FieldBoundTests::UnhelpfulRegex >();
             add< FieldBoundTests::In >();
-            add< NoIndex >();
+            add< QueryPlanTests::NoSpec >();
+            add< QueryPlanTests::SimpleOrder >();
+            add< QueryPlanTests::MoreIndexThanNeeded >();
+            add< QueryPlanTests::IndexSigns >();
+            add< QueryPlanTests::IndexReverse >();
+//            add< QueryPlanTests::EqualThenOrder >();
         }
     };
     
