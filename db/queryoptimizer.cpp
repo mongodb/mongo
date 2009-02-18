@@ -87,7 +87,7 @@ namespace mongo {
             lower_ = other.lower_;
         for( vector< BSONObj >::const_iterator i = other.objData_.begin(); i != other.objData_.end(); ++i )
             objData_.push_back( *i );
-        massert( "Invalid bounds", lower_.woCompare( upper_, false ) <= 0 );
+        massert( "Incompatible bounds", lower_.woCompare( upper_, false ) <= 0 );
         return *this;
     }
     
