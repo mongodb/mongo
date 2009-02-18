@@ -630,7 +630,7 @@
 		};
 		93A8D0700F36AE0200C92B85 /* scons debug test */ = {
 			isa = PBXLegacyTarget;
-			buildArgumentsString = "-j2 --noOptimization test";
+			buildArgumentsString = "-j2 --d test";
 			buildConfigurationList = 93A8D0710F36AE0200C92B85 /* Build configuration list for PBXLegacyTarget "scons debug test" */;
 			buildPhases = (
 			);
