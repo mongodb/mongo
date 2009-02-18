@@ -48,6 +48,8 @@ namespace mongo {
             return _partitioned;
         }
 
+        void turnOnPartitioning(){ _partitioned = true; }
+
         /**
          * @return whether or not this partition is partitioned
          */
@@ -68,16 +70,16 @@ namespace mongo {
         void setPrimary( string s ){
             _primary = s;
         }
-
+        
         virtual string modelServer();
-
+        
         // model stuff
 
         virtual const char * getNS(){ return "config.databases"; }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);
         bool loadByName(const char *nm);
-
+        
     protected:
         string _name; // e.g. "alleyinsider"
         string _primary; // e.g. localhost , mongo.foo.com:9999

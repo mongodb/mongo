@@ -42,14 +42,12 @@ namespace mongo {
         int op = m.data->operation();
         assert( op > dbMsg );
         
-        Strategy * s = 0;
+        Strategy * s = SINGLE;
+        
         if ( r.getConfig()->isPartitioned() ){
             uassert( "partitioned not supported" , 0 );
         }
-        else {
-            s = SINGLE;
-        }
-        
+
         if ( op == dbQuery ) {
             s->queryOp( r );
         }

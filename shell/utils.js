@@ -25,6 +25,18 @@ assert.soon = function( f ) {
     }
 }
 
+assert.throws = function( func , params , msg ){
+
+    try {
+        func.apply( null , params );
+    }
+    catch ( e ){
+        return e;
+    }
+
+    throw "did not throw exception: " + msg ;
+}
+
 Object.extend = function( dst , src ){
     for ( var k in src ){
         dst[k] = src[k];
