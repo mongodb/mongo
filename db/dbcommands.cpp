@@ -735,7 +735,14 @@ namespace mongo {
             static DBDirectClient db;
             
             string ns = nsToClient( dbname );
-            ns += ".fs.chunks"; // make this an option in jsobj
+            ns += ".";
+            {
+                string root = jsobj.getStringField( "root" );
+                if ( root.size() == 0 )
+                    root = "fs";
+                ns += root;
+            }
+            ns += ".chunks"; // make this an option in jsobj
             
             BSONObjBuilder query;
             query.appendAs( jsobj["filemd5"] , "files_id" );
@@ -766,7 +773,11 @@ namespace mongo {
             }
             md5_finish(&st, d);
             
-            result.append( "md5" , digestToString( d ) );
+            if ( n == 0 )
+                result.append( "md5" , "" );
+            else
+                result.append( "md5" , digestToString( d ) );                
+
             return true;
         }
     } cmdFileMD5;

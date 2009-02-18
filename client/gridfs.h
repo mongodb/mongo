@@ -82,6 +82,7 @@ namespace mongo {
     private:
         DBClientBase& _client;
         string _dbName;
+        string _prefix;
         string _filesNS;
         string _chunksNS;
 

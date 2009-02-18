@@ -30,7 +30,7 @@ namespace mongo {
     }
 
 
-    GridFS::GridFS( DBClientBase& client , string dbName , string prefix ) : _client( client ) , _dbName( dbName ){
+    GridFS::GridFS( DBClientBase& client , string dbName , string prefix ) : _client( client ) , _dbName( dbName ) , _prefix( prefix ){
         _filesNS = dbName + "." + prefix + ".files";
         _chunksNS = dbName + "." + prefix + ".chunks";
 
@@ -82,7 +82,7 @@ namespace mongo {
         }
 
         BSONObj res;
-        if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id ) , res ) )
+        if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id << "root" << _prefix ) , res ) )
             throw UserException( "filemd5 failed" );
         
         fileObject.appendAs( res["md5"] , "md5" );
