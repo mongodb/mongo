@@ -717,6 +717,7 @@ namespace mongo {
                 setClientTempNs( i->c_str() );
                 closeClient( i->c_str() );
             }
+
             return true;
         }
     } cmdCloseAllDatabases;
@@ -815,14 +816,19 @@ namespace mongo {
 			assert( ai );
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()) || !c->requiresAuth());
 
-            if ( c->adminOnly() && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {
+            bool admin = c->adminOnly();
+            if ( admin && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {
                 ok = false;
                 errmsg = "access denied";
+                cout << "command denied: " << jsobj.toString() << endl;
             }
             else if ( isMaster() ||
-                     c->slaveOk() ||
-                     ( c->slaveOverrideOk() && ( queryOptions & Option_SlaveOk ) ) ||
-                     fromRepl ) {
+                      c->slaveOk() ||
+                      ( c->slaveOverrideOk() && ( queryOptions & Option_SlaveOk ) ) ||
+                      fromRepl ) 
+            {
+                if( admin || logLevel >= 2 )
+                    log() << "command: " << jsobj.toString() << endl;
                 ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
                 if ( ok && c->logTheOp() && !fromRepl )
                     logOp("c", ns, jsobj);
