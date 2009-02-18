@@ -58,7 +58,7 @@ namespace mongo {
         b << _fieldName << (int)(0xfffffff);
     }
 
-    int ShardKey::compare( BSONObj& lObject , BSONObj& rObject ){
+    int ShardKey::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
         uassert( "not valid yet" , _fieldName );
 
         BSONElement lElement = lObject[ _fieldsAndOrder.firstElement().fieldName() ];
@@ -76,6 +76,22 @@ namespace mongo {
             return 1;
         
         return 0;
+    }
+    
+    void ShardKey::middle( BSONObjBuilder & b , BSONObj & lObject , BSONObj & rObject ){
+        BSONElement lElement = lObject[ _fieldsAndOrder.firstElement().fieldName() ];
+        uassert( "left key doesn't have the shard key" , ! lElement.eoo() );
+        uassert( "left key isn't number" , lElement.isNumber() );
+
+        BSONElement rElement = rObject[ _fieldsAndOrder.firstElement().fieldName() ];
+        uassert( "right key doesn't have the shard key" , ! rElement.eoo() );
+        uassert( "right key isn't number" , rElement.isNumber() );        
+
+        b.append( _fieldName , ( lElement.number() + rElement.number() ) / 2 );
+    }
+    
+    string ShardKey::toString() const {
+        return _fieldsAndOrder.toString();
     }
     
     void shardKeyTest(){

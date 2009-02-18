@@ -33,14 +33,16 @@ namespace mongo {
         void globalMax( BSONObjBuilder & b );
         BSONObj globalMax(){ BSONObjBuilder b; globalMax( b ); return b.obj(); }
         
-        void split( BSONObjBuilder & b , BSONObj & min , BSONObj & max );
-        BSONObj split( BSONObj & min , BSONObj & max ){ BSONObjBuilder b; split( b , min , max ); return b.obj(); }
+        void middle( BSONObjBuilder & b , BSONObj & min , BSONObj & max );
+        BSONObj middle( BSONObj & min , BSONObj & max ){ BSONObjBuilder b; middle( b , min , max ); return b.obj(); }
 
-        int compare( BSONObj& l , BSONObj& r );
+        int compare( const BSONObj& l , const BSONObj& r ) const;
         
         BSONObj& key(){
             return _fieldsAndOrder;
         }
+
+        virtual string toString() const;
 
     private:
         void _init();

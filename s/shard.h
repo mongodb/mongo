@@ -29,26 +29,44 @@
 
 namespace mongo {
 
+    class DBConfig;
     class ShardInfo;
     
-    class Shard {
+    class Shard : public Stringable {
     public:
         
-        BSONObj getMin(){
-            return _data.getObjectField( "min" );
+        BSONObj& getMin(){
+            return _min;
         }
-        BSONObj getMax(){
-            return _data.getObjectField( "max" );
+        BSONObj& getMax(){
+            return _max;
         }
         string getServer(){
             return _data.getStringField( "server" );
         }
         
+        bool contains( const BSONObj& obj );
+
+        void split();
+        
+        virtual string toString() const;
+
+        bool operator==(const Shard& s);
+
+        bool operator!=(const Shard& s){
+            return ! ( *this == s );
+        }
+
+        Shard( const Shard& s );
+
     private:
         Shard( ShardInfo * info , BSONObj data );
 
         ShardInfo * _info;
         BSONObj _data;
+
+        BSONObj _min;
+        BSONObj _max;
 
         void _split( BSONObj& middle );
         
@@ -61,25 +79,39 @@ namespace mongo {
            shards: [ { min: 1, max: 100, server: a } , { min: 101, max: 200 , server : b } ]
          }
     */
-    class ShardInfo : public Model {
+    class ShardInfo : public Model , public Stringable {
     public:
+
+        ShardInfo( DBConfig * config );
+        virtual ~ShardInfo();
 
         string getns(){
             return _ns;
+        }
+        
+        Shard& findShard( const BSONObj & obj );
+
+        ShardKey& getShardKey(){
+            return _key;
         }
 
         virtual const char * getNS() {
             return "config.sharding";
         }
-        
+
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);
         virtual string modelServer();
+
+        virtual string toString() const;
         
     private:
+        DBConfig * _config;
         string _ns;
         ShardKey _key;
-        vector<Shard> _shards;
+        vector<Shard*> _shards;
+        
+        friend class Shard;
     };
     
     void shardObjTest();
