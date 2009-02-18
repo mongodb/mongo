@@ -241,6 +241,10 @@ namespace mongo {
         }
         
         copy( ns, ns, false, logForRepl, false, false, query );
+        char db[256];
+        nsToClient( ns, db );
+        string indexNs = string( db ) + ".system.indexes";
+        copy( indexNs.c_str(), indexNs.c_str(), true, logForRepl, false, false, BSON( "ns" << ns ) );
         return true;
     }
     
