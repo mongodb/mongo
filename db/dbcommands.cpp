@@ -728,12 +728,15 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
+        virtual void help( stringstream& help ) const {
+            help << " example: { filemd5 : ObjectId(aaaaaaa) , key : { ts : 1 } }";
+        }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             static DBDirectClient db;
             
             string ns = nsToClient( dbname );
             ns += ".fs.chunks"; // make this an option in jsobj
-
+            
             BSONObjBuilder query;
             query.appendAs( jsobj["filemd5"] , "files_id" );
             Query q( query.obj() );
