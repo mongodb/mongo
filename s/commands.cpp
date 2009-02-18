@@ -119,7 +119,7 @@ namespace mongo {
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string dbname = cmdObj["moveprimary"].valuestrsafe();
-
+                
                 if ( dbname.size() == 0 ){
                     errmsg = "no db";
                     return false;
@@ -193,9 +193,61 @@ namespace mongo {
             }
         } movePrimary;
 
+        class PartitionCmd : public GridAdminCmd {
+        public:
+            PartitionCmd() : GridAdminCmd( "partition" ){}
+            virtual void help( stringstream& help ) const {
+                help 
+                    << "turns on partitioning for a db.  have to do this before sharding, etc.. will work.\n"
+                    << "  { partition : \"alleyinsider\" }\n";
+            }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string dbname = cmdObj["partition"].valuestrsafe();
+                if ( dbname.size() == 0 ){
+                    errmsg = "no db";
+                    return false;
+                }
+
+                DBConfig * config = grid.getDBConfig( dbname );
+                if ( config->isPartitioned() ){
+                    errmsg = "already partitioned";
+                    return false;
+                }
+
+                config->turnOnPartitioning();
+                config->save();
+                
+                result << "ok" << 1;
+                return true;
+            }
+        } partitionCmd;
+
+        // ------------ collection level commands -------------
+        
+        class ShardCmd : public GridAdminCmd {
+        public:
+            ShardCmd() : GridAdminCmd( "shard" ){}
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+            }            
+        } shardCmd;
+            
+
+        class SplitCollection : public GridAdminCmd {
+        public:
+            SplitCollection() : GridAdminCmd( "split" ){}
+            virtual void help( stringstream& help ) const {
+                help << " example: { shard : 'alleyinsider.blog.posts' , key : { ts : 1 } }";
+            }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+            }            
+            
+
+        } splitCollectionCmd;
 
         // ------------ server level commands -------------
-
+        
         class ListServers : public GridAdminCmd {
         public:
             ListServers() : GridAdminCmd("listservers") { }
