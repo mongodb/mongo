@@ -46,39 +46,11 @@ namespace mongo {
 
     class BSONObj;
 
-    /* db response format
-
-       Query or GetMore: // see struct QueryResult
-          int resultFlags;
-          int64 cursorID;
-          int startingFrom;
-          int nReturned;
-          list of marshalled JSObjects;
-    */
-
-#pragma pack(1)
-    struct QueryResult : public MsgData {
-        enum {
-            ResultFlag_CursorNotFound = 1, /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
-            ResultFlag_ErrSet = 2          /* { $err : ... } is being returned */
-        };
-
-        long long cursorId;
-        int startingFrom;
-        int nReturned;
-        const char *data() {
-            return (char *) (((int *)&nReturned)+1);
-        }
-        int& resultFlags() {
-            return dataAsInt();
-        }
-    };
-#pragma pack()
-
-    /** Represents a query.  Typically one uses the QUERY(...) macro to construct a Query object. 
-        Example:
+    /** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a Query object. 
+        Examples:
            QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
-    */    
+           QUERY( "age" << GT << 30 << LT << 50 )
+    */
     class Query : public Stringable {
     public:
         BSONObj obj;
@@ -124,13 +96,16 @@ namespace mongo {
             its criteria.  Use this helper to append such a function to a query object. 
             Your query may also contain other traditional Mongo query terms.
 
-            @param jscode The javascript code to execute.
+            @param jscode The javascript function to evaluate against each potential object 
+                   match.  The function must return true for matched objects.  Use the this 
+                   variable to inspect the current object.
             @param scope Context for the javascript object.  List in a BSON object any 
                    variables you would like defined when the jscode executes.  One can think 
                    of these as "bind variables".
 
-            Example:
-              conn.findOne("test.coll", Query("a==3").where("this.b == 2 || this.c == 3"));
+            Examples:
+              conn.findOne("test.coll", Query("{a:3}").where("this.b == 2 || this.c == 3"));
+              Query badBalance = Query().where("this.debits - this.credits < 0");
         */
         Query& where(const char *jscode, BSONObj scope);
         Query& where(const char *jscode) { return where(jscode, BSONObj()); }
@@ -242,6 +217,8 @@ namespace mongo {
         virtual void remove( const char * ns , Query query, bool justOne = 0 ) = 0;
 
         virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 ) = 0;
+
+        virtual ~DBClientInterface() { }
     };
 
     /**

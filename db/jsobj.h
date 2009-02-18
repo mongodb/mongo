@@ -482,14 +482,16 @@ namespace mongo {
         BSONObj(Record *r);
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj() : details(0) { }
-        ~BSONObj() {
+        ~BSONObj() { cleanup(); }
+
+        void cleanup() {
             if ( details ) {
                 if ( --details->refCount <= 0 )
                     delete details;
                 details = 0;
-            }
+            }            
         }
-
+        
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
             b.append((void *) objdata(), objsize());
@@ -677,10 +679,7 @@ namespace mongo {
             same underlying data -- use copy() if you need a separate copy to manipulate.
         */
         BSONObj& operator=(const BSONObj& r) {
-            if ( details && details->owned() ) {
-                if ( --details->refCount == 0 )
-                    delete details;
-            }
+            cleanup();
 
             if ( r.details == 0 )
                 details = 0;

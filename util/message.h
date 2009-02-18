@@ -41,6 +41,7 @@ namespace mongo {
 
     class AbstractMessagingPort {
     public:
+        virtual ~AbstractMessagingPort() { }
         virtual void reply(Message& received, Message& response, MSGID responseTo) = 0; // like the reply below, but doesn't rely on received.data still being available
         virtual void reply(Message& received, Message& response) = 0;
     };

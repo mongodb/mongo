@@ -96,6 +96,7 @@ int main( int argc, char** argv ) {
     tests.add( pairingTests(), "pairing" );
     tests.add( pdfileTests(), "pdfile" );
     tests.add( queryTests(), "query" );
+    tests.add( queryOptimizerTests(), "queryoptimizer" );
     tests.add( replTests(), "repl" );
     tests.add( sockTests(), "sock" );
 

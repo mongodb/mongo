@@ -18,7 +18,12 @@
 
 #include "../stdafx.h"
 
+#include "jsobj.h"
+#include "storage.h"
+
 namespace mongo {
+    
+    class Record;
 
     /* 0 = ok
        1 = kill current operation and reset this to 0
@@ -38,6 +43,7 @@ namespace mongo {
     */
     class Cursor {
     public:
+        virtual ~Cursor() {}
         virtual bool ok() = 0;
         bool eof() {
             return !ok();

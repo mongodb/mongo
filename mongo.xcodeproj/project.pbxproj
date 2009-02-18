@@ -20,6 +20,8 @@
 		9302D99F0F30AB8C00DFA4EF /* ShellUtils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ShellUtils.cpp; sourceTree = "<group>"; };
 		9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ShellUtils.h; sourceTree = "<group>"; };
 		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
+		932AC3EB0F4A5B34005BF8B0 /* queryoptimizertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = queryoptimizertests.cpp; sourceTree = "<group>"; };
+		932AC4310F4A5E9D005BF8B0 /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
 		933E22110F4327B2000209E3 /* perftest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = perftest.cpp; sourceTree = "<group>"; };
 		933E22120F4327B2000209E3 /* perftest.o */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.objfile"; path = perftest.o; sourceTree = "<group>"; };
 		9342232B0EF16D4F00608550 /* connpool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = connpool.cpp; sourceTree = "<group>"; };
@@ -206,6 +208,8 @@
 		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
 		93D6BBF70F265E1100FE5722 /* matchertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = matchertests.cpp; sourceTree = "<group>"; };
 		93D6BC9B0F266FC300FE5722 /* querytests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = querytests.cpp; sourceTree = "<group>"; };
+		93E727090F4B5B5B004F9B5D /* shardkey.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = shardkey.cpp; sourceTree = "<group>"; };
+		93E7270A0F4B5B5B004F9B5D /* shardkey.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = shardkey.h; sourceTree = "<group>"; };
 		93F386400F40E27800967EFA /* hint1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = hint1.js; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -224,6 +228,7 @@
 		08FB7795FE84155DC02AAC07 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				932AC4310F4A5E9D005BF8B0 /* SConstruct */,
 				93A13A320F4620E500AF1B0D /* tools */,
 				93A13A200F4620A500AF1B0D /* s */,
 				93A8D1D10F37544800C92B85 /* jstests */,
@@ -289,6 +294,7 @@
 		934223850EF16D7000608550 /* dbtests */ = {
 			isa = PBXGroup;
 			children = (
+				932AC3EB0F4A5B34005BF8B0 /* queryoptimizertests.cpp */,
 				933E22100F4327B2000209E3 /* perf */,
 				937D0E340F28CB070071FFA9 /* repltests.cpp */,
 				937CACE90F27BF4900C57AA6 /* socktests.cpp */,
@@ -424,6 +430,8 @@
 		93A13A200F4620A500AF1B0D /* s */ = {
 			isa = PBXGroup;
 			children = (
+				93E727090F4B5B5B004F9B5D /* shardkey.cpp */,
+				93E7270A0F4B5B5B004F9B5D /* shardkey.h */,
 				93A13A210F4620A500AF1B0D /* commands.cpp */,
 				93A13A230F4620A500AF1B0D /* config.cpp */,
 				93A13A240F4620A500AF1B0D /* config.h */,

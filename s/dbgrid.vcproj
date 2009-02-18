@@ -334,11 +334,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\ConfigServer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\gridconfig.cpp"
+				RelativePath=".\config.cpp"
 				>
 			</File>
 			<File
@@ -351,6 +347,10 @@
 			</File>
 			<File
 				RelativePath=".\shard.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\shardkey.cpp"
 				>
 			</File>
 			<File
