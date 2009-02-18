@@ -82,12 +82,12 @@ AddOption( "--v8" ,
            metavar="dir",
            help="v8 location")
 
-AddOption( "--noOptimization",
-           dest="noOptimization",
+AddOption( "--d",
+           dest="debugBuild",
            type="string",
            nargs=0,
            action="store",
-           help="don't compile with optimization" )
+           help="debug build no optimization, etc..." )
 
 
 AddOption( "--recstore",
@@ -145,7 +145,7 @@ force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 
-noOptimization = not GetOption( "noOptimization" ) is None
+debugBuild = not GetOption( "debugBuild" ) is None
 noshell = not GetOption( "noshell" ) is None
 
 platform = os.sys.platform
@@ -305,8 +305,8 @@ if nix:
     env.Append( LINKFLAGS=" -fPIC " )
     env.Append( LIBS=[] )
 
-    if noOptimization:
-        env.Append( CPPFLAGS=" -O0" )
+    if debugBuild:
+        env.Append( CPPFLAGS=" -O0 -fstack-protector -fstack-check " );
     else:
         env.Append( CPPFLAGS=" -O3" )
 
