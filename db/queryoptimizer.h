@@ -49,7 +49,7 @@ namespace mongo {
         const FieldBound &bound( const char *fieldName ) const {
             map< string, FieldBound >::const_iterator f = bounds_.find( fieldName );
             if ( f == bounds_.end() )
-                return trivialBound_;
+                return trivialBound();
             return f->second;
         }
         int nNontrivialBounds() const {
@@ -60,7 +60,8 @@ namespace mongo {
             return count;
         }
     private:
-        static FieldBound trivialBound_;
+        static FieldBound *trivialBound_;
+        static FieldBound &trivialBound();
         map< string, FieldBound > bounds_;
         BSONObj query_;
     };

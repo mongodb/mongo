@@ -123,7 +123,12 @@ namespace mongo {
         }
     }
     
-    FieldBound FieldBoundSet::trivialBound_;
+    FieldBound *FieldBoundSet::trivialBound_ = 0;
+    FieldBound &FieldBoundSet::trivialBound() {
+        if ( trivialBound_ == 0 )
+            trivialBound_ = new FieldBound();
+        return *trivialBound_;
+    }
     
     QueryPlan::QueryPlan( const FieldBoundSet &fbs, BSONObj order, BSONObj idxKey ) :
     optimal_( false ),
