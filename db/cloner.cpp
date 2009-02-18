@@ -37,7 +37,7 @@ namespace mongo {
     class Cloner: boost::noncopyable {
         auto_ptr< DBClientInterface > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
-                  bool masterSameProcess, bool slaveOk);
+                  bool masterSameProcess, bool slaveOk, BSONObj query = emptyObj);
     public:
         Cloner() { }
 
@@ -45,6 +45,7 @@ namespace mongo {
            useReplAuth - use the credentials we normally use as a replication slave for the cloning
         */
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth);
+        bool cloneCollection( const char *fromhost, const char *ns, BSONObj query, string& errmsg, bool logForRepl );
     };
 
     /* for index info object:
@@ -84,11 +85,11 @@ namespace mongo {
     /* copy the specified collection
        isindex - if true, this is system.indexes collection, in which we do some transformation when copying.
     */
-    void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk) {
+    void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk, BSONObj query) {
         auto_ptr<DBClientCursor> c;
         {
             dbtemprelease r;
-            c = conn->query( from_collection, emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
+            c = conn->query( from_collection, query, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
         }
         assert( c.get() );
         while ( 1 ) {
@@ -228,13 +229,28 @@ namespace mongo {
         return true;
     }
 
+    bool Cloner::cloneCollection( const char *fromhost, const char *ns, BSONObj query, string &errmsg, bool logForRepl ) {
+        {
+            dbtemprelease r;
+            auto_ptr< DBClientConnection > c( new DBClientConnection() );
+            if ( !c->connect( fromhost, errmsg ) )
+                return false;
+            if( !replAuthenticate(c.get()) )
+                return false;
+            conn = c;
+        }
+        
+        copy( ns, ns, false, logForRepl, false, false, query );
+        return true;
+    }
+    
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth)
     {
         Cloner c;
         return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth);
     }
-
+    
     /* Usage:
        mydb.$cmd.findOne( { clone: "fromhost" } );
     */
@@ -254,7 +270,37 @@ namespace mongo {
             return cloneFrom(from.c_str(), errmsg, database->name, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false);
         }
     } cmdclone;
-
+    
+    /* Usage:
+     mydb.$cmd.findOne( { cloneColletion: 1, fromhost: <hostname>, collection: <collectionname>, query: <query> } );
+     */
+    class CmdCloneCollection : public Command {
+    public:
+        virtual bool adminOnly() {
+            return true;
+        }
+        virtual bool slaveOk() {
+            return false;
+        }
+        CmdCloneCollection() : Command("cloneCollection") { }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            string fromhost = cmdObj.getStringField("fromhost");
+            if ( fromhost.empty() )
+                return false;
+            string collection = cmdObj.getStringField("collection");
+            if ( collection.empty() )
+                return false;
+            BSONObj query = cmdObj.getObjectField("query");
+            
+            /* replication note: we must logOp() not the command, but the cloned data -- if the slave
+             were to clone it would get a different point-in-time and not match.
+             */
+            setClient( collection.c_str() );
+            Cloner c;
+            return c.cloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl );
+        }
+    } cmdclonecollection;
+    
     /* Usage:
        admindb.$cmd.findOne( { copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db> } );
     */
