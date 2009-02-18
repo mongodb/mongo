@@ -45,7 +45,7 @@ namespace mongo {
            useReplAuth - use the credentials we normally use as a replication slave for the cloning
         */
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth);
-        bool cloneCollection( const char *fromhost, const char *ns, BSONObj query, string& errmsg, bool logForRepl );
+        bool cloneCollection( const char *fromhost, const char *ns, BSONObj query, string& errmsg, bool logForRepl, bool copyIndexes );
     };
 
     /* for index info object:
@@ -229,7 +229,7 @@ namespace mongo {
         return true;
     }
 
-    bool Cloner::cloneCollection( const char *fromhost, const char *ns, BSONObj query, string &errmsg, bool logForRepl ) {
+    bool Cloner::cloneCollection( const char *fromhost, const char *ns, BSONObj query, string &errmsg, bool logForRepl, bool copyIndexes ) {
         {
             dbtemprelease r;
             auto_ptr< DBClientConnection > c( new DBClientConnection() );
@@ -241,6 +241,9 @@ namespace mongo {
         }
         
         copy( ns, ns, false, logForRepl, false, false, query );
+        if ( !copyIndexes )
+            return true;
+
         char db[256];
         nsToClient( ns, db );
         string indexNs = string( db ) + ".system.indexes";
@@ -292,13 +295,15 @@ namespace mongo {
             if ( collection.empty() )
                 return false;
             BSONObj query = cmdObj.getObjectField("query");
+            BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
+            bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
             
             /* replication note: we must logOp() not the command, but the cloned data -- if the slave
              were to clone it would get a different point-in-time and not match.
              */
             setClient( collection.c_str() );
             Cloner c;
-            return c.cloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl );
+            return c.cloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl, copyIndexes );
         }
     } cmdclonecollection;
     
