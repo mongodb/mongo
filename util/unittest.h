@@ -31,6 +31,7 @@ namespace mongo {
         UnitTest() {
             registerTest(this);
         }
+        virtual ~UnitTest() {}
 
         // assert if fails
         virtual void run() = 0;

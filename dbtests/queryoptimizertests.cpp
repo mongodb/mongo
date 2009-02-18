@@ -26,6 +26,7 @@ namespace QueryOptimizerTests {
     namespace FieldBoundTests {
         class Base {
         public:
+            virtual ~Base() {}
             void run() {
                 FieldBoundSet s( query() );
                 checkElt( lower(), s.bound( "a" ).lower() );
@@ -47,6 +48,7 @@ namespace QueryOptimizerTests {
         
         class Bad {
         public:
+            virtual ~Bad() {}
             void run() {
                 ASSERT_EXCEPTION( FieldBoundSet f( query() ), AssertionException );
             }

@@ -114,6 +114,7 @@ namespace JsobjTests {
             
             class Base {
             public:
+                virtual ~Base() {}
                 void run() {
                     ASSERT( valid().valid() );
                     ASSERT( !invalid().valid() );
@@ -445,6 +446,7 @@ namespace JsobjTests {
         
         class LabelBase {
         public:
+            virtual ~LabelBase() {}
             void run() {
                 ASSERT( !expected().woCompare( actual() ) );
             }

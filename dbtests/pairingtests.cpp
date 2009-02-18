@@ -232,6 +232,8 @@ namespace PairingTests {
     } // namespace ReplPairTests
 
     class DirectConnectBase : public Base {
+    public:
+        virtual ~DirectConnectBase() {}
     protected:
         void negotiate( ReplPair &a, ReplPair &b ) {
             auto_ptr< DBClientConnection > c( new DirectDBClientConnection( &b, cc() ) );

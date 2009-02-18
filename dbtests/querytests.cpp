@@ -198,6 +198,7 @@ namespace QueryTests {
     
     class Fail : public ClientBase {
     public:
+        virtual ~Fail() {}
         void run() {
             prep();
             ASSERT( !error() );

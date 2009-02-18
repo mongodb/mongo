@@ -73,6 +73,7 @@ namespace mongo {
         virtual bool requiresAuth() { return true; }
 
         Command(const char *_name);
+        virtual ~Command() {}
     };
 
     bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);

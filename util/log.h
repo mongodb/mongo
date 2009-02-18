@@ -22,11 +22,13 @@ namespace mongo {
 
     class Stringable {
     public:
+        virtual ~Stringable() {}
         virtual string toString() const = 0;
     };
     
     class Nullstream {
     public:
+        virtual ~Nullstream() {}
       // todo: just use a template for all these
         virtual Nullstream& operator<<(const char *) {
             return *this;

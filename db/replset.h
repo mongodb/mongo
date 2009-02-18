@@ -71,6 +71,7 @@ namespace mongo {
         }
 
         ReplPair(const char *remoteEnd, const char *arbiter);
+        virtual ~ReplPair() {}
 
         bool dominant(const string& myname) {
             if ( myname == remoteHost )

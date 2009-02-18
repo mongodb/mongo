@@ -362,6 +362,7 @@ namespace mongo {
 
     class FileOp {
     public:
+        virtual ~FileOp() {}
         virtual bool apply( const boost::filesystem::path &p ) = 0;
         virtual const char * op() const = 0;
     };

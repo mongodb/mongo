@@ -326,6 +326,7 @@ namespace JsonTests {
         
         class Base {
         public:
+            virtual ~Base() {}
             void run() {
                 ASSERT( fromjson( json() ).valid() );
                 assertEquals( bson(), fromjson( json() ) );
@@ -348,6 +349,7 @@ namespace JsonTests {
         
         class Bad {
         public:
+            virtual ~Bad() {}
             void run() {
                 ASSERT_EXCEPTION( fromjson( json() ), MsgAssertionException );
             }
@@ -427,6 +429,7 @@ namespace JsonTests {
         
         class FancyNumber {
         public:
+            virtual ~FancyNumber() {}
             void run() {
                 ASSERT_EQUALS( int( 1000000 * bson().firstElement().number() ),
                               int( 1000000 * fromjson( json() ).firstElement().number() ) );

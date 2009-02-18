@@ -32,7 +32,7 @@ namespace NamespaceTests {
             Base() {
                 setClient( ns() );
             }
-            ~Base() {
+            virtual ~Base() {
                 if ( id_.info.isNull() )
                     return;
                 theDataFileMgr.deleteRecord( ns(), id_.info.rec(), id_.info );
@@ -379,7 +379,7 @@ namespace NamespaceTests {
         class Base {
         public:
             Base( const char *ns = "foo" ) : ns_( ns ) {}
-            ~Base() {
+            virtual ~Base() {
                 if ( !nsd() )
                     return;
                 string s( ns() );
