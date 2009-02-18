@@ -85,8 +85,6 @@ namespace mongo {
         if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id ) , res ) )
             throw UserException( "filemd5 failed" );
         
-        log() << "res : " << res << endl;
-
         fileObject.appendAs( res["md5"] , "md5" );
 
         BSONObj real = fileObject.obj();
