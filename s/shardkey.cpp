@@ -33,12 +33,12 @@ namespace mongo {
             _init();
         }
         else {
-            _fieldName = 0;
+            _fieldName = "";
         }
     }
 
     void ShardKey::init( BSONObj fieldsAndOrder ){
-        _fieldsAndOrder = fieldsAndOrder;
+        _fieldsAndOrder = fieldsAndOrder.copy();
         _init();
     }
 
@@ -50,18 +50,18 @@ namespace mongo {
 
     
     void ShardKey::globalMin( BSONObjBuilder& b ){
-        uassert( "not valid yet" , _fieldName );
+        uassert( "not valid yet" , _fieldName.size() );
         b << _fieldName << (int)(-0xfffffff);
     }
     
     void ShardKey::globalMax( BSONObjBuilder& b ){
-        uassert( "not valid yet" , _fieldName );
+        uassert( "not valid yet" , _fieldName.size() );
         b << _fieldName << (int)(0xfffffff);
     }
 
     int ShardKey::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
-        uassert( "not valid yet" , _fieldName );
-
+        uassert( "not valid yet" , _fieldName.size() );
+        
         BSONElement lElement = lObject[ _fieldsAndOrder.firstElement().fieldName() ];
         uassert( "left key doesn't have the shard key" , ! lElement.eoo() );
         uassert( "left key isn't number" , lElement.isNumber() );
@@ -88,7 +88,7 @@ namespace mongo {
         uassert( "right key doesn't have the shard key" , ! rElement.eoo() );
         uassert( "right key isn't number" , rElement.isNumber() );        
 
-        b.append( _fieldName , ( lElement.number() + rElement.number() ) / 2 );
+        b.append( _fieldName.c_str() , ( lElement.number() + rElement.number() ) / 2 );
     }
     
     string ShardKey::toString() const {

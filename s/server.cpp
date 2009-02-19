@@ -22,6 +22,7 @@
 #include "../client/connpool.h"
 
 #include "server.h"
+#include "request.h"
 #include "config.h"
 #include "shard.h"
 
@@ -61,8 +62,18 @@ namespace mongo {
                 dbMsgPort.shutdown();
                 break;
             }
-
-            processRequest(m, dbMsgPort);
+            
+            Request r( m , dbMsgPort );
+            try {
+                r.process();
+            }
+            catch ( DBException& e ){
+                log() << "UserException: " << e.what() << endl;
+                if ( r.expectResponse() ){
+                    BSONObj err = BSON( "$err" << e.what() );
+                    replyToQuery( QueryResult::ResultFlag_ErrSet, dbMsgPort , m , err );
+                }
+            }
         }
 
     }

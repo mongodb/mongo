@@ -34,7 +34,7 @@ namespace mongo {
                 DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
                 Message response;
                 bool ok = c.port().call( r.m(), response);
-                uassert("dbgrid: error calling db", ok);
+                uassert("mongos: error calling db", ok);
                 lateAssert = true;
                 r.reply( response  );
                 dbcon.done();
@@ -42,7 +42,7 @@ namespace mongo {
             catch ( AssertionException& e ) {
                 assert( !lateAssert );
                 BSONObjBuilder err;
-                err.append("$err", string("dbgrid ") + (e.msg.empty() ? "dbgrid assertion during query" : e.msg));
+                err.append("$err", string("mongos: ") + (e.msg.empty() ? "assertion during query" : e.msg));
                 BSONObj errObj = err.done();
                 replyToQuery(QueryResult::ResultFlag_ErrSet, r.p() , r.m() , errObj);
                 return;

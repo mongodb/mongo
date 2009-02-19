@@ -34,6 +34,9 @@ namespace mongo {
 
     extern ConfigServer configServer;
     extern Grid grid;
+
+    class ShardInfo;
+
     /**
        top level grid configuration for an entire database
     */
@@ -48,18 +51,21 @@ namespace mongo {
             return _partitioned;
         }
 
-        void turnOnPartitioning(){ _partitioned = true; }
-
+        void turnOnPartitioning();
+        ShardInfo* turnOnSharding( const string& ns , BSONObj fieldsAndOrder );
+        
         /**
          * @return whether or not this partition is partitioned
          */
-        bool sharded( const NamespaceString& ns );
+        bool sharded( const string& ns );
         
+        ShardInfo* getShardInfo( const string& ns );
+
         /**
          * @return the correct for machine for the ns
          * if the namespace is partitioned, will return an empty string
          */
-        string getServer( const NamespaceString& ns );
+        string getServer( const string& ns );
         
         string getPrimary(){
             if ( _primary.size() == 0 )
@@ -84,6 +90,9 @@ namespace mongo {
         string _name; // e.g. "alleyinsider"
         string _primary; // e.g. localhost , mongo.foo.com:9999
         bool _partitioned;
+        
+        set<string> _sharded; // [ "alleyinsider.blog.posts" , ... ] - all ns that are sharded
+        map<string,ShardInfo*> _shards; // this will only have entries for things that have been looked at
 
         friend class Grid;
     };

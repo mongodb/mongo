@@ -25,6 +25,7 @@
 
 #include "server.h"
 #include "config.h"
+#include "shard.h"
 
 namespace mongo {
 
@@ -34,31 +35,97 @@ namespace mongo {
         return configServer.modelServer();
     }
     
-    bool DBConfig::sharded( const NamespaceString& ns ){
+    bool DBConfig::sharded( const string& ns ){
         if ( ! _partitioned )
             return false;
-        uassert( "don't know what to do!" , 0 );
-        return 0;
+        return _sharded.count( ns ) > 0;
     }
 
-    string DBConfig::getServer( const NamespaceString& ns ){
+    string DBConfig::getServer( const string& ns ){
         if ( sharded( ns ) )
             return "";
         
         uassert( "no primary!" , _primary.size() );
         return _primary;
     }
+    
+    void DBConfig::turnOnPartitioning(){
+        _partitioned = true; 
+    }
+    
+    ShardInfo* DBConfig::turnOnSharding( const string& ns , BSONObj fieldsAndOrder ){
+        if ( ! _partitioned )
+            throw UserException( "not partitioned" );
+        
+        ShardInfo * info = _shards[ns];
+        if ( info )
+            return info;
+        
+        if ( sharded( ns ) )
+            throw UserException( "already sharded" );
+
+        _sharded.insert( ns );
+        info = new ShardInfo( this );
+        if ( info->loadByName( ns ) )
+            throw UserException( "something is wrong, ns already has a shard info" );
+        
+        {
+            BSONObjBuilder b;
+            b << "ns" << ns;
+            b << "key" << fieldsAndOrder;
+            BSONObj o = b.obj();
+            info->unserialize( o );
+            info->save();
+        }
+
+        _shards[ns] = info;
+        return info;
+
+    }
+
+    ShardInfo* DBConfig::getShardInfo( const string& ns ){
+        ShardInfo* info = _shards[ns];
+        if ( info )
+            return info;
+        info = new ShardInfo( this );
+        if ( ! info->loadByName( ns ) )
+            throw UserException( (string)"can't load shard info for: " + ns );
+        _shards[ns] = info;
+        return info;
+    }
 
     void DBConfig::serialize(BSONObjBuilder& to){
         to.append("name", _name);
         to.appendBool("partitioned", _partitioned );
         to.append("primary", _primary );
+        
+        if ( _sharded.size() > 0 ){
+            BSONObjBuilder a;
+            int num=0;
+            for ( set<string>::reverse_iterator i=_sharded.rbegin(); i != _sharded.rend(); i++){
+                string temp = a.numStr( num++ );
+                a.append( temp.c_str() , i->c_str() );
+            }
+            to.appendArray( "sharded" , a.obj() );
+        }
     }
     
     void DBConfig::unserialize(BSONObj& from){
         _name = from.getStringField("name");
         _partitioned = from.getBoolField("partitioned");
         _primary = from.getStringField("primary");
+        
+        _sharded.clear();
+        BSONObj sharded = from.getObjectField( "sharded" );
+        if ( ! sharded.isEmpty() ){
+            BSONObjIterator i(sharded);
+            while ( i.more() ){
+                BSONElement e = i.next();
+                string s = e.str();
+                if ( s.size() > 0 )
+                    _sharded.insert( s );
+            }
+        }
     }
     
     bool DBConfig::loadByName(const char *nm){
@@ -249,4 +316,58 @@ namespace mongo {
 
     ConfigServer configServer;    
     Grid grid;
+
+
+    class DBConfigUnitTest : public UnitTest {
+    public:
+        void testInOut( DBConfig& c , BSONObj o ){
+            c.unserialize( o );
+            BSONObjBuilder b;
+            c.serialize( b );
+
+            BSONObj out = b.obj();
+            
+            if ( o.toString() == out.toString() )
+                return;
+            
+            log() << "DBConfig serialization broken\n" 
+                  << "in  : " << o.toString()  << "\n"
+                  << "out : " << out.toString() 
+                  << endl;
+            assert(0);
+        }
+
+        void a(){
+            BSONObjBuilder b;
+            b << "name" << "abc";
+            b.appendBool( "partitioned" , true );
+            b << "primary" << "myserver";
+            
+            DBConfig c;
+            testInOut( c , b.obj() );
+        }
+
+        void b(){
+            BSONObjBuilder b;
+            b << "name" << "abc";
+            b.appendBool( "partitioned" , true );
+            b << "primary" << "myserver";
+            
+            BSONObjBuilder a;
+            a << "0" << "abc.foo";
+            a << "1" << "abc.bar";
+            
+            b.appendArray( "sharded" , a.obj() );
+
+            DBConfig c;
+            testInOut( c , b.obj() );
+            assert( c.sharded( "abc.foo" ) );
+        }
+
+        void run(){
+            a();
+            b();
+        }
+        
+    } dbConfigUnitTest;
 } 

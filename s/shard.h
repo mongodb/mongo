@@ -92,19 +92,15 @@ namespace mongo {
             return _ns;
         }
         
+        int numShards(){ return _shards.size(); }
         Shard& findShard( const BSONObj & obj );
-
-        ShardKey& getShardKey(){
-            return _key;
-        }
-
-        virtual const char * getNS() {
-            return "config.sharding";
-        }
-
+        ShardKey& getShardKey(){  return _key; }
+        
+        virtual const char * getNS(){ return "config.sharding"; }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);
         virtual string modelServer();
+        bool loadByName( const string& ns );
 
         string toString() const;
         static string toString( void *o ) {

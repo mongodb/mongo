@@ -13,8 +13,17 @@ namespace mongo {
     public:
         Request( Message& m, MessagingPort& p );
 
+        // ---- message info -----
+
+
         const char * getns(){
             return _d.getns();
+        }
+        int op(){
+            return _m.data->operation();
+        }
+        bool expectResponse(){
+            return op() == dbQuery || op() == dbGetMore;
         }
         
         MSGID id(){
@@ -24,16 +33,17 @@ namespace mongo {
         DBConfig * getConfig(){
             return _config;
         }
+        
+        // ---- remote location info -----
 
+        
+        string singleServerName();
+        
         const char * primaryName(){
             return _config->getPrimary().c_str();
         }
 
-        string singleServerName(){
-            string s = _config->getServer( getns() );
-            uassert( "sharded!" , s.size() > 0 );
-            return s;
-        }
+        // ---- low level access ----
 
         void reply( Message & response ){
             _p.reply( _m , response , _id );
@@ -43,13 +53,16 @@ namespace mongo {
         DbMessage& d(){ return _d; }
         MessagingPort& p(){ return _p; }
 
+        void process();
+
     private:
         Message& _m;
         DbMessage _d;
         MessagingPort& _p;
-
+        
         MSGID _id;
         DBConfig * _config;
+        ShardInfo * _shardInfo;
     };
 
     class Strategy {

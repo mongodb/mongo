@@ -30,7 +30,9 @@
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
+
 #include "config.h"
+#include "shard.h"
 
 namespace mongo {
 
@@ -192,7 +194,7 @@ namespace mongo {
                 return true;
             }
         } movePrimary;
-
+        
         class PartitionCmd : public GridAdminCmd {
         public:
             PartitionCmd() : GridAdminCmd( "partition" ){}
@@ -216,7 +218,7 @@ namespace mongo {
 
                 config->turnOnPartitioning();
                 config->save();
-                
+
                 result << "ok" << 1;
                 return true;
             }
@@ -227,8 +229,36 @@ namespace mongo {
         class ShardCmd : public GridAdminCmd {
         public:
             ShardCmd() : GridAdminCmd( "shard" ){}
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                return false;
+            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string ns = cmdObj["shard"].valuestrsafe();
+                if ( ns.size() == 0 ){
+                    errmsg = "no ns";
+                    return false;
+                }
+
+                DBConfig * config = grid.getDBConfig( ns );
+                if ( ! config->isPartitioned() ){
+                    errmsg = "db not partitioned ";
+                    return false;
+                }
+                
+                if ( config->sharded( ns ) ){
+                    errmsg = "already sharded";
+                    return false;
+                }
+                
+                BSONObj key = cmdObj.getObjectField( "key" );
+                if ( key.isEmpty() ){
+                    errmsg = "no shard key";
+                    return false;
+                }
+                
+                ShardInfo * info = config->turnOnSharding( ns , key );
+                info->save();
+                config->save();
+
+                result << "ok" << 1;
+                return true;
             }            
         } shardCmd;
             

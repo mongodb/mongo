@@ -104,6 +104,7 @@ namespace mongo {
     }
 
     Shard& ShardInfo::findShard( const BSONObj & obj ){
+
         for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++ ){
             Shard * s = *i;
             if ( s->contains( obj ) )
@@ -122,7 +123,7 @@ namespace mongo {
             string s = shards.numStr( num++ );
             shards.append( s.c_str() , (*i)->_data );
         }
-        to.append( "shards" , shards.obj() );
+        to.appendArray( "shards" , shards.obj() );
     }
 
     void ShardInfo::unserialize(BSONObj& from) {
@@ -154,7 +155,13 @@ namespace mongo {
             }
         }
     }
-    
+
+    bool ShardInfo::loadByName( const string& ns ){
+        BSONObjBuilder b;
+        b.append("ns", ns);
+        BSONObj q = b.done();
+        return load(q);
+    }
 
     string ShardInfo::toString() const {
         stringstream ss;
