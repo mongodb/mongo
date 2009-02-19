@@ -843,8 +843,8 @@ namespace mongo {
                     c->help( help );
                     anObjBuilder.append( "help" , help.str() );                    
                 } else {
-                    if( admin || logLevel >= 2 )
-                        log() << "command: " << jsobj.toString() << endl;
+                    if( admin )
+                        log( 2 ) << "command: " << jsobj << endl;
                     ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
                     if ( ok && c->logTheOp() && !fromRepl )
                         logOp("c", ns, jsobj);
