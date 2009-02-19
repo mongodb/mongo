@@ -51,7 +51,7 @@ namespace mongo {
            QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
            QUERY( "age" << GT << 30 << LT << 50 )
     */
-    class Query : public Stringable {
+    class Query {
     public:
         BSONObj obj;
         Query() : obj(emptyObj) { }
@@ -110,7 +110,8 @@ namespace mongo {
         Query& where(const char *jscode, BSONObj scope);
         Query& where(const char *jscode) { return where(jscode, BSONObj()); }
 
-        virtual string toString() const;
+        string toString() const;
+        operator string() const { return toString(); }
     };
     
 /** Typically one uses the QUERY(...) macro to construct a Query object.
