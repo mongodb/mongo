@@ -199,8 +199,10 @@ namespace QueryOptimizerTests {
             void run() {
                 QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << 1 << "b" << -1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
+                ASSERT_EQUALS( 1, p.direction() );
                 QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( p2.scanAndOrderRequired() );                
+                ASSERT_EQUALS( 0, p2.direction() );
             }            
         };
         
@@ -209,10 +211,13 @@ namespace QueryOptimizerTests {
             void run() {
                 QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
+                ASSERT_EQUALS( -1, p.direction() );
                 QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << -1 << "b" << -1 ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );                
+                ASSERT_EQUALS( -1, p2.direction() );
                 QueryPlan p3( FieldBoundSet( emptyObj ), BSON( "a" << -1 << "b" << -1 ), BSON( "a" << 1 << "b" << -1 ) );
                 ASSERT( p3.scanAndOrderRequired() );                
+                ASSERT_EQUALS( 0, p3.direction() );
             }                        
         };
 
@@ -379,6 +384,40 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class HintSpec : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                BSONObj b = BSON( "hint" << BSON( "a" << 1 ) );
+                BSONElement e = b.firstElement();
+                QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
+                ASSERT_EQUALS( 1, s.nPlans() );                
+            }
+        };
+
+        class HintName : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                BSONObj b = BSON( "hint" << "a_1" );
+                BSONElement e = b.firstElement();
+                QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
+                ASSERT_EQUALS( 1, s.nPlans() );                
+            }
+        };
+        
+        class BadHint : public Base {
+        public:
+            void run() {
+                BSONObj b = BSON( "hint" << "a_1" );
+                BSONElement e = b.firstElement();
+                ASSERT_EXCEPTION( QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e ),
+                                 AssertionException );
+            }
+        };
+        
     } // namespace QueryPlanSetTests
     
     class All : public UnitTest::Suite {
@@ -412,6 +451,9 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::Optimal >();
             add< QueryPlanSetTests::NoOptimal >();
             add< QueryPlanSetTests::NoSpec >();
+            add< QueryPlanSetTests::HintSpec >();
+            add< QueryPlanSetTests::HintName >();
+            add< QueryPlanSetTests::BadHint >();
         }
     };
     

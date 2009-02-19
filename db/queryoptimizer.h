@@ -85,16 +85,18 @@ namespace mongo {
         bool keyMatch() const { return keyMatch_; }
         /* True if keyMatch() is true, and all matches will be equal according to woEqual() */
         bool exactKeyMatch() const { return exactKeyMatch_; }
+        int direction() const { return direction_; }
     private:
         bool optimal_;
         bool scanAndOrderRequired_;
         bool keyMatch_;
         bool exactKeyMatch_;
+        int direction_;
     };
 
     class QueryPlanSet {
     public:
-        QueryPlanSet( const char *ns, BSONObj query, BSONObj order );
+        QueryPlanSet( const char *ns, BSONObj query, BSONObj order, BSONElement *hint = 0 );
         int nPlans() const { return plans_.size(); }
     private:
         FieldBoundSet fbs_;

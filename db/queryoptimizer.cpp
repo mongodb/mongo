@@ -124,7 +124,8 @@ namespace mongo {
     optimal_( false ),
     scanAndOrderRequired_( true ),
     keyMatch_( false ),
-    exactKeyMatch_( false ) {
+    exactKeyMatch_( false ),
+    direction_( 0 ) {
         // full table scan case
         if ( idxKey.isEmpty() ) {
             if ( order.isEmpty() )
@@ -133,7 +134,6 @@ namespace mongo {
         }
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
-        int direction = 0;
         if ( !o.more() )
             scanAndOrderRequired_ = false;
         while( o.more() ) {
@@ -155,12 +155,14 @@ namespace mongo {
                     goto doneCheckOrder;
             }
             int d = oe.number() == ke.number() ? 1 : -1;
-            if ( direction == 0 )
-                direction = d;
-            else if ( direction != d )
-                break;          
+            if ( direction_ == 0 )
+                direction_ = d;
+            else if ( direction_ != d )
+                break;
         }
     doneCheckOrder:
+        if ( scanAndOrderRequired_ )
+            direction_ = 0;
         BSONObjIterator i( idxKey );
         int indexedQueryCount = 0;
         int exactIndexedQueryCount = 0;
@@ -202,16 +204,42 @@ namespace mongo {
         }
     }
     
-    QueryPlanSet::QueryPlanSet( const char *ns, BSONObj query, BSONObj order ) :
+    QueryPlanSet::QueryPlanSet( const char *ns, BSONObj query, BSONObj order, BSONElement *hint ) :
     fbs_( query ) {
+        NamespaceDetails *d = nsdetails( ns );
+        assert( d );
+
+        if ( hint && !hint->eoo() ) {
+            if( hint->type() == String ) {
+                string hintstr = hint->valuestr();
+                for (int i = 0; i < d->nIndexes; i++ ) {
+                    IndexDetails& ii = d->indexes[i];
+                    if ( ii.indexName() == hintstr ) {
+                        plans_.push_back( QueryPlan( fbs_, order, ii.keyPattern() ) );
+                        return;
+                    }
+                }
+            }
+            else if( hint->type() == Object ) { 
+                BSONObj hintobj = hint->embeddedObject();
+                for (int i = 0; i < d->nIndexes; i++ ) {
+                    IndexDetails& ii = d->indexes[i];
+                    if( ii.keyPattern().woCompare(hintobj) == 0 ) {
+                        plans_.push_back( QueryPlan( fbs_, order, ii.keyPattern() ) );
+                        return;
+                    }
+                }
+            }
+            uassert( "bad hint", false );
+        }
+        
         // Table scan plan
         plans_.push_back( QueryPlan( fbs_, order, emptyObj ) );
 
+        // If table scan is optimal
         if ( fbs_.nNontrivialBounds() == 0 && order.isEmpty() )
             return;
         
-        NamespaceDetails *d = nsdetails( ns );
-        assert( d );
         vector< QueryPlan > plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
             QueryPlan p( fbs_, order, d->indexes[ i ].keyPattern() );
