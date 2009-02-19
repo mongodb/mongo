@@ -263,6 +263,10 @@ namespace QueryOptimizerTests {
                 ASSERT( p10.optimal() );
                 QueryPlan p11( FieldBoundSet( BSON( "a" << 1 << "b" << LT << 1 ) ), emptyObj, BSON( "a" << 1 << "b" << 1 << "c" << 1 ) );
                 ASSERT( p11.optimal() );
+                QueryPlan p12( FieldBoundSet( BSON( "a" << LT << 1 ) ), emptyObj, BSON( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                ASSERT( p12.optimal() );
+                QueryPlan p13( FieldBoundSet( BSON( "a" << LT << 1 ) ), BSON( "a" << 1 ), BSON( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                ASSERT( p13.optimal() );
             }
         };
         

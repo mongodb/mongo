@@ -164,8 +164,8 @@ namespace mongo {
         BSONObjIterator i( idxKey );
         int indexedQueryCount = 0;
         int exactIndexedQueryCount = 0;
-        int orderEqIndexedQueryCount = 0;
-        bool stillOrderEqIndexedQueryCount = true;
+        int optimalIndexedQueryCount = 0;
+        bool stillOptimalIndexedQueryCount = true;
         set< string > orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
         while( i.more() ) {
@@ -175,11 +175,14 @@ namespace mongo {
             const FieldBound &fb = fbs.bound( e.fieldName() );
             if ( fb.nontrivial() )
                 ++indexedQueryCount;
-            if ( stillOrderEqIndexedQueryCount ) {
-                if ( fb.equality() )
-                    ++orderEqIndexedQueryCount;
-                else
-                    stillOrderEqIndexedQueryCount = false;
+            if ( stillOptimalIndexedQueryCount ) {
+                if ( fb.nontrivial() )
+                    ++optimalIndexedQueryCount;
+                if ( !fb.equality() )
+                    stillOptimalIndexedQueryCount = false;
+            } else {
+                if ( fb.nontrivial() )
+                    optimalIndexedQueryCount = -1;
             }
             if ( fb.equality() ) {
                 BSONElement e = fb.upper();
@@ -189,9 +192,7 @@ namespace mongo {
             orderFieldsUnindexed.erase( e.fieldName() );
         }
         if ( !scanAndOrderRequired_ &&
-            ( fbs.nNontrivialBounds() == 0 ||
-             ( orderEqIndexedQueryCount > 0 &&
-                orderEqIndexedQueryCount + 1 >= fbs.nNontrivialBounds() ) ) )
+             ( optimalIndexedQueryCount == fbs.nNontrivialBounds() ) )
             optimal_ = true;
         if ( indexedQueryCount == fbs.nNontrivialBounds() &&
             orderFieldsUnindexed.size() == 0 ) {
