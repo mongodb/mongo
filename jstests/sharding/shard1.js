@@ -27,7 +27,7 @@ si = s.config.sharding.findOne();
 assert( si );
 assert.eq( si.ns , "test.foo" );
 
-//assert.eq( 3 , db.foo.find().length() , "after sharding, no split count failed" );
+assert.eq( 3 , db.foo.find().length() , "after sharding, no split count failed" );
 
 
 s.stop();

@@ -104,6 +104,7 @@ namespace mongo {
     }
 
     Shard& ShardInfo::findShard( const BSONObj & obj ){
+
         for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++ ){
             Shard * s = *i;
             if ( s->contains( obj ) )

@@ -27,6 +27,7 @@
 
 #include "request.h"
 #include "config.h"
+#include "shard.h"
 
 namespace mongo {
 
@@ -34,10 +35,29 @@ namespace mongo {
         assert( _d.getns() );
         _id = _m.data->id;
         _config = grid.getDBConfig( getns() );
+
+        if ( _config->sharded( getns() ) ){
+            _shardInfo = _config->getShardInfo( getns() );
+            uassert( (string)"no shard info for: " + getns() , _shardInfo );
+        }
+        else {
+            _shardInfo = 0;
+        }
     }
 
+    string Request::singleServerName(){
+        if ( _shardInfo ){
+            if ( _shardInfo->numShards() > 1 )
+                throw UserException( "can't call singleServerName on a sharded collection" );
+            return _shardInfo->findShard( _shardInfo->getShardKey().globalMin() ).getServer();
+        }
+        string s = _config->getServer( getns() );
+        uassert( "can't call singleServerName on a sharded collection!" , s.size() > 0 );
+        return s;
+    }
+    
     void Request::process(){
-
+        
         int op = _m.data->operation();
         assert( op > dbMsg );
         
@@ -67,6 +87,10 @@ namespace mongo {
             _d.resetPull();
         }
         
+        if ( _shardInfo && _shardInfo->numShards() > 1 ){
+            throw UserException( "can't do sharding yet silly" );
+        }
+
         
         if ( op == dbQuery ) {
             s->queryOp( *this );

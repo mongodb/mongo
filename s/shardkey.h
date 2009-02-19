@@ -48,6 +48,6 @@ namespace mongo {
     private:
         void _init();
         BSONObj _fieldsAndOrder;
-        const char * _fieldName;
+        string _fieldName;
     };
 } 

@@ -53,12 +53,14 @@ namespace mongo {
 
         void turnOnPartitioning();
         ShardInfo* turnOnSharding( const string& ns , BSONObj fieldsAndOrder );
-
+        
         /**
          * @return whether or not this partition is partitioned
          */
         bool sharded( const string& ns );
         
+        ShardInfo* getShardInfo( const string& ns );
+
         /**
          * @return the correct for machine for the ns
          * if the namespace is partitioned, will return an empty string

@@ -83,6 +83,17 @@ namespace mongo {
 
     }
 
+    ShardInfo* DBConfig::getShardInfo( const string& ns ){
+        ShardInfo* info = _shards[ns];
+        if ( info )
+            return info;
+        info = new ShardInfo( this );
+        if ( ! info->loadByName( ns ) )
+            throw UserException( (string)"can't load shard info for: " + ns );
+        _shards[ns] = info;
+        return info;
+    }
+
     void DBConfig::serialize(BSONObjBuilder& to){
         to.append("name", _name);
         to.appendBool("partitioned", _partitioned );
