@@ -36,26 +36,46 @@ namespace mongo {
         _config = grid.getDBConfig( getns() );
     }
 
-    void processRequest(Message& m, MessagingPort& p) {
-        Request r( m , p );
+    void Request::process(){
 
-        int op = m.data->operation();
+        int op = _m.data->operation();
         assert( op > dbMsg );
         
         Strategy * s = SINGLE;
         
-        if ( r.getConfig()->isPartitioned() ){
-            uassert( "partitioned not supported" , 0 );
-        }
+        if ( getConfig()->isPartitioned() && op == dbQuery ){
+            // there are a few things we need to check here
+            // 1. db.eval
+            //     TODO:  right now i'm just going to block all
+            //            will need to make it look at function later
+            // 2. $where - can't access DB
+            //              TODO: make it smarter
 
+            QueryMessage q( _d );
+            BSONObj query = q.query;
+            
+            if ( q.ntoreturn == 1 && 
+                 strstr( q.ns , ".$cmd" ) &&
+                 strcmp( "$eval" , query.firstElement().fieldName() ) ){
+                log() << "trying to eval: " << q.query << endl;
+                throw UserException( "eval not supported on partitioned databases yet" );
+            }
+            
+            if ( query.hasField( "$where" ) )
+                throw UserException( "$where not supported for partitioned databases yet" );
+
+            _d.resetPull();
+        }
+        
+        
         if ( op == dbQuery ) {
-            s->queryOp( r );
+            s->queryOp( *this );
         }
         else if ( op == dbGetMore ) {
-            s->getMore( r );
+            s->getMore( *this );
         }
         else {
-            s->writeOp( op, r );
+            s->writeOp( op, *this );
         }
     }
     

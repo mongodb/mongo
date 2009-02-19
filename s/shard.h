@@ -104,6 +104,8 @@ namespace mongo {
         virtual void unserialize(BSONObj& from);
         virtual string modelServer();
 
+        bool loadByName( const string& ns );
+
         string toString() const;
         operator string() { return toString(); }
         

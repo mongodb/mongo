@@ -16,6 +16,12 @@ namespace mongo {
         const char * getns(){
             return _d.getns();
         }
+        int op(){
+            return _m.data->operation();
+        }
+        bool expectResponse(){
+            return op() == dbQuery || op() == dbGetMore;
+        }
         
         MSGID id(){
             return _id;
@@ -42,6 +48,8 @@ namespace mongo {
         Message& m(){ return _m; }
         DbMessage& d(){ return _d; }
         MessagingPort& p(){ return _p; }
+
+        void process();
 
     private:
         Message& _m;
