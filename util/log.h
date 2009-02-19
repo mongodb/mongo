@@ -19,12 +19,6 @@
 #pragma once
 
 namespace mongo {
-
-    class Stringable {
-    public:
-        virtual ~Stringable() {}
-        virtual string toString() const = 0;
-    };
     
     class Nullstream {
     public:
@@ -60,9 +54,6 @@ namespace mongo {
         virtual Nullstream& operator<<(unsigned long long) {
             return *this;
         }
-        virtual Nullstream& operator<<(Stringable&) {
-            return *this;
-        }
         virtual Nullstream& operator<<(const string&) {
             return *this;
         }
@@ -95,11 +86,6 @@ namespace mongo {
         Logstream& operator<<(long long x) LOGIT
         Logstream& operator<<(unsigned long long x) LOGIT
         Logstream& operator<<(const string& x) LOGIT
-        Logstream& operator<<(Stringable& x){
-            boostlock lk(mutex);
-            cout << x.toString();
-            return *this;
-        }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
             boostlock lk(mutex);
             cout << _endl;

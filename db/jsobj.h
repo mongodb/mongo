@@ -444,7 +444,7 @@ namespace mongo {
      Code With Scope: <total size><String><Object>
      \endcode
      */
-    class BSONObj : public Stringable {
+    class BSONObj {
         friend class BSONObjIterator;
         class Details {
         public:
@@ -502,6 +502,7 @@ namespace mongo {
             This is an abbreviated representation which might be used for logging.
         */
         string toString() const;
+        operator string() const { return toString(); }
 
         /** Properly formatted JSON string. */
         string jsonString( JsonStringFormat format = Strict ) const;

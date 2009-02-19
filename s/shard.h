@@ -32,7 +32,7 @@ namespace mongo {
     class DBConfig;
     class ShardInfo;
     
-    class Shard : public Stringable {
+    class Shard {
     public:
         
         BSONObj& getMin(){
@@ -49,7 +49,8 @@ namespace mongo {
 
         void split();
         
-        virtual string toString() const;
+        string toString() const;
+        operator string() { return toString(); }
 
         bool operator==(const Shard& s);
 
@@ -79,7 +80,7 @@ namespace mongo {
            shards: [ { min: 1, max: 100, server: a } , { min: 101, max: 200 , server : b } ]
          }
     */
-    class ShardInfo : public Model , public Stringable {
+    class ShardInfo : public Model {
     public:
 
         ShardInfo( DBConfig * config );
@@ -103,7 +104,8 @@ namespace mongo {
         virtual void unserialize(BSONObj& from);
         virtual string modelServer();
 
-        virtual string toString() const;
+        string toString() const;
+        operator string() { return toString(); }
         
     private:
         DBConfig * _config;

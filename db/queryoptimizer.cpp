@@ -17,17 +17,7 @@
 */
 
 #include "stdafx.h"
-#include "query.h"
 #include "pdfile.h"
-#include "jsobj.h"
-#include "../util/builder.h"
-#include <time.h>
-#include "btree.h"
-#include "../util/lruishmap.h"
-#include "json.h"
-#include "repl.h"
-#include "replset.h"
-#include "scanandorder.h"
 #include "queryoptimizer.h"
 
 namespace mongo {
@@ -135,11 +125,15 @@ namespace mongo {
     scanAndOrderRequired_( true ),
     keyMatch_( false ),
     exactKeyMatch_( false ) {
-        massert( "Index unhelpful", fbs.nNontrivialBounds() != 0 || !order.isEmpty() );
+        // full table scan case
+        if ( idxKey.isEmpty() ) {
+            if ( order.isEmpty() )
+                scanAndOrderRequired_ = false;
+            return;
+        }
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
         int direction = 0;
-        int eqCount = 0;
         if ( !o.more() )
             scanAndOrderRequired_ = false;
         while( o.more() ) {
@@ -147,13 +141,6 @@ namespace mongo {
             if ( oe.eoo() ) {
                 scanAndOrderRequired_ = false;
                 break;
-            }
-            if ( eqCount != -1 ) {
-                if ( fbs.bound( oe.fieldName() ).equality() ) {
-                    ++eqCount;
-                } else {
-                    eqCount = -1;
-                }
             }
             if ( !k.more() )
                 break;
@@ -174,31 +161,67 @@ namespace mongo {
                 break;          
         }
     doneCheckOrder:
-        if ( !scanAndOrderRequired_ &&
-            eqCount + 1 >= fbs.nBounds() )
-            optimal_ = true;
-        
         BSONObjIterator i( idxKey );
         int indexedQueryCount = 0;
-        int eqIndexedQueryCount = 0;
+        int exactIndexedQueryCount = 0;
+        int orderEqIndexedQueryCount = 0;
+        bool stillOrderEqIndexedQueryCount = true;
         set< string > orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
         while( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
-            if ( fbs.bound( e.fieldName() ).nontrivial() )
+            const FieldBound &fb = fbs.bound( e.fieldName() );
+            if ( fb.nontrivial() )
                 ++indexedQueryCount;
-            if ( fbs.bound( e.fieldName() ).equality() )
-                ++eqIndexedQueryCount;
+            if ( stillOrderEqIndexedQueryCount ) {
+                if ( fb.equality() )
+                    ++orderEqIndexedQueryCount;
+                else
+                    stillOrderEqIndexedQueryCount = false;
+            }
+            if ( fb.equality() ) {
+                BSONElement e = fb.upper();
+                if ( !e.isNumber() && !e.mayEncapsulate() && e.type() != RegEx )
+                    ++exactIndexedQueryCount;
+            }
             orderFieldsUnindexed.erase( e.fieldName() );
         }
+        if ( !scanAndOrderRequired_ &&
+            ( fbs.nNontrivialBounds() == 0 ||
+             ( orderEqIndexedQueryCount > 0 &&
+                orderEqIndexedQueryCount + 1 >= fbs.nNontrivialBounds() ) ) )
+            optimal_ = true;
         if ( indexedQueryCount == fbs.nNontrivialBounds() &&
             orderFieldsUnindexed.size() == 0 ) {
             keyMatch_ = true;
-            if ( eqIndexedQueryCount == fbs.nNontrivialBounds() )
+            if ( exactIndexedQueryCount == fbs.nNontrivialBounds() )
                 exactKeyMatch_ = true;
         }
+    }
+    
+    QueryPlanSet::QueryPlanSet( const char *ns, BSONObj query, BSONObj order ) :
+    fbs_( query ) {
+        // Table scan plan
+        plans_.push_back( QueryPlan( fbs_, order, emptyObj ) );
+
+        if ( fbs_.nNontrivialBounds() == 0 && order.isEmpty() )
+            return;
+        
+        NamespaceDetails *d = nsdetails( ns );
+        assert( d );
+        vector< QueryPlan > plans;
+        for( int i = 0; i < d->nIndexes; ++i ) {
+            QueryPlan p( fbs_, order, d->indexes[ i ].keyPattern() );
+            if ( p.optimal() ) {
+                plans_.push_back( p );
+                return;
+            }
+            plans.push_back( p );
+        }
+        for( vector< QueryPlan >::iterator i = plans.begin(); i != plans.end(); ++i )
+            plans_.push_back( *i );
     }
     
 //    QueryPlan QueryOptimizer::getPlan(
