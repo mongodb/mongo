@@ -25,7 +25,7 @@ namespace mongo {
 
     class FieldBound {
     public:
-        FieldBound( BSONElement e = emptyObj.firstElement() );
+        FieldBound( const BSONElement &e = emptyObj.firstElement() );
         FieldBound &operator&=( const FieldBound &other );
         BSONElement lower() const { return lower_; }
         BSONElement upper() const { return upper_; }
@@ -36,7 +36,7 @@ namespace mongo {
             maxKey.firstElement().woCompare( upper_, false ) != 0;
         }
     private:
-        BSONObj addObj( BSONObj o );
+        BSONObj addObj( const BSONObj &o );
         string simpleRegexEnd( string regex );
         BSONElement lower_;
         BSONElement upper_;
@@ -45,7 +45,7 @@ namespace mongo {
     
     class FieldBoundSet {
     public:
-        FieldBoundSet( BSONObj query );
+        FieldBoundSet( const BSONObj &query );
         const FieldBound &bound( const char *fieldName ) const {
             map< string, FieldBound >::const_iterator f = bounds_.find( fieldName );
             if ( f == bounds_.end() )
@@ -74,7 +74,7 @@ namespace mongo {
     
     class QueryPlan {
     public:
-        QueryPlan( const FieldBoundSet &fbs, BSONObj order, BSONObj idxKey );
+        QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const BSONObj &idxKey );
         /* If true, no other index can do better. */
         bool optimal() const { return optimal_; }
         /* ScanAndOrder processing will be required if true */
@@ -96,7 +96,7 @@ namespace mongo {
 
     class QueryPlanSet {
     public:
-        QueryPlanSet( const char *ns, BSONObj query, BSONObj order, BSONElement *hint = 0 );
+        QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint = 0 );
         int nPlans() const { return plans_.size(); }
     private:
         FieldBoundSet fbs_;

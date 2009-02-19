@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    FieldBound::FieldBound( BSONElement e ) :
+    FieldBound::FieldBound( const BSONElement &e ) :
     lower_( minKey.firstElement() ),
     upper_( maxKey.firstElement() ) {
         if ( e.eoo() )
@@ -86,12 +86,12 @@ namespace mongo {
         return regex;
     }    
     
-    BSONObj FieldBound::addObj( BSONObj o ) {
+    BSONObj FieldBound::addObj( const BSONObj &o ) {
         objData_.push_back( o );
         return o;
     }
     
-    FieldBoundSet::FieldBoundSet( BSONObj query ) :
+    FieldBoundSet::FieldBoundSet( const BSONObj &query ) :
     query_( query.copy() ) {
         BSONObjIterator i( query_ );
         while( i.more() ) {
@@ -120,7 +120,7 @@ namespace mongo {
         return *trivialBound_;
     }
     
-    QueryPlan::QueryPlan( const FieldBoundSet &fbs, BSONObj order, BSONObj idxKey ) :
+    QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const BSONObj &idxKey ) :
     optimal_( false ),
     scanAndOrderRequired_( true ),
     keyMatch_( false ),
@@ -204,7 +204,7 @@ namespace mongo {
         }
     }
     
-    QueryPlanSet::QueryPlanSet( const char *ns, BSONObj query, BSONObj order, BSONElement *hint ) :
+    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :
     fbs_( query ) {
         NamespaceDetails *d = nsdetails( ns );
         assert( d );
