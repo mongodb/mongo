@@ -279,7 +279,7 @@ namespace mongo {
     } cmdclone;
     
     /* Usage:
-     mydb.$cmd.findOne( { cloneColletion: 1, fromhost: <hostname>, collection: <collectionname>, query: <query> } );
+     mydb.$cmd.findOne( { cloneCollection: 1, fromhost: <hostname>, collection: <collectionname>, query: <query> } );
      */
     class CmdCloneCollection : public Command {
     public:
