@@ -331,10 +331,10 @@ again:
             if ( response.data->responseTo == toSend.data->id )
                 break;
             out() << "********************" << endl;
-            out() << "ERROR: MessagingPort::call() wrong id got:" << response.data->responseTo << " expect:" << toSend.data->id << endl;
-            out() << "  old:" << old << endl;
-            out() << "  response msgid:" << response.data->id << endl;
-            out() << "  response len:  " << response.data->len << endl;
+            out() << "ERROR: MessagingPort::call() wrong id got:" << (unsigned)response.data->responseTo << " expect:" << (unsigned)toSend.data->id << endl;
+            out() << "  old:" << (unsigned)old << endl;
+            out() << "  response msgid:" << (unsigned)response.data->id << endl;
+            out() << "  response len:  " << (unsigned)response.data->len << endl;
             assert(false);
             response.reset();
         }

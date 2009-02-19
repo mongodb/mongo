@@ -19,6 +19,21 @@
 #pragma once
 
 namespace mongo {
+
+    // If you don't want your class to inherit from Stringable (for example, if
+    // you don't want a virtual destructor) then add a function like the
+    // following to your class, which takes a pointer to an object of your class
+    // type:
+    // static string toString( void * );
+    class LazyString {
+    public:
+        template< class T >
+        LazyString( T &t ) : obj_( &t ), fun_( &T::toString ) {}
+        string val() const { return (*fun_)(obj_); }
+    private:
+        void *obj_;
+        string (*fun_) (void *);
+    };
     
     class Nullstream {
     public:
@@ -57,6 +72,12 @@ namespace mongo {
         virtual Nullstream& operator<<(const string&) {
             return *this;
         }
+        virtual Nullstream& operator<<(const LazyString&) {
+            return *this;
+        }
+        virtual Nullstream& operator<<(const Stringable&) {
+            return *this;
+        }
         virtual Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
             return *this;
         }
@@ -86,6 +107,16 @@ namespace mongo {
         Logstream& operator<<(long long x) LOGIT
         Logstream& operator<<(unsigned long long x) LOGIT
         Logstream& operator<<(const string& x) LOGIT
+        Logstream& operator<<(const LazyString& x) {
+            boostlock lk(mutex);
+            cout << x.val();
+            return *this;
+        }
+        Logstream& operator<<(const Stringable& x) {
+            boostlock lk(mutex);
+            cout << x.toString();
+            return *this;
+        }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
             boostlock lk(mutex);
             cout << _endl;

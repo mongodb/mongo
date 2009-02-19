@@ -459,7 +459,7 @@ namespace mongo {
             opLogging = (int) cmdObj.findElement(name).number();
             stringstream ss;
             flushOpLog( ss );
-            out() << ss << endl;
+            out() << ss.str() << endl;
             if ( !quiet )
                 log() << "CMD: opLogging set to " << opLogging << endl;
             return true;
