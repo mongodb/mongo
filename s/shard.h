@@ -50,7 +50,9 @@ namespace mongo {
         void split();
         
         string toString() const;
-        operator string() { return toString(); }
+        static string toString( void *o ) {
+            return ( (Shard*) o )->toString();
+        }
 
         bool operator==(const Shard& s);
 
@@ -105,7 +107,9 @@ namespace mongo {
         virtual string modelServer();
 
         string toString() const;
-        operator string() { return toString(); }
+        static string toString( void *o ) {
+            return ( (ShardInfo*) o )->toString();
+        }
         
     private:
         DBConfig * _config;

@@ -19,6 +19,16 @@
 #pragma once
 
 namespace mongo {
+
+    class LazyString {
+    public:
+        template< class T >
+        LazyString( T &t ) : obj_( &t ), fun_( &T::toString ) {}
+        string val() const { return (*fun_)(obj_); }
+    private:
+        void *obj_;
+        string (*fun_) (void *);
+    };
     
     class Nullstream {
     public:
@@ -57,6 +67,9 @@ namespace mongo {
         virtual Nullstream& operator<<(const string&) {
             return *this;
         }
+        virtual Nullstream& operator<<(const LazyString&) {
+            return *this;
+        }
         virtual Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
             return *this;
         }
@@ -86,6 +99,11 @@ namespace mongo {
         Logstream& operator<<(long long x) LOGIT
         Logstream& operator<<(unsigned long long x) LOGIT
         Logstream& operator<<(const string& x) LOGIT
+        Logstream& operator<<(const LazyString& x) {
+            boostlock lk(mutex);
+            cout << x.val();
+            return *this;
+        }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
             boostlock lk(mutex);
             cout << _endl;
