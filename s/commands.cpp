@@ -267,10 +267,51 @@ namespace mongo {
         public:
             SplitCollection() : GridAdminCmd( "split" ){}
             virtual void help( stringstream& help ) const {
-                help << " example: { shard : 'alleyinsider.blog.posts' , key : { ts : 1 } }";
+                help 
+                    << " example: { shard : 'alleyinsider.blog.posts' , find : { ts : 1 } } - split the shard that contains give key \n"
+                    << " example: { shard : 'alleyinsider.blog.posts' , middle : { ts : 1 } } - split the shard that contains the key with this as the middle \n"
+                    << " NOTE: this does not move move the chunks, it merely creates a logical seperation \n"
+                    ;
             }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                return false;
+            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string ns = cmdObj["split"].valuestrsafe();
+                if ( ns.size() == 0 ){
+                    errmsg = "no ns";
+                    return false;
+                }
+                
+                DBConfig * config = grid.getDBConfig( ns );
+                if ( ! config->sharded( ns ) ){
+                    errmsg = "ns not sharded.  have to shard before can split";
+                    return false;
+                }
+                
+                BSONObj find = cmdObj.getObjectField( "find" );
+                bool middle = false;
+                if ( find.isEmpty() ){
+                    find = cmdObj.getObjectField( "middle" );
+                    middle = true;
+                }
+                
+                if ( find.isEmpty() ){
+                    errmsg = "need to specify find or middle";
+                    return false;
+                }
+                
+                ShardInfo * info = config->getShardInfo( ns );
+                Shard& old = info->findShard( find );
+                
+                log() << "splitting: " << ns << " on: " << find << endl;
+
+                if ( middle )
+                    old.split( cmdObj.getObjectField( "middle" ) );
+                else
+                    old.split();
+                
+                info->save();
+                
+                result << "ok" << 1;
+                return true;
             }            
             
 

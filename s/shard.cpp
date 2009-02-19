@@ -30,13 +30,6 @@ namespace mongo {
         _max = _data.getObjectField( "max" );
     }
 
-    Shard::Shard( const Shard& s ){
-        _info = s._info;
-        _data = s._data.copy();
-        _min = _data.getObjectField( "min" );
-        _max = _data.getObjectField( "max" );
-    }
-
     string ShardInfo::modelServer() {
         // TODO: this could move around?
         return configServer.modelServer();
@@ -49,8 +42,10 @@ namespace mongo {
     }
 
     void Shard::split(){
-
-        BSONObj m = _info->getShardKey().middle( getMin() , getMax() );
+        split( _info->getShardKey().middle( getMin() , getMax() ) );
+    }
+        
+    void Shard::split( const BSONObj& m ){
 
         {
             BSONObjBuilder l;

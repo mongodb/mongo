@@ -86,11 +86,11 @@ namespace mongo {
 
             _d.resetPull();
         }
-        
-        if ( _shardInfo && _shardInfo->numShards() > 1 ){
-            throw UserException( "can't do sharding yet silly" );
-        }
 
+        if ( _shardInfo ){
+            if ( _shardInfo->numShards() > 1 )
+                throw UserException( "can't do sharding yet silly" );
+        }
         
         if ( op == dbQuery ) {
             s->queryOp( *this );

@@ -23,16 +23,18 @@
 
 #pragma once
 
+#include "../stdafx.h"
 #include "../client/dbclient.h"
 #include "../client/model.h"
 #include "shardkey.h"
+#include <boost/utility.hpp>
 
 namespace mongo {
 
     class DBConfig;
     class ShardInfo;
     
-    class Shard {
+    class Shard : boost::noncopyable {
     public:
         
         BSONObj& getMin(){
@@ -48,6 +50,7 @@ namespace mongo {
         bool contains( const BSONObj& obj );
 
         void split();
+        void split( const BSONObj& middle );
         
         string toString() const;
         static string toString( void *o ) {
@@ -59,8 +62,6 @@ namespace mongo {
         bool operator!=(const Shard& s){
             return ! ( *this == s );
         }
-
-        Shard( const Shard& s );
 
     private:
         Shard( ShardInfo * info , BSONObj data );

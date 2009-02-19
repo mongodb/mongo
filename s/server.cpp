@@ -77,12 +77,12 @@ namespace mongo {
         }
 
     }
-
+    
     void dbGridConnThread() {
         MessagingPort *p = grab;
         try {
             _dbGridConnThread();
-        } catch ( ... ) {
+        } catch ( ... ){
             problem() << "uncaught exception in dbgridconnthread, closing connection" << endl;
             delete p;
         }
