@@ -278,15 +278,15 @@ namespace mongo {
         }
     } cmdclone;
     
-    /* Usage:
-     mydb.$cmd.findOne( { cloneCollection: 1, fromhost: <hostname>, collection: <collectionname>, query: <query> } );
-     */
     class CmdCloneCollection : public Command {
     public:
         virtual bool slaveOk() {
             return false;
         }
         CmdCloneCollection() : Command("cloneCollection") { }
+        virtual void help( stringstream &help ) const {
+            help << " example: { cloneCollection: 1, fromhost: <hostname>, collection: <collectionname>, query: <query> }";
+        }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() )
