@@ -75,7 +75,7 @@ namespace mongo {
     class QueryPlan {
     public:
         QueryPlan( const FieldBoundSet &fbs, BSONObj order, BSONObj idxKey );
-        /* If true, no other plan can do better unless it is also an exactKeyMatch() */
+        /* If true, no other index can do better. */
         bool optimal() const { return optimal_; }
         /* ScanAndOrder processing will be required if true */
         bool scanAndOrderRequired() const { return scanAndOrderRequired_; }
@@ -83,6 +83,7 @@ namespace mongo {
          query expression to match by itself without ever checking the main object.
          */
         bool keyMatch() const { return keyMatch_; }
+        /* True if keyMatch() is true, and all matches will be equal according to woEqual() */
         bool exactKeyMatch() const { return exactKeyMatch_; }
     private:
         bool optimal_;
@@ -91,9 +92,15 @@ namespace mongo {
         bool exactKeyMatch_;
     };
 
-//    /* We put these objects inside the Database objects: that way later if we want to do
-//       stats, it's in the right place.
-//    */
+    class QueryPlanSet {
+    public:
+        QueryPlanSet( const char *ns, BSONObj query, BSONObj order );
+        int nPlans() const { return plans_.size(); }
+    private:
+        FieldBoundSet fbs_;
+        vector< QueryPlan > plans_;
+    };
+    
 //    class QueryOptimizer {
 //    public:
 //        static QueryPlan getPlan(
