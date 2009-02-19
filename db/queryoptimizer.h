@@ -86,12 +86,16 @@ namespace mongo {
         /* True if keyMatch() is true, and all matches will be equal according to woEqual() */
         bool exactKeyMatch() const { return exactKeyMatch_; }
         int direction() const { return direction_; }
+        BSONObj startKey() const { return startKey_; }
+        BSONObj endKey() const { return endKey_; }
     private:
         bool optimal_;
         bool scanAndOrderRequired_;
         bool keyMatch_;
         bool exactKeyMatch_;
         int direction_;
+        BSONObj startKey_;
+        BSONObj endKey_;
     };
 
     class QueryPlanSet {

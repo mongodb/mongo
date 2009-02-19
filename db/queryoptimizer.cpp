@@ -170,11 +170,15 @@ namespace mongo {
         bool stillOptimalIndexedQueryCount = true;
         set< string > orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
+        BSONObjBuilder lowKeyBuilder;
+        BSONObjBuilder highKeyBuilder;
         while( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
             const FieldBound &fb = fbs.bound( e.fieldName() );
+            lowKeyBuilder.appendAs( fb.lower(), "" );
+            highKeyBuilder.appendAs( fb.upper(), "" );
             if ( fb.nontrivial() )
                 ++indexedQueryCount;
             if ( stillOptimalIndexedQueryCount ) {
@@ -202,6 +206,10 @@ namespace mongo {
             if ( exactIndexedQueryCount == fbs.nNontrivialBounds() )
                 exactKeyMatch_ = true;
         }
+        BSONObj lowKey = lowKeyBuilder.obj();
+        BSONObj highKey = highKeyBuilder.obj();
+        startKey_ = ( direction_ >= 0 ) ? lowKey : highKey;
+        endKey_ = ( direction_ >= 0 ) ? highKey : lowKey;
     }
     
     QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :

@@ -177,12 +177,23 @@ namespace QueryOptimizerTests {
         class SimpleOrder {
         public:
             void run() {
+                BSONObjBuilder b;
+                b.appendMinKey( "" );
+                BSONObj start = b.obj();
+                BSONObjBuilder b2;
+                b2.appendMaxKey( "" );
+                BSONObj end = b2.obj();
+                
                 QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "a" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
+                ASSERT( !p.startKey().woCompare( start ) );
+                ASSERT( !p.endKey().woCompare( end ) );
                 QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
                 QueryPlan p3( FieldBoundSet( emptyObj ), BSON( "b" << 1 ), BSON( "a" << 1 ) );
                 ASSERT( p3.scanAndOrderRequired() );
+                ASSERT( !p3.startKey().woCompare( start ) );
+                ASSERT( !p3.endKey().woCompare( end ) );
             }
         };
         
