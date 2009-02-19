@@ -220,9 +220,19 @@ namespace QueryOptimizerTests {
         class IndexReverse {
         public:
             void run() {
+                BSONObjBuilder b;
+                b.appendMinKey( "" );
+                b.appendMinKey( "" );
+                BSONObj low = b.obj();
+                BSONObjBuilder b2;
+                b2.appendMaxKey( "" );
+                b2.appendMaxKey( "" );
+                BSONObj high = b2.obj();
                 QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
                 ASSERT_EQUALS( -1, p.direction() );
+                ASSERT( !p.endKey().woCompare( low ) );
+                ASSERT( !p.startKey().woCompare( high ) );
                 QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << -1 << "b" << -1 ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );                
                 ASSERT_EQUALS( -1, p2.direction() );
@@ -235,10 +245,22 @@ namespace QueryOptimizerTests {
         class NoOrder {
         public:
             void run() {
+                BSONObjBuilder b;
+                b.append( "", 3 );
+                b.appendMinKey( "" );
+                BSONObj start = b.obj();
+                BSONObjBuilder b2;
+                b2.append( "", 3 );
+                b2.appendMaxKey( "" );
+                BSONObj end = b2.obj();
                 QueryPlan p( FieldBoundSet( BSON( "a" << 3 ) ), emptyObj, BSON( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
+                ASSERT( !p.startKey().woCompare( start ) );
+                ASSERT( !p.endKey().woCompare( end ) );
                 QueryPlan p2( FieldBoundSet( BSON( "a" << 3 ) ), BSONObj(), BSON( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );                
+                ASSERT( !p.startKey().woCompare( start ) );
+                ASSERT( !p.endKey().woCompare( end ) );
             }            
         };
         
