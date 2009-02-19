@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    FieldBound::FieldBound( BSONElement e ) :
+    FieldBound::FieldBound( const BSONElement &e ) :
     lower_( minKey.firstElement() ),
     upper_( maxKey.firstElement() ) {
         if ( e.eoo() )
@@ -86,12 +86,12 @@ namespace mongo {
         return regex;
     }    
     
-    BSONObj FieldBound::addObj( BSONObj o ) {
+    BSONObj FieldBound::addObj( const BSONObj &o ) {
         objData_.push_back( o );
         return o;
     }
     
-    FieldBoundSet::FieldBoundSet( BSONObj query ) :
+    FieldBoundSet::FieldBoundSet( const BSONObj &query ) :
     query_( query.copy() ) {
         BSONObjIterator i( query_ );
         while( i.more() ) {
@@ -120,11 +120,12 @@ namespace mongo {
         return *trivialBound_;
     }
     
-    QueryPlan::QueryPlan( const FieldBoundSet &fbs, BSONObj order, BSONObj idxKey ) :
+    QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const BSONObj &idxKey ) :
     optimal_( false ),
     scanAndOrderRequired_( true ),
     keyMatch_( false ),
-    exactKeyMatch_( false ) {
+    exactKeyMatch_( false ),
+    direction_( 0 ) {
         // full table scan case
         if ( idxKey.isEmpty() ) {
             if ( order.isEmpty() )
@@ -133,7 +134,6 @@ namespace mongo {
         }
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
-        int direction = 0;
         if ( !o.more() )
             scanAndOrderRequired_ = false;
         while( o.more() ) {
@@ -155,12 +155,14 @@ namespace mongo {
                     goto doneCheckOrder;
             }
             int d = oe.number() == ke.number() ? 1 : -1;
-            if ( direction == 0 )
-                direction = d;
-            else if ( direction != d )
-                break;          
+            if ( direction_ == 0 )
+                direction_ = d;
+            else if ( direction_ != d )
+                break;
         }
     doneCheckOrder:
+        if ( scanAndOrderRequired_ )
+            direction_ = 0;
         BSONObjIterator i( idxKey );
         int indexedQueryCount = 0;
         int exactIndexedQueryCount = 0;
@@ -168,11 +170,15 @@ namespace mongo {
         bool stillOptimalIndexedQueryCount = true;
         set< string > orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
+        BSONObjBuilder lowKeyBuilder;
+        BSONObjBuilder highKeyBuilder;
         while( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
             const FieldBound &fb = fbs.bound( e.fieldName() );
+            lowKeyBuilder.appendAs( fb.lower(), "" );
+            highKeyBuilder.appendAs( fb.upper(), "" );
             if ( fb.nontrivial() )
                 ++indexedQueryCount;
             if ( stillOptimalIndexedQueryCount ) {
@@ -200,18 +206,48 @@ namespace mongo {
             if ( exactIndexedQueryCount == fbs.nNontrivialBounds() )
                 exactKeyMatch_ = true;
         }
+        BSONObj lowKey = lowKeyBuilder.obj();
+        BSONObj highKey = highKeyBuilder.obj();
+        startKey_ = ( direction_ >= 0 ) ? lowKey : highKey;
+        endKey_ = ( direction_ >= 0 ) ? highKey : lowKey;
     }
     
-    QueryPlanSet::QueryPlanSet( const char *ns, BSONObj query, BSONObj order ) :
+    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :
     fbs_( query ) {
+        NamespaceDetails *d = nsdetails( ns );
+        assert( d );
+
+        if ( hint && !hint->eoo() ) {
+            if( hint->type() == String ) {
+                string hintstr = hint->valuestr();
+                for (int i = 0; i < d->nIndexes; i++ ) {
+                    IndexDetails& ii = d->indexes[i];
+                    if ( ii.indexName() == hintstr ) {
+                        plans_.push_back( QueryPlan( fbs_, order, ii.keyPattern() ) );
+                        return;
+                    }
+                }
+            }
+            else if( hint->type() == Object ) { 
+                BSONObj hintobj = hint->embeddedObject();
+                for (int i = 0; i < d->nIndexes; i++ ) {
+                    IndexDetails& ii = d->indexes[i];
+                    if( ii.keyPattern().woCompare(hintobj) == 0 ) {
+                        plans_.push_back( QueryPlan( fbs_, order, ii.keyPattern() ) );
+                        return;
+                    }
+                }
+            }
+            uassert( "bad hint", false );
+        }
+        
         // Table scan plan
         plans_.push_back( QueryPlan( fbs_, order, emptyObj ) );
 
+        // If table scan is optimal
         if ( fbs_.nNontrivialBounds() == 0 && order.isEmpty() )
             return;
         
-        NamespaceDetails *d = nsdetails( ns );
-        assert( d );
         vector< QueryPlan > plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
             QueryPlan p( fbs_, order, d->indexes[ i ].keyPattern() );

@@ -837,11 +837,18 @@ namespace mongo {
                       ( c->slaveOverrideOk() && ( queryOptions & Option_SlaveOk ) ) ||
                       fromRepl ) 
             {
-                if( admin || logLevel >= 2 )
-                    log() << "command: " << jsobj.toString() << endl;
-                ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
-                if ( ok && c->logTheOp() && !fromRepl )
-                    logOp("c", ns, jsobj);
+                if ( jsobj.getBoolField( "help" ) ) {
+                    stringstream help;
+                    help << "help for: " << e.fieldName() << " ";
+                    c->help( help );
+                    anObjBuilder.append( "help" , help.str() );                    
+                } else {
+                    if( admin )
+                        log( 2 ) << "command: " << jsobj << endl;
+                    ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
+                    if ( ok && c->logTheOp() && !fromRepl )
+                        logOp("c", ns, jsobj);
+                }
             }
             else {
                 ok = false;

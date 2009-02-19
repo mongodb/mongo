@@ -177,12 +177,23 @@ namespace QueryOptimizerTests {
         class SimpleOrder {
         public:
             void run() {
+                BSONObjBuilder b;
+                b.appendMinKey( "" );
+                BSONObj start = b.obj();
+                BSONObjBuilder b2;
+                b2.appendMaxKey( "" );
+                BSONObj end = b2.obj();
+                
                 QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 ), BSON( "a" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
+                ASSERT( !p.startKey().woCompare( start ) );
+                ASSERT( !p.endKey().woCompare( end ) );
                 QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << 1 ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
                 QueryPlan p3( FieldBoundSet( emptyObj ), BSON( "b" << 1 ), BSON( "a" << 1 ) );
                 ASSERT( p3.scanAndOrderRequired() );
+                ASSERT( !p3.startKey().woCompare( start ) );
+                ASSERT( !p3.endKey().woCompare( end ) );
             }
         };
         
@@ -199,30 +210,57 @@ namespace QueryOptimizerTests {
             void run() {
                 QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << 1 << "b" << -1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
+                ASSERT_EQUALS( 1, p.direction() );
                 QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( p2.scanAndOrderRequired() );                
+                ASSERT_EQUALS( 0, p2.direction() );
             }            
         };
         
         class IndexReverse {
         public:
             void run() {
+                BSONObjBuilder b;
+                b.appendMinKey( "" );
+                b.appendMinKey( "" );
+                BSONObj low = b.obj();
+                BSONObjBuilder b2;
+                b2.appendMaxKey( "" );
+                b2.appendMaxKey( "" );
+                BSONObj high = b2.obj();
                 QueryPlan p( FieldBoundSet( emptyObj ), BSON( "a" << 1 << "b" << -1 ), BSON( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
+                ASSERT_EQUALS( -1, p.direction() );
+                ASSERT( !p.endKey().woCompare( low ) );
+                ASSERT( !p.startKey().woCompare( high ) );
                 QueryPlan p2( FieldBoundSet( emptyObj ), BSON( "a" << -1 << "b" << -1 ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );                
+                ASSERT_EQUALS( -1, p2.direction() );
                 QueryPlan p3( FieldBoundSet( emptyObj ), BSON( "a" << -1 << "b" << -1 ), BSON( "a" << 1 << "b" << -1 ) );
                 ASSERT( p3.scanAndOrderRequired() );                
+                ASSERT_EQUALS( 0, p3.direction() );
             }                        
         };
 
         class NoOrder {
         public:
             void run() {
+                BSONObjBuilder b;
+                b.append( "", 3 );
+                b.appendMinKey( "" );
+                BSONObj start = b.obj();
+                BSONObjBuilder b2;
+                b2.append( "", 3 );
+                b2.appendMaxKey( "" );
+                BSONObj end = b2.obj();
                 QueryPlan p( FieldBoundSet( BSON( "a" << 3 ) ), emptyObj, BSON( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
+                ASSERT( !p.startKey().woCompare( start ) );
+                ASSERT( !p.endKey().woCompare( end ) );
                 QueryPlan p2( FieldBoundSet( BSON( "a" << 3 ) ), BSONObj(), BSON( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );                
+                ASSERT( !p.startKey().woCompare( start ) );
+                ASSERT( !p.endKey().woCompare( end ) );
             }            
         };
         
@@ -379,6 +417,40 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class HintSpec : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                BSONObj b = BSON( "hint" << BSON( "a" << 1 ) );
+                BSONElement e = b.firstElement();
+                QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
+                ASSERT_EQUALS( 1, s.nPlans() );                
+            }
+        };
+
+        class HintName : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                BSONObj b = BSON( "hint" << "a_1" );
+                BSONElement e = b.firstElement();
+                QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
+                ASSERT_EQUALS( 1, s.nPlans() );                
+            }
+        };
+        
+        class BadHint : public Base {
+        public:
+            void run() {
+                BSONObj b = BSON( "hint" << "a_1" );
+                BSONElement e = b.firstElement();
+                ASSERT_EXCEPTION( QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e ),
+                                 AssertionException );
+            }
+        };
+        
     } // namespace QueryPlanSetTests
     
     class All : public UnitTest::Suite {
@@ -412,6 +484,9 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::Optimal >();
             add< QueryPlanSetTests::NoOptimal >();
             add< QueryPlanSetTests::NoSpec >();
+            add< QueryPlanSetTests::HintSpec >();
+            add< QueryPlanSetTests::HintName >();
+            add< QueryPlanSetTests::BadHint >();
         }
     };
     

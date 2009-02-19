@@ -27,8 +27,11 @@ namespace mongo {
     // static string toString( void * );
     class LazyString {
     public:
+        // LazyString is designed to be used in situations where the lifespan of
+        // a temporary object used to construct a LazyString completely includes
+        // the lifespan of the LazyString object itself.
         template< class T >
-        LazyString( T &t ) : obj_( &t ), fun_( &T::toString ) {}
+        LazyString( const T &t ) : obj_( (void*)&t ), fun_( &T::toString ) {}
         string val() const { return (*fun_)(obj_); }
     private:
         void *obj_;
