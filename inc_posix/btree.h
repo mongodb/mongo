@@ -62,10 +62,8 @@ typedef	struct __wt_indx {
 	/*
 	 * Associated address, else WT_ADDR_INVALID.
 	 *
-	 * WT_PAGE_INT: WT_ITEM_KEY_OVFL->addr or WT_ITEM_OFFPAGE->addr.
-	 *
+	 * WT_PAGE_INT: WT_ITEM_OFFP_INTL/LEAF->addr.
 	 * WT_PAGE_LEAF: WT_ITEM_KEY_OVFL->addr.
-	 *
 	 * WT_PAGE_DUP_LEAF: WT_ITEM_DATA_OVFL->addr.
 	 */
 	u_int32_t addr;
@@ -74,7 +72,7 @@ typedef	struct __wt_indx {
 	 * Associated on-page data item.
 	 *
 	 * In the case of primary internal pages, the associated data item
-	 * is a WT_ITEM_OFFPAGE.
+	 * is a WT_ITEM_OFFP_INTL/LEAF.
 	 *
 	 * In the case of primary leaf pages, the associated data item is a
 	 * WT_ITEM_DATA or WT_ITEM_DATA_OVFL, or a duplicate set (a group of
@@ -144,9 +142,9 @@ struct __wt_page {
  * the structure.
  *
  * !!!
- * The order is important: there's a 8-byte type in the middle, and the
- * Solaris compiler will insert space into the structure if we don't put
- * it on an 8-byte boundary.
+ * Field order is important: there's a 8-byte type in the middle, and the
+ * Solaris compiler inserts space into the structure if we don't put that
+ * field on an 8-byte boundary.
  */
 struct __wt_page_desc {
 #define	WT_BTREE_MAGIC		120897
@@ -192,7 +190,7 @@ struct __wt_page_hdr {
 	 * WT_PAGE_DUP_INT:
 	 *	The page contains sorted key/offpage-reference pairs.  Keys
 	 *	are on-page (WT_ITEM_KEY) or overflow (WT_ITEM_KEY_OVFL) items.
-	 *	Offpage references are WT_ITEM_OFFPAGE items.
+	 *	Offpage references are WT_ITEM_OFFP_INTL/LEAF items.
 	 *
 	 *	The u.entries field is the number of entries on the page.
 	 *
@@ -202,7 +200,7 @@ struct __wt_page_hdr {
 	 *	sets are either: a single on-page (WT_ITEM_DATA) or overflow
 	 *	(WT_ITEM_DATA_OVFL) item; a group of duplicate data items
 	 *	where each duplicate is an on-page (WT_ITEM_DUP) or overflow
-	 *	(WT_ITEM_DUP_OVFL) item; an offpage reference (WT_ITEM_OFFPAGE).
+	 *	(WT_ITEM_DUP_OVFL) item; an offpage reference (WT_ITEM_OFFP).
 	 *
 	 *	The u.entries field is the number of entries on the page.
 	 *
@@ -317,7 +315,7 @@ struct __wt_item {
  * size of the page we're about to read.
  *
  * On primary leaf pages, there's a WT_ITEM_KEY/KEY_OVFL item followed by one
- * WT_ITEM_DATA, WT_ITEM_DATA_OVFL or WT_ITEM_OFFPAGE item, or a WT_ITEM_KEY/
+ * WT_ITEM_DATA, WT_ITEM_DATA_OVFL or WT_ITEM_OFFP item, or a WT_ITEM_KEY/
  * KEY_OVFL item followed by some number of WT_ITEM_DUP or WT_ITEM_DUP_OVFL
  * items.
  *
