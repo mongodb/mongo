@@ -567,7 +567,6 @@ __wt_bt_promote(
 	WT_ITEM_OFFP offp, *parent_offp;
 	WT_ITEM_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
-	u_int64_t records;
 	u_int32_t parent_addr, tmp_root_addr;
 	int need_promotion, ret, root_split, tret;
 
@@ -812,8 +811,8 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 			 */
 			ip = parent->indx + (parent->indx_count - 1);
 			parent_offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(ip->ditem);
-			WT_64_CAST(parent_offp->records) =
-			    WT_64_CAST(parent_offp->records) + increment;
+			WT_64_CAST(parent_offp->records) += increment;
+			parent->records += increment;
 		}
 
 err:	/* Discard the parent page. */
