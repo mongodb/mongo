@@ -139,3 +139,10 @@ ShardingTest.prototype.stop = function(){
     }
 }
 
+ShardingTest.prototype.adminCommand = function(cmd){
+    var res = this.admin.runCommand( cmd );
+    if ( res.ok == 1 )
+        return true;
+    
+    throw "command " + tojson( cmd ) + " failed: " + tojson( res );
+}

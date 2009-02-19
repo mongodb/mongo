@@ -22,6 +22,15 @@ BUILDING
     $ cd v8
     $ scons libv8.a
 
+  To compile the unit tests, you need to install the unit test framework from:
+     http://unittest.red-bean.com/
+
+   $ cd ..
+   $ svn co http://svn.red-bean.com/unittest/trunk/ unittest
+   $ cd unittest
+   $ make
+   $ sudo make install
+
 - Then use scons to build.  
 
   If you want to build everything (mongod, mongo, tools, etc):
@@ -53,8 +62,6 @@ Mongo uses memory mapped files.  If built as a 32 bit executable, you will
 not be able to work with large (multi-gigabyte) databases.  However, 32 bit 
 builds should work fine with small development databases.
 
-To compile the unit tests, you need to install the unit test framework from:
- http://unittest.red-bean.com/
 
 --- WINDOWS ---
 

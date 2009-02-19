@@ -72,7 +72,11 @@ namespace mongo {
         void getns(Namespace& ns) {
             ns = data;
         }
-
+        
+        
+        void resetPull(){
+            nextjsobj = data;
+        }
         int pullInt() {
             if ( nextjsobj == data )
                 nextjsobj += strlen(data) + 1; // skip namespace
