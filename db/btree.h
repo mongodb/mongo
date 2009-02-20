@@ -208,6 +208,7 @@ namespace mongo {
         BSONObj endKey;
     public:
         BtreeCursor(IndexDetails&, const BSONObj& startKey, int direction, const BSONObj& query);
+        BtreeCursor( IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, int direction );
         virtual bool ok() {
             return !bucket.isNull();
         }

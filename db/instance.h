@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "../client/dbclient.h"
 #include "security.h"
 
 namespace mongo {

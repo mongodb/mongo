@@ -61,6 +61,32 @@ namespace mongo {
         checkEnd(); 
     }
 
+    BtreeCursor::BtreeCursor( IndexDetails &_id, const BSONObj &_startKey, const BSONObj &_endKey, int _direction ) :
+    startKey( _startKey ),
+    endKey( _endKey ),
+    indexDetails( _id ),
+    order( _id.keyPattern() ),
+    direction( _direction ) {
+        bool found;
+        if ( otherTraceLevel >= 12 ) {
+            if ( otherTraceLevel >= 200 ) {
+                out() << "::BtreeCursor() qtl>200.  validating entire index." << endl;
+                indexDetails.head.btree()->fullValidate(indexDetails.head, order);
+            }
+            else {
+                out() << "BTreeCursor(). dumping head bucket" << endl;
+                indexDetails.head.btree()->dump();
+            }
+        }
+        
+        bucket = indexDetails.head.btree()->
+        locate(indexDetails, indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
+        
+        skipUnusedKeys();
+        
+        checkEnd();         
+    }
+    
     string BtreeCursor::simpleRegexEnd( string regex ) {
         ++regex[ regex.length() - 1 ];
         return regex;

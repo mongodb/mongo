@@ -17,6 +17,8 @@
 */
 
 #include "stdafx.h"
+
+#include "btree.h"
 #include "pdfile.h"
 #include "queryoptimizer.h"
 
@@ -91,7 +93,8 @@ namespace mongo {
         return o;
     }
     
-    FieldBoundSet::FieldBoundSet( const BSONObj &query ) :
+    FieldBoundSet::FieldBoundSet( const char *ns, const BSONObj &query ) :
+    ns_( ns ),
     query_( query.copy() ) {
         BSONObjIterator i( query_ );
         while( i.more() ) {
@@ -120,18 +123,23 @@ namespace mongo {
         return *trivialBound_;
     }
     
-    QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const BSONObj &idxKey ) :
+    QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index ) :
+    fbs_( fbs ),
+    order_( order ),
+    index_( index ),
     optimal_( false ),
     scanAndOrderRequired_( true ),
     keyMatch_( false ),
     exactKeyMatch_( false ),
     direction_( 0 ) {
         // full table scan case
-        if ( idxKey.isEmpty() ) {
-            if ( order.isEmpty() )
+        if ( !index_ ) {
+            if ( order_.isEmpty() )
                 scanAndOrderRequired_ = false;
             return;
         }
+
+        BSONObj idxKey = index->keyPattern();
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
         if ( !o.more() )
@@ -212,8 +220,16 @@ namespace mongo {
         endKey_ = ( direction_ >= 0 ) ? highKey : lowKey;
     }
     
+    auto_ptr< Cursor > QueryPlan::newCursor() const {
+        if ( !index_ )
+            return theDataFileMgr.findAll( fbs_.ns() );
+        else
+            return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, direction_ ) );
+            //TODO This constructor should really take a const ref to the index details.
+    }
+    
     QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :
-    fbs_( query ) {
+    fbs_( ns, query ) {
         NamespaceDetails *d = nsdetails( ns );
         assert( d );
 
@@ -223,7 +239,7 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if ( ii.indexName() == hintstr ) {
-                        plans_.push_back( QueryPlan( fbs_, order, ii.keyPattern() ) );
+                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order, &ii ) ) );
                         return;
                     }
                 }
@@ -233,7 +249,7 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if( ii.keyPattern().woCompare(hintobj) == 0 ) {
-                        plans_.push_back( QueryPlan( fbs_, order, ii.keyPattern() ) );
+                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order, &ii ) ) );
                         return;
                     }
                 }
@@ -242,24 +258,75 @@ namespace mongo {
         }
         
         // Table scan plan
-        plans_.push_back( QueryPlan( fbs_, order, emptyObj ) );
+        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order ) ) );
 
         // If table scan is optimal
         if ( fbs_.nNontrivialBounds() == 0 && order.isEmpty() )
             return;
         
-        vector< QueryPlan > plans;
+        PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
-            QueryPlan p( fbs_, order, d->indexes[ i ].keyPattern() );
-            if ( p.optimal() ) {
+            PlanPtr p( new QueryPlan( fbs_, order, &d->indexes[ i ] ) );
+            if ( p->optimal() ) {
                 plans_.push_back( p );
                 return;
             }
             plans.push_back( p );
         }
-        for( vector< QueryPlan >::iterator i = plans.begin(); i != plans.end(); ++i )
+        for( PlanSet::iterator i = plans.begin(); i != plans.end(); ++i )
             plans_.push_back( *i );
     }
+    
+    auto_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
+        RunnerSet s( *this, op );
+        return s.run();
+    }
+    
+    QueryPlanSet::RunnerSet::RunnerSet( QueryPlanSet &plans, QueryOp &op ) :
+    op_( op ),
+    plans_( plans ),
+    startBarrier_( plans_.nPlans() ),
+    firstDone_( false ) {
+    }
+    
+    auto_ptr< QueryOp > QueryPlanSet::RunnerSet::run() {
+        boost::thread_group threads;
+        auto_ptr< QueryOp > ops[ plans_.nPlans() ];
+        for( int i = 0; i < plans_.nPlans(); ++i ) {
+            ops[ i ] = auto_ptr< QueryOp >( op_.clone() );
+            Runner r( *plans_.plans_[ i ], *this, *ops[ i ] );
+            threads.create_thread( r );
+        }
+        threads.join_all();
+        cout << "really done" << endl;        
+        for( int i = 0; i < plans_.nPlans(); ++i )
+            if ( ops[ i ]->done() )
+                return ops[ i ];
+        assert( false );
+        return auto_ptr< QueryOp >( 0 );
+    }
+
+    class CountOp : public QueryOp {
+    public:
+        virtual void run( const QueryPlan &qp, QueryAborter &qa ) {
+            for( int i = 0; i < 100000; ++i )
+                qa.mayAbort();
+            cout << "done" << endl;
+        }
+        virtual QueryOp *clone() const {
+            return new CountOp( *this );
+        }
+        int count() const { return 1; }
+    };
+    
+    int doCount( const char *ns, const BSONObj &cmd, string &err ) {
+        BSONObj query = cmd.getObjectField("query");
+        QueryPlanSet qps( ns, query, emptyObj );
+        auto_ptr< QueryOp > original( new CountOp () );
+        auto_ptr< QueryOp > o = qps.runOp( *original );
+        return dynamic_cast< CountOp* >( o.get() )->count();
+    }
+
     
 //    QueryPlan QueryOptimizer::getPlan(
 //        const char *ns,

@@ -45,7 +45,7 @@ namespace mongo {
     
     class FieldBoundSet {
     public:
-        FieldBoundSet( const BSONObj &query );
+        FieldBoundSet( const char *ns, const BSONObj &query );
         const FieldBound &bound( const char *fieldName ) const {
             map< string, FieldBound >::const_iterator f = bounds_.find( fieldName );
             if ( f == bounds_.end() )
@@ -65,16 +65,20 @@ namespace mongo {
                     ++count;
             return count;
         }
+        const char *ns() const { return ns_; }
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();
         map< string, FieldBound > bounds_;
+        const char *ns_;
         BSONObj query_;
     };
     
+    class IndexDetails;
     class QueryPlan {
     public:
-        QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const BSONObj &idxKey );
+        QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index = 0 );
+        QueryPlan( const QueryPlan &other );
         /* If true, no other index can do better. */
         bool optimal() const { return optimal_; }
         /* ScanAndOrder processing will be required if true */
@@ -88,7 +92,11 @@ namespace mongo {
         int direction() const { return direction_; }
         BSONObj startKey() const { return startKey_; }
         BSONObj endKey() const { return endKey_; }
+        auto_ptr< Cursor > newCursor() const;
     private:
+        const FieldBoundSet &fbs_;
+        const BSONObj &order_;
+        const IndexDetails *index_;
         bool optimal_;
         bool scanAndOrderRequired_;
         bool keyMatch_;
@@ -98,14 +106,72 @@ namespace mongo {
         BSONObj endKey_;
     };
 
+    class QueryAborter {
+    public:
+        QueryAborter( bool &firstDone ) :
+        firstDone_( firstDone ){}
+        class AbortException : public std::exception {
+        };
+        void mayAbort() {
+            if ( firstDone_ )
+                throw AbortException();
+        }
+    private:
+        bool &firstDone_;
+    };
+    
+    class QueryOp {
+    public:
+        QueryOp() : done_( false ) {}
+        virtual ~QueryOp() {}
+        virtual void run( const QueryPlan &qp, QueryAborter &qa ) = 0;
+        virtual QueryOp *clone() const = 0;
+        bool done() const { return done_; }
+        void setDone() { done_ = true; }
+    private:
+        bool done_;
+    };
+    
     class QueryPlanSet {
     public:
         QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint = 0 );
         int nPlans() const { return plans_.size(); }
+        auto_ptr< QueryOp > runOp( QueryOp &op );
     private:
+        struct RunnerSet {
+            RunnerSet( QueryPlanSet &plans, QueryOp &op );
+            auto_ptr< QueryOp > run();
+            QueryOp &op_;
+            QueryPlanSet &plans_;
+            boost::barrier startBarrier_;
+            bool firstDone_;            
+        };
+        struct Runner {
+            Runner( QueryPlan &plan, RunnerSet &set, QueryOp &op ) :
+            plan_( plan ),
+            set_( set ),
+            op_( op ) {}
+            void operator()() {
+                try {
+                    set_.startBarrier_.wait();
+                    QueryAborter aborter( set_.firstDone_ );
+                    op_.run( plan_, aborter );
+                    set_.firstDone_ = true;
+                    op_.setDone();
+                } catch ( const QueryAborter::AbortException & ) {
+                }
+            }
+            QueryPlan &plan_;
+            RunnerSet &set_;
+            QueryOp &op_;
+        };
         FieldBoundSet fbs_;
-        vector< QueryPlan > plans_;
+        typedef boost::shared_ptr< QueryPlan > PlanPtr;
+        typedef vector< PlanPtr > PlanSet;
+        PlanSet plans_;
     };
+    
+    int doCount( const char *ns, const BSONObj &cmd, string &err );
     
 //    class QueryOptimizer {
 //    public:
