@@ -22,6 +22,8 @@ db.foo.save( { num : 1 , name : "eliot" } );
 db.foo.save( { num : 2 , name : "sara" } );
 db.foo.save( { num : -1 , name : "joe" } );
 
+sleep( 100 ); // TODO: remove
+
 assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() );
 
 s.stop();
