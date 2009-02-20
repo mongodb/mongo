@@ -24,7 +24,7 @@ namespace mongo {
     public:
         template< class T >
         LazyString( const T& t ) {
-            if ( sizeof( Stringifier< T > ) > ( sizeof( Stringifier< unsigned > ) * 2 ) ) {
+            if ( sizeof( Stringifier< T > ) > ( sizeof( Stringifier< const char * > ) * 2 ) ) {
                 stringifier_ = &stringifierError_;
             } else {
                 stringifier_ = new ( stringifierBuf_ ) Stringifier< T >( t );
@@ -46,7 +46,7 @@ namespace mongo {
             virtual string val() const { return "Error converting to string"; }
         } stringifierError_;
         StringifierBase *stringifier_;
-        char stringifierBuf_[ sizeof( Stringifier< unsigned > ) * 2 ];
+        char stringifierBuf_[ sizeof( Stringifier< const char * > ) * 2 ];
     };
     
     class Nullstream {

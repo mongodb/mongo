@@ -5,6 +5,12 @@
 #include <iostream>
 using namespace std;
 
+#ifdef _WIN32
+int getpid(){
+  return 0;
+}
+#endif
+
 namespace mongo {
     
     ProcessInfo::ProcessInfo( pid_t pid ){
