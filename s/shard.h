@@ -43,10 +43,14 @@ namespace mongo {
         BSONObj& getMax(){
             return _max;
         }
+
         string getServer(){
-            return _data.getStringField( "server" );
+            return _server;
         }
-        
+        void setServer( string server );
+
+        BSONObj getData() const;
+
         bool contains( const BSONObj& obj );
 
         void split();
@@ -60,18 +64,23 @@ namespace mongo {
         bool operator!=(const Shard& s){
             return ! ( *this == s );
         }
+        
+        void getFilter( BSONObjBuilder& b );
 
     private:
         Shard( ShardInfo * info , BSONObj data );
-
+        
         ShardInfo * _info;
         BSONObj _data;
-
+        
         BSONObj _min;
         BSONObj _max;
+        string _server;
+        
+        bool _modified;
 
         void _split( BSONObj& middle );
-        
+
         friend class ShardInfo;
     };
 

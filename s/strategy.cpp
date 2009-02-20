@@ -17,9 +17,10 @@ namespace mongo {
         
         dbcon.done();
     }
-
+    
     void Strategy::insert( string server , const char * ns , const BSONObj& obj ){
         ScopedDbConnection dbcon( server );
         dbcon->insert( ns , obj );
+        dbcon.done();
     }
 }

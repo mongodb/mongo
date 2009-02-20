@@ -40,6 +40,8 @@ namespace mongo {
         int compare( const BSONObj& l , const BSONObj& r ) const;
         
         bool hasShardKey( const BSONObj& obj );
+        
+        void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max );
 
         BSONObj& key(){
             return _fieldsAndOrder;

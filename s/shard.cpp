@@ -28,11 +28,13 @@ namespace mongo {
     Shard::Shard( ShardInfo * info , BSONObj data ) : _info( info ) , _data( data ){
         _min = _data.getObjectField( "min" );
         _max = _data.getObjectField( "max" );
+        _server = _data.getStringField( "server" );
+        _modified = false;
     }
 
-    string ShardInfo::modelServer() {
-        // TODO: this could move around?
-        return configServer.modelServer();
+    void Shard::setServer( string s ){
+        _server = s;
+        _modified = true;
     }
 
     bool Shard::contains( const BSONObj& obj ){
@@ -81,9 +83,23 @@ namespace mongo {
             ;
     }
 
+    void Shard::getFilter( BSONObjBuilder& b ){
+        _info->_key.getFilter( b , _min , _max );
+    }
+
+    BSONObj Shard::getData() const{
+        if ( ! _modified )
+            return _data;
+
+        BSONObjBuilder b;
+        b << "min" << _min;
+        b << "max" << _max;
+        b << "server" << _server;
+        return b.obj();
+    }
     
     string Shard::toString() const {
-        return _data.toString();
+        return getData().toString();
     }
 
     // -------  ShardInfo --------
@@ -96,6 +112,11 @@ namespace mongo {
             delete( *i );
         }
         _shards.clear();
+    }
+
+    string ShardInfo::modelServer() {
+        // TODO: this could move around?
+        return configServer.modelServer();
     }
 
     bool ShardInfo::hasShardKey( const BSONObj& obj ){
@@ -120,7 +141,7 @@ namespace mongo {
         int num=0;
         for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++  ){
             string s = shards.numStr( num++ );
-            shards.append( s.c_str() , (*i)->_data );
+            shards.append( s.c_str() , (*i)->getData() );
         }
         to.appendArray( "shards" , shards.obj() );
     }

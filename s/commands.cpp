@@ -149,14 +149,12 @@ namespace mongo {
                     return false;
                 }
 
-                ScopedDbConnection conn( configServer.getPrimary() );                
-                
-                BSONObj server = conn->findOne( "config.servers" , BSON( "host" << to ) );
-                if ( server.isEmpty() ){
+                if ( ! grid.knowAboutServer( to ) ){
                     errmsg = "that server isn't known to me";
-                    conn.done();
                     return false;
                 }
+
+                ScopedDbConnection conn( configServer.getPrimary() );                
                 
                 log() << "moving " << dbname << " primary from: " << config->getPrimary() << " to: " << to << endl;
                 
@@ -180,7 +178,7 @@ namespace mongo {
                 ScopedDbConnection fromconn( config->getPrimary() );
                 
                 config->setPrimary( to );
-                config->save();
+                config->save( true );
                 
                 log() << " dropping " << dbname << " from old" << endl;
 
@@ -217,7 +215,7 @@ namespace mongo {
                 }
 
                 config->turnOnPartitioning();
-                config->save();
+                config->save( true );
 
                 result << "ok" << 1;
                 return true;
@@ -254,8 +252,8 @@ namespace mongo {
                 }
                 
                 ShardInfo * info = config->turnOnSharding( ns , key );
-                info->save();
-                config->save();
+                info->save( true );
+                config->save( true );
 
                 result << "ok" << 1;
                 return true;
@@ -308,7 +306,7 @@ namespace mongo {
                 else
                     old.split();
                 
-                info->save();
+                info->save( true );
                 
                 result << "ok" << 1;
                 return true;
@@ -316,6 +314,99 @@ namespace mongo {
             
 
         } splitCollectionCmd;
+
+        class MoveShard : public GridAdminCmd {
+        public:
+            MoveShard() : GridAdminCmd( "moveshard" ){}
+            virtual void help( stringstream& help ) const {
+                help << "{ moveshard : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
+            }
+            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string ns = cmdObj["moveshard"].valuestrsafe();
+                if ( ns.size() == 0 ){
+                    errmsg = "no ns";
+                    return false;
+                }
+
+                DBConfig * config = grid.getDBConfig( ns );
+                if ( ! config->sharded( ns ) ){
+                    errmsg = "ns not sharded.  have to split before can move a shard";
+                    return false;
+                }
+                
+                BSONObj find = cmdObj.getObjectField( "find" );
+                if ( find.isEmpty() ){
+                    errmsg = "need to specify find.  see help";
+                    return false;
+                }
+
+                string to = cmdObj["to"].valuestrsafe();
+                if ( ! to.size()  ){
+                    errmsg = "you have to specify where you want to move it";
+                    return false;
+                }
+                
+                ShardInfo * info = config->getShardInfo( ns );
+                Shard& s = info->findShard( find );                
+                string from = s.getServer();
+
+                if ( s.getServer() == to ){
+                    errmsg = "that shard is already on that server";
+                    return false;
+                }
+
+                if ( ! grid.knowAboutServer( to ) ){
+                    errmsg = "that server isn't known to me";
+                    return false;
+                }
+                
+                log() << "ns: " << ns << " moving shard: " << s << " to: " << to << endl;
+                
+                // copyCollection
+                ScopedDbConnection toconn( to );
+                BSONObj cloneRes;
+
+                
+                BSONObj filter;
+                {
+                    BSONObjBuilder b;
+                    s.getFilter( b );
+                    filter = b.obj();
+                }
+
+                bool worked = toconn->runCommand( config->getName().c_str() , 
+                                                  BSON( "cloneCollection" << ns << 
+                                                        "from" << from <<
+                                                        "query" << filter
+                                                        ) ,
+                                                  cloneRes
+                                                  );
+                
+                toconn.done();
+                if ( ! worked ){
+                    errmsg = (string)"cloneCollection failed: " + cloneRes.toString();
+                    return false;
+                }
+                
+                // update config db
+                s.setServer( to );
+                info->save( true );
+
+                // delete old data
+                ScopedDbConnection fromconn( from );
+                fromconn->remove( ns.c_str() , filter );
+                string removeerror = fromconn->getLastError();
+                fromconn.done();
+                if ( removeerror.size() ){
+                    errmsg = (string)"error removing old data:" + removeerror;
+                    return false;
+                }
+
+                
+                result << "ok" << 1;
+                return true;
+            }
+        } moveShardCmd;
 
         // ------------ server level commands -------------
         

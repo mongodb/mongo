@@ -94,7 +94,14 @@ namespace mongo {
     bool ShardKey::hasShardKey( const BSONObj& obj ){
         return ! obj[_fieldName.c_str()].eoo();
     }
-    
+
+    void ShardKey::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ){
+        BSONObjBuilder temp;
+        temp.append( "$gte" , min[_fieldName.c_str()].number() );
+        temp.append( "$lt" , max[_fieldName.c_str()].number() );
+        b.append( _fieldName.c_str() , temp.obj() );
+    }    
+
     string ShardKey::toString() const {
         return _fieldsAndOrder.toString();
     }

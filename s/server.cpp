@@ -172,7 +172,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 1;
     }
 
-    log() << argv[0] << " starting (--help for usage)" << endl;
+    log() << argv[0] << " v0.0.1 starting (--help for usage)" << endl;
 
     if ( ! configServer.init( configdbs , infer ) ){
         cerr << "couldn't connectd to config db" << endl;
