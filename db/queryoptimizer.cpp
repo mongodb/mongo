@@ -306,7 +306,7 @@ namespace mongo {
             if ( (*i)->done() )
                 return *i;
         assert( false );
-        return shared_ptr< QueryOp >( reinterpret_cast< QueryOp* >( 0 ) );
+        return shared_ptr< QueryOp >();
     }
 
     class CountOp : public QueryOp {
