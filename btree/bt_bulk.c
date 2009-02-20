@@ -55,7 +55,6 @@ __wt_db_bulk_load(WT_TOC *toc)
 	if ((ret = __wt_bt_page_alloc(db, 1, &page)) != 0)
 		return (ret);
 	page->hdr->type = WT_PAGE_LEAF;
-	page->hdr->level = WT_LEAF_LEVEL;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		/*
@@ -166,7 +165,6 @@ skip_read:
 			if ((ret = __wt_bt_page_alloc(db, 1, &next)) != 0)
 				goto err;
 			next->hdr->type = WT_PAGE_LEAF;
-			next->hdr->level = WT_LEAF_LEVEL;
 			next->hdr->prevaddr = page->addr;
 			page->hdr->nextaddr = next->addr;
 
@@ -422,7 +420,6 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	if ((ret = __wt_bt_page_alloc(db, 1, &page)) != 0)
 		return (ret);
 	page->hdr->type = WT_PAGE_DUP_LEAF;
-	page->hdr->level = WT_LEAF_LEVEL;
 	page->hdr->u.entries = dup_count;
 	page->records = dup_count;
 	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
@@ -481,7 +478,6 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 			if ((ret = __wt_bt_page_alloc(db, 1, &next)) != 0)
 				goto err;
 			next->hdr->type = WT_PAGE_DUP_LEAF;
-			next->hdr->level = WT_LEAF_LEVEL;
 			next->hdr->prevaddr = page->addr;
 			page->hdr->nextaddr = next->addr;
 
@@ -673,7 +669,6 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 		    page->hdr->type == WT_PAGE_INT ||
 		    page->hdr->type == WT_PAGE_LEAF ?
 		    WT_PAGE_INT : WT_PAGE_DUP_INT;
-		next->hdr->level = page->hdr->level + 1;
 
 		/*
 		 * Case #1 -- it's a modified root split, so if we're in the
@@ -761,8 +756,10 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 
 	/* Create the OFFP reference. */
 	WT_ITEM_LEN_SET(&item, sizeof(WT_ITEM_OFFP));
-	WT_ITEM_TYPE_SET(&item, WT_ISLEAF(
-	    page->hdr->level) ? WT_ITEM_OFFP_LEAF : WT_ITEM_OFFP_INTL);
+	WT_ITEM_TYPE_SET(&item, 
+	    page->hdr->type == WT_PAGE_INT ||
+	    page->hdr->type == WT_PAGE_DUP_INT ?
+	    WT_ITEM_OFFP_INTL : WT_ITEM_OFFP_LEAF);
 	WT_64_CAST(offp.records) = page->records;
 	offp.addr = page->addr;
 

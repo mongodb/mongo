@@ -107,7 +107,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 	WT_INDX *ip;
 	WT_PAGE *page;
 	u_int32_t addr, base, indx, limit;
-	int cmp, level, ret;
+	int cmp, isleaf, next_isleaf, ret;
 
 	idb = db->idb;
 
@@ -116,20 +116,16 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		return (WT_NOTFOUND);
 
 	/*
-	 * The level value tells us how big a page to read.  If the tree has
+	 * The isleaf value tells us how big a page to read.  If the tree has
 	 * split, the root page is an internal page, otherwise it's a leaf
-	 * page.   We don't know the real height of the tree, but level gets
-	 * re-set as soon as we have a real page to look at.
+	 * page.
 	 */
-	level = addr == WT_ADDR_FIRST_PAGE ?
-	    WT_LEAF_LEVEL : WT_FIRST_INTERNAL_LEVEL;
+	isleaf = addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
 
 	/* Search the tree. */
-	for (;; --level) {
-		if ((ret =
-		    __wt_bt_page_in(db, addr, WT_ISLEAF(level), &page)) != 0)
+	for (;;) {
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, &page)) != 0)
 			return (ret);
-		level = page->hdr->level;
 
 		/*
 		 * Do a binary search of the page -- this loop needs to be
@@ -161,7 +157,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 * and other code that processes a level of the tree
 			 * doesn't need to know about this.
 			 */
-			if (indx != 0 || WT_ISLEAF(level)) {
+			if (indx != 0 || isleaf) {
 				cmp = db->btree_compare(db, key, (DBT *)ip);
 				if (cmp == 0)
 					break;
@@ -180,12 +176,11 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		 * tree from indx.
 		 */
 		if (cmp == 0) {
-			if (WT_ISLEAF(level)) {
+			if (isleaf) {
 				*pagep = page;
 				*indxp = ip;
 				return (0);
-			} else
-				addr = ip->addr;
+			}
 		} else {
 			/*
 			 * Base is the smallest index greater than key and may
@@ -194,9 +189,11 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 * sorts less than any application key), decrement it
 			 * to the smallest index less than or equal to key.
 			 */
-			addr =
-			    (page->indx + (base == 0 ? base : base - 1))->addr;
+			ip = page->indx + (base == 0 ? base : base - 1);
 		}
+		addr = WT_INDX_OFFP_ADDR(ip);
+		next_isleaf =
+		    WT_ITEM_TYPE(ip->ditem) == WT_ITEM_OFFP_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
 		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
@@ -206,8 +203,9 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		 * Failed to match on a leaf page -- we're done, return the
 		 * failure.
 		 */
-		if (WT_ISLEAF(level))
+		if (isleaf)
 			break;
+		isleaf = next_isleaf;
 	}
 	return (WT_NOTFOUND);
 
@@ -224,11 +222,10 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 {
 	IDB *idb;
 	WT_INDX *ip;
-	WT_ITEM_OFFP *offp;
 	WT_PAGE *page;
 	u_int64_t total;
 	u_int32_t addr, i;
-	int level, ret;
+	int isleaf, next_isleaf, ret;
 
 	idb = db->idb;
 
@@ -237,27 +234,23 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 		return (WT_NOTFOUND);
 
 	/*
-	 * The level value tells us how big a page to read.  If the tree has
+	 * The isleaf value tells us how big a page to read.  If the tree has
 	 * split, the root page is an internal page, otherwise it's a leaf
-	 * page.   We don't know the real height of the tree, but level gets
-	 * re-set as soon as we have a real page to look at.
+	 * page.
 	 */
-	level = addr == WT_ADDR_FIRST_PAGE ?
-	    WT_LEAF_LEVEL : WT_FIRST_INTERNAL_LEVEL;
+	isleaf = addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
 
 	/* Search the tree. */
-	for (total = 0;; --level) {
-		if ((ret =
-		    __wt_bt_page_in(db, addr, WT_ISLEAF(level), &page)) != 0)
+	for (total = 0;;) {
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, &page)) != 0)
 			return (ret);
-		level = page->hdr->level;
 
 		/* Check for a record past the end of the database. */
 		if (total == 0 && page->records < recno)
 			break;
 
 		/* If it's a leaf page, return the page and index. */
-		if (WT_ISLEAF(level)) {
+		if (isleaf) {
 			*pagep = page;
 			*indxp = page->indx + ((recno - total) - 1);
 			return (0);
@@ -265,18 +258,21 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 
 		/* Walk the page, counting records. */
 		WT_INDX_FOREACH(page, ip, i) {
-			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(ip->ditem);
-			if (total + WT_64_CAST(offp->records) >= recno)
+			if (total + WT_INDX_OFFP_RECORDS(ip) >= recno)
 				break;
-			total += WT_64_CAST(offp->records);
+			total += WT_INDX_OFFP_RECORDS(ip);
 		}
 
 		/* ip references the subtree containing the record. */
-		addr = ip->addr;
+		addr = WT_INDX_OFFP_ADDR(ip);
+		next_isleaf =
+		    WT_ITEM_TYPE(ip->ditem) == WT_ITEM_OFFP_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
 		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
 			return (ret);
+
+		isleaf = next_isleaf;
 	}
 
 	(void)__wt_bt_page_out(db, page, 0);

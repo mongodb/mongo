@@ -65,7 +65,8 @@ __wt_db_dump(WT_TOC *toc)
 	WT_CLEAR(last_key_ovfl);
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		if ((ret = __wt_bt_page_in(db, addr, 1, &page)) != 0)
+		if ((ret = __wt_cache_db_in(db,
+		    WT_ADDR_TO_OFF(db, addr), db->leafsize, 0, &page)) != 0)
 			return (ret);
 
 		WT_ITEM_FOREACH(page, item, i) {
@@ -147,7 +148,7 @@ __wt_db_dump(WT_TOC *toc)
 		}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
+		if ((ret = __wt_cache_db_out(db, page, 0)) != 0)
 			return (ret);
 		if (addr == WT_ADDR_INVALID)
 			break;
@@ -171,7 +172,6 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
     FILE *stream, void (*func)(u_int8_t *, u_int32_t, FILE *))
 {
 	WT_ITEM_OVFL *ovfl;
-	WT_ITEM_OFFP *offp, local_offp;
 	WT_PAGE *page, *ovfl_page;
 	u_int32_t addr, i;
 	int isleaf, ret;
@@ -179,36 +179,25 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 	page = NULL;
 
 	/*
-	 * Callers pass us a reference to an on-page WT_ITEM_OFFP structure and
-	 * we don't want to overwrite it.
+	 * Callers pass us a reference to an on-page WT_ITEM_OFFP_INTL/LEAF.
+	 *
+	 * We need to know what kind of page we're getting, use the item type.
 	 */
-	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-	local_offp = *offp;
-	offp = &local_offp;
-
-	/*
-	 * We need to know what kind of page we're getting.  Use the type of
-	 * the item, the first time, and after that use the level of the page
-	 * we just read -- if its level is WT_FIRST_INTERNAL_LEVEL, then we
-	 * are about to read a leaf page.
-	 */
+	addr = ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr;
 	isleaf = WT_ITEM_TYPE(item) == WT_ITEM_OFFP_LEAF ? 1 : 0;
 
 	/* Walk down the duplicates tree to the first leaf page. */
 	for (;;) {
-		if ((ret = __wt_bt_page_in(db, offp->addr, isleaf, &page)) != 0)
-			goto err;
+		if ((ret = __wt_cache_db_in(db, WT_ADDR_TO_OFF(db, addr),
+		    isleaf ? db->leafsize : db->intlsize, 0, &page)) != 0)
+			return (ret);
 		if (isleaf)
 			break;
 
-		/*
-		 * Get the page's first WT_ITEM_OFFP, but don't write our
-		 * caller's data.
-		 */
-		__wt_bt_first_offp(page, offp);
-		isleaf = page->hdr->level == WT_FIRST_INTERNAL_LEVEL ? 1 : 0;
+		/* Get the page's first WT_ITEM_OFFP. */
+		__wt_bt_first_offp(page, &addr, &isleaf);
 
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0) {
+		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
@@ -238,21 +227,22 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 		}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0) {
+		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
 		if (addr == WT_ADDR_INVALID)
 			break;
 
-		if ((ret = __wt_bt_page_in(db, addr, 1, &page)) != 0)
+		if ((ret = __wt_cache_db_in(
+		    db, WT_ADDR_TO_OFF(db, addr), db->leafsize, 0, &page)) != 0)
 			goto err;
 	}
 
 	if (0) {
 err:		ret = WT_ERROR;
 		if (page != NULL)
-			(void)__wt_bt_page_out(db, page, 0);
+			(void)__wt_cache_db_out(db, page, 0);
 	}
 	return (ret);
 }

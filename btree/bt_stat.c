@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_stat_level(DB *, WT_ITEM_OFFP *, int);
+static int __wt_bt_stat_level(DB *, u_int32_t, int);
 static int __wt_bt_stat_page(DB *, WT_PAGE *);
 
 /*
@@ -21,7 +21,6 @@ __wt_bt_stat(DB *db)
 {
 	IDB *idb;
 	WT_PAGE *page;
-	WT_ITEM_OFFP offp;
 	int ret, tret;
 
 	idb = db->idb;
@@ -37,8 +36,7 @@ __wt_bt_stat(DB *db)
 		return (ret);
 	}
 
-	offp.addr = idb->root_addr;
-	return (__wt_bt_stat_level(db, &offp, 0));
+	return (__wt_bt_stat_level(db, idb->root_addr, 0));
 }
 
 /*
@@ -46,16 +44,17 @@ __wt_bt_stat(DB *db)
  *	Stat a level of a tree.
  */
 static int
-__wt_bt_stat_level(DB *db, WT_ITEM_OFFP *offp, int isleaf)
+__wt_bt_stat_level(DB *db, u_int32_t addr, int isleaf)
 {
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	u_int32_t addr;
+	u_int32_t addr_arg;
 	int first, isleaf_arg, ret, tret;
 
 	ret = 0;
+	addr_arg = WT_ADDR_INVALID;
 
-	for (first = 1, addr = offp->addr; addr != WT_ADDR_INVALID;) {
+	for (first = 1; addr != WT_ADDR_INVALID;) {
 		/* Get the next page and stat it. */
 		if ((ret = __wt_bt_page_in(db, addr, isleaf, &page)) != 0)
 			return (ret);
@@ -72,12 +71,9 @@ __wt_bt_stat_level(DB *db, WT_ITEM_OFFP *offp, int isleaf)
 		if (first) {
 			first = 0;
 			if (hdr->type == WT_PAGE_INT ||
-			    hdr->type == WT_PAGE_DUP_INT) {
-				__wt_bt_first_offp(page, offp);
-				isleaf_arg = hdr->level ==
-				    WT_FIRST_INTERNAL_LEVEL ? 1 : 0;
-			} else
-				offp = NULL;
+			    hdr->type == WT_PAGE_DUP_INT)
+				__wt_bt_first_offp(
+				    page, &addr_arg, &isleaf_arg);
 		}
 
 		if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0) {
@@ -86,8 +82,8 @@ __wt_bt_stat_level(DB *db, WT_ITEM_OFFP *offp, int isleaf)
 		}
 	}
 
-	if (offp != NULL)
-		ret = __wt_bt_stat_level(db, offp, isleaf_arg);
+	if (addr_arg != WT_ADDR_INVALID)
+		ret = __wt_bt_stat_level(db, addr_arg, isleaf_arg);
 
 	return (ret);
 }
@@ -115,11 +111,6 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 		WT_STAT_SET(db->dstats,
 		    EXTSIZE, "database extent size", db->extsize);
 	}
-
-	/* The root page has the maximum level of the tree. */
-	if (addr == db->idb->root_addr)
-		WT_STAT_SET(
-		    db->dstats, LEVEL, "levels in the Btree", hdr->level);
 
 	/* Count the free space. */
 	WT_STAT_INCRV(db->dstats,
@@ -186,7 +177,7 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 			if (hdr->type != WT_PAGE_LEAF)
 				break;
 			if ((ret = __wt_bt_stat_level(db,
-			    (WT_ITEM_OFFP *)WT_ITEM_BYTE(item),
+			    ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr,
 			    WT_ITEM_TYPE(item) ==
 			    WT_ITEM_OFFP_LEAF ? 1 : 0)) != 0)
 				return (ret);

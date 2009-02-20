@@ -54,19 +54,10 @@ extern "C" {
 typedef	struct __wt_indx {
 	/*
 	 * The first part of the WT_INDX structure looks exactly like a DBT
-	 * so we can feed it directly to a Btree comparison function.
+	 * so we can feed it to a Btree comparison function without copying.
 	 */
-	void	*data;			/* DBT: data */
-	size_t	 size;			/* DBT: data length */
-
-	/*
-	 * Associated address, else WT_ADDR_INVALID.
-	 *
-	 * WT_PAGE_INT: WT_ITEM_OFFP_INTL/LEAF->addr.
-	 * WT_PAGE_LEAF: WT_ITEM_KEY_OVFL->addr.
-	 * WT_PAGE_DUP_LEAF: WT_ITEM_DATA_OVFL->addr.
-	 */
-	u_int32_t addr;
+	void	 *data;			/* DBT: data */
+	u_int32_t size;			/* DBT: data length */
 
 	/*
 	 * Associated on-page data item.
@@ -80,7 +71,19 @@ typedef	struct __wt_indx {
 	 *
 	 * In the case of off-page duplicate leaf pages, the associated data
 	 * item is the same as the key.
+	 *
+	 * The following are macros to get to the 4 fields of the structures
+	 * a ditem might reference.
 	 */
+#define	WT_INDX_OFFP_RECORDS(ip)					\
+    WT_64_CAST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
+#define	WT_INDX_OFFP_ADDR(ip)						\
+    (((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->addr)
+#define	WT_INDX_OVFL_LEN(ip)						\
+    (((WT_ITEM_OVFL *)WT_ITEM_BYTE((ip)->ditem))->len)
+#define	WT_INDX_OVFL_ADDR(ip)						\
+    (((WT_ITEM_OVFL *)WT_ITEM_BYTE((ip)->ditem))->addr)
+
 	WT_ITEM *ditem;			/* Associated on-page data item */
 
 	u_int32_t flags;
@@ -173,11 +176,9 @@ struct __wt_page_desc {
  * come early in the header to make this simpler.)
  */
 struct __wt_page_hdr {
-	/* An LSN is 8 bytes: 4 bytes of file number, 4 bytes of file offset. */
-	struct __wt_lsn {
-		u_int32_t f;		/* 00-03: File number */
-		u_int32_t o;		/* 04-07: File offset */
-	} lsn;
+	u_int32_t lsn[2];		/* 00-07: LSN */
+
+	u_int32_t checksum;		/* 08-11: checksum */
 
 	/*
 	 * !!!
@@ -222,22 +223,9 @@ struct __wt_page_hdr {
 #define	WT_PAGE_DUP_INT		3	/* Off-page dup btree internal page */
 #define	WT_PAGE_DUP_LEAF	4	/* Off-page dup btree leaf page */
 #define	WT_PAGE_OVFL		5	/* Overflow page */
-	u_int8_t type;			/* 08: page index type */
+	u_int8_t type;			/* 12: page index type */
 
-	/*
-	 * We maintain a tree-level counter -- this is required because we
-	 * need to know the type (and thus the size) of a page before we 
-	 * request it from the cache as we descend the tree.  The maximum
-	 * tree level is 255, which is bigger than any practical fan-out.
-	 */
-#define	WT_LEAF_LEVEL		0	/* Level 0: the leaf page */
-#define	WT_FIRST_INTERNAL_LEVEL	1	/* Level 1: the bottom internal level */
-#define	WT_ISLEAF(level)	((level) == WT_LEAF_LEVEL ? 1 : 0)
-	u_int8_t level;			/* 09: tree level */
-
-	u_int8_t unused[2];		/* 10-11: unused padding */
-
-	u_int32_t checksum;		/* 12-15: checksum */
+	u_int8_t unused[3];		/* 13-15: unused padding */
 
 	union {
 		u_int32_t datalen;	/* 16-19: data length */

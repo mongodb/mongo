@@ -94,13 +94,15 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
  *	information for the first key/WT_ITEM_OFFP pair on the page.
  */
 void
-__wt_bt_first_offp(WT_PAGE *page, WT_ITEM_OFFP *offp)
+__wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp)
 {
 	WT_ITEM *item;
 
 	item = (WT_ITEM *)WT_PAGE_BYTE(page);
 	item = WT_ITEM_NEXT(item);
-	*offp = *(WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
+
+	*addrp = ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr;
+	*isleafp = WT_ITEM_TYPE(item) == WT_ITEM_OFFP_LEAF ? 1 : 0;
 }
 
 /*

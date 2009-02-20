@@ -12,7 +12,7 @@
 static int __wt_bt_verify_item(DB *, WT_PAGE *, bitstr_t *, FILE *);
 static int __wt_bt_verify_checkfrag(DB *, bitstr_t *);
 static int __wt_bt_verify_connections(DB *, WT_PAGE *, bitstr_t *);
-static int __wt_bt_verify_level(DB *, WT_ITEM_OFFP *, int, bitstr_t *, FILE *);
+static int __wt_bt_verify_level(DB *, u_int32_t, int, bitstr_t *, FILE *);
 static int __wt_bt_verify_ovfl(DB *, WT_ITEM_OVFL *, bitstr_t *, FILE *);
 
 /*
@@ -39,7 +39,6 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_ITEM_OFFP offp;
 	bitstr_t *fragbits;
 	u_int32_t frags;
 	int ret, tret;
@@ -96,9 +95,8 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 		 * level in the DESC structure, so there's no way to know
 		 * what the correct level is yet.
 		 */
-		offp.addr = idb->root_addr;
-		if ((ret =
-		    __wt_bt_verify_level(db, &offp, 0, fragbits, fp)) != 0)
+		if ((ret = __wt_bt_verify_level(
+		    db, idb->root_addr, 0, fragbits, fp)) != 0)
 			goto err;
 	}
 
@@ -116,25 +114,20 @@ err:	if (page != NULL &&
  *	Verify a level of a tree.
  */
 static int
-__wt_bt_verify_level(DB *db,
-    WT_ITEM_OFFP *offp, int isleaf, bitstr_t *fragbits, FILE *fp)
+__wt_bt_verify_level(
+    DB *db, u_int32_t addr, int isleaf, bitstr_t *fragbits, FILE *fp)
 {
 	WT_INDX *page_indx, *prev_indx;
-	WT_ITEM_OFFP local_offp;
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
-	u_int32_t addr, bytes;
+	u_int32_t addr_arg, bytes;
 	int first, isleaf_arg, ret, tret;
 	int (*func)(DB *, const DBT *, const DBT *);
 
 	ret = 0;
+	addr_arg = WT_ADDR_INVALID;
 
-	/*
-	 * Callers pass us a reference to an on-page WT_ITEM_OFFP structure and
-	 * we don't want to overwrite it.
-	 */
-	local_offp = *offp;
-	offp = &local_offp;
+	/* Callers pass us a reference to an on-page WT_ITEM_OFFP_INTL/LEAF. */
 
 	/*
 	 * The plan is pretty simple.  We read through the levels of the tree,
@@ -218,8 +211,7 @@ __wt_bt_verify_level(DB *db,
 	 * get the next page we're verifying.
 	 */
 	bytes = isleaf ? db->leafsize : db->intlsize;
-	for (first = 1, page = prev = NULL,
-	    addr = offp->addr;
+	for (first = 1, page = prev = NULL;
 	    addr != WT_ADDR_INVALID;
 	    addr = hdr->nextaddr, prev = page, page = NULL) {
 		/* Get the next page and set the address. */
@@ -240,12 +232,9 @@ __wt_bt_verify_level(DB *db,
 		if (first) {
 			first = 0;
 			if (hdr->type == WT_PAGE_INT ||
-			    hdr->type == WT_PAGE_DUP_INT) {
-				__wt_bt_first_offp(page, offp);
-				isleaf_arg = hdr->level ==
-				    WT_FIRST_INTERNAL_LEVEL ? 1 : 0;
-			} else
-				offp = NULL;
+			    hdr->type == WT_PAGE_DUP_INT)
+				__wt_bt_first_offp(
+				    page, &addr_arg, &isleaf_arg);
 
 			/*
 			 * Set the comparison function -- tucked away here
@@ -309,8 +298,9 @@ err:	if (prev != NULL &&
 	    (tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
-	if (ret == 0 && offp != NULL)
-		ret = __wt_bt_verify_level(db, offp, isleaf_arg, fragbits, fp);
+	if (ret == 0 && addr_arg != WT_ADDR_INVALID)
+		ret = __wt_bt_verify_level(
+		    db, addr_arg, isleaf_arg, fragbits, fp);
 
 	return (ret);
 }
@@ -389,23 +379,13 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 	if ((ret = __wt_bt_page_in(db, hdr->prntaddr, 0, &parent)) != 0)
 		return (ret);
 
-	/* Check that the levels match up. */
-	if (hdr->level + 1 != parent->hdr->level) {
-		__wt_db_errx(db,
-		    "parent's level of page at addr %lu is not one more than "
-		    "the page's level (parent level: %lu, child level %lu)",
-		    (u_long)addr,
-		    (u_long)parent->hdr->level, (u_long)hdr->level);
-		return (WT_ERROR);
-	}
-
 	/*
 	 * Search the parent for the reference to this page -- because we've
 	 * already verified this page, we can build the in-memory page info,
 	 * and use it in the search.
 	 */
 	WT_INDX_FOREACH(parent, parent_indx, i)
-		if (parent_indx->addr == addr)
+		if (WT_INDX_OFFP_ADDR(parent_indx) == addr)
 			break;
 	if (parent_indx == NULL) {
 		__wt_db_errx(db,
@@ -596,31 +576,8 @@ __wt_bt_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 		return (WT_ERROR);
 	}
 
-	/* Check the page level. */
-	switch (hdr->type) {
-	case WT_PAGE_OVFL:
-	case WT_PAGE_LEAF:
-	case WT_PAGE_DUP_LEAF:
-		if (hdr->level != WT_LEAF_LEVEL) {
-			__wt_db_errx(db,
-			    "leaf page at addr %lu is marked internal level",
-			    (u_long)addr);
-			return (WT_ERROR);
-		}
-		break;
-	case WT_PAGE_INT:
-	case WT_PAGE_DUP_INT:
-		if (hdr->level == WT_LEAF_LEVEL) {
-			__wt_db_errx(db,
-			    "internal page at addr %lu is marked leaf level",
-			    (u_long)addr);
-			return (WT_ERROR);
-		}
-		break;
-	WT_DEFAULT_FORMAT(db);
-	}
-
-	if (hdr->unused[0] != '\0' || hdr->unused[1] != '\0') {
+	if (hdr->unused[0] != '\0' ||
+	    hdr->unused[1] != '\0' || hdr->unused[2] != '\0') {
 		__wt_db_errx(db,
 		    "page at addr %lu has non-zero unused header fields",
 		    (u_long)addr);
@@ -804,7 +761,7 @@ eop:			__wt_db_errx(db,
 			case WT_ITEM_OFFP_LEAF:
 				if (hdr->type == WT_PAGE_LEAF &&
 				    (ret = __wt_bt_verify_level(db,
-				    (WT_ITEM_OFFP *)WT_ITEM_BYTE(item),
+				    ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr,
 				    item_type == WT_ITEM_OFFP_LEAF ? 1 : 0,
 				    fragbits, fp)) != 0)
 					goto err;

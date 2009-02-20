@@ -237,18 +237,15 @@ __wt_bt_page_inmem_append(DB *db,
 	case WT_ITEM_KEY:
 		indx->data = WT_ITEM_BYTE(key_item);
 		indx->size = WT_ITEM_LEN(key_item);
-		indx->addr = WT_ADDR_INVALID;
 		break;
 	case WT_ITEM_KEY_OVFL:
 		ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(key_item);
 		indx->size = ovfl->len;
-		indx->addr = ovfl->addr;
 		break;
 	WT_DEFAULT_FORMAT(db);
 	}
 
 	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(data_item);
-	indx->addr = offp->addr;
 	indx->ditem = data_item;
 
 	return (0);
@@ -286,18 +283,15 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 		case WT_ITEM_KEY:
 			indx->data = WT_ITEM_BYTE(item);
 			indx->size = WT_ITEM_LEN(item);
-			indx->addr = WT_ADDR_INVALID;
 			break;
 		case WT_ITEM_KEY_OVFL:
 			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 			indx->size = ovfl->len;
-			indx->addr = ovfl->addr;
 			break;
 		case WT_ITEM_OFFP_INTL:
 		case WT_ITEM_OFFP_LEAF:
 			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
 			records += WT_64_CAST(offp->records);
-			indx->addr = offp->addr;
 			indx->ditem = item;
 			++indx;
 			break;
@@ -345,7 +339,6 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 
 			indx->data = WT_ITEM_BYTE(item);
 			indx->size = WT_ITEM_LEN(item);
-			indx->addr = WT_ADDR_INVALID;
 
 			++indx_count;
 			break;
@@ -357,7 +350,6 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 
 			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 			indx->size = ovfl->len;
-			indx->addr = ovfl->addr;
 
 			++indx_count;
 			break;
@@ -367,10 +359,8 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DUP_OVFL:
 		case WT_ITEM_OFFP_INTL:
 		case WT_ITEM_OFFP_LEAF:
-			if (indx->ditem == NULL) {
+			if (indx->ditem == NULL)
 				indx->ditem = item;
-				indx->addr = WT_ADDR_INVALID;
-			}
 			break;
 		WT_DEFAULT_FORMAT(db);
 		}
@@ -409,12 +399,10 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DUP:
 			indx->data = WT_ITEM_BYTE(item);
 			indx->size = WT_ITEM_LEN(item);
-			indx->addr = WT_ADDR_INVALID;
 			break;
 		case WT_ITEM_DATA_OVFL:
 			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 			indx->size = ovfl->len;
-			indx->addr = ovfl->addr;
 			break;
 		WT_DEFAULT_FORMAT(db);
 		}

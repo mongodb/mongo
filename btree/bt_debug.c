@@ -123,12 +123,7 @@ __wt_bt_dump_ipage(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		fp = stdout;
 
 	WT_INDX_FOREACH(page, indx, i) {
-		fprintf(fp, "%6lu: {addr: ", i);
-		if (indx->addr == WT_ADDR_INVALID)
-			fprintf(fp, "(none)");
-		else
-			fprintf(fp, "%lu", (u_long)indx->addr);
-		fprintf(fp, ", flags: %lx}\n", (u_long)indx->flags);
+		fprintf(fp, "%6lu: {flags: %lx}\n", i, (u_long)indx->flags);
 		if (indx->data != NULL) {
 			fprintf(fp, "\tdbt: ");
 			__wt_bt_dump_dbt((DBT *)indx, fp);
@@ -180,8 +175,8 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		fprintf(fp, "%lu bytes", (u_long)hdr->u.datalen);
 	else
 		fprintf(fp, "%lu entries", (u_long)hdr->u.entries);
-	fprintf(fp, ", level %lu, lsn %lu/%lu\n",
-	    (u_long)hdr->level, (u_long)hdr->lsn.f, (u_long)hdr->lsn.o);
+	fprintf(fp,
+	    ", lsn %lu/%lu\n", (u_long)hdr->lsn[0], (u_long)hdr->lsn[1]);
 	if (hdr->prntaddr == WT_ADDR_INVALID)
 		fprintf(fp, "prntaddr (none), ");
 	else

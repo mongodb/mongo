@@ -37,7 +37,7 @@ __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
 void
-__wt_bt_first_offp(WT_PAGE *page, WT_ITEM_OFFP *offp);
+__wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp);
 void
 __wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr);
 const char *

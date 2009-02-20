@@ -22,7 +22,6 @@ __wt_stat_alloc_db_dstats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_ITEM_TOTAL_DATA].desc = "total database data items";
 	stats[WT_STAT_ITEM_TOTAL_KEY].desc = "total database keys";
 	stats[WT_STAT_LEAFSIZE].desc = "leaf page size";
-	stats[WT_STAT_LEVEL].desc = "levels in the Btree";
 	stats[WT_STAT_MAGIC].desc = "magic number";
 	stats[WT_STAT_MAJOR].desc = "major version number";
 	stats[WT_STAT_MINOR].desc = "minor version number";
@@ -50,7 +49,6 @@ __wt_stat_clear_db_dstats(WT_STATS *stats)
 	stats[WT_STAT_ITEM_TOTAL_DATA].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_KEY].v = 0;
 	stats[WT_STAT_LEAFSIZE].v = 0;
-	stats[WT_STAT_LEVEL].v = 0;
 	stats[WT_STAT_MAGIC].v = 0;
 	stats[WT_STAT_MAJOR].v = 0;
 	stats[WT_STAT_MINOR].v = 0;
