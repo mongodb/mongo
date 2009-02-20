@@ -55,6 +55,10 @@ isString = function( x ){
     return typeof( x ) == "string";
 }
 
+isNumber = function(x){
+    return typeof( x ) == "number";
+}
+
 isObject = function( x ){
     return typeof( x ) == "object";
 }

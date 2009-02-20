@@ -29,8 +29,18 @@ createMongoArgs = function( binaryName , args ){
     if ( args.length == 1 && isObject( args[0] ) ){
         var o = args[0];
         for ( var k in o ){
-            fullArgs.push( "--" + k );
-            fullArgs.push( "" + o[k] );
+            if ( k == "v" && isNumber( o[k] ) ){
+                var n = o[k];
+                if ( n > 0 ){
+                    var temp = "-";
+                    while ( n-- > 0 ) temp += "v";
+                    fullArgs.push( temp );
+                }
+            }
+            else {
+                fullArgs.push( "--" + k );
+                fullArgs.push( "" + o[k] );
+            }
         }
     }
     else {
@@ -81,7 +91,7 @@ startMongoProgram = function(){
     return m;
 }
 
-ShardingTest = function( testName , numServers ){
+ShardingTest = function( testName , numServers , verboseLevel ){
     this._connections = [];
     this._serverNames = [];
 
@@ -93,7 +103,7 @@ ShardingTest = function( testName , numServers ){
         this._serverNames.push( conn.name );
     }
 
-    this.s = startMongos( { port : 39999 , configdb : "localhost:30000" } );
+    this.s = startMongos( { port : 39999 , v : verboseLevel || 0 , configdb : "localhost:30000" } );
     
     var admin = this.admin = this.s.getDB( "admin" );
     this.config = this.s.getDB( "config" );
