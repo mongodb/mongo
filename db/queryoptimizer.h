@@ -93,6 +93,8 @@ namespace mongo {
         BSONObj startKey() const { return startKey_; }
         BSONObj endKey() const { return endKey_; }
         auto_ptr< Cursor > newCursor() const;
+        BSONObj indexKey() const;
+        const char *ns() const { return fbs_.ns(); }
     private:
         const FieldBoundSet &fbs_;
         const BSONObj &order_;
@@ -122,7 +124,7 @@ namespace mongo {
     
     class QueryOp {
     public:
-        QueryOp() : done_( false ) {}
+        QueryOp() : done_() {}
         virtual ~QueryOp() {}
         virtual void run( const QueryPlan &qp, QueryAborter &qa ) = 0;
         virtual QueryOp *clone() const = 0;

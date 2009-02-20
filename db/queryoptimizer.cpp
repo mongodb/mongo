@@ -224,8 +224,12 @@ namespace mongo {
         if ( !index_ )
             return theDataFileMgr.findAll( fbs_.ns() );
         else
-            return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, direction_ ) );
+            return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, direction_ >= 0 ? 1 : -1 ) );
             //TODO This constructor should really take a const ref to the index details.
+    }
+    
+    BSONObj QueryPlan::indexKey() const {
+        return index_->keyPattern();
     }
     
     QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :
@@ -298,7 +302,6 @@ namespace mongo {
             threads.create_thread( r );
         }
         threads.join_all();
-        cout << "really done" << endl;        
         for( int i = 0; i < plans_.nPlans(); ++i )
             if ( ops[ i ]->done() )
                 return ops[ i ];
@@ -308,21 +311,74 @@ namespace mongo {
 
     class CountOp : public QueryOp {
     public:
+        CountOp( const BSONObj &spec ) : spec_( spec ), count_() {}
         virtual void run( const QueryPlan &qp, QueryAborter &qa ) {
-            for( int i = 0; i < 100000; ++i )
+            BSONObj query = spec_.getObjectField("query");            
+            set< string > fields;
+            spec_.getObjectField("fields").getFieldNames( fields );
+            
+            auto_ptr<Cursor> c = qp.newCursor();
+            
+            // TODO We could check if all fields in the key are in 'fields'
+            if ( qp.exactKeyMatch() && fields.empty() ) {
+                /* Here we only look at the btree keys to determine if a match, instead of looking
+                 into the records, which would be much slower.
+                 */
+                BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
+                if ( c->ok() && !query.woCompare( bc->currKeyNode().key, BSONObj(), false ) ) {
+                    BSONObj firstMatch = bc->currKeyNode().key;
+                    count_++;
+                    while ( c->advance() ) {
+                        qa.mayAbort();
+                        if ( !firstMatch.woEqual( bc->currKeyNode().key ) )
+                            break;
+                        count_++;
+                    }
+                }
+                return;
+            }
+            
+            auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
+            while ( c->ok() ) {
                 qa.mayAbort();
-            cout << "done" << endl;
+                BSONObj js = c->current();
+                bool deep;
+                if ( !matcher->matches(js, &deep) ) {
+                }
+                else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+                    bool match = true;
+                    for( set< string >::iterator i = fields.begin(); i != fields.end(); ++i ) {
+                        if ( js.getFieldDotted( i->c_str() ).eoo() ) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if ( match )
+                        ++count_;
+                }
+                c->advance();
+            }
         }
         virtual QueryOp *clone() const {
             return new CountOp( *this );
         }
-        int count() const { return 1; }
+        int count() const { return count_; }
+    private:
+        BSONObj spec_;
+        int count_;
     };
     
     int doCount( const char *ns, const BSONObj &cmd, string &err ) {
         BSONObj query = cmd.getObjectField("query");
+        BSONObj fields = cmd.getObjectField("fields");
+        // count of all objects
+        if ( query.isEmpty() && fields.isEmpty() ) {
+            NamespaceDetails *d = nsdetails( ns );
+            massert( "ns missing", d );
+            return d->nrecords;
+        }
         QueryPlanSet qps( ns, query, emptyObj );
-        auto_ptr< QueryOp > original( new CountOp () );
+        auto_ptr< QueryOp > original( new CountOp( cmd ) );
         auto_ptr< QueryOp > o = qps.runOp( *original );
         return dynamic_cast< CountOp* >( o.get() )->count();
     }
