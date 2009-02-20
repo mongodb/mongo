@@ -53,9 +53,7 @@ namespace mongo {
         void split( const BSONObj& middle );
         
         string toString() const;
-        static string toString( void *o ) {
-            return ( (Shard*) o )->toString();
-        }
+        operator string() const { return toString(); }
 
         bool operator==(const Shard& s);
 
@@ -104,9 +102,7 @@ namespace mongo {
         bool loadByName( const string& ns );
 
         string toString() const;
-        static string toString( void *o ) {
-            return ( (ShardInfo*) o )->toString();
-        }
+        operator string() const { return toString(); }
         
     private:
         DBConfig * _config;
