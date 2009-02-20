@@ -138,11 +138,11 @@ namespace mongo {
     public:
         QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint = 0 );
         int nPlans() const { return plans_.size(); }
-        auto_ptr< QueryOp > runOp( QueryOp &op );
+        shared_ptr< QueryOp > runOp( QueryOp &op );
     private:
         struct RunnerSet {
             RunnerSet( QueryPlanSet &plans, QueryOp &op );
-            auto_ptr< QueryOp > run();
+            shared_ptr< QueryOp > run();
             QueryOp &op_;
             QueryPlanSet &plans_;
             boost::barrier startBarrier_;

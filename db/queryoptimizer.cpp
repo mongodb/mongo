@@ -281,7 +281,7 @@ namespace mongo {
             plans_.push_back( *i );
     }
     
-    auto_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
+    shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
         RunnerSet s( *this, op );
         return s.run();
     }
@@ -293,18 +293,18 @@ namespace mongo {
     firstDone_( false ) {
     }
     
-    auto_ptr< QueryOp > QueryPlanSet::RunnerSet::run() {
+    shared_ptr< QueryOp > QueryPlanSet::RunnerSet::run() {
         boost::thread_group threads;
-        auto_ptr< QueryOp > ops[ plans_.nPlans() ];
-        for( int i = 0; i < plans_.nPlans(); ++i ) {
-            ops[ i ] = auto_ptr< QueryOp >( op_.clone() );
-            Runner r( *plans_.plans_[ i ], *this, *ops[ i ] );
+        vector< shared_ptr< QueryOp > > ops;
+        for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
+            ops.push_back( shared_ptr< QueryOp >( op_.clone() ) );
+            Runner r( **i, *this, *ops.back() );
             threads.create_thread( r );
         }
         threads.join_all();
-        for( int i = 0; i < plans_.nPlans(); ++i )
-            if ( ops[ i ]->done() )
-                return ops[ i ];
+        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i )
+            if ( (*i)->done() )
+                return *i;
         assert( false );
         return auto_ptr< QueryOp >( 0 );
     }
@@ -379,7 +379,7 @@ namespace mongo {
         }
         QueryPlanSet qps( ns, query, emptyObj );
         auto_ptr< QueryOp > original( new CountOp( cmd ) );
-        auto_ptr< QueryOp > o = qps.runOp( *original );
+        shared_ptr< QueryOp > o = qps.runOp( *original );
         return dynamic_cast< CountOp* >( o.get() )->count();
     }
 
