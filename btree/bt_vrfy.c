@@ -616,7 +616,6 @@ __wt_bt_verify_item(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 	} *current, *last_data, *last_key, *swap_tmp, _a, _b, _c;
 	ENV *env;
 	WT_ITEM *item;
-	WT_ITEM_OFFP *offp;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
 	u_int32_t addr, i, item_num, item_len, item_type;

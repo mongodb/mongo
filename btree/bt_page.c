@@ -207,7 +207,6 @@ __wt_bt_page_inmem_append(DB *db,
 	ENV *env;
 	IDB *idb;
 	WT_INDX *indx;
-	WT_ITEM_OFFP *offp;
 	WT_ITEM_OVFL *ovfl;
 	u_int32_t n;
 	int ret;
@@ -246,7 +245,6 @@ __wt_bt_page_inmem_append(DB *db,
 	WT_DEFAULT_FORMAT(db);
 	}
 
-	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(data_item);
 	indx->ditem = data_item;
 
 	return (0);
