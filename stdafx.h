@@ -70,12 +70,6 @@ using namespace std;
 
 namespace mongo {
 
-    class Stringable {
-    public:
-        virtual ~Stringable() throw() {}
-        virtual string toString() const = 0;
-    };
-        
     /* these are manipulated outside of mutexes, so be careful */
     struct Assertion {
         Assertion() {
@@ -113,12 +107,13 @@ namespace mongo {
     /* last assert of diff types: regular, wassert, msgassert, uassert: */
     extern Assertion lastAssert[4];
 
-    class DBException : public exception, public Stringable {
+    class DBException : public exception {
     public:
         virtual const char* what() const throw() = 0;
         virtual string toString() const {
             return what();
         }
+        operator string() const { return toString(); }
     };
 
     class AssertionException : public DBException {

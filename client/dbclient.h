@@ -111,9 +111,7 @@ namespace mongo {
         Query& where(const char *jscode) { return where(jscode, BSONObj()); }
 
         string toString() const;
-        static string toString( void *o ) {
-            return ( (Query*) o )->toString();
-        }
+        operator string() const { return toString(); }
     };
     
 /** Typically one uses the QUERY(...) macro to construct a Query object.

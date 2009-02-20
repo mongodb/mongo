@@ -502,9 +502,7 @@ namespace mongo {
             This is an abbreviated representation which might be used for logging.
         */
         string toString() const;
-        static string toString( void *o ) {
-            return ( (BSONObj*) o )->toString();
-        }
+        operator string() const { return toString(); }
         
         /** Properly formatted JSON string. */
         string jsonString( JsonStringFormat format = Strict ) const;

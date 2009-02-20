@@ -20,22 +20,33 @@
 
 namespace mongo {
 
-    // If you don't want your class to inherit from Stringable (for example, if
-    // you don't want a virtual destructor) then add a function like the
-    // following to your class, which takes a pointer to an object of your class
-    // type:
-    // static string toString( void * );
     class LazyString {
     public:
-        // LazyString is designed to be used in situations where the lifespan of
-        // a temporary object used to construct a LazyString completely includes
-        // the lifespan of the LazyString object itself.
         template< class T >
-        LazyString( const T &t ) : obj_( (void*)&t ), fun_( &T::toString ) {}
-        string val() const { return (*fun_)(obj_); }
+        LazyString( const T& t ) {
+            if ( sizeof( Stringifier< T > ) > ( sizeof( Stringifier< unsigned > ) * 2 ) ) {
+                stringifier_ = &stringifierError_;
+            } else {
+                stringifier_ = new ( stringifierBuf_ ) Stringifier< T >( t );
+            }
+        }
+        string val() const { return stringifier_->val(); }
     private:
-        void *obj_;
-        string (*fun_) (void *);
+        struct StringifierBase {
+            virtual ~StringifierBase() {}
+            virtual string val() const = 0;
+        };
+        template< class T >
+        struct Stringifier : public StringifierBase {
+            Stringifier( const T& t ) : t_( t ) {}
+            virtual string val() const { return string( t_ ); }
+            const T& t_;
+        };
+        static struct StringifierError : public StringifierBase {
+            virtual string val() const { return "Error converting to string"; }
+        } stringifierError_;
+        StringifierBase *stringifier_;
+        char stringifierBuf_[ sizeof( Stringifier< unsigned > ) * 2 ];
     };
     
     class Nullstream {
@@ -72,13 +83,7 @@ namespace mongo {
         virtual Nullstream& operator<<(unsigned long long) {
             return *this;
         }
-        virtual Nullstream& operator<<(const string&) {
-            return *this;
-        }
         virtual Nullstream& operator<<(const LazyString&) {
-            return *this;
-        }
-        virtual Nullstream& operator<<(const Stringable&) {
             return *this;
         }
         virtual Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
@@ -109,15 +114,9 @@ namespace mongo {
         Logstream& operator<<(void *x) LOGIT
         Logstream& operator<<(long long x) LOGIT
         Logstream& operator<<(unsigned long long x) LOGIT
-        Logstream& operator<<(const string& x) LOGIT
         Logstream& operator<<(const LazyString& x) {
             boostlock lk(mutex);
             cout << x.val();
-            return *this;
-        }
-        Logstream& operator<<(const Stringable& x) {
-            boostlock lk(mutex);
-            cout << x.toString();
             return *this;
         }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
