@@ -149,14 +149,12 @@ namespace mongo {
                     return false;
                 }
 
-                ScopedDbConnection conn( configServer.getPrimary() );                
-                
-                BSONObj server = conn->findOne( "config.servers" , BSON( "host" << to ) );
-                if ( server.isEmpty() ){
+                if ( ! grid.knowAboutServer( to ) ){
                     errmsg = "that server isn't known to me";
-                    conn.done();
                     return false;
                 }
+
+                ScopedDbConnection conn( configServer.getPrimary() );                
                 
                 log() << "moving " << dbname << " primary from: " << config->getPrimary() << " to: " << to << endl;
                 
@@ -316,6 +314,76 @@ namespace mongo {
             
 
         } splitCollectionCmd;
+
+        class MoveShard : public GridAdminCmd {
+        public:
+            MoveShard() : GridAdminCmd( "moveshard" ){}
+            virtual void help( stringstream& help ) const {
+                help << "{ moveshard : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
+            }
+            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string ns = cmdObj["moveshard"].valuestrsafe();
+                if ( ns.size() == 0 ){
+                    errmsg = "no ns";
+                    return false;
+                }
+
+                DBConfig * config = grid.getDBConfig( ns );
+                if ( ! config->sharded( ns ) ){
+                    errmsg = "ns not sharded.  have to split before can move a shard";
+                    return false;
+                }
+                
+                BSONObj find = cmdObj.getObjectField( "find" );
+                if ( find.isEmpty() ){
+                    errmsg = "need to specify find.  see help";
+                    return false;
+                }
+
+                string to = cmdObj["to"].valuestrsafe();
+                if ( ! to.size()  ){
+                    errmsg = "you have to specify where you want to move it";
+                    return false;
+                }
+                
+                ShardInfo * info = config->getShardInfo( ns );
+                Shard& s = info->findShard( find );                
+                
+                if ( s.getServer() == to ){
+                    errmsg = "that shard is already on that server";
+                    return false;
+                }
+
+                if ( ! grid.knowAboutServer( to ) ){
+                    errmsg = "that server isn't known to me";
+                    return false;
+                }
+                
+                log() << "ns: " << ns << " moving shard: " << s << " to: " << to << endl;
+                
+                // copyCollection
+                ScopedDbConnection toconn( to );
+                BSONObj cloneRes;
+                bool worked = toconn->runCommand( config->getName().c_str() , 
+                                                  BSON( "cloneCollection" << ns << 
+                                                        "from" << s.getServer() 
+                                                        ) ,
+                                                  cloneRes
+                                                  );
+                
+                toconn.done();
+                if ( ! worked ){
+                    errmsg = (string)"cloneCollection failed: " + cloneRes.toString();
+                    return false;
+                }
+                
+                // update config db
+                // delete old data
+                
+                result << "ok" << 1;
+                return true;
+            }
+        } moveShardCmd;
 
         // ------------ server level commands -------------
         

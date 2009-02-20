@@ -156,6 +156,13 @@ namespace mongo {
         return all[ rand() % all.size() ];
     }
 
+    bool Grid::knowAboutServer( string name ) const{
+        ScopedDbConnection conn( configServer.getPrimary() );
+        BSONObj server = conn->findOne( "config.servers" , BSON( "host" << name ) );
+        conn.done();
+        return ! server.isEmpty();
+    }
+
     DBConfig* Grid::getDBConfig( string database , bool create ){
         {
             string::size_type i = database.find( "." );

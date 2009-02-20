@@ -285,16 +285,18 @@ namespace mongo {
         }
         CmdCloneCollection() : Command("cloneCollection") { }
         virtual void help( stringstream &help ) const {
-            help << " example: { cloneCollection: 1, fromhost: <hostname>, collection: <collectionname>, query: <query> }";
+            help << " example: { cloneCollection: <collection ns>, from: <hostname>, query: <query> }";
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string fromhost = cmdObj.getStringField("fromhost");
+            string fromhost = cmdObj.getStringField("from");
             if ( fromhost.empty() )
                 return false;
-            string collection = cmdObj.getStringField("collection");
+            string collection = cmdObj.getStringField("cloneCollection");
             if ( collection.empty() )
                 return false;
             BSONObj query = cmdObj.getObjectField("query");
+            if ( query.isEmpty() )
+                query = emptyObj;
             BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
             bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
             
@@ -302,6 +304,9 @@ namespace mongo {
              were to clone it would get a different point-in-time and not match.
              */
             setClient( collection.c_str() );
+            
+            log() << "cloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
+            
             Cloner c;
             return c.cloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl, copyIndexes );
         }

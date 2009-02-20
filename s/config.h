@@ -36,13 +36,15 @@ namespace mongo {
     extern Grid grid;
 
     class ShardInfo;
-
+    
     /**
        top level grid configuration for an entire database
     */
     class DBConfig : public Model {
     public:
         DBConfig( string name = "" ) : _name( name ) , _primary("") , _partitioned(false){ }
+        
+        string getName(){ return _name; };
 
         /**
          * @return if anything in this db is partitioned or not
@@ -50,7 +52,7 @@ namespace mongo {
         bool isPartitioned(){
             return _partitioned;
         }
-
+        
         void turnOnPartitioning();
         ShardInfo* turnOnSharding( const string& ns , BSONObj fieldsAndOrder );
         
@@ -107,6 +109,7 @@ namespace mongo {
         
         string pickServerForNewDB();
         
+        bool knowAboutServer( string name ) const;
     private:
         map<string,DBConfig*> _databases;
     };
