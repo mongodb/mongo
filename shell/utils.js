@@ -13,6 +13,13 @@ assert.eq = function( a , b , msg ){
     throw "[" + a + "] != [" + b + "] are not equal : " + msg;
 }
 
+assert.neq = function( a , b , msg ){
+    if ( a != b )
+        return;
+
+    throw "[" + a + "] != [" + b + "] are equal : " + msg;
+}
+
 assert.soon = function( f ) {
     var start = new Date();
     var last;
