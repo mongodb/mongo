@@ -3,8 +3,10 @@
 //
 var files = listFiles("jstests");
 
-db.getSisterDB( "admin" ).runCommand( "closeAllDatabases" );
-prev = db.runCommand( "meminfo" );
+var dummyDb = db.getSisterDB( "dummyDBdummydummy" );
+
+dummyDb.getSisterDB( "admin" ).runCommand( "closeAllDatabases" );
+prev = dummyDb.runCommand( "meminfo" );
 
 print( "START : " + tojson( prev ) );
 
@@ -23,8 +25,8 @@ files.forEach(
         print("         Test : " + x.name + " ...");
         print("                " + Date.timeFunc( function() { load(x.name); }, 1) + "ms");
         
-        assert( db.getSisterDB( "admin" ).runCommand( "closeAllDatabases" ).ok == 1 , "closeAllDatabases failed" );
-        var now = db.runCommand( "meminfo" );
+        assert( dummyDb.getSisterDB( "admin" ).runCommand( "closeAllDatabases" ).ok == 1 , "closeAllDatabases failed" );
+        var now = dummyDb.runCommand( "meminfo" );
         if ( now.virtual > prev.virtual )
             print( "    LEAK : " + prev.virtual + " -->> " + now.virtual );
         prev = now;
@@ -33,5 +35,5 @@ files.forEach(
 
 
 
-db.getSisterDB( "admin" ).runCommand( "closeAllDatabases" );
-print( "END   : " + tojson( db.runCommand( "meminfo" ) ) );
+dummyDb.getSisterDB( "admin" ).runCommand( "closeAllDatabases" );
+print( "END   : " + tojson( dummyDb.runCommand( "meminfo" ) ) );
