@@ -348,7 +348,8 @@ namespace mongo {
                 
                 ShardInfo * info = config->getShardInfo( ns );
                 Shard& s = info->findShard( find );                
-                
+                string from = s.getServer();
+
                 if ( s.getServer() == to ){
                     errmsg = "that shard is already on that server";
                     return false;
@@ -364,9 +365,19 @@ namespace mongo {
                 // copyCollection
                 ScopedDbConnection toconn( to );
                 BSONObj cloneRes;
+
+                
+                BSONObj filter;
+                {
+                    BSONObjBuilder b;
+                    s.getFilter( b );
+                    filter = b.obj();
+                }
+
                 bool worked = toconn->runCommand( config->getName().c_str() , 
                                                   BSON( "cloneCollection" << ns << 
-                                                        "from" << s.getServer() 
+                                                        "from" << from <<
+                                                        "query" << filter
                                                         ) ,
                                                   cloneRes
                                                   );
@@ -378,7 +389,19 @@ namespace mongo {
                 }
                 
                 // update config db
+                s.setServer( to );
+                info->save();
+
                 // delete old data
+                ScopedDbConnection fromconn( from );
+                fromconn->remove( ns.c_str() , filter );
+                string removeerror = fromconn->getLastError();
+                fromconn.done();
+                if ( removeerror.size() ){
+                    errmsg = (string)"error removing old data:" + removeerror;
+                    return false;
+                }
+
                 
                 result << "ok" << 1;
                 return true;
