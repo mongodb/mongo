@@ -506,7 +506,17 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
                 string err;
-                doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err );
+                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                BSONObj one = BSON( "a" << 1 );
+                BSONObj four = BSON( "a" << 4 );
+                theDataFileMgr.insert( ns(), one );
+                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                theDataFileMgr.insert( ns(), four );
+                ASSERT_EQUALS( 1, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                theDataFileMgr.insert( ns(), four );
+                ASSERT_EQUALS( 2, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 3, doCount( ns(), BSON( "query" << emptyObj ), err ) );
+                ASSERT_EQUALS( 3, doCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
             }
         };
         
