@@ -178,7 +178,7 @@ namespace mongo {
                 ScopedDbConnection fromconn( config->getPrimary() );
                 
                 config->setPrimary( to );
-                config->save();
+                config->save( true );
                 
                 log() << " dropping " << dbname << " from old" << endl;
 
@@ -215,7 +215,7 @@ namespace mongo {
                 }
 
                 config->turnOnPartitioning();
-                config->save();
+                config->save( true );
 
                 result << "ok" << 1;
                 return true;
@@ -252,8 +252,8 @@ namespace mongo {
                 }
                 
                 ShardInfo * info = config->turnOnSharding( ns , key );
-                info->save();
-                config->save();
+                info->save( true );
+                config->save( true );
 
                 result << "ok" << 1;
                 return true;
@@ -306,7 +306,7 @@ namespace mongo {
                 else
                     old.split();
                 
-                info->save();
+                info->save( true );
                 
                 result << "ok" << 1;
                 return true;
@@ -390,7 +390,7 @@ namespace mongo {
                 
                 // update config db
                 s.setServer( to );
-                info->save();
+                info->save( true );
 
                 // delete old data
                 ScopedDbConnection fromconn( from );
