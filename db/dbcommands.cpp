@@ -25,6 +25,7 @@
 #include "btree.h"
 #include "../util/lruishmap.h"
 #include "../util/md5.hpp"
+#include "../util/processinfo.h"
 #include "json.h"
 #include "repl.h"
 #include "replset.h"
@@ -404,6 +405,30 @@ namespace mongo {
         }
         time_t started;
     } cmdTimeInfo;
+
+    class CmdMemInfo : public Command {
+    public:
+        virtual bool slaveOk() {
+            return true;
+        }
+        CmdMemInfo() : Command("meminfo") {
+            started = time(0);
+        }
+        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            result.append("uptime",(double) (time(0)-started));
+
+            ProcessInfo p;
+            if ( ! p.supported() ){
+                errmsg = "ProcessInfo not supported on this platform";
+                return false;
+            }
+            
+            result << "resident" << p.getResidentSize();
+            result << "virtual" << p.getVirtualMemorySize();
+            return true;
+        }
+        time_t started;
+    } cmdMemInfo;
 
     /* just to check if the db has asserted */
     class CmdAssertInfo : public Command {

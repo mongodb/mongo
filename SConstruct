@@ -129,6 +129,11 @@ elif os.sys.platform == "win32":
 else:
     commonFiles += [ "util/mmap_posix.cpp" ]
 
+if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
+    commonFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
+else:
+    commonFiles += [ "util/processinfo_none.cpp" ]
+
 coreDbFiles = Split( "" )
 
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
