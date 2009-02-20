@@ -31,6 +31,7 @@ __wt_stat_alloc_db_dstats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_PAGE_INTERNAL].desc = "primary internal pages";
 	stats[WT_STAT_PAGE_LEAF].desc = "primary leaf pages";
 	stats[WT_STAT_PAGE_OVERFLOW].desc = "overflow pages";
+	stats[WT_STAT_TREE_LEVEL].desc = "number of levels in the Btree";
 
 	*statsp = stats;
 	return (0);
@@ -58,6 +59,7 @@ __wt_stat_clear_db_dstats(WT_STATS *stats)
 	stats[WT_STAT_PAGE_INTERNAL].v = 0;
 	stats[WT_STAT_PAGE_LEAF].v = 0;
 	stats[WT_STAT_PAGE_OVERFLOW].v = 0;
+	stats[WT_STAT_TREE_LEVEL].v = 0;
 	return (0);
 }
 

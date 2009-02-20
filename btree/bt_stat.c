@@ -25,8 +25,11 @@ __wt_bt_stat(DB *db)
 
 	idb = db->idb;
 
+	WT_STAT_INCR(db->dstats, TREE_LEVEL, "number of levels in the Btree");
+
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
+
 		if ((ret =
 		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, &page)) != 0)
 			return (ret);
@@ -82,8 +85,10 @@ __wt_bt_stat_level(DB *db, u_int32_t addr, int isleaf)
 		}
 	}
 
-	if (addr_arg != WT_ADDR_INVALID)
+	if (addr_arg != WT_ADDR_INVALID) {
+		WT_STAT_INCR(db->dstats, TREE_LEVEL, NULL);
 		ret = __wt_bt_stat_level(db, addr_arg, isleaf_arg);
+	}
 
 	return (ret);
 }

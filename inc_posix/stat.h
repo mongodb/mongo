@@ -57,7 +57,8 @@ struct __wt_stats {
 #define	WT_STAT_PAGE_INTERNAL		   16
 #define	WT_STAT_PAGE_LEAF		   17
 #define	WT_STAT_PAGE_OVERFLOW		   18
-#define	WT_STAT_DB_DSTATS_TOTAL		   19
+#define	WT_STAT_TREE_LEVEL		   19
+#define	WT_STAT_DB_DSTATS_TOTAL		   20
 
 /*
  * Statistics entries for DB_HSTATS
