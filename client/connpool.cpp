@@ -21,11 +21,12 @@
 
 #include "stdafx.h"
 #include "connpool.h"
+#include "../db/commands.h"
 
 namespace mongo {
 
     DBConnectionPool pool;
-
+    
     DBClientBase* DBConnectionPool::get(const string& host) {
         boostlock L(poolMutex);
 
@@ -59,5 +60,39 @@ namespace mongo {
         p->pool.pop();
         return c;
     }
+
+    void DBConnectionPool::flush(){
+        boostlock L(poolMutex);
+        for ( map<string,PoolForHost*>::iterator i = pools.begin(); i != pools.end(); i++ ){
+            PoolForHost* p = i->second;
+
+            vector<DBClientBase*> all;
+            while ( ! p->pool.empty() ){
+                DBClientBase * c = p->pool.front();
+                p->pool.pop();
+                all.push_back( c );
+                bool res;
+                c->isMaster( res );
+            }
+            
+            for ( vector<DBClientBase*>::iterator i=all.begin(); i != all.end(); i++ ){
+                p->pool.push( *i );
+            }
+        }
+    }
+
+    class PoolFlushCmd : public Command {
+    public:
+        PoolFlushCmd() : Command( "connpoolsync" ){}
+        virtual bool run(const char*, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
+            pool.flush();
+            result << "ok" << 1;
+            return true;
+        }
+        virtual bool slaveOk(){
+            return true;
+        }
+
+    } poolFlushCmd;
 
 } // namespace mongo

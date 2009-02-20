@@ -36,7 +36,7 @@ namespace mongo {
         request...
 
         Usage:
-
+        
         {
            ScopedDbConnection c("myserver");
            c.conn()...
@@ -46,6 +46,7 @@ namespace mongo {
         boost::mutex poolMutex;
         map<string,PoolForHost*> pools; // servername -> pool
     public:
+        void flush();
         DBClientBase *get(const string& host);
         void release(const string& host, DBClientBase *c) {
             boostlock L(poolMutex);
