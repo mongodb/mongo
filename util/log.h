@@ -39,7 +39,7 @@ namespace mongo {
         template< class T >
         struct Stringifier : public StringifierBase {
             Stringifier( const T& t ) : t_( t ) {}
-            virtual string val() const { return string( t_ ); }
+            virtual string val() const { return (string)t_; }
             const T& t_;
         };
         static struct StringifierError : public StringifierBase {
