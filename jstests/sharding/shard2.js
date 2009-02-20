@@ -22,7 +22,7 @@ db.foo.save( { num : 1 , name : "eliot" } );
 db.foo.save( { num : 2 , name : "sara" } );
 db.foo.save( { num : -1 , name : "joe" } );
 
-sleep( 1000 ); // TODO: remove
+s.adminCommand( "connpoolsync" );
 
 assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() , "not right directly to db A" );
 
