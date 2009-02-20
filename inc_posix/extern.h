@@ -59,7 +59,7 @@ __wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
 int
 __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep);
 int
-__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep);
+__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep);
 int
 __wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags);
 void

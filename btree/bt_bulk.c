@@ -730,7 +730,8 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 		parent = next;
 		next = NULL;
 	} else {
-		if ((ret = __wt_bt_page_in(db, parent_addr, 0, &parent)) != 0)
+		if ((ret =
+		    __wt_bt_page_in(db, parent_addr, 0, 1, &parent)) != 0)
 			goto err;
 
 		need_promotion = 0;
@@ -797,8 +798,8 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 			    __wt_bt_page_out(db, parent, WT_MODIFIED)) != 0)
 				goto err;
 			parent = NULL;
-			if ((ret =
-			    __wt_bt_page_in(db, parent_addr, 0, &parent)) != 0)
+			if ((ret = __wt_bt_page_in(
+			    db, parent_addr, 0, 1, &parent)) != 0)
 				goto err;
 
 			/*

@@ -65,8 +65,7 @@ __wt_db_dump(WT_TOC *toc)
 	WT_CLEAR(last_key_ovfl);
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		if ((ret = __wt_cache_db_in(db,
-		    WT_ADDR_TO_OFF(db, addr), db->leafsize, 0, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, 1, 0, &page)) != 0)
 			return (ret);
 
 		WT_ITEM_FOREACH(page, item, i) {
@@ -148,7 +147,7 @@ __wt_db_dump(WT_TOC *toc)
 		}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_cache_db_out(db, page, 0)) != 0)
+		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
 			return (ret);
 		if (addr == WT_ADDR_INVALID)
 			break;
@@ -188,8 +187,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 
 	/* Walk down the duplicates tree to the first leaf page. */
 	for (;;) {
-		if ((ret = __wt_cache_db_in(db, WT_ADDR_TO_OFF(db, addr),
-		    isleaf ? db->leafsize : db->intlsize, 0, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, 0, &page)) != 0)
 			return (ret);
 		if (isleaf)
 			break;
@@ -197,7 +195,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 		/* Get the page's first WT_ITEM_OFFP. */
 		__wt_bt_first_offp(page, &addr, &isleaf);
 
-		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
+		if ((ret = __wt_bt_page_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
@@ -227,22 +225,21 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 		}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_cache_db_out(db, page, 0)) != 0) {
+		if ((ret = __wt_bt_page_out(db, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
 		if (addr == WT_ADDR_INVALID)
 			break;
 
-		if ((ret = __wt_cache_db_in(
-		    db, WT_ADDR_TO_OFF(db, addr), db->leafsize, 0, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, 1, 0, &page)) != 0)
 			goto err;
 	}
 
 	if (0) {
 err:		ret = WT_ERROR;
 		if (page != NULL)
-			(void)__wt_cache_db_out(db, page, 0);
+			(void)__wt_bt_page_out(db, page, 0);
 	}
 	return (ret);
 }

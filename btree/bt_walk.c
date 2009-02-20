@@ -29,9 +29,8 @@ __wt_bt_stat(DB *db)
 
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
-
 		if ((ret =
-		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, &page)) != 0)
+		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, 0, &page)) != 0)
 			return (ret);
 		ret = __wt_bt_stat_page(db, page);
 		if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
@@ -59,7 +58,7 @@ __wt_bt_stat_level(DB *db, u_int32_t addr, int isleaf)
 
 	for (first = 1; addr != WT_ADDR_INVALID;) {
 		/* Get the next page and stat it. */
-		if ((ret = __wt_bt_page_in(db, addr, isleaf, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, 0, &page)) != 0)
 			return (ret);
 
 		ret = __wt_bt_stat_page(db, page);

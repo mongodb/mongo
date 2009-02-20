@@ -80,12 +80,12 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
-		if ((ret = __wt_cache_db_in(db, WT_ADDR_TO_OFF(
-		    db, WT_ADDR_FIRST_PAGE), db->leafsize, 0, &page)) != 0)
+		if ((ret = __wt_bt_page_in(
+		    db, WT_ADDR_FIRST_PAGE, 1, 0, &page)) != 0)
 			return (ret);
 		if ((ret = __wt_bt_verify_page(db, page, fragbits, fp)) != 0)
 			goto err;
-		if ((ret = __wt_cache_db_out(db, page, 0)) != 0)
+		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
 			goto err;
 		page = NULL;
 	} else {
@@ -103,7 +103,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	ret = __wt_bt_verify_checkfrag(db, fragbits);
 
 err:	if (page != NULL &&
-	    (tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
+	    (tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 	__wt_free(env, fragbits);
 	return (ret);
@@ -120,7 +120,7 @@ __wt_bt_verify_level(
 	WT_INDX *page_indx, *prev_indx;
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
-	u_int32_t addr_arg, bytes;
+	u_int32_t addr_arg;
 	int first, isleaf_arg, ret, tret;
 	int (*func)(DB *, const DBT *, const DBT *);
 
@@ -210,13 +210,11 @@ __wt_bt_verify_level(
 	 * level fit into the cache, we'll not move the disk heads except to
 	 * get the next page we're verifying.
 	 */
-	bytes = isleaf ? db->leafsize : db->intlsize;
 	for (first = 1, page = prev = NULL;
 	    addr != WT_ADDR_INVALID;
 	    addr = hdr->nextaddr, prev = page, page = NULL) {
 		/* Get the next page and set the address. */
-		if ((ret = __wt_cache_db_in(
-		    db, WT_ADDR_TO_OFF(db, addr), bytes, 0, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, 0, &page)) != 0)
 			goto err;
 
 		/* Verify the page. */
@@ -287,15 +285,15 @@ __wt_bt_verify_level(
 		}
 
 		/* We're done with the previous page. */
-		if ((ret = __wt_cache_db_out(db, prev, 0)) != 0)
+		if ((ret = __wt_bt_page_out(db, prev, 0)) != 0)
 			goto err;
 	}
 
 err:	if (prev != NULL &&
-	    (tret = __wt_cache_db_out(db, prev, 0)) != 0 && ret == 0)
+	    (tret = __wt_bt_page_out(db, prev, 0)) != 0 && ret == 0)
 		ret = tret;
 	if (page != NULL &&
-	    (tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
+	    (tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	if (ret == 0 && addr_arg != WT_ADDR_INVALID)
@@ -376,7 +374,7 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
-	if ((ret = __wt_bt_page_in(db, hdr->prntaddr, 0, &parent)) != 0)
+	if ((ret = __wt_bt_page_in(db, hdr->prntaddr, 0, 1, &parent)) != 0)
 		return (ret);
 
 	/*
@@ -484,7 +482,7 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 			parent = NULL;
 		else {
 			if ((ret =
-			    __wt_bt_page_in(db, nextaddr, 0, &parent)) != 0)
+			    __wt_bt_page_in(db, nextaddr, 0, 1, &parent)) != 0)
 				return (ret);
 			parent_indx = parent->indx;
 		}

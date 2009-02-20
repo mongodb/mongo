@@ -51,7 +51,7 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
  *	Read a btree page from the cache.
  */
 int
-__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep)
+__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep)
 {
 	ENV *env;
 	WT_PAGE *page;
@@ -67,8 +67,9 @@ __wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, WT_PAGE **pagep)
 	/* Verify the page. */
 	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
-	/* Build the in-memory version of the page as necessary. */
-	if (page->indx_count == 0 && (ret = __wt_bt_page_inmem(db, page)) != 0)
+	/* Optionally build the in-memory version of the page. */
+	if (inmem &&
+	    page->indx_count == 0 && (ret = __wt_bt_page_inmem(db, page)) != 0)
 		return (ret);
 
 	*pagep = page;

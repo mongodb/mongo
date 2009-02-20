@@ -124,7 +124,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 
 	/* Search the tree. */
 	for (;;) {
-		if ((ret = __wt_bt_page_in(db, addr, isleaf, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, 1, &page)) != 0)
 			return (ret);
 
 		/*
@@ -242,7 +242,7 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 
 	/* Search the tree. */
 	for (total = 0;;) {
-		if ((ret = __wt_bt_page_in(db, addr, isleaf, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, 1, &page)) != 0)
 			return (ret);
 
 		/* Check for a record past the end of the database. */
