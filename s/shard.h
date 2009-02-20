@@ -92,7 +92,9 @@ namespace mongo {
         }
         
         int numShards(){ return _shards.size(); }
-        Shard& findShard( const BSONObj & obj );
+        bool hasShardKey( const BSONObj& obj );
+
+        Shard& findShard( const BSONObj& obj );
         ShardKey& getShardKey(){  return _key; }
         
         virtual const char * getNS(){ return "config.sharding"; }
