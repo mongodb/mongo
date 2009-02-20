@@ -39,6 +39,8 @@ namespace mongo {
 
         int compare( const BSONObj& l , const BSONObj& r ) const;
         
+        bool hasShardKey( const BSONObj& obj );
+
         BSONObj& key(){
             return _fieldsAndOrder;
         }

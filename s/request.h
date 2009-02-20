@@ -9,7 +9,7 @@
 
 namespace mongo {
     
-    class Request {
+    class Request : boost::noncopyable {
     public:
         Request( Message& m, MessagingPort& p );
 
@@ -34,6 +34,10 @@ namespace mongo {
             return _config;
         }
         
+        ShardInfo * getShardInfo(){
+            return _shardInfo;
+        }
+
         // ---- remote location info -----
 
         
@@ -67,12 +71,17 @@ namespace mongo {
 
     class Strategy {
     public:
+        Strategy(){}
         virtual ~Strategy() {}
         virtual void queryOp( Request& r ) = 0;
         virtual void getMore( Request& r ) = 0;
         virtual void writeOp( int op , Request& r ) = 0;
+
+    protected:
+        void doWrite( int op , Request& r , string server );
+        void insert( string server , const char * ns , const BSONObj& obj );
     };
     
     extern Strategy * SINGLE;
-    extern Strategy * RANDOM;
+    extern Strategy * SHARDED;
 }

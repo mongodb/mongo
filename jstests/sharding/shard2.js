@@ -2,7 +2,7 @@
 * test very basic sharding
 */
 
-s = new ShardingTest( "shard2" , 2 );
+s = new ShardingTest( "shard2" , 2 , 5);
 
 db = s.getDB( "test" );
 
@@ -17,11 +17,11 @@ shard = s.config.sharding.findOne();
 assert.eq( 2 , shard.shards.length );
 assert.eq( shard.shards[0].server , shard.shards[1].server , "server should be the same after a split" );
 
-/*
+
 db.foo.save( { num : 1 , name : "eliot" } );
 db.foo.save( { num : 2 , name : "sara" } );
 db.foo.save( { num : -1 , name : "joe" } );
 
-assert.eq( 3 , db.foo.find().length() );
-*/
+assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() );
+
 s.stop();

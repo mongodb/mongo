@@ -89,7 +89,7 @@ namespace mongo {
 
         if ( _shardInfo ){
             if ( _shardInfo->numShards() > 1 )
-                throw UserException( "can't do sharding yet silly" );
+                s = SHARDED;
         }
         
         if ( op == dbQuery ) {

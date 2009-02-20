@@ -98,6 +98,10 @@ namespace mongo {
         _shards.clear();
     }
 
+    bool ShardInfo::hasShardKey( const BSONObj& obj ){
+        return _key.hasShardKey( obj );
+    }
+
     Shard& ShardInfo::findShard( const BSONObj & obj ){
 
         for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++ ){

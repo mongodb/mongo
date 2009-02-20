@@ -90,6 +90,10 @@ namespace mongo {
 
         b.append( _fieldName.c_str() , ( lElement.number() + rElement.number() ) / 2 );
     }
+
+    bool ShardKey::hasShardKey( const BSONObj& obj ){
+        return ! obj[_fieldName.c_str()].eoo();
+    }
     
     string ShardKey::toString() const {
         return _fieldsAndOrder.toString();
@@ -110,6 +114,8 @@ namespace mongo {
             assert( k.compare( max , min ) > 0 );
             assert( k.compare( min , min ) == 0 );
             
+            assert( k.hasShardKey( BSON( "key" << 1 ) ) );
+            assert( ! k.hasShardKey( BSON( "key2" << 1 ) ) );
         }
     } shardKeyTest;
 
