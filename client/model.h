@@ -55,7 +55,7 @@ namespace mongo {
             @return true if successful.
         */
         bool load(BSONObj& query);
-        void save();
+        void save( bool check=false );
         
     private:
         BSONObj _id;

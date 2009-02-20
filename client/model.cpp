@@ -36,7 +36,7 @@ namespace mongo {
         return true;
     }
 
-    void Model::save(){
+    void Model::save( bool check ){
         ScopedDbConnection conn( modelServer() );
 
         BSONObjBuilder b;
@@ -67,8 +67,15 @@ namespace mongo {
             conn->update( getNS() , q , o );
             
         }
+        
+        string errmsg = "";
+        if ( check )
+            errmsg = conn->getLastError();
 
         conn.done();
+
+        if ( check && errmsg.size() )
+            throw UserException( (string)"error on Model::save: " + errmsg );
     }
 
 } // namespace mongo
