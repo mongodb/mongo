@@ -13,6 +13,9 @@ files.forEach(
         
         if ( /_runner/.test(x.name) ||
              /_lodeRunner/.test(x.name) ||
+             /jni/.test(x.name) ||
+             /eval/.test(x.name) ||
+             /where/.test(x.name) ||
              ! /\.js$/.test(x.name ) ){ 
             print(" >>>>>>>>>>>>>>> skipping " + x.name);
             return;
