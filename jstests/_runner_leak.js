@@ -4,8 +4,9 @@
 var files = listFiles("jstests");
 
 db.runCommand( "closeAllDatabases" );
-
 prev = db.runCommand( "meminfo" );
+
+print( "START : " + tojson( prev ) );
 
 files.forEach(
     function(x) {
@@ -31,3 +32,6 @@ files.forEach(
 );
 
 
+
+db.runCommand( "closeAllDatabases" );
+print( "END   : " + tojson( db.runCommand( "meminfo" ) ) );
