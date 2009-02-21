@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_dbt_copy(DB *, DBT *, DBT *, u_int8_t *, u_int32_t);
+static int __wt_bt_dbt_ret_copy(DB *, DBT *, DBT *, u_int8_t *, u_int32_t);
 
 /*
  * __wt_bt_dbt_return --
@@ -20,12 +20,24 @@ int
 __wt_bt_dbt_return(DB *db, DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip)
 {
 	IDB *idb;
-	DBT *local_dbt;
+	DBT *local_dbt, local_key, local_data;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
+	int (*callback)(DB *, DBT *, DBT *);
 	int ret;
 
 	idb = db->idb;
+
+	/*
+	 * If the data DBT has been configured for a callback return, we don't
+	 * have to construct or copy anything except overflow key/data items.
+	 */
+	if ((callback = data->callback) != NULL) {
+		key = &local_key;
+		WT_CLEAR(local_key);
+		data = &local_data;
+		WT_CLEAR(local_data);
+	}
 
 	/*
 	 * Handle the key.
@@ -36,33 +48,49 @@ __wt_bt_dbt_return(DB *db, DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip)
 		if (ip->data == NULL &&
 		    (ret = __wt_bt_ovfl_copy_to_indx(db, page, ip)) != 0)
 			return (ret);
-		if ((ret = __wt_bt_dbt_copy(
-		    db, key, &idb->key, ip->data, ip->size)) != 0)
-			return (ret);
+		if (callback != NULL) {
+			key->data = ip->data;
+			key->size = ip->size;
+		} else
+			if ((ret = __wt_bt_dbt_ret_copy(
+			    db, key, &idb->key, ip->data, ip->size)) != 0)
+				return (ret);
 	}
-
-	if (data == NULL)
-		return (0);
 
 	/*
 	 * Handle the data item.
 	 */
-	item = ip->ditem;
-	switch (page->hdr->type) {
-	case WT_PAGE_LEAF:
-		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA)
-			return (__wt_bt_dbt_copy(db, data, &idb->data,
-			    WT_ITEM_BYTE(item), (u_int32_t)WT_ITEM_LEN(item)));
-		/* It's an overflow item. */
-		break;
-	case WT_PAGE_DUP_LEAF:
-		if (WT_ITEM_TYPE(item) == WT_ITEM_DUP)
-			return (__wt_bt_dbt_copy(
-			    db, data, &idb->data, ip->data, ip->size));
-		/* It's an overflow item. */
-		break;
-	WT_DEFAULT_FORMAT(db);
+	if (data != NULL) {
+		item = ip->ditem;
+		switch (page->hdr->type) {
+		case WT_PAGE_LEAF:
+			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA)
+				if (callback != NULL) {
+					data->data = WT_ITEM_BYTE(item);
+					data->size =
+					    (u_int32_t)WT_ITEM_LEN(item);
+				} else
+					return (__wt_bt_dbt_ret_copy(db, data,
+					    &idb->data, WT_ITEM_BYTE(item),
+					    (u_int32_t)WT_ITEM_LEN(item)));
+			/* It's an overflow item. */
+			break;
+		case WT_PAGE_DUP_LEAF:
+			if (WT_ITEM_TYPE(item) == WT_ITEM_DUP)
+				if (callback != NULL) {
+					data->data = ip->data;
+					data->size = ip->size;
+				} else
+					return (__wt_bt_dbt_ret_copy(db, data,
+					    &idb->data, ip->data, ip->size));
+			/* It's an overflow item. */
+			break;
+		WT_DEFAULT_FORMAT(db);
+		}
 	}
+
+	if (callback != NULL)
+		return (callback(db, key, data));
 
 	/*
 	 * Handle overflow data items.
@@ -87,11 +115,12 @@ __wt_bt_dbt_return(DB *db, DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip)
 }
 
 /*
- * __wt_bt_dbt_copy --
+ * __wt_bt_dbt_ret_copy --
  *	Do the actual allocation and copy for a returned DBT.
  */
 static int
-__wt_bt_dbt_copy(DB *db, DBT *dbt, DBT *local_dbt, u_int8_t *p, u_int32_t size)
+__wt_bt_dbt_ret_copy(
+    DB *db, DBT *dbt, DBT *local_dbt, u_int8_t *p, u_int32_t size)
 {
 	ENV *env;
 	int ret;

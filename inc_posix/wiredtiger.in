@@ -70,10 +70,13 @@ typedef u_int64_t wt_recno_t;		/* logical record numbers */
  * Key/data structure -- a Data-Base Thang
  *******************************************/
 struct __dbt {
-	void	 *data;			/* data */
-	u_int32_t size;			/* data length */
+	void	 *data;			/* returned/specified data */
+	u_int32_t size;			/* returned/specified data length */
 
 	u_int32_t data_len;		/* associated memory size */
+
+					/* callback return */
+	int (*callback)(DB *, DBT *, DBT *);
 
 	u_int32_t flags;
 };
