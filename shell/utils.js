@@ -177,6 +177,10 @@ shellPrint = function( x ){
     }
 }
 
+printjson = function(x){
+    print( tojson( x ) );
+}
+
 shellPrintHelper = function( x ){
     
     if ( typeof x != "object" ) 
