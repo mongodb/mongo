@@ -79,7 +79,10 @@ namespace mongo {
 
     protected:
         void doWrite( int op , Request& r , string server );
+        void doQuery( Request& r , string server );
+
         void insert( string server , const char * ns , const BSONObj& obj );
+        
     };
     
     extern Strategy * SINGLE;

@@ -106,6 +106,11 @@ namespace mongo {
         Shard& findShard( const BSONObj& obj );
         ShardKey& getShardKey(){  return _key; }
         
+        /**
+         * @return number of shards added to the vector
+         */
+        int getShardsForQuery( vector<Shard*>& shards , const BSONObj& query );
+
         virtual const char * getNS(){ return "config.sharding"; }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(BSONObj& from);

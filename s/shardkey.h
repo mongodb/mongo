@@ -22,6 +22,13 @@
 
 namespace mongo {
     
+    class Shard;
+
+
+    /**
+       NOTE: the implementation for this is tempoary.
+             it only currently works for a single numeric field
+     */
     class ShardKey {
     public:
         ShardKey( BSONObj fieldsAndOrder = emptyObj );
@@ -42,6 +49,8 @@ namespace mongo {
         bool hasShardKey( const BSONObj& obj );
         
         void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max );
+        
+        bool relevantForQuery( const BSONObj& query , Shard * shard );
 
         BSONObj& key(){
             return _fieldsAndOrder;
