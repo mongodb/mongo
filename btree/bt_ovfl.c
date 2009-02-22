@@ -101,11 +101,11 @@ __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 }
 
 /*
- * __wt_bt_ovfl_copy_to_dbt --
+ * __wt_bt_ovfl_to_dbt --
  *	Copy an overflow item into allocated memory in a DBT.
  */
 int
-__wt_bt_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
+__wt_bt_ovfl_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 {
 	WT_PAGE *ovfl_page;
 	int ret, tret;
@@ -123,11 +123,11 @@ __wt_bt_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 }
 
 /*
- * __wt_bt_ovfl_copy_to_indx --
+ * __wt_bt_ovfl_to_indx --
  *	Copy an overflow item into allocated memory in a WT_INDX
  */
 int
-__wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
+__wt_bt_ovfl_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
 {
 	ENV *env;
 	WT_PAGE *ovfl_page;

@@ -46,7 +46,7 @@ __wt_db_get(WT_TOC *toc)
 		    "data items; use the Db.cursor method instead");
 		ret = WT_ERROR;
 	} else
-		ret = __wt_bt_dbt_return(db, NULL, data, page, indx);
+		ret = __wt_bt_dbt_return(db, key, data, page, indx, 0);
 
 	if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
@@ -88,7 +88,7 @@ __wt_db_get_recno(WT_TOC *toc)
 		    "data items; use the Db.cursor method instead");
 		ret = WT_ERROR;
 	} else
-		ret = __wt_bt_dbt_return(db, key, data, page, indx);
+		ret = __wt_bt_dbt_return(db, key, data, page, indx, 1);
 
 	if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
@@ -141,7 +141,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 */
 			ip = page->indx + indx;
 			if (ip->data == NULL && (ret =
-			    __wt_bt_ovfl_copy_to_indx(db, page, ip)) != 0)
+			    __wt_bt_ovfl_to_indx(db, page, ip)) != 0)
 				goto err;
 
 			/*

@@ -270,11 +270,11 @@ __wt_bt_verify_level(
 		 */
 		prev_indx = prev->indx + (prev->indx_count - 1);
 		if (prev_indx->data == NULL &&
-		    (ret = __wt_bt_ovfl_copy_to_indx(db, prev, prev_indx)) != 0)
+		    (ret = __wt_bt_ovfl_to_indx(db, prev, prev_indx)) != 0)
 			goto err;
 		page_indx = page->indx;
 		if (page_indx->data == NULL &&
-		    (ret = __wt_bt_ovfl_copy_to_indx(db, page, page_indx)) != 0)
+		    (ret = __wt_bt_ovfl_to_indx(db, page, page_indx)) != 0)
 			goto err;
 		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
 			__wt_db_errx(db,
@@ -434,10 +434,10 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		/* The two keys we're going to compare may be overflow keys. */
 		child_indx = child->indx;
 		if (child_indx->data == NULL && (ret =
-		    __wt_bt_ovfl_copy_to_indx(db, child, child_indx)) != 0)
+		    __wt_bt_ovfl_to_indx(db, child, child_indx)) != 0)
 			goto err;
 		if (parent_indx->data == NULL && (ret =
-		    __wt_bt_ovfl_copy_to_indx(db, parent, parent_indx)) != 0)
+		    __wt_bt_ovfl_to_indx(db, parent, parent_indx)) != 0)
 			goto err;
 
 		/* Compare the parent's key against the child's key. */
@@ -493,10 +493,10 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		/* The two keys we're going to compare may be overflow keys. */
 		child_indx = child->indx + (child->indx_count - 1);
 		if (child_indx->data == NULL && (ret =
-		    __wt_bt_ovfl_copy_to_indx(db, child, child_indx)) != 0)
+		    __wt_bt_ovfl_to_indx(db, child, child_indx)) != 0)
 			goto err;
 		if (parent_indx->data == NULL && (ret =
-		    __wt_bt_ovfl_copy_to_indx(db, parent, parent_indx)) != 0)
+		    __wt_bt_ovfl_to_indx(db, parent, parent_indx)) != 0)
 			goto err;
 		/* Compare the parent's key against the child's key. */
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) >= 0) {
@@ -787,7 +787,7 @@ eop:			__wt_db_errx(db,
 		case WT_ITEM_DUP_OVFL:
 			current->indx = item_num;
 			current->item = &current->item_ovfl;
-			if ((ret = __wt_bt_ovfl_copy_to_dbt(db, (WT_ITEM_OVFL *)
+			if ((ret = __wt_bt_ovfl_to_dbt(db, (WT_ITEM_OVFL *)
 			    WT_ITEM_BYTE(item), current->item)) != 0)
 				goto err;
 			break;

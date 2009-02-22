@@ -53,9 +53,9 @@ __wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp);
 int
 __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy);
 int
-__wt_bt_ovfl_copy_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy);
+__wt_bt_ovfl_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy);
 int
-__wt_bt_ovfl_copy_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
+__wt_bt_ovfl_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
 int
 __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep);
 int
@@ -70,7 +70,8 @@ int
 __wt_bt_page_inmem_append(DB *db,
     WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *data_item);
 int
-__wt_bt_dbt_return(DB *db, DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip);
+__wt_bt_dbt_return(DB *db,
+    DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip, int key_return);
 int
 __wt_bt_stat(DB *db);
 int
