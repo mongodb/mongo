@@ -174,7 +174,7 @@ namespace mongo {
             all.append( "min" , _key.globalMin() );
             all.append( "max" , _key.globalMax() );
             all.append( "server" , _config ? _config->getPrimary() : "noserver" );
-            
+
             _shards.push_back( new Shard( this , all.obj() ) );
         }
         else {

@@ -53,7 +53,6 @@ namespace mongo {
 
     extern boost::mutex &dbMutex;
     extern MutexInfo dbMutexInfo;
-//extern int dbLocked;
 
     struct lock {
         boostlock bl_;
@@ -213,3 +212,4 @@ namespace mongo {
 } // namespace mongo
 
 #include "dbinfo.h"
+#include "concurrency.h"

@@ -778,7 +778,7 @@ namespace mongo {
     extern Labeler::Label LTE;
     extern Labeler::Label NE;
     
-    class BSONObjBuilderValueStream {
+    class BSONObjBuilderValueStream : public boost::noncopyable {
     public:
         friend class Labeler;
         BSONObjBuilderValueStream( BSONObjBuilder * builder );
@@ -1061,7 +1061,7 @@ namespace mongo {
         }
 
         /** Stream oriented way to add field names and values. */
-        BSONObjBuilderValueStream &operator<<( string name ) {
+        BSONObjBuilderValueStream &operator<<( const string& name ) {
             return operator<<( name.c_str() );
         }
 
