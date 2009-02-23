@@ -484,8 +484,7 @@ namespace mongo {
         BSONObjBuilder b;
         const char *nameWithinArray;
         BSONObj key = obj.extractFieldsDotted(keyPattern, b, nameWithinArray);
-        if ( key.isEmpty() )
-            return;
+        massert( "new key empty", !key.isEmpty() );
         BSONObjIterator keyIter( key );
         BSONElement arrayElt;
         int arrayPos = -1;
