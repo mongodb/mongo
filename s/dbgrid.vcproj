@@ -390,6 +390,14 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\strategy.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\strategy_shard.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\strategy_single.cpp"
 				>
 			</File>

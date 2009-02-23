@@ -1729,6 +1729,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\processinfo_none.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\util\sock.cpp"
 					>
 				</File>
