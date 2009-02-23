@@ -1,5 +1,6 @@
 // processinfo_none.cpp
 
+#include "stdafx.h"
 #include "processinfo.h"
 
 #include <iostream>

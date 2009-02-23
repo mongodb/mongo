@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    LazyString::StringifierError LazyString::stringifierError_;
+
     vector<UnitTest*> *UnitTest::tests = 0;
     bool UnitTest::running = false;
 
