@@ -701,10 +701,7 @@ namespace mongo {
             }
 
             bool isSorted = false;
-            auto_ptr<Cursor> c = getSpecialCursor(ns);
-
-            if ( c.get() == 0 )
-                c = getIndexCursor(ns, query, order, 0, &isSorted, &hint);
+            auto_ptr< Cursor > c = getIndexCursor(ns, query, order, 0, &isSorted, &hint);
             if ( c.get() == 0 )
                 c = findTableScan(ns, order, &isSorted);
 
