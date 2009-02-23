@@ -24,7 +24,7 @@ namespace mongo {
     
     class Shard;
 
-
+    
     /**
        NOTE: the implementation for this is tempoary.
              it only currently works for a single numeric field
@@ -34,22 +34,47 @@ namespace mongo {
         ShardKey( BSONObj fieldsAndOrder = emptyObj );
         void init( BSONObj fieldsAndOrder );
         virtual ~ShardKey() {}
-
+        
+        /**
+           global min is the lowest possible value for this key
+         */
         void globalMin( BSONObjBuilder & b );
         BSONObj globalMin(){ BSONObjBuilder b; globalMin( b ); return b.obj(); }
-        
+
+        /**
+           global max is the lowest possible value for this key
+         */
         void globalMax( BSONObjBuilder & b );
         BSONObj globalMax(){ BSONObjBuilder b; globalMax( b ); return b.obj(); }
         
+        /**
+           return the key inbetween min and max
+           note: min and max could cross type boundaries
+         */
         void middle( BSONObjBuilder & b , BSONObj & min , BSONObj & max );
         BSONObj middle( BSONObj & min , BSONObj & max ){ BSONObjBuilder b; middle( b , min , max ); return b.obj(); }
 
+        /**
+           l < r negative
+           l == r 0
+           l > r positive
+         */
         int compare( const BSONObj& l , const BSONObj& r ) const;
         
+
+        /**
+         * @return whether or not obj has all fields in this shard key
+         */
         bool hasShardKey( const BSONObj& obj );
         
+        /**
+           returns a filter relevant that returns results only for that range
+        */
         void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max );
         
+        /**
+           @return whether or not shard should be looked at for query
+         */
         bool relevantForQuery( const BSONObj& query , Shard * shard );
 
         BSONObj& key(){
