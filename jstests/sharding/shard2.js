@@ -2,7 +2,7 @@
 * test very basic sharding
 */
 
-s = new ShardingTest( "shard2" , 2 , 5);
+s = new ShardingTest( "shard2" , 2 );
 
 db = s.getDB( "test" );
 
@@ -22,7 +22,7 @@ db.foo.save( { num : 1 , name : "eliot" } );
 db.foo.save( { num : 2 , name : "sara" } );
 db.foo.save( { num : -1 , name : "joe" } );
 
-sleep( 1000 ); // TODO: remove
+s.adminCommand( "connpoolsync" );
 
 assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() , "not right directly to db A" );
 
@@ -37,6 +37,8 @@ assert.eq( 0 , seconday.foo.find().length() , "seconday wrong C" );
 assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
 assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
 
+// test move shard
+
 s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : seconday.getMongo().name } );
 assert.eq( 1 , primary.foo.find().length() );
 assert.eq( 2 , seconday.foo.find().length() );
@@ -45,6 +47,34 @@ assert.eq( 1 , s.config.sharding.count() );
 shard = s.config.sharding.findOne();
 assert.eq( 2 , shard.shards.length );
 assert.neq( shard.shards[0].server , shard.shards[1].server , "servers should not be the same after the move" );
+
+// test inserts go to right server/shard
+
+db.foo.save( { num : 3 , name : "bob" } );
+s.adminCommand( "connpoolsync" );
+assert.eq( 1 , primary.foo.find().length() , "after move insert go wrong place?" );
+assert.eq( 3 , seconday.foo.find().length() , "after move insert go wrong place?" );
+
+db.foo.save( { num : -2 , name : "funny man" } );
+s.adminCommand( "connpoolsync" );
+assert.eq( 2 , primary.foo.find().length() , "after move insert go wrong place?" );
+assert.eq( 3 , seconday.foo.find().length() , "after move insert go wrong place?" );
+
+
+db.foo.save( { num : 0 , name : "funny man" } );
+s.adminCommand( "connpoolsync" );
+assert.eq( 2 , primary.foo.find().length() , "boundary A" );
+assert.eq( 4 , seconday.foo.find().length() , "boundary B" );
+
+// TODO: findOne
+assert.eq( "eliot" , db.foo.findOne( { num : 1 } ).name );
+assert.eq( "funny man" , db.foo.findOne( { num : -2 } ).name );
+
+// TODO: getAll
+
+// TODO: sort by num
+
+// TODO: sory by name
 
 // TODO: add wrong data to primary and make sure doesn't appear in collated results
 

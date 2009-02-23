@@ -11,38 +11,23 @@ namespace mongo {
     class ShardStrategy : public Strategy {
 
         virtual void queryOp( Request& r ){
-            throw UserException( "shard query doesn't work" );
             QueryMessage q( r.d() );
             
-            bool lateAssert = false;
-        
-            log(3) << "query: " << q.ns << "  " << q.query << endl;
+            log(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
-            try {
-                if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
-                    throw UserException( "something is wrong, shouldn't see a command here" );
-                
-                ScopedDbConnection dbcon( r.singleServerName() );
-                DBClientBase &_c = dbcon.conn();
-                
-                // TODO: This will not work with Paired connections.  Fix. 
-                DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
-                Message response;
-                bool ok = c.port().call( r.m(), response);
-                uassert("mongos: error calling db", ok);
-                lateAssert = true;
-                r.reply( response  );
-                dbcon.done();
-            }
-            catch ( AssertionException& e ) {
-                assert( !lateAssert );
-                BSONObjBuilder err;
-                err.append("$err", string("mongos: ") + (e.msg.empty() ? "assertion during query" : e.msg));
-                BSONObj errObj = err.done();
-                replyToQuery(QueryResult::ResultFlag_ErrSet, r.p() , r.m() , errObj);
+            if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
+                throw UserException( "something is wrong, shouldn't see a command here" );
+
+            ShardInfo * info = r.getShardInfo();
+            assert( info );
+
+            vector<Shard*> shards;
+            if ( info->getShardsForQuery( shards , q.query ) == 1 ){
+                doQuery( r , shards[0]->getServer() );
                 return;
             }
-
+            
+            throw UserException( "real sharding doesn't nwork" );
         }
         
         virtual void getMore( Request& r ){

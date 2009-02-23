@@ -14,7 +14,7 @@ namespace mongo {
             
             bool lateAssert = false;
         
-            log(3) << "query: " << q.ns << "  " << q.query << endl;
+            log(3) << "single query: " << q.ns << "  " << q.query << endl;
 
             try {
                 if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") ) {
@@ -27,17 +27,8 @@ namespace mongo {
                     }
                 }
                 
-                ScopedDbConnection dbcon( r.singleServerName() );
-                DBClientBase &_c = dbcon.conn();
-                
-                // TODO: This will not work with Paired connections.  Fix. 
-                DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
-                Message response;
-                bool ok = c.port().call( r.m(), response);
-                uassert("mongos: error calling db", ok);
                 lateAssert = true;
-                r.reply( response  );
-                dbcon.done();
+                doQuery( r , r.singleServerName() );
             }
             catch ( AssertionException& e ) {
                 assert( !lateAssert );
@@ -53,7 +44,7 @@ namespace mongo {
         virtual void getMore( Request& r ){
             const char *ns = r.getns();
         
-            log(3) << "getmore: " << ns << endl;
+            log(3) << "single getmore: " << ns << endl;
 
             ScopedDbConnection dbcon( r.singleServerName() );
             DBClientBase& _c = dbcon.conn();
@@ -72,7 +63,7 @@ namespace mongo {
         
         virtual void writeOp( int op , Request& r ){
             const char *ns = r.getns();
-            log(3) << "write: " << ns << endl;
+            log(3) << "single write: " << ns << endl;
             doWrite( op , r , r.singleServerName() );
         }
     };

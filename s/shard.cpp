@@ -132,6 +132,19 @@ namespace mongo {
         }
         throw UserException( "couldn't find a shard which should be impossible" );
     }
+
+    int ShardInfo::getShardsForQuery( vector<Shard*>& shards , const BSONObj& query ){
+        int added = 0;
+        
+        for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++  ){
+            Shard* s = *i;
+            if ( _key.relevantForQuery( query , s ) ){
+                shards.push_back( s );
+                added++;
+            }
+        }
+        return added;
+    }
     
     void ShardInfo::serialize(BSONObjBuilder& to){
         to.append( "ns", _ns );

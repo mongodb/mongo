@@ -95,6 +95,23 @@ namespace mongo {
         return ! obj[_fieldName.c_str()].eoo();
     }
 
+    bool ShardKey::relevantForQuery( const BSONObj& query , Shard * shard ){
+        if ( ! hasShardKey( query ) ){
+            // if the shard key isn't in the query, then we have to go everywhere
+            // therefore this shard is relevant
+            return true;
+        }
+
+        // the rest of this is crap
+        
+        BSONElement e = query[_fieldName.c_str()];
+        if ( e.isNumber() ){ // TODO: this shoudl really be if its an actual value, and not a range
+            return shard->contains( query );
+        }
+
+        return true;
+    }
+
     void ShardKey::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ){
         BSONObjBuilder temp;
         temp.append( "$gte" , min[_fieldName.c_str()].number() );
