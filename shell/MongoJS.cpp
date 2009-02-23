@@ -324,7 +324,7 @@ Handle<Value> mongoFind(const Arguments& args){
         return c;
     }
     catch ( ... ){
-        return v8::ThrowException( v8::String::New( "socket error on insert" ) );        
+        return v8::ThrowException( v8::String::New( "socket error on query" ) );        
     }
 }
 
