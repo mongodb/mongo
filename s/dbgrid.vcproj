@@ -515,6 +515,10 @@
 				RelativePath=".\shard.h"
 				>
 			</File>
+			<File
+				RelativePath=".\strategy.h"
+				>
+			</File>
 			<Filter
 				Name="Header Shared"
 				>
