@@ -179,7 +179,7 @@ namespace mongo {
         qr->setOperation(opReply);
         qr->cursorId = cursorId;
         qr->startingFrom = startingFrom;
-        qr->nReturned = 1;
+        qr->nReturned = nReturned;
         b.decouple();
         Message *resp = new Message();
         resp->setData(qr, true); // transport will free
