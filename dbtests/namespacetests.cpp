@@ -366,6 +366,20 @@ namespace NamespaceTests {
                 return aDotB();
             }
         };
+        
+        class MissingField : public Base {
+        public:
+            void run() {
+                create();
+                BSONObjSetDefaultOrder keys;
+                id().getKeysFromObject( BSON( "b" << 1 ), keys );
+                checkSize( 1, keys );
+            }
+        private:
+            virtual BSONObj key() const {
+                return BSON( "a" << 1 );
+            }
+        };
 
 // TODO
 // array subelement complex
@@ -569,6 +583,7 @@ namespace NamespaceTests {
             add< IndexDetailsTests::ArraySubobjectMultiFieldIndex >();
             add< IndexDetailsTests::ArraySubobjectSingleMissing >();
             add< IndexDetailsTests::ArraySubobjectMissing >();
+            add< IndexDetailsTests::MissingField >();
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();

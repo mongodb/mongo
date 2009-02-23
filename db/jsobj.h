@@ -565,7 +565,8 @@ namespace mongo {
 
         /** makes a new BSONObj with the fields specified in pattern.
            fields returned in the order they appear in pattern.
-           if any field missing, you get back an empty object overall.
+           if any field is missing from the object, that field in the
+           key will be null.
 
            sets element field names to empty string
            If an array is encountered while scanning the dotted names in pattern,
@@ -578,8 +579,7 @@ namespace mongo {
         /**
            sets element field names to empty string
            If a field in pattern is missing, it is omitted from the returned
-           object.  Unlike extractFieldsDotted, it does not return an empty
-           object on missing pattern field.
+           object.
         */
         BSONObj extractFieldsUnDotted(BSONObj pattern) const;
         
