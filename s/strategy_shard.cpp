@@ -20,12 +20,15 @@ namespace mongo {
 
             ShardInfo * info = r.getShardInfo();
             assert( info );
+            
+            Query query( q.query );
 
             vector<Shard*> shards;
-            if ( info->getShardsForQuery( shards , q.query ) == 1 ){
+            if ( info->getShardsForQuery( shards , query.getFilter() ) == 1 ){
                 doQuery( r , shards[0]->getServer() );
                 return;
             }
+            
             
             throw UserException( "real sharding doesn't nwork" );
         }
