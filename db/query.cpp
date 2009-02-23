@@ -33,6 +33,7 @@
 #include "security.h"
 #include "curop.h"
 #include "commands.h"
+#include "queryoptimizer.h"
 
 namespace mongo {
 
@@ -933,4 +934,513 @@ namespace mongo {
         return qr;
     }
 
+    class CountOp : public QueryOp {
+    public:
+        CountOp( const BSONObj &spec ) : spec_( spec ), count_() {}
+        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
+            BSONObj query = spec_.getObjectField("query");            
+            set< string > fields;
+            spec_.getObjectField("fields").getFieldNames( fields );
+            
+            auto_ptr<Cursor> c = qp.newCursor();
+            
+            // TODO We could check if all fields in the key are in 'fields'
+            if ( qp.exactKeyMatch() && fields.empty() ) {
+                /* Here we only look at the btree keys to determine if a match, instead of looking
+                 into the records, which would be much slower.
+                 */
+                BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
+                if ( c->ok() && !query.woCompare( bc->currKeyNode().key, BSONObj(), false ) ) {
+                    BSONObj firstMatch = bc->currKeyNode().key;
+                    count_++;
+                    while ( c->advance() ) {
+                        qa.mayAbort();
+                        if ( !firstMatch.woEqual( bc->currKeyNode().key ) )
+                            break;
+                        count_++;
+                    }
+                }
+                return;
+            }
+            
+            auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
+            while ( c->ok() ) {
+                qa.mayAbort();
+                BSONObj js = c->current();
+                bool deep;
+                if ( !matcher->matches(js, &deep) ) {
+                }
+                else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+                    bool match = true;
+                    for( set< string >::iterator i = fields.begin(); i != fields.end(); ++i ) {
+                        if ( js.getFieldDotted( i->c_str() ).eoo() ) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if ( match )
+                        ++count_;
+                }
+                c->advance();
+            }
+        }
+        virtual QueryOp *clone() const {
+            return new CountOp( *this );
+        }
+        int count() const { return count_; }
+    private:
+        BSONObj spec_;
+        int count_;
+    };
+    
+    int doCount( const char *ns, const BSONObj &cmd, string &err ) {
+        BSONObj query = cmd.getObjectField("query");
+        BSONObj fields = cmd.getObjectField("fields");
+        // count of all objects
+        if ( query.isEmpty() && fields.isEmpty() ) {
+            NamespaceDetails *d = nsdetails( ns );
+            massert( "ns missing", d );
+            return d->nrecords;
+        }
+        QueryPlanSet qps( ns, query, emptyObj );
+        auto_ptr< CountOp > original( new CountOp( cmd ) );
+        shared_ptr< CountOp > res = qps.runOp( *original );
+        return res->count();
+    }
+        
+    class DoQueryOp : public QueryOp {
+    public:
+        DoQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
+                  bool explain, set< string > &filter, int queryOptions ) :
+        b_( 32768 ),
+        ntoskip_( ntoskip ),
+        ntoreturn_( ntoreturn ),
+        order_( order ),
+        wantMore_( wantMore ),
+        explain_( explain ),
+        filter_( filter ),
+        ordering_(),
+        nscanned_(),
+        queryOptions_( queryOptions ),
+        n_(),
+        soSize_() {}
+        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
+            b_.skip( sizeof( QueryResult ) );
+            
+            auto_ptr< Cursor > c = qp.newCursor();
+            
+            auto_ptr<ScanAndOrder> so;
+            
+            auto_ptr<JSMatcher> matcher(new JSMatcher(qp.query(), c->indexKeyPattern()));
+            
+            if ( qp.scanAndOrderRequired() ) {
+                ordering_ = true;
+                so = auto_ptr<ScanAndOrder>(new ScanAndOrder(ntoskip_, ntoreturn_,order_));
+                wantMore_ = false;
+                //			scanAndOrder(b, c.get(), order, ntoreturn);
+            }
+            
+            bool saveCursor = false;
+            
+            while ( c->ok() ) {
+                qa.mayAbort();
+                BSONObj js = c->current();
+                nscanned_++;
+                bool deep;
+                if ( !matcher->matches(js, &deep) ) {
+                }
+                else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+                    // got a match.
+                    assert( js.objsize() >= 0 ); //defensive for segfaults
+                    if ( ordering_ ) {
+                        // note: no cursors for non-indexed, ordered results.  results must be fairly small.
+                        so->add(js);
+                    }
+                    else if ( ntoskip_ > 0 ) {
+                        ntoskip_--;
+                    } else {
+                        if ( explain_ ) {
+                            n_++;
+                            if ( n_ >= ntoreturn_ && !wantMore_ )
+                                break; // .limit() was used, show just that much.
+                        }
+                        else {
+                            bool ok = fillQueryResultFromObj(b_, &filter_, js);
+                            if ( ok ) n_++;
+                            if ( ok ) {
+                                if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
+                                    (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
+                                    /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+                                     is only a size limit.  The idea is that on a find() where one doesn't use much results,
+                                     we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                                     
+                                     The n limit (vs. size) is important when someone fetches only one small field from big
+                                     objects, which causes massive scanning server-side.
+                                     */
+                                    /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                                    if ( wantMore_ && ntoreturn_ != 1 ) {
+                                        if ( useCursors ) {
+                                            c->advance();
+                                            if ( c->ok() ) {
+                                                // more...so save a cursor
+                                                saveCursor = true;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                c->advance();
+            } // end while
+            
+            if ( explain_ ) {
+                soSize_ = so->size();
+            } else if ( ordering_ ) {
+                // TODO Allow operation to abort during fill.
+                so->fill(b_, &filter_, n_);
+            }
+            else if ( !saveCursor && (queryOptions_ & Option_CursorTailable) && c->tailable() ) {
+                c->setAtTail();
+                saveCursor = true;
+            }
+
+            if ( saveCursor ) {
+                c_ = c;
+                matcher_ = matcher;
+            }
+        }
+        virtual QueryOp *clone() const {
+            return new DoQueryOp( ntoskip_, ntoreturn_, order_, wantMore_, explain_, filter_, queryOptions_ );
+        }
+        BufBuilder &builder() { return b_; }
+        bool scanAndOrderRequired() const { return ordering_; }
+        auto_ptr< Cursor > cursor() { return c_; }
+        auto_ptr< JSMatcher > matcher() { return matcher_; }
+        int n() const { return n_; }
+        int soSize() const { return soSize_; }
+    private:
+        BufBuilder b_;
+        int ntoskip_;
+        int ntoreturn_;
+        BSONObj order_;
+        bool wantMore_;
+        bool explain_;
+        set< string > &filter_;   
+        bool ordering_;
+        auto_ptr< Cursor > c_;
+        int nscanned_;
+        int queryOptions_;
+        auto_ptr< JSMatcher > matcher_;
+        int n_;
+        int soSize_;
+    };
+    
+    auto_ptr< QueryResult > doQuery(Message& m, stringstream& ss ) {
+        DbMessage d( m );
+        QueryMessage q( d );
+        const char *ns = q.ns;
+        int ntoskip = q.ntoskip;
+        int _ntoreturn = q.ntoreturn;
+        BSONObj jsobj = q.query;
+        auto_ptr< set< string > > filter = q.fields;
+        int queryOptions = q.queryOptions;
+        
+        Timer t;
+        
+        log(2) << "runQuery: " << ns << jsobj << endl;
+        
+        int nscanned = 0;
+        bool wantMore = true;
+        int ntoreturn = _ntoreturn;
+        if ( _ntoreturn < 0 ) {
+            /* _ntoreturn greater than zero is simply a hint on how many objects to send back per 
+             "cursor batch".
+             A negative number indicates a hard limit.
+             */
+            ntoreturn = -_ntoreturn;
+            wantMore = false;
+        }
+        ss << "query " << ns << " ntoreturn:" << ntoreturn;
+        {
+            string s = jsobj.toString();
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
+        }
+        
+        BufBuilder bb;
+        BSONObjBuilder cmdResBuf;
+        long long cursorid = 0;
+        
+        bb.skip(sizeof(QueryResult));
+        
+        auto_ptr< QueryResult > qr;
+        int n = 0;
+        
+        /* we assume you are using findOne() for running a cmd... */
+        if ( ntoreturn == 1 && runCommands(ns, jsobj, ss, bb, cmdResBuf, false, queryOptions) ) {
+            n = 1;
+            qr.reset( (QueryResult *) bb.buf() );
+            bb.decouple();
+            qr->resultFlags() = 0;
+            qr->len = bb.len();
+            ss << " reslen:" << bb.len();
+            //	qr->channel = 0;
+            qr->setOperation(opReply);
+            qr->cursorId = cursorid;
+            qr->startingFrom = 0;
+            qr->nReturned = n;            
+        }
+        else {
+            
+            AuthenticationInfo *ai = authInfo.get();
+            uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
+            
+            uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
+            
+            BSONElement hint;
+            bool explain = false;
+            bool _gotquery = false;
+            BSONObj query;// = jsobj.getObjectField("query");
+            {
+                BSONElement e = jsobj.findElement("query");
+                if ( !e.eoo() && (e.type() == Object || e.type() == Array) ) {
+                    query = e.embeddedObject();
+                    _gotquery = true;
+                }
+            }
+            BSONObj order;
+            {
+                BSONElement e = jsobj.findElement("orderby");
+                if ( !e.eoo() ) {
+                    order = e.embeddedObjectUserCheck();
+                    if ( e.type() == Array )
+                        order = transformOrderFromArrayFormat(order);
+                }
+            }
+            if ( !_gotquery && order.isEmpty() )
+                query = jsobj;
+            else {
+                explain = jsobj.getBoolField("$explain");
+                hint = jsobj.getField("$hint");
+            }
+            
+            /* The ElemIter will not be happy if this isn't really an object. So throw exception
+             here when that is true.
+             (Which may indicate bad data from appserver?)
+             */
+            if ( query.objsize() == 0 ) {
+                out() << "Bad query object?\n  jsobj:";
+                out() << jsobj.toString() << "\n  query:";
+                out() << query.toString() << endl;
+                uassert("bad query object", false);
+            }
+
+            QueryPlanSet qps( ns, query, order );
+            auto_ptr< DoQueryOp > original( new DoQueryOp( ntoskip, ntoreturn, order, wantMore, explain, *filter, queryOptions ) );
+            shared_ptr< DoQueryOp > o = qps.runOp( *original );
+            DoQueryOp &dqo = *o;
+            n = dqo.n();
+            if ( dqo.scanAndOrderRequired() )
+                ss << " scanAndOrder ";
+            auto_ptr< Cursor > c = dqo.cursor();
+            if ( c.get() ) {
+                ClientCursor *cc = new ClientCursor();
+                cc->c = c;
+                cursorid = cc->cursorid;
+                DEV out() << "  query has more, cursorid: " << cursorid << endl;
+                cc->matcher = dqo.matcher();
+                cc->ns = ns;
+                cc->pos = n;
+                cc->filter = filter;
+                cc->originalMessage = m;
+                cc->updateLocation();
+                if ( c->tailing() )
+                    DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
+                else
+                    DEV out() << "  query has more, cursorid: " << cursorid << endl;
+            }
+            if ( explain ) {
+                BSONObjBuilder builder;
+                builder.append("cursor", c->toString());
+                builder.append("startKey", c->prettyStartKey());
+                builder.append("endKey", c->prettyEndKey());
+                builder.append("nscanned", nscanned);
+                builder.append("n", dqo.scanAndOrderRequired() ? dqo.soSize() : n);
+                if ( dqo.scanAndOrderRequired() )
+                    builder.append("scanAndOrder", true);
+                builder.append("millis", t.millis());
+                BSONObj obj = builder.done();
+                fillQueryResultFromObj(dqo.builder(), 0, obj);
+                n = 1;
+            }
+            qr.reset( (QueryResult *) dqo.builder().buf() );
+            dqo.builder().decouple();
+            qr->cursorId = cursorid;
+            qr->resultFlags() = 0;
+            qr->len = dqo.builder().len();
+            ss << " reslen:" << qr->len;
+            qr->setOperation(opReply);
+            qr->startingFrom = 0;
+            qr->nReturned = n;
+        }
+        
+        int duration = t.millis();
+        if ( (database && database->profile) || duration >= 100 ) {
+            ss << " nscanned:" << nscanned << ' ';
+            if ( ntoskip )
+                ss << " ntoskip:" << ntoskip;
+            if ( database && database->profile )
+                ss << " \nquery: ";
+            ss << jsobj << ' ';
+        }
+        ss << " nreturned:" << n;
+        return qr;        
+    }    
+
+    class UpdateOp : public QueryOp {
+    public:
+        UpdateOp() : nscanned_() {}
+        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
+            BSONObj pattern = qp.query();
+            c_ = qp.newCursor();
+            if ( c_->ok() ) {
+                JSMatcher matcher(pattern, c_->indexKeyPattern());
+                do {
+                    qa.mayAbort();
+                    Record *r = c_->_current();
+                    nscanned_++;
+                    BSONObj js(r);
+                    if ( matcher.matches(js) )
+                        break;
+                    c_->advance();
+                } while( c_->ok() );
+            }
+        }
+        virtual QueryOp *clone() const {
+            return new UpdateOp();
+        }
+        auto_ptr< Cursor > c() { return c_; }
+        int nscanned() const { return nscanned_; }
+    private:
+        auto_ptr< Cursor > c_;
+        int nscanned_;
+    };
+    
+    int __doUpdateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
+        int profile = database->profile;
+        
+        if ( strstr(ns, ".system.") ) {
+            if( strstr(ns, ".system.users") )
+                ;
+            else {
+                out() << "\nERROR: attempt to update in system namespace " << ns << endl;
+                ss << " can't update system namespace ";
+                return 0;
+            }
+        }
+        
+        QueryPlanSet qps( ns, pattern, emptyObj );
+        auto_ptr< UpdateOp > original( new UpdateOp() );
+        shared_ptr< UpdateOp > u = qps.runOp( *original );
+        auto_ptr< Cursor > c = u->c();
+        if ( c->ok() ) {
+            Record *r = c->_current();
+            BSONObj js(r);
+            
+            if ( logop ) {
+                BSONObjBuilder idPattern;
+                BSONElement id;
+                // NOTE: If the matching object lacks an id, we'll log
+                // with the original pattern.  This isn't replay-safe.
+                // It might make sense to suppress the log instead
+                // if there's no id.
+                if ( js.getObjectID( id ) ) {
+                    idPattern.append( id );
+                    pattern = idPattern.obj();
+                }
+            }
+            
+            /* note: we only update one row and quit.  if you do multiple later,
+             be careful or multikeys in arrays could break things badly.  best
+             to only allow updating a single row with a multikey lookup.
+             */
+            
+            if ( profile )
+                ss << " nscanned:" << u->nscanned();
+            
+            /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
+             regular ones at the moment. */
+            const char *firstField = updateobj.firstElement().fieldName();
+            if ( firstField[0] == '$' ) {
+                vector<Mod> mods;
+                Mod::getMods(mods, updateobj);
+                NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
+                set<string>& idxKeys = ndt.indexKeys();
+                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
+                    if ( idxKeys.count(i->fieldName) ) {
+                        uassert("can't $inc/$set an indexed field", false);
+                    }
+                }
+                
+                Mod::applyMods(mods, c->currLoc().obj());
+                if ( profile )
+                    ss << " fastmod ";
+                if ( logop ) {
+                    if ( mods.size() ) {
+                        logOp("u", ns, updateobj, &pattern, &upsert);
+                        return 5;
+                    }
+                }
+                return 2;
+            } else {
+                checkNoMods( updateobj );
+            }
+            
+            theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
+            return 1;            
+        }
+        
+        if ( profile )
+            ss << " nscanned:" << u->nscanned();
+        
+        if ( upsert ) {
+            if ( updateobj.firstElement().fieldName()[0] == '$' ) {
+                /* upsert of an $inc. build a default */
+                vector<Mod> mods;
+                Mod::getMods(mods, updateobj);
+                BSONObjBuilder b;
+                BSONObjIterator i( pattern );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    // Presumably the number of mods is small, so this loop isn't too expensive.
+                    for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); ++i ) {
+                        if ( strcmp( e.fieldName(), i->fieldName ) == 0 )
+                            continue;
+                        b.append( e );
+                    }
+                }
+                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
+                    b.append(i->fieldName, i->getn());
+                BSONObj obj = b.done();
+                theDataFileMgr.insert(ns, obj);
+                if ( profile )
+                    ss << " fastmodinsert ";
+                if ( logop )
+                    logOp( "i", ns, obj );
+                return 3;
+            }
+            if ( profile )
+                ss << " upsert ";
+            theDataFileMgr.insert(ns, updateobj);
+            if ( logop )
+                logOp( "i", ns, updateobj );
+            return 4;
+        }
+        return 0;
+    }
+    
 } // namespace mongo

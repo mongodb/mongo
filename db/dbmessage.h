@@ -19,6 +19,7 @@
 #include "storage.h"
 #include "jsobj.h"
 #include "namespace.h"
+#include "../util/message.h"
 
 namespace mongo {
 

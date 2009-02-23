@@ -66,6 +66,7 @@ namespace mongo {
             return count;
         }
         const char *ns() const { return ns_; }
+        BSONObj query() const { return query_; }
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();
@@ -95,6 +96,7 @@ namespace mongo {
         auto_ptr< Cursor > newCursor() const;
         BSONObj indexKey() const;
         const char *ns() const { return fbs_.ns(); }
+        BSONObj query() const { return fbs_.query(); }
     private:
         const FieldBoundSet &fbs_;
         const BSONObj &order_;
@@ -110,25 +112,33 @@ namespace mongo {
 
     class QueryAborter {
     public:
-        QueryAborter( bool &firstDone ) :
+        QueryAborter( const bool &firstDone ) :
         firstDone_( firstDone ){}
         class AbortException : public std::exception {
         };
-        void mayAbort() {
+        void mayAbort() const {
             if ( firstDone_ )
                 throw AbortException();
         }
     private:
-        bool &firstDone_;
+        const bool &firstDone_;
     };
     
+    // Inherit from this interface to implement a new query operation.
     class QueryOp {
     public:
         QueryOp() : done_() {}
         virtual ~QueryOp() {}
-        virtual void run( const QueryPlan &qp, QueryAborter &qa ) = 0;
+        // Called by the runner, to execute this query operation using the
+        // given query plan.  The implementation should call qa.mayAbort()
+        // periodically in order to abort if the operation on another query
+        // plan is complete.
+        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) = 0;
+        // Return a copy of the inheriting class, which will be run with its own
+        // query plan.
         virtual QueryOp *clone() const = 0;
         bool done() const { return done_; }
+        // To be called by the runner only.
         void setDone() { done_ = true; }
     private:
         bool done_;
@@ -139,6 +149,10 @@ namespace mongo {
         QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint = 0 );
         int nPlans() const { return plans_.size(); }
         shared_ptr< QueryOp > runOp( QueryOp &op );
+        template< class T >
+        shared_ptr< T > runOp( T &op ) {
+            return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
+        }
     private:
         struct RunnerSet {
             RunnerSet( QueryPlanSet &plans, QueryOp &op );
@@ -172,8 +186,6 @@ namespace mongo {
         typedef vector< PlanPtr > PlanSet;
         PlanSet plans_;
     };
-    
-    int doCount( const char *ns, const BSONObj &cmd, string &err );
     
 //    class QueryOptimizer {
 //    public:
