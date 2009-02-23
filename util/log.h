@@ -22,41 +22,29 @@ namespace mongo {
 
     class LazyString {
     public:
-        template< class T >
-        LazyString( const T& t ) {
-            if ( sizeof( Stringifier< T > ) > ( sizeof( Stringifier< const char * > ) * 2 ) ) {
-                stringifier_ = &stringifierError_;
-            } else {
-                stringifier_ = new ( stringifierBuf_ ) Stringifier< T >( t );
-            }
-        }
-        string val() const { return stringifier_->val(); }
+        virtual ~LazyString() {}
+        virtual string val() const = 0;
+    };
+    
+    template< class T >
+    class LazyStringImpl : public LazyString {
+    public:
+        LazyStringImpl( const T &t ) : t_( t ) {}
+        virtual string val() const { return (string)t_; }
     private:
-        struct StringifierBase {
-            virtual ~StringifierBase() {}
-            virtual string val() const = 0;
-        };
-        template< class T >
-        struct Stringifier : public StringifierBase {
-            Stringifier( const T& t ) : t_( t ) {}
-            virtual string val() const { return (string)t_; }
-            const T& t_;
-        };
-        static struct StringifierError : public StringifierBase {
-            virtual string val() const { return "Error converting to string"; }
-        } stringifierError_;
-        StringifierBase *stringifier_;
-        char stringifierBuf_[ sizeof( Stringifier< const char * > ) * 2 ];
+        const T& t_;
     };
     
     class Nullstream {
     public:
         virtual ~Nullstream() {}
-      // todo: just use a template for all these
         virtual Nullstream& operator<<(const char *) {
             return *this;
         }
-        virtual Nullstream& operator<<(char x) {
+        virtual Nullstream& operator<<(char *) {
+            return *this;
+        }
+        virtual Nullstream& operator<<(char) {
             return *this;
         }
         virtual Nullstream& operator<<(int) {
@@ -83,8 +71,23 @@ namespace mongo {
         virtual Nullstream& operator<<(unsigned long long) {
             return *this;
         }
+        virtual Nullstream& operator<<(bool) {
+            return *this;
+        }
         virtual Nullstream& operator<<(const LazyString&) {
             return *this;
+        }
+        template< class T >
+        Nullstream& operator<<(T *t) {
+            return operator<<( static_cast<void*>( t ) );
+        }        
+        template< class T >
+        Nullstream& operator<<(const T *t) {
+            return operator<<( static_cast<const void*>( t ) );
+        }        
+        template< class T >
+        Nullstream& operator<<(const T &t) {
+            return operator<<( static_cast<const LazyString&>( LazyStringImpl< T >( t ) ) );
         }
         virtual Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
             return *this;
@@ -105,6 +108,7 @@ namespace mongo {
             cout.flush();
         }
         Logstream& operator<<(const char *x) LOGIT
+        Logstream& operator<<(char *x) LOGIT
         Logstream& operator<<(char x) LOGIT
         Logstream& operator<<(int x) LOGIT
         Logstream& operator<<(long x) LOGIT
@@ -114,6 +118,7 @@ namespace mongo {
         Logstream& operator<<(void *x) LOGIT
         Logstream& operator<<(long long x) LOGIT
         Logstream& operator<<(unsigned long long x) LOGIT
+        Logstream& operator<<(bool x) LOGIT
         Logstream& operator<<(const LazyString& x) {
             boostlock lk(mutex);
             cout << x.val();
