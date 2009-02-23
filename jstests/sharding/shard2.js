@@ -25,6 +25,7 @@ db.foo.save( { num : -1 , name : "joe" } );
 s.adminCommand( "connpoolsync" );
 
 assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() , "not right directly to db A" );
+assert.eq( 3 , db.foo.find().length() );
 
 primary = s.getServer( "test" ).getDB( "test" );
 seconday = s.getOther( primary ).getDB( "test" );
@@ -66,11 +67,12 @@ s.adminCommand( "connpoolsync" );
 assert.eq( 2 , primary.foo.find().length() , "boundary A" );
 assert.eq( 4 , seconday.foo.find().length() , "boundary B" );
 
-// TODO: findOne
+// findOne
 assert.eq( "eliot" , db.foo.findOne( { num : 1 } ).name );
 assert.eq( "funny man" , db.foo.findOne( { num : -2 } ).name );
 
 // TODO: getAll
+//assert.eq( 3 , db.foo.find().length() );
 
 // TODO: sort by num
 

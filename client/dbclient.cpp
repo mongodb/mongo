@@ -70,7 +70,30 @@ namespace mongo {
         obj = b.obj();
         return *this; 
     }
-
+    
+    bool Query::isComplex() const{
+        return obj.hasElement( "query" );
+    }
+        
+    BSONObj Query::getFilter() const {
+        if ( ! isComplex() )
+            return obj;
+        return obj.getObjectField( "query" );
+    }
+    BSONObj Query::getSort() const {
+        if ( ! isComplex() )
+            return emptyObj;
+        return obj.getObjectField( "orderby" );
+    }
+    BSONObj Query::getHint() const {
+        if ( ! isComplex() )
+            return emptyObj;
+        return obj.getObjectField( "$hint" );
+    }
+    bool Query::isExplain() const {
+        return isComplex() && obj.getBoolField( "$explain" );
+    }
+    
     string Query::toString() const{
         return obj.toString();
     }

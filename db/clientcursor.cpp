@@ -27,6 +27,7 @@
 #include "introspect.h"
 #include <time.h>
 #include "db.h"
+#include "commands.h"
 
 namespace mongo {
 
@@ -181,50 +182,20 @@ namespace mongo {
         return x;
     }
 
-    class CursInspector : public SingleResultObjCursor {
-        Cursor* clone() {
-            return new CursInspector();
-        }
-        void fill() {
-            b.append("byLocation_size", unsigned( byLoc.size() ) );
-            b.append("clientCursors_size", unsigned( clientCursorsById.size() ) );
-            /* todo update for new impl:
-            		stringstream ss;
-            		ss << '\n';
-            		int x = 40;
-            		DiskToCC::iterator it = clientCursorsByLocation.begin();
-            		while( it != clientCursorsByLocation.end() ) {
-            			DiskLoc dl = it->first;
-            			ss << dl.toString() << " -> \n";
-            			set<ClientCursor*>::iterator j = it->second.begin();
-            			while( j != it->second.end() ) {
-            				ss << "    cid:" << j->second->cursorid << ' ' << j->second->ns << " pos:" << j->second->pos << " LL:" << j->second->lastLoc.toString();
-            				try {
-            					setClient(j->second->ns.c_str());
-            					Record *r = dl.rec();
-            					ss << " lwh:" << hex << r->lengthWithHeaders << " nxt:" << r->nextOfs << " prv:" << r->prevOfs << dec << ' ' << j->second->c->toString();
-            					if( r->nextOfs >= 0 && r->nextOfs < 16 )
-            						ss << " DELETED??? (!)";
-            				}
-            				catch(...) {
-            					ss << " EXCEPTION";
-            				}
-            				ss << "\n";
-            				j++;
-            			}
-            			if( --x <= 0 ) {
-            				ss << "only first 40 shown\n" << endl;
-            				break;
-            			}
-            			it++;
-            		}
-            		b.append("dump", ss.str().c_str());
-            */
-        }
+    // QUESTION: Restrict to the namespace from which this command was issued?
+    // Alternatively, make this command admin-only?
+    class CmdCursorInfo : public Command {
     public:
-        CursInspector() {
-            reg("intr.cursors");
+        CmdCursorInfo() : Command( "cursorInfo" ) {}
+        virtual bool slaveOk() { return true; }
+        virtual void help( stringstream& help ) const {
+            help << " example: { cursorInfo : 1 }";
         }
-    } _ciproto;
-
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            result.append("byLocation_size", unsigned( byLoc.size() ) );
+            result.append("clientCursors_size", unsigned( clientCursorsById.size() ) );
+            return true;
+        }
+    } cmdCursorInfo;
+    
 } // namespace mongo

@@ -109,7 +109,18 @@ namespace mongo {
         */
         Query& where(const char *jscode, BSONObj scope);
         Query& where(const char *jscode) { return where(jscode, BSONObj()); }
+        
 
+        /**
+         * if this query has an orderby, hint, or some other field
+         */
+        bool isComplex() const;
+        
+        BSONObj getFilter() const;
+        BSONObj getSort() const;
+        BSONObj getHint() const;
+        bool isExplain() const;
+        
         string toString() const;
         operator string() const { return toString(); }
     };

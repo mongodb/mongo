@@ -714,7 +714,8 @@ namespace mongo {
 
     /* makes a new BSONObj with the fields specified in pattern.
        fields returned in the order they appear in pattern.
-       if any field missing, you get back an empty object overall.
+       if any field missing from the original object, that field
+       in the key will be null.
 
        n^2 implementation bad if pattern and object have lots
        of fields - normally pattern doesn't so should be fine.
@@ -729,8 +730,8 @@ namespace mongo {
             const char *name = e.fieldName();
             BSONElement x = getFieldDottedOrArray( name );
             if ( x.eoo() ) {
-                nameWithinArray = "";
-                return BSONObj();
+                b.appendNull( "" );
+                continue;
             } else if ( x.type() == Array ) {
                 // NOTE: Currently set based on last array discovered.
                 nameWithinArray = name;
@@ -743,8 +744,7 @@ namespace mongo {
     /**
      sets element field names to empty string
      If a field in pattern is missing, it is omitted from the returned
-     object.  Unlike extractFieldsDotted, it does not return an empty
-     object on missing pattern field.
+     object.
      */
     BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) const {
         BSONObjBuilder b;
