@@ -65,6 +65,9 @@ namespace mongo {
         virtual Nullstream& operator<<(void *) {
             return *this;
         }
+        virtual Nullstream& operator<<(const void *) {
+            return *this;
+        }
         virtual Nullstream& operator<<(long long) {
             return *this;
         }
@@ -116,6 +119,7 @@ namespace mongo {
         Logstream& operator<<(unsigned x) LOGIT
         Logstream& operator<<(double x) LOGIT
         Logstream& operator<<(void *x) LOGIT
+        Logstream& operator<<(const void *x) LOGIT
         Logstream& operator<<(long long x) LOGIT
         Logstream& operator<<(unsigned long long x) LOGIT
         Logstream& operator<<(bool x) LOGIT
