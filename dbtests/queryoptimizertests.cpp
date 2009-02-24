@@ -159,12 +159,13 @@ namespace QueryOptimizerTests {
         class SimplifiedQuery {
         public:
             void run() {
-                FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 ) );
+                FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 ) );
                 BSONObj simple = fbs.simplifiedQuery();
                 out() << "simple: " << simple << endl;
                 ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gte:5,$lte:10}" ) ) );
                 ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
                 ASSERT( !simple.getObjectField( "c" ).woCompare( fromjson( "{$lte:4}" ) ) );
+                ASSERT( !simple.getObjectField( "d" ).woCompare( fromjson( "{$gte:0}" ) ) );
             }
         };
         
@@ -211,7 +212,8 @@ namespace QueryOptimizerTests {
         
         // There's a limit of 10 indexes total, make sure not to exceed this in a given test.
 #define INDEX(x) this->index( BSON(x) )
-#define FBS(x) FieldBoundSet( ns(), x )
+        FieldBoundSet FieldBoundSet_GLOBAL( "", emptyObj );
+#define FBS(x) ( FieldBoundSet_GLOBAL = FieldBoundSet( ns(), x ) )
         
         class NoIndex : public Base {
         public:

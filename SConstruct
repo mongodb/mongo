@@ -115,7 +115,7 @@ env.Append( CPPPATH=[ "." ] )
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
-commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp" )
+commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ]
 commonFiles += Glob( "util/*.c" );
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
