@@ -85,11 +85,11 @@ namespace mongo {
     class Cursor;
     auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch = 0, bool *isSorted = 0, BSONElement *hint = 0);
 
-    int runCount(const char *ns, BSONObj& cmd, string& err);
+    int runCount(const char *ns, const BSONObj& cmd, string& err);
     
     // Using new query optimizer:
-    int doCount( const char *ns, const BSONObj &cmd, string &err );
-    auto_ptr< QueryResult > doQuery(Message& m, stringstream& ss );
+    int doCount(const char *ns, const BSONObj& cmd, string& err);
+    auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss );
     
 } // namespace mongo
 

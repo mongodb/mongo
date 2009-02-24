@@ -526,37 +526,37 @@ namespace mongo {
     BSONObj empty_obj = fromjson("{}");
 
     /* { count: "collectionname"[, query: <query>] }
-       returns -1 on ns does not exist error.
-               -2 on other errors
-    */
-    int runCount(const char *ns, BSONObj& cmd, string& err) {
+     returns -1 on ns does not exist error.
+     -2 on other errors
+     */
+    int runCount(const char *ns, const BSONObj& cmd, string& err) {
         NamespaceDetails *d = nsdetails(ns);
         if ( d == 0 ) {
             err = "ns does not exist";
             return -1;
         }
-
+        
         BSONObj query = cmd.getObjectField("query");
         
         set< string > fields;
         cmd.getObjectField("fields").getFieldNames( fields );
-
+        
         if ( query.isEmpty() && fields.empty() ) {
             // count of all objects
             return (int) d->nrecords;
         }
-
+        
         auto_ptr<Cursor> c;
-
+        
         bool simpleKeyToMatch = false;
         c = getIndexCursor(ns, query, empty_obj, &simpleKeyToMatch);
-
+        
         if ( c.get() ) {
             // TODO We could check if all fields in the key are in 'fields'
             if ( simpleKeyToMatch && fields.empty() ) {
                 /* Here we only look at the btree keys to determine if a match, instead of looking
-                   into the records, which would be much slower.
-                   */
+                 into the records, which would be much slower.
+                 */
                 int count = 0;
                 BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
                 if ( c->ok() && !query.woCompare( bc->currKeyNode().key, BSONObj(), false ) ) {
@@ -573,7 +573,7 @@ namespace mongo {
         } else {
             c = findTableScan(ns, empty_obj);
         }
-
+        
         int count = 0;
         auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
         while ( c->ok() ) {
@@ -595,7 +595,7 @@ namespace mongo {
             c->advance();
         }
         return count;
-    }
+    }    
 
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
        [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
@@ -990,18 +990,30 @@ namespace mongo {
         int count_;
     };
     
+    /* { count: "collectionname"[, query: <query>] }
+         returns -1 on ns does not exist error.
+    */    
     int doCount( const char *ns, const BSONObj &cmd, string &err ) {
+        NamespaceDetails *d = nsdetails( ns );
+        if ( !d ) {
+            err = "ns missing";
+            return -1;
+        }
         BSONObj query = cmd.getObjectField("query");
         BSONObj fields = cmd.getObjectField("fields");
         // count of all objects
         if ( query.isEmpty() && fields.isEmpty() ) {
-            NamespaceDetails *d = nsdetails( ns );
-            massert( "ns missing", d );
             return d->nrecords;
         }
         QueryPlanSet qps( ns, query, emptyObj );
         auto_ptr< CountOp > original( new CountOp( cmd ) );
         shared_ptr< CountOp > res = qps.runOp( *original );
+        if ( !res->complete() ) {
+            log() << "Count with ns: " << ns << " and query: " << query
+                  << " failed with exception: " << res->exceptionMessage()
+                  << endl;
+            return 0;
+        }
         return res->count();
     }
         
@@ -1020,15 +1032,16 @@ namespace mongo {
         nscanned_(),
         queryOptions_( queryOptions ),
         n_(),
-        soSize_() {}
+        soSize_(),
+        saveClientCursor_() {}
         virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
             b_.skip( sizeof( QueryResult ) );
             
-            auto_ptr< Cursor > c = qp.newCursor();
+            c_ = qp.newCursor();
             
             auto_ptr<ScanAndOrder> so;
             
-            auto_ptr<JSMatcher> matcher(new JSMatcher(qp.query(), c->indexKeyPattern()));
+            matcher_.reset(new JSMatcher(qp.query(), c_->indexKeyPattern()));
             
             if ( qp.scanAndOrderRequired() ) {
                 ordering_ = true;
@@ -1037,16 +1050,15 @@ namespace mongo {
                 //			scanAndOrder(b, c.get(), order, ntoreturn);
             }
             
-            bool saveCursor = false;
-            
-            while ( c->ok() ) {
+            while ( c_->ok() ) {
                 qa.mayAbort();
-                BSONObj js = c->current();
+                BSONObj js = c_->current();
                 nscanned_++;
                 bool deep;
-                if ( !matcher->matches(js, &deep) ) {
+                if ( !matcher_->matches(js, &deep) ) {
                 }
-                else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+                else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
+                    out() << "c_: " << c_->toString() << " match: " << js << endl;
                     // got a match.
                     assert( js.objsize() >= 0 ); //defensive for segfaults
                     if ( ordering_ ) {
@@ -1077,10 +1089,10 @@ namespace mongo {
                                     /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                                     if ( wantMore_ && ntoreturn_ != 1 ) {
                                         if ( useCursors ) {
-                                            c->advance();
-                                            if ( c->ok() ) {
+                                            c_->advance();
+                                            if ( c_->ok() ) {
                                                 // more...so save a cursor
-                                                saveCursor = true;
+                                                saveClientCursor_ = true;
                                             }
                                         }
                                     }
@@ -1090,23 +1102,18 @@ namespace mongo {
                         }
                     }
                 }
-                c->advance();
+                c_->advance();
             } // end while
             
             if ( explain_ ) {
-                soSize_ = so->size();
+                n_ = ordering_ ? so->size() : n_;
             } else if ( ordering_ ) {
                 // TODO Allow operation to abort during fill.
                 so->fill(b_, &filter_, n_);
             }
-            else if ( !saveCursor && (queryOptions_ & Option_CursorTailable) && c->tailable() ) {
-                c->setAtTail();
-                saveCursor = true;
-            }
-
-            if ( saveCursor ) {
-                c_ = c;
-                matcher_ = matcher;
+            else if ( !saveClientCursor_ && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
+                c_->setAtTail();
+                saveClientCursor_ = true;
             }
         }
         virtual QueryOp *clone() const {
@@ -1117,7 +1124,8 @@ namespace mongo {
         auto_ptr< Cursor > cursor() { return c_; }
         auto_ptr< JSMatcher > matcher() { return matcher_; }
         int n() const { return n_; }
-        int soSize() const { return soSize_; }
+        int nscanned() const { return nscanned_; }
+        bool saveClientCursor() const { return saveClientCursor_; }
     private:
         BufBuilder b_;
         int ntoskip_;
@@ -1133,9 +1141,10 @@ namespace mongo {
         auto_ptr< JSMatcher > matcher_;
         int n_;
         int soSize_;
+        bool saveClientCursor_;
     };
     
-    auto_ptr< QueryResult > doQuery(Message& m, stringstream& ss ) {
+    auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
         DbMessage d( m );
         QueryMessage q( d );
         const char *ns = q.ns;
@@ -1234,15 +1243,16 @@ namespace mongo {
                 uassert("bad query object", false);
             }
 
-            QueryPlanSet qps( ns, query, order );
+            QueryPlanSet qps( ns, query, order, &hint );
             auto_ptr< DoQueryOp > original( new DoQueryOp( ntoskip, ntoreturn, order, wantMore, explain, *filter, queryOptions ) );
             shared_ptr< DoQueryOp > o = qps.runOp( *original );
             DoQueryOp &dqo = *o;
+            massert( dqo.exceptionMessage(), dqo.complete() );
             n = dqo.n();
             if ( dqo.scanAndOrderRequired() )
                 ss << " scanAndOrder ";
             auto_ptr< Cursor > c = dqo.cursor();
-            if ( c.get() ) {
+            if ( dqo.saveClientCursor() ) {
                 ClientCursor *cc = new ClientCursor();
                 cc->c = c;
                 cursorid = cc->cursorid;
@@ -1253,7 +1263,7 @@ namespace mongo {
                 cc->filter = filter;
                 cc->originalMessage = m;
                 cc->updateLocation();
-                if ( c->tailing() )
+                if ( cc->c->tailing() )
                     DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
                 else
                     DEV out() << "  query has more, cursorid: " << cursorid << endl;
@@ -1263,8 +1273,8 @@ namespace mongo {
                 builder.append("cursor", c->toString());
                 builder.append("startKey", c->prettyStartKey());
                 builder.append("endKey", c->prettyEndKey());
-                builder.append("nscanned", nscanned);
-                builder.append("n", dqo.scanAndOrderRequired() ? dqo.soSize() : n);
+                builder.append("nscanned", dqo.nscanned());
+                builder.append("n", n);
                 if ( dqo.scanAndOrderRequired() )
                     builder.append("scanAndOrder", true);
                 builder.append("millis", t.millis());

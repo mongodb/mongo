@@ -79,7 +79,6 @@ namespace mongo {
             lower_ = other.lower_;
         for( vector< BSONObj >::const_iterator i = other.objData_.begin(); i != other.objData_.end(); ++i )
             objData_.push_back( *i );
-        massert( "Incompatible bounds", lower_.woCompare( upper_, false ) <= 0 );
         return *this;
     }
     
@@ -131,10 +130,11 @@ namespace mongo {
     scanAndOrderRequired_( true ),
     keyMatch_( false ),
     exactKeyMatch_( false ),
-    direction_( 0 ) {
+    direction_( 0 ),
+    unhelpful_( false ) {
         // full table scan case
         if ( !index_ ) {
-            if ( order_.isEmpty() )
+            if ( order_.isEmpty() || !strcmp( order_.firstElement().fieldName(), "$natural" ) )
                 scanAndOrderRequired_ = false;
             return;
         }
@@ -178,15 +178,17 @@ namespace mongo {
         bool stillOptimalIndexedQueryCount = true;
         set< string > orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
-        BSONObjBuilder lowKeyBuilder;
-        BSONObjBuilder highKeyBuilder;
+        BSONObjBuilder startKeyBuilder;
+        BSONObjBuilder endKeyBuilder;
         while( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
             const FieldBound &fb = fbs.bound( e.fieldName() );
-            lowKeyBuilder.appendAs( fb.lower(), "" );
-            highKeyBuilder.appendAs( fb.upper(), "" );
+            int number = (int) e.number(); // returns 0.0 if not numeric
+            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction_ >= 0 ? 1 : -1 ) > 0 );
+            startKeyBuilder.appendAs( forward ? fb.lower() : fb.upper(), "" );
+            endKeyBuilder.appendAs( forward ? fb.upper() : fb.lower(), "" );
             if ( fb.nontrivial() )
                 ++indexedQueryCount;
             if ( stillOptimalIndexedQueryCount ) {
@@ -214,18 +216,21 @@ namespace mongo {
             if ( exactIndexedQueryCount == fbs.nNontrivialBounds() )
                 exactKeyMatch_ = true;
         }
-        BSONObj lowKey = lowKeyBuilder.obj();
-        BSONObj highKey = highKeyBuilder.obj();
-        startKey_ = ( direction_ >= 0 ) ? lowKey : highKey;
-        endKey_ = ( direction_ >= 0 ) ? highKey : lowKey;
+        startKey_ = startKeyBuilder.obj();
+        endKey_ = endKeyBuilder.obj();
+        if ( !keyMatch_ &&
+            ( scanAndOrderRequired_ || order_.isEmpty() ) &&
+            !fbs.bound( idxKey.firstElement().fieldName() ).nontrivial() )
+            unhelpful_ = true;
     }
     
     auto_ptr< Cursor > QueryPlan::newCursor() const {
+        if ( !fbs_.matchPossible() )
+            return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
         if ( !index_ )
-            return theDataFileMgr.findAll( fbs_.ns() );
-        else
-            return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, direction_ >= 0 ? 1 : -1 ) );
-            //TODO This constructor should really take a const ref to the index details.
+            return findTableScan( fbs_.ns(), order_, 0 );
+        //TODO This constructor should really take a const ref to the index details.
+        return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, direction_ >= 0 ? 1 : -1 ) );
     }
     
     BSONObj QueryPlan::indexKey() const {
@@ -235,8 +240,12 @@ namespace mongo {
     QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :
     fbs_( ns, query ) {
         NamespaceDetails *d = nsdetails( ns );
-        assert( d );
-
+        if ( !d || !fbs_.matchPossible() ) {
+            // Table scan plan only
+            plans_.push_back( PlanPtr( new QueryPlan( fbs_, order ) ) );
+            return;
+        }
+        
         if ( hint && !hint->eoo() ) {
             if( hint->type() == String ) {
                 string hintstr = hint->valuestr();
@@ -250,6 +259,12 @@ namespace mongo {
             }
             else if( hint->type() == Object ) { 
                 BSONObj hintobj = hint->embeddedObject();
+                uassert( "bad hint", !hintobj.isEmpty() );
+                if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
+                    // Table scan plan
+                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order ) ) );
+                    return;
+                }
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if( ii.keyPattern().woCompare(hintobj) == 0 ) {
@@ -268,14 +283,19 @@ namespace mongo {
         if ( fbs_.nNontrivialBounds() == 0 && order.isEmpty() )
             return;
         
+        // Only table scan can give natural order.
+        if ( !order.isEmpty() && !strcmp( order.firstElement().fieldName(), "$natural" ) )
+            return;
+        
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
             PlanPtr p( new QueryPlan( fbs_, order, &d->indexes[ i ] ) );
             if ( p->optimal() ) {
                 plans_.push_back( p );
                 return;
+            } else if ( !p->unhelpful() ) {
+                plans.push_back( p );
             }
-            plans.push_back( p );
         }
         for( PlanSet::iterator i = plans.begin(); i != plans.end(); ++i )
             plans_.push_back( *i );
@@ -294,6 +314,14 @@ namespace mongo {
     }
     
     shared_ptr< QueryOp > QueryPlanSet::RunnerSet::run() {
+        massert( "no plans", plans_.plans_.size() > 0 );
+        if ( plans_.plans_.size() == 1 ) {
+            shared_ptr< QueryOp > op( op_.clone() );
+            Runner r( *plans_.plans_[ 0 ], *this, *op );
+            r();
+            return op;
+        }
+        
         boost::thread_group threads;
         vector< shared_ptr< QueryOp > > ops;
         for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
@@ -303,10 +331,9 @@ namespace mongo {
         }
         threads.join_all();
         for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i )
-            if ( (*i)->done() )
+            if ( (*i)->complete() )
                 return *i;
-        assert( false );
-        return shared_ptr< QueryOp >();
+        return ops[ 0 ];
     }
 
     

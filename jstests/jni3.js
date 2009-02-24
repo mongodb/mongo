@@ -2,7 +2,7 @@
 t = db.jni3;
 
 debug = function( s ){
-    //print( s );
+    //printjson( s );
 }
 
 for( z = 0; z < 2; z++ ) {
@@ -45,16 +45,23 @@ for( z = 0; z < 2; z++ ) {
     catch(e) { 
 	ok = true;
     }
+    debug( ok );
     assert(ok);
     
     t.ensureIndex({z:1});
     t.ensureIndex({q:1});
+
+    debug( "before indexed find" );
     
-    assert( 2 == t.find( { $where : 
-			   function(){ 
-                               return obj.i == 7 || obj.i == 8;
-			   } 
-			 } ).length() );
+    arr = t.find( { $where : 
+                 function(){ 
+                 return obj.i == 7 || obj.i == 8;
+                 } 
+                 } ).toArray();
+    debug( arr );
+    assert.eq( 2, arr.length );
+    
+    debug( "after indexed find" );
     
     for( i = 1000; i < 2000; i++ )
 	t.save( { i:i, z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } );
@@ -63,4 +70,5 @@ for( z = 0; z < 2; z++ ) {
     
     assert( t.validate().valid );
     
+    debug( "done iter" );
 }
