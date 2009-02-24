@@ -169,6 +169,24 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class QueryPatternTest {
+        public:
+            void run() {
+                ASSERT( p( BSON( "a" << 1 ) ) == p( BSON( "a" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) == p( BSON( "a" << 5 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "b" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "a" << LTE << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "a" << 1 << "b" << 2 ) ) );
+                ASSERT( p( BSON( "a" << 1 << "b" << 3 ) ) != p( BSON( "a" << 1 ) ) );
+                ASSERT( p( BSON( "a" << LT << 1 ) ) == p( BSON( "a" << LTE << 5 ) ) );
+                ASSERT( p( BSON( "a" << LT << 1 << GTE << 0 ) ) == p( BSON( "a" << LTE << 5 << GTE << 0 ) ) );
+            }
+        private:
+            static QueryPattern p( const BSONObj &query ) {
+                return FieldBoundSet( "", query ).pattern();
+            }
+        };
+        
     } // namespace FieldBoundTests
     
     namespace QueryPlanTests {
@@ -698,6 +716,7 @@ namespace QueryOptimizerTests {
             add< FieldBoundTests::UnhelpfulRegex >();
             add< FieldBoundTests::In >();
             add< FieldBoundTests::SimplifiedQuery >();
+            add< FieldBoundTests::QueryPatternTest >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();

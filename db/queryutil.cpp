@@ -138,5 +138,24 @@ namespace mongo {
         }
         return b.obj();
     }
+    
+    QueryPattern FieldBoundSet::pattern() const {
+        QueryPattern qp;
+        for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i ) {
+            if ( i->second.equality() ) {
+                qp.fieldTypes_[ i->first ] = QueryPattern::Equality;
+            } else if ( i->second.nontrivial() ) {
+                bool upper = i->second.upper().type() != MaxKey;
+                bool lower = i->second.lower().type() != MinKey;
+                if ( upper && lower )
+                    qp.fieldTypes_[ i->first ] = QueryPattern::UpperAndLowerBound;
+                else if ( upper )
+                    qp.fieldTypes_[ i->first ] = QueryPattern::UpperBound;
+                else if ( lower )
+                    qp.fieldTypes_[ i->first ] = QueryPattern::LowerBound;                    
+            }
+        }
+        return qp;
+    }
 
 } // namespace mongo

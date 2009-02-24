@@ -42,6 +42,38 @@ namespace mongo {
         vector< BSONObj > objData_;
     };
     
+    class QueryPattern {
+    public:
+        friend class FieldBoundSet;
+        enum Type {
+            Equality,
+            LowerBound,
+            UpperBound,
+            UpperAndLowerBound
+        };
+        bool operator==( const QueryPattern &other ) const {
+            map< string, Type >::const_iterator i = fieldTypes_.begin();
+            map< string, Type >::const_iterator j = other.fieldTypes_.begin();
+            while( i != fieldTypes_.end() ) {
+                if ( j == other.fieldTypes_.end() )
+                    return false;
+                if ( i->first != j->first )
+                    return false;
+                if ( i->second != j->second )
+                    return false;
+                ++i;
+                ++j;
+            }
+            return ( j == other.fieldTypes_.end() );
+        }
+        bool operator!=( const QueryPattern &other ) const {
+            return !operator==( other );
+        }
+    private:
+        QueryPattern() {}
+        map< string, Type > fieldTypes_;
+    };
+    
     class FieldBoundSet {
     public:
         FieldBoundSet( const char *ns, const BSONObj &query );
@@ -73,6 +105,7 @@ namespace mongo {
                     return false;
             return true;
         }
+        QueryPattern pattern() const;
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();
@@ -80,6 +113,5 @@ namespace mongo {
         const char *ns_;
         BSONObj query_;
     };
-
 
 } // namespace mongo
