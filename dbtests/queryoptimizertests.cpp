@@ -539,21 +539,21 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
                 string err;
-                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 BSONObj one = BSON( "a" << 1 );
                 BSONObj four = BSON( "a" << 4 );
                 theDataFileMgr.insert( ns(), one );
-                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 theDataFileMgr.insert( ns(), four );
-                ASSERT_EQUALS( 1, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 1, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 theDataFileMgr.insert( ns(), four );
-                ASSERT_EQUALS( 2, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
-                ASSERT_EQUALS( 3, doCount( ns(), BSON( "query" << emptyObj ), err ) );
-                ASSERT_EQUALS( 3, doCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
+                ASSERT_EQUALS( 2, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << emptyObj ), err ) );
+                ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
                 // missing ns
-                ASSERT_EQUALS( -1, doCount( "missingNS", emptyObj, err ) );
+                ASSERT_EQUALS( -1, runCount( "missingNS", emptyObj, err ) );
                 // impossible match
-                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << GT << 0 << LT << -1 ) ), err ) );
+                ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 << LT << -1 ) ), err ) );
             }
         };
         

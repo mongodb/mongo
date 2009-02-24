@@ -302,38 +302,72 @@ namespace mongo {
     }
     
     shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
-        RunnerSet s( *this, op );
-        return s.run();
+        Runner r( *this, op );
+        return r.run();
     }
     
-    QueryPlanSet::RunnerSet::RunnerSet( QueryPlanSet &plans, QueryOp &op ) :
+    QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
     op_( op ),
-    plans_( plans ),
-    startBarrier_( plans_.nPlans() ),
-    firstDone_( false ) {
+    plans_( plans ) {
+//    startBarrier_( plans_.nPlans() ),
+//    firstDone_( false ) {
     }
     
-    shared_ptr< QueryOp > QueryPlanSet::RunnerSet::run() {
+    shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
         massert( "no plans", plans_.plans_.size() > 0 );
-        if ( plans_.plans_.size() == 1 ) {
-            shared_ptr< QueryOp > op( op_.clone() );
-            Runner r( *plans_.plans_[ 0 ], *this, *op );
-            r();
-            return op;
-        }
         
-        boost::thread_group threads;
         vector< shared_ptr< QueryOp > > ops;
         for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
-            ops.push_back( shared_ptr< QueryOp >( op_.clone() ) );
-            Runner r( **i, *this, *ops.back() );
-            threads.create_thread( r );
+            shared_ptr< QueryOp > op( op_.clone() );
+            op->setQueryPlan( i->get() );
+            ops.push_back( op );
         }
-        threads.join_all();
+
         for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i )
-            if ( (*i)->complete() )
-                return *i;
+            (*i)->init();
+        
+        while( 1 ) {
+            unsigned errCount = 0;
+            for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+                QueryOp &op = **i;
+                try {
+                    if ( op.exceptionMessage().empty() )
+                        op.next();
+                } catch ( const std::exception &e ) {
+                    op.setExceptionMessage( e.what() );
+                } catch ( ... ) {
+                    op.setExceptionMessage( "Caught unknown exception" );
+                }
+                if ( op.complete() )
+                    return *i;
+                if ( !op.exceptionMessage().empty() )
+                    ++errCount;
+            }
+            if ( errCount == ops.size() )
+                break;
+        }
         return ops[ 0 ];
+        
+        
+//        if ( plans_.plans_.size() == 1 ) {
+//            shared_ptr< QueryOp > op( op_.clone() );
+//            Runner r( *plans_.plans_[ 0 ], *this, *op );
+//            r();
+//            return op;
+//        }
+//        
+//        boost::thread_group threads;
+//        vector< shared_ptr< QueryOp > > ops;
+//        for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
+//            ops.push_back( shared_ptr< QueryOp >( op_.clone() ) );
+//            Runner r( **i, *this, *ops.back() );
+//            threads.create_thread( r );
+//        }
+//        threads.join_all();
+//        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i )
+//            if ( (*i)->complete() )
+//                return *i;
+//        return ops[ 0 ];
     }
 
     

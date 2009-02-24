@@ -120,42 +120,42 @@ namespace mongo {
         bool unhelpful_;
     };
 
-    class QueryAborter {
-    public:
-        QueryAborter( const bool &firstDone ) :
-        firstDone_( firstDone ){}
-        class AbortException : public std::exception {
-        };
-        void mayAbort() const {
-            if ( firstDone_ )
-                throw AbortException();
-        }
-    private:
-        const bool &firstDone_;
-    };
+//    class QueryAborter {
+//    public:
+//        QueryAborter( const bool &firstDone ) :
+//        firstDone_( firstDone ){}
+//        class AbortException : public std::exception {
+//        };
+//        void mayAbort() const {
+//            if ( firstDone_ )
+//                throw AbortException();
+//        }
+//    private:
+//        const bool &firstDone_;
+//    };
     
     // Inherit from this interface to implement a new query operation.
     class QueryOp {
     public:
-        QueryOp() : complete_() {}
+        QueryOp() : complete_(), qp_() {}
         virtual ~QueryOp() {}
-        // Called by the runner, to execute this query operation using the
-        // given query plan.  The implementation should call qa.mayAbort()
-        // periodically in order to abort if the operation on another query
-        // plan is complete.
-        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) = 0;
+        virtual void init() = 0;
+        virtual void next() = 0;
+        void setQueryPlan( const QueryPlan *qp ) { qp_ = qp; }
         // Return a copy of the inheriting class, which will be run with its own
         // query plan.
         virtual QueryOp *clone() const = 0;
         bool complete() const { return complete_; }
         string exceptionMessage() const { return exceptionMessage_; }
-        // To be called by the runner only.
-        void setComplete() { complete_ = true; }
-        // To be called by the runner only.
+        // To be called by QueryPlanSet::Runner only.
         void setExceptionMessage( const string &exceptionMessage ) { exceptionMessage_ = exceptionMessage; }
+    protected:
+        void setComplete() { complete_ = true; }
+        const QueryPlan &qp() { return *qp_; }
     private:
         bool complete_;
         string exceptionMessage_;
+        const QueryPlan *qp_;
     };
     
     class QueryPlanSet {
@@ -168,38 +168,46 @@ namespace mongo {
             return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
         }
     private:
-        struct RunnerSet {
-            RunnerSet( QueryPlanSet &plans, QueryOp &op );
+        struct Runner {
+            Runner( QueryPlanSet &plans, QueryOp &op );
             shared_ptr< QueryOp > run();
             QueryOp &op_;
             QueryPlanSet &plans_;
-            boost::barrier startBarrier_;
-            bool firstDone_;            
+//            boost::barrier startBarrier_;
+//            bool firstDone_;            
         };
-        struct Runner {
-            Runner( QueryPlan &plan, RunnerSet &set, QueryOp &op ) :
-            plan_( plan ),
-            set_( set ),
-            op_( op ) {}
-            void operator()() {
-                try {
-                    set_.startBarrier_.wait();
-                    QueryAborter aborter( set_.firstDone_ );
-                    op_.run( plan_, aborter );
-                    set_.firstDone_ = true;
-                    op_.setComplete();
-                } catch ( const QueryAborter::AbortException & ) {
-                } catch ( const std::exception &e ) {
-                    exceptionMessage_ = e.what();
-                } catch ( ... ) {
-                    exceptionMessage_ = "Caught unknown exception";
-                }
-            }
-            QueryPlan &plan_;
-            RunnerSet &set_;
-            QueryOp &op_;
-            string exceptionMessage_;
-        };
+//        struct RunnerSet {
+//            RunnerSet( QueryPlanSet &plans, QueryOp &op );
+//            shared_ptr< QueryOp > run();
+//            QueryOp &op_;
+//            QueryPlanSet &plans_;
+//            boost::barrier startBarrier_;
+//            bool firstDone_;            
+//        };
+//        struct Runner {
+//            Runner( QueryPlan &plan, RunnerSet &set, QueryOp &op ) :
+//            plan_( plan ),
+//            set_( set ),
+//            op_( op ) {}
+//            void operator()() {
+//                try {
+//                    set_.startBarrier_.wait();
+//                    QueryAborter aborter( set_.firstDone_ );
+//                    op_.run( plan_, aborter );
+//                    set_.firstDone_ = true;
+//                    op_.setComplete();
+//                } catch ( const QueryAborter::AbortException & ) {
+//                } catch ( const std::exception &e ) {
+//                    exceptionMessage_ = e.what();
+//                } catch ( ... ) {
+//                    exceptionMessage_ = "Caught unknown exception";
+//                }
+//            }
+//            QueryPlan &plan_;
+//            RunnerSet &set_;
+//            QueryOp &op_;
+//            string exceptionMessage_;
+//        };
         FieldBoundSet fbs_;
         typedef boost::shared_ptr< QueryPlan > PlanPtr;
         typedef vector< PlanPtr > PlanSet;

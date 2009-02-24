@@ -525,77 +525,77 @@ namespace mongo {
     BSONObj id_obj = fromjson("{\"_id\":ObjectId( \"000000000000000000000000\" )}");
     BSONObj empty_obj = fromjson("{}");
 
-    /* { count: "collectionname"[, query: <query>] }
-     returns -1 on ns does not exist error.
-     -2 on other errors
-     */
-    int runCount(const char *ns, const BSONObj& cmd, string& err) {
-        NamespaceDetails *d = nsdetails(ns);
-        if ( d == 0 ) {
-            err = "ns does not exist";
-            return -1;
-        }
-        
-        BSONObj query = cmd.getObjectField("query");
-        
-        set< string > fields;
-        cmd.getObjectField("fields").getFieldNames( fields );
-        
-        if ( query.isEmpty() && fields.empty() ) {
-            // count of all objects
-            return (int) d->nrecords;
-        }
-        
-        auto_ptr<Cursor> c;
-        
-        bool simpleKeyToMatch = false;
-        c = getIndexCursor(ns, query, empty_obj, &simpleKeyToMatch);
-        
-        if ( c.get() ) {
-            // TODO We could check if all fields in the key are in 'fields'
-            if ( simpleKeyToMatch && fields.empty() ) {
-                /* Here we only look at the btree keys to determine if a match, instead of looking
-                 into the records, which would be much slower.
-                 */
-                int count = 0;
-                BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
-                if ( c->ok() && !query.woCompare( bc->currKeyNode().key, BSONObj(), false ) ) {
-                    BSONObj firstMatch = bc->currKeyNode().key;
-                    count++;
-                    while ( c->advance() ) {
-                        if ( !firstMatch.woEqual( bc->currKeyNode().key ) )
-                            break;
-                        count++;
-                    }
-                }
-                return count;
-            }
-        } else {
-            c = findTableScan(ns, empty_obj);
-        }
-        
-        int count = 0;
-        auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
-        while ( c->ok() ) {
-            BSONObj js = c->current();
-            bool deep;
-            if ( !matcher->matches(js, &deep) ) {
-            }
-            else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
-                bool match = true;
-                for( set< string >::iterator i = fields.begin(); i != fields.end(); ++i ) {
-                    if ( js.getFieldDotted( i->c_str() ).eoo() ) {
-                        match = false;
-                        break;
-                    }
-                }
-                if ( match )
-                    ++count;
-            }
-            c->advance();
-        }
-        return count;
-    }    
+//    /* { count: "collectionname"[, query: <query>] }
+//     returns -1 on ns does not exist error.
+//     -2 on other errors
+//     */
+//    int runCount(const char *ns, const BSONObj& cmd, string& err) {
+//        NamespaceDetails *d = nsdetails(ns);
+//        if ( d == 0 ) {
+//            err = "ns does not exist";
+//            return -1;
+//        }
+//        
+//        BSONObj query = cmd.getObjectField("query");
+//        
+//        set< string > fields;
+//        cmd.getObjectField("fields").getFieldNames( fields );
+//        
+//        if ( query.isEmpty() && fields.empty() ) {
+//            // count of all objects
+//            return (int) d->nrecords;
+//        }
+//        
+//        auto_ptr<Cursor> c;
+//        
+//        bool simpleKeyToMatch = false;
+//        c = getIndexCursor(ns, query, empty_obj, &simpleKeyToMatch);
+//        
+//        if ( c.get() ) {
+//            // TODO We could check if all fields in the key are in 'fields'
+//            if ( simpleKeyToMatch && fields.empty() ) {
+//                /* Here we only look at the btree keys to determine if a match, instead of looking
+//                 into the records, which would be much slower.
+//                 */
+//                int count = 0;
+//                BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
+//                if ( c->ok() && !query.woCompare( bc->currKeyNode().key, BSONObj(), false ) ) {
+//                    BSONObj firstMatch = bc->currKeyNode().key;
+//                    count++;
+//                    while ( c->advance() ) {
+//                        if ( !firstMatch.woEqual( bc->currKeyNode().key ) )
+//                            break;
+//                        count++;
+//                    }
+//                }
+//                return count;
+//            }
+//        } else {
+//            c = findTableScan(ns, empty_obj);
+//        }
+//        
+//        int count = 0;
+//        auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
+//        while ( c->ok() ) {
+//            BSONObj js = c->current();
+//            bool deep;
+//            if ( !matcher->matches(js, &deep) ) {
+//            }
+//            else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+//                bool match = true;
+//                for( set< string >::iterator i = fields.begin(); i != fields.end(); ++i ) {
+//                    if ( js.getFieldDotted( i->c_str() ).eoo() ) {
+//                        match = false;
+//                        break;
+//                    }
+//                }
+//                if ( match )
+//                    ++count;
+//            }
+//            c->advance();
+//        }
+//        return count;
+//    }    
 
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
        [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
@@ -933,43 +933,92 @@ namespace mongo {
 
     class CountOp : public QueryOp {
     public:
-        CountOp( const BSONObj &spec ) : spec_( spec ), count_() {}
-        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
-            BSONObj query = spec_.getObjectField("query");            
-            set< string > fields;
-            spec_.getObjectField("fields").getFieldNames( fields );
-            
-            auto_ptr<Cursor> c = qp.newCursor();
-            
-            // TODO We could check if all fields in the key are in 'fields'
-            if ( qp.exactKeyMatch() && fields.empty() ) {
-                /* Here we only look at the btree keys to determine if a match, instead of looking
-                 into the records, which would be much slower.
-                 */
-                BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
-                if ( c->ok() && !query.woCompare( bc->currKeyNode().key, BSONObj(), false ) ) {
-                    BSONObj firstMatch = bc->currKeyNode().key;
-                    count_++;
-                    while ( c->advance() ) {
-                        qa.mayAbort();
-                        if ( !firstMatch.woEqual( bc->currKeyNode().key ) )
-                            break;
-                        count_++;
-                    }
-                }
+        CountOp( const BSONObj &spec ) : spec_( spec ), count_(), bc_() {}
+//        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
+//            BSONObj query = spec_.getObjectField("query");            
+//            set< string > fields;
+//            spec_.getObjectField("fields").getFieldNames( fields );
+//            
+//            auto_ptr<Cursor> c = qp.newCursor();
+//            
+//            // TODO We could check if all fields in the key are in 'fields'
+//            if ( qp.exactKeyMatch() && fields.empty() ) {
+//                /* Here we only look at the btree keys to determine if a match, instead of looking
+//                 into the records, which would be much slower.
+//                 */
+//                BtreeCursor *bc = dynamic_cast<BtreeCursor *>(c.get());
+//                if ( c->ok() && !query.woCompare( bc->currKeyNode().key, BSONObj(), false ) ) {
+//                    BSONObj firstMatch = bc->currKeyNode().key;
+//                    count_++;
+//                    while ( c->advance() ) {
+//                        qa.mayAbort();
+//                        if ( !firstMatch.woEqual( bc->currKeyNode().key ) )
+//                            break;
+//                        count_++;
+//                    }
+//                }
+//                return;
+//            }
+//            
+//            auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
+//            while ( c->ok() ) {
+//                qa.mayAbort();
+//                BSONObj js = c->current();
+//                bool deep;
+//                if ( !matcher->matches(js, &deep) ) {
+//                }
+//                else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+//                    bool match = true;
+//                    for( set< string >::iterator i = fields.begin(); i != fields.end(); ++i ) {
+//                        if ( js.getFieldDotted( i->c_str() ).eoo() ) {
+//                            match = false;
+//                            break;
+//                        }
+//                    }
+//                    if ( match )
+//                        ++count_;
+//                }
+//                c->advance();
+//            }
+//        }
+        virtual void init() {
+            query_ = spec_.getObjectField( "query" );
+            spec_.getObjectField( "fields" ).getFieldNames( fields_ );
+            c_ = qp().newCursor();
+            if ( qp().exactKeyMatch() && fields_.empty() )
+                bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
+            else
+                matcher_.reset( new JSMatcher( query_, c_->indexKeyPattern() ) );
+        }
+        virtual void next() {
+            if ( !c_->ok() ) {
+                setComplete();
                 return;
             }
-            
-            auto_ptr<JSMatcher> matcher(new JSMatcher(query, c->indexKeyPattern()));
-            while ( c->ok() ) {
-                qa.mayAbort();
-                BSONObj js = c->current();
-                bool deep;
-                if ( !matcher->matches(js, &deep) ) {
+            if ( bc_ ) {
+                if ( firstMatch_.isEmpty() ) {
+                    firstMatch_ = bc_->currKeyNode().key;
+                    // if not match
+                    if ( query_.woCompare( firstMatch_, BSONObj(), false ) ) {
+                        setComplete();
+                        return;
+                    }
+                    ++count_;
+                } else {
+                    if ( !firstMatch_.woEqual( bc_->currKeyNode().key ) ) {
+                        setComplete();
+                        return;
+                    }
+                    ++count_;
                 }
-                else if ( !deep || !c->getsetdup(c->currLoc()) ) { // i.e., check for dups on deep items only
+            } else {
+                BSONObj js = c_->current();
+                bool deep;
+                if ( !matcher_->matches(js, &deep) ) {
+                }
+                else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
                     bool match = true;
-                    for( set< string >::iterator i = fields.begin(); i != fields.end(); ++i ) {
+                    for( set< string >::iterator i = fields_.begin(); i != fields_.end(); ++i ) {
                         if ( js.getFieldDotted( i->c_str() ).eoo() ) {
                             match = false;
                             break;
@@ -977,23 +1026,29 @@ namespace mongo {
                     }
                     if ( match )
                         ++count_;
-                }
-                c->advance();
+                }                
             }
+            c_->advance();
         }
         virtual QueryOp *clone() const {
-            return new CountOp( *this );
+            return new CountOp( spec_ );
         }
         int count() const { return count_; }
     private:
         BSONObj spec_;
         int count_;
+        auto_ptr< Cursor > c_;
+        BSONObj query_;
+        set< string > fields_;
+        BtreeCursor *bc_;
+        auto_ptr< JSMatcher > matcher_;
+        BSONObj firstMatch_;
     };
     
     /* { count: "collectionname"[, query: <query>] }
          returns -1 on ns does not exist error.
     */    
-    int doCount( const char *ns, const BSONObj &cmd, string &err ) {
+    int runCount( const char *ns, const BSONObj &cmd, string &err ) {
         NamespaceDetails *d = nsdetails( ns );
         if ( !d ) {
             err = "ns missing";
@@ -1034,87 +1089,173 @@ namespace mongo {
         n_(),
         soSize_(),
         saveClientCursor_() {}
-        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
+//        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
+//            b_.skip( sizeof( QueryResult ) );
+//            
+//            c_ = qp.newCursor();
+//            
+//            auto_ptr<ScanAndOrder> so;
+//            
+//            matcher_.reset(new JSMatcher(qp.query(), c_->indexKeyPattern()));
+//            
+//            if ( qp.scanAndOrderRequired() ) {
+//                ordering_ = true;
+//                so = auto_ptr<ScanAndOrder>(new ScanAndOrder(ntoskip_, ntoreturn_,order_));
+//                wantMore_ = false;
+//                //			scanAndOrder(b, c.get(), order, ntoreturn);
+//            }
+//            
+//            while ( c_->ok() ) {
+//                qa.mayAbort();
+//                BSONObj js = c_->current();
+//                nscanned_++;
+//                bool deep;
+//                if ( !matcher_->matches(js, &deep) ) {
+//                }
+//                else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
+//                    out() << "c_: " << c_->toString() << " match: " << js << endl;
+//                    // got a match.
+//                    assert( js.objsize() >= 0 ); //defensive for segfaults
+//                    if ( ordering_ ) {
+//                        // note: no cursors for non-indexed, ordered results.  results must be fairly small.
+//                        so->add(js);
+//                    }
+//                    else if ( ntoskip_ > 0 ) {
+//                        ntoskip_--;
+//                    } else {
+//                        if ( explain_ ) {
+//                            n_++;
+//                            if ( n_ >= ntoreturn_ && !wantMore_ )
+//                                break; // .limit() was used, show just that much.
+//                        }
+//                        else {
+//                            bool ok = fillQueryResultFromObj(b_, &filter_, js);
+//                            if ( ok ) n_++;
+//                            if ( ok ) {
+//                                if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
+//                                    (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
+//                                    /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+//                                     is only a size limit.  The idea is that on a find() where one doesn't use much results,
+//                                     we don't return much, but once getmore kicks in, we start pushing significant quantities.
+//                                     
+//                                     The n limit (vs. size) is important when someone fetches only one small field from big
+//                                     objects, which causes massive scanning server-side.
+//                                     */
+//                                    /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+//                                    if ( wantMore_ && ntoreturn_ != 1 ) {
+//                                        if ( useCursors ) {
+//                                            c_->advance();
+//                                            if ( c_->ok() ) {
+//                                                // more...so save a cursor
+//                                                saveClientCursor_ = true;
+//                                            }
+//                                        }
+//                                    }
+//                                    break;
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//                c_->advance();
+//            } // end while
+//            
+//            if ( explain_ ) {
+//                n_ = ordering_ ? so->size() : n_;
+//            } else if ( ordering_ ) {
+//                // TODO Allow operation to abort during fill.
+//                so->fill(b_, &filter_, n_);
+//            }
+//            else if ( !saveClientCursor_ && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
+//                c_->setAtTail();
+//                saveClientCursor_ = true;
+//            }
+//        }
+        virtual void init() {
             b_.skip( sizeof( QueryResult ) );
             
-            c_ = qp.newCursor();
+            c_ = qp().newCursor();
             
-            auto_ptr<ScanAndOrder> so;
+            matcher_.reset(new JSMatcher(qp().query(), c_->indexKeyPattern()));
             
-            matcher_.reset(new JSMatcher(qp.query(), c_->indexKeyPattern()));
-            
-            if ( qp.scanAndOrderRequired() ) {
+            if ( qp().scanAndOrderRequired() ) {
                 ordering_ = true;
-                so = auto_ptr<ScanAndOrder>(new ScanAndOrder(ntoskip_, ntoreturn_,order_));
+                so_.reset( new ScanAndOrder( ntoskip_, ntoreturn_, order_ ) );
                 wantMore_ = false;
-                //			scanAndOrder(b, c.get(), order, ntoreturn);
+            }
+        }
+        virtual void next() {
+            if ( !c_->ok() ) {
+                finish();
+                return;
             }
             
-            while ( c_->ok() ) {
-                qa.mayAbort();
-                BSONObj js = c_->current();
-                nscanned_++;
-                bool deep;
-                if ( !matcher_->matches(js, &deep) ) {
+            BSONObj js = c_->current();
+            nscanned_++;
+            bool deep;
+            if ( !matcher_->matches(js, &deep) ) {
+            }
+            else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
+                // got a match.
+                assert( js.objsize() >= 0 ); //defensive for segfaults
+                if ( ordering_ ) {
+                    // note: no cursors for non-indexed, ordered results.  results must be fairly small.
+                    so_->add(js);
                 }
-                else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
-                    out() << "c_: " << c_->toString() << " match: " << js << endl;
-                    // got a match.
-                    assert( js.objsize() >= 0 ); //defensive for segfaults
-                    if ( ordering_ ) {
-                        // note: no cursors for non-indexed, ordered results.  results must be fairly small.
-                        so->add(js);
-                    }
-                    else if ( ntoskip_ > 0 ) {
-                        ntoskip_--;
-                    } else {
-                        if ( explain_ ) {
-                            n_++;
-                            if ( n_ >= ntoreturn_ && !wantMore_ )
-                                break; // .limit() was used, show just that much.
+                else if ( ntoskip_ > 0 ) {
+                    ntoskip_--;
+                } else {
+                    if ( explain_ ) {
+                        n_++;
+                        if ( n_ >= ntoreturn_ && !wantMore_ ) {
+                            // .limit() was used, show just that much.
+                            finish();
+                            return;
                         }
-                        else {
-                            bool ok = fillQueryResultFromObj(b_, &filter_, js);
-                            if ( ok ) n_++;
-                            if ( ok ) {
-                                if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                    (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
-                                    /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-                                     is only a size limit.  The idea is that on a find() where one doesn't use much results,
-                                     we don't return much, but once getmore kicks in, we start pushing significant quantities.
-                                     
-                                     The n limit (vs. size) is important when someone fetches only one small field from big
-                                     objects, which causes massive scanning server-side.
-                                     */
-                                    /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                                    if ( wantMore_ && ntoreturn_ != 1 ) {
-                                        if ( useCursors ) {
-                                            c_->advance();
-                                            if ( c_->ok() ) {
-                                                // more...so save a cursor
-                                                saveClientCursor_ = true;
-                                            }
+                    }
+                    else {
+                        bool ok = fillQueryResultFromObj(b_, &filter_, js);
+                        if ( ok ) n_++;
+                        if ( ok ) {
+                            if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
+                                (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
+                                /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+                                 is only a size limit.  The idea is that on a find() where one doesn't use much results,
+                                 we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                                 
+                                 The n limit (vs. size) is important when someone fetches only one small field from big
+                                 objects, which causes massive scanning server-side.
+                                 */
+                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                                if ( wantMore_ && ntoreturn_ != 1 ) {
+                                    if ( useCursors ) {
+                                        c_->advance();
+                                        if ( c_->ok() ) {
+                                            // more...so save a cursor
+                                            saveClientCursor_ = true;
                                         }
                                     }
-                                    break;
                                 }
+                                finish();
+                                return;
                             }
                         }
                     }
                 }
-                c_->advance();
-            } // end while
-            
+            }
+            c_->advance();            
+        }
+        void finish() {
             if ( explain_ ) {
-                n_ = ordering_ ? so->size() : n_;
+                n_ = ordering_ ? so_->size() : n_;
             } else if ( ordering_ ) {
-                // TODO Allow operation to abort during fill.
-                so->fill(b_, &filter_, n_);
+                so_->fill(b_, &filter_, n_);
             }
             else if ( !saveClientCursor_ && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
                 c_->setAtTail();
                 saveClientCursor_ = true;
             }
+            setComplete();            
         }
         virtual QueryOp *clone() const {
             return new DoQueryOp( ntoskip_, ntoreturn_, order_, wantMore_, explain_, filter_, queryOptions_ );
@@ -1142,6 +1283,7 @@ namespace mongo {
         int n_;
         int soSize_;
         bool saveClientCursor_;
+        auto_ptr< ScanAndOrder > so_;
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
@@ -1306,148 +1448,148 @@ namespace mongo {
         return qr;        
     }    
 
-    class UpdateOp : public QueryOp {
-    public:
-        UpdateOp() : nscanned_() {}
-        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
-            BSONObj pattern = qp.query();
-            c_ = qp.newCursor();
-            if ( c_->ok() ) {
-                JSMatcher matcher(pattern, c_->indexKeyPattern());
-                do {
-                    qa.mayAbort();
-                    Record *r = c_->_current();
-                    nscanned_++;
-                    BSONObj js(r);
-                    if ( matcher.matches(js) )
-                        break;
-                    c_->advance();
-                } while( c_->ok() );
-            }
-        }
-        virtual QueryOp *clone() const {
-            return new UpdateOp();
-        }
-        auto_ptr< Cursor > c() { return c_; }
-        int nscanned() const { return nscanned_; }
-    private:
-        auto_ptr< Cursor > c_;
-        int nscanned_;
-    };
-    
-    int __doUpdateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
-        int profile = database->profile;
-        
-        if ( strstr(ns, ".system.") ) {
-            if( strstr(ns, ".system.users") )
-                ;
-            else {
-                out() << "\nERROR: attempt to update in system namespace " << ns << endl;
-                ss << " can't update system namespace ";
-                return 0;
-            }
-        }
-        
-        QueryPlanSet qps( ns, pattern, emptyObj );
-        auto_ptr< UpdateOp > original( new UpdateOp() );
-        shared_ptr< UpdateOp > u = qps.runOp( *original );
-        auto_ptr< Cursor > c = u->c();
-        if ( c->ok() ) {
-            Record *r = c->_current();
-            BSONObj js(r);
-            
-            if ( logop ) {
-                BSONObjBuilder idPattern;
-                BSONElement id;
-                // NOTE: If the matching object lacks an id, we'll log
-                // with the original pattern.  This isn't replay-safe.
-                // It might make sense to suppress the log instead
-                // if there's no id.
-                if ( js.getObjectID( id ) ) {
-                    idPattern.append( id );
-                    pattern = idPattern.obj();
-                }
-            }
-            
-            /* note: we only update one row and quit.  if you do multiple later,
-             be careful or multikeys in arrays could break things badly.  best
-             to only allow updating a single row with a multikey lookup.
-             */
-            
-            if ( profile )
-                ss << " nscanned:" << u->nscanned();
-            
-            /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
-             regular ones at the moment. */
-            const char *firstField = updateobj.firstElement().fieldName();
-            if ( firstField[0] == '$' ) {
-                vector<Mod> mods;
-                Mod::getMods(mods, updateobj);
-                NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
-                set<string>& idxKeys = ndt.indexKeys();
-                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
-                    if ( idxKeys.count(i->fieldName) ) {
-                        uassert("can't $inc/$set an indexed field", false);
-                    }
-                }
-                
-                Mod::applyMods(mods, c->currLoc().obj());
-                if ( profile )
-                    ss << " fastmod ";
-                if ( logop ) {
-                    if ( mods.size() ) {
-                        logOp("u", ns, updateobj, &pattern, &upsert);
-                        return 5;
-                    }
-                }
-                return 2;
-            } else {
-                checkNoMods( updateobj );
-            }
-            
-            theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
-            return 1;            
-        }
-        
-        if ( profile )
-            ss << " nscanned:" << u->nscanned();
-        
-        if ( upsert ) {
-            if ( updateobj.firstElement().fieldName()[0] == '$' ) {
-                /* upsert of an $inc. build a default */
-                vector<Mod> mods;
-                Mod::getMods(mods, updateobj);
-                BSONObjBuilder b;
-                BSONObjIterator i( pattern );
-                while( i.more() ) {
-                    BSONElement e = i.next();
-                    if ( e.eoo() )
-                        break;
-                    // Presumably the number of mods is small, so this loop isn't too expensive.
-                    for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); ++i ) {
-                        if ( strcmp( e.fieldName(), i->fieldName ) == 0 )
-                            continue;
-                        b.append( e );
-                    }
-                }
-                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
-                    b.append(i->fieldName, i->getn());
-                BSONObj obj = b.done();
-                theDataFileMgr.insert(ns, obj);
-                if ( profile )
-                    ss << " fastmodinsert ";
-                if ( logop )
-                    logOp( "i", ns, obj );
-                return 3;
-            }
-            if ( profile )
-                ss << " upsert ";
-            theDataFileMgr.insert(ns, updateobj);
-            if ( logop )
-                logOp( "i", ns, updateobj );
-            return 4;
-        }
-        return 0;
-    }
+//    class UpdateOp : public QueryOp {
+//    public:
+//        UpdateOp() : nscanned_() {}
+//        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
+//            BSONObj pattern = qp.query();
+//            c_ = qp.newCursor();
+//            if ( c_->ok() ) {
+//                JSMatcher matcher(pattern, c_->indexKeyPattern());
+//                do {
+//                    qa.mayAbort();
+//                    Record *r = c_->_current();
+//                    nscanned_++;
+//                    BSONObj js(r);
+//                    if ( matcher.matches(js) )
+//                        break;
+//                    c_->advance();
+//                } while( c_->ok() );
+//            }
+//        }
+//        virtual QueryOp *clone() const {
+//            return new UpdateOp();
+//        }
+//        auto_ptr< Cursor > c() { return c_; }
+//        int nscanned() const { return nscanned_; }
+//    private:
+//        auto_ptr< Cursor > c_;
+//        int nscanned_;
+//    };
+//    
+//    int __doUpdateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
+//        int profile = database->profile;
+//        
+//        if ( strstr(ns, ".system.") ) {
+//            if( strstr(ns, ".system.users") )
+//                ;
+//            else {
+//                out() << "\nERROR: attempt to update in system namespace " << ns << endl;
+//                ss << " can't update system namespace ";
+//                return 0;
+//            }
+//        }
+//        
+//        QueryPlanSet qps( ns, pattern, emptyObj );
+//        auto_ptr< UpdateOp > original( new UpdateOp() );
+//        shared_ptr< UpdateOp > u = qps.runOp( *original );
+//        auto_ptr< Cursor > c = u->c();
+//        if ( c->ok() ) {
+//            Record *r = c->_current();
+//            BSONObj js(r);
+//            
+//            if ( logop ) {
+//                BSONObjBuilder idPattern;
+//                BSONElement id;
+//                // NOTE: If the matching object lacks an id, we'll log
+//                // with the original pattern.  This isn't replay-safe.
+//                // It might make sense to suppress the log instead
+//                // if there's no id.
+//                if ( js.getObjectID( id ) ) {
+//                    idPattern.append( id );
+//                    pattern = idPattern.obj();
+//                }
+//            }
+//            
+//            /* note: we only update one row and quit.  if you do multiple later,
+//             be careful or multikeys in arrays could break things badly.  best
+//             to only allow updating a single row with a multikey lookup.
+//             */
+//            
+//            if ( profile )
+//                ss << " nscanned:" << u->nscanned();
+//            
+//            /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
+//             regular ones at the moment. */
+//            const char *firstField = updateobj.firstElement().fieldName();
+//            if ( firstField[0] == '$' ) {
+//                vector<Mod> mods;
+//                Mod::getMods(mods, updateobj);
+//                NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
+//                set<string>& idxKeys = ndt.indexKeys();
+//                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
+//                    if ( idxKeys.count(i->fieldName) ) {
+//                        uassert("can't $inc/$set an indexed field", false);
+//                    }
+//                }
+//                
+//                Mod::applyMods(mods, c->currLoc().obj());
+//                if ( profile )
+//                    ss << " fastmod ";
+//                if ( logop ) {
+//                    if ( mods.size() ) {
+//                        logOp("u", ns, updateobj, &pattern, &upsert);
+//                        return 5;
+//                    }
+//                }
+//                return 2;
+//            } else {
+//                checkNoMods( updateobj );
+//            }
+//            
+//            theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
+//            return 1;            
+//        }
+//        
+//        if ( profile )
+//            ss << " nscanned:" << u->nscanned();
+//        
+//        if ( upsert ) {
+//            if ( updateobj.firstElement().fieldName()[0] == '$' ) {
+//                /* upsert of an $inc. build a default */
+//                vector<Mod> mods;
+//                Mod::getMods(mods, updateobj);
+//                BSONObjBuilder b;
+//                BSONObjIterator i( pattern );
+//                while( i.more() ) {
+//                    BSONElement e = i.next();
+//                    if ( e.eoo() )
+//                        break;
+//                    // Presumably the number of mods is small, so this loop isn't too expensive.
+//                    for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); ++i ) {
+//                        if ( strcmp( e.fieldName(), i->fieldName ) == 0 )
+//                            continue;
+//                        b.append( e );
+//                    }
+//                }
+//                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
+//                    b.append(i->fieldName, i->getn());
+//                BSONObj obj = b.done();
+//                theDataFileMgr.insert(ns, obj);
+//                if ( profile )
+//                    ss << " fastmodinsert ";
+//                if ( logop )
+//                    logOp( "i", ns, obj );
+//                return 3;
+//            }
+//            if ( profile )
+//                ss << " upsert ";
+//            theDataFileMgr.insert(ns, updateobj);
+//            if ( logop )
+//                logOp( "i", ns, updateobj );
+//            return 4;
+//        }
+//        return 0;
+//    }
     
 } // namespace mongo
