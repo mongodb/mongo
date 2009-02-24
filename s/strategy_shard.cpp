@@ -68,6 +68,96 @@ namespace mongo {
         auto_ptr<DBClientCursor> _current;
     };
     
+    class ParallelSortShardedCursor : public ShardedCursor {
+    public:
+        ParallelSortShardedCursor( set<ServerAndQuery> servers , QueryMessage& q , const BSONObj& sortKey ) : ShardedCursor( q ) , _servers( servers ){
+            _numServers = servers.size();
+            _sortKey = sortKey;
+
+            _cursors = new auto_ptr<DBClientCursor>[_numServers];
+            _nexts = new BSONObj[_numServers];
+            
+            // TODO: parellize
+            int num = 0;
+            for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ ){
+                const ServerAndQuery& sq = *i;
+                _cursors[num++] = query( sq._server , 0 , sq._extra );
+            }
+            
+        }
+        virtual ~ParallelSortShardedCursor(){
+            delete( _cursors );
+        }
+
+        virtual bool more(){
+            for ( int i=0; i<_numServers; i++ ){
+                if ( ! _nexts[i].isEmpty() )
+                    return true;
+
+                if ( _cursors[i].get() && _cursors[i]->more() )
+                    return true;
+            }
+            return false;
+        }
+        
+        virtual BSONObj next(){
+            advance();
+            
+            BSONObj best = emptyObj;
+            int bestFrom = -1;
+            
+            for ( int i=0; i<_numServers; i++){
+                if ( _nexts[i].isEmpty() )
+                    continue;
+
+                if ( best.isEmpty() ){
+                    best = _nexts[i];
+                    bestFrom = i;
+                    continue;
+                }
+                
+                int comp = best.woSortOrder( _nexts[i] , _sortKey );
+                if ( comp < 0 )
+                    continue;
+                
+                best = _nexts[i];
+                bestFrom = i;
+            }
+            
+            uassert( "no more elements" , ! best.isEmpty() );
+            _nexts[bestFrom] = emptyObj;
+            
+            return best;
+        }
+        
+    private:
+        
+        void advance(){
+            for ( int i=0; i<_numServers; i++ ){
+
+                if ( ! _nexts[i].isEmpty() ){
+                    // already have a good object there
+                    continue;
+                }
+                
+                if ( ! _cursors[i]->more() ){
+                    // cursor is dead, oh well
+                    continue;
+                }
+
+                _nexts[i] = _cursors[i]->next();
+            }
+            
+        }
+
+        int _numServers;
+        set<ServerAndQuery> _servers;
+        BSONObj _sortKey;
+
+        auto_ptr<DBClientCursor> * _cursors;
+        BSONObj * _nexts;
+    };
+    
     class ShardStrategy : public Strategy {
 
         virtual void queryOp( Request& r ){
@@ -99,7 +189,7 @@ namespace mongo {
                 return;
             }
             
-            SerialServerShardedCursor * cursor = 0;
+            ShardedCursor * cursor = 0;
             
             BSONObj sort = query.getSort();
             
@@ -126,7 +216,7 @@ namespace mongo {
                 }
                 else {
                     // 3. sort on non-sharded key, pull back a portion from each server and iterate slowly
-                    throw UserException( "sorting and sharding doesn't work on a arbitrary field yet" );
+                    cursor = new ParallelSortShardedCursor( servers , q , sort );
                 }
             }
             
