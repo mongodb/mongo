@@ -540,7 +540,8 @@ namespace mongo {
         bool autoReconnect;
         time_t lastReconnectTry;
         string serverAddress; // remember for reconnects
-        void checkConnection();
+        void _checkConnection();
+        void checkConnection() { if( failed ) _checkConnection(); }
 		map< string, pair<string,string> > authCache;
     public:
 

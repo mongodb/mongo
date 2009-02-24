@@ -195,7 +195,7 @@ namespace mongo {
             return io.getStringField("ns");
         }
 
-        /* delete this index.  does NOT celan up the system catalog
+        /* delete this index.  does NOT clean up the system catalog
            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill();

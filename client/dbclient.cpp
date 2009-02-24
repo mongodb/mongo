@@ -384,7 +384,6 @@ namespace mongo {
         int port;
         size_t idx = serverAddress.find( ":" );
         if ( idx != string::npos ) {
-            //out() << "port string:" << ip.substr( idx ) << endl;
             port = strtol( serverAddress.substr( idx + 1 ).c_str(), 0, 10 );
             ip = serverAddress.substr( 0 , idx );
             ip = hostbyname(ip.c_str());
@@ -409,7 +408,7 @@ namespace mongo {
         return true;
     }
 
-    void DBClientConnection::checkConnection() {
+    void DBClientConnection::_checkConnection() {
         if ( !failed )
             return;
         if ( lastReconnectTry && time(0)-lastReconnectTry < 2 )
@@ -582,7 +581,13 @@ namespace mongo {
     }
 
     void DBClientConnection::say( Message &toSend ) {
-        port().say( toSend );
+        checkConnection();
+        try { 
+            port().say( toSend );
+        } catch( SocketException & ) { 
+            failed = true;
+            throw;
+        }
     }
 
     void DBClientConnection::sayPiggyBack( Message &toSend ) {
@@ -590,11 +595,21 @@ namespace mongo {
     }
 
     bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk ) {
-        if ( !port().call(toSend, response) ) {
+        /* todo: this is very ugly messagingport::call returns an error code AND can throw 
+                 an exception.  we should make it return void and just throw an exception anytime 
+                 it fails
+        */
+        try { 
+            if ( !port().call(toSend, response) ) {
+                failed = true;
+                if ( assertOk )
+                    massert("dbclient error communicating with server", false);
+                return false;
+            }
+        }
+        catch( SocketException & ) { 
             failed = true;
-            if ( assertOk )
-                massert("dbclient error communicating with server", false);
-            return false;
+            throw;
         }
         return true;
     }

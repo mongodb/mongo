@@ -61,11 +61,24 @@ namespace mongo {
         MongoDataFile(int fn) : fileNo(fn) { }
         void open(const char *filename, int requestedDataSize = 0);
 
-        Extent* newExtent(const char *ns, int approxSize, bool newCapped = false, int loops = 0);
+        /* allocate a new extent from this datafile. 
+           @param capped - true if capped collection
+           @param loops is our recursion check variable - you want to pass in zero
+        */
+        Extent* createExtent(const char *ns, int approxSize, bool capped = false, int loops = 0);
+
+        /* see if we can find an extent of the right size in the freelist.  if not, 
+           createExtent.
+        */
+        Extent* allocExtent(const char *ns, int approxSize, bool capped = false);
+
         MDFHeader *getHeader() {
             return header;
         }
+
+        /* return max size an extent may be */
         static int maxSize();
+
     private:
         int defaultSize( const char *filename ) const;
 
@@ -191,6 +204,9 @@ namespace mongo {
         Caller will need to add that to the freelist structure in namespacedetail.
         */
         DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset);
+
+        /* like init(), but for a reuse case */
+        DiskLoc reuse(const char *nsname);
 
         void assertOk() {
             assert(magic == 0x41424344);
