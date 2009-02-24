@@ -74,19 +74,20 @@ namespace mongo {
         virtual ~QueryOp() {}
         virtual void init() = 0;
         virtual void next() = 0;
-        void setQueryPlan( const QueryPlan *qp ) { qp_ = qp; }
+        virtual bool mayRecordPlan() const = 0;
         // Return a copy of the inheriting class, which will be run with its own
         // query plan.
         virtual QueryOp *clone() const = 0;
         bool complete() const { return complete_; }
         bool error() const { return error_; }
         string exceptionMessage() const { return exceptionMessage_; }
+        const QueryPlan &qp() { return *qp_; }
         // To be called by QueryPlanSet::Runner only.
+        void setQueryPlan( const QueryPlan *qp ) { qp_ = qp; }
         void setExceptionMessage( const string &exceptionMessage ) {
             error_ = true;
             exceptionMessage_ = exceptionMessage;
         }
-        const QueryPlan &qp() { return *qp_; }
     protected:
         void setComplete() { complete_ = true; }
     private:

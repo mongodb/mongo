@@ -664,6 +664,7 @@ namespace QueryOptimizerTests {
                     youThrow_ = !youThrow_;
                     return op;
                 }
+                virtual bool mayRecordPlan() const { return true; }
             private:
                 bool iThrow_;
                 bool &threw_;
@@ -695,6 +696,7 @@ namespace QueryOptimizerTests {
                 virtual QueryOp *clone() const {
                     return new TestOp();
                 }
+                virtual bool mayRecordPlan() const { return true; }
             };
         };
         
@@ -744,6 +746,7 @@ namespace QueryOptimizerTests {
                 virtual QueryOp *clone() const {
                     return new TestOp();
                 }
+                virtual bool mayRecordPlan() const { return true; }
             };            
         };        
         

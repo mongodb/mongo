@@ -697,6 +697,7 @@ namespace mongo {
             return new CountOp( spec_ );
         }
         int count() const { return count_; }
+        virtual bool mayRecordPlan() const { return true; }
     private:
         BSONObj spec_;
         int count_;
@@ -838,6 +839,7 @@ namespace mongo {
             }
             setComplete();            
         }
+        virtual bool mayRecordPlan() const { return ntoreturn_ != 1; }
         virtual QueryOp *clone() const {
             return new DoQueryOp( ntoskip_, ntoreturn_, order_, wantMore_, explain_, filter_, queryOptions_ );
         }

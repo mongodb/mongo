@@ -257,7 +257,8 @@ namespace mongo {
                     op.setExceptionMessage( "Caught unknown exception" );
                 }
                 if ( op.complete() ) {
-                    op.qp().registerSelf(); 
+                    if ( op.mayRecordPlan() )
+                        op.qp().registerSelf(); 
                     return *i;
                 }
                 if ( op.error() )
