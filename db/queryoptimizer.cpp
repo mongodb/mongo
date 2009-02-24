@@ -211,8 +211,6 @@ namespace mongo {
     QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
     op_( op ),
     plans_( plans ) {
-//    startBarrier_( plans_.nPlans() ),
-//    firstDone_( false ) {
     }
     
     shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
