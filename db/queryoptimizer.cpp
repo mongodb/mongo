@@ -123,6 +123,23 @@ namespace mongo {
         return *trivialBound_;
     }
     
+    BSONObj FieldBoundSet::simplifiedQuery() const {
+        BSONObjBuilder b;
+        for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i ) {
+            if ( i->second.equality() )
+                b.appendAs( i->second.lower(), i->first.c_str() );
+            else if ( i->second.nontrivial() ) {
+                BSONObjBuilder c;
+                if ( i->second.lower().type() != MinKey )
+                    c.appendAs( i->second.lower(), "$gte" );
+                if ( i->second.upper().type() != MaxKey )
+                    c.appendAs( i->second.upper(), "$lte" );
+                b.append( i->first.c_str(), c.done() );
+            }
+        }
+        return b.obj();
+    }
+    
     QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index ) :
     fbs_( fbs ),
     order_( order ),

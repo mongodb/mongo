@@ -162,6 +162,18 @@ namespace QueryOptimizerTests {
             BSONObj o1_, o2_;
         };
         
+        class SimplifiedQuery {
+        public:
+            void run() {
+                FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 ) );
+                BSONObj simple = fbs.simplifiedQuery();
+                out() << "simple: " << simple << endl;
+                ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gte:5,$lte:10}" ) ) );
+                ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
+                ASSERT( !simple.getObjectField( "c" ).woCompare( fromjson( "{$lte:4}" ) ) );
+            }
+        };
+        
     } // namespace FieldBoundTests
     
     namespace QueryPlanTests {
@@ -540,6 +552,7 @@ namespace QueryOptimizerTests {
             add< FieldBoundTests::Regex >();
             add< FieldBoundTests::UnhelpfulRegex >();
             add< FieldBoundTests::In >();
+            add< FieldBoundTests::SimplifiedQuery >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();

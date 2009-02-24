@@ -67,6 +67,7 @@ namespace mongo {
         }
         const char *ns() const { return ns_; }
         BSONObj query() const { return query_; }
+        BSONObj simplifiedQuery() const;
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();
