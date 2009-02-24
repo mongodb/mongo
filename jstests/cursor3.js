@@ -17,18 +17,18 @@ function testConstrainedFindWithOrdering( db ) {
     r.save( { a: 2 } );
     r.ensureIndex( { a: 1 } );
 
-    checkResults( [ 1 ], r.find( { a: 1 } ).sort( { a: 1 } ) );
-    checkResults( [ 1 ], r.find( { a: 1 } ).sort( { a: -1 } ) );
+    checkResults( [ 1 ], r.find( { a: 1 } ).sort( { a: 1 } ).hint( { a: 1 } ) );
+    checkResults( [ 1 ], r.find( { a: 1 } ).sort( { a: -1 } ).hint( { a: 1 } ) );
 
-    checkResults( [ 1, 2 ], r.find( { a: { $gt: 0 } } ).sort( { a: 1 } ) );
-    checkResults( [ 2, 1 ], r.find( { a: { $gt: 0 } } ).sort( { a: -1 } ) );
-    checkResults( [ 1, 2 ], r.find( { a: { $gte: 1 } } ).sort( { a: 1 } ) );
-    checkResults( [ 2, 1 ], r.find( { a: { $gte: 1 } } ).sort( { a: -1 } ) );
+    checkResults( [ 1, 2 ], r.find( { a: { $gt: 0 } } ).sort( { a: 1 } ).hint( { a: 1 } ) );
+    checkResults( [ 2, 1 ], r.find( { a: { $gt: 0 } } ).sort( { a: -1 } ).hint( { a: 1 } ) );
+    checkResults( [ 1, 2 ], r.find( { a: { $gte: 1 } } ).sort( { a: 1 } ).hint( { a: 1 } ) );
+    checkResults( [ 2, 1 ], r.find( { a: { $gte: 1 } } ).sort( { a: -1 } ).hint( { a: 1 } ) );
     
-    checkResults( [ 0, 1 ], r.find( { a: { $lt: 2 } } ).sort( { a: 1 } ) );
-    checkResults( [ 1, 0 ], r.find( { a: { $lt: 2 } } ).sort( { a: -1 } ) );
-    checkResults( [ 0, 1 ], r.find( { a: { $lte: 1 } } ).sort( { a: 1 } ) );
-    checkResults( [ 1, 0 ], r.find( { a: { $lte: 1 } } ).sort( { a: -1 } ) );
+    checkResults( [ 0, 1 ], r.find( { a: { $lt: 2 } } ).sort( { a: 1 } ).hint( { a: 1 } ) );
+    checkResults( [ 1, 0 ], r.find( { a: { $lt: 2 } } ).sort( { a: -1 } ).hint( { a: 1 } ) );
+    checkResults( [ 0, 1 ], r.find( { a: { $lte: 1 } } ).sort( { a: 1 } ).hint( { a: 1 } ) );
+    checkResults( [ 1, 0 ], r.find( { a: { $lte: 1 } } ).sort( { a: -1 } ).hint( { a: 1 } ) );
 }
 
 testConstrainedFindWithOrdering( db );
