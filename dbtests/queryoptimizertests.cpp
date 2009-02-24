@@ -577,6 +577,70 @@ namespace QueryOptimizerTests {
             }
         };        
         
+        class SingleException : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                ASSERT_EQUALS( 3, s.nPlans() );
+                bool threw = false;
+                auto_ptr< TestOp > t( new TestOp( true, threw ) );
+                shared_ptr< TestOp > done = s.runOp( *t );
+                ASSERT( threw );
+                ASSERT( done->complete() );
+                ASSERT( done->exceptionMessage().empty() );
+            }
+        private:
+            class TestOp : public QueryOp {
+            public:
+                TestOp( bool iThrow, bool &threw ) : iThrow_( iThrow ), threw_( threw ), i_(), youThrow_( false ) {}
+                virtual void init() {}
+                virtual void next() {
+                    if ( iThrow_ )
+                        threw_ = true;
+                    massert( "throw", !iThrow_ );
+                    if ( ++i_ > 10 )
+                        setComplete();
+                }
+                virtual QueryOp *clone() const {
+                    QueryOp *op = new TestOp( youThrow_, threw_ );
+                    youThrow_ = !youThrow_;
+                    return op;
+                }
+            private:
+                bool iThrow_;
+                bool &threw_;
+                int i_;
+                mutable bool youThrow_;
+            };
+        };
+        
+        class AllException : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                ASSERT_EQUALS( 3, s.nPlans() );
+                auto_ptr< TestOp > t( new TestOp() );
+                shared_ptr< TestOp > done = s.runOp( *t );
+                ASSERT( !done->complete() );
+                ASSERT_EQUALS( "throw", done->exceptionMessage() );
+            }
+        private:
+            class TestOp : public QueryOp {
+            public:
+                virtual void init() {}
+                virtual void next() {
+                    massert( "throw", false );
+                }
+                virtual QueryOp *clone() const {
+                    return new TestOp();
+                }
+            };
+        };
+        
     } // namespace QueryPlanSetTests
     
     class All : public UnitTest::Suite {
@@ -619,6 +683,8 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::Count >();
             add< QueryPlanSetTests::QueryMissingNs >();
             add< QueryPlanSetTests::UnhelpfulIndex >();
+            add< QueryPlanSetTests::SingleException >();
+            add< QueryPlanSetTests::AllException >();
         }
     };
     
