@@ -72,6 +72,7 @@ namespace mongo {
     
     auto_ptr<DBClientCursor> ShardedCursor::query( const string& server , int num ){
         ScopedDbConnection conn( server );
+        log(5) << "ShardedCursor::query  server:" << server << " ns:" << _ns << " query:" << _query << " num:" << num << endl;
         auto_ptr<DBClientCursor> cursor = conn->query( _ns.c_str() , _query , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
         conn.done();
         return cursor;

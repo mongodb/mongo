@@ -76,6 +76,16 @@ namespace mongo {
            @return whether or not shard should be looked at for query
          */
         bool relevantForQuery( const BSONObj& query , Shard * shard );
+        
+        int numFields() const{ return _fieldsAndOrder.nFields(); }
+
+
+        /**
+           0 if sort either doesn't have all the fields or has extra fields
+           < 0 if sort is descending
+           > 1 if sort is ascending
+         */
+        int isMatchAndOrder( const BSONObj& sort );
 
         BSONObj& key(){
             return _fieldsAndOrder;

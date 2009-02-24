@@ -119,6 +119,15 @@ namespace mongo {
         b.append( _fieldName.c_str() , temp.obj() );
     }    
 
+    int ShardKey::isMatchAndOrder( const BSONObj& sort ){
+        if ( sort.nFields() != _fieldsAndOrder.nFields() )
+            return 0;
+
+        if ( sort[_fieldName.c_str()].number() <= 0 )
+            return -1;
+        return 1;
+    }
+
     string ShardKey::toString() const {
         return _fieldsAndOrder.toString();
     }
