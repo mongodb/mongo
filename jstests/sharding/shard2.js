@@ -32,13 +32,13 @@ seconday = s.getOther( primary ).getDB( "test" );
 
 assert.eq( 3 , primary.foo.find().length() , "primary wrong B" );
 assert.eq( 0 , seconday.foo.find().length() , "seconday wrong C" );
+assert.eq( 3 , db.foo.find().sort( { num : 1 } ).length() );
 
-// at this point we have 2 shard on 1 server
-
-assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
-assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
+// NOTE: at this point we have 2 shard on 1 server
 
 // test move shard
+assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
+assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
 
 s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : seconday.getMongo().name } );
 assert.eq( 1 , primary.foo.find().length() );
@@ -99,5 +99,11 @@ assert.eq( 3 , db.foo.find().sort( { num : -1 } )[0].num , "sharding query w/sor
 
 
 // TODO: sory by name
+
+// sort by num multiple shards per server
+s.adminCommand( { split : "test.foo" , find : { num : 2 } } );
+assert.eq( "funny man" , db.foo.find().sort( { num : 1 } )[0].name , "sharding query w/sort and another split 1 order wrong" );
+assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query w/sort and another split 2 order wrong" );
+//assert.eq( "funny man" , db.foo.find( { num : { $lt : 100 } } ).sort( { num : 1 } ).arrayAccess(0).name , "sharding query w/sort and another split 3 order wrong" );
 
 s.stop();

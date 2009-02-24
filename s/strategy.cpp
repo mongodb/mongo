@@ -70,12 +70,79 @@ namespace mongo {
     ShardedCursor::~ShardedCursor(){
     }
     
-    auto_ptr<DBClientCursor> ShardedCursor::query( const string& server , int num ){
+    auto_ptr<DBClientCursor> ShardedCursor::query( const string& server , int num , BSONObj extra ){
+
+        BSONObj q = _query;
+        if ( ! extra.isEmpty() ){
+            q = concatQuery( q , extra );
+        }
+
         ScopedDbConnection conn( server );
-        log(5) << "ShardedCursor::query  server:" << server << " ns:" << _ns << " query:" << _query << " num:" << num << endl;
+        log(5) << "ShardedCursor::query  server:" << server << " ns:" << _ns << " query:" << q << " num:" << num << endl;
         auto_ptr<DBClientCursor> cursor = conn->query( _ns.c_str() , _query , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
         conn.done();
         return cursor;
+    }
+
+    BSONObj ShardedCursor::concatQuery( const BSONObj& query , const BSONObj& extraFilter ){
+        if ( ! query.hasField( "query" ) )
+            return _concatFilter( query , extraFilter );
+        
+        BSONObjBuilder b;
+        BSONObjIterator i( query );
+        while ( i.more() ){
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+
+            if ( strcmp( e.fieldName() , "query" ) ){
+                b.append( e );
+                continue;
+            }
+            
+            b.append( "query" , _concatFilter( e.embeddedObjectUserCheck() , extraFilter ) );
+        }
+        return b.obj();
+    }
+
+    BSONObj ShardedCursor::_concatFilter( const BSONObj& filter , const BSONObj& extra ){
+        BSONObjBuilder b;
+        
+        { // take things from filter
+            BSONObjIterator i( filter );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                if ( e.eoo() ) 
+                    break;
+                
+                if ( ! extra.hasField( e.fieldName() ) ){
+                    b.append( e );
+                    continue;
+                }
+
+                BSONElement f = extra[e.fieldName()];
+
+                uassert( "don't understand how filter couldn't be a range" , e.type() == Object );
+                uassert( "don't understand how extra couldn't be a range" , f.type() == Object );
+
+                throw UserException( "can't handle a filter on a shard key yet: (" );
+            }
+        }
+        
+        { // take anything left over from extra 
+            BSONObjIterator i( extra );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                if ( e.eoo() ) 
+                    break;
+                
+                if ( filter.hasField( e.fieldName() ) )
+                    continue;
+                b.append( e );
+            }
+        }
+        
+        return b.obj();
     }
 
     void ShardedCursor::sendNextBatch( Request& r ){

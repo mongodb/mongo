@@ -51,9 +51,8 @@ namespace mongo {
             if ( _serverIndex >= _servers.size() )
                 return false;
 
-            uassert( "no custom query yet" , _servers[_serverIndex]._extra.isEmpty() );
-            _current = query( _servers[_serverIndex]._server );
-            _serverIndex++;
+            ServerAndQuery& sq = _servers[_serverIndex++];
+            _current = query( sq._server , 0 , sq._extra );
             return _current->more();
         }
 
@@ -115,8 +114,13 @@ namespace mongo {
                     set<ServerAndQuery> buckets;
                     for ( vector<Shard*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                         Shard * s = *i;
-                        uassert( "multiple shards per server w/sort doesn't work" , serverCounts[s->getServer()] == 1 );
-                        buckets.insert( ServerAndQuery( s->getServer() , emptyObj , s->getMin() ) );
+                        BSONObj extra = emptyObj;
+                        if ( serverCounts[s->getServer()] > 1 ){
+                            BSONObjBuilder b;
+                            s->getFilter( b );
+                            extra = b.obj();
+                        }
+                        buckets.insert( ServerAndQuery( s->getServer() , extra , s->getMin() ) );
                     }
                     cursor = new SerialServerShardedCursor( buckets , q , shardKeyOrder );
                 }

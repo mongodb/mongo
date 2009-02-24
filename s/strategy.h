@@ -31,8 +31,11 @@ namespace mongo {
         void sendNextBatch( Request& r );
         
     protected:
-        auto_ptr<DBClientCursor> query( const string& server , int num = 0 );
-                                        
+        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = emptyObj );
+
+        BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
+        BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
+
         string _ns;
         int _options;
         BSONObj _query;
