@@ -8,38 +8,64 @@
 
 namespace mongo {
     
-    class DownstreamServerState {
+    class ServerAndQuery {
     public:
-        DownstreamServerState( string name ) : _name( name ) , _used(0){ 
+        ServerAndQuery( const string& server , BSONObj extra = emptyObj , BSONObj orderObject = emptyObj ) : 
+            _server( server ) , _extra( extra ) , _orderObject( orderObject ){
         }
-        
-        string _name;
-        bool _used;
-        long long _cursor;
-    };
 
+        bool operator<( const ServerAndQuery& other ) const{
+            if ( ! _orderObject.isEmpty() )
+                return _orderObject.woCompare( other._orderObject ) < 0;
+            
+            if ( _server < other._server )
+                return true;
+            if ( other._server > _server )
+                return false;
+            return _extra.woCompare( other._extra ) < 0;
+        }
+
+        string _server;
+        BSONObj _extra;
+        BSONObj _orderObject;
+    };
+    
     class SerialServerShardedCursor : public ShardedCursor {
     public:
-        SerialServerShardedCursor( set<string> servers , string ns , const BSONObj& q ){
-            for ( set<string>::iterator i = servers.begin(); i!=servers.end(); i++ )
-                _servers.push_back( DownstreamServerState( *i ) );
+        SerialServerShardedCursor( set<ServerAndQuery> servers , QueryMessage& q , int sortOrder=0) : ShardedCursor( q ){
+            for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ )
+                _servers.push_back( *i );
 
+            if ( sortOrder > 0 )
+                sort( _servers.begin() , _servers.end() );
+            else if ( sortOrder < 0 )
+                sort( _servers.rbegin() , _servers.rend() );
+                    
             _serverIndex = 0;
-            
-            _ns = ns;
-            _query = q.copy();
         }
-
-        virtual void sendNextBatch( Request& r ){
-            throw UserException( "SerialServerShardedCursor doesn't work yet" );
-        }
-
-    private:
-        vector<DownstreamServerState> _servers;
-        int _serverIndex;
         
-        string _ns;
-        BSONObj _query;
+        virtual bool more(){
+            if ( _current.get() && _current->more() )
+                return true;
+
+            if ( _serverIndex >= _servers.size() )
+                return false;
+
+            ServerAndQuery& sq = _servers[_serverIndex++];
+            _current = query( sq._server , 0 , sq._extra );
+            return _current->more();
+        }
+
+        virtual BSONObj next(){
+            uassert( "no more items" , more() );
+            return _current->next();
+        }
+        
+    private:
+        vector<ServerAndQuery> _servers;
+        unsigned _serverIndex;
+        
+        auto_ptr<DBClientCursor> _current;
     };
     
     class ShardStrategy : public Strategy {
@@ -60,27 +86,48 @@ namespace mongo {
             vector<Shard*> shards;
             info->getShardsForQuery( shards , query.getFilter()  );
             
-            set<string> servers;
+            set<ServerAndQuery> servers;
+            map<string,int> serverCounts;
             for ( vector<Shard*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                 servers.insert( (*i)->getServer() );
+                int& num = serverCounts[(*i)->getServer()];
+                num++;
             }
             
             if ( servers.size() == 1 ){
-                doQuery( r , *(servers.begin()) );
+                doQuery( r , servers.begin()->_server );
                 return;
             }
             
             SerialServerShardedCursor * cursor = 0;
-
-            if ( query.getSort().isEmpty() ){
+            
+            BSONObj sort = query.getSort();
+            
+            if ( sort.isEmpty() ){
                 // 1. no sort, can just hit them in serial
-                cursor = new SerialServerShardedCursor( servers , q.ns , q.query );
+                cursor = new SerialServerShardedCursor( servers , q );
             }
             else {
-                // 2. sort on shard key, can do in serial intelligently
-                // 3. sort on non-sharded key, pull back a portion from each server and iterate slowly
-
-                throw UserException( "sorting and sharding doesn't work yet" );
+                int shardKeyOrder = info->getShardKey().isMatchAndOrder( sort );
+                if ( shardKeyOrder ){
+                    // 2. sort on shard key, can do in serial intelligently
+                    set<ServerAndQuery> buckets;
+                    for ( vector<Shard*>::iterator i = shards.begin(); i != shards.end(); i++ ){
+                        Shard * s = *i;
+                        BSONObj extra = emptyObj;
+                        if ( serverCounts[s->getServer()] > 1 ){
+                            BSONObjBuilder b;
+                            s->getFilter( b );
+                            extra = b.obj();
+                        }
+                        buckets.insert( ServerAndQuery( s->getServer() , extra , s->getMin() ) );
+                    }
+                    cursor = new SerialServerShardedCursor( buckets , q , shardKeyOrder );
+                }
+                else {
+                    // 3. sort on non-sharded key, pull back a portion from each server and iterate slowly
+                    throw UserException( "sorting and sharding doesn't work on a arbitrary field yet" );
+                }
             }
             
             assert( cursor );

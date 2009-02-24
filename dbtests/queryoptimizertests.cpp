@@ -51,16 +51,6 @@ namespace QueryOptimizerTests {
             }
         };
         
-        class Bad {
-        public:
-            virtual ~Bad() {}
-            void run() {
-                ASSERT_EXCEPTION( FieldBoundSet f( "ns", query() ), AssertionException );
-            }
-        protected:
-            virtual BSONObj query() = 0;
-        };
-        
         class Empty : public Base {
             virtual BSONObj query() { return emptyObj; }
         };
@@ -115,8 +105,12 @@ namespace QueryOptimizerTests {
             virtual BSONObj query() { return BSON( "a" << 1 << "a" << GTE << 1 ); }            
         };
 
-        class EqGteInvalid : public Bad {
-            virtual BSONObj query() { return BSON( "a" << 1 << "a" << GTE << 2 ); }            
+        class EqGteInvalid {
+        public:
+            void run() {
+                FieldBoundSet fbs( "ns", BSON( "a" << 1 << "a" << GTE << 2 ) );
+                ASSERT( !fbs.matchPossible() );
+            }
         };        
 
         class Regex : public Base {
@@ -278,17 +272,17 @@ namespace QueryOptimizerTests {
             void run() {
                 BSONObjBuilder b;
                 b.appendMinKey( "" );
-                b.appendMinKey( "" );
-                BSONObj low = b.obj();
+                b.appendMaxKey( "" );
+                BSONObj start = b.obj();
                 BSONObjBuilder b2;
                 b2.appendMaxKey( "" );
-                b2.appendMaxKey( "" );
-                BSONObj high = b2.obj();
+                b2.appendMinKey( "" );
+                BSONObj end = b2.obj();
                 QueryPlan p( FBS( emptyObj ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
                 ASSERT_EQUALS( -1, p.direction() );
-                ASSERT( !p.endKey().woCompare( low ) );
-                ASSERT( !p.startKey().woCompare( high ) );
+                ASSERT( !p.startKey().woCompare( start ) );
+                ASSERT( !p.endKey().woCompare( end ) );
                 QueryPlan p2( FBS( emptyObj ), BSON( "a" << -1 << "b" << -1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );                
                 ASSERT_EQUALS( -1, p2.direction() );
@@ -427,6 +421,8 @@ namespace QueryOptimizerTests {
                 setClient( ns() );
                 string err;
                 userCreateNS( ns(), emptyObj, err, false );
+                AuthenticationInfo *ai = new AuthenticationInfo();
+                authInfo.reset( ai );
             }
             ~Base() {
                 if ( !nsd() )
@@ -434,6 +430,20 @@ namespace QueryOptimizerTests {
                 string s( ns() );
                 dropNS( s );
             }
+            static void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
+                // see query.h for the protocol we are using here.
+                BufBuilder b;
+                int opts = queryOptions;
+                assert( (opts&Option_ALLMASK) == opts );
+                b.append(opts);
+                b.append(ns.c_str());
+                b.append(nToSkip);
+                b.append(nToReturn);
+                query.appendSelfToBufBuilder(b);
+                if ( fieldsToReturn )
+                    fieldsToReturn->appendSelfToBufBuilder(b);
+                toSend.setData(dbQuery, b.buf(), b.len());
+            }            
         protected:
             static const char *ns() { return "QueryPlanSetTests.coll"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
@@ -503,6 +513,28 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class NaturalHint : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                BSONObj b = BSON( "hint" << BSON( "$natural" << 1 ) );
+                BSONElement e = b.firstElement();
+                QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
+                ASSERT_EQUALS( 1, s.nPlans() );                
+            }
+        };
+
+        class NaturalSort : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "b_2" );
+                QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "$natural" << 1 ) );
+                ASSERT_EQUALS( 1, s.nPlans() );
+            }
+        };
+
         class BadHint : public Base {
         public:
             void run() {
@@ -530,8 +562,32 @@ namespace QueryOptimizerTests {
                 ASSERT_EQUALS( 2, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 ASSERT_EQUALS( 3, doCount( ns(), BSON( "query" << emptyObj ), err ) );
                 ASSERT_EQUALS( 3, doCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
+                // missing ns
+                ASSERT_EQUALS( -1, doCount( "missingNS", emptyObj, err ) );
+                // impossible match
+                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << GT << 0 << LT << -1 ) ), err ) );
             }
         };
+        
+        class QueryMissingNs : public Base {
+        public:
+            void run() {
+                Message m;
+                assembleRequest( "missingNS", emptyObj, 0, 0, &emptyObj, 0, m );
+                stringstream ss;
+                ASSERT_EQUALS( 0, runQuery( m, ss )->nReturned );
+            }
+        };
+        
+        class UnhelpfulIndex : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                QueryPlanSet s( ns(), BSON( "a" << 1 << "c" << 2 ), emptyObj );
+                ASSERT_EQUALS( 2, s.nPlans() );                
+            }
+        };        
         
     } // namespace QueryPlanSetTests
     
@@ -570,8 +626,12 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::NoSpec >();
             add< QueryPlanSetTests::HintSpec >();
             add< QueryPlanSetTests::HintName >();
+            add< QueryPlanSetTests::NaturalHint >();
+            add< QueryPlanSetTests::NaturalSort >();
             add< QueryPlanSetTests::BadHint >();
             add< QueryPlanSetTests::Count >();
+            add< QueryPlanSetTests::QueryMissingNs >();
+            add< QueryPlanSetTests::UnhelpfulIndex >();
         }
     };
     

@@ -239,7 +239,8 @@ namespace mongo {
                 return false;
             conn = c;
         }
-        
+       
+
         copy( ns, ns, false, logForRepl, false, false, query );
         if ( !copyIndexes )
             return true;

@@ -2,7 +2,7 @@
 * test very basic sharding
 */
 
-s = new ShardingTest( "shard2" , 2 );
+s = new ShardingTest( "shard2" , 2 , 5 );
 
 db = s.getDB( "test" );
 
@@ -32,13 +32,13 @@ seconday = s.getOther( primary ).getDB( "test" );
 
 assert.eq( 3 , primary.foo.find().length() , "primary wrong B" );
 assert.eq( 0 , seconday.foo.find().length() , "seconday wrong C" );
+assert.eq( 3 , db.foo.find().sort( { num : 1 } ).length() );
 
-// at this point we have 2 shard on 1 server
-
-assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
-assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
+// NOTE: at this point we have 2 shard on 1 server
 
 // test move shard
+assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
+assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
 
 s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : seconday.getMongo().name } );
 assert.eq( 1 , primary.foo.find().length() );
@@ -62,7 +62,7 @@ assert.eq( 2 , primary.foo.find().length() , "after move insert go wrong place?"
 assert.eq( 3 , seconday.foo.find().length() , "after move insert go wrong place?" );
 
 
-db.foo.save( { num : 0 , name : "funny man" } );
+db.foo.save( { num : 0 , name : "funny guy" } );
 s.adminCommand( "connpoolsync" );
 assert.eq( 2 , primary.foo.find().length() , "boundary A" );
 assert.eq( 4 , seconday.foo.find().length() , "boundary B" );
@@ -71,13 +71,39 @@ assert.eq( 4 , seconday.foo.find().length() , "boundary B" );
 assert.eq( "eliot" , db.foo.findOne( { num : 1 } ).name );
 assert.eq( "funny man" , db.foo.findOne( { num : -2 } ).name );
 
-// TODO: getAll
-//assert.eq( 3 , db.foo.find().length() );
+// getAll
+function sumQuery( c ){
+    var sum = 0;
+    c.toArray().forEach(
+        function(z){
+            sum += z.num;
+        }
+    );
+    return sum;
+}
+assert.eq( 6 , db.foo.find().length() , "sharded query 1" );
+assert.eq( 3 , sumQuery( db.foo.find() ) , "sharded query 2" );
 
-// TODO: sort by num
+// sort by num
+
+assert.eq( 3 , sumQuery( db.foo.find().sort( { num : 1 } ) ) , "sharding query w/sort 1" );
+assert.eq( 3 , sumQuery( db.foo.find().sort( { num : -1 } ) ) , "sharding query w/sort 2" );
+
+printjson( db.foo.find().sort( { num : 1 } ).toArray() );
+
+assert.eq( "funny man" , db.foo.find().sort( { num : 1 } )[0].name , "sharding query w/sort 3 order wrong" );
+assert.eq( -2 , db.foo.find().sort( { num : 1 } )[0].num , "sharding query w/sort 4 order wrong" );
+
+assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query w/sort 5 order wrong" );
+assert.eq( 3 , db.foo.find().sort( { num : -1 } )[0].num , "sharding query w/sort 6 order wrong" );
+
 
 // TODO: sory by name
 
-// TODO: add wrong data to primary and make sure doesn't appear in collated results
+// sort by num multiple shards per server
+s.adminCommand( { split : "test.foo" , find : { num : 2 } } );
+assert.eq( "funny man" , db.foo.find().sort( { num : 1 } )[0].name , "sharding query w/sort and another split 1 order wrong" );
+assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query w/sort and another split 2 order wrong" );
+//assert.eq( "funny man" , db.foo.find( { num : { $lt : 100 } } ).sort( { num : 1 } ).arrayAccess(0).name , "sharding query w/sort and another split 3 order wrong" );
 
 s.stop();

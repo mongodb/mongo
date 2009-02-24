@@ -1330,6 +1330,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\concurrency.h"
+				>
+			</File>
+			<File
 				RelativePath=".\curop.h"
 				>
 			</File>

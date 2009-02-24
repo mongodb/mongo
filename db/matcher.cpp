@@ -447,6 +447,7 @@ namespace mongo {
                 return false; // didn't compile
             }
 #if !defined(NOJNI)
+
             /**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */
             {
                 if ( where->jsScope ) {

@@ -68,6 +68,12 @@ namespace mongo {
         const char *ns() const { return ns_; }
         BSONObj query() const { return query_; }
         BSONObj simplifiedQuery() const;
+        bool matchPossible() const {
+            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
+                if ( i->second.lower().woCompare( i->second.upper(), false ) > 0 )
+                    return false;
+            return true;
+        }
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();
@@ -91,6 +97,9 @@ namespace mongo {
         bool keyMatch() const { return keyMatch_; }
         /* True if keyMatch() is true, and all matches will be equal according to woEqual() */
         bool exactKeyMatch() const { return exactKeyMatch_; }
+        /* If true, the startKey and endKey are unhelpful, the index order doesn't match the 
+           requested sort order, and keyMatch is false */
+        bool unhelpful() const { return unhelpful_; }
         int direction() const { return direction_; }
         BSONObj startKey() const { return startKey_; }
         BSONObj endKey() const { return endKey_; }
@@ -109,6 +118,7 @@ namespace mongo {
         int direction_;
         BSONObj startKey_;
         BSONObj endKey_;
+        bool unhelpful_;
     };
 
     class QueryAborter {
@@ -128,7 +138,7 @@ namespace mongo {
     // Inherit from this interface to implement a new query operation.
     class QueryOp {
     public:
-        QueryOp() : done_() {}
+        QueryOp() : complete_() {}
         virtual ~QueryOp() {}
         // Called by the runner, to execute this query operation using the
         // given query plan.  The implementation should call qa.mayAbort()
@@ -138,11 +148,15 @@ namespace mongo {
         // Return a copy of the inheriting class, which will be run with its own
         // query plan.
         virtual QueryOp *clone() const = 0;
-        bool done() const { return done_; }
+        bool complete() const { return complete_; }
+        string exceptionMessage() const { return exceptionMessage_; }
         // To be called by the runner only.
-        void setDone() { done_ = true; }
+        void setComplete() { complete_ = true; }
+        // To be called by the runner only.
+        void setExceptionMessage( const string &exceptionMessage ) { exceptionMessage_ = exceptionMessage; }
     private:
-        bool done_;
+        bool complete_;
+        string exceptionMessage_;
     };
     
     class QueryPlanSet {
@@ -174,13 +188,18 @@ namespace mongo {
                     QueryAborter aborter( set_.firstDone_ );
                     op_.run( plan_, aborter );
                     set_.firstDone_ = true;
-                    op_.setDone();
+                    op_.setComplete();
                 } catch ( const QueryAborter::AbortException & ) {
+                } catch ( const std::exception &e ) {
+                    exceptionMessage_ = e.what();
+                } catch ( ... ) {
+                    exceptionMessage_ = "Caught unknown exception";
                 }
             }
             QueryPlan &plan_;
             RunnerSet &set_;
             QueryOp &op_;
+            string exceptionMessage_;
         };
         FieldBoundSet fbs_;
         typedef boost::shared_ptr< QueryPlan > PlanPtr;
