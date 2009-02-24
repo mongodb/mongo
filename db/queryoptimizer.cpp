@@ -258,7 +258,7 @@ namespace mongo {
                 }
                 if ( op.complete() ) {
                     if ( op.mayRecordPlan() )
-                        op.qp().registerSelf(); 
+                        op.qp().registerSelf();
                     return *i;
                 }
                 if ( op.error() )

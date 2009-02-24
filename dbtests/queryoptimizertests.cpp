@@ -724,6 +724,12 @@ namespace QueryOptimizerTests {
                     }
                 }
                 nPlans( 3 );
+                
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                NoRecordTestOp original;
+                s.runOp( original );
+                nPlans( 3 );
+                
                 runQuery();
                 nPlans( 1 );
             }
@@ -747,7 +753,11 @@ namespace QueryOptimizerTests {
                     return new TestOp();
                 }
                 virtual bool mayRecordPlan() const { return true; }
-            };            
+            };
+            class NoRecordTestOp : public TestOp {
+                virtual bool mayRecordPlan() const { return false; }
+                virtual QueryOp *clone() const { return new NoRecordTestOp(); }
+            };
         };        
         
     } // namespace QueryPlanSetTests
