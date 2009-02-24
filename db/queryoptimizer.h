@@ -64,20 +64,6 @@ namespace mongo {
         bool unhelpful_;
     };
 
-//    class QueryAborter {
-//    public:
-//        QueryAborter( const bool &firstDone ) :
-//        firstDone_( firstDone ){}
-//        class AbortException : public std::exception {
-//        };
-//        void mayAbort() const {
-//            if ( firstDone_ )
-//                throw AbortException();
-//        }
-//    private:
-//        const bool &firstDone_;
-//    };
-    
     // Inherit from this interface to implement a new query operation.
     class QueryOp {
     public:
@@ -117,54 +103,11 @@ namespace mongo {
             shared_ptr< QueryOp > run();
             QueryOp &op_;
             QueryPlanSet &plans_;
-//            boost::barrier startBarrier_;
-//            bool firstDone_;            
         };
-//        struct RunnerSet {
-//            RunnerSet( QueryPlanSet &plans, QueryOp &op );
-//            shared_ptr< QueryOp > run();
-//            QueryOp &op_;
-//            QueryPlanSet &plans_;
-//            boost::barrier startBarrier_;
-//            bool firstDone_;            
-//        };
-//        struct Runner {
-//            Runner( QueryPlan &plan, RunnerSet &set, QueryOp &op ) :
-//            plan_( plan ),
-//            set_( set ),
-//            op_( op ) {}
-//            void operator()() {
-//                try {
-//                    set_.startBarrier_.wait();
-//                    QueryAborter aborter( set_.firstDone_ );
-//                    op_.run( plan_, aborter );
-//                    set_.firstDone_ = true;
-//                    op_.setComplete();
-//                } catch ( const QueryAborter::AbortException & ) {
-//                } catch ( const std::exception &e ) {
-//                    exceptionMessage_ = e.what();
-//                } catch ( ... ) {
-//                    exceptionMessage_ = "Caught unknown exception";
-//                }
-//            }
-//            QueryPlan &plan_;
-//            RunnerSet &set_;
-//            QueryOp &op_;
-//            string exceptionMessage_;
-//        };
         FieldBoundSet fbs_;
         typedef boost::shared_ptr< QueryPlan > PlanPtr;
         typedef vector< PlanPtr > PlanSet;
         PlanSet plans_;
     };
-    
-//    class QueryOptimizer {
-//    public:
-//        static QueryPlan getPlan(
-//            const char *ns,
-//            BSONObj* query,
-//            BSONObj* order = 0,
-//            BSONObj* hint = 0);
-//    };
 
 } // namespace mongo
