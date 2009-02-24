@@ -408,7 +408,7 @@ namespace mongo {
         return true;
     }
 
-    void DBClientConnection::checkConnection() {
+    void DBClientConnection::_checkConnection() {
         if ( !failed )
             return;
         if ( lastReconnectTry && time(0)-lastReconnectTry < 2 )
@@ -581,7 +581,13 @@ namespace mongo {
     }
 
     void DBClientConnection::say( Message &toSend ) {
-        port().say( toSend );
+        checkConnection();
+        try { 
+            port().say( toSend );
+        } catch( SocketException & ) { 
+            failed = true;
+            throw;
+        }
     }
 
     void DBClientConnection::sayPiggyBack( Message &toSend ) {
