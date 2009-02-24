@@ -31,7 +31,7 @@ namespace mongo {
     class FieldBound {
     public:
         FieldBound( const BSONElement &e = emptyObj.firstElement() );
-        FieldBound &operator&=( const FieldBound &other );
+        const FieldBound &operator&=( const FieldBound &other );
         BSONElement lower() const { return lower_; }
         BSONElement upper() const { return upper_; }
         bool equality() const { return lower_.woCompare( upper_, false ) == 0; }

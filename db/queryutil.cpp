@@ -91,7 +91,7 @@ namespace mongo {
         }
     }
     
-    FieldBound &FieldBound::operator&=( const FieldBound &other ) {
+    const FieldBound &FieldBound::operator&=( const FieldBound &other ) {
         if ( other.upper_.woCompare( upper_, false ) < 0 )
             upper_ = other.upper_;
         if ( other.lower_.woCompare( lower_, false ) > 0 )
