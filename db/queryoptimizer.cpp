@@ -231,7 +231,7 @@ namespace mongo {
             for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                 QueryOp &op = **i;
                 try {
-                    if ( op.exceptionMessage().empty() )
+                    if ( !op.error() )
                         op.next();
                 } catch ( const std::exception &e ) {
                     op.setExceptionMessage( e.what() );
@@ -240,7 +240,7 @@ namespace mongo {
                 }
                 if ( op.complete() )
                     return *i;
-                if ( !op.exceptionMessage().empty() )
+                if ( op.error() )
                     ++errCount;
             }
             if ( errCount == ops.size() )

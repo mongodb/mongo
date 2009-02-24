@@ -67,7 +67,7 @@ namespace mongo {
     // Inherit from this interface to implement a new query operation.
     class QueryOp {
     public:
-        QueryOp() : complete_(), qp_() {}
+        QueryOp() : complete_(), qp_(), error_() {}
         virtual ~QueryOp() {}
         virtual void init() = 0;
         virtual void next() = 0;
@@ -76,9 +76,13 @@ namespace mongo {
         // query plan.
         virtual QueryOp *clone() const = 0;
         bool complete() const { return complete_; }
+        bool error() const { return error_; }
         string exceptionMessage() const { return exceptionMessage_; }
         // To be called by QueryPlanSet::Runner only.
-        void setExceptionMessage( const string &exceptionMessage ) { exceptionMessage_ = exceptionMessage; }
+        void setExceptionMessage( const string &exceptionMessage ) {
+            error_ = true;
+            exceptionMessage_ = exceptionMessage;
+        }
     protected:
         void setComplete() { complete_ = true; }
         const QueryPlan &qp() { return *qp_; }
@@ -86,6 +90,7 @@ namespace mongo {
         bool complete_;
         string exceptionMessage_;
         const QueryPlan *qp_;
+        bool error_;
     };
     
     class QueryPlanSet {

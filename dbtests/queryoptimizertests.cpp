@@ -645,6 +645,7 @@ namespace QueryOptimizerTests {
                 ASSERT( threw );
                 ASSERT( done->complete() );
                 ASSERT( done->exceptionMessage().empty() );
+                ASSERT( !done->error() );
             }
         private:
             class TestOp : public QueryOp {
@@ -682,6 +683,7 @@ namespace QueryOptimizerTests {
                 shared_ptr< TestOp > done = s.runOp( *t );
                 ASSERT( !done->complete() );
                 ASSERT_EQUALS( "throw", done->exceptionMessage() );
+                ASSERT( done->error() );
             }
         private:
             class TestOp : public QueryOp {
