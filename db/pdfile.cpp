@@ -574,6 +574,7 @@ namespace mongo {
         info.setInvalid();
     }
 
+
     /* Pull out the relevant key objects from obj, so we
        can index them.  Note that the set is multiple elements
        only when it's a "multikey" array.

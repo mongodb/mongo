@@ -646,7 +646,6 @@ namespace mongo {
                                 for ( int i = 0; i < d->nIndexes; i++ )
                                     d->indexes[i].kill();
                                 d->nIndexes = 0;
-                                log() << "  alpha implementation, space not reclaimed" << endl;
                             }
                         }
                         else {
@@ -665,7 +664,6 @@ namespace mongo {
                                 d->nIndexes--;
                                 for ( int i = x; i < d->nIndexes; i++ )
                                     d->indexes[i] = d->indexes[i+1];
-                                log() << "deleteIndexes: alpha implementation, space not reclaimed\n";
                             } else {
                                 log() << "deleteIndexes: " << idxName << " not found" << endl;
                                 errmsg = "index not found";
