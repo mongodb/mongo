@@ -101,9 +101,9 @@ assert.eq( 3 , db.foo.find().sort( { num : -1 } )[0].num , "sharding query w/sor
 // TODO: sory by name
 
 // sort by num multiple shards per server
-s.adminCommand( { split : "test.foo" , find : { num : 2 } } );
+s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
 assert.eq( "funny man" , db.foo.find().sort( { num : 1 } )[0].name , "sharding query w/sort and another split 1 order wrong" );
 assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query w/sort and another split 2 order wrong" );
-//assert.eq( "funny man" , db.foo.find( { num : { $lt : 100 } } ).sort( { num : 1 } ).arrayAccess(0).name , "sharding query w/sort and another split 3 order wrong" );
+assert.eq( "funny man" , db.foo.find( { num : { $lt : 100 } } ).sort( { num : 1 } ).arrayAccess(0).name , "sharding query w/sort and another split 3 order wrong" );
 
 s.stop();

@@ -4,6 +4,7 @@
 #include "request.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
+#include "../db/queryutil.h"
 
 namespace mongo {
 
@@ -104,10 +105,16 @@ namespace mongo {
         }
         return b.obj();
     }
-
+    
     BSONObj ShardedCursor::_concatFilter( const BSONObj& filter , const BSONObj& extra ){
         BSONObjBuilder b;
+        b.appendElements( filter );
+        b.appendElements( extra );
         
+        FieldBoundSet s( "wrong" , b.obj() );
+        return s.simplifiedQuery();
+
+        /*    
         { // take things from filter
             BSONObjIterator i( filter );
             while ( i.more() ){
@@ -121,10 +128,11 @@ namespace mongo {
                 }
 
                 BSONElement f = extra[e.fieldName()];
-
+                
                 uassert( "don't understand how filter couldn't be a range" , e.type() == Object );
                 uassert( "don't understand how extra couldn't be a range" , f.type() == Object );
-
+                
+                
                 throw UserException( "can't handle a filter on a shard key yet: (" );
             }
         }
@@ -141,8 +149,9 @@ namespace mongo {
                 b.append( e );
             }
         }
-        
         return b.obj();
+        */        
+
     }
 
     void ShardedCursor::sendNextBatch( Request& r ){
