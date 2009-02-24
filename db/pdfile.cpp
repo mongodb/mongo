@@ -304,31 +304,41 @@ namespace mongo {
             if( high < 0 ) high = approxSize;
             DiskLoc L = f->firstExtent;
             int n = 0;
+            Extent *best = 0;
+            int bestDiff = 0x7fffffff;
             while( !L.isNull() ) { 
                 Extent * e = L.ext();
-                if( e->length >= low && e->length <= high ) {
-                    // this one works
-
-                    // remove from the free list
-                    if( !e->xprev.isNull() )
-                        e->xprev.ext()->xnext = e->xnext;
-                    if( !e->xnext.isNull() )
-                        e->xnext.ext()->xprev = e->xprev;
-                    if( f->firstExtent == L )
-                        f->firstExtent = e->xnext;
-                    if( f->lastExtent == L )
-                        f->lastExtent = e->xprev;
-
-                    // use it
-                    OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
-                    DiskLoc emptyLoc = e->reuse(ns);
-                    addNewExtentToNamespace(ns, e, L, emptyLoc, capped);
-                    return e;
+                if( e->length >= low && e->length <= high ) { 
+                    int diff = abs(e->length - approxSize);
+                    if( diff < bestDiff ) { 
+                        bestDiff = diff;
+                        best = e;
+                        if( diff == 0 ) 
+                            break;
+                    }
                 }
                 L = e->xnext;
                 ++n;
             }
             OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
+            if( best ) {
+                Extent *e = best;
+                // remove from the free list
+                if( !e->xprev.isNull() )
+                    e->xprev.ext()->xnext = e->xnext;
+                if( !e->xnext.isNull() )
+                    e->xnext.ext()->xprev = e->xprev;
+                if( f->firstExtent == L )
+                    f->firstExtent = e->xnext;
+                if( f->lastExtent == L )
+                    f->lastExtent = e->xprev;
+
+                // use it
+                OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
+                DiskLoc emptyLoc = e->reuse(ns);
+                addNewExtentToNamespace(ns, e, L, emptyLoc, capped);
+                return e;
+            }
         }
 
         return createExtent(ns, approxSize, capped);
