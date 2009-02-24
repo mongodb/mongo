@@ -1,5 +1,7 @@
+// shard2.js
+
 /**
-* test very basic sharding
+* test basic sharding
 */
 
 s = new ShardingTest( "shard2" , 2 , 5 );
@@ -98,7 +100,7 @@ assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query 
 assert.eq( 3 , db.foo.find().sort( { num : -1 } )[0].num , "sharding query w/sort 6 order wrong" );
 
 
-// TODO: sory by name
+// sory by name
 
 function getNames( c ){
     return c.toArray().map( function(z){ return z.name; } );
