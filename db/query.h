@@ -82,8 +82,6 @@ namespace mongo {
 
     int runCount(const char *ns, const BSONObj& cmd, string& err);
     
-    // Using new query optimizer:
-//    int doCount(const char *ns, const BSONObj& cmd, string& err);
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss );
     
 } // namespace mongo
