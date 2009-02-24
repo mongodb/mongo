@@ -8,38 +8,36 @@
 
 namespace mongo {
     
-    class DownstreamServerState {
-    public:
-        DownstreamServerState( string name ) : _name( name ) , _used(0){ 
-        }
-        
-        string _name;
-        bool _used;
-        long long _cursor;
-    };
-
     class SerialServerShardedCursor : public ShardedCursor {
     public:
-        SerialServerShardedCursor( set<string> servers , string ns , const BSONObj& q ){
+        SerialServerShardedCursor( set<string> servers , QueryMessage& q ) : ShardedCursor( q ){
             for ( set<string>::iterator i = servers.begin(); i!=servers.end(); i++ )
-                _servers.push_back( DownstreamServerState( *i ) );
+                _servers.push_back( *i );
 
             _serverIndex = 0;
-            
-            _ns = ns;
-            _query = q.copy();
         }
-
-        virtual void sendNextBatch( Request& r ){
-            throw UserException( "SerialServerShardedCursor doesn't work yet" );
-        }
-
-    private:
-        vector<DownstreamServerState> _servers;
-        int _serverIndex;
         
-        string _ns;
-        BSONObj _query;
+        virtual bool more(){
+            if ( _current.get() && _current->more() )
+                return true;
+
+            if ( _serverIndex >= _servers.size() )
+                return false;
+
+            _current = query( _servers[_serverIndex++] );
+            return _current->more();
+        }
+
+        virtual BSONObj next(){
+            uassert( "no more items" , more() );
+            return _current->next();
+        }
+        
+    private:
+        vector<string> _servers;
+        unsigned _serverIndex;
+        
+        auto_ptr<DBClientCursor> _current;
     };
     
     class ShardStrategy : public Strategy {
@@ -74,7 +72,7 @@ namespace mongo {
 
             if ( query.getSort().isEmpty() ){
                 // 1. no sort, can just hit them in serial
-                cursor = new SerialServerShardedCursor( servers , q.ns , q.query );
+                cursor = new SerialServerShardedCursor( servers , q );
             }
             else {
                 // 2. sort on shard key, can do in serial intelligently
