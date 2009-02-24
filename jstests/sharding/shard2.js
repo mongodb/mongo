@@ -100,6 +100,18 @@ assert.eq( 3 , db.foo.find().sort( { num : -1 } )[0].num , "sharding query w/sor
 
 // TODO: sory by name
 
+function getNames( c ){
+    return c.toArray().map( function(z){ return z.name; } );
+}
+correct = getNames( db.foo.find() ).sort();
+assert.eq( correct , getNames( db.foo.find().sort( { name : 1 } ) ) );
+correct = correct.reverse();
+assert.eq( correct , getNames( db.foo.find().sort( { name : -1 } ) ) );
+
+assert.eq( 3 , sumQuery( db.foo.find().sort( { name : 1 } ) ) , "sharding query w/non-shard sort 1" );
+assert.eq( 3 , sumQuery( db.foo.find().sort( { name : -1 } ) ) , "sharding query w/non-shard sort 2" );
+
+
 // sort by num multiple shards per server
 s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
 assert.eq( "funny man" , db.foo.find().sort( { num : 1 } )[0].name , "sharding query w/sort and another split 1 order wrong" );
