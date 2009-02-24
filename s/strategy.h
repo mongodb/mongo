@@ -22,12 +22,19 @@ namespace mongo {
 
     class ShardedCursor {
     public:
-        ShardedCursor(){}
-        virtual ~ShardedCursor(){}
+        ShardedCursor( QueryMessage& q );
+        virtual ~ShardedCursor();
 
         virtual void sendNextBatch( Request& r ) = 0;
+        
+    protected:
+        auto_ptr<DBClientCursor> query( const string& server , int num );
+                                        
+        string _ns;
+        int _options;
+        BSONObj _query;
+        BSONObj _fields;
 
-    private:
         long long _id;
     };
     

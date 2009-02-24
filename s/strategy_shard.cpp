@@ -20,26 +20,24 @@ namespace mongo {
 
     class SerialServerShardedCursor : public ShardedCursor {
     public:
-        SerialServerShardedCursor( set<string> servers , string ns , const BSONObj& q ){
+        SerialServerShardedCursor( set<string> servers , QueryMessage& q ) : ShardedCursor( q ){
             for ( set<string>::iterator i = servers.begin(); i!=servers.end(); i++ )
                 _servers.push_back( DownstreamServerState( *i ) );
 
             _serverIndex = 0;
-            
-            _ns = ns;
-            _query = q.copy();
         }
-
+        
         virtual void sendNextBatch( Request& r ){
+            while ( _serverIndex < _servers.size() ){
+                    }
             throw UserException( "SerialServerShardedCursor doesn't work yet" );
         }
-
+        
     private:
         vector<DownstreamServerState> _servers;
         int _serverIndex;
         
-        string _ns;
-        BSONObj _query;
+        auto_ptr<DBClientCursor> _current;
     };
     
     class ShardStrategy : public Strategy {
@@ -74,7 +72,7 @@ namespace mongo {
 
             if ( query.getSort().isEmpty() ){
                 // 1. no sort, can just hit them in serial
-                cursor = new SerialServerShardedCursor( servers , q.ns , q.query );
+                cursor = new SerialServerShardedCursor( servers , q );
             }
             else {
                 // 2. sort on shard key, can do in serial intelligently

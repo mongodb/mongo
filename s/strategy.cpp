@@ -7,6 +7,8 @@
 
 namespace mongo {
 
+    // ----- Strategy ------
+
     void Strategy::doWrite( int op , Request& r , string server ){
         ScopedDbConnection dbcon( server );
         DBClientBase &_c = dbcon.conn();
@@ -44,4 +46,23 @@ namespace mongo {
         dbcon->insert( ns , obj );
         dbcon.done();
     }
+
+    // ----- ShardedCursor ------
+
+    ShardedCursor::ShardedCursor( QueryMessage& q ){
+        _ns = q.ns;
+        _query = q.query.copy();
+        _options = q.queryOptions;
+        
+        if ( q.fields.get() ){
+            BSONObjBuilder b;
+            for ( set<string>::iterator i=q.fields->begin(); i!=q.fields->end(); i++)
+                b.append( i->c_str() , 1 );
+            _fields = b.obj();
+        }
+    }
+
+    ShardedCursor::~ShardedCursor(){
+    }
+    
 }
