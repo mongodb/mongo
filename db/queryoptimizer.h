@@ -20,67 +20,9 @@
 
 #include "cursor.h"
 #include "jsobj.h"
+#include "queryutil.h"
 
 namespace mongo {
-
-    class FieldBound {
-    public:
-        FieldBound( const BSONElement &e = emptyObj.firstElement() );
-        FieldBound &operator&=( const FieldBound &other );
-        BSONElement lower() const { return lower_; }
-        BSONElement upper() const { return upper_; }
-        bool equality() const { return lower_.woCompare( upper_, false ) == 0; }
-        bool nontrivial() const {
-            return
-            minKey.firstElement().woCompare( lower_, false ) != 0 ||
-            maxKey.firstElement().woCompare( upper_, false ) != 0;
-        }
-    private:
-        BSONObj addObj( const BSONObj &o );
-        string simpleRegexEnd( string regex );
-        BSONElement lower_;
-        BSONElement upper_;
-        vector< BSONObj > objData_;
-    };
-    
-    class FieldBoundSet {
-    public:
-        FieldBoundSet( const char *ns, const BSONObj &query );
-        const FieldBound &bound( const char *fieldName ) const {
-            map< string, FieldBound >::const_iterator f = bounds_.find( fieldName );
-            if ( f == bounds_.end() )
-                return trivialBound();
-            return f->second;
-        }
-        int nBounds() const {
-            int count = 0;
-            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
-                ++count;
-            return count;
-        }
-        int nNontrivialBounds() const {
-            int count = 0;
-            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
-                if ( i->second.nontrivial() )
-                    ++count;
-            return count;
-        }
-        const char *ns() const { return ns_; }
-        BSONObj query() const { return query_; }
-        BSONObj simplifiedQuery() const;
-        bool matchPossible() const {
-            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
-                if ( i->second.lower().woCompare( i->second.upper(), false ) > 0 )
-                    return false;
-            return true;
-        }
-    private:
-        static FieldBound *trivialBound_;
-        static FieldBound &trivialBound();
-        map< string, FieldBound > bounds_;
-        const char *ns_;
-        BSONObj query_;
-    };
     
     class IndexDetails;
     class QueryPlan {
