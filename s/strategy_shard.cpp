@@ -35,7 +35,7 @@ namespace mongo {
         
     private:
         vector<string> _servers;
-        int _serverIndex;
+        unsigned _serverIndex;
         
         auto_ptr<DBClientCursor> _current;
     };

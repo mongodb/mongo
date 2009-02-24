@@ -21,7 +21,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72E
 		..\dbtests\jsobjtests.cpp = ..\dbtests\jsobjtests.cpp
 		..\dbtests\jsontests.cpp = ..\dbtests\jsontests.cpp
 		..\dbtests\matchertests.cpp = ..\dbtests\matchertests.cpp
-		..\dbtests\namespacetests.cpp = ..\dbtests\namespacetests.cpp
 		..\dbtests\pairingtests.cpp = ..\dbtests\pairingtests.cpp
 		..\dbtests\pdfiletests.cpp = ..\dbtests\pdfiletests.cpp
 		..\dbtests\querytests.cpp = ..\dbtests\querytests.cpp
