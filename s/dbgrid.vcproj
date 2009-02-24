@@ -338,6 +338,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\queryutil.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\request.cpp"
 				>
 			</File>

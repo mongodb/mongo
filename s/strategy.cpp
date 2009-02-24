@@ -113,45 +113,6 @@ namespace mongo {
         
         FieldBoundSet s( "wrong" , b.obj() );
         return s.simplifiedQuery();
-
-        /*    
-        { // take things from filter
-            BSONObjIterator i( filter );
-            while ( i.more() ){
-                BSONElement e = i.next();
-                if ( e.eoo() ) 
-                    break;
-                
-                if ( ! extra.hasField( e.fieldName() ) ){
-                    b.append( e );
-                    continue;
-                }
-
-                BSONElement f = extra[e.fieldName()];
-                
-                uassert( "don't understand how filter couldn't be a range" , e.type() == Object );
-                uassert( "don't understand how extra couldn't be a range" , f.type() == Object );
-                
-                
-                throw UserException( "can't handle a filter on a shard key yet: (" );
-            }
-        }
-        
-        { // take anything left over from extra 
-            BSONObjIterator i( extra );
-            while ( i.more() ){
-                BSONElement e = i.next();
-                if ( e.eoo() ) 
-                    break;
-                
-                if ( filter.hasField( e.fieldName() ) )
-                    continue;
-                b.append( e );
-            }
-        }
-        return b.obj();
-        */        
-
     }
 
     void ShardedCursor::sendNextBatch( Request& r ){

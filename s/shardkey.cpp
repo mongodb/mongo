@@ -123,6 +123,9 @@ namespace mongo {
         if ( sort.nFields() != _fieldsAndOrder.nFields() )
             return 0;
 
+        if ( ! sort.hasField( _fieldName.c_str() ) )
+            return 0;
+
         if ( sort[_fieldName.c_str()].number() <= 0 )
             return -1;
         return 1;

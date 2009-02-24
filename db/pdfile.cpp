@@ -109,7 +109,8 @@ namespace mongo {
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
                  and then go back and set to ok : 1 after we are done.
         */
-        addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
+        if( strstr(ns, ".$freelist") == 0 )
+            addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
 
         long long size = initialExtentSize(128);
         BSONElement e = j.findElement("size");
@@ -137,13 +138,13 @@ namespace mongo {
         if ( nExtents > 0 ) {
             assert( size <= 0x7fffffff );
             for ( int i = 0; i < nExtents; ++i ) {
-                database->suitableFile((int) size)->newExtent( ns, (int) size, newCapped );
+                database->suitableFile((int) size)->allocExtent( ns, (int) size, newCapped );
             }
         } else
             while ( size > 0 ) {
                 int max = MongoDataFile::maxSize() - MDFHeader::headerSize();
                 int desiredExtentSize = (int) (size > max ? max : size);
-                Extent *e = database->suitableFile( desiredExtentSize )->newExtent( ns, desiredExtentSize, newCapped );
+                Extent *e = database->suitableFile( desiredExtentSize )->allocExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
             }
 
@@ -237,8 +238,29 @@ namespace mongo {
         header->init(fileNo, size);
     }
 
-    /* prev - previous extent for this namespace.  null=this is the first one. */
-    Extent* MongoDataFile::newExtent(const char *ns, int approxSize, bool newCapped, int loops) {
+    void addNewExtentToNamespace(const char *ns, Extent *e, DiskLoc eloc, DiskLoc emptyLoc, bool capped) { 
+        DiskLoc oldExtentLoc;
+        NamespaceIndex *ni = nsindex(ns);
+        NamespaceDetails *details = ni->details(ns);
+        if ( details ) {
+assert( !details->lastExtent.isNull() );
+            assert( !details->firstExtent.isNull() );
+            e->xprev = details->lastExtent;
+            details->lastExtent.ext()->xnext = eloc;
+assert( !eloc.isNull() );
+            details->lastExtent = eloc;
+        }
+        else {
+            ni->add(ns, eloc, capped);
+            details = ni->details(ns);
+        }
+
+        details->lastExtentSize = e->length;
+        DEBUGGING out() << "temp: newextent adddelrec " << ns << endl;
+        details->addDeletedRec(emptyLoc.drec(), emptyLoc);
+    }
+
+    Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
         massert( "bad new extent size", approxSize >= 0 && approxSize <= 0x7ff00000 );
         massert( "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
         int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
@@ -251,7 +273,7 @@ namespace mongo {
                 out() << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
             }
             log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
-            return database->addAFile()->newExtent(ns, approxSize, newCapped, loops+1);
+            return database->addAFile()->createExtent(ns, approxSize, newCapped, loops+1);
         }
         int offset = header->unused.getOfs();
         header->unused.setOfs( fileNo, offset + ExtentSize );
@@ -260,30 +282,100 @@ namespace mongo {
         Extent *e = _getExtent(loc);
         DiskLoc emptyLoc = e->init(ns, ExtentSize, fileNo, offset);
 
-        DiskLoc oldExtentLoc;
-        NamespaceIndex *ni = nsindex(ns);
-        NamespaceDetails *details = ni->details(ns);
-        if ( details ) {
-            assert( !details->firstExtent.isNull() );
-            e->xprev = details->lastExtent;
-            details->lastExtent.ext()->xnext = loc;
-            details->lastExtent = loc;
-        }
-        else {
-            ni->add(ns, loc, newCapped);
-            details = ni->details(ns);
-        }
-
-        details->lastExtentSize = approxSize;
-        DEBUGGING out() << "temp: newextent adddelrec " << ns << endl;
-        details->addDeletedRec(emptyLoc.drec(), emptyLoc);
+        addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
         DEV log() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
         << " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
         return e;
     }
 
+    Extent* MongoDataFile::allocExtent(const char *ns, int approxSize, bool capped) { 
+        string s = database->name + ".$freelist";
+        NamespaceDetails *f = nsdetails(s.c_str());
+        if( f ) {
+            int low, high;
+            if( capped ) {
+                // be strict about the size
+                low = approxSize;
+                if( low > 2048 ) low -= 256;
+                high = (int) (approxSize * 1.05) + 256;
+            }
+            else { 
+                low = (int) (approxSize * 0.8);
+                high = (int) (approxSize * 1.4);
+            }
+            if( high < 0 ) high = approxSize;
+            int n = 0;
+            Extent *best = 0;
+            int bestDiff = 0x7fffffff;
+            {
+                DiskLoc L = f->firstExtent;
+                while( !L.isNull() ) { 
+                    Extent * e = L.ext();
+                    if( e->length >= low && e->length <= high ) { 
+                        int diff = abs(e->length - approxSize);
+                        if( diff < bestDiff ) { 
+                            bestDiff = diff;
+                            best = e;
+                            if( diff == 0 ) 
+                                break;
+                        }
+                    }
+                    L = e->xnext;
+                    ++n;
+                
+                }
+            }
+            OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
+            if( best ) {
+                Extent *e = best;
+                // remove from the free list
+                if( !e->xprev.isNull() )
+                    e->xprev.ext()->xnext = e->xnext;
+                if( !e->xnext.isNull() )
+                    e->xnext.ext()->xprev = e->xprev;
+                if( f->firstExtent == e->myLoc )
+                    f->firstExtent = e->xnext;
+                if( f->lastExtent == e->myLoc )
+                    f->lastExtent = e->xprev;
+
+                // use it
+                OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
+                DiskLoc emptyLoc = e->reuse(ns);
+                addNewExtentToNamespace(ns, e, e->myLoc, emptyLoc, capped);
+                return e;
+            }
+        }
+
+        return createExtent(ns, approxSize, capped);
+    }
+
     /*---------------------------------------------------------------------*/
+
+    DiskLoc Extent::reuse(const char *nsname) { 
+        log(3) << "reset extent was:" << ns.buf << " now:" << nsname << '\n';
+        massert( "Extent::reset bad magic value", magic == 0x41424344 );
+        xnext.Null();
+        xprev.Null();
+        ns = nsname;
+        firstRecord.Null();
+        lastRecord.Null();
+
+        DiskLoc emptyLoc = myLoc;
+        emptyLoc.inc( (extentData-(char*)this) );
+
+        int delRecLength = length - (extentData - (char *) this);
+        DeletedRecord *empty1 = (DeletedRecord *) extentData;
+        DeletedRecord *empty = (DeletedRecord *) getRecord(emptyLoc);
+        assert( empty == empty1 );
+        memset(empty, delRecLength, 1);
+
+        empty->lengthWithHeaders = delRecLength;
+        empty->extentOfs = myLoc.getOfs();
+        empty->nextDeleted.Null();
+
+        return emptyLoc;
+    }
 
     /* assumes already zeroed -- insufficient for block 'reuse' perhaps */
     DiskLoc Extent::init(const char *nsname, int _length, int _fileNo, int _offset) {
@@ -431,16 +523,44 @@ namespace mongo {
 
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
-        assert( strstr(nsToDrop.c_str(), ".system.") == 0 );
+        NamespaceDetails* d = nsdetails(nsToDrop.c_str());
+        uassert( "ns not found", d );
+
+        uassert( "can't drop system ns", strstr(nsToDrop.c_str(), ".system.") == 0 );
         {
             // remove from the system catalog
-            BSONObjBuilder b;
-            b.append("name", nsToDrop.c_str());
-            BSONObj cond = b.done(); // { name: "colltodropname" }
+            BSONObj cond = BSON( "name" << nsToDrop );   // { name: "colltodropname" }
             string system_namespaces = database->name + ".system.namespaces";
             /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
 			// no check of return code as this ns won't exist for some of the new storage engines
         }
+
+        // free extents
+        if( !d->firstExtent.isNull() ) {
+            string s = database->name + ".$freelist";
+            NamespaceDetails *freeExtents = nsdetails(s.c_str());
+            if( freeExtents == 0 ) { 
+                string err;
+                _userCreateNS(s.c_str(), emptyObj, err);
+                freeExtents = nsdetails(s.c_str());
+                massert("can't create .$freelist", freeExtents);
+            }
+            if( freeExtents->firstExtent.isNull() ) { 
+                freeExtents->firstExtent = d->firstExtent;
+                freeExtents->lastExtent = d->lastExtent;
+            }
+            else { 
+                DiskLoc a = freeExtents->firstExtent;
+                assert( a.ext()->xprev.isNull() );
+                a.ext()->xprev = d->lastExtent;
+                d->lastExtent.ext()->xnext = a;
+                freeExtents->firstExtent = d->firstExtent;
+
+                d->firstExtent.setInvalid();
+                d->lastExtent.setInvalid();
+            }
+        }
+
         // remove from the catalog hashtable
         database->namespaceIndex.kill(nsToDrop.c_str());
     }
@@ -469,6 +589,7 @@ namespace mongo {
         head.setInvalid();
         info.setInvalid();
     }
+
 
     /* Pull out the relevant key objects from obj, so we
        can index them.  Note that the set is multiple elements
@@ -956,7 +1077,7 @@ namespace mongo {
             /* todo: shouldn't be in the namespace catalog until after the allocations here work.
                      also if this is an addIndex, those checks should happen before this!
             */
-            database->newestFile()->newExtent(ns, initialExtentSize(len));
+            database->newestFile()->allocExtent(ns, initialExtentSize(len));
             d = nsdetails(ns);
         }
         d->paddingFits();
@@ -1047,7 +1168,7 @@ namespace mongo {
             // out of space
             if ( d->capped == 0 ) { // size capped doesn't grow
                 DEV log() << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
-                database->newestFile()->newExtent(ns, followupExtentSize(len, d->lastExtentSize));
+                database->newestFile()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize));
                 loc = d->alloc(ns, lenWHdr, extentLoc);
             }
             if ( loc.isNull() ) {
@@ -1064,9 +1185,6 @@ namespace mongo {
             ((int&)*r->data) = *((int*) obuf) + newId->size();
             memcpy(r->data+4, newId->rawdata(), newId->size());
             memcpy(r->data+4+newId->size(), ((char *)obuf)+4, addID-4);
-// TEMP:
-//            BSONObj foo(r->data);
-//            cout << "tmp:" << foo.toString() << endl;
         }
         else {
             memcpy(r->data, obuf, len);

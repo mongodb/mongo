@@ -1,5 +1,7 @@
+// shard2.js
+
 /**
-* test very basic sharding
+* test basic sharding
 */
 
 s = new ShardingTest( "shard2" , 2 , 5 );
@@ -98,7 +100,19 @@ assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query 
 assert.eq( 3 , db.foo.find().sort( { num : -1 } )[0].num , "sharding query w/sort 6 order wrong" );
 
 
-// TODO: sory by name
+// sory by name
+
+function getNames( c ){
+    return c.toArray().map( function(z){ return z.name; } );
+}
+correct = getNames( db.foo.find() ).sort();
+assert.eq( correct , getNames( db.foo.find().sort( { name : 1 } ) ) );
+correct = correct.reverse();
+assert.eq( correct , getNames( db.foo.find().sort( { name : -1 } ) ) );
+
+assert.eq( 3 , sumQuery( db.foo.find().sort( { name : 1 } ) ) , "sharding query w/non-shard sort 1" );
+assert.eq( 3 , sumQuery( db.foo.find().sort( { name : -1 } ) ) , "sharding query w/non-shard sort 2" );
+
 
 // sort by num multiple shards per server
 s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );

@@ -1410,6 +1410,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\queryutil.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\repl.h"
 				>
 			</File>
