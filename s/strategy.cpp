@@ -60,9 +60,44 @@ namespace mongo {
                 b.append( i->c_str() , 1 );
             _fields = b.obj();
         }
+
+        do {
+            _id = security.getNonce();
+        } while ( _id == 0 );
+        
     }
 
     ShardedCursor::~ShardedCursor(){
     }
     
+    auto_ptr<DBClientCursor> ShardedCursor::query( const string& server , int num ){
+        ScopedDbConnection conn( server );
+        auto_ptr<DBClientCursor> cursor = conn->query( _ns.c_str() , _query , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
+        conn.done();
+        return cursor;
+    }
+
+    void ShardedCursor::sendNextBatch( Request& r ){
+        BufBuilder b(32768);
+        
+        int num = 0;
+        
+        cout << "TEMP: ShardedCursor " << _ns << "\t" << _query << endl;
+        while ( more() ){
+            BSONObj o = next();
+            cout << "\t" << o << endl;
+
+            b.append( (void*)o.objdata() , o.objsize() );
+            num++;
+            
+            if ( b.len() > 2097152 ){
+                // TEMP
+                break;
+            }
+
+        }
+
+        uassert( "can't handle getMore with sharding yet" , ! more() );
+        replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num );
+    }
 }

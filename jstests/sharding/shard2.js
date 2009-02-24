@@ -72,7 +72,10 @@ assert.eq( "eliot" , db.foo.findOne( { num : 1 } ).name );
 assert.eq( "funny man" , db.foo.findOne( { num : -2 } ).name );
 
 // TODO: getAll
-//assert.eq( 3 , db.foo.find().length() );
+assert.eq( 6 , db.foo.find().length() );
+var sum = 0;
+db.foo.find().toArray().forEach( function(z){ sum += z.num; } );
+assert.eq( 3 , sum );
 
 // TODO: sort by num
 

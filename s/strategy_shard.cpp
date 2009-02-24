@@ -8,33 +8,33 @@
 
 namespace mongo {
     
-    class DownstreamServerState {
-    public:
-        DownstreamServerState( string name ) : _name( name ) , _used(0){ 
-        }
-        
-        string _name;
-        bool _used;
-        long long _cursor;
-    };
-
     class SerialServerShardedCursor : public ShardedCursor {
     public:
         SerialServerShardedCursor( set<string> servers , QueryMessage& q ) : ShardedCursor( q ){
             for ( set<string>::iterator i = servers.begin(); i!=servers.end(); i++ )
-                _servers.push_back( DownstreamServerState( *i ) );
+                _servers.push_back( *i );
 
             _serverIndex = 0;
         }
         
-        virtual void sendNextBatch( Request& r ){
-            while ( _serverIndex < _servers.size() ){
-                    }
-            throw UserException( "SerialServerShardedCursor doesn't work yet" );
+        virtual bool more(){
+            if ( _current.get() && _current->more() )
+                return true;
+
+            if ( _serverIndex >= _servers.size() )
+                return false;
+
+            _current = query( _servers[_serverIndex++] );
+            return _current->more();
+        }
+
+        virtual BSONObj next(){
+            uassert( "no more items" , more() );
+            return _current->next();
         }
         
     private:
-        vector<DownstreamServerState> _servers;
+        vector<string> _servers;
         int _serverIndex;
         
         auto_ptr<DBClientCursor> _current;

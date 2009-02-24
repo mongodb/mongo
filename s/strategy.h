@@ -25,10 +25,13 @@ namespace mongo {
         ShardedCursor( QueryMessage& q );
         virtual ~ShardedCursor();
 
-        virtual void sendNextBatch( Request& r ) = 0;
+        virtual bool more() = 0;
+        virtual BSONObj next() = 0;
+        
+        void sendNextBatch( Request& r );
         
     protected:
-        auto_ptr<DBClientCursor> query( const string& server , int num );
+        auto_ptr<DBClientCursor> query( const string& server , int num = 0 );
                                         
         string _ns;
         int _options;
