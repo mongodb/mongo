@@ -348,6 +348,7 @@ namespace mongo {
 
             setClient( q.ns );
             strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);
+//            msgdata = runQuery(m, ss ).release();
             msgdata = runQuery(m, q.ns, q.ntoskip, q.ntoreturn, q.query, q.fields, ss, q.queryOptions);
         }
         catch ( AssertionException& e ) {

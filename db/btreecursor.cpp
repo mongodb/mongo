@@ -78,7 +78,7 @@ namespace mongo {
                 indexDetails.head.btree()->dump();
             }
         }
-        
+
         bucket = indexDetails.head.btree()->
         locate(indexDetails, indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
         
