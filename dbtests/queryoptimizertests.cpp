@@ -400,6 +400,29 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class Unhelpful : public Base {
+        public:
+            void run() {
+                QueryPlan p( FBS( BSON( "b" << 1 ) ), emptyObj, INDEX( "a" << 1 << "b" << 1 ) );
+                ASSERT( p.keyMatch() );
+                ASSERT( !p.bound( "a" ).nontrivial() );
+                ASSERT( !p.unhelpful() );
+                QueryPlan p2( FBS( BSON( "b" << 1 << "c" << 1 ) ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
+                ASSERT( !p2.keyMatch() );
+                ASSERT( !p2.scanAndOrderRequired() );
+                ASSERT( !p2.bound( "a" ).nontrivial() );
+                ASSERT( !p2.unhelpful() );
+                QueryPlan p3( FBS( BSON( "b" << 1 << "c" << 1 ) ), emptyObj, INDEX( "b" << 1 ) );
+                ASSERT( !p3.keyMatch() );
+                ASSERT( p3.bound( "b" ).nontrivial() );
+                ASSERT( !p3.unhelpful() );
+                QueryPlan p4( FBS( BSON( "c" << 1 << "d" << 1 ) ), emptyObj, INDEX( "b" << 1 << "c" << 1 ) );
+                ASSERT( !p4.keyMatch() );
+                ASSERT( !p4.bound( "b" ).nontrivial() );
+                ASSERT( p4.unhelpful() );
+            }
+        };
+        
     } // namespace QueryPlanTests
 
     namespace QueryPlanSetTests {
@@ -671,6 +694,7 @@ namespace QueryOptimizerTests {
             add< QueryPlanTests::MoreOptimal >();
             add< QueryPlanTests::KeyMatch >();
             add< QueryPlanTests::ExactKeyQueryTypes >();
+            add< QueryPlanTests::Unhelpful >();
             add< QueryPlanSetTests::NoIndexes >();
             add< QueryPlanSetTests::Optimal >();
             add< QueryPlanSetTests::NoOptimal >();
