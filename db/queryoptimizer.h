@@ -50,6 +50,9 @@ namespace mongo {
         const char *ns() const { return fbs_.ns(); }
         BSONObj query() const { return fbs_.query(); }
         const FieldBound &bound( const char *fieldName ) const { return fbs_.bound( fieldName ); }
+        void registerSelf() const {
+            registerIndexForPattern( ns(), fbs_.pattern(), indexKey() );
+        }
     private:
         const FieldBoundSet &fbs_;
         const BSONObj &order_;
@@ -83,9 +86,9 @@ namespace mongo {
             error_ = true;
             exceptionMessage_ = exceptionMessage;
         }
+        const QueryPlan &qp() { return *qp_; }
     protected:
         void setComplete() { complete_ = true; }
-        const QueryPlan &qp() { return *qp_; }
     private:
         bool complete_;
         string exceptionMessage_;

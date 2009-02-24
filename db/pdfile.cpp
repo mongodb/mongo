@@ -36,6 +36,7 @@ _ disallow system* manipulations from the database.
 #include "repl.h"
 #include "dbhelpers.h"
 #include "namespace.h"
+#include "queryutil.h"
 
 namespace mongo {
 
@@ -650,6 +651,7 @@ namespace mongo {
         unindexRecord(ns, d, todelete, dl);
 
         _deleteRecord(d, ns, todelete, dl);
+        registerWriteOp( ns );
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
@@ -726,6 +728,7 @@ namespace mongo {
             return;
         }
 
+        registerWriteOp( ns );
         d->paddingFits();
 
         /* has any index keys changed? */
@@ -1009,6 +1012,7 @@ namespace mongo {
             //indexFullNS = tabletoidxns;
             //indexFullNS += ".$";
             //indexFullNS += name; // database.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
+            clearQueryCache( tabletoidxns );
         }
 
         const BSONElement *newId = &writeId;
@@ -1084,6 +1088,9 @@ namespace mongo {
         d->nrecords++;
         d->datasize += r->netLength();
 
+        if ( !god )
+            registerWriteOp( ns );
+        
         if ( tableToIndex ) {
             IndexDetails& idxinfo = tableToIndex->indexes[tableToIndex->nIndexes];
             idxinfo.info = loc;

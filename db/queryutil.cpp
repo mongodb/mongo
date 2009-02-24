@@ -24,6 +24,25 @@
 
 namespace mongo {
 
+    map< string, int > writeCount_;
+    map< string, map< QueryPattern, BSONObj > > queryCache_;
+    void registerWriteOp( const string &ns ) {
+        if ( queryCache_[ ns ].empty() )
+            return;
+        if ( ++writeCount_[ ns ] >= 100 )
+            clearQueryCache( ns );
+    }
+    void clearQueryCache( const string &ns ) {
+        queryCache_[ ns ].clear();
+        writeCount_[ ns ] = 0;
+    }
+    BSONObj indexForPattern( const string &ns, const QueryPattern &pattern ) {
+        return queryCache_[ ns ][ pattern ];
+    }
+    void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey ) {
+        queryCache_[ ns ][ pattern ] = indexKey;
+    }
+    
     FieldBound::FieldBound( const BSONElement &e ) :
     lower_( minKey.firstElement() ),
     upper_( maxKey.firstElement() ) {
@@ -157,5 +176,5 @@ namespace mongo {
         }
         return qp;
     }
-
+    
 } // namespace mongo

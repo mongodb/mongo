@@ -22,6 +22,12 @@
 
 namespace mongo {
 
+    class QueryPattern;
+    void registerWriteOp( const string &ns );
+    void clearQueryCache( const string &ns );
+    BSONObj indexForPattern( const string &ns, const QueryPattern &pattern );
+    void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey );
+    
     class FieldBound {
     public:
         FieldBound( const BSONElement &e = emptyObj.firstElement() );
@@ -68,6 +74,25 @@ namespace mongo {
         }
         bool operator!=( const QueryPattern &other ) const {
             return !operator==( other );
+        }
+        bool operator<( const QueryPattern &other ) const {
+            map< string, Type >::const_iterator i = fieldTypes_.begin();
+            map< string, Type >::const_iterator j = other.fieldTypes_.begin();
+            while( i != fieldTypes_.end() ) {
+                if ( j == other.fieldTypes_.end() )
+                    return false;
+                if ( i->first < j->first )
+                    return true;
+                else if ( i->first > j->first )
+                    return false;
+                if ( i->second < j->second )
+                    return true;
+                else if ( i->second > j->second )
+                    return false;
+                ++i;
+                ++j;
+            }
+            return ( j != other.fieldTypes_.end() );
         }
     private:
         QueryPattern() {}

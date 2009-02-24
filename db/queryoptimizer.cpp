@@ -136,6 +136,8 @@ namespace mongo {
     }
     
     BSONObj QueryPlan::indexKey() const {
+        if ( !index_ )
+            return BSON( "$natural" << 1 );
         return index_->keyPattern();
     }
     
@@ -143,7 +145,7 @@ namespace mongo {
     fbs_( ns, query ) {
         NamespaceDetails *d = nsdetails( ns );
         if ( !d || !fbs_.matchPossible() ) {
-            // Table scan plan only
+            // Table scan plan, when no matches are possible
             plans_.push_back( PlanPtr( new QueryPlan( fbs_, order ) ) );
             return;
         }
@@ -176,6 +178,22 @@ namespace mongo {
                 }
             }
             uassert( "bad hint", false );
+        }
+        
+        BSONObj bestIndex = indexForPattern( ns, fbs_.pattern() );
+        if ( !bestIndex.isEmpty() ) {
+            if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
+                // Table scan plan
+                plans_.push_back( PlanPtr( new QueryPlan( fbs_, order ) ) );
+                return;
+            }
+            for (int i = 0; i < d->nIndexes; i++ ) {
+                IndexDetails& ii = d->indexes[i];
+                if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
+                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order, &ii ) ) );
+                    return;
+                }
+            }
         }
         
         // Table scan plan
@@ -238,8 +256,10 @@ namespace mongo {
                 } catch ( ... ) {
                     op.setExceptionMessage( "Caught unknown exception" );
                 }
-                if ( op.complete() )
+                if ( op.complete() ) {
+                    op.qp().registerSelf(); 
                     return *i;
+                }
                 if ( op.error() )
                     ++errCount;
             }

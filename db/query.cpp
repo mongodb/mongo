@@ -482,8 +482,6 @@ namespace mongo {
         return __updateObjects( ns, updateobj, pattern, upsert, ss, logop );
     }
         
-    /* todo: we can optimize replication by just doing insert when an upsert triggers.
-    */
     void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss) {
         int rc = __updateObjects(ns, updateobj, pattern, upsert, ss, true);
         if ( rc != 5 && rc != 0 && rc != 4 && rc != 3 )

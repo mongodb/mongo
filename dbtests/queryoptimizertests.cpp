@@ -698,6 +698,55 @@ namespace QueryOptimizerTests {
             };
         };
         
+        class SaveGoodIndex : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                nPlans( 3 );
+                runQuery();
+                nPlans( 1 );
+                nPlans( 1 );
+                Helpers::ensureIndex( ns(), BSON( "c" << 1 ), "c_1" );
+                nPlans( 3 );
+                runQuery();
+                nPlans( 1 );
+                
+                {
+                    dbtemprelease t;
+                    DBDirectClient client;
+                    for( int i = 0; i < 34; ++i ) {
+                        client.insert( ns(), BSON( "i" << i ) );
+                        client.update( ns(), QUERY( "i" << i ), BSON( "i" << i + 1 ) );
+                        client.remove( ns(), BSON( "i" << i + 1 ) );
+                    }
+                }
+                nPlans( 3 );
+                runQuery();
+                nPlans( 1 );
+            }
+        private:
+            void nPlans( int n ) {
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                ASSERT_EQUALS( n, s.nPlans() );                
+            }
+            void runQuery() {
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                TestOp original;
+                s.runOp( original );
+            }
+            class TestOp : public QueryOp {
+            public:
+                virtual void init() {}
+                virtual void next() {
+                    setComplete();
+                }
+                virtual QueryOp *clone() const {
+                    return new TestOp();
+                }
+            };            
+        };        
+        
     } // namespace QueryPlanSetTests
     
     class All : public UnitTest::Suite {
@@ -745,6 +794,7 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::UnhelpfulIndex >();
             add< QueryPlanSetTests::SingleException >();
             add< QueryPlanSetTests::AllException >();
+            add< QueryPlanSetTests::SaveGoodIndex >();
         }
     };
     
