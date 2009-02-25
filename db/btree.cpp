@@ -296,7 +296,7 @@ namespace mongo {
 
     extern DiskLoc minDiskLoc;
 
-    bool BtreeBucket::exists(IndexDetails& idx, DiskLoc thisLoc, BSONObj& key, BSONObj order) { 
+    bool BtreeBucket::exists(const IndexDetails& idx, DiskLoc thisLoc, BSONObj& key, BSONObj order) { 
         int pos;
         bool found;
         DiskLoc b = locate(idx, thisLoc, key, order, pos, found, minDiskLoc);
@@ -328,7 +328,7 @@ namespace mongo {
        note result might be an Unused location!
     */
 	char foo;
-    bool BtreeBucket::find(IndexDetails& idx, BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup) {
+    bool BtreeBucket::find(const IndexDetails& idx, BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup) {
 #if defined(_EXPERIMENT1)
 		{
 			char *z = (char *) this;
@@ -704,7 +704,7 @@ found:
         return DiskLoc();
     }
 
-    DiskLoc BtreeBucket::locate(IndexDetails& idx, const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction) {
+    DiskLoc BtreeBucket::locate(const IndexDetails& idx, const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction) {
         int p;
         found = find(idx, key, recordLoc, order, p, /*assertIfDup*/ false);
         if ( found ) {

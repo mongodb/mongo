@@ -160,7 +160,7 @@ namespace mongo {
     public:
         void dump();
 
-        bool exists(IndexDetails& idx, DiskLoc thisLoc, BSONObj& key, BSONObj order);
+        bool exists(const IndexDetails& idx, DiskLoc thisLoc, BSONObj& key, BSONObj order);
 
         static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
 
@@ -173,7 +173,7 @@ namespace mongo {
         /* locate may return an "unused" key that is just a marker.  so be careful.
              looks for a key:recordloc pair.
         */
-        DiskLoc locate(IndexDetails& , const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, 
+        DiskLoc locate(const IndexDetails& , const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, 
                        int& pos, bool& found, DiskLoc recordLoc, int direction=1);
 
         /* advance one key position in the index: */
@@ -198,7 +198,7 @@ namespace mongo {
         int _insert(DiskLoc thisLoc, DiskLoc recordLoc,
                     BSONObj& key, const BSONObj &order, bool dupsAllowed,
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
-        bool find(IndexDetails& idx, BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
+        bool find(const IndexDetails& idx, BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
     };
 
@@ -207,7 +207,7 @@ namespace mongo {
         BSONObj startKey;
         BSONObj endKey;
     public:
-        BtreeCursor( IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, int direction );
+        BtreeCursor( const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, int direction );
         virtual bool ok() {
             return !bucket.isNull();
         }
@@ -273,7 +273,7 @@ namespace mongo {
         /* Check if the current key is beyond endKey. */
         void checkEnd();
 
-        IndexDetails& indexDetails;
+        const IndexDetails& indexDetails;
         BSONObj order;
         DiskLoc bucket;
         int keyOfs;
