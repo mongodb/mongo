@@ -22,6 +22,7 @@
 #include "../../client/dbclient.h"
 #include "../../db/instance.h"
 #include "../../db/query.h"
+#include "../../db/queryoptimizer.h"
 
 #include <unittest/Registry.hpp>
 #include <unittest/UnitTest.hpp>
@@ -464,7 +465,7 @@ namespace Plan {
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                getIndexCursor( ns_.c_str(), emptyObj, emptyObj, 0, 0, &hintElt_ );
+                QueryPlanSet s( ns_.c_str(), emptyObj, emptyObj, &hintElt_ );
         }
         string ns_;        
         auto_ptr< dblock > lk_;
@@ -485,7 +486,7 @@ namespace Plan {
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                getIndexCursor( ns_.c_str(), emptyObj, BSON( "a" << 1 ) );
+                QueryPlanSet s( ns_.c_str(), emptyObj, BSON( "a" << 1 ) );
         }
         string ns_;        
         auto_ptr< dblock > lk_;
@@ -504,7 +505,7 @@ namespace Plan {
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                getIndexCursor( ns_.c_str(), BSON( "a" << 1 ), emptyObj );
+                QueryPlanSet s( ns_.c_str(), BSON( "a" << 1 ), emptyObj );
         }
         string ns_;        
         auto_ptr< dblock > lk_;
