@@ -171,7 +171,8 @@ namespace mongo {
     }
     
     ParallelSortShardedCursor::~ParallelSortShardedCursor(){
-        delete( _cursors );
+        delete [] _cursors;
+        delete [] _nexts;
     }
 
     bool ParallelSortShardedCursor::more(){
