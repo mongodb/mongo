@@ -271,8 +271,15 @@ namespace mongo {
         }
 
         for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
-            (*i)->init();
-            if ( (*i)->complete() )
+            QueryOp &op = **i;
+            try {
+                op.init();
+            } catch ( const std::exception &e ) {
+                op.setExceptionMessage( e.what() );
+            } catch ( ... ) {
+                op.setExceptionMessage( "Caught unknown exception" );
+            }
+            if ( op.complete() )
                 return *i;
         }
         

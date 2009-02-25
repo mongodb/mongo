@@ -81,7 +81,7 @@ namespace mongo {
         bool complete() const { return complete_; }
         bool error() const { return error_; }
         string exceptionMessage() const { return exceptionMessage_; }
-        const QueryPlan &qp() { return *qp_; }
+        const QueryPlan &qp() const { return *qp_; }
         // To be called by QueryPlanSet::Runner only.
         void setQueryPlan( const QueryPlan *qp ) { qp_ = qp; }
         void setExceptionMessage( const string &exceptionMessage ) {

@@ -69,64 +69,6 @@ namespace QueryTests {
         }
     };
     
-    class NoFindSpec : public Base {
-    public:
-        void run() {
-            ASSERT( !getIndexCursor( ns(), emptyObj, emptyObj ).get() );
-        }
-    };
-    
-    class SimpleFind : public Base {
-    public:
-        void run() {
-            bool simpleKeyMatch = false;
-            bool isSorted = false;
-            ASSERT( getIndexCursor( ns(), fromjson( "{\"a\":\"b\"}" ),
-                                   emptyObj, &simpleKeyMatch ).get() );
-            ASSERT( simpleKeyMatch );
-            ASSERT( !isSorted );
-        }
-    };
-    
-    class SimpleFindSort : public Base {
-    public:
-        void run() {
-            bool simpleKeyMatch = false;
-            bool isSorted = false;
-            ASSERT( getIndexCursor( ns(), fromjson( "{\"a\":\"b\"}" ),
-                                    fromjson( "{\"a\":1}" ), &simpleKeyMatch,
-                                    &isSorted ).get() );
-            ASSERT( !simpleKeyMatch );
-            ASSERT( isSorted );
-        }        
-    };
-    
-    class FindNumericNotSimple : public Base {
-    public:
-        void run() {
-            bool simpleKeyMatch = false;
-            bool isSorted = false;
-            ASSERT( getIndexCursor( ns(), fromjson( "{\"a\":1}" ),
-                                   emptyObj, &simpleKeyMatch,
-                                   &isSorted ).get() );
-            ASSERT( !simpleKeyMatch );
-            ASSERT( !isSorted );
-        }        
-    };
-
-    class FindObjectNotSimple : public Base {
-    public:
-        void run() {
-            bool simpleKeyMatch = false;
-            bool isSorted = false;
-            ASSERT( getIndexCursor( ns(), fromjson( "{\"a\":{\"b\":1}}" ),
-                                   emptyObj, &simpleKeyMatch,
-                                   &isSorted ).get() );
-            ASSERT( !simpleKeyMatch );
-            ASSERT( !isSorted );
-        }        
-    };
-
     class CountBasic : public Base {
     public:
         void run() {
@@ -252,11 +194,6 @@ namespace QueryTests {
     class All : public UnitTest::Suite {
     public:
         All() {
-            add< NoFindSpec >();
-            add< SimpleFind >();
-            add< SimpleFindSort >();
-            add< FindNumericNotSimple >();
-            add< FindObjectNotSimple >();
             add< CountBasic >();
             add< CountQuery >();
             add< CountFields >();

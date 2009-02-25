@@ -45,149 +45,63 @@ namespace mongo {
 //ns->query->DiskLoc
     LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
 
-    int nextCursorId = 1;
     extern bool useCursors;
 
-    void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e);
-
-    int matchDirection( const BSONObj &index, const BSONObj &sort ) {
-        if ( index.isEmpty() || sort.isEmpty() )
-            return 0;
-        int direction = 0;
-        BSONObjIterator i( index );
-        BSONObjIterator s( sort );
-        while ( 1 ) {
-            BSONElement ie = i.next();
-            BSONElement se = s.next();
-            if ( ie.eoo() && !se.eoo() )
-                return 0;
-            if ( ie.eoo() || se.eoo() )
-                return direction;
-
-            if ( strcmp( ie.fieldName(), se.fieldName() ) != 0 )
-                return 0;
-
-            int d = ie.number() == se.number() ? 1 : -1;
-            if ( direction == 0 )
-                direction = d;
-            else if ( direction != d )
-                return 0;
+    // Just try to identify best plan.
+    class DeleteOp : public QueryOp {
+    public:
+        DeleteOp( bool justOne, int& bestCount ) :
+        justOne_( justOne ),
+        count_(),
+        bestCount_( bestCount ),
+        nScanned_() {
         }
-    }
+        virtual void init() {
+            c_ = qp().newCursor();
+            matcher_.reset( new JSMatcher( qp().query(), c_->indexKeyPattern() ) );
+        }
+        virtual void next() {
+            if ( !c_->ok() ) {
+                setComplete();
+                return;
+            }
+            
+            Record *r = c_->_current();
+            DiskLoc rloc = c_->currLoc();
+            BSONObj js(r);
+            
+            bool deep;
+            if ( matcher_->matches(js, &deep) ) {
+                if ( !deep || !c_->getsetdup(rloc) )
+                    ++count_;
+            }
 
-    auto_ptr< Cursor > getHintCursor( IndexDetails &ii, BSONObj query, BSONObj order, bool *simpleKeyMatch, bool *isSorted ) {
-        int direction = matchDirection( ii.keyPattern(), order );
-        if ( isSorted ) *isSorted = ( direction != 0 );
-        if ( direction == 0 )
-            direction = 1;
-        // NOTE This startKey is incorrect, preserving for the moment so
-        // we can preserve simpleKeyMatch behavior.
-        BSONObj startKey = ii.getKeyFromQuery(query);
-        if ( simpleKeyMatch )
-            *simpleKeyMatch = query.nFields() == startKey.nFields();
-        return auto_ptr<Cursor>(new BtreeCursor(ii, emptyObj, direction, query));        
-    }
+            c_->advance();
+            ++nScanned_;
+            if ( count_ > bestCount_ )
+                bestCount_ = count_;
+            
+            if ( count_ > 0 ) {
+                if ( justOne_ )
+                    setComplete();
+                else if ( nScanned_ >= 100 && count_ == bestCount_ )
+                    setComplete();
+            }
+        }
+        virtual bool mayRecordPlan() const { return !justOne_; }
+        virtual QueryOp *clone() const {
+            return new DeleteOp( justOne_, bestCount_ );
+        }
+        auto_ptr< Cursor > newCursor() const { return qp().newCursor(); }
+    private:
+        bool justOne_;
+        int count_;
+        int &bestCount_;
+        int nScanned_;
+        auto_ptr< Cursor > c_;
+        auto_ptr< JSMatcher > matcher_;
+    };
     
-    /* todo: _ use index on partial match with the query
-
-       parameters
-         query - the query, e.g., { name: 'joe' }
-         order - order by spec, e.g., { name: 1 } 1=ASC, -1=DESC
-         simpleKeyMatch - set to true if the query is purely for a single key value
-                          unchanged otherwise.
-    */
-    auto_ptr<Cursor> getIndexCursor(const char *ns, const BSONObj& query, const BSONObj& order, bool *simpleKeyMatch, bool *isSorted, BSONElement *hint) {
-        NamespaceDetails *d = nsdetails(ns);
-        if ( d == 0 ) return auto_ptr<Cursor>();
-
-        if ( hint && !hint->eoo() ) {
-            /* todo: more work needed.  doesn't handle $lt & $gt for example.
-                     waiting for query optimizer rewrite (see queryoptimizer.h) before finishing the work.
-            */
-            if( hint->type() == String ) {
-                string hintstr = hint->valuestr();
-                for (int i = 0; i < d->nIndexes; i++ ) {
-                    IndexDetails& ii = d->indexes[i];
-                    if ( ii.indexName() == hintstr ) {
-                        return getHintCursor( ii, query, order, simpleKeyMatch, isSorted );
-                    }
-                }
-            }
-            else if( hint->type() == Object ) { 
-                BSONObj hintobj = hint->embeddedObject();
-                for (int i = 0; i < d->nIndexes; i++ ) {
-                    IndexDetails& ii = d->indexes[i];
-                    if( ii.keyPattern().woCompare(hintobj) == 0 ) {
-                        return getHintCursor( ii, query, order, simpleKeyMatch, isSorted );
-                    }
-                }
-            }
-            else { 
-                uasserted("bad hint object");
-            }
-            uasserted("hint index not found");
-        }
-
-        if ( !order.isEmpty() ) {
-            // order by
-            for (int i = 0; i < d->nIndexes; i++ ) {
-                BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
-                assert( strcmp(ns, idxInfo.getStringField("ns")) == 0 );
-                BSONObj idxKey = idxInfo.getObjectField("key");
-                int direction = matchDirection( idxKey, order );
-                if ( direction != 0 ) {
-                    DEV out() << " using index " << d->indexes[i].indexNamespace() << '\n';
-                    if ( isSorted )
-                        *isSorted = true;
-
-                    return auto_ptr<Cursor>(new BtreeCursor(d->indexes[i], emptyObj, direction, query));
-                }
-            }
-        }
-
-        set<string> queryFields;
-        query.getFieldNames(queryFields);
-        if ( queryFields.size() == 0 ) {
-            DEV out() << "getIndexCursor fail " << ns << '\n';
-            return auto_ptr<Cursor>();            
-        }
-        
-        // regular query without order by
-        for (int i = 0; i < d->nIndexes; i++ ) {
-            BSONObj idxInfo = d->indexes[i].info.obj(); // { name:, ns:, key: }
-            BSONObj idxKey = idxInfo.getObjectField("key");
-
-            if ( queryFields.count( idxKey.firstElement().fieldName() ) > 0 ) {
-                BSONObj q = query.extractFieldsUnDotted(idxKey);
-                assert(q.objsize() != 0); // guard against a seg fault if details is 0
-                                                                                                               
-                // Make sure 1st element of index will help us.                                    
-                BSONElement e = q.firstElement();          
-                /* regexp: only supported if form is /^text/ */
-                if ( e.type() == RegEx && !e.simpleRegex() )                         
-                    continue;                                                                      
-                if ( e.type() == Object && getGtLtOp( e ) >= JSMatcher::opIN )                     
-                    continue;                                                                      
-                
-                bool simple = true;                                                                
-                BSONObjIterator it( q );                                                           
-                while( simple && it.more() ) {                
-                    BSONElement e = it.next();
-                    if ( e.eoo() )
-                        break;
-                    if ( e.isNumber() || e.mayEncapsulate() || e.type() == RegEx )
-                        simple = false;                                                            
-                }
-                DEV out() << "using index " << d->indexes[i].indexNamespace() << endl;
-                if ( simple && simpleKeyMatch )
-                    *simpleKeyMatch = true;
-                return auto_ptr< Cursor >( new BtreeCursor( d->indexes[ i ], emptyObj, 1, query ) );
-            }
-        }
-        DEV out() << "getIndexCursor fail " << ns << '\n';
-        return auto_ptr<Cursor>();
-    }
-
     /* ns:      namespace, e.g. <database>.<collection>
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
@@ -207,11 +121,12 @@ namespace mongo {
         }
 
         int nDeleted = 0;
-        BSONObj order;
-        auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
-        if ( c.get() == 0 )
-            c = theDataFileMgr.findAll(ns);
-
+        QueryPlanSet s( ns, pattern, emptyObj );
+        int best = 0;
+        DeleteOp original( justOne, best );
+        shared_ptr< DeleteOp > bestOp = s.runOp( original );
+        auto_ptr< Cursor > c = bestOp->newCursor();
+        
         if( !c->ok() )
             return nDeleted;
 

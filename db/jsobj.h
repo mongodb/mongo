@@ -724,8 +724,9 @@ namespace mongo {
         // TODO Support conversion of element types other than min and max.
         BSONObj clientReadable() const;
         
-        /** Return new object with the field names replaced. */
-        BSONObj replaceFieldNames( const vector< string > &names ) const;
+        /** Return new object with the field names replaced by those in the
+            passed object. */
+        BSONObj replaceFieldNames( const BSONObj &obj ) const;
         
         /** true unless corrupt */
         bool valid() const;

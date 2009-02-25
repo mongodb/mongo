@@ -28,40 +28,7 @@ namespace mongo {
     DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
     DiskLoc minDiskLoc(0, 1);
 
-    BtreeCursor::BtreeCursor(IndexDetails& _id, const BSONObj& k, int _direction, const BSONObj& _query) :
-//    query(_query),
-            indexDetails(_id),
-            order(_id.keyPattern()),
-            direction(_direction)
-    {
-//otherTraceLevel = 999;
-
-        bool found;
-        if ( otherTraceLevel >= 12 ) {
-            if ( otherTraceLevel >= 200 ) {
-                out() << "::BtreeCursor() qtl>200.  validating entire index." << endl;
-                indexDetails.head.btree()->fullValidate(indexDetails.head, order);
-            }
-            else {
-                out() << "BTreeCursor(). dumping head bucket" << endl;
-                indexDetails.head.btree()->dump();
-            }
-        }
-
-        findExtremeKeys( _query );
-
-        if ( !k.isEmpty() )
-            startKey = k.copy();
-
-        bucket = indexDetails.head.btree()->
-                 locate(indexDetails, indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
-
-        skipUnusedKeys();
-
-        checkEnd(); 
-    }
-
-    BtreeCursor::BtreeCursor( IndexDetails &_id, const BSONObj &_startKey, const BSONObj &_endKey, int _direction ) :
+    BtreeCursor::BtreeCursor( const IndexDetails &_id, const BSONObj &_startKey, const BSONObj &_endKey, int _direction ) :
     startKey( _startKey ),
     endKey( _endKey ),
     indexDetails( _id ),
@@ -87,91 +54,6 @@ namespace mongo {
         checkEnd();         
     }
     
-    string BtreeCursor::simpleRegexEnd( string regex ) {
-        ++regex[ regex.length() - 1 ];
-        return regex;
-    }
-    
-// Given a query, find the lowest and highest keys along our index that could
-// potentially match the query.  These lowest and highest keys will be mapped
-// to startKey and endKey based on the value of direction.
-    void BtreeCursor::findExtremeKeys( const BSONObj &query ) {
-        BSONObjBuilder startBuilder;
-        BSONObjBuilder endBuilder;
-        vector< string >fields;
-        getIndexFields( fields );
-        for ( vector<string>::iterator i = fields.begin(); i != fields.end(); ++i ) {
-            const char * field = i->c_str();
-            BSONElement k = indexDetails.keyPattern().getFieldDotted( field );
-            int number = (int) k.number(); // returns 0.0 if not numeric
-            bool forward = ( ( number >= 0 ? 1 : -1 ) * direction > 0 );
-            BSONElement lowest = minKey.firstElement();
-            BSONElement highest = maxKey.firstElement();
-            BSONElement e = query.getFieldDotted( field );
-            BSONObjBuilder temp, temp2;
-            if ( !e.eoo() && e.type() != RegEx ) {
-                if ( getGtLtOp( e ) == JSMatcher::Equality )
-                    lowest = highest = e;
-                else
-                    findExtremeInequalityValues( e, lowest, highest );
-            } else if ( e.type() == RegEx ) {                                                      
-                const char *r = e.simpleRegex();
-                if ( r ) {                                                                         
-                    temp.append( "", r );                                                          
-                    lowest = temp.done().firstElement();
-                    temp2.append( "", simpleRegexEnd( r ) );
-                    highest = temp2.done().firstElement();
-                }
-            }                  
-            startBuilder.appendAs( forward ? lowest : highest, "" );
-            endBuilder.appendAs( forward ? highest : lowest, "" );
-        }
-        startKey = startBuilder.obj();
-        endKey = endBuilder.obj();
-    }
-
-// Find lowest and highest possible key values given all $gt, $gte, $lt, and
-// $lte elements in e.  The values of lowest and highest should be
-// preinitialized, for example to minKey.firstElement() and maxKey.firstElement().
-    void BtreeCursor::findExtremeInequalityValues( const BSONElement &e,
-            BSONElement &lowest,
-            BSONElement &highest ) {
-        BSONObjIterator i( e.embeddedObject() );
-        while ( 1 ) {
-            BSONElement s = i.next();
-            if ( s.eoo() )
-                break;
-            int op = s.getGtLtOp();
-            if ( ( op == JSMatcher::LT || op == JSMatcher::LTE ) &&
-                    ( s.woCompare( highest, false ) < 0 ) )
-                highest = s;
-            else if ( ( op == JSMatcher::GT || op == JSMatcher::GTE ) &&
-                      ( s.woCompare( lowest, false ) > 0 ) )
-                lowest = s;
-        }
-    }
-
-// Expand all field names in key to use dotted notation.
-    void BtreeCursor::getFields( const BSONObj &key, vector< string > &fields ) {
-        BSONObjIterator i( key );
-        while ( 1 ) {
-            BSONElement k = i.next();
-            if ( k.eoo() )
-                break;
-            bool addedSubfield = false;
-            if ( k.type() == Object ) {
-                vector< string > subFields;
-                getFields( k.embeddedObject(), subFields );
-                for ( vector< string >::iterator i = subFields.begin(); i != subFields.end(); ++i ) {
-                    addedSubfield = true;
-                    fields.push_back( k.fieldName() + string( "." ) + *i );
-                }
-            }
-            if ( !addedSubfield )
-                fields.push_back( k.fieldName() );
-        }
-    }
-
     /* skip unused keys. */
     void BtreeCursor::skipUnusedKeys() {
         int u = 0;

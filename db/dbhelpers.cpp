@@ -21,6 +21,7 @@
 #include "dbhelpers.h"
 #include "query.h"
 #include "json.h"
+#include "queryoptimizer.h"
 
 namespace mongo {
 
@@ -50,31 +51,51 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
     }
 
+    class FindOne : public QueryOp {
+    public:
+        FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
+        virtual void init() {
+            massert( "Not an index cursor", !requireIndex_ || strcmp( qp().indexKey().firstElement().fieldName(), "$natural" ) != 0 );
+            c_ = qp().newCursor();
+            if ( !c_->ok() )
+                setComplete();
+            else
+                matcher_.reset( new JSMatcher( qp().query(), qp().indexKey() ) );
+        }
+        virtual void next() {
+            if ( !c_->ok() ) {
+                setComplete();
+                return;
+            }
+            BSONObj js = c_->current();
+            if ( matcher_->matches( js ) ) {
+                one_ = js;
+                setComplete();
+            } else {
+                c_->advance();
+            }
+        }
+        virtual bool mayRecordPlan() const { return false; }
+        virtual QueryOp *clone() const { return new FindOne( requireIndex_ ); }
+        BSONObj one() const { return one_; }
+    private:
+        bool requireIndex_;
+        auto_ptr< Cursor > c_;
+        auto_ptr< JSMatcher > matcher_;
+        BSONObj one_;
+    };
+    
     /* fetch a single object from collection ns that matches query 
        set your db context first
     */
     bool Helpers::findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex) { 
-        auto_ptr<Cursor> c = getIndexCursor(ns, query, emptyObj);
-        if ( c.get() == 0 ) {
-            massert("index missing on server's findOne invocation", !requireIndex);
-            c = DataFileMgr::findAll(ns);
-        }
-
-        if( !c->ok() ) 
+        QueryPlanSet s( ns, query, emptyObj );
+        FindOne original( requireIndex );
+        shared_ptr< FindOne > res = s.runOp( original );
+        if ( res->one().isEmpty() )
             return false;
-
-        JSMatcher matcher(query, c->indexKeyPattern());
-
-        do {
-            BSONObj js = c->current();
-            if( matcher.matches(js) ) { 
-                result = js;
-                return true;
-            }
-            c->advance();
-        } while( c->ok() );
-
-        return false;
+        result = res->one();
+        return true;
     }
 
     int test2_dbh() {
