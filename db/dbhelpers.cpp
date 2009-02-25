@@ -56,7 +56,7 @@ namespace mongo {
         FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
         virtual void init() {
             massert( "Not an index cursor", !requireIndex_ || strcmp( qp().indexKey().firstElement().fieldName(), "$natural" ) != 0 );
-            auto_ptr< Cursor > c_ = qp().newCursor();
+            c_ = qp().newCursor();
             if ( !c_->ok() )
                 setComplete();
             else
