@@ -119,6 +119,8 @@ namespace mongo {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
+            if ( strcmp( e.fieldName(), "$where" ) == 0 )
+                continue;
             if ( getGtLtOp( e ) == JSMatcher::Equality ) {
                 bounds_[ e.fieldName() ] &= FieldBound( e );
             }

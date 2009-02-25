@@ -189,6 +189,13 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class NoWhere {
+        public:
+            void run() {
+                ASSERT_EQUALS( 0, FieldBoundSet( "ns", BSON( "$where" << 1 ) ).nNontrivialBounds() );
+            }
+        };
+        
     } // namespace FieldBoundTests
     
     namespace QueryPlanTests {
@@ -830,6 +837,7 @@ namespace QueryOptimizerTests {
             add< FieldBoundTests::In >();
             add< FieldBoundTests::SimplifiedQuery >();
             add< FieldBoundTests::QueryPatternTest >();
+            add< FieldBoundTests::NoWhere >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();
