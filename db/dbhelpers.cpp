@@ -92,7 +92,6 @@ namespace mongo {
         QueryPlanSet s( ns, query, emptyObj );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );
-        massert( res->exceptionMessage(), res->complete() );
         if ( res->one().isEmpty() )
             return false;
         result = res->one();

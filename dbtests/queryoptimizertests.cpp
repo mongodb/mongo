@@ -479,6 +479,7 @@ namespace QueryOptimizerTests {
             ~Base() {
                 if ( !nsd() )
                     return;
+                clearQueryCache( ns() );
                 string s( ns() );
                 dropNS( s );
             }
@@ -816,6 +817,19 @@ namespace QueryOptimizerTests {
             };
         };
         
+        class FindOne : public Base {
+        public:
+            void run() {
+                BSONObj one = BSON( "a" << 1 );
+                theDataFileMgr.insert( ns(), one );
+                BSONObj result;
+                ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result ) );
+                ASSERT( !Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ) );                
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ) );                
+            }
+        };
+        
     } // namespace QueryPlanSetTests
     
     class All : public UnitTest::Suite {
@@ -866,6 +880,7 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::AllException >();
             add< QueryPlanSetTests::SaveGoodIndex >();
             add< QueryPlanSetTests::TryAllPlansOnErr >();
+            add< QueryPlanSetTests::FindOne >();
         }
     };
     
