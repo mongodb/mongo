@@ -76,12 +76,24 @@ namespace mongo {
                 delete( cursor );
                 return;
             }
-            
-            // TODO: store cursor
+            cout << "STORING CURSOR : " << cursor->getId() << endl;
+            cursorCache.store( cursor );
         }
         
         virtual void getMore( Request& r ){
-            throw UserException( "shard getMore doesn't work yet" );
+            int ntoreturn = r.d().pullInt();
+            long long id = r.d().pullInt64();
+
+            ShardedCursor * cursor = cursorCache.get( id );
+            uassert( "can't find cursor" , cursor );
+
+            cout << "GOT CURSOR : " << id << endl;
+            
+            if ( cursor->sendNextBatch( r , ntoreturn ) )
+                return;
+            
+            delete( cursor );
+            cursorCache.remove( id );
         }
         
         virtual void writeOp( int op , Request& r ){

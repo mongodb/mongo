@@ -19,11 +19,14 @@ namespace mongo {
 
         virtual bool more() = 0;
         virtual BSONObj next() = 0;
+
+        long long getId(){ return _id; }
         
         /**
          * @return whether there is more data left
          */
-        bool sendNextBatch( Request& r );
+        bool sendNextBatch( Request& r ){ return sendNextBatch( r , _ntoreturn ); }
+        bool sendNextBatch( Request& r , int ntoreturn );
         
     protected:
         auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = emptyObj );
@@ -42,6 +45,7 @@ namespace mongo {
         long long _id;
 
         int _totalSent;
+        bool _done;
     };
 
 
@@ -95,4 +99,19 @@ namespace mongo {
         auto_ptr<DBClientCursor> * _cursors;
         BSONObj * _nexts;
     };
+    
+    class CursorCache {
+    public:
+        CursorCache();
+        ~CursorCache();
+        
+        ShardedCursor* get( long long id );
+        void store( ShardedCursor* cursor );
+        void remove( long long id );
+
+    private:
+        map<long long,ShardedCursor*> _cursors;
+    };
+    
+    extern CursorCache cursorCache;
 }

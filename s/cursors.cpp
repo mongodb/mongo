@@ -16,6 +16,7 @@ namespace mongo {
         _ntoreturn = q.ntoreturn;
         
         _totalSent = 0;
+        _done = false;
 
         if ( q.fields.get() ){
             BSONObjBuilder b;
@@ -77,7 +78,9 @@ namespace mongo {
         return s.simplifiedQuery();
     }
 
-    bool ShardedCursor::sendNextBatch( Request& r ){
+    bool ShardedCursor::sendNextBatch( Request& r , int ntoreturn ){
+        uassert( "cursor already done" , ! _done );
+        
         int maxSize = 1024 * 1024;
         if ( _totalSent > 0 )
             maxSize *= 3;
@@ -87,7 +90,7 @@ namespace mongo {
         int num = 0;
         bool sendMore = true;
         
-        cout << "TEMP: ShardedCursor " << _ns << "\t" << _query << " ntoreturn: " << _ntoreturn << endl;
+        cout << "TEMP: ShardedCursor " << _ns << "\t" << _query << " ntoreturn: " << ntoreturn << endl;
         while ( more() ){
             BSONObj o = next();
             cout << "\t" << o << endl;
@@ -98,12 +101,12 @@ namespace mongo {
             if ( b.len() > maxSize )
                 break;
 
-            if ( num == _ntoreturn ){
+            if ( num == ntoreturn ){
                 // soft limit aka batch size
                 break;
             }
 
-            if ( ( -1 * num + _totalSent ) == _ntoreturn ){
+            if ( ( -1 * num + _totalSent ) == ntoreturn ){
                 // hard limit - total to send
                 sendMore = false;
                 break;
@@ -114,6 +117,7 @@ namespace mongo {
         log() << "  hasMore:" << hasMore << " id:" << _id << endl;
         replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , 0 , hasMore ? _id : 0 );
         _totalSent += num;
+        _done = ! hasMore;
         return hasMore;
     }
 
@@ -229,4 +233,28 @@ namespace mongo {
             
     }
 
+    CursorCache::CursorCache(){
+    }
+
+    CursorCache::~CursorCache(){
+        // TODO: delete old cursors?
+    }
+
+    ShardedCursor* CursorCache::get( long long id ){
+        map<long long,ShardedCursor*>::iterator i = _cursors.find( id );
+        if ( i == _cursors.end() ){
+            OCCASIONALLY log() << "Sharded CursorCache missing cursor id: " << id << endl;
+            return 0;
+        }
+        return i->second;
+    }
+    
+    void CursorCache::store( ShardedCursor * cursor ){
+        _cursors[cursor->getId()] = cursor;
+    }
+    void CursorCache::remove( long long id ){
+        _cursors.erase( id );
+    }
+
+    CursorCache cursorCache;
 }
