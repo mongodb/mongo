@@ -921,17 +921,18 @@ namespace mongo {
         return b.obj();
     }
     
-    BSONObj BSONObj::replaceFieldNames( const vector< string > &names ) const {
+    BSONObj BSONObj::replaceFieldNames( const BSONObj &names ) const {
         BSONObjBuilder b;
         BSONObjIterator i( *this );
-        vector< string >::const_iterator j = names.begin();
+        BSONObjIterator j( names );
+        BSONElement f = j.more() ? j.next() : emptyObj.firstElement();
         while( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
-            if ( j != names.end() ) {
-                b.appendAs( e, j->c_str() );
-                ++j;
+            if ( !f.eoo() ) {
+                b.appendAs( e, f.fieldName() );
+                f = j.next();
             } else {
                 b.append( e );
             }

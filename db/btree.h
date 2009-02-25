@@ -207,7 +207,6 @@ namespace mongo {
         BSONObj startKey;
         BSONObj endKey;
     public:
-        BtreeCursor(IndexDetails&, const BSONObj& startKey, int direction, const BSONObj& query);
         BtreeCursor( IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, int direction );
         virtual bool ok() {
             return !bucket.isNull();
@@ -259,28 +258,13 @@ namespace mongo {
         }
 
         virtual BSONObj prettyStartKey() const {
-            vector< string > fieldNames;
-            getIndexFields( fieldNames );
-            return startKey.replaceFieldNames( fieldNames ).clientReadable();
+            return startKey.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
         }
         virtual BSONObj prettyEndKey() const {
-            vector< string > fieldNames;
-            getIndexFields( fieldNames );
-            return endKey.replaceFieldNames( fieldNames ).clientReadable();
+            return endKey.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
         }
         
     private:
-        /* set startKey and endKey -- the bounding keys for the query range. */
-        void findExtremeKeys( const BSONObj &query );
-
-        void findExtremeInequalityValues( const BSONElement &e,
-                                          BSONElement &lowest,
-                                          BSONElement &highest );
-        void getIndexFields( vector< string > &fields ) const {
-            return getFields( indexDetails.keyPattern(), fields );
-        }
-        static void getFields( const BSONObj &key, vector< string > &fields );
-
         /* Our btrees may (rarely) have "unused" keys when items are deleted.
            Skip past them.
         */
@@ -288,8 +272,6 @@ namespace mongo {
 
         /* Check if the current key is beyond endKey. */
         void checkEnd();
-
-        static string simpleRegexEnd( string regex );
 
         IndexDetails& indexDetails;
         BSONObj order;
