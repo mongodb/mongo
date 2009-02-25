@@ -19,38 +19,6 @@ namespace mongo {
         void insert( string server , const char * ns , const BSONObj& obj );
         
     };
-
-    class ShardedCursor {
-    public:
-        ShardedCursor( QueryMessage& q );
-        virtual ~ShardedCursor();
-
-        virtual bool more() = 0;
-        virtual BSONObj next() = 0;
-        
-        /**
-         * @return whether there is more data left
-         */
-        bool sendNextBatch( Request& r );
-        
-    protected:
-        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = emptyObj );
-
-        BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
-        BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
-
-        string _ns;
-        int _options;
-        int _skip;
-        int _ntoreturn;
-        
-        BSONObj _query;
-        BSONObj _fields;
-
-        long long _id;
-
-        int _totalSent;
-    };
     
     extern Strategy * SINGLE;
     extern Strategy * SHARDED;
