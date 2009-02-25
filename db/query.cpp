@@ -395,8 +395,8 @@ namespace mongo {
         }
         
         QueryPlanSet qps( ns, pattern, emptyObj );
-        auto_ptr< UpdateOp > original( new UpdateOp() );
-        shared_ptr< UpdateOp > u = qps.runOp( *original );
+        UpdateOp original;
+        shared_ptr< UpdateOp > u = qps.runOp( original );
         massert( u->exceptionMessage(), u->complete() );
         auto_ptr< Cursor > c = u->c();
         if ( c->ok() ) {
@@ -751,8 +751,8 @@ namespace mongo {
             return d->nrecords;
         }
         QueryPlanSet qps( ns, query, emptyObj );
-        auto_ptr< CountOp > original( new CountOp( cmd ) );
-        shared_ptr< CountOp > res = qps.runOp( *original );
+        CountOp original( cmd );
+        shared_ptr< CountOp > res = qps.runOp( original );
         if ( !res->complete() ) {
             log() << "Count with ns: " << ns << " and query: " << query
                   << " failed with exception: " << res->exceptionMessage()
@@ -995,8 +995,8 @@ namespace mongo {
             }
 
             QueryPlanSet qps( ns, query, order, &hint );
-            auto_ptr< DoQueryOp > original( new DoQueryOp( ntoskip, ntoreturn, order, wantMore, explain, *filter, queryOptions ) );
-            shared_ptr< DoQueryOp > o = qps.runOp( *original );
+            DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, *filter, queryOptions );
+            shared_ptr< DoQueryOp > o = qps.runOp( original );
             DoQueryOp &dqo = *o;
             massert( dqo.exceptionMessage(), dqo.complete() );
             n = dqo.n();
