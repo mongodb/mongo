@@ -402,7 +402,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         haveReadLine = False
         if darwin:
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
-            myenv.Append( LIBS=["readline"] )
+            myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
         elif myCheckLib( "readline" ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
             myCheckLib( "tinfo" )
