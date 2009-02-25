@@ -4,7 +4,6 @@
 #include "request.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
-#include "../db/queryutil.h"
 
 namespace mongo {
 
@@ -48,94 +47,4 @@ namespace mongo {
         dbcon.done();
     }
 
-    // ----- ShardedCursor ------
-
-    ShardedCursor::ShardedCursor( QueryMessage& q ){
-        _ns = q.ns;
-        _query = q.query.copy();
-        _options = q.queryOptions;
-        
-        if ( q.fields.get() ){
-            BSONObjBuilder b;
-            for ( set<string>::iterator i=q.fields->begin(); i!=q.fields->end(); i++)
-                b.append( i->c_str() , 1 );
-            _fields = b.obj();
-        }
-
-        do {
-            _id = security.getNonce();
-        } while ( _id == 0 );
-        
-    }
-
-    ShardedCursor::~ShardedCursor(){
-    }
-    
-    auto_ptr<DBClientCursor> ShardedCursor::query( const string& server , int num , BSONObj extra ){
-
-        BSONObj q = _query;
-        if ( ! extra.isEmpty() ){
-            q = concatQuery( q , extra );
-        }
-
-        ScopedDbConnection conn( server );
-        log(5) << "ShardedCursor::query  server:" << server << " ns:" << _ns << " query:" << q << " num:" << num << endl;
-        auto_ptr<DBClientCursor> cursor = conn->query( _ns.c_str() , _query , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
-        conn.done();
-        return cursor;
-    }
-
-    BSONObj ShardedCursor::concatQuery( const BSONObj& query , const BSONObj& extraFilter ){
-        if ( ! query.hasField( "query" ) )
-            return _concatFilter( query , extraFilter );
-        
-        BSONObjBuilder b;
-        BSONObjIterator i( query );
-        while ( i.more() ){
-            BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
-
-            if ( strcmp( e.fieldName() , "query" ) ){
-                b.append( e );
-                continue;
-            }
-            
-            b.append( "query" , _concatFilter( e.embeddedObjectUserCheck() , extraFilter ) );
-        }
-        return b.obj();
-    }
-    
-    BSONObj ShardedCursor::_concatFilter( const BSONObj& filter , const BSONObj& extra ){
-        BSONObjBuilder b;
-        b.appendElements( filter );
-        b.appendElements( extra );
-        
-        FieldBoundSet s( "wrong" , b.obj() );
-        return s.simplifiedQuery();
-    }
-
-    void ShardedCursor::sendNextBatch( Request& r ){
-        BufBuilder b(32768);
-        
-        int num = 0;
-        
-        cout << "TEMP: ShardedCursor " << _ns << "\t" << _query << endl;
-        while ( more() ){
-            BSONObj o = next();
-            cout << "\t" << o << endl;
-
-            b.append( (void*)o.objdata() , o.objsize() );
-            num++;
-            
-            if ( b.len() > 2097152 ){
-                // TEMP
-                break;
-            }
-
-        }
-
-        uassert( "can't handle getMore with sharding yet" , ! more() );
-        replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num );
-    }
 }

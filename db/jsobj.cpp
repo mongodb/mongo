@@ -22,6 +22,7 @@
 #include "../util/goodies.h"
 #include <limits>
 #include "../util/unittest.h"
+#include "json.h"
 
 namespace mongo {
 
@@ -649,6 +650,8 @@ namespace mongo {
         return -1;
     }
 
+    BSONObj staticNull = fromjson( "{'':null}" );
+    
     /* well ordered compare */
     int BSONObj::woSortOrder(const BSONObj& other, const BSONObj& sortKey ) const{
         if ( isEmpty() )
@@ -665,18 +668,13 @@ namespace mongo {
                 return 0;
             
             BSONElement l = getField( f.fieldName() );
-            BSONElement r = other.getField( f.fieldName() );
-            
-            if ( l.eoo() && r.eoo() )
-                return 0;
-            
             if ( l.eoo() )
-                return -1;
-
+                l = staticNull.firstElement();
+            BSONElement r = other.getField( f.fieldName() );
             if ( r.eoo() )
-                return 1;
-
-            int x = l.woCompare( r, true );
+                r = staticNull.firstElement();
+            
+            int x = l.woCompare( r, false );
             if ( f.number() < 0 )
                 x = -x;
             if ( x != 0 )

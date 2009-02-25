@@ -109,6 +109,14 @@ namespace JsobjTests {
                 ASSERT( basic( "a", 1 ).woCompare( basic( "a", 2 ), basic( "a", -1 ) ) > 0 );
             }
         };
+        
+        class WoSortOrder : public Base {
+        public:
+            void run() {
+                ASSERT( BSON( "a" << 1 ).woSortOrder( BSON( "a" << 2 ), BSON( "b" << 1 << "a" << 1 ) ) < 0 );
+                ASSERT( fromjson( "{a:null}" ).woSortOrder( BSON( "b" << 1 ), BSON( "a" << 1 ) ) == 0 );
+            }
+        };
 
         namespace Validation {
             
@@ -525,6 +533,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareEmbeddedObject >();
             add< BSONObjTests::WoCompareEmbeddedArray >();
             add< BSONObjTests::WoCompareOrdered >();
+            add< BSONObjTests::WoSortOrder >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();

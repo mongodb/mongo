@@ -120,4 +120,17 @@ assert.eq( "funny man" , db.foo.find().sort( { num : 1 } )[0].name , "sharding q
 assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query w/sort and another split 2 order wrong" );
 assert.eq( "funny man" , db.foo.find( { num : { $lt : 100 } } ).sort( { num : 1 } ).arrayAccess(0).name , "sharding query w/sort and another split 3 order wrong" );
 
+// getMore
+assert.eq( 4 , db.foo.find().limit(-4).toArray().length , "getMore 1" );
+function countCursor( c ){
+    var num = 0;
+    while ( c.hasNext() ){
+        c.next();
+        num++;
+    }
+    return num;
+}
+assert.eq( 6 , countCursor( db.foo.find()._exec() ) , "getMore 2" );
+//assert.eq( 6 , countCursor( db.foo.find().limit(1)._exec() ) , "getMore 3" );
+
 s.stop();
