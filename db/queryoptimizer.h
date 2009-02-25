@@ -106,7 +106,9 @@ namespace mongo {
         shared_ptr< T > runOp( T &op ) {
             return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
         }
+        const FieldBoundSet &fbs() const { return fbs_; }
     private:
+        void init();
         struct Runner {
             Runner( QueryPlanSet &plans, QueryOp &op );
             shared_ptr< QueryOp > run();
@@ -117,6 +119,10 @@ namespace mongo {
         typedef boost::shared_ptr< QueryPlan > PlanPtr;
         typedef vector< PlanPtr > PlanSet;
         PlanSet plans_;
+        bool mayRecordPlan_;
+        bool usingPrerecordedPlan_;
+        BSONObj hint_;
+        BSONObj order_;
     };
 
 } // namespace mongo

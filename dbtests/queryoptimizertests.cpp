@@ -731,6 +731,13 @@ namespace QueryOptimizerTests {
                 NoRecordTestOp original;
                 s.runOp( original );
                 nPlans( 3 );
+
+                BSONObj hint = fromjson( "{hint:{$natural:1}}" );
+                BSONElement hintElt = hint.firstElement();
+                QueryPlanSet s2( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ), &hintElt );
+                TestOp newOriginal;
+                s2.runOp( newOriginal );
+                nPlans( 3 );
                 
                 runQuery();
                 nPlans( 1 );
@@ -761,6 +768,46 @@ namespace QueryOptimizerTests {
                 virtual QueryOp *clone() const { return new NoRecordTestOp(); }
             };
         };        
+        
+        class TryAllPlansOnErr : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), emptyObj );
+                ScanOnlyTestOp op;
+                s.runOp( op );
+                ASSERT( !fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern() ) ) );
+                
+                QueryPlanSet s2( ns(), BSON( "a" << 4 ), emptyObj );
+                TestOp op2;
+                ASSERT( s2.runOp( op2 )->complete() );
+            }
+        private:
+            class TestOp : public QueryOp {
+            public:
+                virtual void init() {}
+                virtual void next() {
+                    if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
+                        massert( "throw", false );
+                    setComplete();
+                }
+                virtual QueryOp *clone() const {
+                    return new TestOp();
+                }
+                virtual bool mayRecordPlan() const { return true; }
+            };
+            class ScanOnlyTestOp : public TestOp {
+                virtual void next() {
+                    if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
+                        setComplete();
+                    massert( "throw", false );
+                }
+                virtual QueryOp *clone() const {
+                    return new ScanOnlyTestOp();
+                }
+            };
+        };
         
     } // namespace QueryPlanSetTests
     
@@ -810,6 +857,7 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::SingleException >();
             add< QueryPlanSetTests::AllException >();
             add< QueryPlanSetTests::SaveGoodIndex >();
+            add< QueryPlanSetTests::TryAllPlansOnErr >();
         }
     };
     
