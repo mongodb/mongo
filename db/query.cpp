@@ -188,6 +188,61 @@ namespace mongo {
         return auto_ptr<Cursor>();
     }
 
+    // Just try to identify best plan.
+    class DeleteOp : public QueryOp {
+    public:
+        DeleteOp( bool justOne, int& bestCount ) :
+        justOne_( justOne ),
+        count_(),
+        bestCount_( bestCount ),
+        nScanned_() {
+        }
+        virtual void init() {
+            c_ = qp().newCursor();
+            matcher_.reset( new JSMatcher( qp().query(), c_->indexKeyPattern() ) );
+        }
+        virtual void next() {
+            if ( !c_->ok() ) {
+                setComplete();
+                return;
+            }
+            
+            Record *r = c_->_current();
+            DiskLoc rloc = c_->currLoc();
+            BSONObj js(r);
+            
+            bool deep;
+            if ( matcher_->matches(js, &deep) ) {
+                if ( !deep || !c_->getsetdup(rloc) )
+                    ++count_;
+            }
+
+            c_->advance();
+            ++nScanned_;
+            if ( count_ > bestCount_ )
+                bestCount_ = count_;
+            
+            if ( count_ > 0 ) {
+                if ( justOne_ )
+                    setComplete();
+                else if ( nScanned_ >= 100 && count_ == bestCount_ )
+                    setComplete();
+            }
+        }
+        virtual bool mayRecordPlan() const { return !justOne_; }
+        virtual QueryOp *clone() const {
+            return new DeleteOp( justOne_, bestCount_ );
+        }
+        auto_ptr< Cursor > newCursor() const { return qp().newCursor(); }
+    private:
+        bool justOne_;
+        int count_;
+        int &bestCount_;
+        int nScanned_;
+        auto_ptr< Cursor > c_;
+        auto_ptr< JSMatcher > matcher_;
+    };
+    
     /* ns:      namespace, e.g. <database>.<collection>
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
@@ -207,11 +262,12 @@ namespace mongo {
         }
 
         int nDeleted = 0;
-        BSONObj order;
-        auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
-        if ( c.get() == 0 )
-            c = theDataFileMgr.findAll(ns);
-
+        QueryPlanSet s( ns, pattern, emptyObj );
+        int best = 0;
+        DeleteOp original( justOne, best );
+        shared_ptr< DeleteOp > bestOp = s.runOp( original );
+        auto_ptr< Cursor > c = bestOp->newCursor();
+        
         if( !c->ok() )
             return nDeleted;
 
