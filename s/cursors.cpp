@@ -24,26 +24,31 @@ namespace mongo {
                 b.append( i->c_str() , 1 );
             _fields = b.obj();
         }
-
+        else {
+            _fields = emptyObj;
+        }
+        
         do {
             _id = security.getNonce();
         } while ( _id == 0 );
-        
+
     }
 
     ShardedCursor::~ShardedCursor(){
+        _done = true; // just in case
     }
     
     auto_ptr<DBClientCursor> ShardedCursor::query( const string& server , int num , BSONObj extra ){
-
+        uassert( "cursor already done" , ! _done );
+        
         BSONObj q = _query;
         if ( ! extra.isEmpty() ){
             q = concatQuery( q , extra );
         }
 
         ScopedDbConnection conn( server );
-        log(5) << "ShardedCursor::query  server:" << server << " ns:" << _ns << " query:" << q << " num:" << num << endl;
-        auto_ptr<DBClientCursor> cursor = conn->query( _ns.c_str() , _query , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
+        log(5) << "ShardedCursor::query  server:" << server << " ns:" << _ns << " query:" << q << " num:" << num << " _fields:" << _fields << " options: " << _options << endl;
+        auto_ptr<DBClientCursor> cursor = conn->query( _ns.c_str() , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
         conn.done();
         return cursor;
     }
@@ -80,7 +85,7 @@ namespace mongo {
 
     bool ShardedCursor::sendNextBatch( Request& r , int ntoreturn ){
         uassert( "cursor already done" , ! _done );
-        
+                
         int maxSize = 1024 * 1024;
         if ( _totalSent > 0 )
             maxSize *= 3;
@@ -89,11 +94,9 @@ namespace mongo {
         
         int num = 0;
         bool sendMore = true;
-        
-        cout << "TEMP: ShardedCursor " << _ns << "\t" << _query << " ntoreturn: " << ntoreturn << endl;
+
         while ( more() ){
             BSONObj o = next();
-            cout << "\t" << o << endl;
 
             b.append( (void*)o.objdata() , o.objsize() );
             num++;
@@ -114,13 +117,15 @@ namespace mongo {
         }
 
         bool hasMore = sendMore && more();
-        log() << "  hasMore:" << hasMore << " id:" << _id << endl;
+        log(6) << "\t hasMore:" << hasMore << " id:" << _id << endl;
+        
         replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , 0 , hasMore ? _id : 0 );
         _totalSent += num;
         _done = ! hasMore;
+        
         return hasMore;
     }
-
+    
     // --------  SerialServerShardedCursor -----------
     
     SerialServerShardedCursor::SerialServerShardedCursor( set<ServerAndQuery> servers , QueryMessage& q , int sortOrder) : ShardedCursor( q ){
@@ -156,7 +161,7 @@ namespace mongo {
     
     ParallelSortShardedCursor::ParallelSortShardedCursor( set<ServerAndQuery> servers , QueryMessage& q , const BSONObj& sortKey ) : ShardedCursor( q ) , _servers( servers ){
         _numServers = servers.size();
-        _sortKey = sortKey;
+        _sortKey = sortKey.getOwned();
 
         _cursors = new auto_ptr<DBClientCursor>[_numServers];
         _nexts = new BSONObj[_numServers];
