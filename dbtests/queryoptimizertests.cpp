@@ -830,6 +830,51 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class Delete : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                for( int i = 0; i < 200; ++i ) {
+                    BSONObj two = BSON( "a" << 2 );
+                    theDataFileMgr.insert( ns(), two );
+                }
+                BSONObj one = BSON( "a" << 1 );
+                theDataFileMgr.insert( ns(), one );
+                deleteObjects( ns(), BSON( "a" << 1 ), false );
+                ASSERT( BSON( "a" << 1 ).woCompare( indexForPattern( ns(), FieldBoundSet( ns(), BSON( "a" << 1 ) ).pattern() ) ) == 0 );
+            }
+        };
+        
+        class DeleteOneScan : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "_id" << 1 ), "_id_1" );
+                BSONObj one = BSON( "_id" << 2 );
+                BSONObj two = BSON( "_id" << 1 );
+                theDataFileMgr.insert( ns(), one );
+                theDataFileMgr.insert( ns(), two );
+                BSONObj id;
+                deleteObjects( ns(), BSON( "_id" << GT << 0 ), true, &id );
+                ASSERT_EQUALS( 2, id.getIntField( "_id" ) );
+            }
+        };
+
+        class DeleteOneIndex : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a" );
+                BSONObj one = BSON( "a" << 2 << "_id" << 0 );
+                BSONObj two = BSON( "a" << 1 << "_id" << 1 );
+                BSONObj three = BSON( "a" << 0 << "_id" << 2 );
+                theDataFileMgr.insert( ns(), one );
+                theDataFileMgr.insert( ns(), two );
+                theDataFileMgr.insert( ns(), three );
+                BSONObj id;
+                deleteObjects( ns(), BSON( "a" << GTE << 0 << "_id" << GT << 0 ), true, &id );
+                ASSERT_EQUALS( 2, id.getIntField( "_id" ) );
+            }
+        };
+        
     } // namespace QueryPlanSetTests
     
     class All : public UnitTest::Suite {
@@ -881,6 +926,9 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::SaveGoodIndex >();
             add< QueryPlanSetTests::TryAllPlansOnErr >();
             add< QueryPlanSetTests::FindOne >();
+            add< QueryPlanSetTests::Delete >();
+            add< QueryPlanSetTests::DeleteOneScan >();
+            add< QueryPlanSetTests::DeleteOneIndex >();
         }
     };
     
