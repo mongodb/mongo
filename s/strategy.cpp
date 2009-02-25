@@ -54,7 +54,11 @@ namespace mongo {
         _ns = q.ns;
         _query = q.query.copy();
         _options = q.queryOptions;
+        _skip = q.ntoskip;
+        _ntoreturn = q.ntoreturn;
         
+        _totalSent = 0;
+
         if ( q.fields.get() ){
             BSONObjBuilder b;
             for ( set<string>::iterator i=q.fields->begin(); i!=q.fields->end(); i++)
@@ -115,12 +119,17 @@ namespace mongo {
         return s.simplifiedQuery();
     }
 
-    void ShardedCursor::sendNextBatch( Request& r ){
+    bool ShardedCursor::sendNextBatch( Request& r ){
+        int maxSize = 1024 * 1024;
+        if ( _totalSent > 0 )
+            maxSize *= 3;
+        
         BufBuilder b(32768);
         
         int num = 0;
+        bool sendMore = true;
         
-        cout << "TEMP: ShardedCursor " << _ns << "\t" << _query << endl;
+        cout << "TEMP: ShardedCursor " << _ns << "\t" << _query << " ntoreturn: " << _ntoreturn << endl;
         while ( more() ){
             BSONObj o = next();
             cout << "\t" << o << endl;
@@ -128,14 +137,25 @@ namespace mongo {
             b.append( (void*)o.objdata() , o.objsize() );
             num++;
             
-            if ( b.len() > 2097152 ){
-                // TEMP
+            if ( b.len() > maxSize )
+                break;
+
+            if ( num == _ntoreturn ){
+                // soft limit aka batch size
                 break;
             }
 
+            if ( ( -1 * num + _totalSent ) == _ntoreturn ){
+                // hard limit - total to send
+                sendMore = false;
+                break;
+            }
         }
 
-        uassert( "can't handle getMore with sharding yet" , ! more() );
-        replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num );
+        bool hasMore = sendMore && more();
+        log() << "  hasMore:" << hasMore << " id:" << _id << endl;
+        replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , 0 , hasMore ? _id : 0 );
+        _totalSent += num;
+        return hasMore;
     }
 }

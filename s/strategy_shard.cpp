@@ -221,7 +221,12 @@ namespace mongo {
             }
             
             assert( cursor );
-            cursor->sendNextBatch( r );
+            if ( ! cursor->sendNextBatch( r ) ){
+                delete( cursor );
+                return;
+            }
+            
+            // TODO: store cursor
         }
         
         virtual void getMore( Request& r ){
