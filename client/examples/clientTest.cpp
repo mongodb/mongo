@@ -116,7 +116,7 @@ int main() {
 
         // nonexistent index test
         assert( conn.findOne(ns, Query("{name:\"eliot\"}").hint("{foo:1}")).hasElement("$err") );
-        assert( conn.getLastError() == "hint index not found" );
+        assert( conn.getLastError() == "bad hint" );
         conn.resetError();
         assert( conn.getLastError() == "" );
 
