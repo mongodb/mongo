@@ -566,6 +566,7 @@ namespace mongo {
     /* -- DBClientCursor ---------------------------------------------- */
 
     void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
+        CHECK_OBJECT( query , "assembleRequest query" );
         // see query.h for the protocol we are using here.
         BufBuilder b;
         int opts = queryOptions;
@@ -662,7 +663,7 @@ namespace mongo {
             assert( qr->cursorId == 0 );
             cursorId = 0; // 0 indicates no longer valid (dead)
         }
-        if ( cursorId == 0 ) {
+        if ( cursorId == 0 || ! ( opts & Option_CursorTailable ) ) {
             // only set initially: we don't want to kill it on end of data
             // if it's a tailable cursor
             cursorId = qr->cursorId;
