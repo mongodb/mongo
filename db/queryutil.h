@@ -57,20 +57,12 @@ namespace mongo {
             UpperBound,
             UpperAndLowerBound
         };
+        // for testing only, speed unimportant
         bool operator==( const QueryPattern &other ) const {
-            map< string, Type >::const_iterator i = fieldTypes_.begin();
-            map< string, Type >::const_iterator j = other.fieldTypes_.begin();
-            while( i != fieldTypes_.end() ) {
-                if ( j == other.fieldTypes_.end() )
-                    return false;
-                if ( i->first != j->first )
-                    return false;
-                if ( i->second != j->second )
-                    return false;
-                ++i;
-                ++j;
-            }
-            return ( j == other.fieldTypes_.end() );
+            bool less = operator<( other );
+            bool more = other.operator<( *this );
+            assert( !( less && more ) );
+            return !( less || more );
         }
         bool operator!=( const QueryPattern &other ) const {
             return !operator==( other );
