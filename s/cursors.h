@@ -2,7 +2,7 @@
 
 #pragma once 
 
-#include "stdafx.h"
+#include "../stdafx.h"
 
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"
@@ -52,7 +52,7 @@ namespace mongo {
     class ServerAndQuery {
     public:
         ServerAndQuery( const string& server , BSONObj extra = emptyObj , BSONObj orderObject = emptyObj ) : 
-            _server( server ) , _extra( extra ) , _orderObject( orderObject ){
+            _server( server ) , _extra( extra.getOwned() ) , _orderObject( orderObject.getOwned() ){
         }
 
         bool operator<( const ServerAndQuery& other ) const{

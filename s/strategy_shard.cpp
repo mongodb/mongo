@@ -15,7 +15,7 @@ namespace mongo {
             QueryMessage q( r.d() );
             
             log(3) << "shard query: " << q.ns << "  " << q.query << endl;
-
+            
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( "something is wrong, shouldn't see a command here" );
 
@@ -70,13 +70,13 @@ namespace mongo {
                     cursor = new ParallelSortShardedCursor( servers , q , sort );
                 }
             }
-            
+
             assert( cursor );
             if ( ! cursor->sendNextBatch( r ) ){
                 delete( cursor );
                 return;
             }
-            cout << "STORING CURSOR : " << cursor->getId() << endl;
+            log(6) << "storing cursor : " << cursor->getId() << endl;
             cursorCache.store( cursor );
         }
         
@@ -84,13 +84,19 @@ namespace mongo {
             int ntoreturn = r.d().pullInt();
             long long id = r.d().pullInt64();
 
-            ShardedCursor * cursor = cursorCache.get( id );
-            uassert( "can't find cursor" , cursor );
+            log(6) << "want cursor : " << id << endl;
 
-            cout << "GOT CURSOR : " << id << endl;
-            
-            if ( cursor->sendNextBatch( r , ntoreturn ) )
+            ShardedCursor * cursor = cursorCache.get( id );
+            if ( ! cursor ){
+                log(6) << "\t invalid cursor :(" << endl;
+                replyToQuery( QueryResult::ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                 return;
+            }
+            
+            if ( cursor->sendNextBatch( r , ntoreturn ) ){
+                log(6) << "\t cursor finished: " << id << endl;
+                return;
+            }
             
             delete( cursor );
             cursorCache.remove( id );

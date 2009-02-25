@@ -4,7 +4,7 @@
 * test basic sharding
 */
 
-s = new ShardingTest( "shard2" , 2 , 5 );
+s = new ShardingTest( "shard2" , 2 );
 
 db = s.getDB( "test" );
 
@@ -91,8 +91,6 @@ assert.eq( 3 , sumQuery( db.foo.find() ) , "sharded query 2" );
 assert.eq( 3 , sumQuery( db.foo.find().sort( { num : 1 } ) ) , "sharding query w/sort 1" );
 assert.eq( 3 , sumQuery( db.foo.find().sort( { num : -1 } ) ) , "sharding query w/sort 2" );
 
-printjson( db.foo.find().sort( { num : 1 } ).toArray() );
-
 assert.eq( "funny man" , db.foo.find().sort( { num : 1 } )[0].name , "sharding query w/sort 3 order wrong" );
 assert.eq( -2 , db.foo.find().sort( { num : 1 } )[0].num , "sharding query w/sort 4 order wrong" );
 
@@ -131,6 +129,6 @@ function countCursor( c ){
     return num;
 }
 assert.eq( 6 , countCursor( db.foo.find()._exec() ) , "getMore 2" );
-//assert.eq( 6 , countCursor( db.foo.find().limit(1)._exec() ) , "getMore 3" );
+assert.eq( 6 , countCursor( db.foo.find().limit(1)._exec() ) , "getMore 3" );
 
 s.stop();

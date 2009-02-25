@@ -599,6 +599,8 @@ namespace mongo {
             return details ? details->_objsize : 0;    // includes the embedded size field
         }
 
+        bool isValid();
+
 		/** @return true if object is empty -- i.e.,  {} */
         bool isEmpty() const {
             return objsize() <= 5;
@@ -702,7 +704,7 @@ namespace mongo {
         BSONObj copy() const;
 
         BSONObj getOwned() const{
-            if ( details->owned() )
+            if ( ! details || details->owned() )
                 return *this;
             return copy();
         }
@@ -1192,6 +1194,12 @@ namespace mongo {
 #pragma pack()
     extern JSObj1 js1;
 
+#ifdef _DEBUG
+#define CHECK_OBJECT( o , msg ) massert( (string)"object not valid" + (msg) , (o).isValid() )
+#else
+#define CHECK_OBJECT( o , msg )
+#endif
+
     inline BSONObj BSONElement::embeddedObjectUserCheck() {
         uassert( "invalid parameter: expected an object", type()==Object || type()==Array );
         return BSONObj(value());
@@ -1209,7 +1217,7 @@ namespace mongo {
     }
     
     inline BSONObj BSONObj::copy() const {
-        if ( isEmpty() )
+        if ( ! details )
             return *this;
 
         char *p = (char*) malloc(objsize());
@@ -1264,6 +1272,13 @@ namespace mongo {
     inline void BSONObj::validateEmpty() {
         if ( details == 0 )
             *this = emptyObj;
+    }
+
+    inline bool BSONObj::isValid(){
+        if ( ! details )
+            return true;
+
+        return details->_objsize == ((int*)(details->_objdata))[0];
     }
 
     inline bool BSONObj::getObjectID(BSONElement& e) { 

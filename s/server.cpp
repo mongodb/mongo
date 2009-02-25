@@ -74,6 +74,7 @@ namespace mongo {
                     replyToQuery( QueryResult::ResultFlag_ErrSet, dbMsgPort , m , err );
                 }
             }
+
         }
 
     }
