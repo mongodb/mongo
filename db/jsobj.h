@@ -828,7 +828,7 @@ namespace mongo {
         BSONObjBuilder& appendElements(BSONObj x);
 
         /** append element to the object we are building */
-        void append(BSONElement& e) {
+        void append( const BSONElement& e) {
             assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
             b.append((void*) e.rawdata(), e.size());
         }

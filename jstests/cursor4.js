@@ -23,25 +23,25 @@ function testConstrainedFindMultiFieldSorting( db ) {
     reverseEntries = entries.slice();
     reverseEntries.reverse();
 
-    checkResults( entries.slice( 2, 4 ), r.find( { a: 1, b: 1 } ).sort( { a: 1, b: 1 } ) );
-    checkResults( entries.slice( 2, 4 ), r.find( { a: 1, b: 1 } ).sort( { a: -1, b: -1 } ) );
+    checkResults( entries.slice( 2, 4 ), r.find( { a: 1, b: 1 } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
+    checkResults( entries.slice( 2, 4 ), r.find( { a: 1, b: 1 } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
 
-    checkResults( entries.slice( 2, 5 ), r.find( { a: { $gt: 0 } } ).sort( { a: 1, b: 1 } ) );
-    checkResults( reverseEntries.slice( 0, 3 ), r.find( { a: { $gt: 0 } } ).sort( { a: -1, b: -1 } ) );
-    checkResults( entries.slice( 0, 4 ), r.find( { a: { $lt: 2 } } ).sort( { a: 1, b: 1 } ) );
-    checkResults( reverseEntries.slice( 1, 5 ), r.find( { a: { $lt: 2 } } ).sort( { a: -1, b: -1 } ) );
+    checkResults( entries.slice( 2, 5 ), r.find( { a: { $gt: 0 } } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
+    checkResults( reverseEntries.slice( 0, 3 ), r.find( { a: { $gt: 0 } } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
+    checkResults( entries.slice( 0, 4 ), r.find( { a: { $lt: 2 } } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
+    checkResults( reverseEntries.slice( 1, 5 ), r.find( { a: { $lt: 2 } } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
 
-    checkResults( entries.slice( 4, 5 ), r.find( { a: { $gt: 0 }, b: { $lt: 1 } } ).sort( { a: 1, b: 1 } ) );
-    checkResults( entries.slice( 2, 4 ), r.find( { a: { $gt: 0 }, b: { $gt: 0 } } ).sort( { a: 1, b: 1 } ) );
+    checkResults( entries.slice( 4, 5 ), r.find( { a: { $gt: 0 }, b: { $lt: 1 } } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
+    checkResults( entries.slice( 2, 4 ), r.find( { a: { $gt: 0 }, b: { $gt: 0 } } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
 
-    checkResults( reverseEntries.slice( 0, 1 ), r.find( { a: { $gt: 0 }, b: { $lt: 1 } } ).sort( { a: -1, b: -1 } ) );
-    checkResults( reverseEntries.slice( 1, 3 ), r.find( { a: { $gt: 0 }, b: { $gt: 0 } } ).sort( { a: -1, b: -1 } ) );
+    checkResults( reverseEntries.slice( 0, 1 ), r.find( { a: { $gt: 0 }, b: { $lt: 1 } } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
+    checkResults( reverseEntries.slice( 1, 3 ), r.find( { a: { $gt: 0 }, b: { $gt: 0 } } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
 
-    checkResults( entries.slice( 0, 1 ), r.find( { a: { $lt: 2 }, b: { $lt: 1 } } ).sort( { a: 1, b: 1 } ) );
-    checkResults( entries.slice( 1, 4 ), r.find( { a: { $lt: 2 }, b: { $gt: 0 } } ).sort( { a: 1, b: 1 } ) );
+    checkResults( entries.slice( 0, 1 ), r.find( { a: { $lt: 2 }, b: { $lt: 1 } } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
+    checkResults( entries.slice( 1, 4 ), r.find( { a: { $lt: 2 }, b: { $gt: 0 } } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
 
-    checkResults( reverseEntries.slice( 4, 5 ), r.find( { a: { $lt: 2 }, b: { $lt: 1 } } ).sort( { a: -1, b: -1 } ) );
-    checkResults( reverseEntries.slice( 1, 4 ), r.find( { a: { $lt: 2 }, b: { $gt: 0 } } ).sort( { a: -1, b: -1 } ) );
+    checkResults( reverseEntries.slice( 4, 5 ), r.find( { a: { $lt: 2 }, b: { $lt: 1 } } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
+    checkResults( reverseEntries.slice( 1, 4 ), r.find( { a: { $lt: 2 }, b: { $gt: 0 } } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
 }
 
 testConstrainedFindMultiFieldSorting( db );

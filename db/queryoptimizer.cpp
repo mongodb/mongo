@@ -136,41 +136,62 @@ namespace mongo {
     }
     
     BSONObj QueryPlan::indexKey() const {
+        if ( !index_ )
+            return BSON( "$natural" << 1 );
         return index_->keyPattern();
     }
     
     QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :
-    fbs_( ns, query ) {
+    fbs_( ns, query ),
+    mayRecordPlan_( true ),
+    usingPrerecordedPlan_( false ),
+    hint_( emptyObj ),
+    order_( order.copy() ) {
+        if ( hint && !hint->eoo() ) {
+            BSONObjBuilder b;
+            b.append( *hint );
+            hint_ = b.obj();
+        }
+        init();
+    }
+    
+    void QueryPlanSet::init() {
+        mayRecordPlan_ = true;
+        usingPrerecordedPlan_ = false;
+        
+        const char *ns = fbs_.ns();
         NamespaceDetails *d = nsdetails( ns );
         if ( !d || !fbs_.matchPossible() ) {
-            // Table scan plan only
-            plans_.push_back( PlanPtr( new QueryPlan( fbs_, order ) ) );
+            // Table scan plan, when no matches are possible
+            plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
             return;
         }
         
-        if ( hint && !hint->eoo() ) {
-            if( hint->type() == String ) {
-                string hintstr = hint->valuestr();
+        BSONElement hint = hint_.firstElement();
+        if ( !hint.eoo() ) {
+            mayRecordPlan_ = false;
+            if( hint.type() == String ) {
+                string hintstr = hint.valuestr();
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if ( ii.indexName() == hintstr ) {
-                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order, &ii ) ) );
+                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
                         return;
                     }
                 }
             }
-            else if( hint->type() == Object ) { 
-                BSONObj hintobj = hint->embeddedObject();
+            else if( hint.type() == Object ) { 
+                BSONObj hintobj = hint.embeddedObject();
                 uassert( "bad hint", !hintobj.isEmpty() );
                 if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
                     // Table scan plan
-                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order ) ) );
+                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
                     return;
                 }
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if( ii.keyPattern().woCompare(hintobj) == 0 ) {
-                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order, &ii ) ) );
+                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
                         return;
                     }
                 }
@@ -178,20 +199,38 @@ namespace mongo {
             uassert( "bad hint", false );
         }
         
+        BSONObj bestIndex = indexForPattern( ns, fbs_.pattern() );
+        if ( !bestIndex.isEmpty() ) {
+            usingPrerecordedPlan_ = true;
+            if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
+                // Table scan plan
+                plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
+                return;
+            }
+            for (int i = 0; i < d->nIndexes; i++ ) {
+                IndexDetails& ii = d->indexes[i];
+                if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
+                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
+                    return;
+                }
+            }
+            assert( false );
+        }
+        
         // Table scan plan
-        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order ) ) );
+        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
 
         // If table scan is optimal
-        if ( fbs_.nNontrivialBounds() == 0 && order.isEmpty() )
+        if ( fbs_.nNontrivialBounds() == 0 && order_.isEmpty() )
             return;
         
         // Only table scan can give natural order.
-        if ( !order.isEmpty() && !strcmp( order.firstElement().fieldName(), "$natural" ) )
+        if ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) )
             return;
         
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
-            PlanPtr p( new QueryPlan( fbs_, order, &d->indexes[ i ] ) );
+            PlanPtr p( new QueryPlan( fbs_, order_, &d->indexes[ i ] ) );
             if ( p->optimal() ) {
                 plans_.push_back( p );
                 return;
@@ -204,52 +243,63 @@ namespace mongo {
     }
     
     shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
-        RunnerSet s( *this, op );
-        return s.run();
-    }
-    
-    QueryPlanSet::RunnerSet::RunnerSet( QueryPlanSet &plans, QueryOp &op ) :
-    op_( op ),
-    plans_( plans ),
-    startBarrier_( plans_.nPlans() ),
-    firstDone_( false ) {
-    }
-    
-    shared_ptr< QueryOp > QueryPlanSet::RunnerSet::run() {
-        massert( "no plans", plans_.plans_.size() > 0 );
-        if ( plans_.plans_.size() == 1 ) {
-            shared_ptr< QueryOp > op( op_.clone() );
-            Runner r( *plans_.plans_[ 0 ], *this, *op );
-            r();
-            return op;
+        if ( usingPrerecordedPlan_ ) {
+            Runner r( *this, op );
+            shared_ptr< QueryOp > res = r.run();
+            if ( res->complete() )
+                return res;
+            registerIndexForPattern( fbs_.ns(), fbs_.pattern(), BSONObj() );
+            init();
         }
+        Runner r( *this, op );
+        return r.run();
+    }
+    
+    QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
+    op_( op ),
+    plans_( plans ) {
+    }
+    
+    shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
+        massert( "no plans", plans_.plans_.size() > 0 );
         
-        boost::thread_group threads;
         vector< shared_ptr< QueryOp > > ops;
         for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
-            ops.push_back( shared_ptr< QueryOp >( op_.clone() ) );
-            Runner r( **i, *this, *ops.back() );
-            threads.create_thread( r );
+            shared_ptr< QueryOp > op( op_.clone() );
+            op->setQueryPlan( i->get() );
+            ops.push_back( op );
         }
-        threads.join_all();
-        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i )
+
+        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+            (*i)->init();
             if ( (*i)->complete() )
                 return *i;
+        }
+        
+        while( 1 ) {
+            unsigned errCount = 0;
+            for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+                QueryOp &op = **i;
+                try {
+                    if ( !op.error() )
+                        op.next();
+                } catch ( const std::exception &e ) {
+                    op.setExceptionMessage( e.what() );
+                } catch ( ... ) {
+                    op.setExceptionMessage( "Caught unknown exception" );
+                }
+                if ( op.complete() ) {
+                    if ( plans_.mayRecordPlan_ && op.mayRecordPlan() )
+                        op.qp().registerSelf();
+                    return *i;
+                }
+                if ( op.error() )
+                    ++errCount;
+            }
+            if ( errCount == ops.size() )
+                break;
+        }
         return ops[ 0 ];
     }
-
-    
-//    QueryPlan QueryOptimizer::getPlan(
-//        const char *ns,
-//        BSONObj* query,
-//        BSONObj* order,
-//        BSONObj* hint)
-//    {
-//        QueryPlan plan;
-//
-//
-//
-//        return plan;
-//    }
 
 } // namespace mongo

@@ -22,6 +22,13 @@
 		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
 		932AC3EB0F4A5B34005BF8B0 /* queryoptimizertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = queryoptimizertests.cpp; sourceTree = "<group>"; };
 		932AC4310F4A5E9D005BF8B0 /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
+		933A4D130F55A68600145C4B /* authTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = authTest.cpp; sourceTree = "<group>"; };
+		933A4D150F55A68600145C4B /* clientTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = clientTest.cpp; sourceTree = "<group>"; };
+		933A4D170F55A68600145C4B /* first.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = first.cpp; sourceTree = "<group>"; };
+		933A4D190F55A68600145C4B /* second.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = second.cpp; sourceTree = "<group>"; };
+		933A4D1B0F55A68600145C4B /* tail.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tail.cpp; sourceTree = "<group>"; };
+		933A4D1C0F55A68600145C4B /* tutorial.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tutorial.cpp; sourceTree = "<group>"; };
+		933A4D1D0F55A68600145C4B /* whereExample.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = whereExample.cpp; sourceTree = "<group>"; };
 		933E22110F4327B2000209E3 /* perftest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = perftest.cpp; sourceTree = "<group>"; };
 		933E22120F4327B2000209E3 /* perftest.o */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.objfile"; path = perftest.o; sourceTree = "<group>"; };
 		9342232B0EF16D4F00608550 /* connpool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = connpool.cpp; sourceTree = "<group>"; };
@@ -123,6 +130,15 @@
 		937D0E340F28CB070071FFA9 /* repltests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = repltests.cpp; sourceTree = "<group>"; };
 		937D14AB0F2A225F0071FFA9 /* nonce.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nonce.h; sourceTree = "<group>"; };
 		937D14AC0F2A226E0071FFA9 /* nonce.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nonce.cpp; sourceTree = "<group>"; };
+		938A7A420F54871000FB7A07 /* storage.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = storage.cpp; sourceTree = "<group>"; };
+		938A7A430F54873600FB7A07 /* concurrency.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = concurrency.h; sourceTree = "<group>"; };
+		938A7A440F54873600FB7A07 /* queryutil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = queryutil.cpp; sourceTree = "<group>"; };
+		938A7A450F54873600FB7A07 /* queryutil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = queryutil.h; sourceTree = "<group>"; };
+		938A7A460F54873600FB7A07 /* rec.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = rec.h; sourceTree = "<group>"; };
+		938A7A470F54873600FB7A07 /* reccache.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = reccache.cpp; sourceTree = "<group>"; };
+		938A7A480F54873600FB7A07 /* reccache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = reccache.h; sourceTree = "<group>"; };
+		938A7A490F54873600FB7A07 /* reci.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = reci.h; sourceTree = "<group>"; };
+		938A7A4A0F54873600FB7A07 /* recstore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = recstore.h; sourceTree = "<group>"; };
 		939C67200F535D72006570D3 /* cursor8.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = cursor8.js; sourceTree = "<group>"; };
 		93A13A210F4620A500AF1B0D /* commands.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = commands.cpp; sourceTree = "<group>"; };
 		93A13A230F4620A500AF1B0D /* config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = config.cpp; sourceTree = "<group>"; };
@@ -284,6 +300,20 @@
 			path = shell;
 			sourceTree = "<group>";
 		};
+		933A4D120F55A68600145C4B /* examples */ = {
+			isa = PBXGroup;
+			children = (
+				933A4D130F55A68600145C4B /* authTest.cpp */,
+				933A4D150F55A68600145C4B /* clientTest.cpp */,
+				933A4D170F55A68600145C4B /* first.cpp */,
+				933A4D190F55A68600145C4B /* second.cpp */,
+				933A4D1B0F55A68600145C4B /* tail.cpp */,
+				933A4D1C0F55A68600145C4B /* tutorial.cpp */,
+				933A4D1D0F55A68600145C4B /* whereExample.cpp */,
+			);
+			path = examples;
+			sourceTree = "<group>";
+		};
 		933E22100F4327B2000209E3 /* perf */ = {
 			isa = PBXGroup;
 			children = (
@@ -296,6 +326,7 @@
 		9342232A0EF16D4F00608550 /* client */ = {
 			isa = PBXGroup;
 			children = (
+				933A4D120F55A68600145C4B /* examples */,
 				9342232B0EF16D4F00608550 /* connpool.cpp */,
 				9342232C0EF16D4F00608550 /* connpool.h */,
 				9342232D0EF16D4F00608550 /* dbclient.cpp */,
@@ -332,6 +363,15 @@
 		9342238F0EF16DB400608550 /* db */ = {
 			isa = PBXGroup;
 			children = (
+				938A7A430F54873600FB7A07 /* concurrency.h */,
+				938A7A440F54873600FB7A07 /* queryutil.cpp */,
+				938A7A450F54873600FB7A07 /* queryutil.h */,
+				938A7A460F54873600FB7A07 /* rec.h */,
+				938A7A470F54873600FB7A07 /* reccache.cpp */,
+				938A7A480F54873600FB7A07 /* reccache.h */,
+				938A7A490F54873600FB7A07 /* reci.h */,
+				938A7A4A0F54873600FB7A07 /* recstore.h */,
+				938A7A420F54871000FB7A07 /* storage.cpp */,
 				93A8CD190F33B7AF00C92B85 /* mmap_win.cpp */,
 				93A8CD180F33B7A000C92B85 /* mmap_posix.cpp */,
 				93A8CD170F33B78D00C92B85 /* mmap_mm.cpp */,

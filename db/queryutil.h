@@ -22,10 +22,16 @@
 
 namespace mongo {
 
+    class QueryPattern;
+    void registerWriteOp( const string &ns );
+    void clearQueryCache( const string &ns );
+    BSONObj indexForPattern( const string &ns, const QueryPattern &pattern );
+    void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey );
+    
     class FieldBound {
     public:
         FieldBound( const BSONElement &e = emptyObj.firstElement() );
-        FieldBound &operator&=( const FieldBound &other );
+        const FieldBound &operator&=( const FieldBound &other );
         BSONElement lower() const { return lower_; }
         BSONElement upper() const { return upper_; }
         bool equality() const { return lower_.woCompare( upper_, false ) == 0; }
@@ -40,6 +46,49 @@ namespace mongo {
         BSONElement lower_;
         BSONElement upper_;
         vector< BSONObj > objData_;
+    };
+    
+    class QueryPattern {
+    public:
+        friend class FieldBoundSet;
+        enum Type {
+            Equality,
+            LowerBound,
+            UpperBound,
+            UpperAndLowerBound
+        };
+        // for testing only, speed unimportant
+        bool operator==( const QueryPattern &other ) const {
+            bool less = operator<( other );
+            bool more = other.operator<( *this );
+            assert( !( less && more ) );
+            return !( less || more );
+        }
+        bool operator!=( const QueryPattern &other ) const {
+            return !operator==( other );
+        }
+        bool operator<( const QueryPattern &other ) const {
+            map< string, Type >::const_iterator i = fieldTypes_.begin();
+            map< string, Type >::const_iterator j = other.fieldTypes_.begin();
+            while( i != fieldTypes_.end() ) {
+                if ( j == other.fieldTypes_.end() )
+                    return false;
+                if ( i->first < j->first )
+                    return true;
+                else if ( i->first > j->first )
+                    return false;
+                if ( i->second < j->second )
+                    return true;
+                else if ( i->second > j->second )
+                    return false;
+                ++i;
+                ++j;
+            }
+            return ( j != other.fieldTypes_.end() );
+        }
+    private:
+        QueryPattern() {}
+        map< string, Type > fieldTypes_;
     };
     
     class FieldBoundSet {
@@ -73,6 +122,7 @@ namespace mongo {
                     return false;
             return true;
         }
+        QueryPattern pattern() const;
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();
@@ -80,6 +130,5 @@ namespace mongo {
         const char *ns_;
         BSONObj query_;
     };
-
 
 } // namespace mongo

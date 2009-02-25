@@ -26,11 +26,11 @@ function testBoundsWithSubobjectIndexes( db ) {
     rIdx = { "a.d": -1, a: -1, e: 1 };
     r.ensureIndex( idx );
 
-    checkResults( [ z[ 0 ], z[ 4 ], z[ 2 ] ], r.find( { e: 4 } ).sort( idx ) );
-    checkResults( [ z[ 1 ], z[ 3 ] ], r.find( { e: { $gt: 4 }, "a.b": 1 } ).sort( idx ) );
+    checkResults( [ z[ 0 ], z[ 4 ], z[ 2 ] ], r.find( { e: 4 } ).sort( idx ).hint( idx ) );
+    checkResults( [ z[ 1 ], z[ 3 ] ], r.find( { e: { $gt: 4 }, "a.b": 1 } ).sort( idx ).hint( idx ) );
 
-    checkResults( [ z[ 2 ], z[ 4 ], z[ 0 ] ], r.find( { e: 4 } ).sort( rIdx ) );
-    checkResults( [ z[ 3 ], z[ 1 ] ], r.find( { e: { $gt: 4 }, "a.b": 1 } ).sort( rIdx ) );
+    checkResults( [ z[ 2 ], z[ 4 ], z[ 0 ] ], r.find( { e: 4 } ).sort( rIdx ).hint( idx ) );
+    checkResults( [ z[ 3 ], z[ 1 ] ], r.find( { e: { $gt: 4 }, "a.b": 1 } ).sort( rIdx ).hint( idx ) );
 }
 
 testBoundsWithSubobjectIndexes( db );

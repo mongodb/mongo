@@ -30,77 +30,38 @@ f.drop();
 
 f.save( { a : 5 } )
 f.ensureIndex( { a: 1 } );
-index( f.find().sort( { a: 1 } ) );
-index( f.find( { a: 5 } ) );
-index( f.find( { a: 5 } ).sort( { a: 1 } ) );
-index( f.find( { a: { $gt: 5 } } ) );
-index( f.find( { a: { $gt: 5 } } ).sort( { a: 1 } ) );
-index( f.find( { a: { $gt: 5, $lt: 1000 } } ) );
-index( f.find( { a: { $gt: 5, $lt: 1000 } } ).sort( { a: 1 } ) );
+index( f.find( { a: 5 } ).sort( { a: 1 } ).hint( { a: 1 } ) );
+noIndex( f.find( { a: 5 } ).sort( { a: 1 } ).hint( { $natural: 1 } ) );
 f.drop();
 
 f.ensureIndex( { a: 1, b: 1 } );
-index( f.find().sort( { a: 1, b: 1 } ) );
-index( f.find().sort( { a: -1, b: -1 } ) );
-index( f.find().sort( { a: 1 } ) );
-index( f.find().sort( { a: 1 } ).hint( { a: 1, b: 1 } ) );
-noIndex( f.find().sort( { a: 1, b: -1 } ) );
-noIndex( f.find().sort( { b: 1, a: 1 } ) );
+assert.eq( 1, f.find( { a: 1 } ).hint( { a: 1, b: 1 } ).explain().startKey.a );
+assert.eq( 1, f.find( { a: 1 } ).hint( { a: 1, b: 1 } ).explain().endKey.a );
+assert.eq( 1, f.find( { a: 1, c: 1 } ).hint( { a: 1, b: 1 } ).explain().startKey.a );
+assert.eq( 1, f.find( { a: 1, c: 1 } ).hint( { a: 1, b: 1 } ).explain().endKey.a );
+assert.eq( null, f.find( { a: 1, c: 1 } ).hint( { a: 1, b: 1 } ).explain().startKey.c );
+assert.eq( null, f.find( { a: 1, c: 1 } ).hint( { a: 1, b: 1 } ).explain().endKey.c );
 
-noIndex( f.find() );
-noIndex( f.find( { c: 1 } ) );
-index( f.find( { a: 1 } ) );
-assert.eq( 1, f.find( { a: 1 } ).explain().startKey.a );
-assert.eq( 1, f.find( { a: 1 } ).explain().endKey.a );
-index( f.find( { a: 1, c: 1 } ) );
-assert.eq( 1, f.find( { a: 1, c: 1 } ).explain().startKey.a );
-assert.eq( 1, f.find( { a: 1, c: 1 } ).explain().endKey.a );
-assert.eq( null, f.find( { a: 1, c: 1 } ).explain().startKey.c );
-assert.eq( null, f.find( { a: 1, c: 1 } ).explain().endKey.c );
-noIndex( f.find( { b: 1 } ) );
-index( f.find( { a: 1, b: 1 } ) );
-index( f.find( { b: 1, a: 1 } ) );
+start( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).hint( { a: 1, b: 1 } ) );
+start( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
+start( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
+start( { a: "a", b: 1 }, f.find( { b: 1, a: /^a/ } ).hint( { a: 1, b: 1 } ) );
+end( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ).hint( { a: 1, b: 1 } ) );
+end( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
+end( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
+end( { a: "b", b: 1 }, f.find( { b: 1, a: /^a/ } ).hint( { a: 1, b: 1 } ) );
 
-index( f.find( { a: /^a/, b: 1 } ) );
-index( f.find( { b: 1, a: /^a/ } ) );
-start( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ) );
-start( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: 1, b: 1 } ) );
-start( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: -1, b: -1 } ) );
-start( { a: "a", b: 1 }, f.find( { b: 1, a: /^a/ } ) );
-end( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ) );
-end( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: 1, b: 1 } ) );
-end( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: -1, b: -1 } ) );
-end( { a: "b", b: 1 }, f.find( { b: 1, a: /^a/ } ) );
+start( { a: "z", b: 1 }, f.find( { a: /^z/, b: 1 } ).hint( { a: 1, b: 1 } ) );
+end( { a: "{", b: 1 }, f.find( { a: /^z/, b: 1 } ).hint( { a: 1, b: 1 } ) );
 
-start( { a: "z", b: 1 }, f.find( { a: /^z/, b: 1 } ) );
-end( { a: "{", b: 1 }, f.find( { a: /^z/, b: 1 } ) );
-noIndex( f.find( { a: /^\{/, b: 1 } ) );
+start( { a: "az", b: 1 }, f.find( { a: /^az/, b: 1 } ).hint( { a: 1, b: 1 } ) );
+end( { a: "a{", b: 1 }, f.find( { a: /^az/, b: 1 } ).hint( { a: 1, b: 1 } ) );
 
-start( { a: "az", b: 1 }, f.find( { a: /^az/, b: 1 } ) );
-end( { a: "a{", b: 1 }, f.find( { a: /^az/, b: 1 } ) );
+both( { a: 1, b: 3 }, f.find( { a: 1, b: 3 } ).hint( { a: 1, b: 1 } ) );
 
-noIndex( f.find( { a: /ab/, b: 1 } ) );
-noIndex( f.find( { a: /^ab/g, b: 1 } ) );
-noIndex( f.find( { a: /^ab-/, b: 1 } ) );
-noIndex( f.find( { b: 1, a: /ab/ } ) );
-index( f.find( { b: /ab/, a: 1 } ) );
-index( f.find( { a: 1, b: /ab/ } ) );
-
-noIndex( f.find( { a: { $in: [ 1, 2 ] }, b: 1 } ) );
-index( f.find( { a: 1, b: { $in: [ 1, 2 ] } } ) );
-
-noIndex( f.find( { a: /^/, b: 1 } ) );
-
-both( { a: 1, b: 3 }, f.find( { a: 1, b: 3 } ) );
-
-index( f.find( { a: { $gt: 1, $lt: 1 }, b: 2 } ) );
-both( { a: 1, b: 2 }, f.find( { a: { $gt: 1, $lt: 1 }, b: 2 } ) );
-index( f.find( { a: { $gt: 1, $lt: 1 }, b: 2 } ).sort( { a: 1, b: 1 } ) );
-both( { a: 1, b: 2 }, f.find( { a: { $gt: 1, $lt: 1 }, b: 2 } ).sort( { a: 1, b: 1 } ) );
-
-index( f.find( { a: { $gt: 1 }, b: { $lt: 2 } } ) );
-index( f.find( { a: { $gt: 1 }, b: { $lt: 2 } } ).sort( { a: 1, b: 1 } ) );
+both( { a: 1, b: 2 }, f.find( { a: { $gt: 1, $lt: 1 }, b: 2 } ).hint( { a: 1, b: 1 } ) );
+both( { a: 1, b: 2 }, f.find( { a: { $gt: 1, $lt: 1 }, b: 2 } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
 
 f.drop();
 f.ensureIndex( { b: 1, a: 1 } );
-both( { a: 1, b: 3 }, f.find( { a: 1, b: 3 } ) );
+both( { a: 1, b: 3 }, f.find( { a: 1, b: 3 } ).hint( { b: 1, a: 1 } ) );

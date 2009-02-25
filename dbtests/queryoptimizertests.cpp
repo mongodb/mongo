@@ -169,6 +169,33 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class QueryPatternTest {
+        public:
+            void run() {
+                ASSERT( p( BSON( "a" << 1 ) ) == p( BSON( "a" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) == p( BSON( "a" << 5 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "b" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "a" << LTE << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "a" << 1 << "b" << 2 ) ) );
+                ASSERT( p( BSON( "a" << 1 << "b" << 3 ) ) != p( BSON( "a" << 1 ) ) );
+                ASSERT( p( BSON( "a" << LT << 1 ) ) == p( BSON( "a" << LTE << 5 ) ) );
+                ASSERT( p( BSON( "a" << LT << 1 << GTE << 0 ) ) == p( BSON( "a" << LTE << 5 << GTE << 0 ) ) );
+                ASSERT( p( BSON( "a" << 1 ) ) < p( BSON( "a" << 1 << "b" << 1 ) ) );
+                ASSERT( !( p( BSON( "a" << 1 << "b" << 1 ) ) < p( BSON( "a" << 1 ) ) ) );
+            }
+        private:
+            static QueryPattern p( const BSONObj &query ) {
+                return FieldBoundSet( "", query ).pattern();
+            }
+        };
+        
+        class NoWhere {
+        public:
+            void run() {
+                ASSERT_EQUALS( 0, FieldBoundSet( "ns", BSON( "$where" << 1 ) ).nNontrivialBounds() );
+            }
+        };
+        
     } // namespace FieldBoundTests
     
     namespace QueryPlanTests {
@@ -414,6 +441,29 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class Unhelpful : public Base {
+        public:
+            void run() {
+                QueryPlan p( FBS( BSON( "b" << 1 ) ), emptyObj, INDEX( "a" << 1 << "b" << 1 ) );
+                ASSERT( p.keyMatch() );
+                ASSERT( !p.bound( "a" ).nontrivial() );
+                ASSERT( !p.unhelpful() );
+                QueryPlan p2( FBS( BSON( "b" << 1 << "c" << 1 ) ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
+                ASSERT( !p2.keyMatch() );
+                ASSERT( !p2.scanAndOrderRequired() );
+                ASSERT( !p2.bound( "a" ).nontrivial() );
+                ASSERT( !p2.unhelpful() );
+                QueryPlan p3( FBS( BSON( "b" << 1 << "c" << 1 ) ), emptyObj, INDEX( "b" << 1 ) );
+                ASSERT( !p3.keyMatch() );
+                ASSERT( p3.bound( "b" ).nontrivial() );
+                ASSERT( !p3.unhelpful() );
+                QueryPlan p4( FBS( BSON( "c" << 1 << "d" << 1 ) ), emptyObj, INDEX( "b" << 1 << "c" << 1 ) );
+                ASSERT( !p4.keyMatch() );
+                ASSERT( !p4.bound( "b" ).nontrivial() );
+                ASSERT( p4.unhelpful() );
+            }
+        };
+        
     } // namespace QueryPlanTests
 
     namespace QueryPlanSetTests {
@@ -553,21 +603,21 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
                 string err;
-                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 BSONObj one = BSON( "a" << 1 );
                 BSONObj four = BSON( "a" << 4 );
                 theDataFileMgr.insert( ns(), one );
-                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 theDataFileMgr.insert( ns(), four );
-                ASSERT_EQUALS( 1, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 1, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 theDataFileMgr.insert( ns(), four );
-                ASSERT_EQUALS( 2, doCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
-                ASSERT_EQUALS( 3, doCount( ns(), BSON( "query" << emptyObj ), err ) );
-                ASSERT_EQUALS( 3, doCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
+                ASSERT_EQUALS( 2, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
+                ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << emptyObj ), err ) );
+                ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
                 // missing ns
-                ASSERT_EQUALS( -1, doCount( "missingNS", emptyObj, err ) );
+                ASSERT_EQUALS( -1, runCount( "missingNS", emptyObj, err ) );
                 // impossible match
-                ASSERT_EQUALS( 0, doCount( ns(), BSON( "query" << BSON( "a" << GT << 0 << LT << -1 ) ), err ) );
+                ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 << LT << -1 ) ), err ) );
             }
         };
         
@@ -591,6 +641,181 @@ namespace QueryOptimizerTests {
             }
         };        
         
+        class SingleException : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                ASSERT_EQUALS( 3, s.nPlans() );
+                bool threw = false;
+                auto_ptr< TestOp > t( new TestOp( true, threw ) );
+                shared_ptr< TestOp > done = s.runOp( *t );
+                ASSERT( threw );
+                ASSERT( done->complete() );
+                ASSERT( done->exceptionMessage().empty() );
+                ASSERT( !done->error() );
+            }
+        private:
+            class TestOp : public QueryOp {
+            public:
+                TestOp( bool iThrow, bool &threw ) : iThrow_( iThrow ), threw_( threw ), i_(), youThrow_( false ) {}
+                virtual void init() {}
+                virtual void next() {
+                    if ( iThrow_ )
+                        threw_ = true;
+                    massert( "throw", !iThrow_ );
+                    if ( ++i_ > 10 )
+                        setComplete();
+                }
+                virtual QueryOp *clone() const {
+                    QueryOp *op = new TestOp( youThrow_, threw_ );
+                    youThrow_ = !youThrow_;
+                    return op;
+                }
+                virtual bool mayRecordPlan() const { return true; }
+            private:
+                bool iThrow_;
+                bool &threw_;
+                int i_;
+                mutable bool youThrow_;
+            };
+        };
+        
+        class AllException : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                ASSERT_EQUALS( 3, s.nPlans() );
+                auto_ptr< TestOp > t( new TestOp() );
+                shared_ptr< TestOp > done = s.runOp( *t );
+                ASSERT( !done->complete() );
+                ASSERT_EQUALS( "throw", done->exceptionMessage() );
+                ASSERT( done->error() );
+            }
+        private:
+            class TestOp : public QueryOp {
+            public:
+                virtual void init() {}
+                virtual void next() {
+                    massert( "throw", false );
+                }
+                virtual QueryOp *clone() const {
+                    return new TestOp();
+                }
+                virtual bool mayRecordPlan() const { return true; }
+            };
+        };
+        
+        class SaveGoodIndex : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                nPlans( 3 );
+                runQuery();
+                nPlans( 1 );
+                nPlans( 1 );
+                Helpers::ensureIndex( ns(), BSON( "c" << 1 ), "c_1" );
+                nPlans( 3 );
+                runQuery();
+                nPlans( 1 );
+                
+                {
+                    dbtemprelease t;
+                    DBDirectClient client;
+                    for( int i = 0; i < 34; ++i ) {
+                        client.insert( ns(), BSON( "i" << i ) );
+                        client.update( ns(), QUERY( "i" << i ), BSON( "i" << i + 1 ) );
+                        client.remove( ns(), BSON( "i" << i + 1 ) );
+                    }
+                }
+                nPlans( 3 );
+                
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                NoRecordTestOp original;
+                s.runOp( original );
+                nPlans( 3 );
+
+                BSONObj hint = fromjson( "{hint:{$natural:1}}" );
+                BSONElement hintElt = hint.firstElement();
+                QueryPlanSet s2( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ), &hintElt );
+                TestOp newOriginal;
+                s2.runOp( newOriginal );
+                nPlans( 3 );
+                
+                runQuery();
+                nPlans( 1 );
+            }
+        private:
+            void nPlans( int n ) {
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                ASSERT_EQUALS( n, s.nPlans() );                
+            }
+            void runQuery() {
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                TestOp original;
+                s.runOp( original );
+            }
+            class TestOp : public QueryOp {
+            public:
+                virtual void init() {}
+                virtual void next() {
+                    setComplete();
+                }
+                virtual QueryOp *clone() const {
+                    return new TestOp();
+                }
+                virtual bool mayRecordPlan() const { return true; }
+            };
+            class NoRecordTestOp : public TestOp {
+                virtual bool mayRecordPlan() const { return false; }
+                virtual QueryOp *clone() const { return new NoRecordTestOp(); }
+            };
+        };        
+        
+        class TryAllPlansOnErr : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), emptyObj );
+                ScanOnlyTestOp op;
+                s.runOp( op );
+                ASSERT( !fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern() ) ) );
+                
+                QueryPlanSet s2( ns(), BSON( "a" << 4 ), emptyObj );
+                TestOp op2;
+                ASSERT( s2.runOp( op2 )->complete() );
+            }
+        private:
+            class TestOp : public QueryOp {
+            public:
+                virtual void init() {}
+                virtual void next() {
+                    if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
+                        massert( "throw", false );
+                    setComplete();
+                }
+                virtual QueryOp *clone() const {
+                    return new TestOp();
+                }
+                virtual bool mayRecordPlan() const { return true; }
+            };
+            class ScanOnlyTestOp : public TestOp {
+                virtual void next() {
+                    if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
+                        setComplete();
+                    massert( "throw", false );
+                }
+                virtual QueryOp *clone() const {
+                    return new ScanOnlyTestOp();
+                }
+            };
+        };
+        
     } // namespace QueryPlanSetTests
     
     class All : public UnitTest::Suite {
@@ -611,6 +836,8 @@ namespace QueryOptimizerTests {
             add< FieldBoundTests::UnhelpfulRegex >();
             add< FieldBoundTests::In >();
             add< FieldBoundTests::SimplifiedQuery >();
+            add< FieldBoundTests::QueryPatternTest >();
+            add< FieldBoundTests::NoWhere >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();
@@ -622,6 +849,7 @@ namespace QueryOptimizerTests {
             add< QueryPlanTests::MoreOptimal >();
             add< QueryPlanTests::KeyMatch >();
             add< QueryPlanTests::ExactKeyQueryTypes >();
+            add< QueryPlanTests::Unhelpful >();
             add< QueryPlanSetTests::NoIndexes >();
             add< QueryPlanSetTests::Optimal >();
             add< QueryPlanSetTests::NoOptimal >();
@@ -634,6 +862,10 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::Count >();
             add< QueryPlanSetTests::QueryMissingNs >();
             add< QueryPlanSetTests::UnhelpfulIndex >();
+            add< QueryPlanSetTests::SingleException >();
+            add< QueryPlanSetTests::AllException >();
+            add< QueryPlanSetTests::SaveGoodIndex >();
+            add< QueryPlanSetTests::TryAllPlansOnErr >();
         }
     };
     

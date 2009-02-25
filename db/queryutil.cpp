@@ -24,6 +24,25 @@
 
 namespace mongo {
 
+    map< string, int > writeCount_;
+    map< string, map< QueryPattern, BSONObj > > queryCache_;
+    void registerWriteOp( const string &ns ) {
+        if ( queryCache_[ ns ].empty() )
+            return;
+        if ( ++writeCount_[ ns ] >= 100 )
+            clearQueryCache( ns );
+    }
+    void clearQueryCache( const string &ns ) {
+        queryCache_[ ns ].clear();
+        writeCount_[ ns ] = 0;
+    }
+    BSONObj indexForPattern( const string &ns, const QueryPattern &pattern ) {
+        return queryCache_[ ns ][ pattern ];
+    }
+    void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey ) {
+        queryCache_[ ns ][ pattern ] = indexKey;
+    }
+    
     FieldBound::FieldBound( const BSONElement &e ) :
     lower_( minKey.firstElement() ),
     upper_( maxKey.firstElement() ) {
@@ -72,7 +91,7 @@ namespace mongo {
         }
     }
     
-    FieldBound &FieldBound::operator&=( const FieldBound &other ) {
+    const FieldBound &FieldBound::operator&=( const FieldBound &other ) {
         if ( other.upper_.woCompare( upper_, false ) < 0 )
             upper_ = other.upper_;
         if ( other.lower_.woCompare( lower_, false ) > 0 )
@@ -100,6 +119,8 @@ namespace mongo {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
+            if ( strcmp( e.fieldName(), "$where" ) == 0 )
+                continue;
             if ( getGtLtOp( e ) == JSMatcher::Equality ) {
                 bounds_[ e.fieldName() ] &= FieldBound( e );
             }
@@ -138,5 +159,24 @@ namespace mongo {
         }
         return b.obj();
     }
-
+    
+    QueryPattern FieldBoundSet::pattern() const {
+        QueryPattern qp;
+        for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i ) {
+            if ( i->second.equality() ) {
+                qp.fieldTypes_[ i->first ] = QueryPattern::Equality;
+            } else if ( i->second.nontrivial() ) {
+                bool upper = i->second.upper().type() != MaxKey;
+                bool lower = i->second.lower().type() != MinKey;
+                if ( upper && lower )
+                    qp.fieldTypes_[ i->first ] = QueryPattern::UpperAndLowerBound;
+                else if ( upper )
+                    qp.fieldTypes_[ i->first ] = QueryPattern::UpperBound;
+                else if ( lower )
+                    qp.fieldTypes_[ i->first ] = QueryPattern::LowerBound;                    
+            }
+        }
+        return qp;
+    }
+    
 } // namespace mongo

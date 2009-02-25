@@ -23,45 +23,58 @@ function checkExplain( e, idx, reverse, nScanned ) {
 }
 
 function check( indexed ) {
-    e = r.find().sort( { a: 1, b: 1 } ).explain();
-    checkExplain( e, false, false, 4 );
-    f = r.find().sort( { a: 1, b: 1 } );
+    var hint;
+    if ( indexed ) {
+        hint = { a: 1, b: -1 };
+    } else {
+        hint = { $natural: 1 };
+    }
+    
+    e = r.find().sort( { a: 1, b: 1 } ).hint( hint ).explain();
+    checkExplain( e, indexed, false, 4 );
+    f = r.find().sort( { a: 1, b: 1 } ).hint( hint );
     eq( z[ 0 ], f[ 0 ] );
     eq( z[ 1 ], f[ 1 ] );
     eq( z[ 2 ], f[ 2 ] );
     eq( z[ 3 ], f[ 3 ] );
 
-    e = r.find().sort( { a: 1, b: -1 } ).explain();
-    checkExplain( e, true && indexed, false, 4 );
-    f = r.find().sort( { a: 1, b: -1 } );
+    e = r.find().sort( { a: 1, b: -1 } ).hint( hint ).explain();
+    checkExplain( e, indexed, false, 4 );
+    f = r.find().sort( { a: 1, b: -1 } ).hint( hint );
     eq( z[ 1 ], f[ 0 ] );
     eq( z[ 0 ], f[ 1 ] );
     eq( z[ 3 ], f[ 2 ] );
     eq( z[ 2 ], f[ 3 ] );
 
-    e = r.find().sort( { a: -1, b: 1 } ).explain();
-    checkExplain( e, true && indexed, true && indexed, 4 );
-    f = r.find().sort( { a: -1, b: 1 } );
+    e = r.find().sort( { a: -1, b: 1 } ).hint( hint ).explain();
+    checkExplain( e, indexed, true && indexed, 4 );
+    f = r.find().sort( { a: -1, b: 1 } ).hint( hint );
     eq( z[ 2 ], f[ 0 ] );
     eq( z[ 3 ], f[ 1 ] );
     eq( z[ 0 ], f[ 2 ] );
     eq( z[ 1 ], f[ 3 ] );
 
-    e = r.find( { a: { $gte: 2 } } ).sort( { a: 1, b: -1 } ).explain();
-    checkExplain( e, true && indexed, false, indexed ? 2 : 4 );
-    f = r.find( { a: { $gte: 2 } } ).sort( { a: 1, b: -1 } );
+    e = r.find( { a: { $gte: 2 } } ).sort( { a: 1, b: -1 } ).hint( hint ).explain();
+    checkExplain( e, indexed, false, indexed ? 2 : 4 );
+    f = r.find( { a: { $gte: 2 } } ).sort( { a: 1, b: -1 } ).hint( hint );
     eq( z[ 3 ], f[ 0 ] );
     eq( z[ 2 ], f[ 1 ] );
 
-    e = r.find( { a : { $gte: 2 } } ).sort( { a: -1, b: 1 } ).explain();
-    checkExplain( e, true && indexed, true && indexed, indexed ? 2 : 4 );
-    f = r.find( { a: { $gte: 2 } } ).sort( { a: -1, b: 1 } );
+    e = r.find( { a : { $gte: 2 } } ).sort( { a: -1, b: 1 } ).hint( hint ).explain();
+    checkExplain( e, indexed, true && indexed, indexed ? 2 : 4 );
+    f = r.find( { a: { $gte: 2 } } ).sort( { a: -1, b: 1 } ).hint( hint );
     eq( z[ 2 ], f[ 0 ] );
     eq( z[ 3 ], f[ 1 ] );
 
-    e = r.find().sort( { a: -1, b: -1 } ).explain();
-    checkExplain( e, false, false, 4 );
-    f = r.find().sort( { a: -1, b: -1 } );
+    e = r.find( { a : { $gte: 2 } } ).sort( { a: 1, b: 1 } ).hint( hint ).explain();
+    checkExplain( e, indexed, false, indexed ? 2 : 4 );
+    f = r.find( { a: { $gte: 2 } } ).sort( { a: 1, b: 1 } ).hint( hint );
+    eq( z[ 2 ], f[ 0 ] );
+    eq( z[ 3 ], f[ 1 ] );
+
+    e = r.find().sort( { a: -1, b: -1 } ).hint( hint ).explain();
+    checkExplain( e, indexed, false, 4 );
+    f = r.find().sort( { a: -1, b: -1 } ).hint( hint );
     eq( z[ 3 ], f[ 0 ] );
     eq( z[ 2 ], f[ 1 ] );
     eq( z[ 1 ], f[ 2 ] );
@@ -79,10 +92,9 @@ z = [ { a: 1, b: 1 },
 for( i = 0; i < z.length; ++i )
     r.save( z[ i ] );
 
-check( false );
-
 r.ensureIndex( { a: 1, b: -1 } );
 
+check( false );
 check( true );
 
-assert.eq( "BasicCursor", r.find().sort( { a: 1, b: -1, z: 1 } ).explain().cursor );
+assert.eq( "BasicCursor", r.find().sort( { a: 1, b: -1, z: 1 } ).hint( { $natural: -1 } ).explain().cursor );
