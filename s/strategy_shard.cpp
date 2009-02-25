@@ -49,7 +49,7 @@ namespace mongo {
                 cursor = new SerialServerShardedCursor( servers , q );
             }
             else {
-                int shardKeyOrder = info->getShardKey().isMatchAndOrder( sort );
+                int shardKeyOrder = info->getShardKey().canOrder( sort );
                 if ( shardKeyOrder ){
                     // 2. sort on shard key, can do in serial intelligently
                     set<ServerAndQuery> buckets;
