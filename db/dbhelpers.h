@@ -47,7 +47,7 @@ namespace mongo {
 
            @return true if object found
         */
-        static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex=false);
+        static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex = false);
 
         /* Get/put the first object from a collection.  Generally only useful if the collection
            only ever has a single object -- which is a "singleton collection".
