@@ -36,7 +36,6 @@ _ disallow system* manipulations from the database.
 #include "repl.h"
 #include "dbhelpers.h"
 #include "namespace.h"
-#include "queryutil.h"
 
 namespace mongo {
 
@@ -1133,7 +1132,6 @@ assert( !eloc.isNull() );
             //indexFullNS = tabletoidxns;
             //indexFullNS += ".$";
             //indexFullNS += name; // database.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
-            clearQueryCache( tabletoidxns );
         }
 
         const BSONElement *newId = &writeId;
