@@ -270,8 +270,11 @@ namespace mongo {
             ops.push_back( op );
         }
 
-        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i )
+        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
             (*i)->init();
+            if ( (*i)->complete() )
+                return *i;
+        }
         
         while( 1 ) {
             unsigned errCount = 0;

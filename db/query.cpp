@@ -344,9 +344,46 @@ namespace mongo {
         }
     }
     
+    class UpdateOp : public QueryOp {
+    public:
+        UpdateOp() : nscanned_() {}
+        virtual void init() {
+            BSONObj pattern = qp().query();
+            c_ = qp().newCursor();
+            if ( !c_->ok() )
+                setComplete();
+            else
+                matcher_.reset( new JSMatcher( pattern, c_->indexKeyPattern() ) );
+        }
+        virtual void next() {
+            if ( !c_->ok() ) {
+                setComplete();
+                return;
+            }
+            Record *r = c_->_current();
+            nscanned_++;
+            BSONObj js(r);
+            if ( matcher_->matches(js) ) {
+                setComplete();
+                return;
+            }
+            c_->advance();
+        }
+        virtual bool mayRecordPlan() const { return false; }
+        virtual QueryOp *clone() const {
+            return new UpdateOp();
+        }
+        auto_ptr< Cursor > c() { return c_; }
+        int nscanned() const { return nscanned_; }
+    private:
+        auto_ptr< Cursor > c_;
+        int nscanned_;
+        auto_ptr< JSMatcher > matcher_;
+    };
+    
     int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
         int profile = database->profile;
-
+        
         if ( strstr(ns, ".system.") ) {
             if( strstr(ns, ".system.users") )
                 ;
@@ -356,83 +393,72 @@ namespace mongo {
                 return 0;
             }
         }
-
-        int nscanned = 0;
-        {
-            BSONObj order;
-            auto_ptr<Cursor> c = getIndexCursor(ns, pattern, order);
-            if ( c.get() == 0 )
-                c = theDataFileMgr.findAll(ns);
-            /* we check ok first so we don't bother building the matcher if we don't need to */
-            if( c->ok() ) { 
-                JSMatcher matcher(pattern, c->indexKeyPattern());
-                do {
-                    Record *r = c->_current();
-                    nscanned++;
-                    BSONObj js(r);
-                    if ( !matcher.matches(js) ) {
-                    }
-                    else {
-                        if ( logop ) {
-                            BSONObjBuilder idPattern;
-                            BSONElement id;
-                            // NOTE: If the matching object lacks an id, we'll log
-                            // with the original pattern.  This isn't replay-safe.
-                            // It might make sense to suppress the log instead
-                            // if there's no id.
-                            if ( js.getObjectID( id ) ) {
-                                idPattern.append( id );
-                                pattern = idPattern.obj();
-                            }
-                        }
-
-                        /* note: we only update one row and quit.  if you do multiple later,
-                        be careful or multikeys in arrays could break things badly.  best
-                        to only allow updating a single row with a multikey lookup.
-                        */
-
-                        if ( profile )
-                            ss << " nscanned:" << nscanned;
-
-                        /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
-                        regular ones at the moment. */
-                        const char *firstField = updateobj.firstElement().fieldName();
-                        if ( firstField[0] == '$' ) {
-                            vector<Mod> mods;
-                            Mod::getMods(mods, updateobj);
-                            NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
-                            set<string>& idxKeys = ndt.indexKeys();
-                            for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
-                                if ( idxKeys.count(i->fieldName) ) {
-                                    uassert("can't $inc/$set an indexed field", false);
-                                }
-                            }
-
-                            Mod::applyMods(mods, c->currLoc().obj());
-                            if ( profile )
-                                ss << " fastmod ";
-                            if ( logop ) {
-                                if ( mods.size() ) {
-                                    logOp("u", ns, updateobj, &pattern, &upsert);
-                                    return 5;
-                                }
-                            }
-                            return 2;
-                        } else {
-                            checkNoMods( updateobj );
-                        }
-
-                        theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
-                        return 1;
-                    }
-                    c->advance();
-                } while( c->ok() );
+        
+        QueryPlanSet qps( ns, pattern, emptyObj );
+        auto_ptr< UpdateOp > original( new UpdateOp() );
+        shared_ptr< UpdateOp > u = qps.runOp( *original );
+        massert( u->exceptionMessage(), u->complete() );
+        auto_ptr< Cursor > c = u->c();
+        if ( c->ok() ) {
+            Record *r = c->_current();
+            BSONObj js(r);
+            
+            if ( logop ) {
+                BSONObjBuilder idPattern;
+                BSONElement id;
+                // NOTE: If the matching object lacks an id, we'll log
+                // with the original pattern.  This isn't replay-safe.
+                // It might make sense to suppress the log instead
+                // if there's no id.
+                if ( js.getObjectID( id ) ) {
+                    idPattern.append( id );
+                    pattern = idPattern.obj();
+                }
             }
+            
+            /* note: we only update one row and quit.  if you do multiple later,
+             be careful or multikeys in arrays could break things badly.  best
+             to only allow updating a single row with a multikey lookup.
+             */
+            
+            if ( profile )
+                ss << " nscanned:" << u->nscanned();
+            
+            /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
+             regular ones at the moment. */
+            const char *firstField = updateobj.firstElement().fieldName();
+            if ( firstField[0] == '$' ) {
+                vector<Mod> mods;
+                Mod::getMods(mods, updateobj);
+                NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
+                set<string>& idxKeys = ndt.indexKeys();
+                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
+                    if ( idxKeys.count(i->fieldName) ) {
+                        uassert("can't $inc/$set an indexed field", false);
+                    }
+                }
+                
+                Mod::applyMods(mods, c->currLoc().obj());
+                if ( profile )
+                    ss << " fastmod ";
+                if ( logop ) {
+                    if ( mods.size() ) {
+                        logOp("u", ns, updateobj, &pattern, &upsert);
+                        return 5;
+                    }
+                }
+                return 2;
+            } else {
+                checkNoMods( updateobj );
+            }
+            
+            theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
+            return 1;            
         }
-
+        
         if ( profile )
-            ss << " nscanned:" << nscanned;
-
+            ss << " nscanned:" << u->nscanned();
+        
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
@@ -470,7 +496,7 @@ namespace mongo {
         }
         return 0;
     }
-
+    
     /* todo:
      _ smart requery find record immediately
      returns:
@@ -1030,149 +1056,6 @@ namespace mongo {
         ss << " nreturned:" << n;
         return qr;        
     }    
-
-//    class UpdateOp : public QueryOp {
-//    public:
-//        UpdateOp() : nscanned_() {}
-//        virtual void run( const QueryPlan &qp, const QueryAborter &qa ) {
-//            BSONObj pattern = qp.query();
-//            c_ = qp.newCursor();
-//            if ( c_->ok() ) {
-//                JSMatcher matcher(pattern, c_->indexKeyPattern());
-//                do {
-//                    qa.mayAbort();
-//                    Record *r = c_->_current();
-//                    nscanned_++;
-//                    BSONObj js(r);
-//                    if ( matcher.matches(js) )
-//                        break;
-//                    c_->advance();
-//                } while( c_->ok() );
-//            }
-//        }
-//        virtual QueryOp *clone() const {
-//            return new UpdateOp();
-//        }
-//        auto_ptr< Cursor > c() { return c_; }
-//        int nscanned() const { return nscanned_; }
-//    private:
-//        auto_ptr< Cursor > c_;
-//        int nscanned_;
-//    };
-//    
-//    int __doUpdateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
-//        int profile = database->profile;
-//        
-//        if ( strstr(ns, ".system.") ) {
-//            if( strstr(ns, ".system.users") )
-//                ;
-//            else {
-//                out() << "\nERROR: attempt to update in system namespace " << ns << endl;
-//                ss << " can't update system namespace ";
-//                return 0;
-//            }
-//        }
-//        
-//        QueryPlanSet qps( ns, pattern, emptyObj );
-//        auto_ptr< UpdateOp > original( new UpdateOp() );
-//        shared_ptr< UpdateOp > u = qps.runOp( *original );
-//        auto_ptr< Cursor > c = u->c();
-//        if ( c->ok() ) {
-//            Record *r = c->_current();
-//            BSONObj js(r);
-//            
-//            if ( logop ) {
-//                BSONObjBuilder idPattern;
-//                BSONElement id;
-//                // NOTE: If the matching object lacks an id, we'll log
-//                // with the original pattern.  This isn't replay-safe.
-//                // It might make sense to suppress the log instead
-//                // if there's no id.
-//                if ( js.getObjectID( id ) ) {
-//                    idPattern.append( id );
-//                    pattern = idPattern.obj();
-//                }
-//            }
-//            
-//            /* note: we only update one row and quit.  if you do multiple later,
-//             be careful or multikeys in arrays could break things badly.  best
-//             to only allow updating a single row with a multikey lookup.
-//             */
-//            
-//            if ( profile )
-//                ss << " nscanned:" << u->nscanned();
-//            
-//            /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
-//             regular ones at the moment. */
-//            const char *firstField = updateobj.firstElement().fieldName();
-//            if ( firstField[0] == '$' ) {
-//                vector<Mod> mods;
-//                Mod::getMods(mods, updateobj);
-//                NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
-//                set<string>& idxKeys = ndt.indexKeys();
-//                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
-//                    if ( idxKeys.count(i->fieldName) ) {
-//                        uassert("can't $inc/$set an indexed field", false);
-//                    }
-//                }
-//                
-//                Mod::applyMods(mods, c->currLoc().obj());
-//                if ( profile )
-//                    ss << " fastmod ";
-//                if ( logop ) {
-//                    if ( mods.size() ) {
-//                        logOp("u", ns, updateobj, &pattern, &upsert);
-//                        return 5;
-//                    }
-//                }
-//                return 2;
-//            } else {
-//                checkNoMods( updateobj );
-//            }
-//            
-//            theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
-//            return 1;            
-//        }
-//        
-//        if ( profile )
-//            ss << " nscanned:" << u->nscanned();
-//        
-//        if ( upsert ) {
-//            if ( updateobj.firstElement().fieldName()[0] == '$' ) {
-//                /* upsert of an $inc. build a default */
-//                vector<Mod> mods;
-//                Mod::getMods(mods, updateobj);
-//                BSONObjBuilder b;
-//                BSONObjIterator i( pattern );
-//                while( i.more() ) {
-//                    BSONElement e = i.next();
-//                    if ( e.eoo() )
-//                        break;
-//                    // Presumably the number of mods is small, so this loop isn't too expensive.
-//                    for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); ++i ) {
-//                        if ( strcmp( e.fieldName(), i->fieldName ) == 0 )
-//                            continue;
-//                        b.append( e );
-//                    }
-//                }
-//                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
-//                    b.append(i->fieldName, i->getn());
-//                BSONObj obj = b.done();
-//                theDataFileMgr.insert(ns, obj);
-//                if ( profile )
-//                    ss << " fastmodinsert ";
-//                if ( logop )
-//                    logOp( "i", ns, obj );
-//                return 3;
-//            }
-//            if ( profile )
-//                ss << " upsert ";
-//            theDataFileMgr.insert(ns, updateobj);
-//            if ( logop )
-//                logOp( "i", ns, updateobj );
-//            return 4;
-//        }
-//        return 0;
-//    }
     
 } // namespace mongo
+ 
