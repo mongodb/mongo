@@ -701,6 +701,12 @@ namespace mongo {
         */
         BSONObj copy() const;
 
+        BSONObj getOwned() const{
+            if ( details->owned() )
+                return *this;
+            return copy();
+        }
+
         /** @return A hash code for the object */
         int hash() const {
             unsigned x = 0;
