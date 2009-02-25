@@ -154,7 +154,5 @@ namespace mongo {
             assert( ! k.hasShardKey( BSON( "key2" << 1 ) ) );
         }
     } shardKeyTest;
-
-
     
 } // namespace mongo
