@@ -338,6 +338,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\cursors.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\db\queryutil.cpp"
 				>
 			</File>

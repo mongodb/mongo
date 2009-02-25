@@ -1,5 +1,6 @@
 // cursors.cpp
 
+#include "stdafx.h"
 #include "cursors.h"
 #include "../client/connpool.h"
 #include "../db/queryutil.h"
