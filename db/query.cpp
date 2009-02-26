@@ -944,6 +944,7 @@ namespace mongo {
                 if ( dqo.scanAndOrderRequired() )
                     builder.append("scanAndOrder", true);
                 builder.append("millis", t.millis());
+                builder.appendElements(qps.explain());
                 BSONObj obj = builder.done();
                 fillQueryResultFromObj(dqo.builder(), 0, obj);
                 n = 1;
