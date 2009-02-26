@@ -28,11 +28,12 @@ namespace mongo {
        NOTE: the implementation for this is temporary.
              it only currently works for a single numeric field
      */
-    /* A ShardKey is a pattern indicating what data to extract from the object to make the shard key from. 
-       */
-    class ShardKey {
+    /* A ShardKeyPattern is a pattern indicating what data to extract from the object to make the shard key from.
+       Analogous to an index key pattern.
+    */
+    class ShardKeyPattern {
     public:
-        ShardKey( BSONObj fieldsAndOrder = emptyObj );
+        ShardKeyPattern( BSONObj fieldsAndOrder = emptyObj );
         void init( BSONObj fieldsAndOrder );
         
         /**
@@ -46,9 +47,9 @@ namespace mongo {
          */
         void globalMax( BSONObjBuilder & b );
         BSONObj globalMax(){ BSONObjBuilder b; globalMax( b ); return b.obj(); }
-        
+
         /**
-           return the key inbetween min and max
+           return the key central between min and max
            note: min and max could cross type boundaries
          */
         void middle( BSONObjBuilder & b , BSONObj & min , BSONObj & max );
@@ -72,25 +73,32 @@ namespace mongo {
         */
         void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max );
         
-        /**
-???
-           @return whether or not shard should be looked at for query
+        /** @return true if shard s is relevant for query q.
+
+            Example:
+              q:     { x : 3 }
+              *this: { x : 1 }
+              s:     x:2..x:7
+               -> true
          */
-        bool relevantForQuery( const BSONObj& query , Shard * shard );
+        bool relevantForQuery( const BSONObj& q , Shard * s );
         
         //int ___numFields() const{ return _fieldsAndOrder.nFields(); }
 
         /**
-???
-           0 if sort either doesn't have all the fields or has extra fields
-           < 0 if sort is descending
-           > 1 if sort is ascending
-         */
-        int isMatchAndOrder( const BSONObj& sort );
+           Example
+            sort:   { ts: -1 }
+            *this:  { ts:1 }
+              -> -1
 
-        BSONObj& key(){
-            return _fieldsAndOrder;
-        }
+              @return
+              0 if sort either doesn't have all the fields or has extra fields
+              < 0 if sort is descending
+              > 1 if sort is ascending
+         */
+        int canOrder( const BSONObj& sort );
+
+        BSONObj key() { return _fieldsAndOrder; }
 
         string toString() const;
 

@@ -104,7 +104,7 @@ namespace mongo {
         bool hasShardKey( const BSONObj& obj );
 
         Shard& findShard( const BSONObj& obj );
-        ShardKey& getShardKey(){  return _key; }
+        ShardKeyPattern& getShardKey(){  return _key; }
         
         /**
          * @return number of shards added to the vector
@@ -123,7 +123,7 @@ namespace mongo {
     private:
         DBConfig * _config;
         string _ns;
-        ShardKey _key;
+        ShardKeyPattern _key;
         vector<Shard*> _shards;
         
         friend class Shard;

@@ -28,7 +28,7 @@
 
 namespace mongo {
     
-    ShardKey::ShardKey( BSONObj fieldsAndOrder ) : _fieldsAndOrder( fieldsAndOrder ){
+    ShardKeyPattern::ShardKeyPattern( BSONObj fieldsAndOrder ) : _fieldsAndOrder( fieldsAndOrder ){
         if ( _fieldsAndOrder.nFields() > 0 ){
             _init();
         }
@@ -37,29 +37,29 @@ namespace mongo {
         }
     }
 
-    void ShardKey::init( BSONObj fieldsAndOrder ){
+    void ShardKeyPattern::init( BSONObj fieldsAndOrder ){
         _fieldsAndOrder = fieldsAndOrder.copy();
         _init();
     }
 
-    void ShardKey::_init(){
+    void ShardKeyPattern::_init(){
         _fieldName = _fieldsAndOrder.firstElement().fieldName();
         uassert( "shard key only supports 1 field right now" , 1 == _fieldsAndOrder.nFields() );
         uassert( "shard key has to be a number right now" , _fieldsAndOrder.firstElement().isNumber() );
     }
 
     
-    void ShardKey::globalMin( BSONObjBuilder& b ){
+    void ShardKeyPattern::globalMin( BSONObjBuilder& b ){
         uassert( "not valid yet" , _fieldName.size() );
         b << _fieldName << (int)(-0xfffffff);
     }
     
-    void ShardKey::globalMax( BSONObjBuilder& b ){
+    void ShardKeyPattern::globalMax( BSONObjBuilder& b ){
         uassert( "not valid yet" , _fieldName.size() );
         b << _fieldName << (int)(0xfffffff);
     }
 
-    int ShardKey::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
+    int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
         uassert( "not valid yet" , _fieldName.size() );
         
         BSONElement lElement = lObject[ _fieldsAndOrder.firstElement().fieldName() ];
@@ -79,7 +79,7 @@ namespace mongo {
         return 0;
     }
     
-    void ShardKey::middle( BSONObjBuilder & b , BSONObj & lObject , BSONObj & rObject ){
+    void ShardKeyPattern::middle( BSONObjBuilder & b , BSONObj & lObject , BSONObj & rObject ){
         BSONElement lElement = lObject[ _fieldsAndOrder.firstElement().fieldName() ];
         uassert( "left key doesn't have the shard key" , ! lElement.eoo() );
         uassert( "left key isn't number" , lElement.isNumber() );
@@ -91,11 +91,11 @@ namespace mongo {
         b.append( _fieldName.c_str() , ( lElement.number() + rElement.number() ) / 2 );
     }
 
-    bool ShardKey::hasShardKey( const BSONObj& obj ){
+    bool ShardKeyPattern::hasShardKey( const BSONObj& obj ){
         return ! obj[_fieldName.c_str()].eoo();
     }
 
-    bool ShardKey::relevantForQuery( const BSONObj& query , Shard * shard ){
+    bool ShardKeyPattern::relevantForQuery( const BSONObj& query , Shard * shard ){
         if ( ! hasShardKey( query ) ){
             // if the shard key isn't in the query, then we have to go everywhere
             // therefore this shard is relevant
@@ -112,14 +112,14 @@ namespace mongo {
         return true;
     }
 
-    void ShardKey::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ){
+    void ShardKeyPattern::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ){
         BSONObjBuilder temp;
         temp.append( "$gte" , min[_fieldName.c_str()].number() );
         temp.append( "$lt" , max[_fieldName.c_str()].number() );
         b.append( _fieldName.c_str() , temp.obj() );
     }    
 
-    int ShardKey::isMatchAndOrder( const BSONObj& sort ){
+    int ShardKeyPattern::canOrder( const BSONObj& sort ){
         if ( sort.nFields() != _fieldsAndOrder.nFields() )
             return 0;
 
@@ -131,14 +131,14 @@ namespace mongo {
         return 1;
     }
 
-    string ShardKey::toString() const {
+    string ShardKeyPattern::toString() const {
         return _fieldsAndOrder.toString();
     }
 
     class ShardKeyUnitTest : public UnitTest {
     public:
         void run(){
-            ShardKey k( BSON( "key" << 1 ) );
+            ShardKeyPattern k( BSON( "key" << 1 ) );
             
             BSONObj min = k.globalMin();
             BSONObj max = k.globalMax();
