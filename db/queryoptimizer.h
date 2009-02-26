@@ -122,6 +122,8 @@ namespace mongo {
             shared_ptr< QueryOp > run();
             QueryOp &op_;
             QueryPlanSet &plans_;
+            static void initOp( QueryOp &op );
+            static void nextOp( QueryOp &op );
         };
         FieldBoundSet fbs_;
         PlanSet plans_;
