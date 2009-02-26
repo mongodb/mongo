@@ -161,7 +161,6 @@ namespace QueryOptimizerTests {
             void run() {
                 FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 ) );
                 BSONObj simple = fbs.simplifiedQuery();
-                out() << "simple: " << simple << endl;
                 ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gte:5,$lte:10}" ) ) );
                 ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
                 ASSERT( !simple.getObjectField( "c" ).woCompare( fromjson( "{$lte:4}" ) ) );
@@ -182,10 +181,16 @@ namespace QueryOptimizerTests {
                 ASSERT( p( BSON( "a" << LT << 1 << GTE << 0 ) ) == p( BSON( "a" << LTE << 5 << GTE << 0 ) ) );
                 ASSERT( p( BSON( "a" << 1 ) ) < p( BSON( "a" << 1 << "b" << 1 ) ) );
                 ASSERT( !( p( BSON( "a" << 1 << "b" << 1 ) ) < p( BSON( "a" << 1 ) ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << "a" ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << -1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "c" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 << "c" << -1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << -1 << "c" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 << "c" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "b" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) ) );
             }
         private:
-            static QueryPattern p( const BSONObj &query ) {
-                return FieldBoundSet( "", query ).pattern();
+            static QueryPattern p( const BSONObj &query, const BSONObj &sort = emptyObj ) {
+                return FieldBoundSet( "", query ).pattern( sort );
             }
         };
         
