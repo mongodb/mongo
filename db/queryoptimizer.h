@@ -107,6 +107,7 @@ namespace mongo {
             return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
         }
         const FieldBoundSet &fbs() const { return fbs_; }
+        BSONObj explain() const;
     private:
         void addOtherPlans( bool checkFirst );
         typedef boost::shared_ptr< QueryPlan > PlanPtr;

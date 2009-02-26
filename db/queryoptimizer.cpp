@@ -269,6 +269,17 @@ namespace mongo {
         return r.run();
     }
     
+    BSONObj QueryPlanSet::explain() const {
+        vector< BSONObj > arr;
+        for( PlanSet::const_iterator i = plans_.begin(); i != plans_.end(); ++i ) {
+            auto_ptr< Cursor > c = (*i)->newCursor();
+            arr.push_back( BSON( "cursor" << c->toString() << "startKey" << c->prettyStartKey() << "endKey" << c->prettyEndKey() ) );
+        }
+        BSONObjBuilder b;
+        b.append( "allPlans", arr );
+        return b.obj();
+    }
+    
     QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
     op_( op ),
     plans_( plans ) {
