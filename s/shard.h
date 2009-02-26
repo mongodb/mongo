@@ -32,9 +32,14 @@
 namespace mongo {
 
     class DBConfig;
-    class ShardInfo;
-    
-    class Shard : boost::noncopyable {
+    class ShardManager;
+    class ShardObjUnitTest;
+
+    /**
+       config.shard
+       { ns : "alleyinsider.fs.chunks" , min : {} , max : {} , server : "localhost:30001" }
+     */    
+    class Shard : public Model , boost::noncopyable {
     public:
         
         BSONObj& getMin(){
@@ -49,13 +54,8 @@ namespace mongo {
         }
         void setServer( string server );
 
-        BSONObj getData() const;
-
         bool contains( const BSONObj& obj );
 
-        void split();
-        void split( const BSONObj& middle );
-        
         string toString() const;
         operator string() const { return toString(); }
 
@@ -67,12 +67,21 @@ namespace mongo {
         
         void getFilter( BSONObjBuilder& b );
 
+        Shard * split();
+        Shard * split( const BSONObj& middle );
+
+        virtual const char * getNS(){ return "config.shard"; }
+        virtual void serialize(BSONObjBuilder& to);
+        virtual void unserialize(BSONObj& from);
+        virtual string modelServer();
+
+    protected:
+        Shard( ShardManager * info );
+        
     private:
-        Shard( ShardInfo * info , BSONObj data );
+        ShardManager * _manager;
         
-        ShardInfo * _info;
-        BSONObj _data;
-        
+        string _ns;
         BSONObj _min;
         BSONObj _max;
         string _server;
@@ -81,7 +90,8 @@ namespace mongo {
 
         void _split( BSONObj& middle );
 
-        friend class ShardInfo;
+        friend class ShardManager;
+        friend class ShardObjUnitTest;
     };
 
     /* config.sharding
@@ -90,11 +100,11 @@ namespace mongo {
            shards: [ { min: 1, max: 100, server: a } , { min: 101, max: 200 , server : b } ]
          }
     */
-    class ShardInfo : public Model {
+    class ShardManager {
     public:
 
-        ShardInfo( DBConfig * config );
-        virtual ~ShardInfo();
+        ShardManager( DBConfig * config , string ns ,ShardKeyPattern pattern );
+        virtual ~ShardManager();
 
         string getns(){
             return _ns;
@@ -111,11 +121,7 @@ namespace mongo {
          */
         int getShardsForQuery( vector<Shard*>& shards , const BSONObj& query );
 
-        virtual const char * getNS(){ return "config.sharding"; }
-        virtual void serialize(BSONObjBuilder& to);
-        virtual void unserialize(BSONObj& from);
-        virtual string modelServer();
-        bool loadByName( const string& ns );
+        void save();
 
         string toString() const;
         operator string() const { return toString(); }
@@ -124,6 +130,7 @@ namespace mongo {
         DBConfig * _config;
         string _ns;
         ShardKeyPattern _key;
+        
         vector<Shard*> _shards;
         
         friend class Shard;

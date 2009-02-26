@@ -38,7 +38,7 @@ namespace mongo {
     bool DBConfig::sharded( const string& ns ){
         if ( ! _partitioned )
             return false;
-        return _sharded.count( ns ) > 0;
+        return _sharded.find( ns ) != _sharded.end();
     }
 
     string DBConfig::getServer( const string& ns ){
@@ -53,45 +53,34 @@ namespace mongo {
         _partitioned = true; 
     }
     
-    ShardInfo* DBConfig::turnOnSharding( const string& ns , BSONObj fieldsAndOrder ){
+    ShardManager* DBConfig::turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder ){
         if ( ! _partitioned )
             throw UserException( "not partitioned" );
         
-        ShardInfo * info = _shards[ns];
+        ShardManager * info = _shards[ns];
         if ( info )
             return info;
         
         if ( sharded( ns ) )
             throw UserException( "already sharded" );
 
-        _sharded.insert( ns );
-        info = new ShardInfo( this );
-        if ( info->loadByName( ns ) )
-            throw UserException( "something is wrong, ns already has a shard info" );
-        
-        {
-            BSONObjBuilder b;
-            b << "ns" << ns;
-            b << "key" << fieldsAndOrder;
-            BSONObj o = b.obj();
-            info->unserialize( o );
-            info->save();
-        }
+        _sharded[ns] = fieldsAndOrder;
 
+        info = new ShardManager( this , ns , fieldsAndOrder );
         _shards[ns] = info;
         return info;
 
     }
 
-    ShardInfo* DBConfig::getShardInfo( const string& ns ){
-        ShardInfo* info = _shards[ns];
-        if ( info )
-            return info;
-        info = new ShardInfo( this );
-        if ( ! info->loadByName( ns ) )
-            throw UserException( (string)"can't load shard info for: " + ns );
-        _shards[ns] = info;
-        return info;
+    ShardManager* DBConfig::getShardManager( const string& ns ){
+        ShardManager* m = _shards[ns];
+        if ( m )
+            return m;
+
+        uassert( (string)"not sharded:" + ns , sharded( ns ) );
+        m = new ShardManager( this , ns , _sharded[ ns ] );
+        _shards[ns] = m;
+        return m;
     }
 
     void DBConfig::serialize(BSONObjBuilder& to){
@@ -101,10 +90,8 @@ namespace mongo {
         
         if ( _sharded.size() > 0 ){
             BSONObjBuilder a;
-            int num=0;
-            for ( set<string>::reverse_iterator i=_sharded.rbegin(); i != _sharded.rend(); i++){
-                string temp = a.numStr( num++ );
-                a.append( temp.c_str() , i->c_str() );
+            for ( map<string,ShardKeyPattern>::reverse_iterator i=_sharded.rbegin(); i != _sharded.rend(); i++){
+                a.append( i->first.c_str() , i->second.key() );
             }
             to.appendArray( "sharded" , a.obj() );
         }
@@ -121,11 +108,18 @@ namespace mongo {
             BSONObjIterator i(sharded);
             while ( i.more() ){
                 BSONElement e = i.next();
-                string s = e.str();
-                if ( s.size() > 0 )
-                    _sharded.insert( s );
+                if ( e.eoo() )
+                    break;
+                uassert( "shared things have to be objects" , e.type() == Object );
+                _sharded[e.fieldName()] = e.embeddedObject();
             }
         }
+    }
+    
+    void DBConfig::save( bool check ){
+        Model::save( check );
+        for ( map<string,ShardManager*>::iterator i=_shards.begin(); i != _shards.end(); i++)
+            i->second->save();
     }
     
     bool DBConfig::loadByName(const char *nm){
@@ -361,16 +355,17 @@ namespace mongo {
             b << "primary" << "myserver";
             
             BSONObjBuilder a;
-            a << "0" << "abc.foo";
-            a << "1" << "abc.bar";
+            a << "abc.foo" << BSON( "a" << 1 );
+            a << "abc.bar" << BSON( "b" << -1 );
             
             b.appendArray( "sharded" , a.obj() );
 
             DBConfig c;
             testInOut( c , b.obj() );
             assert( c.sharded( "abc.foo" ) );
+            assert( ! c.sharded( "abc.food" ) );
         }
-
+        
         void run(){
             a();
             b();

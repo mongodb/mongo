@@ -20,15 +20,13 @@
 #include "shard.h"
 #include "config.h"
 #include "../util/unittest.h"
+#include "../client/connpool.h"
 
 namespace mongo {
 
     // -------  Shard --------
     
-    Shard::Shard( ShardInfo * info , BSONObj data ) : _info( info ) , _data( data ){
-        _min = _data.getObjectField( "min" );
-        _max = _data.getObjectField( "max" );
-        _server = _data.getStringField( "server" );
+    Shard::Shard( ShardManager * manager ) : _manager( manager ){
         _modified = false;
     }
 
@@ -36,95 +34,120 @@ namespace mongo {
         _server = s;
         _modified = true;
     }
-
+    
     bool Shard::contains( const BSONObj& obj ){
         return
-            _info->getShardKey().compare( getMin() , obj ) <= 0 &&
-            _info->getShardKey().compare( obj , getMax() ) < 0;
+            _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
+            _manager->getShardKey().compare( obj , getMax() ) < 0;
     }
 
-    void Shard::split(){
-        split( _info->getShardKey().middle( getMin() , getMax() ) );
+    Shard * Shard::split(){
+        return split( _manager->getShardKey().middle( getMin() , getMax() ) );
     }
+
+    Shard * Shard::split( const BSONObj& m ){
+        uassert( "can't split as shard that doesn't have a manager" , _manager );
         
-    void Shard::split( const BSONObj& m ){
+        Shard * s = new Shard( _manager );
+        s->_ns = _ns;
+        s->_server = _server;
+        s->_min = m.getOwned();
+        s->_max = _max;
+        
+        s->_modified = true;
+        _modified = true;
 
-        {
-            BSONObjBuilder l;
-            l.append( "min" , _min );
-            l.append( "max" , m );
-            l.append( "server" , getServer() );
-            _info->_shards.push_back( new Shard( _info , l.obj() ) );
-        }
-
-        {
-            BSONObjBuilder r;
-            r.append( "min" , m );
-            r.append( "max" , _max );
-            r.append( "server" , getServer() );
-            _info->_shards.push_back( new Shard( _info , r.obj() ) );
-        }
-
-        for ( vector<Shard*>::iterator i=_info->_shards.begin(); i != _info->_shards.end(); i++ ){
-            Shard * s = *i;
-            if ( s == this ){
-                _info->_shards.erase( i );
-                delete( s );
-                break;
-            }
-        }
-
+        _manager->_shards.push_back( s );
+        
+        _max = m.getOwned(); 
+        
+        return s;
     }
-
+    
     bool Shard::operator==( const Shard& s ){
         return 
-            _info->getShardKey().compare( _min , s._min ) == 0 &&
-            _info->getShardKey().compare( _max , s._max ) == 0
+            _manager->getShardKey().compare( _min , s._min ) == 0 &&
+            _manager->getShardKey().compare( _max , s._max ) == 0
             ;
     }
 
     void Shard::getFilter( BSONObjBuilder& b ){
-        _info->_key.getFilter( b , _min , _max );
+        _manager->_key.getFilter( b , _min , _max );
     }
 
-    BSONObj Shard::getData() const{
-        if ( ! _modified )
-            return _data;
+    void Shard::serialize(BSONObjBuilder& to){
+        to << "ns" << _ns;
+        to << "min" << _min;
+        to << "max" << _max;
+        to << "server" << _server;
+    }
 
-        BSONObjBuilder b;
-        b << "min" << _min;
-        b << "max" << _max;
-        b << "server" << _server;
-        return b.obj();
+    void Shard::unserialize(BSONObj& from){
+        _ns = from.getStringField( "ns" );
+        _min = from.getObjectField( "min" ).getOwned();
+        _max = from.getObjectField( "max" ).getOwned();
+        _server = from.getStringField( "server" );
+        
+        uassert( "Shard needs a ns" , ! _ns.empty() );
+        uassert( "Shard needs a server" , ! _ns.empty() );
+
+        uassert( "Shard needs a min" , ! _min.isEmpty() );
+        uassert( "Shard needs a max" , ! _max.isEmpty() );
+    }
+
+    string Shard::modelServer() {
+        // TODO: this could move around?
+        return configServer.modelServer();
     }
     
     string Shard::toString() const {
-        return getData().toString();
+        stringstream ss;
+        ss << "shard  ns:" << _ns << " server: " << _server << " min: " << _min << " max: " << _max;
+        return ss.str();
     }
+    
+    // -------  ShardManager --------
 
-    // -------  ShardInfo --------
+    ShardManager::ShardManager( DBConfig * config , string ns , ShardKeyPattern pattern ) : _config( config ) , _ns( ns ) , _key( pattern ){
+        Shard temp(0);
+        
+        ScopedDbConnection conn( temp.modelServer() );
+        auto_ptr<DBClientCursor> cursor = conn->query( temp.getNS() , BSON( "ns" <<  ns ) );
+        while ( cursor->more() ){
+            Shard * s = new Shard( this );
+            BSONObj d = cursor->next();
+            s->unserialize( d );
+            _shards.push_back( s );
+        }
+        conn.done();
+        
+        if ( _shards.size() == 0 ){
+            Shard * s = new Shard( this );
+            s->_ns = ns;
+            s->_min = _key.globalMin();
+            s->_max = _key.globalMax();
+            s->_server = config->getPrimary();
+            s->_modified = true;
 
-    ShardInfo::ShardInfo( DBConfig * config ) : _config( config ){
+            _shards.push_back( s );
+
+            log() << "no shards for:" << ns << " so creating first: " << s->toString() << endl;
+        }
     }
-
-    ShardInfo::~ShardInfo(){
+    
+    ShardManager::~ShardManager(){
         for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++ ){
             delete( *i );
         }
         _shards.clear();
     }
 
-    string ShardInfo::modelServer() {
-        // TODO: this could move around?
-        return configServer.modelServer();
-    }
-
-    bool ShardInfo::hasShardKey( const BSONObj& obj ){
+    bool ShardManager::hasShardKey( const BSONObj& obj ){
         return _key.hasShardKey( obj );
     }
 
-    Shard& ShardInfo::findShard( const BSONObj & obj ){
-
+    Shard& ShardManager::findShard( const BSONObj & obj ){
+        
         for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++ ){
             Shard * s = *i;
             if ( s->contains( obj ) )
@@ -133,7 +156,7 @@ namespace mongo {
         throw UserException( "couldn't find a shard which should be impossible" );
     }
 
-    int ShardInfo::getShardsForQuery( vector<Shard*>& shards , const BSONObj& query ){
+    int ShardManager::getShardsForQuery( vector<Shard*>& shards , const BSONObj& query ){
         int added = 0;
         
         for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++  ){
@@ -145,122 +168,35 @@ namespace mongo {
         }
         return added;
     }
-    
-    void ShardInfo::serialize(BSONObjBuilder& to){
-        to.append( "ns", _ns );
-        to.append( "key" , _key.key() );
-        
-        BSONObjBuilder shards;
-        int num=0;
-        for ( vector<Shard*>::iterator i=_shards.begin(); i != _shards.end(); i++  ){
-            string s = shards.numStr( num++ );
-            shards.append( s.c_str() , (*i)->getData() );
-        }
-        to.appendArray( "shards" , shards.obj() );
-    }
 
-    void ShardInfo::unserialize(BSONObj& from) {
-        _ns = from.getStringField("ns");
-        uassert("bad config.shards.name", !_ns.empty());
-        
-        _key.init( from.getObjectField( "key" ) );
-
-        assert( _shards.size() == 0 );
-
-        BSONObj shards = from.getObjectField( "shards" );
-        if ( shards.isEmpty() ){
-            BSONObjBuilder all;
-
-            all.append( "min" , _key.globalMin() );
-            all.append( "max" , _key.globalMax() );
-            all.append( "server" , _config ? _config->getPrimary() : "noserver" );
-
-            _shards.push_back( new Shard( this , all.obj() ) );
-        }
-        else {
-            int num=0;
-            while ( true ){
-                string s = BSONObjBuilder::numStr( num++ );            
-                BSONObj next = shards.getObjectField( s.c_str() );
-                if ( next.isEmpty() )
-                    break;
-                _shards.push_back( new Shard( this , next ) );
-            }
+    void ShardManager::save(){
+        for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
+            Shard* s = *i;
+            if ( ! s->_modified )
+                continue;
+            s->save( true );
         }
     }
 
-    bool ShardInfo::loadByName( const string& ns ){
-        BSONObjBuilder b;
-        b.append("ns", ns);
-        BSONObj q = b.done();
-        return load(q);
-    }
-
-    string ShardInfo::toString() const {
+    string ShardManager::toString() const {
         stringstream ss;
-        ss << "ShardInfo: " << _ns << " key:" << _key.toString() << "\n";
+        ss << "ShardManager: " << _ns << " key:" << _key.toString() << "\n";
         for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
             const Shard* s = *i;
             ss << "\t" << s->toString() << "\n";
         }
         return ss.str();
     }
-
+    
     
     class ShardObjUnitTest : public UnitTest {
     public:
-        void run(){
-            if( 1 ) {
-cout << "TODO TURN TESTS BACK ON!" << endl;
-return;
-            }
-            string ns = "alleyinsider.blog.posts";
-            BSONObj o = BSON( "ns" << ns << "key" << BSON( "num" << 1 ) );
-            
-            ShardInfo si(0);
-            si.unserialize( o );
-            assert( si.getns() == ns );
-            
-            BSONObjBuilder b;
-            si.serialize( b );
-            BSONObj a = b.obj();
-            assert( ns == a.getStringField( "ns" ) );
-            assert( 1 == a.getObjectField( "key" )["num"].number() );
-            
-            log(2) << a << endl;
-            
-            {
-                ShardInfo si2(0);
-                si2.unserialize( a );
-                BSONObjBuilder b2;
-                si2.serialize( b2 );
-                assert( b2.obj().woEqual(a) );
-            }
-            
-            {
-                BSONObj num = BSON( "num" << 5 );
-                si.findShard( num );
-                
-                assert( si.findShard( BSON( "num" << -1 ) ) == 
-                        si.findShard( BSON( "num" << 1 ) ) );
-                
-                log(2) << "before split: " << si << endl;
-                si.findShard( num ).split();
-                log(2) << "after split: " << si << endl;
-                
-                assert( si.findShard( BSON( "num" << -1 ) ) != 
-                        si.findShard( BSON( "num" << 1 ) ) );
-                
-                string s1 = si.toString();
-                BSONObjBuilder b2;
-                si.serialize( b2 );
-                ShardInfo s3(0);
-                BSONObj temp = b2.obj();
-                s3.unserialize( temp );
-                assert( s1 == s3.toString() );
-                
-            }
+        void runShard(){
 
+        }
+        
+        void run(){
+            runShard();
             log(1) << "shardObjTest passed" << endl;
         }
     } shardObjTest;

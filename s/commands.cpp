@@ -251,8 +251,7 @@ namespace mongo {
                     return false;
                 }
                 
-                ShardInfo * info = config->turnOnSharding( ns , key );
-                info->save( true );
+                config->turnOnSharding( ns , key );
                 config->save( true );
 
                 result << "ok" << 1;
@@ -296,7 +295,7 @@ namespace mongo {
                     return false;
                 }
                 
-                ShardInfo * info = config->getShardInfo( ns );
+                ShardManager * info = config->getShardManager( ns );
                 Shard& old = info->findShard( find );
                 
                 log() << "splitting: " << ns << " on: " << find << endl;
@@ -306,7 +305,7 @@ namespace mongo {
                 else
                     old.split();
                 
-                info->save( true );
+                info->save();
                 
                 result << "ok" << 1;
                 return true;
@@ -346,7 +345,7 @@ namespace mongo {
                     return false;
                 }
                 
-                ShardInfo * info = config->getShardInfo( ns );
+                ShardManager * info = config->getShardManager( ns );
                 Shard& s = info->findShard( find );                
                 string from = s.getServer();
 
@@ -390,7 +389,7 @@ namespace mongo {
                 
                 // update config db
                 s.setServer( to );
-                info->save( true );
+                info->save();
 
                 // delete old data
                 ScopedDbConnection fromconn( from );

@@ -27,8 +27,6 @@
 */
 
 namespace mongo {
-
-
     
     ShardKeyPattern::ShardKeyPattern( BSONObj fieldsAndOrder ) : pattern( fieldsAndOrder.getOwned() ){
         if ( pattern.nFields() > 0 ){

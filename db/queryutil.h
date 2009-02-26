@@ -85,11 +85,31 @@ namespace mongo {
                 ++i;
                 ++j;
             }
-            return ( j != other.fieldTypes_.end() );
+            if ( j != other.fieldTypes_.end() )
+                return true;
+            return sort_.woCompare( other.sort_ ) < 0;
         }
     private:
         QueryPattern() {}
+        void setSort( const BSONObj sort ) {
+            sort_ = normalizeSort( sort );
+        }
+        BSONObj static normalizeSort( const BSONObj &spec ) {
+            if ( spec.isEmpty() )
+                return spec;
+            int direction = ( spec.firstElement().number() >= 0 ) ? 1 : -1;
+            BSONObjIterator i( spec );
+            BSONObjBuilder b;
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                b.append( e.fieldName(), direction * ( ( e.number() >= 0 ) ? -1 : 1 ) );
+            }
+            return b.obj();
+        }
         map< string, Type > fieldTypes_;
+        BSONObj sort_;
     };
     
     class FieldBoundSet {
@@ -123,7 +143,7 @@ namespace mongo {
                     return false;
             return true;
         }
-        QueryPattern pattern() const;
+        QueryPattern pattern( const BSONObj &sort = emptyObj ) const;
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();

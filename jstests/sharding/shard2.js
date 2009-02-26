@@ -10,14 +10,12 @@ db = s.getDB( "test" );
 
 s.adminCommand( { partition : "test" } );
 s.adminCommand( { shard : "test.foo" , key : { num : 1 } } );
-assert.eq( 1 , s.config.sharding.count()  , "sanity check 1" );
-assert.eq( 1, s.config.sharding.findOne().shards.length );
+assert.eq( 1 , s.config.shard.count()  , "sanity check 1" );
 
 s.adminCommand( { split : "test.foo" , find : { num : 0 } } );
-assert.eq( 1 , s.config.sharding.count() );
-shard = s.config.sharding.findOne();
-assert.eq( 2 , shard.shards.length );
-assert.eq( shard.shards[0].server , shard.shards[1].server , "server should be the same after a split" );
+assert.eq( 2 , s.config.shard.count() , "should be 2 shards" );
+shards = s.config.shard.find().toArray();
+assert.eq( shards[0].server , shards[1].server , "server should be the same after a split" );
 
 
 db.foo.save( { num : 1 , name : "eliot" } );
@@ -46,10 +44,9 @@ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : seconday.ge
 assert.eq( 1 , primary.foo.find().length() );
 assert.eq( 2 , seconday.foo.find().length() );
 
-assert.eq( 1 , s.config.sharding.count() );
-shard = s.config.sharding.findOne();
-assert.eq( 2 , shard.shards.length );
-assert.neq( shard.shards[0].server , shard.shards[1].server , "servers should not be the same after the move" );
+assert.eq( 2 , s.config.shard.count() , "still should have 2 shards" );
+shards = s.config.shard.find().toArray();
+assert.neq( shards[0].server , shards[1].server , "servers should NOT be the same after the move" );
 
 // test inserts go to right server/shard
 

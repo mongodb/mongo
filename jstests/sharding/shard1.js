@@ -19,11 +19,10 @@ assert.eq( 3 , db.foo.find().length() , "after partitioning count failed" );
 
 s.adminCommand( shardCommand );
 dbconfig = s.config.databases.findOne( { name : "test" } );
-assert( dbconfig.sharded.length == 1 , "sharded length" );
-assert( dbconfig.sharded[0] == "test.foo" );
+assert.eq( dbconfig.sharded["test.foo"] , { num : 1 } , "Sharded content" );
 
-assert.eq( 1 , s.config.sharding.count() );
-si = s.config.sharding.findOne();
+assert.eq( 1 , s.config.shard.count() );
+si = s.config.shard.findOne();
 assert( si );
 assert.eq( si.ns , "test.foo" );
 

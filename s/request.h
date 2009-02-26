@@ -34,7 +34,7 @@ namespace mongo {
             return _config;
         }
         
-        ShardInfo * getShardInfo(){
+        ShardManager * getShardManager(){
             return _shardInfo;
         }
 
@@ -66,7 +66,7 @@ namespace mongo {
         
         MSGID _id;
         DBConfig * _config;
-        ShardInfo * _shardInfo;
+        ShardManager * _shardInfo;
     };
 
 }

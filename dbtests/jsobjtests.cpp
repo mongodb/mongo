@@ -110,6 +110,14 @@ namespace JsobjTests {
             }
         };
         
+        class WoCompareDifferentLength : public Base {
+        public:
+            void run() {
+                ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << 1 << "b" << 1 ) ) < 0 );
+                ASSERT( BSON( "a" << 1 << "b" << 1 ).woCompare( BSON( "a" << 1 ) ) > 0 );
+            }
+        };
+        
         class WoSortOrder : public Base {
         public:
             void run() {
@@ -117,7 +125,7 @@ namespace JsobjTests {
                 ASSERT( fromjson( "{a:null}" ).woSortOrder( BSON( "b" << 1 ), BSON( "a" << 1 ) ) == 0 );
             }
         };
-
+        
         namespace Validation {
             
             class Base {
@@ -533,6 +541,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareEmbeddedObject >();
             add< BSONObjTests::WoCompareEmbeddedArray >();
             add< BSONObjTests::WoCompareOrdered >();
+            add< BSONObjTests::WoCompareDifferentLength >();
             add< BSONObjTests::WoSortOrder >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();

@@ -37,7 +37,7 @@ namespace mongo {
         _config = grid.getDBConfig( getns() );
 
         if ( _config->sharded( getns() ) ){
-            _shardInfo = _config->getShardInfo( getns() );
+            _shardInfo = _config->getShardManager( getns() );
             uassert( (string)"no shard info for: " + getns() , _shardInfo );
         }
         else {

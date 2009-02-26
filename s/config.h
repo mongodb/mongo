@@ -26,6 +26,7 @@
 #include "../db/namespace.h"
 #include "../client/dbclient.h"
 #include "../client/model.h"
+#include "shardkey.h"
 
 namespace mongo {
 
@@ -35,7 +36,7 @@ namespace mongo {
     extern ConfigServer configServer;
     extern Grid grid;
 
-    class ShardInfo;
+    class ShardManager;
     
     /**
        top level grid configuration for an entire database
@@ -54,14 +55,14 @@ namespace mongo {
         }
         
         void turnOnPartitioning();
-        ShardInfo* turnOnSharding( const string& ns , BSONObj fieldsAndOrder );
+        ShardManager* turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder );
         
         /**
          * @return whether or not this partition is partitioned
          */
         bool sharded( const string& ns );
         
-        ShardInfo* getShardInfo( const string& ns );
+        ShardManager* getShardManager( const string& ns );
 
         /**
          * @return the correct for machine for the ns
@@ -79,6 +80,8 @@ namespace mongo {
             _primary = s;
         }
         
+        virtual void save( bool check=true);
+
         virtual string modelServer();
         
         // model stuff
@@ -93,8 +96,8 @@ namespace mongo {
         string _primary; // e.g. localhost , mongo.foo.com:9999
         bool _partitioned;
         
-        set<string> _sharded; // [ "alleyinsider.blog.posts" , ... ] - all ns that are sharded
-        map<string,ShardInfo*> _shards; // this will only have entries for things that have been looked at
+        map<string,ShardKeyPattern> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
+        map<string,ShardManager*> _shards; // this will only have entries for things that have been looked at
 
         friend class Grid;
     };

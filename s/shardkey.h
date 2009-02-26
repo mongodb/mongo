@@ -30,7 +30,6 @@ namespace mongo {
     class ShardKeyPattern {
     public:
         ShardKeyPattern( BSONObj fieldsAndOrder = emptyObj );
-        void init( BSONObj  ) { assert(false); }
         
         /**
            global min is the lowest possible value for this key
