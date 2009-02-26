@@ -24,10 +24,6 @@ namespace mongo {
     
     class Shard;
 
-    /**
-       NOTE: the implementation for this is temporary.
-             it only currently works for a single numeric field
-     */
     /* A ShardKeyPattern is a pattern indicating what data to extract from the object to make the shard key from.
        Analogous to an index key pattern.
     */
@@ -63,7 +59,7 @@ namespace mongo {
         int compare( const BSONObj& l , const BSONObj& r ) const;
         
         /**
-         * @return whether or not obj has all fields in this shard key
+         * @return whether or not obj has all fields in this shard key pattern
          */
         bool hasShardKey( const BSONObj& obj );
         
