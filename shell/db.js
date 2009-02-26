@@ -174,9 +174,9 @@ DB.prototype.cloneCollection = function(from, collection, query) {
     assert( isString(from) && from.length );
     assert( isString(collection) && collection.length );
     collection = this._name + "." + collection;
-    assert( isObject(query) );
+    query = query || {};
     //this.resetIndexCache();
-    return this._dbCommand( { cloneCollection:1, fromhost:from, collection:collection, query:query } );
+    return this._dbCommand( { cloneCollection:collection, fromhost:from, query:query } );
 }
 
 
