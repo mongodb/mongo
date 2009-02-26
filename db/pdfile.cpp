@@ -36,6 +36,7 @@ _ disallow system* manipulations from the database.
 #include "repl.h"
 #include "dbhelpers.h"
 #include "namespace.h"
+#include "queryutil.h"
 
 namespace mongo {
 

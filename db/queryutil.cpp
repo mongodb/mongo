@@ -163,7 +163,7 @@ namespace mongo {
         return b.obj();
     }
     
-    QueryPattern FieldBoundSet::pattern() const {
+    QueryPattern FieldBoundSet::pattern( const BSONObj &sort ) const {
         QueryPattern qp;
         for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i ) {
             if ( i->second.equality() ) {
@@ -179,6 +179,7 @@ namespace mongo {
                     qp.fieldTypes_[ i->first ] = QueryPattern::LowerBound;                    
             }
         }
+        qp.setSort( sort );
         return qp;
     }
     

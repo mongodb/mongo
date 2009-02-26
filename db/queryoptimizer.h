@@ -51,7 +51,7 @@ namespace mongo {
         BSONObj query() const { return fbs_.query(); }
         const FieldBound &bound( const char *fieldName ) const { return fbs_.bound( fieldName ); }
         void registerSelf( int nScanned ) const {
-            registerIndexForPattern( ns(), fbs_.pattern(), indexKey(), nScanned );
+            registerIndexForPattern( ns(), fbs_.pattern( order_ ), indexKey(), nScanned );
         }
     private:
         const FieldBoundSet &fbs_;
@@ -122,6 +122,8 @@ namespace mongo {
             shared_ptr< QueryOp > run();
             QueryOp &op_;
             QueryPlanSet &plans_;
+            static void initOp( QueryOp &op );
+            static void nextOp( QueryOp &op );
         };
         FieldBoundSet fbs_;
         PlanSet plans_;

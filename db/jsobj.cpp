@@ -639,7 +639,9 @@ namespace mongo {
             if ( ordered )
                 o = k.next();
             if ( l.eoo() )
-                return 0;
+                return r.eoo() ? 0 : -1;
+            if ( r.eoo() )
+                return 1;
 
             int x = l.woCompare( r, considerFieldName );
             if ( ordered && o.number() < 0 )

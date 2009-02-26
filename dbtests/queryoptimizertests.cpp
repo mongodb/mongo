@@ -161,7 +161,6 @@ namespace QueryOptimizerTests {
             void run() {
                 FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 ) );
                 BSONObj simple = fbs.simplifiedQuery();
-                out() << "simple: " << simple << endl;
                 ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gte:5,$lte:10}" ) ) );
                 ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
                 ASSERT( !simple.getObjectField( "c" ).woCompare( fromjson( "{$lte:4}" ) ) );
@@ -182,10 +181,16 @@ namespace QueryOptimizerTests {
                 ASSERT( p( BSON( "a" << LT << 1 << GTE << 0 ) ) == p( BSON( "a" << LTE << 5 << GTE << 0 ) ) );
                 ASSERT( p( BSON( "a" << 1 ) ) < p( BSON( "a" << 1 << "b" << 1 ) ) );
                 ASSERT( !( p( BSON( "a" << 1 << "b" << 1 ) ) < p( BSON( "a" << 1 ) ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << "a" ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << -1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "c" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 << "c" << -1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << -1 << "c" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 << "c" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "b" << 1 ) ) );
+                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) ) );
             }
         private:
-            static QueryPattern p( const BSONObj &query ) {
-                return FieldBoundSet( "", query ).pattern();
+            static QueryPattern p( const BSONObj &query, const BSONObj &sort = emptyObj ) {
+                return FieldBoundSet( "", query ).pattern( sort );
             }
         };
         
@@ -518,7 +523,7 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "b_2" );
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), emptyObj );
-                ASSERT_EQUALS( 2, s.nPlans() );                
+                ASSERT_EQUALS( 1, s.nPlans() );                
             }
         };
 
@@ -746,6 +751,11 @@ namespace QueryOptimizerTests {
                 TestOp newOriginal;
                 s2.runOp( newOriginal );
                 nPlans( 3 );
+
+                QueryPlanSet s3( ns(), BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) );
+                TestOp newerOriginal;
+                s3.runOp( newerOriginal );
+                nPlans( 3 );                
                 
                 runQuery();
                 nPlans( 1 );
@@ -782,12 +792,12 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
 
-                QueryPlanSet s( ns(), BSON( "a" << 4 ), emptyObj );
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ScanOnlyTestOp op;
                 s.runOp( op );
-                ASSERT( !fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern() ) ) );
+                ASSERT( fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern( BSON( "b" << 1 ) ) ) ) == 0 );
                 
-                QueryPlanSet s2( ns(), BSON( "a" << 4 ), emptyObj );
+                QueryPlanSet s2( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 TestOp op2;
                 ASSERT( s2.runOp( op2 )->complete() );
             }
@@ -849,13 +859,15 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "_id" << 1 ), "_id_1" );
-                BSONObj one = BSON( "_id" << 2 );
-                BSONObj two = BSON( "_id" << 1 );
+                BSONObj one = BSON( "_id" << 3 << "a" << 1 );
+                BSONObj two = BSON( "_id" << 2 << "a" << 1 );
+                BSONObj three = BSON( "_id" << 1 << "a" << -1 );
                 theDataFileMgr.insert( ns(), one );
                 theDataFileMgr.insert( ns(), two );
+                theDataFileMgr.insert( ns(), three );
                 BSONObj id;
-                deleteObjects( ns(), BSON( "_id" << GT << 0 ), true, &id );
-                ASSERT_EQUALS( 2, id.getIntField( "_id" ) );
+                deleteObjects( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ), true, &id );
+                ASSERT_EQUALS( 3, id.getIntField( "_id" ) );
             }
         };
 
