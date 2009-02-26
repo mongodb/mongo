@@ -141,13 +141,14 @@ namespace mongo {
         return index_->keyPattern();
     }
     
-    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :
+    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan ) :
     fbs_( ns, query ),
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
     hint_( emptyObj ),
     order_( order.copy() ),
-    oldNScanned_( 0 ) {
+    oldNScanned_( 0 ),
+    honorRecordedPlan_( honorRecordedPlan ) {
         if ( hint && !hint->eoo() ) {
             BSONObjBuilder b;
             b.append( *hint );
@@ -201,24 +202,26 @@ namespace mongo {
             uassert( "bad hint", false );
         }
         
-        BSONObj bestIndex = indexForPattern( ns, fbs_.pattern( order_ ) );
-        if ( !bestIndex.isEmpty() ) {
-            usingPrerecordedPlan_ = true;
-            mayRecordPlan_ = false;
-            oldNScanned_ = nScannedForPattern( ns, fbs_.pattern( order_ ) );
-            if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
-                // Table scan plan
-                plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
-                return;
-            }
-            for (int i = 0; i < d->nIndexes; i++ ) {
-                IndexDetails& ii = d->indexes[i];
-                if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
+        if ( honorRecordedPlan_ ) {
+            BSONObj bestIndex = indexForPattern( ns, fbs_.pattern( order_ ) );
+            if ( !bestIndex.isEmpty() ) {
+                usingPrerecordedPlan_ = true;
+                mayRecordPlan_ = false;
+                oldNScanned_ = nScannedForPattern( ns, fbs_.pattern( order_ ) );
+                if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
+                    // Table scan plan
+                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
                     return;
                 }
+                for (int i = 0; i < d->nIndexes; i++ ) {
+                    IndexDetails& ii = d->indexes[i];
+                    if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
+                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
+                        return;
+                    }
+                }
+                assert( false );
             }
-            assert( false );
         }
         
         addOtherPlans( false );
