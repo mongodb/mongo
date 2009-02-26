@@ -137,7 +137,37 @@ namespace mongo {
             Shard& s = manager->findShard( toupdate );
             doWrite( dbUpdate , r , s.getServer() );
         }
+        
+        void receivedDelete( Request& r , DbMessage& d, ShardManager* manager ){
 
+            int flags = d.pullInt();
+            bool justOne = flags & 1;
+            
+            uassert( "bad delete message" , d.moreJSObjs() );
+            BSONObj pattern = d.nextJsObj();
+            
+            if ( manager->hasShardKey( pattern ) ){
+                Shard& s = manager->findShard( pattern );
+                doWrite( dbDelete , r , s.getServer() );
+                return;
+            }
+            
+            if ( ! justOne && ! pattern.hasField( "_id" ) )
+                throw UserException( "can only delete with a non-shard key pattern if can delete as many as we find" );
+            
+            vector<Shard*> shards;
+            manager->getShardsForQuery( shards , pattern );
+            
+            set<string> seen;
+            for ( vector<Shard*>::iterator i=shards.begin(); i!=shards.end(); i++){
+                Shard * s = *i;
+                if ( seen.count( s->getServer() ) )
+                    continue;
+                seen.insert( s->getServer() );
+                doWrite( dbDelete , r , s->getServer() );
+            }
+        }
+        
         virtual void writeOp( int op , Request& r ){
             
             const char *ns = r.getns();
@@ -152,6 +182,9 @@ namespace mongo {
             }
             else if ( op == dbUpdate ){
                 receivedUpdate( r , d , info );    
+            }
+            else if ( op == dbDelete ){
+                receivedDelete( r , d , info );
             }
             else {
                 log() << "sharding can't do write op: " << op << endl;

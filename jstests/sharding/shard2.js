@@ -136,4 +136,17 @@ db.foo.update( { num : 3 } , person );
 person = db.foo.findOne( { num : 3 } );
 assert.eq( "bob is gone" , person.name );
 
+// remove
+assert( db.foo.findOne( { num : 3 } ) != null );
+db.foo.remove( { num : 3 } );
+assert( db.foo.findOne( { num : 3 } ) == null );
+
+db.foo.save( { num : 3 , name : "eliot2" } );
+person = db.foo.findOne( { num : 3 } );
+assert( person );
+assert( person.name == "eliot2" );
+
+db.foo.remove( { _id : person._id } );
+assert( db.foo.findOne( { num : 3 } ) == null );
+
 s.stop();
