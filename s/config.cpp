@@ -53,11 +53,11 @@ namespace mongo {
         _partitioned = true; 
     }
     
-    ShardInfo* DBConfig::turnOnSharding( const string& ns , BSONObj fieldsAndOrder ){
+    ShardManager* DBConfig::turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder ){
         if ( ! _partitioned )
             throw UserException( "not partitioned" );
         
-        ShardInfo * info = _shards[ns];
+        ShardManager * info = _shards[ns];
         if ( info )
             return info;
         
@@ -65,33 +65,22 @@ namespace mongo {
             throw UserException( "already sharded" );
 
         _sharded[ns] = fieldsAndOrder;
-        info = new ShardInfo( this );
-        if ( info->loadByName( ns ) )
-            throw UserException( "something is wrong, ns already has a shard info" );
-        
-        {
-            BSONObjBuilder b;
-            b << "ns" << ns;
-            b << "key" << fieldsAndOrder;
-            BSONObj o = b.obj();
-            info->unserialize( o );
-            info->save();
-        }
 
+        info = new ShardManager( this , ns , fieldsAndOrder );
         _shards[ns] = info;
         return info;
 
     }
 
-    ShardInfo* DBConfig::getShardInfo( const string& ns ){
-        ShardInfo* info = _shards[ns];
-        if ( info )
-            return info;
-        info = new ShardInfo( this );
-        if ( ! info->loadByName( ns ) )
-            throw UserException( (string)"can't load shard info for: " + ns );
-        _shards[ns] = info;
-        return info;
+    ShardManager* DBConfig::getShardManager( const string& ns ){
+        ShardManager* m = _shards[ns];
+        if ( m )
+            return m;
+
+        uassert( (string)"not sharded:" + ns , sharded( ns ) );
+        m = new ShardManager( this , ns , _sharded[ ns ] );
+        _shards[ns] = m;
+        return m;
     }
 
     void DBConfig::serialize(BSONObjBuilder& to){
@@ -125,6 +114,12 @@ namespace mongo {
                 _sharded[e.fieldName()] = e.embeddedObject();
             }
         }
+    }
+    
+    void DBConfig::save( bool check ){
+        Model::save( check );
+        for ( map<string,ShardManager*>::iterator i=_shards.begin(); i != _shards.end(); i++)
+            i->second->save();
     }
     
     bool DBConfig::loadByName(const char *nm){

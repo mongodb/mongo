@@ -28,18 +28,13 @@
 
 namespace mongo {
     
-    ShardKeyPattern::ShardKeyPattern( BSONObj fieldsAndOrder ) : _fieldsAndOrder( fieldsAndOrder ){
+    ShardKeyPattern::ShardKeyPattern( BSONObj fieldsAndOrder ) : _fieldsAndOrder( fieldsAndOrder.getOwned() ){
         if ( _fieldsAndOrder.nFields() > 0 ){
             _init();
         }
         else {
             _fieldName = "";
         }
-    }
-
-    void ShardKeyPattern::init( BSONObj fieldsAndOrder ){
-        _fieldsAndOrder = fieldsAndOrder.copy();
-        _init();
     }
 
     void ShardKeyPattern::_init(){

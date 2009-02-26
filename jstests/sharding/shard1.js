@@ -21,8 +21,8 @@ s.adminCommand( shardCommand );
 dbconfig = s.config.databases.findOne( { name : "test" } );
 assert.eq( dbconfig.sharded["test.foo"] , { num : 1 } , "Sharded content" );
 
-assert.eq( 1 , s.config.sharding.count() );
-si = s.config.sharding.findOne();
+assert.eq( 1 , s.config.shard.count() );
+si = s.config.shard.findOne();
 assert( si );
 assert.eq( si.ns , "test.foo" );
 

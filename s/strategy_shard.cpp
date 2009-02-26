@@ -19,7 +19,7 @@ namespace mongo {
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( "something is wrong, shouldn't see a command here" );
 
-            ShardInfo * info = r.getShardInfo();
+            ShardManager * info = r.getShardManager();
             assert( info );
             
             Query query( q.query );
@@ -108,7 +108,7 @@ namespace mongo {
             log(3) << "write: " << ns << endl;
             
             DbMessage& d = r.d();
-            ShardInfo * info = r.getShardInfo();
+            ShardManager * info = r.getShardManager();
             assert( info );
             
             if ( op == dbInsert ){
