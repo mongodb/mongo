@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <list>
 #include "query.h"
+#include "queryutil.h"
 #include "json.h"
 
 namespace mongo {
@@ -504,6 +505,11 @@ namespace mongo {
     map<string,NamespaceDetailsTransient*> NamespaceDetailsTransient::map;
     typedef map<string,NamespaceDetailsTransient*>::iterator ouriter;
 
+    void NamespaceDetailsTransient::reset() {
+        clearQueryCache( ns.c_str() );
+        haveIndexKeys = false;
+    }
+    
     NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
         NamespaceDetailsTransient*& t = map[ns];
         if ( t == 0 )

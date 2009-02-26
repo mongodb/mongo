@@ -21,7 +21,6 @@
 #include "../stdafx.h"
 
 #include "jsobj.h"
-#include "queryutil.h"
 #include "storage.h"
 
 #include "../util/hashtab.h"
@@ -363,10 +362,7 @@ namespace mongo {
         void addedIndex() { reset(); }
         void deletedIndex() { reset(); }
     private:
-        void reset() {
-            clearQueryCache( ns.c_str() );
-            haveIndexKeys = false;            
-        }
+        void reset();
         static std::map<string,NamespaceDetailsTransient*> map;
     public:
         static NamespaceDetailsTransient& get(const char *ns);
