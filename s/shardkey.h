@@ -30,13 +30,12 @@ namespace mongo {
     class ShardKeyPattern {
     public:
         ShardKeyPattern( BSONObj fieldsAndOrder = emptyObj );
-        void init( BSONObj fieldsAndOrder );
+        void init( BSONObj  ) { assert(false); }
         
         /**
            global min is the lowest possible value for this key
          */
-        void globalMin( BSONObjBuilder & b );
-        BSONObj globalMin(){ BSONObjBuilder b; globalMin( b ); return b.obj(); }
+        BSONObj globalMin();
 
         /**
            global max is the lowest possible value for this key
@@ -79,7 +78,7 @@ namespace mongo {
          */
         bool relevantForQuery( const BSONObj& q , Shard * s );
         
-        //int ___numFields() const{ return _fieldsAndOrder.nFields(); }
+        //int ___numFields() const{ return pattern.nFields(); }
 
         /**
            Example
@@ -94,13 +93,13 @@ namespace mongo {
          */
         int canOrder( const BSONObj& sort );
 
-        BSONObj key() { return _fieldsAndOrder; }
+        BSONObj key() { return pattern; }
 
         string toString() const;
 
     private:
         void _init();
-        BSONObj _fieldsAndOrder;
+        BSONObj pattern;
         string _fieldName;
     };
 } 

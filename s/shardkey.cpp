@@ -30,8 +30,8 @@ namespace mongo {
 
 
     
-    ShardKeyPattern::ShardKeyPattern( BSONObj fieldsAndOrder ) : _fieldsAndOrder( fieldsAndOrder ){
-        if ( _fieldsAndOrder.nFields() > 0 ){
+    ShardKeyPattern::ShardKeyPattern( BSONObj fieldsAndOrder ) : pattern( fieldsAndOrder.getOwned() ){
+        if ( pattern.nFields() > 0 ){
             _init();
         }
         else {
@@ -39,36 +39,33 @@ namespace mongo {
         }
     }
 
-    void ShardKeyPattern::init( BSONObj fieldsAndOrder ){
-        _fieldsAndOrder = fieldsAndOrder.copy();
-        _init();
-    }
-
     void ShardKeyPattern::_init(){
-        _fieldName = _fieldsAndOrder.firstElement().fieldName();
-        uassert( "shard key only supports 1 field right now" , 1 == _fieldsAndOrder.nFields() );
-        uassert( "shard key has to be a number right now" , _fieldsAndOrder.firstElement().isNumber() );
+        _fieldName = pattern.firstElement().fieldName();
+        uassert( "shard key only supports 1 field right now" , 1 == pattern.nFields() );
+        uassert( "shard key has to be a number right now" , pattern.firstElement().isNumber() );
     }
 
-    
-    void ShardKeyPattern::globalMin( BSONObjBuilder& b ){
-        uassert( "not valid yet" , _fieldName.size() );
-        b << _fieldName << (int)(-0xfffffff);
+    BSONObj ShardKeyPattern::globalMin() {
+        BSONObjBuilder b;
+        BSONElement e = pattern.firstElement();
+        b.appendMinKey(e.fieldName());
+        return b.obj();
     }
-    
+
     void ShardKeyPattern::globalMax( BSONObjBuilder& b ){
         uassert( "not valid yet" , _fieldName.size() );
         b << _fieldName << (int)(0xfffffff);
     }
 
     int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
+
         uassert( "not valid yet" , _fieldName.size() );
         
-        BSONElement lElement = lObject[ _fieldsAndOrder.firstElement().fieldName() ];
+        BSONElement lElement = lObject[ pattern.firstElement().fieldName() ];
         uassert( "left key doesn't have the shard key" , ! lElement.eoo() );
         uassert( "left key isn't number" , lElement.isNumber() );
 
-        BSONElement rElement = rObject[ _fieldsAndOrder.firstElement().fieldName() ];
+        BSONElement rElement = rObject[ pattern.firstElement().fieldName() ];
         uassert( "right key doesn't have the shard key" , ! rElement.eoo() );
         uassert( "right key isn't number" , rElement.isNumber() );
 
@@ -82,11 +79,11 @@ namespace mongo {
     }
     
     void ShardKeyPattern::middle( BSONObjBuilder & b , BSONObj & lObject , BSONObj & rObject ){
-        BSONElement lElement = lObject[ _fieldsAndOrder.firstElement().fieldName() ];
+        BSONElement lElement = lObject[ pattern.firstElement().fieldName() ];
         uassert( "left key doesn't have the shard key" , ! lElement.eoo() );
         uassert( "left key isn't number" , lElement.isNumber() );
 
-        BSONElement rElement = rObject[ _fieldsAndOrder.firstElement().fieldName() ];
+        BSONElement rElement = rObject[ pattern.firstElement().fieldName() ];
         uassert( "right key doesn't have the shard key" , ! rElement.eoo() );
         uassert( "right key isn't number" , rElement.isNumber() );        
 
@@ -122,7 +119,7 @@ namespace mongo {
     }    
 
     int ShardKeyPattern::canOrder( const BSONObj& sort ){
-        if ( sort.nFields() != _fieldsAndOrder.nFields() )
+        if ( sort.nFields() != pattern.nFields() )
             return 0;
 
         if ( ! sort.hasField( _fieldName.c_str() ) )
@@ -134,7 +131,7 @@ namespace mongo {
     }
 
     string ShardKeyPattern::toString() const {
-        return _fieldsAndOrder.toString();
+        return pattern.toString();
     }
 
     class ShardKeyUnitTest : public UnitTest {
@@ -143,6 +140,9 @@ namespace mongo {
             ShardKeyPattern k( BSON( "key" << 1 ) );
             
             BSONObj min = k.globalMin();
+
+//            cout << min.jsonString(TenGen) << endl;
+
             BSONObj max = k.globalMax();
             
             BSONObj k1 = BSON( "key" << 5 );
