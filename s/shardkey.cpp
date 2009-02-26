@@ -27,6 +27,8 @@
 */
 
 namespace mongo {
+
+
     
     ShardKeyPattern::ShardKeyPattern( BSONObj fieldsAndOrder ) : _fieldsAndOrder( fieldsAndOrder ){
         if ( _fieldsAndOrder.nFields() > 0 ){
@@ -143,15 +145,29 @@ namespace mongo {
             BSONObj min = k.globalMin();
             BSONObj max = k.globalMax();
             
-            log(3) << "globalMin: " << min << endl;
-            log(3) << "globalMax: " << max << endl;
-            
+            BSONObj k1 = BSON( "key" << 5 );
+
             assert( k.compare( min , max ) < 0 );
+            assert( k.compare( min , k1 ) < 0 );
             assert( k.compare( max , min ) > 0 );
             assert( k.compare( min , min ) == 0 );
             
-            assert( k.hasShardKey( BSON( "key" << 1 ) ) );
+            assert( k.hasShardKey( k1 ) );
             assert( ! k.hasShardKey( BSON( "key2" << 1 ) ) );
+
+            BSONObj a = k1;
+            BSONObj b = BSON( "key" << 999 );
+
+            assert( k.compare(a,b) < 0 );
+
+            assert( k.compare(a,k.middle(a,a)) == 0 );
+            assert( k.compare(a,k.middle(a,b)) <= 0 );
+            assert( k.compare(k.middle(a,b),b) <= 0 );
+
+            assert( k.canOrder( fromjson("{key:1}") ) == 1 );
+            assert( k.canOrder( fromjson("{zz:1}") ) == 0 );
+            assert( k.canOrder( fromjson("{key:-1}") ) == -1 );
+
         }
     } shardKeyTest;
     
