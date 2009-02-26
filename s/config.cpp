@@ -101,8 +101,8 @@ namespace mongo {
         
         if ( _sharded.size() > 0 ){
             BSONObjBuilder a;
-            for ( map<string,BSONObj>::reverse_iterator i=_sharded.rbegin(); i != _sharded.rend(); i++){
-                a.append( i->first.c_str() , i->second );
+            for ( map<string,ShardKeyPattern>::reverse_iterator i=_sharded.rbegin(); i != _sharded.rend(); i++){
+                a.append( i->first.c_str() , i->second.key() );
             }
             to.appendArray( "sharded" , a.obj() );
         }

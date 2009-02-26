@@ -26,6 +26,7 @@
 #include "../db/namespace.h"
 #include "../client/dbclient.h"
 #include "../client/model.h"
+#include "shardkey.h"
 
 namespace mongo {
 
@@ -93,7 +94,7 @@ namespace mongo {
         string _primary; // e.g. localhost , mongo.foo.com:9999
         bool _partitioned;
         
-        map<string,BSONObj> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
+        map<string,ShardKeyPattern> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
         map<string,ShardInfo*> _shards; // this will only have entries for things that have been looked at
 
         friend class Grid;
