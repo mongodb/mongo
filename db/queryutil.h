@@ -87,8 +87,6 @@ namespace mongo {
             }
             if ( j != other.fieldTypes_.end() )
                 return true;
-            out() << "sort_: " << sort_ << endl;
-            out() << "other.sort_: " << other.sort_ << endl;
             return sort_.woCompare( other.sort_ ) < 0;
         }
     private:
@@ -97,6 +95,8 @@ namespace mongo {
             sort_ = normalizeSort( sort );
         }
         BSONObj static normalizeSort( const BSONObj &spec ) {
+            if ( spec.isEmpty() )
+                return spec;
             int direction = ( spec.firstElement().number() >= 0 ) ? 1 : -1;
             BSONObjIterator i( spec );
             BSONObjBuilder b;

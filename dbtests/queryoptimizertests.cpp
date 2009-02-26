@@ -751,6 +751,11 @@ namespace QueryOptimizerTests {
                 TestOp newOriginal;
                 s2.runOp( newOriginal );
                 nPlans( 3 );
+
+                QueryPlanSet s3( ns(), BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) );
+                TestOp newerOriginal;
+                s3.runOp( newerOriginal );
+                nPlans( 3 );                
                 
                 runQuery();
                 nPlans( 1 );
@@ -790,9 +795,9 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ScanOnlyTestOp op;
                 s.runOp( op );
-                ASSERT( fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern() ) ) == 0 );
+                ASSERT( fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern( BSON( "b" << 1 ) ) ) ) == 0 );
                 
-                QueryPlanSet s2( ns(), BSON( "a" << 4 ), emptyObj );
+                QueryPlanSet s2( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 TestOp op2;
                 ASSERT( s2.runOp( op2 )->complete() );
             }
