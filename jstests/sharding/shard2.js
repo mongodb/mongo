@@ -128,4 +128,12 @@ function countCursor( c ){
 assert.eq( 6 , countCursor( db.foo.find()._exec() ) , "getMore 2" );
 assert.eq( 6 , countCursor( db.foo.find().limit(1)._exec() ) , "getMore 3" );
 
+// update
+person = db.foo.findOne( { num : 3 } );
+assert.eq( "bob" , person.name );
+person.name = "bob is gone";
+db.foo.update( { num : 3 } , person );
+person = db.foo.findOne( { num : 3 } );
+assert.eq( "bob is gone" , person.name );
+
 s.stop();
