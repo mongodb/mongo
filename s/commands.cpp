@@ -471,7 +471,7 @@ namespace mongo {
 
         
         // --------------- public commands ----------------
-
+        
         class IsDbGridCmd : public Command {
         public:
             virtual bool slaveOk() {
@@ -484,7 +484,7 @@ namespace mongo {
                 return true;
             }
         } isdbgrid;
-
+        
         class CmdIsMaster : public Command {
         public:
             virtual bool requiresAuth() { return false; }
@@ -498,7 +498,35 @@ namespace mongo {
                 return true;
             }
         } ismaster;
-
+        
+        class CmdShardGetPrevError : public Command {
+        public:
+            virtual bool requiresAuth() { return false; }
+            virtual bool slaveOk() {
+                return true;
+            }
+            CmdShardGetPrevError() : Command("getpreverror") { }
+            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                errmsg += "getpreverror not supported on mongos";
+                result << "ok" << 0;
+                return false;
+            }
+        } cmdGetPrevError;
+        
+        class CmdShardGetLastError : public Command {
+        public:
+            virtual bool requiresAuth() { return false; }
+            virtual bool slaveOk() {
+                return true;
+            }
+            CmdShardGetLastError() : Command("getplasterror") { }
+            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                errmsg += "getlasterror not working yet";
+                result << "ok" << 0;
+                return false;
+            }
+        } cmdGetLastError;
+        
     }
 
 } // namespace mongo

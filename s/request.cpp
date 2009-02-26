@@ -76,7 +76,7 @@ namespace mongo {
             
             if ( q.ntoreturn == 1 && 
                  strstr( q.ns , ".$cmd" ) &&
-                 strcmp( "$eval" , query.firstElement().fieldName() ) ){
+                 strcmp( "$eval" , query.firstElement().fieldName() ) == 0 ){
                 log() << "trying to eval: " << q.query << endl;
                 throw UserException( "eval not supported on partitioned databases yet" );
             }

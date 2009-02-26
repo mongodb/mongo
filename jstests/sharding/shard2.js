@@ -149,4 +149,9 @@ assert( person.name == "eliot2" );
 db.foo.remove( { _id : person._id } );
 assert( db.foo.findOne( { num : 3 } ) == null );
 
+// TODO: getLastError
+db.getLastError();
+db.getPrevError();
+
+
 s.stop();
