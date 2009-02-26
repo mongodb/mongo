@@ -229,17 +229,14 @@ namespace mongo {
         NamespaceDetails *d = nsdetails( ns );
         if ( !d )
             return;
-        
-        // Table scan plan
-        addPlan( PlanPtr( new QueryPlan( fbs_, order_ ) ), checkFirst );
 
-        // If table scan is optimal
-        if ( fbs_.nNontrivialBounds() == 0 && order_.isEmpty() )
+        // If table scan is optimal or natural order requested
+        if ( ( fbs_.nNontrivialBounds() == 0 && order_.isEmpty() ) ||
+            ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
+            // Table scan plan
+            addPlan( PlanPtr( new QueryPlan( fbs_, order_ ) ), checkFirst );
             return;
-        
-        // Only table scan can give natural order.
-        if ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) )
-            return;
+        }
         
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
@@ -253,6 +250,9 @@ namespace mongo {
         }
         for( PlanSet::iterator i = plans.begin(); i != plans.end(); ++i )
             addPlan( *i, checkFirst );
+
+        // Table scan plan
+        addPlan( PlanPtr( new QueryPlan( fbs_, order_ ) ), checkFirst );
     }
     
     shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
@@ -285,15 +285,8 @@ namespace mongo {
         }
 
         for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
-            QueryOp &op = **i;
-            try {
-                op.init();
-            } catch ( const std::exception &e ) {
-                op.setExceptionMessage( e.what() );
-            } catch ( ... ) {
-                op.setExceptionMessage( "Caught unknown exception" );
-            }
-            if ( op.complete() )
+            initOp( **i );
+            if ( (*i)->complete() )
                 return *i;
         }
         
@@ -303,14 +296,7 @@ namespace mongo {
             unsigned errCount = 0;
             for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                 QueryOp &op = **i;
-                try {
-                    if ( !op.error() )
-                        op.next();
-                } catch ( const std::exception &e ) {
-                    op.setExceptionMessage( e.what() );
-                } catch ( ... ) {
-                    op.setExceptionMessage( "Caught unknown exception" );
-                }
+                nextOp( op );
                 if ( op.complete() ) {
                     if ( plans_.mayRecordPlan_ && op.mayRecordPlan() )
                         op.qp().registerSelf( nScanned );
@@ -329,13 +315,7 @@ namespace mongo {
                     shared_ptr< QueryOp > op( op_.clone() );
                     op->setQueryPlan( i->get() );
                     ops.push_back( op );
-                    try {
-                        op->init();
-                    } catch ( const std::exception &e ) {
-                        op->setExceptionMessage( e.what() );
-                    } catch ( ... ) {
-                        op->setExceptionMessage( "Caught unknown exception" );
-                    }
+                    initOp( *op );
                     if ( op->complete() )
                         return op;
                 }                
@@ -346,5 +326,26 @@ namespace mongo {
         }
         return ops[ 0 ];
     }
+    
+    void QueryPlanSet::Runner::initOp( QueryOp &op ) {
+        try {
+            op.init();
+        } catch ( const std::exception &e ) {
+            op.setExceptionMessage( e.what() );
+        } catch ( ... ) {
+            op.setExceptionMessage( "Caught unknown exception" );
+        }        
+    }
 
+    void QueryPlanSet::Runner::nextOp( QueryOp &op ) {
+        try {
+            if ( !op.error() )
+                op.next();
+        } catch ( const std::exception &e ) {
+            op.setExceptionMessage( e.what() );
+        } catch ( ... ) {
+            op.setExceptionMessage( "Caught unknown exception" );
+        }        
+    }
+    
 } // namespace mongo
