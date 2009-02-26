@@ -518,7 +518,7 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "b_2" );
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), emptyObj );
-                ASSERT_EQUALS( 2, s.nPlans() );                
+                ASSERT_EQUALS( 1, s.nPlans() );                
             }
         };
 
@@ -782,10 +782,10 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
 
-                QueryPlanSet s( ns(), BSON( "a" << 4 ), emptyObj );
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ScanOnlyTestOp op;
                 s.runOp( op );
-                ASSERT( !fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern() ) ) );
+                ASSERT( fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern() ) ) == 0 );
                 
                 QueryPlanSet s2( ns(), BSON( "a" << 4 ), emptyObj );
                 TestOp op2;
@@ -849,13 +849,15 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "_id" << 1 ), "_id_1" );
-                BSONObj one = BSON( "_id" << 2 );
-                BSONObj two = BSON( "_id" << 1 );
+                BSONObj one = BSON( "_id" << 3 << "a" << 1 );
+                BSONObj two = BSON( "_id" << 2 << "a" << 1 );
+                BSONObj three = BSON( "_id" << 1 << "a" << -1 );
                 theDataFileMgr.insert( ns(), one );
                 theDataFileMgr.insert( ns(), two );
+                theDataFileMgr.insert( ns(), three );
                 BSONObj id;
-                deleteObjects( ns(), BSON( "_id" << GT << 0 ), true, &id );
-                ASSERT_EQUALS( 2, id.getIntField( "_id" ) );
+                deleteObjects( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ), true, &id );
+                ASSERT_EQUALS( 3, id.getIntField( "_id" ) );
             }
         };
 
