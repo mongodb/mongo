@@ -50,8 +50,8 @@ namespace mongo {
         const char *ns() const { return fbs_.ns(); }
         BSONObj query() const { return fbs_.query(); }
         const FieldBound &bound( const char *fieldName ) const { return fbs_.bound( fieldName ); }
-        void registerSelf() const {
-            registerIndexForPattern( ns(), fbs_.pattern(), indexKey() );
+        void registerSelf( int nScanned ) const {
+            registerIndexForPattern( ns(), fbs_.pattern(), indexKey(), nScanned );
         }
     private:
         const FieldBoundSet &fbs_;
@@ -108,6 +108,14 @@ namespace mongo {
         }
         const FieldBoundSet &fbs() const { return fbs_; }
     private:
+        void addOtherPlans( bool checkFirst );
+        typedef boost::shared_ptr< QueryPlan > PlanPtr;
+        typedef vector< PlanPtr > PlanSet;
+        void addPlan( PlanPtr plan, bool checkFirst ) {
+            if ( checkFirst && plan->indexKey().woCompare( plans_[ 0 ]->indexKey() ) == 0 )
+                return;
+            plans_.push_back( plan );
+        }
         void init();
         struct Runner {
             Runner( QueryPlanSet &plans, QueryOp &op );
@@ -116,13 +124,12 @@ namespace mongo {
             QueryPlanSet &plans_;
         };
         FieldBoundSet fbs_;
-        typedef boost::shared_ptr< QueryPlan > PlanPtr;
-        typedef vector< PlanPtr > PlanSet;
         PlanSet plans_;
         bool mayRecordPlan_;
         bool usingPrerecordedPlan_;
         BSONObj hint_;
         BSONObj order_;
+        int oldNScanned_;
     };
 
 } // namespace mongo

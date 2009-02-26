@@ -146,7 +146,8 @@ namespace mongo {
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
     hint_( emptyObj ),
-    order_( order.copy() ) {
+    order_( order.copy() ),
+    oldNScanned_( 0 ) {
         if ( hint && !hint->eoo() ) {
             BSONObjBuilder b;
             b.append( *hint );
@@ -156,6 +157,7 @@ namespace mongo {
     }
     
     void QueryPlanSet::init() {
+        plans_.clear();
         mayRecordPlan_ = true;
         usingPrerecordedPlan_ = false;
         
@@ -202,6 +204,8 @@ namespace mongo {
         BSONObj bestIndex = indexForPattern( ns, fbs_.pattern() );
         if ( !bestIndex.isEmpty() ) {
             usingPrerecordedPlan_ = true;
+            mayRecordPlan_ = false;
+            oldNScanned_ = nScannedForPattern( ns, fbs_.pattern() );
             if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
                 // Table scan plan
                 plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
@@ -217,8 +221,17 @@ namespace mongo {
             assert( false );
         }
         
+        addOtherPlans( false );
+    }
+    
+    void QueryPlanSet::addOtherPlans( bool checkFirst ) {
+        const char *ns = fbs_.ns();
+        NamespaceDetails *d = nsdetails( ns );
+        if ( !d )
+            return;
+        
         // Table scan plan
-        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
+        addPlan( PlanPtr( new QueryPlan( fbs_, order_ ) ), checkFirst );
 
         // If table scan is optimal
         if ( fbs_.nNontrivialBounds() == 0 && order_.isEmpty() )
@@ -232,23 +245,24 @@ namespace mongo {
         for( int i = 0; i < d->nIndexes; ++i ) {
             PlanPtr p( new QueryPlan( fbs_, order_, &d->indexes[ i ] ) );
             if ( p->optimal() ) {
-                plans_.push_back( p );
+                addPlan( p, checkFirst );
                 return;
             } else if ( !p->unhelpful() ) {
                 plans.push_back( p );
             }
         }
         for( PlanSet::iterator i = plans.begin(); i != plans.end(); ++i )
-            plans_.push_back( *i );
+            addPlan( *i, checkFirst );
     }
     
     shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
         if ( usingPrerecordedPlan_ ) {
             Runner r( *this, op );
             shared_ptr< QueryOp > res = r.run();
-            if ( res->complete() )
+            // plans_.size() > 1 if addOtherPlans was called in Runner::run().
+            if ( res->complete() || plans_.size() > 1 )
                 return res;
-            registerIndexForPattern( fbs_.ns(), fbs_.pattern(), BSONObj() );
+            registerIndexForPattern( fbs_.ns(), fbs_.pattern(), BSONObj(), 0 );
             init();
         }
         Runner r( *this, op );
@@ -283,7 +297,9 @@ namespace mongo {
                 return *i;
         }
         
+        int nScanned = 0;
         while( 1 ) {
+            ++nScanned;
             unsigned errCount = 0;
             for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                 QueryOp &op = **i;
@@ -297,7 +313,7 @@ namespace mongo {
                 }
                 if ( op.complete() ) {
                     if ( plans_.mayRecordPlan_ && op.mayRecordPlan() )
-                        op.qp().registerSelf();
+                        op.qp().registerSelf( nScanned );
                     return *i;
                 }
                 if ( op.error() )
@@ -305,6 +321,28 @@ namespace mongo {
             }
             if ( errCount == ops.size() )
                 break;
+            if ( plans_.usingPrerecordedPlan_ && nScanned > plans_.oldNScanned_ * 10 ) {
+                plans_.addOtherPlans( true );
+                PlanSet::iterator i = plans_.plans_.begin();
+                ++i;
+                for( ; i != plans_.plans_.end(); ++i ) {
+                    shared_ptr< QueryOp > op( op_.clone() );
+                    op->setQueryPlan( i->get() );
+                    ops.push_back( op );
+                    try {
+                        op->init();
+                    } catch ( const std::exception &e ) {
+                        op->setExceptionMessage( e.what() );
+                    } catch ( ... ) {
+                        op->setExceptionMessage( "Caught unknown exception" );
+                    }
+                    if ( op->complete() )
+                        return op;
+                }                
+                plans_.mayRecordPlan_ = true;
+                plans_.usingPrerecordedPlan_ = false;
+                // TODO Don't write wrong nScanned if we complete on another plan.
+            }
         }
         return ops[ 0 ];
     }

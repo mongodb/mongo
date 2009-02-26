@@ -26,7 +26,8 @@ namespace mongo {
     void registerWriteOp( const string &ns );
     void clearQueryCache( const string &ns );
     BSONObj indexForPattern( const string &ns, const QueryPattern &pattern );
-    void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey );
+    int nScannedForPattern( const string &ns, const QueryPattern &pattern );
+    void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey, int nScanned );
     
     class FieldBound {
     public:
