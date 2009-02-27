@@ -80,8 +80,10 @@ namespace mongo {
         CodeWScope=15,
         /** 32 bit signed integer */
         NumberInt = 16,
+        /** Updated to a Date with value next OpTime on insert */
+        CurrentTime = 17,
         /** max type that is not MaxKey */
-        JSTypeMax=16,
+        JSTypeMax=17,
         /** larger than all other types */
         MaxKey=127
     };
@@ -202,7 +204,7 @@ namespace mongo {
         int size( int maxLen = -1 ) const;
 
         /** Wrap this element up as a singleton object. */
-        BSONObj wrap();
+        BSONObj wrap() const;
 
         /** field name of the element.  e.g., for 
            name : "Joe"
@@ -243,11 +245,6 @@ namespace mongo {
         /** True if element is of a numeric type. */
         bool isNumber() const {
             return type() == NumberDouble || type() == NumberInt;
-        }
-        /** Change the value, in place, of the number. */
-        void setNumber(double d) {
-            if ( type() == NumberDouble ) *((double *) value()) = d;
-            else if ( type() == NumberInt ) *((int *) value()) = (int) d;
         }
         /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0. */
         double number() const {
@@ -310,14 +307,14 @@ namespace mongo {
         BSONObj codeWScopeObject() const;
 
         /** Get binary data.  Element must be of type BinData */
-        const char *binData(int& len) { 
+        const char *binData(int& len) const { 
             // BinData: <int len> <byte subtype> <byte[len] data>
             assert( type() == BinData );
             len = valuestrsize();
             return value() + 5;
         }
         
-        BinDataType binDataType(){
+        BinDataType binDataType() const {
             // BinData: <int len> <byte subtype> <byte[len] data>
             assert( type() == BinData );
             char c = (value() + 4)[0];
@@ -403,7 +400,7 @@ namespace mongo {
         int fieldNameSize;
         mutable int totalSize; /* caches the computed size */
     };
-
+    
     /* l and r MUST have same type when called: check that first. */
     int compareElementValues(const BSONElement& l, const BSONElement& r);
     int getGtLtOp(BSONElement& e);
@@ -466,11 +463,18 @@ namespace mongo {
         void init(const char *data, bool ifree) {
             details = new Details();
             details->_objdata = data;
-            details->_objsize = *((int*) data);
+            details->_objsize = *(reinterpret_cast<const int*>(data));
             massert( "BSONObj size spec too small", details->_objsize > 0 );
             massert( "BSONObj size spec too large", details->_objsize <= 1024 * 1024 * 16 );
             details->refCount = ifree ? 1 : -1;
         }
+        void cleanup() {
+            if ( details ) {
+                if ( --details->refCount <= 0 )
+                    delete details;
+                details = 0;
+            }            
+        }        
     public:
         /** Construct a BSONObj from data in the proper format. 
             @param ifree true if the BSONObj should free() the msgdata when 
@@ -485,17 +489,9 @@ namespace mongo {
         BSONObj() : details(0) { }
         ~BSONObj() { cleanup(); }
 
-        void cleanup() {
-            if ( details ) {
-                if ( --details->refCount <= 0 )
-                    delete details;
-                details = 0;
-            }            
-        }
-        
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
-            b.append((void *) objdata(), objsize());
+            b.append(reinterpret_cast<const void *>( objdata() ), objsize());
         }
 
         /** Readable representation of a BSON object in an extended JSON-style notation. 
@@ -962,6 +958,13 @@ namespace mongo {
             b.append( fieldName );
         }
         
+        // Append a CurrentTime field -- will be updated to next OpTime on db insert.
+        void appendCurrentTime( const char *fieldName ) {
+            b.append( (char) CurrentTime );
+            b.append( fieldName );
+            b.append( (unsigned long long) 0 );
+        }
+        
         /* Deprecated (but supported) */
         void appendDBRef( const char *fieldName, const char *ns, const OID &oid ) {
             b.append( (char) DBRef );
@@ -1228,7 +1231,7 @@ namespace mongo {
     }
 
 // wrap this element up as a singleton object.
-    inline BSONObj BSONElement::wrap() {
+    inline BSONObj BSONElement::wrap() const {
         BSONObjBuilder b;
         b.append(*this);
         return b.obj();

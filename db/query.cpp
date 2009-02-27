@@ -19,7 +19,7 @@
 #include "stdafx.h"
 #include "query.h"
 #include "pdfile.h"
-#include "jsobj.h"
+#include "jsobjmanipulator.h"
 #include "../util/builder.h"
 #include <time.h>
 #include "introspect.h"
@@ -190,11 +190,11 @@ namespace mongo {
             BSONElement e = obj.getFieldDotted(m.fieldName);
             if ( e.isNumber() ) {
                 if ( m.op == INC ) {
-                    e.setNumber( e.number() + m.getn() );
+                    BSONElementManipulator( e ).setNumber( e.number() + m.getn() );
                     m.setn( e.number() );
                     // *m.n = e.number() += *m.n;
                 } else {
-                    e.setNumber( m.getn() ); // $set or $SET
+                    BSONElementManipulator( e ).setNumber( m.getn() ); // $set or $SET
                 }
             }
         }

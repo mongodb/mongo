@@ -18,7 +18,9 @@
  */
 
 #include "../db/jsobj.h"
+#include "../db/jsobjmanipulator.h"
 #include "../db/json.h"
+#include "../db/repl.h"
 
 #include "dbtests.h"
 
@@ -123,6 +125,33 @@ namespace JsobjTests {
             void run() {
                 ASSERT( BSON( "a" << 1 ).woSortOrder( BSON( "a" << 2 ), BSON( "b" << 1 << "a" << 1 ) ) < 0 );
                 ASSERT( fromjson( "{a:null}" ).woSortOrder( BSON( "b" << 1 ), BSON( "a" << 1 ) ) == 0 );
+            }
+        };
+        
+        class CurrentTimeTest : public Base {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.appendCurrentTime( "a" );
+                BSONObj o = b.done();
+                o.toString();
+                ASSERT( o.valid() );
+                ASSERT_EQUALS( CurrentTime, o.getField( "a" ).type() );
+                BSONObjIterator i( o );
+                ASSERT( i.more() );
+                BSONElement e = i.next();
+                ASSERT_EQUALS( CurrentTime, e.type() );
+                ASSERT( i.more() );
+                e = i.next();
+                ASSERT( e.eoo() );
+                
+                OpTime before = OpTime::now();
+                BSONElementManipulator( o.firstElement() ).initCurrentTime();
+                OpTime after = OpTime::now();
+                
+                OpTime test = OpTime( o.firstElement().date() );
+                ASSERT( before < test );
+                ASSERT( test < after );
             }
         };
         
@@ -543,6 +572,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareOrdered >();
             add< BSONObjTests::WoCompareDifferentLength >();
             add< BSONObjTests::WoSortOrder >();
+            add< BSONObjTests::CurrentTimeTest >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();

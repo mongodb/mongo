@@ -76,7 +76,7 @@ namespace mongo {
             append<double>(j);
         }
 
-        void append(void *src, int len) {
+        void append(const void *src, int len) {
             memcpy(grow(len), src, len);
         }
 

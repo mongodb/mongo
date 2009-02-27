@@ -28,7 +28,7 @@
 #include "../stdafx.h"
 #include "../util/mmap.h"
 #include "storage.h"
-#include "jsobj.h"
+#include "jsobjmanipulator.h"
 #include "namespace.h"
 
 // see version, versionMinor, below.

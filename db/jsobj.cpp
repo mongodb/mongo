@@ -23,6 +23,7 @@
 #include <limits>
 #include "../util/unittest.h"
 #include "json.h"
+#include "repl.h"
 
 namespace mongo {
 
@@ -330,6 +331,7 @@ namespace mongo {
         case NumberInt:
             x = 4;
             break;
+        case CurrentTime:
         case Date:
         case NumberDouble:
             x = 8;

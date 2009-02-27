@@ -264,7 +264,42 @@ namespace PdfileTests {
         };
 
     } // namespace ScanCapped
-
+    
+    namespace Insert {
+        class Base {
+        public:
+            Base() {
+                setClient( ns() );
+            }
+            virtual ~Base() {
+                if ( !nsd() )
+                    return;
+                string n( ns() );
+                dropNS( n );
+            }
+        protected:
+            static const char *ns() {
+                return "pdfiletests.Insert";
+            }
+            static NamespaceDetails *nsd() {
+                return nsdetails( ns() );
+            }
+        private:
+            dblock lk_;
+        };
+        
+        class UpdateDate : public Base {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.appendCurrentTime( "a" );
+                BSONObj o = b.done();
+                theDataFileMgr.insert( ns(), o );
+                ASSERT_EQUALS( Date, o.getField( "a" ).type() );
+            }
+        };
+    } // namespace Insert
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -281,6 +316,7 @@ namespace PdfileTests {
             add< ScanCapped::AloneInExtent >();
             add< ScanCapped::FirstInExtent >();
             add< ScanCapped::LastInExtent >();
+            add< Insert::UpdateDate >();
         }
     };
 
