@@ -286,7 +286,7 @@ namespace mongo {
         averageValues(b, lt, l, r);
     }
 
-    BSONObj ShardKeyPattern::middle( BSONObj &lo , BSONObj &ro ) {
+    BSONObj ShardKeyPattern::middle( const BSONObj &lo , const BSONObj &ro ) {
         BSONObj L = extractKey(lo);
         BSONObj R = extractKey(ro);
         BSONElement l = L.firstElement();
@@ -503,6 +503,10 @@ namespace mongo {
 //            cout << "\n" << min.toString() << " " << m.toString() << endl;
 //            cout << p << endl;
         }
+        void testGlobal(){
+            ShardKeyPattern k( fromjson( "{num:1}" ) );
+            cout << "global middle:" << k.middle( k.globalMin() , k.globalMax() ) << endl;
+        }
         void div(const char *a, const char *res) { 
             OID A,RES;
             A.init(a);
@@ -582,9 +586,10 @@ namespace mongo {
             assert( k.canOrder( fromjson("{key:1}") ) == 1 );
             assert( k.canOrder( fromjson("{zz:1}") ) == 0 );
             assert( k.canOrder( fromjson("{key:-1}") ) == -1 );
-
+            
             testCanOrder();
             testMiddle();
+            testGlobal();
             getfilt();
             rfq();
             // add middle multitype tests

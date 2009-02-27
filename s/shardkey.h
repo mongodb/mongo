@@ -47,7 +47,7 @@ namespace mongo {
            return the key central between min and max
            note: min and max could cross type boundaries
          */
-        BSONObj middle( BSONObj & min , BSONObj & max );
+        BSONObj middle( const BSONObj & min , const BSONObj & max );
 
         /** compare shard keys from the objects specified
            l < r negative

@@ -44,10 +44,13 @@ namespace mongo {
     Shard * Shard::split(){
         return split( _manager->getShardKey().middle( getMin() , getMax() ) );
     }
-
+    
     Shard * Shard::split( const BSONObj& m ){
         uassert( "can't split as shard that doesn't have a manager" , _manager );
         
+        log(1) << " before split on: "  << m << "\n"
+               << "\t self  : " << toString() << endl;
+
         Shard * s = new Shard( _manager );
         s->_ns = _ns;
         s->_server = _server;
@@ -61,6 +64,10 @@ namespace mongo {
         
         _max = m.getOwned(); 
         
+        log(1) << " after split:\n" 
+               << "\t left : " << toString() << "\n" 
+               << "\t right: "<< s->toString() << endl;
+
         return s;
     }
     
