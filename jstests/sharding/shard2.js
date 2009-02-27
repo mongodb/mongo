@@ -4,7 +4,7 @@
 * test basic sharding
 */
 
-s = new ShardingTest( "shard2" , 2 );
+s = new ShardingTest( "shard2" , 2 , 5 );
 
 db = s.getDB( "test" );
 
@@ -12,7 +12,7 @@ s.adminCommand( { partition : "test" } );
 s.adminCommand( { shard : "test.foo" , key : { num : 1 } } );
 assert.eq( 1 , s.config.shard.count()  , "sanity check 1" );
 
-s.adminCommand( { split : "test.foo" , find : { num : 0 } } );
+s.adminCommand( { split : "test.foo" , middle : { num : 0 } } );
 assert.eq( 2 , s.config.shard.count() , "should be 2 shards" );
 shards = s.config.shard.find().toArray();
 assert.eq( shards[0].server , shards[1].server , "server should be the same after a split" );
@@ -25,7 +25,7 @@ db.foo.save( { num : -1 , name : "joe" } );
 s.adminCommand( "connpoolsync" );
 
 assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() , "not right directly to db A" );
-assert.eq( 3 , db.foo.find().length() );
+assert.eq( 3 , db.foo.find().length() , "not right on shard" );
 
 primary = s.getServer( "test" ).getDB( "test" );
 seconday = s.getOther( primary ).getDB( "test" );
@@ -41,8 +41,8 @@ assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { n
 assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
 
 s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : seconday.getMongo().name } );
-assert.eq( 1 , primary.foo.find().length() );
-assert.eq( 2 , seconday.foo.find().length() );
+assert.eq( 2 , seconday.foo.find().length() , "seconday should have 2 after move shard" );
+assert.eq( 1 , primary.foo.find().length() , "primary should only have 1 after move shard" );
 
 assert.eq( 2 , s.config.shard.count() , "still should have 2 shards" );
 shards = s.config.shard.find().toArray();
