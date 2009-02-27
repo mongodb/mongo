@@ -40,7 +40,7 @@ namespace mongo {
 
         virtual const char * getNS() = 0;
         virtual void serialize(BSONObjBuilder& to) = 0;
-        virtual void unserialize(BSONObj& from) = 0;
+        virtual void unserialize(const BSONObj& from) = 0;
 
         /** Define this as you see fit if you are using the default conn() implementation. */
         static string defaultServer;

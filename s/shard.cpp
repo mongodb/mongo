@@ -82,7 +82,7 @@ namespace mongo {
         to << "server" << _server;
     }
 
-    void Shard::unserialize(BSONObj& from){
+    void Shard::unserialize(const BSONObj& from){
         _ns = from.getStringField( "ns" );
         _min = from.getObjectField( "min" ).getOwned();
         _max = from.getObjectField( "max" ).getOwned();

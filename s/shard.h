@@ -72,7 +72,7 @@ namespace mongo {
 
         virtual const char * getNS(){ return "config.shard"; }
         virtual void serialize(BSONObjBuilder& to);
-        virtual void unserialize(BSONObj& from);
+        virtual void unserialize(const BSONObj& from);
         virtual string modelServer();
 
     protected:

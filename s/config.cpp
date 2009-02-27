@@ -97,7 +97,7 @@ namespace mongo {
         }
     }
     
-    void DBConfig::unserialize(BSONObj& from){
+    void DBConfig::unserialize(const BSONObj& from){
         _name = from.getStringField("name");
         _partitioned = from.getBoolField("partitioned");
         _primary = from.getStringField("primary");
