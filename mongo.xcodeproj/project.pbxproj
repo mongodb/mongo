@@ -20,6 +20,7 @@
 		9302D99F0F30AB8C00DFA4EF /* ShellUtils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ShellUtils.cpp; sourceTree = "<group>"; };
 		9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ShellUtils.h; sourceTree = "<group>"; };
 		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
+		931A027A0F58AA4400147C0E /* jsobjmanipulator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jsobjmanipulator.h; sourceTree = "<group>"; };
 		932AC3EB0F4A5B34005BF8B0 /* queryoptimizertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = queryoptimizertests.cpp; sourceTree = "<group>"; };
 		932AC4310F4A5E9D005BF8B0 /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
 		933A4D130F55A68600145C4B /* authTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = authTest.cpp; sourceTree = "<group>"; };
@@ -91,15 +92,6 @@
 		934223C70EF16DB400608550 /* scanandorder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = scanandorder.h; sourceTree = "<group>"; };
 		934223C80EF16DB400608550 /* storage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = storage.h; sourceTree = "<group>"; };
 		934223C90EF16DB400608550 /* tests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tests.cpp; sourceTree = "<group>"; };
-		934DD8690EFAD21900459CC1 /* dbgrid.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbgrid.cpp; sourceTree = "<group>"; };
-		934DD86B0EFAD21900459CC1 /* dbgrid_commands.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbgrid_commands.cpp; sourceTree = "<group>"; };
-		934DD86C0EFAD21900459CC1 /* gridconfig.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = gridconfig.cpp; sourceTree = "<group>"; };
-		934DD86D0EFAD21900459CC1 /* gridconfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gridconfig.h; sourceTree = "<group>"; };
-		934DD86E0EFAD21900459CC1 /* griddatabase.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = griddatabase.cpp; sourceTree = "<group>"; };
-		934DD86F0EFAD21900459CC1 /* griddatabase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = griddatabase.h; sourceTree = "<group>"; };
-		934DD8700EFAD21900459CC1 /* request.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = request.cpp; sourceTree = "<group>"; };
-		934DD8710EFAD21900459CC1 /* shard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = shard.cpp; sourceTree = "<group>"; };
-		934DD8720EFAD21900459CC1 /* shard.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = shard.h; sourceTree = "<group>"; };
 		934DD87C0EFAD23B00459CC1 /* background.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = background.cpp; sourceTree = "<group>"; };
 		934DD87D0EFAD23B00459CC1 /* background.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = background.h; sourceTree = "<group>"; };
 		934DD87F0EFAD23B00459CC1 /* builder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = builder.h; sourceTree = "<group>"; };
@@ -266,7 +258,6 @@
 				9302D9920F30AB8C00DFA4EF /* shell */,
 				9342232A0EF16D4F00608550 /* client */,
 				9342238F0EF16DB400608550 /* db */,
-				934DD8680EFAD21900459CC1 /* dbgrid */,
 				934223850EF16D7000608550 /* dbtests */,
 				934DD87B0EFAD23B00459CC1 /* util */,
 			);
@@ -363,6 +354,7 @@
 		9342238F0EF16DB400608550 /* db */ = {
 			isa = PBXGroup;
 			children = (
+				931A027A0F58AA4400147C0E /* jsobjmanipulator.h */,
 				938A7A430F54873600FB7A07 /* concurrency.h */,
 				938A7A440F54873600FB7A07 /* queryutil.cpp */,
 				938A7A450F54873600FB7A07 /* queryutil.h */,
@@ -435,22 +427,6 @@
 				934223C90EF16DB400608550 /* tests.cpp */,
 			);
 			path = db;
-			sourceTree = "<group>";
-		};
-		934DD8680EFAD21900459CC1 /* dbgrid */ = {
-			isa = PBXGroup;
-			children = (
-				934DD8690EFAD21900459CC1 /* dbgrid.cpp */,
-				934DD86B0EFAD21900459CC1 /* dbgrid_commands.cpp */,
-				934DD86C0EFAD21900459CC1 /* gridconfig.cpp */,
-				934DD86D0EFAD21900459CC1 /* gridconfig.h */,
-				934DD86E0EFAD21900459CC1 /* griddatabase.cpp */,
-				934DD86F0EFAD21900459CC1 /* griddatabase.h */,
-				934DD8700EFAD21900459CC1 /* request.cpp */,
-				934DD8710EFAD21900459CC1 /* shard.cpp */,
-				934DD8720EFAD21900459CC1 /* shard.h */,
-			);
-			path = dbgrid;
 			sourceTree = "<group>";
 		};
 		934DD87B0EFAD23B00459CC1 /* util */ = {

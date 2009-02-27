@@ -128,30 +128,33 @@ namespace JsobjTests {
             }
         };
         
-        class CurrentTimeTest : public Base {
+        class TimestampTest : public Base {
         public:
             void run() {
                 BSONObjBuilder b;
-                b.appendCurrentTime( "a" );
+                b.appendTimestamp( "a" );
                 BSONObj o = b.done();
                 o.toString();
                 ASSERT( o.valid() );
-                ASSERT_EQUALS( CurrentTime, o.getField( "a" ).type() );
+                ASSERT_EQUALS( Timestamp, o.getField( "a" ).type() );
                 BSONObjIterator i( o );
                 ASSERT( i.more() );
                 BSONElement e = i.next();
-                ASSERT_EQUALS( CurrentTime, e.type() );
+                ASSERT_EQUALS( Timestamp, e.type() );
                 ASSERT( i.more() );
                 e = i.next();
                 ASSERT( e.eoo() );
                 
                 OpTime before = OpTime::now();
-                BSONElementManipulator( o.firstElement() ).initCurrentTime();
+                BSONElementManipulator( o.firstElement() ).initTimestamp();
                 OpTime after = OpTime::now();
                 
                 OpTime test = OpTime( o.firstElement().date() );
-                ASSERT( before < test );
-                ASSERT( test < after );
+                ASSERT( before < test && test < after );
+                
+                BSONElementManipulator( o.firstElement() ).initTimestamp();
+                test = OpTime( o.firstElement().date() );
+                ASSERT( before < test && test < after );  
             }
         };
         
@@ -572,7 +575,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareOrdered >();
             add< BSONObjTests::WoCompareDifferentLength >();
             add< BSONObjTests::WoSortOrder >();
-            add< BSONObjTests::CurrentTimeTest >();
+            add< BSONObjTests::TimestampTest >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();

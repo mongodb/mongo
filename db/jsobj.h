@@ -81,7 +81,7 @@ namespace mongo {
         /** 32 bit signed integer */
         NumberInt = 16,
         /** Updated to a Date with value next OpTime on insert */
-        CurrentTime = 17,
+        Timestamp = 17,
         /** max type that is not MaxKey */
         JSTypeMax=17,
         /** larger than all other types */
@@ -958,9 +958,9 @@ namespace mongo {
             b.append( fieldName );
         }
         
-        // Append a CurrentTime field -- will be updated to next OpTime on db insert.
-        void appendCurrentTime( const char *fieldName ) {
-            b.append( (char) CurrentTime );
+        // Append a Timestamp field -- will be updated to next OpTime on db insert.
+        void appendTimestamp( const char *fieldName ) {
+            b.append( (char) Timestamp );
             b.append( fieldName );
             b.append( (unsigned long long) 0 );
         }

@@ -292,10 +292,11 @@ namespace PdfileTests {
         public:
             void run() {
                 BSONObjBuilder b;
-                b.appendCurrentTime( "a" );
+                b.appendTimestamp( "a" );
                 BSONObj o = b.done();
+                ASSERT( 0 == o.getField( "a" ).date() );
                 theDataFileMgr.insert( ns(), o );
-                ASSERT_EQUALS( Date, o.getField( "a" ).type() );
+                ASSERT( 0 != o.getField( "a" ).date() );
             }
         };
     } // namespace Insert

@@ -331,7 +331,7 @@ namespace mongo {
         case NumberInt:
             x = 4;
             break;
-        case CurrentTime:
+        case Timestamp:
         case Date:
         case NumberDouble:
             x = 8;

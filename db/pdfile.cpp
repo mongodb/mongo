@@ -1152,7 +1152,7 @@ assert( !eloc.isNull() );
                 len += newId->size();
             }
             
-            // If have a CurrentTime field as the first or second element,
+            // If have a Timestamp field as the first or second element,
             // update it to a Date field set to OpTime::now().asDate().  The
             // replacement policy is a work in progress.
             BSONObjIterator i( io );
@@ -1160,8 +1160,8 @@ assert( !eloc.isNull() );
                 BSONElement e = i.next();
                 if ( e.eoo() )
                     break;
-                if ( e.type() == CurrentTime ) {
-                    BSONElementManipulator( e ).initCurrentTime();
+                if ( e.type() == Timestamp ) {
+                    BSONElementManipulator( e ).initTimestamp();
                     break;
                 }
             }

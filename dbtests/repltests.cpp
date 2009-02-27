@@ -199,26 +199,27 @@ namespace ReplTests {
             virtual void reset() const = 0;
         };
         
-        class InsertCurrentTime : public Base {
+        class InsertTimestamp : public Base {
         public:
-            InsertCurrentTime() : date_( ~0ULL ) {}
+            InsertTimestamp() : date_( ~0ULL ) {}
             void doIt() const {
                 BSONObjBuilder b;
                 b.append( "a", 1 );
-                b.appendCurrentTime( "t" );
+                b.appendTimestamp( "t" );
                 client()->insert( ns(), b.done() );
             }
             void check() const {
                 BSONObj o = client()->findOne( ns(), QUERY( "a" << 1 ) );
-                ASSERT_EQUALS( Date, o.getField( "t" ).type() );
+                ASSERT( 0 != o.getField( "t" ).date() );
                 if ( date_ != ~0ULL )
                     ASSERT_EQUALS( date_, o.getField( "t" ).date() );
+                date_ = o.getField( "t" ).date();
             }
             void reset() const {
                 deleteAll( ns() );
             }
         private:
-            unsigned long long date_;
+            mutable unsigned long long date_;
         };
         
         class InsertAutoId : public Base {
@@ -581,7 +582,7 @@ namespace ReplTests {
     public:
         All() {
             add< LogBasic >();
-            add< Idempotence::InsertCurrentTime >();
+            add< Idempotence::InsertTimestamp >();
             add< Idempotence::InsertAutoId >();
             add< Idempotence::InsertWithId >();
             add< Idempotence::InsertTwo >();
