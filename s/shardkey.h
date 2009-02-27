@@ -29,33 +29,32 @@ namespace mongo {
     */
     class ShardKeyPattern {
     public:
-        ShardKeyPattern( BSONObj fieldsAndOrder = emptyObj );
+        ShardKeyPattern( BSONObj p = emptyObj ) : pattern( p.getOwned() ) {
+            pattern.getFieldNames(patternfields);
+        }
         
         /**
            global min is the lowest possible value for this key
          */
-        void globalMin( BSONObjBuilder & b );
-        BSONObj globalMin(){ BSONObjBuilder b; globalMin( b ); return b.obj(); }
+        BSONObj globalMin() const;
 
         /**
            global max is the lowest possible value for this key
          */
-        void globalMax( BSONObjBuilder & b );
-        BSONObj globalMax(){ BSONObjBuilder b; globalMax( b ); return b.obj(); }
+        BSONObj globalMax() const;
 
         /**
            return the key central between min and max
            note: min and max could cross type boundaries
          */
-        void middle( BSONObjBuilder & b , BSONObj & min , BSONObj & max );
-        BSONObj middle( BSONObj & min , BSONObj & max ){ BSONObjBuilder b; middle( b , min , max ); return b.obj(); }
+        BSONObj middle( BSONObj & min , BSONObj & max );
 
         /** compare shard keys from the objects specified
            l < r negative
            l == r 0
            l > r positive
          */
-        int compare( const BSONObj& l , const BSONObj& r ) const;
+        int compare( const BSONObj& l , const BSONObj& r );
         
         /**
          * @return whether or not obj has all fields in this shard key pattern
@@ -78,7 +77,7 @@ namespace mongo {
          */
         bool relevantForQuery( const BSONObj& q , Shard * s );
         
-        //int ___numFields() const{ return _fieldsAndOrder.nFields(); }
+        //int ___numFields() const{ return pattern.nFields(); }
 
         /**
            Example
@@ -93,13 +92,19 @@ namespace mongo {
          */
         int canOrder( const BSONObj& sort );
 
-        BSONObj key() { return _fieldsAndOrder; }
+        BSONObj key() { return pattern; }
 
         string toString() const;
 
+        ShardKeyPattern(const ShardKeyPattern& p) { 
+            pattern = p.pattern;
+            patternfields = p.patternfields;
+        }
+
     private:
-        void _init();
-        BSONObj _fieldsAndOrder;
-        string _fieldName;
+        /* question: better to have patternfields precomputed or not?  depends on if we use copy contructor often. */
+        BSONObj pattern;
+        set<string> patternfields;
+        BSONObj extractKey(const BSONObj& from) const;
     };
 } 

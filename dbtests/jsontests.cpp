@@ -30,17 +30,14 @@ namespace JsonTests {
         class Empty {
         public:
             void run() {
-                BSONObjBuilder b;
-                ASSERT_EQUALS( "{}", b.done().jsonString( Strict ) );
+                ASSERT_EQUALS( "{}", emptyObj.jsonString( Strict ) );
             }
         };
         
         class SingleStringMember {
         public:
             void run() {
-                BSONObjBuilder b;
-                b.append( "a", "b" );
-                ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : \"b\" }", BSON( "a" << "b" ).jsonString( Strict ) );
             }
         };
         
@@ -205,12 +202,13 @@ namespace JsonTests {
                 memset( &oid, 0xff, 12 );
                 BSONObjBuilder b;
                 b.appendDBRef( "a", "namespace", oid );
+                BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
-                              b.done().jsonString( Strict ) );
+                              built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
-                              b.done().jsonString( JS ) );
+                              built.jsonString( JS ) );
                 ASSERT_EQUALS( "{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
-                              b.done().jsonString( TenGen ) );
+                              built.jsonString( TenGen ) );
             }
         };
         
@@ -233,10 +231,11 @@ namespace JsonTests {
                 memset( &oid, 0xff, 12 );
                 BSONObjBuilder b;
                 b.appendOID( "a", &oid );
+                BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : \"ffffffffffffffffffffffff\" }",
-                              b.done().jsonString( Strict ) );
+                              built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : ObjectId( \"ffffffffffffffffffffffff\" ) }",
-                              b.done().jsonString( TenGen ) );
+                              built.jsonString( TenGen ) );
             }
         };
         
@@ -278,9 +277,10 @@ namespace JsonTests {
             void run() {
                 BSONObjBuilder b;
                 b.appendDate( "a", 0 );
-                ASSERT_EQUALS( "{ \"a\" : { \"$date\" : 0 } }", b.done().jsonString( Strict ) );
-                ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", b.done().jsonString( TenGen ) );
-                ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", b.done().jsonString( JS ) );
+                BSONObj built = b.done();
+                ASSERT_EQUALS( "{ \"a\" : { \"$date\" : 0 } }", built.jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", built.jsonString( TenGen ) );
+                ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", built.jsonString( JS ) );
             }
         };
         
@@ -289,10 +289,11 @@ namespace JsonTests {
             void run() {
                 BSONObjBuilder b;
                 b.appendRegex( "a", "abc", "i" );
+                BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"abc\", \"$options\" : \"i\" } }",
-                              b.done().jsonString( Strict ) );
-                ASSERT_EQUALS( "{ \"a\" : /abc/i }", b.done().jsonString( TenGen ) );
-                ASSERT_EQUALS( "{ \"a\" : /abc/i }", b.done().jsonString( JS ) );
+                              built.jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : /abc/i }", built.jsonString( TenGen ) );
+                ASSERT_EQUALS( "{ \"a\" : /abc/i }", built.jsonString( JS ) );
             }
         };
         
@@ -301,10 +302,11 @@ namespace JsonTests {
             void run() {
                 BSONObjBuilder b;
                 b.appendRegex( "a", "/\"", "i" );
+                BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"\\/\\\"\", \"$options\" : \"i\" } }",
-                              b.done().jsonString( Strict ) );
-                ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", b.done().jsonString( TenGen ) );
-                ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", b.done().jsonString( JS ) );
+                              built.jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", built.jsonString( TenGen ) );
+                ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", built.jsonString( JS ) );
             }
         };
         
@@ -313,10 +315,11 @@ namespace JsonTests {
             void run() {
                 BSONObjBuilder b;
                 b.appendRegex( "a", "z", "abcgimx" );
+                BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"z\", \"$options\" : \"abcgimx\" } }",
-                              b.done().jsonString( Strict ) );
-                ASSERT_EQUALS( "{ \"a\" : /z/gim }", b.done().jsonString( TenGen ) );
-                ASSERT_EQUALS( "{ \"a\" : /z/gim }", b.done().jsonString( JS ) );
+                              built.jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : /z/gim }", built.jsonString( TenGen ) );
+                ASSERT_EQUALS( "{ \"a\" : /z/gim }", built.jsonString( JS ) );
             }
         };
         
@@ -574,8 +577,9 @@ namespace JsonTests {
                 u[ 5 ] = 0x80;
                 u[ 6 ] = 0;
                 b.append( "a", u );
-                ASSERT_EQUALS( string( u ), b.done().firstElement().valuestr() );
-                return b.obj();
+                BSONObj built = b.obj();
+                ASSERT_EQUALS( string( u ), built.firstElement().valuestr() );
+                return built;
             }
             virtual string json() const {
                 return "{ \"a\" : \"\\ua000\\uA000\" }";

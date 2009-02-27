@@ -35,7 +35,14 @@ namespace mongo {
         const FieldBound &operator&=( const FieldBound &other );
         BSONElement lower() const { return lower_; }
         BSONElement upper() const { return upper_; }
-        bool equality() const { return lower_.woCompare( upper_, false ) == 0; }
+        bool lowerInclusive() const { return lowerInclusive_; }
+        bool upperInclusive() const { return upperInclusive_; }
+        bool equality() const {
+            return
+            lower_.woCompare( upper_, false ) == 0 &&
+            upperInclusive_ &&
+            lowerInclusive_;
+        }
         bool nontrivial() const {
             return
             minKey.firstElement().woCompare( lower_, false ) != 0 ||
@@ -45,7 +52,9 @@ namespace mongo {
         BSONObj addObj( const BSONObj &o );
         string simpleRegexEnd( string regex );
         BSONElement lower_;
+        bool lowerInclusive_;
         BSONElement upper_;
+        bool upperInclusive_;
         vector< BSONObj > objData_;
     };
     

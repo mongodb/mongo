@@ -48,7 +48,9 @@ namespace mongo {
     
     FieldBound::FieldBound( const BSONElement &e ) :
     lower_( minKey.firstElement() ),
-    upper_( maxKey.firstElement() ) {
+    lowerInclusive_( true ),
+    upper_( maxKey.firstElement() ),
+    upperInclusive_( true ) {
         if ( e.eoo() )
             return;
         if ( e.type() == RegEx ) {
@@ -56,19 +58,22 @@ namespace mongo {
             if ( r ) {
                 lower_ = addObj( BSON( "" << r ) ).firstElement();
                 upper_ = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
+                upperInclusive_ = false;
             }            
             return;
         }
         switch( e.getGtLtOp() ) {
             case JSMatcher::Equality:
                 lower_ = e;
-                upper_ = e;   
+                upper_ = e;
                 break;
             case JSMatcher::LT:
+                upperInclusive_ = false;
             case JSMatcher::LTE:
                 upper_ = e;
                 break;
             case JSMatcher::GT:
+                lowerInclusive_ = false;
             case JSMatcher::GTE:
                 lower_ = e;
                 break;
@@ -95,10 +100,23 @@ namespace mongo {
     }
     
     const FieldBound &FieldBound::operator&=( const FieldBound &other ) {
-        if ( other.upper_.woCompare( upper_, false ) < 0 )
+        int cmp;
+        cmp = other.upper_.woCompare( upper_, false );
+        if ( cmp == 0 )
+            if ( !other.upperInclusive_ )
+                upperInclusive_ = false;
+        if ( cmp < 0 ) {
             upper_ = other.upper_;
-        if ( other.lower_.woCompare( lower_, false ) > 0 )
+            upperInclusive_ = other.upperInclusive_;
+        }
+        cmp = other.lower_.woCompare( lower_, false );
+        if ( cmp == 0 )
+            if ( !other.lowerInclusive_ )
+                lowerInclusive_ = false;
+        if ( cmp > 0 ) {
             lower_ = other.lower_;
+            lowerInclusive_ = other.lowerInclusive_;
+        }
         for( vector< BSONObj >::const_iterator i = other.objData_.begin(); i != other.objData_.end(); ++i )
             objData_.push_back( *i );
         return *this;
@@ -154,9 +172,9 @@ namespace mongo {
             else if ( i->second.nontrivial() ) {
                 BSONObjBuilder c;
                 if ( i->second.lower().type() != MinKey )
-                    c.appendAs( i->second.lower(), "$gte" );
+                    c.appendAs( i->second.lower(), i->second.lowerInclusive() ? "$gte" : "$gt" );
                 if ( i->second.upper().type() != MaxKey )
-                    c.appendAs( i->second.upper(), "$lte" );
+                    c.appendAs( i->second.upper(), i->second.upperInclusive() ? "$lte" : "$lt" );
                 b.append( i->first.c_str(), c.done() );
             }
         }

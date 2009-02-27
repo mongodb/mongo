@@ -75,7 +75,7 @@ namespace mongo {
         virtual void unserialize(const BSONObj& from);
         virtual string modelServer();
 
-    protected:
+    public:
         Shard( ShardManager * info );
         
     private:
