@@ -341,8 +341,6 @@ namespace mongo {
 #if !defined(NOJNI)
         if ( useJNI ) {
             JavaJS = new JavaJSImpl(appserverLoc);
-            // This takes a bit of time, so comenting
-//            javajstest();
         }
 #endif
       
