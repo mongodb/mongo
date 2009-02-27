@@ -116,7 +116,7 @@ namespace mongo {
         return Res;
     }
 
-    OID averageOIDs(OID& left, OID& right) { 
+    OID averageOIDs(const OID& left, const OID& right) { 
         // return add(left, div2(diff(right,left)));
         return left + div2(right-left);
     }
