@@ -133,6 +133,7 @@ namespace QueryTests {
         static bool error() {
             return !client_.getPrevError().getField( "err" ).isNull();
         }
+        DBDirectClient &client() const { return client_; }
     private:
         static DBDirectClient client_;
     };
@@ -191,6 +192,20 @@ namespace QueryTests {
         }        
     };
 
+    class BoundedKey : public ClientBase {
+    public:
+        void run() {
+            const char *ns = "querytests.BoundedKey";
+            insert( ns, BSON( "a" << 1 ) );
+            BSONObjBuilder a;
+            a.appendMaxKey( "$lt" );
+            BSONObj limit = a.done();
+            ASSERT( !client().findOne( ns, QUERY( "a" << limit ) ).isEmpty() );
+            client().ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT( !client().findOne( ns, QUERY( "a" << limit ).hint( BSON( "a" << 1 ) ) ).isEmpty() );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -204,6 +219,7 @@ namespace QueryTests {
             add< ModNotFirst >();
             add< ModDuplicateFieldSpec >();
             add< ModNonNumber >();
+            add< BoundedKey >();
         }
     };
     
