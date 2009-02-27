@@ -293,7 +293,7 @@ void mongoProgramThread() {
         assert( dup2( pipeEnds[ 1 ], STDOUT_FILENO ) != -1 );
         assert( dup2( pipeEnds[ 1 ], STDERR_FILENO ) != -1 );
         execvp( argv[ 0 ], argv );
-        assert( false );
+        assert( ( "Unable to start program", false ) );
     }
     
     int i = 0;

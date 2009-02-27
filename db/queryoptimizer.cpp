@@ -141,13 +141,14 @@ namespace mongo {
         return index_->keyPattern();
     }
     
-    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint ) :
+    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan ) :
     fbs_( ns, query ),
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
     hint_( emptyObj ),
     order_( order.copy() ),
-    oldNScanned_( 0 ) {
+    oldNScanned_( 0 ),
+    honorRecordedPlan_( honorRecordedPlan ) {
         if ( hint && !hint->eoo() ) {
             BSONObjBuilder b;
             b.append( *hint );
@@ -201,24 +202,26 @@ namespace mongo {
             uassert( "bad hint", false );
         }
         
-        BSONObj bestIndex = indexForPattern( ns, fbs_.pattern( order_ ) );
-        if ( !bestIndex.isEmpty() ) {
-            usingPrerecordedPlan_ = true;
-            mayRecordPlan_ = false;
-            oldNScanned_ = nScannedForPattern( ns, fbs_.pattern( order_ ) );
-            if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
-                // Table scan plan
-                plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
-                return;
-            }
-            for (int i = 0; i < d->nIndexes; i++ ) {
-                IndexDetails& ii = d->indexes[i];
-                if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
+        if ( honorRecordedPlan_ ) {
+            BSONObj bestIndex = indexForPattern( ns, fbs_.pattern( order_ ) );
+            if ( !bestIndex.isEmpty() ) {
+                usingPrerecordedPlan_ = true;
+                mayRecordPlan_ = false;
+                oldNScanned_ = nScannedForPattern( ns, fbs_.pattern( order_ ) );
+                if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
+                    // Table scan plan
+                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
                     return;
                 }
+                for (int i = 0; i < d->nIndexes; i++ ) {
+                    IndexDetails& ii = d->indexes[i];
+                    if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
+                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
+                        return;
+                    }
+                }
+                assert( false );
             }
-            assert( false );
         }
         
         addOtherPlans( false );
@@ -269,6 +272,17 @@ namespace mongo {
         return r.run();
     }
     
+    BSONObj QueryPlanSet::explain() const {
+        vector< BSONObj > arr;
+        for( PlanSet::const_iterator i = plans_.begin(); i != plans_.end(); ++i ) {
+            auto_ptr< Cursor > c = (*i)->newCursor();
+            arr.push_back( BSON( "cursor" << c->toString() << "startKey" << c->prettyStartKey() << "endKey" << c->prettyEndKey() ) );
+        }
+        BSONObjBuilder b;
+        b.append( "allPlans", arr );
+        return b.obj();
+    }
+    
     QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
     op_( op ),
     plans_( plans ) {
@@ -291,19 +305,24 @@ namespace mongo {
         }
         
         int nScanned = 0;
+        int nScannedBackup = 0;
         while( 1 ) {
             ++nScanned;
             unsigned errCount = 0;
+            bool first = true;
             for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                 QueryOp &op = **i;
                 nextOp( op );
                 if ( op.complete() ) {
+                    if ( first )
+                        nScanned += nScannedBackup;
                     if ( plans_.mayRecordPlan_ && op.mayRecordPlan() )
                         op.qp().registerSelf( nScanned );
                     return *i;
                 }
                 if ( op.error() )
                     ++errCount;
+                first = false;
             }
             if ( errCount == ops.size() )
                 break;
@@ -321,7 +340,8 @@ namespace mongo {
                 }                
                 plans_.mayRecordPlan_ = true;
                 plans_.usingPrerecordedPlan_ = false;
-                // TODO Don't write wrong nScanned if we complete on another plan.
+                nScannedBackup = nScanned;
+                nScanned = 0;
             }
         }
         return ops[ 0 ];

@@ -102,6 +102,72 @@ namespace mongo {
             cursorCache.remove( id );
         }
         
+        void receivedInsert( Request& r , DbMessage& d, ShardManager* manager ){
+            while ( d.moreJSObjs() ){
+                BSONObj o = d.nextJsObj();
+                if ( ! manager->hasShardKey( o ) ){
+                    log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
+                    throw UserException( "tried to insert object without shard key" );
+                }
+                
+                Shard& s = manager->findShard( o );
+                log(4) << "  server:" << s.getServer() << " " << o << endl;
+                insert( s.getServer() , r.getns() , o );
+            }            
+        }
+
+        void receivedUpdate( Request& r , DbMessage& d, ShardManager* manager ){
+            int flags = d.pullInt();
+            
+            BSONObj query = d.nextJsObj();
+            uassert( "invalid update" , d.moreJSObjs() );
+            BSONObj toupdate = d.nextJsObj();
+
+            
+            bool upsert = flags & 1;
+            if ( upsert && ! manager->hasShardKey( toupdate ) )
+                throw UserException( "can't upsert something without shard key" );
+
+            if ( ! manager->hasShardKey( query ) )
+                throw UserException( "can't do update with query that doesn't have the shard key" );
+            
+            if ( manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) )
+                throw UserException( "change would move shards!" );
+
+            Shard& s = manager->findShard( toupdate );
+            doWrite( dbUpdate , r , s.getServer() );
+        }
+        
+        void receivedDelete( Request& r , DbMessage& d, ShardManager* manager ){
+
+            int flags = d.pullInt();
+            bool justOne = flags & 1;
+            
+            uassert( "bad delete message" , d.moreJSObjs() );
+            BSONObj pattern = d.nextJsObj();
+            
+            if ( manager->hasShardKey( pattern ) ){
+                Shard& s = manager->findShard( pattern );
+                doWrite( dbDelete , r , s.getServer() );
+                return;
+            }
+            
+            if ( ! justOne && ! pattern.hasField( "_id" ) )
+                throw UserException( "can only delete with a non-shard key pattern if can delete as many as we find" );
+            
+            vector<Shard*> shards;
+            manager->getShardsForQuery( shards , pattern );
+            
+            set<string> seen;
+            for ( vector<Shard*>::iterator i=shards.begin(); i!=shards.end(); i++){
+                Shard * s = *i;
+                if ( seen.count( s->getServer() ) )
+                    continue;
+                seen.insert( s->getServer() );
+                doWrite( dbDelete , r , s->getServer() );
+            }
+        }
+        
         virtual void writeOp( int op , Request& r ){
             
             const char *ns = r.getns();
@@ -112,20 +178,13 @@ namespace mongo {
             assert( info );
             
             if ( op == dbInsert ){
-                while ( d.moreJSObjs() ){
-                    BSONObj o = d.nextJsObj();
-                    if ( ! info->hasShardKey( o ) ){
-                        log() << "tried to insert object without shard key: " << ns << "  " << o << endl;
-                        throw UserException( "tried to insert object without shard key" );
-                    }
-                    
-                    Shard& s = info->findShard( o );
-                    log(4) << "  server:" << s.getServer() << " " << o << endl;
-                    insert( s.getServer() , ns , o );
-                }
+                receivedInsert( r , d , info );
             }
             else if ( op == dbUpdate ){
-                throw UserException( "can't do update yet on sharded collection" );
+                receivedUpdate( r , d , info );    
+            }
+            else if ( op == dbDelete ){
+                receivedDelete( r , d , info );
             }
             else {
                 log() << "sharding can't do write op: " << op << endl;

@@ -909,7 +909,13 @@ namespace mongo {
                 uassert("bad query object", false);
             }
 
-            QueryPlanSet qps( ns, query, order, &hint );
+            BSONObj oldPlan;
+            if ( explain && hint.eoo() ) {
+                QueryPlanSet qps( ns, query, order );
+                if ( qps.usingPrerecordedPlan() )
+                    oldPlan = qps.explain();
+            }
+            QueryPlanSet qps( ns, query, order, &hint, !explain );
             DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, *filter, queryOptions );
             shared_ptr< DoQueryOp > o = qps.runOp( original );
             DoQueryOp &dqo = *o;
@@ -944,6 +950,10 @@ namespace mongo {
                 if ( dqo.scanAndOrderRequired() )
                     builder.append("scanAndOrder", true);
                 builder.append("millis", t.millis());
+                if ( !oldPlan.isEmpty() )
+                    builder.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
+                if ( hint.eoo() )
+                    builder.appendElements(qps.explain());
                 BSONObj obj = builder.done();
                 fillQueryResultFromObj(dqo.builder(), 0, obj);
                 n = 1;

@@ -88,7 +88,7 @@ namespace mongo {
 
         virtual const char * getNS(){ return "config.databases"; }
         virtual void serialize(BSONObjBuilder& to);
-        virtual void unserialize(BSONObj& from);
+        virtual void unserialize(const BSONObj& from);
         bool loadByName(const char *nm);
         
     protected:

@@ -99,7 +99,7 @@ namespace mongo {
     
     class QueryPlanSet {
     public:
-        QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint = 0 );
+        QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint = 0, bool honorRecordedPlan = true );
         int nPlans() const { return plans_.size(); }
         shared_ptr< QueryOp > runOp( QueryOp &op );
         template< class T >
@@ -107,6 +107,8 @@ namespace mongo {
             return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
         }
         const FieldBoundSet &fbs() const { return fbs_; }
+        BSONObj explain() const;
+        bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
     private:
         void addOtherPlans( bool checkFirst );
         typedef boost::shared_ptr< QueryPlan > PlanPtr;
@@ -132,6 +134,7 @@ namespace mongo {
         BSONObj hint_;
         BSONObj order_;
         int oldNScanned_;
+        bool honorRecordedPlan_;
     };
 
 } // namespace mongo
