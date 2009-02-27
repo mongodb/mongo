@@ -377,7 +377,11 @@ namespace mongo {
           _ regex
         */
 
-        return shard->contains(v);
+        return
+            compare( shard->getMin() , v ) <= 0 &&
+            compare( v, shard->getMax() ) < 0;
+
+//        return shard->contains(v);
     }
 
     /**
@@ -456,14 +460,12 @@ namespace mongo {
             assert( k.hasShardKey(x) );
         }
         void rfq() {
-            if( 1 ) 
-                return;// can't do, manager is null.
             ShardKeyPattern k( BSON( "key" << 1 ) );
             BSONObj q = BSON( "key" << 3 );
             Shard s(0);
             BSONObj z = fromjson("{ ns : \"alleyinsider.fs.chunks\" , min : {key:2} , max : {key:20} , server : \"localhost:30001\" }");
             s.unserialize(z);
-            cout << k.relevantForQuery(q, &s) << endl;
+            assert( k.relevantForQuery(q, &s) );
         }
         void getfilt() { 
             ShardKeyPattern k( BSON( "key" << 1 ) );
