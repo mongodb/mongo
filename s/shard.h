@@ -79,15 +79,19 @@ namespace mongo {
         Shard( ShardManager * info );
         
     private:
+        
+        void _markModified();
+
         ShardManager * _manager;
         
         string _ns;
         BSONObj _min;
         BSONObj _max;
         string _server;
-        
-        bool _modified;
+        unsigned long long _lastmod;
 
+        bool _modified;
+        
         void _split( BSONObj& middle );
 
         friend class ShardManager;

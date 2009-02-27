@@ -32,7 +32,7 @@ namespace mongo {
 
     void Shard::setServer( string s ){
         _server = s;
-        _modified = true;
+        _markModified();
     }
     
     bool Shard::contains( const BSONObj& obj ){
@@ -54,9 +54,9 @@ namespace mongo {
         s->_min = m.getOwned();
         s->_max = _max;
         
-        s->_modified = true;
-        _modified = true;
-
+        s->_markModified();
+        _markModified();
+        
         _manager->_shards.push_back( s );
         
         _max = m.getOwned(); 
@@ -74,19 +74,22 @@ namespace mongo {
     void Shard::getFilter( BSONObjBuilder& b ){
         _manager->_key.getFilter( b , _min , _max );
     }
-
+    
     void Shard::serialize(BSONObjBuilder& to){
         to << "ns" << _ns;
         to << "min" << _min;
         to << "max" << _max;
         to << "server" << _server;
+        if ( _lastmod )
+            to.appendDate( "lastmod" , _lastmod );
     }
-
+    
     void Shard::unserialize(const BSONObj& from){
         _ns = from.getStringField( "ns" );
         _min = from.getObjectField( "min" ).getOwned();
         _max = from.getObjectField( "max" ).getOwned();
         _server = from.getStringField( "server" );
+        _lastmod = from.hasField( "lastmod" ) ? from["lastmod"].date() : 0;
         
         uassert( "Shard needs a ns" , ! _ns.empty() );
         uassert( "Shard needs a server" , ! _ns.empty() );
@@ -100,6 +103,14 @@ namespace mongo {
         return configServer.modelServer();
     }
     
+    void Shard::_markModified(){
+        _modified = true;
+
+        unsigned long long t = time(0);
+        t *= 1000;
+        _lastmod = t;
+    }
+
     string Shard::toString() const {
         stringstream ss;
         ss << "shard  ns:" << _ns << " server: " << _server << " min: " << _min << " max: " << _max;
@@ -127,7 +138,7 @@ namespace mongo {
             s->_min = _key.globalMin();
             s->_max = _key.globalMax();
             s->_server = config->getPrimary();
-            s->_modified = true;
+            s->_markModified();
 
             _shards.push_back( s );
 
