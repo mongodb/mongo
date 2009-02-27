@@ -344,8 +344,8 @@ namespace mongo {
                 return number() == r.number() && r.isNumber();
             bool match= valuesize() == r.valuesize() &&
                         memcmp(value(),r.value(),valuesize()) == 0;
-            return match;
-            // todo: make "0" == 0.0, undefined==null
+            return match && type() == r.type();
+            // todo: make "0" == 0.0
         }
 
         /** Returns true if elements are equal. */
@@ -381,7 +381,7 @@ namespace mongo {
                 type() == Array ||
                 type() == CodeWScope;
         }
-        
+
     protected:
         // If maxLen is specified, don't scan more than maxLen bytes.
         BSONElement(const char *d, int maxLen = -1) : data(d) {
@@ -588,7 +588,7 @@ namespace mongo {
 			x and y elements of this object, if they are present.
            returns elements with original field names
         */
-        BSONObj extractFields(BSONObj &pattern);
+        BSONObj extractFields(const BSONObj &pattern) const;
 
         /** @return the raw data of the object */
         const char *objdata() const {
@@ -703,11 +703,13 @@ namespace mongo {
         */
         BSONObj copy() const;
 
+        /* make sure the data buffer is under the control of BSONObj's and not a remote buffer */
         BSONObj getOwned() const{
             if ( ! details || details->owned() )
                 return *this;
             return copy();
         }
+        bool isOwned() const { return details == 0 || details->owned(); }
 
         /** @return A hash code for the object */
         int hash() const {

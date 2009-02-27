@@ -302,7 +302,6 @@ namespace mongo {
     inline void our_debug_free(void *p) {
         unsigned *u = (unsigned *) p;
         u[0] = 0xEEEEEEEE;
-        u[1] = 0xEEEEEEEE;
         free(p);
     }
 #define free our_debug_free
