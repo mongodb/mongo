@@ -235,11 +235,11 @@ namespace mongo {
             return *value() ? true : false;
         }
 
-        /** Retrieve a java style data value from the element. 
+        /** Retrieve a java style date value from the element. 
             Ensure element is of type Date before calling.
         */
         unsigned long long date() const {
-            return *((unsigned long long*) value());
+            return *reinterpret_cast< const unsigned long long* >( value() );
         }
 
         /** True if element is of a numeric type. */
@@ -248,14 +248,14 @@ namespace mongo {
         }
         /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0. */
         double number() const {
-            if ( type() == NumberDouble ) return *((double *) value());
-            if ( type() == NumberInt ) return *((int *) value());
+            if ( type() == NumberDouble ) return *reinterpret_cast< const double* >( value() );
+            if ( type() == NumberInt ) return *reinterpret_cast< const int* >( value() );
             return 0;
         }
         /** Retrieve the object ID stored in the object. 
             You must ensure the element is of type jstOID first. */
-        OID& __oid() const {
-            return *((OID*) value());
+        const OID &__oid() const {
+            return *reinterpret_cast< const OID* >( value() );
         }
 
         /** True if element is null. */
@@ -266,12 +266,12 @@ namespace mongo {
         /** Size (length) of a string element.  
             You must assure of type String first.  */
         int valuestrsize() const {
-            return *((int *) value());
+            return *reinterpret_cast< const int* >( value() );
         }
 
         // for objects the size *includes* the size of the size field
         int objsize() const {
-            return *((int *) value());
+            return *reinterpret_cast< const int* >( value() );
         }
 
         /** Get a string's value.  Also gives you start of the real data for an embedded object. 

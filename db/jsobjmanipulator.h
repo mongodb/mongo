@@ -41,8 +41,8 @@ public:
     }
     /** Change the value, in place, of the number. */
     void setNumber(double d) {
-        if ( element_.type() == NumberDouble ) *( reinterpret_cast< double * >( value() ) )  = d;
-        else if ( element_.type() == NumberInt ) *( reinterpret_cast< int * >( value() ) ) = (int) d;
+        if ( element_.type() == NumberDouble ) *reinterpret_cast< double * >( value() )  = d;
+        else if ( element_.type() == NumberInt ) *reinterpret_cast< int * >( value() ) = (int) d;
     }    
 private:
     char *data() { return nonConst( element_.rawdata() ); }
