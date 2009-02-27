@@ -192,19 +192,6 @@ namespace mongo {
     class ShardObjUnitTest : public UnitTest {
     public:
         void runShard(){
-            Shard s(0);
-            {
-                BSONObj a = BSON( "ns" << "a.fs.chunks" << 
-                                  "min" << BSON( "num" << 0 ) <<
-                                  "max" << BSON( "num" << 100 ) <<
-                                  "server" << "localhost:30000" );
-                s.unserialize( a );
-                
-                BSONObjBuilder b;
-                s.serialize( b );
-                
-                assert( a.toString() == b.obj().toString() );
-            }
 
         }
         

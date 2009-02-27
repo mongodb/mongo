@@ -588,6 +588,9 @@ namespace mongo {
     }
 
     string BSONObj::jsonString( JsonStringFormat format ) const {
+
+        cout << "temp jsonstring: " << this->toString() << endl;
+
         if ( isEmpty() ) return "{}";
 
         stringstream s;
@@ -797,7 +800,7 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONObj BSONObj::extractFields(BSONObj& pattern) {
+    BSONObj BSONObj::extractFields(const BSONObj& pattern) const {
         BSONObjBuilder b(32); // scanandorder.h can make a zillion of these, so we start the allocation very small
         BSONObjIterator i(pattern);
         while ( i.more() ) {
