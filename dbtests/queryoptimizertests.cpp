@@ -36,11 +36,15 @@ namespace QueryOptimizerTests {
                 FieldBoundSet s( "ns", query() );
                 checkElt( lower(), s.bound( "a" ).lower() );
                 checkElt( upper(), s.bound( "a" ).upper() );
+                ASSERT_EQUALS( lowerInclusive(), s.bound( "a" ).lowerInclusive() );
+                ASSERT_EQUALS( upperInclusive(), s.bound( "a" ).upperInclusive() );
             }
         protected:
             virtual BSONObj query() = 0;
             virtual BSONElement lower() { return minKey.firstElement(); }
+            virtual bool lowerInclusive() { return true; }
             virtual BSONElement upper() { return maxKey.firstElement(); }
+            virtual bool upperInclusive() { return true; }
         private:
             static void checkElt( BSONElement expected, BSONElement actual ) {
                 if ( expected.woCompare( actual, false ) ) {
@@ -74,11 +78,13 @@ namespace QueryOptimizerTests {
             Lt() : o_( BSON( "-" << 1 ) ) {}
             virtual BSONObj query() { return BSON( "a" << LT << 1 ); }
             virtual BSONElement upper() { return o_.firstElement(); }
+            virtual bool upperInclusive() { return false; }
             BSONObj o_;
         };        
 
         class Lte : public Lt {
             virtual BSONObj query() { return BSON( "a" << LTE << 1 ); }            
+            virtual bool upperInclusive() { return true; }
         };
         
         class Gt : public Base {
@@ -86,11 +92,13 @@ namespace QueryOptimizerTests {
             Gt() : o_( BSON( "-" << 1 ) ) {}
             virtual BSONObj query() { return BSON( "a" << GT << 1 ); }
             virtual BSONElement lower() { return o_.firstElement(); }
+            virtual bool lowerInclusive() { return false; }
             BSONObj o_;
         };        
         
         class Gte : public Gt {
             virtual BSONObj query() { return BSON( "a" << GTE << 1 ); }            
+            virtual bool lowerInclusive() { return true; }
         };
         
         class TwoLt : public Lt {
@@ -123,6 +131,7 @@ namespace QueryOptimizerTests {
             }
             virtual BSONElement lower() { return o1_.firstElement(); }
             virtual BSONElement upper() { return o2_.firstElement(); }
+            virtual bool upperInclusive() { return false; }
             BSONObj o1_, o2_;
         };        
         

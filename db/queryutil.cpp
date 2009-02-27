@@ -58,6 +58,7 @@ namespace mongo {
             if ( r ) {
                 lower_ = addObj( BSON( "" << r ) ).firstElement();
                 upper_ = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
+                upperInclusive_ = false;
             }            
             return;
         }
