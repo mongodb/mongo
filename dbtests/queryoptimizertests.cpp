@@ -156,15 +156,34 @@ namespace QueryOptimizerTests {
             BSONObj o1_, o2_;
         };
         
+        class Equality {
+        public:
+            void run() {
+                FieldBoundSet s( "ns", BSON( "a" << 1 ) );
+                ASSERT( s.bound( "a" ).equality() );
+                FieldBoundSet s2( "ns", BSON( "a" << GTE << 1 << LTE << 1 ) );
+                ASSERT( s2.bound( "a" ).equality() );
+                FieldBoundSet s3( "ns", BSON( "a" << GT << 1 << LTE << 1 ) );
+                ASSERT( !s3.bound( "a" ).equality() );
+                FieldBoundSet s4( "ns", BSON( "a" << GTE << 1 << LT << 1 ) );
+                ASSERT( !s4.bound( "a" ).equality() );
+                FieldBoundSet s5( "ns", BSON( "a" << GTE << 1 << LTE << 1 << GT << 1 ) );
+                ASSERT( !s5.bound( "a" ).equality() );
+                FieldBoundSet s6( "ns", BSON( "a" << GTE << 1 << LTE << 1 << LT << 1 ) );
+                ASSERT( !s6.bound( "a" ).equality() );
+            }
+        };
+        
         class SimplifiedQuery {
         public:
             void run() {
-                FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 ) );
+                FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 << GT << 0 << "e" << GTE << 0 << LTE << 10 ) );
                 BSONObj simple = fbs.simplifiedQuery();
-                ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gte:5,$lte:10}" ) ) );
+                ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gt:5,$lt:10}" ) ) );
                 ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
-                ASSERT( !simple.getObjectField( "c" ).woCompare( fromjson( "{$lte:4}" ) ) );
-                ASSERT( !simple.getObjectField( "d" ).woCompare( fromjson( "{$gte:0}" ) ) );
+                ASSERT( !simple.getObjectField( "c" ).woCompare( fromjson( "{$lt:4}" ) ) );
+                ASSERT( !simple.getObjectField( "d" ).woCompare( fromjson( "{$gt:0}" ) ) );
+                ASSERT( !simple.getObjectField( "e" ).woCompare( fromjson( "{$gte:0,$lte:10}" ) ) );
             }
         };
         
@@ -933,6 +952,7 @@ namespace QueryOptimizerTests {
             add< FieldBoundTests::Regex >();
             add< FieldBoundTests::UnhelpfulRegex >();
             add< FieldBoundTests::In >();
+            add< FieldBoundTests::Equality >();
             add< FieldBoundTests::SimplifiedQuery >();
             add< FieldBoundTests::QueryPatternTest >();
             add< FieldBoundTests::NoWhere >();
