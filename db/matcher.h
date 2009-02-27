@@ -109,6 +109,9 @@ namespace mongo {
 
     private:
         void addBasic(BSONElement e, int c, BSONObj& indexKeyPattern) {
+            // TODO May want to selectively ignore these types based on op type.
+            if ( e.type() == MinKey || e.type() == MaxKey )
+                return;
             BasicMatcher bm;
             bm.toMatch = e;
             bm.compareOp = c;
