@@ -364,6 +364,8 @@ namespace mongo {
         massert( "regex shard support not done yet", e.type() != RegEx );
 
         if( e.type() == Object ) { 
+			//			cout << "\n\nrfq\n" << v.toString() << "\n\nquery:\n" << query.toString() << endl;
+			//			sleepsecs(99);
             massert( "gt/lt etc. support not done yet", e.embeddedObject().firstElement().fieldName()[0] != '$');
         }
 
