@@ -35,6 +35,7 @@ namespace mongo {
         
         /**
            global min is the lowest possible value for this key
+		   e.g. { num : MinKey }
          */
         BSONObj globalMin() const;
 
@@ -44,7 +45,7 @@ namespace mongo {
         BSONObj globalMax() const;
 
         /**
-           return the key central between min and max
+           @return the key central between min and max
            note: min and max could cross type boundaries
          */
         BSONObj middle( const BSONObj & min , const BSONObj & max );
@@ -57,7 +58,9 @@ namespace mongo {
         int compare( const BSONObj& l , const BSONObj& r );
         
         /**
-         * @return whether or not obj has all fields in this shard key pattern
+           @return whether or not obj has all fields in this shard key pattern
+		   e.g. 
+		     ShardKey({num:1}).hasShardKey({ name:"joe", num:3 }) is true
          */
         bool hasShardKey( const BSONObj& obj );
         
@@ -77,9 +80,8 @@ namespace mongo {
          */
         bool relevantForQuery( const BSONObj& q , Shard * s );
         
-        //int ___numFields() const{ return pattern.nFields(); }
-
         /**
+           Returns if the given sort pattern can be ordered by the shard key pattern.
            Example
             sort:   { ts: -1 }
             *this:  { ts:1 }
