@@ -159,10 +159,20 @@ Local<v8::Object> mongoToV8( BSONObj & m , bool array ){
             
             b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
             b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
-
+            
             o->Set( v8::String::New( f.fieldName() ) , b );
             break;
         };
+            
+        case mongo::Timestamp: {
+            Local<v8::Object> sub = v8::Object::New();            
+
+            sub->Set( v8::String::New( "time" ) , v8::Date::New( f.timestampTime() ) );
+            sub->Set( v8::String::New( "i" ) , v8::Number::New( f.timestampInc() ) );
+            
+            o->Set( v8::String::New( f.fieldName() ) , sub );
+            break;
+        }
 
         default:
             cout << "can't handle type: ";

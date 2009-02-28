@@ -379,6 +379,14 @@ namespace mongo {
                 type() == CodeWScope;
         }
 
+        unsigned long long timestampTime() const{
+            unsigned long long t = ((unsigned int*)(value() + 4 ))[0];
+            return t * 1000;
+        }
+        unsigned int timestampInc() const{
+            return ((unsigned int*)(value() ))[0];
+        }
+
     protected:
         // If maxLen is specified, don't scan more than maxLen bytes.
         BSONElement(const char *d, int maxLen = -1) : data(d) {

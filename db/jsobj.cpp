@@ -122,6 +122,9 @@ namespace mongo {
         case BinData:
             s << fieldName() << " : BinData";
             break;
+        case Timestamp:
+            s << fieldName() << " : Timestamp " << timestampTime() << "|" << timestampInc();
+            break;
         default:
             s << fieldName() << ": ?type=" << type();
             break;
@@ -442,6 +445,7 @@ namespace mongo {
             return f==0 ? 0 : 1;
         case Bool:
             return *l.value() - *r.value();
+        case Timestamp:
         case Date:
             if ( l.date() < r.date() )
                 return -1;
