@@ -364,6 +364,7 @@ namespace mongo {
                 }
                 return 2;
             } else {
+                BSONElementManipulator::lookForTimestamps( updateobj );
                 checkNoMods( updateobj );
             }
             

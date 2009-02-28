@@ -127,5 +127,34 @@ int main() {
         assert( conn.validate( ns ) );
     }
     
+    { // timestamp test
+        
+        const char * tsns = "test.tstest1";
+        conn.dropCollection( tsns );
+        
+        {
+            mongo::BSONObjBuilder b;
+            b.appendTimestamp( "ts" );
+            conn.insert( tsns , b.obj() );
+        }
+        
+        mongo::BSONObj out = conn.findOne( tsns , mongo::emptyObj );
+        unsigned int inc = out["ts"].timestampInc();
+        
+        {
+            mongo::BSONObjBuilder b1;
+            b1.append( out["_id"] );
+            
+            mongo::BSONObjBuilder b2;
+            b2.append( out["_id"] );
+            b2.appendTimestamp( "ts" );
+            
+            conn.update( tsns , b1.obj() , b2.obj() );
+        }
+        
+        assert( conn.findOne( tsns , mongo::emptyObj )["ts"].timestampInc() == ( inc + 1 ) );
+        
+    }
+    
     cout << "client test finished!" << endl;
 }

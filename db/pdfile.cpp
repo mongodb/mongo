@@ -1152,19 +1152,7 @@ assert( !eloc.isNull() );
                 len += newId->size();
             }
             
-            // If have a Timestamp field as the first or second element,
-            // update it to a Date field set to OpTime::now().asDate().  The
-            // replacement policy is a work in progress.
-            BSONObjIterator i( io );
-            for( int j = 0; i.more() && j < 2; ++j ) {
-                BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                if ( e.type() == Timestamp ) {
-                    BSONElementManipulator( e ).initTimestamp();
-                    break;
-                }
-            }
+            BSONElementManipulator::lookForTimestamps( io );
         }
 
         DiskLoc extentLoc;
