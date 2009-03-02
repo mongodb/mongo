@@ -43,25 +43,27 @@ public:
         }
         currentStart_ = T();
     }
-    struct Usage { string ns; D time; double pct; };
+    struct Usage { string ns; D time; double pct; int calls; };
     static void usage( vector< Usage > &res ) {
         multimap< D, string, more > sorted;
-        for( map< string, D >::iterator i = snapshot_.begin(); i != snapshot_.end(); ++i )
-            sorted.insert( make_pair( i->second, i->first ) );
+        for( UsageMap::iterator i = snapshot_.begin(); i != snapshot_.end(); ++i )
+            sorted.insert( make_pair( i->second.first, i->first ) );
         for( multimap< D, string, more >::iterator i = sorted.begin(); i != sorted.end(); ++i ) {
             Usage u;
             u.ns = i->second;
-            u.time = totalUsage_[ u.ns ];
+            u.time = totalUsage_[ u.ns ].first;
             u.pct = snapshotDuration_ != D() ? 100.0 * i->first.ticks() / snapshotDuration_.ticks() : 0;
+            u.calls = snapshot_[ u.ns ].second;
             res.push_back( u );
         }
-        for( map< string, D >::iterator i = totalUsage_.begin(); i != totalUsage_.end(); ++i ) {
+        for( UsageMap::iterator i = totalUsage_.begin(); i != totalUsage_.end(); ++i ) {
             if ( snapshot_.count( i->first ) != 0 )
                 continue;
             Usage u;
             u.ns = i->first;
-            u.time = i->second;
+            u.time = i->second.first;
             u.pct = 0;
+            u.calls = 0;
             res.push_back( u );
         }
     }
@@ -78,13 +80,15 @@ public:
         nextSnapshot_.clear();
     }
 private:
-    typedef map< string, D > UsageMap;
+    typedef map< string, pair< D, int > > UsageMap;
     static T currentTime() {
         return boost::posix_time::microsec_clock::universal_time();
     }
     static void recordUsage( const string &client, D duration ) {
-        totalUsage_[ client ] += duration;
-        nextSnapshot_[ client ] += duration;
+        totalUsage_[ client ].first += duration;
+        totalUsage_[ client ].second++;
+        nextSnapshot_[ client ].first += duration;
+        nextSnapshot_[ client ].second++;
     }
     struct more { bool operator()( const D &a, const D &b ) { return a > b; } };
     static string current_;

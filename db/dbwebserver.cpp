@@ -129,11 +129,11 @@ namespace mongo {
             ss << '\n';
 
             ss << "\n<b>DBTOP</b>\n";
-            ss << "<table border=1><tr align='left'><th>Namespace</th><th>%</th><th>Time</th>";
+            ss << "<table border=1><tr align='left'><th>Namespace</th><th>%</th><th>Calls</th><th>Time</th>";
             vector< Top::Usage > usage;
             Top::usage( usage );
             for( vector< Top::Usage >::iterator i = usage.begin(); i != usage.end(); ++i )
-                ss << setprecision( 2 ) << fixed << "<tr><td>" << i->ns << "</td><td>" << i->pct << "</td><td>" << i->time << "</td></tr>\n";
+                ss << setprecision( 2 ) << fixed << "<tr><td>" << i->ns << "</td><td>" << i->pct << "</td><td>" << i->calls << "</td><td>" << i->time << "</td></tr>\n";
             ss << "</table>";
             
             ss << "\n<b>dt\ttlocked</b>\n";

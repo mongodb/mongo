@@ -7,16 +7,16 @@
 
 namespace mongo {
 
-    class PortMessageServer : public MessageServer , public Listener {
-    public:
-        PortMessageServer( int port , MessageHandler * handler ) :
-            MessageServer( port , handler ) , 
-            Listener( port ){
+    namespace pms {
 
-        }
-        
-        void threadRun( MessagingPort * p ){
-            assert( p );
+        MessagingPort * grab = 0;
+        MessageHandler * handler;
+
+        void threadRun(){
+            assert( grab );
+            MessagingPort * p = grab;
+            grab = 0;
+            
             Message m;
             try {
                 while ( 1 ){
@@ -28,17 +28,34 @@ namespace mongo {
                         break;
                     }
                     
-                    _handler->process( m , p );
+                    handler->process( m , p );
                 }
             }
             catch ( ... ){
                 problem() << "uncaught exception in PortMessageServer::threadRun, closing connection" << endl;
                 delete p;
-            }
+            }            
+            
+        }
+
+    }
+
+    class PortMessageServer : public MessageServer , public Listener {
+    public:
+        PortMessageServer( int port , MessageHandler * handler ) :
+            MessageServer( port , handler ) , 
+            Listener( port ){
+            
+            uassert( "multiple PortMessageServer not supported" , ! pms::handler );
+            pms::handler = handler;
         }
         
         virtual void accepted(MessagingPort * p) {
-            boost::thread thr( bind( &PortMessageServer::threadRun , this , p ) );
+            assert( ! pms::grab );
+            pms::grab = p;
+            boost::thread thr( pms::threadRun );
+            while ( pms::grab )
+                sleepmillis(1);
         }
         
         void run(){
