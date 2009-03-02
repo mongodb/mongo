@@ -124,8 +124,9 @@ namespace mongo {
         Logstream& operator<<(unsigned long long x) LOGIT
         Logstream& operator<<(bool x) LOGIT
         Logstream& operator<<(const LazyString& x) {
+            string res = x.val();
             boostlock lk(mutex);
-            cout << x.val();
+            cout << res;
             return *this;
         }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
