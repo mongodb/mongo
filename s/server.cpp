@@ -63,7 +63,7 @@ namespace mongo {
                 break;
             }
             
-            Request r( m , dbMsgPort );
+            Request r( m , &dbMsgPort );
             try {
                 r.process();
             }
@@ -71,7 +71,7 @@ namespace mongo {
                 log() << "UserException: " << e.what() << endl;
                 if ( r.expectResponse() ){
                     BSONObj err = BSON( "$err" << e.what() );
-                    replyToQuery( QueryResult::ResultFlag_ErrSet, dbMsgPort , m , err );
+                    replyToQuery( QueryResult::ResultFlag_ErrSet, &dbMsgPort , m , err );
                 }
             }
 

@@ -165,7 +165,7 @@ namespace mongo {
 namespace mongo {
 
     inline void replyToQuery(int queryResultFlags,
-                             MessagingPort& p, Message& requestMsg,
+                             AbstractMessagingPort* p, Message& requestMsg,
                              void *data, int size,
                              int nReturned, int startingFrom = 0,
                              long long cursorId = 0
@@ -183,7 +183,7 @@ namespace mongo {
         b.decouple();
         Message *resp = new Message();
         resp->setData(qr, true); // transport will free
-        p.reply(requestMsg, *resp, requestMsg.data->id);
+        p->reply(requestMsg, *resp, requestMsg.data->id);
     }
 
 } // namespace mongo
@@ -195,7 +195,7 @@ namespace mongo {
 
     /* object reply helper. */
     inline void replyToQuery(int queryResultFlags,
-                             MessagingPort& p, Message& requestMsg,
+                             AbstractMessagingPort* p, Message& requestMsg,
                              BSONObj& responseObj)
     {
         replyToQuery(queryResultFlags,

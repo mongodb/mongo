@@ -31,7 +31,7 @@
 
 namespace mongo {
 
-    Request::Request( Message& m, MessagingPort& p ) : _m(m) , _d( m ) , _p(p){
+    Request::Request( Message& m, AbstractMessagingPort* p ) : _m(m) , _d( m ) , _p(p){
         assert( _d.getns() );
         _id = _m.data->id;
         _config = grid.getDBConfig( getns() );
