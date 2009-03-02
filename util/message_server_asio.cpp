@@ -18,9 +18,9 @@ using namespace std;
 
 namespace mongo {
 
-    class MessageServerSession : public enable_shared_from_this<MessageServerSession> {
+    class MessageServerSession : public enable_shared_from_this<MessageServerSession> , public AbstractMessagingPort {
     public:
-        MessageServerSession( io_service& ioservice ) : _socket( ioservice ){
+        MessageServerSession( MessageHandler * handler , io_service& ioservice ) : _handler( handler ) , _socket( ioservice ){
             
         }
 
@@ -41,12 +41,19 @@ namespace mongo {
                  << " id : " << _inHeader.id << "\n"
                  << " op : " << _inHeader._operation << "\n";
             
+            if ( ! _inHeader.valid() ){
+                cerr << "  got invalid header from: " << _socket.remote_endpoint() << " closing connected" << endl;
+                return;
+            }
+            
             char * raw = (char*)malloc( _inHeader.len );
-
+            
             MsgData * data = (MsgData*)raw;
             memcpy( data , &_inHeader , sizeof( _inHeader ) );
             assert( data->len == _inHeader.len );
             
+            uassert( "_cur not empty!" , ! _cur.data );
+
             _cur.setData( data , true );
             async_read( _socket , 
                         buffer( raw + sizeof( _inHeader ) , _inHeader.len - sizeof( _inHeader ) ) ,
@@ -54,21 +61,41 @@ namespace mongo {
         }
         
         void handleReadBody( const boost::system::error_code& error ){
-            cout << "got whole message!" << endl;
+            _handler->process( _cur , this );
+        }
+        
+        void handleWriteDone( const boost::system::error_code& error ){
+            _cur.reset();
         }
 
-    private:
+        virtual void reply( Message& received, Message& response ){
+            reply( received , response , received.data->id );
+        }
+        
+        virtual void reply( Message& query , Message& toSend, MSGID responseTo ){
+            toSend.data->id = nextMessageId();
+            toSend.data->responseTo = responseTo;
+            uassert( "pipelining requests doesn't work yet" , query.data->id == _cur.data->id );
+            async_write( _socket , 
+                         buffer( (char*)toSend.data , toSend.data->len ) , 
+                         bind( &MessageServerSession::handleWriteDone , shared_from_this() , placeholders::error ) );
+        }
+
+
+    private:        
+        MessageHandler * _handler;
         tcp::socket _socket;
         MsgData _inHeader;
         Message _cur;
     };
-
+    
 
     class AsyncMessageServer : public MessageServer {
     public:
-        AsyncMessageServer( int port ) : MessageServer( port ) , 
-                                    _endpoint( tcp::v4() , port ) , 
-                                    _acceptor( _ioservice , _endpoint ){
+        AsyncMessageServer( int port , MessageHandler * handler ) : 
+            MessageServer( port , handler ) , 
+            _endpoint( tcp::v4() , port ) , 
+            _acceptor( _ioservice , _endpoint ){
             _accept();
         }
         virtual ~AsyncMessageServer(){
@@ -91,10 +118,8 @@ namespace mongo {
             _accept();
         }
         
-    private:
-
         void _accept(){
-            shared_ptr<MessageServerSession> session( new MessageServerSession( _ioservice ) );
+            shared_ptr<MessageServerSession> session( new MessageServerSession( _handler , _ioservice ) );
             _acceptor.async_accept( session->socket() ,
                                     bind( &AsyncMessageServer::handleAccept,
                                           this, 
@@ -103,12 +128,12 @@ namespace mongo {
                                     );            
         }
 
+    private:
         io_service _ioservice;
         tcp::endpoint _endpoint;
         tcp::acceptor _acceptor;
-        
     };
-
+    
 
     // --temp hacks--
     void dbexit( int rc , const char * why ){
@@ -127,7 +152,7 @@ namespace mongo {
 using namespace mongo;
 
 int main(){
-    mongo::AsyncMessageServer s(9999);
+    mongo::AsyncMessageServer s(9999,0);
     s.run();
 
     return 0;
