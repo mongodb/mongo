@@ -393,4 +393,10 @@ again:
         piggyBackData->append( toSend );
     }
 
+    MSGID nextMessageId(){
+        MSGID msgid = NextMsgId;
+        ++NextMsgId;
+        return msgid;
+    }
+
 } // namespace mongo

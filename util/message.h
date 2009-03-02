@@ -108,6 +108,14 @@ namespace mongo {
         int& dataAsInt() {
             return *((int *) _data);
         }
+        
+        bool valid(){
+            if ( len <= 0 || len > ( 1024 * 1024 * 10 ) )
+                return false;
+            if ( _operation < 0 || _operation > 100000 )
+                return false;
+            return true;
+        }
 
         int dataLen(); // len without header
     };
@@ -183,5 +191,7 @@ namespace mongo {
     public:
         virtual const char* what() const throw() { return "socket exception"; }
     };
+
+    MSGID nextMessageId();
 
 } // namespace mongo
