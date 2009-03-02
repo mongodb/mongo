@@ -184,6 +184,7 @@ namespace mongo {
         friend class BSONObj;
     public:
         string toString() const;
+        operator string() const { return toString(); }
         string jsonString( JsonStringFormat format, bool includeFieldNames = true ) const;
 
         /** Returns the type of the element */
@@ -472,6 +473,8 @@ namespace mongo {
             details = new Details();
             details->_objdata = data;
             details->_objsize = *(reinterpret_cast<const int*>(data));
+            if ( details->_objsize <= 0 )
+                printStackTrace();
             massert( "BSONObj size spec too small", details->_objsize > 0 );
             massert( "BSONObj size spec too large", details->_objsize <= 1024 * 1024 * 16 );
             details->refCount = ifree ? 1 : -1;

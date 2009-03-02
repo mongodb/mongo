@@ -58,7 +58,7 @@ namespace mongo {
         }
         virtual void init() {
             c_ = qp().newCursor();
-            matcher_.reset( new JSMatcher( qp().query() ) );
+            matcher_.reset( new KeyValJSMatcher( qp().query(), qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -66,12 +66,10 @@ namespace mongo {
                 return;
             }
             
-            Record *r = c_->_current();
             DiskLoc rloc = c_->currLoc();
-            BSONObj js(r);
             
             bool deep;
-            if ( matcher_->matches(js, &deep) ) {
+            if ( matcher_->matches(c_->currKey(), rloc, &deep) ) {
                 if ( !deep || !c_->getsetdup(rloc) )
                     ++count_;
             }
@@ -99,7 +97,7 @@ namespace mongo {
         int &bestCount_;
         int nScanned_;
         auto_ptr< Cursor > c_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
     };
     
     /* ns:      namespace, e.g. <database>.<collection>
@@ -130,15 +128,13 @@ namespace mongo {
         if( !c->ok() )
             return nDeleted;
 
-        JSMatcher matcher(pattern);
+        KeyValJSMatcher matcher(pattern, c->indexKeyPattern());
 
         do {
-            Record *r = c->_current();
             DiskLoc rloc = c->currLoc();
-            BSONObj js(r);
             
             bool deep;
-            if ( !matcher.matches(js, &deep) ) {
+            if ( !matcher.matches(c->currKey(), rloc, &deep) ) {
                 c->advance(); // advance must be after noMoreMatches() because it uses currKey()
             }
             else {
@@ -147,19 +143,18 @@ namespace mongo {
                 if ( !justOne )
                     c->noteLocation();
 
-                theDataFileMgr.deleteRecord(ns, r, rloc);
-                nDeleted++;
-                if ( justOne ) {
-                    if ( deletedId ) {
-                        BSONElement e;
-                        if( js.getObjectID( e ) ) {
-                            BSONObjBuilder b;
-                            b.append( e );
-                            *deletedId = b.obj();
-                        }
-                    }
-                    break;
+                if ( justOne && deletedId ) {
+                    BSONElement e;
+                    if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
+                        BSONObjBuilder b;
+                        b.append( e );
+                        *deletedId = b.obj();
+                    }                    
                 }
+                theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
+                nDeleted++;
+                if ( justOne )
+                    break;
                 c->checkLocation();
             }
         } while ( c->ok() );
@@ -268,17 +263,15 @@ namespace mongo {
             if ( !c_->ok() )
                 setComplete();
             else
-                matcher_.reset( new JSMatcher( pattern ) );
+                matcher_.reset( new KeyValJSMatcher( pattern, qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
                 setComplete();
                 return;
             }
-            Record *r = c_->_current();
             nscanned_++;
-            BSONObj js(r);
-            if ( matcher_->matches(js) ) {
+            if ( matcher_->matches(c_->currKey(), c_->currLoc()) ) {
                 setComplete();
                 return;
             }
@@ -293,7 +286,7 @@ namespace mongo {
     private:
         auto_ptr< Cursor > c_;
         int nscanned_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
     };
     
     int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
@@ -539,10 +532,8 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
-                BSONObj js = c->current();
-
                 bool deep;
-                if ( !cc->matcher->matches(js, &deep) ) {
+                if ( !cc->matcher->matches(c->currKey(), c->currLoc(), &deep) ) {
                 }
                 else {
                     //out() << "matches " << c->currLoc().toString() << ' ' << deep << '\n';
@@ -550,6 +541,7 @@ namespace mongo {
                         //out() << "  but it's a dup \n";
                     }
                     else {
+                        BSONObj js = c->current();
                         bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
                         if ( ok ) {
                             n++;
@@ -702,7 +694,7 @@ namespace mongo {
             
             c_ = qp().newCursor();
             
-            matcher_.reset(new JSMatcher(qp().query()));
+            matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
             
             if ( qp().scanAndOrderRequired() ) {
                 ordering_ = true;
@@ -716,12 +708,12 @@ namespace mongo {
                 return;
             }
             
-            BSONObj js = c_->current();
             nscanned_++;
             bool deep;
-            if ( !matcher_->matches(js, &deep) ) {
+            if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
             }
             else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
+                BSONObj js = c_->current();
                 // got a match.
                 assert( js.objsize() >= 0 ); //defensive for segfaults
                 if ( ordering_ ) {
@@ -790,7 +782,7 @@ namespace mongo {
         BufBuilder &builder() { return b_; }
         bool scanAndOrderRequired() const { return ordering_; }
         auto_ptr< Cursor > cursor() { return c_; }
-        auto_ptr< JSMatcher > matcher() { return matcher_; }
+        auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
         int n() const { return n_; }
         int nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
@@ -806,7 +798,7 @@ namespace mongo {
         auto_ptr< Cursor > c_;
         int nscanned_;
         int queryOptions_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
         int n_;
         int soSize_;
         bool saveClientCursor_;

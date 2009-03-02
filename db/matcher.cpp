@@ -115,20 +115,29 @@ namespace mongo {
 namespace mongo {
     
     KeyValJSMatcher::KeyValJSMatcher(const BSONObj &_jsobj, const BSONObj &indexKeyPattern) :
-    keyMatcher_(emptyObj),
-    recordMatcher_(_jsobj) {
+    keyMatcher_(_jsobj.filterFieldsUndotted(indexKeyPattern, true), indexKeyPattern),
+    recordMatcher_(_jsobj.filterFieldsUndotted(indexKeyPattern, false)) {
     }
     
     bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
-        return recordMatcher_.matches(recLoc.rec(), deep);
+//        out() << "key: " << key << ", rec: " << BSONObj( recLoc.rec() ) << endl;
+//        out() << "keyMatch: " << keyMatcher_.matches( key ) << endl;
+//        out() << "recordMatch: " << recordMatcher_.matches( recLoc.rec() ) << endl;
+        bool ret = //return
+        keyMatcher_.matches(key, deep) ?
+        recordMatcher_.matches(recLoc.rec(), deep) :
+        false;
+//        out() << "ret: " << ret << endl;
+        return ret;
     }
     
     
-    /* _jsobj          - the query pattern - This should not be destroyed before the matcher.
+    /* _jsobj          - the query pattern
     */
-    JSMatcher::JSMatcher(const BSONObj &_jsobj) :
-            in(0), where(0), jsobj(_jsobj), nRegex(0)
+    JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
+            in(0), where(0), jsobj(_jsobj), constrainIndexKey_(constrainIndexKey), nRegex(0)
     {
+//        out() << "query: " << jsobj << endl;
         nBuilders = 0;
         BSONObjIterator i(jsobj);
         n = 0;
@@ -267,6 +276,7 @@ namespace mongo {
             }
 
             // normal, simple case e.g. { a : "foo" }
+//            out() << "addBasic: " << e << endl;
             addBasic(e, Equality);
         }
     }
@@ -316,7 +326,36 @@ namespace mongo {
         1 match
     */
     int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
-        {
+        BSONElement e;
+//        out() << "fieldName: " << fieldName << endl;
+//        out() << "constrain: " << constrainIndexKey_ << endl;
+//        out() << "obj: " << obj << endl;
+        if ( !constrainIndexKey_.isEmpty() ) {
+            assert( e.eoo() );
+            BSONObjIterator i( constrainIndexKey_ );
+            int j = 0;
+            while( i.more() ) {
+                BSONElement f = i.next();
+                if ( f.eoo() )
+                    break;
+                if ( strcmp( f.fieldName(), fieldName ) == 0 )
+                    break;
+                ++j;
+            }
+            BSONObjIterator k( obj );
+            while( k.more() ) {
+                BSONElement g = k.next();
+                if ( g.eoo() )
+                    break;
+                if ( j == 0 ) {
+                    e = g;
+                    break;
+                }
+                --j;
+            }
+            assert( !e.eoo() );
+//            out() << "idx e: " << e << endl;
+        } else {
             const char *p = strchr(fieldName, '.');
             if ( p ) {
                 string left(fieldName, p-fieldName);
@@ -329,11 +368,13 @@ namespace mongo {
 
                 BSONObj eo = e.embeddedObject();
                 return matchesDotted(p+1, toMatch, eo, compareOp, deep, e.type() == Array);
+            } else {
+                e = obj.getField(fieldName);
+//                out() << "getField: " << e << endl;
             }
         }
-
-        BSONElement e = obj.getField(fieldName);
-
+//        out() << "e: " << e << endl;
+        
         if ( valuesMatch(e, toMatch, compareOp) ) {
             return 1;
         }
@@ -419,7 +460,9 @@ namespace mongo {
         for ( int i = 0; i < n; i++ ) {
             BasicMatcher& bm = basics[i];
             BSONElement& m = bm.toMatch;
+//            out() << "m: " << m << endl;
             // -1=mismatch. 0=missing element. 1=match
+//            out() << "m.fieldName: " << m.fieldName() << endl;
             int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, deep);
             if ( cmp < 0 )
                 return false;

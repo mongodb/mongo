@@ -93,7 +93,9 @@ namespace mongo {
             return op <= LTE ? -1 : 1;
         }
 
-        JSMatcher(const BSONObj& pattern);
+        // Only specify constrainIndexKey if matches() will be called with
+        // index keys having empty string field names.
+        JSMatcher(const BSONObj &pattern, const BSONObj &constrainIndexKey = BSONObj());
 
         ~JSMatcher();
 
@@ -107,7 +109,7 @@ namespace mongo {
 
     private:
         void addBasic(BSONElement e, int c) {
-            // TODO May want to selectively ignore these types based on op type.
+            // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
                 return;
             BasicMatcher bm;
@@ -121,8 +123,9 @@ namespace mongo {
 
         set<BSONElement,element_lt> *in; // set if query uses $in
         Where *where;                    // set if query uses $where
-        const BSONObj& jsobj;                  // the query pattern.  e.g., { name: "joe" }
-
+        BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
+        BSONObj constrainIndexKey_;
+        
         vector<BasicMatcher> basics;
         int n;                           // # of basicmatcher items
 

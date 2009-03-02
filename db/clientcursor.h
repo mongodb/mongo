@@ -46,7 +46,7 @@ namespace mongo {
         const CursorId cursorid;
         string ns;
         //BSONObj pattern; // the query object
-        auto_ptr<JSMatcher> matcher;
+        auto_ptr<KeyValJSMatcher> matcher;
         auto_ptr<Cursor> c;
         int pos;
         DiskLoc lastLoc() const {
