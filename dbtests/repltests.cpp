@@ -295,10 +295,7 @@ namespace ReplTests {
                 b.append( "_id", 1 );
                 b.appendTimestamp( "t" );
                 client()->update( ns(), BSON( "_id" << 1 ), b.done() );
-                out() << "one: " << client()->findOne( ns(), QUERY( "_id" << 1 ) ) << endl;
                 date_ = client()->findOne( ns(), QUERY( "_id" << 1 ) ).getField( "t" ).date();
-                out() << "date: " << client()->findOne( ns(), QUERY( "_id" << 1 ) ).getField( "t" ).date() << endl; 
-                out() << "date_: " << date_ << endl;
             }
             void check() const {
                 BSONObj o = client()->findOne( ns(), QUERY( "_id" << 1 ) );
