@@ -114,6 +114,17 @@ namespace QueryTests {
         }        
     };
 
+    class CountIndexedRegex : public Base {
+    public:
+        void run() {
+            insert( "{\"a\":\"b\"}" );
+            insert( "{\"a\":\"c\"}" );            
+            BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
+            string err;
+            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+        }
+    };
+    
     class ClientBase {
     public:
         // NOTE: Not bothering to backup the old error record.
@@ -213,6 +224,7 @@ namespace QueryTests {
             add< CountQuery >();
             add< CountFields >();
             add< CountQueryFields >();
+            add< CountIndexedRegex >();
             add< ModId >();
             add< ModNonmodMix >();
             add< InvalidMod >();

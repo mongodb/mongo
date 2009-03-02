@@ -836,6 +836,30 @@ namespace mongo {
         return b.obj();
     }
     
+    BSONElement BSONObj::getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const {
+        BSONObjIterator i( indexKey );
+        int j = 0;
+        while( i.more() ) {
+            BSONElement f = i.next();
+            if ( f.eoo() )
+                return BSONElement();
+            if ( strcmp( f.fieldName(), fieldName ) == 0 )
+                break;
+            ++j;
+        }
+        BSONObjIterator k( *this );
+        while( k.more() ) {
+            BSONElement g = k.next();
+            if ( g.eoo() )
+                return BSONElement();
+            if ( j == 0 ) {
+                return g;
+            }
+            --j;
+        }
+        return BSONElement();
+    }
+    
     int BSONObj::getIntField(const char *name) const {
         BSONElement e = getField(name);
         return e.isNumber() ? (int) e.number() : INT_MIN;

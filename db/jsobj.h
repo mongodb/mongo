@@ -599,6 +599,8 @@ namespace mongo {
         
         BSONObj filterFieldsUndotted(const BSONObj &filter, bool inFilter) const;
 
+        BSONElement getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const;
+        
         /** @return the raw data of the object */
         const char *objdata() const {
             return details->_objdata;

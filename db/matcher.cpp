@@ -120,15 +120,11 @@ namespace mongo {
     }
     
     bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
-//        out() << "key: " << key << ", rec: " << BSONObj( recLoc.rec() ) << endl;
-//        out() << "keyMatch: " << keyMatcher_.matches( key ) << endl;
-//        out() << "recordMatch: " << recordMatcher_.matches( recLoc.rec() ) << endl;
-        bool ret = //return
-        keyMatcher_.matches(key, deep) ?
-        recordMatcher_.matches(recLoc.rec(), deep) :
-        false;
-//        out() << "ret: " << ret << endl;
-        return ret;
+        if ( !keyMatcher_.matches(key, deep) )
+            return false;
+        if ( recordMatcher_.trivial() )
+            return true;
+        return recordMatcher_.matches(recLoc.rec(), deep);
     }
     
     
@@ -327,34 +323,9 @@ namespace mongo {
     */
     int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
         BSONElement e;
-//        out() << "fieldName: " << fieldName << endl;
-//        out() << "constrain: " << constrainIndexKey_ << endl;
-//        out() << "obj: " << obj << endl;
         if ( !constrainIndexKey_.isEmpty() ) {
-            assert( e.eoo() );
-            BSONObjIterator i( constrainIndexKey_ );
-            int j = 0;
-            while( i.more() ) {
-                BSONElement f = i.next();
-                if ( f.eoo() )
-                    break;
-                if ( strcmp( f.fieldName(), fieldName ) == 0 )
-                    break;
-                ++j;
-            }
-            BSONObjIterator k( obj );
-            while( k.more() ) {
-                BSONElement g = k.next();
-                if ( g.eoo() )
-                    break;
-                if ( j == 0 ) {
-                    e = g;
-                    break;
-                }
-                --j;
-            }
+            e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
             assert( !e.eoo() );
-//            out() << "idx e: " << e << endl;
         } else {
             const char *p = strchr(fieldName, '.');
             if ( p ) {
@@ -370,10 +341,8 @@ namespace mongo {
                 return matchesDotted(p+1, toMatch, eo, compareOp, deep, e.type() == Array);
             } else {
                 e = obj.getField(fieldName);
-//                out() << "getField: " << e << endl;
             }
         }
-//        out() << "e: " << e << endl;
         
         if ( valuesMatch(e, toMatch, compareOp) ) {
             return 1;
@@ -460,9 +429,7 @@ namespace mongo {
         for ( int i = 0; i < n; i++ ) {
             BasicMatcher& bm = basics[i];
             BSONElement& m = bm.toMatch;
-//            out() << "m: " << m << endl;
             // -1=mismatch. 0=missing element. 1=match
-//            out() << "m.fieldName: " << m.fieldName() << endl;
             int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, deep);
             if ( cmp < 0 )
                 return false;
@@ -480,7 +447,12 @@ namespace mongo {
 
         for ( int r = 0; r < nRegex; r++ ) {
             RegexMatcher& rm = regexs[r];
-            BSONElement e = jsobj.getFieldDotted(rm.fieldName);
+            out() << "matching regex" << endl;
+            BSONElement e;
+            if ( !constrainIndexKey_.isEmpty() )
+                e = jsobj.getFieldUsingIndexNames(rm.fieldName, constrainIndexKey_);
+            else
+                e = jsobj.getFieldDotted(rm.fieldName);
             if ( e.eoo() )
                 return false;
             if ( !regexMatches(rm, e, deep) )
