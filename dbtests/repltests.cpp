@@ -201,19 +201,17 @@ namespace ReplTests {
         
         class InsertTimestamp : public Base {
         public:
-            InsertTimestamp() : date_( ~0ULL ) {}
             void doIt() const {
                 BSONObjBuilder b;
                 b.append( "a", 1 );
                 b.appendTimestamp( "t" );
                 client()->insert( ns(), b.done() );
+                date_ = client()->findOne( ns(), QUERY( "a" << 1 ) ).getField( "t" ).date();
             }
             void check() const {
                 BSONObj o = client()->findOne( ns(), QUERY( "a" << 1 ) );
                 ASSERT( 0 != o.getField( "t" ).date() );
-                if ( date_ != ~0ULL )
-                    ASSERT_EQUALS( date_, o.getField( "t" ).date() );
-                date_ = o.getField( "t" ).date();
+                ASSERT_EQUALS( date_, o.getField( "t" ).date() );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -290,6 +288,31 @@ namespace ReplTests {
             BSONObj o_;            
         };
 
+        class UpdateTimestamp : public Base {
+        public:
+            void doIt() const {
+                BSONObjBuilder b;
+                b.append( "_id", 1 );
+                b.appendTimestamp( "t" );
+                client()->update( ns(), BSON( "_id" << 1 ), b.done() );
+                out() << "one: " << client()->findOne( ns(), QUERY( "_id" << 1 ) ) << endl;
+                date_ = client()->findOne( ns(), QUERY( "_id" << 1 ) ).getField( "t" ).date();
+                out() << "date: " << client()->findOne( ns(), QUERY( "_id" << 1 ) ).getField( "t" ).date() << endl; 
+                out() << "date_: " << date_ << endl;
+            }
+            void check() const {
+                BSONObj o = client()->findOne( ns(), QUERY( "_id" << 1 ) );
+                ASSERT( 0 != o.getField( "t" ).date() );
+                ASSERT_EQUALS( date_, o.getField( "t" ).date() );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 1 ) );
+            }
+        private:
+            mutable unsigned long long date_;
+        };
+        
         class UpdateSameField : public Base {
         public:
             UpdateSameField() :
@@ -587,6 +610,7 @@ namespace ReplTests {
             add< Idempotence::InsertWithId >();
             add< Idempotence::InsertTwo >();
             add< Idempotence::InsertTwoIdentical >();
+            add< Idempotence::UpdateTimestamp >();
             add< Idempotence::UpdateSameField >();
             add< Idempotence::UpdateSameFieldWithId >();
             add< Idempotence::UpdateSameFieldExplicitId >();

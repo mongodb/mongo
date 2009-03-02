@@ -1107,7 +1107,7 @@ namespace mongo {
         memcpy(p, obj.objdata(), obj.objsize());
         p += obj.objsize();
         *p = EOO;
-
+        
         //BSONObj temp(r);
         //out() << "temp:" << temp.toString() << endl;
 
