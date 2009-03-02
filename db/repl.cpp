@@ -665,7 +665,7 @@ namespace mongo {
                         Timer t;
                         _updateObjects(ns, o, o, true, ss);
                         if( t.millis() >= 2 ) {
-                            RARELY RARELY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
+                            RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                         }
                     }
                     else {
