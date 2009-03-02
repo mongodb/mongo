@@ -133,7 +133,6 @@ namespace mongo {
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
             in(0), where(0), jsobj(_jsobj), constrainIndexKey_(constrainIndexKey), nRegex(0)
     {
-//        out() << "query: " << jsobj << endl;
         nBuilders = 0;
         BSONObjIterator i(jsobj);
         n = 0;
@@ -272,7 +271,6 @@ namespace mongo {
             }
 
             // normal, simple case e.g. { a : "foo" }
-//            out() << "addBasic: " << e << endl;
             addBasic(e, Equality);
         }
     }
@@ -447,7 +445,6 @@ namespace mongo {
 
         for ( int r = 0; r < nRegex; r++ ) {
             RegexMatcher& rm = regexs[r];
-            out() << "matching regex" << endl;
             BSONElement e;
             if ( !constrainIndexKey_.isEmpty() )
                 e = jsobj.getFieldUsingIndexNames(rm.fieldName, constrainIndexKey_);
