@@ -1,5 +1,7 @@
 // message_server_asio.cpp
 
+#ifdef USE_ASIO
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -152,3 +154,5 @@ namespace mongo {
     }    
 
 }
+
+#endif
