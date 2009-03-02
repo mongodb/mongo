@@ -514,7 +514,7 @@ env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 # mongos
 mongos = env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "s/*.cpp" ) )
 
-blah = env.Program( "blah" , commonFiles + coreDbFiles + [ "util/message_server_asio.cpp"] )
+#blah = env.Program( "blah" , commonFiles + coreDbFiles + [ "util/message_server_asio.cpp"] )
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
