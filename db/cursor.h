@@ -52,6 +52,7 @@ namespace mongo {
         virtual BSONObj current() = 0;
         virtual DiskLoc currLoc() = 0;
         virtual bool advance() = 0; /*true=ok*/
+        virtual BSONObj currKey() const { return emptyObj; }
 
         /* Implement these if you want the cursor to be "tailable" */
         /* tailable(): if true, cursor has tailable capability AND

@@ -30,7 +30,7 @@ namespace mongo {
     struct _KeyNode {
         DiskLoc prevChildBucket;
         DiskLoc recordLoc;
-        short keyDataOfs() {
+        short keyDataOfs() const {
             return (short) _kdo;
         }
         unsigned short _kdo;
@@ -68,9 +68,9 @@ namespace mongo {
     /* wrapper - this is our in memory representation of the key.  _KeyNode is the disk representation. */
     class KeyNode {
     public:
-        KeyNode(BucketBasics& bb, _KeyNode &k);
-        DiskLoc& prevChildBucket;
-        DiskLoc& recordLoc;
+        KeyNode(const BucketBasics& bb, const _KeyNode &k);
+        const DiskLoc& prevChildBucket;
+        const DiskLoc& recordLoc;
         BSONObj key;
     };
 
@@ -90,7 +90,7 @@ namespace mongo {
             assert( pos >= 0 && pos <= n );
             return pos == n ? nextChild : k(pos).prevChildBucket;
         }
-        KeyNode keyNode(int i) {
+        KeyNode keyNode(int i) const {
             assert( i < n );
             return KeyNode(*this, k(i));
         }
@@ -149,6 +149,9 @@ namespace mongo {
         int topSize; // size of the data at the top of the bucket (keys are at the beginning or 'bottom')
         int n; // # of keys so far.
         int reserved;
+        const _KeyNode& k(int i) const {
+            return ((_KeyNode*)data)[i];
+        }
         _KeyNode& k(int i) {
             return ((_KeyNode*)data)[i];
         }
@@ -225,11 +228,11 @@ namespace mongo {
             assert( kn.isUsed() );
             return kn;
         }
-        KeyNode currKeyNode() {
+        KeyNode currKeyNode() const {
             assert( !bucket.isNull() );
             return bucket.btree()->keyNode(keyOfs);
         }
-        BSONObj currKey() {
+        virtual BSONObj currKey() const {
             return currKeyNode().key;
         }
 

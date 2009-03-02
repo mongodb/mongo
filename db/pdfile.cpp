@@ -67,7 +67,7 @@ namespace mongo {
         return ss.str();
     }
 
-    BSONObj::BSONObj(Record *r) {
+    BSONObj::BSONObj(const Record *r) {
         init(r->data, false);
         /*
         	_objdata = r->data;

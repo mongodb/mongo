@@ -617,16 +617,18 @@ namespace mongo {
                     ++count_;
                 }
             } else {
-                BSONObj js = c_->current();
                 bool deep;
-                if ( !matcher_->matches(js, &deep) ) {
+                if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
                 }
                 else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
                     bool match = true;
-                    for( set< string >::iterator i = fields_.begin(); i != fields_.end(); ++i ) {
-                        if ( js.getFieldDotted( i->c_str() ).eoo() ) {
-                            match = false;
-                            break;
+                    if ( !fields_.empty() ) {
+                        BSONObj js = c_->current();
+                        for( set< string >::iterator i = fields_.begin(); i != fields_.end(); ++i ) {
+                            if ( js.getFieldDotted( i->c_str() ).eoo() ) {
+                                match = false;
+                                break;
+                            }
                         }
                     }
                     if ( match )

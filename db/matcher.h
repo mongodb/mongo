@@ -48,6 +48,7 @@ namespace mongo {
 
 // SQL where clause equivalent
     class Where;
+    class DiskLoc;
 
     /* Match BSON objects against a query pattern.
 
@@ -102,6 +103,8 @@ namespace mongo {
         /* deep - means we looked into arrays for a match
         */
         bool matches(const BSONObj& j, bool *deep = 0);
+        
+        bool matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep = 0);
 
         int getN() {
             return n;

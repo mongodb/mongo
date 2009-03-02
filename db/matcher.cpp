@@ -23,6 +23,7 @@
 #include "../util/goodies.h"
 #include "javajs.h"
 #include "../util/unittest.h"
+#include "storage.h"
 
 namespace mongo {
 
@@ -398,6 +399,10 @@ namespace mongo {
         return false;
     }
 
+    bool JSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
+        return matches( recLoc.rec(), deep );
+    }
+    
     /* See if an object matches the query.
        deep - return true when means we looked into arrays for a match
 

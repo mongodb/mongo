@@ -33,7 +33,7 @@ namespace mongo {
     int split_debug = 0;
     int insert_debug = 0;
 
-    KeyNode::KeyNode(BucketBasics& bb, _KeyNode &k) :
+    KeyNode::KeyNode(const BucketBasics& bb, const _KeyNode &k) :
             prevChildBucket(k.prevChildBucket),
             recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
     { }

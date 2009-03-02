@@ -491,7 +491,7 @@ namespace mongo {
         explicit BSONObj(const char *msgdata, bool ifree = false) {
             init(msgdata, ifree);
         }
-        BSONObj(Record *r);
+        BSONObj(const Record *r);
         /** Construct an empty BSONObj -- that is, {}. */
         // TODO: Unify this with 'emptyObj'
         BSONObj() : details(0) { }
