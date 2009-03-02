@@ -1,5 +1,7 @@
 // message_server_asio.cpp
 
+#ifdef USE_ASIO
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -30,17 +32,10 @@ namespace mongo {
 
         void start(){
             cout << "MessageServerSession start from:" << _socket.remote_endpoint() << endl;
-            async_read( _socket , 
-                        buffer( &_inHeader , sizeof( _inHeader ) ) ,
-                        bind( &MessageServerSession::handleReadHeader , shared_from_this() , placeholders::error ) );
+            _startHeaderRead();
         }
         
         void handleReadHeader( const boost::system::error_code& error ){
-            cout << "got header\n" 
-                 << " len: " << _inHeader.len << "\n"
-                 << " id : " << _inHeader.id << "\n"
-                 << " op : " << _inHeader._operation << "\n";
-            
             if ( ! _inHeader.valid() ){
                 cerr << "  got invalid header from: " << _socket.remote_endpoint() << " closing connected" << endl;
                 return;
@@ -52,7 +47,7 @@ namespace mongo {
             memcpy( data , &_inHeader , sizeof( _inHeader ) );
             assert( data->len == _inHeader.len );
             
-            uassert( "_cur not empty!" , ! _cur.data );
+            uassert( "_cur not empty! pipelining requests not supported" , ! _cur.data );
 
             _cur.setData( data , true );
             async_read( _socket , 
@@ -61,18 +56,29 @@ namespace mongo {
         }
         
         void handleReadBody( const boost::system::error_code& error ){
+            _replyCalled = false;
+            
             _handler->process( _cur , this );
+
+            if ( ! _replyCalled ){
+                _cur.reset();
+                _startHeaderRead();
+            }
         }
         
         void handleWriteDone( const boost::system::error_code& error ){
             _cur.reset();
+            _replyCalled = false;
+            _startHeaderRead();
         }
-
+        
         virtual void reply( Message& received, Message& response ){
             reply( received , response , received.data->id );
         }
         
         virtual void reply( Message& query , Message& toSend, MSGID responseTo ){
+            _replyCalled = true;
+
             toSend.data->id = nextMessageId();
             toSend.data->responseTo = responseTo;
             uassert( "pipelining requests doesn't work yet" , query.data->id == _cur.data->id );
@@ -83,10 +89,19 @@ namespace mongo {
 
 
     private:        
+
+        void _startHeaderRead(){
+            async_read( _socket , 
+                        buffer( &_inHeader , sizeof( _inHeader ) ) ,
+                        bind( &MessageServerSession::handleReadHeader , shared_from_this() , placeholders::error ) );
+        }
+        
         MessageHandler * _handler;
         tcp::socket _socket;
         MsgData _inHeader;
         Message _cur;
+
+        bool _replyCalled;
     };
     
 
@@ -133,27 +148,11 @@ namespace mongo {
         tcp::endpoint _endpoint;
         tcp::acceptor _acceptor;
     };
-    
 
-    // --temp hacks--
-    void dbexit( int rc , const char * why ){
-        cerr << "dbserver.cpp::dbexit" << endl;
-        ::exit(rc);
-    }
-    
-    const char * curNs = "";
-    
-    string getDbContext(){
-        return "getDbContext bad";
-    }
+    MessageServer * createServer( int port , MessageHandler * handler ){
+        return new AsyncMessageServer( port , handler );
+    }    
 
 }
 
-using namespace mongo;
-
-int main(){
-    mongo::AsyncMessageServer s(9999,0);
-    s.run();
-
-    return 0;
-}
+#endif

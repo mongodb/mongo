@@ -20,6 +20,7 @@
 #include "../util/message.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
+#include "../util/message_server.h"
 
 #include "server.h"
 #include "request.h"
@@ -47,23 +48,12 @@ namespace mongo {
         out() << "                                           in our hostname with \"-grid\".\n";
         out() << endl;
     }
-
-    MessagingPort *grab = 0;
-
-    void _dbGridConnThread() {
-        MessagingPort& dbMsgPort = *grab;
-        grab = 0;
-        Message m;
-        while ( 1 ) {
-            m.reset();
-
-            if ( !dbMsgPort.recv(m) ) {
-                log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
-                dbMsgPort.shutdown();
-                break;
-            }
-            
-            Request r( m , &dbMsgPort );
+    
+    class ShardedMessageHandler : public MessageHandler {
+    public:
+        virtual ~ShardedMessageHandler(){}
+        virtual void process( Message& m , AbstractMessagingPort* p ){
+            Request r( m , p );
             try {
                 r.process();
             }
@@ -71,40 +61,19 @@ namespace mongo {
                 log() << "UserException: " << e.what() << endl;
                 if ( r.expectResponse() ){
                     BSONObj err = BSON( "$err" << e.what() );
-                    replyToQuery( QueryResult::ResultFlag_ErrSet, &dbMsgPort , m , err );
+                    replyToQuery( QueryResult::ResultFlag_ErrSet, p , m , err );
                 }
             }
-
-        }
-
-    }
-    
-    void dbGridConnThread() {
-        MessagingPort *p = grab;
-        try {
-            _dbGridConnThread();
-        } catch ( ... ){
-            problem() << "uncaught exception in dbgridconnthread, closing connection" << endl;
-            delete p;
-        }
-    }
-
-    class DbGridListener : public Listener {
-    public:
-        DbGridListener(int p) : Listener(p) { }
-        virtual void accepted(MessagingPort *mp) {
-            assert( grab == 0 );
-            grab = mp;
-            boost::thread thr(dbGridConnThread);
-            while ( grab )
-                sleepmillis(1);
         }
     };
 
     void start() {
         log() << "waiting for connections on port " << port << "..." << endl;
-        DbGridListener l(port);
-        l.listen();
+        //DbGridListener l(port);
+        //l.listen();
+        ShardedMessageHandler handler;
+        MessageServer * server = createServer( port , &handler );
+        server->run();
     }
 
 } // namespace mongo

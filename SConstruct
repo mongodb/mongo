@@ -134,7 +134,8 @@ if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
 else:
     commonFiles += [ "util/processinfo_none.cpp" ]
 
-coreDbFiles = Split( "" )
+coreDbFiles = []
+coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
 
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
 
@@ -386,6 +387,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         else:
             Exit(1)
 
+    if conf.CheckCXXHeader( "boost/asio.hpp" ):
+        myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
+
     for b in boostLibs:
         l = "boost_" + b
         myCheckLib( [ l + "-mt" , l ] , release or not shell)
@@ -512,9 +516,7 @@ env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
 # mongos
-mongos = env.Program( "mongos" , commonFiles + coreDbFiles + Glob( "s/*.cpp" ) )
-
-#blah = env.Program( "blah" , commonFiles + coreDbFiles + [ "util/message_server_asio.cpp"] )
+mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + Glob( "s/*.cpp" ) )
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
