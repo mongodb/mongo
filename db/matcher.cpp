@@ -113,15 +113,22 @@ namespace mongo {
 #include "pdfile.h"
 
 namespace mongo {
-
+    
+    KeyValJSMatcher::KeyValJSMatcher(const BSONObj &_jsobj, const BSONObj &indexKeyPattern) :
+    keyMatcher_(emptyObj),
+    recordMatcher_(_jsobj) {
+    }
+    
+    bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
+        return recordMatcher_.matches(recLoc.rec(), deep);
+    }
+    
+    
     /* _jsobj          - the query pattern - This should not be destroyed before the matcher.
-       indexKeyPattern - the "key pattern" / template of what is in the keys of the index we are using.
-                         used to set indexMatches return value from matches()
     */
-    JSMatcher::JSMatcher(const BSONObj &_jsobj, BSONObj indexKeyPattern) :
+    JSMatcher::JSMatcher(const BSONObj &_jsobj) :
             in(0), where(0), jsobj(_jsobj), nRegex(0)
     {
-        checkInIndex = !indexKeyPattern.isEmpty();
         nBuilders = 0;
         BSONObjIterator i(jsobj);
         n = 0;
@@ -171,7 +178,6 @@ namespace mongo {
                     RegexMatcher& rm = regexs[nRegex];
                     rm.re = new pcrecpp::RE(e.regex(), options);
                     rm.fieldName = e.fieldName();
-                    rm.inIndex = indexKeyPattern.hasElement(rm.fieldName);
 
                     nRegex++;
                 }
@@ -215,7 +221,7 @@ namespace mongo {
                                 BSONObjBuilder *b = new BSONObjBuilder();
                                 builders[nBuilders++] = b;
                                 b->appendAs(fe, e.fieldName());
-                                addBasic(b->done().firstElement(), op, indexKeyPattern);
+                                addBasic(b->done().firstElement(), op);
                                 ok = true;
                             }
                         }
@@ -226,7 +232,7 @@ namespace mongo {
                                 BSONObjBuilder *b = new BSONObjBuilder();
                                 builders[nBuilders++] = b;
                                 b->appendAs(fe, e.fieldName());
-                                addBasic(b->done().firstElement(), NE, indexKeyPattern);
+                                addBasic(b->done().firstElement(), NE);
                                 ok = true;
                             }
                             else
@@ -245,7 +251,7 @@ namespace mongo {
                                     in->insert(ie);
                                 }
                             }
-                            addBasic(e, opIN, indexKeyPattern); // e not actually used at the moment for $in
+                            addBasic(e, opIN); // e not actually used at the moment for $in
                             ok = true;
                         }
                         else
@@ -261,7 +267,7 @@ namespace mongo {
             }
 
             // normal, simple case e.g. { a : "foo" }
-            addBasic(e, Equality, indexKeyPattern);
+            addBasic(e, Equality);
         }
     }
 
@@ -399,16 +405,8 @@ namespace mongo {
         return false;
     }
 
-    bool JSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
-        return matches( recLoc.rec(), deep );
-    }
-    
     /* See if an object matches the query.
        deep - return true when means we looked into arrays for a match
-
-       Wondering if it would be worth having
-         if( !inIndex && !ok ) continue;
-       in each loop to bypass those checks.  probably not worth checking as usually we are ok.
     */
     bool JSMatcher::matches(const BSONObj& jsobj, bool *deep) {
         if ( deep )
@@ -505,17 +503,17 @@ namespace mongo {
 
             BSONObj j1((const char *) &js1);
             BSONObj j2((const char *) &js2);
-            JSMatcher m(j2, BSONObj());
+            JSMatcher m(j2);
             assert( m.matches(j1) );
             js2.sval[0] = 'z';
             assert( !m.matches(j1) );
-            JSMatcher n(j1, BSONObj());
+            JSMatcher n(j1);
             assert( n.matches(j1) );
             assert( !n.matches(j2) );
 
             BSONObj j0 = emptyObj;
 //		BSONObj j0((const char *) &js0);
-            JSMatcher p(j0, BSONObj());
+            JSMatcher p(j0);
             assert( p.matches(j1) );
             assert( p.matches(j2) );
         }

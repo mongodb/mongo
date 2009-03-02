@@ -821,6 +821,21 @@ namespace mongo {
         return b.obj();
     }
 
+    BSONObj BSONObj::filterFieldsUndotted( const BSONObj &filter, bool inFilter ) const {
+        BSONObjBuilder b;
+        BSONObjIterator i( *this );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            BSONElement x = filter.getField( e.fieldName() );
+            if ( ( x.eoo() && !inFilter ) ||
+                ( !x.eoo() && inFilter ) )
+                b.append( e );
+        }
+        return b.obj();
+    }
+    
     int BSONObj::getIntField(const char *name) const {
         BSONElement e = getField(name);
         return e.isNumber() ? (int) e.number() : INT_MIN;

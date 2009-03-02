@@ -593,6 +593,8 @@ namespace mongo {
            returns elements with original field names
         */
         BSONObj extractFields(const BSONObj &pattern) const;
+        
+        BSONObj filterFieldsUndotted(const BSONObj &filter, bool inFilter) const;
 
         /** @return the raw data of the object */
         const char *objdata() const {

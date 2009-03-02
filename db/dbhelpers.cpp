@@ -60,7 +60,7 @@ namespace mongo {
             if ( !c_->ok() )
                 setComplete();
             else
-                matcher_.reset( new JSMatcher( qp().query(), qp().indexKey() ) );
+                matcher_.reset( new JSMatcher( qp().query() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {

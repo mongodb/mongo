@@ -58,7 +58,7 @@ namespace mongo {
         }
         virtual void init() {
             c_ = qp().newCursor();
-            matcher_.reset( new JSMatcher( qp().query(), c_->indexKeyPattern() ) );
+            matcher_.reset( new JSMatcher( qp().query() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -130,7 +130,7 @@ namespace mongo {
         if( !c->ok() )
             return nDeleted;
 
-        JSMatcher matcher(pattern, c->indexKeyPattern());
+        JSMatcher matcher(pattern);
 
         do {
             Record *r = c->_current();
@@ -268,7 +268,7 @@ namespace mongo {
             if ( !c_->ok() )
                 setComplete();
             else
-                matcher_.reset( new JSMatcher( pattern, c_->indexKeyPattern() ) );
+                matcher_.reset( new JSMatcher( pattern ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -593,7 +593,7 @@ namespace mongo {
             if ( qp().exactKeyMatch() && fields_.empty() )
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
             else
-                matcher_.reset( new JSMatcher( query_, c_->indexKeyPattern() ) );
+                matcher_.reset( new KeyValJSMatcher( query_, c_->indexKeyPattern() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -649,7 +649,7 @@ namespace mongo {
         BSONObj query_;
         set< string > fields_;
         BtreeCursor *bc_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
         BSONObj firstMatch_;
     };
     
@@ -702,7 +702,7 @@ namespace mongo {
             
             c_ = qp().newCursor();
             
-            matcher_.reset(new JSMatcher(qp().query(), c_->indexKeyPattern()));
+            matcher_.reset(new JSMatcher(qp().query()));
             
             if ( qp().scanAndOrderRequired() ) {
                 ordering_ = true;

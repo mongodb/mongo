@@ -29,10 +29,8 @@ namespace mongo {
     public:
         const char *fieldName;
         pcrecpp::RE *re;
-        bool inIndex;
         RegexMatcher() {
             re = 0;
-            inIndex = false;
         }
         ~RegexMatcher() {
             delete re;
@@ -43,7 +41,6 @@ namespace mongo {
     public:
         BSONElement toMatch;
         int compareOp;
-        bool inIndex;
     };
 
 // SQL where clause equivalent
@@ -96,7 +93,7 @@ namespace mongo {
             return op <= LTE ? -1 : 1;
         }
 
-        JSMatcher(const BSONObj& pattern, BSONObj indexKeyPattern);
+        JSMatcher(const BSONObj& pattern);
 
         ~JSMatcher();
 
@@ -104,21 +101,18 @@ namespace mongo {
         */
         bool matches(const BSONObj& j, bool *deep = 0);
         
-        bool matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep = 0);
-
         int getN() {
             return n;
         }
 
     private:
-        void addBasic(BSONElement e, int c, BSONObj& indexKeyPattern) {
+        void addBasic(BSONElement e, int c) {
             // TODO May want to selectively ignore these types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
                 return;
             BasicMatcher bm;
             bm.toMatch = e;
             bm.compareOp = c;
-            bm.inIndex = indexKeyPattern.hasElement(e.fieldName());
             basics.push_back(bm);
             n++;
         }
@@ -138,8 +132,17 @@ namespace mongo {
         // so we delete the mem when we're done:
         BSONObjBuilder *builders[8];
         int nBuilders;
-
-        bool checkInIndex;
+    };
+    
+    // If match succeeds on index key, then attempt to match full record.
+    class KeyValJSMatcher : boost::noncopyable {
+    public:
+        KeyValJSMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
+        bool matches(const BSONObj &j, bool *deep = 0);
+        bool matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep = 0);
+    private:
+        JSMatcher keyMatcher_;
+        JSMatcher recordMatcher_;
     };
 
 } // namespace mongo

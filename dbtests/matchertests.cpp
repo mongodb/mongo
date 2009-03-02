@@ -29,7 +29,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":\"b\"}" );
-            JSMatcher m( query, fromjson( "{\"a\":1}" ) );
+            JSMatcher m( query );
             ASSERT( m.matches( fromjson( "{\"a\":\"b\"}" ) ) );
         }
     };
@@ -38,7 +38,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":5}" );
-            JSMatcher m( query, fromjson( "{\"a\":1}" ) );
+            JSMatcher m( query );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );            
         }
     };
@@ -48,7 +48,7 @@ namespace MatcherTests {
         void run() {
             BSONObjBuilder query;
             query.append( "a", 5 );
-            JSMatcher m( query.done(), fromjson( "{\"a\":1}" ) );
+            JSMatcher m( query.done() );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );            
         }        
     };
@@ -57,7 +57,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":{\"$gt\":4}}" );
-            JSMatcher m( query, fromjson( "{\"a\":1}" ) );
+            JSMatcher m( query );
             BSONObjBuilder b;
             b.append( "a", 5 );
             ASSERT( m.matches( b.done() ) );
