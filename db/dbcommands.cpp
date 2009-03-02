@@ -217,12 +217,9 @@ namespace mongo {
                     errmsg = "unauthorized [2]";
                     return false;
                 }
-            } 
-            {
-                log() << "terminating, shutdown command received" << endl;
-                dbtemprelease r;
-                dbexit(EXIT_SUCCESS);
             }
+            log() << "terminating, shutdown command received" << endl;
+            dbexit(EXIT_SUCCESS);
             return true;
         }
     } cmdShutdown;
