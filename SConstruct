@@ -389,6 +389,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     if conf.CheckCXXHeader( "boost/asio.hpp" ):
         myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
+    else:
+        print( "WARNING: old version of boost - you should consider upgrading" )
 
     for b in boostLibs:
         l = "boost_" + b
