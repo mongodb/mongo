@@ -22,13 +22,6 @@
 
 namespace mongo {
 
-    class QueryPattern;
-    void registerWriteOp( const string &ns );
-    void clearQueryCache( const string &ns );
-    BSONObj indexForPattern( const string &ns, const QueryPattern &pattern );
-    int nScannedForPattern( const string &ns, const QueryPattern &pattern );
-    void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey, int nScanned );
-    
     class FieldBound {
     public:
         FieldBound( const BSONElement &e = emptyObj.firstElement() );

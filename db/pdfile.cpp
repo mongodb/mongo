@@ -772,7 +772,7 @@ assert( !eloc.isNull() );
         unindexRecord(ns, d, todelete, dl);
 
         _deleteRecord(d, ns, todelete, dl);
-        registerWriteOp( ns );
+        NamespaceDetailsTransient::get( ns ).registerWriteOp();
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
@@ -849,7 +849,7 @@ assert( !eloc.isNull() );
             return;
         }
 
-        registerWriteOp( ns );
+        NamespaceDetailsTransient::get( ns ).registerWriteOp();
         d->paddingFits();
 
         /* has any index keys changed? */
@@ -1208,7 +1208,7 @@ assert( !eloc.isNull() );
         d->datasize += r->netLength();
 
         if ( !god )
-            registerWriteOp( ns );
+            NamespaceDetailsTransient::get( ns ).registerWriteOp();
         
         if ( tableToIndex ) {
             IndexDetails& idxinfo = tableToIndex->indexes[tableToIndex->nIndexes];

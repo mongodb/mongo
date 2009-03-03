@@ -21,6 +21,7 @@
 #include "../stdafx.h"
 
 #include "jsobj.h"
+#include "queryutil.h"
 #include "storage.h"
 
 #include "../util/hashtab.h"
@@ -343,8 +344,10 @@ namespace mongo {
         bool haveIndexKeys;
         set<string> allIndexKeys;
         void computeIndexKeys();
+        int writeCount_;
+        map< QueryPattern, pair< BSONObj, int > > queryCache_;
     public:
-        NamespaceDetailsTransient(const char *_ns) : ns(_ns) {
+        NamespaceDetailsTransient(const char *_ns) : ns(_ns), haveIndexKeys(), writeCount_() {
             haveIndexKeys=false; /*lazy load them*/
         }
         ~NamespaceDetailsTransient() { reset(); }
@@ -362,6 +365,25 @@ namespace mongo {
 
         void addedIndex() { reset(); }
         void deletedIndex() { reset(); }
+        void registerWriteOp() {
+            if ( queryCache_.empty() )
+                return;
+            if ( ++writeCount_ >= 100 )
+                clearQueryCache();
+        }
+        void clearQueryCache() {
+            queryCache_.clear();
+            writeCount_ = 0;
+        }
+        BSONObj indexForPattern( const QueryPattern &pattern ) {
+            return queryCache_[ pattern ].first;
+        }
+        int nScannedForPattern( const QueryPattern &pattern ) {
+            return queryCache_[ pattern ].second;
+        }
+        void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, int nScanned ) {
+            queryCache_[ pattern ] = make_pair( indexKey, nScanned );
+        }
     private:
         void reset();
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > map;

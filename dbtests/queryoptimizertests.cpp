@@ -512,7 +512,7 @@ namespace QueryOptimizerTests {
             ~Base() {
                 if ( !nsd() )
                     return;
-                clearQueryCache( ns() );
+                NamespaceDetailsTransient::get( ns() ).clearQueryCache();
                 string s( ns() );
                 dropNS( s );
             }
@@ -823,8 +823,8 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ScanOnlyTestOp op;
                 s.runOp( op );
-                ASSERT( fromjson( "{$natural:1}" ).woCompare( indexForPattern( ns(), s.fbs().pattern( BSON( "b" << 1 ) ) ) ) == 0 );
-                ASSERT_EQUALS( 1, nScannedForPattern( ns(), s.fbs().pattern( BSON( "b" << 1 ) ) ) );
+                ASSERT( fromjson( "{$natural:1}" ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( s.fbs().pattern( BSON( "b" << 1 ) ) ) ) == 0 );
+                ASSERT_EQUALS( 1, NamespaceDetailsTransient::get( ns() ).nScannedForPattern( s.fbs().pattern( BSON( "b" << 1 ) ) ) );
                 
                 QueryPlanSet s2( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 TestOp op2;
@@ -880,8 +880,8 @@ namespace QueryOptimizerTests {
                 BSONObj one = BSON( "a" << 1 );
                 theDataFileMgr.insert( ns(), one );
                 deleteObjects( ns(), BSON( "a" << 1 ), false );
-                ASSERT( BSON( "a" << 1 ).woCompare( indexForPattern( ns(), FieldBoundSet( ns(), BSON( "a" << 1 ) ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 2, nScannedForPattern( ns(), FieldBoundSet( ns(), BSON( "a" << 1 ) ).pattern() ) );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldBoundSet( ns(), BSON( "a" << 1 ) ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( 2, NamespaceDetailsTransient::get( ns() ).nScannedForPattern( FieldBoundSet( ns(), BSON( "a" << 1 ) ).pattern() ) );
             }
         };
         
@@ -932,13 +932,13 @@ namespace QueryOptimizerTests {
                 assembleRequest( ns(), QUERY( "b" << 0 << "a" << GTE << 0 ).obj, 2, 0, 0, 0, m );
                 stringstream ss;
                 runQuery( m, ss );
-                ASSERT( BSON( "$natural" << 1 ).woCompare( indexForPattern( ns(), FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );
+                ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );
                 
                 Message m2;
                 assembleRequest( ns(), QUERY( "b" << 99 << "a" << GTE << 0 ).obj, 2, 0, 0, 0, m2 );
                 runQuery( m2, ss );
-                ASSERT( BSON( "a" << 1 ).woCompare( indexForPattern( ns(), FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );                
-                ASSERT_EQUALS( 2, nScannedForPattern( ns(), FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );                
+                ASSERT_EQUALS( 2, NamespaceDetailsTransient::get( ns() ).nScannedForPattern( FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
             }
         };
         

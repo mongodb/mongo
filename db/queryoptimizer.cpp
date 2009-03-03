@@ -141,6 +141,10 @@ namespace mongo {
         return index_->keyPattern();
     }
     
+    void QueryPlan::registerSelf( int nScanned ) const {
+        NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
+    }
+    
     QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan ) :
     fbs_( ns, query ),
     mayRecordPlan_( true ),
@@ -203,11 +207,11 @@ namespace mongo {
         }
         
         if ( honorRecordedPlan_ ) {
-            BSONObj bestIndex = indexForPattern( ns, fbs_.pattern( order_ ) );
+            BSONObj bestIndex = NamespaceDetailsTransient::get( ns ).indexForPattern( fbs_.pattern( order_ ) );
             if ( !bestIndex.isEmpty() ) {
                 usingPrerecordedPlan_ = true;
                 mayRecordPlan_ = false;
-                oldNScanned_ = nScannedForPattern( ns, fbs_.pattern( order_ ) );
+                oldNScanned_ = NamespaceDetailsTransient::get( ns ).nScannedForPattern( fbs_.pattern( order_ ) );
                 if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
                     // Table scan plan
                     plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
@@ -275,7 +279,7 @@ namespace mongo {
             // plans_.size() > 1 if addOtherPlans was called in Runner::run().
             if ( res->complete() || plans_.size() > 1 )
                 return res;
-            registerIndexForPattern( fbs_.ns(), fbs_.pattern( order_ ), BSONObj(), 0 );
+            NamespaceDetailsTransient::get( fbs_.ns() ).registerIndexForPattern( fbs_.pattern( order_ ), BSONObj(), 0 );
             init();
         }
         Runner r( *this, op );

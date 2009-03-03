@@ -24,28 +24,6 @@
 
 namespace mongo {
 
-    map< string, int > writeCount_;
-    map< string, map< QueryPattern, pair< BSONObj, int > > > queryCache_;
-    void registerWriteOp( const string &ns ) {
-        if ( queryCache_[ ns ].empty() )
-            return;
-        if ( ++writeCount_[ ns ] >= 100 )
-            clearQueryCache( ns );
-    }
-    void clearQueryCache( const string &ns ) {
-        queryCache_[ ns ].clear();
-        writeCount_[ ns ] = 0;
-    }
-    BSONObj indexForPattern( const string &ns, const QueryPattern &pattern ) {
-        return queryCache_[ ns ][ pattern ].first;
-    }
-    int nScannedForPattern( const string &ns, const QueryPattern &pattern ) {
-        return queryCache_[ ns ][ pattern ].second;
-    }    
-    void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey, int nScanned ) {
-        queryCache_[ ns ][ pattern ] = make_pair( indexKey, nScanned );
-    }
-    
     FieldBound::FieldBound( const BSONElement &e ) :
     lower_( minKey.firstElement() ),
     lowerInclusive_( true ),

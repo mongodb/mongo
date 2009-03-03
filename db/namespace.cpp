@@ -506,7 +506,7 @@ namespace mongo {
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
     void NamespaceDetailsTransient::reset() {
-        clearQueryCache( ns.c_str() );
+        clearQueryCache();
         haveIndexKeys = false;
     }
     

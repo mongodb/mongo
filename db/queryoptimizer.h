@@ -50,9 +50,7 @@ namespace mongo {
         const char *ns() const { return fbs_.ns(); }
         BSONObj query() const { return fbs_.query(); }
         const FieldBound &bound( const char *fieldName ) const { return fbs_.bound( fieldName ); }
-        void registerSelf( int nScanned ) const {
-            registerIndexForPattern( ns(), fbs_.pattern( order_ ), indexKey(), nScanned );
-        }
+        void registerSelf( int nScanned ) const;
     private:
         const FieldBoundSet &fbs_;
         const BSONObj &order_;
