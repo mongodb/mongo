@@ -603,6 +603,9 @@ namespace mongo {
     }
 
     void abruptQuit(int x) {
+        ostringstream ossOp;
+        ossOp << "Last op: " << currentOp.infoNoauth() << endl;
+        rawOut( ossOp.str() );
         ostringstream oss;
         oss << "Got signal: " << x << ", printing backtrace:" << endl;
         printStackTrace( oss );

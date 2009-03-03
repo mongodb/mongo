@@ -26,7 +26,6 @@
 #include "instance.h"
 #include "lasterror.h"
 #include "security.h"
-#include "curop.h"
 #include "json.h"
 #include "reccache.h"
 
@@ -614,7 +613,7 @@ namespace mongo {
         stringstream ss;
         ss << "dbexit: " << why << endl;
         rawOut( ss.str() );
-
+        
         stringstream ss2;
         flushOpLog( ss2 );
         rawOut( ss2.str() );

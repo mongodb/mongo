@@ -32,13 +32,17 @@ namespace mongo {
         }
 
         BSONObj info() { 
-            BSONObjBuilder b;
             AuthenticationInfo *ai = authInfo.get();
             if( ai == 0 || !ai->isAuthorized("admin") ) { 
+                BSONObjBuilder b;
                 b.append("err", "unauthorized");
                 return b.obj();
             }
-
+            return infoNoauth();
+        }
+        
+        BSONObj infoNoauth() {
+            BSONObjBuilder b;
             b.append("opid", opNum);
             b.append("active", active);
             if( active ) 

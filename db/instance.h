@@ -20,10 +20,13 @@
 #pragma once
 
 #include "../client/dbclient.h"
+#include "curop.h"
 #include "security.h"
 
 namespace mongo {
 
+    extern CurOp currentOp;
+    
 // turn on or off the oplog.* files which the db can generate.
 // these files are for diagnostic purposes and are unrelated to
 // local.oplog.$main used by replication.
