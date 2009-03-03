@@ -160,7 +160,7 @@ namespace mongo {
 
         static void loadAll(vector<ReplSource*>&);
         static void cleanup(vector<ReplSource*>&);
-        ReplSource(BSONObj);
+        explicit ReplSource(BSONObj);
         bool sync();
         void save(); // write ourself to local.sources
         void resetConnection() {
