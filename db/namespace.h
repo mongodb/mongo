@@ -350,7 +350,6 @@ namespace mongo {
         NamespaceDetailsTransient(const char *_ns) : ns(_ns), haveIndexKeys(), writeCount_() {
             haveIndexKeys=false; /*lazy load them*/
         }
-        ~NamespaceDetailsTransient() { reset(); }
 
         /* get set of index keys for this namespace.  handy to quickly check if a given
            field is indexed (Note it might be a seconary component of a compound index.)
