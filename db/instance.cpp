@@ -282,7 +282,8 @@ namespace mongo {
         prefix += '.';
         ClientCursor::invalidate(prefix.c_str());
 
-        NamespaceDetailsTransient::drop( cl );
+        NamespaceDetailsTransient::drop( prefix.c_str() );
+
         eraseDatabase( cl, path );
         delete database; // closes files
         database = 0;

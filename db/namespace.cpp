@@ -517,10 +517,10 @@ namespace mongo {
         return *t;
     }
 
-    void NamespaceDetailsTransient::drop(const char *ns) {
+    void NamespaceDetailsTransient::drop(const char *prefix) {
         vector< string > found;
         for( ouriter i = map.begin(); i != map.end(); ++i )
-            if ( strncmp( i->first.c_str(), ns, strlen( ns ) ) == 0 )
+            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
                 found.push_back( i->first );
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
             map[ *i ].reset();

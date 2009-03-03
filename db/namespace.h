@@ -367,7 +367,8 @@ namespace mongo {
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > map;
     public:
         static NamespaceDetailsTransient& get(const char *ns);
-        static void drop(const char *ns);
+        // Drop cached information on all namespaces beginning with the specified prefix.
+        static void drop(const char *prefix);
     };
 
     /* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog"
