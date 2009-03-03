@@ -502,8 +502,8 @@ namespace mongo {
 
     /* ------------------------------------------------------------------------- */
 
-    map<string,NamespaceDetailsTransient*> NamespaceDetailsTransient::map;
-    typedef map<string,NamespaceDetailsTransient*>::iterator ouriter;
+    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::map;
+    typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
     void NamespaceDetailsTransient::reset() {
         clearQueryCache( ns.c_str() );
@@ -511,12 +511,22 @@ namespace mongo {
     }
     
     NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
-        NamespaceDetailsTransient*& t = map[ns];
-        if ( t == 0 )
-            t = new NamespaceDetailsTransient(ns);
+        shared_ptr< NamespaceDetailsTransient > &t = map[ ns ];
+        if ( t.get() == 0 )
+            t.reset( new NamespaceDetailsTransient(ns) );
         return *t;
     }
 
+    void NamespaceDetailsTransient::drop(const char *ns) {
+        vector< string > found;
+        for( ouriter i = map.begin(); i != map.end(); ++i )
+            if ( strncmp( i->first.c_str(), ns, strlen( ns ) ) == 0 )
+                found.push_back( i->first );
+        for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
+            map[ *i ].reset();
+        }
+    }
+    
     void NamespaceDetailsTransient::computeIndexKeys() {
         allIndexKeys.clear();
         NamespaceDetails *d = nsdetails(ns.c_str());

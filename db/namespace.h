@@ -347,6 +347,7 @@ namespace mongo {
         NamespaceDetailsTransient(const char *_ns) : ns(_ns) {
             haveIndexKeys=false; /*lazy load them*/
         }
+        ~NamespaceDetailsTransient() { reset(); }
 
         /* get set of index keys for this namespace.  handy to quickly check if a given
            field is indexed (Note it might be a seconary component of a compound index.)
@@ -363,9 +364,10 @@ namespace mongo {
         void deletedIndex() { reset(); }
     private:
         void reset();
-        static std::map<string,NamespaceDetailsTransient*> map;
+        static std::map< string, shared_ptr< NamespaceDetailsTransient > > map;
     public:
         static NamespaceDetailsTransient& get(const char *ns);
+        static void drop(const char *ns);
     };
 
     /* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog"

@@ -165,6 +165,7 @@ namespace mongo {
     void closeClient( const char *cl, const char *path = dbpath );
 
     inline void eraseDatabase( const char *ns, const char *path=dbpath ) {
+        
         string key = getKey( ns, path );
         databases.erase( key );
     }
