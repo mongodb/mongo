@@ -229,6 +229,8 @@ namespace mongo {
                     out() << ii.keyPattern() << ", ";
                 }
                 out() << endl;
+                
+                massert( "Unable to locate previously recorded index", false );
             }
         }
         
