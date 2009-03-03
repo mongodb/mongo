@@ -43,7 +43,7 @@ namespace mongo {
         return queryCache_[ ns ][ pattern ].second;
     }    
     void registerIndexForPattern( const string &ns, const QueryPattern &pattern, const BSONObj &indexKey, int nScanned ) {
-        queryCache_[ ns ][ pattern ] = make_pair( indexKey, nScanned );
+        queryCache_[ ns ][ pattern ] = make_pair( indexKey.copy(), nScanned );
     }
     
     FieldBound::FieldBound( const BSONElement &e ) :
