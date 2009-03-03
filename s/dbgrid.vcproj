@@ -42,7 +42,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;..\pcre-7.4&quot;;&quot;C:\Program Files\boost\boost_1_35_0&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;USE_ASIO"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -493,6 +493,18 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\message_server_asio.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\db\nonce.cpp"
 					>
 				</File>
@@ -539,6 +551,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\client\connpool.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\dbmessage.h"
 					>
 				</File>
@@ -581,10 +597,6 @@
 		<Filter
 			Name="client"
 			>
-			<File
-				RelativePath="..\client\connpool.cpp"
-				>
-			</File>
 			<File
 				RelativePath="..\client\connpool.h"
 				>
