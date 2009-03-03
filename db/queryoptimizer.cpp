@@ -220,7 +220,15 @@ namespace mongo {
                         return;
                     }
                 }
-                assert( false );
+                
+                // TEMP debug info
+                out() << "ERROR unable to find bextIndex: " << bestIndex << endl;
+                out() << "candidates: ";
+                for( int i = 0; i < d->nIndexes; ++i ) {
+                    IndexDetails& ii = d->indexes[i];
+                    out() << ii.keyPattern() << ", ";
+                }
+                out() << endl;
             }
         }
         
