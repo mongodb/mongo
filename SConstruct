@@ -408,7 +408,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         haveReadLine = False
         if darwin:
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
-            myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
+            if force64:
+                myCheckLib( "readline" , True )
+                myCheckLib( "ncurses" , True )
+            else:
+                myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
         elif myCheckLib( "readline" ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
             myCheckLib( "tinfo" )
