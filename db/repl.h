@@ -134,10 +134,8 @@ namespace mongo {
 
         ReplSource();
 
-    protected:
-        static void applyOperation(const BSONObj& op);
-        
     public:
+        static void applyOperation(const BSONObj& op);
         bool replacing; // in "replace mode" -- see CmdReplacePeer
         bool paired; // --pair in use
         string hostName;    // ip addr or hostname plus optionally, ":<port>"
@@ -190,10 +188,7 @@ namespace mongo {
        "c" db cmd
        "db" declares presence of a database (ns is set to the db name + '.')
     */
-    void _logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt, bool *b);
-    inline void logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt = 0, bool *b = 0) {
-        if ( master )
-            _logOp(opstr, ns, obj, patt, b);
-    }
+    void _logOp(const char *opstr, const char *ns, const char *logNs, BSONObj& obj, BSONObj *patt, bool *b);
+    void logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt = 0, bool *b = 0);
 
 } // namespace mongo

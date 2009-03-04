@@ -1044,6 +1044,14 @@ namespace mongo {
     NamespaceDetails *localOplogMainDetails = 0;
     Database *localOplogClient = 0;
 
+    void logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt, bool *b) {
+        if ( master )
+            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b);
+        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
+        if ( !t.logNS().empty() )
+            _logOp(opstr, ns, t.logNS().c_str(), obj, patt, b);
+    }    
+    
     /* we write to local.opload.$main:
          { ts : ..., op: ..., ns: ..., o: ... }
        ts: an OpTime timestamp
@@ -1060,7 +1068,7 @@ namespace mongo {
          when set, indicates this is the first thing we have logged for this database.
          thus, the slave does not need to copy down all the data when it sees this.
     */
-    void _logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *o2, bool *bb) {
+    void _logOp(const char *opstr, const char *ns, const char *logNS, BSONObj& obj, BSONObj *o2, bool *bb) {
         if ( strncmp(ns, "local.", 6) == 0 )
             return;
 
@@ -1091,11 +1099,11 @@ namespace mongo {
         if ( localOplogMainDetails == 0 ) {
             setClientTempNs("local.");
             localOplogClient = database;
-            localOplogMainDetails = nsdetails("local.oplog.$main");
+            localOplogMainDetails = nsdetails(logNS);
         }
         database = localOplogClient;
 
-        Record *r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, "local.oplog.$main", len);
+        Record *r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
 
         char *p = r->data;
         memcpy(p, partial.objdata(), posz);
@@ -1365,4 +1373,42 @@ namespace mongo {
         replPair = new ReplPair(remoteEnd, arb);
     }
 
+    class CmdLogCollection : public Command {
+    public:
+        virtual bool slaveOk() {
+            return false;
+        }
+        CmdLogCollection() : Command( "logCollection" ) {}
+        virtual void help( stringstream &help ) const {
+            help << "examples: { logCollection: <collection ns>, start: 1 }, "
+                 << "{ logCollection: <collection ns>, drop: 1 }";
+        }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            bool start = !cmdObj.getField( "start" ).eoo();
+            bool drop = !cmdObj.getField( "drop" ).eoo();
+            if ( start ? drop : !drop ) {
+                errmsg = "Must specify exactly one of start:1 or drop:1";
+                return false;
+            }
+            setClientTempNs( ns );
+            NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
+            if ( start ) {
+                if ( t.logNS().empty() ) {
+                    t.startLog();
+                } else {
+                    errmsg = "Log already started for ns: " + string( ns );
+                    return false;
+                }
+            } else {
+                if ( t.logNS().empty() ) {
+                    errmsg = "No log to drop for ns: " + string( ns );
+                    return false;
+                } else {
+                    t.dropLog();
+                }
+            }
+            return true;
+        }
+    } cmdlogcollection;
+    
 } // namespace mongo

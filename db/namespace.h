@@ -346,6 +346,7 @@ namespace mongo {
         void computeIndexKeys();
         int writeCount_;
         map< QueryPattern, pair< BSONObj, int > > queryCache_;
+        string logNS_;
     public:
         NamespaceDetailsTransient(const char *_ns) : ns(_ns), haveIndexKeys(), writeCount_() {
             haveIndexKeys=false; /*lazy load them*/
@@ -383,6 +384,11 @@ namespace mongo {
         void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, int nScanned ) {
             queryCache_[ pattern ] = make_pair( indexKey, nScanned );
         }
+        
+        void startLog();
+        void dropLog();
+        string logNS() const { return logNS_; }
+        
     private:
         void reset();
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > map;

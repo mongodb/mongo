@@ -523,6 +523,7 @@ assert( !eloc.isNull() );
 
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
+        out() << "nsToDrop: " << nsToDrop << endl;
         NamespaceDetails* d = nsdetails(nsToDrop.c_str());
         uassert( "ns not found", d );
 

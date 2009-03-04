@@ -536,6 +536,20 @@ namespace mongo {
 //        allIndexKeys.insert(fields.begin(),fields.end());
         }
     }
+    
+    void NamespaceDetailsTransient::startLog() {
+        logNS_ = "local.temp.oplog." + ns;
+        stringstream spec;
+        // 128MB
+        spec << "{size:" << 128 * 1024 * 1024 << ",capped:true}";
+        string err;
+        userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false );
+    }
+    
+    void NamespaceDetailsTransient::dropLog() {
+        dropNS( logNS_ );
+        logNS_ = "";
+    }    
 
     /* ------------------------------------------------------------------------- */
 

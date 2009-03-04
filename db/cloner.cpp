@@ -35,7 +35,7 @@ namespace mongo {
     bool replAuthenticate(DBClientConnection *);
 
     class Cloner: boost::noncopyable {
-        auto_ptr< DBClientInterface > conn;
+        auto_ptr< DBClientWithCommands > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
                   bool masterSameProcess, bool slaveOk, BSONObj query = emptyObj);
     public:
@@ -156,7 +156,7 @@ namespace mongo {
 
                 conn = c;
             } else {
-                conn = auto_ptr< DBClientInterface >( new DBDirectClient() );
+                conn.reset( new DBDirectClient() );
             }
             c = conn->query( ns.c_str(), emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
         }
@@ -230,6 +230,9 @@ namespace mongo {
     }
 
     bool Cloner::cloneCollection( const char *fromhost, const char *ns, BSONObj query, string &errmsg, bool logForRepl, bool copyIndexes ) {
+        char db[256];
+        nsToClient( ns, db );
+
         {
             dbtemprelease r;
             auto_ptr< DBClientConnection > c( new DBClientConnection() );
@@ -238,17 +241,44 @@ namespace mongo {
             if( !replAuthenticate(c.get()) )
                 return false;
             conn = c;
+
+            // Start temporary op log
+            BSONObj info;
+            if ( !conn->runCommand( db, BSON( "logCollection" << ns << "start" << 1 ), info ) ) {
+                errmsg = "logCollection failed: " + (string)info;
+                return false;
+            }
         }
        
-
+        
         copy( ns, ns, false, logForRepl, false, false, query );
-        if ( !copyIndexes )
-            return true;
 
-        char db[256];
-        nsToClient( ns, db );
-        string indexNs = string( db ) + ".system.indexes";
-        copy( indexNs.c_str(), indexNs.c_str(), true, logForRepl, false, false, BSON( "ns" << ns ) );
+        if ( copyIndexes ) {
+            string indexNs = string( db ) + ".system.indexes";
+            copy( indexNs.c_str(), indexNs.c_str(), true, logForRepl, false, false, BSON( "ns" << ns ) );
+        }
+        
+        // According to the docs, the machine I'm cloning from is supposed to be
+        // locked during this part.  Need to learn more about the plan for that.
+        string logNS = "local.temp.oplog." + string( ns );
+        auto_ptr< DBClientCursor > c = conn->query( logNS.c_str(), Query() );
+        while( 1 ) {
+            {
+                dbtemprelease t;
+                if ( !c->more() )
+                    break;
+            }
+            ReplSource::applyOperation( c->next() );
+        }
+        
+        {
+            dbtemprelease t;
+            BSONObj info;
+            if ( !conn->runCommand( db, BSON( "logCollection" << ns << "drop" << 1 ), info ) ) {
+                errmsg = "logCollection failed: " + (string)info;
+                return false;
+            }
+        }
         return true;
     }
     
@@ -290,11 +320,15 @@ namespace mongo {
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
-            if ( fromhost.empty() )
+            if ( fromhost.empty() ) {
+                errmsg = "missing from spec";
                 return false;
+            }
             string collection = cmdObj.getStringField("cloneCollection");
-            if ( collection.empty() )
+            if ( collection.empty() ) {
+                errmsg = "missing cloneCollection spec";
                 return false;
+            }
             BSONObj query = cmdObj.getObjectField("query");
             if ( query.isEmpty() )
                 query = emptyObj;
