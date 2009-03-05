@@ -233,7 +233,7 @@ extern v8::Handle< v8::Context > baseContext_;
 class JSThreadConfig {
 public:
     JSThreadConfig( const Arguments &args ) : started_(), done_() {
-        jsassert( args.Length() > 0, "need to sxpecify at least one argument to fork" );
+        jsassert( args.Length() > 0, "need at least one argument" );
         jsassert( args[ 0 ]->IsFunction(), "first argument must be a function" );
         Local< Function > f = Function::Cast( *args[ 0 ] );
         f_ = Persistent< Function >::New( f );
@@ -241,7 +241,6 @@ public:
             args_.push_back( Persistent< Value >::New( args[ i ] ) );
     }
     ~JSThreadConfig() {
-        cout << "goodbye" << endl;
         f_.Dispose();
         for( vector< Persistent< Value > >::iterator i = args_.begin(); i != args_.end(); ++i )
             i->Dispose();
@@ -294,7 +293,9 @@ private:
 
 Handle< Value > ThreadInit( const Arguments &args ) {
     Handle<Object> it = args.This();
-    // NOTE I believe the passed JSThreadConfig will never be freed.
+    // NOTE I believe the passed JSThreadConfig will never be freed.  If this
+    // policy is changed, JSThread may no longer be able to store JSThreadConfig
+    // by reference.
     it->Set( String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
     return Undefined();
 }

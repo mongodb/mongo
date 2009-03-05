@@ -75,6 +75,7 @@ Handle<Value> mongoInit(const Arguments& args){
         return v8::ThrowException( v8::String::New( "couldn't connect" ) );
     }
 
+    // NOTE I don't believe the conn object will ever be freed.
     args.This()->Set( CONN_STRING , External::New( conn ) );
     args.This()->Set( String::New( "slaveOk" ) , Boolean::New( false ) );
     
@@ -336,6 +337,7 @@ Handle<Value> mongoFind(const Arguments& args){
         v8::Function * cons = (v8::Function*)( *( mongo->Get( String::New( "internalCursor" ) ) ) );
         Local<v8::Object> c = cons->NewInstance();
         
+        // NOTE I don't believe the cursor object will ever be freed.
         c->Set( v8::String::New( "cursor" ) , External::New( cursor.release() ) );
         return c;
     }
