@@ -188,7 +188,11 @@ void sleepms( int ms ) {
 Handle<v8::Value> JSSleep(const Arguments& args){
     assert( args.Length() == 1 );
     assert( args[0]->IsInt32() );
-    sleepms( args[0]->ToInt32()->Value() );
+    int ms = args[ 0 ]->ToInt32()->Value();
+    {
+        v8::Unlocker u;
+        sleepms( ms );
+    }
     return v8::Undefined();
 }
 
@@ -223,6 +227,21 @@ void ReportException(v8::TryCatch* try_catch) {
     cout << try_catch << endl;
 }
 
+class JSThread {
+public:
+    JSThread( const Arguments &args ) : args_( args ) {}
+    void operator()() {
+        v8::Locker l;
+    }
+private:
+    Arguments args_;
+};
+
+Handle< v8::Value > JSFork( const Arguments &args ) {
+    jsassert( args.Length() > 0, "need to specify at least one argument to fork" );
+    return v8::Undefined();
+}
+
 const char *argv0 = 0;
 void RecordMyLocation( const char *_argv0 ) { argv0 = _argv0; }
 
@@ -241,107 +260,107 @@ char *copyString( const char *original ) {
 }
 
 boost::mutex &mongoProgramOutputMutex( *( new boost::mutex ) );
-const v8::Arguments *mongoProgramArgs = 0;
 
 void writeMongoProgramOutputLine( int port, const char *line ) {
     boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
     cout << "m" << port << "| " << line << endl;
 }
 
-void mongoProgramThread() {
-    assert( mongoProgramArgs->Length() > 0 );
-    v8::String::Utf8Value programParse( (*mongoProgramArgs)[ 0 ] );
-    assert( *programParse );
-    string program( *programParse );
-
-    assert( argv0 );
-    boost::filesystem::path programPath = ( boost::filesystem::path( argv0 ) ).branch_path() / program;
-    assert( boost::filesystem::exists( programPath ) );
-    
-    int port = -1;
-    char * argv[ mongoProgramArgs->Length() + 1 ];
-    {
-        string s = programPath.native_file_string();
-        if ( s == program )
-            s = "./" + s;
-        argv[ 0 ] = copyString( s.c_str() );
-    }
-    
-    for( int i = 1; i < mongoProgramArgs->Length(); ++i ) {
-        v8::String::Utf8Value str( (*mongoProgramArgs)[ i ] );
-        assert( *str );
-        char *s = copyString( *str );
-        if ( string( "--port" ) == s )
-            port = -2;
-        else if ( port == -2 )
-            port = strtol( s, 0, 10 );
-        argv[ i ] = s;
-    }
-    argv[ mongoProgramArgs->Length() ] = 0;
-    
-    assert( port > 0 );
-    assert( dbs.count( port ) == 0 );
-
-    int pipeEnds[ 2 ];
-    assert( pipe( pipeEnds ) != -1 );
-
-    fflush( 0 );
-    pid_t pid = fork();
-    assert( pid != -1 );
-    
-    if ( pid == 0 ) {
-        assert( dup2( pipeEnds[ 1 ], STDOUT_FILENO ) != -1 );
-        assert( dup2( pipeEnds[ 1 ], STDERR_FILENO ) != -1 );
-        execvp( argv[ 0 ], argv );
-        assert( ( "Unable to start program", false ) );
-    }
-    
-    int i = 0;
-    while( argv[ i ] )
-        free( argv[ i++ ] );
-    
-    dbs.insert( make_pair( port, make_pair( pid, pipeEnds[ 1 ] ) ) );
-
-    // Allow caller to return -- this is our low rent lock
-    mongoProgramArgs = 0;
-
-    // This assumes there aren't any 0's in the mongo program output.
-    // Hope that's ok.
-    char buf[ 1024 ];
-    char temp[ 1024 ];
-    char *start = buf;
-    while( 1 ) {
-        int lenToRead = 1023 - ( start - buf );
-        int ret = read( pipeEnds[ 0 ], (void *)start, lenToRead );
-        assert( ret != -1 );
-        start[ ret ] = '\0';
-        char *last = buf;
-        for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
-            *i = '\0';
-            writeMongoProgramOutputLine( port, last );
+class MongoProgramRunner {
+    char **argv_;
+    int port_;
+public:
+    MongoProgramRunner( const v8::Arguments &args ) {
+        assert( args.Length() > 0 );
+        v8::String::Utf8Value programParse( args[ 0 ] );
+        assert( *programParse );
+        string program( *programParse );
+        
+        assert( argv0 );
+        boost::filesystem::path programPath = ( boost::filesystem::path( argv0 ) ).branch_path() / program;
+        assert( boost::filesystem::exists( programPath ) );
+        
+        port_ = -1;
+        argv_ = new char *[ args.Length() + 1 ];
+        {
+            string s = programPath.native_file_string();
+            if ( s == program )
+                s = "./" + s;
+            argv_[ 0 ] = copyString( s.c_str() );
         }
-        if ( ret == 0 ) {
-            if ( *last )
-                writeMongoProgramOutputLine( port, last );
-            break;
+        
+        for( int i = 1; i < args.Length(); ++i ) {
+            v8::String::Utf8Value str( args[ i ] );
+            assert( *str );
+            char *s = copyString( *str );
+            if ( string( "--port" ) == s )
+                port_ = -2;
+            else if ( port_ == -2 )
+                port_ = strtol( s, 0, 10 );
+            argv_[ i ] = s;
         }
-        if ( last != buf ) {
-            strcpy( temp, last );
-            strcpy( buf, temp );
-        } else {
-            assert( strlen( buf ) < 1023 );
-        }
-        start = buf + strlen( buf );
+        argv_[ args.Length() ] = 0;
+        
+        assert( port_ > 0 );
+        assert( dbs.count( port_ ) == 0 );        
     }
-}
+    
+    void operator()() {
+        int pipeEnds[ 2 ];
+        assert( pipe( pipeEnds ) != -1 );
+        
+        fflush( 0 );
+        pid_t pid = fork();
+        assert( pid != -1 );
+        
+        if ( pid == 0 ) {
+            assert( dup2( pipeEnds[ 1 ], STDOUT_FILENO ) != -1 );
+            assert( dup2( pipeEnds[ 1 ], STDERR_FILENO ) != -1 );
+            execvp( argv_[ 0 ], argv_ );
+            assert( ( "Unable to start program", false ) );
+        }
+        
+        int i = 0;
+        while( argv_[ i ] )
+            free( argv_[ i++ ] );
+        free( argv_ );
+        
+        dbs.insert( make_pair( port_, make_pair( pid, pipeEnds[ 1 ] ) ) );
+        
+        // This assumes there aren't any 0's in the mongo program output.
+        // Hope that's ok.
+        char buf[ 1024 ];
+        char temp[ 1024 ];
+        char *start = buf;
+        while( 1 ) {
+            int lenToRead = 1023 - ( start - buf );
+            int ret = read( pipeEnds[ 0 ], (void *)start, lenToRead );
+            assert( ret != -1 );
+            start[ ret ] = '\0';
+            char *last = buf;
+            for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
+                *i = '\0';
+                writeMongoProgramOutputLine( port_, last );
+            }
+            if ( ret == 0 ) {
+                if ( *last )
+                    writeMongoProgramOutputLine( port_, last );
+                break;
+            }
+            if ( last != buf ) {
+                strcpy( temp, last );
+                strcpy( buf, temp );
+            } else {
+                assert( strlen( buf ) < 1023 );
+            }
+            start = buf + strlen( buf );
+        }        
+    }
+};
 
-// Relies on global mongoProgramArgs; not thread-safe
 v8::Handle< v8::Value > StartMongoProgram( const v8::Arguments &a ) {
-    assert( !mongoProgramArgs );
-    mongoProgramArgs = &a;
-    boost::thread t( mongoProgramThread );
-    while( mongoProgramArgs )
-        sleepms( 2 );
+    MongoProgramRunner r( a );
+    boost::thread t( r );
     return v8::Undefined();
 }
 
@@ -413,6 +432,7 @@ void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("listFiles"), v8::FunctionTemplate::New(ListFiles));
     global->Set(v8::String::New("quit"), v8::FunctionTemplate::New(Quit));
     global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
+    global->Set(v8::String::New("fork"), v8::FunctionTemplate::New(JSFork));
 #if !defined(_WIN32)
     global->Set(v8::String::New("_startMongoProgram"), v8::FunctionTemplate::New(StartMongoProgram));
     global->Set(v8::String::New("stopMongod"), v8::FunctionTemplate::New(StopMongoProgram));

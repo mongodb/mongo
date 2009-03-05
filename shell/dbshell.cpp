@@ -99,6 +99,7 @@ int main(int argc, char* argv[]) {
 
     //v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
     
+    v8::Locker l;
     v8::HandleScope handle_scope;
 
     v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
