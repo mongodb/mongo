@@ -1,6 +1,7 @@
 // ShellUtils.cpp
 
 #include "ShellUtils.h"
+#include <boost/smart_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -227,19 +228,85 @@ void ReportException(v8::TryCatch* try_catch) {
     cout << try_catch << endl;
 }
 
-class JSThread {
+extern v8::Handle< v8::Context > baseContext_;
+
+class JSThreadConfig {
 public:
-    JSThread( const Arguments &args ) : args_( args ) {}
-    void operator()() {
-        v8::Locker l;
+    JSThreadConfig( const Arguments &args ) {
+        jsassert( args.Length() > 0, "need to sxpecify at least one argument to fork" );
+        jsassert( args[ 0 ]->IsFunction(), "first argument must be a function" );
+        Local< Function > f = Function::Cast( *args[ 0 ] );
+        f_ = Persistent< Function >::New( f );
+        for( int i = 1; i < args.Length(); ++i )
+            args_.push_back( Persistent< Value >::New( args[ i ] ) );
+    }
+    ~JSThreadConfig() {
+        cout << "goodbye" << endl;
+        f_.Dispose();
+        for( vector< Persistent< Value > >::iterator i = args_.begin(); i != args_.end(); ++i )
+            i->Dispose();
+        returnData_.Dispose();
+    }
+    void start() {
+        JSThread jt( *this );
+        thread_.reset( new boost::thread( jt ) );
+    }
+    void join() {
+        Unlocker u;
+        thread_->join();
+    }
+    Local< Value > returnData() {
+        join();
+        return Local< Value >::New( returnData_ );
     }
 private:
-    Arguments args_;
+    class JSThread {
+    public:
+        JSThread( JSThreadConfig &config ) : config_( config ) {}
+        void operator()() {
+            Locker l;
+            Context::Scope context_scope( baseContext_ );
+            HandleScope handle_scope;
+            boost::scoped_array< Handle< Value > > argv( new Handle< Value >[ config_.args_.size() ] );
+            for( unsigned int i = 0; i < config_.args_.size(); ++i )
+                argv[ i ] = config_.args_[ i ];
+            Local< Value > ret = config_.f_->Call( Context::GetCurrent()->Global(), config_.args_.size(), argv.get() );
+            config_.returnData_ = Persistent< Value >::New( ret );
+        }
+    private:
+        JSThreadConfig &config_;
+    };
+    
+    Persistent< Function > f_;
+    vector< Persistent< Value > > args_;
+    auto_ptr< boost::thread > thread_;
+    Persistent< Value > returnData_;
 };
 
-Handle< v8::Value > JSFork( const Arguments &args ) {
-    jsassert( args.Length() > 0, "need to specify at least one argument to fork" );
-    return v8::Undefined();
+Handle< Value > ThreadInit( const Arguments &args ) {
+    Handle<Object> it = args.This();
+    it->Set( String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
+    return Undefined();
+}
+
+JSThreadConfig *thisConfig( const Arguments &args ) {
+    Local< External > c = External::Cast( *(args.This()->Get( String::New( "_JSThreadConfig" ) ) ) );
+    JSThreadConfig *config = (JSThreadConfig *)( c->Value() );
+    return config;
+}
+
+Handle< Value > ThreadStart( const Arguments &args ) {
+    thisConfig( args )->start();
+    return Undefined();
+}
+
+Handle< Value > ThreadJoin( const Arguments &args ) {
+    thisConfig( args )->join();
+    return Undefined();
+}
+
+Handle< Value > ThreadReturnData( const Arguments &args ) {
+    return thisConfig( args )->returnData();
 }
 
 const char *argv0 = 0;
@@ -425,6 +492,20 @@ MongoProgramScope::~MongoProgramScope() {}
 void KillMongoProgramInstances() {}
 #endif
 
+Handle< Value > ThreadInject( const Arguments &args ) {
+    jsassert( args.Length() == 1 , "threadInject takes exactly 1 argument" );
+    jsassert( args[0]->IsObject() , "threadInject needs to be passed a prototype" );
+    
+    Local<v8::Object> o = args[0]->ToObject();
+    
+    o->Set( String::New( "init" ) , FunctionTemplate::New( ThreadInit )->GetFunction() );
+    o->Set( String::New( "start" ) , FunctionTemplate::New( ThreadStart )->GetFunction() );
+    o->Set( String::New( "join" ) , FunctionTemplate::New( ThreadJoin )->GetFunction() );
+    o->Set( String::New( "returnData" ) , FunctionTemplate::New( ThreadReturnData )->GetFunction() );
+    
+    return v8::Undefined();    
+}
+
 void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("sleep"), v8::FunctionTemplate::New(JSSleep));
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
@@ -432,7 +513,7 @@ void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("listFiles"), v8::FunctionTemplate::New(ListFiles));
     global->Set(v8::String::New("quit"), v8::FunctionTemplate::New(Quit));
     global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
-    global->Set(v8::String::New("fork"), v8::FunctionTemplate::New(JSFork));
+    global->Set(v8::String::New("threadInject"), v8::FunctionTemplate::New(ThreadInject));
 #if !defined(_WIN32)
     global->Set(v8::String::New("_startMongoProgram"), v8::FunctionTemplate::New(StartMongoProgram));
     global->Set(v8::String::New("stopMongod"), v8::FunctionTemplate::New(StopMongoProgram));

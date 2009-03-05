@@ -92,6 +92,8 @@ string fixHost( string url , string host , string port ){
     return newurl;
 }
 
+v8::Handle< v8::Context > baseContext_;
+
 int main(int argc, char* argv[]) {
     setupSignals();
     
@@ -107,9 +109,8 @@ int main(int argc, char* argv[]) {
     installShellUtils( global );
     installMongoGlobals( global );
 
-    
-    v8::Handle<v8::Context> context = v8::Context::New(NULL, global);
-    v8::Context::Scope context_scope(context);
+    baseContext_ = v8::Context::New(NULL, global);
+    v8::Context::Scope context_scope(baseContext_);
     
     { // init mongo code
         v8::HandleScope handle_scope;
@@ -285,7 +286,7 @@ int main(int argc, char* argv[]) {
         
         cout << "type \"help\" for help" << endl;
         
-        v8::Handle<v8::Object> shellHelper = context->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
+        v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
         while ( 1 ){
             

@@ -23,6 +23,7 @@ v8::Handle<v8::Value> Quit(const v8::Arguments& args);
 v8::Handle<v8::Value> Version(const v8::Arguments& args);
 v8::Handle<v8::Value> JSSleep(const v8::Arguments& args);
 v8::Handle<v8::Value> JSFork(const v8::Arguments& args);
+v8::Handle<v8::Value> Join(const v8::Arguments& args);
 
 v8::Handle<v8::String> ReadFile(const char* name);
 
