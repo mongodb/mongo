@@ -232,7 +232,7 @@ extern v8::Handle< v8::Context > baseContext_;
 
 class JSThreadConfig {
 public:
-    JSThreadConfig( const Arguments &args ) {
+    JSThreadConfig( const Arguments &args ) : started_(), done_() {
         jsassert( args.Length() > 0, "need to sxpecify at least one argument to fork" );
         jsassert( args[ 0 ]->IsFunction(), "first argument must be a function" );
         Local< Function > f = Function::Cast( *args[ 0 ] );
@@ -248,15 +248,20 @@ public:
         returnData_.Dispose();
     }
     void start() {
+        jsassert( !started_, "Thread already started" );
         JSThread jt( *this );
         thread_.reset( new boost::thread( jt ) );
+        started_ = true;
     }
     void join() {
+        jsassert( started_ && !done_, "Thread not running" );
         Unlocker u;
         thread_->join();
+        done_ = true;
     }
     Local< Value > returnData() {
-        join();
+        if ( !done_ )
+            join();
         return Local< Value >::New( returnData_ );
     }
 private:
@@ -267,16 +272,20 @@ private:
             Locker l;
             Context::Scope context_scope( baseContext_ );
             HandleScope handle_scope;
-            boost::scoped_array< Handle< Value > > argv( new Handle< Value >[ config_.args_.size() ] );
+            boost::scoped_array< Persistent< Value > > argv( new Persistent< Value >[ config_.args_.size() ] );
             for( unsigned int i = 0; i < config_.args_.size(); ++i )
-                argv[ i ] = config_.args_[ i ];
+                argv[ i ] = Persistent< Value >::New( config_.args_[ i ] );
             Local< Value > ret = config_.f_->Call( Context::GetCurrent()->Global(), config_.args_.size(), argv.get() );
+            for( unsigned int i = 0; i < config_.args_.size(); ++i )
+                argv[ i ].Dispose();
             config_.returnData_ = Persistent< Value >::New( ret );
         }
     private:
         JSThreadConfig &config_;
     };
-    
+
+    bool started_;
+    bool done_;
     Persistent< Function > f_;
     vector< Persistent< Value > > args_;
     auto_ptr< boost::thread > thread_;
@@ -285,6 +294,7 @@ private:
 
 Handle< Value > ThreadInit( const Arguments &args ) {
     Handle<Object> it = args.This();
+    // NOTE I believe the passed JSThreadConfig will never be freed.
     it->Set( String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
     return Undefined();
 }
