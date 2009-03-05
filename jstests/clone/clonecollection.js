@@ -27,3 +27,25 @@ assert.eq( 1, t.system.indexes.find().count() );
 // Verify index works
 assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().startKey.i );
 assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length );
+
+f.a.drop();
+t.a.drop();
+
+for( i = 0; i < 100000; ++i ) {
+    f.a.save( { i: i } );
+}
+
+cc = fork( function() { t.cloneCollection( "localhost:27018", "a" ); } );
+cc.start();
+
+sleep( 200 );
+f.a.save( { i: 200000 } );
+f.a.remove( { i: 99999 } );
+f.a.update( { i: 99998 }, { i: 99998, x: "y" } );
+
+cc.join();
+
+assert.eq( 100000, t.a.find().count() );
+assert.eq( 1, t.a.find( { i: 200000 } ).count() );
+assert.eq( 0, t.a.find( { i: 99999 } ).count() );
+assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count() );
