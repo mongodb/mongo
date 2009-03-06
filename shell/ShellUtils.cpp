@@ -270,6 +270,8 @@ private:
         JSThread( JSThreadConfig &config ) : config_( config ) {}
         void operator()() {
             Locker l;
+            // Context scope and handle scope held in thread specific storage,
+            // so need to configure for each thread.
             Context::Scope context_scope( baseContext_ );
             HandleScope handle_scope;
             boost::scoped_array< Persistent< Value > > argv( new Persistent< Value >[ config_.args_.size() ] );
@@ -396,7 +398,7 @@ public:
             assert( dup2( pipeEnds[ 1 ], STDOUT_FILENO ) != -1 );
             assert( dup2( pipeEnds[ 1 ], STDERR_FILENO ) != -1 );
             execvp( argv_[ 0 ], argv_ );
-            assert( ( "Unable to start program", false ) );
+            assert( "Unable to start program" == 0 );
         }
         
         int i = 0;
