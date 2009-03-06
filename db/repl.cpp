@@ -1044,6 +1044,19 @@ namespace mongo {
     NamespaceDetails *localOplogMainDetails = 0;
     Database *localOplogClient = 0;
 
+    void logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt, bool *b) {
+        if ( master )
+            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b);
+        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
+        if ( t.logValid() ) {
+            try {
+                _logOp(opstr, ns, t.logNS().c_str(), obj, patt, b);
+            } catch ( const DBException & ) {
+                t.invalidateLog();
+            }
+        }
+    }    
+    
     /* we write to local.opload.$main:
          { ts : ..., op: ..., ns: ..., o: ... }
        ts: an OpTime timestamp
@@ -1060,7 +1073,7 @@ namespace mongo {
          when set, indicates this is the first thing we have logged for this database.
          thus, the slave does not need to copy down all the data when it sees this.
     */
-    void _logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *o2, bool *bb) {
+    void _logOp(const char *opstr, const char *ns, const char *logNS, BSONObj& obj, BSONObj *o2, bool *bb) {
         if ( strncmp(ns, "local.", 6) == 0 )
             return;
 
@@ -1088,14 +1101,20 @@ namespace mongo {
         int posz = partial.objsize();
         int len = posz + obj.objsize() + 1 + 2 /*o:*/;
 
-        if ( localOplogMainDetails == 0 ) {
-            setClientTempNs("local.");
-            localOplogClient = database;
-            localOplogMainDetails = nsdetails("local.oplog.$main");
+        Record *r;
+        if ( strncmp( logNS, "local.", 6 ) == 0 ) { // For now, assume this is olog main
+            if ( localOplogMainDetails == 0 ) {
+                setClientTempNs("local.");
+                localOplogClient = database;
+                localOplogMainDetails = nsdetails(logNS);
+            }
+            database = localOplogClient;
+            r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
+        } else {
+            setClient( logNS );
+            assert( nsdetails( logNS ) );
+            r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
-        database = localOplogClient;
-
-        Record *r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, "local.oplog.$main", len);
 
         char *p = r->data;
         memcpy(p, partial.objdata(), posz);
@@ -1365,4 +1384,54 @@ namespace mongo {
         replPair = new ReplPair(remoteEnd, arb);
     }
 
+    class CmdLogCollection : public Command {
+    public:
+        virtual bool slaveOk() {
+            return false;
+        }
+        CmdLogCollection() : Command( "logCollection" ) {}
+        virtual void help( stringstream &help ) const {
+            help << "examples: { logCollection: <collection ns>, start: 1 }, "
+                 << "{ logCollection: <collection ns>, validateComplete: 1 }";
+        }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            string logCollection = cmdObj.getStringField( "logCollection" );
+            if ( logCollection.empty() ) {
+                errmsg = "missing logCollection spec";
+                return false;
+            }
+            bool start = !cmdObj.getField( "start" ).eoo();
+            bool validateComplete = !cmdObj.getField( "validateComplete" ).eoo();
+            if ( start ? validateComplete : !validateComplete ) {
+                errmsg = "Must specify exactly one of start:1 or validateComplete:1";
+                return false;
+            }
+            int logSizeMb = cmdObj.getIntField( "logSizeMb" );
+            NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( logCollection.c_str() );
+            if ( start ) {
+                if ( t.logNS().empty() ) {
+                    if ( logSizeMb == INT_MIN ) {
+                        t.startLog();
+                    } else {
+                        t.startLog( logSizeMb );
+                    }
+                } else {
+                    errmsg = "Log already started for ns: " + logCollection;
+                    return false;
+                }
+            } else {
+                if ( t.logNS().empty() ) {
+                    errmsg = "No log to validateComplete for ns: " + logCollection;
+                    return false;
+                } else {
+                    if ( !t.validateCompleteLog() ) {
+                        errmsg = "Oplog failure, insufficient space allocated";
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+    } cmdlogcollection;
+    
 } // namespace mongo

@@ -75,6 +75,7 @@ Handle<Value> mongoInit(const Arguments& args){
         return v8::ThrowException( v8::String::New( "couldn't connect" ) );
     }
 
+    // NOTE I don't believe the conn object will ever be freed.
     args.This()->Set( CONN_STRING , External::New( conn ) );
     args.This()->Set( String::New( "slaveOk" ) , Boolean::New( false ) );
     
@@ -325,11 +326,18 @@ Handle<Value> mongoFind(const Arguments& args){
     bool slaveOk = slaveOkVal->BooleanValue();
     
     try {
-        auto_ptr<mongo::DBClientCursor> cursor = conn->query( ns, q , (int)(args[3]->ToNumber()->Value()) , (int)(args[4]->ToNumber()->Value()) , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
+        auto_ptr<mongo::DBClientCursor> cursor;
+        int nToReturn = (int)(args[3]->ToNumber()->Value());
+        int nToSkip = (int)(args[4]->ToNumber()->Value());
+        {
+            v8::Unlocker u;
+            cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
+        }
         
         v8::Function * cons = (v8::Function*)( *( mongo->Get( String::New( "internalCursor" ) ) ) );
         Local<v8::Object> c = cons->NewInstance();
         
+        // NOTE I don't believe the cursor object will ever be freed.
         c->Set( v8::String::New( "cursor" ) , External::New( cursor.release() ) );
         return c;
     }
@@ -428,7 +436,11 @@ v8::Handle<v8::Value> internalCursorNext(const v8::Arguments& args){
     mongo::DBClientCursor * cursor = getCursor( args );
     if ( ! cursor )
         return v8::Undefined();
-    BSONObj o = cursor->next();
+    BSONObj o;
+    {
+        v8::Unlocker u;
+        o = cursor->next();
+    }
     return mongoToV8( o );
 }
 
@@ -436,7 +448,12 @@ v8::Handle<v8::Value> internalCursorHasNext(const v8::Arguments& args){
     mongo::DBClientCursor * cursor = getCursor( args );
     if ( ! cursor )
         return Boolean::New( false );
-    return Boolean::New( cursor->more() );
+    bool more;
+    {
+        v8::Unlocker u;
+        more = cursor->more();
+    }
+    return Boolean::New( more );
 }
 
 

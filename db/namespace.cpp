@@ -466,6 +466,7 @@ namespace mongo {
                 continue;
             }
 
+            massert( "Capped collection full and delete not allowed", cappedMayDelete() );
             DiskLoc fr = theCapExtent()->firstRecord;
             theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
             compact();
@@ -535,6 +536,39 @@ namespace mongo {
             d->indexes[i].keyPattern().getFieldNames(allIndexKeys);
 //        allIndexKeys.insert(fields.begin(),fields.end());
         }
+    }
+    
+    void NamespaceDetailsTransient::startLog( int logSizeMb ) {
+        logNS_ = "local.temp.oplog." + ns;
+        logValid_ = true;
+        stringstream spec;
+        // 128MB
+        spec << "{size:" << logSizeMb * 1024 * 1024 << ",capped:true}";
+        setClientTempNs( logNS_.c_str() );
+        string err;
+        massert( "Could not create log ns", userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false ) );
+        NamespaceDetails *d = nsdetails( logNS_.c_str() );
+        d->cappedDisallowDelete();
+    }
+
+    void NamespaceDetailsTransient::invalidateLog() {
+        dropLog();
+        logValid_ = false;
+    }
+    
+    bool NamespaceDetailsTransient::validateCompleteLog() {
+        dropLog();
+        bool ret = logValid_;
+        logValid_ = false;
+        logNS_ = "";
+        return ret;
+    }
+    
+    void NamespaceDetailsTransient::dropLog() {
+        if ( !logValid_ )
+            return;
+        setClientTempNs( logNS_.c_str() );
+        dropNS( logNS_ );
     }
 
     /* ------------------------------------------------------------------------- */

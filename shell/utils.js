@@ -122,6 +122,18 @@ ObjectId.prototype.tojson = function(){
 
 ObjectId.prototype.isObjectId = true;
 
+Thread = function(){
+    this.init.apply( this, arguments );
+}
+
+threadInject( Thread.prototype );
+
+fork = function() {
+    var t = new Thread( function() {} );
+    Thread.apply( t, arguments );
+    return t;
+}
+
 tojson = function( x ){
     if ( x == null || x == undefined )
         return "";
