@@ -502,7 +502,7 @@ namespace mongo {
 
     /* ------------------------------------------------------------------------- */
 
-    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::map;
+    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::map_;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
     void NamespaceDetailsTransient::reset() {
@@ -511,7 +511,7 @@ namespace mongo {
     }
     
     NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = map[ ns ];
+        shared_ptr< NamespaceDetailsTransient > &t = map_[ ns ];
         if ( t.get() == 0 )
             t.reset( new NamespaceDetailsTransient(ns) );
         return *t;
@@ -519,11 +519,11 @@ namespace mongo {
 
     void NamespaceDetailsTransient::drop(const char *prefix) {
         vector< string > found;
-        for( ouriter i = map.begin(); i != map.end(); ++i )
+        for( ouriter i = map_.begin(); i != map_.end(); ++i )
             if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
                 found.push_back( i->first );
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            map[ *i ].reset();
+            map_[ *i ].reset();
         }
     }
     

@@ -391,7 +391,7 @@ namespace mongo {
         
     private:
         void reset();
-        static std::map< string, shared_ptr< NamespaceDetailsTransient > > map;
+        static std::map< string, shared_ptr< NamespaceDetailsTransient > > map_;
     public:
         static NamespaceDetailsTransient& get(const char *ns);
         // Drop cached information on all namespaces beginning with the specified prefix.
