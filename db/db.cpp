@@ -304,6 +304,18 @@ namespace mongo {
                 boost::filesystem::remove_all( *i );
         }
     }
+    
+    void clearTmpCollections() {
+        vector< string > toDelete;
+        DBDirectClient cli;
+        auto_ptr< DBClientCursor > c = cli.query( "local.system.namespaces", Query( fromjson( "{name:/^local.temp./}" ) ) );
+        while( c->more() )
+            toDelete.push_back( c->next().getStringField( "name" ) );
+        for( vector< string >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
+            log() << "Dropping old temporary collection: " << *i << endl;
+            cli.dropCollection( *i );
+        }
+    }
 
     Timer startupSrandTimer;
 
@@ -315,6 +327,7 @@ namespace mongo {
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         
         clearTmpFiles();
+        clearTmpCollections();
 
         if ( opLogging )
             log() << "opLogging = " << opLogging << endl;
