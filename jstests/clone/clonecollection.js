@@ -42,7 +42,7 @@ cc.start();
 sleep( 200 );
 f.a.save( { i: 200000 } );
 //f.a.save( { i: -1 } );
-f.a.remove( { i: 99999 } );
+f.a.remove( { i: 0 } );
 f.a.update( { i: 99998 }, { i: 99998, x: "y" } );
 assert( !finished, "test run invalid" );
 
@@ -51,5 +51,5 @@ cc.join();
 assert.eq( 100000, t.a.find().count() );
 assert.eq( 1, t.a.find( { i: 200000 } ).count() );
 assert.eq( 0, t.a.find( { i: -1 } ).count() );
-assert.eq( 0, t.a.find( { i: 99999 } ).count() );
+assert.eq( 0, t.a.find( { i: 0 } ).count() );
 assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count() );
