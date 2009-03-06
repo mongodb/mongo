@@ -268,6 +268,26 @@ DBCollection.prototype.dropIndex =  function(index) {
     return res;
 }
 
+DBCollection.prototype.copyTo = function( newName ){
+    return this.getDB().eval( 
+        function( collName , newName ){
+            var from = db[collName];
+            var to = db[newName];
+            to.ensureIndex( { _id : 1 } );
+            var count = 0;
+            
+            var cursor = from.find();
+            while ( cursor.hasNext() ){
+                var o = cursor.next();
+                count++;
+                to.save( o );
+            }
+            
+            return count;
+        } , this.getName() , newName 
+    );
+}
+
 DBCollection.prototype.getCollection = function( subName ){
     return this._db.getCollection( this._shortName + "." + subName );
 }
