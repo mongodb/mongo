@@ -14,9 +14,9 @@ assert.eq( "paisley ha ha!", c.returnData() );
 
 z = fork( function( a ) {
 	var y = fork( function( a ) {
-		return a + 1; }, 5 );
+		return a + "b"; }, "a" );
 	y.start();
 	return y.returnData() + a;
-    }, 1 );
+    }, "c" );
 z.start();
-assert.eq( 7, z.returnData() );
+assert.eq( "abc", z.returnData() );
