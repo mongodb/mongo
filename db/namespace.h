@@ -255,7 +255,7 @@ namespace mongo {
         }
 
         void cappedDisallowDelete() {
-            flags &= Flag_CappedDisallowDelete;
+            flags |= Flag_CappedDisallowDelete;
         }
         
         /* returns index of the first index in which the field is present. -1 if not present. */
@@ -394,10 +394,10 @@ namespace mongo {
             queryCache_[ pattern ] = make_pair( indexKey, nScanned );
         }
         
-        void startLog();
+        void startLog( int logSizeMb = 128 );
         void invalidateLog();
         bool validateCompleteLog();
-        string logNS() const { return logValid_ ? logNS_ : ""; }
+        string logNS() const { return logNS_; }
         bool logValid() const { return logValid_; }
         
     private:

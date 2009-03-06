@@ -28,6 +28,8 @@ assert.eq( 1, t.system.indexes.find().count() );
 assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().startKey.i );
 assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length );
 
+
+// Now test insert + delete + update during clone
 f.a.drop();
 t.a.drop();
 
@@ -35,7 +37,7 @@ for( i = 0; i < 100000; ++i ) {
     f.a.save( { i: i } );
 }
 
-finished = false
+finished = false;
 cc = fork( function() { t.cloneCollection( "localhost:27018", "a", {i:{$gte:0}} ); finished = true; } );
 cc.start();
 
@@ -53,3 +55,42 @@ assert.eq( 1, t.a.find( { i: 200000 } ).count() );
 assert.eq( 0, t.a.find( { i: -1 } ).count() );
 assert.eq( 0, t.a.find( { i: 0 } ).count() );
 assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count() );
+
+
+// Now test oplog running out of space -- specify small size clone oplog for test.
+f.a.drop();
+t.a.drop();
+
+for( i = 0; i < 100000; ++i ) {
+    f.a.save( { i: i } );
+}
+
+cc = fork( function() { assert.eq( 0, t.runCommand( { cloneCollection:"jstests_clonecollection.a", from:"localhost:27018", logSizeMb:1 } ).ok ); } );
+cc.start();
+
+sleep( 200 );
+for( i = 100000; i < 110000; ++i ) {
+    f.a.save( { i: i } );
+}
+
+cc.join();
+
+
+// Make sure the same works with standard size op log.
+f.a.drop();
+t.a.drop();
+
+for( i = 0; i < 100000; ++i ) {
+    f.a.save( { i: i } );
+}
+
+cc = fork( function() { assert.eq( 1, t.cloneCollection( "localhost:27018", "a" ).ok ); } );
+cc.start();
+
+sleep( 200 );
+for( i = 100000; i < 110000; ++i ) {
+    f.a.save( { i: i } );
+}
+
+cc.join();
+assert.eq( 110000, t.a.find().count() );

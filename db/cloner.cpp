@@ -45,7 +45,7 @@ namespace mongo {
            useReplAuth - use the credentials we normally use as a replication slave for the cloning
         */
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth);
-        bool cloneCollection( const char *fromhost, const char *ns, BSONObj query, string& errmsg, bool logForRepl, bool copyIndexes );
+        bool cloneCollection( const char *fromhost, const char *ns, BSONObj query, string& errmsg, bool logForRepl, bool copyIndexes, int logSizeMb );
     };
 
     /* for index info object:
@@ -229,7 +229,7 @@ namespace mongo {
         return true;
     }
 
-    bool Cloner::cloneCollection( const char *fromhost, const char *ns, BSONObj query, string &errmsg, bool logForRepl, bool copyIndexes ) {
+    bool Cloner::cloneCollection( const char *fromhost, const char *ns, BSONObj query, string &errmsg, bool logForRepl, bool copyIndexes, int logSizeMb ) {
         char db[256];
         nsToClient( ns, db );
 
@@ -243,8 +243,12 @@ namespace mongo {
             conn = c;
 
             // Start temporary op log
+            BSONObjBuilder cmdSpec;
+            cmdSpec << "logCollection" << ns << "start" << 1;
+            if ( logSizeMb != INT_MIN )
+                cmdSpec << "logSizeMb" << logSizeMb;
             BSONObj info;
-            if ( !conn->runCommand( db, BSON( "logCollection" << ns << "start" << 1 ), info ) ) {
+            if ( !conn->runCommand( db, cmdSpec.done(), info ) ) {
                 errmsg = "logCollection failed: " + (string)info;
                 return false;
             }
@@ -340,6 +344,8 @@ namespace mongo {
                 query = emptyObj;
             BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
             bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
+            // Will not be used if doesn't exist.
+            int logSizeMb = cmdObj.getIntField( "logSizeMb" );
             
             /* replication note: we must logOp() not the command, but the cloned data -- if the slave
              were to clone it would get a different point-in-time and not match.
@@ -349,7 +355,7 @@ namespace mongo {
             log() << "cloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
             
             Cloner c;
-            return c.cloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl, copyIndexes );
+            return c.cloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl, copyIndexes, logSizeMb );
         }
     } cmdclonecollection;
     

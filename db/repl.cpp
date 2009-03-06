@@ -1406,10 +1406,15 @@ namespace mongo {
                 errmsg = "Must specify exactly one of start:1 or validateComplete:1";
                 return false;
             }
+            int logSizeMb = cmdObj.getIntField( "logSizeMb" );
             NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( logCollection.c_str() );
             if ( start ) {
                 if ( t.logNS().empty() ) {
-                    t.startLog();
+                    if ( logSizeMb == INT_MIN ) {
+                        t.startLog();
+                    } else {
+                        t.startLog( logSizeMb );
+                    }
                 } else {
                     errmsg = "Log already started for ns: " + logCollection;
                     return false;

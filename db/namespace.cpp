@@ -538,15 +538,15 @@ namespace mongo {
         }
     }
     
-    void NamespaceDetailsTransient::startLog() {
+    void NamespaceDetailsTransient::startLog( int logSizeMb ) {
         logNS_ = "local.temp.oplog." + ns;
         logValid_ = true;
         stringstream spec;
         // 128MB
-        spec << "{size:" << 128 * 1024 * 1024 << ",capped:true}";
+        spec << "{size:" << logSizeMb * 1024 * 1024 << ",capped:true}";
         setClientTempNs( logNS_.c_str() );
         string err;
-        userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false );
+        massert( "Could not create log ns", userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false ) );
         NamespaceDetails *d = nsdetails( logNS_.c_str() );
         d->cappedDisallowDelete();
     }
@@ -560,6 +560,7 @@ namespace mongo {
         dropLog();
         bool ret = logValid_;
         logValid_ = false;
+        logNS_ = "";
         return ret;
     }
     
@@ -568,7 +569,6 @@ namespace mongo {
             return;
         setClientTempNs( logNS_.c_str() );
         dropNS( logNS_ );
-        logNS_ = "";        
     }
 
     /* ------------------------------------------------------------------------- */
