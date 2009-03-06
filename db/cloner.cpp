@@ -258,17 +258,23 @@ namespace mongo {
             copy( indexNs.c_str(), indexNs.c_str(), true, logForRepl, false, false, BSON( "ns" << ns ) );
         }
         
+        JSMatcher matcher( query );
         // According to the docs, the machine I'm cloning from is supposed to be
         // locked during this part.  Need to learn more about the plan for that.
         string logNS = "local.temp.oplog." + string( ns );
         auto_ptr< DBClientCursor > c = conn->query( logNS.c_str(), Query() );
         while( 1 ) {
+            BSONObj op;
             {
                 dbtemprelease t;
                 if ( !c->more() )
                     break;
+                op = c->next();
             }
-            ReplSource::applyOperation( c->next() );
+            // For sharding v1.0, we don't allow shard key updates -- so just
+            // filter each insert by value.
+            if ( op.getStringField( "op" )[ 0 ] != 'i' || matcher.matches( op.getObjectField( "o" ) ) )
+                ReplSource::applyOperation( op );
         }
         
         {

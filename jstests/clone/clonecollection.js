@@ -41,7 +41,7 @@ cc.start();
 
 sleep( 200 );
 f.a.save( { i: 200000 } );
-//f.a.save( { i: -1 } );
+f.a.save( { i: -1 } );
 f.a.remove( { i: 0 } );
 f.a.update( { i: 99998 }, { i: 99998, x: "y" } );
 assert( !finished, "test run invalid" );
