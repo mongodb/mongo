@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <sstream>
+#include <vector>
 
 using namespace std;
 using namespace v8;
