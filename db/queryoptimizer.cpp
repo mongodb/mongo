@@ -150,7 +150,7 @@ namespace mongo {
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
     hint_( emptyObj ),
-    order_( order.copy() ),
+    order_( order.getOwned() ),
     oldNScanned_( 0 ),
     honorRecordedPlan_( honorRecordedPlan ) {
         if ( hint && !hint->eoo() ) {

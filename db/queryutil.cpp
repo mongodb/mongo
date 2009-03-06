@@ -112,7 +112,7 @@ namespace mongo {
     
     FieldBoundSet::FieldBoundSet( const char *ns, const BSONObj &query ) :
     ns_( ns ),
-    query_( query.copy() ) {
+    query_( query.getOwned() ) {
         BSONObjIterator i( query_ );
         while( i.more() ) {
             BSONElement e = i.next();
