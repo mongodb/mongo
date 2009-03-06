@@ -270,6 +270,8 @@ private:
         JSThread( JSThreadConfig &config ) : config_( config ) {}
         void operator()() {
             Locker l;
+            // Context scope and handle scope held in thread specific storage,
+            // so need to configure for each thread.
             Context::Scope context_scope( baseContext_ );
             HandleScope handle_scope;
             boost::scoped_array< Persistent< Value > > argv( new Persistent< Value >[ config_.args_.size() ] );
