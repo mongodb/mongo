@@ -1096,14 +1096,20 @@ namespace mongo {
         int posz = partial.objsize();
         int len = posz + obj.objsize() + 1 + 2 /*o:*/;
 
-        if ( localOplogMainDetails == 0 ) {
-            setClientTempNs("local.");
-            localOplogClient = database;
-            localOplogMainDetails = nsdetails(logNS);
+        Record *r;
+        if ( strncmp( logNS, "local.", 6 ) == 0 ) { // For now, assume this is olog main
+            if ( localOplogMainDetails == 0 ) {
+                setClientTempNs("local.");
+                localOplogClient = database;
+                localOplogMainDetails = nsdetails(logNS);
+            }
+            database = localOplogClient;
+            r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
+        } else {
+            setClient( logNS );
+            assert( nsdetails( logNS ) );
+            r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
-        database = localOplogClient;
-
-        Record *r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
 
         char *p = r->data;
         memcpy(p, partial.objdata(), posz);
@@ -1384,24 +1390,28 @@ namespace mongo {
                  << "{ logCollection: <collection ns>, drop: 1 }";
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            string logCollection = cmdObj.getStringField( "logCollection" );
+            if ( logCollection.empty() ) {
+                errmsg = "missing logCollection spec";
+                return false;
+            }
             bool start = !cmdObj.getField( "start" ).eoo();
             bool drop = !cmdObj.getField( "drop" ).eoo();
             if ( start ? drop : !drop ) {
                 errmsg = "Must specify exactly one of start:1 or drop:1";
                 return false;
             }
-            setClientTempNs( ns );
-            NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
+            NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( logCollection.c_str() );
             if ( start ) {
                 if ( t.logNS().empty() ) {
                     t.startLog();
                 } else {
-                    errmsg = "Log already started for ns: " + string( ns );
+                    errmsg = "Log already started for ns: " + logCollection;
                     return false;
                 }
             } else {
                 if ( t.logNS().empty() ) {
-                    errmsg = "No log to drop for ns: " + string( ns );
+                    errmsg = "No log to drop for ns: " + logCollection;
                     return false;
                 } else {
                     t.dropLog();

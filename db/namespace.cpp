@@ -542,11 +542,13 @@ namespace mongo {
         stringstream spec;
         // 128MB
         spec << "{size:" << 128 * 1024 * 1024 << ",capped:true}";
+        setClientTempNs( logNS_.c_str() );
         string err;
         userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false );
     }
     
     void NamespaceDetailsTransient::dropLog() {
+        setClientTempNs( logNS_.c_str() );
         dropNS( logNS_ );
         logNS_ = "";
     }    
