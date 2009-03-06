@@ -243,7 +243,8 @@ namespace mongo {
         char reserved[108];
 
         enum {
-            Flag_HaveIdIndex = 1 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
+            Flag_HaveIdIndex = 1 << 0, // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
+            Flag_CappedDisallowDelete = 1 << 1 // set when deletes not allowed during capped table allocation.
         };
 
         /* you MUST call when adding an index.  see pdfile.cpp */
@@ -253,6 +254,10 @@ namespace mongo {
             flags &= ~Flag_HaveIdIndex;
         }
 
+        void cappedDisallowDelete() {
+            flags &= Flag_CappedDisallowDelete;
+        }
+        
         /* returns index of the first index in which the field is present. -1 if not present. */
         int fieldIsIndexed(const char *fieldName);
 
@@ -315,6 +320,9 @@ namespace mongo {
         void checkMigrate();
 
     private:
+        bool cappedMayDelete() const {
+            return !( flags & Flag_CappedDisallowDelete );
+        }
         Extent *theCapExtent() const {
             return capExtent.ext();
         }

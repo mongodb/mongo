@@ -1048,8 +1048,13 @@ namespace mongo {
         if ( master )
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b);
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
-        if ( t.logValid() )
-            _logOp(opstr, ns, t.logNS().c_str(), obj, patt, b);
+        if ( t.logValid() ) {
+            try {
+                _logOp(opstr, ns, t.logNS().c_str(), obj, patt, b);
+            } catch ( const DBException & ) {
+                t.invalidateLog();
+            }
+        }
     }    
     
     /* we write to local.opload.$main:

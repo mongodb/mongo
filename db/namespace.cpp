@@ -466,6 +466,7 @@ namespace mongo {
                 continue;
             }
 
+            massert( "Capped collection full and delete not allowed", cappedMayDelete() );
             DiskLoc fr = theCapExtent()->firstRecord;
             theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
             compact();
@@ -546,6 +547,8 @@ namespace mongo {
         setClientTempNs( logNS_.c_str() );
         string err;
         userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false );
+        NamespaceDetails *d = nsdetails( logNS_.c_str() );
+        d->cappedDisallowDelete();
     }
 
     void NamespaceDetailsTransient::invalidateLog() {
