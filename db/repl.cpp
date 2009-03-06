@@ -1048,7 +1048,7 @@ namespace mongo {
         if ( master )
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b);
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
-        if ( !t.logNS().empty() )
+        if ( t.logValid() )
             _logOp(opstr, ns, t.logNS().c_str(), obj, patt, b);
     }    
     
@@ -1387,7 +1387,7 @@ namespace mongo {
         CmdLogCollection() : Command( "logCollection" ) {}
         virtual void help( stringstream &help ) const {
             help << "examples: { logCollection: <collection ns>, start: 1 }, "
-                 << "{ logCollection: <collection ns>, drop: 1 }";
+                 << "{ logCollection: <collection ns>, validateComplete: 1 }";
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string logCollection = cmdObj.getStringField( "logCollection" );
@@ -1396,9 +1396,9 @@ namespace mongo {
                 return false;
             }
             bool start = !cmdObj.getField( "start" ).eoo();
-            bool drop = !cmdObj.getField( "drop" ).eoo();
-            if ( start ? drop : !drop ) {
-                errmsg = "Must specify exactly one of start:1 or drop:1";
+            bool validateComplete = !cmdObj.getField( "validateComplete" ).eoo();
+            if ( start ? validateComplete : !validateComplete ) {
+                errmsg = "Must specify exactly one of start:1 or validateComplete:1";
                 return false;
             }
             NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( logCollection.c_str() );
@@ -1411,10 +1411,13 @@ namespace mongo {
                 }
             } else {
                 if ( t.logNS().empty() ) {
-                    errmsg = "No log to drop for ns: " + logCollection;
+                    errmsg = "No log to validateComplete for ns: " + logCollection;
                     return false;
                 } else {
-                    t.dropLog();
+                    if ( !t.validateCompleteLog() ) {
+                        errmsg = "Oplog failure, insufficient space allocated";
+                        return false;
+                    }
                 }
             }
             return true;

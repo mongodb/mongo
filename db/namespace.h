@@ -347,8 +347,9 @@ namespace mongo {
         int writeCount_;
         map< QueryPattern, pair< BSONObj, int > > queryCache_;
         string logNS_;
+        bool logValid_;
     public:
-        NamespaceDetailsTransient(const char *_ns) : ns(_ns), haveIndexKeys(), writeCount_() {
+        NamespaceDetailsTransient(const char *_ns) : ns(_ns), haveIndexKeys(), writeCount_(), logValid_() {
             haveIndexKeys=false; /*lazy load them*/
         }
 
@@ -386,11 +387,14 @@ namespace mongo {
         }
         
         void startLog();
-        void dropLog();
-        string logNS() const { return logNS_; }
+        void invalidateLog();
+        bool validateCompleteLog();
+        string logNS() const { return logValid_ ? logNS_ : ""; }
+        bool logValid() const { return logValid_; }
         
     private:
         void reset();
+        void dropLog();
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > map_;
     public:
         static NamespaceDetailsTransient& get(const char *ns);

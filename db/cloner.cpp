@@ -280,7 +280,7 @@ namespace mongo {
         {
             dbtemprelease t;
             BSONObj info;
-            if ( !conn->runCommand( db, BSON( "logCollection" << ns << "drop" << 1 ), info ) ) {
+            if ( !conn->runCommand( db, BSON( "logCollection" << ns << "validateComplete" << 1 ), info ) ) {
                 errmsg = "logCollection failed: " + (string)info;
                 return false;
             }

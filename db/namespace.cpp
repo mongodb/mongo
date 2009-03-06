@@ -539,6 +539,7 @@ namespace mongo {
     
     void NamespaceDetailsTransient::startLog() {
         logNS_ = "local.temp.oplog." + ns;
+        logValid_ = true;
         stringstream spec;
         // 128MB
         spec << "{size:" << 128 * 1024 * 1024 << ",capped:true}";
@@ -546,12 +547,26 @@ namespace mongo {
         string err;
         userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false );
     }
+
+    void NamespaceDetailsTransient::invalidateLog() {
+        dropLog();
+        logValid_ = false;
+    }
+    
+    bool NamespaceDetailsTransient::validateCompleteLog() {
+        dropLog();
+        bool ret = logValid_;
+        logValid_ = false;
+        return ret;
+    }
     
     void NamespaceDetailsTransient::dropLog() {
+        if ( !logValid_ )
+            return;
         setClientTempNs( logNS_.c_str() );
         dropNS( logNS_ );
-        logNS_ = "";
-    }    
+        logNS_ = "";        
+    }
 
     /* ------------------------------------------------------------------------- */
 
