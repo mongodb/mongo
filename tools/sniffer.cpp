@@ -11,6 +11,7 @@
 
  */
 
+#include "../util/builder.h"
 #include "../util/message.h"
 #include "../db/dbmessage.h"
 #include "../client/dbclient.h"
@@ -27,18 +28,25 @@
 #include <arpa/inet.h>
 
 #include <iostream>
+#include <map>
 #include <string>
+
+#include <boost/shared_ptr.hpp>
 
 using namespace std;
 using mongo::asserted;
 using mongo::Message;
+using mongo::MsgData;
 using mongo::DbMessage;
 using mongo::BSONObj;
+using mongo::BufBuilder;
+using mongo::DBClientConnection;
 
-#define SNAP_LEN 1518
+#define SNAP_LEN 65535
 
 int captureHeaderSize;
 set<int> serverPorts;
+string forwardAddress;
 
 /* IP header */
 struct sniff_ip {
@@ -60,7 +68,7 @@ struct sniff_ip {
 #define IP_V(ip)                (((ip)->ip_vhl) >> 4)
 
 /* TCP header */
-typedef u_int tcp_seq;
+typedef u_int32_t tcp_seq;
 
 struct sniff_tcp {
     u_short th_sport;               /* source port */
@@ -84,6 +92,38 @@ struct sniff_tcp {
     u_short th_urp;                 /* urgent pointer */
 };
 
+struct Connection {
+    struct in_addr srcAddr;
+    u_short srcPort;
+    struct in_addr dstAddr;
+    u_short dstPort;
+    bool operator<( const Connection &other ) const {
+        int ret;
+        ret = diff( srcAddr.s_addr, other.srcAddr.s_addr );
+        if ( ret != 0 )
+            return ret < 0;
+        ret = diff( srcPort, other.srcPort );
+        if ( ret != 0 )
+            return ret < 0;
+        ret = diff( dstAddr.s_addr, other.dstAddr.s_addr );
+        if ( ret != 0 )
+            return ret < 0;
+        ret = diff( dstPort, other.dstPort );
+        return ret < 0;
+    }
+    template< class T >
+    static int diff( T a, T b ) {
+        if ( a > b ) return 1;
+        else if ( a < b ) return -1;
+        return 0;
+    }
+};
+
+map< Connection, bool > seen;
+map< Connection, int > bytesRemainingInMessage;
+map< Connection, boost::shared_ptr< BufBuilder > > messageBuilder;
+map< Connection, unsigned > expectedSeq;
+map< Connection, DBClientConnection* > forwarder;
 
 void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
 	
@@ -109,14 +149,66 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     }
 	
 	const u_char * payload = (const u_char*)(packet + captureHeaderSize + size_ip + size_tcp);
-	
-	int size_payload = ntohs(ip->ip_len) - (size_ip + size_tcp);
+
+	unsigned totalSize = ntohs(ip->ip_len);
+    assert( totalSize <= header->caplen );
+
+    int size_payload = totalSize - (size_ip + size_tcp);
 	if (size_payload <= 0 )
         return;
+        
+    Connection c;
+    c.srcAddr = ip->ip_src;
+    c.srcPort = tcp->th_sport;
+    c.dstAddr = ip->ip_dst;
+    c.dstPort = tcp->th_dport;
+    
+    if ( seen[ c ] ) {
+        if ( expectedSeq[ c ] != ntohl( tcp->th_seq ) ) {
+            cerr << "Warning: sequence # mismatch, there may be dropped packets" << endl;
+        }
+        expectedSeq[ c ] = ntohl( tcp->th_seq ) + size_payload;
+    } else {
+        seen[ c ] = true;
+        expectedSeq[ c ] = ntohl( tcp->th_seq ) + size_payload;
+    }
+    
+    expectedSeq[ c ] = ntohl( tcp->th_seq ) + size_payload;
+    
+    Message m;
+    
+    if ( bytesRemainingInMessage[ c ] == 0 ) {
+        m.setData( (MsgData*)payload , false );
+        if ( !m.data->valid() ) {
+            cerr << "Invalid message start, skipping packet." << endl;
+            return;
+        }
+        if ( size_payload > m.data->len ) {
+            cerr << "Multiple messages in packet, skipping packet." << endl;
+            return;
+        }
+        if ( size_payload < m.data->len ) {
+            bytesRemainingInMessage[ c ] = m.data->len - size_payload;
+            messageBuilder[ c ].reset( new BufBuilder() );
+            messageBuilder[ c ]->append( (void*)payload, size_payload );
+            return;
+        }
+    } else {
+        bytesRemainingInMessage[ c ] -= size_payload;
+        messageBuilder[ c ]->append( (void*)payload, size_payload );
+        if ( bytesRemainingInMessage[ c ] < 0 ) {
+            cerr << "Received too many bytes to complete message, resetting buffer" << endl;
+            bytesRemainingInMessage[ c ] = 0;
+            messageBuilder[ c ].reset();
+            return;
+        }
+        if ( bytesRemainingInMessage[ c ] > 0 )
+            return;
+        m.setData( (MsgData*)messageBuilder[ c ]->buf(), true );
+        messageBuilder[ c ]->decouple();
+        messageBuilder[ c ].reset();
+    }
 
-
-    Message m( (void*)payload , 0 );
-    assert( size_payload == m.data->len );
     DbMessage d( m );
     
     cout << inet_ntoa(ip->ip_src) << ":" << ntohs( tcp->th_sport ) 
@@ -149,7 +241,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         int flags = d.pullInt();
         BSONObj q = d.nextJsObj();
         BSONObj o = d.nextJsObj();
-        cout << "\tupdate  flags:" << flags << " q:" << q  << " o:" << o << endl;
+        cout << "\tupdate  flags:" << flags << " q:" << q << " o:" << o << endl;
         break;
     }
     case mongo::dbInsert:{
@@ -158,15 +250,64 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
             cout << "\t\t" << d.nextJsObj() << endl;
         break;
     }
+    case mongo::dbGetMore:{
+        int nToReturn = d.pullInt();
+        int cursorId = d.pullInt64();
+        cout << "\tgetMore nToReturn: " << nToReturn << " cursorId: " << cursorId << endl;
+        break;        
+    }
+    case mongo::dbDelete:{
+        int flags = d.pullInt();
+        BSONObj q = d.nextJsObj();
+        cout << "\tdelete flags: " << flags << " q: " << q << endl;
+        break;                
+    }
+    case mongo::dbKillCursors:{
+        int *x = (int *) m.data->_data;
+        x++; // reserved
+        int n = *x;
+        cout << "\tkillCursors n: " << n << endl;
+        break;
+    }
     default:
-        cout << "*** CANNOT HANDLE TYPE: " << m.data->operation() << endl;
+        cerr << "*** CANNOT HANDLE TYPE: " << m.data->operation() << endl;
     }    
     
+    if ( m.data->operation() != mongo::opReply && !forwardAddress.empty() ) {
+        DBClientConnection *conn = forwarder[ c ];
+        if ( !conn ) {
+            // These won't get freed on error, oh well...
+            conn = new DBClientConnection( true );
+            conn->connect( forwardAddress );
+            forwarder[ c ] = conn;
+        }
+        if ( m.data->operation() == mongo::dbQuery || m.data->operation() == mongo::dbGetMore ) {
+            Message response;
+            conn->port().call( m, response );
+        } else {
+            conn->port().say( m );
+        }
+    }
+}
+
+void usage() {
+    cout <<
+    "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | FILE <filename>)] [<port0> <port1> ... ]\n"
+    "--forward       Forward all parsed request messages to mongod instance at \n"
+    "                specified host:port\n"
+    "--source        Source of traffic to sniff, either a network interface or a\n"
+    "                file containing perviously captured packets, in pcap format.\n"
+    "                If no source is specified, mongosniff will attempt to sniff\n"
+    "                from one of the machine's network interfaces.\n"
+    "<port0>...      These parameters are used to filter sniffing.  By default, \n"
+    "                only port 27017 is sniffed.\n"
+    "--help          Print this help message.\n"
+    << endl;
 }
 
 int main(int argc, char **argv){
 
-	char *dev = NULL;
+	const char *dev = NULL;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *handle;
 
@@ -174,34 +315,68 @@ int main(int argc, char **argv){
 	bpf_u_int32 mask;
 	bpf_u_int32 net;
     
-	if (argc >= 2){
-		dev = argv[1];
-	}
-	else {
-		dev = pcap_lookupdev(errbuf);
-		if ( ! dev ){
-            cerr << "error finding device" << endl;
-            return -1;
-		}
-	}
+    bool source = false;
+    bool replay = false;
+    const char *file;    
+
+    vector< const char * > args;
+    for( int i = 1; i < argc; ++i )
+        args.push_back( argv[ i ] );
     
-    for ( int i=2; i<argc; i++ )
-        serverPorts.insert( atoi( argv[i] ) );
-    if ( ! serverPorts.size() )
+    try {
+        for( unsigned i = 0; i < args.size(); ++i ) {
+            const char *arg = args[ i ];
+            if ( arg == string( "--help" ) ) {
+                usage();
+                return 0;
+            } else if ( arg == string( "--forward" ) ) {
+                forwardAddress = args[ ++i ];
+            } else if ( arg == string( "--source" ) ) {
+                assert( source == false );
+                source = true;
+                replay = ( args[ ++i ] == string( "FILE" ) );
+                if ( replay )
+                    file = args[ ++i ];
+                else
+                    dev = args[ ++i ];
+            } else {
+                serverPorts.insert( atoi( args[ i ] ) );
+            }
+        }
+    } catch ( ... ) {
+        usage();
+        return -1;
+    }
+    
+    if ( !serverPorts.size() )
         serverPorts.insert( 27017 );
-
-	if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1){
-        cerr << "can't get netmask!" << endl;
-        return -1;
-	}
     
-	handle = pcap_open_live(dev, SNAP_LEN, 1, 1000, errbuf);
-	if ( ! handle ){
-        cerr << "error opening device!" << endl;
-        return -1;
-	}
+    if ( !replay ) {
+        if ( !dev ) {
+            dev = pcap_lookupdev(errbuf);
+            if ( ! dev ) {
+                cerr << "error finding device" << endl;
+                return -1;
+            }
+            cout << "found device: " << dev << endl;
+        }
+        if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1){
+            cerr << "can't get netmask!" << endl;
+            return -1;
+        }
+        handle = pcap_open_live(dev, SNAP_LEN, 1, 1000, errbuf);
+        if ( ! handle ){
+            cerr << "error opening device!" << endl;
+            return -1;
+        }
+    } else {
+        handle = pcap_open_offline(file, errbuf);
+        if ( ! handle ){
+            cerr << "error opening capture file!" << endl;
+            return -1;
+        }        
+    }
     
-
     switch ( pcap_datalink( handle ) ){
     case DLT_EN10MB: 
         captureHeaderSize = 14;
@@ -212,7 +387,7 @@ int main(int argc, char **argv){
     default:
         cerr << "don't know how to handle datalink type: " << pcap_datalink( handle ) << endl;
     }
-
+    
 	assert( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, net) != -1 );
 	assert( pcap_setfilter(handle, &fp) != -1 );
     
@@ -226,6 +401,9 @@ int main(int argc, char **argv){
 	pcap_freecode(&fp);
 	pcap_close(handle);
 
+    for( map< Connection, DBClientConnection* >::iterator i = forwarder.begin(); i != forwarder.end(); ++i )
+        free( i->second );
+    
     return 0;
 }
 
