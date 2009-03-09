@@ -414,6 +414,16 @@ namespace mongo {
     int compareElementValues(const BSONElement& l, const BSONElement& r);
     int getGtLtOp(BSONElement& e);
 
+    /* compare values with type check. 
+       note: as is now, not smart about int/double comingling. TODO 
+    */
+    inline int compareValues(const BSONElement& l, const BSONElement& r)
+    {
+        int x = (int) l.type() - (int) r.type();
+        if( x ) return x;
+        return compareElementValues(l,r);
+    }
+
     /**
 	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
        object in a binary representation.

@@ -344,46 +344,89 @@ namespace mongo {
      s:     x:2..x:7
        -> true
     */
+
+    bool ShardKeyPattern::relevant(const BSONObj& query, BSONObj& L, BSONObj& R) { 
+        BSONObj q = extractKey( query );
+        if( q.isEmpty() )
+            return true;
+
+        BSONElement e = q.firstElement();
+        assert( !e.eoo() ) ;
+
+        if( e.type() == RegEx ) {
+            /* todo: if starts with ^, we could be smarter here */
+            return true;
+        }
+
+        if( e.type() == Object ) { 
+            BSONObjIterator j(e.embeddedObject());
+            BSONElement LE = L.firstElement(); // todo compound keys
+            BSONElement RE = R.firstElement(); // todo compound keys
+            while( 1 ) { 
+                BSONElement f = j.next();
+                if( f.eoo() ) 
+                    break;
+                int op = f.getGtLtOp();
+                switch( op ) { 
+                    case JSMatcher::LT:
+                        if( compareValues(f, LE) <= 0 )
+                            return false;
+                        break;
+                    case JSMatcher::LTE:
+                        if( compareValues(f, LE) < 0 )
+                            return false;
+                        break;
+                    case JSMatcher::GT:
+                    case JSMatcher::GTE:
+                        if( compareValues(f, RE) >= 0 )
+                            return false;
+                        break;
+                    case JSMatcher::opIN:
+                    case JSMatcher::NE:
+                        massert("not implemented yet relevant()", false);
+                    case JSMatcher::Equality:
+                        goto normal;
+                    default:
+                        massert("bad operator in relevant()?", false);
+                }
+            }
+            return true;
+        }
+normal:
+        return L.woCompare(q) <= 0 && R.woCompare(q) > 0;
+    }
+
     bool ShardKeyPattern::relevantForQuery( const BSONObj& query , Shard * shard ){
-        if ( ! hasShardKey( query ) ){
+/*        if ( ! hasShardKey( query ) ){
             // if the shard key isn't in the query, then we have to go everywhere
             // therefore this shard is relevant
             return true;
         }
-
+*/
         massert("not done for compound patterns", patternfields.size() == 1);
 
-        /* question: are patterns ever { field : -1 } ? */
+        bool rel = relevant(query, shard->getMin(), shard->getMax());
+        if( !hasShardKey( query ) )
+            assert(rel);
 
-        /* might be easiest here to use a JSMatcher plus a little extra */
+        return rel;
 
-        //string f = *patternfields.begin();
-        BSONObj v = extractKey( query );
-
-        BSONElement e = v.firstElement();
-        massert( "regex shard support not done yet", e.type() != RegEx );
-
-        if( e.type() == Object ) { 
+/*        if( e.type() == Object ) { 
 			//			cout << "\n\nrfq\n" << v.toString() << "\n\nquery:\n" << query.toString() << endl;
 			//			sleepsecs(99);
             massert( "gt/lt etc. support not done yet", e.embeddedObject().firstElement().fieldName()[0] != '$');
-        }
-
-        /* question: areKey kthese already proper keys, and extractKey call is unnecessary? */
-        //        BSONObj L = extractKey(shard->getMin());
-        //        BSONObj R = extractKey(shard->getMax());
+        }*/
 
         /* todo:
           _ $gt/$lt
           _ $ne 
           _ regex
         */
-
+/*
         return
             compare( shard->getMin() , v ) <= 0 &&
             compare( v, shard->getMax() ) < 0;
-
-//        return shard->contains(v);
+*/
     }
 
     /**
@@ -468,6 +511,11 @@ namespace mongo {
             BSONObj z = fromjson("{ ns : \"alleyinsider.fs.chunks\" , min : {key:2} , max : {key:20} , server : \"localhost:30001\" }");
             s.unserialize(z);
             assert( k.relevantForQuery(q, &s) );
+            assert( k.relevantForQuery(fromjson("{foo:9,key:4}"), &s) );
+            assert( !k.relevantForQuery(fromjson("{foo:9,key:43}"), &s) );
+            assert( k.relevantForQuery(fromjson("{foo:9,key:{$gt:10}}"), &s) );
+            assert( !k.relevantForQuery(fromjson("{foo:9,key:{$gt:22}}"), &s) );
+            assert( k.relevantForQuery(fromjson("{foo:9}"), &s) );
         }
         void getfilt() { 
             ShardKeyPattern k( BSON( "key" << 1 ) );

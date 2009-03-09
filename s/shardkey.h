@@ -108,5 +108,6 @@ namespace mongo {
         BSONObj pattern;
         set<string> patternfields;
         BSONObj extractKey(const BSONObj& from) const;
+        bool relevant(const BSONObj& query, BSONObj& L, BSONObj& R);
     };
 } 

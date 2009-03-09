@@ -28,6 +28,7 @@ namespace mongo {
     
     Shard::Shard( ShardManager * manager ) : _manager( manager ){
         _modified = false;
+        _lastmod = 0;
     }
 
     void Shard::setServer( string s ){
@@ -83,12 +84,15 @@ namespace mongo {
     }
     
     void Shard::serialize(BSONObjBuilder& to){
+        if ( _lastmod )
+            to.appendDate( "lastmod" , _lastmod );
+        else 
+            to.appendTimestamp( "lastmod" );
+
         to << "ns" << _ns;
         to << "min" << _min;
         to << "max" << _max;
         to << "server" << _server;
-        if ( _lastmod )
-            to.appendDate( "lastmod" , _lastmod );
     }
     
     void Shard::unserialize(const BSONObj& from){
@@ -115,7 +119,7 @@ namespace mongo {
 
         unsigned long long t = time(0);
         t *= 1000;
-        _lastmod = t;
+        _lastmod = 0;
     }
 
     string Shard::toString() const {
