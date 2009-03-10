@@ -43,8 +43,6 @@ namespace mongo {
     extern bool quota;
     extern int port;
 
-    const char *dbpath = "/data/db/";
-
     DataFileMgr theDataFileMgr;
     map<string,Database*> databases;
     Database *database;

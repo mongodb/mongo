@@ -209,7 +209,7 @@ namespace mongo {
                 setClient(clientname.c_str(), clientpath.c_str());
         }
     };
-
+    
 } // namespace mongo
 
 #include "dbinfo.h"

@@ -319,12 +319,28 @@ namespace mongo {
 
     Timer startupSrandTimer;
 
-    void segvhandler(int x);
+    void acquirePathLock() {
+#if !defined(_WIN32)
+        string name = lockFileName();
+        
+        if ( boost::filesystem::exists( name ) ) {
+            int l = open( name.c_str(), O_RDONLY | O_EXLOCK | O_NONBLOCK );
+            massert( "Could not acquire lock for dbpath: " + name, l > 0 );
+            boost::filesystem::remove( name );
+            close( l );
+        }
 
+        lockFile = open( name.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_EXLOCK | O_TRUNC | O_NONBLOCK, S_IRWXU | S_IRWXG | S_IRWXO );
+        massert( "Could not acquire lock for dbpath: " + name, lockFile > 0 );
+#endif
+    }
+    
     void _initAndListen(int listenPort, const char *appserverLoc = null) {
         stringstream ss;
         ss << "dbpath (" << dbpath << ") does not exist";
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
+        
+        acquirePathLock();
         
         clearTmpFiles();
         clearTmpCollections();
