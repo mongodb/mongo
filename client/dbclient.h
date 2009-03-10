@@ -188,8 +188,11 @@ namespace mongo {
                 nToSkip(_nToSkip),
                 fieldsToReturn(_fieldsToReturn),
                 opts(queryOptions),
-                m(new Message()) {
-            cursorId = 0;
+                m(new Message()),
+                cursorId(),
+                nReturned(),
+                pos(),
+                data() {
         }
 
         virtual ~DBClientCursor();
