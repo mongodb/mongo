@@ -85,10 +85,13 @@ namespace mongo {
             nextjsobj += 4;
             return i;
         }
-        long long pullInt64() {
+        long long pullInt64() const {
+            return pullInt64();
+        }
+        long long &pullInt64() {
             if ( nextjsobj == data )
                 nextjsobj += strlen(data) + 1; // skip namespace
-            long long i = *((long long *)nextjsobj);
+            long long &i = *((long long *)nextjsobj);
             nextjsobj += 8;
             return i;
         }
