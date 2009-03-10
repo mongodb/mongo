@@ -217,6 +217,23 @@ namespace QueryTests {
         }
     };
     
+    class GetMore : public ClientBase {
+    public:
+        void run() {
+            const char *ns = "querytests.GetMore";
+            insert( ns, BSON( "a" << 1 ) );
+            insert( ns, BSON( "a" << 2 ) );
+            insert( ns, BSON( "a" << 3 ) );
+            auto_ptr< DBClientCursor > cursor = client().query( ns, emptyObj, 2 );
+            long long cursorId = cursor->getCursorId();
+            cursor->decouple();
+            cursor.reset();
+            cursor = client().getMore( ns, cursorId );
+            ASSERT( cursor->more() );
+            ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -232,6 +249,7 @@ namespace QueryTests {
             add< ModDuplicateFieldSpec >();
             add< ModNonNumber >();
             add< BoundedKey >();
+            add< GetMore >();
         }
     };
     

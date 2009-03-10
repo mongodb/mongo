@@ -446,6 +446,13 @@ namespace mongo {
         return auto_ptr< DBClientCursor >( 0 );
     }
 
+    auto_ptr<DBClientCursor> DBClientBase::getMore( const char *ns, long long cursorId, int nToReturn, int options ) {
+        auto_ptr<DBClientCursor> c( new DBClientCursor( this, ns, cursorId, nToReturn, options ) );
+        if ( c->init() )
+            return c;
+        return auto_ptr< DBClientCursor >( 0 );
+    }
+
     void DBClientBase::insert( const char * ns , BSONObj obj ) {
         Message toSend;
 
@@ -630,10 +637,18 @@ namespace mongo {
 
     bool DBClientCursor::init() {
         Message toSend;
-        assembleRequest( ns, query, nToReturn, nToSkip, fieldsToReturn, opts, toSend );
+        if ( !cursorId ) {
+            assembleRequest( ns, query, nToReturn, nToSkip, fieldsToReturn, opts, toSend );
+        } else {
+            BufBuilder b;
+            b.append( opts );
+            b.append( ns.c_str() );
+            b.append( nToReturn );
+            b.append( cursorId );
+            toSend.setData( dbGetMore, b.buf(), b.len() );
+        }
         if ( !connector->call( toSend, *m, false ) )
             return false;
-
         dataReceived();
         return true;
     }
@@ -698,7 +713,7 @@ namespace mongo {
     }
 
     DBClientCursor::~DBClientCursor() {
-        if ( cursorId ) {
+        if ( cursorId && ownCursor_ ) {
             BufBuilder b;
             b.append( (int)0 ); // reserved
             b.append( (int)1 ); // number

@@ -192,11 +192,28 @@ namespace mongo {
                 cursorId(),
                 nReturned(),
                 pos(),
-                data() {
+                data(),
+                ownCursor_( true ) {
         }
+        
+        DBClientCursor( DBConnector *_connector, const char *_ns, long long _cursorId, int _nToReturn, int options ) :
+                connector(_connector),
+                ns(_ns),
+                nToReturn( _nToReturn ),
+                opts( options ),
+                m(new Message()),
+                cursorId( _cursorId ),
+                nReturned(),
+                pos(),
+                data(),
+                ownCursor_( true ) {
+        }            
 
         virtual ~DBClientCursor();
 
+        long long getCursorId() const { return cursorId; }
+        void decouple() { ownCursor_ = false; }
+        
     private:
         DBConnector *connector;
         string ns;
@@ -213,6 +230,7 @@ namespace mongo {
         const char *data;
         void dataReceived();
         void requestMore();
+        bool ownCursor_;
     };
 
 
@@ -224,6 +242,8 @@ namespace mongo {
         virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
+        virtual auto_ptr<DBClientCursor> getMore( const char *ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
+        
         virtual BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
         virtual void insert( const char * ns, BSONObj obj ) = 0;
@@ -478,6 +498,12 @@ namespace mongo {
         virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
+        /** @param cursorId id of cursor to retrieve
+            @return an handle to a previously allocated cursor
+            @throws AssertionException
+         */
+        virtual auto_ptr<DBClientCursor> getMore( const char *ns, long long cursorId, int nToReturn = 0, int options = 0 );
+        
         /**
            @return a single object that matches the query.  if none do, then the object is empty
            @throws AssertionException
