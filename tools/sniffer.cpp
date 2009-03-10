@@ -98,24 +98,7 @@ struct Connection {
     struct in_addr dstAddr;
     u_short dstPort;
     bool operator<( const Connection &other ) const {
-        int ret;
-        ret = diff( srcAddr.s_addr, other.srcAddr.s_addr );
-        if ( ret != 0 )
-            return ret < 0;
-        ret = diff( srcPort, other.srcPort );
-        if ( ret != 0 )
-            return ret < 0;
-        ret = diff( dstAddr.s_addr, other.dstAddr.s_addr );
-        if ( ret != 0 )
-            return ret < 0;
-        ret = diff( dstPort, other.dstPort );
-        return ret < 0;
-    }
-    template< class T >
-    static int diff( T a, T b ) {
-        if ( a > b ) return 1;
-        else if ( a < b ) return -1;
-        return 0;
+        return memcmp( this, &other, sizeof( Connection ) ) < 0;
     }
 };
 
@@ -167,10 +150,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         if ( expectedSeq[ c ] != ntohl( tcp->th_seq ) ) {
             cerr << "Warning: sequence # mismatch, there may be dropped packets" << endl;
         }
-        expectedSeq[ c ] = ntohl( tcp->th_seq ) + size_payload;
     } else {
         seen[ c ] = true;
-        expectedSeq[ c ] = ntohl( tcp->th_seq ) + size_payload;
     }
     
     expectedSeq[ c ] = ntohl( tcp->th_seq ) + size_payload;
