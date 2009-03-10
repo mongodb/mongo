@@ -30,8 +30,6 @@
 #include "reccache.h"
 
 namespace mongo {
-    
-    const char *dbpath = "/data/db/";
 
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
@@ -631,17 +629,8 @@ namespace mongo {
         // should we be locked here?  we aren't. might be ok as-is.
         recCacheCloseAll();
 
-        // remove lock file
-        if ( lockFile > 0 ) {
-            string lockFile = lockFileName();
-            boost::filesystem::remove( lockFile.c_str() );
-        }
-        
         rawOut( "dbexit: really exiting now\n" );
         ::exit(rc);
     }
-
-    string lockFileName() { return ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string(); }
-    int lockFile = -1;
 
 } // namespace mongo

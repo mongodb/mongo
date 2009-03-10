@@ -97,9 +97,7 @@ namespace mongo {
     void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit);
     void getDatabaseNames( vector< string > &names );
 
-    string lockFileName();
-    extern int lockFile;
-    
+
 // --- local client ---
 
     class DBDirectClient : public DBClientBase {
