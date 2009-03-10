@@ -46,6 +46,7 @@ namespace mongo {
     LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
 
     extern bool useCursors;
+    extern bool useHints;
 
     // Just try to identify best plan.
     class DeleteOp : public QueryOp {
@@ -890,7 +891,8 @@ namespace mongo {
                 query = jsobj;
             else {
                 explain = jsobj.getBoolField("$explain");
-                hint = jsobj.getField("$hint");
+                if ( useHints )
+                    hint = jsobj.getField("$hint");
             }
             
             /* The ElemIter will not be happy if this isn't really an object. So throw exception

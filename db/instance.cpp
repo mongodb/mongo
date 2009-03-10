@@ -63,7 +63,8 @@ namespace mongo {
     long long oplogSize = 0;
 
     bool useCursors = true;
-
+    bool useHints = true;
+    
     void closeAllSockets();
     void flushOpLog( stringstream &ss ) {
         if( _oplog.f && _oplog.f->is_open() ) {

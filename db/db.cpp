@@ -34,6 +34,8 @@ namespace mongo {
 
     /* only off if --nocursors which is for debugging. */
     extern bool useCursors;
+    /* only off if --nohints */
+    extern bool useHints;
 
     extern int port;
     extern int curOp;
@@ -543,6 +545,8 @@ int main(int argc, char* argv[], char *envp[] )
                 appsrvPath = argv[++i];
             else if ( s == "--nocursors" )
                 useCursors = false;
+            else if ( s == "--nohints" )
+                useHints = false;
             else if ( s == "--oplogSize" ) {
                 long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad arg", x > 0);
