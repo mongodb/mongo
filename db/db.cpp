@@ -26,6 +26,9 @@
 #include "../util/unittest.h"
 #include "dbmessage.h"
 #include "instance.h"
+#if !defined(_WIN32)
+#include <sys/file.h>
+#endif
 
 namespace mongo {
 
