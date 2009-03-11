@@ -771,9 +771,13 @@ namespace mongo {
                 so_->fill(b_, &filter_, n_);
             }
             else if ( !saveClientCursor_ && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
+                cout << "setting at tail" << endl;
                 c_->setAtTail();
                 saveClientCursor_ = true;
             }
+            cout << "query complete for ns: " << qp().ns() << endl;
+            cout << "option tailable? : " << ( queryOptions_ & Option_CursorTailable ) << endl;
+            cout << "tailable? : " << c_->tailable() << endl;
             setComplete();            
         }
         virtual bool mayRecordPlan() const { return ntoreturn_ != 1; }

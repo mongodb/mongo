@@ -176,7 +176,15 @@ DB.prototype.cloneCollection = function(from, collection, query) {
     collection = this._name + "." + collection;
     query = query || {};
     //this.resetIndexCache();
-    return this._dbCommand( { cloneCollection:collection, from:from, query:query } );
+    var ret = this._dbCommand( { startCloneCollection:collection, from:from, query:query } );
+    print( "ret:" );
+    printjson( ret );
+    if ( !ret.ok )
+        return ret;
+    var ret2 = this._dbCommand( {finishCloneCollection:ret.finishToken} );
+    print( "ret2:" );
+    printjson( ret2 );
+    return ret2;
 }
 
 
