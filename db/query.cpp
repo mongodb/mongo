@@ -511,7 +511,7 @@ namespace mongo {
         int n = 0;
 
         if ( !cc ) {
-            DEV log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
+            log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
@@ -519,14 +519,14 @@ namespace mongo {
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
-            c->tailResume();
             while ( 1 ) {
                 if ( !c->ok() ) {
-                    if ( c->tailing() ) {
-                        c->setAtTail();
+                    if ( c->tailable() ) {
+                        if ( c->advance() ) {
+                            continue;
+                        }
                         break;
                     }
-                    DEV log() << "  getmore: last batch, erasing cursor " << cursorid << endl;
                     bool ok = ClientCursor::erase(cursorid);
                     assert(ok);
                     cursorid = 0;
@@ -549,8 +549,6 @@ namespace mongo {
                             if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
                                     (ntoreturn==0 && b.len()>1*1024*1024) ) {
                                 c->advance();
-                                if ( c->tailing() && !c->ok() )
-                                    c->setAtTail();
                                 cc->pos += n;
                                 //cc->updateLocation();
                                 break;
@@ -770,8 +768,11 @@ namespace mongo {
             } else if ( ordering_ ) {
                 so_->fill(b_, filter_, n_);
             }
-            else if ( !saveClientCursor_ && !c_->ok() && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
-                c_->setAtTail();
+            if ( ( queryOptions_ & Option_CursorTailable ) && ntoreturn_ != 1 ) {
+                c_->setTailable();
+            }
+            // If the tailing request succeeded.
+            if ( c_->tailable() ) {
                 saveClientCursor_ = true;
             }
             setComplete();            
@@ -932,7 +933,7 @@ namespace mongo {
                 cc->filter = filter;
                 cc->originalMessage = m;
                 cc->updateLocation();
-                if ( cc->c->tailing() )
+                if ( !cc->c->ok() && cc->c->tailable() )
                     DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
                 else
                     DEV out() << "  query has more, cursorid: " << cursorid << endl;
