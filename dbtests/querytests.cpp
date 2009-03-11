@@ -292,6 +292,47 @@ namespace QueryTests {
         }
     };
     
+    class TailableDelete : public ClientBase {
+    public:
+        ~TailableDelete() {
+            client().dropCollection( "querytests.TailableDelete" );
+        }
+        void run() {
+            const char *ns = "querytests.TailableDelete";
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
+            c->next();
+            c->next();
+            ASSERT( !c->more() );
+            client().remove( ns, QUERY( "a" << 1 ) );
+            insert( ns, BSON( "a" << 2 ) );
+            ASSERT( !c->more() );
+            ASSERT_EQUALS( 0, c->getCursorId() );
+        }
+    };
+
+    class TailableInsertDelete : public ClientBase {
+    public:
+        ~TailableInsertDelete() {
+            client().dropCollection( "querytests.TailableInsertDelete" );
+        }
+        void run() {
+            const char *ns = "querytests.TailableInsertDelete";
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
+            c->next();
+            c->next();
+            ASSERT( !c->more() );
+            insert( ns, BSON( "a" << 2 ) );
+            client().remove( ns, QUERY( "a" << 1 ) );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 2, c->next().getIntField( "a" ) );
+            ASSERT( !c->more() );
+        }
+    };    
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -311,6 +352,8 @@ namespace QueryTests {
             add< ReturnOneOfManyAndTail >();
             add< TailNotAtEnd >();
             add< EmptyTail >();
+            add< TailableDelete >();
+            add< TailableInsertDelete >();
         }
     };
     
