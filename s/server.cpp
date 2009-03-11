@@ -44,8 +44,8 @@ namespace mongo {
         out() << " -v+  verbose\n";
         out() << " --port <portno>\n";
         out() << " --configdb <configdbname> [<configdbname>...]\n";
-        out() << " --infer                                   infer configdbname by replacing \"-n<n>\"\n";
-        out() << "                                           in our hostname with \"-grid\".\n";
+//        out() << " --infer                                   infer configdbname by replacing \"-n<n>\"\n";
+//        out() << "                                           in our hostname with \"-grid\".\n";
         out() << endl;
     }
     

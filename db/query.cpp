@@ -520,12 +520,13 @@ namespace mongo {
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
-            c->tailResume();
             while ( 1 ) {
                 if ( !c->ok() ) {
                     cout << "tailing? : " << c->tailing() << endl;
-                    if ( c->tailing() ) {
-                        c->setAtTail();
+                    if ( c->tailable() ) {
+                        if ( c->advance() ) {
+                            continue;
+                        }
                         break;
                     }
                     log() << "  getmore: last batch, erasing cursor " << cursorid << endl;
@@ -551,8 +552,6 @@ namespace mongo {
                             if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
                                     (ntoreturn==0 && b.len()>1*1024*1024) ) {
                                 c->advance();
-                                if ( c->tailing() && !c->ok() )
-                                    c->setAtTail();
                                 cc->pos += n;
                                 //cc->updateLocation();
                                 break;
@@ -678,7 +677,7 @@ namespace mongo {
     class DoQueryOp : public QueryOp {
     public:
         DoQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
-                  bool explain, set< string > &filter, int queryOptions ) :
+                  bool explain, set< string > *filter, int queryOptions ) :
         b_( 32768 ),
         ntoskip_( ntoskip ),
         ntoreturn_( ntoreturn ),
@@ -735,7 +734,7 @@ namespace mongo {
                         }
                     }
                     else {
-                        bool ok = fillQueryResultFromObj(b_, &filter_, js);
+                        bool ok = fillQueryResultFromObj(b_, filter_, js);
                         if ( ok ) n_++;
                         if ( ok ) {
                             if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
@@ -770,11 +769,14 @@ namespace mongo {
             if ( explain_ ) {
                 n_ = ordering_ ? so_->size() : n_;
             } else if ( ordering_ ) {
-                so_->fill(b_, &filter_, n_);
+                so_->fill(b_, filter_, n_);
             }
-            else if ( !saveClientCursor_ && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
+            if ( ( queryOptions_ & Option_CursorTailable ) && ntoreturn_ != 1 ) {
                 cout << "setting at tail" << endl;
-                c_->setAtTail();
+                c_->setTailable();
+            }
+            // If the tailing request succeeded.
+            if ( c_->tailable() ) {
                 saveClientCursor_ = true;
             }
             cout << "query complete for ns: " << qp().ns() << endl;
@@ -800,7 +802,7 @@ namespace mongo {
         BSONObj order_;
         bool wantMore_;
         bool explain_;
-        set< string > &filter_;   
+        set< string > *filter_;   
         bool ordering_;
         auto_ptr< Cursor > c_;
         int nscanned_;
@@ -919,7 +921,7 @@ namespace mongo {
                     oldPlan = qps.explain();
             }
             QueryPlanSet qps( ns, query, order, &hint, !explain );
-            DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, *filter, queryOptions );
+            DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
             shared_ptr< DoQueryOp > o = qps.runOp( original );
             DoQueryOp &dqo = *o;
             massert( dqo.exceptionMessage(), dqo.complete() );
@@ -938,7 +940,7 @@ namespace mongo {
                 cc->filter = filter;
                 cc->originalMessage = m;
                 cc->updateLocation();
-                if ( cc->c->tailing() )
+                if ( !cc->c->ok() && cc->c->tailable() )
                     DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
                 else
                     DEV out() << "  query has more, cursorid: " << cursorid << endl;

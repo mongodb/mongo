@@ -53,22 +53,17 @@ namespace mongo {
         virtual DiskLoc currLoc() = 0;
         virtual bool advance() = 0; /*true=ok*/
         virtual BSONObj currKey() const { return emptyObj; }
+        // DiskLoc the cursor requires for continued operation.  Before this
+        // DiskLoc is deleted, the cursor must be incremented or destroyed.
+        virtual DiskLoc refLoc() = 0;
 
         /* Implement these if you want the cursor to be "tailable" */
-        /* tailable(): if true, cursor has tailable capability AND
-                       the user requested use of those semantics. */
+        
+        /* Request that the cursor starts tailing after advancing past last record. */
+        /* The implementation may or may not honor this request. */
+        virtual void setTailable() {}
+        /* indicates if tailing is enabled. */
         virtual bool tailable() {
-            return false;
-        }
-        /* indicates we should mark where we are and go into tail mode. */
-        virtual void setAtTail() {
-            assert(false);
-        }
-        /* you must call tailResume before reusing the cursor */
-        virtual void tailResume() { }
-        /* indicates ifi we are actively tailing.  once it goes active,
-           this should return treu even after tailResume(). */
-        virtual bool tailing() {
             return false;
         }
 
@@ -107,6 +102,7 @@ namespace mongo {
 
         virtual BSONObj prettyStartKey() const { return emptyObj; }
         virtual BSONObj prettyEndKey() const { return emptyObj; }
+
     };
 
     class AdvanceStrategy {
@@ -125,12 +121,10 @@ namespace mongo {
         AdvanceStrategy *s;
 
     private:
-        // for tailing:
-        enum State { Normal, TailPoint, TailResumed } state;
+        bool tailable_;
         void init() {
-            state = Normal;
+            tailable_ = false;
         }
-
     public:
         bool ok() {
             return !curr.isNull();
@@ -147,14 +141,22 @@ namespace mongo {
         virtual DiskLoc currLoc() {
             return curr;
         }
-
+        virtual DiskLoc refLoc() {
+            return curr.isNull() ? last : curr;
+        }
+        
         bool advance() {
             checkForInterrupt();
-            if ( eof() )
-                return false;
-            _current();
-            last = curr;
-            curr = s->next( curr );
+            if ( eof() ) {
+                if ( tailable_ && !last.isNull() ) {
+                    curr = s->next( last );                    
+                } else {
+                    return false;
+                }
+            } else {
+                last = curr;
+                curr = s->next( curr );
+            }
             return ok();
         }
 
@@ -167,27 +169,12 @@ namespace mongo {
         virtual string toString() {
             return "BasicCursor";
         }
-
-        virtual void tailResume() {
-            if ( state == TailPoint ) {
-                state = TailResumed;
-                advance();
-            }
-        }
-        virtual void setAtTail() {
-            assert( state != TailPoint );
-            assert( curr.isNull() );
-            assert( !last.isNull() );
-            curr = last;
-            last.Null();
-            state = TailPoint;
+        virtual void setTailable() {
+            if ( !curr.isNull() || !last.isNull() )
+                tailable_ = true;
         }
         virtual bool tailable() {
-            // to go into tail mode we need a non-null point of reference for resumption
-            return !last.isNull();
-        }
-        virtual bool tailing() {
-            return state != Normal;
+            return tailable_;
         }
     };
 
