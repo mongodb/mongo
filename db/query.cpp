@@ -511,22 +511,24 @@ namespace mongo {
         int n = 0;
 
         if ( !cc ) {
-            DEV log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
+            log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
+            log() << "getMore: cursorid found " << ns << " " << cursorid << endl;
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
             c->tailResume();
             while ( 1 ) {
                 if ( !c->ok() ) {
+                    cout << "tailing? : " << c->tailing() << endl;
                     if ( c->tailing() ) {
                         c->setAtTail();
                         break;
                     }
-                    DEV log() << "  getmore: last batch, erasing cursor " << cursorid << endl;
+                    log() << "  getmore: last batch, erasing cursor " << cursorid << endl;
                     bool ok = ClientCursor::erase(cursorid);
                     assert(ok);
                     cursorid = 0;

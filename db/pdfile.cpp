@@ -949,7 +949,7 @@ assert( !eloc.isNull() );
 
         Timer t;
         Nullstream& l = log();
-        l << "building new index for " << ns << "...";
+        l << "building new index on " << idx.keyPattern() << " for " << ns << "...";
         l.flush();
         int err = 0;
         int n = 0;

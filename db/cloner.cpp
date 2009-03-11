@@ -270,8 +270,14 @@ namespace mongo {
             c = conn->query( logNS.c_str(), Query(), 0, 0, 0, Option_CursorTailable );
         }
         cout << "start cursorId: " << c->getCursorId() << endl;
-        replayOpLog( c.get(), query );
-        cursorId = c->getCursorId();
+        if ( c->more() ) {
+            replayOpLog( c.get(), query );
+            cursorId = c->getCursorId();
+            massert( "Expected valid tailing cursor", cursorId != 0 );
+        } else {
+            massert( "Did not expect valid cursor for empty query result", c->getCursorId() == 0 );
+            cursorId = 0;
+        }
         cout << "set cursorId: " << cursorId << endl;
         c->decouple();
         return true;
@@ -298,6 +304,8 @@ namespace mongo {
         char db[256];
         nsToClient( ns, db );
 
+        cout << "using cursorId: " << cursorId << endl;
+        
         auto_ptr< DBClientCursor > cur;
         {
             dbtemprelease r;
@@ -308,7 +316,10 @@ namespace mongo {
                 return false;
             conn = c;            
             string logNS = "local.temp.oplog." + string( ns );
-            cur = conn->getMore( logNS.c_str(), cursorId );
+            if ( cursorId != 0 )
+                cur = conn->getMore( logNS.c_str(), cursorId );
+            else
+                cur = conn->query( logNS.c_str(), Query() );
         }
         replayOpLog( cur.get(), query );
         {
@@ -441,10 +452,10 @@ namespace mongo {
                 cursorId = cursorIdToken.date();
                 cout << "val: " << cursorIdToken.date() << endl;
             }
-            if ( cursorId == 0 ) {
-                errmsg = "invalid cursorId spec";
-                return false;
-            }
+//            if ( cursorId == 0 ) {
+//                errmsg = "invalid cursorId spec";
+//                return false;
+//            }
             
             setClient( collection.c_str() );
             
