@@ -139,6 +139,10 @@ coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.c
 
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
 
+coreShardFiles = []
+shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
+serverOnlyFiles += coreShardFiles + [ "s/commands_db.cpp" ]
+
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "mongod" )
@@ -522,7 +526,7 @@ env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
 # mongos
-mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + Glob( "s/*.cpp" ) )
+mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles )
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )

@@ -987,6 +987,12 @@ namespace mongo {
             b.append( fieldName );
             b.append( (unsigned long long) 0 );
         }
+
+        void appendTimestamp( const char *fieldName , unsigned long long val ) {
+            b.append( (char) Timestamp );
+            b.append( fieldName );
+            b.append( val );
+        }
         
         /* Deprecated (but supported) */
         void appendDBRef( const char *fieldName, const char *ns, const OID &oid ) {
