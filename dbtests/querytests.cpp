@@ -219,6 +219,9 @@ namespace QueryTests {
     
     class GetMore : public ClientBase {
     public:
+        ~GetMore() {
+            client().dropCollection( "querytests.GetMore" );
+        }
         void run() {
             const char *ns = "querytests.GetMore";
             insert( ns, BSON( "a" << 1 ) );
@@ -231,6 +234,23 @@ namespace QueryTests {
             cursor = client().getMore( ns, cursorId );
             ASSERT( cursor->more() );
             ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );
+        }
+    };
+    
+    class ReturnOneOfManyAndTail : public ClientBase {
+    public:
+        ~ReturnOneOfManyAndTail() {
+            client().dropCollection( "querytests.ReturnOneOfManyAndTail" );
+        }
+        void run() {
+            const char *ns = "querytests.ReturnOneOfManyAndTail";
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            insert( ns, BSON( "a" << 2 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 0 ).hint( BSON( "$natural" << 1 ) ), 1, 0, 0, Option_CursorTailable );
+            ASSERT_EQUALS( 0, c->getCursorId() );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 1, c->next().getIntField( "a" ) );
         }
     };
     
@@ -250,6 +270,7 @@ namespace QueryTests {
             add< ModNonNumber >();
             add< BoundedKey >();
             add< GetMore >();
+            add< ReturnOneOfManyAndTail >();
         }
     };
     

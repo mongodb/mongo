@@ -770,7 +770,7 @@ namespace mongo {
             } else if ( ordering_ ) {
                 so_->fill(b_, &filter_, n_);
             }
-            else if ( !saveClientCursor_ && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
+            else if ( !saveClientCursor_ && !c_->ok() && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
                 c_->setAtTail();
                 saveClientCursor_ = true;
             }
