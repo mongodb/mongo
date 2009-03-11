@@ -516,20 +516,17 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
-            log() << "getMore: cursorid found " << ns << " " << cursorid << endl;
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
             while ( 1 ) {
                 if ( !c->ok() ) {
-                    cout << "tailing? : " << c->tailing() << endl;
                     if ( c->tailable() ) {
                         if ( c->advance() ) {
                             continue;
                         }
                         break;
                     }
-                    log() << "  getmore: last batch, erasing cursor " << cursorid << endl;
                     bool ok = ClientCursor::erase(cursorid);
                     assert(ok);
                     cursorid = 0;
@@ -772,16 +769,12 @@ namespace mongo {
                 so_->fill(b_, filter_, n_);
             }
             if ( ( queryOptions_ & Option_CursorTailable ) && ntoreturn_ != 1 ) {
-                cout << "setting at tail" << endl;
                 c_->setTailable();
             }
             // If the tailing request succeeded.
             if ( c_->tailable() ) {
                 saveClientCursor_ = true;
             }
-            cout << "query complete for ns: " << qp().ns() << endl;
-            cout << "option tailable? : " << ( queryOptions_ & Option_CursorTailable ) << endl;
-            cout << "tailable? : " << c_->tailable() << endl;
             setComplete();            
         }
         virtual bool mayRecordPlan() const { return ntoreturn_ != 1; }

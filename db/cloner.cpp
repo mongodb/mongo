@@ -269,7 +269,6 @@ namespace mongo {
             string logNS = "local.temp.oplog." + string( ns );
             c = conn->query( logNS.c_str(), Query(), 0, 0, 0, Option_CursorTailable );
         }
-        cout << "start cursorId: " << c->getCursorId() << endl;
         if ( c->more() ) {
             replayOpLog( c.get(), query );
             cursorId = c->getCursorId();
@@ -278,7 +277,6 @@ namespace mongo {
             massert( "Did not expect valid cursor for empty query result", c->getCursorId() == 0 );
             cursorId = 0;
         }
-        cout << "set cursorId: " << cursorId << endl;
         c->decouple();
         return true;
     }
@@ -304,8 +302,6 @@ namespace mongo {
         char db[256];
         nsToClient( ns, db );
 
-        cout << "using cursorId: " << cursorId << endl;
-        
         auto_ptr< DBClientCursor > cur;
         {
             dbtemprelease r;
@@ -360,6 +356,49 @@ namespace mongo {
         }
     } cmdclone;
     
+    class CmdCloneCollection : public Command {
+    public:
+        virtual bool slaveOk() {
+            return false;
+        }
+        CmdCloneCollection() : Command("cloneCollection") { }
+        virtual void help( stringstream &help ) const {
+            help << " example: { cloneCollection: <collection ns>, from: <hostname>, query: <query> }";
+        }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            string fromhost = cmdObj.getStringField("from");
+            if ( fromhost.empty() ) {
+                errmsg = "missing from spec";
+                return false;
+            }
+            string collection = cmdObj.getStringField("cloneCollection");
+            if ( collection.empty() ) {
+                errmsg = "missing cloneCollection spec";
+                return false;
+            }
+            BSONObj query = cmdObj.getObjectField("query");
+            if ( query.isEmpty() )
+                query = emptyObj;
+            BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
+            bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
+            // Will not be used if doesn't exist.
+            int logSizeMb = cmdObj.getIntField( "logSizeMb" );
+            
+            /* replication note: we must logOp() not the command, but the cloned data -- if the slave
+             were to clone it would get a different point-in-time and not match.
+             */
+            setClient( collection.c_str() );
+            
+            log() << "cloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
+            
+            Cloner c;
+            long long cursorId;
+            if ( !c.startCloneCollection( fromhost.c_str(), collection.c_str(), query, errmsg, !fromRepl, copyIndexes, logSizeMb, cursorId ) )
+                return false;
+            return c.finishCloneCollection( fromhost.c_str(), collection.c_str(), query, cursorId, errmsg);
+        }
+    } cmdclonecollection;
+
     class CmdStartCloneCollection : public Command {
     public:
         virtual bool slaveOk() {
@@ -407,7 +446,6 @@ namespace mongo {
                 b << "query" << query;
                 b.appendDate( "cursorId", cursorId );
                 BSONObj token = b.done();
-                log() << "returning token: " << token << endl;
                 result << "finishToken" << token;
             }
             return res;
@@ -429,7 +467,6 @@ namespace mongo {
                 errmsg = "missing finishCloneCollection finishToken spec";
                 return false;
             }
-            cout << "fromToken: " << fromToken.toString() << endl;
             string fromhost = fromToken.getStringField( "fromhost" );
             if ( fromhost.empty() ) {
                 errmsg = "missing fromhost spec";
@@ -446,16 +483,9 @@ namespace mongo {
             }
             long long cursorId = 0;
             BSONElement cursorIdToken = fromToken.getField( "cursorId" );
-            cout << "token type: " << cursorIdToken.type() << endl;
             if ( cursorIdToken.type() == Date ) {
-                cout << "type date" << endl;
                 cursorId = cursorIdToken.date();
-                cout << "val: " << cursorIdToken.date() << endl;
             }
-//            if ( cursorId == 0 ) {
-//                errmsg = "invalid cursorId spec";
-//                return false;
-//            }
             
             setClient( collection.c_str() );
             
