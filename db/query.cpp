@@ -676,7 +676,7 @@ namespace mongo {
     class DoQueryOp : public QueryOp {
     public:
         DoQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
-                  bool explain, set< string > &filter, int queryOptions ) :
+                  bool explain, set< string > *filter, int queryOptions ) :
         b_( 32768 ),
         ntoskip_( ntoskip ),
         ntoreturn_( ntoreturn ),
@@ -733,7 +733,7 @@ namespace mongo {
                         }
                     }
                     else {
-                        bool ok = fillQueryResultFromObj(b_, &filter_, js);
+                        bool ok = fillQueryResultFromObj(b_, filter_, js);
                         if ( ok ) n_++;
                         if ( ok ) {
                             if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
@@ -768,7 +768,7 @@ namespace mongo {
             if ( explain_ ) {
                 n_ = ordering_ ? so_->size() : n_;
             } else if ( ordering_ ) {
-                so_->fill(b_, &filter_, n_);
+                so_->fill(b_, filter_, n_);
             }
             else if ( !saveClientCursor_ && !c_->ok() && (queryOptions_ & Option_CursorTailable) && c_->tailable() ) {
                 c_->setAtTail();
@@ -794,7 +794,7 @@ namespace mongo {
         BSONObj order_;
         bool wantMore_;
         bool explain_;
-        set< string > &filter_;   
+        set< string > *filter_;   
         bool ordering_;
         auto_ptr< Cursor > c_;
         int nscanned_;
@@ -913,7 +913,7 @@ namespace mongo {
                     oldPlan = qps.explain();
             }
             QueryPlanSet qps( ns, query, order, &hint, !explain );
-            DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, *filter, queryOptions );
+            DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
             shared_ptr< DoQueryOp > o = qps.runOp( original );
             DoQueryOp &dqo = *o;
             massert( dqo.exceptionMessage(), dqo.complete() );
