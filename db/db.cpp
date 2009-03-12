@@ -620,6 +620,7 @@ namespace mongo {
 } // namespace mongo
 
 #include <signal.h>
+#include <string.h>
 
 namespace mongo {
 
@@ -632,11 +633,16 @@ namespace mongo {
     }
 
     void abruptQuit(int x) {
+        ostringstream ossSig;
+        ossSig << "Got signal: " << x << " (" << strsignal( x ) << ")." << endl;
+        rawOut( ossSig.str() );
+
         ostringstream ossOp;
         ossOp << "Last op: " << currentOp.infoNoauth() << endl;
         rawOut( ossOp.str() );
+
         ostringstream oss;
-        oss << "Got signal: " << x << ", printing backtrace:" << endl;
+        oss << "Backtrace:" << endl;
         printStackTrace( oss );
         rawOut( oss.str() );
         exit(14);
@@ -648,7 +654,7 @@ namespace mongo {
     void interruptThread() {
         int x;
         sigwait( &asyncSignals, &x );
-        log() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+        log() << "got kill or ctrl c signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
         {
             dblock lk;
             log() << "now exiting" << endl;
