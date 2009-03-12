@@ -408,6 +408,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
+    myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
+
     if shell:
         haveReadLine = False
         if darwin:
@@ -546,7 +548,7 @@ perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
-if nix and darwin:
+if darwin or clientEnv["_HAVEPCAP"]:
     sniffEnv = clientEnv.Clone()
     sniffEnv.Append( LIBS=[ "pcap" ] )
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
