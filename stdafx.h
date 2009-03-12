@@ -280,11 +280,15 @@ namespace mongo {
        use this to log things just there.
     */
 #if defined(_WIN32)
-#define DEV if( 0 )
 #define WIN if( 1 )
 #else
-#define DEV if( 0 )
 #define WIN if( 0 )
+#endif
+
+#if defined(_DEBUG)
+#define DEV if( 1 )
+#else
+#define DEV if( 0 )
 #endif
 
 #define DEBUGGING if( 0 )
