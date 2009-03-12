@@ -89,6 +89,12 @@ AddOption( "--d",
            action="store",
            help="debug build no optimization, etc..." )
 
+AddOption( "--dd",
+           dest="debugBuildAndLogging",
+           type="string",
+           nargs=0,
+           action="store",
+           help="debug build no optimization, additional debug logging, etc..." )
 
 AddOption( "--recstore",
            dest="recstore",
@@ -155,7 +161,8 @@ force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 
-debugBuild = not GetOption( "debugBuild" ) is None
+debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
+debugLogging = not GetOption( "debugBuildAndLogging" ) is None
 noshell = not GetOption( "noshell" ) is None
 
 platform = os.sys.platform
@@ -316,9 +323,12 @@ if nix:
     env.Append( LIBS=[] )
 
     if debugBuild:
-        env.Append( CPPFLAGS=" -O0 -fstack-protector -fstack-check -D_DEBUG" );
+        env.Append( CPPFLAGS=" -O0 -fstack-protector -fstack-check" );
     else:
         env.Append( CPPFLAGS=" -O3" )
+    
+    if debugLogging:
+        env.Append( CPPFLAGS=" -D_DEBUG" );
 
     if force64:
         env.Append( CFLAGS="-m64" )
