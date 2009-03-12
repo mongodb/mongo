@@ -42,14 +42,7 @@ namespace mongo {
         virtual void serialize(BSONObjBuilder& to) = 0;
         virtual void unserialize(const BSONObj& from) = 0;
 
-        /** Define this as you see fit if you are using the default conn() implementation. */
-        static string defaultServer;
-
-        /** Override this if you need to do fancier connection management than simply using globalConn. */
-        virtual string modelServer(){
-            uassert( "defaultServer not set" , defaultServer.size() );
-            return defaultServer;
-        }
+        virtual string modelServer() = 0;
 
         /** Load a single object. 
             @return true if successful.
