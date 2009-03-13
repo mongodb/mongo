@@ -248,11 +248,90 @@ namespace QueryTests {
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
             auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 0 ).hint( BSON( "$natural" << 1 ) ), 1, 0, 0, Option_CursorTailable );
+            // If only one result requested, a cursor is not saved.
             ASSERT_EQUALS( 0, c->getCursorId() );
             ASSERT( c->more() );
             ASSERT_EQUALS( 1, c->next().getIntField( "a" ) );
         }
     };
+    
+    class TailNotAtEnd : public ClientBase {
+    public:
+        ~TailNotAtEnd() {
+            client().dropCollection( "querytests.TailNotAtEnd" );
+        }
+        void run() {
+            const char *ns = "querytests.TailNotAtEnd";
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            insert( ns, BSON( "a" << 2 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
+            ASSERT( 0 != c->getCursorId() );
+            while( c->more() )
+                c->next();
+            ASSERT( 0 != c->getCursorId() );
+            insert( ns, BSON( "a" << 3 ) );
+            insert( ns, BSON( "a" << 4 ) );
+            insert( ns, BSON( "a" << 5 ) );
+            insert( ns, BSON( "a" << 6 ) );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 3, c->next().getIntField( "a" ) );
+        }
+    };
+    
+    class EmptyTail : public ClientBase {
+    public:
+        ~EmptyTail() {
+            client().dropCollection( "querytests.EmptyTail" );
+        }
+        void run() {
+            const char *ns = "querytests.EmptyTail";
+            ASSERT_EQUALS( 0, client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable )->getCursorId() );
+            insert( ns, BSON( "a" << 0 ) );
+            ASSERT( 0 != client().query( ns, QUERY( "a" << 1 ).hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable )->getCursorId() );
+        }
+    };
+    
+    class TailableDelete : public ClientBase {
+    public:
+        ~TailableDelete() {
+            client().dropCollection( "querytests.TailableDelete" );
+        }
+        void run() {
+            const char *ns = "querytests.TailableDelete";
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
+            c->next();
+            c->next();
+            ASSERT( !c->more() );
+            client().remove( ns, QUERY( "a" << 1 ) );
+            insert( ns, BSON( "a" << 2 ) );
+            ASSERT( !c->more() );
+            ASSERT_EQUALS( 0, c->getCursorId() );
+        }
+    };
+
+    class TailableInsertDelete : public ClientBase {
+    public:
+        ~TailableInsertDelete() {
+            client().dropCollection( "querytests.TailableInsertDelete" );
+        }
+        void run() {
+            const char *ns = "querytests.TailableInsertDelete";
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
+            c->next();
+            c->next();
+            ASSERT( !c->more() );
+            insert( ns, BSON( "a" << 2 ) );
+            client().remove( ns, QUERY( "a" << 1 ) );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 2, c->next().getIntField( "a" ) );
+            ASSERT( !c->more() );
+        }
+    };    
     
     class All : public UnitTest::Suite {
     public:
@@ -271,6 +350,10 @@ namespace QueryTests {
             add< BoundedKey >();
             add< GetMore >();
             add< ReturnOneOfManyAndTail >();
+            add< TailNotAtEnd >();
+            add< EmptyTail >();
+            add< TailableDelete >();
+            add< TailableInsertDelete >();
         }
     };
     

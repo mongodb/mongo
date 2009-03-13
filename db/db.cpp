@@ -590,6 +590,7 @@ usage:
     out() << " --quota                   enable db quota management\n";
     out() << " --appsrvpath <path>       root directory for the babble app server\n";
     out() << " --nocursors               diagnostic/debugging option\n";
+    out() << " --nohints                 ignore query hints\n";
     out() << " --nojni" << endl;
     out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     out() << " --oplogSize <size_in_MB>  custom size if creating new replication operation log" << endl;
@@ -620,6 +621,7 @@ namespace mongo {
 } // namespace mongo
 
 #include <signal.h>
+#include <string.h>
 
 namespace mongo {
 
@@ -632,11 +634,16 @@ namespace mongo {
     }
 
     void abruptQuit(int x) {
+        ostringstream ossSig;
+        ossSig << "Got signal: " << x << " (" << strsignal( x ) << ")." << endl;
+        rawOut( ossSig.str() );
+
         ostringstream ossOp;
         ossOp << "Last op: " << currentOp.infoNoauth() << endl;
         rawOut( ossOp.str() );
+
         ostringstream oss;
-        oss << "Got signal: " << x << ", printing backtrace:" << endl;
+        oss << "Backtrace:" << endl;
         printStackTrace( oss );
         rawOut( oss.str() );
         exit(14);
@@ -648,7 +655,7 @@ namespace mongo {
     void interruptThread() {
         int x;
         sigwait( &asyncSignals, &x );
-        log() << "got kill or ctrl c signal " << x << ", will terminate after current cmd ends" << endl;
+        log() << "got kill or ctrl c signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
         {
             dblock lk;
             log() << "now exiting" << endl;

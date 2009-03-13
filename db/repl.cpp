@@ -1168,23 +1168,31 @@ namespace mongo {
                     pairSync->setInitialSyncCompletedLocking();
                 }
             }
-            catch ( SyncException& ) {
+            catch ( const SyncException& ) {
                 log() << "caught SyncException, sleeping 10 secs" << endl;
                 return 10;
             }
             catch ( AssertionException& e ) {
                 if ( e.severe() ) {
-                    log() << "replMain exception " << e.what() << ", sleeping 1 minutes" << endl;
+                    log() << "replMain AssertionException " << e.what() << ", sleeping 1 minutes" << endl;
                     return 60;
                 }
                 else {
-                    log() << "replMain exception " << e.what() << '\n';
+                    log() << "replMain AssertionException " << e.what() << '\n';
                 }
                 replInfo = "replMain caught AssertionException";
             }
+            catch ( const DBException& e ) {
+                log() << "replMain DBException " << e.what() << endl;
+                replInfo = "replMain caught DBException";
+            }
+            catch ( const std::exception &e ) {
+                log() << "replMain std::exception " << e.what() << endl;
+                replInfo = "replMain caught std::exception";                
+            }
             catch ( ... ) { 
-                log() << "unexpected assertion during replication.  replication will halt" << endl;
-                replAllDead = "caught unexpected assertion during replication";
+                log() << "unexpected exception during replication.  replication will halt" << endl;
+                replAllDead = "caught unexpected exception during replication";
             }
             if ( !ok )
                 s->resetConnection();

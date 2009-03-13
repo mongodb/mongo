@@ -103,7 +103,8 @@ ShardingTest = function( testName , numServers , verboseLevel ){
         this._serverNames.push( conn.name );
     }
 
-    this.s = startMongos( { port : 39999 , v : verboseLevel || 0 , configdb : "localhost:30000" } );
+    this._configDB = "localhost:30000";
+    this.s = startMongos( { port : 39999 , v : verboseLevel || 0 , configdb : this._configDB } );
     
     var admin = this.admin = this.s.getDB( "admin" );
     this.config = this.s.getDB( "config" );

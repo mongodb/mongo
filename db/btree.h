@@ -248,6 +248,9 @@ namespace mongo {
         virtual DiskLoc currLoc() {
             return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc();
         }
+        virtual DiskLoc refLoc() {
+            return currLoc();
+        }
         virtual Record* _current() {
             return currLoc().rec();
         }

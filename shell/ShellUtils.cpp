@@ -454,14 +454,14 @@ v8::Handle< v8::Value > ResetDbpath( const v8::Arguments &a ) {
     return v8::Undefined();
 }
 
-void killDb( int port ) {
+void killDb( int port, int signal ) {
     if( dbs.count( port ) != 1 ) {
         cout << "No db started on port: " << port << endl;
         return;
     }
 
     pid_t pid = dbs[ port ].first;
-    kill( pid, SIGTERM );
+    kill( pid, signal );
 
     boost::xtime xt;
     boost::xtime_get(&xt, boost::TIME_UTC);
@@ -481,16 +481,21 @@ void killDb( int port ) {
 }
 
 v8::Handle< v8::Value > StopMongoProgram( const v8::Arguments &a ) {
-    assert( a.Length() == 1 );
+    assert( a.Length() == 1 || a.Length() == 2 );
     assert( a[ 0 ]->IsInt32() );
     int port = a[ 0 ]->ToInt32()->Value();
-    killDb( port );
+    int signal = SIGTERM;
+    if ( a.Length() == 2 ) {
+        assert( a[ 1 ]->IsInt32() );
+        signal = a[ 1 ]->ToInt32()->Value();
+    }
+    killDb( port, signal );
     return v8::Undefined();
 }
 
 void KillMongoProgramInstances() {
     for( map< int, pair< pid_t, int > >::iterator i = dbs.begin(); i != dbs.end(); ++i )
-        killDb( i->first );    
+        killDb( i->first, SIGTERM );
 }
 
 MongoProgramScope::~MongoProgramScope() {

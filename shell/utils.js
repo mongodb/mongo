@@ -10,7 +10,7 @@ assert.eq = function( a , b , msg ){
     if ( a == b )
         return;
 
-    if ( a.toString() == b.toString() )
+    if ( a != null && b != null && a.toString() == b.toString() )
         return;
 
     throw "[" + a + "] != [" + b + "] are not equal : " + msg;

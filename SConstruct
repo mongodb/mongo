@@ -89,6 +89,12 @@ AddOption( "--d",
            action="store",
            help="debug build no optimization, etc..." )
 
+AddOption( "--dd",
+           dest="debugBuildAndLogging",
+           type="string",
+           nargs=0,
+           action="store",
+           help="debug build no optimization, additional debug logging, etc..." )
 
 AddOption( "--recstore",
            dest="recstore",
@@ -139,6 +145,10 @@ coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.c
 
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
 
+coreShardFiles = []
+shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
+serverOnlyFiles += coreShardFiles + [ "s/commands_db.cpp" ]
+
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "mongod" )
@@ -151,7 +161,8 @@ force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 
-debugBuild = not GetOption( "debugBuild" ) is None
+debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
+debugLogging = not GetOption( "debugBuildAndLogging" ) is None
 noshell = not GetOption( "noshell" ) is None
 
 platform = os.sys.platform
@@ -312,9 +323,12 @@ if nix:
     env.Append( LIBS=[] )
 
     if debugBuild:
-        env.Append( CPPFLAGS=" -O0 -fstack-protector -fstack-check -D_DEBUG" );
+        env.Append( CPPFLAGS=" -O0 -fstack-protector -fstack-check" );
     else:
         env.Append( CPPFLAGS=" -O3" )
+    
+    if debugLogging:
+        env.Append( CPPFLAGS=" -D_DEBUG" );
 
     if force64:
         env.Append( CFLAGS="-m64" )
@@ -403,6 +417,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if nix and needPcre:
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
+
+    myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
 
     if shell:
         haveReadLine = False
@@ -522,7 +538,7 @@ env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
 # mongos
-mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + Glob( "s/*.cpp" ) )
+mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles )
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
@@ -542,7 +558,7 @@ perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
-if nix and darwin:
+if darwin or clientEnv["_HAVEPCAP"]:
     sniffEnv = clientEnv.Clone()
     sniffEnv.Append( LIBS=[ "pcap" ] )
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )

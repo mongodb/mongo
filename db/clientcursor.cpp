@@ -119,25 +119,19 @@ namespace mongo {
                 i != toAdvance.end(); ++i )
         {
             Cursor *c = (*i)->c.get();
-            DiskLoc tmp1 = c->currLoc();
+            DiskLoc tmp1 = c->refLoc();
             if ( tmp1 != dl ) {
                 /* this might indicate a failure to call ClientCursor::updateLocation() */
                 problem() << "warning: cursor loc does not match byLoc position!" << endl;
             }
             c->checkLocation();
-            if ( c->tailing() ) {
-                DEV out() << "killing cursor as we would have to advance it and it is tailable" << endl;
-                delete *i;
-                continue;
-            }
             c->advance();
-            DiskLoc newLoc = c->currLoc();
-            if ( newLoc.isNull() ) {
+            if ( c->eof() ) {
                 // advanced to end -- delete cursor
                 delete *i;
             }
             else {
-                wassert( newLoc != dl );
+                wassert( c->refLoc() != dl );
                 (*i)->updateLocation();
             }
         }
@@ -158,7 +152,7 @@ namespace mongo {
     */
     void ClientCursor::updateLocation() {
         assert( cursorid );
-        DiskLoc cl = c->currLoc();
+        DiskLoc cl = c->refLoc();
         if ( lastLoc() == cl ) {
             //log() << "info: lastloc==curloc " << ns << '\n';
             return;

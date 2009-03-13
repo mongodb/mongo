@@ -32,7 +32,6 @@ namespace mongo {
     int port = 27017;
     const char *curNs = "";
     Database *database = 0;
-    string Model::defaultServer;
     string ourHostname;
 
     string getDbContext() {
