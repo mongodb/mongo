@@ -637,6 +637,8 @@ elif not onlyServer:
 
 #  ---- RUNNING TESTS ----
 
+testEnv.Alias( "dummySmokeSideEffect", [], [] )
+
 def addSmoketest( name, deps, actions ):
     testEnv.Alias( name, deps, actions )
     testEnv.AlwaysBuild( name )
