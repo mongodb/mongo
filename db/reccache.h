@@ -49,7 +49,7 @@ class RecCache {
 
     /* get the right file for a given diskloc */
     BasicRecStore& store(DiskLoc& d) { 
-        int n = d.a() - 10000;
+        int n = d.a() - Base;
         if( (int) stores.size() > n ) { 
             BasicRecStore *rs = stores[n];
             if( rs ) 
@@ -108,9 +108,7 @@ class RecCache {
         return n;
     }
     fileofs fileOfs(DiskLoc d) { 
-        // temp impl.
-        // todo: handle 64 bit file sizes
-        return d.getOfs();
+        return ((fileofs) d.getOfs()) * recsize;
     }
 
     void dump();
@@ -170,10 +168,12 @@ public:
         boostlock lk(rcmutex);
         BasicRecStore& rs = store(ns);
         fileofs o = rs.insert((const char *) obuf, len);
-        assert( o <= 0x7fffffff );
+        assert( o % recsize == 0 );
+        fileofs recnum = o / recsize;
+        massert( "RecCache file too large?", recnum <= 0x7fffffff );
         Node *n = mkNode();
         memcpy(n->data, obuf, len);
-        DiskLoc d(rs.fileNumber + Base, (int) o);
+        DiskLoc d(rs.fileNumber + Base, (int) recnum);
         n->loc = d;
         m[d] = n;
         return d;

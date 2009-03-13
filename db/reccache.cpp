@@ -108,16 +108,14 @@ BasicRecStore* RecCache::initStore(int n) {
 }
 
 void RecCache::initStoreByNs(const char *_ns) {
-    string ns;
-    int nl;
+    string namefrag;
     { 
         stringstream ss;
         ss << '-';
         ss << _ns;
         assert( strchr(_ns, '$') == 0); // $ not good for filenames
         ss << ".idx";
-        ns = ss.str();
-        nl = ns.length();
+        namefrag = ss.str();
     }
 
     path dir(dbpath);
@@ -126,15 +124,9 @@ void RecCache::initStoreByNs(const char *_ns) {
     try {
         directory_iterator i(dir);
         while ( i != end ) {
-            string s = i->string();
-            const char *q = s.c_str();
-            const char *p = strstr(q, ns.c_str());
+            string s = i->leaf();
+            const char *p = strstr(s.c_str(), namefrag.c_str());
             if( p ) {
-                // found it
-                // back up to start of filename
-                while( p > q ) {
-                    if( p[-1] == '/' ) break;
-                }
                 _initStore(s);
                 return;
             }
@@ -155,7 +147,7 @@ void RecCache::initStoreByNs(const char *_ns) {
 
     // DNE.  create it.
     stringstream ss;
-    ss << nmax+1 << ns;
+    ss << nmax+1 << namefrag;
     _initStore(ss.str());
 }
 
