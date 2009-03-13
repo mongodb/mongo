@@ -4,7 +4,7 @@
 
    _ support > 2GB data per file
    _ multiple files, not just indexes.dat
-   _ lazier writes?
+   _ lazier writes? (may be done?)
    _ configurable cache size
    _ fix on abnormal terminations to be able to restart some
 */
@@ -65,15 +65,13 @@ public:
     static void modified(DiskLoc d) { }
 };
 
-/* Glue btree to RecStoreInterface
-*/
+/* Glue btree to RecStoreInterface: ---------------------------- */
 
 // pick your store for indexes by setting this typedef
 #if defined(_RECSTORE)
-typedef BasicCached_RecStore BtreeStore;
+typedef Cached_RecStore BtreeStore;
 #else
 typedef MongoMemMapped_RecStore BtreeStore;
-//typedef InMem_RecStore BtreeStore;
 #endif
 
 const int BucketSize = 8192;

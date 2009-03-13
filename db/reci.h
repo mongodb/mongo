@@ -14,6 +14,9 @@ class RecStoreInterface {
 public:
     static char* get(DiskLoc d, unsigned len) { assert(false); return 0; }
 
+    /* indicate that the diskloc specified has been updated. note that as-is today, the modification may come AFTER this 
+       call -- we handle that currently.
+    */
     static void modified(DiskLoc d) { assert(false); }
 
     /* insert specified data as a record */

@@ -1,5 +1,10 @@
 // reccache.h
 
+/* Cached_RecStore
+   This is our store which implements a traditional page-cache type of storage
+   (not memory mapped files).
+*/
+
 /* LOCK HIERARCHY
      
      dblock
@@ -28,15 +33,49 @@ class RecCache {
         bool dirty;
         Node *older, *newer;
     };
-    boost::mutex rcmutex;
+    boost::mutex rcmutex; // mainly to coordinate with the lazy writer thread
     unsigned recsize;
     map<DiskLoc, Node*> m;
     Node *newest, *oldest;
     unsigned nnodes;
     set<DiskLoc> dirtyl;
-public:
-    static BasicRecStore tempStore;
-private:
+    vector<BasicRecStore*> stores;
+    map<string, BasicRecStore*> storesByNs;
+    enum { Base = 10000 };
+
+    BasicRecStore* _initStore(string fname);
+    BasicRecStore* initStore(int n);
+    void initStoreByNs(const char *ns);
+
+    /* get the right file for a given diskloc */
+    BasicRecStore& store(DiskLoc& d) { 
+        int n = d.a() - 10000;
+        if( (int) stores.size() > n ) { 
+            BasicRecStore *rs = stores[n];
+            if( rs ) 
+                return *rs;
+        }
+        return *initStore(n);
+    }
+    BasicRecStore& store(const char *ns) {
+        char buf[256];
+        char *p = buf;
+        while( 1 ) {
+            if( *ns == '$' ) *p = '_';
+            else
+                *p = *ns;
+            if( *ns == 0 )
+                break;
+            p++; ns++;
+        }
+        assert( p - buf < (int) sizeof(buf) );
+        BasicRecStore *&rs = storesByNs[buf];
+        if( rs )
+            return *rs;
+        initStoreByNs(buf);
+        return *rs;
+    }
+
     void writeDirty( set<DiskLoc>::iterator i, bool rawLog = false );
     void writeIfDirty(Node *n);
     void touch(Node* n) { 
@@ -69,7 +108,8 @@ private:
         return n;
     }
     fileofs fileOfs(DiskLoc d) { 
-        // temp impl
+        // temp impl.
+        // todo: handle 64 bit file sizes
         return d.getOfs();
     }
 
@@ -96,6 +136,7 @@ public:
        after the writing.
     */
     void dirty(DiskLoc d) {
+        assert( d.a() >= Base );
         boostlock lk(rcmutex);
         map<DiskLoc, Node*>::iterator i = m.find(d);
         if( i != m.end() ) {
@@ -108,7 +149,7 @@ public:
     }
 
     char* get(DiskLoc d, unsigned len) { 
-        assert( d.a() == 9999 );
+        assert( d.a() >= Base );
         assert( len == recsize );
 
         boostlock lk(rcmutex);
@@ -120,34 +161,30 @@ public:
 
         Node *n = mkNode();
         n->loc = d;
-        tempStore.get(fileOfs(d), n->data, recsize); // could throw exception
+        store(d).get(fileOfs(d), n->data, recsize); // could throw exception
         m.insert( pair<DiskLoc, Node*>(d, n) );
         return n->data;
     }
 
     DiskLoc insert(const char *ns, const void *obuf, int len, bool god) {
         boostlock lk(rcmutex);
-        fileofs o = tempStore.insert((const char *) obuf, len);
+        BasicRecStore& rs = store(ns);
+        fileofs o = rs.insert((const char *) obuf, len);
         assert( o <= 0x7fffffff );
         Node *n = mkNode();
         memcpy(n->data, obuf, len);
-        DiskLoc d(9999, (int) o);
+        DiskLoc d(rs.fileNumber + Base, (int) o);
         n->loc = d;
         m[d] = n;
         return d;
     }
 
-    void closing() { 
-        boostlock lk(rcmutex);
-        (cout << "TEMP: recCacheCloseAll() writing dirty pages...\n").flush();
-        writeDirty( dirtyl.begin(), true );
-        (cout << "TEMP: write dirty done\n").flush();
-    }
+    void closing();
 };
 
 extern RecCache theRecCache;
 
-class BasicCached_RecStore : public RecStoreInterface { 
+class Cached_RecStore : public RecStoreInterface { 
 public:
     static char* get(DiskLoc d, unsigned len) { 
         return theRecCache.get(d, len);
@@ -158,7 +195,6 @@ public:
     }
 
     static void modified(DiskLoc d) { 
-        assert( d.a() == 9999 );
         theRecCache.dirty(d);
     }
 };
