@@ -30,12 +30,16 @@ class BasicRecStore {
     };
 
 public:
+    BasicRecStore(int _fileNumber) : fileNumber(_fileNumber) { }
     ~BasicRecStore();
     void init(const char *fn, unsigned recsize);
     fileofs insert(const char *buf, unsigned len);
     void update(fileofs o, const char *buf, unsigned len);
     void remove(fileofs o, unsigned len);
     void get(fileofs o, char *buf, unsigned len);
+
+    int fileNumber; // this goes in DiskLoc::a
+
 private:
 
     void writeHeader();

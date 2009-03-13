@@ -347,7 +347,7 @@ namespace mongo {
             log() << "opLogging = " << opLogging << endl;
         _oplog.init();
 
-#if defined(_RECSTORE)
+#if 0
         {
             stringstream indexpath;
             indexpath << dbpath << "/indexes.dat";

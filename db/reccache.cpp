@@ -32,12 +32,151 @@ void recCacheCloseAll() {
 
 int ndirtywritten;
 
+/* filename format is 
+
+     <n>-<ns>.idx
+*/
+
+BasicRecStore* RecCache::_initStore(string fname) { 
+
+    assert( strchr(fname.c_str(), '/') == 0 );
+    assert( strchr(fname.c_str(), '\\') == 0 );
+
+    stringstream ss(fname);
+    int n;
+    ss >> n;
+    assert( n >= 0 );
+    char ch;
+    ss >> ch;
+    assert( ch == '-' );
+    string rest;
+    ss >> rest;
+    const char *p = rest.c_str();
+    const char *q = strstr(p, ".idx");
+    assert( q );
+    string ns(p, q-p);
+
+    // arbitrary limit.  if you are hitting, we should use fewer files and put multiple 
+    // indexes in a single file (which is easy to do)
+    massert( "too many index files", n < 10000 );
+
+    if( stores.size() < (unsigned)n+1 )
+        stores.resize(n+1);
+    assert( stores[n] == 0 );
+    BasicRecStore *rs = new BasicRecStore(n);
+    path pf(dbpath);
+    pf /= fname;
+    string full = pf.string();
+    rs->init(full.c_str(), recsize);
+    stores[n] = rs;
+    storesByNs[ns] = rs;
+    return rs;
+}
+
+BasicRecStore* RecCache::initStore(int n) { 
+    string ns;
+    { 
+        stringstream ss;
+        ss << '/' << n << '-';
+        ns = ss.str();
+    }
+
+    /* this will be slow if there are thousands of files */
+    path dir(dbpath);
+    directory_iterator end;
+    try {
+        directory_iterator i(dir);
+        while ( i != end ) {
+            string s = i->string();
+            const char *p = strstr(s.c_str(), ns.c_str());
+            if( p && strstr(p, ".idx") ) { 
+                // found it
+                path P = *i;
+                return _initStore(P.leaf());
+            }
+            i++;
+        }
+    }
+    catch (...) {
+        string s = string("i/o error looking for .idx file in ") + dbpath;
+        massert(s, false);
+    }
+    stringstream ss;
+    ss << "index datafile missing? n=" << n;
+    uasserted(ss.str());
+    return 0;
+}
+
+void RecCache::initStoreByNs(const char *_ns) {
+    string ns;
+    int nl;
+    { 
+        stringstream ss;
+        ss << '-';
+        ss << _ns;
+        assert( strchr(_ns, '$') == 0); // $ not good for filenames
+        ss << ".idx";
+        ns = ss.str();
+        nl = ns.length();
+    }
+
+    path dir(dbpath);
+    directory_iterator end;
+    int nmax = -1;
+    try {
+        directory_iterator i(dir);
+        while ( i != end ) {
+            string s = i->string();
+            const char *q = s.c_str();
+            const char *p = strstr(q, ns.c_str());
+            if( p ) {
+                // found it
+                // back up to start of filename
+                while( p > q ) {
+                    if( p[-1] == '/' ) break;
+                }
+                _initStore(s);
+                return;
+            }
+            if( strstr(s.c_str(), ".idx") ) { 
+                stringstream ss(s);
+                int n = -1;
+                ss >> n;
+                if( n > nmax )
+                    nmax = n;
+            }
+            i++;
+        }
+    }
+    catch (...) {
+        string s = string("i/o error looking for .idx file in ") + dbpath;
+        massert(s, false);
+    }
+
+    // DNE.  create it.
+    stringstream ss;
+    ss << nmax+1 << ns;
+    _initStore(ss.str());
+}
+
 inline void RecCache::writeIfDirty(Node *n) {
     if( n->dirty ) {
         ndirtywritten++;
         n->dirty = false;
-        tempStore.update(fileOfs(n->loc), n->data, recsize);
+        store(n->loc).update(fileOfs(n->loc), n->data, recsize);
     }
+}
+
+void RecCache::closing() { 
+    boostlock lk(rcmutex);
+    (cout << "TEMP: recCacheCloseAll() writing dirty pages...\n").flush();
+    writeDirty( dirtyl.begin(), true );
+    for( unsigned i = 0; i < stores.size(); i++ ) { 
+        if( stores[i] ) {
+            delete stores[i];
+        }
+    }
+    (cout << "TEMP: write dirty done\n").flush();
 }
 
 /* note that this is written in order, as much as possible, given that dirtyl is of type set. */

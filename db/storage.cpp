@@ -8,9 +8,9 @@
 
 namespace mongo {
 
-BasicRecStore RecCache::tempStore;
-
 void writerThread();
+
+static int inited;
 
 void BasicRecStore::init(const char *fn, unsigned recsize)
 { 
@@ -41,9 +41,10 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
         f.fsync();
     }
 #if defined(_RECSTORE)
-    boost::thread t(writerThread);
+    if( inited++ == 0 ) {
+        boost::thread t(writerThread);
+    }
 #endif
 }
-
 
 }
