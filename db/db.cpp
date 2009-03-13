@@ -590,6 +590,7 @@ usage:
     out() << " --quota                   enable db quota management\n";
     out() << " --appsrvpath <path>       root directory for the babble app server\n";
     out() << " --nocursors               diagnostic/debugging option\n";
+    out() << " --nohints                 ignore query hints\n";
     out() << " --nojni" << endl;
     out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     out() << " --oplogSize <size_in_MB>  custom size if creating new replication operation log" << endl;
