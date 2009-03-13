@@ -34,7 +34,6 @@ namespace mongo {
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
-    bool objcheck = false;
     bool quota = false;
     bool slave = false;
     bool master = false; // true means keep an op log
@@ -434,9 +433,6 @@ namespace mongo {
 		
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
-            if ( objcheck && !js.valid() ) {
-                uassert("insert: bad object from client", false);
-            }
 
             theDataFileMgr.insert(ns, js);
             logOp("i", ns, js);

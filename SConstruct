@@ -629,29 +629,90 @@ elif not onlyServer:
     shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
 
     if weird:
-        shellEnv.Program( "mongo" , shell32BitFiles )
+        mongo = shellEnv.Program( "mongo" , shell32BitFiles )
     else:
         shellEnv.Append( LIBS=[ "mongoclient"] )
-        shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
+        mongo = shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) );
 
 
 #  ---- RUNNING TESTS ----
 
+testEnv.Alias( "dummySmokeSideEffect", [], [] )
+
+def addSmoketest( name, deps, actions ):
+    testEnv.Alias( name, deps, actions )
+    testEnv.AlwaysBuild( name )
+    # Prevent smoke tests from running in parallel
+    testEnv.SideEffect( "dummySmokeSideEffect", name )
+
 def testSetup( env , target , source ):
     Mkdir( "/tmp/unittest/" )
 
-testEnv.Alias( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
-testEnv.AlwaysBuild( "smoke" )
-
-testEnv.Alias( "smokePerf", [ "perftest" ] , [ testSetup , perftest[ 0 ].abspath ] )
-testEnv.AlwaysBuild( "smokePerf" )
+addSmoketest( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
+addSmoketest( "smokePerf", [ "perftest" ] , [ testSetup , perftest[ 0 ].abspath ] )
 
 clientExec = [ x[0].abspath for x in clientTests ];
-testEnv.Alias( "smokeClient" , clientExec , clientExec )
-testEnv.AlwaysBuild( "smokeClient" )
+addSmoketest( "smokeClient" , clientExec , clientExec )
+addSmoketest( "mongosTest" , [ mongos[0].abspath ] , [ mongos[0].abspath + " --test" ] )
 
-env.Alias( "mongosTest" , [ mongos[0].abspath ] , [ mongos[0].abspath + " --test" ] )
-env.AlwaysBuild( "mongosTest" )
+def jsSpec( suffix ):
+    import os.path
+    args = [ os.path.dirname( mongo[0].abspath ), "jstests" ] + suffix
+    return apply( os.path.join, args )
+
+def jsDirTestSpec( dir ):
+    return mongo[0].abspath + " --nodb " + jsSpec( [ dir, "*.js" ] )
+
+# These tests require the mongo shell
+if not onlyServer:
+    addSmoketest( "smokeJs", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "_runner.js" ] ) ] )
+    addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
+    addSmoketest( "smokeRepl", [ "mongo", "mongod" ], [ jsDirTestSpec( "repl" ) ] )
+    addSmoketest( "smokeRecovery", [ "mongo", "mongod" ], [ jsDirTestSpec( "recovery" ) ] )
+    addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
+    addSmoketest( "smokeJsPerf", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "perf", "*.js" ] ) ] )
+
+mongodForTests = None
+
+def startMongodForTests( env, target, source ):
+    global mongodForTests
+    if mongodForTests:
+        return
+    from subprocess import Popen
+    mongodForTests = Popen( [ "mongod", "run" ] )
+    # Wait for mongod to start
+    from time import sleep
+    sleep( 1 )
+    
+def stopMongodForTests():
+    global mongodForTests
+    if not mongodForTests:
+        return
+    try:
+        # This function not available in Python 2.5
+        mongodForTests.terminate()
+    except AttributeError:
+        from os import kill
+        kill( mongodForTests.pid, 15 )
+    mongodForTests.wait()
+
+testEnv.Alias( "startMongod", ["mongod"], [startMongodForTests] );
+testEnv.AlwaysBuild( "startMongod" );
+
+def addMongodReqTargets( env, target, source ):
+    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeJsPerf" ]
+    for target in mongodReqTargets:
+        testEnv.Depends( target, "startMongod" )
+        testEnv.Depends( "smokeAll", target )
+
+testEnv.Alias( "addMongodReqTargets", [], [addMongodReqTargets] )
+testEnv.AlwaysBuild( "addMongodReqTargets" )
+
+testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeRecovery", "smokeSharding" ] )
+testEnv.AlwaysBuild( "smokeAll" )
+
+import atexit
+atexit.register( stopMongodForTests )
 
 #  ----  INSTALL -------
 

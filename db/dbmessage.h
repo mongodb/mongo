@@ -33,6 +33,8 @@ namespace mongo {
           list of marshalled JSObjects;
     */
 
+    extern bool objcheck;
+    
 #pragma pack(1)
     struct QueryResult : public MsgData {
         enum {
@@ -119,6 +121,9 @@ namespace mongo {
             massert( "Invalid object size", js.objsize() > 3 );
             massert( "Next object larger than available space",
                     js.objsize() < ( theEnd - data ) );
+            if ( objcheck && !js.valid() ) {
+                massert("bad object in message", false);
+            }            
             nextjsobj += js.objsize();
             if ( nextjsobj >= theEnd )
                 nextjsobj = 0;

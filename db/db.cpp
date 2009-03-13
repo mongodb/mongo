@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    extern bool objcheck, quiet, quota, cpu;
+    extern bool quiet, quota, cpu;
     bool useJNI = true;
 
     /* only off if --nocursors which is for debugging. */

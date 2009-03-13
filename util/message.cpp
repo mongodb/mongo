@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    bool objcheck = false;
+    
 // if you want trace output:
 #define mmm(x)
 
