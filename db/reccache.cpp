@@ -97,6 +97,9 @@ BasicRecStore* RecCache::initStore(int n) {
             i++;
         }
     }
+    catch( DBException & ) { 
+        throw;
+    }
     catch (...) {
         string s = string("i/o error looking for .idx file in ") + dbpath;
         massert(s, false);
