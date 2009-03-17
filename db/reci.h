@@ -22,6 +22,8 @@ public:
     /* insert specified data as a record */
     static DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { assert(false); return DiskLoc(); }
 
+    /* drop the collection */
+    static void drop(const char *ns) { assert(false); }
 };
 
 }

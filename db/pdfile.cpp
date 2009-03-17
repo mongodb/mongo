@@ -584,7 +584,8 @@ assert( !eloc.isNull() );
             wassert( n == 1 );
         }
 
-        dropNS(ns);
+        BtreeStore::drop(ns.c_str());
+        //        dropNS(ns); 
         //	database->namespaceIndex.kill(ns.c_str());
         head.setInvalid();
         info.setInvalid();

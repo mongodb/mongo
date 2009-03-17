@@ -30,6 +30,10 @@ public:
     }
 
     static void modified(DiskLoc d) { }
+
+    static void drop(const char *ns) { 
+        dropNS(ns);
+    }
 };
 
 /* An in memory RecStoreInterface implementation ----------------------------
@@ -63,6 +67,10 @@ public:
     }
 
     static void modified(DiskLoc d) { }
+
+    static void drop(const char *ns) { 
+        log() << "warning: drop() not yet implemented for InMem_RecStore" << endl;
+    }
 };
 
 /* Glue btree to RecStoreInterface: ---------------------------- */

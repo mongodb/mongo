@@ -89,7 +89,7 @@ public:
                 BSONObj o = fromjson( line );
                 _conn.insert( ns.c_str() , o );
             }
-            catch ( MsgAssertionException ma ){
+            catch ( MsgAssertionException& ma ){
                 cout << "exception:" << ma.toString() << endl;
                 cout << line << endl;
             }
