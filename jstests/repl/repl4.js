@@ -1,6 +1,6 @@
 // Test replication 'only' mode
 
-var baseName = "jstests_repl3test";
+var baseName = "jstests_repl4test";
 
 soonCount = function( db, coll, count ) {
     assert.soon( function() { 
