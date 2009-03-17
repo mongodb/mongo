@@ -25,6 +25,8 @@ doTest = function( signal ) {
     
     assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );
     as = s.getDB( baseName ).a
+    
+    sleep( 10000 );
     assert.soon( function() { return 1001 == as.find().count(); } );
     assert.eq( 1, as.find( { i: 0 } ).count() );
     assert.eq( 1, as.find( { i: 999 } ).count() );

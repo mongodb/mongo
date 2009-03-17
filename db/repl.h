@@ -155,6 +155,7 @@ namespace mongo {
         set<string> dbs;
 
         int nClonedThisPass;
+        bool haveDbList_;
 
         static void loadAll(vector<ReplSource*>&);
         static void cleanup(vector<ReplSource*>&);

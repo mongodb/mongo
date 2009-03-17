@@ -270,7 +270,6 @@ namespace mongo {
     }
 
     void closeClient( const char *cl, const char *path ) {
-        /* reset haveLogged in local.dbinfo */
         if ( string("local") != cl ) {
             DBInfo i(cl);
             i.dbDropped();
