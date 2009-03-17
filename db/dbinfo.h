@@ -23,15 +23,7 @@ namespace mongo {
     /* this is an "accessor" class to data held in local.dbinfo.<dbname>
 
        system.dbinfo contains:
-
-           { haveLogged : true }
-
-             haveLogged -- if true, we have already logged events to the oplog for this
-               database.  missing implies false.
-
-       other attributes will be added later.
-
-       Note that class Database caches the DBInfo::haveLogged() value to keep things fast.
+       attributes will be added later.
     */
     class DBInfo {
         string ns;
@@ -53,24 +45,11 @@ namespace mongo {
             return c->current();
         }
 
-        bool haveLogged() {
-            return getDbInfoObj().getBoolField("haveLogged");
-        }
-
-        void setHaveLogged();
         void dbDropped();
     };
 
-    inline void Database::setHaveLogged() {
-        if ( _haveLogged ) return;
-        DBInfo i(name.c_str());
-        i.setHaveLogged();
-        _haveLogged = true;
-    }
-
     inline void Database::finishInit() {
         DBInfo i(name.c_str());
-        _haveLogged = i.haveLogged();
     }
 
 } // namespace mongo

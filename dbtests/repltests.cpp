@@ -161,12 +161,10 @@ namespace ReplTests {
     class LogBasic : public Base {
     public:
         void run() {
-            ASSERT( !database->haveLogged() );
             ASSERT( oneOp().isEmpty() );
             
             client()->insert( ns(), fromjson( "{\"a\":\"b\"}" ) );
 
-            ASSERT( database->haveLogged() );
             ASSERT( !oneOp().isEmpty() );
         }
     };

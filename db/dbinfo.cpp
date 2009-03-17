@@ -22,18 +22,6 @@
 
 namespace mongo {
 
-    void DBInfo::setHaveLogged() {
-        if ( haveLogged() )
-            return;
-
-        NamespaceDetails *d = nsdetails(ns.c_str());
-        assert( d == 0 || d->nrecords == 0 );
-        BSONObjBuilder b;
-        b.appendBool("haveLogged", true);
-        BSONObj o = b.done();
-        theDataFileMgr.insert(ns.c_str(), (void *) o.objdata(), o.objsize());
-    }
-
     void DBInfo::dbDropped() {
         BSONObj empty;
         deleteObjects(ns.c_str(), empty, false);

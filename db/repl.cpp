@@ -27,8 +27,7 @@
 
    local.sources         - indicates what sources we pull from as a "slave", and the last update of each
    local.oplog.$main     - our op log as "master"
-   local.dbinfo.<dbname> - as master, have we already logged events to the oplog for this database?
-							{ haveLogged : true }
+   local.dbinfo.<dbname>
    local.pair.startup    - can contain a special value indicating for a pair that we have the master copy.
                            used when replacing other half of the pair which has permanently failed.
    local.pair.sync       - { initialsynccomplete: 1 }
@@ -401,6 +400,7 @@ namespace mongo {
         replacing = false;
         nClonedThisPass = 0;
         paired = false;
+        haveDbList_ = false;
     }
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
@@ -429,6 +429,8 @@ namespace mongo {
                 dbs.insert( e.fieldName() );
             }
         }
+        
+        haveDbList_ = !dbs.empty();
     }
 
     /* Turn our C++ Source object into a BSONObj */
@@ -463,6 +465,7 @@ namespace mongo {
         BSONObj pattern = b.done();
 
         BSONObj o = jsobj();
+        log( 1 ) << "Saving repl source: " << o << endl;
 
         stringstream ss;
         setClient("local.sources");
@@ -611,6 +614,7 @@ namespace mongo {
         }
         dbs.clear();
         syncedTo = OpTime();
+        haveDbList_ = false;
     }
     
     bool ReplSource::resync(string db) {
@@ -754,17 +758,7 @@ namespace mongo {
         if ( justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
                 newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
         {
-            if ( op.getBoolField("first") &&
-                    pairSync->initialSyncCompleted() /*<- when false, we are a replacement volume for a pair and need a full sync */
-               ) {
-                log() << "pull: got {first:true} op ns:" << ns << '\n';
-                /* this is the first thing in the oplog ever, so we don't need to resync(). */
-                if ( newDb )
-                    dbs.insert(clientName);
-                else
-                    problem() << "warning: justCreated && !newDb in repl " << op.toString() << endl;
-            }
-            else if ( paired && !justCreated ) {
+            if ( paired && !justCreated ) {
                 if ( strcmp(opType,"db") == 0 && strcmp(ns, "admin.") == 0 ) {
                     // "admin" is a special namespace we use for priviledged commands -- ok if it exists first on
                     // either side
@@ -806,7 +800,35 @@ namespace mongo {
             c = 0;
         }
 
+        if ( syncedTo.isNull() )
+            log(1) << "pull:   initial run\n";
+
         if ( c == 0 ) {
+            if ( syncedTo == OpTime() ) {
+                BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
+                if ( !last.isEmpty() ) {
+                    BSONElement ts = last.findElement( "ts" );
+                    massert( "non Date ts found", ts.type() == Date );
+                    syncedTo = OpTime( ts.date() );
+                }
+                if ( !haveDbList_ ) {
+                    haveDbList_ = true;
+                    BSONObj info;
+                    bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
+                    massert( "Unable to get database list", ok );
+                    BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
+                    while( i.more() ) {
+                        BSONElement e = i.next();
+                        if ( e.eoo() )
+                            break;
+                        string name = e.embeddedObject().getField( "name" ).valuestr();
+                        if ( name != "local" ) {
+                            addDbNextPass.insert( name );
+                        }
+                    }
+                }
+            }
+            
             BSONObjBuilder q;
             q.appendDate("$gte", syncedTo.asDate());
             BSONObjBuilder query;
@@ -871,18 +893,10 @@ namespace mongo {
         }
         OpTime nextOpTime( ts.date() );
         log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
-        bool initial = syncedTo.isNull();
-        if ( initial || tailing ) {
-            if ( tailing ) {
-                assert( syncedTo < nextOpTime );
-            }
-            else {
-                log(1) << "pull:   initial run\n";
-            }
-            {
-                sync_pullOpLog_applyOperation(op);
-                n++;
-            }
+        if ( tailing ) {
+            assert( syncedTo < nextOpTime );
+            sync_pullOpLog_applyOperation(op);
+            n++;
         }
         else if ( nextOpTime != syncedTo ) {
             Nullstream& l = log();
@@ -901,7 +915,9 @@ namespace mongo {
             throw SyncException();
         }
         else {
-            /* t == syncedTo, so the first op was applied previously, no need to redo it. */
+            /* t == syncedTo, so the first op was applied previously or this is
+               the initial run and the first op is unnecessary, no need to apply
+               it. */
         }
 
         // apply operations
@@ -1078,8 +1094,6 @@ namespace mongo {
             return;
 
         Database *oldClient = database;
-        bool haveLogged = database && database->haveLogged();
-
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
         */
@@ -1092,11 +1106,6 @@ namespace mongo {
             b.appendBool("b", *bb);
         if ( o2 )
             b.append("o2", *o2);
-        if ( !haveLogged ) {
-            b.appendBool("first", true);
-            if ( database ) // null on dropDatabase()'s logging.
-                database->setHaveLogged();
-        }
         BSONObj partial = b.done();
         int posz = partial.objsize();
         int len = posz + obj.objsize() + 1 + 2 /*o:*/;

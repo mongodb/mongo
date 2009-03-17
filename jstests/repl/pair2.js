@@ -8,6 +8,16 @@ ismaster = function( n ) {
     return im.ismaster;
 }
 
+soonCount = function( count ) {
+    assert.soon( function() { 
+                if ( -1 == l.getDBNames().indexOf( baseName ) )
+                    return false;
+                if ( -1 == l.getDB( baseName ).getCollectionNames().indexOf( "z" ) )
+                    return false;
+                return l.getDB( baseName ).z.find().count() == count; 
+                } );    
+}
+
 doTest = function( signal ) {
     
     // spec small oplog for fast startup on 64bit machines
@@ -22,8 +32,11 @@ doTest = function( signal ) {
     rz = r.getDB( baseName ).z
     
     rz.save( { _id: new ObjectId() } );
-    assert.soon( function() { return lz.find().count() == 1; } );
+    soonCount( 1 );
     assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
+    
+    // Allow slave to save its db list -- eventually we can remove the sleep.
+    sleep( 10000 );
     
     stopMongod( 27019, signal );
     
@@ -35,9 +48,10 @@ doTest = function( signal ) {
     l.setSlaveOk();
     assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
     
-    assert.soon( function() { return l.getDBNames().indexOf( baseName ) != -1; } );
+    sleep( 10000 );
+    
+    soonCount( 1001 );
     lz = l.getDB( baseName ).z
-    assert.soon( function() { return 1001 == lz.find().count(); } );
     assert.eq( 1, lz.find( { i: 0 } ).count() );
     assert.eq( 1, lz.find( { i: 999 } ).count() );
     

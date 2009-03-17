@@ -157,7 +157,7 @@ tojson = function( x ){
 }
 
 tojsonObject = function( x ){
-    assert( typeof x == "object" , "tojsonObject needs object, not: " + typeof x );
+    assert.eq( ( typeof x ) , "object" , "tojsonObject needs object, not [" + ( typeof x ) + "]" );
     
     if ( x.tojson )
         return x.tojson();
