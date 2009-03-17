@@ -751,7 +751,7 @@ namespace mongo {
             log() << "replAllDead, throwing SyncException\n";
             throw SyncException();
         }
-
+        
          /* datafiles were missing.  so we need everything, no matter what sources object says */
         if ( justCreated ) {
             nClonedThisPass++;
@@ -813,7 +813,8 @@ namespace mongo {
                         string name = e.embeddedObject().getField( "name" ).valuestr();
                         // We may be paired, so only attempt to add databases not already present.
                         if ( name != "local" && localDbs.count( name ) == 0 ) {
-                            addDbNextPass.insert( name );
+                            if ( only.empty() || only == name )
+                                addDbNextPass.insert( name );
                         }
                     }
                 }
