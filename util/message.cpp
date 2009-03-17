@@ -401,4 +401,8 @@ again:
         return msgid;
     }
 
+    bool doesOpGetAResponse( int op ){
+        return op == dbQuery || op == dbGetMore;
+    }
+
 } // namespace mongo
