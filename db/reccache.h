@@ -46,6 +46,7 @@ class RecCache {
     BasicRecStore* _initStore(string fname);
     BasicRecStore* initStore(int n);
     void initStoreByNs(const char *ns);
+    void closeStore(BasicRecStore *rs);
 
     /* get the right file for a given diskloc */
     BasicRecStore& store(DiskLoc& d) { 
@@ -164,6 +165,8 @@ public:
         return n->data;
     }
 
+    void drop(const char *ns);
+
     DiskLoc insert(const char *ns, const void *obuf, int len, bool god) {
         boostlock lk(rcmutex);
         BasicRecStore& rs = store(ns);
@@ -196,6 +199,10 @@ public:
 
     static void modified(DiskLoc d) { 
         theRecCache.dirty(d);
+    }
+
+    static void drop(const char *ns) { 
+        theRecCache.drop(ns);
     }
 };
 

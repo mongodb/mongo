@@ -752,39 +752,21 @@ namespace mongo {
             throw SyncException();
         }
 
-        // operation type -- see logOp() comments for types
-        const char *opType = op.getStringField("op");
-
-        if ( justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
-                newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
-        {
-            if ( paired && !justCreated ) {
-                if ( strcmp(opType,"db") == 0 && strcmp(ns, "admin.") == 0 ) {
-                    // "admin" is a special namespace we use for priviledged commands -- ok if it exists first on
-                    // either side
-                }
-                else {
-                    /* the other half of our pair has some operations. yet we already had a db on our
-                    disk even though the db in question is not listed in the source.
-                    */
-                    replAllDead = "pair: historical image missing for a db";
-                    problem() << "pair: historical image missing for " << clientName << ", setting replAllDead=true" << endl;
-                    log() << "op:" << op.toString() << endl;
-                    /*
-                    log() << "TEMP: pair: assuming we have the historical image for: " <<
-                    clientName << ". add extra checks here." << endl;
-                    dbs.insert(clientName);
-                    */
-                }
-            }
-            else {
-                nClonedThisPass++;
-                resync(database->name);
-            }
-            addDbNextPass.erase(clientName);
+         /* datafiles were missing.  so we need everything, no matter what sources object says */
+        if ( justCreated ) {
+            nClonedThisPass++;
+            resync(database->name);
+            save();
+        } else if ( newDb && strcmp( clientName, "admin" ) != 0 ) {
+            replAllDead = "An initial clone by an earlier instance did not complete, "
+                          "or a local db was was created by the user with the same name as a db on the remote instance; "
+                          "resync required";
+            problem() << replAllDead;
+            problem() << "op: " << op << endl;
+        } else {
+            applyOperation( op );            
         }
-
-        applyOperation( op );
+        addDbNextPass.erase(clientName);
         database = 0;
     }
 
@@ -813,6 +795,13 @@ namespace mongo {
                 }
                 if ( !haveDbList_ ) {
                     haveDbList_ = true;
+                    set< string > localDbs;
+                    vector< string > diskDbs;
+                    getDatabaseNames( diskDbs );
+                    for( vector< string >::iterator i = diskDbs.begin(); i != diskDbs.end(); ++i )
+                        localDbs.insert( *i );
+                    for( map< string, Database* >::iterator i = databases.begin(); i != databases.end(); ++i )
+                        localDbs.insert( i->first );
                     BSONObj info;
                     bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
                     massert( "Unable to get database list", ok );
@@ -822,7 +811,8 @@ namespace mongo {
                         if ( e.eoo() )
                             break;
                         string name = e.embeddedObject().getField( "name" ).valuestr();
-                        if ( name != "local" ) {
+                        // We may be paired, so only attempt to add databases not already present.
+                        if ( name != "local" && localDbs.count( name ) == 0 ) {
                             addDbNextPass.insert( name );
                         }
                     }

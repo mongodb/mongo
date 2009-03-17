@@ -2,6 +2,18 @@
 
 var baseName = "jstests_repl3test";
 
+soonCount = function( count ) {
+    assert.soon( function() { 
+//                print( "check count" );
+                if ( -1 == s.getDBNames().indexOf( baseName ) )
+                    return false;
+                if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "a" ) )
+                    return false;
+//                print( "count: " + s.getDB( baseName ).z.find().count() );
+                return s.getDB( baseName ).a.find().count() == count; 
+                } );    
+}
+
 doTest = function( signal ) {
     
     // spec small oplog to make slave get out of sync
@@ -9,10 +21,9 @@ doTest = function( signal ) {
     s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
     
     am = m.getDB( baseName ).a
-    as = s.getDB( baseName ).a
     
     am.save( { _id: new ObjectId() } );
-    assert.soon( function() { return as.find().count() == 1; } );
+    soonCount( 1 );
     stopMongod( 27019, signal );
     
     big = new Array( 2000 ).toString();
@@ -27,9 +38,9 @@ doTest = function( signal ) {
     // Need the 2 additional seconds timeout, since commands don't work on an 'allDead' node.
     assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );
     assert.soon( function() { return s.getDB( baseName ).getCollectionNames().indexOf( "a" ) != -1; } );
-    
+
+    soonCount( 1001 );
     as = s.getDB( baseName ).a
-    assert.soon( function() { return 1001 == as.find().count(); } );
     assert.eq( 1, as.find( { i: 0 } ).count() );
     assert.eq( 1, as.find( { i: 999 } ).count() );
     

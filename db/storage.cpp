@@ -15,6 +15,7 @@ static int inited;
 void BasicRecStore::init(const char *fn, unsigned recsize)
 { 
     massert( "compile packing problem recstore?", sizeof(RecStoreHeader) == 8192);
+    filename = fn;
     f.open(fn);
     uassert( string("couldn't open file:")+fn, f.is_open() );
     len = f.len();

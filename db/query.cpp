@@ -433,7 +433,7 @@ namespace mongo {
         try {
             return _runCommands(ns, jsobj, ss, b, anObjBuilder, fromRepl, queryOptions);
         }
-        catch ( AssertionException e ) {
+        catch ( AssertionException& e ) {
             if ( !e.msg.empty() )
                 anObjBuilder.append("assertion", e.msg);
         }

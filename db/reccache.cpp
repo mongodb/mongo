@@ -187,6 +187,7 @@ void RecCache::writeDirty( set<DiskLoc>::iterator startAt, bool rawLog ) {
     }
     catch(...) {
         const char *message = "Problem: bad() in RecCache::writeDirty, file io error\n";
+
         if ( rawLog )
             rawOut( message );
         else
@@ -258,6 +259,62 @@ void RecCache::dump() {
     }
     assert( newest == last );
 //    cout << endl;
+}
+
+void RecCache::closeStore(BasicRecStore *rs) { 
+    for( set<DiskLoc>::iterator i = dirtyl.begin(); i != dirtyl.end(); ) { 
+        DiskLoc k = *i++;
+        if( k.a() == rs->fileNumber )
+            dirtyl.erase(k);
+    }
+
+    for( map<DiskLoc,Node*>::iterator i = m.begin(); i != m.end(); ) { 
+        DiskLoc k = i->first;
+        i++;
+        if( k.a() == rs->fileNumber )
+            m.erase(k);
+    }
+
+    for( unsigned i = 0; i < stores.size(); i++ ) { 
+        if( stores[i] == rs ) { 
+            stores[i] = 0;
+            break;
+        }
+    }
+    delete rs; // closes file
+}
+
+void RecCache::drop(const char *ns) { 
+    // todo: test with a non clean shutdown file
+    boostlock lk(rcmutex);
+
+    char buf[256];
+    {
+        char *p = buf;
+        while( 1 ) {
+            if( *ns == '$' ) *p = '_';
+            else
+                *p = *ns;
+            if( *ns == 0 )
+                break;
+            p++; ns++;
+        }
+        assert( p - buf < (int) sizeof(buf) );
+    }
+    BasicRecStore *&rs = storesByNs[buf];
+    if( rs == 0 )
+        initStoreByNs(buf); // load -- creates if DNE which is slightly bad. 
+    {
+        string fname = rs->filename;
+        closeStore(rs);
+        rs = 0;
+        try { 
+            boost::filesystem::remove(fname);
+        } 
+        catch(...) { 
+            log() << "couldn't remove file " << fname << endl;
+        }
+    }
 }
 
 void dbunlocking() { 

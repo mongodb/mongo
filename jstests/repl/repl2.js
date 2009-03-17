@@ -2,6 +2,18 @@
 
 var baseName = "jstests_repl2test";
 
+soonCount = function( count ) {
+    assert.soon( function() { 
+//                print( "check count" );
+                if ( -1 == s.getDBNames().indexOf( baseName ) )
+                    return false;
+                if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "a" ) )
+                    return false;
+//                print( "count: " + s.getDB( baseName ).z.find().count() );
+                return s.getDB( baseName ).a.find().count() == count; 
+                } );    
+}
+
 doTest = function( signal ) {
     
     // spec small oplog to make slave get out of sync
@@ -9,10 +21,9 @@ doTest = function( signal ) {
     s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
     
     am = m.getDB( baseName ).a
-    as = s.getDB( baseName ).a
     
     am.save( { _id: new ObjectId() } );
-    assert.soon( function() { return as.find().count() == 1; } );
+    soonCount( 1 );
     assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
     stopMongod( 27019, signal );
     
@@ -22,12 +33,10 @@ doTest = function( signal ) {
     
     s = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
     assert.soon( function() { return 1 == s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
-    
-    assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );
-    as = s.getDB( baseName ).a
-    
+
     sleep( 10000 );
-    assert.soon( function() { return 1001 == as.find().count(); } );
+    soonCount( 1001 );
+    as = s.getDB( baseName ).a
     assert.eq( 1, as.find( { i: 0 } ).count() );
     assert.eq( 1, as.find( { i: 999 } ).count() );
     
