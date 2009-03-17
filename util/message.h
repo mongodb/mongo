@@ -92,6 +92,8 @@ namespace mongo {
         dbKillCursors = 2007
     };
 
+    bool doesOpGetAResponse( int op );
+
     struct MsgData {
         int len; /* len of the msg, including this field */
         MSGID id; /* request/reply id's match... */

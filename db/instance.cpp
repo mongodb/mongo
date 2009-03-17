@@ -28,6 +28,7 @@
 #include "security.h"
 #include "json.h"
 #include "reccache.h"
+#include "s/d_logic.h"
 
 namespace mongo {
 
@@ -86,7 +87,7 @@ namespace mongo {
         BSONObj obj = currentOp.info();
         replyToQuery(0, m, dbresponse, obj);
     }
-
+    
     void killOp( Message &m, DbResponse &dbresponse ) {
         BSONObj obj;
         AuthenticationInfo *ai = authInfo.get();
@@ -101,7 +102,7 @@ namespace mongo {
         }
         replyToQuery(0, m, dbresponse, obj);
     }
-
+    
     // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse ) {
         // before we lock...
@@ -118,9 +119,12 @@ namespace mongo {
                 }
             }
         }
+        
+        if ( handlePossibleShardedMessage( m , dbresponse ) )
+            return true;
 
         dblock lk;
-
+        
         stringstream ss;
         char buf[64];
         time_t now = time(0);
