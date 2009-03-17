@@ -40,6 +40,8 @@ public:
 
     int fileNumber; // this goes in DiskLoc::a
 
+    string filename;
+
 private:
 
     void writeHeader();

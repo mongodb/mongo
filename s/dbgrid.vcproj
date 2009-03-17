@@ -504,6 +504,14 @@
 						/>
 					</FileConfiguration>
 					<FileConfiguration
+						Name="release_nojni|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
 						Name="Debug Recstore|Win32"
 						>
 						<Tool

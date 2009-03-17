@@ -728,8 +728,6 @@ namespace mongo {
 
     }
 
-} // namespace mongo
-
 #if defined(_MAIN)
 int main() {
     return javajstest();
@@ -738,3 +736,4 @@ int main() {
 
 #endif
 
+} // namespace mongo

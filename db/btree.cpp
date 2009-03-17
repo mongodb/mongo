@@ -750,7 +750,12 @@ found:
             _KeyNode& kn = k(pos);
             if ( kn.isUnused() ) {
                 DEBUGGING out() << "reusing unused key" << endl;
-                massert( "btree reuse unused key error?", kn.prevChildBucket == lChild );
+                if( kn.prevChildBucket != lChild ) {
+                    /* is it ok if they don't match, and we just need to update??? */
+                    log() << "pcb:" << kn.prevChildBucket.toString() << " lChild:" << lChild.toString() << '\n';
+                    log() << "rChild:" << rChild.toString() << '\n';
+                    massert( "btree reuse unused key error?", false);
+                }
                 // check rchild too?
                 kn.setUsed();
                 return 0;

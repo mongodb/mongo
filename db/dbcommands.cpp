@@ -630,6 +630,7 @@ namespace mongo {
 
                     d->aboutToDeleteAnIndex();
 
+                    /* there may be pointers pointing at keys in the btree(s).  kill them. */
                     ClientCursor::invalidate(toDeleteNs.c_str());
 
                     // delete a specific index or all?
