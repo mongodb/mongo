@@ -116,12 +116,13 @@ env = Environment()
 
 if GetOption( "recstore" ) != None:
     env.Append( CPPDEFINES=[ "_RECSTORE" ] )
+env.Append( CPPDEFINES=[ "_SCONS" ] )
 env.Append( CPPPATH=[ "." ] )
 
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
-commonFiles = Split( "stdafx.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp" )
+commonFiles = Split( "stdafx.cpp gitversion.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ]
 commonFiles += Glob( "util/*.c" );
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
@@ -342,6 +343,33 @@ if nix:
 
 
 # --- check system ---
+
+def getGitVersion():
+    if not os.path.exists( ".git" ):
+        return "nogitversion"
+
+    version = open( ".git/HEAD" ,'r' ).read().strip()
+    if not version.startswith( "ref: " ):
+        return version
+    version = version[5:]
+    f = ".git/" + version
+    if not os.path.exists( f ):
+        return version
+    return open( f , 'r' ).read().strip()
+
+def setupGitFile( outFile ):
+    version = getGitVersion()
+    contents = "#include \"stdafx.h\"\n"
+    contents += "#include <iostream>\n"
+    contents += "namespace mongo { void printGitVersion(){ log() << \"git version: " + version + "\" << std::endl; } }\n"
+    
+    if os.path.exists( outFile ) and open( outFile ).read().strip() == contents.strip():
+        return
+    
+    out = open( outFile , 'w' )
+    out.write( contents )
+
+setupGitFile( "gitversion.cpp" )
 
 def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)

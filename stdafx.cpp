@@ -120,6 +120,10 @@ namespace mongo {
         fsync( STDOUT_FILENO );        
 #endif
     }
-    
+
+#ifndef _SCONS
+    // only works in scons
+    void printGitVersion(){}
+#endif
 
 } // namespace mongo

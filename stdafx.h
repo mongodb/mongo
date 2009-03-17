@@ -44,6 +44,8 @@ namespace mongo {
     void dbexit(int returnCode, const char *whyMsg = "");
     void exit( int status );
 
+    void printGitVersion();
+
     inline void * ourmalloc(size_t size) {
         void *x = malloc(size);
         if ( x == 0 ) dbexit(42, "malloc fails");
