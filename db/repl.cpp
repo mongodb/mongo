@@ -27,8 +27,7 @@
 
    local.sources         - indicates what sources we pull from as a "slave", and the last update of each
    local.oplog.$main     - our op log as "master"
-   local.dbinfo.<dbname> - as master, have we already logged events to the oplog for this database?
-							{ haveLogged : true }
+   local.dbinfo.<dbname>
    local.pair.startup    - can contain a special value indicating for a pair that we have the master copy.
                            used when replacing other half of the pair which has permanently failed.
    local.pair.sync       - { initialsynccomplete: 1 }
@@ -1095,8 +1094,6 @@ namespace mongo {
             return;
 
         Database *oldClient = database;
-        bool haveLogged = database && database->haveLogged();
-
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
         */
@@ -1109,10 +1106,6 @@ namespace mongo {
             b.appendBool("b", *bb);
         if ( o2 )
             b.append("o2", *o2);
-        if ( !haveLogged ) {
-            if ( database ) // null on dropDatabase()'s logging.
-                database->setHaveLogged();
-        }
         BSONObj partial = b.done();
         int posz = partial.objsize();
         int len = posz + obj.objsize() + 1 + 2 /*o:*/;

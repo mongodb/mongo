@@ -125,14 +125,6 @@ namespace mongo {
         int profile; // 0=off.
         string profileName; // "alleyinsider.system.profile"
 
-        bool haveLogged() {
-            return _haveLogged;
-        }
-        void setHaveLogged();
-
-    private:
-        // see dbinfo.h description.  if true, we have logged to the replication log.
-        bool _haveLogged;
     };
 
     extern Database *database;
