@@ -4,6 +4,7 @@ var baseName = "jstests_pair1test";
 
 ismaster = function( n ) {
     im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
+//    print( "ismaster: " + tojson( im ) );
     assert( im );
     return im.ismaster;
 }
