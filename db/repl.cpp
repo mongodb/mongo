@@ -401,6 +401,7 @@ namespace mongo {
         replacing = false;
         nClonedThisPass = 0;
         paired = false;
+        haveDbList_ = false;
     }
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
@@ -429,6 +430,8 @@ namespace mongo {
                 dbs.insert( e.fieldName() );
             }
         }
+        
+        haveDbList_ = !dbs.empty();
     }
 
     /* Turn our C++ Source object into a BSONObj */
@@ -463,6 +466,7 @@ namespace mongo {
         BSONObj pattern = b.done();
 
         BSONObj o = jsobj();
+        log( 1 ) << "Saving repl source: " << o << endl;
 
         stringstream ss;
         setClient("local.sources");
@@ -611,6 +615,7 @@ namespace mongo {
         }
         dbs.clear();
         syncedTo = OpTime();
+        haveDbList_ = false;
     }
     
     bool ReplSource::resync(string db) {
@@ -806,7 +811,35 @@ namespace mongo {
             c = 0;
         }
 
+        if ( syncedTo.isNull() )
+            log(1) << "pull:   initial run\n";
+
         if ( c == 0 ) {
+            if ( syncedTo == OpTime() ) {
+                BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
+                if ( !last.isEmpty() ) {
+                    BSONElement ts = last.findElement( "ts" );
+                    massert( "non Date ts found", ts.type() == Date );
+                    syncedTo = OpTime( ts.date() );
+                }
+                if ( !haveDbList_ ) {
+                    haveDbList_ = true;
+                    BSONObj info;
+                    bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
+                    massert( "Unable to get database list", ok );
+                    BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
+                    while( i.more() ) {
+                        BSONElement e = i.next();
+                        if ( e.eoo() )
+                            break;
+                        string name = e.embeddedObject().getField( "name" ).valuestr();
+                        if ( name != "local" ) {
+                            addDbNextPass.insert( name );
+                        }
+                    }
+                }
+            }
+            
             BSONObjBuilder q;
             q.appendDate("$gte", syncedTo.asDate());
             BSONObjBuilder query;
@@ -871,18 +904,10 @@ namespace mongo {
         }
         OpTime nextOpTime( ts.date() );
         log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
-        bool initial = syncedTo.isNull();
-        if ( initial || tailing ) {
-            if ( tailing ) {
-                assert( syncedTo < nextOpTime );
-            }
-            else {
-                log(1) << "pull:   initial run\n";
-            }
-            {
-                sync_pullOpLog_applyOperation(op);
-                n++;
-            }
+        if ( tailing ) {
+            assert( syncedTo < nextOpTime );
+            sync_pullOpLog_applyOperation(op);
+            n++;
         }
         else if ( nextOpTime != syncedTo ) {
             Nullstream& l = log();
@@ -901,7 +926,9 @@ namespace mongo {
             throw SyncException();
         }
         else {
-            /* t == syncedTo, so the first op was applied previously, no need to redo it. */
+            /* t == syncedTo, so the first op was applied previously or this is
+               the initial run and the first op is unnecessary, no need to apply
+               it. */
         }
 
         // apply operations
