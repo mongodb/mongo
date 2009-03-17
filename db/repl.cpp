@@ -759,17 +759,7 @@ namespace mongo {
         if ( justCreated || /* datafiles were missing.  so we need everything, no matter what sources object says */
                 newDb ) /* if not in dbs, we've never synced this database before, so we need everything */
         {
-            if ( op.getBoolField("first") &&
-                    pairSync->initialSyncCompleted() /*<- when false, we are a replacement volume for a pair and need a full sync */
-               ) {
-                log() << "pull: got {first:true} op ns:" << ns << '\n';
-                /* this is the first thing in the oplog ever, so we don't need to resync(). */
-                if ( newDb )
-                    dbs.insert(clientName);
-                else
-                    problem() << "warning: justCreated && !newDb in repl " << op.toString() << endl;
-            }
-            else if ( paired && !justCreated ) {
+            if ( paired && !justCreated ) {
                 if ( strcmp(opType,"db") == 0 && strcmp(ns, "admin.") == 0 ) {
                     // "admin" is a special namespace we use for priviledged commands -- ok if it exists first on
                     // either side
@@ -1120,7 +1110,6 @@ namespace mongo {
         if ( o2 )
             b.append("o2", *o2);
         if ( !haveLogged ) {
-            b.appendBool("first", true);
             if ( database ) // null on dropDatabase()'s logging.
                 database->setHaveLogged();
         }
