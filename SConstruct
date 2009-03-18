@@ -129,7 +129,7 @@ env.Append( CPPPATH=[ "." ] )
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
-commonFiles = Split( "stdafx.cpp localinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp" )
+commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ]
 commonFiles += Glob( "util/*.c" );
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
@@ -371,7 +371,7 @@ def getSysInfo():
     else:
         return " ".join( os.uname() )
 
-def setupLocalInfoFile( outFile ):
+def setupBuildInfoFile( outFile ):
     version = getGitVersion()
     sysInfo = getSysInfo()
     contents = "#include \"stdafx.h\"\n"
@@ -386,7 +386,7 @@ def setupLocalInfoFile( outFile ):
     out.write( contents )
     out.close()
 
-setupLocalInfoFile( "localinfo.cpp" )
+setupBuildInfoFile( "buildinfo.cpp" )
 
 def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)

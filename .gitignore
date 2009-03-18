@@ -26,7 +26,7 @@ db/.gdb*
 db/makefile.local
 config.log
 settings.py
-localinfo.cpp
+buildinfo.cpp
 
 #temp dirs
 dump
