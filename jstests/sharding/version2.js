@@ -9,7 +9,7 @@ a = s._connections[0].getDB( "admin" );
 assert( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).mine.i == 0 );
 assert( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.i == 0 );
 
-assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , version : 2 } ).ok == 1 );
+assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , version : 2 , authoritative : true } ).ok == 1 );
 
 assert( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).mine.i == 2 );
 assert( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.i == 2 );

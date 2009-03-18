@@ -73,6 +73,11 @@ namespace mongo {
                 }
                 
                 if ( shardConfigServer.size() == 0 ){
+                    if ( ! cmdObj.getBoolField( "authoritative" ) ){
+                        result.appendBool( "need_authoritative" , true );
+                        errmsg = "first setShardVersion";
+                        return false;
+                    }
                     shardConfigServer = configdb;
                 }
                 else if ( shardConfigServer != configdb ){
@@ -125,6 +130,14 @@ namespace mongo {
                 return false;
             }
             
+            if ( myVersion == 0 && ! cmdObj.getBoolField( "authoritative" ) ){
+                // need authoritative for first look
+                result.appendBool( "need_authoritative" , true );
+                result.append( "ns" , ns );
+                errmsg = "first time for this ns";
+                return false;
+            }
+
             result.appendTimestamp( "oldVersion" , oldVersion );
             oldVersion = version;
             myVersion = version;
