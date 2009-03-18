@@ -47,6 +47,20 @@ assert.throws = function( func , params , msg ){
     throw "did not throw exception: " + msg ;
 }
 
+assert.commandWorked = function( res , msg ){
+    if ( res.ok == 1 )
+        return;
+    
+    throw "command failed: " + tojson( res ) + " : " + msg;
+}
+
+assert.commandFailed = function( res , msg ){
+    if ( res.ok == 0 )
+        return;
+    
+    throw "command worked when it should have failed: " + tojson( res ) + " : " + msg;
+}
+
 Object.extend = function( dst , src ){
     for ( var k in src ){
         dst[k] = src[k];
