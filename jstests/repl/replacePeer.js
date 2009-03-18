@@ -1,6 +1,6 @@
 // test replace peer
 
-var baseName = "jstests_pair1test";
+var baseName = "jstests_replacepeertest";
 
 ismaster = function( n ) {
     im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );

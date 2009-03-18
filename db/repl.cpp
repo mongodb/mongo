@@ -606,26 +606,44 @@ namespace mongo {
     
     void ReplSource::forceResync( const char *requester ) {
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
-            log() << requester << " resync: dropping database " << *i << endl;
-            string dummyns = *i + ".";
-            setClientTempNs( dummyns.c_str() );
-            assert( database->name == *i );
-            dropDatabase( dummyns.c_str() );
+            resyncDrop( i->c_str(), requester );
         }
+        BSONObj info;
+        {
+            dbtemprelease t;
+            connect();
+            bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
+            massert( "Unable to get database list", ok );
+        }
+        BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            string name = e.embeddedObject().getField( "name" ).valuestr();
+            if ( name != "local" && name != "admin" && dbs.count( name ) == 0 ) {
+                if ( only.empty() || only == name ) {
+                    resyncDrop( name.c_str(), requester );
+                }
+            }
+        }        
         dbs.clear();
         syncedTo = OpTime();
         haveDbList_ = false;
     }
+
+    string ReplSource::resyncDrop( const char *db, const char *requester ) {
+        log() << "resync: dropping database " << db << endl;
+        string dummyns = string( db ) + ".";
+        setClientTempNs(dummyns.c_str());        
+        assert( database->name == db );
+        dropDatabase(dummyns.c_str());
+        return dummyns;
+    }
     
     bool ReplSource::resync(string db) {
-        {
-            log(1) << "resync: dropping database " << db << endl;
-            string dummyns = db + ".";
-            assert( database->name == db );
-            dropDatabase(dummyns.c_str());
-            setClientTempNs(dummyns.c_str());
-        }
-
+        string dummyNs = resyncDrop( db.c_str(), "internal" );
+        setClientTempNs( dummyNs.c_str() );
         {
             log() << "resync: cloning database " << db << endl;
             ReplInfo r("resync: cloning a database");
@@ -991,6 +1009,20 @@ namespace mongo {
 		return true;
 	}
 
+    bool ReplSource::connect() {
+        if ( conn.get() == 0 ) {
+            conn = auto_ptr<DBClientConnection>(new DBClientConnection());
+            string errmsg;
+            ReplInfo r("trying to connect to sync source");
+            if ( !conn->connect(hostName.c_str(), errmsg) || !replAuthenticate(conn.get()) ) {
+                resetConnection();
+                log() << "pull:   cantconn " << errmsg << endl;
+                return false;
+            }
+        }
+        return true;
+    }
+    
     /* note: not yet in mutex at this point.
        returns true if everything happy.  return false if you want to reconnect.
     */
@@ -1007,25 +1039,18 @@ namespace mongo {
             return false;
         }
 
-        if ( conn.get() == 0 ) {
-            conn = auto_ptr<DBClientConnection>(new DBClientConnection());
-            string errmsg;
-            ReplInfo r("trying to connect to sync source");
-            if ( !conn->connect(hostName.c_str(), errmsg) || !replAuthenticate(conn.get()) ) {
-                resetConnection();
-                log() << "pull:   cantconn " << errmsg << endl;
-                if ( replPair && paired ) {
-                    assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
-                    replPair->arbitrate();
-                }
-                {
-                    ReplInfo r("can't connect to sync source, sleeping");
-                    sleepsecs(1);
-                }
-                return false;
+        if ( !connect() ) {
+            if ( replPair && paired ) {
+                assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
+                replPair->arbitrate();
             }
+            {
+                ReplInfo r("can't connect to sync source, sleeping");
+                sleepsecs(1);
+            }
+            return false;            
         }
-
+        
         if ( paired )
             replPair->negotiate(conn.get(), "direct");
 

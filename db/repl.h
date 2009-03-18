@@ -133,6 +133,11 @@ namespace mongo {
         set<string> addDbNextPass;
 
         ReplSource();
+        
+        // returns the dummy ns used to do the drop
+        string resyncDrop( const char *db, const char *requester );
+        // returns true if connected on return
+        bool connect();
 
     public:
         static void applyOperation(const BSONObj& op);
