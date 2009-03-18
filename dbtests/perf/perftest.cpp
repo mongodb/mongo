@@ -435,6 +435,56 @@ namespace QueryTests {
         string ns_;
     };
 
+    class GetMore {
+    public:
+        GetMore() : ns_( testNs( this ) ) {
+            for( int i = 0; i < 100000; ++i )
+                client_->insert( ns_.c_str(), BSON( "a" << i ) );            
+            c_ = client_->query( ns_.c_str(), Query() );
+        }
+        void run() {
+            int i = 0;
+            for( ; c_->more(); c_->nextSafe(), ++i );
+            ASSERT_EQUALS( 100000, i );
+        }
+        string ns_;
+        auto_ptr< DBClientCursor > c_;
+    };
+    
+    class GetMoreIndex {
+    public:
+        GetMoreIndex() : ns_( testNs( this ) ) {
+            for( int i = 0; i < 100000; ++i )
+                client_->insert( ns_.c_str(), BSON( "a" << i ) );            
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
+            c_ = client_->query( ns_.c_str(), QUERY( "a" << GT << -1 ).hint( BSON( "a" << 1 ) ) );            
+        }
+        void run() {
+            int i = 0;
+            for( ; c_->more(); c_->nextSafe(), ++i );
+            ASSERT_EQUALS( 100000, i );
+        }
+        string ns_;
+        auto_ptr< DBClientCursor > c_;
+    };
+
+    class GetMoreKeyMatchHelps {
+    public:
+        GetMoreKeyMatchHelps() : ns_( testNs( this ) ) {
+            for( int i = 0; i < 1000000; ++i )
+                client_->insert( ns_.c_str(), BSON( "a" << i << "b" << i % 10 << "c" << "d" ) );            
+            client_->ensureIndex( ns_, BSON( "a" << 1 << "b" << 1 ) );
+            c_ = client_->query( ns_.c_str(), QUERY( "a" << GT << -1 << "b" << 0 ).hint( BSON( "a" << 1 << "b" << 1 ) ) );            
+        }
+        void run() {
+            int i = 0;
+            for( ; c_->more(); c_->nextSafe(), ++i );
+            ASSERT_EQUALS( 100000, i );
+        }
+        string ns_;
+        auto_ptr< DBClientCursor > c_;        
+    };
+    
     class All : public RunnerSuite {
     public:
         All() {
@@ -443,6 +493,9 @@ namespace QueryTests {
             add< NoMatchLong >();
             add< SortOrdered >();
             add< SortReverse >();
+            add< GetMore >();
+            add< GetMoreIndex >();
+            add< GetMoreKeyMatchHelps >();
         }
     };    
     
