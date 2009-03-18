@@ -595,8 +595,6 @@ namespace mongo {
 
     string BSONObj::jsonString( JsonStringFormat format ) const {
 
-        cout << "temp jsonstring: " << this->toString() << endl;
-
         if ( isEmpty() ) return "{}";
 
         stringstream s;
