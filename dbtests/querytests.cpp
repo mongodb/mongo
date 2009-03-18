@@ -333,6 +333,24 @@ namespace QueryTests {
         }
     };    
     
+    class OplogReplayMode : public ClientBase {
+    public:
+        ~OplogReplayMode() {
+            client().dropCollection( "querytests.OplogReplayMode" );            
+        }
+        void run() {
+            const char *ns = "querytests.OplogReplayMode";
+            insert( ns, BSON( "a" << 3 ) );
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            insert( ns, BSON( "a" << 2 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, Option_OplogReplay );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( 2, c->next().getIntField( "a" ) );
+            ASSERT( !c->more() );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -354,6 +372,7 @@ namespace QueryTests {
             add< EmptyTail >();
             add< TailableDelete >();
             add< TailableInsertDelete >();
+            add< OplogReplayMode >();
         }
     };
     

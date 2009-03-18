@@ -501,7 +501,7 @@ assert( !eloc.isNull() );
         BSONElement el = order.findElement("$natural"); // e.g., { $natural : -1 }
 
         if ( el.number() >= 0 )
-            return DataFileMgr::findAll(ns);
+            return DataFileMgr::findAll(ns, startLoc);
 
         // "reverse natural order"
         NamespaceDetails *d = nsdetails(ns);

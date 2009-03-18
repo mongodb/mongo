@@ -130,7 +130,7 @@ namespace mongo {
         if ( !fbs_.matchPossible() )
             return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
         if ( !index_ )
-            return findTableScan( fbs_.ns(), order_ );
+            return findTableScan( fbs_.ns(), order_, startLoc );
         massert( "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
         //TODO This constructor should really take a const ref to the index details.
         return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, direction_ >= 0 ? 1 : -1 ) );
