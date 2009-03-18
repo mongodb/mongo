@@ -168,40 +168,126 @@ namespace mongo {
         const char *fieldName;
         double *ndouble;
         int *nint;
-        void setn(double n) {
+        BSONElement elt;
+        void setn(double n) const {
             if ( ndouble ) *ndouble = n;
             else *nint = (int) n;
         }
-        double getn() {
+        double getn() const {
             return ndouble ? *ndouble : *nint;
         }
         int type;
-        static void getMods(vector<Mod>& mods, BSONObj from);
-        static void applyMods(vector<Mod>& mods, BSONObj obj);
     };
 
-    void Mod::applyMods(vector<Mod>& mods, BSONObj obj) {
-        for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
-            Mod& m = *i;
-            BSONElement e = obj.getFieldDotted(m.fieldName);
-            if ( e.isNumber() ) {
-                if ( m.op == INC ) {
-                    BSONElementManipulator( e ).setNumber( e.number() + m.getn() );
-                    m.setn( e.number() );
-                    // *m.n = e.number() += *m.n;
-                } else {
-                    BSONElementManipulator( e ).setNumber( m.getn() ); // $set or $SET
+    class ModSet {
+        vector< Mod > mods_;
+    public:
+        void getMods( const BSONObj &from );
+        bool applyModsInPlace( const BSONObj &obj ) const;
+        BSONObj createNewFromMods( const BSONObj &obj ) const;
+        void checkUnindexed( const set<string>& idxKeys ) const {
+            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
+                if ( idxKeys.count(i->fieldName) ) {
+                    uassert("can't $inc/$set an indexed field", false);
                 }
             }
         }
+        unsigned size() const { return mods_.size(); }
+        bool haveModForField( const char *fieldName ) const {
+            // Presumably the number of mods is small, so this loop isn't too expensive.
+            for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+                if ( strcmp( fieldName, i->fieldName ) == 0 )
+                    return true;
+            }
+            return false;
+        }
+        const Mod *modForField( const char *fieldName ) const {
+            // Presumably the number of mods is small, so this loop isn't too expensive.
+            for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+                if ( strcmp( fieldName, i->fieldName ) == 0 )
+                    return &*i;
+            }
+            return 0;
+        }
+        void appendUpsert( BSONObjBuilder &b ) const {
+            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
+                b.append(i->fieldName, i->getn());   
+        }
+        void checkNoEmbedded() const {
+            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
+                uassert( "Embedded mods not yet supported when $set requires object recreation",
+                        strchr( i->fieldName, '.' ) == 0 );
+        }
+    };
+    
+    bool ModSet::applyModsInPlace(const BSONObj &obj) const {
+        bool inPlacePossible = true;
+        // Perform this check first, so that we don't leave a partially modified object
+        // on uassert.
+        for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+            const Mod& m = *i;
+            BSONElement e = obj.getFieldDotted(m.fieldName);
+            uassert( "Cannot apply $inc modifier to non-number", m.op != Mod::INC || e.isNumber() );
+            if ( e.isNumber() && m.elt.isNumber() )
+                continue;
+            if ( m.elt.valuesize() == e.valuesize() )
+                continue;
+            inPlacePossible = false;
+        }
+        if ( !inPlacePossible ) {
+            return false;
+        }
+        for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+            const Mod& m = *i;
+            BSONElement e = obj.getFieldDotted(m.fieldName);
+            if ( m.op == Mod::INC ) {
+                BSONElementManipulator( e ).setNumber( e.number() + m.getn() );
+                m.setn( e.number() );
+                // *m.n = e.number() += *m.n;
+            } else {
+                // $set or $SET
+                if ( e.isNumber() && m.elt.isNumber() )
+                    BSONElementManipulator( e ).setNumber( m.getn() );
+                else
+                    BSONElementManipulator( e ).replaceTypeAndValue( m.elt );
+            }
+        }
+        return true;
     }
 
+    BSONObj ModSet::createNewFromMods( const BSONObj &obj ) const {
+        BSONObjBuilder b;
+        
+        // Just temporary
+        checkNoEmbedded();
+        
+        BSONObjIterator i( obj );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            const Mod *mod = modForField( e.fieldName() );
+            if ( !mod ) {
+                b.append( e );
+            } else if ( mod->op == Mod::INC ) {
+                if ( e.type() == NumberInt )
+                    b.append( e.fieldName(), int( e.number() + mod->getn() ) );
+                else
+                    b.append( e.fieldName(), double( e.number() + mod->getn() ) );
+                mod->setn( e.number() );
+            } else if ( mod->op == Mod::SET ) {
+                b.appendAs( mod->elt, e.fieldName() );
+            }
+        }
+        return b.obj();
+    }
+    
     /* get special operations like $inc
        { $inc: { a:1, b:1 } }
        { $set: { a:77 } }
        NOTE: MODIFIES source from object!
     */
-    void Mod::getMods(vector<Mod>& mods, BSONObj from) {
+    void ModSet::getMods(const BSONObj &from) {
         BSONObjIterator it(from);
         while ( it.more() ) {
             BSONElement e = it.next();
@@ -212,7 +298,7 @@ namespace mongo {
                     *fn == '$' && e.type() == Object && fn[4] == 0 );
             BSONObj j = e.embeddedObject();
             BSONObjIterator jt(j);
-            Op op = Mod::SET;
+            Mod::Op op = Mod::SET;
             if ( strcmp("$inc",fn) == 0 ) {
                 op = Mod::INC;
                 strcpy((char *) fn, "$set");
@@ -227,20 +313,20 @@ namespace mongo {
                 m.op = op;
                 m.fieldName = f.fieldName();
                 uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
-                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
+                for ( vector<Mod>::iterator i = mods_.begin(); i != mods_.end(); i++ ) {
                     uassert( "Field name duplication not allowed with modifiers",
                             strcmp( m.fieldName, i->fieldName ) != 0 );
                 }
-                uassert( "Modifiers allowed for numbers only", f.isNumber() );
+                uassert( "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
+                m.elt = f;
                 if ( f.type() == NumberDouble ) {
                     m.ndouble = (double *) f.value();
                     m.nint = 0;
-                }
-                else {
+                } else if ( f.type() == NumberInt ) {
                     m.ndouble = 0;
                     m.nint = (int *) f.value();
                 }
-                mods.push_back( m );
+                mods_.push_back( m );
             }
         }
     }
@@ -337,19 +423,18 @@ namespace mongo {
              regular ones at the moment. */
             const char *firstField = updateobj.firstElement().fieldName();
             if ( firstField[0] == '$' ) {
-                vector<Mod> mods;
-                Mod::getMods(mods, updateobj);
+                ModSet mods;
+                mods.getMods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
                 set<string>& idxKeys = ndt.indexKeys();
-                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ ) {
-                    if ( idxKeys.count(i->fieldName) ) {
-                        uassert("can't $inc/$set an indexed field", false);
-                    }
+                mods.checkUnindexed( idxKeys );
+                if ( mods.applyModsInPlace( c->currLoc().obj() ) ) {
+                    if ( profile )
+                        ss << " fastmod ";
+                } else {
+                    BSONObj newObj = mods.createNewFromMods( c->currLoc().obj() );
+                    theDataFileMgr.update(ns, r, c->currLoc(), newObj.objdata(), newObj.objsize(), ss);                    
                 }
-                
-                Mod::applyMods(mods, c->currLoc().obj());
-                if ( profile )
-                    ss << " fastmod ";
                 if ( logop ) {
                     if ( mods.size() ) {
                         logOp("u", ns, updateobj, &pattern, &upsert);
@@ -363,7 +448,7 @@ namespace mongo {
             }
             
             theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
-            return 1;            
+            return 1;
         }
         
         if ( profile )
@@ -372,23 +457,18 @@ namespace mongo {
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
-                vector<Mod> mods;
-                Mod::getMods(mods, updateobj);
+                ModSet mods;
+                mods.getMods(updateobj);
                 BSONObjBuilder b;
                 BSONObjIterator i( pattern );
                 while( i.more() ) {
                     BSONElement e = i.next();
                     if ( e.eoo() )
                         break;
-                    // Presumably the number of mods is small, so this loop isn't too expensive.
-                    for( vector<Mod>::iterator i = mods.begin(); i != mods.end(); ++i ) {
-                        if ( strcmp( e.fieldName(), i->fieldName ) == 0 )
-                            continue;
+                    if ( !mods.haveModForField( e.fieldName() ) )
                         b.append( e );
-                    }
                 }
-                for ( vector<Mod>::iterator i = mods.begin(); i != mods.end(); i++ )
-                    b.append(i->fieldName, i->getn());
+                mods.appendUpsert( b );
                 BSONObj obj = b.done();
                 theDataFileMgr.insert(ns, obj);
                 if ( profile )
@@ -409,10 +489,7 @@ namespace mongo {
     
     /* todo:
      _ smart requery find record immediately
-     returns:
-     2: we did applyMods() but didn't logOp()
-     5: we did applyMods() and did logOp() (so don't do it again)
-     (clean these up later...)
+     (clean return codes up later...)
      */
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
         return __updateObjects( ns, updateobj, pattern, upsert, ss, logop );

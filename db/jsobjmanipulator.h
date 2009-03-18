@@ -46,6 +46,13 @@ public:
         else if ( element_.type() == NumberInt ) *reinterpret_cast< int * >( value() ) = (int) d;
     }    
 
+    /** Replace the type and value of the element with the type and value of e,
+        preserving the original fieldName */
+    void replaceTypeAndValue( const BSONElement &e ) {
+        *data() = e.type();
+        memcpy( value(), e.value(), e.valuesize() );
+    }
+    
     static void lookForTimestamps( const BSONObj& obj ){
         // If have a Timestamp field as the first or second element,
         // update it to a Date field set to OpTime::now().asDate().  The

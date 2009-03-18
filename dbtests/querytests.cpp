@@ -197,12 +197,19 @@ namespace QueryTests {
         }        
     };
 
-    class ModNonNumber : public Fail {
+    class IncNonNumber : public Fail {
         void doIt() {
-            update( ns(), emptyObj, fromjson( "{$set:{a:'d'}}" ) );
+            update( ns(), emptyObj, fromjson( "{$inc:{a:'d'}}" ) );
         }        
     };
-
+    
+    class IncTargetNonNumber : public Fail {
+        void doIt() {
+            insert( ns(), BSON( "a" << "a" ) );
+            update( ns(), BSON( "a" << "a" ), fromjson( "{$inc:{a:1}}" ) );
+        }        
+    };
+    
     class BoundedKey : public ClientBase {
     public:
         void run() {
@@ -351,6 +358,90 @@ namespace QueryTests {
         }
     };
     
+    class SetBase : public ClientBase {
+    public:
+        ~SetBase() {
+            client().dropCollection( ns() );
+        }
+    protected:
+        const char *ns() { return "querytests.SetBase"; }
+    };
+    
+    class SetNum : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), BSON( "a" << 1 ) );
+            client().update( ns(), BSON( "a" << 1 ), BSON( "$set" << BSON( "a" << 4 ) ) );
+            ASSERT( !client().findOne( ns(), BSON( "a" << 4 ) ).isEmpty() );
+        }
+    };
+    
+    class SetString : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), BSON( "a" << "b" ) );
+            client().update( ns(), BSON( "a" << "b" ), BSON( "$set" << BSON( "a" << "c" ) ) );
+            ASSERT( !client().findOne( ns(), BSON( "a" << "c" ) ).isEmpty() );
+        }
+    };
+    
+    class SetStringDifferentLength : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), BSON( "a" << "b" ) );
+            client().update( ns(), BSON( "a" << "b" ), BSON( "$set" << BSON( "a" << "cd" ) ) );
+            ASSERT( !client().findOne( ns(), BSON( "a" << "cd" ) ).isEmpty() );            
+        }
+    };
+    
+    class SetStringToNum : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), BSON( "a" << "b" ) );
+            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a" << 5 ) ) );
+            ASSERT( !client().findOne( ns(), BSON( "a" << 5 ) ).isEmpty() );
+        }        
+    };
+    
+    class SetStringToNumInPlace : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), BSON( "a" << "bcd" ) );
+            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a" << 5.0 ) ) );
+            ASSERT( !client().findOne( ns(), BSON( "a" << 5.0 ) ).isEmpty() );            
+        }
+    };
+    
+    class ModDotted : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{a:{b:4}}" ) );
+            client().update( ns(), emptyObj, BSON( "$inc" << BSON( "a.b" << 10 ) ) );
+            ASSERT( !client().findOne( ns(), BSON( "a.b" << 14 ) ).isEmpty() );            
+            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a.b" << 55 ) ) );
+            ASSERT( !client().findOne( ns(), BSON( "a.b" << 55 ) ).isEmpty() );                        
+        }
+    };
+
+    class SetInPlaceDotted : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
+            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a.b" << "llll" ) ) );
+            out() << "one: " << client().findOne( ns(), emptyObj ) << endl; 
+            ASSERT( !client().findOne( ns(), BSON( "a.b" << "llll" ) ).isEmpty() );                        
+        }
+    };
+
+//    class SetRecreateDotted : public SetBase {
+//    public:
+//        void run() {
+//            client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
+//            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
+//            ASSERT( !client().findOne( ns(), BSON( "a.b" << "lllll" ) ).isEmpty() );                        
+//        }
+//    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -364,7 +455,8 @@ namespace QueryTests {
             add< InvalidMod >();
             add< ModNotFirst >();
             add< ModDuplicateFieldSpec >();
-            add< ModNonNumber >();
+            add< IncNonNumber >();
+            add< IncTargetNonNumber >();
             add< BoundedKey >();
             add< GetMore >();
             add< ReturnOneOfManyAndTail >();
@@ -373,6 +465,14 @@ namespace QueryTests {
             add< TailableDelete >();
             add< TailableInsertDelete >();
             add< OplogReplayMode >();
+            add< SetNum >();
+            add< SetString >();
+            add< SetStringDifferentLength >();
+            add< SetStringToNum >();
+            add< SetStringToNumInPlace >();
+            add< ModDotted >();
+            add< SetInPlaceDotted >();
+//            add< SetRecreateDotted >();
         }
     };
     

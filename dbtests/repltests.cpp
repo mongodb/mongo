@@ -594,6 +594,21 @@ namespace ReplTests {
             BSONObj o_, u_;
         };
         
+        class SetNumToStr : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$set" << BSON( "a" << "bcd" ) ) );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( BSON( "_id" << 0 << "a" << "bcd" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 << "a" << 4.0 ) );
+            }
+        };
+        
     } // namespace Idempotence
     
     class All : public UnitTest::Suite {
@@ -622,6 +637,7 @@ namespace ReplTests {
             add< Idempotence::Remove >();
             add< Idempotence::RemoveOne >();
             add< Idempotence::FailingUpdate >();
+            add< Idempotence::SetNumToStr >();
         }
     };
     
