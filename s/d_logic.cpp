@@ -231,8 +231,8 @@ namespace mongo {
             return true;
         }
         
-        cerr << "can't handle bad shard version: " << errmsg << endl;
-        assert( 0 );
+        cerr << "can't handle writes and bad shard version: " << errmsg << endl;
+        massert( "shard problem" , 0 );
         return true;
     }
     
