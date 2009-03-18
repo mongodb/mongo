@@ -687,11 +687,15 @@ namespace mongo {
         queryOptions_( queryOptions ),
         n_(),
         soSize_(),
-        saveClientCursor_() {}
+        saveClientCursor_(),
+        findingStart_( queryOptions & Option_OplogReplay ) {}
         virtual void init() {
             b_.skip( sizeof( QueryResult ) );
             
-            c_ = qp().newCursor();
+            if ( findingStart_ )
+                c_ = qp().newReverseCursor();
+            else
+                c_ = qp().newCursor();
             
             matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
             
@@ -702,6 +706,19 @@ namespace mongo {
             }
         }
         virtual void next() {
+            if ( findingStart_ ) {
+                if ( !c_->ok() ) {
+                    findingStart_ = false;
+                    c_ = qp().newCursor();
+                } else if ( !matcher_->matches( c_->currKey(), c_->currLoc() ) ) {
+                    findingStart_ = false;
+                    c_ = qp().newCursor( c_->currLoc() );
+                } else {
+                    c_->advance();
+                    return;
+                }
+            }
+            
             if ( !c_->ok() ) {
                 finish();
                 return;
@@ -805,6 +822,7 @@ namespace mongo {
         int soSize_;
         bool saveClientCursor_;
         auto_ptr< ScanAndOrder > so_;
+        bool findingStart_;
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {

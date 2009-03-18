@@ -850,7 +850,7 @@ namespace mongo {
             // queryObj = { ts: { $gte: syncedTo } }
 
             log(2) << "repl: " << ns << ".find(" << queryObj.toString() << ')' << '\n';
-            cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable | Option_SlaveOk );
+            cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable | Option_SlaveOk | Option_OplogReplay );
             c = cursor.get();
             tailing = false;
         }

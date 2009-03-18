@@ -46,7 +46,7 @@ namespace mongo {
     bool repairDatabase(const char *ns, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
     void dropNS(const string& dropNs);;
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
-    auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, bool *isSorted=0);
+    auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
 
 // -1 if library unavailable.
     boost::intmax_t freeSpace();
@@ -104,7 +104,7 @@ namespace mongo {
         DiskLoc insert(const char *ns, BSONObj &o);
         DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, const BSONElement &writeId = BSONElement());
         void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false);
-        static auto_ptr<Cursor> findAll(const char *ns);
+        static auto_ptr<Cursor> findAll(const char *ns, const DiskLoc &startLoc = DiskLoc());
 
         /* special version of insert for transaction logging -- streamlined a bit.
            assumes ns is capped and no indexes

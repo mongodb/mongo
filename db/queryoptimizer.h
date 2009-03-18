@@ -45,7 +45,8 @@ namespace mongo {
         int direction() const { return direction_; }
         BSONObj startKey() const { return startKey_; }
         BSONObj endKey() const { return endKey_; }
-        auto_ptr< Cursor > newCursor() const;
+        auto_ptr< Cursor > newCursor( const DiskLoc &startLoc = DiskLoc() ) const;
+        auto_ptr< Cursor > newReverseCursor() const;
         BSONObj indexKey() const;
         const char *ns() const { return fbs_.ns(); }
         BSONObj query() const { return fbs_.query(); }

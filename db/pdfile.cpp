@@ -447,7 +447,7 @@ assert( !eloc.isNull() );
 
     /*---------------------------------------------------------------------*/
 
-    auto_ptr<Cursor> DataFileMgr::findAll(const char *ns) {
+    auto_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
         DiskLoc loc;
         bool found = nsindex(ns)->find(ns, loc);
         if ( !found ) {
@@ -477,6 +477,8 @@ assert( !eloc.isNull() );
         }
 
         if ( !nsdetails( ns )->capped ) {
+            if ( !startLoc.isNull() )
+                return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
             while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
                 /* todo: if extent is empty, free it for reuse elsewhere.
                     that is a bit complicated have to clean up the freelists.
@@ -488,17 +490,15 @@ assert( !eloc.isNull() );
             }
             return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
         } else {
-            return auto_ptr< Cursor >( new ForwardCappedCursor( nsdetails( ns ) ) );
+            return auto_ptr< Cursor >( new ForwardCappedCursor( nsdetails( ns ), startLoc ) );
         }
     }
 
     /* get a table scan cursor, but can be forward or reverse direction.
        order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
     */
-    auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, bool *isSorted) {
+    auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc) {
         BSONElement el = order.findElement("$natural"); // e.g., { $natural : -1 }
-        if ( !el.eoo() && isSorted )
-            *isSorted = true;
 
         if ( el.number() >= 0 )
             return DataFileMgr::findAll(ns);
@@ -508,6 +508,8 @@ assert( !eloc.isNull() );
         if ( !d )
             return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
         if ( !d->capped ) {
+            if ( !startLoc.isNull() )
+                return auto_ptr<Cursor>(new ReverseCursor( startLoc ));                
             Extent *e = d->lastExtent.ext();
             while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
                 OCCASIONALLY out() << "  findTableScan: extent empty, skipping ahead" << endl;
@@ -515,7 +517,7 @@ assert( !eloc.isNull() );
             }
             return auto_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
         } else {
-            return auto_ptr< Cursor >( new ReverseCappedCursor( d ) );
+            return auto_ptr< Cursor >( new ReverseCappedCursor( d, startLoc ) );
         }
     }
 

@@ -126,13 +126,27 @@ namespace mongo {
             unhelpful_ = true;
     }
     
-    auto_ptr< Cursor > QueryPlan::newCursor() const {
+    auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc ) const {
         if ( !fbs_.matchPossible() )
             return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
         if ( !index_ )
-            return findTableScan( fbs_.ns(), order_, 0 );
+            return findTableScan( fbs_.ns(), order_ );
+        massert( "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
         //TODO This constructor should really take a const ref to the index details.
         return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, direction_ >= 0 ? 1 : -1 ) );
+    }
+
+    auto_ptr< Cursor > QueryPlan::newReverseCursor() const {
+        if ( !fbs_.matchPossible() )
+            return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
+        if ( !index_ ) {
+            int orderSpec = order_.getIntField( "$natural" );
+            if ( orderSpec == INT_MIN )
+                orderSpec = 1;
+            return findTableScan( fbs_.ns(), BSON( "$natural" << -orderSpec ) );
+        }
+        massert( "newReverseCursor() not implemented for indexed plans", false );
+        return auto_ptr< Cursor >( 0 );
     }
     
     BSONObj QueryPlan::indexKey() const {

@@ -192,7 +192,7 @@ namespace mongo {
 
     class ForwardCappedCursor : public BasicCursor, public AdvanceStrategy {
     public:
-        ForwardCappedCursor( NamespaceDetails *nsd = 0 );
+        ForwardCappedCursor( NamespaceDetails *nsd = 0, const DiskLoc &startLoc = DiskLoc() );
         virtual string toString() {
             return "ForwardCappedCursor";
         }
@@ -203,7 +203,7 @@ namespace mongo {
 
     class ReverseCappedCursor : public BasicCursor, public AdvanceStrategy {
     public:
-        ReverseCappedCursor( NamespaceDetails *nsd = 0 );
+        ReverseCappedCursor( NamespaceDetails *nsd = 0, const DiskLoc &startLoc = DiskLoc() );
         virtual string toString() {
             return "ReverseCappedCursor";
         }

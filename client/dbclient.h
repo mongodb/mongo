@@ -35,13 +35,15 @@ namespace mongo {
            final object it references were deleted.  Thus, you should be prepared to requery if you get back
            ResultFlag_CursorNotFound.
         */
-        Option_CursorTailable = 2,
+        Option_CursorTailable = 1 << 1,
 
         /** allow query of replica slave.  normally these return an error except for namespace "local".
         */
-        Option_SlaveOk = 4,
+        Option_SlaveOk = 1 << 2,
+        
+        Option_OplogReplay = 1 << 3,
 
-        Option_ALLMASK = 6
+        Option_ALLMASK = ( 1 << 4 ) - 2
     };
 
     class BSONObj;

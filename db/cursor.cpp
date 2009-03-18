@@ -54,18 +54,20 @@ namespace mongo {
         return nsd->lastRecord();
     }
 
-    ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd ) :
+    ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd, const DiskLoc &startLoc ) :
             nsd( _nsd ) {
         if ( !nsd )
             return;
-        DiskLoc start;
-        if ( !nsd->capLooped() )
-            start = nsd->firstRecord();
-        else {
-            start = nsd->capExtent.ext()->firstRecord;
-            if ( !start.isNull() && start == nsd->capFirstNewRecord ) {
-                start = nsd->capExtent.ext()->lastRecord;
-                start = nextLoop( nsd, start );
+        DiskLoc start = startLoc;
+        if ( start.isNull() ) {
+            if ( !nsd->capLooped() )
+                start = nsd->firstRecord();
+            else {
+                start = nsd->capExtent.ext()->firstRecord;
+                if ( !start.isNull() && start == nsd->capFirstNewRecord ) {
+                    start = nsd->capExtent.ext()->lastRecord;
+                    start = nextLoop( nsd, start );
+                }
             }
         }
         curr = start;
@@ -92,15 +94,18 @@ namespace mongo {
         return i;
     }
 
-    ReverseCappedCursor::ReverseCappedCursor( NamespaceDetails *_nsd ) :
+    ReverseCappedCursor::ReverseCappedCursor( NamespaceDetails *_nsd, const DiskLoc &startLoc ) :
             nsd( _nsd ) {
         if ( !nsd )
             return;
-        DiskLoc start;
-        if ( !nsd->capLooped() )
-            start = nsd->lastRecord();
-        else
-            start = nsd->capExtent.ext()->lastRecord;
+        DiskLoc start = startLoc;
+        if ( start.isNull() ) {
+            if ( !nsd->capLooped() ) {
+                start = nsd->lastRecord();
+            } else {
+                start = nsd->capExtent.ext()->lastRecord;
+            }
+        }
         curr = start;
         s = this;
     }
