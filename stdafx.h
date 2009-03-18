@@ -45,6 +45,7 @@ namespace mongo {
     void exit( int status );
 
     void printGitVersion();
+    void printSysInfo();
 
     inline void * ourmalloc(size_t size) {
         void *x = malloc(size);

@@ -127,6 +127,7 @@ namespace mongo {
         const char *Version = "db version v0.8.0.1";
         log() << Version << ", pdfile version " << VERSION << "." << VERSION_MINOR << endl;
         printGitVersion();
+        printSysInfo();
         pdfileInit();
         //testTheDb();
         log() << "waiting for connections on port " << port << "..." << endl;

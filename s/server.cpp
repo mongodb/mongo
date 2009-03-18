@@ -143,6 +143,7 @@ int main(int argc, char* argv[], char *envp[] ) {
 
     log() << argv[0] << " v0.0.1 starting (--help for usage)" << endl;
     printGitVersion();
+    printSysInfo();
 
     if ( ! configServer.init( configdbs , infer ) ){
         cerr << "couldn't connectd to config db" << endl;
