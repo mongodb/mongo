@@ -55,10 +55,14 @@ namespace mongo {
         strncpy(filename, _filename, 255);
         filename[255] = 0;
         { 
-            char *p = filename;
-            while( *p ) { 
-                if( *p == ':' ) *p = '_';
-                p++;
+            size_t len = strlen( filename );
+            for ( size_t i=len-1; i>=0; i-- ){
+                if ( filename[i] == '/' ||
+                     filename[i] == '\\' )
+                    break;
+                
+                if ( filename[i] == ':' )
+                    filename[i] = '_';
             }
         }
 
