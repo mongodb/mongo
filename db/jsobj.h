@@ -462,12 +462,12 @@ namespace mongo {
      */
     class BSONObj {
         friend class BSONObjIterator;
-        class Details {
+        class Holder {
         public:
-            Details( const char *objdata ) :
+            Holder( const char *objdata ) :
             _objdata( objdata ) {
             }
-            ~Details() {
+            ~Holder() {
                 free((void *)_objdata);
                 _objdata = 0;
             }
@@ -475,10 +475,10 @@ namespace mongo {
             const char *_objdata;
         };
         const char *_objdata;
-        boost::shared_ptr< Details > _holder;
+        boost::shared_ptr< Holder > _holder;
         void init(const char *data, bool ifree) {
             if ( ifree )
-                _holder.reset( new Details( data ) );
+                _holder.reset( new Holder( data ) );
             _objdata = data;
             massert( "BSONObj size spec too small", objsize() > 0 );
             massert( "BSONObj size spec too large", objsize() <= 1024 * 1024 * 16 );
@@ -495,6 +495,8 @@ namespace mongo {
         /** Construct an empty BSONObj -- that is, {}. */
         // TODO: Unify this with 'emptyObj'
         BSONObj() : _objdata(0) { }
+        // defensive
+        ~BSONObj() { _objdata = 0; }
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
