@@ -473,7 +473,6 @@ namespace mongo {
                 _objdata = 0;
             }
             const char *_objdata;
-            int _objsize;
             int refCount; // -1 == don't free (we don't "own" the buffer)
             bool owned() {
                 return refCount >= 0;
@@ -482,9 +481,8 @@ namespace mongo {
         void init(const char *data, bool ifree) {
             details = new Details();
             details->_objdata = data;
-            details->_objsize = *(reinterpret_cast<const int*>(data));
-            massert( "BSONObj size spec too small", details->_objsize > 0 );
-            massert( "BSONObj size spec too large", details->_objsize <= 1024 * 1024 * 16 );
+            massert( "BSONObj size spec too small", objsize() > 0 );
+            massert( "BSONObj size spec too large", objsize() <= 1024 * 1024 * 16 );
             details->refCount = ifree ? 1 : -1;
         }
         void cleanup() {
@@ -492,7 +490,7 @@ namespace mongo {
                 if ( --details->refCount <= 0 )
                     delete details;
                 details = 0;
-            }            
+            }   
         }        
     public:
         /** Construct a BSONObj from data in the proper format. 
@@ -615,7 +613,7 @@ namespace mongo {
         }
         /** @return total size of the BSON object in bytes */
         int objsize() const {
-            return details ? details->_objsize : 0;    // includes the embedded size field
+            return details ? *(reinterpret_cast<const int*>(details->_objdata)) : 0;
         }
 
         bool isValid();
@@ -1312,7 +1310,7 @@ namespace mongo {
         if ( ! details )
             return true;
 
-        return details->_objsize == ((int*)(details->_objdata))[0];
+        return objsize() == ((int*)(details->_objdata))[0];
     }
 
     inline bool BSONObj::getObjectID(BSONElement& e) { 
