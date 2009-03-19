@@ -45,7 +45,8 @@ class RecCache {
 
     BasicRecStore* _initStore(string fname);
     BasicRecStore* initStore(int n);
-    void initStoreByNs(const char *ns);
+    string findStoreFilename(const char *_ns, bool& found);
+    void initStoreByNs(const char *escaped_ns);
     void closeStore(BasicRecStore *rs);
 
     /* get the right file for a given diskloc */

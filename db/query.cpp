@@ -765,7 +765,9 @@ namespace mongo {
         n_(),
         soSize_(),
         saveClientCursor_(),
-        findingStart_( queryOptions & Option_OplogReplay ) {}
+        findingStart_( (queryOptions & Option_OplogReplay) != 0 ) 
+        {}
+
         virtual void init() {
             b_.skip( sizeof( QueryResult ) );
             

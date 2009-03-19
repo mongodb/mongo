@@ -572,24 +572,23 @@ assert( !eloc.isNull() );
     void IndexDetails::kill() {
         string ns = indexNamespace(); // e.g. foo.coll.$ts_1
         
-        {
-            // clean up parent namespace index cache
-            NamespaceDetailsTransient::get( parentNS().c_str() ).deletedIndex();
-            // clean up in system.indexes
-            BSONObjBuilder b;
-            b.append("name", indexName().c_str());
-            b.append("ns", parentNS().c_str());
-            BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
-            string system_indexes = database->name + ".system.indexes";
-            int n = deleteObjects(system_indexes.c_str(), cond, false, 0, true);
-            wassert( n == 1 );
-        }
+        // clean up parent namespace index cache
+        NamespaceDetailsTransient::get( parentNS().c_str() ).deletedIndex();
+
+        BSONObjBuilder b;
+        b.append("name", indexName().c_str());
+        b.append("ns", parentNS().c_str());
+        BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
 
         BtreeStore::drop(ns.c_str());
-        //        dropNS(ns); 
-        //	database->namespaceIndex.kill(ns.c_str());
         head.setInvalid();
         info.setInvalid();
+
+        // clean up in system.indexes.  we do this last on purpose.  note we have 
+        // to make the cond object before the drop() above though.
+        string system_indexes = database->name + ".system.indexes";
+        int n = deleteObjects(system_indexes.c_str(), cond, false, 0, true);
+        wassert( n == 1 );
     }
 
 

@@ -1,14 +1,14 @@
-Mongo Database README
+Mongo DB README
 
 DOCUMENTATION
 
-http://mongodb.onconfluence.com/display/DOCS/Mongo+Documentation
+http://www.mongodb.org/display/DOCS/Home
 
-ORGANIZATION
+COMPONENTS
 
-db/             : core database source code
-grid/           : socket messaging stuff
-util/           : util classes
+mongod - The database process.
+mongos - Sharding controller (sharding available later in Q209).
+mongo  - The interact javascript db shell.
 
 BUILDING
 
@@ -43,7 +43,7 @@ BUILDING
 
 RUNNING
 
-Run ./db and command line options will display.
+Run ./mongod and command line options will display.
 
 COMPILER VERSIONS
 
@@ -56,14 +56,15 @@ Mongo uses the 10gen appserver and the Java Virtual Machine to execute
 user program code in the database.  This feature is optional -- if you would 
 like to run the database without these installed, run with the --nojni 
 option.  With --nojni specified, the db.eval() and $where features are no 
-longer available.
+longer available.  You may still need JVM libraries which are statically linked.
 
 Mongo uses memory mapped files.  If built as a 32 bit executable, you will 
 not be able to work with large (multi-gigabyte) databases.  However, 32 bit 
-builds should work fine with small development databases.
-
+builds work fine with small development databases.
 
 --- WINDOWS ---
+
+See also http://www.mongodb.org/display/DOCS/Building+for+Windows
 
 COMPILING
    REQUIREMENTS
@@ -73,7 +74,6 @@ COMPILING
      - vc++ express
      - windows sdk - tested with v6.0 v6.0a
      - java sdk 1.6
-
 
     you have to add java\jdk\bin\ to your path
 

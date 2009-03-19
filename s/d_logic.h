@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "stdafx.h"
+#include "../stdafx.h"
 
 namespace mongo {
 

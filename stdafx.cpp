@@ -124,6 +124,7 @@ namespace mongo {
 #ifndef _SCONS
     // only works in scons
     void printGitVersion(){}
+    void printSysInfo(){}
 #endif
 
 } // namespace mongo
