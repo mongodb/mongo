@@ -462,6 +462,7 @@ namespace mongo {
      */
     class BSONObj {
         friend class BSONObjIterator;
+        const char *_objdata;
         class Details {
         public:
             Details( const char *objdata, int refCount ) :
@@ -471,13 +472,8 @@ namespace mongo {
             ~Details() {
                 // note refCount means two different things (thus the assert here)
                 assert(_refCount <= 0);
-                if (owned()) {
-                    free((void *)_objdata);
-                }
+                free((void *)_objdata);
                 _objdata = 0;
-            }
-            bool owned() {
-                return _refCount >= 0;
             }
             // TEMP
             int &refCount() {
@@ -487,9 +483,11 @@ namespace mongo {
             const char *_objdata;
             int _refCount; // -1 == don't free (we don't "own" the buffer)
         } *details;
-        const char *_objdata;
         void init(const char *data, bool ifree) {
-            details = new Details( data, ifree ? 1 : -1 );
+            if ( ifree )
+                details = new Details( data, 1 );
+            else
+                details = 0;
             _objdata = data;
             massert( "BSONObj size spec too small", objsize() > 0 );
             massert( "BSONObj size spec too large", objsize() <= 1024 * 1024 * 16 );
@@ -512,7 +510,7 @@ namespace mongo {
         BSONObj(const Record *r);
         /** Construct an empty BSONObj -- that is, {}. */
         // TODO: Unify this with 'emptyObj'
-        BSONObj() : details(0) { }
+        BSONObj() : _objdata(0), details(0) { }
         ~BSONObj() { cleanup(); }
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
@@ -622,7 +620,9 @@ namespace mongo {
         }
         /** @return total size of the BSON object in bytes */
         int objsize() const {
-            return details ? *(reinterpret_cast<const int*>(objdata())) : 0;
+            if ( !objdata() )
+                return 0;
+            return *(reinterpret_cast<const int*>(objdata()));
         }
 
         bool isValid();
@@ -632,7 +632,6 @@ namespace mongo {
             return objsize() <= 5;
         }
 
-        /* sigh...details == 0 is such a pain we have to eliminate that possibility */
         void validateEmpty();
 
         void dump() {
@@ -697,15 +696,13 @@ namespace mongo {
             same underlying data -- use copy() if you need a separate copy to manipulate.
         */
         BSONObj(const BSONObj& r) {
-            if ( r.details == 0 )
+            if ( r.details == 0 ) {
                 details = 0;
-            else if ( r.details->owned() ) {
+            } else {
                 details = r.details;
                 details->refCount()++;
             }
-            else {
-                details = new Details(*r.details);
-            }
+            _objdata = r._objdata;
         }
         /** uses smart pointers so both objects will refer to the 
             same underlying data -- use copy() if you need a separate copy to manipulate.
@@ -715,13 +712,11 @@ namespace mongo {
 
             if ( r.details == 0 )
                 details = 0;
-            else if ( r.details->owned() ) {
+            else {
                 details = r.details;
                 details->refCount()++;
             }
-            else {
-                details = new Details(*r.details);
-            }
+            _objdata = r._objdata;
             return *this;
         }
 
@@ -731,11 +726,11 @@ namespace mongo {
 
         /* make sure the data buffer is under the control of BSONObj's and not a remote buffer */
         BSONObj getOwned() const{
-            if ( ! details || details->owned() )
-                return *this;
-            return copy();
+            if ( !isOwned() )
+                return copy();
+            return *this;
         }
-        bool isOwned() const { return details == 0 || details->owned(); }
+        bool isOwned() const { return details != 0; }
 
         /** @return A hash code for the object */
         int hash() const {
@@ -1258,7 +1253,7 @@ namespace mongo {
     }
     
     inline BSONObj BSONObj::copy() const {
-        if ( ! details )
+        if ( !objdata() )
             return *this;
 
         char *p = (char*) malloc(objsize());
@@ -1311,12 +1306,12 @@ namespace mongo {
     extern BSONObj emptyObj;
 
     inline void BSONObj::validateEmpty() {
-        if ( details == 0 )
+        if ( objdata() == 0 )
             *this = emptyObj;
     }
 
     inline bool BSONObj::isValid(){
-        if ( ! details )
+        if ( !objdata() )
             return true;
 
         return objsize() == ((int*)(objdata()))[0];

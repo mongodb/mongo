@@ -694,7 +694,7 @@ namespace mongo {
 
 
     BSONElement BSONObj::getField(const char *name) const {
-        if ( details ) {
+        if ( objdata() ) {
             BSONObjIterator i(*this);
             while ( i.more() ) {
                 BSONElement e = i.next();
@@ -909,7 +909,7 @@ namespace mongo {
        returns n added not counting _id unless requested.
     */
     int BSONObj::addFields(BSONObj& from, set<string>& fields) {
-        assert( details == 0 ); /* partial implementation for now... */
+        assert( objdata() == 0 ); /* partial implementation for now... */
 
         BSONObjBuilder b;
 
