@@ -464,30 +464,39 @@ namespace mongo {
         friend class BSONObjIterator;
         class Details {
         public:
+            Details( const char *objdata, int refCount ) :
+            _objdata( objdata ),
+            _refCount( refCount ) {
+            }
             ~Details() {
                 // note refCount means two different things (thus the assert here)
-                assert(refCount <= 0);
+                assert(_refCount <= 0);
                 if (owned()) {
                     free((void *)_objdata);
                 }
                 _objdata = 0;
             }
-            const char *_objdata;
-            int refCount; // -1 == don't free (we don't "own" the buffer)
             bool owned() {
-                return refCount >= 0;
+                return _refCount >= 0;
             }
+            // TEMP
+            int &refCount() {
+                return _refCount;
+            }
+        private:
+            const char *_objdata;
+            int _refCount; // -1 == don't free (we don't "own" the buffer)
         } *details;
+        const char *_objdata;
         void init(const char *data, bool ifree) {
-            details = new Details();
-            details->_objdata = data;
+            details = new Details( data, ifree ? 1 : -1 );
+            _objdata = data;
             massert( "BSONObj size spec too small", objsize() > 0 );
             massert( "BSONObj size spec too large", objsize() <= 1024 * 1024 * 16 );
-            details->refCount = ifree ? 1 : -1;
         }
         void cleanup() {
             if ( details ) {
-                if ( --details->refCount <= 0 )
+                if ( --details->refCount() <= 0 )
                     delete details;
                 details = 0;
             }   
@@ -609,11 +618,11 @@ namespace mongo {
         
         /** @return the raw data of the object */
         const char *objdata() const {
-            return details->_objdata;
+            return _objdata;
         }
         /** @return total size of the BSON object in bytes */
         int objsize() const {
-            return details ? *(reinterpret_cast<const int*>(details->_objdata)) : 0;
+            return details ? *(reinterpret_cast<const int*>(objdata())) : 0;
         }
 
         bool isValid();
@@ -692,7 +701,7 @@ namespace mongo {
                 details = 0;
             else if ( r.details->owned() ) {
                 details = r.details;
-                details->refCount++;
+                details->refCount()++;
             }
             else {
                 details = new Details(*r.details);
@@ -708,7 +717,7 @@ namespace mongo {
                 details = 0;
             else if ( r.details->owned() ) {
                 details = r.details;
-                details->refCount++;
+                details->refCount()++;
             }
             else {
                 details = new Details(*r.details);
@@ -1310,7 +1319,7 @@ namespace mongo {
         if ( ! details )
             return true;
 
-        return objsize() == ((int*)(details->_objdata))[0];
+        return objsize() == ((int*)(objdata()))[0];
     }
 
     inline bool BSONObj::getObjectID(BSONElement& e) { 
