@@ -110,7 +110,13 @@ BasicRecStore* RecCache::initStore(int n) {
     return 0;
 }
 
-void RecCache::initStoreByNs(const char *_ns) {
+/* find the filename for a given ns.
+   format is 
+     <n>-<escaped_ns>.idx
+   returns filename.  found is true if found.  If false, a proposed name is returned for (optional) creation
+   of the file.
+*/
+string RecCache::findStoreFilename(const char *_ns, bool& found) {
     string namefrag;
     { 
         stringstream ss;
@@ -130,8 +136,8 @@ void RecCache::initStoreByNs(const char *_ns) {
             string s = i->leaf();
             const char *p = strstr(s.c_str(), namefrag.c_str());
             if( p ) {
-                _initStore(s);
-                return;
+                found = true;
+                return s;
             }
             if( strstr(s.c_str(), ".idx") ) { 
                 stringstream ss(s);
@@ -148,10 +154,17 @@ void RecCache::initStoreByNs(const char *_ns) {
         massert(s, false);
     }
 
-    // DNE.  create it.
+    // DNE.  return a name that would work.
     stringstream ss;
     ss << nmax+1 << namefrag;
-    _initStore(ss.str());
+    found = false;
+    return ss.str();
+}
+
+void RecCache::initStoreByNs(const char *_ns) {
+    bool found;
+    string fn = findStoreFilename(_ns, found);
+    _initStore(fn);
 }
 
 inline void RecCache::writeIfDirty(Node *n) {
@@ -284,12 +297,13 @@ void RecCache::closeStore(BasicRecStore *rs) {
     delete rs; // closes file
 }
 
-void RecCache::drop(const char *ns) { 
+void RecCache::drop(const char *_ns) { 
     // todo: test with a non clean shutdown file
     boostlock lk(rcmutex);
 
     char buf[256];
     {
+        const char *ns = _ns;
         char *p = buf;
         while( 1 ) {
             if( *ns == '$' ) *p = '_';
@@ -302,18 +316,28 @@ void RecCache::drop(const char *ns) {
         assert( p - buf < (int) sizeof(buf) );
     }
     BasicRecStore *&rs = storesByNs[buf];
-    if( rs == 0 )
-        initStoreByNs(buf); // load -- creates if DNE which is slightly bad. 
-    {
-        string fname = rs->filename;
+    string fname;
+    if( rs ) {
+        fname = rs->filename;
         closeStore(rs);
         rs = 0;
-        try { 
-            boost::filesystem::remove(fname);
-        } 
-        catch(...) { 
-            log() << "couldn't remove file " << fname << endl;
+    }
+    else { 
+        bool found;
+        fname = findStoreFilename(buf, found);
+        if( !found ) { 
+            log() << "RecCache::drop: no idx file found for " << _ns << endl;
+            return;
         }
+        path pf(dbpath);
+        pf /= fname;
+        fname = pf.string();
+    }
+    try { 
+        boost::filesystem::remove(fname);
+    } 
+    catch(...) { 
+        log() << "RecCache::drop: exception removing file " << fname << endl;
     }
 }
 
