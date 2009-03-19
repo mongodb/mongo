@@ -367,7 +367,7 @@ def getGitVersion():
 def getSysInfo():
     import os, sys
     if windows:
-        return " ".join( [ "windows" ] + sys.getwindowsversion() )
+        return "windows " + str( sys.getwindowsversion() )
     else:
         return " ".join( os.uname() )
 
