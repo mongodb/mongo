@@ -194,7 +194,7 @@ namespace mongo {
        "c" db cmd
        "db" declares presence of a database (ns is set to the db name + '.')
     */
-    void _logOp(const char *opstr, const char *ns, const char *logNs, BSONObj& obj, BSONObj *patt, bool *b);
-    void logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt = 0, bool *b = 0);
+    void _logOp(const char *opstr, const char *ns, const char *logNs, const BSONObj& obj, BSONObj *patt, bool *b);
+    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt = 0, bool *b = 0);
 
 } // namespace mongo

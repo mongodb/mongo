@@ -16,7 +16,7 @@ int main() {
     }
 
     { // clean up old data from any previous tests
-        conn.remove( "test.system.users" , emptyObj );
+        conn.remove( "test.system.users" , BSONObj() );
     }
 
     conn.insert( "test.system.users" , BSON( "user" << "eliot" << "pwd" << conn.createPasswordDigest( "eliot" , "bar" ) ) );

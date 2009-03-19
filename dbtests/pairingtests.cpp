@@ -188,7 +188,7 @@ namespace PairingTests {
                 rp1.arbitrate();
                 ASSERT( rp1.state == ReplPair::State_Master );
 
-                TestableReplPair rp2( false, emptyObj );
+                TestableReplPair rp2( false, BSONObj() );
                 rp2.arbitrate();
                 ASSERT( rp2.state == ReplPair::State_CantArb );
 

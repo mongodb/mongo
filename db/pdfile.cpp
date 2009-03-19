@@ -54,7 +54,7 @@ namespace mongo {
     int callDepth = 0;
 
     extern int otherTraceLevel;
-    void addNewNamespaceToCatalog(const char *ns, BSONObj *options = 0);
+    void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
 
     string getDbContext() {
         stringstream ss;
@@ -98,7 +98,7 @@ namespace mongo {
         return z;
     }
 
-    bool _userCreateNS(const char *ns, BSONObj& j, string& err) {
+    bool _userCreateNS(const char *ns, const BSONObj& j, string& err) {
         if ( nsdetails(ns) ) {
             err = "collection already exists";
             return false;
@@ -160,7 +160,6 @@ namespace mongo {
 // { ..., capped: true, size: ..., max: ... }
 // returns true if successful
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication) {
-        j.validateEmpty();
         bool ok = _userCreateNS(ns, j, err);
         if ( logForReplication && ok )
             logOp("c", ns, j);
@@ -543,7 +542,7 @@ assert( !eloc.isNull() );
             NamespaceDetails *freeExtents = nsdetails(s.c_str());
             if( freeExtents == 0 ) { 
                 string err;
-                _userCreateNS(s.c_str(), emptyObj, err);
+                _userCreateNS(s.c_str(), BSONObj(), err);
                 freeExtents = nsdetails(s.c_str());
                 massert("can't create .$freelist", freeExtents);
             }
@@ -998,7 +997,6 @@ assert( !eloc.isNull() );
         }
     }
 
-    extern BSONObj emptyObj;
     extern BSONObj id_obj;
 
     void ensureHaveIdIndex(const char *ns) {
@@ -1114,7 +1112,7 @@ assert( !eloc.isNull() );
             if ( tableToIndex == 0 ) {
                 // try to create it
                 string err;
-                if ( !userCreateNS(tabletoidxns.c_str(), emptyObj, err, false) ) {
+                if ( !userCreateNS(tabletoidxns.c_str(), BSONObj(), err, false) ) {
                     problem() << "ERROR: failed to create collection while adding its index. " << tabletoidxns << endl;
                     return DiskLoc();
                 }

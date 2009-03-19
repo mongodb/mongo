@@ -37,7 +37,7 @@ namespace mongo {
     class Cloner: boost::noncopyable {
         auto_ptr< DBClientWithCommands > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
-                  bool masterSameProcess, bool slaveOk, BSONObj query = emptyObj);
+                  bool masterSameProcess, bool slaveOk, BSONObj query = BSONObj());
         void replayOpLog( DBClientCursor *c, const BSONObj &query );
     public:
         Cloner() { }
@@ -160,7 +160,7 @@ namespace mongo {
             } else {
                 conn.reset( new DBDirectClient() );
             }
-            c = conn->query( ns.c_str(), emptyObj, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
+            c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
         }
         if ( c.get() == 0 ) {
             errmsg = "query failed " + ns;
@@ -378,7 +378,7 @@ namespace mongo {
             }
             BSONObj query = cmdObj.getObjectField("query");
             if ( query.isEmpty() )
-                query = emptyObj;
+                query = BSONObj();
             BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
             bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
             // Will not be used if doesn't exist.
@@ -422,7 +422,7 @@ namespace mongo {
             }
             BSONObj query = cmdObj.getObjectField("query");
             if ( query.isEmpty() )
-                query = emptyObj;
+                query = BSONObj();
             BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
             bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
             // Will not be used if doesn't exist.
@@ -479,7 +479,7 @@ namespace mongo {
             }
             BSONObj query = fromToken.getObjectField("query");
             if ( query.isEmpty() ) {
-                query = emptyObj;
+                query = BSONObj();
             }
             long long cursorId = 0;
             BSONElement cursorIdToken = fromToken.getField( "cursorId" );

@@ -519,7 +519,7 @@ namespace mongo {
             // --source <host> specified.
             // check that no items are in sources other than that
             // add if missing
-            auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
+            auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
             while ( c->ok() ) {
                 n++;
@@ -552,7 +552,7 @@ namespace mongo {
         }
 
         setClient("local.sources");
-        auto_ptr<Cursor> c = findTableScan("local.sources", emptyObj);
+        auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
         while ( c->ok() ) {
             ReplSource tmp(c->current());
             if ( replPair && tmp.hostName == replPair->remote && tmp.sourceName() == "main" ) {
@@ -1076,7 +1076,7 @@ namespace mongo {
     NamespaceDetails *localOplogMainDetails = 0;
     Database *localOplogClient = 0;
 
-    void logOp(const char *opstr, const char *ns, BSONObj& obj, BSONObj *patt, bool *b) {
+    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( master )
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b);
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
@@ -1105,7 +1105,7 @@ namespace mongo {
          when set, indicates this is the first thing we have logged for this database.
          thus, the slave does not need to copy down all the data when it sees this.
     */
-    void _logOp(const char *opstr, const char *ns, const char *logNS, BSONObj& obj, BSONObj *o2, bool *bb) {
+    void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb) {
         if ( strncmp(ns, "local.", 6) == 0 )
             return;
 
@@ -1318,7 +1318,7 @@ namespace mongo {
                 string dbname = string(f.c_str(), f.size() - 2);
                 if ( dbname != "local." ) {
                     setClientTempNs(dbname.c_str());
-                    logOp("db", dbname.c_str(), emptyObj);
+                    logOp("db", dbname.c_str(), BSONObj());
                 }
             }
             i++;

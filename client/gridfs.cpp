@@ -107,7 +107,7 @@ namespace mongo {
     }
 
     auto_ptr<DBClientCursor> GridFS::list(){
-        return _client.query( _filesNS.c_str() , emptyObj );
+        return _client.query( _filesNS.c_str() , BSONObj() );
     }
 
     auto_ptr<DBClientCursor> GridFS::list( BSONObj o ){

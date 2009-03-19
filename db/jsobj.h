@@ -482,6 +482,16 @@ namespace mongo {
             _objdata = data;
             massert( "Invalid BSONObj spec size", isValid() );
         }
+#pragma pack(1)
+        static struct EmptyObject {
+            EmptyObject() {
+                len = 5;
+                jstype = EOO;
+            }
+            int len;
+            char jstype;
+        } emptyObject;
+#pragma pack()
     public:
         /** Construct a BSONObj from data in the proper format. 
             @param ifree true if the BSONObj should free() the msgdata when 
@@ -492,8 +502,7 @@ namespace mongo {
         }
         BSONObj(const Record *r);
         /** Construct an empty BSONObj -- that is, {}. */
-        // TODO: Unify this with 'emptyObj'
-        BSONObj() : _objdata(0) { }
+        BSONObj() : _objdata( reinterpret_cast< const char * >( &emptyObject ) ) { }
         // defensive
         ~BSONObj() { _objdata = 0; }
 
@@ -604,8 +613,6 @@ namespace mongo {
         }
         /** @return total size of the BSON object in bytes */
         int objsize() const {
-            if ( !objdata() )
-                return 0;
             return *(reinterpret_cast<const int*>(objdata()));
         }
 
@@ -616,12 +623,9 @@ namespace mongo {
             return objsize() <= 5;
         }
 
-        void validateEmpty();
-
         void dump() {
             out() << hex;
             const char *p = objdata();
-            if ( !p ) return;
             for ( int i = 0; i < objsize(); i++ ) {
                 out() << i << '\t' << (unsigned) *p;
                 if ( *p >= 'A' && *p <= 'z' )
@@ -778,13 +782,6 @@ namespace mongo {
         BSONObjBuilder& operator<<( T value );
         
         Labeler operator<<( const Labeler::Label &l );
-/*
-        BSONObjBuilder& operator<<( const char * value );
-        BSONObjBuilder& operator<<( const string& v ) { return (*this << v.c_str()); }
-        BSONObjBuilder& operator<<( const int value );
-        BSONObjBuilder& operator<<( const double value );
-        BSONObjBuilder& operator<<( const unsigned long value ){ return (*this << (double)value); }
-*/
 
         void endField( const char *nextFieldName = 0 );
         bool subobjStarted() const { return _fieldName != 0; }
@@ -1210,9 +1207,6 @@ namespace mongo {
     }
     
     inline BSONObj BSONObj::copy() const {
-        if ( !objdata() )
-            return *this;
-
         char *p = (char*) malloc(objsize());
         memcpy(p, objdata(), objsize());
         return BSONObj(p, true);
@@ -1260,17 +1254,7 @@ namespace mongo {
         return *this;
     }
 
-    extern BSONObj emptyObj;
-
-    inline void BSONObj::validateEmpty() {
-        if ( objdata() == 0 )
-            *this = emptyObj;
-    }
-
     inline bool BSONObj::isValid(){
-        if ( !objdata() )
-            return true;
-
         return objsize() > 0 && objsize() <= 1024 * 1024 * 16 ;
     }
 

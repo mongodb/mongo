@@ -60,7 +60,7 @@ namespace ReplTests {
             return "local.oplog.$main";
         }
         DBClientInterface *client() const { return &client_; }
-        BSONObj one( const BSONObj &query = emptyObj ) const {
+        BSONObj one( const BSONObj &query = BSONObj() ) const {
             return client()->findOne( ns(), query );            
         }
         void checkOne( const BSONObj &o ) const {
@@ -81,7 +81,7 @@ namespace ReplTests {
             ASSERT( !expected.woCompare( got ) );
         }
         BSONObj oneOp() const { 
-            return client()->findOne( logNs(), emptyObj );
+            return client()->findOne( logNs(), BSONObj() );
         }
         int count() const {
             int count = 0;

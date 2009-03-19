@@ -29,7 +29,7 @@ namespace mongo {
         bool sendNextBatch( Request& r , int ntoreturn );
         
     protected:
-        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = emptyObj );
+        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() );
 
         BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
         BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
@@ -51,7 +51,7 @@ namespace mongo {
 
     class ServerAndQuery {
     public:
-        ServerAndQuery( const string& server , BSONObj extra = emptyObj , BSONObj orderObject = emptyObj ) : 
+        ServerAndQuery( const string& server , BSONObj extra = BSONObj() , BSONObj orderObject = BSONObj() ) : 
             _server( server ) , _extra( extra.getOwned() ) , _orderObject( orderObject.getOwned() ){
         }
 

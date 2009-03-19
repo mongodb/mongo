@@ -88,7 +88,7 @@ namespace mongo {
        set your db context first
     */
     bool Helpers::findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex) { 
-        QueryPlanSet s( ns, query, emptyObj );
+        QueryPlanSet s( ns, query, BSONObj() );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );
         if ( res->one().isEmpty() )
@@ -132,12 +132,12 @@ namespace mongo {
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         DBContext context(ns);
         stringstream ss;
-        updateObjects(ns, obj, /*pattern=*/emptyObj, /*upsert=*/true, ss);
+        updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, ss);
     }
 
     void Helpers::emptyCollection(const char *ns) {
         DBContext context(ns);
-        deleteObjects(ns, emptyObj, false);
+        deleteObjects(ns, BSONObj(), false);
     }
 
 } // namespace mongo

@@ -169,37 +169,37 @@ namespace QueryTests {
     
     class ModId : public Fail {
         void doIt() {
-            update( ns(), emptyObj, fromjson( "{$set:{'_id':4}}" ) );
+            update( ns(), BSONObj(), fromjson( "{$set:{'_id':4}}" ) );
         }
     };
     
     class ModNonmodMix : public Fail {
         void doIt() {
-            update( ns(), emptyObj, fromjson( "{$set:{a:4},z:3}" ) );
+            update( ns(), BSONObj(), fromjson( "{$set:{a:4},z:3}" ) );
         }        
     };
     
     class InvalidMod : public Fail {
         void doIt() {
-            update( ns(), emptyObj, fromjson( "{$awk:{a:4}}" ) );
+            update( ns(), BSONObj(), fromjson( "{$awk:{a:4}}" ) );
         }        
     };
 
     class ModNotFirst : public Fail {
         void doIt() {
-            update( ns(), emptyObj, fromjson( "{z:3,$set:{a:4}}" ) );
+            update( ns(), BSONObj(), fromjson( "{z:3,$set:{a:4}}" ) );
         }        
     };
     
     class ModDuplicateFieldSpec : public Fail {
         void doIt() {
-            update( ns(), emptyObj, fromjson( "{$set:{a:4},$inc:{a:1}}" ) );
+            update( ns(), BSONObj(), fromjson( "{$set:{a:4},$inc:{a:1}}" ) );
         }        
     };
 
     class IncNonNumber : public Fail {
         void doIt() {
-            update( ns(), emptyObj, fromjson( "{$inc:{a:'d'}}" ) );
+            update( ns(), BSONObj(), fromjson( "{$inc:{a:'d'}}" ) );
         }        
     };
     
@@ -234,7 +234,7 @@ namespace QueryTests {
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
             insert( ns, BSON( "a" << 3 ) );
-            auto_ptr< DBClientCursor > cursor = client().query( ns, emptyObj, 2 );
+            auto_ptr< DBClientCursor > cursor = client().query( ns, BSONObj(), 2 );
             long long cursorId = cursor->getCursorId();
             cursor->decouple();
             cursor.reset();
@@ -398,7 +398,7 @@ namespace QueryTests {
     public:
         void run() {
             client().insert( ns(), BSON( "a" << "b" ) );
-            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a" << 5 ) ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a" << 5 ) ) );
             ASSERT( !client().findOne( ns(), BSON( "a" << 5 ) ).isEmpty() );
         }        
     };
@@ -407,7 +407,7 @@ namespace QueryTests {
     public:
         void run() {
             client().insert( ns(), BSON( "a" << "bcd" ) );
-            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a" << 5.0 ) ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a" << 5.0 ) ) );
             ASSERT( !client().findOne( ns(), BSON( "a" << 5.0 ) ).isEmpty() );            
         }
     };
@@ -416,9 +416,9 @@ namespace QueryTests {
     public:
         void run() {
             client().insert( ns(), fromjson( "{a:{b:4}}" ) );
-            client().update( ns(), emptyObj, BSON( "$inc" << BSON( "a.b" << 10 ) ) );
+            client().update( ns(), BSONObj(), BSON( "$inc" << BSON( "a.b" << 10 ) ) );
             ASSERT( !client().findOne( ns(), BSON( "a.b" << 14 ) ).isEmpty() );            
-            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a.b" << 55 ) ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << 55 ) ) );
             ASSERT( !client().findOne( ns(), BSON( "a.b" << 55 ) ).isEmpty() );                        
         }
     };
@@ -427,8 +427,8 @@ namespace QueryTests {
     public:
         void run() {
             client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
-            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a.b" << "llll" ) ) );
-            out() << "one: " << client().findOne( ns(), emptyObj ) << endl; 
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "llll" ) ) );
+            out() << "one: " << client().findOne( ns(), BSONObj() ) << endl; 
             ASSERT( !client().findOne( ns(), BSON( "a.b" << "llll" ) ).isEmpty() );                        
         }
     };
@@ -437,7 +437,7 @@ namespace QueryTests {
 //    public:
 //        void run() {
 //            client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
-//            client().update( ns(), emptyObj, BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
+//            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
 //            ASSERT( !client().findOne( ns(), BSON( "a.b" << "lllll" ) ).isEmpty() );                        
 //        }
 //    };

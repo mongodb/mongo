@@ -56,7 +56,7 @@ namespace mongo {
     class Query {
     public:
         BSONObj obj;
-        Query() : obj(emptyObj) { }
+        Query() : obj(BSONObj()) { }
         Query(const BSONObj& b) : obj(b) { }
         Query(const string &json) : 
             obj(fromjson(json)) { }
@@ -293,7 +293,7 @@ namespace mongo {
         /** count number of objects in collection ns that match the query criteria specified
             throws UserAssertion if database returns an error
         */
-        unsigned long long count(const char *ns, BSONObj query = emptyObj);
+        unsigned long long count(const char *ns, BSONObj query = BSONObj());
 
         string createPasswordDigest( const char * username , const char * clearTextPassword );
 

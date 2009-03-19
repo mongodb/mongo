@@ -29,7 +29,7 @@ namespace mongo {
     */
     class ShardKeyPattern {
     public:
-        ShardKeyPattern( BSONObj p = emptyObj ) : pattern( p.getOwned() ) {
+        ShardKeyPattern( BSONObj p = BSONObj() ) : pattern( p.getOwned() ) {
             pattern.getFieldNames(patternfields);
         }
         

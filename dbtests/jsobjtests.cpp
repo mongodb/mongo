@@ -168,8 +168,8 @@ namespace JsobjTests {
                     ASSERT( !invalid().valid() );
                 }
             protected:
-                virtual BSONObj valid() const { return emptyObj; }
-                virtual BSONObj invalid() const { return emptyObj; }
+                virtual BSONObj valid() const { return BSONObj(); }
+                virtual BSONObj invalid() const { return BSONObj(); }
                 static char get( const BSONObj &o, int i ) {
                     return o.objdata()[ i ];
                 }

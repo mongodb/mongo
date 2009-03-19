@@ -30,7 +30,7 @@ void run() {
 
   cout << "count:" << c.count("tutorial.persons") << endl;
 
-  auto_ptr<DBClientCursor> cursor = c.query("tutorial.persons", emptyObj);
+  auto_ptr<DBClientCursor> cursor = c.query("tutorial.persons", BSONObj());
   while( cursor->more() ) { 
       cout << cursor->next().toString() << endl;
   }

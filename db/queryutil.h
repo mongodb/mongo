@@ -24,7 +24,7 @@ namespace mongo {
 
     class FieldBound {
     public:
-        FieldBound( const BSONElement &e = emptyObj.firstElement() );
+        FieldBound( const BSONElement &e = BSONObj().firstElement() );
         const FieldBound &operator&=( const FieldBound &other );
         BSONElement lower() const { return lower_; }
         BSONElement upper() const { return upper_; }
@@ -145,7 +145,7 @@ namespace mongo {
                     return false;
             return true;
         }
-        QueryPattern pattern( const BSONObj &sort = emptyObj ) const;
+        QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();

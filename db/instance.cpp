@@ -319,7 +319,7 @@ namespace mongo {
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
-        BSONObj deletedId = emptyObj;
+        BSONObj deletedId = BSONObj();
         deleteObjects(ns, pattern, justOne, &deletedId);
         if ( justOne ) {
             if ( deletedId.isEmpty() ) {

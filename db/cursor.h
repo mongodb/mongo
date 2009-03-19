@@ -52,7 +52,7 @@ namespace mongo {
         virtual BSONObj current() = 0;
         virtual DiskLoc currLoc() = 0;
         virtual bool advance() = 0; /*true=ok*/
-        virtual BSONObj currKey() const { return emptyObj; }
+        virtual BSONObj currKey() const { return BSONObj(); }
         // DiskLoc the cursor requires for continued operation.  Before this
         // DiskLoc is deleted, the cursor must be incremented or destroyed.
         virtual DiskLoc refLoc() = 0;
@@ -100,8 +100,8 @@ namespace mongo {
             return false;
         }
 
-        virtual BSONObj prettyStartKey() const { return emptyObj; }
-        virtual BSONObj prettyEndKey() const { return emptyObj; }
+        virtual BSONObj prettyStartKey() const { return BSONObj(); }
+        virtual BSONObj prettyEndKey() const { return BSONObj(); }
 
     };
 

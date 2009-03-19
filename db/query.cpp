@@ -120,7 +120,7 @@ namespace mongo {
         }
 
         int nDeleted = 0;
-        QueryPlanSet s( ns, pattern, emptyObj );
+        QueryPlanSet s( ns, pattern, BSONObj() );
         int best = 0;
         DeleteOp original( justOne, best );
         shared_ptr< DeleteOp > bestOp = s.runOp( original );
@@ -389,7 +389,7 @@ namespace mongo {
             }
         }
         
-        QueryPlanSet qps( ns, pattern, emptyObj );
+        QueryPlanSet qps( ns, pattern, BSONObj() );
         UpdateOp original;
         shared_ptr< UpdateOp > u = qps.runOp( original );
         massert( u->exceptionMessage(), u->complete() );
@@ -736,7 +736,7 @@ namespace mongo {
         if ( query.isEmpty() && fields.isEmpty() ) {
             return d->nrecords;
         }
-        QueryPlanSet qps( ns, query, emptyObj );
+        QueryPlanSet qps( ns, query, BSONObj() );
         CountOp original( cmd );
         shared_ptr< CountOp > res = qps.runOp( original );
         if ( !res->complete() ) {

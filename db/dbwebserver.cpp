@@ -167,7 +167,7 @@ namespace mongo {
         
         bool allowed( const char * rq , vector<string>& headers ){
             
-            if ( db.findOne( "admin.system.users" , emptyObj ).isEmpty() )
+            if ( db.findOne( "admin.system.users" , BSONObj() ).isEmpty() )
                 return true;
             
             string auth = getHeader( rq , "Authorization" );

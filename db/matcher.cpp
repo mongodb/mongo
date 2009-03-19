@@ -523,7 +523,7 @@ namespace mongo {
             assert( n.matches(j1) );
             assert( !n.matches(j2) );
 
-            BSONObj j0 = emptyObj;
+            BSONObj j0 = BSONObj();
 //		BSONObj j0((const char *) &js0);
             JSMatcher p(j0);
             assert( p.matches(j1) );

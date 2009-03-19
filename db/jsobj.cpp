@@ -562,6 +562,8 @@ namespace mongo {
 
     /* BSONObj ------------------------------------------------------------*/
 
+    BSONObj::EmptyObject BSONObj::emptyObject;
+    
     string BSONObj::toString() const {
         if ( isEmpty() ) return "{}";
 
@@ -694,15 +696,13 @@ namespace mongo {
 
 
     BSONElement BSONObj::getField(const char *name) const {
-        if ( objdata() ) {
-            BSONObjIterator i(*this);
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                if ( strcmp(e.fieldName(), name) == 0 )
-                    return e;
-            }
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            if ( strcmp(e.fieldName(), name) == 0 )
+                return e;
         }
         return nullElement;
     }
@@ -909,7 +909,7 @@ namespace mongo {
        returns n added not counting _id unless requested.
     */
     int BSONObj::addFields(BSONObj& from, set<string>& fields) {
-        assert( objdata() == 0 ); /* partial implementation for now... */
+        assert( isEmpty() && !isOwned() ); /* partial implementation for now... */
 
         BSONObjBuilder b;
 
@@ -973,7 +973,7 @@ namespace mongo {
         BSONObjBuilder b;
         BSONObjIterator i( *this );
         BSONObjIterator j( names );
-        BSONElement f = j.more() ? j.next() : emptyObj.firstElement();
+        BSONElement f = j.more() ? j.next() : BSONObj().firstElement();
         while( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
@@ -1058,19 +1058,6 @@ namespace mongo {
         fieldNameSize = 0;
         totalSize = -1;
     }
-
-#pragma pack(1)
-    struct EmptyObject {
-        EmptyObject() {
-            len = 5;
-            jstype = EOO;
-        }
-        int len;
-        char jstype;
-    } emptyObject;
-#pragma pack()
-
-    BSONObj emptyObj((char *) &emptyObject);
 
     struct BsonUnitTest : public UnitTest {
         void testRegex() {

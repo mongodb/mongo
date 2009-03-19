@@ -524,7 +524,7 @@ public:
 
     BSONObj fromjson( const char *str ) {
         if ( ! strlen(str) )
-            return emptyObj;
+            return BSONObj();
         ObjectBuilder b;
         JsonGrammar parser( b );
         parse_info<> result = parse( str, parser, space_p );

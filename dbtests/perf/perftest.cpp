@@ -411,7 +411,7 @@ namespace QueryTests {
         }
         void run() {
             auto_ptr< DBClientCursor > c = 
-            client_->query( ns_.c_str(), Query( emptyObj ).sort( BSON( "_id" << 1 ) ) );
+            client_->query( ns_.c_str(), Query( BSONObj() ).sort( BSON( "_id" << 1 ) ) );
             int i = 0;
             for( ; c->more(); c->nextSafe(), ++i );
             ASSERT_EQUALS( 50000, i );
@@ -427,7 +427,7 @@ namespace QueryTests {
         }
         void run() {
             auto_ptr< DBClientCursor > c = 
-            client_->query( ns_.c_str(), Query( emptyObj ).sort( BSON( "_id" << 1 ) ) );
+            client_->query( ns_.c_str(), Query( BSONObj() ).sort( BSON( "_id" << 1 ) ) );
             int i = 0;
             for( ; c->more(); c->nextSafe(), ++i );
             ASSERT_EQUALS( 50000, i );
@@ -518,7 +518,7 @@ namespace Plan {
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                QueryPlanSet s( ns_.c_str(), emptyObj, emptyObj, &hintElt_ );
+                QueryPlanSet s( ns_.c_str(), BSONObj(), BSONObj(), &hintElt_ );
         }
         string ns_;        
         auto_ptr< dblock > lk_;
@@ -539,7 +539,7 @@ namespace Plan {
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                QueryPlanSet s( ns_.c_str(), emptyObj, BSON( "a" << 1 ) );
+                QueryPlanSet s( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) );
         }
         string ns_;        
         auto_ptr< dblock > lk_;
@@ -558,7 +558,7 @@ namespace Plan {
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                QueryPlanSet s( ns_.c_str(), BSON( "a" << 1 ), emptyObj );
+                QueryPlanSet s( ns_.c_str(), BSON( "a" << 1 ), BSONObj() );
         }
         string ns_;        
         auto_ptr< dblock > lk_;

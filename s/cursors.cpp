@@ -26,7 +26,7 @@ namespace mongo {
             _fields = b.obj();
         }
         else {
-            _fields = emptyObj;
+            _fields = BSONObj();
         }
         
         do {
@@ -195,7 +195,7 @@ namespace mongo {
     BSONObj ParallelSortShardedCursor::next(){
         advance();
             
-        BSONObj best = emptyObj;
+        BSONObj best = BSONObj();
         int bestFrom = -1;
             
         for ( int i=0; i<_numServers; i++){
@@ -217,7 +217,7 @@ namespace mongo {
         }
             
         uassert( "no more elements" , ! best.isEmpty() );
-        _nexts[bestFrom] = emptyObj;
+        _nexts[bestFrom] = BSONObj();
             
         return best;
     }

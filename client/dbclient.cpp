@@ -82,12 +82,12 @@ namespace mongo {
     }
     BSONObj Query::getSort() const {
         if ( ! isComplex() )
-            return emptyObj;
+            return BSONObj();
         return obj.getObjectField( "orderby" );
     }
     BSONObj Query::getHint() const {
         if ( ! isComplex() )
-            return emptyObj;
+            return BSONObj();
         return obj.getObjectField( "$hint" );
     }
     bool Query::isExplain() const {
@@ -730,7 +730,6 @@ namespace mongo {
     /* ------------------------------------------------------ */
 
 // "./db testclient" to invoke
-    extern BSONObj emptyObj;
     void testClient3() {
         out() << "testClient()" << endl;
 //	DBClientConnection c(true);
@@ -747,7 +746,7 @@ namespace mongo {
 again:
         out() << "query foo.bar..." << endl;
         auto_ptr<DBClientCursor> cursor =
-            c.query("foo.bar", emptyObj, 0, 0, 0, Option_CursorTailable);
+            c.query("foo.bar", BSONObj(), 0, 0, 0, Option_CursorTailable);
         DBClientCursor *cc = cursor.get();
         if ( cc == 0 ) {
             out() << "query() returned 0, sleeping 10 secs" << endl;
@@ -896,7 +895,7 @@ again:
 		while( 1 ) { 
 			sleepsecs(3);
 			try { 
-				log() << "findone returns " << p.findOne("dwight.foo", emptyObj).toString() << endl;
+				log() << "findone returns " << p.findOne("dwight.foo", BSONObj()).toString() << endl;
 				sleepsecs(3);
 				BSONObj info;
 				bool im;

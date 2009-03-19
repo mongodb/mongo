@@ -138,7 +138,7 @@ int main() {
             conn.insert( tsns , b.obj() );
         }
         
-        mongo::BSONObj out = conn.findOne( tsns , mongo::emptyObj );
+        mongo::BSONObj out = conn.findOne( tsns , mongo::BSONObj() );
         unsigned int inc = out["ts"].timestampInc();
         
         {
@@ -152,7 +152,7 @@ int main() {
             conn.update( tsns , b1.obj() , b2.obj() );
         }
         
-        assert( conn.findOne( tsns , mongo::emptyObj )["ts"].timestampInc() == ( inc + 1 ) );
+        assert( conn.findOne( tsns , mongo::BSONObj() )["ts"].timestampInc() == ( inc + 1 ) );
         
     }
     

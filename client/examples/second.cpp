@@ -18,12 +18,12 @@ int main() {
 
     const char * ns = "test.second";
 
-    conn.remove( ns , emptyObj );
+    conn.remove( ns , BSONObj() );
 
     conn.insert( ns , BSON( "name" << "eliot" << "num" << 17 ) );
     conn.insert( ns , BSON( "name" << "sara" << "num" << 24 ) );
 
-    auto_ptr<DBClientCursor> cursor = conn.query( ns , emptyObj );
+    auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObj() );
     cout << "using cursor" << endl;
     while ( cursor->more() ) {
         BSONObj obj = cursor->next();

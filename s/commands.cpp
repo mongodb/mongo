@@ -95,7 +95,7 @@ namespace mongo {
                 ScopedDbConnection conn( configServer.getPrimary() );                
         
 
-                auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , emptyObj );
+                auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , BSONObj() );
 
                 BSONObjBuilder list;                
                 int num = 0;
@@ -416,7 +416,7 @@ namespace mongo {
                 ScopedDbConnection conn( configServer.getPrimary() );
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn->query( "config.servers" , emptyObj );
+                auto_ptr<DBClientCursor> cursor = conn->query( "config.servers" , BSONObj() );
                 while ( cursor->more() ){
                     BSONObj o = cursor->next();
                     all.push_back( o );

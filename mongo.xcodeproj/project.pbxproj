@@ -21,6 +21,15 @@
 		9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ShellUtils.h; sourceTree = "<group>"; };
 		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
 		931A027A0F58AA4400147C0E /* jsobjmanipulator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jsobjmanipulator.h; sourceTree = "<group>"; };
+		93278F570F72D32900844664 /* gridfs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = gridfs.cpp; sourceTree = "<group>"; };
+		93278F580F72D32900844664 /* gridfs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gridfs.h; sourceTree = "<group>"; };
+		93278F610F72D39400844664 /* cursors.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cursors.cpp; sourceTree = "<group>"; };
+		93278F620F72D39400844664 /* cursors.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cursors.h; sourceTree = "<group>"; };
+		93278F630F72D39400844664 /* d_logic.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = d_logic.cpp; sourceTree = "<group>"; };
+		93278F640F72D39400844664 /* d_logic.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = d_logic.h; sourceTree = "<group>"; };
+		93278F650F72D39400844664 /* strategy.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = strategy.cpp; sourceTree = "<group>"; };
+		93278F660F72D39400844664 /* strategy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = strategy.h; sourceTree = "<group>"; };
+		93278F670F72D39400844664 /* strategy_shard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = strategy_shard.cpp; sourceTree = "<group>"; };
 		932AC3EB0F4A5B34005BF8B0 /* queryoptimizertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = queryoptimizertests.cpp; sourceTree = "<group>"; };
 		932AC4310F4A5E9D005BF8B0 /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
 		933A4D130F55A68600145C4B /* authTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = authTest.cpp; sourceTree = "<group>"; };
@@ -321,6 +330,8 @@
 		9342232A0EF16D4F00608550 /* client */ = {
 			isa = PBXGroup;
 			children = (
+				93278F570F72D32900844664 /* gridfs.cpp */,
+				93278F580F72D32900844664 /* gridfs.h */,
 				933A4D120F55A68600145C4B /* examples */,
 				9342232B0EF16D4F00608550 /* connpool.cpp */,
 				9342232C0EF16D4F00608550 /* connpool.h */,
@@ -474,6 +485,13 @@
 		93A13A200F4620A500AF1B0D /* s */ = {
 			isa = PBXGroup;
 			children = (
+				93278F610F72D39400844664 /* cursors.cpp */,
+				93278F620F72D39400844664 /* cursors.h */,
+				93278F630F72D39400844664 /* d_logic.cpp */,
+				93278F640F72D39400844664 /* d_logic.h */,
+				93278F650F72D39400844664 /* strategy.cpp */,
+				93278F660F72D39400844664 /* strategy.h */,
+				93278F670F72D39400844664 /* strategy_shard.cpp */,
 				93E727090F4B5B5B004F9B5D /* shardkey.cpp */,
 				93E7270A0F4B5B5B004F9B5D /* shardkey.h */,
 				93A13A210F4620A500AF1B0D /* commands.cpp */,

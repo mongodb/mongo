@@ -56,7 +56,7 @@ namespace QueryOptimizerTests {
         };
         
         class Empty : public Base {
-            virtual BSONObj query() { return emptyObj; }
+            virtual BSONObj query() { return BSONObj(); }
         };
         
         class Eq : public Base {
@@ -217,7 +217,7 @@ namespace QueryOptimizerTests {
                 ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) ) );
             }
         private:
-            static QueryPattern p( const BSONObj &query, const BSONObj &sort = emptyObj ) {
+            static QueryPattern p( const BSONObj &query, const BSONObj &sort = BSONObj() ) {
                 return FieldBoundSet( "", query ).pattern( sort );
             }
         };
@@ -237,7 +237,7 @@ namespace QueryOptimizerTests {
             Base() : indexNum_( 0 ) {
                 setClient( ns() );
                 string err;
-                userCreateNS( ns(), emptyObj, err, false );
+                userCreateNS( ns(), BSONObj(), err, false );
             }
             ~Base() {
                 if ( !nsd() )
@@ -272,13 +272,13 @@ namespace QueryOptimizerTests {
         
         // There's a limit of 10 indexes total, make sure not to exceed this in a given test.
 #define INDEX(x) this->index( BSON(x) )
-        FieldBoundSet FieldBoundSet_GLOBAL( "", emptyObj );
-#define FBS(x) ( FieldBoundSet_GLOBAL = FieldBoundSet( ns(), x ) )
+        auto_ptr< FieldBoundSet > FieldBoundSet_GLOBAL;
+#define FBS(x) ( FieldBoundSet_GLOBAL.reset( new FieldBoundSet( ns(), x ) ), *FieldBoundSet_GLOBAL )
         
         class NoIndex : public Base {
         public:
             void run() {
-                QueryPlan p( FBS( emptyObj ), emptyObj, 0 );
+                QueryPlan p( FBS( BSONObj() ), BSONObj(), 0 );
                 ASSERT( !p.optimal() );
                 ASSERT( !p.scanAndOrderRequired() );
                 ASSERT( !p.keyMatch() );
@@ -296,13 +296,13 @@ namespace QueryOptimizerTests {
                 b2.appendMaxKey( "" );
                 BSONObj end = b2.obj();
                 
-                QueryPlan p( FBS( emptyObj ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
+                QueryPlan p( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
                 ASSERT( !p.startKey().woCompare( start ) );
                 ASSERT( !p.endKey().woCompare( end ) );
-                QueryPlan p2( FBS( emptyObj ), BSON( "a" << 1 << "b" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
+                QueryPlan p2( FBS( BSONObj() ), BSON( "a" << 1 << "b" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
-                QueryPlan p3( FBS( emptyObj ), BSON( "b" << 1 ), INDEX( "a" << 1 ) );
+                QueryPlan p3( FBS( BSONObj() ), BSON( "b" << 1 ), INDEX( "a" << 1 ) );
                 ASSERT( p3.scanAndOrderRequired() );
                 ASSERT( !p3.startKey().woCompare( start ) );
                 ASSERT( !p3.endKey().woCompare( end ) );
@@ -312,7 +312,7 @@ namespace QueryOptimizerTests {
         class MoreIndexThanNeeded : public Base {
         public:
             void run() {
-                QueryPlan p( FBS( emptyObj ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
+                QueryPlan p( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
             }
         };
@@ -320,10 +320,10 @@ namespace QueryOptimizerTests {
         class IndexSigns : public Base {
         public:
             void run() {
-                QueryPlan p( FBS( emptyObj ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << 1 << "b" << -1 ) );
+                QueryPlan p( FBS( BSONObj() ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << 1 << "b" << -1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
                 ASSERT_EQUALS( 1, p.direction() );
-                QueryPlan p2( FBS( emptyObj ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << 1 << "b" << 1 ) );
+                QueryPlan p2( FBS( BSONObj() ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( p2.scanAndOrderRequired() );                
                 ASSERT_EQUALS( 0, p2.direction() );
             }            
@@ -340,15 +340,15 @@ namespace QueryOptimizerTests {
                 b2.appendMaxKey( "" );
                 b2.appendMinKey( "" );
                 BSONObj end = b2.obj();
-                QueryPlan p( FBS( emptyObj ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << -1 << "b" << 1 ) );
+                QueryPlan p( FBS( BSONObj() ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
                 ASSERT_EQUALS( -1, p.direction() );
                 ASSERT( !p.startKey().woCompare( start ) );
                 ASSERT( !p.endKey().woCompare( end ) );
-                QueryPlan p2( FBS( emptyObj ), BSON( "a" << -1 << "b" << -1 ), INDEX( "a" << 1 << "b" << 1 ) );
+                QueryPlan p2( FBS( BSONObj() ), BSON( "a" << -1 << "b" << -1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );                
                 ASSERT_EQUALS( -1, p2.direction() );
-                QueryPlan p3( FBS( emptyObj ), BSON( "a" << -1 << "b" << -1 ), INDEX( "a" << 1 << "b" << -1 ) );
+                QueryPlan p3( FBS( BSONObj() ), BSON( "a" << -1 << "b" << -1 ), INDEX( "a" << 1 << "b" << -1 ) );
                 ASSERT( p3.scanAndOrderRequired() );                
                 ASSERT_EQUALS( 0, p3.direction() );
             }                        
@@ -365,7 +365,7 @@ namespace QueryOptimizerTests {
                 b2.append( "", 3 );
                 b2.appendMaxKey( "" );
                 BSONObj end = b2.obj();
-                QueryPlan p( FBS( BSON( "a" << 3 ) ), emptyObj, INDEX( "a" << -1 << "b" << 1 ) );
+                QueryPlan p( FBS( BSON( "a" << 3 ) ), BSONObj(), INDEX( "a" << -1 << "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
                 ASSERT( !p.startKey().woCompare( start ) );
                 ASSERT( !p.endKey().woCompare( end ) );
@@ -391,9 +391,9 @@ namespace QueryOptimizerTests {
         class Optimal : public Base {
         public:
             void run() {
-                QueryPlan p( FBS( emptyObj ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
+                QueryPlan p( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
                 ASSERT( p.optimal() );
-                QueryPlan p2( FBS( emptyObj ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
+                QueryPlan p2( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( p2.optimal() );
                 QueryPlan p3( FBS( BSON( "a" << 1 ) ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( p3.optimal() );
@@ -409,7 +409,7 @@ namespace QueryOptimizerTests {
                 ASSERT( p8.optimal() );
                 QueryPlan p9( FBS( BSON( "a" << 1 << "b" << LT << 1 ) ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
                 ASSERT( p9.optimal() );
-                QueryPlan p10( FBS( BSON( "a" << 1 ) ), emptyObj, INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                QueryPlan p10( FBS( BSON( "a" << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
                 ASSERT( p10.optimal() );
             }
         };
@@ -417,9 +417,9 @@ namespace QueryOptimizerTests {
         class MoreOptimal : public Base {
         public:
             void run() {
-                QueryPlan p11( FBS( BSON( "a" << 1 << "b" << LT << 1 ) ), emptyObj, INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                QueryPlan p11( FBS( BSON( "a" << 1 << "b" << LT << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
                 ASSERT( p11.optimal() );
-                QueryPlan p12( FBS( BSON( "a" << LT << 1 ) ), emptyObj, INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                QueryPlan p12( FBS( BSON( "a" << LT << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
                 ASSERT( p12.optimal() );
                 QueryPlan p13( FBS( BSON( "a" << LT << 1 ) ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
                 ASSERT( p13.optimal() );
@@ -429,10 +429,10 @@ namespace QueryOptimizerTests {
         class KeyMatch : public Base {
         public:
             void run() {
-                QueryPlan p( FBS( emptyObj ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
+                QueryPlan p( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
                 ASSERT( p.keyMatch() );
                 ASSERT( p.exactKeyMatch() );
-                QueryPlan p2( FBS( emptyObj ), BSON( "a" << 1 ), INDEX( "b" << 1 << "a" << 1 ) );
+                QueryPlan p2( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "b" << 1 << "a" << 1 ) );
                 ASSERT( p2.keyMatch() );
                 ASSERT( p2.exactKeyMatch() );
                 QueryPlan p3( FBS( BSON( "b" << "z" ) ), BSON( "a" << 1 ), INDEX( "b" << 1 << "a" << 1 ) );
@@ -441,13 +441,13 @@ namespace QueryOptimizerTests {
                 QueryPlan p4( FBS( BSON( "c" << "y" << "b" << "z" ) ), BSON( "a" << 1 ), INDEX( "b" << 1 << "a" << 1 << "c" << 1 ) );
                 ASSERT( p4.keyMatch() );
                 ASSERT( p4.exactKeyMatch() );
-                QueryPlan p5( FBS( BSON( "c" << "y" << "b" << "z" ) ), emptyObj, INDEX( "b" << 1 << "a" << 1 << "c" << 1 ) );
+                QueryPlan p5( FBS( BSON( "c" << "y" << "b" << "z" ) ), BSONObj(), INDEX( "b" << 1 << "a" << 1 << "c" << 1 ) );
                 ASSERT( p5.keyMatch() );
                 ASSERT( p5.exactKeyMatch() );
-                QueryPlan p6( FBS( BSON( "c" << LT << "y" << "b" << GT << "z" ) ), emptyObj, INDEX( "b" << 1 << "a" << 1 << "c" << 1 ) );
+                QueryPlan p6( FBS( BSON( "c" << LT << "y" << "b" << GT << "z" ) ), BSONObj(), INDEX( "b" << 1 << "a" << 1 << "c" << 1 ) );
                 ASSERT( p6.keyMatch() );
                 ASSERT( !p6.exactKeyMatch() );
-                QueryPlan p7( FBS( emptyObj ), BSON( "a" << 1 ), INDEX( "b" << 1 ) );
+                QueryPlan p7( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "b" << 1 ) );
                 ASSERT( !p7.keyMatch() );
                 ASSERT( !p7.exactKeyMatch() );
                 QueryPlan p8( FBS( BSON( "d" << "y" ) ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
@@ -459,17 +459,17 @@ namespace QueryOptimizerTests {
         class ExactKeyQueryTypes : public Base {
         public:
             void run() {
-                QueryPlan p( FBS( BSON( "a" << "b" ) ), emptyObj, INDEX( "a" << 1 ) );
+                QueryPlan p( FBS( BSON( "a" << "b" ) ), BSONObj(), INDEX( "a" << 1 ) );
                 ASSERT( p.exactKeyMatch() );
-                QueryPlan p2( FBS( BSON( "a" << 4 ) ), emptyObj, INDEX( "a" << 1 ) );
+                QueryPlan p2( FBS( BSON( "a" << 4 ) ), BSONObj(), INDEX( "a" << 1 ) );
                 ASSERT( !p2.exactKeyMatch() );
-                QueryPlan p3( FBS( BSON( "a" << BSON( "c" << "d" ) ) ), emptyObj, INDEX( "a" << 1 ) );
+                QueryPlan p3( FBS( BSON( "a" << BSON( "c" << "d" ) ) ), BSONObj(), INDEX( "a" << 1 ) );
                 ASSERT( !p3.exactKeyMatch() );
                 BSONObjBuilder b;
                 b.appendRegex( "a", "^ddd" );
-                QueryPlan p4( FBS( b.obj() ), emptyObj, INDEX( "a" << 1 ) );
+                QueryPlan p4( FBS( b.obj() ), BSONObj(), INDEX( "a" << 1 ) );
                 ASSERT( !p4.exactKeyMatch() );
-                QueryPlan p5( FBS( BSON( "a" << "z" << "b" << 4 ) ), emptyObj, INDEX( "a" << 1 << "b" << 1 ) );
+                QueryPlan p5( FBS( BSON( "a" << "z" << "b" << 4 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p5.exactKeyMatch() );
             }
         };
@@ -477,7 +477,7 @@ namespace QueryOptimizerTests {
         class Unhelpful : public Base {
         public:
             void run() {
-                QueryPlan p( FBS( BSON( "b" << 1 ) ), emptyObj, INDEX( "a" << 1 << "b" << 1 ) );
+                QueryPlan p( FBS( BSON( "b" << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( p.keyMatch() );
                 ASSERT( !p.bound( "a" ).nontrivial() );
                 ASSERT( !p.unhelpful() );
@@ -486,11 +486,11 @@ namespace QueryOptimizerTests {
                 ASSERT( !p2.scanAndOrderRequired() );
                 ASSERT( !p2.bound( "a" ).nontrivial() );
                 ASSERT( !p2.unhelpful() );
-                QueryPlan p3( FBS( BSON( "b" << 1 << "c" << 1 ) ), emptyObj, INDEX( "b" << 1 ) );
+                QueryPlan p3( FBS( BSON( "b" << 1 << "c" << 1 ) ), BSONObj(), INDEX( "b" << 1 ) );
                 ASSERT( !p3.keyMatch() );
                 ASSERT( p3.bound( "b" ).nontrivial() );
                 ASSERT( !p3.unhelpful() );
-                QueryPlan p4( FBS( BSON( "c" << 1 << "d" << 1 ) ), emptyObj, INDEX( "b" << 1 << "c" << 1 ) );
+                QueryPlan p4( FBS( BSON( "c" << 1 << "d" << 1 ) ), BSONObj(), INDEX( "b" << 1 << "c" << 1 ) );
                 ASSERT( !p4.keyMatch() );
                 ASSERT( !p4.bound( "b" ).nontrivial() );
                 ASSERT( p4.unhelpful() );
@@ -505,7 +505,7 @@ namespace QueryOptimizerTests {
             Base() {
                 setClient( ns() );
                 string err;
-                userCreateNS( ns(), emptyObj, err, false );
+                userCreateNS( ns(), BSONObj(), err, false );
                 AuthenticationInfo *ai = new AuthenticationInfo();
                 authInfo.reset( ai );
             }
@@ -550,7 +550,7 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "b_2" );
-                QueryPlanSet s( ns(), BSON( "a" << 4 ), emptyObj );
+                QueryPlanSet s( ns(), BSON( "a" << 4 ), BSONObj() );
                 ASSERT_EQUALS( 1, s.nPlans() );                
             }
         };
@@ -570,7 +570,7 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
-                QueryPlanSet s( ns(), emptyObj, emptyObj );
+                QueryPlanSet s( ns(), BSONObj(), BSONObj() );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -646,10 +646,10 @@ namespace QueryOptimizerTests {
                 ASSERT_EQUALS( 1, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 theDataFileMgr.insert( ns(), four );
                 ASSERT_EQUALS( 2, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
-                ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << emptyObj ), err ) );
+                ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSONObj() ), err ) );
                 ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
                 // missing ns
-                ASSERT_EQUALS( -1, runCount( "missingNS", emptyObj, err ) );
+                ASSERT_EQUALS( -1, runCount( "missingNS", BSONObj(), err ) );
                 // impossible match
                 ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 << LT << -1 ) ), err ) );
             }
@@ -659,7 +659,7 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 Message m;
-                assembleRequest( "missingNS", emptyObj, 0, 0, 0, 0, m );
+                assembleRequest( "missingNS", BSONObj(), 0, 0, 0, 0, m );
                 stringstream ss;
                 ASSERT_EQUALS( 0, runQuery( m, ss )->nReturned );
             }
@@ -670,7 +670,7 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
-                QueryPlanSet s( ns(), BSON( "a" << 1 << "c" << 2 ), emptyObj );
+                QueryPlanSet s( ns(), BSON( "a" << 1 << "c" << 2 ), BSONObj() );
                 ASSERT_EQUALS( 2, s.nPlans() );                
             }
         };        

@@ -55,7 +55,7 @@ namespace mongo {
                     set<ServerAndQuery> buckets;
                     for ( vector<Shard*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                         Shard * s = *i;
-                        BSONObj extra = emptyObj;
+                        BSONObj extra = BSONObj();
                         if ( serverCounts[s->getServer()] > 1 ){
                             BSONObjBuilder b;
                             s->getFilter( b );

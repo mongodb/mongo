@@ -163,7 +163,7 @@ namespace mongo {
     fbs_( ns, query ),
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
-    hint_( emptyObj ),
+    hint_( BSONObj() ),
     order_( order.getOwned() ),
     oldNScanned_( 0 ),
     honorRecordedPlan_( honorRecordedPlan ) {

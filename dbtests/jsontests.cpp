@@ -30,7 +30,7 @@ namespace JsonTests {
         class Empty {
         public:
             void run() {
-                ASSERT_EQUALS( "{}", emptyObj.jsonString( Strict ) );
+                ASSERT_EQUALS( "{}", BSONObj().jsonString( Strict ) );
             }
         };
         
