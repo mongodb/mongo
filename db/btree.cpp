@@ -26,17 +26,16 @@ namespace mongo {
 
 #define VERIFYTHISLOC dassert( thisLoc.btree() == this );
 
-    const int KeyMax = BucketSize / 10;
-
-    int ninserts = 0;
-    extern int otherTraceLevel;
-    int split_debug = 0;
-    int insert_debug = 0;
-
     KeyNode::KeyNode(const BucketBasics& bb, const _KeyNode &k) :
             prevChildBucket(k.prevChildBucket),
             recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
     { }
+
+    const int KeyMax = BucketSize / 10;
+
+    extern int otherTraceLevel;
+    int split_debug = 0;
+    int insert_debug = 0;
 
     /* BucketBasics --------------------------------------------------- */
 
@@ -727,7 +726,8 @@ found:
             return pos == n ? DiskLoc() /*theend*/ : thisLoc;
     }
 
-    /* thisloc is the location of this bucket object.  you must pass that in. */
+    /* @thisLoc disk location of *this
+    */
     int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc,
                              BSONObj& key, const BSONObj &order, bool dupsAllowed,
                              DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) {
@@ -749,14 +749,9 @@ found:
         if ( found ) {
             _KeyNode& kn = k(pos);
             if ( kn.isUnused() ) {
-                DEBUGGING out() << "reusing unused key" << endl;
-                if( kn.prevChildBucket != lChild ) {
-                    /* is it ok if they don't match, and we just need to update??? */
-                    log() << "pcb:" << kn.prevChildBucket.toString() << " lChild:" << lChild.toString() << '\n';
-                    log() << "rChild:" << rChild.toString() << '\n';
-                    massert( "btree reuse unused key error?", false);
-                }
-                // check rchild too?
+                log(4) << "btree _insert: reusing unused key" << endl;
+                massert("_insert: reuse key but lchild is not null", lChild.isNull());
+                massert("_insert: reuse key but rchild is not null", rChild.isNull());
                 kn.setUsed();
                 return 0;
             }
@@ -768,18 +763,6 @@ found:
             out() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
             out() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
             massert("btree: key+recloc already in index", false);
-
-            // on a dup key always insert on the right or else you will be broken.
-            //		pos++;
-            // on a promotion, find the right point to update if dup keys.
-            /* not needed: we always insert right after the first key so we are ok with just pos++...
-            if( !rChild.isNull() ) {
-            	while( pos < n && k(pos).prevChildBucket != lchild ) {
-            		pos++;
-            		out() << "looking for the right dup key" << endl;
-            	}
-            }
-            */
         }
 
         DEBUGGING out() << "TEMP: key: " << key.toString() << endl;
@@ -818,16 +801,6 @@ found:
                 problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.toString() << '\n';
                 return 3;
             }
-            ++ninserts;
-            /*
-            if( ninserts % 1000 == 0 ) {
-            	out() << "ninserts: " << ninserts << endl;
-            	if( 0 && ninserts >= 127287 ) {
-            		out() << "debug?" << endl;
-            		split_debug = 1;
-            	}
-            }
-            */
         }
 
         int x = _insert(thisLoc, recordLoc, key, order, dupsAllowed, DiskLoc(), DiskLoc(), idx);

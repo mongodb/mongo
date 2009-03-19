@@ -342,10 +342,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\d_logic.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\db\queryutil.cpp"
 				>
 			</File>
