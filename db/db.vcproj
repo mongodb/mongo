@@ -1750,6 +1750,14 @@
 				</File>
 			</Filter>
 		</Filter>
+		<Filter
+			Name="shard"
+			>
+			<File
+				RelativePath="..\s\d_logic.cpp"
+				>
+			</File>
+		</Filter>
 	</Files>
 	<Globals>
 	</Globals>

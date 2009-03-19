@@ -28,7 +28,7 @@
 #include "security.h"
 #include "json.h"
 #include "reccache.h"
-#include "s/d_logic.h"
+#include "../s/d_logic.h"
 
 namespace mongo {
 
