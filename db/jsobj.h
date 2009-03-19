@@ -480,7 +480,7 @@ namespace mongo {
             if ( ifree )
                 _holder.reset( new Holder( data ) );
             _objdata = data;
-            massert( "Ivalid BSONObj spec size", isValid() );
+            massert( "Invalid BSONObj spec size", isValid() );
         }
     public:
         /** Construct a BSONObj from data in the proper format. 
@@ -621,6 +621,7 @@ namespace mongo {
         void dump() {
             out() << hex;
             const char *p = objdata();
+            if ( !p ) return;
             for ( int i = 0; i < objsize(); i++ ) {
                 out() << i << '\t' << (unsigned) *p;
                 if ( *p >= 'A' && *p <= 'z' )
