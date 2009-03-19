@@ -462,43 +462,27 @@ namespace mongo {
      */
     class BSONObj {
         friend class BSONObjIterator;
-        const char *_objdata;
         class Details {
         public:
-            Details( const char *objdata, int refCount ) :
-            _objdata( objdata ),
-            _refCount( refCount ) {
+            Details( const char *objdata ) :
+            _objdata( objdata ) {
             }
             ~Details() {
-                // note refCount means two different things (thus the assert here)
-                assert(_refCount <= 0);
                 free((void *)_objdata);
                 _objdata = 0;
             }
-            // TEMP
-            int &refCount() {
-                return _refCount;
-            }
         private:
             const char *_objdata;
-            int _refCount; // -1 == don't free (we don't "own" the buffer)
-        } *details;
+        };
+        const char *_objdata;
+        boost::shared_ptr< Details > _holder;
         void init(const char *data, bool ifree) {
             if ( ifree )
-                details = new Details( data, 1 );
-            else
-                details = 0;
+                _holder.reset( new Details( data ) );
             _objdata = data;
             massert( "BSONObj size spec too small", objsize() > 0 );
             massert( "BSONObj size spec too large", objsize() <= 1024 * 1024 * 16 );
         }
-        void cleanup() {
-            if ( details ) {
-                if ( --details->refCount() <= 0 )
-                    delete details;
-                details = 0;
-            }   
-        }        
     public:
         /** Construct a BSONObj from data in the proper format. 
             @param ifree true if the BSONObj should free() the msgdata when 
@@ -510,8 +494,7 @@ namespace mongo {
         BSONObj(const Record *r);
         /** Construct an empty BSONObj -- that is, {}. */
         // TODO: Unify this with 'emptyObj'
-        BSONObj() : _objdata(0), details(0) { }
-        ~BSONObj() { cleanup(); }
+        BSONObj() : _objdata(0) { }
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );
@@ -692,34 +675,6 @@ namespace mongo {
 		*/
 		bool getObjectID(BSONElement& e);
 
-        /** copy constructor.  uses smart pointers so both objects will refer to the 
-            same underlying data -- use copy() if you need a separate copy to manipulate.
-        */
-        BSONObj(const BSONObj& r) {
-            if ( r.details == 0 ) {
-                details = 0;
-            } else {
-                details = r.details;
-                details->refCount()++;
-            }
-            _objdata = r._objdata;
-        }
-        /** uses smart pointers so both objects will refer to the 
-            same underlying data -- use copy() if you need a separate copy to manipulate.
-        */
-        BSONObj& operator=(const BSONObj& r) {
-            cleanup();
-
-            if ( r.details == 0 )
-                details = 0;
-            else {
-                details = r.details;
-                details->refCount()++;
-            }
-            _objdata = r._objdata;
-            return *this;
-        }
-
         /** makes a copy of the object. 
         */
         BSONObj copy() const;
@@ -730,7 +685,7 @@ namespace mongo {
                 return copy();
             return *this;
         }
-        bool isOwned() const { return details != 0; }
+        bool isOwned() const { return _holder.get() != 0; }
 
         /** @return A hash code for the object */
         int hash() const {
