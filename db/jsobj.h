@@ -480,8 +480,7 @@ namespace mongo {
             if ( ifree )
                 _holder.reset( new Holder( data ) );
             _objdata = data;
-            massert( "BSONObj size spec too small", objsize() > 0 );
-            massert( "BSONObj size spec too large", objsize() <= 1024 * 1024 * 16 );
+            massert( "Ivalid BSONObj spec size", isValid() );
         }
     public:
         /** Construct a BSONObj from data in the proper format. 
@@ -1271,7 +1270,7 @@ namespace mongo {
         if ( !objdata() )
             return true;
 
-        return objsize() == ((int*)(objdata()))[0];
+        return objsize() > 0 && objsize() <= 1024 * 1024 * 16 ;
     }
 
     inline bool BSONObj::getObjectID(BSONElement& e) { 
