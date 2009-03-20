@@ -5,7 +5,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "db", "db.vcproj", "{215B2D6
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{4082881B-EB00-486F-906C-843B8EC06E18}"
 	ProjectSection(SolutionItems) = preProject
-		..\client\examples\authTest.cpp = ..\client\examples\authTest.cpp
 		..\client\examples\clientTest.cpp = ..\client\examples\clientTest.cpp
 		..\client\examples\first.cpp = ..\client\examples\first.cpp
 		..\client\examples\second.cpp = ..\client\examples\second.cpp

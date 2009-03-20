@@ -60,7 +60,11 @@ namespace mongo {
             namespaceIndex.init();
             if ( n < 0 || n >= DiskLoc::MaxFiles ) {
                 out() << "getFile(): n=" << n << endl;
-                assert( n >= 0 && n < DiskLoc::MaxFiles );
+#if !defined(_RECSTORE)
+                if( n >= RecCache::Base && n <= RecCache::Base+1000 )
+                    massert("getFile(): bad file number - using recstore db w/nonrecstore db build?", false);
+#endif
+                massert("getFile(): bad file number value (corrupt db?)", false);
             }
             DEV {
                 if ( n > 100 )
