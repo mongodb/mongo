@@ -750,8 +750,8 @@ namespace mongo {
  
     The labels GT, GTE, LT, LTE, NE can be helpful for stream-oriented construction
     of a BSONObj, particularly when assembling a Query.  For example,
-    BSON( "a" << GT << 23.4 << NE << 3 << "b" << 2 ) produces the object
-    { a: { \$gt: 23.4, \$ne: 3 }, b: 2 }.
+    BSON( "a" << GT << 23.4 << NE << 30 << "b" << 2 ) produces the object
+    { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
 */
 #define BSON(x) (( BSONObjBuilder() << x ).obj())
 
