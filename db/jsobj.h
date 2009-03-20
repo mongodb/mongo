@@ -798,6 +798,9 @@ namespace mongo {
     private:
         const char * _fieldName;
         BSONObjBuilder * _builder;
+
+        bool haveSubobj() const { return _subobj.get(); }
+        BSONObjBuilder *subobj();
         auto_ptr< BSONObjBuilder > _subobj;
     };
     
@@ -807,7 +810,7 @@ namespace mongo {
     class BSONObjBuilder {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
-        BSONObjBuilder(int initsize=512) : b(initsize) {
+        BSONObjBuilder(int initsize=512) : b(initsize), s_( this ) {
             b.skip(4); /*leave room for size field*/
         }
 
@@ -1064,10 +1067,8 @@ namespace mongo {
 
         /** Stream oriented way to add field names and values. */
         BSONObjBuilderValueStream &operator<<(const char * name ) {
-            if ( !s_.get() )
-                s_.reset( new BSONObjBuilderValueStream( this ) );
-            s_->endField( name );
-            return *s_;
+            s_.endField( name );
+            return s_;
         }
 
         /** Stream oriented way to add field names and values. */
@@ -1076,9 +1077,8 @@ namespace mongo {
         }
 
         Labeler operator<<( const Labeler::Label &l ) {
-            massert( "Value stream expected", s_.get() );
-            massert( "No subobject started", s_->subobjStarted() );
-            return *s_ << l;
+            massert( "No subobject started", s_.subobjStarted() );
+            return s_ << l;
         }
 
     private:
@@ -1090,8 +1090,7 @@ namespace mongo {
         }
 
         char* _done() {
-            if ( s_.get() )
-                s_->endField();
+            s_.endField();
             b.append((char) EOO);
             char *data = b.buf();
             *((int*)data) = b.len();
@@ -1099,7 +1098,7 @@ namespace mongo {
         }
 
         BufBuilder b;
-        auto_ptr< BSONObjBuilderValueStream > s_;
+        BSONObjBuilderValueStream s_;
     };
 
 
@@ -1279,7 +1278,6 @@ namespace mongo {
     inline BSONObjBuilderValueStream::BSONObjBuilderValueStream( BSONObjBuilder * builder ) {
         _fieldName = 0;
         _builder = builder;
-        _subobj.reset( new BSONObjBuilder() );
     }
     
     template<class T> inline 
@@ -1294,22 +1292,28 @@ namespace mongo {
     }
 
     inline void BSONObjBuilderValueStream::endField( const char *nextFieldName ) {
-        if ( _fieldName ) {
-            _builder->append( _fieldName, _subobj->done() );
-            _subobj.reset( new BSONObjBuilder() );
+        if ( _fieldName && haveSubobj() ) {
+            _builder->append( _fieldName, subobj()->done() );
         }
+        _subobj.reset();
         _fieldName = nextFieldName;
     }    
 
+    inline BSONObjBuilder *BSONObjBuilderValueStream::subobj() {
+        if ( !haveSubobj() )
+            _subobj.reset( new BSONObjBuilder() );
+        return _subobj.get();
+    }
+    
     template<class T> inline
     BSONObjBuilder& Labeler::operator<<( T value ) {
-        s_->_subobj->append( l_.l_, value );
+        s_->subobj()->append( l_.l_, value );
         return *s_->_builder;
     }    
 
     inline
     BSONObjBuilder& Labeler::operator<<( const BSONElement& e ) {
-        s_->_subobj->appendAs( e, l_.l_ );
+        s_->subobj()->appendAs( e, l_.l_ );
         return *s_->_builder;
     }    
         
