@@ -10,6 +10,7 @@ namespace mongo {
 */
 class RecStoreInterface {
 public:
+    virtual ~RecStoreInterface() {}
     /* Get a pointer to the data at diskloc d.  Pointer guaranteed to stay in
        scope through the current database operation's life.
     */
