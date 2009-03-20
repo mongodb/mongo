@@ -41,8 +41,9 @@ class RecCache {
     set<DiskLoc> dirtyl;
     vector<BasicRecStore*> stores;
     map<string, BasicRecStore*> storesByNs;
+public:
     enum { Base = 10000 };
-
+private:
     BasicRecStore* _initStore(string fname);
     BasicRecStore* initStore(int n);
     string findStoreFilename(const char *_ns, bool& found);
