@@ -164,8 +164,8 @@ namespace mongo {
 // does not delete the files on disk
     void closeClient( const char *cl, const char *path = dbpath );
 
+    /* remove database from the databases map */
     inline void eraseDatabase( const char *ns, const char *path=dbpath ) {
-        
         string key = getKey( ns, path );
         databases.erase( key );
     }

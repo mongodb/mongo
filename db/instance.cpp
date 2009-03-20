@@ -273,6 +273,9 @@ namespace mongo {
         killCursors(n, (long long *) x);
     }
 
+    /* cl - database name
+       path - db directory
+    */
     void closeClient( const char *cl, const char *path ) {
         if ( string("local") != cl ) {
             DBInfo i(cl);

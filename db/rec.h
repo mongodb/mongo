@@ -23,15 +23,15 @@ namespace mongo {
 
 class MongoMemMapped_RecStore : public RecStoreInterface { 
 public:
-    static char* get(DiskLoc d, unsigned len) { return d.rec()->data; }
+    virtual char* get(DiskLoc d, unsigned len) { return d.rec()->data; }
 
-    static DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
+    virtual DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
         return theDataFileMgr.insert(ns, obuf, len, god);
     }
 
-    static void modified(DiskLoc d) { }
+    virtual void modified(DiskLoc d) { }
 
-    static void drop(const char *ns) { 
+    virtual void drop(const char *ns) { 
         dropNS(ns);
     }
 };
@@ -39,6 +39,7 @@ public:
 /* An in memory RecStoreInterface implementation ----------------------------
 */
 
+#if 0
 class InMem_RecStore : public RecStoreInterface { 
     enum { INMEMFILE = 0x70000000 };
 public:
@@ -72,27 +73,23 @@ public:
         log() << "warning: drop() not yet implemented for InMem_RecStore" << endl;
     }
 };
+#endif
 
 /* Glue btree to RecStoreInterface: ---------------------------- */
 
-// pick your store for indexes by setting this typedef
-#if defined(_RECSTORE)
-typedef Cached_RecStore BtreeStore;
-#else
-typedef MongoMemMapped_RecStore BtreeStore;
-#endif
+extern RecStoreInterface *btreeStore;
 
 const int BucketSize = 8192;
 
 inline BtreeBucket* DiskLoc::btree() const {
     assert( fileNo != -1 );
-    return (BtreeBucket*) BtreeStore::get(*this, BucketSize);
+    return (BtreeBucket*) btreeStore->get(*this, BucketSize);
 }
 
 inline BtreeBucket* DiskLoc::btreemod() const {
     assert( fileNo != -1 );
-    BtreeBucket *b = (BtreeBucket*) BtreeStore::get(*this, BucketSize);
-    BtreeStore::modified(*this);
+    BtreeBucket *b = (BtreeBucket*) btreeStore->get(*this, BucketSize);
+    btreeStore->modified(*this);
     return b;
 }
 
