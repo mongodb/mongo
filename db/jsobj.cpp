@@ -318,7 +318,7 @@ namespace mongo {
         if ( totalSize >= 0 )
             return totalSize;
 
-        int remain = maxLen - fieldNameSize - 1;
+        int remain = maxLen - fieldNameSize() - 1;
         
         int x = 0;
         switch ( type() ) {
@@ -383,7 +383,7 @@ namespace mongo {
             massert(ss.str().c_str(),false);
         }
         }
-        totalSize =  x + fieldNameSize + 1; // BSONType
+        totalSize =  x + fieldNameSize() + 1; // BSONType
 
         return totalSize;
     }
@@ -1055,8 +1055,8 @@ namespace mongo {
 
     BSONElement::BSONElement() {
         data = &js0.eoo;
-        fieldNameSize = 0;
-        totalSize = -1;
+        fieldNameSize_ = 0;
+        totalSize = 5;
     }
 
     struct BsonUnitTest : public UnitTest {

@@ -218,11 +218,11 @@ namespace mongo {
 
         /** raw data of the element's value (so be careful). */
         const char * value() const {
-            return (data + fieldNameSize + 1);
+            return (data + fieldNameSize() + 1);
         }
         /** size in bytes of the element's value (when applicable). */
         int valuesize() const {
-            return size() - fieldNameSize - 1;
+            return size() - fieldNameSize() - 1;
         }
 
         bool isBoolean() const {
@@ -249,9 +249,14 @@ namespace mongo {
         }
         /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0. */
         double number() const {
-            if ( type() == NumberDouble ) return *reinterpret_cast< const double* >( value() );
-            if ( type() == NumberInt ) return *reinterpret_cast< const int* >( value() );
-            return 0;
+            switch( type() ) {
+                case NumberDouble:
+                    return *reinterpret_cast< const double* >( value() );
+                case NumberInt:
+                    return *reinterpret_cast< const int* >( value() );
+                default:
+                    return 0;
+            }
         }
         /** Retrieve the object ID stored in the object. 
             You must ensure the element is of type jstOID first. */
@@ -387,26 +392,30 @@ namespace mongo {
         unsigned int timestampInc() const{
             return ((unsigned int*)(value() ))[0];
         }
-
+        
     protected:
         // If maxLen is specified, don't scan more than maxLen bytes.
         BSONElement(const char *d, int maxLen = -1) : data(d) {
+            fieldNameSize_ = -1;
             if ( eoo() )
-                fieldNameSize = 0;
+                fieldNameSize_ = 0;
             else {
                 if ( maxLen != -1 ) {
                     int size = strnlen( fieldName(), maxLen - 1 );
                     massert( "Invalid field name", size != -1 );
-                    fieldNameSize = size + 1;
-                } else {
-                    fieldNameSize = strlen( fieldName() ) + 1;
+                    fieldNameSize_ = size + 1;
                 }
             }
             totalSize = -1;
         }
     private:
         const char *data;
-        int fieldNameSize;
+        mutable int fieldNameSize_; // cached value
+        int fieldNameSize() const {
+            if ( fieldNameSize_ == -1 )
+                fieldNameSize_ = strlen( fieldName() ) + 1;
+            return fieldNameSize_;
+        }
         mutable int totalSize; /* caches the computed size */
     };
     
