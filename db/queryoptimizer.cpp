@@ -238,16 +238,6 @@ namespace mongo {
                         return;
                     }
                 }
-                
-                // TEMP debug info
-                out() << "ERROR unable to find bextIndex: " << bestIndex << endl;
-                out() << "candidates: ";
-                for( int i = 0; i < d->nIndexes; ++i ) {
-                    IndexDetails& ii = d->indexes[i];
-                    out() << ii.keyPattern() << ", ";
-                }
-                out() << endl;
-                
                 massert( "Unable to locate previously recorded index", false );
             }
         }
