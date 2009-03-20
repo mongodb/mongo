@@ -379,7 +379,7 @@ namespace mongo {
 
     extern int dump;
 
-    inline bool _regexMatches(RegexMatcher& rm, BSONElement& e) {
+    inline bool _regexMatches(RegexMatcher& rm, const BSONElement& e) {
         char buf[64];
         const char *p = buf;
         if ( e.type() == String || e.type() == Symbol )
@@ -397,7 +397,7 @@ namespace mongo {
         return rm.re->PartialMatch(p);
     }
     /* todo: internal dotted notation scans -- not done yet here. */
-    inline bool regexMatches(RegexMatcher& rm, BSONElement& e, bool *deep) {
+    inline bool regexMatches(RegexMatcher& rm, const BSONElement& e, bool *deep) {
         if ( e.type() != Array )
             return _regexMatches(rm, e);
 

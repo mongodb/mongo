@@ -540,7 +540,7 @@ namespace mongo {
 //   a : 3
 // else we just append the element.
 //
-    void appendElementHandlingGtLt(BSONObjBuilder& b, BSONElement& e) {
+    void appendElementHandlingGtLt(BSONObjBuilder& b, const BSONElement& e) {
         if ( e.type() == Object ) {
             BSONElement fe = e.embeddedObject().firstElement();
             const char *fn = fe.fieldName();
@@ -552,7 +552,7 @@ namespace mongo {
         b.append(e);
     }
     
-    int getGtLtOp(BSONElement& e) {
+    int getGtLtOp(const BSONElement& e) {
         if ( e.type() != Object )
             return JSMatcher::Equality;
 

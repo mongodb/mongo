@@ -421,7 +421,7 @@ namespace mongo {
     
     /* l and r MUST have same type when called: check that first. */
     int compareElementValues(const BSONElement& l, const BSONElement& r);
-    int getGtLtOp(BSONElement& e);
+    int getGtLtOp(const BSONElement& e);
 
     /* compare values with type check. 
        note: as is now, not smart about int/double comingling. TODO 
@@ -770,7 +770,7 @@ namespace mongo {
            one gets 
              { age : { $gt : someElement's value } } 
         */
-        BSONObjBuilder& operator<<( BSONElement& e );
+        BSONObjBuilder& operator<<( const BSONElement& e );
     private:
         const Label &l_;
         BSONObjBuilderValueStream *s_;
@@ -1308,7 +1308,7 @@ namespace mongo {
     }    
 
     inline
-    BSONObjBuilder& Labeler::operator<<( BSONElement& e ) {
+    BSONObjBuilder& Labeler::operator<<( const BSONElement& e ) {
         s_->_subobj->appendAs( e, l_.l_ );
         return *s_->_builder;
     }    

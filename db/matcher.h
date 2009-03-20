@@ -109,7 +109,7 @@ namespace mongo {
 
         bool trivial() const { return n == 0 && nRegex == 0 && where == 0; }
     private:
-        void addBasic(BSONElement e, int c) {
+        void addBasic(const BSONElement &e, int c) {
             // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
                 return;
