@@ -123,12 +123,6 @@ namespace mongo {
                 return trivialBound();
             return f->second;
         }
-        int nBounds() const {
-            int count = 0;
-            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
-                ++count;
-            return count;
-        }
         int nNontrivialBounds() const {
             int count = 0;
             for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
