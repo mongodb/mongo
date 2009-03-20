@@ -580,7 +580,7 @@ assert( !eloc.isNull() );
         b.append("ns", parentNS().c_str());
         BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
 
-        BtreeStore::drop(ns.c_str());
+        btreeStore->drop(ns.c_str());
         head.setInvalid();
         info.setInvalid();
 

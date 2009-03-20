@@ -41,7 +41,7 @@ namespace mongo {
 
     inline void BucketBasics::modified(const DiskLoc& thisLoc) {
         VERIFYTHISLOC
-        BtreeStore::modified(thisLoc);
+        btreeStore->modified(thisLoc);
     }
 
     int BucketBasics::Size() const {
@@ -582,7 +582,7 @@ found:
         r->nextChild = nextChild;
         r->assertValid( order );
 
-        rLoc = BtreeStore::insert(idx.indexNamespace().c_str(), r, r->Size(), true);
+        rLoc = btreeStore->insert(idx.indexNamespace().c_str(), r, r->Size(), true);
         if ( split_debug )
             out() << "     new rLoc:" << rLoc.toString() << endl;
         free(r);
@@ -603,7 +603,7 @@ found:
                 p->pushBack(middle.recordLoc, middle.key, order, thisLoc);
                 p->nextChild = rLoc;
                 p->assertValid( order );
-                parent = idx.head = BtreeStore::insert(idx.indexNamespace().c_str(), p, p->Size(), true);
+                parent = idx.head = btreeStore->insert(idx.indexNamespace().c_str(), p, p->Size(), true);
                 if ( split_debug )
                     out() << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
                 free(p);
@@ -642,7 +642,7 @@ found:
     /* start a new index off, empty */
     DiskLoc BtreeBucket::addHead(IndexDetails& id) {
         BtreeBucket *p = allocTemp();
-        DiskLoc loc = BtreeStore::insert(id.indexNamespace().c_str(), p, p->Size(), true);
+        DiskLoc loc = btreeStore->insert(id.indexNamespace().c_str(), p, p->Size(), true);
         free(p);
         return loc;
     }

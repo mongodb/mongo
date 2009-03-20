@@ -1,6 +1,6 @@
 // reccache.h
 
-/* Cached_RecStore
+/* CachedBasicRecStore
    This is our store which implements a traditional page-cache type of storage
    (not memory mapped files).
 */
@@ -189,21 +189,22 @@ public:
 
 extern RecCache theRecCache;
 
-class Cached_RecStore : public RecStoreInterface { 
+class CachedBasicRecStore : public RecStoreInterface { 
 public:
-    static char* get(DiskLoc d, unsigned len) { 
+    virtual char* get(DiskLoc d, unsigned len) { 
         return theRecCache.get(d, len);
     }
 
-    static DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
+    virtual DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
         return theRecCache.insert(ns, obuf, len, god);
     }
 
-    static void modified(DiskLoc d) { 
+    virtual void modified(DiskLoc d) { 
         theRecCache.dirty(d);
     }
 
-    static void drop(const char *ns) { 
+    /* drop collection */
+    virtual void drop(const char *ns) { 
         theRecCache.drop(ns);
     }
 };

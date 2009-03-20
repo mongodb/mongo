@@ -12,6 +12,14 @@ void writerThread();
 
 static int inited;
 
+// pick your store for indexes by setting this typedef
+// this doesn't need to be an ifdef, we can make it dynamic
+#if defined(_RECSTORE)
+RecStoreInterface *btreeStore = new CachedBasicRecStore();
+#else
+RecStoreInterface *btreeStore = new MongoMemMapped_RecStore();
+#endif
+
 void BasicRecStore::init(const char *fn, unsigned recsize)
 { 
     massert( "compile packing problem recstore?", sizeof(RecStoreHeader) == 8192);
