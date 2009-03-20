@@ -112,7 +112,6 @@ namespace mongo {
 
 } // namespace mongo
 
-#include <boost/thread/barrier.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
 
