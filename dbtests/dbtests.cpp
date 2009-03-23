@@ -99,6 +99,7 @@ int main( int argc, char** argv ) {
     tests.add( queryOptimizerTests(), "queryoptimizer" );
     tests.add( replTests(), "repl" );
     tests.add( sockTests(), "sock" );
+    tests.add( updateTests(), "update" );
 
     return tests.run( argc, argv );
 }
