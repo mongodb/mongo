@@ -190,12 +190,39 @@ namespace UpdateTests {
     class SetRecreateDotted : public SetBase {
     public:
         void run() {
-            client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:'cdef'}}" ) );
             client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
-            ASSERT( !client().findOne( ns(), BSON( "a.b" << "lllll" ) ).isEmpty() );                        
+            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll'}}" ) ) == 0 );                        
         }
     };
-        
+
+    class SetMissingDotted : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
+            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll'}}" ) ) == 0 );                        
+        }
+    };    
+    
+    class SetAdjacentDotted : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:{c:4}}" ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
+            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll',c:4}}" ) ) == 0 );                        
+        }
+    };    
+
+    class IncMissing : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), BSONObj(), BSON( "$inc" << BSON( "f" << 3.0 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:3}" ) ) == 0 );                        
+        }
+    };        
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -214,6 +241,9 @@ namespace UpdateTests {
             add< ModDotted >();
             add< SetInPlaceDotted >();
             add< SetRecreateDotted >();            
+            add< SetMissingDotted >();            
+            add< SetAdjacentDotted >();            
+            add< IncMissing >();            
         }
     };
     

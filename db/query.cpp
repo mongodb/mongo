@@ -250,7 +250,7 @@ namespace mongo {
         for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
-            uassert( "Cannot apply $inc modifier to non-number", m.op != Mod::INC || e.isNumber() );
+            uassert( "Cannot apply $inc modifier to non-number", m.op != Mod::INC || e.isNumber() || e.eoo() );
             if ( e.isNumber() && m.elt.isNumber() )
                 continue;
             if ( m.elt.valuesize() == e.valuesize() )
@@ -373,6 +373,7 @@ namespace mongo {
                 ++m;
                 ++p;
             } else if ( cmp < 0 ) {
+                // Here may be $inc or $set
                 b2.appendAs( m->elt, m->fieldName );
                 ++m;
             } else if ( cmp > 0 ) {
@@ -382,20 +383,6 @@ namespace mongo {
         }
                 
         b2.appendSelf( b );
-//        
-//            const Mod *mod = modForField( e.fieldName() );
-//            if ( !mod ) {
-//                b.append( e );
-//            } else if ( mod->op == Mod::INC ) {
-//                if ( e.type() == NumberInt )
-//                    b.append( e.fieldName(), int( e.number() + mod->getn() ) );
-//                else
-//                    b.append( e.fieldName(), double( e.number() + mod->getn() ) );
-//                mod->setn( e.number() );
-//            } else if ( mod->op == Mod::SET ) {
-//                b.appendAs( mod->elt, e.fieldName() );
-//            }
-//        }
         return b.obj();
     }
     
