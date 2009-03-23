@@ -1,9 +1,13 @@
 // storage.cpp
 
 #include "stdafx.h"
+int aaa;
 #include "pdfile.h"
+
 #include "reccache.h"
+
 #include "rec.h"
+
 #include "db.h"
 
 namespace mongo {
@@ -32,6 +36,40 @@ void recCacheCloseAll() {
 
 int ndirtywritten;
 
+inline static string escape(const char *ns) {
+    char buf[256];
+    char *p = buf;
+    while( 1 ) {
+        if( *ns == '$' ) *p = '~';
+        else
+            *p = *ns;
+        if( *ns == 0 )
+            break;
+        p++; ns++;
+    }
+    assert( p - buf < (int) sizeof(buf) );
+    return buf;
+}
+
+inline static string unescape(const char *ns) {
+    char buf[256];
+    char *p = buf;
+    while( 1 ) {
+        if( *ns == '~' ) *p = '$';
+        else
+            *p = *ns;
+        if( *ns == 0 )
+            break;
+        p++; ns++;
+    }
+    assert( p - buf < (int) sizeof(buf) );
+    return buf;
+}
+
+string RecCache::directory() { 
+    return database->path;
+}
+
 /* filename format is 
 
      <n>-<ns>.idx
@@ -54,7 +92,7 @@ BasicRecStore* RecCache::_initStore(string fname) {
     const char *p = rest.c_str();
     const char *q = strstr(p, ".idx");
     assert( q );
-    string ns(p, q-p);
+    string escaped_ns(p, q-p);
 
     // arbitrary limit.  if you are hitting, we should use fewer files and put multiple 
     // indexes in a single file (which is easy to do)
@@ -64,12 +102,13 @@ BasicRecStore* RecCache::_initStore(string fname) {
         stores.resize(n+1);
     assert( stores[n] == 0 );
     BasicRecStore *rs = new BasicRecStore(n);
-    path pf(dbpath);
+    path pf(directory());
     pf /= fname;
     string full = pf.string();
     rs->init(full.c_str(), recsize);
     stores[n] = rs;
-    storesByNs[ns] = rs;
+    string ns = unescape(escaped_ns.c_str());
+    storesByNsKey[mknskey(ns.c_str())] = rs;
     return rs;
 }
 
@@ -82,7 +121,7 @@ BasicRecStore* RecCache::initStore(int n) {
     }
 
     /* this will be slow if there are thousands of files */
-    path dir(dbpath);
+    path dir(directory());
     directory_iterator end;
     try {
         directory_iterator i(dir);
@@ -101,7 +140,7 @@ BasicRecStore* RecCache::initStore(int n) {
         throw;
     }
     catch (...) {
-        string s = string("i/o error looking for .idx file in ") + dbpath;
+        string s = string("i/o error looking for .idx file in ") + directory();
         massert(s, false);
     }
     stringstream ss;
@@ -121,13 +160,12 @@ string RecCache::findStoreFilename(const char *_ns, bool& found) {
     { 
         stringstream ss;
         ss << '-';
-        ss << _ns;
-        assert( strchr(_ns, '$') == 0); // $ not good for filenames
+        ss << escape(_ns);
         ss << ".idx";
         namefrag = ss.str();
     }
 
-    path dir(dbpath);
+    path dir(directory());
     directory_iterator end;
     int nmax = -1;
     try {
@@ -150,7 +188,7 @@ string RecCache::findStoreFilename(const char *_ns, bool& found) {
         }
     }
     catch (...) {
-        string s = string("i/o error looking for .idx file in ") + dbpath;
+        string s = string("i/o error looking for .idx file in ") + directory();
         massert(s, false);
     }
 
@@ -161,7 +199,7 @@ string RecCache::findStoreFilename(const char *_ns, bool& found) {
     return ss.str();
 }
 
-void RecCache::initStoreByNs(const char *_ns) {
+void RecCache::initStoreByNs(const char *_ns, const string& nskey) {
     bool found;
     string fn = findStoreFilename(_ns, found);
     _initStore(fn);
@@ -275,16 +313,17 @@ void RecCache::dump() {
 }
 
 void RecCache::closeStore(BasicRecStore *rs) { 
+    int n = rs->fileNumber + Base;
     for( set<DiskLoc>::iterator i = dirtyl.begin(); i != dirtyl.end(); ) { 
         DiskLoc k = *i++;
-        if( k.a() == rs->fileNumber )
+        if( k.a() == n )
             dirtyl.erase(k);
     }
 
     for( map<DiskLoc,Node*>::iterator i = m.begin(); i != m.end(); ) { 
         DiskLoc k = i->first;
         i++;
-        if( k.a() == rs->fileNumber )
+        if( k.a() == n )
             m.erase(k);
     }
 
@@ -301,21 +340,7 @@ void RecCache::drop(const char *_ns) {
     // todo: test with a non clean shutdown file
     boostlock lk(rcmutex);
 
-    char buf[256];
-    {
-        const char *ns = _ns;
-        char *p = buf;
-        while( 1 ) {
-            if( *ns == '$' ) *p = '_';
-            else
-                *p = *ns;
-            if( *ns == 0 )
-                break;
-            p++; ns++;
-        }
-        assert( p - buf < (int) sizeof(buf) );
-    }
-    BasicRecStore *&rs = storesByNs[buf];
+    BasicRecStore *&rs = storesByNsKey[mknskey(_ns)];
     string fname;
     if( rs ) {
         fname = rs->filename;
@@ -324,16 +349,18 @@ void RecCache::drop(const char *_ns) {
     }
     else { 
         bool found;
-        fname = findStoreFilename(buf, found);
+        fname = findStoreFilename(_ns, found);
         if( !found ) { 
             log() << "RecCache::drop: no idx file found for " << _ns << endl;
             return;
         }
-        path pf(dbpath);
+        path pf(directory());
         pf /= fname;
         fname = pf.string();
     }
-    try { 
+    try {
+        if( !boost::filesystem::exists(fname) ) 
+            log() << "RecCache::drop: can't find file to remove " << fname << endl;
         boost::filesystem::remove(fname);
     } 
     catch(...) { 
