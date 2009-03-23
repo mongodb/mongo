@@ -120,8 +120,12 @@ namespace mongo {
             }
         }
         
-        if ( handlePossibleShardedMessage( m , dbresponse ) )
+        if ( handlePossibleShardedMessage( m , dbresponse ) ){
+            /* important to do this before we lock
+               so if a message has to be forwarded, doesn't block for that
+            */
             return true;
+        }
 
         dblock lk;
         
