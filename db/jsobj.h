@@ -799,7 +799,7 @@ namespace mongo {
         const char * _fieldName;
         BSONObjBuilder * _builder;
 
-        bool haveSubobj() const { return _subobj.get(); }
+        bool haveSubobj() const { return _subobj.get() != 0; }
         BSONObjBuilder *subobj();
         auto_ptr< BSONObjBuilder > _subobj;
     };

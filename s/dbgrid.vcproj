@@ -50,6 +50,7 @@
 				PrecompiledHeaderThrough="stdafx.h"
 				WarningLevel="3"
 				DebugInformationFormat="4"
+				DisableSpecificWarnings="4355"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -125,6 +126,7 @@
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
 				DebugInformationFormat="3"
+				DisableSpecificWarnings="4355"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -202,6 +204,7 @@
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
 				DebugInformationFormat="3"
+				DisableSpecificWarnings="4355"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -279,6 +282,7 @@
 				PrecompiledHeaderThrough="stdafx.h"
 				WarningLevel="3"
 				DebugInformationFormat="4"
+				DisableSpecificWarnings="4355"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
