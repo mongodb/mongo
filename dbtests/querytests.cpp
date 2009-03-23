@@ -428,19 +428,18 @@ namespace QueryTests {
         void run() {
             client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
             client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "llll" ) ) );
-            out() << "one: " << client().findOne( ns(), BSONObj() ) << endl; 
             ASSERT( !client().findOne( ns(), BSON( "a.b" << "llll" ) ).isEmpty() );                        
         }
     };
 
-//    class SetRecreateDotted : public SetBase {
-//    public:
-//        void run() {
-//            client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
-//            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
-//            ASSERT( !client().findOne( ns(), BSON( "a.b" << "lllll" ) ).isEmpty() );                        
-//        }
-//    };
+    class SetRecreateDotted : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
+            ASSERT( !client().findOne( ns(), BSON( "a.b" << "lllll" ) ).isEmpty() );                        
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -472,7 +471,7 @@ namespace QueryTests {
             add< SetStringToNumInPlace >();
             add< ModDotted >();
             add< SetInPlaceDotted >();
-//            add< SetRecreateDotted >();
+            add< SetRecreateDotted >();
         }
     };
     

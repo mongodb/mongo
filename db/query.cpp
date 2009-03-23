@@ -177,14 +177,32 @@ namespace mongo {
             return ndouble ? *ndouble : *nint;
         }
         int type;
+        bool operator<( const Mod &other ) const {
+            return strcmp( fieldName, other.fieldName ) < 0;
+        }
     };
 
     class ModSet {
         vector< Mod > mods_;
+        void sortMods() {
+            sort( mods_.begin(), mods_.end() );
+        }
+        static void extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base );
+        int compare( const vector< Mod >::iterator &m, map< string, BSONElement >::iterator &p, const map< string, BSONElement >::iterator &pEnd ) const {
+            bool mDone = ( m == mods_.end() );
+            bool pDone = ( p == pEnd );
+            if ( mDone && pDone )
+                return 0;
+            if ( mDone )
+                return 1;
+            if ( pDone )
+                return -1;
+            return strcmp( m->fieldName, p->first.c_str() );
+        }
     public:
         void getMods( const BSONObj &from );
         bool applyModsInPlace( const BSONObj &obj ) const;
-        BSONObj createNewFromMods( const BSONObj &obj ) const;
+        BSONObj createNewFromMods( const BSONObj &obj );
         void checkUnindexed( const set<string>& idxKeys ) const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
                 if ( idxKeys.count(i->fieldName) ) {
@@ -201,6 +219,16 @@ namespace mongo {
             }
             return false;
         }
+        bool haveModForFieldOrSubfield( const char *fieldName ) const {
+            // Presumably the number of mods is small, so this loop isn't too expensive.
+            for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+                const char *dot = strchr( i->fieldName, '.' );
+                int len = dot ? dot - i->fieldName : strlen( i->fieldName );
+                if ( strncmp( fieldName, i->fieldName, len ) == 0 )
+                    return true;
+            }
+            return false;
+        }
         const Mod *modForField( const char *fieldName ) const {
             // Presumably the number of mods is small, so this loop isn't too expensive.
             for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
@@ -212,11 +240,6 @@ namespace mongo {
         void appendUpsert( BSONObjBuilder &b ) const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
                 b.append(i->fieldName, i->getn());   
-        }
-        void checkNoEmbedded() const {
-            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
-                uassert( "Embedded mods not yet supported when $set requires object recreation",
-                        strchr( i->fieldName, '.' ) == 0 );
         }
     };
     
@@ -242,6 +265,7 @@ namespace mongo {
             BSONElement e = obj.getFieldDotted(m.fieldName);
             if ( m.op == Mod::INC ) {
                 BSONElementManipulator( e ).setNumber( e.number() + m.getn() );
+                BSONElementManipulator( m.elt ).setNumber( e.number() );
                 m.setn( e.number() );
                 // *m.n = e.number() += *m.n;
             } else {
@@ -255,30 +279,123 @@ namespace mongo {
         return true;
     }
 
-    BSONObj ModSet::createNewFromMods( const BSONObj &obj ) const {
+    class EmbeddedBuilder {
+    public:
+        EmbeddedBuilder() {
+            addBuilder( "" );
+        }
+        // It is assumed that the calls to appendAs will be made with the 'name'
+        // parameter in lex ascending order.
+        void appendAs( const BSONElement &e, string name ) {
+            cout << "appendAs: " << name << endl;
+            int i = 0, n = builders_.size();
+            while( i < n && name.substr( 0, builders_[ i ].first.length() ) == builders_[ i ].first ) {
+                name = name.substr( builders_[ i ].first.length() );
+                ++i;
+            }
+            for( int j = n - 1; j >= i; --j ) {
+                builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
+                builders_.pop_back();
+            }
+            for( string next = splitDot( name ); !next.empty(); next = splitDot( name ) ) {
+                addBuilder( next );
+            }
+            builders_.back().second->appendAs( e, name.c_str() );
+        }
+        void appendSelf( BSONObjBuilder &b ) {
+            for( int j = builders_.size() - 1; j >= 1; --j ) {
+                builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
+                builders_.pop_back();
+            }
+            b.appendElements( builders_.back().second->done() );
+        }
+    private:
+        void addBuilder( const string &name ) {
+            builders_.push_back( make_pair( name, shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+        }
+        string splitDot( string & str ) {
+            size_t pos = str.find( '.' );
+            if ( pos == string::npos )
+                return "";
+            string ret = str.substr( 0, pos );
+            str = str.substr( pos + 1 );
+            return ret;
+        }
+        typedef vector< pair< string, shared_ptr< BSONObjBuilder > > > Stack;
+        Stack builders_;
+    };
+    
+    void ModSet::extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base ) {
+        if ( top.type() != Object && top.type() != Array ) {
+            fields[ base + top.fieldName() ] = top;
+            return;
+        }
+        BSONObjIterator i( top.embeddedObject() );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            extractFields( fields, e, base + top.fieldName() + "." );
+        }
+    }
+    
+    BSONObj ModSet::createNewFromMods( const BSONObj &obj ) {
+        sortMods();
+        map< string, BSONElement > existing;
+        
         BSONObjBuilder b;
-        
-        // Just temporary
-        checkNoEmbedded();
-        
         BSONObjIterator i( obj );
         while( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
-            const Mod *mod = modForField( e.fieldName() );
-            if ( !mod ) {
+            if ( !haveModForFieldOrSubfield( e.fieldName() ) ) {
                 b.append( e );
-            } else if ( mod->op == Mod::INC ) {
-                if ( e.type() == NumberInt )
-                    b.append( e.fieldName(), int( e.number() + mod->getn() ) );
-                else
-                    b.append( e.fieldName(), double( e.number() + mod->getn() ) );
-                mod->setn( e.number() );
-            } else if ( mod->op == Mod::SET ) {
-                b.appendAs( mod->elt, e.fieldName() );
+            } else {
+                extractFields( existing, e, "" );
             }
         }
+            
+        EmbeddedBuilder b2;
+        vector< Mod >::iterator m = mods_.begin();
+        map< string, BSONElement >::iterator p = existing.begin();
+        while( m != mods_.end() || p != existing.end() ) {
+            int cmp = compare( m, p, existing.end() );
+            if ( cmp == 0 ) {
+                BSONElement e = p->second;
+                if ( m->op == Mod::INC ) {
+                    BSONElementManipulator( m->elt ).setNumber( e.number() + m->getn() );
+                    m->setn( m->elt.number() );
+                } else if ( m->op == Mod::SET ) {
+                    // nothing
+                }                
+                b2.appendAs( m->elt, m->fieldName );
+                ++m;
+                ++p;
+            } else if ( cmp < 0 ) {
+                b2.appendAs( m->elt, m->fieldName );
+                ++m;
+            } else if ( cmp > 0 ) {
+                b2.appendAs( p->second, p->first ); 
+                ++p;
+            }
+        }
+                
+        b2.appendSelf( b );
+//        
+//            const Mod *mod = modForField( e.fieldName() );
+//            if ( !mod ) {
+//                b.append( e );
+//            } else if ( mod->op == Mod::INC ) {
+//                if ( e.type() == NumberInt )
+//                    b.append( e.fieldName(), int( e.number() + mod->getn() ) );
+//                else
+//                    b.append( e.fieldName(), double( e.number() + mod->getn() ) );
+//                mod->setn( e.number() );
+//            } else if ( mod->op == Mod::SET ) {
+//                b.appendAs( mod->elt, e.fieldName() );
+//            }
+//        }
         return b.obj();
     }
     
