@@ -550,6 +550,34 @@ namespace mongo {
         else { 
             massert("--only requires use of --source", dashDashOnly.empty());
         }
+        
+        if ( replPair ) {
+            const string &remote = replPair->remote;
+            setClient( "local.sources" );
+            // --pairwith host specified.
+            // check that no items are in sources other than that
+            // add if missing
+            auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
+            int n = 0;
+            while ( c->ok() ) {
+                n++;
+                ReplSource tmp(c->current());
+                if ( tmp.hostName != remote ) {
+                    log() << "E10003 pairwith " << remote << " != " << tmp.hostName << " from local.sources collection" << endl;
+                    log() << "terminating after 30 seconds" << endl;
+                    sleepsecs(30);
+                    dbexit(18);
+                }
+                c->advance();
+            }
+            uassert( "E10002 local.sources collection corrupt?", n<2 );
+            if ( n == 0 ) {
+                // source missing.  add.
+                ReplSource s;
+                s.hostName = remote;
+                s.save();
+            }
+        }
 
         setClient("local.sources");
         auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
