@@ -1,6 +1,6 @@
 // test replace peer
 
-var baseName = "jstests_replacepeertest";
+var baseName = "jstests_replacepeer1test";
 
 ismaster = function( n ) {
     im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
@@ -56,7 +56,7 @@ doTest = function( signal ) {
     stopMongod( 27019, signal );
 
     writeOne( r );
-    
+
     assert.eq( 1, r.getDB( "admin" ).runCommand( {replacepeer:1} ).ok );
     
     writeOne( r );
