@@ -1016,6 +1016,7 @@ namespace mongo {
             DoQueryOp &dqo = *o;
             massert( dqo.exceptionMessage(), dqo.complete() );
             n = dqo.n();
+            nscanned = dqo.nscanned();
             if ( dqo.scanAndOrderRequired() )
                 ss << " scanAndOrder ";
             auto_ptr< Cursor > c = dqo.cursor();
