@@ -389,15 +389,47 @@ namespace mongo {
                 if ( m->op == Mod::INC ) {
                     BSONElementManipulator( m->elt ).setNumber( e.number() + m->getn() );
                     m->setn( m->elt.number() );
+                    b2.appendAs( m->elt, m->fieldName );
                 } else if ( m->op == Mod::SET ) {
-                    // nothing
+                    b2.appendAs( m->elt, m->fieldName );
+                } else if ( m->op == Mod::PUSH ) {
+                    uassert( "Push can only be applied to an array", e.type() == Array );
+                    BSONObjBuilder arr;
+                    BSONObjIterator i( e.embeddedObject() );
+                    const char *lastIndex = 0;
+                    while( i.more() ) {
+                        BSONElement arrI = i.next();
+                        if ( arrI.eoo() )
+                            break;
+                        arr.append( arrI );
+                        lastIndex = arrI.fieldName();
+                    }
+                    string nextIndex;
+                    if ( !lastIndex )
+                        nextIndex = "0";
+                    else {
+                        int index = strtol( lastIndex, 0, 10 );
+                        stringstream ss;
+                        ss << index + 1;
+                        nextIndex = ss.str();
+                    }
+                    arr.appendAs( m->elt, nextIndex.c_str() );
+                    BSONObjBuilder encapsulatedArr;
+                    encapsulatedArr.appendArray( "foo", arr.done() );
+                    b2.appendAs( encapsulatedArr.done().firstElement(), m->fieldName );
                 }
-                b2.appendAs( m->elt, m->fieldName );
                 ++m;
                 ++p;
             } else if ( cmp < 0 ) {
-                // Here may be $inc or $set
-                b2.appendAs( m->elt, m->fieldName );
+                if ( m->op == Mod::PUSH ) {
+                    BSONObjBuilder arr;
+                    arr.appendAs( m->elt, "0" );
+                    BSONObjBuilder encapsulatedArr;
+                    encapsulatedArr.appendArray( "foo", arr.done() );
+                    b2.appendAs( encapsulatedArr.done().firstElement(), m->fieldName );
+                } else {
+                    b2.appendAs( m->elt, m->fieldName );
+                }
                 ++m;
             } else if ( cmp > 0 ) {
                 if ( mayAddEmbedded( existing, p->first ) )
