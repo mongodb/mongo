@@ -27,6 +27,9 @@ public:
     /* drop the collection */
     virtual void drop(const char *ns) = 0;
 
+    /* close datafiles associated with the db specified. */
+    virtual void closeFiles(string dbname, string path) = 0;
+
     /* todo add: 
        closeFiles(dbname)
        eraseFiles(dbname)

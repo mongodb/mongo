@@ -31,8 +31,6 @@
 
 namespace mongo {
 
-    /* TODO: FIX cleanup of clientCursors when hit the end. (ntoreturn insufficient) */
-
     CCById clientCursorsById;
 
     /* ------------------------------------------- */
