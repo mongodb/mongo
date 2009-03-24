@@ -46,18 +46,42 @@ char * shellReadline( const char * prompt ){
 #endif
 }
 
+#if !defined(_WIN32)
+#include <execinfo.h>
+#include <string.h>
+
 void quitNicely( int sig ){
     shellHistoryDone();
     exit(0);
 }
 
+/* use "addr2line -CFe <exe>" to parse. */
+inline void printStackTrace() {
+    void *b[20];
+    size_t size;
+    char **strings;
+    size_t i;
+    
+    size = backtrace(b, 20);
+    strings = backtrace_symbols(b, size);
+    
+    for (i = 0; i < size; i++)
+        cout << hex << b[i] << ' ';
+    cout << '\n';
+    for (i = 0; i < size; i++)
+        cout << ' ' << strings[i] << '\n';
+    cout << dec;
+    free (strings);    
+}
+
 void quitAbruptly( int sig ) {
+    cout << "mongo got signal" << sig << " (" << strsignal( sig ) << "), stack trace: " << endl;
+    printStackTrace();
     KillMongoProgramInstances();
     exit(14);    
 }
 
 void setupSignals() {
-#ifndef _WIN32
     signal( SIGINT , quitNicely );
     signal( SIGTERM , quitNicely );
     signal( SIGPIPE , quitNicely ); // Maybe just log and continue?
@@ -65,8 +89,10 @@ void setupSignals() {
     signal( SIGSEGV , quitAbruptly );
     signal( SIGBUS , quitAbruptly );
     signal( SIGFPE , quitAbruptly );
-#endif
 }
+#else
+inline void setupSignals() {}
+#endif
 
 string fixHost( string url , string host , string port ){
     if ( host.size() == 0 && port.size() == 0 ){
