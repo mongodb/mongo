@@ -155,7 +155,7 @@ namespace mongo {
         return index_->keyPattern();
     }
     
-    void QueryPlan::registerSelf( int nScanned ) const {
+    void QueryPlan::registerSelf( long long nScanned ) const {
         NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
     }
     
@@ -322,8 +322,8 @@ namespace mongo {
                 return *i;
         }
         
-        int nScanned = 0;
-        int nScannedBackup = 0;
+        long long nScanned = 0;
+        long long nScannedBackup = 0;
         while( 1 ) {
             ++nScanned;
             unsigned errCount = 0;

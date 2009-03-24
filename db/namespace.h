@@ -353,7 +353,7 @@ namespace mongo {
         set<string> allIndexKeys;
         void computeIndexKeys();
         int writeCount_;
-        map< QueryPattern, pair< BSONObj, int > > queryCache_;
+        map< QueryPattern, pair< BSONObj, long long > > queryCache_;
         string logNS_;
         bool logValid_;
     public:
@@ -387,10 +387,10 @@ namespace mongo {
         BSONObj indexForPattern( const QueryPattern &pattern ) {
             return queryCache_[ pattern ].first;
         }
-        int nScannedForPattern( const QueryPattern &pattern ) {
+        long long nScannedForPattern( const QueryPattern &pattern ) {
             return queryCache_[ pattern ].second;
         }
-        void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, int nScanned ) {
+        void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, long long nScanned ) {
             queryCache_[ pattern ] = make_pair( indexKey, nScanned );
         }
         

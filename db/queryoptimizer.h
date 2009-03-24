@@ -51,7 +51,7 @@ namespace mongo {
         const char *ns() const { return fbs_.ns(); }
         BSONObj query() const { return fbs_.query(); }
         const FieldBound &bound( const char *fieldName ) const { return fbs_.bound( fieldName ); }
-        void registerSelf( int nScanned ) const;
+        void registerSelf( long long nScanned ) const;
     private:
         const FieldBoundSet &fbs_;
         const BSONObj &order_;
@@ -132,7 +132,7 @@ namespace mongo {
         bool usingPrerecordedPlan_;
         BSONObj hint_;
         BSONObj order_;
-        int oldNScanned_;
+        long long oldNScanned_;
         bool honorRecordedPlan_;
     };
 
