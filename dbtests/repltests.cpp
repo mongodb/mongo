@@ -465,7 +465,7 @@ namespace ReplTests {
             UpsertInsertIdMod() :
             q_( fromjson( "{'_id':5,a:4}" ) ),
             u_( fromjson( "{$inc:{a:3}}" ) ),
-            ou_( fromjson( "{'_id':5,a:3}" ) ) {}
+            ou_( fromjson( "{'_id':5,a:7}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_, true );
             }
@@ -506,7 +506,7 @@ namespace ReplTests {
             UpsertInsertInc() :
             q_( fromjson( "{a:5}" ) ),
             u_( fromjson( "{$inc:{a:3}}" ) ),
-            ou_( fromjson( "{a:3}" ) ) {}
+            ou_( fromjson( "{a:8}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_, true );
             }

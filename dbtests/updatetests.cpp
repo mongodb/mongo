@@ -293,6 +293,14 @@ namespace UpdateTests {
         }
     };
     
+    class UpsertMissingEmbedded : public SetBase {
+    public:
+        void run() {
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << 1 ) ), true );
+            ASSERT( !client().findOne( ns(), QUERY( "a.b" << 1 ) ).isEmpty() );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -322,6 +330,7 @@ namespace UpdateTests {
             add< ModMasksEmbeddedConflict >();            
             add< ModOverwritesExistingObject >();            
             add< InvalidEmbeddedSet >();            
+            add< UpsertMissingEmbedded >();            
         }
     };
     

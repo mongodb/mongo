@@ -578,22 +578,19 @@ namespace mongo {
                 /* upsert of an $inc. build a default */
                 ModSet mods;
                 mods.getMods(updateobj);
-                BSONObjBuilder b;
-                BSONObjIterator i( pattern );
-                while( i.more() ) {
-                    BSONElement e = i.next();
-                    if ( e.eoo() )
-                        break;
-                    if ( !mods.haveModForField( e.fieldName() ) )
-                        b.append( e );
+                BSONObj newObj = pattern.copy();
+                if ( mods.applyModsInPlace( newObj ) ) {
+                    //
+                } else {
+                    newObj = mods.createNewFromMods( newObj );
                 }
-                mods.appendUpsert( b );
-                BSONObj obj = b.done();
-                theDataFileMgr.insert(ns, obj);
+                if ( profile )
+                    ss << " fastmodinsert ";
+                theDataFileMgr.insert(ns, newObj);
                 if ( profile )
                     ss << " fastmodinsert ";
                 if ( logop )
-                    logOp( "i", ns, obj );
+                    logOp( "i", ns, newObj );
                 return 3;
             }
             if ( profile )
