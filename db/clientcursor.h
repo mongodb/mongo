@@ -1,3 +1,5 @@
+/* clientcursor.h */
+
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -14,9 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* clientcursor.h
-
-   Cursor -- and its derived classes -- are our internal cursors.
+/* Cursor -- and its derived classes -- are our internal cursors.
 
    ClientCursor is a wrapper that represents a cursorid from our database
    application's perspective.
@@ -28,14 +28,13 @@
 
 namespace mongo {
 
-    typedef long long CursorId;
-    class Cursor;
+    typedef long long CursorId; /* passed to the client so it can send back on getMore */
+    class Cursor; /* internal server cursor base class */
     class ClientCursor;
     typedef map<CursorId, ClientCursor*> CCById;
     extern CCById clientCursorsById;
 
     class ClientCursor {
-        friend class CursInspector;
         DiskLoc _lastLoc; // use getter and setter not this.
         static CursorId allocCursorId();
     public:
@@ -45,10 +44,9 @@ namespace mongo {
         ~ClientCursor();
         const CursorId cursorid;
         string ns;
-        //BSONObj pattern; // the query object
         auto_ptr<KeyValJSMatcher> matcher;
         auto_ptr<Cursor> c;
-        int pos;
+        int pos; /* # objects into the cursor so far */
         DiskLoc lastLoc() const {
             return _lastLoc;
         }
