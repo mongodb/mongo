@@ -83,6 +83,10 @@ namespace mongo {
         void append(const char *str) {
             append((void*) str, strlen(str)+1);
         }
+        
+        void append(const string &str) {
+            append( (void *)str.c_str(), str.length() + 1 );
+        }
 
         int len() {
             return l;
