@@ -25,6 +25,13 @@
 #include "dbtests.h"
 
 namespace JsobjTests {
+    class BSONElementBasic {
+    public:
+        void run() {
+            ASSERT_EQUALS( 1, BSONElement().size() );
+        }
+    };
+    
     namespace BSONObjTests {
         class Create {
         public:
@@ -567,6 +574,7 @@ namespace JsobjTests {
     class All : public UnitTest::Suite {
     public:
         All() {
+            add< BSONElementBasic >();
             add< BSONObjTests::Create >();
             add< BSONObjTests::WoCompareBasic >();
             add< BSONObjTests::NumericCompareBasic >();
