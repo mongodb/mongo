@@ -60,8 +60,8 @@ namespace mongo {
         Query(const BSONObj& b) : obj(b) { }
         Query(const string &json) : 
             obj(fromjson(json)) { }
-        Query(const char *json) : 
-          obj(fromjson(json)) { }
+        Query(const char * json) : 
+            obj(fromjson(json)) { }
 
         /** Add a sort (ORDER BY) criteria to the query expression. 
             @param sortPattern the sort order template.  For example to order by name ascending, time descending:
@@ -78,7 +78,7 @@ namespace mongo {
             @param asc = 1 for ascending order
             asc = -1 for descending order
         */
-        Query& sort(const char *field, int asc = 1) { sort( BSON( field << asc ) ); return *this; }
+        Query& sort(const string &field, int asc = 1) { sort( BSON( field << asc ) ); return *this; }
 
         /** Provide a hint to the query.
             @param keyPattern Key pattern for the index to use.
@@ -86,7 +86,7 @@ namespace mongo {
               hint("{ts:1}")
         */
         Query& hint(BSONObj keyPattern);
-        Query& hint(const char *jsonKeyPatt) { return hint(fromjson(jsonKeyPatt)); }
+        Query& hint(const string &jsonKeyPatt) { return hint(fromjson(jsonKeyPatt)); }
 
         /** Return explain information about execution of this query instead of the actual query results.
             Normally it is easier to use the mongo shell to run db.find(...).explain().
@@ -109,8 +109,8 @@ namespace mongo {
               conn.findOne("test.coll", Query("{a:3}").where("this.b == 2 || this.c == 3"));
               Query badBalance = Query().where("this.debits - this.credits < 0");
         */
-        Query& where(const char *jscode, BSONObj scope);
-        Query& where(const char *jscode) { return where(jscode, BSONObj()); }
+        Query& where(const string &jscode, BSONObj scope);
+        Query& where(const string &jscode) { return where(jscode, BSONObj()); }
         
 
         /**
@@ -141,7 +141,7 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) = 0;
         virtual void say( Message &toSend ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;
-        virtual void checkResponse( const char *data, int nReturned ) {}
+        virtual void checkResponse( const string &data, int nReturned ) {}
     };
 
 	/** Queries return a cursor object */
@@ -181,7 +181,7 @@ namespace mongo {
 
         bool init();
 
-        DBClientCursor( DBConnector *_connector, const char * _ns, BSONObj _query, int _nToReturn,
+        DBClientCursor( DBConnector *_connector, const string &_ns, BSONObj _query, int _nToReturn,
                         int _nToSkip, BSONObj *_fieldsToReturn, int queryOptions ) :
                 connector(_connector),
                 ns(_ns),
@@ -198,7 +198,7 @@ namespace mongo {
                 ownCursor_( true ) {
         }
         
-        DBClientCursor( DBConnector *_connector, const char *_ns, long long _cursorId, int _nToReturn, int options ) :
+        DBClientCursor( DBConnector *_connector, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
                 connector(_connector),
                 ns(_ns),
                 nToReturn( _nToReturn ),
@@ -241,20 +241,20 @@ namespace mongo {
      */
     class DBClientInterface : boost::noncopyable {
     public:
-        virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
-        virtual auto_ptr<DBClientCursor> getMore( const char *ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
+        virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
         
-        virtual BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+        virtual BSONObj findOne(const string &ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
-        virtual void insert( const char * ns, BSONObj obj ) = 0;
+        virtual void insert( const string &ns, BSONObj obj ) = 0;
         
-        virtual void insert( const char * ns, const vector< BSONObj >& v ) = 0;
+        virtual void insert( const string &ns, const vector< BSONObj >& v ) = 0;
 
-        virtual void remove( const char * ns , Query query, bool justOne = 0 ) = 0;
+        virtual void remove( const string &ns , Query query, bool justOne = 0 ) = 0;
 
-        virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 ) = 0;
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 ) = 0;
 
         virtual ~DBClientInterface() { }
     };
@@ -265,7 +265,7 @@ namespace mongo {
     */
     class DBClientWithCommands : public DBClientInterface {
         bool isOk(const BSONObj&);
-        bool simpleCommand(const char *dbname, BSONObj *info, const char *command);
+        bool simpleCommand(const string &dbname, BSONObj *info, const string &command);
     public:
         /** Run a database command.  Database commands are represented as BSON objects.  Common database
            commands have prebuilt helper functions -- see below.  If a helper is not available you can
@@ -278,7 +278,7 @@ namespace mongo {
 
            @return true if the command returned "ok".
         */
-        bool runCommand(const char *dbname, const BSONObj& cmd, BSONObj &info);
+        bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info);
 
         /** Authorize access to a particular database.
 			Authentication is separate for each database on the server -- you may authenticate for any 
@@ -288,14 +288,14 @@ namespace mongo {
 			@param digestPassword if password is plain text, set this to true.  otherwise assumed to be pre-digested
             @return true if successful
         */
-        virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
+        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true);
 
         /** count number of objects in collection ns that match the query criteria specified
             throws UserAssertion if database returns an error
         */
-        unsigned long long count(const char *ns, BSONObj query = BSONObj());
+        unsigned long long count(const string &ns, BSONObj query = BSONObj());
 
-        string createPasswordDigest( const char * username , const char * clearTextPassword );
+        string createPasswordDigest( const string &username , const string &clearTextPassword );
 
         /** returns true in isMaster parm if this db is the current master
            of a replica pair.
@@ -323,7 +323,7 @@ namespace mongo {
 
            returns true if successful.
         */
-        bool createCollection(const char *ns, unsigned size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
+        bool createCollection(const string &ns, unsigned size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
 
         /** Get error result from the last operation on this connection. 
             @return error or empty string if no error.
@@ -345,7 +345,7 @@ namespace mongo {
         bool resetError() { return simpleCommand("admin", 0, "reseterror"); }
 
         /** Erase / drop an entire database */
-        bool dropDatabase(const char *dbname, BSONObj *info = 0) {
+        bool dropDatabase(const string &dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "dropDatabase");
         }
 
@@ -364,7 +364,7 @@ namespace mongo {
         /** Perform a repair and compaction of the specified database.  May take a long time to run.  Disk space
            must be available equal to the size of the database while repairing.
         */
-        bool repairDatabase(const char *dbname, BSONObj *info = 0) {
+        bool repairDatabase(const string &dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "repairDatabase");
         }
         
@@ -387,7 +387,7 @@ namespace mongo {
 
            returns true if successful
         */
-        bool copyDatabase(const char *fromdb, const char *todb, const char *fromhost = "", BSONObj *info = 0);
+        bool copyDatabase(const string &fromdb, const string &todb, const string &fromhost = "", BSONObj *info = 0);
 
         /** The Mongo database provides built-in performance profiling capabilities.  Uset setDbProfilingLevel()
            to enable.  Profiling information is then written to the system.profiling collection, which one can
@@ -398,8 +398,8 @@ namespace mongo {
             ProfileSlow = 1, // log very slow (>100ms) operations
             ProfileAll = 2
         };
-        bool setDbProfilingLevel(const char *dbname, ProfilingLevel level, BSONObj *info = 0);
-        bool getDbProfilingLevel(const char *dbname, ProfilingLevel& level, BSONObj *info = 0);
+        bool setDbProfilingLevel(const string &dbname, ProfilingLevel level, BSONObj *info = 0);
+        bool getDbProfilingLevel(const string &dbname, ProfilingLevel& level, BSONObj *info = 0);
 
         /** Run javascript code on the database server.
            dbname    database context in which the code runs. The javascript variable 'db' will be assigned
@@ -416,12 +416,12 @@ namespace mongo {
 
            See testDbEval() in dbclient.cpp for an example of usage.
         */
-        bool eval(const char *dbname, const char *jscode, BSONObj& info, BSONElement& retValue, BSONObj *args = 0);
+        bool eval(const string &dbname, const string &jscode, BSONObj& info, BSONElement& retValue, BSONObj *args = 0);
 
         /**
            
          */
-        bool validate( const char * ns , bool scandata=true ){
+        bool validate( const string &ns , bool scandata=true ){
             BSONObj cmd = BSON( "validate" << nsGetCollection( ns ) << "scandata" << scandata );
             BSONObj info;
             return runCommand( nsGetDB( ns ).c_str() , cmd , info );
@@ -430,9 +430,9 @@ namespace mongo {
         /* The following helpers are simply more convenient forms of eval() for certain common cases */
 
         /* invocation with no return value of interest -- with or without one simple parameter */
-        bool eval(const char *dbname, const char *jscode);
+        bool eval(const string &dbname, const string &jscode);
         template< class T >
-        bool eval(const char *dbname, const char *jscode, T parm1) {
+        bool eval(const string &dbname, const string &jscode, T parm1) {
             BSONObj info;
             BSONElement retValue;
             BSONObjBuilder b;
@@ -443,7 +443,7 @@ namespace mongo {
 
         /** eval invocation with one parm to server and one numeric field (either int or double) returned */
         template< class T, class NumType >
-        bool eval(const char *dbname, const char *jscode, T parm1, NumType& ret) {
+        bool eval(const string &dbname, const string &jscode, T parm1, NumType& ret) {
             BSONObj info;
             BSONElement retValue;
             BSONObjBuilder b;
@@ -497,41 +497,41 @@ namespace mongo {
          @return    cursor.   0 if error (connection failure)
          @throws AssertionException
         */
-        virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /** @param cursorId id of cursor to retrieve
             @return an handle to a previously allocated cursor
             @throws AssertionException
          */
-        virtual auto_ptr<DBClientCursor> getMore( const char *ns, long long cursorId, int nToReturn = 0, int options = 0 );
+        virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 );
         
         /**
            @return a single object that matches the query.  if none do, then the object is empty
            @throws AssertionException
         */
-        virtual BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        virtual BSONObj findOne(const string &ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
         
         /**
            insert an object into the database
          */
-        virtual void insert( const char * ns , BSONObj obj );
+        virtual void insert( const string &ns , BSONObj obj );
 
         /**
            insert a vector of objects into the database
          */
-        virtual void insert( const char * ns, const vector< BSONObj >& v );
+        virtual void insert( const string &ns, const vector< BSONObj >& v );
 
         /**
            remove matching objects from the database
            @param justOne if this true, then once a single match is found will stop
          */
-        virtual void remove( const char * ns , Query q , bool justOne = 0 );
+        virtual void remove( const string &ns , Query q , bool justOne = 0 );
         
         /**
            updates objects matching query
          */
-        virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 );
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 );
 
         /** Create an index if it does not already exist.
             ensureIndex calls are remembered so it is safe/fast to call this function many 
@@ -541,7 +541,7 @@ namespace mongo {
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
-        virtual bool ensureIndex( const string &ns , BSONObj keys , const char * name = 0 );
+        virtual bool ensureIndex( const string &ns , BSONObj keys , const string &name = "" );
 
         /**
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
@@ -592,7 +592,7 @@ namespace mongo {
            @param errmsg any relevant error message will appended to the string
            @return false if fails to connect.
         */
-        virtual bool connect(const char *serverHostname, string& errmsg);
+        virtual bool connect(const string &serverHostname, string& errmsg);
 
         /** Connect to a Mongo database server.  Exception throwing version.
             Throws a UserException if cannot connect.
@@ -608,9 +608,9 @@ namespace mongo {
                 throw ConnectException(string("can't connect ") + errmsg);
         }
 
-        virtual bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg, bool digestPassword = true);
+        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true);
 
-        virtual auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             checkConnection();
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions );
@@ -673,7 +673,7 @@ namespace mongo {
            when false returned, you can still try to use this connection object, it will
            try reconnects.
            */
-        bool connect(const char *serverHostname1, const char *serverHostname2);
+        bool connect(const string &serverHostname1, const string &serverHostname2);
 
         /** Connect to a server pair using a host pair string of the form
               hostname[:port],hostname[:port]
@@ -686,35 +686,35 @@ namespace mongo {
 
         /** Authorize.  Authorizes both sides of the pair as needed. 
         */
-        bool auth(const char *dbname, const char *username, const char *pwd, string& errmsg);
+        bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg);
 
         /** throws userassertion "no master found" */
         virtual
-        auto_ptr<DBClientCursor> query(const char *ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                        BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /** throws userassertion "no master found" */
         virtual
-        BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        BSONObj findOne(const string &ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /** insert */
-        virtual void insert( const char * ns , BSONObj obj ) {
+        virtual void insert( const string &ns , BSONObj obj ) {
             checkMaster().insert(ns, obj);
         }
 
         /** insert multiple objects.  Note that single object insert is asynchronous, so this version 
             is only nominally faster and not worth a special effort to try to use.  */
-        virtual void insert( const char * ns, const vector< BSONObj >& v ) {
+        virtual void insert( const string &ns, const vector< BSONObj >& v ) {
             checkMaster().insert(ns, v);
         }
 
         /** remove */
-        virtual void remove( const char * ns , Query obj , bool justOne = 0 ) {
+        virtual void remove( const string &ns , Query obj , bool justOne = 0 ) {
             checkMaster().remove(ns, obj, justOne);
         }
 
         /** update */
-        virtual void update( const char * ns , Query query , BSONObj obj , bool upsert = 0 ) {
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 ) {
             return checkMaster().update(ns, query, obj, upsert);
         }
         
