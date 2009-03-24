@@ -209,7 +209,7 @@ namespace mongo {
     };
     
     struct Mod {
-        enum Op { INC, SET } op;
+        enum Op { INC, SET, PUSH } op;
         const char *fieldName;
         double *ndouble;
         int *nint;
@@ -255,6 +255,14 @@ namespace mongo {
                 left += "." + EmbeddedBuilder::splitDot( right );
             }
             return true;
+        }
+        static Mod::Op opFromStr( const char *fn ) {
+            const char *valid[] = { "$inc", "$set", "$push" };
+            for( int i = 0; i < 3; ++i )
+                if ( strcmp( fn, valid[ i ] ) == 0 )
+                    return Mod::Op( i );
+            uassert( "Invalid modifier specified", false );
+            return Mod::INC;
         }
     public:
         void getMods( const BSONObj &from );
@@ -308,6 +316,8 @@ namespace mongo {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
             uassert( "Cannot apply $inc modifier to non-number", m.op != Mod::INC || e.isNumber() || e.eoo() );
+            if ( m.op == Mod::PUSH )
+                inPlacePossible = false;
             if ( e.isNumber() && m.elt.isNumber() )
                 continue;
             if ( m.elt.valuesize() == e.valuesize() )
@@ -403,6 +413,7 @@ namespace mongo {
     /* get special operations like $inc
        { $inc: { a:1, b:1 } }
        { $set: { a:77 } }
+       { $push: { a:55 } }
        NOTE: MODIFIES source from object!
     */
     void ModSet::getMods(const BSONObj &from) {
@@ -412,17 +423,12 @@ namespace mongo {
             if ( e.eoo() )
                 break;
             const char *fn = e.fieldName();
-            uassert( "Invalid modifier specified",
-                    *fn == '$' && e.type() == Object && fn[4] == 0 );
+            uassert( "Invalid modifier specified", e.type() == Object );
             BSONObj j = e.embeddedObject();
             BSONObjIterator jt(j);
-            Mod::Op op = Mod::SET;
-            if ( strcmp("$inc",fn) == 0 ) {
-                op = Mod::INC;
-                strcpy((char *) fn, "$set");
-            } else {
-                uassert( "Invalid modifier specified", strcmp("$set",fn ) == 0 );
-            }
+            Mod::Op op = opFromStr( fn );
+            if ( op == Mod::INC )
+                strcpy((char *) fn, "$set"); // rewrite for op log
             while ( jt.more() ) {
                 BSONElement f = jt.next();
                 if ( f.eoo() )

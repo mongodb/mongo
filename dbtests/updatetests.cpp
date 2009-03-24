@@ -301,6 +301,15 @@ namespace UpdateTests {
         }
     };
     
+    class Push : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1]}" ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 5 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[1,5]}" ) ) == 0 );                     
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -331,6 +340,7 @@ namespace UpdateTests {
             add< ModOverwritesExistingObject >();            
             add< InvalidEmbeddedSet >();            
             add< UpsertMissingEmbedded >();            
+            add< Push >();            
         }
     };
     
