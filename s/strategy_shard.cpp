@@ -102,7 +102,7 @@ namespace mongo {
             cursorCache.remove( id );
         }
         
-        void receivedInsert( Request& r , DbMessage& d, ShardManager* manager ){
+        void _insert( Request& r , DbMessage& d, ShardManager* manager ){
             while ( d.moreJSObjs() ){
                 BSONObj o = d.nextJsObj();
                 if ( ! manager->hasShardKey( o ) ){
@@ -116,7 +116,7 @@ namespace mongo {
             }            
         }
 
-        void receivedUpdate( Request& r , DbMessage& d, ShardManager* manager ){
+        void _update( Request& r , DbMessage& d, ShardManager* manager ){
             int flags = d.pullInt();
             
             BSONObj query = d.nextJsObj();
@@ -138,7 +138,7 @@ namespace mongo {
             doWrite( dbUpdate , r , s.getServer() );
         }
         
-        void receivedDelete( Request& r , DbMessage& d, ShardManager* manager ){
+        void _delete( Request& r , DbMessage& d, ShardManager* manager ){
 
             int flags = d.pullInt();
             bool justOne = flags & 1;
@@ -169,7 +169,6 @@ namespace mongo {
         }
         
         virtual void writeOp( int op , Request& r ){
-            
             const char *ns = r.getns();
             log(3) << "write: " << ns << endl;
             
@@ -178,13 +177,13 @@ namespace mongo {
             assert( info );
             
             if ( op == dbInsert ){
-                receivedInsert( r , d , info );
+                _insert( r , d , info );
             }
             else if ( op == dbUpdate ){
-                receivedUpdate( r , d , info );    
+                _update( r , d , info );    
             }
             else if ( op == dbDelete ){
-                receivedDelete( r , d , info );
+                _delete( r , d , info );
             }
             else {
                 log() << "sharding can't do write op: " << op << endl;

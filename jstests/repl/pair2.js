@@ -33,6 +33,7 @@ doTest = function( signal ) {
     rz = r.getDB( baseName ).z
     
     rz.save( { _id: new ObjectId() } );
+    sleep( 5000 );
     soonCount( 1 );
     assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
 
@@ -46,8 +47,7 @@ doTest = function( signal ) {
     l.setSlaveOk();
     assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
     
-    sleep( 3000 );
-    
+    sleep( 8000 );
     soonCount( 1001 );
     lz = l.getDB( baseName ).z
     assert.eq( 1, lz.find( { i: 0 } ).count() );

@@ -547,8 +547,12 @@ namespace mongo {
                 s.save();
             }
         }
-        else { 
-            massert("--only requires use of --source", dashDashOnly.empty());
+        else {
+            try {
+                massert("--only requires use of --source", dashDashOnly.empty());
+            } catch ( ... ) {
+                exit( 40 );
+            }
         }
         
         if ( replPair ) {

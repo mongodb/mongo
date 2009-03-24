@@ -77,7 +77,7 @@ namespace mongo {
     // If justOne is true, deletedId is set to the id of the deleted object.
     int deleteObjects(const char *ns, BSONObj pattern, bool justOne, BSONObj *deletedId = 0, bool god=false);
 
-    int runCount(const char *ns, const BSONObj& cmd, string& err);
+    long long runCount(const char *ns, const BSONObj& cmd, string& err);
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss );
     
