@@ -163,6 +163,56 @@ namespace mongo {
         return nDeleted;
     }
 
+    class EmbeddedBuilder {
+    public:
+        EmbeddedBuilder() {
+            addBuilder( "" );
+        }
+        // It is assumed that the calls to appendAs will be made with the 'name'
+        // parameter in lex ascending order.
+        void appendAs( const BSONElement &e, string name ) {
+            cout << "appendAs: " << name << endl;
+            int i = 1, n = builders_.size();
+            while( i < n && name.substr( 0, builders_[ i ].first.length() ) == builders_[ i ].first ) {
+                name = name.substr( builders_[ i ].first.length() + 1 );
+                cout << "name now: " << name << endl;
+                ++i;
+            }
+            for( int j = n - 1; j >= i; --j ) {
+                builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
+                cout << "popping: " << builders_.back().first << endl;
+                builders_.pop_back();
+            }
+            for( string next = splitDot( name ); !next.empty(); next = splitDot( name ) ) {
+                addBuilder( next );
+            }
+            cout << "name appending: " << name << endl;
+            builders_.back().second->appendAs( e, name.c_str() );
+        }
+        void appendSelf( BSONObjBuilder &b ) {
+            for( int j = builders_.size() - 1; j >= 1; --j ) {
+                builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
+                builders_.pop_back();
+            }
+            b.appendElements( builders_.back().second->done() );
+        }
+        static string splitDot( string & str ) {
+            size_t pos = str.find( '.' );
+            if ( pos == string::npos )
+                return "";
+            string ret = str.substr( 0, pos );
+            str = str.substr( pos + 1 );
+            return ret;
+        }
+    private:
+        void addBuilder( const string &name ) {
+            cout << "adding builder (" << name << ")" << endl;
+            builders_.push_back( make_pair( name, shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+        }
+        typedef vector< pair< string, shared_ptr< BSONObjBuilder > > > Stack;
+        Stack builders_;
+    };
+    
     struct Mod {
         enum Op { INC, SET } op;
         const char *fieldName;
@@ -198,6 +248,16 @@ namespace mongo {
             if ( pDone )
                 return -1;
             return strcmp( m->fieldName, p->first.c_str() );
+        }
+        bool mayAddEmbedded( map< string, BSONElement > &existing, string right ) {
+            for( string left = EmbeddedBuilder::splitDot( right );
+                left.length() > 0 && left[ left.length() - 1 ] != '.';
+                left += "." + EmbeddedBuilder::splitDot( right ) ) {
+                if ( existing.count( left ) > 0 && existing[ left ].type() != Object )
+                    return false;
+                left += "." + EmbeddedBuilder::splitDot( right );
+            }
+            return true;
         }
     public:
         void getMods( const BSONObj &from );
@@ -279,54 +339,8 @@ namespace mongo {
         return true;
     }
 
-    class EmbeddedBuilder {
-    public:
-        EmbeddedBuilder() {
-            addBuilder( "" );
-        }
-        // It is assumed that the calls to appendAs will be made with the 'name'
-        // parameter in lex ascending order.
-        void appendAs( const BSONElement &e, string name ) {
-            cout << "appendAs: " << name << endl;
-            int i = 0, n = builders_.size();
-            while( i < n && name.substr( 0, builders_[ i ].first.length() ) == builders_[ i ].first ) {
-                name = name.substr( builders_[ i ].first.length() );
-                ++i;
-            }
-            for( int j = n - 1; j >= i; --j ) {
-                builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
-                builders_.pop_back();
-            }
-            for( string next = splitDot( name ); !next.empty(); next = splitDot( name ) ) {
-                addBuilder( next );
-            }
-            builders_.back().second->appendAs( e, name.c_str() );
-        }
-        void appendSelf( BSONObjBuilder &b ) {
-            for( int j = builders_.size() - 1; j >= 1; --j ) {
-                builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
-                builders_.pop_back();
-            }
-            b.appendElements( builders_.back().second->done() );
-        }
-    private:
-        void addBuilder( const string &name ) {
-            builders_.push_back( make_pair( name, shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
-        }
-        string splitDot( string & str ) {
-            size_t pos = str.find( '.' );
-            if ( pos == string::npos )
-                return "";
-            string ret = str.substr( 0, pos );
-            str = str.substr( pos + 1 );
-            return ret;
-        }
-        typedef vector< pair< string, shared_ptr< BSONObjBuilder > > > Stack;
-        Stack builders_;
-    };
-    
     void ModSet::extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base ) {
-        if ( top.type() != Object && top.type() != Array ) {
+        if ( top.type() != Object ) {
             fields[ base + top.fieldName() ] = top;
             return;
         }
@@ -368,12 +382,14 @@ namespace mongo {
                     m->setn( m->elt.number() );
                 } else if ( m->op == Mod::SET ) {
                     // nothing
-                }                
+                }
                 b2.appendAs( m->elt, m->fieldName );
                 ++m;
                 ++p;
             } else if ( cmp < 0 ) {
                 // Here may be $inc or $set
+                uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object",
+                        mayAddEmbedded( existing, m->fieldName ) );
                 b2.appendAs( m->elt, m->fieldName );
                 ++m;
             } else if ( cmp > 0 ) {

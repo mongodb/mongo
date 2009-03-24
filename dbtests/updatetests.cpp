@@ -223,6 +223,44 @@ namespace UpdateTests {
         }
     };        
     
+    class UnorderedNewSet : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "f.g.h" << 3.0 << "f.g.a" << 2.0 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:{g:{a:2,h:3}}}" ) ) == 0 );                        
+        }        
+    };
+
+    class UnorderedNewSetAdjacent : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "f.g.h.b" << 3.0 << "f.g.a.b" << 2.0 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:{g:{a:{b:2},h:{b:3}}}}" ) ) == 0 );                        
+        }        
+    };
+
+    class ArrayEmbeddedSet : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,z:[4,'b']}" ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "z.0" << "a" ) ) );
+            out() << "one: " << client().findOne( ns(), Query() ) << endl;
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,z:[4,'b']}" ) ) == 0 );                        
+        }        
+    };
+    
+    class AttemptEmbedInExistingNum : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:1}" ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << 1 ) ) );
+            out() << "one: " << client().findOne( ns(), Query() ) << endl;
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:1}" ) ) == 0 );                        
+        }        
+    };
+
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -244,6 +282,10 @@ namespace UpdateTests {
             add< SetMissingDotted >();            
             add< SetAdjacentDotted >();            
             add< IncMissing >();            
+            add< UnorderedNewSet >();            
+            add< UnorderedNewSetAdjacent >();            
+            add< ArrayEmbeddedSet >();            
+            add< AttemptEmbedInExistingNum >();            
         }
     };
     
