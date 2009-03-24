@@ -34,6 +34,15 @@ public:
     virtual void drop(const char *ns) { 
         dropNS(ns);
     }
+
+    /* close datafiles associated with the db specified. */
+    virtual void closeFiles(string dbname, string path) {
+        /* as this is only used for indexes so far, and we are in the same 
+           PDFiles as the nonindex data, we just rely on them having been closed 
+           at the same time.  one day this may need to change.
+        */
+    }
+
 };
 
 /* An in memory RecStoreInterface implementation ----------------------------

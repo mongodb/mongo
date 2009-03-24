@@ -213,6 +213,28 @@ inline void RecCache::writeIfDirty(Node *n) {
     }
 }
 
+void RecCache::closeFiles(string dbname, string path) { 
+    dassert( dbMutexInfo.isLocked() );
+    boostlock lk(rcmutex);
+
+    // first we write all dirty pages.  it is not easy to check which Nodes are for a particular
+    // db, so we just write them all.
+    writeDirty( dirtyl.begin(), true );
+
+    string key = path + dbname + '.';
+    unsigned sz = key.size();
+    for( map<string, BasicRecStore*>::iterator i = storesByNsKey.begin(); i != storesByNsKey.end(); i++ ) { 
+        map<string, BasicRecStore*>::iterator j = i;
+        i++;
+        if( strncmp(j->first.c_str(), key.c_str(), sz) == 0 ) {
+            assert( stores[j->second->fileNumber] != 0 );
+            stores[j->second->fileNumber] = 0;
+            delete j->second;
+            storesByNsKey.erase(j);
+        }
+    }
+}
+
 void RecCache::closing() { 
     boostlock lk(rcmutex);
     (cout << "TEMP: recCacheCloseAll() writing dirty pages...\n").flush();
@@ -312,6 +334,9 @@ void RecCache::dump() {
 //    cout << endl;
 }
 
+/* cleans up everything EXCEPT storesByNsKey.
+   note this function is slow should not be invoked often
+*/
 void RecCache::closeStore(BasicRecStore *rs) { 
     int n = rs->fileNumber + Base;
     for( set<DiskLoc>::iterator i = dirtyl.begin(); i != dirtyl.end(); ) { 
@@ -327,12 +352,15 @@ void RecCache::closeStore(BasicRecStore *rs) {
             m.erase(k);
     }
 
+    assert( stores[rs->fileNumber] != 0 );
+    stores[rs->fileNumber] = 0;
+/*
     for( unsigned i = 0; i < stores.size(); i++ ) { 
         if( stores[i] == rs ) { 
             stores[i] = 0;
             break;
         }
-    }
+    }*/
     delete rs; // closes file
 }
 
@@ -340,12 +368,12 @@ void RecCache::drop(const char *_ns) {
     // todo: test with a non clean shutdown file
     boostlock lk(rcmutex);
 
-    BasicRecStore *&rs = storesByNsKey[mknskey(_ns)];
+    map<string, BasicRecStore*>::iterator it = storesByNsKey.find(mknskey(_ns));
     string fname;
-    if( rs ) {
-        fname = rs->filename;
-        closeStore(rs);
-        rs = 0;
+    if( it != storesByNsKey.end() ) {
+        fname = it->second->filename;
+        closeStore(it->second); // cleans up stores[] etc.
+        storesByNsKey.erase(it);
     }
     else { 
         bool found;

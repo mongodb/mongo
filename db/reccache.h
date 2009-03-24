@@ -181,6 +181,9 @@ public:
         return d;
     }
 
+    void closeFiles(string dbname, string path);
+
+    // at termination: write dirty pages and close all files
     void closing();
 };
 
@@ -203,6 +206,11 @@ public:
     /* drop collection */
     virtual void drop(const char *ns) { 
         theRecCache.drop(ns);
+    }
+
+    /* close datafiles associated with the db specified. */
+    virtual void closeFiles(string dbname, string path) {
+        theRecCache.closeFiles(dbname, dbpath);
     }
 };
 
