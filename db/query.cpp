@@ -171,22 +171,18 @@ namespace mongo {
         // It is assumed that the calls to appendAs will be made with the 'name'
         // parameter in lex ascending order.
         void appendAs( const BSONElement &e, string name ) {
-            cout << "appendAs: " << name << endl;
             int i = 1, n = builders_.size();
             while( i < n && name.substr( 0, builders_[ i ].first.length() ) == builders_[ i ].first ) {
                 name = name.substr( builders_[ i ].first.length() + 1 );
-                cout << "name now: " << name << endl;
                 ++i;
             }
             for( int j = n - 1; j >= i; --j ) {
                 builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
-                cout << "popping: " << builders_.back().first << endl;
                 builders_.pop_back();
             }
             for( string next = splitDot( name ); !next.empty(); next = splitDot( name ) ) {
                 addBuilder( next );
             }
-            cout << "name appending: " << name << endl;
             builders_.back().second->appendAs( e, name.c_str() );
         }
         void appendSelf( BSONObjBuilder &b ) {
@@ -206,7 +202,6 @@ namespace mongo {
         }
     private:
         void addBuilder( const string &name ) {
-            cout << "adding builder (" << name << ")" << endl;
             builders_.push_back( make_pair( name, shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
         }
         typedef vector< pair< string, shared_ptr< BSONObjBuilder > > > Stack;
@@ -254,6 +249,8 @@ namespace mongo {
                 left.length() > 0 && left[ left.length() - 1 ] != '.';
                 left += "." + EmbeddedBuilder::splitDot( right ) ) {
                 if ( existing.count( left ) > 0 && existing[ left ].type() != Object )
+                    return false;
+                if ( modForField( left.c_str() ) )
                     return false;
                 left += "." + EmbeddedBuilder::splitDot( right );
             }
@@ -327,9 +324,7 @@ namespace mongo {
                 BSONElementManipulator( e ).setNumber( e.number() + m.getn() );
                 BSONElementManipulator( m.elt ).setNumber( e.number() );
                 m.setn( e.number() );
-                // *m.n = e.number() += *m.n;
             } else {
-                // $set or $SET
                 if ( e.isNumber() && m.elt.isNumber() )
                     BSONElementManipulator( e ).setNumber( m.getn() );
                 else
@@ -375,6 +370,10 @@ namespace mongo {
         map< string, BSONElement >::iterator p = existing.begin();
         while( m != mods_.end() || p != existing.end() ) {
             int cmp = compare( m, p, existing.end() );
+            if ( cmp <= 0 )
+                uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
+                         " or is referenced in another $set clause",
+                        mayAddEmbedded( existing, m->fieldName ) );                
             if ( cmp == 0 ) {
                 BSONElement e = p->second;
                 if ( m->op == Mod::INC ) {
@@ -388,12 +387,11 @@ namespace mongo {
                 ++p;
             } else if ( cmp < 0 ) {
                 // Here may be $inc or $set
-                uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object",
-                        mayAddEmbedded( existing, m->fieldName ) );
                 b2.appendAs( m->elt, m->fieldName );
                 ++m;
             } else if ( cmp > 0 ) {
-                b2.appendAs( p->second, p->first ); 
+                if ( mayAddEmbedded( existing, p->first ) )
+                    b2.appendAs( p->second, p->first ); 
                 ++p;
             }
         }
@@ -433,6 +431,7 @@ namespace mongo {
                 m.op = op;
                 m.fieldName = f.fieldName();
                 uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
+                uassert( "Invalid mod field name, may not end in a period", m.fieldName[ strlen( m.fieldName ) - 1 ] != '.' );
                 for ( vector<Mod>::iterator i = mods_.begin(); i != mods_.end(); i++ ) {
                     uassert( "Field name duplication not allowed with modifiers",
                             strcmp( m.fieldName, i->fieldName ) != 0 );
@@ -1035,8 +1034,6 @@ namespace mongo {
         int queryOptions = q.queryOptions;
         
         Timer t;
-        cout << "query obj: " << jsobj << endl;
-        
         log(2) << "runQuery: " << ns << jsobj << endl;
         
         long long nscanned = 0;
@@ -1101,7 +1098,6 @@ namespace mongo {
             {
                 BSONElement e = jsobj.findElement("orderby");
                 if ( !e.eoo() ) {
-                    cout << "e type: " << e.type() << endl;
                     order = e.embeddedObjectUserCheck();
                     if ( e.type() == Array )
                         order = transformOrderFromArrayFormat(order);

@@ -255,12 +255,44 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:1}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << 1 ) ) );
-            out() << "one: " << client().findOne( ns(), Query() ) << endl;
-//            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:1}" ) ) == 0 );         
-            cout << "BSONElement(): " << BSONElement() << endl;
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:1}" ) ) == 0 );         
         }        
     };
+    
+    class AttemptEmbedConflictsWithOtherSet : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 2 << "a.b" << 1 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );         
+        }                
+    };
 
+    class ModMasksEmbeddedConflict : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:2}}" ) );
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 2 << "a.b" << 1 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:2}}" ) ) == 0 );         
+        }                
+    };
+
+    class ModOverwritesExistingObject : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:2}}" ) );
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a" << BSON( "c" << 2 ) ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{c:2}}" ) ) == 0 );         
+        }                
+    };    
+    
+    class InvalidEmbeddedSet : public Fail {
+    public:
+        virtual void doIt() {
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a." << 1 ) ) );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -286,6 +318,10 @@ namespace UpdateTests {
             add< UnorderedNewSetAdjacent >();            
             add< ArrayEmbeddedSet >();            
             add< AttemptEmbedInExistingNum >();            
+            add< AttemptEmbedConflictsWithOtherSet >();            
+            add< ModMasksEmbeddedConflict >();            
+            add< ModOverwritesExistingObject >();            
+            add< InvalidEmbeddedSet >();            
         }
     };
     

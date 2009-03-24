@@ -1199,8 +1199,6 @@ namespace mongo {
 #endif
 
     inline BSONObj BSONElement::embeddedObjectUserCheck() {
-        printStackTrace();
-        out() << "this: " << *this << endl;
         uassert( "invalid parameter: expected an object", type()==Object || type()==Array );
         return BSONObj(value());
     }
