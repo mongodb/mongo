@@ -31,51 +31,48 @@ class RecCache {
         char *data;
         DiskLoc loc;
         bool dirty;
-        Node *older, *newer;
+        Node *older, *newer; // lru
     };
     boost::mutex rcmutex; // mainly to coordinate with the lazy writer thread
     unsigned recsize;
-    map<DiskLoc, Node*> m;
+    map<DiskLoc, Node*> m; // the cache
     Node *newest, *oldest;
     unsigned nnodes;
     set<DiskLoc> dirtyl;
-    vector<BasicRecStore*> stores;
-    map<string, BasicRecStore*> storesByNs;
+    vector<BasicRecStore*> stores; // DiskLoc::a() indicates the index into this vector
+    map<string, BasicRecStore*> storesByNsKey; // nskey -> BasicRecStore*
 public:
     enum { Base = 10000 };
 private:
     BasicRecStore* _initStore(string fname);
     BasicRecStore* initStore(int n);
     string findStoreFilename(const char *_ns, bool& found);
-    void initStoreByNs(const char *escaped_ns);
+    void initStoreByNs(const char *ns, const string& nskey);
     void closeStore(BasicRecStore *rs);
+
+    static string directory();
+    static string mknskey(const char *ns) { 
+        return directory() + ns;
+    }
 
     /* get the right file for a given diskloc */
     BasicRecStore& store(DiskLoc& d) { 
         int n = d.a() - Base;
         if( (int) stores.size() > n ) { 
             BasicRecStore *rs = stores[n];
-            if( rs ) 
+            if( rs ) {
+                assert( rs->fileNumber == n );
                 return *rs;
+            }
         }
         return *initStore(n);
     }
     BasicRecStore& store(const char *ns) {
-        char buf[256];
-        char *p = buf;
-        while( 1 ) {
-            if( *ns == '$' ) *p = '_';
-            else
-                *p = *ns;
-            if( *ns == 0 )
-                break;
-            p++; ns++;
-        }
-        assert( p - buf < (int) sizeof(buf) );
-        BasicRecStore *&rs = storesByNs[buf];
+        string nskey = mknskey(ns);
+        BasicRecStore *&rs = storesByNsKey[nskey];
         if( rs )
             return *rs;
-        initStoreByNs(buf);
+        initStoreByNs(ns, nskey);
         return *rs;
     }
 
@@ -117,9 +114,9 @@ private:
     void dump();
 
 public:
-    /* all public functions (except constructor) use the mutex */
+    /* all public functions (except constructor) should use the mutex */
 
-    RecCache(unsigned sz) : recsize(sz) { 
+    RecCache(unsigned recsz) : recsize(recsz) { 
         nnodes = 0;
         newest = oldest = 0;
     }
@@ -184,6 +181,9 @@ public:
         return d;
     }
 
+    void closeFiles(string dbname, string path);
+
+    // at termination: write dirty pages and close all files
     void closing();
 };
 
@@ -206,6 +206,11 @@ public:
     /* drop collection */
     virtual void drop(const char *ns) { 
         theRecCache.drop(ns);
+    }
+
+    /* close datafiles associated with the db specified. */
+    virtual void closeFiles(string dbname, string path) {
+        theRecCache.closeFiles(dbname, dbpath);
     }
 };
 

@@ -96,7 +96,7 @@ namespace mongo {
         bool justOne_;
         int count_;
         int &bestCount_;
-        int nScanned_;
+        long long nScanned_;
         auto_ptr< Cursor > c_;
         auto_ptr< KeyValJSMatcher > matcher_;
     };
@@ -489,10 +489,10 @@ namespace mongo {
             return new UpdateOp();
         }
         auto_ptr< Cursor > c() { return c_; }
-        int nscanned() const { return nscanned_; }
+        long long nscanned() const { return nscanned_; }
     private:
         auto_ptr< Cursor > c_;
-        int nscanned_;
+        long long nscanned_;
         auto_ptr< KeyValJSMatcher > matcher_;
     };
     
@@ -828,11 +828,11 @@ namespace mongo {
         virtual QueryOp *clone() const {
             return new CountOp( spec_ );
         }
-        int count() const { return count_; }
+        long long count() const { return count_; }
         virtual bool mayRecordPlan() const { return true; }
     private:
         BSONObj spec_;
-        int count_;
+        long long count_;
         auto_ptr< Cursor > c_;
         BSONObj query_;
         set< string > fields_;
@@ -844,7 +844,7 @@ namespace mongo {
     /* { count: "collectionname"[, query: <query>] }
          returns -1 on ns does not exist error.
     */    
-    int runCount( const char *ns, const BSONObj &cmd, string &err ) {
+    long long runCount( const char *ns, const BSONObj &cmd, string &err ) {
         NamespaceDetails *d = nsdetails( ns );
         if ( !d ) {
             err = "ns missing";
@@ -1002,7 +1002,7 @@ namespace mongo {
         auto_ptr< Cursor > cursor() { return c_; }
         auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
         int n() const { return n_; }
-        int nscanned() const { return nscanned_; }
+        long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
     private:
         BufBuilder b_;
@@ -1014,7 +1014,7 @@ namespace mongo {
         set< string > *filter_;   
         bool ordering_;
         auto_ptr< Cursor > c_;
-        int nscanned_;
+        long long nscanned_;
         int queryOptions_;
         auto_ptr< KeyValJSMatcher > matcher_;
         int n_;
@@ -1039,7 +1039,7 @@ namespace mongo {
         
         log(2) << "runQuery: " << ns << jsobj << endl;
         
-        int nscanned = 0;
+        long long nscanned = 0;
         bool wantMore = true;
         int ntoreturn = _ntoreturn;
         if ( _ntoreturn < 0 ) {
@@ -1163,7 +1163,7 @@ namespace mongo {
                 builder.append("cursor", c->toString());
                 builder.append("startKey", c->prettyStartKey());
                 builder.append("endKey", c->prettyEndKey());
-                builder.append("nscanned", dqo.nscanned());
+                builder.append("nscanned", double( dqo.nscanned() ) );
                 builder.append("n", n);
                 if ( dqo.scanAndOrderRequired() )
                     builder.append("scanAndOrder", true);

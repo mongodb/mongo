@@ -49,6 +49,7 @@ namespace mongo {
             profileName = name + ".system.profile";
         }
         ~Database() {
+            btreeStore->closeFiles(name, path);
             int n = files.size();
             for ( int i = 0; i < n; i++ )
                 delete files[i];

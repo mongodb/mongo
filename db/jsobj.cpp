@@ -1056,7 +1056,7 @@ namespace mongo {
     BSONElement::BSONElement() {
         data = &js0.eoo;
         fieldNameSize_ = 0;
-        totalSize = 5;
+        totalSize = 1;
     }
 
     struct BsonUnitTest : public UnitTest {
