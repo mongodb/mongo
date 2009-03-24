@@ -1035,6 +1035,7 @@ namespace mongo {
         int queryOptions = q.queryOptions;
         
         Timer t;
+        cout << "query obj: " << jsobj << endl;
         
         log(2) << "runQuery: " << ns << jsobj << endl;
         
@@ -1100,6 +1101,7 @@ namespace mongo {
             {
                 BSONElement e = jsobj.findElement("orderby");
                 if ( !e.eoo() ) {
+                    cout << "e type: " << e.type() << endl;
                     order = e.embeddedObjectUserCheck();
                     if ( e.type() == Array )
                         order = transformOrderFromArrayFormat(order);
