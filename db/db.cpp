@@ -130,7 +130,7 @@ namespace mongo {
         printSysInfo();
         pdfileInit();
         //testTheDb();
-        log() << "waiting for connections on port " << port << "..." << endl;
+        log() << "waiting for connections on port " << port << endl;
         OurListener l(port);
         startReplication();
         boost::thread thr(webServerThread);

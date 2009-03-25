@@ -67,7 +67,7 @@ namespace mongo {
     };
 
     void start() {
-        log() << "waiting for connections on port " << port << "..." << endl;
+        log() << "waiting for connections on port " << port << endl;
         //DbGridListener l(port);
         //l.listen();
         ShardedMessageHandler handler;
