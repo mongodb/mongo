@@ -86,7 +86,8 @@ namespace mongo {
             GTE = 0x6,
             GT = 0x4,
             opIN = 0x8, // { x : { $in : [1,2,3] } }
-            NE = 0x9
+            NE = 0x9,
+            opSIZE = 0x10
         };
 
         static int opDirection(int op) {

@@ -383,6 +383,7 @@ namespace mongo {
                         break;
                     case JSMatcher::opIN:
                     case JSMatcher::NE:
+                    case JSMatcher::opSIZE:
                         massert("not implemented yet relevant()", false);
                     case JSMatcher::Equality:
                         goto normal;

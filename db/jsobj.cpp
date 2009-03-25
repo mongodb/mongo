@@ -407,6 +407,8 @@ namespace mongo {
             }
             else if ( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
                 return JSMatcher::opIN;
+            else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fn[5] == 0 )
+                return JSMatcher::opSIZE;
         }
         return JSMatcher::Equality;
     }
