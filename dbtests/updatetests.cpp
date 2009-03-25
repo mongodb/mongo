@@ -337,6 +337,42 @@ namespace UpdateTests {
         }        
     };
     
+    class PushFromEmpty : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[]}" ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 5 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[5]}" ) ) == 0 );                     
+        }        
+    };
+
+    class PushInsideNothing : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a.b" << 5 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:[5]}}" ) ) == 0 );                     
+        }                
+    };
+
+    class CantPushInsideOtherMod : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a" << BSONObj() ) << "$push" << BSON( "a.b" << 5 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );                     
+        }                
+    };
+    
+    class CantPushTwice : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[]}" ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 4 ) << "$push" << BSON( "a" << 5 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[]}" ) ) == 0 );
+        }                        
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -371,6 +407,10 @@ namespace UpdateTests {
             add< PushInvalidEltType >();            
             add< PushConflictsWithOtherMod >();            
             add< PushFromNothing >();            
+            add< PushFromEmpty >();            
+            add< PushInsideNothing >();            
+            add< CantPushInsideOtherMod >();            
+            add< CantPushTwice >();            
         }
     };
     
