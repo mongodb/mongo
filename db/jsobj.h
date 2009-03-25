@@ -841,6 +841,8 @@ namespace mongo {
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
+        /** add header for a new subobject and return bufbuilder for writing to
+            the subobject's body */
         BufBuilder &subobjStart(const char *fieldName) {
             b.append((char) Object);
             b.append(fieldName);
@@ -856,6 +858,14 @@ namespace mongo {
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
+        /** add header for a new subarray and return bufbuilder for writing to
+            the subarray's body */
+        BufBuilder &subarrayStart(const char *fieldName) {
+            b.append((char) Array);
+            b.append(fieldName);
+            return b;
+        }
+        
         /** Append a boolean element */
         void appendBool(const char *fieldName, int val) {
             b.append((char) Bool);
@@ -1051,6 +1061,7 @@ namespace mongo {
 
         /** The returned BSONObj will free the buffer when it is finished. */
         BSONObj obj() {
+            massert( "builder does not own memory", owned() );
             int l;
             return BSONObj(decouple(l), true);
         }
@@ -1098,6 +1109,10 @@ namespace mongo {
             return s_ << l;
         }
 
+        bool owned() const {
+            return &b == &buf_;
+        }
+        
     private:
         // Append the provided arr object as an array.
         void marshalArray( const char *fieldName, const BSONObj &arr ) {
