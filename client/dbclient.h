@@ -547,6 +547,8 @@ namespace mongo {
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
          */
         virtual void resetIndexCache();
+        
+        virtual string getServerAddress() const = 0;
 
     private:
         set<string> _seenIndexes;
@@ -639,6 +641,10 @@ namespace mongo {
         string toString() {
             return serverAddress;
         }
+        
+        string getServerAddress() const {
+            return serverAddress;
+        }
 
     protected:
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );
@@ -724,6 +730,10 @@ namespace mongo {
          */
         void isntMaster() {
             master = ( ( master == Left ) ? NotSetR : NotSetL );
+        }
+
+        string getServerAddress() const {
+            return left.getServerAddress() + "," + right.getServerAddress();
         }
 
         /* TODO - not yet implemented. mongos may need these. */

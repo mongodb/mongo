@@ -99,10 +99,13 @@ namespace mongo {
 
 
 // --- local client ---
-
+    
     class DBDirectClient : public DBClientBase {
         virtual string toString() {
             return "DBDirectClient";
+        }
+        virtual string getServerAddress() const{
+            return "localhost"; // TODO: should this have the port?
         }
         virtual bool call( Message &toSend, Message &response, bool assertOk=true );
         virtual void say( Message &toSend );
