@@ -28,7 +28,7 @@
 
 namespace mongo {
 
-    Query& Query::where(const char *jscode, BSONObj scope) { 
+    Query& Query::where(const string &jscode, BSONObj scope) { 
         /* use where() before sort() and hint() and explain(), else this will assert. */
         assert( !obj.hasField("query") );
         BSONObjBuilder b;
@@ -104,16 +104,16 @@ namespace mongo {
         return o.getIntField("ok") == 1;
     }
 
-    inline bool DBClientWithCommands::runCommand(const char *dbname, const BSONObj& cmd, BSONObj &info) {
-        string ns = string(dbname) + ".$cmd";
-        info = findOne(ns.c_str(), cmd);
+    inline bool DBClientWithCommands::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info) {
+        string ns = dbname + ".$cmd";
+        info = findOne(ns, cmd);
         return isOk(info);
     }
 
     /* note - we build a bson obj here -- for something that is super common like getlasterror you
               should have that object prebuilt as that would be faster.
     */
-    bool DBClientWithCommands::simpleCommand(const char *dbname, BSONObj *info, const char *command) {
+    bool DBClientWithCommands::simpleCommand(const string &dbname, BSONObj *info, const string &command) {
         BSONObj o;
         if ( info == 0 )
             info = &o;
@@ -122,7 +122,7 @@ namespace mongo {
         return runCommand(dbname, b.done(), *info);
     }
 
-    unsigned long long DBClientWithCommands::count(const char *_ns, BSONObj query) { 
+    unsigned long long DBClientWithCommands::count(const string &_ns, BSONObj query) { 
         NamespaceString ns(_ns);
         BSONObj cmd = BSON( "count" << ns.coll << "query" << query );
         BSONObj res;
@@ -152,20 +152,20 @@ namespace mongo {
 
     BSONObj getnoncecmdobj = fromjson("{getnonce:1}");
 
-    string DBClientWithCommands::createPasswordDigest( const char * username , const char * clearTextPassword ){
+    string DBClientWithCommands::createPasswordDigest( const string & username , const string & clearTextPassword ){
         md5digest d;
         {
             md5_state_t st;
             md5_init(&st);
-            md5_append(&st, (const md5_byte_t *) username, strlen(username));
+            md5_append(&st, (const md5_byte_t *) username.data(), username.length());
             md5_append(&st, (const md5_byte_t *) ":mongo:", 7 );
-            md5_append(&st, (const md5_byte_t *) clearTextPassword, strlen(clearTextPassword));
+            md5_append(&st, (const md5_byte_t *) clearTextPassword.data(), clearTextPassword.length());
             md5_finish(&st, d);
         }
         return digestToString( d );
     }
 
-    bool DBClientWithCommands::auth(const char *dbname, const char *username, const char *password_text, string& errmsg, bool digestPassword) {
+    bool DBClientWithCommands::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
 		//cout << "TEMP AUTH " << toString() << dbname << ' ' << username << ' ' << password_text << ' ' << digestPassword << endl;
 
 		string password = password_text;
@@ -194,7 +194,7 @@ namespace mongo {
                 md5_state_t st;
                 md5_init(&st);
                 md5_append(&st, (const md5_byte_t *) nonce.c_str(), nonce.size() );
-                md5_append(&st, (const md5_byte_t *) username, strlen(username));
+                md5_append(&st, (const md5_byte_t *) username.data(), username.length());
                 md5_append(&st, (const md5_byte_t *) password.c_str(), password.size() );
                 md5_finish(&st, d);
             }
@@ -219,7 +219,7 @@ namespace mongo {
         return ok;
     }
 
-    bool DBClientWithCommands::createCollection(const char *ns, unsigned size, bool capped, int max, BSONObj *info) {
+    bool DBClientWithCommands::createCollection(const string &ns, unsigned size, bool capped, int max, BSONObj *info) {
         BSONObj o;
         if ( info == 0 )	info = &o;
         BSONObjBuilder b;
@@ -227,12 +227,11 @@ namespace mongo {
         if ( size ) b.append("size", size);
         if ( capped ) b.append("capped", true);
         if ( max ) b.append("max", max);
-        string db = nsToClient(ns);
+        string db = nsToClient(ns.c_str());
         return runCommand(db.c_str(), b.done(), *info);
     }
 
-    bool DBClientWithCommands::copyDatabase(const char *fromdb, const char *todb, const char *fromhost, BSONObj *info) {
-        assert( *fromdb && *todb );
+    bool DBClientWithCommands::copyDatabase(const string &fromdb, const string &todb, const string &fromhost, BSONObj *info) {
         BSONObj o;
         if ( info == 0 ) info = &o;
         BSONObjBuilder b;
@@ -243,7 +242,7 @@ namespace mongo {
         return runCommand("admin", b.done(), *info);
     }
 
-    bool DBClientWithCommands::setDbProfilingLevel(const char *dbname, ProfilingLevel level, BSONObj *info ) {
+    bool DBClientWithCommands::setDbProfilingLevel(const string &dbname, ProfilingLevel level, BSONObj *info ) {
         BSONObj o;
         if ( info == 0 ) info = &o;
 
@@ -251,7 +250,7 @@ namespace mongo {
             // Create system.profile collection.  If it already exists this does nothing.
             // TODO: move this into the db instead of here so that all
             //       drivers don't have to do this.
-            string ns = string(dbname) + ".system.profile";
+            string ns = dbname + ".system.profile";
             createCollection(ns.c_str(), 1024 * 1024, true, 0, info);
         }
 
@@ -262,7 +261,7 @@ namespace mongo {
 
     BSONObj getprofilingcmdobj = fromjson("{\"profile\":-1}");
 
-    bool DBClientWithCommands::getDbProfilingLevel(const char *dbname, ProfilingLevel& level, BSONObj *info) {
+    bool DBClientWithCommands::getDbProfilingLevel(const string &dbname, ProfilingLevel& level, BSONObj *info) {
         BSONObj o;
         if ( info == 0 ) info = &o;
         if ( runCommand(dbname, getprofilingcmdobj, *info) ) {
@@ -272,9 +271,9 @@ namespace mongo {
         return false;
     }
 
-    bool DBClientWithCommands::eval(const char *dbname, const char *jscode, BSONObj& info, BSONElement& retValue, BSONObj *args) {
+    bool DBClientWithCommands::eval(const string &dbname, const string &jscode, BSONObj& info, BSONElement& retValue, BSONObj *args) {
         BSONObjBuilder b;
-        b.appendCode("$eval", jscode);
+        b.appendCode("$eval", jscode.c_str());
         if ( args )
             b.appendArray("args", *args);
         bool ok = runCommand(dbname, b.done(), info);
@@ -283,7 +282,7 @@ namespace mongo {
         return ok;
     }
 
-    bool DBClientWithCommands::eval(const char *dbname, const char *jscode) {
+    bool DBClientWithCommands::eval(const string &dbname, const string &jscode) {
         BSONObj info;
         BSONElement retValue;
         return eval(dbname, jscode, info, retValue);
@@ -349,7 +348,7 @@ namespace mongo {
 
     /* --- dbclientconnection --- */
 
-	bool DBClientConnection::auth(const char *dbname, const char *username, const char *password_text, string& errmsg, bool digestPassword) {
+	bool DBClientConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
 		string password = password_text;
 		if( digestPassword ) 
 			password = createPasswordDigest( username , password_text );
@@ -365,7 +364,7 @@ namespace mongo {
 		return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
 	}
 
-    BSONObj DBClientBase::findOne(const char *ns, Query query, BSONObj *fieldsToReturn, int queryOptions) {
+    BSONObj DBClientBase::findOne(const string &ns, Query query, BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
@@ -377,7 +376,7 @@ namespace mongo {
         return c->next().copy();
     }
 
-    bool DBClientConnection::connect(const char *_serverAddress, string& errmsg) {
+    bool DBClientConnection::connect(const string &_serverAddress, string& errmsg) {
         serverAddress = _serverAddress;
 
         string ip;
@@ -436,7 +435,7 @@ namespace mongo {
 		}
     }
 
-    auto_ptr<DBClientCursor> DBClientBase::query(const char *ns, Query query, int nToReturn,
+    auto_ptr<DBClientCursor> DBClientBase::query(const string &ns, Query query, int nToReturn,
             int nToSkip, BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c( new DBClientCursor( this,
                                     ns, query.obj, nToReturn, nToSkip,
@@ -446,14 +445,14 @@ namespace mongo {
         return auto_ptr< DBClientCursor >( 0 );
     }
 
-    auto_ptr<DBClientCursor> DBClientBase::getMore( const char *ns, long long cursorId, int nToReturn, int options ) {
+    auto_ptr<DBClientCursor> DBClientBase::getMore( const string &ns, long long cursorId, int nToReturn, int options ) {
         auto_ptr<DBClientCursor> c( new DBClientCursor( this, ns, cursorId, nToReturn, options ) );
         if ( c->init() )
             return c;
         return auto_ptr< DBClientCursor >( 0 );
     }
 
-    void DBClientBase::insert( const char * ns , BSONObj obj ) {
+    void DBClientBase::insert( const string & ns , BSONObj obj ) {
         Message toSend;
 
         BufBuilder b;
@@ -467,7 +466,7 @@ namespace mongo {
         say( toSend );
     }
 
-    void DBClientBase::insert( const char * ns , const vector< BSONObj > &v ) {
+    void DBClientBase::insert( const string & ns , const vector< BSONObj > &v ) {
         Message toSend;
         
         BufBuilder b;
@@ -482,7 +481,7 @@ namespace mongo {
         say( toSend );
     }
 
-    void DBClientBase::remove( const char * ns , Query obj , bool justOne ) {
+    void DBClientBase::remove( const string & ns , Query obj , bool justOne ) {
         Message toSend;
 
         BufBuilder b;
@@ -502,7 +501,7 @@ namespace mongo {
         say( toSend );
     }
 
-    void DBClientBase::update( const char * ns , Query query , BSONObj obj , bool upsert ) {
+    void DBClientBase::update( const string & ns , Query query , BSONObj obj , bool upsert ) {
 
         BufBuilder b;
         b.append( (int)0 ); // reserverd
@@ -519,7 +518,7 @@ namespace mongo {
         say( toSend );
     }
 
-    bool DBClientBase::ensureIndex( const string &ns , BSONObj keys , const char * name ) {
+    bool DBClientBase::ensureIndex( const string &ns , BSONObj keys , const string & name ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
@@ -527,7 +526,7 @@ namespace mongo {
         string cacheKey(ns);
         cacheKey += "--";
 
-        if ( name ) {
+        if ( name != "" ) {
             toSave.append( "name" , name );
             cacheKey += name;
         }
@@ -840,7 +839,7 @@ again:
         return master == Left ? left : right;
     }
 
-    bool DBClientPaired::connect(const char *serverHostname1, const char *serverHostname2) {
+    bool DBClientPaired::connect(const string &serverHostname1, const string &serverHostname2) {
         string errmsg;
         bool l = left.connect(serverHostname1, errmsg);
         bool r = right.connect(serverHostname2, errmsg);
@@ -856,7 +855,7 @@ again:
         return true;
     }
 
-	bool DBClientPaired::auth(const char *dbname, const char *username, const char *pwd, string& errmsg) { 
+	bool DBClientPaired::auth(const string &dbname, const string &username, const string &pwd, string& errmsg) { 
 		DBClientConnection& m = checkMaster();
 		if( !m.auth(dbname, username, pwd, errmsg) )
 			return false;
@@ -873,13 +872,13 @@ again:
 		return true;
 	}
 
-    auto_ptr<DBClientCursor> DBClientPaired::query(const char *a, Query b, int c, int d,
+    auto_ptr<DBClientCursor> DBClientPaired::query(const string &a, Query b, int c, int d,
             BSONObj *e, int f)
     {
         return checkMaster().query(a,b,c,d,e,f);
     }
 
-    BSONObj DBClientPaired::findOne(const char *a, Query b, BSONObj *c, int d) {
+    BSONObj DBClientPaired::findOne(const string &a, Query b, BSONObj *c, int d) {
         return checkMaster().findOne(a,b,c,d);
     }
 

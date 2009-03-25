@@ -162,6 +162,7 @@ allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "mongod" )
 nix = False
 useJavaHome = False
+linux = False
 linux64  = False
 darwin = False
 windows = False
@@ -231,6 +232,7 @@ if "darwin" == os.sys.platform:
         env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
 
 elif "linux2" == os.sys.platform:
+    linux = True
     useJavaHome = True
     javaOS = "linux"
     platform = "linux"
@@ -479,6 +481,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             myCheckLib( "tinfo" )
         else:
             print( "WARNING: no readline, shell will be a bit ugly" )
+
+        if linux:
+            myCheckLib( "rt" , True )
 
     # this will add it iff it exists and works
     myCheckLib( "boost_system-mt" )

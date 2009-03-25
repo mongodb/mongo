@@ -858,6 +858,10 @@ namespace mongo {
             b.append(fieldName);
             b.append(n);
         }
+        /** Append a 32 bit integer element */
+        void append(const string &fieldName, int n) {
+            append( fieldName.c_str(), n );
+        }
         void append(const char *fieldName, unsigned n) { append(fieldName, (int) n); }
         /** Append a double element */
         BSONObjBuilder& append(const char *fieldName, double n) {
@@ -1013,6 +1017,9 @@ namespace mongo {
         /* helper function -- see Query::where() for primary way to do this. */
         void appendWhere( const char *code, const BSONObj &scope ){
             appendCodeWScope( "$where" , code , scope );
+        }
+        void appendWhere( const string &code, const BSONObj &scope ){
+            appendWhere( code.c_str(), scope );
         }
         
         /** Append an array of values. */

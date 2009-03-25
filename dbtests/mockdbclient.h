@@ -25,11 +25,11 @@ class MockDBClientConnection : public DBClientConnection {
 public:
     MockDBClientConnection() : connect_() {}
     virtual
-    BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+    BSONObj findOne(const string &ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
         return one_;
     }
     virtual
-    bool connect(const char *serverHostname, string& errmsg) {
+    bool connect(const string &serverHostname, string& errmsg) {
         return connect_;
     }
     virtual
@@ -62,7 +62,7 @@ public:
             rp_( rp ),
             cc_( cc ) {
     }
-    virtual BSONObj findOne(const char *ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+    virtual BSONObj findOne(const string &ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
         if ( cc_ ) cc_->beforeCommand();
         SetGlobalReplPair s( rp_ );
         BSONObjBuilder result;
@@ -70,7 +70,7 @@ public:
         if ( cc_ ) cc_->afterCommand();
         return result.obj();
     }
-    virtual bool connect( const char *serverHostname, string& errmsg ) {
+    virtual bool connect( const string &serverHostname, string& errmsg ) {
         return true;
     }
 private:
