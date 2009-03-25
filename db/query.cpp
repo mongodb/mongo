@@ -347,9 +347,8 @@ namespace mongo {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
             if ( m.op == Mod::INC ) {
-                BSONElementManipulator( e ).setNumber( e.number() + m.getn() );
-                BSONElementManipulator( m.elt ).setNumber( e.number() );
-                m.setn( e.number() );
+                m.setn( e.number() + m.getn() );
+                BSONElementManipulator( e ).setNumber( m.getn() );
             } else {
                 if ( e.isNumber() && m.elt.isNumber() )
                     BSONElementManipulator( e ).setNumber( m.getn() );
@@ -403,8 +402,7 @@ namespace mongo {
             if ( cmp == 0 ) {
                 BSONElement e = p->second;
                 if ( m->op == Mod::INC ) {
-                    BSONElementManipulator( m->elt ).setNumber( e.number() + m->getn() );
-                    m->setn( m->elt.number() );
+                    m->setn( m->getn() + e.number() );
                     b2.appendAs( m->elt, m->fieldName );
                 } else if ( m->op == Mod::SET ) {
                     b2.appendAs( m->elt, m->fieldName );
