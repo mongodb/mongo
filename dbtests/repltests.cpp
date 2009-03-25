@@ -624,6 +624,51 @@ namespace ReplTests {
             }            
         };
         
+        class PushUpsert : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ), true );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( fromjson( "{'_id':0,a:[4,5]}" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4]}" ) );
+            }            
+        };
+
+        class MultiPush : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) << "$push" << BSON( "b.c" << 6.0 ) ) );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( fromjson( "{'_id':0,a:[4,5],b:{c:[6]}}" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4]}" ) );
+            }            
+        };
+
+        class EmptyPush : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( fromjson( "{'_id':0,a:[5]}" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0}" ) );
+            }                        
+        };
+        
     } // namespace Idempotence
     
     class All : public UnitTest::Suite {
@@ -654,6 +699,9 @@ namespace ReplTests {
             add< Idempotence::FailingUpdate >();
             add< Idempotence::SetNumToStr >();
             add< Idempotence::Push >();
+            add< Idempotence::PushUpsert >();
+            add< Idempotence::MultiPush >();
+            add< Idempotence::EmptyPush >();
         }
     };
     

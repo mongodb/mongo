@@ -214,6 +214,7 @@ namespace mongo {
         double *ndouble;
         int *nint;
         BSONElement elt;
+        int pushStartSize;
         void setn(double n) const {
             if ( ndouble ) *ndouble = n;
             else *nint = (int) n;
@@ -311,22 +312,13 @@ namespace mongo {
                     return true;
             return false;
         }
-        void appendSizeSpecForPushes( BSONObjBuilder &b, const BSONObj &original ) const {
+        void appendSizeSpecForPushes( BSONObjBuilder &b ) const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
                 if ( i->op == Mod::PUSH ) {
-                    BSONElement arrElt = original.getFieldDotted( i->fieldName );
-                    if ( arrElt.type() != Array )
-                        continue;
-                    BSONObj arr = arrElt.embeddedObject();
-                    int count = 0;
-                    BSONObjIterator j( arr );
-                    while( j.more() ) {
-                        BSONElement e = j.next();
-                        if ( e.eoo() )
-                            break;
-                        ++count;
-                    }
-                    b << i->fieldName << BSON( "$size" << count );
+                    if ( i->pushStartSize == -1 )
+                        b.appendNull( i->fieldName );
+                    else
+                        b << i->fieldName << BSON( "$size" << i->pushStartSize );
                 }
             }
         }
@@ -420,27 +412,22 @@ namespace mongo {
                     uassert( "Push can only be applied to an array", e.type() == Array );
                     BSONObjBuilder arr;
                     BSONObjIterator i( e.embeddedObject() );
-                    const char *lastIndex = 0;
+                    int count = 0;
                     while( i.more() ) {
                         BSONElement arrI = i.next();
                         if ( arrI.eoo() )
                             break;
                         arr.append( arrI );
-                        lastIndex = arrI.fieldName();
+                        ++count;
                     }
-                    string nextIndex;
-                    if ( !lastIndex )
-                        nextIndex = "0";
-                    else {
-                        int index = strtol( lastIndex, 0, 10 );
-                        stringstream ss;
-                        ss << index + 1;
-                        nextIndex = ss.str();
-                    }
+                    stringstream ss;
+                    ss << count;
+                    string nextIndex = ss.str();
                     arr.appendAs( m->elt, nextIndex.c_str() );
                     BSONObjBuilder encapsulatedArr;
                     encapsulatedArr.appendArray( "foo", arr.done() );
                     b2.appendAs( encapsulatedArr.done().firstElement(), m->fieldName );
+                    m->pushStartSize = count;
                 }
                 ++m;
                 ++p;
@@ -451,6 +438,7 @@ namespace mongo {
                     BSONObjBuilder encapsulatedArr;
                     encapsulatedArr.appendArray( "foo", arr.done() );
                     b2.appendAs( encapsulatedArr.done().firstElement(), m->fieldName );
+                    m->pushStartSize = -1;
                 } else {
                     b2.appendAs( m->elt, m->fieldName );
                 }
@@ -613,18 +601,18 @@ namespace mongo {
                     if ( profile )
                         ss << " fastmod ";
                 } else {
-                    if ( logop && mods.havePush() ) {
-                        BSONObjBuilder patternBuilder;
-                        patternBuilder.appendElements( pattern );
-                        mods.appendSizeSpecForPushes( patternBuilder, c->currLoc().obj() );
-                        pattern = patternBuilder.obj();                        
-                    }
                     BSONObj newObj = mods.createNewFromMods( c->currLoc().obj() );
                     theDataFileMgr.update(ns, r, c->currLoc(), newObj.objdata(), newObj.objsize(), ss);                    
                 }
                 if ( logop ) {
                     if ( mods.size() ) {
-                        logOp("u", ns, updateobj, &pattern, &upsert);
+                        if ( mods.havePush() ) {
+                            BSONObjBuilder patternBuilder;
+                            patternBuilder.appendElements( pattern );
+                            mods.appendSizeSpecForPushes( patternBuilder );
+                            pattern = patternBuilder.obj();                        
+                        }
+                        logOp("u", ns, updateobj, &pattern );
                         return 5;
                     }
                 }
