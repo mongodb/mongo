@@ -221,7 +221,6 @@ namespace mongo {
         double getn() const {
             return ndouble ? *ndouble : *nint;
         }
-        int type;
         bool operator<( const Mod &other ) const {
             return strcmp( fieldName, other.fieldName ) < 0;
         }
@@ -305,6 +304,31 @@ namespace mongo {
         void appendUpsert( BSONObjBuilder &b ) const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
                 b.append(i->fieldName, i->getn());   
+        }
+        bool havePush() const {
+            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
+                if ( i->op == Mod::PUSH )
+                    return true;
+            return false;
+        }
+        void appendSizeSpecForPushes( BSONObjBuilder &b, const BSONObj &original ) const {
+            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
+                if ( i->op == Mod::PUSH ) {
+                    BSONElement arrElt = original.getFieldDotted( i->fieldName );
+                    if ( arrElt.type() != Array )
+                        continue;
+                    BSONObj arr = arrElt.embeddedObject();
+                    int count = 0;
+                    BSONObjIterator j( arr );
+                    while( j.more() ) {
+                        BSONElement e = j.next();
+                        if ( e.eoo() )
+                            break;
+                        ++count;
+                    }
+                    b << i->fieldName << BSON( "$size" << count );
+                }
+            }
         }
     };
     
@@ -589,6 +613,12 @@ namespace mongo {
                     if ( profile )
                         ss << " fastmod ";
                 } else {
+                    if ( logop && mods.havePush() ) {
+                        BSONObjBuilder patternBuilder;
+                        patternBuilder.appendElements( pattern );
+                        mods.appendSizeSpecForPushes( patternBuilder, c->currLoc().obj() );
+                        pattern = patternBuilder.obj();                        
+                    }
                     BSONObj newObj = mods.createNewFromMods( c->currLoc().obj() );
                     theDataFileMgr.update(ns, r, c->currLoc(), newObj.objdata(), newObj.objsize(), ss);                    
                 }

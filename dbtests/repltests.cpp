@@ -609,6 +609,21 @@ namespace ReplTests {
             }
         };
         
+        class Push : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( fromjson( "{'_id':0,a:[4,5]}" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4]}" ) );
+            }            
+        };
+        
     } // namespace Idempotence
     
     class All : public UnitTest::Suite {
@@ -638,6 +653,7 @@ namespace ReplTests {
             add< Idempotence::RemoveOne >();
             add< Idempotence::FailingUpdate >();
             add< Idempotence::SetNumToStr >();
+            add< Idempotence::Push >();
         }
     };
     
