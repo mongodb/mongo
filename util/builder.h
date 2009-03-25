@@ -27,8 +27,12 @@ namespace mongo {
     class BufBuilder {
     public:
         BufBuilder(int initsize = 512) : size(initsize) {
-            data = (char *) malloc(size);
-            assert(data);
+            if ( size > 0 ) {
+                data = (char *) malloc(size);
+                assert(data);
+            } else {
+                data = 0;
+            }
             l = 0;
         }
         ~BufBuilder() {
@@ -88,7 +92,7 @@ namespace mongo {
             append( (void *)str.c_str(), str.length() + 1 );
         }
 
-        int len() {
+        int len() const {
             return l;
         }
 
@@ -99,6 +103,8 @@ namespace mongo {
             l += by;
             if ( l > size ) {
                 int a = size * 2;
+                if ( a == 0 )
+                    a = 512;
                 if ( l > a )
                     a = l + 16 * 1024;
                 assert( a < 64 * 1024 * 1024 );

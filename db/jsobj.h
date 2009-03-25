@@ -807,13 +807,17 @@ namespace mongo {
     /**
        utility for creating a BSONObj
      */
-    class BSONObjBuilder {
+    class BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
-        BSONObjBuilder(int initsize=512) : b(initsize), s_( this ) {
+        BSONObjBuilder(int initsize=512) : b(buf_), buf_(initsize), offset_( 0 ), s_( this ) {
             b.skip(4); /*leave room for size field*/
         }
 
+        BSONObjBuilder( BufBuilder &baseBuilder ) : b( baseBuilder ), offset_( baseBuilder.len() ), s_( this ) {
+            b.skip( 4 );
+        }
+        
         /** add all the fields from the object specified to this object */
         BSONObjBuilder& appendElements(BSONObj x);
 
@@ -837,6 +841,12 @@ namespace mongo {
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
+        BufBuilder &subobjStart(const char *fieldName) {
+            b.append((char) Object);
+            b.append(fieldName);
+            return b;
+        }
+        
         /** add a subobject as a member with type Array.  Thus arr object should have "0", "1", ...
            style fields in it.
         */
@@ -1099,12 +1109,14 @@ namespace mongo {
         char* _done() {
             s_.endField();
             b.append((char) EOO);
-            char *data = b.buf();
-            *((int*)data) = b.len();
+            char *data = b.buf() + offset_;
+            *((int*)data) = b.len() - offset_;
             return data;
         }
 
-        BufBuilder b;
+        BufBuilder &b;
+        BufBuilder buf_;
+        int offset_;
         BSONObjBuilderValueStream s_;
     };
 
