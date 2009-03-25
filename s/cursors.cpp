@@ -48,6 +48,8 @@ namespace mongo {
         }
 
         ScopedDbConnection conn( server );
+        checkShardVersion( conn.conn() , _ns );
+
         log(5) << "ShardedCursor::query  server:" << server << " ns:" << _ns << " query:" << q << " num:" << num << " _fields:" << _fields << " options: " << _options << endl;
         auto_ptr<DBClientCursor> cursor = conn->query( _ns.c_str() , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
         conn.done();

@@ -4,6 +4,7 @@
 #include "request.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
+#include "shard.h"
 
 namespace mongo {
 
@@ -25,6 +26,8 @@ namespace mongo {
             ScopedDbConnection dbcon( server );
             DBClientBase &_c = dbcon.conn();
             
+            checkShardVersion( _c , r.getns() );
+
             // TODO: This will not work with Paired connections.  Fix. 
             DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
             Message response;
@@ -45,6 +48,24 @@ namespace mongo {
         ScopedDbConnection dbcon( server );
         dbcon->insert( ns , obj );
         dbcon.done();
+    }
+
+    void checkShardVersion( DBClientBase& conn , const string& ns ){
+        // TODO: cache, optimize, etc...
+        
+        DBConfig * conf = grid.getDBConfig( ns );
+        if ( ! conf )
+            return;
+        
+        if ( ! conf->sharded( ns ) )
+            return;
+        
+        ServerShardVersion version = conf->getShardManager( ns )->getVersion( conn.getServerAddress() );
+        cout << "got version: " << version << " for : " << ns << endl;
+        
+        
+        // grid->getVersion( conn.server() , ns );
+        // check
     }
 
 }
