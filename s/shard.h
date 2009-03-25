@@ -35,6 +35,8 @@ namespace mongo {
     class ShardManager;
     class ShardObjUnitTest;
 
+    typedef unsigned long long ServerShardVersion;
+
     /**
        config.shard
        { ns : "alleyinsider.fs.chunks" , min : {} , max : {} , server : "localhost:30001" }
@@ -88,7 +90,7 @@ namespace mongo {
         BSONObj _min;
         BSONObj _max;
         string _server;
-        unsigned long long _lastmod;
+        ServerShardVersion _lastmod;
 
         bool _modified;
         
@@ -129,7 +131,8 @@ namespace mongo {
 
         string toString() const;
         operator string() const { return toString(); }
-        
+
+        ServerShardVersion getVersion( const string& server ) const;
     private:
         DBConfig * _config;
         string _ns;
