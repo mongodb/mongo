@@ -43,12 +43,12 @@ namespace mongo {
         virtual void unserialize(const BSONObj& from) = 0;
 
         virtual string modelServer() = 0;
-
+        
         /** Load a single object. 
             @return true if successful.
         */
-        bool load(BSONObj& query);
-        void save( bool check=false );
+        virtual bool load(BSONObj& query);
+        virtual void save( bool check=false );
         
     private:
         BSONObj _id;

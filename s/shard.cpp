@@ -190,7 +190,7 @@ namespace mongo {
         }
         return added;
     }
-
+    
     void ShardManager::save(){
         for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
             Shard* s = *i;
@@ -198,6 +198,24 @@ namespace mongo {
                 continue;
             s->save( true );
         }
+    }
+
+    ServerShardVersion ShardManager::getVersion( const string& server ) const{
+        // TODO: cache or something?
+        
+        ServerShardVersion max = 0;
+        cout << "getVersion for: " << server << endl;
+        for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
+            Shard* s = *i;
+            cout << "\t" << s->getServer() << endl;
+            if ( s->getServer() != server )
+                continue;
+            
+            if ( s->_lastmod > max )
+                max = s->_lastmod;
+        }        
+
+        return max;
     }
 
     string ShardManager::toString() const {

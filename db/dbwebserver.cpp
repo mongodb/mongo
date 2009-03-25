@@ -147,7 +147,7 @@ namespace mongo {
         }
 
         void doUnlockedStuff(stringstream& ss) {
-            ss << "port:      " << port << '\n';
+            /* this is in the header already ss << "port:      " << port << '\n'; */
             ss << "dblocked:  " << dbMutexInfo.isLocked() << " (initial)\n";
             ss << "uptime:    " << time(0)-started << " seconds\n";
             if ( replAllDead )
@@ -251,7 +251,7 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << "db " << getHostName() << ':' << port << ' ';
+                z << "mongodb " << getHostName() << ':' << port << ' ';
                 dbname = z.str();
             }
             ss << dbname << "</title></head><body><h2>" << dbname << "</h2><p>\n<pre>";
@@ -442,8 +442,14 @@ namespace mongo {
         AuthenticationInfo *ai = new AuthenticationInfo();
         authInfo.reset(ai);
         DbWebServer mini;
-        if ( mini.init(port+1000) )
+        int p = port + 1000;
+        if ( mini.init(p) ) {
+            log() << "web admin interface listening on port " << p << '\n';
             mini.run();
+        }
+        else { 
+            log() << "warning: web admin interface failed to initialize on port " << p << endl;
+        }
     }
 
 } // namespace mongo

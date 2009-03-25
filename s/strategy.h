@@ -19,6 +19,8 @@ namespace mongo {
         void insert( string server , const char * ns , const BSONObj& obj );
         
     };
+
+    void checkShardVersion( DBClientBase & conn , const string& ns );
     
     extern Strategy * SINGLE;
     extern Strategy * SHARDED;
