@@ -350,6 +350,7 @@ void writeMongoProgramOutputLine( int port, const char *line ) {
 class MongoProgramRunner {
     char **argv_;
     int port_;
+    int pipe_;
 public:
     MongoProgramRunner( const v8::Arguments &args ) {
         assert( args.Length() > 0 );
@@ -386,7 +387,7 @@ public:
         assert( dbs.count( port_ ) == 0 );        
     }
     
-    void operator()() {
+    void start() {
         int pipeEnds[ 2 ];
         assert( pipe( pipeEnds ) != -1 );
         
@@ -407,7 +408,11 @@ public:
         free( argv_ );
         
         dbs.insert( make_pair( port_, make_pair( pid, pipeEnds[ 1 ] ) ) );
-        
+        pipe_ = pipeEnds[ 0 ];
+    }
+    
+    // Continue reading output
+    void operator()() {
         // This assumes there aren't any 0's in the mongo program output.
         // Hope that's ok.
         char buf[ 1024 ];
@@ -415,7 +420,7 @@ public:
         char *start = buf;
         while( 1 ) {
             int lenToRead = 1023 - ( start - buf );
-            int ret = read( pipeEnds[ 0 ], (void *)start, lenToRead );
+            int ret = read( pipe_, (void *)start, lenToRead );
             assert( ret != -1 );
             start[ ret ] = '\0';
             char *last = buf;
@@ -441,6 +446,7 @@ public:
 
 v8::Handle< v8::Value > StartMongoProgram( const v8::Arguments &a ) {
     MongoProgramRunner r( a );
+    r.start();
     boost::thread t( r );
     return v8::Undefined();
 }
@@ -494,8 +500,11 @@ v8::Handle< v8::Value > StopMongoProgram( const v8::Arguments &a ) {
 }
 
 void KillMongoProgramInstances() {
+    vector< int > ports;
     for( map< int, pair< pid_t, int > >::iterator i = dbs.begin(); i != dbs.end(); ++i )
-        killDb( i->first, SIGTERM );
+        ports.push_back( i->first );
+    for( vector< int >::iterator i = ports.begin(); i != ports.end(); ++i )
+        killDb( *i, SIGTERM );
 }
 
 MongoProgramScope::~MongoProgramScope() {
