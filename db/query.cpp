@@ -34,6 +34,7 @@
 #include "curop.h"
 #include "commands.h"
 #include "queryoptimizer.h"
+#include "lasterror.h"
 
 namespace mongo {
 
@@ -160,6 +161,7 @@ namespace mongo {
             }
         } while ( c->ok() );
 
+        recordDelete( nDeleted );
         return nDeleted;
     }
 
@@ -584,6 +586,8 @@ namespace mongo {
                 }
             }
             
+            recordUpdate( true );
+            
             /* note: we only update one row and quit.  if you do multiple later,
              be careful or multikeys in arrays could break things badly.  best
              to only allow updating a single row with a multikey lookup.
@@ -632,6 +636,8 @@ namespace mongo {
         
         if ( profile )
             ss << " nscanned:" << u->nscanned();
+        
+        recordUpdate( false );
         
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {

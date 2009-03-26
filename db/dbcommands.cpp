@@ -243,7 +243,7 @@ namespace mongo {
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.get();
             assert( le );
-            le->resetError();
+            le->reset();
             return true;
         }
     } cmdResetError;
@@ -262,11 +262,10 @@ namespace mongo {
             LastError *le = lastError.get();
             assert( le );
             le->nPrev--; // we don't count as an operation
-            if ( le->nPrev != 1 || !le->haveError() ) {
-                result.appendNull("err");
-                return true;
-            }
-            result.append("err", le->msg);
+            if ( le->nPrev != 1 )
+                LastError::noError.appendSelf( result );
+            else
+                le->appendSelf( result );
             return true;
         }
     } cmdGetLastError;
@@ -301,13 +300,11 @@ namespace mongo {
             LastError *le = lastError.get();
             assert( le );
             le->nPrev--; // we don't count as an operation
-            if ( !le->haveError() ) {
-                result.appendNull("err");
-                result.append("nPrev", 1);
-                return true;
-            }
-            result.append("err", le->msg);
-            result.append("nPrev", le->nPrev);
+            le->appendSelf( result );
+            if ( le->valid )
+                result.append( "nPrev", le->nPrev );
+            else
+                result.append( "nPrev", -1 );
             return true;
         }
     } cmdGetPrevError;
