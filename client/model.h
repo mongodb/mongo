@@ -50,7 +50,7 @@ namespace mongo {
         virtual bool load(BSONObj& query);
         virtual void save( bool check=false );
         
-    private:
+    protected:
         BSONObj _id;
     };
 
