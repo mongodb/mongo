@@ -373,6 +373,15 @@ namespace UpdateTests {
         }                        
     };
     
+    class SetEncapsulationConflictsWithExistingType : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:4}}" ) );
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a.b.c" << 4.0 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );
+        }                                
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -411,6 +420,7 @@ namespace UpdateTests {
             add< PushInsideNothing >();            
             add< CantPushInsideOtherMod >();            
             add< CantPushTwice >();            
+            add< SetEncapsulationConflictsWithExistingType >();            
         }
     };
     

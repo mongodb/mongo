@@ -265,7 +265,6 @@ namespace mongo {
                     return false;
                 if ( modForField( left.c_str() ) )
                     return false;
-                left += "." + EmbeddedBuilder::splitDot( right );
             }
             return true;
         }
