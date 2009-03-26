@@ -161,7 +161,6 @@ namespace mongo {
             }
         } while ( c->ok() );
 
-        recordDelete( nDeleted );
         return nDeleted;
     }
 
@@ -586,8 +585,6 @@ namespace mongo {
                 }
             }
             
-            recordUpdate( true );
-            
             /* note: we only update one row and quit.  if you do multiple later,
              be careful or multikeys in arrays could break things badly.  best
              to only allow updating a single row with a multikey lookup.
@@ -637,8 +634,6 @@ namespace mongo {
         if ( profile )
             ss << " nscanned:" << u->nscanned();
         
-        recordUpdate( false );
-        
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
@@ -677,10 +672,11 @@ namespace mongo {
         return __updateObjects( ns, updateobj, pattern, upsert, ss, logop );
     }
         
-    void updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss) {
+    bool updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss) {
         int rc = __updateObjects(ns, updateobj, pattern, upsert, ss, true);
         if ( rc != 5 && rc != 0 && rc != 4 && rc != 3 )
             logOp("u", ns, updateobj, &pattern, &upsert);
+        return ( rc == 1 || rc == 2 || rc == 5 );
     }
 
     int queryTraceLevel = 0;
