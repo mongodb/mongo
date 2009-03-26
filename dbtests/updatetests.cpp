@@ -381,6 +381,24 @@ namespace UpdateTests {
             ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );
         }                                
     };
+
+    class CantPushToParent : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:4}}" ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 4.0 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );            
+        }
+    };
+    
+    class CantIncParent : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:4}}" ) );
+            client().update( ns(), Query(), BSON( "$inc" << BSON( "a" << 4.0 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );            
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -421,6 +439,8 @@ namespace UpdateTests {
             add< CantPushInsideOtherMod >();            
             add< CantPushTwice >();            
             add< SetEncapsulationConflictsWithExistingType >();            
+            add< CantPushToParent >();            
+            add< CantIncParent >();            
         }
     };
     

@@ -340,6 +340,7 @@ namespace mongo {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
             uassert( "Cannot apply $inc modifier to non-number", m.op != Mod::INC || e.isNumber() || e.eoo() );
+            uassert( "Cannot apply $push modifier to non-array", m.op != Mod::PUSH || e.type() == Array || e.eoo() );
             if ( m.op == Mod::PUSH )
                 inPlacePossible = false;
             if ( e.isNumber() && m.elt.isNumber() )
@@ -415,7 +416,6 @@ namespace mongo {
                 } else if ( m->op == Mod::SET ) {
                     b2.appendAs( m->elt, m->fieldName );
                 } else if ( m->op == Mod::PUSH ) {
-                    uassert( "Push can only be applied to an array", e.type() == Array );
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
                     int count = 0;
