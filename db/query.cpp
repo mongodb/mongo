@@ -250,6 +250,7 @@ namespace mongo {
             bool pDone = ( p == pEnd );
             if ( mDone && pDone )
                 return 0;
+            // If one iterator is done we want to read from the other one, so say the other one is lower.
             if ( mDone )
                 return 1;
             if ( pDone )
@@ -313,10 +314,6 @@ namespace mongo {
                     return &*i;
             }
             return 0;
-        }
-        void appendUpsert( BSONObjBuilder &b ) const {
-            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
-                b.append(i->fieldName, i->getn());   
         }
         bool havePush() const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
