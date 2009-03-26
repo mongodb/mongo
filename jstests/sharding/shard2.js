@@ -44,7 +44,7 @@ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : seconday.ge
 assert.eq( 2 , seconday.foo.find().length() , "seconday should have 2 after move shard" );
 assert.eq( 1 , primary.foo.find().length() , "primary should only have 1 after move shard" );
 
-assert.eq( 2 , s.config.shard.count() , "still should have 2 shards" );
+assert.eq( 2 , s.config.shard.count() , "still should have 2 shards after move not:" + s.config.shard.find().toArray().tojson( true ) );
 shards = s.config.shard.find().toArray();
 assert.neq( shards[0].server , shards[1].server , "servers should NOT be the same after the move" );
 

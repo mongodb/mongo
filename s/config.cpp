@@ -72,9 +72,9 @@ namespace mongo {
 
     }
 
-    ShardManager* DBConfig::getShardManager( const string& ns ){
+    ShardManager* DBConfig::getShardManager( const string& ns , bool reload ){
         ShardManager* m = _shards[ns];
-        if ( m )
+        if ( m && ! reload )
             return m;
 
         uassert( (string)"not sharded:" + ns , sharded( ns ) );

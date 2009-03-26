@@ -62,7 +62,7 @@ namespace mongo {
          */
         bool sharded( const string& ns );
         
-        ShardManager* getShardManager( const string& ns );
+        ShardManager* getShardManager( const string& ns , bool reload = false );
 
         /**
          * @return the correct for machine for the ns
