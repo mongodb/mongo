@@ -696,7 +696,7 @@ def addSmoketest( name, deps, actions ):
     testEnv.SideEffect( "dummySmokeSideEffect", name )
 
 def testSetup( env , target , source ):
-    Mkdir( "/tmp/unittest/" )
+    Execute( Mkdir( "/tmp/unittest/" ) )
 
 addSmoketest( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ testSetup , perftest[ 0 ].abspath ] )
