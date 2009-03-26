@@ -42,6 +42,7 @@ class RecCache {
     vector<BasicRecStore*> stores; // DiskLoc::a() indicates the index into this vector
     map<string, BasicRecStore*> storesByNsKey; // nskey -> BasicRecStore*
 public:
+    static unsigned MAXNODES;
     enum { Base = 10000 };
 private:
     BasicRecStore* _initStore(string fname);
@@ -112,6 +113,7 @@ private:
     }
 
     void dump();
+    void _ejectOld();
 
 public:
     /* all public functions (except constructor) should use the mutex */
@@ -124,7 +126,10 @@ public:
     /* call this after doing some work, after you are sure you are done with modifications.
        we call it from dbunlocking().
     */
-    void ejectOld();
+    void ejectOld() { 
+        if( nnodes > MAXNODES ) // just enough here to be inlineable for speed reasons.  _ejectOld does the real work
+            _ejectOld();
+    }
 
     /* bg writer thread invokes this */
     void writeLazily();
@@ -213,5 +218,10 @@ public:
         theRecCache.closeFiles(dbname, dbpath);
     }
 };
+
+inline void dbunlocking() { 
+//    dassert( dbMutexInfo.isLocked() );
+    theRecCache.ejectOld();
+}
 
 } /*namespace*/

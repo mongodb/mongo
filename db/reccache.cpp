@@ -1,18 +1,18 @@
 // storage.cpp
 
 #include "stdafx.h"
-int aaa;
 #include "pdfile.h"
-
 #include "reccache.h"
-
 #include "rec.h"
-
 #include "db.h"
 
 namespace mongo {
 
 RecCache theRecCache(BucketSize);
+
+/* TODO MAKE CONFIGURABLE */
+// 100k * 8KB = 800MB
+unsigned RecCache::MAXNODES = 150000;
 
 void writerThread() { 
     sleepsecs(10);
@@ -294,18 +294,13 @@ void RecCache::writeLazily() {
     sleepmillis(sleep);
 }
 
-// 100k * 8KB = 800MB
-const unsigned RECCACHELIMIT = 150000;
-
-inline void RecCache::ejectOld() { 
-    if( nnodes <= RECCACHELIMIT )
-        return;
+void RecCache::_ejectOld() { 
     boostlock lk(rcmutex);
-    if( nnodes <= RECCACHELIMIT )
+    if( nnodes <= MAXNODES )
         return;
     Node *n = oldest;
     while( 1 ) {
-        if( nnodes <= RECCACHELIMIT - 4 ) { 
+        if( nnodes <= MAXNODES - 4 ) { 
             n->older = 0;
             oldest = n;
             assert( oldest ) ;
@@ -394,11 +389,6 @@ void RecCache::drop(const char *_ns) {
     catch(...) { 
         log() << "RecCache::drop: exception removing file " << fname << endl;
     }
-}
-
-void dbunlocking() { 
-    dassert( dbMutexInfo.isLocked() );
-    theRecCache.ejectOld();
 }
 
 }
