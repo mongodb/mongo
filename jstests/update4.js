@@ -17,6 +17,13 @@ f.update( {a:1}, {a:1}, true );
 assert.eq( false, getLastError().updatedExisting );
 f.update( {a:1}, {a:1}, true );
 assert.eq( true, getLastError().updatedExisting );
+assert.eq( true, db.getPrevError().updatedExisting );
+assert.eq( 1, db.getPrevError().nPrev );
+
+f.findOne();
+assert.eq( undefined, getLastError().updatedExisting );
+assert.eq( true, db.getPrevError().updatedExisting );
+assert.eq( 2, db.getPrevError().nPrev );
 
 db.forceError();
 assert.eq( undefined, getLastError().updatedExisting );
