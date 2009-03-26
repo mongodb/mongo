@@ -25,6 +25,7 @@ function simpleFindOne(){
     return a2.getMongo().getDB( "alleyinsider" ).foo.findOne();
 }
 
+assert.commandWorked( a2.runCommand( { "setShardVersion" : "alleyinsider.bar" , configdb : s._configDB , version : 2 , authoritative : true } ) , "setShardVersion bar temp");
 assert.throws( simpleFindOne , [] , "should complain about not in sharded mode 1" );
 assert( a2.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , version : 2 } ).ok == 1 , "setShardVersion a2-1");
 simpleFindOne(); // now should run ok

@@ -120,7 +120,9 @@ namespace mongo {
 
             unsigned long long& oldVersion = (*versions)[ns];
             if ( version < oldVersion ){
-                errmsg = "going to older version for you!";
+                errmsg = "you already have a newer version";
+                result.appendTimestamp( "oldVersion" , oldVersion );
+                result.appendTimestamp( "newVersion" , version );
                 return false;
             }
 
@@ -194,11 +196,19 @@ namespace mongo {
         
         NSVersions * versions = clientShardVersions.get();
         if ( ! versions ){
-            errmsg = ns + " in sharded mode, but client not in sharded mode";
-            return false;
+            // this means the client has nothing sharded
+            // so this allows direct connections to do whatever they want
+            // which i think is the correct behavior
+            return true;
         }
 
         unsigned long long clientVersion = (*versions)[ns];
+
+        if ( clientVersion == 0 ){
+            errmsg = "client in sharded mode, but doesn't have version set for this collection";
+            return false;
+        }
+        
         if ( clientVersion >= version ){
             return true;
         }
