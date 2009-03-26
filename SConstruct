@@ -258,7 +258,7 @@ elif "sunos5" == os.sys.platform:
      useJavaHome = True
      javaHome = "/usr/lib/jvm/java-6-sun/"
      javaOS = "solaris"
-     env.Append( CPPDEFINES=[ "__linux__" ] )
+     env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
 
 elif "win32" == os.sys.platform:
     windows = True
@@ -714,7 +714,7 @@ def jsDirTestSpec( dir ):
     return mongo[0].abspath + " --nodb " + jsSpec( [ dir, "*.js" ] )
 
 # These tests require the mongo shell
-if not onlyServer:
+if not onlyServer and not noshell:
     addSmoketest( "smokeJs", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "_runner.js" ] ) ] )
     addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod" ], [ jsDirTestSpec( "repl" ) ] )
