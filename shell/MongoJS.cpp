@@ -174,7 +174,17 @@ Local<v8::Object> mongoToV8( BSONObj & m , bool array ){
             o->Set( v8::String::New( f.fieldName() ) , sub );
             break;
         }
+            
+        case mongo::MinKey:
+            // TODO: make a special type
+            o->Set( v8::String::New( f.fieldName() ) , v8::String::New( "MinKey" ) );
+            break;
 
+        case mongo::MaxKey:
+            // TODO: make a special type
+            o->Set( v8::String::New( f.fieldName() ) , v8::String::New( "MaxKey" ) );
+            break;
+            
         default:
             cout << "can't handle type: ";
 			cout  << f.type() << " ";

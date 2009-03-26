@@ -115,14 +115,18 @@ Date.prototype.tojson = function(){
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
 
-Array.prototype.tojson = function(){
+Array.prototype.tojson = function( sepLines ){
     var s = "[";
+    if ( sepLines ) s += "\n";
     for ( var i=0; i<this.length; i++){
-        if ( i > 0 )
+        if ( i > 0 ){
             s += ",";
+            if ( sepLines ) s += "\n";
+        }
         s += tojson( this[i] );
     }
     s += "]";
+    if ( sepLines ) s += "\n";
     return s;
 }
 
