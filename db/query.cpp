@@ -165,32 +165,35 @@ namespace mongo {
 
     class EmbeddedBuilder {
     public:
-        EmbeddedBuilder() {
-            addBuilder( "" );
+        EmbeddedBuilder( BSONObjBuilder *b ) {
+            builders_.push_back( make_pair( "", b ) );
         }
-        // It is assumed that the calls to appendAs will be made with the 'name'
+        // It is assumed that the calls to prepareContext will be made with the 'name'
         // parameter in lex ascending order.
-        void appendAs( const BSONElement &e, string name ) {
+        void prepareContext( string &name ) {
             int i = 1, n = builders_.size();
             while( i < n && name.substr( 0, builders_[ i ].first.length() ) == builders_[ i ].first ) {
                 name = name.substr( builders_[ i ].first.length() + 1 );
                 ++i;
             }
             for( int j = n - 1; j >= i; --j ) {
-                builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
-                builders_.pop_back();
+                popBuilder();
             }
             for( string next = splitDot( name ); !next.empty(); next = splitDot( name ) ) {
                 addBuilder( next );
             }
-            builders_.back().second->appendAs( e, name.c_str() );
         }
-        void appendSelf( BSONObjBuilder &b ) {
-            for( int j = builders_.size() - 1; j >= 1; --j ) {
-                builders_[ j - 1 ].second->append( builders_[ j ].first.c_str(), builders_[ j ].second->done() );
-                builders_.pop_back();
-            }
-            b.appendElements( builders_.back().second->done() );
+        void appendAs( const BSONElement &e, string name ) {
+            prepareContext( name );
+            back()->appendAs( e, name.c_str() );
+        }
+        BufBuilder &subarrayStartAs( string name ) {
+            prepareContext( name );
+            return back()->subarrayStart( name.c_str() );
+        }
+        void done() {
+            while( !builderStorage_.empty() )
+                popBuilder();
         }
         static string splitDot( string & str ) {
             size_t pos = str.find( '.' );
@@ -202,10 +205,18 @@ namespace mongo {
         }
     private:
         void addBuilder( const string &name ) {
-            builders_.push_back( make_pair( name, shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+            shared_ptr< BSONObjBuilder > newBuilder( new BSONObjBuilder( back()->subobjStart( name.c_str() ) ) );
+            builders_.push_back( make_pair( name, newBuilder.get() ) );
+            builderStorage_.push_back( newBuilder );
         }
-        typedef vector< pair< string, shared_ptr< BSONObjBuilder > > > Stack;
-        Stack builders_;
+        void popBuilder() {
+            back()->done();
+            builders_.pop_back();
+            builderStorage_.pop_back();
+        }
+        BSONObjBuilder *back() { return builders_.back().second; }
+        vector< pair< string, BSONObjBuilder * > > builders_;
+        vector< shared_ptr< BSONObjBuilder > > builderStorage_;
     };
     
     struct Mod {
@@ -390,7 +401,7 @@ namespace mongo {
             }
         }
             
-        EmbeddedBuilder b2;
+        EmbeddedBuilder b2( &b );
         vector< Mod >::iterator m = mods_.begin();
         map< string, BSONElement >::iterator p = existing.begin();
         while( m != mods_.end() || p != existing.end() ) {
@@ -408,7 +419,7 @@ namespace mongo {
                     b2.appendAs( m->elt, m->fieldName );
                 } else if ( m->op == Mod::PUSH ) {
                     uassert( "Push can only be applied to an array", e.type() == Array );
-                    BSONObjBuilder arr;
+                    BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
                     int count = 0;
                     while( i.more() ) {
@@ -422,20 +433,16 @@ namespace mongo {
                     ss << count;
                     string nextIndex = ss.str();
                     arr.appendAs( m->elt, nextIndex.c_str() );
-                    BSONObjBuilder encapsulatedArr;
-                    encapsulatedArr.appendArray( "foo", arr.done() );
-                    b2.appendAs( encapsulatedArr.done().firstElement(), m->fieldName );
+                    arr.done();
                     m->pushStartSize = count;
                 }
                 ++m;
                 ++p;
             } else if ( cmp < 0 ) {
                 if ( m->op == Mod::PUSH ) {
-                    BSONObjBuilder arr;
+                    BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     arr.appendAs( m->elt, "0" );
-                    BSONObjBuilder encapsulatedArr;
-                    encapsulatedArr.appendArray( "foo", arr.done() );
-                    b2.appendAs( encapsulatedArr.done().firstElement(), m->fieldName );
+                    arr.done();
                     m->pushStartSize = -1;
                 } else {
                     b2.appendAs( m->elt, m->fieldName );
@@ -447,8 +454,7 @@ namespace mongo {
                 ++p;
             }
         }
-                
-        b2.appendSelf( b );
+        b2.done();
         return b.obj();
     }
     
