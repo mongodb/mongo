@@ -44,6 +44,7 @@ namespace mongo {
         
         if ( _id.isEmpty() ){
             OID oid;
+            oid.init();
             b.appendOID( "_id" , &oid );
             
             BSONObj o = b.obj();
