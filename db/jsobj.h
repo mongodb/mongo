@@ -814,7 +814,7 @@ namespace mongo {
             b.skip(4); /*leave room for size field*/
         }
 
-        BSONObjBuilder( BufBuilder &baseBuilder ) : b( baseBuilder ), offset_( baseBuilder.len() ), s_( this ) {
+        BSONObjBuilder( BufBuilder &baseBuilder ) : b( baseBuilder ), buf_( 0 ), offset_( baseBuilder.len() ), s_( this ) {
             b.skip( 4 );
         }
         
