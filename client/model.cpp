@@ -32,7 +32,7 @@ namespace mongo {
             return false;
         
         unserialize(b);
-        _id = b["_id"].wrap();
+        _id = b["_id"].wrap().getOwned();
         return true;
     }
 
@@ -48,7 +48,7 @@ namespace mongo {
             
             BSONObj o = b.obj();
             conn->insert( getNS() , o );
-            _id = o["_id"].wrap();
+            _id = o["_id"].wrap().getOwned();
 
             log(4) << "inserted new model " << getNS() << "  " << o << endl;
         }
