@@ -781,6 +781,7 @@ namespace mongo {
     extern Labeler::Label LT;
     extern Labeler::Label LTE;
     extern Labeler::Label NE;
+    extern Labeler::Label SIZE;
     
     class BSONObjBuilderValueStream : public boost::noncopyable {
     public:

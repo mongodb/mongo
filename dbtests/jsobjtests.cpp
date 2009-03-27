@@ -556,6 +556,15 @@ namespace JsobjTests {
             }            
         };        
 
+        class LabelSize : public LabelBase {
+            BSONObj expected() {
+                return BSON( "a" << BSON( "$size" << 4 ) );
+            }
+            BSONObj actual() {
+                return BSON( "a" << SIZE << 4 );
+            }            
+        };        
+        
         class LabelMulti : public LabelBase {
             BSONObj expected() {
                 return BSON( "z" << "q"
@@ -591,7 +600,6 @@ namespace JsobjTests {
             b2.done();
             b1.append( "f", 10.0 );
             BSONObj ret = b1.done();
-            out() << "ret: " << ret << endl;
             ASSERT( ret.valid() );
             ASSERT( ret.woCompare( fromjson( "{a:'bcd',foo:{ggg:44},f:10}" ) ) == 0 );
         }
@@ -651,6 +659,7 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelShares >();
             add< ValueStreamTests::LabelDouble >();
             add< ValueStreamTests::LabelDoubleShares >();
+            add< ValueStreamTests::LabelSize >();
             add< ValueStreamTests::LabelMulti >();
             add< ValueStreamTests::Unallowed >();
             add< SubObjectBuilder >();
