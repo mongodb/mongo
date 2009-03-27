@@ -798,6 +798,53 @@ namespace mongo {
         }
     } cmdFileMD5;
     
+    class CmdMedianKey : public Command {
+    public:
+        CmdMedianKey() : Command( "medianKey" ) {}
+        virtual bool slaveOk() { return true; }
+        virtual void help( stringstream &help ) const {
+            help << " example: { medianKey:\"blog.posts\", keyPattern:{x:1} min:{x:10}, max:{x:55} }";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            const char *ns = jsobj.getStringField( "medianKey" );
+            BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
+            BSONObj min = jsobj.getObjectField( "min" ).extractFieldsUnDotted( keyPattern );
+            BSONObj max = jsobj.getObjectField( "max" ).extractFieldsUnDotted( keyPattern );
+            if ( ns[ 0 ] == '\0' || keyPattern.isEmpty() || min.isEmpty() || max.isEmpty() ) {
+                errmsg = "invalid command syntax";
+                return false;
+            }
+            setClient( ns );
+            const IndexDetails *id = 0;
+            NamespaceDetails *d = nsdetails( ns );
+            for (int i = 0; i < d->nIndexes; i++ ) {
+                IndexDetails& ii = d->indexes[i];
+                if( ii.keyPattern().woCompare(keyPattern) == 0 ) {
+                    id = &ii;
+                    break;
+                }
+            }            
+            if ( !id ) {
+                errmsg = "no index found for specified keyPattern";
+                return false;
+            }
+            
+            Timer t;
+            int num = 0;
+            for( BtreeCursor c( *id, min, max, 1 ); c.ok(); c.advance(), ++num );
+            num /= 2;
+            BtreeCursor c( *id, min, max, 1 );
+            for( ; num; c.advance(), --num );
+            int ms = t.millis();
+            if ( ms > 100 ) {
+                out() << "Finding median for index: " << keyPattern << " between " << min << " and " << max << " took " << ms << "ms." << endl;
+            }
+            
+            result.append( "median", c.prettyKey( c.currKey() ) );
+            return true;
+        }
+    } cmdMedianKey;
+    
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here
