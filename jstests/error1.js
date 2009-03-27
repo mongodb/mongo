@@ -17,12 +17,17 @@ assert( db.$cmd.findOne({getpreverror:1}).err != null );
 
 assert( db.getLastError() != null );
 assert( db.getPrevError().err != null , "preverror 2" );
-
+assert( db.getPrevError().nPrev == 1 );
 
 db.foo.findOne();
 assert( db.$cmd.findOne({getlasterror:1}).err == null );
 assert( db.$cmd.findOne({getpreverror:1}).err != null );
 assert( db.$cmd.findOne({getpreverror:1}).nPrev == 2 );
+
+db.foo.findOne();
+assert( db.$cmd.findOne({getlasterror:1}).err == null );
+assert( db.$cmd.findOne({getpreverror:1}).err != null );
+assert( db.$cmd.findOne({getpreverror:1}).nPrev == 3 );
 
 db.resetError();
 db.forceError();

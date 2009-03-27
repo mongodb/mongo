@@ -258,6 +258,14 @@ namespace mongo {
                             addBasic(e, opIN); // e not actually used at the moment for $in
                             ok = true;
                         }
+                        else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' ) {
+                            uassert( "$size must be a number", fe.isNumber() );
+                            BSONObjBuilder *b = new BSONObjBuilder();
+                            builders[nBuilders++] = b;
+                            b->appendAs(fe, e.fieldName());
+                            addBasic(b->done().firstElement(), opSIZE);                            
+                            ok = true;
+                        }
                         else
                             uassert("invalid $operator", false);
                     }
@@ -289,6 +297,20 @@ namespace mongo {
             return c;
         }
 
+        if ( op == opSIZE ) {
+            if ( l.type() != Array )
+                return 0;
+            int count = 0;
+            BSONObjIterator i( l.embeddedObject() );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                ++count;
+            }
+            return count == r.number();
+        }
+        
         /* check LT, GTE, ... */
         if ( !( l.isNumber() && r.isNumber() ) && ( l.type() != r.type() ) )
             return false;

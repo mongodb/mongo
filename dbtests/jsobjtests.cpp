@@ -25,6 +25,16 @@
 #include "dbtests.h"
 
 namespace JsobjTests {
+    class BufBuilderBasic {
+    public:
+        void run() {
+            BufBuilder b( 0 );
+            b.append( "foo" );
+            ASSERT_EQUALS( 4, b.len() );
+            ASSERT( strcmp( "foo", b.buf() ) == 0 );
+        }
+    };
+    
     class BSONElementBasic {
     public:
         void run() {
@@ -546,6 +556,15 @@ namespace JsobjTests {
             }            
         };        
 
+        class LabelSize : public LabelBase {
+            BSONObj expected() {
+                return BSON( "a" << BSON( "$size" << 4 ) );
+            }
+            BSONObj actual() {
+                return BSON( "a" << SIZE << 4 );
+            }            
+        };        
+        
         class LabelMulti : public LabelBase {
             BSONObj expected() {
                 return BSON( "z" << "q"
@@ -571,9 +590,25 @@ namespace JsobjTests {
         
     } // namespace ValueStreamTests
     
+    class SubObjectBuilder {
+    public:
+        void run() {
+            BSONObjBuilder b1;
+            b1.append( "a", "bcd" );
+            BSONObjBuilder b2( b1.subobjStart( "foo" ) );
+            b2.append( "ggg", 44.0 );
+            b2.done();
+            b1.append( "f", 10.0 );
+            BSONObj ret = b1.done();
+            ASSERT( ret.valid() );
+            ASSERT( ret.woCompare( fromjson( "{a:'bcd',foo:{ggg:44},f:10}" ) ) == 0 );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
+            add< BufBuilderBasic >();
             add< BSONElementBasic >();
             add< BSONObjTests::Create >();
             add< BSONObjTests::WoCompareBasic >();
@@ -624,8 +659,10 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelShares >();
             add< ValueStreamTests::LabelDouble >();
             add< ValueStreamTests::LabelDoubleShares >();
+            add< ValueStreamTests::LabelSize >();
             add< ValueStreamTests::LabelMulti >();
             add< ValueStreamTests::Unallowed >();
+            add< SubObjectBuilder >();
         }
     };
     

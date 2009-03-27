@@ -201,11 +201,59 @@ namespace Update {
         string ns_;
     };
 
+    class Inc {
+    public:
+        Inc() : ns_( testNs( this ) ) {
+            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            for( int i = 0; i < 10000; ++i )
+                client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << 0 ) );            
+        }
+        void run() {
+            for( int j = 0; j < 10; ++j )
+                for( int i = 0; i < 10000; ++i )
+                    client_->update( ns_.c_str(), QUERY( "_id" << i ), BSON( "$inc" << BSON( "i" << 1 ) ) );
+        }
+        string ns_;        
+    };
+
+    class Set {
+    public:
+        Set() : ns_( testNs( this ) ) {
+            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            for( int i = 0; i < 10000; ++i )
+                client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << 0 ) );            
+        }
+        void run() {
+            for( int j = 1; j < 11; ++j )
+                for( int i = 0; i < 10000; ++i )
+                    client_->update( ns_.c_str(), QUERY( "_id" << i ), BSON( "$set" << BSON( "i" << j ) ) );
+        }
+        string ns_;        
+    };
+    
+    class SetGrow {
+    public:
+        SetGrow() : ns_( testNs( this ) ) {
+            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            for( int i = 0; i < 10000; ++i )
+                client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << "" ) );            
+        }
+        void run() {
+            for( int j = 9; j > -1; --j )
+                for( int i = 0; i < 10000; ++i )
+                    client_->update( ns_.c_str(), QUERY( "_id" << i ), BSON( "$set" << BSON( "i" << "aaaaaaaaaa"[j] ) ) );
+        }
+        string ns_;        
+    };
+
     class All : public RunnerSuite {
     public:
         All() {
             add< Smaller >();
             add< Bigger >();
+            add< Inc >();
+            add< Set >();
+            add< SetGrow >();
         }
     };
 } // namespace Update

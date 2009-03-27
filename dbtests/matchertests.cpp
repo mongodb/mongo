@@ -64,6 +64,16 @@ namespace MatcherTests {
         }        
     };
 
+    class Size {
+    public:
+        void run() {
+            JSMatcher m( fromjson( "{a:{$size:4}}" ) );
+            ASSERT( m.matches( fromjson( "{a:[1,2,3,4]}" ) ) );
+            ASSERT( !m.matches( fromjson( "{a:[1,2,3]}" ) ) );
+            ASSERT( !m.matches( fromjson( "{a:[1,2,3,'a','b']}" ) ) );
+        }        
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -71,6 +81,7 @@ namespace MatcherTests {
             add< DoubleEqual >();
             add< MixedNumericEqual >();
             add< MixedNumericGt >();
+            add< Size >();
         }
     };
     

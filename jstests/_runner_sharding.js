@@ -16,7 +16,13 @@ files.forEach(
         
         print(" *******************************************");
         print("         Test : " + x.name + " ...");
-        print("                " + Date.timeFunc( function() { load(x.name); }, 1) + "ms");
+        try {
+            print("                " + Date.timeFunc( function() { load(x.name); }, 1) + "ms");
+        }
+        catch ( e ){
+            print( " ERROR on " + x.name + "!! " + e );
+            throw e;
+        }
         
     }
 );

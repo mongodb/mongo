@@ -313,7 +313,7 @@ int main(int argc, char* argv[]) {
         cout << "type \"help\" for help" << endl;
         
         v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
-
+        
         while ( 1 ){
             
             char * line = shellReadline( "> " );
@@ -325,9 +325,9 @@ int main(int argc, char* argv[]) {
             
             string code = line;
             if ( code == "exit" ){
-	        break;
-	    }
-
+                break;
+            }
+            
             {
                 string cmd = line;
                 if ( cmd.find( " " ) > 0 )
@@ -340,18 +340,18 @@ int main(int argc, char* argv[]) {
                 }
                 
             }
-
+            
             v8::HandleScope handle_scope;
             ExecuteString(v8::String::New( code.c_str() ),
                           v8::String::New("(shell)"),
                           true,
                           true);
-
             
-	    shellHistoryAdd( line );
+            
+            shellHistoryAdd( line );
         }
         
-	shellHistoryDone();
+        shellHistoryDone();
     }
     
     return 0;

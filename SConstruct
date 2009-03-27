@@ -575,7 +575,8 @@ testEnv.Append( LIBPATH=["."] )
 
 
 # main db target
-Default( env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ]  ) )
+mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ]  )
+Default( mongod )
 
 # tools
 allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
@@ -726,10 +727,11 @@ mongodForTests = None
 
 def startMongodForTests( env, target, source ):
     global mongodForTests
+    global mongod
     if mongodForTests:
         return
     from subprocess import Popen
-    mongodForTests = Popen( [ "mongod", "run" ] )
+    mongodForTests = Popen( [ mongod[0].abspath, "run" ] )
     # Wait for mongod to start
     from time import sleep
     sleep( 1 )

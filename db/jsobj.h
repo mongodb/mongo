@@ -781,6 +781,7 @@ namespace mongo {
     extern Labeler::Label LT;
     extern Labeler::Label LTE;
     extern Labeler::Label NE;
+    extern Labeler::Label SIZE;
     
     class BSONObjBuilderValueStream : public boost::noncopyable {
     public:
@@ -807,13 +808,18 @@ namespace mongo {
     /**
        utility for creating a BSONObj
      */
-    class BSONObjBuilder {
+    class BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
-        BSONObjBuilder(int initsize=512) : b(initsize), s_( this ) {
+        BSONObjBuilder(int initsize=512) : b(buf_), buf_(initsize), offset_( 0 ), s_( this ) {
             b.skip(4); /*leave room for size field*/
         }
 
+        /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder */
+        BSONObjBuilder( BufBuilder &baseBuilder ) : b( baseBuilder ), buf_( 0 ), offset_( baseBuilder.len() ), s_( this ) {
+            b.skip( 4 );
+        }
+        
         /** add all the fields from the object specified to this object */
         BSONObjBuilder& appendElements(BSONObj x);
 
@@ -837,6 +843,14 @@ namespace mongo {
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
+        /** add header for a new subobject and return bufbuilder for writing to
+            the subobject's body */
+        BufBuilder &subobjStart(const char *fieldName) {
+            b.append((char) Object);
+            b.append(fieldName);
+            return b;
+        }
+        
         /** add a subobject as a member with type Array.  Thus arr object should have "0", "1", ...
            style fields in it.
         */
@@ -846,6 +860,14 @@ namespace mongo {
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
+        /** add header for a new subarray and return bufbuilder for writing to
+            the subarray's body */
+        BufBuilder &subarrayStart(const char *fieldName) {
+            b.append((char) Array);
+            b.append(fieldName);
+            return b;
+        }
+        
         /** Append a boolean element */
         void appendBool(const char *fieldName, int val) {
             b.append((char) Bool);
@@ -1041,6 +1063,7 @@ namespace mongo {
 
         /** The returned BSONObj will free the buffer when it is finished. */
         BSONObj obj() {
+            massert( "builder does not own memory", owned() );
             int l;
             return BSONObj(decouple(l), true);
         }
@@ -1088,6 +1111,10 @@ namespace mongo {
             return s_ << l;
         }
 
+        bool owned() const {
+            return &b == &buf_;
+        }
+        
     private:
         // Append the provided arr object as an array.
         void marshalArray( const char *fieldName, const BSONObj &arr ) {
@@ -1099,12 +1126,14 @@ namespace mongo {
         char* _done() {
             s_.endField();
             b.append((char) EOO);
-            char *data = b.buf();
-            *((int*)data) = b.len();
+            char *data = b.buf() + offset_;
+            *((int*)data) = b.len() - offset_;
             return data;
         }
 
-        BufBuilder b;
+        BufBuilder &b;
+        BufBuilder buf_;
+        int offset_;
         BSONObjBuilderValueStream s_;
     };
 

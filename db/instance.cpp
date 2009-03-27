@@ -314,7 +314,8 @@ namespace mongo {
 
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
-        updateObjects(ns, toupdate, query, flags & 1, ss);
+        bool updatedExisting = updateObjects(ns, toupdate, query, flags & 1, ss);
+        recordUpdate( updatedExisting );
     }
 
     void receivedDelete(Message& m) {
@@ -327,7 +328,8 @@ namespace mongo {
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
         BSONObj deletedId = BSONObj();
-        deleteObjects(ns, pattern, justOne, &deletedId);
+        int n = deleteObjects(ns, pattern, justOne, &deletedId);
+        recordDelete( n );
         if ( justOne ) {
             if ( deletedId.isEmpty() ) {
                 problem() << "deleted object without id, not logging" << endl;

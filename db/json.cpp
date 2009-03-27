@@ -32,14 +32,33 @@ namespace mongo {
         const char *fieldName() {
             return fieldNames.back().c_str();
         }
-        void push() {
+        bool empty() const {
+            return builders.size() == 0;
+        }
+        void init() {
             boost::shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
             builders.push_back( b );
             fieldNames.push_back( "" );
             indexes.push_back( 0 );
         }
+        void pushObject( const char *fieldName ) {
+            boost::shared_ptr< BSONObjBuilder > b( new BSONObjBuilder( builders.back()->subobjStart( fieldName ) ) );
+            builders.push_back( b );
+            fieldNames.push_back( "" );
+            indexes.push_back( 0 );
+        }
+        void pushArray( const char *fieldName ) {
+            boost::shared_ptr< BSONObjBuilder > b( new BSONObjBuilder( builders.back()->subarrayStart( fieldName ) ) );
+            builders.push_back( b );
+            fieldNames.push_back( "" );
+            indexes.push_back( 0 );
+        }
         BSONObj pop() {
-            BSONObj ret = back()->obj();
+            BSONObj ret;
+            if ( back()->owned() )
+                ret = back()->obj();
+            else
+                ret = back()->done();
             builders.pop_back();
             fieldNames.pop_back();
             indexes.pop_back();
@@ -70,7 +89,10 @@ namespace mongo {
     struct objectStart {
         objectStart( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char &c ) const {
-            b.push();
+            if ( b.empty() )
+                b.init();
+            else
+                b.pushObject( b.fieldName() );
         }
         ObjectBuilder &b;
     };
@@ -78,7 +100,7 @@ namespace mongo {
     struct arrayStart {
         arrayStart( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char &c ) const {
-            b.push();
+            b.pushArray( b.fieldName() );
             b.nameFromIndex();
         }
         ObjectBuilder &b;
@@ -229,8 +251,7 @@ namespace mongo {
     struct subobjectEnd {
         subobjectEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            BSONObj o = b.pop();
-            b.back()->append( b.fieldName(), o );
+            b.pop();
         }
         ObjectBuilder &b;
     };
@@ -238,8 +259,7 @@ namespace mongo {
     struct arrayEnd {
         arrayEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            BSONObj o = b.pop();
-            b.back()->appendArray( b.fieldName(), o );
+            b.pop();
         }
         ObjectBuilder &b;
     };
