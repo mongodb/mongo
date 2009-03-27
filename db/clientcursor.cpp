@@ -82,6 +82,19 @@ namespace mongo {
             delete (*i);
     }
 
+    /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
+    void idleTimeReport(unsigned millis) {
+        assert( dbMutexInfo.isLocked() );
+        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
+            ByLoc::iterator j = i;
+            i++;
+            if( (j->second->idleAgeMillis += millis) > 60000 ) {
+                log(2) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns << " idle:" << j->second->idleAgeMillis << "ms\n";
+                delete j->second;
+            }
+        }
+    }
+
     /* must call when a btree bucket going away.
        note this is potentially slow
     */
@@ -150,6 +163,7 @@ namespace mongo {
     */
     void ClientCursor::updateLocation() {
         assert( cursorid );
+        idleAgeMillis = 0;
         DiskLoc cl = c->refLoc();
         if ( lastLoc() == cl ) {
             //log() << "info: lastloc==curloc " << ns << '\n';

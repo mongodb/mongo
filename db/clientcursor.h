@@ -38,7 +38,7 @@ namespace mongo {
         DiskLoc _lastLoc; // use getter and setter not this.
         static CursorId allocCursorId();
     public:
-        ClientCursor() : cursorid( allocCursorId() ), pos(0) {
+        ClientCursor() : cursorid( allocCursorId() ), pos(0), idleAgeMillis(0) {
             clientCursorsById.insert( make_pair(cursorid, this) );
         }
         ~ClientCursor();
@@ -52,7 +52,8 @@ namespace mongo {
         }
         void setLastLoc(DiskLoc);
         auto_ptr< set<string> > filter; // which fields query wants returned
-        Message originalMessage; // this is effectively an auto ptr for data the matcher points to.
+        Message originalMessage; // this is effectively an auto ptr for data the matcher points to
+        unsigned idleAgeMillis; // how long has the cursor been around, relative to server idle time
 
         /* Get rid of cursors for namespaces that begin with nsprefix.
            Used by drop, deleteIndexes, dropDatabase.
