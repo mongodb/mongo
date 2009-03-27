@@ -79,7 +79,7 @@ DBCollection.prototype._massageObject = function( q ){
 }
 
 DBCollection.prototype._validateForStorage = function( o ){
-    for ( k in o ){
+    for ( var k in o ){
         if ( k.indexOf( "." ) >= 0 )
             throw "can't have . in field names [" + k + "]" ;
     }
@@ -129,7 +129,7 @@ DBCollection.prototype.save = function( obj ){
 
 DBCollection.prototype._genIndexName = function( keys ){
     var name = "";
-    for ( k in keys ){
+    for ( var k in keys ){
         if ( name.length > 0 )
             name += "_";
         name += k + "_";
