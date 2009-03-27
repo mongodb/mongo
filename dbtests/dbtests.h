@@ -33,3 +33,4 @@ UnitTest::TestPtr queryTests();
 UnitTest::TestPtr queryOptimizerTests();
 UnitTest::TestPtr replTests();
 UnitTest::TestPtr sockTests();
+UnitTest::TestPtr updateTests();

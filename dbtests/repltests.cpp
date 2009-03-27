@@ -465,7 +465,7 @@ namespace ReplTests {
             UpsertInsertIdMod() :
             q_( fromjson( "{'_id':5,a:4}" ) ),
             u_( fromjson( "{$inc:{a:3}}" ) ),
-            ou_( fromjson( "{'_id':5,a:3}" ) ) {}
+            ou_( fromjson( "{'_id':5,a:7}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_, true );
             }
@@ -506,7 +506,7 @@ namespace ReplTests {
             UpsertInsertInc() :
             q_( fromjson( "{a:5}" ) ),
             u_( fromjson( "{$inc:{a:3}}" ) ),
-            ou_( fromjson( "{a:3}" ) ) {}
+            ou_( fromjson( "{a:8}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_, true );
             }
@@ -609,6 +609,66 @@ namespace ReplTests {
             }
         };
         
+        class Push : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( fromjson( "{'_id':0,a:[4,5]}" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4]}" ) );
+            }            
+        };
+        
+        class PushUpsert : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ), true );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( fromjson( "{'_id':0,a:[4,5]}" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4]}" ) );
+            }            
+        };
+
+        class MultiPush : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) << "$push" << BSON( "b.c" << 6.0 ) ) );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( fromjson( "{'_id':0,a:[4,5],b:{c:[6]}}" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4]}" ) );
+            }            
+        };
+
+        class EmptyPush : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( fromjson( "{'_id':0,a:[5]}" ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0}" ) );
+            }                        
+        };
+        
     } // namespace Idempotence
     
     class All : public UnitTest::Suite {
@@ -638,6 +698,10 @@ namespace ReplTests {
             add< Idempotence::RemoveOne >();
             add< Idempotence::FailingUpdate >();
             add< Idempotence::SetNumToStr >();
+            add< Idempotence::Push >();
+            add< Idempotence::PushUpsert >();
+            add< Idempotence::MultiPush >();
+            add< Idempotence::EmptyPush >();
         }
     };
     

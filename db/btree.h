@@ -263,11 +263,15 @@ namespace mongo {
             return s;
         }
 
+        BSONObj prettyKey( const BSONObj &key ) const {
+            return key.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
+        }
+        
         virtual BSONObj prettyStartKey() const {
-            return startKey.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
+            return prettyKey( startKey );
         }
         virtual BSONObj prettyEndKey() const {
-            return endKey.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
+            return prettyKey( endKey );
         }
         
     private:

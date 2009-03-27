@@ -21,23 +21,39 @@
 #include <boost/thread/tss.hpp>
 
 namespace mongo {
-
+    class BSONObjBuilder;
+    
     struct LastError {
         string msg;
+        enum { NotUpdate, True, False } updatedExisting;
+        int nObjects;
         int nPrev;
+        bool valid;
         void raiseError(const char *_msg) {
+            reset( true );
             msg = _msg;
-            nPrev = 1;
         }
-        bool haveError() const {
-            return !msg.empty();
+        void recordUpdate( bool _updatedExisting ) {
+            reset( true );
+            nObjects = 1;
+            updatedExisting = _updatedExisting ? True : False;
         }
-        void resetError() {
-            msg.clear();
+        void recordDelete( int nDeleted ) {
+            reset( true );
+            nObjects = nDeleted;
         }
         LastError() {
-            nPrev = 0;
+            reset();
         }
+        void reset( bool _valid = false ) {
+            msg.clear();
+            updatedExisting = NotUpdate;
+            nObjects = 0;
+            nPrev = 1;
+            valid = _valid;
+        }
+        void appendSelf( BSONObjBuilder &b );
+        static LastError noError;
     };
 
     extern boost::thread_specific_ptr<LastError> lastError;
@@ -50,5 +66,16 @@ namespace mongo {
         }
         le->raiseError(msg);
     }
+    
+    inline void recordUpdate( bool updatedExisting ) {
+        LastError *le = lastError.get();
+        if ( le )
+            le->recordUpdate( updatedExisting );        
+    }
 
+    inline void recordDelete( int nDeleted ) {
+        LastError *le = lastError.get();
+        if ( le )
+            le->recordDelete( nDeleted );        
+    }
 } // namespace mongo
