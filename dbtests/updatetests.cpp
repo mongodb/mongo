@@ -400,6 +400,24 @@ namespace UpdateTests {
         }
     };
     
+    class DontDropEmpty : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:{}}}" ) );
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a.c" << 4.0 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:{},c:4}}" ) ) == 0 );            
+        }
+    };
+
+    class InsertInEmpty : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:{}}}" ) );
+            client().update( ns(), Query(), BSON( "$set" << BSON( "a.b.f" << 4.0 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:{f:4}}}" ) ) == 0 );            
+        }
+    };
+
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -441,6 +459,8 @@ namespace UpdateTests {
             add< SetEncapsulationConflictsWithExistingType >();            
             add< CantPushToParent >();            
             add< CantIncParent >();            
+            add< DontDropEmpty >();            
+            add< InsertInEmpty >();            
         }
     };
     

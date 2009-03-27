@@ -185,6 +185,11 @@ namespace mongo {
             }
         }
         void appendAs( const BSONElement &e, string name ) {
+            if ( e.type() == Object && e.valuesize() == 5 ) { // empty object -- this way we can add to it later
+                string dummyName = name + ".foo";
+                prepareContext( dummyName );
+                return;
+            }
             prepareContext( name );
             back()->appendAs( e, name.c_str() );
         }
@@ -374,12 +379,16 @@ namespace mongo {
             return;
         }
         BSONObjIterator i( top.embeddedObject() );
+        bool empty = true;
         while( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
             extractFields( fields, e, base + top.fieldName() + "." );
+            empty = false;
         }
+        if ( empty )
+            fields[ base + top.fieldName() ] = top;            
     }
     
     BSONObj ModSet::createNewFromMods( const BSONObj &obj ) {
