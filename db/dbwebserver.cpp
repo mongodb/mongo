@@ -61,6 +61,8 @@ namespace mongo {
     unsigned q = 0;
     extern bool cpu;
 
+    void idleTimeReport(unsigned millis);
+
     void statsThread() {
         unsigned long long timeLastPass = 0;
         while ( 1 ) {
@@ -85,6 +87,7 @@ namespace mongo {
                         if ( cpu )
                             log() << "cpu: " << s << endl;
                         lockStats[q] = s;
+                        idleTimeReport( (unsigned) ((dt - dlocked)/1000) );
                     }
                 }
                 timeLastPass = now;

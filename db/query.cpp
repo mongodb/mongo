@@ -353,15 +353,22 @@ namespace mongo {
         for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
-            uassert( "Cannot apply $inc modifier to non-number", m.op != Mod::INC || e.isNumber() || e.eoo() );
-            uassert( "Cannot apply $push modifier to non-array", m.op != Mod::PUSH || e.type() == Array || e.eoo() );
-            if ( m.op == Mod::PUSH )
-                inPlacePossible = false;
-            if ( e.isNumber() && m.elt.isNumber() )
-                continue;
-            if ( m.elt.valuesize() == e.valuesize() )
-                continue;
-            inPlacePossible = false;
+            switch( m.op ) {
+                case Mod::INC:
+                    uassert( "Cannot apply $inc modifier to non-number", e.isNumber() || e.eoo() );
+                    if ( !e.isNumber() )
+                        inPlacePossible = false;
+                    break;
+                case Mod::SET:
+                    if ( !( e.isNumber() && m.elt.isNumber() ) &&
+                        m.elt.valuesize() != e.valuesize() )
+                        inPlacePossible = false;
+                    break;
+                case Mod::PUSH:
+                    uassert( "Cannot apply $push modifier to non-array", e.type() == Array || e.eoo() );
+                    inPlacePossible = false;
+                    break;
+            }
         }
         if ( !inPlacePossible ) {
             return false;
