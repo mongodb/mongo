@@ -122,6 +122,26 @@ namespace mongo {
         _lastmod = 0;
     }
 
+    void Shard::save( bool check ){
+        cout << "HERE: " << _id << endl;
+        bool reload = ! _lastmod;
+        Model::save( check );
+        cout << "\t" << _id << endl;
+        if ( reload ){
+            // need to do this so that we get the new _lastMod and therefore version number
+
+            massert( "_id has to be filled in already" , ! _id.isEmpty() );
+            
+            string b = toString();
+            BSONObj q = _id.copy();
+            massert( "how could load fail?" , load( q ) );
+            cout << "before: " << q << "\t" << b << endl;
+            cout << "after : " << _id << "\t" << toString() << endl;
+            massert( "shard reload changed content!" , b == toString() );
+            massert( "id changed!" , q["_id"] == _id["_id"] );
+        }
+    }
+
     string Shard::toString() const {
         stringstream ss;
         ss << "shard  ns:" << _ns << " server: " << _server << " min: " << _min << " max: " << _max;
@@ -140,6 +160,7 @@ namespace mongo {
             BSONObj d = cursor->next();
             s->unserialize( d );
             _shards.push_back( s );
+            s->_id = d["_id"].wrap().getOwned();
         }
         conn.done();
         
@@ -150,7 +171,7 @@ namespace mongo {
             s->_max = _key.globalMax();
             s->_server = config->getPrimary();
             s->_markModified();
-
+            
             _shards.push_back( s );
 
             log() << "no shards for:" << ns << " so creating first: " << s->toString() << endl;
@@ -178,6 +199,17 @@ namespace mongo {
         throw UserException( "couldn't find a shard which should be impossible" );
     }
 
+    Shard* ShardManager::findShardOnServer( const string& server ) const {
+
+        for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
+            Shard* s = *i;
+            if ( s->getServer() == server )
+                return s;
+        }
+
+        return 0;
+    }
+
     int ShardManager::getShardsForQuery( vector<Shard*>& shards , const BSONObj& query ){
         int added = 0;
         
@@ -192,25 +224,40 @@ namespace mongo {
     }
     
     void ShardManager::save(){
+        ServerShardVersion a = getVersion();
+        
         for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
             Shard* s = *i;
             if ( ! s->_modified )
                 continue;
             s->save( true );
         }
-    }
 
+        massert( "how did version get smalled" , getVersion() >= a );
+    }
+    
     ServerShardVersion ShardManager::getVersion( const string& server ) const{
         // TODO: cache or something?
         
         ServerShardVersion max = 0;
-        cout << "getVersion for: " << server << endl;
+
         for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
             Shard* s = *i;
-            cout << "\t" << s->getServer() << endl;
             if ( s->getServer() != server )
                 continue;
             
+            if ( s->_lastmod > max )
+                max = s->_lastmod;
+        }        
+
+        return max;
+    }
+
+    ServerShardVersion ShardManager::getVersion() const{
+        ServerShardVersion max = 0;
+
+        for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
+            Shard* s = *i;
             if ( s->_lastmod > max )
                 max = s->_lastmod;
         }        

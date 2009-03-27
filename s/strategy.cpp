@@ -50,7 +50,7 @@ namespace mongo {
         dbcon.done();
     }
 
-    void checkShardVersion( DBClientBase& conn , const string& ns ){
+    void checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative ){
         // TODO: cache, optimize, etc...
         
         DBConfig * conf = grid.getDBConfig( ns );
@@ -60,12 +60,43 @@ namespace mongo {
         if ( ! conf->sharded( ns ) )
             return;
         
-        ServerShardVersion version = conf->getShardManager( ns )->getVersion( conn.getServerAddress() );
-        cout << "got version: " << version << " for : " << ns << endl;
         
+        ShardManager * manager = conf->getShardManager( ns , authoritative );
         
-        // grid->getVersion( conn.server() , ns );
-        // check
-    }
+        ServerShardVersion version = manager->getVersion( conn.getServerAddress() );
 
+        BSONObj result;
+        if ( setShardVersion( conn , ns , version , authoritative , result ) ){
+            return;
+        }
+
+        log(1) << "       setShardVersion failed!\n" << result << endl;
+
+        if ( result.getBoolField( "need_authoritative" ) )
+            massert( "need_authoritative set but in authoritative mode already" , ! authoritative );
+        
+        if ( ! authoritative ){
+            checkShardVersion( conn , ns , 1 );
+            return;
+        }
+        
+        log(1) << "     setShardVersion failed: " << result << endl;
+        massert( "setShardVersion failed!" , 0 );
+    }
+    
+    bool setShardVersion( DBClientBase & conn , const string& ns , ServerShardVersion version , bool authoritative , BSONObj& result ){
+
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder.append( "setShardVersion" , ns.c_str() );
+        cmdBuilder.append( "configdb" , configServer.modelServer() );
+        cmdBuilder.appendTimestamp( "version" , version );
+        if ( authoritative )
+            cmdBuilder.appendBool( "authoritative" , 1 );
+        BSONObj cmd = cmdBuilder.obj();
+        
+        log(1) << "    setShardVersion  " << conn.getServerAddress() << "  " << ns << "  " << cmd << endl;
+        
+        return conn.runCommand( "admin" , cmd , result );
+    }
+    
 }

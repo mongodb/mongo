@@ -43,6 +43,8 @@ namespace mongo {
      */    
     class Shard : public Model , boost::noncopyable {
     public:
+
+        Shard( ShardManager * info );
         
         BSONObj& getMin(){
             return _min;
@@ -77,13 +79,12 @@ namespace mongo {
         virtual void unserialize(const BSONObj& from);
         virtual string modelServer();
 
-    public:
-        Shard( ShardManager * info );
+        virtual void save( bool check=false );
+
+        void _markModified();
         
     private:
         
-        void _markModified();
-
         ShardManager * _manager;
         
         string _ns;
@@ -120,8 +121,11 @@ namespace mongo {
         bool hasShardKey( const BSONObj& obj );
 
         Shard& findShard( const BSONObj& obj );
+        Shard* findShardOnServer( const string& server ) const;
+        
         ShardKeyPattern& getShardKey(){  return _key; }
         
+
         /**
          * @return number of shards added to the vector
          */
@@ -133,13 +137,16 @@ namespace mongo {
         operator string() const { return toString(); }
 
         ServerShardVersion getVersion( const string& server ) const;
+        ServerShardVersion getVersion() const;
     private:
         DBConfig * _config;
         string _ns;
         ShardKeyPattern _key;
         
         vector<Shard*> _shards;
-        
+
+        mutex _lock;
+
         friend class Shard;
     };
 
