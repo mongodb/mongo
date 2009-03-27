@@ -2,7 +2,17 @@ f = db.jstests_median;
 f.drop();
 
 f.ensureIndex( {i:1} );
-for( i = 0; i < 1000; ++i ) {
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", keyPattern:{i:1}, min:{i:0}, max:{i:0} } ).ok );
+
+f.save( {i:0} );
+assert.eq( 0, db.runCommand( {medianKey:"test.jstests_median", keyPattern:{i:1}, min:{i:0}, max:{i:1} } ).median.i );
+assert.eq( 0, db.runCommand( {medianKey:"test.jstests_median", keyPattern:{i:1}, min:{i:0}, max:{i:10} } ).median.i );
+
+f.save( {i:1} );
+assert.eq( 1, db.runCommand( {medianKey:"test.jstests_median", keyPattern:{i:1}, min:{i:0}, max:{i:1} } ).median.i );
+assert.eq( 1, db.runCommand( {medianKey:"test.jstests_median", keyPattern:{i:1}, min:{i:0}, max:{i:10} } ).median.i );
+
+for( i = 2; i < 1000; ++i ) {
     f.save( {i:i} );
 }
 
@@ -31,3 +41,34 @@ assert.eq( 44, db.runCommand( {medianKey:"test.jstests_median", keyPattern:{i:1,
 
 assert.eq( 10, db.runCommand( {medianKey:"test.jstests_median", keyPattern:{i:1,j:-1}, min:{i:10,j:50}, max:{i:11,j:75} } ).median.i );
 assert.eq( 12, db.runCommand( {medianKey:"test.jstests_median", keyPattern:{i:1,j:-1}, min:{i:10,j:50}, max:{i:11,j:75} } ).median.j );
+
+f.drop();
+f.ensureIndex( {i:1,j:1} );
+f.save( {i:0,j:0} );
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", min:{i:0}, max:{i:0} } ).ok );
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", min:{i:0}, max:{i:1} } ).ok );
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:1}, max:{i:1} } ).ok );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:0,j:0} } ).ok );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:1,j:1} } ).ok );
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", min:{i:1,j:1}, max:{i:0,j:0} } ).ok );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:0,j:1} } ).ok );
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:1}, max:{i:0,j:0} } ).ok );
+
+f.drop();
+f.ensureIndex( {i:1,j:-1} );
+f.save( {i:0,j:0} );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:0,j:0} } ).ok );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:1,j:1} } ).ok );
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", min:{i:1,j:1}, max:{i:0,j:0} } ).ok );
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:0,j:1} } ).ok );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:1}, max:{i:0,j:0} } ).ok );
+
+f.drop();
+f.ensureIndex( {i:1,j:1} );
+f.ensureIndex( {i:1,j:-1} );
+f.save( {i:0,j:0} );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:0,j:0} } ).ok );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:1,j:1} } ).ok );
+assert.eq( false, db.runCommand( {medianKey:"test.jstests_median", min:{i:1,j:1}, max:{i:0,j:0} } ).ok );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:0}, max:{i:0,j:1} } ).ok );
+assert.eq( true, db.runCommand( {medianKey:"test.jstests_median", min:{i:0,j:1}, max:{i:0,j:0} } ).ok );
