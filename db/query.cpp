@@ -287,9 +287,18 @@ namespace mongo {
         BSONObj createNewFromMods( const BSONObj &obj );
         void checkUnindexed( const set<string>& idxKeys ) const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
-                if ( idxKeys.count(i->fieldName) ) {
+                // check if there is an index key that is a parent of mod
+                for( const char *dot = strchr( i->fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
+                    if ( idxKeys.count( string( i->fieldName, dot - i->fieldName ) ) )
+                        uassert("can't $inc/$set an indexed field", false);
+                string fullName = i->fieldName;
+                // check if there is an index key equal to mod
+                if ( idxKeys.count(fullName) )
                     uassert("can't $inc/$set an indexed field", false);
-                }
+                // check if there is an index key that is a child of mod
+                set< string >::const_iterator j = idxKeys.upper_bound( fullName );
+                if ( j != idxKeys.end() && j->find( fullName ) == 0 )
+                    uassert("can't $inc/$set an indexed field", false);                    
             }
         }
         unsigned size() const { return mods_.size(); }

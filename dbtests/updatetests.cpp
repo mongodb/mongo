@@ -418,6 +418,26 @@ namespace UpdateTests {
         }
     };
 
+    class IndexParentOfMod : public SetBase {
+    public:
+        void run() {
+            client().ensureIndex( ns(), BSON( "a" << 1 ) );
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), Query(), fromjson( "{$set:{'a.b':4}}" ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );                        
+        }
+    };
+    
+    class ModParentOfIndex : public SetBase {
+    public:
+        void run() {
+            client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            client().update( ns(), Query(), fromjson( "{$set:{'a':4}}" ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );                        
+        }
+    };
+
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -461,6 +481,8 @@ namespace UpdateTests {
             add< CantIncParent >();            
             add< DontDropEmpty >();            
             add< InsertInEmpty >();            
+            add< IndexParentOfMod >();            
+            add< ModParentOfIndex >();            
         }
     };
     
