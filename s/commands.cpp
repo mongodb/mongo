@@ -389,6 +389,12 @@ namespace mongo {
                 
                 // update config db
                 s.setServer( to );
+                
+                // need to increment version # for old server
+                Shard * randomShardOnOldServer = info->findShardOnServer( from );
+                if ( randomShardOnOldServer )
+                    randomShardOnOldServer->_markModified();
+
                 info->save();
 
                 // delete old data

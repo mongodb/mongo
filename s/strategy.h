@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include "stdafx.h"
+#include "shard.h"
+
 namespace mongo {
     
     class Strategy {
@@ -20,8 +23,10 @@ namespace mongo {
         
     };
 
-    void checkShardVersion( DBClientBase & conn , const string& ns );
+    void checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false );
     
+    bool setShardVersion( DBClientBase & conn , const string& ns , ServerShardVersion version , bool authoritative , BSONObj& result );
+
     extern Strategy * SINGLE;
     extern Strategy * SHARDED;
 }
