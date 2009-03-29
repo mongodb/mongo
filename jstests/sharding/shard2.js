@@ -4,6 +4,10 @@
 * test basic sharding
 */
 
+placeCheck = function( num ){
+    print("shard2 step: " + num );
+}
+
 s = new ShardingTest( "shard2" , 2 , 5 );
 
 db = s.getDB( "test" );
@@ -34,6 +38,8 @@ assert.eq( 3 , primary.foo.find().length() , "primary wrong B" );
 assert.eq( 0 , seconday.foo.find().length() , "seconday wrong C" );
 assert.eq( 3 , db.foo.find().sort( { num : 1 } ).length() );
 
+placeCheck( 2 );
+
 // NOTE: at this point we have 2 shard on 1 server
 
 // test move shard
@@ -47,6 +53,8 @@ assert.eq( 1 , primary.foo.find().length() , "primary should only have 1 after m
 assert.eq( 2 , s.config.shard.count() , "still should have 2 shards after move not:" + s.config.shard.find().toArray().tojson( true ) );
 shards = s.config.shard.find().toArray();
 assert.neq( shards[0].server , shards[1].server , "servers should NOT be the same after the move" );
+
+placeCheck( 3 );
 
 // test inserts go to right server/shard
 
@@ -66,6 +74,8 @@ s.adminCommand( "connpoolsync" );
 assert.eq( 2 , primary.foo.find().length() , "boundary A" );
 assert.eq( 4 , seconday.foo.find().length() , "boundary B" );
 
+placeCheck( 4 );
+
 // findOne
 assert.eq( "eliot" , db.foo.findOne( { num : 1 } ).name );
 assert.eq( "funny man" , db.foo.findOne( { num : -2 } ).name );
@@ -83,6 +93,8 @@ function sumQuery( c ){
 assert.eq( 6 , db.foo.find().length() , "sharded query 1" );
 assert.eq( 3 , sumQuery( db.foo.find() ) , "sharded query 2" );
 
+placeCheck( 5 );
+
 // sort by num
 
 assert.eq( 3 , sumQuery( db.foo.find().sort( { num : 1 } ) ) , "sharding query w/sort 1" );
@@ -94,7 +106,7 @@ assert.eq( -2 , db.foo.find().sort( { num : 1 } )[0].num , "sharding query w/sor
 assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query w/sort 5 order wrong" );
 assert.eq( 3 , db.foo.find().sort( { num : -1 } )[0].num , "sharding query w/sort 6 order wrong" );
 
-
+placeCheck( 6 );
 // sory by name
 
 function getNames( c ){
@@ -114,6 +126,8 @@ s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
 assert.eq( "funny man" , db.foo.find().sort( { num : 1 } )[0].name , "sharding query w/sort and another split 1 order wrong" );
 assert.eq( "bob" , db.foo.find().sort( { num : -1 } )[0].name , "sharding query w/sort and another split 2 order wrong" );
 assert.eq( "funny man" , db.foo.find( { num : { $lt : 100 } } ).sort( { num : 1 } ).arrayAccess(0).name , "sharding query w/sort and another split 3 order wrong" );
+
+placeCheck( 7 );
 
 // getMore
 assert.eq( 4 , db.foo.find().limit(-4).toArray().length , "getMore 1" );
@@ -148,6 +162,8 @@ assert( person.name == "eliot2" );
 
 db.foo.remove( { _id : person._id } );
 assert( db.foo.findOne( { num : 3 } ) == null );
+
+placeCheck( 8 );
 
 // TODO: getLastError
 db.getLastError();
