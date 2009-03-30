@@ -1331,56 +1331,6 @@ namespace mongo {
         }
     }
 
-    /* used to verify that slave knows what databases we have */
-    void logOurDbsPresence() {
-        path dbs(dbpath);
-        directory_iterator end;
-        directory_iterator i(dbs);
-
-        dblock lk;
-
-        while ( i != end ) {
-            path p = *i;
-            string f = p.leaf();
-            if ( endsWith(f.c_str(), ".ns") ) {
-                /* note: we keep trailing "." so that when slave calls setClient(ns) everything is happy; e.g.,
-                         valid namespaces must always have a dot, even though here it is just a placeholder not
-                  	   a real one
-                  	   */
-                string dbname = string(f.c_str(), f.size() - 2);
-                if ( dbname != "local." ) {
-                    setClientTempNs(dbname.c_str());
-                    logOp("db", dbname.c_str(), BSONObj());
-                }
-            }
-            i++;
-        }
-
-        database = 0;
-    }
-
-    /* we have to log the db presence periodically as that "advertisement" will roll out of the log
-       as it is of finite length.  also as we only do one db cloning per pass, we could skip over a bunch of
-       advertisements and thus need to see them again later.  so this mechanism can actually be very slow to
-       work, and should be improved.
-    */
-    void replMasterThread() {
-        sleepsecs(15);
-        logOurDbsPresence();
-
-        // if you are testing, you might finish test and shutdown in less than 10
-        // minutes yet not have done something in first 15 -- this is to exercise
-        // this code some.
-        sleepsecs(90);
-        logOurDbsPresence();
-
-        while ( 1 ) {
-            logOurDbsPresence();
-            sleepsecs(60 * 10);
-        }
-
-    }
-
     void tempThread() {
         while ( 1 ) {
             out() << dbMutexInfo.isLocked() << endl;
@@ -1440,7 +1390,6 @@ namespace mongo {
                 log(1) << "master=true" << endl;
             master = true;
             createOplog();
-            boost::thread mt(replMasterThread);
         }
     }
 
