@@ -57,7 +57,7 @@ namespace mongo {
             }
             return c;
         }
-        DBClientBase *c = p->pool.front();
+        DBClientBase *c = p->pool.top();
         p->pool.pop();
         return c;
     }
@@ -69,7 +69,7 @@ namespace mongo {
 
             vector<DBClientBase*> all;
             while ( ! p->pool.empty() ){
-                DBClientBase * c = p->pool.front();
+                DBClientBase * c = p->pool.top();
                 p->pool.pop();
                 all.push_back( c );
                 bool res;
