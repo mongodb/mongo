@@ -38,6 +38,7 @@ namespace mongo {
             DBClientBase *c;
             if( host.find(',') == string::npos ) {
                 DBClientConnection *cc = new DBClientConnection(true);
+                log(2) << "creating new connection for pool to:" << host << endl;
                 if ( !cc->connect(host.c_str(), errmsg) ) {
                     delete cc;
                     uassert( (string)"dbconnectionpool: connect failed" + host , false);
