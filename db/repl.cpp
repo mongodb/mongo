@@ -832,8 +832,7 @@ namespace mongo {
             c = 0;
         }
 
-        if ( syncedTo.isNull() )
-            log(1) << "pull:   initial run\n";
+        bool initial = syncedTo.isNull();
 
         if ( c == 0 ) {
             if ( syncedTo == OpTime() ) {
@@ -934,8 +933,11 @@ namespace mongo {
         }
         OpTime nextOpTime( ts.date() );
         log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
-        if ( tailing ) {
-            assert( syncedTo < nextOpTime );
+        if ( tailing || initial ) {
+            if ( initial )
+                log(1) << "pull:   initial run\n";
+            else
+                assert( syncedTo < nextOpTime );
             sync_pullOpLog_applyOperation(op);
             n++;
         }
@@ -956,9 +958,7 @@ namespace mongo {
             throw SyncException();
         }
         else {
-            /* t == syncedTo, so the first op was applied previously or this is
-               the initial run and the first op is unnecessary, no need to apply
-               it. */
+            /* t == syncedTo, so the first op was applied previously. */
         }
 
         // apply operations
