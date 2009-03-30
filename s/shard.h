@@ -138,16 +138,26 @@ namespace mongo {
 
         ServerShardVersion getVersion( const string& server ) const;
         ServerShardVersion getVersion() const;
+
+        /**
+         * this is just an increasing number of how many shard managers we have so we know if something has been updated
+         */
+        unsigned long long getSequenceNumber(){
+            return _sequenceNumber;
+        }
+        
     private:
         DBConfig * _config;
         string _ns;
         ShardKeyPattern _key;
         
         vector<Shard*> _shards;
-
+        
         mutex _lock;
-
+        unsigned long long _sequenceNumber;
+        
         friend class Shard;
+        static unsigned long long NextSequenceNumber;
     };
 
 } // namespace mongo
