@@ -260,10 +260,10 @@ namespace mongo {
             }            
         } shardCmd;
             
-
-        class SplitCollection : public GridAdminCmd {
+        
+        class SplitCollectionHelper : public GridAdminCmd {
         public:
-            SplitCollection() : GridAdminCmd( "split" ){}
+            SplitCollectionHelper( const char * name ) : GridAdminCmd( name ){}
             virtual void help( stringstream& help ) const {
                 help 
                     << " example: { shard : 'alleyinsider.blog.posts' , find : { ts : 1 } } - split the shard that contains give key \n"
@@ -271,13 +271,16 @@ namespace mongo {
                     << " NOTE: this does not move move the chunks, it merely creates a logical seperation \n"
                     ;
             }
+            
+            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ) = 0;
+            
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string ns = cmdObj["split"].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
                 }
-                
+
                 DBConfig * config = grid.getDBConfig( ns );
                 if ( ! config->sharded( ns ) ){
                     errmsg = "ns not sharded.  have to shard before can split";
@@ -299,7 +302,43 @@ namespace mongo {
                 ShardManager * info = config->getShardManager( ns );
                 Shard& old = info->findShard( find );
                 
-                log() << "splitting: " << ns << " on: " << find << endl;
+
+                return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
+            }
+
+        };
+
+        class SplitValueCommand : public SplitCollectionHelper {
+        public:
+            SplitValueCommand() : SplitCollectionHelper( "splitvalue" ){}
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
+                
+                result << "shardinfo" << old.toString();
+                
+                result.appendBool( "auto" , middle.isEmpty() );
+                
+                if ( middle.isEmpty() ){
+                    
+                    old.split();
+                }
+                else {
+                    result.append( "middle" , middle );
+                }
+                
+                result << "ok" << 1;
+                return true;
+            }            
+            
+
+        } splitValueCmd;
+
+
+        class SplitCollection : public SplitCollectionHelper {
+        public:
+            SplitCollection() : SplitCollectionHelper( "split" ){}            
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
+                
+                log() << "splitting: " << ns << "  shard: " << old << endl;
                 
                 unsigned long long nextTS = grid.getNextOpTime();
                 ScopedDbConnection conn( old.getServer() );
@@ -311,12 +350,12 @@ namespace mongo {
                 }
                 conn.done();
 
-                if ( middle )
-                    old.split( cmdObj.getObjectField( "middle" ) );
-                else
+                if ( middle.isEmpty() )
                     old.split();
+                else
+                    old.split( middle );
                 
-                info->save();
+                manager->save();
                 
                 result << "ok" << 1;
                 return true;

@@ -42,8 +42,12 @@ namespace mongo {
             _manager->getShardKey().compare( obj , getMax() ) < 0;
     }
 
+    BSONObj Shard::pickSplitPoint(){
+        return _manager->getShardKey().middle( getMin() , getMax() );
+    }
+
     Shard * Shard::split(){
-        return split( _manager->getShardKey().middle( getMin() , getMax() ) );
+        return split( pickSplitPoint() );
     }
     
     Shard * Shard::split( const BSONObj& m ){

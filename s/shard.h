@@ -64,13 +64,14 @@ namespace mongo {
         operator string() const { return toString(); }
 
         bool operator==(const Shard& s);
-
+        
         bool operator!=(const Shard& s){
             return ! ( *this == s );
         }
         
         void getFilter( BSONObjBuilder& b );
 
+        BSONObj pickSplitPoint();
         Shard * split();
         Shard * split( const BSONObj& middle );
 
