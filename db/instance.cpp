@@ -28,6 +28,7 @@
 #include "security.h"
 #include "json.h"
 #include "reccache.h"
+#include "replset.h"
 #include "../s/d_logic.h"
 
 namespace mongo {
@@ -302,6 +303,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
+        uassert( "not master", isMaster( ns ) );
         setClient(ns);
         //if( database->profile )
         ss << ns << ' ';
@@ -322,6 +324,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
+        uassert( "not master", isMaster( ns ) );
         setClient(ns);
         int flags = d.pullInt();
         bool justOne = flags & 1;
@@ -359,6 +362,9 @@ namespace mongo {
                 }
             }
 
+            // Check before setClient() to avoid creating ns unnecessarily.
+            uassert( "not master", isMasterNs( q.ns ) || (q.queryOptions & Option_SlaveOk) || strstr( q.ns, ".$cmd" ) );
+            
             setClient( q.ns );
             strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);
             msgdata = runQuery(m, ss ).release();
@@ -440,6 +446,7 @@ namespace mongo {
         DbMessage d(m);
 		const char *ns = d.getns();
 		assert(*ns);
+        uassert( "not master", isMaster( ns ) );
 		setClient(ns);
 		ss << ns;
 		
