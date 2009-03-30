@@ -153,7 +153,7 @@ assert.eq( "bob is gone" , person.name , "update test B" );
 // remove
 assert( db.foo.findOne( { num : 3 } ) != null , "remove test A" );
 db.foo.remove( { num : 3 } );
-assert( db.foo.findOne( { num : 3 } ) == null , "remove test B" );
+assert.isnull( db.foo.findOne( { num : 3 } ) , "remove test B" );
 
 db.foo.save( { num : 3 , name : "eliot2" } );
 person = db.foo.findOne( { num : 3 } );
@@ -161,7 +161,7 @@ assert( person , "remove test C" );
 assert.eq( person.name , "eliot2" );
 
 db.foo.remove( { _id : person._id } );
-assert( db.foo.findOne( { num : 3 } ) == null , "remove test E - should have been null - not: " + tojson( db.foo.findOne( { num : 3 } ) ) );
+assert.isnull( db.foo.findOne( { num : 3 } ) , "remove test E" );
 
 placeCheck( 8 );
 

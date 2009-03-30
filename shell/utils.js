@@ -61,6 +61,13 @@ assert.commandFailed = function( res , msg ){
     throw "command worked when it should have failed: " + tojson( res ) + " : " + msg;
 }
 
+assert.isnull = function( what , msg ){
+    if ( what == null )
+        return;
+    
+    throw "supposed to null (" + ( msg || "" ) + ") was: " + tojson( what );
+}
+
 Object.extend = function( dst , src ){
     for ( var k in src ){
         dst[k] = src[k];
