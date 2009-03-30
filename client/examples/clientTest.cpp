@@ -139,7 +139,8 @@ int main() {
         }
         
         mongo::BSONObj out = conn.findOne( tsns , mongo::BSONObj() );
-        unsigned int inc = out["ts"].timestampInc();
+        unsigned long long oldTime = out["ts"].timestampTime();
+        unsigned int oldInc = out["ts"].timestampInc();
         
         {
             mongo::BSONObjBuilder b1;
@@ -152,7 +153,9 @@ int main() {
             conn.update( tsns , b1.obj() , b2.obj() );
         }
         
-        assert( conn.findOne( tsns , mongo::BSONObj() )["ts"].timestampInc() == ( inc + 1 ) );
+        BSONObj found = conn.findOne( tsns , mongo::BSONObj() );
+        assert( ( oldTime < found["ts"].timestampTime() ) ||
+               ( oldInc + 1 == found["ts"].timestampInc() ) );
         
     }
     
