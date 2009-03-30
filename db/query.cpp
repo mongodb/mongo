@@ -1161,8 +1161,8 @@ namespace mongo {
             AuthenticationInfo *ai = authInfo.get();
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
             
-            uassert("not master", isMaster() || (queryOptions & Option_SlaveOk));
-            
+            uassert( "not master", isMaster() || (queryOptions & Option_SlaveOk) );
+
             BSONElement hint;
             bool explain = false;
             bool _gotquery = false;

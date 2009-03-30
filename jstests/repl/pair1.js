@@ -3,7 +3,7 @@
 var baseName = "jstests_pair1test";
 
 ismaster = function( n ) {
-    im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
+    var im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
 //    print( "ismaster: " + tojson( im ) );
     assert( im );
     return im.ismaster;
@@ -32,6 +32,25 @@ checkWrite = function( m, s ) {
                 } );
 }
 
+// check that slave reads and writes are guarded
+checkSlaveGuard = function( s ) {
+    var t = s.getDB( baseName + "-temp" ).temp;
+    assert.throws( t.find().count, {}, "not master" );
+    assert.throws( t.find(), {}, "not master", "find did not assert" );
+    
+    checkError = function() {
+        assert.eq( "not master", s.getDB( "admin" ).getLastError() );
+        s.getDB( "admin" ).resetError();
+    }
+    s.getDB( "admin" ).resetError();
+    t.save( {x:1} );
+    checkError();
+    t.update( {}, {x:2}, true );
+    checkError();
+    t.remove( {x:0} );
+    checkError();
+}
+
 doTest = function( signal ) {
 
     // spec small oplog for fast startup on 64bit machines
@@ -51,8 +70,7 @@ doTest = function( signal ) {
                 return ( lm == 0 && rm == 1 );
                 } );
     
-    // Check that reading from slave fails
-    assert.throws( l.getDB( baseName + "-temp" ).temp.find().count, {}, "not master" );
+    checkSlaveGuard( l );
     
     checkWrite( r, l );
     

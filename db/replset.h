@@ -107,16 +107,24 @@ namespace mongo {
 
        See also CmdIsMaster.
 
+       If 'client' is not specified, the current client is used.
     */
-    inline bool isMaster() {
+    inline bool isMaster( const char *client = 0 ) {
+        if ( !client )
+            client = database->name.c_str();
         if ( replAllDead ) {
-            return database->name == "local";
+            return strcmp( client, "local" ) == 0;
         }
 
         if ( replPair == 0 || replPair->state == ReplPair::State_Master )
             return true;
 
-        return database->name == "local";
+        return strcmp( client, "local" ) == 0;
+    }
+    inline bool isMasterNs( const char *ns ) {
+        char cl[ 256 ];
+        nsToClient( ns, cl );
+        return isMaster( cl );
     }
 
     inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {

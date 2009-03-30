@@ -4,7 +4,7 @@ var baseName = "jstests_replacepeer1test";
 
 ismaster = function( n ) {
     im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
-    //    print( "ismaster: " + tojson( im ) );
+//    print( "ismaster: " + tojson( im ) );
     assert( im );
     return im.ismaster;
 }
@@ -59,9 +59,6 @@ doTest = function( signal ) {
 
     assert.eq( 1, r.getDB( "admin" ).runCommand( {replacepeer:1} ).ok );
     
-    writeOne( r );
-    sleep( 1000 ); // flush write to disk
-    
     stopMongod( 27021, signal );
     
     l = startMongod( "--port", "27020", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27021", "127.0.0.1:27018", "--oplogSize", "1" );
@@ -81,7 +78,7 @@ doTest = function( signal ) {
     
     checkWrite( r, l );
     l.setSlaveOk();
-    assert.eq( 4, l.getDB( baseName ).z.find().toArray().length );
+    assert.eq( 3, l.getDB( baseName ).z.find().toArray().length );
     
     stopMongod( 27018 );
     stopMongod( 27020 );
