@@ -150,6 +150,8 @@ namespace mongo {
     
     // -------  ShardManager --------
 
+    unsigned long long ShardManager::NextSequenceNumber = 1;
+
     ShardManager::ShardManager( DBConfig * config , string ns , ShardKeyPattern pattern ) : _config( config ) , _ns( ns ) , _key( pattern ){
         Shard temp(0);
         
@@ -173,9 +175,11 @@ namespace mongo {
             s->_markModified();
             
             _shards.push_back( s );
-
+            
             log() << "no shards for:" << ns << " so creating first: " << s->toString() << endl;
         }
+
+        _sequenceNumber = ++NextSequenceNumber;
     }
     
     ShardManager::~ShardManager(){
@@ -231,6 +235,7 @@ namespace mongo {
             if ( ! s->_modified )
                 continue;
             s->save( true );
+            _sequenceNumber = ++NextSequenceNumber;
         }
 
         massert( "how did version get smalled" , getVersion() >= a );

@@ -50,6 +50,8 @@ namespace mongo {
         dbcon.done();
     }
 
+    map<DBClientBase*,unsigned long long> checkShardVersionLastSequence;
+
     void checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative ){
         // TODO: cache, optimize, etc...
         
@@ -62,11 +64,17 @@ namespace mongo {
         
         
         ShardManager * manager = conf->getShardManager( ns , authoritative );
-        
-        ServerShardVersion version = manager->getVersion( conn.getServerAddress() );
+
+        unsigned long long & sequenceNumber = checkShardVersionLastSequence[ &conn ];        
+        if ( manager->getSequenceNumber() == sequenceNumber )
+            return;
+
+        ServerShardVersion version = manager->getVersion( conn.getServerAddress() ); 
 
         BSONObj result;
         if ( setShardVersion( conn , ns , version , authoritative , result ) ){
+            // success!
+            sequenceNumber = manager->getSequenceNumber();
             return;
         }
 
