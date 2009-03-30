@@ -94,7 +94,7 @@ namespace mongo {
             cmdBuilder.appendBool( "authoritative" , 1 );
         BSONObj cmd = cmdBuilder.obj();
         
-        log(1) << "    setShardVersion  " << conn.getServerAddress() << "  " << ns << "  " << cmd << endl;
+        log(1) << "    setShardVersion  " << conn.getServerAddress() << "  " << ns << "  " << cmd << " " << &conn << endl;
         
         return conn.runCommand( "admin" , cmd , result );
     }
