@@ -33,6 +33,7 @@
 
 #include "config.h"
 #include "shard.h"
+#include "strategy.h"
 
 namespace mongo {
 
@@ -299,6 +300,16 @@ namespace mongo {
                 Shard& old = info->findShard( find );
                 
                 log() << "splitting: " << ns << " on: " << find << endl;
+                
+                unsigned long long nextTS = grid.getNextOpTime();
+                ScopedDbConnection conn( old.getServer() );
+                BSONObj lockResult;
+                if ( ! setShardVersion( conn.conn() , ns , nextTS , true , lockResult ) ){
+                    log() << "setShardVersion for split failed!" << endl;
+                    errmsg = "setShardVersion failed to lock server.  is someone else doing something?";
+                    return false;
+                }
+                conn.done();
 
                 if ( middle )
                     old.split( cmdObj.getObjectField( "middle" ) );

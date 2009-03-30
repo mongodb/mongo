@@ -113,6 +113,8 @@ namespace mongo {
         string pickServerForNewDB();
         
         bool knowAboutServer( string name ) const;
+
+        unsigned long long getNextOpTime() const;
     private:
         map<string,DBConfig*> _databases;
     };
