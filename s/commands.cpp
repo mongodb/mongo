@@ -263,7 +263,7 @@ namespace mongo {
         
         class SplitCollectionHelper : public GridAdminCmd {
         public:
-            SplitCollectionHelper( const char * name ) : GridAdminCmd( name ){}
+            SplitCollectionHelper( const char * name ) : GridAdminCmd( name ) , _name( name ){}
             virtual void help( stringstream& help ) const {
                 help 
                     << " example: { shard : 'alleyinsider.blog.posts' , find : { ts : 1 } } - split the shard that contains give key \n"
@@ -275,7 +275,7 @@ namespace mongo {
             virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ) = 0;
             
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string ns = cmdObj["split"].valuestrsafe();
+                string ns = cmdObj[_name.c_str()].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
@@ -306,6 +306,8 @@ namespace mongo {
                 return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
             }
 
+        protected:
+            string _name;
         };
 
         class SplitValueCommand : public SplitCollectionHelper {
@@ -317,13 +319,10 @@ namespace mongo {
                 
                 result.appendBool( "auto" , middle.isEmpty() );
                 
-                if ( middle.isEmpty() ){
-                    
-                    old.split();
-                }
-                else {
-                    result.append( "middle" , middle );
-                }
+                if ( middle.isEmpty() )
+                    middle = old.pickSplitPoint();
+
+                result.append( "middle" , middle );
                 
                 result << "ok" << 1;
                 return true;

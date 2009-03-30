@@ -81,7 +81,9 @@ namespace mongo {
         virtual string modelServer();
 
         virtual void save( bool check=false );
-
+        
+        void ensureIndex();
+        
         void _markModified();
         
     private:
@@ -126,6 +128,10 @@ namespace mongo {
         
         ShardKeyPattern& getShardKey(){  return _key; }
         
+        /**
+         * makes sure the shard index is on all servers
+         */
+        void ensureIndex();
 
         /**
          * @return number of shards added to the vector

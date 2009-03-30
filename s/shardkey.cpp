@@ -28,10 +28,6 @@
 
 namespace mongo {
 
-    inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const { 
-        return from.extractFields(pattern);
-    }
-    
     BSONObj ShardKeyPattern::globalMin() const {
         BSONObjBuilder b;
         BSONElement e = pattern.firstElement();
