@@ -51,6 +51,9 @@ doTest = function( signal ) {
                 return ( lm == 0 && rm == 1 );
                 } );
     
+    // Check that reading from slave fails
+    assert.throws( l.getDB( baseName + "-temp" ).temp.find().count, {}, "not master" );
+    
     checkWrite( r, l );
     
     stopMongod( 27020, signal );
