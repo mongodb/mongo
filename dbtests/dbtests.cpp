@@ -80,6 +80,8 @@ int main( int argc, char** argv ) {
     dbpath = dbpathSpec.c_str();
 
     srand( seed );
+    printGitVersion();
+    printSysInfo();
     out() << "random seed: " << seed << endl;
 
     UnitTest::Registry tests;

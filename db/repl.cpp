@@ -202,6 +202,23 @@ namespace mongo {
                 errmsg = "not dead, no need to resync";
                 return false;
             }
+            
+            // Wait for slave thread to finish syncing, so sources will be be
+            // reloaded with new saved state on next pass.
+            Timer t;
+            while ( 1 ) {
+                if ( syncing == 0 || t.millis() > 20000 )
+                    break;
+                {
+                    dbtemprelease t;
+                    sleepmillis(10);
+                }
+            }
+            if ( syncing ) {
+                errmsg = "timeout waiting for sync() to finish";
+                return false;
+            }
+            
             ReplSource::forceResyncDead( "user" );
             result.append( "info", "triggered resync for all sources" );
             return true;                
@@ -400,7 +417,7 @@ namespace mongo {
         replacing = false;
         nClonedThisPass = 0;
         paired = false;
-        haveDbList_ = false;
+        mustListDbs_ = true;
     }
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
@@ -419,18 +436,18 @@ namespace mongo {
             //syncedTo.asDate() = e.date();
         }
 
-        BSONObj dbsObj = o.getObjectField("dbs");
+        BSONObj dbsObj = o.getObjectField("dbsNextPass");
         if ( !dbsObj.isEmpty() ) {
             BSONObjIterator i(dbsObj);
             while ( 1 ) {
                 BSONElement e = i.next();
                 if ( e.eoo() )
                     break;
-                dbs.insert( e.fieldName() );
+                addDbNextPass.insert( e.fieldName() );
             }
-        }
+        }        
         
-        haveDbList_ = !dbs.empty();
+        repopulateDbsList( o );
     }
 
     /* Turn our C++ Source object into a BSONObj */
@@ -451,6 +468,15 @@ namespace mongo {
         }
         if ( n )
             b.append("dbs", dbs_builder.done());
+        
+        BSONObjBuilder dbsNextPassBuilder;
+        n = 0;
+        for ( set<string>::iterator i = addDbNextPass.begin(); i != addDbNextPass.end(); i++ ) {
+            n++;
+            dbsNextPassBuilder.appendBool(i->c_str(), 1);
+        }
+        if ( n )
+            b.append("dbsNextPass", dbsNextPassBuilder.done());
 
         return b.obj();
     }
@@ -492,16 +518,32 @@ namespace mongo {
     string dashDashSource;
     string dashDashOnly;
 
-    static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, vector<ReplSource*>&old) {
-        for ( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
-            if ( s == **i ) {
-                v.push_back(*i);
-                old.erase(i);
-                return;
+    void ReplSource::repopulateDbsList( const BSONObj &o ) {
+        dbs.clear();
+        BSONObj dbsObj = o.getObjectField("dbs");
+        if ( !dbsObj.isEmpty() ) {
+            BSONObjIterator i(dbsObj);
+            while ( 1 ) {
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                dbs.insert( e.fieldName() );
             }
-            i++;
         }
-
+    }
+    
+    static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, const BSONObj &spec, vector<ReplSource*>&old) {
+        if ( s.syncedTo != OpTime() ) { // Don't reuse old ReplSource if there was a forced resync.
+            for ( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
+                if ( s == **i ) {
+                    v.push_back(*i);
+                    old.erase(i);
+                    return;
+                }
+                i++;
+            }
+        }
+        
         v.push_back( new ReplSource(s) );
     }
 
@@ -596,7 +638,7 @@ namespace mongo {
                     tmp.replacing = true;
                 }
             }
-            addSourceToList(v, tmp, old);
+            addSourceToList(v, tmp, c->current(), old);
             c->advance();
         }
         database = 0;
@@ -661,7 +703,8 @@ namespace mongo {
         }        
         dbs.clear();
         syncedTo = OpTime();
-        haveDbList_ = false;
+        mustListDbs_ = true;
+        save();
     }
 
     string ReplSource::resyncDrop( const char *db, const char *requester ) {
@@ -802,21 +845,20 @@ namespace mongo {
             throw SyncException();
         }
         
-         /* datafiles were missing.  so we need everything, no matter what sources object says */
-        if ( justCreated ) {
+        if ( newDb || justCreated ) {
+            if ( !justCreated && strcmp( clientName, "admin" ) != 0  ) {
+                log() << "An earlier initial clone did not complete, resyncing." << endl;
+            } else if ( !newDb ) {
+                log() << "Db just created, but not new to repl source." << endl;
+            }
             nClonedThisPass++;
             resync(database->name);
-            save();
-        } else if ( newDb && strcmp( clientName, "admin" ) != 0 ) {
-            replAllDead = "An initial clone by an earlier instance did not complete, "
-                          "or a local db was was created by the user with the same name as a db on the remote instance; "
-                          "resync required";
-            problem() << replAllDead;
-            problem() << "op: " << op << endl;
+            addDbNextPass.erase(clientName);
+            save(); // persist dbs, next pass dbs
         } else {
             applyOperation( op );            
+            addDbNextPass.erase( clientName );
         }
-        addDbNextPass.erase(clientName);
         database = 0;
     }
 
@@ -836,14 +878,15 @@ namespace mongo {
 
         if ( c == 0 ) {
             if ( syncedTo == OpTime() ) {
+                // Important to grab last oplog timestamp before listing databases.
                 BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
                 if ( !last.isEmpty() ) {
                     BSONElement ts = last.findElement( "ts" );
                     massert( "non Date ts found", ts.type() == Date );
                     syncedTo = OpTime( ts.date() );
                 }
-                if ( !haveDbList_ ) {
-                    haveDbList_ = true;
+                if ( mustListDbs_ ) {
+                    mustListDbs_ = false;
                     set< string > localDbs;
                     vector< string > diskDbs;
                     getDatabaseNames( diskDbs );
@@ -1331,56 +1374,6 @@ namespace mongo {
         }
     }
 
-    /* used to verify that slave knows what databases we have */
-    void logOurDbsPresence() {
-        path dbs(dbpath);
-        directory_iterator end;
-        directory_iterator i(dbs);
-
-        dblock lk;
-
-        while ( i != end ) {
-            path p = *i;
-            string f = p.leaf();
-            if ( endsWith(f.c_str(), ".ns") ) {
-                /* note: we keep trailing "." so that when slave calls setClient(ns) everything is happy; e.g.,
-                         valid namespaces must always have a dot, even though here it is just a placeholder not
-                  	   a real one
-                  	   */
-                string dbname = string(f.c_str(), f.size() - 2);
-                if ( dbname != "local." ) {
-                    setClientTempNs(dbname.c_str());
-                    logOp("db", dbname.c_str(), BSONObj());
-                }
-            }
-            i++;
-        }
-
-        database = 0;
-    }
-
-    /* we have to log the db presence periodically as that "advertisement" will roll out of the log
-       as it is of finite length.  also as we only do one db cloning per pass, we could skip over a bunch of
-       advertisements and thus need to see them again later.  so this mechanism can actually be very slow to
-       work, and should be improved.
-    */
-    void replMasterThread() {
-        sleepsecs(15);
-        logOurDbsPresence();
-
-        // if you are testing, you might finish test and shutdown in less than 10
-        // minutes yet not have done something in first 15 -- this is to exercise
-        // this code some.
-        sleepsecs(90);
-        logOurDbsPresence();
-
-        while ( 1 ) {
-            logOurDbsPresence();
-            sleepsecs(60 * 10);
-        }
-
-    }
-
     void tempThread() {
         while ( 1 ) {
             out() << dbMutexInfo.isLocked() << endl;
@@ -1440,7 +1433,6 @@ namespace mongo {
                 log(1) << "master=true" << endl;
             master = true;
             createOplog();
-            boost::thread mt(replMasterThread);
         }
     }
 
