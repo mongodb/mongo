@@ -64,13 +64,14 @@ namespace mongo {
         operator string() const { return toString(); }
 
         bool operator==(const Shard& s);
-
+        
         bool operator!=(const Shard& s){
             return ! ( *this == s );
         }
         
         void getFilter( BSONObjBuilder& b );
 
+        BSONObj pickSplitPoint();
         Shard * split();
         Shard * split( const BSONObj& middle );
 
@@ -80,7 +81,9 @@ namespace mongo {
         virtual string modelServer();
 
         virtual void save( bool check=false );
-
+        
+        void ensureIndex();
+        
         void _markModified();
         
     private:
@@ -125,6 +128,10 @@ namespace mongo {
         
         ShardKeyPattern& getShardKey(){  return _key; }
         
+        /**
+         * makes sure the shard index is on all servers
+         */
+        void ensureIndex();
 
         /**
          * @return number of shards added to the vector

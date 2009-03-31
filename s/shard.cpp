@@ -42,8 +42,57 @@ namespace mongo {
             _manager->getShardKey().compare( obj , getMax() ) < 0;
     }
 
+    BSONObj Shard::pickSplitPoint(){
+        int sort = 0;
+        
+        if ( _manager->getShardKey().globalMin().woCompare( getMin() ) == 0 ){
+            sort = 1;
+        }
+        else if ( _manager->getShardKey().globalMax().woCompare( getMax() ) == 0 ){
+            sort = -1;
+        }
+        
+        if ( sort ){
+            ScopedDbConnection conn( getServer() );
+            Query q;
+            if ( sort == 1 )
+                q.sort( _manager->getShardKey().key() );
+            else {
+                BSONObj k = _manager->getShardKey().key();
+                BSONObjBuilder r;
+                
+                BSONObjIterator i(k);
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    uassert( "can only handle numbers here - which i think is correct" , e.isNumber() );
+                    r.append( e.fieldName() , -1 * e.number() );
+                }
+                
+                q.sort( r.obj() );
+            }
+            BSONObj end = conn->findOne( _ns , q );
+            conn.done();
+            
+            if ( ! end.isEmpty() )
+                return _manager->getShardKey().extractKey( end );
+        }
+        
+        ScopedDbConnection conn( getServer() );
+        BSONObj result;
+        uassert( "medianKey failed!" , conn->runCommand( "admin" , BSON( "medianKey" << _ns
+                                                                         << "keyPattern" << _manager->getShardKey().key() 
+                                                                         << "min" << getMin() 
+                                                                         << "max" << getMax() 
+                                                                         ) , result ) );
+        conn.done();
+        
+        return result.getObjectField( "median" );
+    }
+
     Shard * Shard::split(){
-        return split( _manager->getShardKey().middle( getMin() , getMax() ) );
+        return split( pickSplitPoint() );
     }
     
     Shard * Shard::split( const BSONObj& m ){
@@ -141,6 +190,12 @@ namespace mongo {
             massert( "id changed!" , q["_id"] == _id["_id"] );
         }
     }
+    
+    void Shard::ensureIndex(){
+        ScopedDbConnection conn( getServer() );
+        conn->ensureIndex( _ns , _manager->getShardKey().key() );
+        conn.done();
+    }
 
     string Shard::toString() const {
         stringstream ss;
@@ -227,6 +282,18 @@ namespace mongo {
         return added;
     }
     
+    void ShardManager::ensureIndex(){
+        set<string> seen;
+        
+        for ( vector<Shard*>::const_iterator i=_shards.begin(); i!=_shards.end(); i++ ){
+            Shard* s = *i;
+            if ( seen.count( s->getServer() ) )
+                continue;
+            seen.insert( s->getServer() );
+            s->ensureIndex();
+        }
+    }
+
     void ShardManager::save(){
         ServerShardVersion a = getVersion();
         
@@ -237,8 +304,10 @@ namespace mongo {
             s->save( true );
             _sequenceNumber = ++NextSequenceNumber;
         }
-
+        
         massert( "how did version get smalled" , getVersion() >= a );
+
+        ensureIndex(); // TODO: this is too aggressive - but not really sooo bad
     }
     
     ServerShardVersion ShardManager::getVersion( const string& server ) const{

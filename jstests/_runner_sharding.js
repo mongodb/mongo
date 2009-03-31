@@ -3,6 +3,8 @@
 //
 var files = listFiles("jstests/sharding");
 
+var num = 0;
+
 files.forEach(
     function(x) {
         
@@ -13,7 +15,10 @@ files.forEach(
             return;
         }
         
-        
+        if ( num++ > 0 ){
+            sleep( 1000 ); // let things fully come down
+        }
+
         print(" *******************************************");
         print("         Test : " + x.name + " ...");
         try {

@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "shard.h"
+#include "request.h"
 
 namespace mongo {
     

@@ -199,6 +199,16 @@ namespace mongo {
         return cc;
     }
 
+    unsigned long long Grid::getNextOpTime() const {
+        ScopedDbConnection conn( configServer.getPrimary() );
+        
+        BSONObj result;
+        massert( "getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime" ) );
+        conn.done();
+
+        return result["optime"].date();
+    }
+
     /* --- ConfigServer ---- */
 
     ConfigServer::ConfigServer() {

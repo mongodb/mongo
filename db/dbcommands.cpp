@@ -811,13 +811,18 @@ namespace mongo {
             BSONObj max = jsobj.getObjectField( "max" );
             
             if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
-                errmsg = "invalid command syntax";
+                errmsg = "invalid command syntax (note: min and max are required)";
                 return false;
             }
             
             setClient( ns );
             const IndexDetails *id = 0;
             NamespaceDetails *d = nsdetails( ns );
+            if ( ! d ){
+                errmsg = "ns not found";
+                return false;
+            }
+                
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
             if ( keyPattern.isEmpty() ) {
                 BSONObjIterator i( min );

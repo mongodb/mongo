@@ -33,6 +33,7 @@
 
 #include "config.h"
 #include "shard.h"
+#include "strategy.h"
 
 namespace mongo {
 
@@ -259,10 +260,10 @@ namespace mongo {
             }            
         } shardCmd;
             
-
-        class SplitCollection : public GridAdminCmd {
+        
+        class SplitCollectionHelper : public GridAdminCmd {
         public:
-            SplitCollection() : GridAdminCmd( "split" ){}
+            SplitCollectionHelper( const char * name ) : GridAdminCmd( name ) , _name( name ){}
             virtual void help( stringstream& help ) const {
                 help 
                     << " example: { shard : 'alleyinsider.blog.posts' , find : { ts : 1 } } - split the shard that contains give key \n"
@@ -270,13 +271,16 @@ namespace mongo {
                     << " NOTE: this does not move move the chunks, it merely creates a logical seperation \n"
                     ;
             }
+            
+            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ) = 0;
+            
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string ns = cmdObj["split"].valuestrsafe();
+                string ns = cmdObj[_name.c_str()].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
                 }
-                
+
                 DBConfig * config = grid.getDBConfig( ns );
                 if ( ! config->sharded( ns ) ){
                     errmsg = "ns not sharded.  have to shard before can split";
@@ -298,14 +302,59 @@ namespace mongo {
                 ShardManager * info = config->getShardManager( ns );
                 Shard& old = info->findShard( find );
                 
-                log() << "splitting: " << ns << " on: " << find << endl;
 
-                if ( middle )
-                    old.split( cmdObj.getObjectField( "middle" ) );
-                else
-                    old.split();
+                return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
+            }
+
+        protected:
+            string _name;
+        };
+
+        class SplitValueCommand : public SplitCollectionHelper {
+        public:
+            SplitValueCommand() : SplitCollectionHelper( "splitvalue" ){}
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
                 
-                info->save();
+                result << "shardinfo" << old.toString();
+                
+                result.appendBool( "auto" , middle.isEmpty() );
+                
+                if ( middle.isEmpty() )
+                    middle = old.pickSplitPoint();
+
+                result.append( "middle" , middle );
+                
+                result << "ok" << 1;
+                return true;
+            }            
+            
+
+        } splitValueCmd;
+
+
+        class SplitCollection : public SplitCollectionHelper {
+        public:
+            SplitCollection() : SplitCollectionHelper( "split" ){}            
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
+                
+                log() << "splitting: " << ns << "  shard: " << old << endl;
+                
+                unsigned long long nextTS = grid.getNextOpTime();
+                ScopedDbConnection conn( old.getServer() );
+                BSONObj lockResult;
+                if ( ! setShardVersion( conn.conn() , ns , nextTS , true , lockResult ) ){
+                    log() << "setShardVersion for split failed!" << endl;
+                    errmsg = "setShardVersion failed to lock server.  is someone else doing something?";
+                    return false;
+                }
+                conn.done();
+
+                if ( middle.isEmpty() )
+                    old.split();
+                else
+                    old.split( middle );
+                
+                manager->save();
                 
                 result << "ok" << 1;
                 return true;

@@ -265,8 +265,10 @@ namespace mongo {
     */
     class DBClientWithCommands : public DBClientInterface {
         bool isOk(const BSONObj&);
-        bool simpleCommand(const string &dbname, BSONObj *info, const string &command);
     public:
+
+        bool simpleCommand(const string &dbname, BSONObj *info, const string &command);
+
         /** Run a database command.  Database commands are represented as BSON objects.  Common database
            commands have prebuilt helper functions -- see below.  If a helper is not available you can
            directly call runCommand.
