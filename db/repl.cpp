@@ -662,6 +662,7 @@ namespace mongo {
         dbs.clear();
         syncedTo = OpTime();
         haveDbList_ = false;
+        save();
     }
 
     string ReplSource::resyncDrop( const char *db, const char *requester ) {
@@ -802,17 +803,15 @@ namespace mongo {
             throw SyncException();
         }
         
-         /* datafiles were missing.  so we need everything, no matter what sources object says */
-        if ( justCreated ) {
+        if ( newDb || justCreated ) {
+            if ( !justCreated && strcmp( clientName, "admin" ) != 0  ) {
+                log() << "An earlier initial clone did not complete, resyncing." << endl;
+            } else if ( !newDb ) {
+                log() << "Db just created, but not new to repl source." << endl;
+            }
             nClonedThisPass++;
             resync(database->name);
-            save();
-        } else if ( newDb && strcmp( clientName, "admin" ) != 0 ) {
-            replAllDead = "An initial clone by an earlier instance did not complete, "
-                          "or a local db was was created by the user with the same name as a db on the remote instance; "
-                          "resync required";
-            problem() << replAllDead;
-            problem() << "op: " << op << endl;
+            save(); // persist dbs
         } else {
             applyOperation( op );            
         }
