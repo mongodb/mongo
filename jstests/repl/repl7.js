@@ -18,6 +18,9 @@ doTest = function( signal ) {
                 } );
     
     stopMongod( 27019, signal );
+    
+    sleep( 4000 );
+    
     s = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );    
     
     assert.soon( function() {

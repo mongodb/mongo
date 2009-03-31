@@ -484,6 +484,7 @@ void killDb( int port, int signal ) {
 
     close( dbs[ port ].second );
     dbs.erase( port );
+    sleepms( 1000 );
 }
 
 v8::Handle< v8::Value > StopMongoProgram( const v8::Arguments &a ) {
