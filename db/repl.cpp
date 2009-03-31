@@ -436,6 +436,17 @@ namespace mongo {
             //syncedTo.asDate() = e.date();
         }
 
+        BSONObj dbsObj = o.getObjectField("dbsNextPass");
+        if ( !dbsObj.isEmpty() ) {
+            BSONObjIterator i(dbsObj);
+            while ( 1 ) {
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                addDbNextPass.insert( e.fieldName() );
+            }
+        }        
+        
         repopulateDbsList( o );
     }
 
@@ -457,6 +468,15 @@ namespace mongo {
         }
         if ( n )
             b.append("dbs", dbs_builder.done());
+        
+        BSONObjBuilder dbsNextPassBuilder;
+        n = 0;
+        for ( set<string>::iterator i = addDbNextPass.begin(); i != addDbNextPass.end(); i++ ) {
+            n++;
+            dbsNextPassBuilder.appendBool(i->c_str(), 1);
+        }
+        if ( n )
+            b.append("dbsNextPass", dbsNextPassBuilder.done());
 
         return b.obj();
     }
@@ -833,11 +853,12 @@ namespace mongo {
             }
             nClonedThisPass++;
             resync(database->name);
-            save(); // persist dbs
+            addDbNextPass.erase(clientName);
+            save(); // persist dbs, next pass dbs
         } else {
             applyOperation( op );            
+            addDbNextPass.erase( clientName );
         }
-        addDbNextPass.erase(clientName);
         database = 0;
     }
 
