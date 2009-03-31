@@ -551,27 +551,64 @@ namespace mongo {
         if ( ! possible.size() ) {
             possible.push_back( "./" );
             possible.push_back( "../" );
-
+            
             log(2) << "dbExecCommand: " << dbExecCommand << endl;
             
-	    string dbDir = dbExecCommand;
+            string dbDir = dbExecCommand;
 #ifdef WIN32
-	    if ( dbDir.find( "\\" ) != string::npos ){
-	      dbDir = dbDir.substr( 0 , dbDir.find_last_of( "\\" ) );
-	    }
+            if ( dbDir.find( "\\" ) != string::npos ){
+                dbDir = dbDir.substr( 0 , dbDir.find_last_of( "\\" ) );
+            }
+            else {
+                dbDir = ".";
+            }
 #else
-	    if ( dbDir.find( "/" ) != string::npos ){
-	      dbDir = dbDir.substr( 0 , dbDir.find_last_of( "/" ) );
-	    }
+            if ( dbDir.find( "/" ) != string::npos ){
+                dbDir = dbDir.substr( 0 , dbDir.find_last_of( "/" ) );
+            }
+            else {
+                bool found = false;
+                
+                if ( getenv( "PATH" ) ){
+                    string s = getenv( "PATH" );
+                    s += ":";
+                    pcrecpp::StringPiece input( s );
+                    string dir;
+                    pcrecpp::RE re("(.*?):");
+                    while ( re.Consume( &input, &dir ) ){
+                        string test = dir + "/" + dbExecCommand;
+                        if ( boost::filesystem::exists( test ) ){
+                            if ( boost::filesystem::is_symlink( test ) ){
+                                char tmp[2048];
+                                
+                                while ( boost::filesystem::is_symlink( test ) ){
+                                    int len = readlink( test.c_str() , tmp , 2048 );
+                                    tmp[len] = 0;
+                                    test = tmp;
+                                }
+                                
+                                path p( test );
+                                dir = p.parent_path().string();
+                            }
+                            dbDir = dir;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if ( ! found )
+                    dbDir = ".";
+            }
 #endif
-	    else {
-	      dbDir = ".";
-	    }
-
-	    log(2) << "dbDir [" << dbDir << "]" << endl;
-	    possible.push_back( ( dbDir + "/../lib/mongo/" ));
-	    possible.push_back( ( dbDir + "/../lib64/mongo/" ));
-	    possible.push_back( ( dbDir + "/../lib32/mongo/" ));
+            
+            log(2) << "dbDir [" << dbDir << "]" << endl;
+            possible.push_back( ( dbDir + "/../lib/mongo/" ));
+            possible.push_back( ( dbDir + "/../lib64/mongo/" ));
+            possible.push_back( ( dbDir + "/../lib32/mongo/" ));
+            possible.push_back( ( dbDir + "/" ));
+            possible.push_back( ( dbDir + "/lib64/mongo/" ));
+            possible.push_back( ( dbDir + "/lib32/mongo/" ));
         }
 
         for ( list<string>::iterator i = possible.begin() ; i != possible.end(); i++ ) {
