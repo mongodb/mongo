@@ -578,15 +578,12 @@ namespace mongo {
                     while ( re.Consume( &input, &dir ) ){
                         string test = dir + "/" + dbExecCommand;
                         if ( boost::filesystem::exists( test ) ){
-                            if ( boost::filesystem::is_symlink( test ) ){
+                            while ( boost::filesystem::symbolic_link_exists( test ) ){
                                 char tmp[2048];
-                                
-                                while ( boost::filesystem::is_symlink( test ) ){
-                                    int len = readlink( test.c_str() , tmp , 2048 );
-                                    tmp[len] = 0;
-                                    test = tmp;
-                                }
-                                
+                                int len = readlink( test.c_str() , tmp , 2048 );
+                                tmp[len] = 0;
+                                log(5) << " symlink " << test << "  -->> " << tmp << endl;
+                                test = tmp;
                                 path p( test );
                                 dir = p.remove_leaf().string();
                             }
