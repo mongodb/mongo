@@ -584,8 +584,8 @@ namespace mongo {
                                 tmp[len] = 0;
                                 log(5) << " symlink " << test << "  -->> " << tmp << endl;
                                 test = tmp;
-                                path p( test );
-                                dir = p.remove_leaf().string();
+                                
+                                dir = test.substr( 0 , test.rfind( "/" ) );
                             }
                             dbDir = dir;
                             found = true;
