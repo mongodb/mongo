@@ -629,7 +629,9 @@ UnitTest::TestPtr suite() {
 }
 
 int main( int argc, char **argv ) {
-    
+    printGitVersion();
+    printSysInfo();
+
     logLevel = -1;
     
     boost::filesystem::path p( "/data/db/perftest" );
