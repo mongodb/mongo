@@ -588,7 +588,7 @@ namespace mongo {
                                 }
                                 
                                 path p( test );
-                                dir = p.parent_path().string();
+                                dir = p.remove_leaf().string();
                             }
                             dbDir = dir;
                             found = true;
