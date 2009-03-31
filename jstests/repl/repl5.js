@@ -28,7 +28,6 @@ doTest = function( signal ) {
     s = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
     sleep( 1000 );
     ma.save( { i:-1 } );
-    assert.soon( function() { return 1 == s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
 
     ma.save( { i:-2 } );
     soonCountAtLeast( "a", "a", 10002 );
