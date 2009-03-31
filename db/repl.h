@@ -158,6 +158,7 @@ namespace mongo {
            to go fetch the old data.
         */
         set<string> dbs;
+        void repopulateDbsList( const BSONObj &o );
 
         int nClonedThisPass;
         bool haveDbList_;

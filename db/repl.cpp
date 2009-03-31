@@ -202,6 +202,23 @@ namespace mongo {
                 errmsg = "not dead, no need to resync";
                 return false;
             }
+            
+            // Wait for slave thread to finish syncing, so sources will be be
+            // reloaded with new saved state on next pass.
+            Timer t;
+            while ( 1 ) {
+                if ( syncing == 0 || t.millis() > 20000 )
+                    break;
+                {
+                    dbtemprelease t;
+                    sleepmillis(10);
+                }
+            }
+            if ( syncing ) {
+                errmsg = "timeout waiting for sync() to finish";
+                return false;
+            }
+            
             ReplSource::forceResyncDead( "user" );
             result.append( "info", "triggered resync for all sources" );
             return true;                
@@ -419,18 +436,7 @@ namespace mongo {
             //syncedTo.asDate() = e.date();
         }
 
-        BSONObj dbsObj = o.getObjectField("dbs");
-        if ( !dbsObj.isEmpty() ) {
-            BSONObjIterator i(dbsObj);
-            while ( 1 ) {
-                BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                dbs.insert( e.fieldName() );
-            }
-        }
-        
-        haveDbList_ = !dbs.empty();
+        repopulateDbsList( o );
     }
 
     /* Turn our C++ Source object into a BSONObj */
@@ -492,16 +498,34 @@ namespace mongo {
     string dashDashSource;
     string dashDashOnly;
 
-    static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, vector<ReplSource*>&old) {
-        for ( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
-            if ( s == **i ) {
-                v.push_back(*i);
-                old.erase(i);
-                return;
+    void ReplSource::repopulateDbsList( const BSONObj &o ) {
+        dbs.clear();
+        BSONObj dbsObj = o.getObjectField("dbs");
+        if ( !dbsObj.isEmpty() ) {
+            BSONObjIterator i(dbsObj);
+            while ( 1 ) {
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                dbs.insert( e.fieldName() );
             }
-            i++;
         }
-
+        
+        haveDbList_ = !dbs.empty();        
+    }
+    
+    static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, const BSONObj &spec, vector<ReplSource*>&old) {
+        if ( s.syncedTo != OpTime() ) { // Don't reuse old ReplSource if there was a forced resync.
+            for ( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
+                if ( s == **i ) {
+                    v.push_back(*i);
+                    old.erase(i);
+                    return;
+                }
+                i++;
+            }
+        }
+        
         v.push_back( new ReplSource(s) );
     }
 
@@ -596,7 +620,7 @@ namespace mongo {
                     tmp.replacing = true;
                 }
             }
-            addSourceToList(v, tmp, old);
+            addSourceToList(v, tmp, c->current(), old);
             c->advance();
         }
         database = 0;
@@ -835,6 +859,7 @@ namespace mongo {
 
         if ( c == 0 ) {
             if ( syncedTo == OpTime() ) {
+                // Important to grab last oplog timestamp before listing databases.
                 BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
                 if ( !last.isEmpty() ) {
                     BSONElement ts = last.findElement( "ts" );
