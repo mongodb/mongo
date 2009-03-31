@@ -417,7 +417,7 @@ namespace mongo {
         replacing = false;
         nClonedThisPass = 0;
         paired = false;
-        haveDbList_ = false;
+        mustListDbs_ = true;
     }
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
@@ -510,8 +510,6 @@ namespace mongo {
                 dbs.insert( e.fieldName() );
             }
         }
-        
-        haveDbList_ = !dbs.empty();        
     }
     
     static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, const BSONObj &spec, vector<ReplSource*>&old) {
@@ -685,7 +683,7 @@ namespace mongo {
         }        
         dbs.clear();
         syncedTo = OpTime();
-        haveDbList_ = false;
+        mustListDbs_ = true;
         save();
     }
 
@@ -866,8 +864,8 @@ namespace mongo {
                     massert( "non Date ts found", ts.type() == Date );
                     syncedTo = OpTime( ts.date() );
                 }
-                if ( !haveDbList_ ) {
-                    haveDbList_ = true;
+                if ( mustListDbs_ ) {
+                    mustListDbs_ = false;
                     set< string > localDbs;
                     vector< string > diskDbs;
                     getDatabaseNames( diskDbs );

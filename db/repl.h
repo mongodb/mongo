@@ -161,7 +161,7 @@ namespace mongo {
         void repopulateDbsList( const BSONObj &o );
 
         int nClonedThisPass;
-        bool haveDbList_;
+        bool mustListDbs_;
 
         static void loadAll(vector<ReplSource*>&);
         static void cleanup(vector<ReplSource*>&);
