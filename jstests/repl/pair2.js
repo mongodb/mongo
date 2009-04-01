@@ -40,7 +40,6 @@ doTest = function( signal ) {
     assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
 
     stopMongod( ports[ 1 ], signal );
-    sleep( 2000 );
     
     big = new Array( 2000 ).toString();
     for( i = 0; i < 1000; ++i )
@@ -57,6 +56,8 @@ doTest = function( signal ) {
     assert.eq( 1, lz.find( { i: 999 } ).count() );
     
     assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
+
+    ports.forEach( function( x ) { stopMongod( x ); } );
 
 }
 

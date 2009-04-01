@@ -77,7 +77,6 @@ doTest = function( signal ) {
     checkWrite( r, l );
     
     stopMongod( ports[ 2 ], signal );
-    sleep( 2000 );
     
     assert.soon( function() {
                 lm = ismaster( l );
@@ -101,7 +100,6 @@ doTest = function( signal ) {
     checkWrite( l, r );
     
     stopMongod( ports[ 1 ], signal );
-    sleep( 2000 );
     
     assert.soon( function() {
                 rm = ismaster( r );
@@ -122,7 +120,9 @@ doTest = function( signal ) {
                 } );
     
     checkWrite( r, l );
-    
+
+    ports.forEach( function( x ) { stopMongod( x ); } );
+
 }
 
 doTest( 15 ); // SIGTERM

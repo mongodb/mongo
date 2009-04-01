@@ -21,8 +21,6 @@ doTest = function( signal ) {
     
     stopMongod( ports[ 1 ], signal );
     
-    sleep( 4000 );
-    
     s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );    
     
     assert.soon( function() {
@@ -36,7 +34,9 @@ doTest = function( signal ) {
     for( n = "a"; n != "aaaaa"; n += "a" ) {
         assert.eq( 1, m.getDB( n ).a.find().count() );
     }    
-    
+
+    ports.forEach( function( x ) { stopMongod( x ); } );
+
 }
 
 doTest( 15 ); // SIGTERM

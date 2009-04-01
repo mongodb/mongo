@@ -43,7 +43,6 @@ doTest = function( signal ) {
 
     stopMongod( ports[ 1 ], signal );
     stopMongod( ports[ 2 ], signal );
-    sleep( 2000 );
     
     for( i = 1000; i < 1010; ++i )
         am.save( { _id: new ObjectId(), i: i } );
@@ -54,7 +53,6 @@ doTest = function( signal ) {
     assert.eq( 1, as.find( { i: 1009 } ).count() );
     
     stopMongod( ports[ 0 ], signal );
-    sleep( 2000 );
     
     m = startMongoProgram( "mongod", "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
     am = m.getDB( baseName ).a
@@ -70,7 +68,9 @@ doTest = function( signal ) {
     as = s2.getDB( baseName ).a
     assert.eq( 1, as.find( { i: 1009 } ).count() );
     assert.eq( 1, as.find( { i: 1019 } ).count() );
-    
+
+    ports.forEach( function( x ) { stopMongod( x ); } );
+
 }
 
 doTest( 15 ); // SIGTERM

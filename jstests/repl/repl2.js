@@ -28,7 +28,6 @@ doTest = function( signal ) {
     soonCount( 1 );
     assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
     stopMongod( ports[ 1 ], signal );
-    sleep( 2000 );
     
     big = new Array( 2000 ).toString();
     for( i = 0; i < 1000; ++i )
@@ -44,6 +43,8 @@ doTest = function( signal ) {
     assert.eq( 1, as.find( { i: 999 } ).count() );
     
     assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
+
+    ports.forEach( function( x ) { stopMongod( x ); } );
 
 }
 

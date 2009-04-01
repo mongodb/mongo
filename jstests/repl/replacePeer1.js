@@ -56,14 +56,12 @@ doTest = function( signal ) {
     checkWrite( r, l );
     
     stopMongod( ports[ 1 ], signal );
-    sleep( 2000 );
 
     writeOne( r );
 
     assert.eq( 1, r.getDB( "admin" ).runCommand( {replacepeer:1} ).ok );
     
     stopMongod( ports[ 3 ], signal );
-    sleep( 2000 );
     
     l = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 3 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
     r = startMongoProgram( "mongod", "--port", ports[ 3 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
@@ -83,7 +81,9 @@ doTest = function( signal ) {
     checkWrite( r, l );
     l.setSlaveOk();
     assert.eq( 3, l.getDB( baseName ).z.find().toArray().length );
-    
+
+    ports.forEach( function( x ) { stopMongod( x ); } );
+
 }
 
 doTest( 15 ); // SIGTERM

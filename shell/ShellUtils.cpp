@@ -486,7 +486,8 @@ void killDb( int port, int signal ) {
 
     close( dbs[ port ].second );
     dbs.erase( port );
-    sleepms( 2000 ); // allow operating system to reclaim resources
+    if ( signal == SIGKILL || i == 5 )
+        sleepms( 4000 ); // allow operating system to reclaim resources
 }
 
 v8::Handle< v8::Value > StopMongoProgram( const v8::Arguments &a ) {

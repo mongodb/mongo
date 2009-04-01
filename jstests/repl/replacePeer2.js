@@ -64,7 +64,6 @@ doTest = function( signal ) {
     
     stopMongod( ports[ 3 ], signal );
     stopMongod( ports[ 1 ], signal );
-    sleep( 2000 );
 
     l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
     r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
@@ -84,7 +83,9 @@ doTest = function( signal ) {
     checkWrite( l, r );
     r.setSlaveOk();
     assert.eq( 2, r.getDB( baseName ).z.find().toArray().length );
-    
+
+    ports.forEach( function( x ) { stopMongod( x ); } );
+
 }
 
 doTest( 15 ); // SIGTERM

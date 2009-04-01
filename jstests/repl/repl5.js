@@ -26,7 +26,6 @@ doTest = function( signal ) {
     s = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
     soonCountAtLeast( "a", "a", 1 );
     stopMongod( ports[ 1 ], signal );
-    sleep( 2000 );
 
     s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
     sleep( 1000 );
@@ -34,6 +33,8 @@ doTest = function( signal ) {
 
     ma.save( { i:-2 } );
     soonCountAtLeast( "a", "a", 10002 );
+
+    ports.forEach( function( x ) { stopMongod( x ); } );
 
 }
 
