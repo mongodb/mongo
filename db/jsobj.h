@@ -129,7 +129,7 @@ namespace mongo {
                 if( u < 16 ) s << '0';
                 s << u;
             }
-            const char * raw = (const char*)&b;
+            const unsigned char * raw = (const unsigned char*)&b;
             for( int i = 0; i < 4; i++ ) {
                 unsigned u = raw[i];
                 if( u < 16 ) s << '0';
