@@ -9,6 +9,8 @@
 #include <map>
 #include <sstream>
 #include <vector>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 using namespace std;
 using namespace v8;
@@ -535,6 +537,35 @@ Handle< Value > ThreadInject( const Arguments &args ) {
     return v8::Undefined();    
 }
 
+Handle< Value > AllocatePorts( const Arguments &args ) {
+    jsassert( args.Length() == 1 , "allocatePorts takes exactly 1 argument" );
+    jsassert( args[0]->IsInt32() , "allocatePorts needs to be passed an integer" );
+
+    int n = args[0]->ToInt32()->Value();
+    
+    Local< Array > ret = Array::New( n );
+    for( int i = 0; i < n; ++i ) {
+        int s = socket( AF_INET, SOCK_STREAM, 0 );
+        assert( s );
+
+        sockaddr_in address;
+        memset(address.sin_zero, 0, sizeof(address.sin_zero));
+        address.sin_family = AF_INET;
+        address.sin_port = 0;
+        address.sin_addr.s_addr = 0;        
+        assert( 0 == bind( s, (sockaddr*)&address, sizeof( address ) ) );
+        
+        sockaddr_in newAddress;
+        socklen_t len = sizeof( newAddress );
+        assert( 0 == getsockname( s, (sockaddr*)&newAddress, &len ) );
+        ret->Set( Number::New( i ), Number::New( ntohs( newAddress.sin_port ) ) );
+        
+        assert( 0 == close( s ) );
+    }
+
+    return ret;
+}
+
 void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("sleep"), v8::FunctionTemplate::New(JSSleep));
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
@@ -543,6 +574,7 @@ void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("quit"), v8::FunctionTemplate::New(Quit));
     global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
     global->Set(v8::String::New("threadInject"), v8::FunctionTemplate::New(ThreadInject));
+    global->Set(v8::String::New("allocatePorts"), v8::FunctionTemplate::New(AllocatePorts));
 #if !defined(_WIN32)
     global->Set(v8::String::New("_startMongoProgram"), v8::FunctionTemplate::New(StartMongoProgram));
     global->Set(v8::String::New("stopMongod"), v8::FunctionTemplate::New(StopMongoProgram));
