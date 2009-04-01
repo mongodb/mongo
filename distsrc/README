@@ -33,3 +33,9 @@ Documentation
 
  * http://www.mongodb.org/display/DOCS/Community+Info
 
+Platform Notes
+--------------
+
+  Linux 64-bit
+  * mongo (the shell) is a 32-bit binary even on 64-bit linux.  This is because of of v8 - which only works 32bit
+    to run you'll need to make sure you have 32 bits stdc++  some common names: lib32stdc++6, libstdc++.i386
