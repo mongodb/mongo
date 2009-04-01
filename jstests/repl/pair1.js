@@ -53,10 +53,12 @@ checkSlaveGuard = function( s ) {
 
 doTest = function( signal ) {
 
+    ports = allocatePorts( 3 );
+    
     // spec small oplog for fast startup on 64bit machines
-    a = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-arbiter" );
-    l = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27020", "127.0.0.1:27018", "--oplogSize", "1" );
-    r = startMongod( "--port", "27020", "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:27019", "127.0.0.1:27018", "--oplogSize", "1" );
+    a = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-arbiter" );
+    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
+    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
     
     assert.soon( function() {
                 am = ismaster( a );
@@ -74,7 +76,7 @@ doTest = function( signal ) {
     
     checkWrite( r, l );
     
-    stopMongod( 27020, signal );
+    stopMongod( ports[ 2 ], signal );
     sleep( 2000 );
     
     assert.soon( function() {
@@ -83,7 +85,7 @@ doTest = function( signal ) {
                 return ( lm == 1 );
                 } );
     
-    r = startMongod( "--port", "27020", "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:27019", "127.0.0.1:27018", "--oplogSize", "1" );
+    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
     
     assert.soon( function() {
                 lm = ismaster( l );
@@ -98,7 +100,7 @@ doTest = function( signal ) {
     // Once this returns, the initial sync for r will have completed.
     checkWrite( l, r );
     
-    stopMongod( 27019, signal );
+    stopMongod( ports[ 1 ], signal );
     sleep( 2000 );
     
     assert.soon( function() {
@@ -107,7 +109,7 @@ doTest = function( signal ) {
                 return ( rm == 1 );
                 } );
     
-    l = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27020", "127.0.0.1:27018", "--oplogSize", "1" );
+    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
     
     assert.soon( function() {
                 lm = ismaster( l );
@@ -120,10 +122,6 @@ doTest = function( signal ) {
                 } );
     
     checkWrite( r, l );
-    
-    stopMongod( 27018 );
-    stopMongod( 27019 );
-    stopMongod( 27020 );
     
 }
 

@@ -3,25 +3,27 @@
 var baseName = "jstests_repl7test";
 
 doTest = function( signal ) {
+
+    ports = allocatePorts( 2 );
     
     // spec small oplog for fast startup on 64bit machines
-    m = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
+    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
 
     for( n = "a"; n != "aaaaa"; n += "a" ) {
         m.getDB( n ).a.save( {x:1} );
     }
 
-    s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
+    s = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
     
     assert.soon( function() {
                 return -1 != s.getDBNames().indexOf( "aa" );
                 } );
     
-    stopMongod( 27019, signal );
+    stopMongod( ports[ 1 ], signal );
     
     sleep( 4000 );
     
-    s = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );    
+    s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );    
     
     assert.soon( function() {
                 for( n = "a"; n != "aaaaa"; n += "a" ) {
@@ -35,8 +37,6 @@ doTest = function( signal ) {
         assert.eq( 1, m.getDB( n ).a.find().count() );
     }    
     
-    stopMongod( 27019 );
-    stopMongod( 27018 );
 }
 
 doTest( 15 ); // SIGTERM

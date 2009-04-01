@@ -21,11 +21,13 @@ soonCount = function( count ) {
 }
 
 doTest = function( signal ) {
+
+    ports = allocatePorts( 3 );
     
     // spec small oplog for fast startup on 64bit machines
-    a = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-arbiter" );
-    l = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27020", "127.0.0.1:27018", "--oplogSize", "1" );
-    r = startMongod( "--port", "27020", "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:27019", "127.0.0.1:27018", "--oplogSize", "1" );
+    a = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-arbiter" );
+    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
+    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
     l.setSlaveOk();
     
     assert.soon( function() { return ( ismaster( l ) == 0 && ismaster( r ) == 1 ); } );
@@ -37,14 +39,14 @@ doTest = function( signal ) {
     soonCount( 1 );
     assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
 
-    stopMongod( 27019, signal );
+    stopMongod( ports[ 1 ], signal );
     sleep( 2000 );
     
     big = new Array( 2000 ).toString();
     for( i = 0; i < 1000; ++i )
         rz.save( { _id: new ObjectId(), i: i, b: big } );
     
-    l = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27020", "127.0.0.1:27018", "--oplogSize", "1" );
+    l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
     l.setSlaveOk();
     assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
     
@@ -56,9 +58,6 @@ doTest = function( signal ) {
     
     assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
 
-    stopMongod( 27018 );
-    stopMongod( 27019 );
-    stopMongod( 27020 );
 }
 
 doTest( 15 ); // SIGTERM

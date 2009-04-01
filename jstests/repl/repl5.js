@@ -14,27 +14,27 @@ soonCountAtLeast = function( db, coll, count ) {
 }
 
 doTest = function( signal ) {
+
+    ports = allocatePorts( 2 );
     
-    m = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
+    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
     
     ma = m.getDB( "a" ).a;
     for( i = 0; i < 10000; ++i )
         ma.save( { i:i } );
     
-    s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
+    s = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
     soonCountAtLeast( "a", "a", 1 );
-    stopMongod( 27019, signal );
+    stopMongod( ports[ 1 ], signal );
     sleep( 2000 );
 
-    s = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
+    s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
     sleep( 1000 );
     ma.save( { i:-1 } );
 
     ma.save( { i:-2 } );
     soonCountAtLeast( "a", "a", 10002 );
 
-    stopMongod( 27018 );
-    stopMongod( 27019 );
 }
 
 doTest( 15 ); // SIGTERM

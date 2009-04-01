@@ -33,11 +33,13 @@ checkWrite = function( m, s ) {
 }
 
 doTest = function( signal ) {
+
+    ports = allocatePorts( 4 );
     
     // spec small oplog for fast startup on 64bit machines
-    a = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-arbiter" );
-    l = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27021", "127.0.0.1:27018", "--oplogSize", "1" );
-    r = startMongod( "--port", "27021", "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:27019", "127.0.0.1:27018", "--oplogSize", "1" );
+    a = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-arbiter" );
+    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 3 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
+    r = startMongod( "--port", ports[ 3 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
 
     assert.soon( function() {
                 am = ismaster( a );
@@ -60,12 +62,12 @@ doTest = function( signal ) {
     // Make sure there would be enough time to save to l if we hadn't called replacepeer.
     sleep( 10000 );
     
-    stopMongod( 27021, signal );
-    stopMongod( 27019, signal );
+    stopMongod( ports[ 3 ], signal );
+    stopMongod( ports[ 1 ], signal );
     sleep( 2000 );
 
-    l = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27020", "127.0.0.1:27018", "--oplogSize", "1" );
-    r = startMongod( "--port", "27020", "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:27019", "127.0.0.1:27018", "--oplogSize", "1" );
+    l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
+    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
 
     assert.soon( function() {
                 am = ismaster( a );
@@ -83,10 +85,6 @@ doTest = function( signal ) {
     r.setSlaveOk();
     assert.eq( 2, r.getDB( baseName ).z.find().toArray().length );
     
-    stopMongod( 27018 );
-    stopMongod( 27019 );
-    stopMongod( 27020 );
-    stopMongod( 27021 );    
 }
 
 doTest( 15 ); // SIGTERM

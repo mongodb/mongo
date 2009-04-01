@@ -16,23 +16,25 @@ soonCount = function( count ) {
 
 doTest = function( signal ) {
     
+    ports = allocatePorts( 2 );
+
     // spec small oplog to make slave get out of sync
-    m = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
-    s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
+    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
+    s = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
     
     am = m.getDB( baseName ).a
     
     am.save( { _id: new ObjectId() } );
     soonCount( 1 );
     assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
-    stopMongod( 27019, signal );
+    stopMongod( ports[ 1 ], signal );
     sleep( 2000 );
     
     big = new Array( 2000 ).toString();
     for( i = 0; i < 1000; ++i )
         am.save( { _id: new ObjectId(), i: i, b: big } );
     
-    s = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
+    s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
     assert.soon( function() { return 1 == s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
 
     sleep( 10000 );
@@ -43,8 +45,6 @@ doTest = function( signal ) {
     
     assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
 
-    stopMongod( 27018 );
-    stopMongod( 27019 );
 }
 
 doTest( 15 ); // SIGTERM

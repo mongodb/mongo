@@ -13,10 +13,12 @@ soonCount = function( db, coll, count ) {
 }
 
 doTest = function() {
+
+    ports = allocatePorts( 2 );
     
     // spec small oplog for fast startup on 64bit machines
-    m = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
-    s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018", "--only", "c" );
+    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
+    s = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--only", "c" );
     
     cm = m.getDB( "c" ).c
     bm = m.getDB( "b" ).b
