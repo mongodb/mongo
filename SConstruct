@@ -400,7 +400,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             print( "can't find stdc++ library which is needed" );
             Exit(1)
 
-    def myCheckLib( poss , failIfNotFound=False , java=False ):
+    def myCheckLib( poss , failIfNotFound=False , java=False , staticOnly=False):
 
         if type( poss ) != types.ListType :
             poss = [poss]
@@ -426,8 +426,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 extra += " 32 bit version for shell"
             print( "ERROR: can't find static version of: " + str( poss ) + extra + " in: " + str( allPlaces ) )
             Exit(1)
-
-        res = conf.CheckLib( poss )
+            
+        res = not staticOnly and conf.CheckLib( poss )
         if res:
             return True
 
@@ -468,7 +468,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
-    myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
+    myenv["_HAVEPCAP"] = myCheckLib( "pcap", staticOnly=release )
 
     if shell:
         haveReadLine = False
