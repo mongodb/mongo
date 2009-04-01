@@ -30,6 +30,9 @@
 #include "reccache.h"
 #include "replset.h"
 #include "../s/d_logic.h"
+#if !defined(_WIN32)
+#include <sys/file.h>
+#endif
 
 namespace mongo {
 
