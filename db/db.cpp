@@ -134,7 +134,10 @@ namespace mongo {
         OurListener l(port);
         startReplication();
         boost::thread thr(webServerThread);
-        l.listen();
+        if ( l.init() ) {
+            registerListenerSocket( l.socket() );
+            l.listen();
+        }
     }
 
     class JniMessagingPort : public AbstractMessagingPort {

@@ -32,12 +32,15 @@ namespace mongo {
     public:
         Listener(int p) : port(p) { }
         virtual ~Listener() {}
+        bool init(); // set up socket
+        int socket() const { return sock; }
         void listen(); // never returns (start a thread)
 
         /* spawn a thread, etc., then return */
         virtual void accepted(MessagingPort *mp) = 0;
     private:
         int port;
+        int sock;
     };
 
     class AbstractMessagingPort {

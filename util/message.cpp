@@ -40,12 +40,12 @@ namespace mongo {
 
     /* listener ------------------------------------------------------------------- */
 
-    void Listener::listen() {
+    bool Listener::init() {
         SockAddr me(port);
-        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        sock = ::socket(AF_INET, SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
             log() << "ERROR: listen(): invalid socket? " << errno << endl;
-            return;
+            return false;
         }
         prebindOptions( sock );
         if ( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) {
@@ -53,19 +53,27 @@ namespace mongo {
             if ( errno == 98 )
                 log() << "98 == addr already in use" << endl;
             closesocket(sock);
-            return;
+            return false;
         }
 
         if ( ::listen(sock, 128) != 0 ) {
             log() << "listen(): listen() failed " << errno << endl;
             closesocket(sock);
-            return;
+            return false;
         }
+        
+        return true;
+    }
 
+    void Listener::listen() {
         SockAddr from;
         while ( 1 ) {
             int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
             if ( s < 0 ) {
+                if ( errno == ECONNABORTED ) {
+                    log() << "Listener on port " << port << " aborted" << endl;
+                    return;
+                }
                 log() << "Listener: accept() returns " << s << " errno:" << errno << endl;
                 continue;
             }

@@ -21,6 +21,7 @@
 		9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ShellUtils.h; sourceTree = "<group>"; };
 		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
 		931183420F8277FD00A6DC44 /* repl7.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = repl7.js; sourceTree = "<group>"; };
+		931184DC0F83C95800A6DC44 /* message_server_port.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = message_server_port.cpp; sourceTree = "<group>"; };
 		931A027A0F58AA4400147C0E /* jsobjmanipulator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jsobjmanipulator.h; sourceTree = "<group>"; };
 		93278F570F72D32900844664 /* gridfs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = gridfs.cpp; sourceTree = "<group>"; };
 		93278F580F72D32900844664 /* gridfs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gridfs.h; sourceTree = "<group>"; };
@@ -453,6 +454,7 @@
 		934DD87B0EFAD23B00459CC1 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				931184DC0F83C95800A6DC44 /* message_server_port.cpp */,
 				936B89590F4C899400934AF2 /* file.h */,
 				936B895A0F4C899400934AF2 /* md5.c */,
 				936B895B0F4C899400934AF2 /* md5.h */,

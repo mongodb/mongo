@@ -254,7 +254,7 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << "mongodb " << getHostName() << ':' << port << ' ';
+                z << "mongodb " << getHostName() << ':' << mongo::port << ' ';
                 dbname = z.str();
             }
             ss << dbname << "</title></head><body><h2>" << dbname << "</h2><p>\n<pre>";
@@ -447,6 +447,7 @@ namespace mongo {
         DbWebServer mini;
         int p = port + 1000;
         if ( mini.init(p) ) {
+            registerListenerSocket( mini.socket() );
             log() << "web admin interface listening on port " << p << '\n';
             mini.run();
         }

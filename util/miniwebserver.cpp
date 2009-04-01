@@ -28,9 +28,10 @@ namespace mongo {
         sock = 0;
     }
 
-    bool MiniWebServer::init(int port) {
+    bool MiniWebServer::init(int _port) {
+        port = _port;
         SockAddr me(port);
-        sock = socket(AF_INET, SOCK_STREAM, 0);
+        sock = ::socket(AF_INET, SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
             log() << "ERROR: MiniWebServer listen(): invalid socket? " << errno << endl;
             return false;
@@ -191,6 +192,10 @@ namespace mongo {
         while ( 1 ) {
             int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
             if ( s < 0 ) {
+                if ( errno == ECONNABORTED ) {
+                    log() << "Listener on port " << port << " aborted." << endl;
+                    return;
+                }
                 log() << "MiniWebServer: accept() returns " << s << " errno:" << errno << endl;
                 sleepmillis(200);
                 continue;

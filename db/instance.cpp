@@ -610,6 +610,13 @@ namespace mongo {
 
     void recCacheCloseAll();
 
+    boost::mutex &listenerSocketMutex( *( new boost::mutex ) );
+    vector< int > listenerSockets;
+    void registerListenerSocket( int socket ) {
+        boostlock lk( listenerSocketMutex );
+        listenerSockets.push_back( socket );
+    }
+    
     boost::mutex &exitMutex( *( new boost::mutex ) );
     bool firstExit = true;
 
@@ -629,7 +636,16 @@ namespace mongo {
         stringstream ss;
         ss << "dbexit: " << why << endl;
         rawOut( ss.str() );
-        
+
+        {
+            // close listener sockets
+            // We would only hang here if a synchronous signal is received 
+            // during a registerListenerSocket() call, which we don't expect.
+            boostlock lk( listenerSocketMutex );
+            for( vector< int >::iterator i = listenerSockets.begin(); i != listenerSockets.end(); ++i )
+                close( *i );
+        }
+                
         stringstream ss2;
         flushOpLog( ss2 );
         rawOut( ss2.str() );

@@ -27,7 +27,7 @@ namespace mongo {
         MiniWebServer();
         virtual ~MiniWebServer() {}
 
-        bool init(int port);
+        bool init(int _port);
         void run();
 
         virtual void doRequest(
@@ -39,7 +39,8 @@ namespace mongo {
             vector<string>& headers // if completely empty, content-type: text/html will be added
         ) = 0;
 
-
+        int socket() const { return sock; }
+        
     protected:
         string parseURL( const char * buf );
         string parseMethod( const char * headers );
@@ -51,6 +52,7 @@ namespace mongo {
         void accepted(int s);
         static bool fullReceive( const char *buf );
 
+        int port;
         int sock;
     };
 

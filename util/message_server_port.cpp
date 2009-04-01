@@ -59,6 +59,7 @@ namespace mongo {
         }
         
         void run(){
+            assert( init() );
             listen();
         }
 
