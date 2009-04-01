@@ -382,6 +382,10 @@ namespace mongo {
         srand(curTimeMicros() ^ startupSrandTimer.micros());
 
         listen(listenPort);
+        
+        // listen() will return when exit code closes its socket.
+        while( 1 )
+            sleepsecs( 100 );
     }
     void initAndListen(int listenPort, const char *appserverLoc = null) {
         try { _initAndListen(listenPort, appserverLoc); }
