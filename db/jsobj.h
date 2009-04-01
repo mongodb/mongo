@@ -124,8 +124,14 @@ namespace mongo {
             //            s.fill( '0' );
             //            s.width( 2 );
             // fill wasn't working so doing manually...
-            for( int i = 0; i < 12; i++ ) {
+            for( int i = 0; i < 8; i++ ) {
                 unsigned u = data[i];
+                if( u < 16 ) s << '0';
+                s << u;
+            }
+            const char * raw = (const char*)&b;
+            for( int i = 0; i < 4; i++ ) {
+                unsigned u = raw[i];
                 if( u < 16 ) s << '0';
                 s << u;
             }

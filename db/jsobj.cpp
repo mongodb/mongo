@@ -1136,10 +1136,11 @@ namespace mongo {
         (unsigned&) data[4] = machine;
         ++inc;
         T = (char *) &inc;
-        data[8] = T[3];
-        data[9] = T[2];
-        data[10] = T[1];
-        data[11] = T[0];
+        char * raw = (char*)&b;
+        raw[0] = T[3];
+        raw[1] = T[2];
+        raw[2] = T[1];
+        raw[3] = T[0];
     }
     
     void OID::init( string s ){
