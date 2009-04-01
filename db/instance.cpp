@@ -81,6 +81,8 @@ namespace mongo {
        future: maybe use this as a "going away" thing on process termination with a higher flag value 
     */
     int killCurrentOp = 0;
+    
+    int lockFile = 0;
 
     CurOp currentOp;
 
@@ -659,6 +661,8 @@ namespace mongo {
 
         // should we be locked here?  we aren't. might be ok as-is.
         recCacheCloseAll();
+        
+        flock( lockFile, LOCK_UN );
 
         rawOut( "dbexit: really exiting now\n" );
         ::exit(rc);
