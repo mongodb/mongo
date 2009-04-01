@@ -665,8 +665,10 @@ namespace mongo {
         // should we be locked here?  we aren't. might be ok as-is.
         recCacheCloseAll();
         
+#if !defined(_WIN32) and !defined(__sunos__)
         flock( lockFile, LOCK_UN );
-
+#endif
+        
         rawOut( "dbexit: really exiting now\n" );
         ::exit(rc);
     }
