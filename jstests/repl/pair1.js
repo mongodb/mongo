@@ -75,6 +75,7 @@ doTest = function( signal ) {
     checkWrite( r, l );
     
     stopMongod( 27020, signal );
+    sleep( 2000 );
     
     assert.soon( function() {
                 lm = ismaster( l );
@@ -98,6 +99,7 @@ doTest = function( signal ) {
     checkWrite( l, r );
     
     stopMongod( 27019, signal );
+    sleep( 2000 );
     
     assert.soon( function() {
                 rm = ismaster( r );
@@ -126,5 +128,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
-sleep( 2000 );
 doTest( 9 );  // SIGKILL

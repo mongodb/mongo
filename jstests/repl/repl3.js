@@ -25,6 +25,7 @@ doTest = function( signal ) {
     am.save( { _id: new ObjectId() } );
     soonCount( 1 );
     stopMongod( 27019, signal );
+    sleep( 2000 );
     
     big = new Array( 2000 ).toString();
     for( i = 0; i < 1000; ++i )
@@ -51,5 +52,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
-sleep( 2000 );
 doTest( 9 );  // SIGKILL

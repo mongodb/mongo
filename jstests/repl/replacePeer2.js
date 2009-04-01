@@ -62,6 +62,7 @@ doTest = function( signal ) {
     
     stopMongod( 27021, signal );
     stopMongod( 27019, signal );
+    sleep( 2000 );
 
     l = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:27020", "127.0.0.1:27018", "--oplogSize", "1" );
     r = startMongod( "--port", "27020", "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:27019", "127.0.0.1:27018", "--oplogSize", "1" );
@@ -89,5 +90,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
-sleep( 2000 );
 doTest( 9 );  // SIGKILL

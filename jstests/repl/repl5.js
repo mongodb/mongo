@@ -24,6 +24,7 @@ doTest = function( signal ) {
     s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
     soonCountAtLeast( "a", "a", 1 );
     stopMongod( 27019, signal );
+    sleep( 2000 );
 
     s = startMongoProgram( "mongod", "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
     sleep( 1000 );
@@ -37,5 +38,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
-sleep( 2000 );
 doTest( 9 );  // SIGKILL

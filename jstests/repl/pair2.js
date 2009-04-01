@@ -38,6 +38,7 @@ doTest = function( signal ) {
     assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
 
     stopMongod( 27019, signal );
+    sleep( 2000 );
     
     big = new Array( 2000 ).toString();
     for( i = 0; i < 1000; ++i )
@@ -61,5 +62,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
-sleep( 2000 );
 doTest( 9 );  // SIGKILL
