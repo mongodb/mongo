@@ -70,7 +70,8 @@ namespace mongo {
                 return 0;
             }
             // Check for end of disk.
-            lseek(fd, length - 1, SEEK_SET);
+            massert( "Unable to allocate file of desired size",
+                    length - 1 == lseek(fd, length - 1, SEEK_SET) );
             write(fd, "", 1);
             lseek(fd, 0, SEEK_SET);
             Nullstream &l = log();
