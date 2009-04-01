@@ -83,9 +83,10 @@ doTest = function( signal ) {
     assert.eq( 2, r.getDB( baseName ).z.find().toArray().length );
     
     stopMongod( 27018 );
+    stopMongod( 27019 );
     stopMongod( 27020 );
     stopMongod( 27021 );    
 }
 
 doTest( 15 ); // SIGTERM
-//doTest( 9 );  // SIGKILL
+doTest( 9 );  // SIGKILL
