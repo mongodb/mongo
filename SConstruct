@@ -245,7 +245,7 @@ elif "linux2" == os.sys.platform:
         linux64 = True
         javaVersion = "amd64"
         nixLibPrefix = "lib64"
-        env.Append( LIBPATH=["/usr/lib64"] )
+        env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
     
     if force32:
@@ -437,6 +437,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             
         return False
 
+    if shell:
+        myCheckLib( "v8" , True )
+
     if needPcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
         print( "can't find pcre" )
         Exit(1)
@@ -626,8 +629,6 @@ if release and ( ( darwin and force64 ) or linux64 ):
     shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
     shellEnv["LIBS"] = env["LIBS_CLEAN"]
     shellEnv["SLIBS"] = ""
-
-shellEnv.Append( LIBS=[ "v8" ] )
 
 shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 shellEnv.JSHeader( "shell/mongo.jsall" )
