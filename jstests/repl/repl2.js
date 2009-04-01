@@ -47,4 +47,5 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
+sleep( 2000 );
 doTest( 9 );  // SIGKILL
