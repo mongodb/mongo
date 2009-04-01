@@ -163,8 +163,8 @@ namespace mongo {
         int nClonedThisPass;
         bool mustListDbs_;
 
-        static void loadAll(vector<ReplSource*>&);
-        static void cleanup(vector<ReplSource*>&);
+        typedef vector< shared_ptr< ReplSource > > SourceVector;
+        static void loadAll(SourceVector&);
         explicit ReplSource(BSONObj);
         bool sync();
         void save(); // write ourself to local.sources

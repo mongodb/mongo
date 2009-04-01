@@ -166,7 +166,7 @@ namespace mongo {
                 return false;
             }
             {
-                vector<ReplSource*> sources;
+                ReplSource::SourceVector sources;
                 ReplSource::loadAll(sources);
                 if ( sources.size() != 1 ) {
                     errmsg = "local.sources.count() != 1, cannot replace peer";
@@ -510,11 +510,6 @@ namespace mongo {
         }
     }
 
-    void ReplSource::cleanup(vector<ReplSource*>& v) {
-        for ( vector<ReplSource*>::iterator i = v.begin(); i != v.end(); i++ )
-            delete *i;
-    }
-
     string dashDashSource;
     string dashDashOnly;
 
@@ -532,9 +527,9 @@ namespace mongo {
         }
     }
     
-    static void addSourceToList(vector<ReplSource*>&v, ReplSource& s, const BSONObj &spec, vector<ReplSource*>&old) {
+    static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, const BSONObj &spec, ReplSource::SourceVector &old) {
         if ( s.syncedTo != OpTime() ) { // Don't reuse old ReplSource if there was a forced resync.
-            for ( vector<ReplSource*>::iterator i = old.begin(); i != old.end();  ) {
+            for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
                 if ( s == **i ) {
                     v.push_back(*i);
                     old.erase(i);
@@ -544,15 +539,15 @@ namespace mongo {
             }
         }
         
-        v.push_back( new ReplSource(s) );
+        v.push_back( shared_ptr< ReplSource >( new ReplSource( s ) ) );
     }
 
     /* we reuse our existing objects so that we can keep our existing connection
        and cursor in effect.
     */
-    void ReplSource::loadAll(vector<ReplSource*>& v) {
-        vector<ReplSource *> old = v;
-        v.erase(v.begin(), v.end());
+    void ReplSource::loadAll(SourceVector &v) {
+        SourceVector old = v;
+        v.clear();
 
         bool gotPairWith = false;
 
@@ -645,15 +640,12 @@ namespace mongo {
 
         if ( !gotPairWith && replPair ) {
             /* add the --pairwith server */
-            ReplSource *s = new ReplSource();
+            shared_ptr< ReplSource > s( new ReplSource() );
             s->paired = true;
             s->hostName = replPair->remote;
             s->replacing = replacePeer;
             v.push_back(s);
         }
-
-        for ( vector<ReplSource*>::iterator i = old.begin(); i != old.end(); i++ )
-            delete *i;
     }
 
     BSONObj opTimeQuery = fromjson("{\"getoptime\":1}");
@@ -670,9 +662,9 @@ namespace mongo {
     void ReplSource::forceResyncDead( const char *requester ) {
         if ( !replAllDead )
             return;
-        vector<ReplSource*> sources;
+        SourceVector sources;
         ReplSource::loadAll(sources);
-        for( vector< ReplSource * >::iterator i = sources.begin(); i != sources.end(); ++i ) {
+        for( SourceVector::iterator i = sources.begin(); i != sources.end(); ++i ) {
             (*i)->forceResync( requester );
         }
         replAllDead = 0;        
@@ -1242,7 +1234,7 @@ namespace mongo {
     */
 
     /* returns: # of seconds to sleep before next pass */
-    int _replMain(vector<ReplSource*>& sources) {
+    int _replMain(ReplSource::SourceVector& sources) {
         {
             ReplInfo r("replMain load sources");
             dblock lk;
@@ -1257,8 +1249,8 @@ namespace mongo {
         }
 
         bool sleep = true;
-        for ( vector<ReplSource*>::iterator i = sources.begin(); i != sources.end(); i++ ) {
-            ReplSource *s = *i;
+        for ( ReplSource::SourceVector::iterator i = sources.begin(); i != sources.end(); i++ ) {
+            ReplSource *s = i->get();
             bool ok = false;
             try {
                 ok = s->sync();
@@ -1304,7 +1296,7 @@ namespace mongo {
     }
 
     void replMain() {
-        vector<ReplSource*> sources;
+        ReplSource::SourceVector sources;
         while ( 1 ) {
             int s = 0;
             {
@@ -1334,9 +1326,6 @@ namespace mongo {
                 sleepsecs(s);
             }
         }
-
-//    assert(false);
-//	ReplSource::cleanup(sources);
     }
 
     int debug_stop_repl = 0;
