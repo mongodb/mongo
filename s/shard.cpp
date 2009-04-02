@@ -88,7 +88,7 @@ namespace mongo {
                                                                          ) , result ) );
         conn.done();
         
-        return result.getObjectField( "median" );
+        return result.getObjectField( "median" ).getOwned();
     }
 
     Shard * Shard::split(){
