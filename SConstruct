@@ -774,6 +774,18 @@ testEnv.AlwaysBuild( "addMongodReqTargets" )
 testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeRecovery", "smokeSharding" ] )
 testEnv.AlwaysBuild( "smokeAll" )
 
+def addMongodReqNoJsTargets( env, target, source ):
+    mongodReqTargets = [ "smokeClient" ]
+    for target in mongodReqTargets:
+        testEnv.Depends( target, "startMongod" )
+        testEnv.Depends( "smokeAllNoJs", target )
+
+testEnv.Alias( "addMongodReqNoJsTargets", [], [addMongodReqNoJsTargets] )
+testEnv.AlwaysBuild( "addMongodReqNoJsTargets" )
+
+testEnv.Alias( "smokeAllNoJs", [ "smoke", "mongosTest", "addMongodReqNoJsTargets" ] )
+testEnv.AlwaysBuild( "smokeAllNoJs" )
+
 import atexit
 atexit.register( stopMongodForTests )
 
