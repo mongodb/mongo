@@ -22,6 +22,10 @@ getCount = function( n ) {
 checkWrite = function( m, s ) {
     writeOne( m );
     assert.eq( 1, getCount( m ) );
+    check( s );
+}
+
+check = function( s ) {
     s.setSlaveOk();
     assert.soon( function() {
                 if ( -1 == s.getDBNames().indexOf( baseName ) )
@@ -29,7 +33,7 @@ checkWrite = function( m, s ) {
                 if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "z" ) )
                     return false;
                 return 1 == getCount( s );
-                } );
+                } );    
 }
 
 // check that slave reads and writes are guarded
@@ -84,6 +88,8 @@ doTest = function( signal ) {
                 return ( lm == 1 );
                 } );
     
+    writeOne( l );
+    
     r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1" );
     
     assert.soon( function() {
@@ -97,6 +103,8 @@ doTest = function( signal ) {
                 } );
     
     // Once this returns, the initial sync for r will have completed.
+    check( r );
+    
     checkWrite( l, r );
     
     stopMongod( ports[ 1 ], signal );
