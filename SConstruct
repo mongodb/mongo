@@ -591,6 +591,8 @@ env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
 
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
+env.Program( "mongobridge" , allToolFiles + [ "tools/bridge.cpp" ] )
+
 # mongos
 mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles )
 

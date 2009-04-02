@@ -50,6 +50,7 @@ mongoexport
 
 mongoimportjson
 mongosniff
+mongobridge
 
 *.tgz
 
