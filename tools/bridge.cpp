@@ -33,7 +33,8 @@ public:
     void operator()() const {
         DBClientConnection dest;
         string errmsg;
-        massert( errmsg, dest.connect( destUri, errmsg ) );
+        while( !dest.connect( destUri, errmsg ) )
+            sleepmillis( 500 );
         Message m;
         while( 1 ) {
             m.reset();
