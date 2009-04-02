@@ -22,4 +22,6 @@ assert.eq( 16, db.runCommand( {datasize:"test.jstests_datasize", min:{_id:'a'}, 
 assert.eq( 16, db.runCommand( {datasize:"test.jstests_datasize", min:{_id:'a'}, max:{_id:'d' }, keyPattern:{_id:1}} ).size );
 assert.eq( 17, db.runCommand( {datasize:"test.jstests_datasize", min:{_id:'d'}, max:{_id:'z' }, keyPattern:{_id:1}} ).size );
 
+assert.eq( 16, db.runCommand( {datasize:"test.jstests_datasize", min:{_id:'c'}, max:{_id:'c' }} ).size );
+
 assert.eq( 0, db.runCommand( {datasize:"test.jstests_datasize", min:{_id:'a'}, max:{_id:'d' }, keyPattern:{a:1}} ).ok );
