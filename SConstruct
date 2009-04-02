@@ -565,12 +565,12 @@ env.Append( BUILDERS={'JSHeader' : jshBuilder})
 
 clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )
-clientEnv.Append( LIBS=[ "libmongoclient.a"] )
+clientEnv.Prepend( LIBS=[ "libmongoclient.a"] )
 clientEnv.Append( LIBPATH=["."] )
 
 testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
-testEnv.Append( LIBS=[ "unittest" , "libmongotestfiles.a" ] )
+testEnv.Prepend( LIBS=[ "libmongotestfiles.a" , "unittest" ] )
 testEnv.Append( LIBPATH=["."] )
 
 
