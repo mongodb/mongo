@@ -891,7 +891,8 @@ namespace mongo {
         CmdMedianKey() : Command( "medianKey" ) {}
         virtual bool slaveOk() { return true; }
         virtual void help( stringstream &help ) const {
-            help << " example: { medianKey:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }";
+            help << " example: { medianKey:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }\n"
+                "NOTE: This command may take awhile to run";
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             const char *ns = jsobj.getStringField( "medianKey" );
@@ -924,6 +925,54 @@ namespace mongo {
         }
     } cmdMedianKey;
     
+    class CmdDatasize : public Command {
+    public:
+        CmdDatasize() : Command( "datasize" ) {}
+        virtual bool slaveOk() { return true; }
+        virtual void help( stringstream &help ) const {
+            help << " example: { medianKey:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }\n"
+                "NOTE: This command may take awhile to run";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            const char *ns = jsobj.getStringField( "datasize" );
+            BSONObj min = jsobj.getObjectField( "min" );
+            BSONObj max = jsobj.getObjectField( "max" );
+            BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
+
+            auto_ptr< Cursor > c;
+            if ( min.isEmpty() && max.isEmpty() ) {
+                setClient( ns );
+                c = theDataFileMgr.findAll( ns );
+            } else if ( min.isEmpty() || max.isEmpty() ) {
+                errmsg = "only one of min or max specified";
+                return false;
+            } else {            
+                const IndexDetails *id = indexDetailsForRange( ns, errmsg, min, max, keyPattern );
+                if ( id == 0 )
+                    return false;
+                c.reset( new BtreeCursor( *id, min, max, 1 ) );
+            }
+            
+            Timer t;
+            long long size = 0;
+            while( c->ok() ) {
+                size += c->current().objsize();
+                c->advance();
+            }
+            int ms = t.millis();
+            if ( ms > 100 ) {
+                if ( min.isEmpty() ) {
+                    out() << "Finding size for ns: " << ns << " took " << ms << "ms." << endl;
+                } else {
+                    out() << "Finding size for ns: " << ns << " between " << min << " and " << max << " took " << ms << "ms." << endl;
+                }
+            }
+            
+            result.append( "size", (double)size );
+            return true;
+        }
+    } cmdDatasize;
+
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here
