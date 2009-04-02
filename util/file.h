@@ -12,7 +12,11 @@
 
 namespace mongo { 
 
+#ifndef __sunos__
 typedef uint64_t fileofs;
+#else
+typedef boost::uint64_t fileofs;
+#endif
 
 class FileInterface { 
 public:
