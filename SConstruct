@@ -735,12 +735,20 @@ def startMongodForTests( env, target, source ):
     mongodForTests = Popen( [ mongod[0].abspath, "run" ] )
     # Wait for mongod to start
     from time import sleep
-    sleep( 1 )
+    sleep( 2 )
+    if mongodForTests.poll() is not None:
+        print( "Failed to start mongod" )
+        mongodForTests = None
+        Exit( 1 )
     
 def stopMongodForTests():
     global mongodForTests
     if not mongodForTests:
         return
+    if mongodForTests.poll() is not None:
+        print( "Failed to start mongod" )
+        mongodForTests = None
+        Exit( 1 )
     try:
         # This function not available in Python 2.5
         mongodForTests.terminate()
