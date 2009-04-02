@@ -798,6 +798,94 @@ namespace mongo {
         }
     } cmdFileMD5;
     
+    bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
+        BSONObjIterator p( idxPattern );
+        BSONObjIterator k( sampleKey );
+        int i = 0;
+        while( 1 ) {
+            BSONElement pe = p.next();
+            BSONElement ke = k.next();
+            if ( pe.eoo() && ke.eoo() )
+                return true;
+            if ( pe.eoo() || ke.eoo() )
+                return false;
+            if ( strcmp( pe.fieldName(), ke.fieldName() ) != 0 )
+                return false;
+            if ( ( i == firstSignificantField ) && !( ( direction > 0 ) == ( pe.number() > 0 ) ) )
+                return false;
+            ++i;
+        }
+        return false;
+    }
+
+    // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
+    const IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
+        if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
+            errmsg = "invalid command syntax (note: min and max are required)";
+            return 0;
+        }
+
+        setClient( ns );
+        const IndexDetails *id = 0;
+        NamespaceDetails *d = nsdetails( ns );
+        if ( !d ) {
+            errmsg = "ns not found";
+            return 0;
+        }
+        
+        if ( keyPattern.isEmpty() ) {
+            BSONObjIterator i( min );
+            BSONObjIterator a( max );
+            int direction = 0;
+            int firstSignificantField = 0;
+            while( 1 ) {
+                BSONElement ie = i.next();
+                BSONElement ae = a.next();
+                if ( ie.eoo() && ae.eoo() )
+                    break;
+                if ( ie.eoo() || ae.eoo() || strcmp( ie.fieldName(), ae.fieldName() ) != 0 ) {
+                    errmsg = "min and max keys do not share pattern";
+                    return 0;
+                }
+                int cmp = ie.woCompare( ae );
+                if ( cmp < 0 )
+                    direction = 1;
+                if ( cmp > 0 )
+                    direction = -1;
+                if ( direction != 0 )
+                    break;
+                ++firstSignificantField;
+            }
+            for (int i = 0; i < d->nIndexes; i++ ) {
+                IndexDetails& ii = d->indexes[i];
+                if ( indexWorks( ii.keyPattern(), min, direction, firstSignificantField ) ) {
+                    id = &ii;
+                    keyPattern = ii.keyPattern();
+                    break;
+                }
+            }
+            
+        } else {            
+            for (int i = 0; i < d->nIndexes; i++ ) {
+                IndexDetails& ii = d->indexes[i];
+                if( ii.keyPattern().woCompare(keyPattern) == 0 ) {
+                    id = &ii;
+                    break;
+                }
+            }
+        }
+
+        if ( !id ) {
+            errmsg = "no index found for specified keyPattern";
+            return 0;
+        }
+        
+        min = min.extractFieldsUnDotted( keyPattern );
+        max = max.extractFieldsUnDotted( keyPattern );
+
+        return id;
+    }
+    
     class CmdMedianKey : public Command {
     public:
         CmdMedianKey() : Command( "medianKey" ) {}
@@ -809,70 +897,12 @@ namespace mongo {
             const char *ns = jsobj.getStringField( "medianKey" );
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
-            
-            if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
-                errmsg = "invalid command syntax (note: min and max are required)";
-                return false;
-            }
-            
-            setClient( ns );
-            const IndexDetails *id = 0;
-            NamespaceDetails *d = nsdetails( ns );
-            if ( ! d ){
-                errmsg = "ns not found";
-                return false;
-            }
-                
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
-            if ( keyPattern.isEmpty() ) {
-                BSONObjIterator i( min );
-                BSONObjIterator a( max );
-                int direction = 0;
-                int firstSignificantField = 0;
-                while( 1 ) {
-                    BSONElement ie = i.next();
-                    BSONElement ae = a.next();
-                    if ( ie.eoo() && ae.eoo() )
-                        break;
-                    if ( ie.eoo() || ae.eoo() || strcmp( ie.fieldName(), ae.fieldName() ) != 0 ) {
-                        errmsg = "min and max keys do not share pattern";
-                        return false;
-                    }
-                    int cmp = ie.woCompare( ae );
-                    if ( cmp < 0 )
-                        direction = 1;
-                    if ( cmp > 0 )
-                        direction = -1;
-                    if ( direction != 0 )
-                        break;
-                    ++firstSignificantField;
-                }
-                for (int i = 0; i < d->nIndexes; i++ ) {
-                    IndexDetails& ii = d->indexes[i];
-                    if ( indexWorks( ii.keyPattern(), min, direction, firstSignificantField ) ) {
-                        id = &ii;
-                        keyPattern = ii.keyPattern();
-                    }
-                }
-                    
-            } else {            
-                for (int i = 0; i < d->nIndexes; i++ ) {
-                    IndexDetails& ii = d->indexes[i];
-                    if( ii.keyPattern().woCompare(keyPattern) == 0 ) {
-                        id = &ii;
-                        break;
-                    }
-                }
-            }
-
-            if ( !id ) {
-                errmsg = "no index found for specified keyPattern";
+            
+            const IndexDetails *id = indexDetailsForRange( ns, errmsg, min, max, keyPattern );
+            if ( id == 0 )
                 return false;
-            }
-            
-            min = min.extractFieldsUnDotted( keyPattern );
-            max = max.extractFieldsUnDotted( keyPattern );
-            
+
             Timer t;
             int num = 0;
             for( BtreeCursor c( *id, min, max, 1 ); c.ok(); c.advance(), ++num );
@@ -891,26 +921,6 @@ namespace mongo {
             
             result.append( "median", c.prettyKey( c.currKey() ) );
             return true;
-        }
-    private:
-        static bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
-            BSONObjIterator p( idxPattern );
-            BSONObjIterator k( sampleKey );
-            int i = 0;
-            while( 1 ) {
-                BSONElement pe = p.next();
-                BSONElement ke = k.next();
-                if ( pe.eoo() && ke.eoo() )
-                    return true;
-                if ( pe.eoo() || ke.eoo() )
-                    return false;
-                if ( strcmp( pe.fieldName(), ke.fieldName() ) != 0 )
-                    return false;
-                if ( ( i == firstSignificantField ) && !( ( direction > 0 ) == ( pe.number() > 0 ) ) )
-                    return false;
-                ++i;
-            }
-            return false;
         }
     } cmdMedianKey;
     
