@@ -160,7 +160,6 @@ namespace mongo {
         
         vector<Shard*> _shards;
         
-        mutex _lock;
         unsigned long long _sequenceNumber;
         
         friend class Shard;
