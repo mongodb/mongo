@@ -19,9 +19,9 @@ doTest = function( signal ) {
     ports = allocatePorts( 3 );
     
     // spec small oplog for fast startup on 64bit machines
-    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
-    s1 = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave1", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
-    s2 = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-slave2", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
+    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1", "--nohttpinterface" );
+    s1 = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave1", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface" );
+    s2 = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-slave2", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface" );
     
     am = m.getDB( baseName ).a
     
@@ -47,14 +47,14 @@ doTest = function( signal ) {
     for( i = 1000; i < 1010; ++i )
         am.save( { _id: new ObjectId(), i: i } );
     
-    s1 = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave1", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
+    s1 = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave1", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface" );
     soonCount( s1, 1010 );
     as = s1.getDB( baseName ).a
     assert.eq( 1, as.find( { i: 1009 } ).count() );
     
     stopMongod( ports[ 0 ], signal );
     
-    m = startMongoProgram( "mongod", "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
+    m = startMongoProgram( "mongod", "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1", "--nohttpinterface" );
     am = m.getDB( baseName ).a
     
     for( i = 1010; i < 1020; ++i )
@@ -63,7 +63,7 @@ doTest = function( signal ) {
     soonCount( s1, 1020 );
     assert.eq( 1, as.find( { i: 1019 } ).count() );
 
-    s2 = startMongoProgram( "mongod", "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-slave2", "--slave", "--source", "127.0.0.1:" + ports[ 0 ] );
+    s2 = startMongoProgram( "mongod", "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-slave2", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface" );
     soonCount( s2, 1020 );
     as = s2.getDB( baseName ).a
     assert.eq( 1, as.find( { i: 1009 } ).count() );
