@@ -40,6 +40,8 @@ namespace mongo {
     /* only off if --nohints */
     extern bool useHints;
 
+    bool noHttpInterface = false;
+    
     extern int port;
     extern int curOp;
     extern bool autoresync;
@@ -135,7 +137,8 @@ namespace mongo {
         log() << "waiting for connections on port " << port << endl;
         OurListener l(port);
         startReplication();
-        boost::thread thr(webServerThread);
+        if ( !noHttpInterface )
+            boost::thread thr(webServerThread);
         if ( l.init() ) {
             registerListenerSocket( l.socket() );
             l.listen();
@@ -554,6 +557,8 @@ int main(int argc, char* argv[], char *envp[] )
                 useCursors = false;
             else if ( s == "--nohints" )
                 useHints = false;
+            else if ( s == "--nohttpinterface" )
+                noHttpInterface = true;
             else if ( s == "--oplogSize" ) {
                 long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad arg", x > 0);
@@ -602,6 +607,7 @@ usage:
     out() << " --appsrvpath <path>       root directory for the babble app server\n";
     out() << " --nocursors               diagnostic/debugging option\n";
     out() << " --nohints                 ignore query hints\n";
+    out() << " --nohttpinterface         disable http interface\n";
     out() << " --nojni" << endl;
     out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     out() << " --oplogSize <size_in_MB>  custom size if creating new replication operation log" << endl;
