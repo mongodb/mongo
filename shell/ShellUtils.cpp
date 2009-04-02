@@ -426,6 +426,8 @@ public:
             int ret = read( pipe_, (void *)start, lenToRead );
             assert( ret != -1 );
             start[ ret ] = '\0';
+            if ( strlen( start ) != unsigned( ret ) )
+                writeMongoProgramOutputLine( port_, "WARNING: mongod wrote null bytes to output" );
             char *last = buf;
             for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
                 *i = '\0';
