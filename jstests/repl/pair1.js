@@ -5,7 +5,7 @@ var baseName = "jstests_pair1test";
 ismaster = function( n ) {
     var im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
 //    print( "ismaster: " + tojson( im ) );
-    assert( im );
+    assert( im, "command ismaster failed" );
     return im.ismaster;
 }
 
@@ -69,9 +69,9 @@ doTest = function( signal ) {
                 lm = ismaster( l );
                 rm = ismaster( r );
                 
-                assert( am == 1 );
-                assert( lm == -1 || lm == 0 );
-                assert( rm == -1 || rm == 0 || rm == 1 );
+                assert( am == 1, "am value invalid" );
+                assert( lm == -1 || lm == 0, "lm value invalid" );
+                assert( rm == -1 || rm == 0 || rm == 1, "rm value invalid" );
                 
                 return ( lm == 0 && rm == 1 );
                 } );
@@ -84,7 +84,7 @@ doTest = function( signal ) {
     
     assert.soon( function() {
                 lm = ismaster( l );
-                assert( lm == 0 || lm == 1 );
+                assert( lm == 0 || lm == 1, "lm value invalid" );
                 return ( lm == 1 );
                 } );
     
@@ -96,8 +96,8 @@ doTest = function( signal ) {
                 lm = ismaster( l );
                 rm = ismaster( r );
                 
-                assert( lm == 1 );
-                assert( rm == -1 || rm == 0 );
+                assert( lm == 1, "lm value invalid" );
+                assert( rm == -1 || rm == 0, "rm value invalid" );
                 
                 return ( rm == 0 );
                 } );
@@ -111,7 +111,7 @@ doTest = function( signal ) {
     
     assert.soon( function() {
                 rm = ismaster( r );
-                assert( rm == 0 || rm == 1 );
+                assert( rm == 0 || rm == 1, "rm value invalid" );
                 return ( rm == 1 );
                 } );
     
@@ -121,8 +121,8 @@ doTest = function( signal ) {
                 lm = ismaster( l );
                 rm = ismaster( r );
                 
-                assert( lm == -1 || lm == 0 );
-                assert( rm == 1 );
+                assert( lm == -1 || lm == 0, "lm value invalid" );
+                assert( rm == 1, "rm value invalid" );
                 
                 return ( lm == 0 && rm == 1 );
                 } );
