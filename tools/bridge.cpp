@@ -43,7 +43,7 @@ public:
                 mp_.shutdown();
                 break;
             }
-            
+
             int oldId = m.data->id;
             if ( m.data->operation() == dbQuery || m.data->operation() == dbMsg || m.data->operation() == dbGetMore ) {
                 Message response;
@@ -80,9 +80,9 @@ void check( bool b ) {
 }
 
 int main( int argc, char **argv ) {
-    
+
     check( argc == 5 );
-    
+
     for( int i = 1; i < 5; ++i ) {
         check( i % 2 != 0 );
         if ( strcmp( argv[ i ], "--port" ) == 0 ) {
@@ -94,10 +94,10 @@ int main( int argc, char **argv ) {
         }
     }
     check( port != 0 && !destUri.empty() );
-    
+
     MyListener l( port );
     l.init();
     l.listen();
-    
+
     return 0;
 }

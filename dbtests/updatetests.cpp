@@ -52,7 +52,7 @@ namespace UpdateTests {
         static DBDirectClient client_;
     };
     DBDirectClient ClientBase::client_;
-        
+
     class Fail : public ClientBase {
     public:
         virtual ~Fail() {}
@@ -65,54 +65,54 @@ namespace UpdateTests {
     protected:
         const char *ns() { return "UpdateTests_Fail"; }
         virtual void prep() {
-            insert( ns(), fromjson( "{a:1}" ) );   
+            insert( ns(), fromjson( "{a:1}" ) );
         }
         virtual void doIt() = 0;
     };
-        
+
     class ModId : public Fail {
         void doIt() {
             update( ns(), BSONObj(), fromjson( "{$set:{'_id':4}}" ) );
         }
     };
-    
+
     class ModNonmodMix : public Fail {
         void doIt() {
             update( ns(), BSONObj(), fromjson( "{$set:{a:4},z:3}" ) );
-        }        
+        }
     };
-    
+
     class InvalidMod : public Fail {
         void doIt() {
             update( ns(), BSONObj(), fromjson( "{$awk:{a:4}}" ) );
-        }        
+        }
     };
-    
+
     class ModNotFirst : public Fail {
         void doIt() {
             update( ns(), BSONObj(), fromjson( "{z:3,$set:{a:4}}" ) );
-        }        
+        }
     };
-    
+
     class ModDuplicateFieldSpec : public Fail {
         void doIt() {
             update( ns(), BSONObj(), fromjson( "{$set:{a:4},$inc:{a:1}}" ) );
-        }        
+        }
     };
-    
+
     class IncNonNumber : public Fail {
         void doIt() {
             update( ns(), BSONObj(), fromjson( "{$inc:{a:'d'}}" ) );
-        }        
+        }
     };
-    
+
     class IncTargetNonNumber : public Fail {
         void doIt() {
             insert( ns(), BSON( "a" << "a" ) );
             update( ns(), BSON( "a" << "a" ), fromjson( "{$inc:{a:1}}" ) );
-        }        
+        }
     };
-    
+
     class SetBase : public ClientBase {
     public:
         ~SetBase() {
@@ -121,7 +121,7 @@ namespace UpdateTests {
     protected:
         const char *ns() { return "updatetests.SetBase"; }
     };
-    
+
     class SetNum : public SetBase {
     public:
         void run() {
@@ -130,7 +130,7 @@ namespace UpdateTests {
             ASSERT( !client().findOne( ns(), BSON( "a" << 4 ) ).isEmpty() );
         }
     };
-    
+
     class SetString : public SetBase {
     public:
         void run() {
@@ -139,60 +139,60 @@ namespace UpdateTests {
             ASSERT( !client().findOne( ns(), BSON( "a" << "c" ) ).isEmpty() );
         }
     };
-    
+
     class SetStringDifferentLength : public SetBase {
     public:
         void run() {
             client().insert( ns(), BSON( "a" << "b" ) );
             client().update( ns(), BSON( "a" << "b" ), BSON( "$set" << BSON( "a" << "cd" ) ) );
-            ASSERT( !client().findOne( ns(), BSON( "a" << "cd" ) ).isEmpty() );            
+            ASSERT( !client().findOne( ns(), BSON( "a" << "cd" ) ).isEmpty() );
         }
     };
-    
+
     class SetStringToNum : public SetBase {
     public:
         void run() {
             client().insert( ns(), BSON( "a" << "b" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 5 ) ) );
             ASSERT( !client().findOne( ns(), BSON( "a" << 5 ) ).isEmpty() );
-        }        
+        }
     };
-    
+
     class SetStringToNumInPlace : public SetBase {
     public:
         void run() {
             client().insert( ns(), BSON( "a" << "bcd" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 5.0 ) ) );
-            ASSERT( !client().findOne( ns(), BSON( "a" << 5.0 ) ).isEmpty() );            
+            ASSERT( !client().findOne( ns(), BSON( "a" << 5.0 ) ).isEmpty() );
         }
     };
-    
+
     class ModDotted : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{a:{b:4}}" ) );
             client().update( ns(), Query(), BSON( "$inc" << BSON( "a.b" << 10 ) ) );
-            ASSERT( !client().findOne( ns(), BSON( "a.b" << 14 ) ).isEmpty() );            
+            ASSERT( !client().findOne( ns(), BSON( "a.b" << 14 ) ).isEmpty() );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << 55 ) ) );
-            ASSERT( !client().findOne( ns(), BSON( "a.b" << 55 ) ).isEmpty() );                        
+            ASSERT( !client().findOne( ns(), BSON( "a.b" << 55 ) ).isEmpty() );
         }
     };
-    
+
     class SetInPlaceDotted : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{a:{b:'cdef'}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << "llll" ) ) );
-            ASSERT( !client().findOne( ns(), BSON( "a.b" << "llll" ) ).isEmpty() );                        
+            ASSERT( !client().findOne( ns(), BSON( "a.b" << "llll" ) ).isEmpty() );
         }
     };
-    
+
     class SetRecreateDotted : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{b:'cdef'}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
-            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll'}}" ) ) == 0 );                        
+            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll'}}" ) ) == 0 );
         }
     };
 
@@ -201,35 +201,35 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
-            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll'}}" ) ) == 0 );                        
+            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll'}}" ) ) == 0 );
         }
-    };    
-    
+    };
+
     class SetAdjacentDotted : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{c:4}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
-            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll',c:4}}" ) ) == 0 );                        
+            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll',c:4}}" ) ) == 0 );
         }
-    };    
+    };
 
     class IncMissing : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$inc" << BSON( "f" << 3.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:3}" ) ) == 0 );                        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:3}" ) ) == 0 );
         }
-    };        
-    
+    };
+
     class UnorderedNewSet : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "f.g.h" << 3.0 << "f.g.a" << 2.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:{g:{a:2,h:3}}}" ) ) == 0 );                        
-        }        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:{g:{a:2,h:3}}}" ) ) == 0 );
+        }
     };
 
     class UnorderedNewSetAdjacent : public SetBase {
@@ -237,8 +237,8 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), BSONObj(), BSON( "$set" << BSON( "f.g.h.b" << 3.0 << "f.g.a.b" << 2.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:{g:{a:{b:2},h:{b:3}}}}" ) ) == 0 );                        
-        }        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:{g:{a:{b:2},h:{b:3}}}}" ) ) == 0 );
+        }
     };
 
     class ArrayEmbeddedSet : public SetBase {
@@ -246,26 +246,26 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,z:[4,'b']}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "z.0" << "a" ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,z:[4,'b']}" ) ) == 0 );                        
-        }        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,z:[4,'b']}" ) ) == 0 );
+        }
     };
-    
+
     class AttemptEmbedInExistingNum : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:1}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << 1 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:1}" ) ) == 0 );         
-        }        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:1}" ) ) == 0 );
+        }
     };
-    
+
     class AttemptEmbedConflictsWithOtherSet : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 2 << "a.b" << 1 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );         
-        }                
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );
+        }
     };
 
     class ModMasksEmbeddedConflict : public SetBase {
@@ -273,8 +273,8 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{b:2}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 2 << "a.b" << 1 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:2}}" ) ) == 0 );         
-        }                
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:2}}" ) ) == 0 );
+        }
     };
 
     class ModOverwritesExistingObject : public SetBase {
@@ -282,17 +282,17 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{b:2}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << BSON( "c" << 2 ) ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{c:2}}" ) ) == 0 );         
-        }                
-    };    
-    
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{c:2}}" ) ) == 0 );
+        }
+    };
+
     class InvalidEmbeddedSet : public Fail {
     public:
         virtual void doIt() {
             client().update( ns(), Query(), BSON( "$set" << BSON( "a." << 1 ) ) );
         }
     };
-    
+
     class UpsertMissingEmbedded : public SetBase {
     public:
         void run() {
@@ -300,50 +300,50 @@ namespace UpdateTests {
             ASSERT( !client().findOne( ns(), QUERY( "a.b" << 1 ) ).isEmpty() );
         }
     };
-    
+
     class Push : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:[1]}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[1,5]}" ) ) == 0 );                     
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[1,5]}" ) ) == 0 );
         }
     };
-    
+
     class PushInvalidEltType : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:1}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:1}" ) ) == 0 );                     
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:1}" ) ) == 0 );
         }
     };
-    
+
     class PushConflictsWithOtherMod : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:[1]}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 1 ) <<"$push" << BSON( "a" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[1]}" ) ) == 0 );                     
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[1]}" ) ) == 0 );
         }
     };
-    
+
     class PushFromNothing : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[5]}" ) ) == 0 );                     
-        }        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[5]}" ) ) == 0 );
+        }
     };
-    
+
     class PushFromEmpty : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:[]}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[5]}" ) ) == 0 );                     
-        }        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[5]}" ) ) == 0 );
+        }
     };
 
     class PushInsideNothing : public SetBase {
@@ -351,8 +351,8 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a.b" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:[5]}}" ) ) == 0 );                     
-        }                
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:[5]}}" ) ) == 0 );
+        }
     };
 
     class CantPushInsideOtherMod : public SetBase {
@@ -360,26 +360,26 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << BSONObj() ) << "$push" << BSON( "a.b" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );                     
-        }                
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );
+        }
     };
-    
+
     class CantPushTwice : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:[]}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 4 ) << "$push" << BSON( "a" << 5 ) ) );
             ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[]}" ) ) == 0 );
-        }                        
+        }
     };
-    
+
     class SetEncapsulationConflictsWithExistingType : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{b:4}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b.c" << 4.0 ) ) );
             ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );
-        }                                
+        }
     };
 
     class CantPushToParent : public SetBase {
@@ -387,25 +387,25 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{b:4}}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 4.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );            
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );
         }
     };
-    
+
     class CantIncParent : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{b:4}}" ) );
             client().update( ns(), Query(), BSON( "$inc" << BSON( "a" << 4.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );            
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );
         }
     };
-    
+
     class DontDropEmpty : public SetBase {
     public:
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{b:{}}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.c" << 4.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:{},c:4}}" ) ) == 0 );            
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:{},c:4}}" ) ) == 0 );
         }
     };
 
@@ -414,7 +414,7 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{b:{}}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b.f" << 4.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:{f:4}}}" ) ) == 0 );            
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:{f:4}}}" ) ) == 0 );
         }
     };
 
@@ -424,17 +424,17 @@ namespace UpdateTests {
             client().ensureIndex( ns(), BSON( "a" << 1 ) );
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), fromjson( "{$set:{'a.b':4}}" ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );                        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );
         }
     };
-    
+
     class ModParentOfIndex : public SetBase {
     public:
         void run() {
             client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), fromjson( "{$set:{'a':4}}" ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );                        
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );
         }
     };
 
@@ -455,37 +455,37 @@ namespace UpdateTests {
             add< SetStringToNumInPlace >();
             add< ModDotted >();
             add< SetInPlaceDotted >();
-            add< SetRecreateDotted >();            
-            add< SetMissingDotted >();            
-            add< SetAdjacentDotted >();            
-            add< IncMissing >();            
-            add< UnorderedNewSet >();            
-            add< UnorderedNewSetAdjacent >();            
-            add< ArrayEmbeddedSet >();            
-            add< AttemptEmbedInExistingNum >();            
-            add< AttemptEmbedConflictsWithOtherSet >();            
-            add< ModMasksEmbeddedConflict >();            
-            add< ModOverwritesExistingObject >();            
-            add< InvalidEmbeddedSet >();            
-            add< UpsertMissingEmbedded >();            
-            add< Push >();            
-            add< PushInvalidEltType >();            
-            add< PushConflictsWithOtherMod >();            
-            add< PushFromNothing >();            
-            add< PushFromEmpty >();            
-            add< PushInsideNothing >();            
-            add< CantPushInsideOtherMod >();            
-            add< CantPushTwice >();            
-            add< SetEncapsulationConflictsWithExistingType >();            
-            add< CantPushToParent >();            
-            add< CantIncParent >();            
-            add< DontDropEmpty >();            
-            add< InsertInEmpty >();            
-            add< IndexParentOfMod >();            
-            add< ModParentOfIndex >();            
+            add< SetRecreateDotted >();
+            add< SetMissingDotted >();
+            add< SetAdjacentDotted >();
+            add< IncMissing >();
+            add< UnorderedNewSet >();
+            add< UnorderedNewSetAdjacent >();
+            add< ArrayEmbeddedSet >();
+            add< AttemptEmbedInExistingNum >();
+            add< AttemptEmbedConflictsWithOtherSet >();
+            add< ModMasksEmbeddedConflict >();
+            add< ModOverwritesExistingObject >();
+            add< InvalidEmbeddedSet >();
+            add< UpsertMissingEmbedded >();
+            add< Push >();
+            add< PushInvalidEltType >();
+            add< PushConflictsWithOtherMod >();
+            add< PushFromNothing >();
+            add< PushFromEmpty >();
+            add< PushInsideNothing >();
+            add< CantPushInsideOtherMod >();
+            add< CantPushTwice >();
+            add< SetEncapsulationConflictsWithExistingType >();
+            add< CantPushToParent >();
+            add< CantIncParent >();
+            add< DontDropEmpty >();
+            add< InsertInEmpty >();
+            add< IndexParentOfMod >();
+            add< ModParentOfIndex >();
         }
     };
-    
+
 } // namespace UpdateTests
 
 UnitTest::TestPtr updateTests() {
