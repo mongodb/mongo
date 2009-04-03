@@ -475,21 +475,23 @@ void killDb( int port, int signal ) {
     kill( pid, signal );
 
     int i = 0;
-    for( ; i < 5; ++i ) {
+    for( ; i < 10; ++i ) {
+        if ( i == 5 ) {
+            cout << "process on port " << port << "not terminated, sending sigkill" << endl;
+            kill( pid, SIGKILL );
+        }        
         int temp;
         if( waitpid( pid, &temp, WNOHANG ) == pid )
             break;
         cout << "waiting for process on port " << port << " to terminate" << endl;
         sleepms( 1000 );
     }
-    if ( i == 5 ) {
-        cout << "process on port " << port << "not terminated, sending sigkill" << endl;
-        kill( pid, SIGKILL );
-    }
+    if ( i == 10 )
+        assert( "Failed to terminate process" == 0 );
 
     close( dbs[ port ].second );
     dbs.erase( port );
-    if ( signal == SIGKILL || i == 5 ) {
+    if ( i > 4 || signal == SIGKILL ) {
         cout << "sleeping after sigkill" << endl;
         sleepms( 4000 ); // allow operating system to reclaim resources
     }
