@@ -21,6 +21,7 @@
 #include "config.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
+#include "strategy.h"
 
 namespace mongo {
 
@@ -126,6 +127,8 @@ namespace mongo {
         
         string from = _server;
         
+        lockNamespaceOnServer( from , _ns );
+
         // copyCollection
         ScopedDbConnection toconn( to );
         BSONObj cloneRes;

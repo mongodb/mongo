@@ -24,11 +24,14 @@ namespace mongo {
         
     };
 
+    extern Strategy * SINGLE;
+    extern Strategy * SHARDED;
+
     void checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false );
     
     bool setShardVersion( DBClientBase & conn , const string& ns , ServerShardVersion version , bool authoritative , BSONObj& result );
 
-    extern Strategy * SINGLE;
-    extern Strategy * SHARDED;
+    bool lockNamespaceOnServer( const string& server , const string& ns );
+    bool lockNamespaceOnServer( DBClientBase& conn , const string& ns );
 }
 

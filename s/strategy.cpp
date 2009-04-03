@@ -106,5 +106,16 @@ namespace mongo {
         
         return conn.runCommand( "admin" , cmd , result );
     }
-    
+
+    bool lockNamespaceOnServer( const string& server , const string& ns ){
+        ScopedDbConnection conn( server );
+        bool res = lockNamespaceOnServer( conn.conn() , ns );
+        conn.done();
+        return res;
+    }
+
+    bool lockNamespaceOnServer( DBClientBase& conn , const string& ns ){
+        BSONObj lockResult;
+        return setShardVersion( conn , ns , grid.getNextOpTime() , true , lockResult );
+    }
 }
