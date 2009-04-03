@@ -120,6 +120,60 @@ namespace mongo {
 
         return s;
     }
+
+    bool Shard::moveAndCommit( const string& to , string& errmsg ){
+        log() << "moving shard ns: " << _ns << " moving shard: " << toString() << " " << _server << " -> " << to << endl;
+        
+        string from = _server;
+        
+        // copyCollection
+        ScopedDbConnection toconn( to );
+        BSONObj cloneRes;
+        
+        
+        BSONObj filter;
+        {
+            BSONObjBuilder b;
+            getFilter( b );
+            filter = b.obj();
+        }
+        
+        bool worked = toconn->runCommand( _manager->_config->getName().c_str() , 
+                                          BSON( "cloneCollection" << _ns << 
+                                                "from" << from <<
+                                                "query" << filter
+                                                ) ,
+                                          cloneRes
+                                          );
+        
+        toconn.done();
+        if ( ! worked ){
+            errmsg = (string)"cloneCollection failed: " + cloneRes.toString();
+            return false;
+        }
+        
+        // update config db
+        setServer( to );
+        
+        // need to increment version # for old server
+        Shard * randomShardOnOldServer = _manager->findShardOnServer( from );
+        if ( randomShardOnOldServer )
+            randomShardOnOldServer->_markModified();
+        
+        _manager->save();
+        
+        // delete old data
+        ScopedDbConnection fromconn( from );
+        fromconn->remove( _ns.c_str() , filter );
+        string removeerror = fromconn->getLastError();
+        fromconn.done();
+        if ( removeerror.size() ){
+            errmsg = (string)"error removing old data:" + removeerror;
+            return false;
+        }
+        
+        return true;
+    }
     
     bool Shard::operator==( const Shard& s ){
         return 
