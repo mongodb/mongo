@@ -35,7 +35,7 @@ doTest = function( signal ) {
     s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--autoresync", "--nohttpinterface" );
     
     // after SyncException, mongod waits 10 secs.
-    sleep( 12000 );
+    sleep( 15000 );
     
     // Need the 2 additional seconds timeout, since commands don't work on an 'allDead' node.
     assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );
