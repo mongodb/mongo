@@ -553,8 +553,8 @@ Handle< Value > AllocatePorts( const Arguments &args ) {
     jsassert( args[0]->IsInt32() , "allocatePorts needs to be passed an integer" );
 
     int n = args[0]->ToInt32()->Value();
-    
-    Local< Array > ret = Array::New( n );
+
+    vector< int > ports;
     for( int i = 0; i < n; ++i ) {
         int s = socket( AF_INET, SOCK_STREAM, 0 );
         assert( s );
@@ -569,11 +569,16 @@ Handle< Value > AllocatePorts( const Arguments &args ) {
         sockaddr_in newAddress;
         socklen_t len = sizeof( newAddress );
         assert( 0 == getsockname( s, (sockaddr*)&newAddress, &len ) );
-        ret->Set( Number::New( i ), Number::New( ntohs( newAddress.sin_port ) ) );
+        ports.push_back( ntohs( newAddress.sin_port ) );
         
         assert( 0 == close( s ) );
     }
 
+    sort( ports.begin(), ports.end() );
+    Local< Array > ret = Array::New( n );
+    for( unsigned i = 0; i < ports.size(); ++i )
+        ret->Set( Number::New( i ), Number::New( ports[ i ] ) );
+    
     return ret;
 }
 
