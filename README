@@ -28,10 +28,11 @@ BUILDING
    $ cd ..
    $ svn co http://svn.red-bean.com/unittest/trunk/ unittest
    $ cd unittest
+   $ ./configure
    $ make
    $ sudo make install
 
-- Then use scons to build.  
+- Then use scons to build.
 
   If you want to build everything (mongod, mongo, tools, etc):
 
@@ -52,14 +53,14 @@ of GCC may not be happy.
 
 NOTES
 
-Mongo uses the 10gen appserver and the Java Virtual Machine to execute 
-user program code in the database.  This feature is optional -- if you would 
-like to run the database without these installed, run with the --nojni 
-option.  With --nojni specified, the db.eval() and $where features are no 
+Mongo uses the 10gen appserver and the Java Virtual Machine to execute
+user program code in the database.  This feature is optional -- if you would
+like to run the database without these installed, run with the --nojni
+option.  With --nojni specified, the db.eval() and $where features are no
 longer available.  You may still need JVM libraries which are statically linked.
 
-Mongo uses memory mapped files.  If built as a 32 bit executable, you will 
-not be able to work with large (multi-gigabyte) databases.  However, 32 bit 
+Mongo uses memory mapped files.  If built as a 32 bit executable, you will
+not be able to work with large (multi-gigabyte) databases.  However, 32 bit
 builds work fine with small development databases.
 
 --- WINDOWS ---

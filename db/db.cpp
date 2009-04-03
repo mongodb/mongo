@@ -344,6 +344,17 @@ namespace mongo {
     }
 
     void _initAndListen(int listenPort, const char *appserverLoc = null) {
+
+#if !defined(_WIN32)
+        pid_t pid = 0;
+        pid = getpid();
+#else
+        int pid=0;
+#endif
+
+        log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
+              <<  " master = " << master << " slave = " << slave << endl;
+        
         stringstream ss;
         ss << "dbpath (" << dbpath << ") does not exist";
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
@@ -365,15 +376,6 @@ namespace mongo {
         }
 #endif
 
-#if !defined(_WIN32)
-        pid_t pid = 0;
-        pid = getpid();
-#else
-        int pid=0;
-#endif
-
-        log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
-        <<  " master = " << master << " slave = " << slave << endl;
 
 #if !defined(NOJNI)
         if ( useJNI ) {
