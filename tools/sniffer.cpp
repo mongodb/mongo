@@ -343,7 +343,7 @@ int main(int argc, char **argv){
     
     bool source = false;
     bool replay = false;
-    const char *file;    
+    const char *file = 0;    
 
     vector< const char * > args;
     for( int i = 1; i < argc; ++i )

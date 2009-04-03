@@ -1229,10 +1229,11 @@ namespace mongo {
                 cc->filter = filter;
                 cc->originalMessage = m;
                 cc->updateLocation();
-                if ( !cc->c->ok() && cc->c->tailable() )
+                if ( !cc->c->ok() && cc->c->tailable() ) {
                     DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
-                else
+                } else {
                     DEV out() << "  query has more, cursorid: " << cursorid << endl;
+                }
             }
             if ( explain ) {
                 BSONObjBuilder builder;
