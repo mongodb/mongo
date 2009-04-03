@@ -481,7 +481,9 @@ void killDb( int port, int signal ) {
             kill( pid, SIGKILL );
         }        
         int temp;
-        if( waitpid( pid, &temp, WNOHANG ) == pid )
+        int ret = waitpid( pid, &temp, WNOHANG );
+        cout << "waitpid returns: " << ret << ", errno: " << errno << ", strerror: " << strerror( errno ) << endl;
+        if ( ret == pid )
             break;
         cout << "waiting for process on port " << port << " to terminate" << endl;
         sleepms( 1000 );
