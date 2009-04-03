@@ -29,7 +29,7 @@ assert.soon = function( f ) {
     while( 1 ) {
         if ( f() )
             return;
-        if ( ( new Date() ).getTime() - start.getTime() > 10000 )
+        if ( ( new Date() ).getTime() - start.getTime() > 20000 )
             throw "assert.soon failed: " + f;
         sleep( 200 );
     }
