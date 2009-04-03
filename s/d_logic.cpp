@@ -157,7 +157,7 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
         }
-
+        
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             string ns = cmdObj["getShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ){
@@ -179,6 +179,35 @@ namespace mongo {
         
     } getShardVersion;
 
+    class MoveShardStartCommand : public MongodShardCommand {
+    public:
+        MoveShardStartCommand() : MongodShardCommand( "moveshard.start" ){}
+        virtual void help( stringstream& help ) const {
+            help << "should not be calling this directly" << endl;
+        }
+
+        bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            // i assume i'm already locked
+            // so i have to start clone, tell caller its ok to make change
+            // then finish calls finish, and then deletes data when cursors are done
+            return false;
+        }
+        
+    } moveShardStartCmd;
+
+    class MoveShardFinishCommand : public MongodShardCommand {
+    public:
+        MoveShardFinishCommand() : MongodShardCommand( "moveshard.finish" ){}
+        virtual void help( stringstream& help ) const {
+            help << "should not be calling this directly" << endl;
+        }
+
+        bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            // see MoveShardStartCommand::run
+            return false;
+        }
+        
+    } moveShardFinishCmd;
     
     /**
      * @ return true if not in sharded mode
