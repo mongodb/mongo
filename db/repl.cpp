@@ -325,7 +325,7 @@ namespace mongo {
 
             int was = cmdObj.getIntField("i_was");
             string myname = cmdObj.getStringField("your_name");
-            if ( myname.empty() || was < -1 ) {
+            if ( myname.empty() || was < -3 ) {
                 errmsg = "your_name/i_was not specified";
                 return false;
             }
