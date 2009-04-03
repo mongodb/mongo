@@ -339,15 +339,10 @@ namespace mongo {
                 
                 log() << "splitting: " << ns << "  shard: " << old << endl;
                 
-                unsigned long long nextTS = grid.getNextOpTime();
-                ScopedDbConnection conn( old.getServer() );
-                BSONObj lockResult;
-                if ( ! setShardVersion( conn.conn() , ns , nextTS , true , lockResult ) ){
-                    log() << "setShardVersion for split failed!" << endl;
-                    errmsg = "setShardVersion failed to lock server.  is someone else doing something?";
+                if ( ! lockNamespaceOnServer( old.getServer() , ns ) ){
+                    log() << errmsg << endl;
                     return false;
                 }
-                conn.done();
 
                 if ( middle.isEmpty() )
                     old.split();
