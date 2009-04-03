@@ -72,7 +72,9 @@ doTest1 = function() {
     
     // reconnect
     
-    connect();
+    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
+    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
+    // no arbiter yet, to ensure r becomes master.
     assert.soon( function() {
                 lm = ismaster( l );
                 rm = ismaster( r );
@@ -82,6 +84,8 @@ doTest1 = function() {
                 
                 return ( lm == 0 && rm == 1 );
                 } );
+    startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
+    startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
 
     // disconnect r ( master )
     stopMongoProgram( arPort );
