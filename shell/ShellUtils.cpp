@@ -476,7 +476,7 @@ void killDb( int port, int signal ) {
     assert( 0 == kill( pid, signal ) );
 
     int i = 0;
-    for( ; i < 20; ++i ) {
+    for( ; i < 65; ++i ) {
         if ( i == 5 ) {
             cout << "process on port " << port << "not terminated, sending sigkill" << endl;
             assert( 0 == kill( pid, SIGKILL ) );
@@ -489,7 +489,7 @@ void killDb( int port, int signal ) {
         cout << "waiting for process on port " << port << " to terminate" << endl;
         sleepms( 1000 );
     }
-    if ( i == 20 )
+    if ( i == 65 )
         assert( "Failed to terminate process" == 0 );
 
     close( dbs[ port ].second );
