@@ -74,6 +74,8 @@ namespace mongo {
         BSONObj pickSplitPoint();
         Shard * split();
         Shard * split( const BSONObj& middle );
+        
+        bool moveAndCommit( const string& to , string& errmsg );
 
         virtual const char * getNS(){ return "config.shard"; }
         virtual void serialize(BSONObjBuilder& to);

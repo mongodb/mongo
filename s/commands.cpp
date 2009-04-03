@@ -408,54 +408,8 @@ namespace mongo {
                     return false;
                 }
                 
-                log() << "ns: " << ns << " moving shard: " << s << " to: " << to << endl;
-                
-                // copyCollection
-                ScopedDbConnection toconn( to );
-                BSONObj cloneRes;
-
-                
-                BSONObj filter;
-                {
-                    BSONObjBuilder b;
-                    s.getFilter( b );
-                    filter = b.obj();
-                }
-
-                bool worked = toconn->runCommand( config->getName().c_str() , 
-                                                  BSON( "cloneCollection" << ns << 
-                                                        "from" << from <<
-                                                        "query" << filter
-                                                        ) ,
-                                                  cloneRes
-                                                  );
-                
-                toconn.done();
-                if ( ! worked ){
-                    errmsg = (string)"cloneCollection failed: " + cloneRes.toString();
+                if ( ! s.moveAndCommit( to , errmsg ) )
                     return false;
-                }
-                
-                // update config db
-                s.setServer( to );
-                
-                // need to increment version # for old server
-                Shard * randomShardOnOldServer = info->findShardOnServer( from );
-                if ( randomShardOnOldServer )
-                    randomShardOnOldServer->_markModified();
-
-                info->save();
-
-                // delete old data
-                ScopedDbConnection fromconn( from );
-                fromconn->remove( ns.c_str() , filter );
-                string removeerror = fromconn->getLastError();
-                fromconn.done();
-                if ( removeerror.size() ){
-                    errmsg = (string)"error removing old data:" + removeerror;
-                    return false;
-                }
-
                 
                 result << "ok" << 1;
                 return true;
