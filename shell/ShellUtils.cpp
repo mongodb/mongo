@@ -474,23 +474,25 @@ void killDb( int port, int signal ) {
     pid_t pid = dbs[ port ].first;
     kill( pid, signal );
 
-    boost::xtime xt;
-    boost::xtime_get(&xt, boost::TIME_UTC);
-    ++xt.sec;
     int i = 0;
-    for( ; i < 5; ++i, ++xt.sec ) {
+    for( ; i < 5; ++i ) {
         int temp;
-        if( waitpid( pid, &temp, WNOHANG ) != 0 )
+        if( waitpid( pid, &temp, WNOHANG ) == pid )
             break;
-        boost::thread::sleep( xt );
+        cout << "waiting for process on port " << port << " to terminate" << endl;
+        sleepms( 1000 );
     }
-    if ( i == 5 )
+    if ( i == 5 ) {
+        cout << "process on port " << port << "not terminated, sending sigkill" << endl;
         kill( pid, SIGKILL );
+    }
 
     close( dbs[ port ].second );
     dbs.erase( port );
-    if ( signal == SIGKILL || i == 5 )
+    if ( signal == SIGKILL || i == 5 ) {
+        cout << "sleeping after sigkill" << endl;
         sleepms( 4000 ); // allow operating system to reclaim resources
+    }
 }
 
 v8::Handle< v8::Value > StopMongoProgram( const v8::Arguments &a ) {
