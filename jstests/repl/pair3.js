@@ -16,7 +16,7 @@ connect = function() {
     startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
 }
 
-doTest = function() {
+doTest1 = function() {
     ports = allocatePorts( 7 );
     aPort = ports[ 0 ];
     alPort = ports[ 1 ];
@@ -181,6 +181,71 @@ doTest = function() {
                 return ( rm == 0 );
                 } );
 
+    ports.forEach( function( x ) { stopMongoProgram( x ); } );
 }
 
-doTest();
+// this time don't start connected
+doTest2 = function() {
+    ports = allocatePorts( 7 );
+    aPort = ports[ 0 ];
+    alPort = ports[ 1 ];
+    arPort = ports[ 2 ];
+    lPort = ports[ 3 ];
+    lpPort = ports[ 4 ];
+    rPort = ports[ 5 ];
+    rpPort = ports[ 6 ];
+    
+    a = startMongod( "--port", aPort, "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface" );
+    l = startMongod( "--port", lPort, "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + rpPort, "127.0.0.1:" + alPort, "--oplogSize", "1", "--nohttpinterface" );
+    r = startMongod( "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + arPort, "--oplogSize", "1", "--nohttpinterface" );
+
+    assert.soon( function() {
+                lm = ismaster( l );
+                rm = ismaster( r );
+                
+                assert( lm == -1 || lm == -3, "lm value invalid" );
+                assert( rm == -1 || rm == -3, "rm value invalid" );
+                
+                return ( lm == -3 && rm == -3 );
+                } );
+    
+    startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
+
+    // there hasn't been an initial sync, no no node will become master
+    
+    for( i = 0; i < 10; ++i ) {
+        assert( ismaster( l ) == -3 && ismaster( r ) == -3 );
+        sleep( 500 );
+    }
+
+    stopMongoProgram( arPort );
+
+    startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
+
+    for( i = 0; i < 10; ++i ) {
+        assert( ismaster( l ) == -3 && ismaster( r ) == -3 );
+        sleep( 500 );
+    }    
+
+    stopMongoProgram( alPort );
+    
+    // connect l and r without a
+    
+    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
+    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
+    
+    assert.soon( function() {
+                lm = ismaster( l );
+                rm = ismaster( r );
+                
+                assert( lm == 0 || lm == -3, "lm value invalid" );
+                assert( rm == 1 || rm == -3 || rm == 0, "rm value invalid" );
+                
+                return ( lm == 0 && rm == 1 );
+                } );
+    
+    ports.forEach( function( x ) { stopMongoProgram( x ); } );    
+}
+
+doTest1();
+doTest2();
