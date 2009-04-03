@@ -35,11 +35,9 @@ doTest = function() {
     // normal startup
     
     assert.soon( function() {
-                am = ismaster( a );
                 lm = ismaster( l );
                 rm = ismaster( r );
                 
-                assert( am == 1, "am value invalid" );
                 assert( lm == -1 || lm == 0, "lm value invalid" );
                 assert( rm == -1 || rm == 0 || rm == 1, "rm value invalid" );
                 
@@ -84,7 +82,31 @@ doTest = function() {
                 
                 return ( lm == 0 && rm == 1 );
                 } );
+
+    // disconnect r ( master )
+    stopMongoProgram( arPort );
+    stopMongoProgram( lpPort );
+    stopMongoProgram( rpPort );
     
+    assert.soon( function() {
+                lm = ismaster( l );
+                rm = ismaster( r );
+                
+                assert( lm == 0 || lm == 1, "lm value invalid" );
+                assert( rm == 1 || rm == -3, "rm value invalid" );
+                
+                return ( rm == -3 && lm == 1 );
+                } );
+    
+    // disconnect l ( new master )
+    stopMongoProgram( alPort );
+    
+    assert.soon( function() {
+                lm = ismaster( l );
+                assert( lm == 1 || lm == -3, "lm value invalid" );
+                return ( lm == -3 );
+                } );
+
 }
 
 doTest();
