@@ -298,6 +298,30 @@ namespace QueryTests {
         }
     };
     
+    class BasicCount : public ClientBase {
+    public:
+        ~BasicCount() {
+            client().dropCollection( "querytests.BasicCount" );
+        }
+        void run() {
+            const char *ns = "querytests.BasicCount";
+            client().ensureIndex( ns, BSON( "a" << 1 ) );
+            count( 0 );
+            insert( ns, BSON( "a" << 3 ) );
+            count( 0 );
+            insert( ns, BSON( "a" << 4 ) );
+            count( 1 );
+            insert( ns, BSON( "a" << 5 ) );
+            count( 1 );
+            insert( ns, BSON( "a" << 4 ) );
+            count( 2 );
+        }
+    private:
+        void count( int c ) const {
+            ASSERT_EQUALS( c, client().count( "querytests.BasicCount", BSON( "a" << 4 ) ) );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
