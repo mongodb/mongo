@@ -541,7 +541,7 @@ namespace QueryTests {
                 client_->insert( ns_.c_str(), obj );
         }
         void run() {
-            ASSERT_EQUALS( 100000, client_->count( ns_, BSON( "a" << 1 ) ) );
+            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << 1 ) ) );
         }
         string ns_;
     };
@@ -555,7 +555,7 @@ namespace QueryTests {
             client_->ensureIndex( ns_, obj );
         }
         void run() {
-            ASSERT_EQUALS( 100000, client_->count( ns_, BSON( "a" << GTE << 1 ) ) );
+            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << GTE << 1 ) ) );
         }
         string ns_;
     };
@@ -569,7 +569,7 @@ namespace QueryTests {
             client_->ensureIndex( ns_, obj );
         }
         void run() {
-            ASSERT_EQUALS( 100000, client_->count( ns_, BSON( "a" << 1 ) ) );
+            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << 1 ) ) );
         }
         string ns_;
     };

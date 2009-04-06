@@ -10,7 +10,9 @@ namespace mongo {
 
 void writerThread();
 
-static int inited;
+#if defined(_RECSTORE)
+    static int inited;
+#endif
 
 // pick your store for indexes by setting this typedef
 // this doesn't need to be an ifdef, we can make it dynamic

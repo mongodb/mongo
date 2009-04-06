@@ -35,6 +35,8 @@ doTest = function( signal ) {
         assert.eq( 1, m.getDB( n ).a.find().count() );
     }    
 
+    sleep( 300 );
+    
     ports.forEach( function( x ) { stopMongod( x ); } );
 
 }
