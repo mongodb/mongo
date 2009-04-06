@@ -11,7 +11,6 @@
 #include <vector>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <errno.h>
 
 using namespace std;
 using namespace v8;

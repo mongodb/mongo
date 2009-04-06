@@ -24,6 +24,7 @@
 #include <time.h>
 #include "../util/goodies.h"
 #include <fcntl.h>
+#include <errno.h>
 
 namespace mongo {
 
@@ -74,7 +75,7 @@ namespace mongo {
                     log() << "Listener on port " << port << " aborted" << endl;
                     return;
                 }
-                log() << "Listener: accept() returns " << s << " errno:" << errno << endl;
+                log() << "Listener: accept() returns " << s << " errno:" << errno << ", strerror: " << strerror( errno ) << endl;
                 continue;
             }
             disableNagle(s);
