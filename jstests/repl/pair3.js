@@ -112,7 +112,10 @@ doTest1 = function() {
                 } );
 
     // reconnect
-    connect();
+    
+    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
+    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
+    // no arbiter yet, to ensure r becomes master.
     assert.soon( function() {
                 lm = ismaster( l );
                 rm = ismaster( r );
@@ -122,6 +125,8 @@ doTest1 = function() {
                 
                 return ( lm == 0 && rm == 1 );
                 } );
+    startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
+    startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
 
     // disconnect l ( slave )
 
@@ -170,8 +175,7 @@ doTest1 = function() {
                 return ( rm == -3 && lm == 1 );
                 } );
     
-    // reconnect r
-    startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
+    // reconnect r, without arbiter to prevent r becoming master.
     startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
     startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
     
@@ -179,8 +183,8 @@ doTest1 = function() {
                 lm = ismaster( l );
                 rm = ismaster( r );
                 
-                assert( rm == 0 || rm == -3, "lm value invalid" );
-                assert( lm == 1, "rm value invalid" );
+                assert( rm == 0 || rm == -3, "rm value invalid" );
+                assert( lm == 1, "lm value invalid" );
                 
                 return ( rm == 0 );
                 } );
