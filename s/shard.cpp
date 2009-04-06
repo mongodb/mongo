@@ -126,14 +126,8 @@ namespace mongo {
         log() << "moving shard ns: " << _ns << " moving shard: " << toString() << " " << _server << " -> " << to << endl;
         
         string from = _server;
-        
-        lockNamespaceOnServer( from , _ns );
+        ServerShardVersion oldVersion = _manager->getVersion( from );
 
-        // copyCollection
-        ScopedDbConnection toconn( to );
-        BSONObj cloneRes;
-        
-        
         BSONObj filter;
         {
             BSONObjBuilder b;
@@ -141,17 +135,20 @@ namespace mongo {
             filter = b.obj();
         }
         
-        bool worked = toconn->runCommand( _manager->_config->getName().c_str() , 
-                                          BSON( "cloneCollection" << _ns << 
-                                                "from" << from <<
-                                                "query" << filter
-                                                ) ,
-                                          cloneRes
-                                          );
+        ScopedDbConnection fromconn( from );
+
+        BSONObj startRes;
+        bool worked = fromconn->runCommand( "admin" ,
+                                            BSON( "moveshard.start" << _ns << 
+                                                  "from" << from <<
+                                                  "to" << to <<
+                                                  "filter" << filter
+                                                  ) ,
+                                            startRes
+                                            );
         
-        toconn.done();
         if ( ! worked ){
-            errmsg = (string)"cloneCollection failed: " + cloneRes.toString();
+            errmsg = (string)"moveshard.start failed: " + startRes.toString();
             return false;
         }
         
@@ -165,16 +162,29 @@ namespace mongo {
         
         _manager->save();
         
-        // delete old data
-        ScopedDbConnection fromconn( from );
-        fromconn->remove( _ns.c_str() , filter );
-        string removeerror = fromconn->getLastError();
-        fromconn.done();
-        if ( removeerror.size() ){
-            errmsg = (string)"error removing old data:" + removeerror;
+        BSONObj finishRes;
+        {
+
+            ServerShardVersion newVersion = _manager->getVersion( from );
+            uassert( "version has to be higher" , newVersion > oldVersion );
+
+            BSONObjBuilder b;
+            b << "moveshard.finish" << _ns;
+            b << "to" << to;
+            b.appendTimestamp( "newVersion" , newVersion );
+            b.append( startRes["finishToken"] );
+        
+            worked = fromconn->runCommand( "admin" ,
+                                           b.done() , 
+                                           finishRes );
+        }
+        
+        if ( ! worked ){
+            errmsg = (string)"moveshard.finish failed: " + finishRes.toString();
             return false;
         }
         
+        fromconn.done();
         return true;
     }
     
