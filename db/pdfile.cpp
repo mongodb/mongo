@@ -644,7 +644,9 @@ assert( !eloc.isNull() );
             if ( e.eoo() )
                 break;
 
-            if ( strlen( nameWithinArray ) != 0 ) {
+            if ( nameWithinArray[ 0 ] != '\0' ) {
+                if ( e.type() != Object )
+                    continue;
                 e = e.embeddedObject().getFieldDotted( nameWithinArray );
                 if ( e.eoo() )
                     continue;

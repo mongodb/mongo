@@ -381,6 +381,20 @@ namespace NamespaceTests {
             }
         };
 
+        class SubobjectMissing : public Base {
+        public:
+            void run() {
+                create();
+                BSONObjSetDefaultOrder keys;
+                id().getKeysFromObject( fromjson( "{a:[1,2]}" ), keys );
+                checkSize( 0, keys );
+            }
+        private:
+            virtual BSONObj key() const {
+                return aDotB();
+            }
+        };
+        
 // TODO
 // array subelement complex
 // parallel arrays complex
@@ -584,6 +598,7 @@ namespace NamespaceTests {
             add< IndexDetailsTests::ArraySubobjectSingleMissing >();
             add< IndexDetailsTests::ArraySubobjectMissing >();
             add< IndexDetailsTests::MissingField >();
+            add< IndexDetailsTests::SubobjectMissing >();
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
