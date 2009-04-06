@@ -30,6 +30,8 @@
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"
 
+#include "../client/connpool.h"
+
 using namespace std;
 
 namespace mongo {
@@ -40,6 +42,22 @@ namespace mongo {
     boost::thread_specific_ptr<NSVersions> clientShardVersions;
     string shardConfigServer;
 
+    unsigned long long getVersion( BSONElement e , string& errmsg ){
+        if ( e.eoo() ){
+            errmsg = "no version";
+            return 0;
+        }
+        
+        if ( e.isNumber() )
+            return (unsigned long long)e.number();
+        
+        if ( e.type() == Date || e.type() == Timestamp )
+            return e.date();
+
+        
+        errmsg = "version is not a numberic type";
+        return 0;
+    }
 
     class MongodShardCommand : public Command {
     public:
@@ -86,23 +104,9 @@ namespace mongo {
                 }
             }
             
-            unsigned long long version;
-            {
-                BSONElement e = cmdObj["version"];
-                if ( e.eoo() ){
-                    errmsg = "no version";
-                    return false;
-                }
-                else if ( e.isNumber() )
-                    version = (unsigned long long)e.number();
-                else if ( e.type() == Date || e.type() == Timestamp )
-                    version = e.date();
-                else {
-                    errmsg = "version is not a numberic type";
-                    return false;
-                }
-                
-            }
+            unsigned long long version = getVersion( cmdObj["version"] , errmsg );
+            if ( ! version )
+                return false;
 
             NSVersions * versions = clientShardVersions.get();
             
@@ -178,19 +182,69 @@ namespace mongo {
         }
         
     } getShardVersion;
-
+    
     class MoveShardStartCommand : public MongodShardCommand {
     public:
         MoveShardStartCommand() : MongodShardCommand( "moveshard.start" ){}
         virtual void help( stringstream& help ) const {
             help << "should not be calling this directly" << endl;
         }
-
+        
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-            // i assume i'm already locked
             // so i have to start clone, tell caller its ok to make change
+            // at this point the caller locks me, and updates config db
             // then finish calls finish, and then deletes data when cursors are done
-            return false;
+            
+            string ns = cmdObj["moveshard.start"].valuestrsafe();
+            string to = cmdObj["to"].valuestrsafe();
+            string from = cmdObj["from"].valuestrsafe(); // my public address, a tad redundant, but safe
+            BSONObj filter = cmdObj.getObjectField( "filter" );
+            
+            if ( ns.size() == 0 ){
+                errmsg = "need to specify namespace in command";
+                return false;
+            }
+            
+            if ( to.size() == 0 ){
+                errmsg = "need to specify server to move shard to";
+                return false;
+            }
+            if ( from.size() == 0 ){
+                errmsg = "need to specify server to move shard from (redundat i know)";
+                return false;
+            }
+            
+            if ( filter.isEmpty() ){
+                errmsg = "need to specify a filter";
+                return false;
+            }
+            
+            log() << "got moveshard.start: " << cmdObj << endl;
+            
+            
+            BSONObj res;
+            bool ok;
+            
+            {
+                dbtemprelease unlock;
+                
+                ScopedDbConnection conn( to );
+                ok = conn->runCommand( "admin" , 
+                                            BSON( "startCloneCollection" << ns <<
+                                                  "from" << from <<
+                                                  "query" << filter 
+                                                  ) , 
+                                            res );
+                conn.done();
+            }
+            
+            log() << "   moveshard.start res: " << res << endl;
+            
+            if ( ok ){
+                result.append( res["finishToken"] );
+            }
+
+            return ok;
         }
         
     } moveShardStartCmd;
@@ -201,10 +255,73 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "should not be calling this directly" << endl;
         }
-
+        
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             // see MoveShardStartCommand::run
-            return false;
+            
+            string ns = cmdObj["moveshard.finish"].valuestrsafe();
+            if ( ns.size() == 0 ){
+                errmsg = "need ns as cmd value";
+                return false;
+            }
+
+            string to = cmdObj["to"].valuestrsafe();
+            if ( to.size() == 0 ){
+                errmsg = "need to specify server to move shard to";
+                return false;
+            }
+
+
+            unsigned long long newVersion = getVersion( cmdObj["newVersion"] , errmsg );
+            if ( newVersion == 0 ){
+                errmsg = "have to specify new version number";
+                return false;
+            }
+                                                        
+            BSONObj finishToken = cmdObj.getObjectField( "finishToken" );
+            if ( finishToken.isEmpty() ){
+                errmsg = "need finishToken";
+                return false;
+            }
+            
+            if ( ns != finishToken["collection"].valuestrsafe() ){
+                errmsg = "namespaced don't match";
+                return false;
+            }
+            
+            // now we're locked
+            myVersions[ns] = newVersion;
+
+            BSONObj res;
+            bool ok;
+            
+            {
+                dbtemprelease unlock;
+                
+                ScopedDbConnection conn( to );
+                ok = conn->runCommand( "admin" , 
+                                       BSON( "finishCloneCollection" << finishToken ) ,
+                                       res );
+                conn.done();
+            }
+            
+            if ( ! ok ){
+                // uh oh
+                errmsg = "finishCloneCollection failed!";
+                result << "finishError" << res;
+                return false;
+            }
+            
+            // wait until cursors are clean
+            cerr << "WARNING: deleting data before ensuring no more cursors TODO" << endl;
+            
+            dbtemprelease unlock;
+
+            DBDirectClient client;
+            BSONObj removeFilter = finishToken.getObjectField( "query" );
+            client.remove( ns , removeFilter );
+
+            return true;
         }
         
     } moveShardFinishCmd;
