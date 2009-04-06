@@ -533,47 +533,6 @@ namespace QueryTests {
         auto_ptr< DBClientCursor > c_;        
     };
     
-    class Count {
-    public:
-        Count() : ns_( testNs( this ) ) {
-            BSONObj obj = BSON( "a" << 1 );
-            for( int i = 0; i < 100000; ++i )
-                client_->insert( ns_.c_str(), obj );
-        }
-        void run() {
-            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << 1 ) ) );
-        }
-        string ns_;
-    };
-
-    class CountIndex {
-    public:
-        CountIndex() : ns_( testNs( this ) ) {
-            BSONObj obj = BSON( "a" << 1 );
-            for( int i = 0; i < 100000; ++i )
-                client_->insert( ns_.c_str(), obj );
-            client_->ensureIndex( ns_, obj );
-        }
-        void run() {
-            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << GTE << 1 ) ) );
-        }
-        string ns_;
-    };
-
-    class CountSimpleIndex {
-    public:
-        CountSimpleIndex() : ns_( testNs( this ) ) {
-            BSONObj obj = BSON( "a" << 1 );
-            for( int i = 0; i < 100000; ++i )
-                client_->insert( ns_.c_str(), obj );
-            client_->ensureIndex( ns_, obj );
-        }
-        void run() {
-            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << 1 ) ) );
-        }
-        string ns_;
-    };
-    
     class All : public RunnerSuite {
     public:
         All() {
@@ -585,13 +544,65 @@ namespace QueryTests {
             add< GetMore >();
             add< GetMoreIndex >();
             add< GetMoreKeyMatchHelps >();
+        }
+    };    
+    
+} // namespace QueryTests
+
+namespace Count {
+
+    class Count {
+    public:
+        Count() : ns_( testNs( this ) ) {
+            BSONObj obj = BSON( "a" << 1 );
+            for( int i = 0; i < 100000; ++i )
+                client_->insert( ns_, obj );
+        }
+        void run() {
+            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << 1 ) ) );
+        }
+        string ns_;
+    };
+    
+    class CountIndex {
+    public:
+        CountIndex() : ns_( testNs( this ) ) {
+            BSONObj obj = BSON( "a" << 1 );
+            for( int i = 0; i < 100000; ++i )
+                client_->insert( ns_, obj );
+            client_->ensureIndex( ns_, obj );
+        }
+        void run() {
+            // 'simple' match does not work for numbers
+            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << 1 ) ) );
+        }
+        string ns_;
+    };
+    
+    class CountSimpleIndex {
+    public:
+        CountSimpleIndex() : ns_( testNs( this ) ) {
+            BSONObj obj = BSON( "a" << "b" );
+            for( int i = 0; i < 100000; ++i )
+                client_->insert( ns_, obj );
+            client_->ensureIndex( ns_, obj );
+        }
+        void run() {
+            ASSERT_EQUALS( 100000U, client_->count( ns_, BSON( "a" << "b" ) ) );
+        }
+        string ns_;
+    };
+    
+    class All : public RunnerSuite {
+    public:
+        All() {
             add< Count >();
             add< CountIndex >();
             add< CountSimpleIndex >();
         }
     };    
-    
-} // namespace QueryTests
+        
+} // namespace Count
 
 namespace Plan {
 
@@ -692,6 +703,7 @@ int main( int argc, char **argv ) {
     tests.add( suite< BSON::All >(), "bson" );
     tests.add( suite< Index::All >(), "index" );
     tests.add( suite< QueryTests::All >(), "query" );
+    tests.add( suite< Count::All >(), "count" );
     tests.add( suite< Plan::All >(), "plan" );
 
     return tests.run( argc, argv );    
