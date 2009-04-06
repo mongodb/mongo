@@ -642,6 +642,7 @@ namespace mongo {
         ss << "dbexit: " << why << endl;
         rawOut( ss.str() );
 
+#ifndef _WIN32
         {
             // close listener sockets
             // We would only hang here if a synchronous signal is received 
@@ -650,6 +651,7 @@ namespace mongo {
             for( vector< int >::iterator i = listenerSockets.begin(); i != listenerSockets.end(); ++i )
                 close( *i );
         }
+#endif
                 
         stringstream ss2;
         flushOpLog( ss2 );
