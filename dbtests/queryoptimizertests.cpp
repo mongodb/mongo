@@ -229,6 +229,15 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class Numeric {
+        public:
+            void run() {
+                FieldBoundSet f( "", BSON( "a" << 1 ) );
+                ASSERT( f.bound( "a" ).lower().woCompare( BSON( "a" << 2.0 ).firstElement() ) < 0 );
+                ASSERT( f.bound( "a" ).lower().woCompare( BSON( "a" << 0.0 ).firstElement() ) > 0 );
+            }
+        };
+        
     } // namespace FieldBoundTests
     
     namespace QueryPlanTests {
@@ -965,6 +974,7 @@ namespace QueryOptimizerTests {
             add< FieldBoundTests::SimplifiedQuery >();
             add< FieldBoundTests::QueryPatternTest >();
             add< FieldBoundTests::NoWhere >();
+            add< FieldBoundTests::Numeric >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();
