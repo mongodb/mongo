@@ -274,6 +274,8 @@ namespace mongo {
             return prettyKey( endKey );
         }
         
+        void forgetEndKey() { endKey = BSONObj(); }
+        
     private:
         /* Our btrees may (rarely) have "unused" keys when items are deleted.
            Skip past them.

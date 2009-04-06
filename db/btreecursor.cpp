@@ -82,9 +82,11 @@ namespace mongo {
     void BtreeCursor::checkEnd() {
         if ( bucket.isNull() )
             return;
-        int cmp = sgn( endKey.woCompare( currKey(), order ) );
-        if ( cmp != 0 && cmp != direction )
-            bucket = DiskLoc();
+        if ( !endKey.isEmpty() ) {
+            int cmp = sgn( endKey.woCompare( currKey(), order ) );
+            if ( cmp != 0 && cmp != direction )
+                bucket = DiskLoc();
+        }
     }
 
     bool BtreeCursor::advance() {

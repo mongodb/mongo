@@ -857,10 +857,13 @@ namespace mongo {
             query_ = spec_.getObjectField( "query" );
             spec_.getObjectField( "fields" ).getFieldNames( fields_ );
             c_ = qp().newCursor();
-            if ( qp().exactKeyMatch() && fields_.empty() )
+            if ( qp().exactKeyMatch() && fields_.empty() ) {
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
-            else
+                bc_->forgetEndKey();
+            }
+            else {
                 matcher_.reset( new JSMatcher( query_ ) );
+            }
         }
         virtual void next() {
             if ( !c_->ok() ) {
