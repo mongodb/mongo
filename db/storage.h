@@ -37,7 +37,7 @@ namespace mongo {
         int fileNo; /* this will be volume, file #, etc. */
         int ofs;
     public:
-        enum { MaxFiles=4000, NullOfs = -1 };
+        enum SentinelValues { MaxFiles=4000, NullOfs = -1 };
 
         int a() const {
             return fileNo;

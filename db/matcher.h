@@ -79,7 +79,7 @@ namespace mongo {
             }
         };
     public:
-        enum {
+        enum MatchType {
             Equality = 0,
             LT = 0x1,
             LTE = 0x3,

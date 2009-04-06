@@ -50,7 +50,7 @@ public:
 
 #if 0
 class InMem_RecStore : public RecStoreInterface { 
-    enum { INMEMFILE = 0x70000000 };
+    enum InmemfileValue { INMEMFILE = 0x70000000 };
 public:
     static char* get(DiskLoc d, unsigned len) { 
         assert( d.a() == INMEMFILE );

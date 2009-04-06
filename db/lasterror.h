@@ -25,7 +25,7 @@ namespace mongo {
     
     struct LastError {
         string msg;
-        enum { NotUpdate, True, False } updatedExisting;
+        enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
         int nObjects;
         int nPrev;
         bool valid;

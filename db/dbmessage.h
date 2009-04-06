@@ -37,7 +37,7 @@ namespace mongo {
     
 #pragma pack(1)
     struct QueryResult : public MsgData {
-        enum {
+        enum ResultFlagType {
             ResultFlag_CursorNotFound = 1, /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
             ResultFlag_ErrSet = 2          /* { $err : ... } is being returned */
         };

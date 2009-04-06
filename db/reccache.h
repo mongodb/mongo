@@ -43,7 +43,7 @@ class RecCache {
     map<string, BasicRecStore*> storesByNsKey; // nskey -> BasicRecStore*
 public:
     static unsigned MAXNODES;
-    enum { Base = 10000 };
+    enum BaseValue { Base = 10000 };
 private:
     BasicRecStore* _initStore(string fname);
     BasicRecStore* initStore(int n);

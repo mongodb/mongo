@@ -39,7 +39,7 @@ namespace mongo {
 
     class ReplPair {
     public:
-        enum {
+        enum ReplState {
             State_CantArb = -3,
             State_Confused = -2,
             State_Negotiating = -1,

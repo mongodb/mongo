@@ -148,7 +148,7 @@ namespace mongo {
     */
     class Record {
     public:
-        enum { HeaderSize = 16 };
+        enum HeaderSizeValue { HeaderSize = 16 };
         int lengthWithHeaders;
         int extentOfs;
         int nextOfs;

@@ -73,7 +73,7 @@ namespace mongo {
 
     class Namespace {
     public:
-        enum { MaxNsLen = 128 };
+        enum MaxNsLenValue { MaxNsLen = 128 };
         Namespace(const char *ns) {
             *this = ns;
         }
@@ -242,7 +242,7 @@ namespace mongo {
         DiskLoc capFirstNewRecord;
         char reserved[108];
 
-        enum {
+        enum NamespaceFlags {
             Flag_HaveIdIndex = 1 << 0, // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
             Flag_CappedDisallowDelete = 1 << 1 // set when deletes not allowed during capped table allocation.
         };
