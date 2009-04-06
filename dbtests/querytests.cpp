@@ -317,7 +317,7 @@ namespace QueryTests {
             count( 2 );
         }
     private:
-        void count( int c ) const {
+        void count( unsigned long long c ) const {
             ASSERT_EQUALS( c, client().count( "querytests.BasicCount", BSON( "a" << 4 ) ) );
         }
     };
