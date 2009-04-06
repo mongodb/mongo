@@ -55,8 +55,9 @@ namespace mongo {
             case JSMatcher::GTE:
                 lower_ = e;
                 break;
-            case JSMatcher::opIN: {
-                massert( "$in requires array", e.type() == Array );
+            case JSMatcher::opIN:
+            case JSMatcher::opALL: {
+                massert( "$in/$all require array", e.type() == Array );
                 BSONElement max = minKey.firstElement();
                 BSONElement min = maxKey.firstElement();
                 BSONObjIterator i( e.embeddedObject() );

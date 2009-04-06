@@ -71,6 +71,7 @@ namespace MatcherTests {
             ASSERT( m.matches( fromjson( "{a:[1,2,3,4]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3,'a','b']}" ) ) );
+            ASSERT( !m.matches( fromjson( "{a:[[1,2,3,4]]}" ) ) );
         }        
     };
     

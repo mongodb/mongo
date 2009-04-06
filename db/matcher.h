@@ -87,7 +87,8 @@ namespace mongo {
             GT = 0x4,
             opIN = 0x8, // { x : { $in : [1,2,3] } }
             NE = 0x9,
-            opSIZE = 0x10
+            opSIZE = 0x0A,
+            opALL = 0x0B,
         };
 
         static int opDirection(int op) {
@@ -109,6 +110,7 @@ namespace mongo {
         }
 
         bool trivial() const { return n == 0 && nRegex == 0 && where == 0; }
+        bool keyMatch() const { return !all && !haveSize; }
     private:
         void addBasic(const BSONElement &e, int c) {
             // TODO May want to selectively ignore these element types based on op type.
@@ -121,15 +123,17 @@ namespace mongo {
             n++;
         }
 
-        int valuesMatch(const BSONElement& l, const BSONElement& r, int op);
+        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep=0);
 
         set<BSONElement,element_lt> *in; // set if query uses $in
+        set<BSONElement,element_lt> *all; // set if query uses $all
         Where *where;                    // set if query uses $where
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
         BSONObj constrainIndexKey_;
         
         vector<BasicMatcher> basics;
         int n;                           // # of basicmatcher items
+        bool haveSize;
 
         RegexMatcher regexs[4];
         int nRegex;

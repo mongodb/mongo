@@ -105,6 +105,7 @@ namespace mongo {
         for ( int i = 0; i < nBuilders; i++ )
             delete builders[i];
         delete in;
+        delete all;
         delete where;
     }
 
@@ -120,8 +121,15 @@ namespace mongo {
     }
     
     bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
-        if ( !keyMatcher_.matches(key, deep) )
-            return false;
+        if ( keyMatcher_.keyMatch() ) {
+            if ( !keyMatcher_.matches(key, deep) ) {
+                return false;
+            }
+        } else {
+            if ( !keyMatcher_.matches(recLoc.rec(), deep) ) {
+                return false;
+            }            
+        }
         if ( recordMatcher_.trivial() )
             return true;
         return recordMatcher_.matches(recLoc.rec(), deep);
@@ -131,7 +139,7 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-            in(0), where(0), jsobj(_jsobj), constrainIndexKey_(constrainIndexKey), nRegex(0)
+            in(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
     {
         nBuilders = 0;
         BSONObjIterator i(jsobj);
@@ -258,12 +266,28 @@ namespace mongo {
                             addBasic(e, opIN); // e not actually used at the moment for $in
                             ok = true;
                         }
-                        else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' ) {
-                            uassert( "$size must be a number", fe.isNumber() );
+                        else if ( fn[1] == 'a' && fn[2] == 'l' && fn[3] == 'l' && fn[4] == 0 && fe.type() == Array ) {
+                            // $all
+                            uassert( "only 1 $all statement per query supported", all == 0 ); // todo...
+                            all = new set<BSONElement,element_lt>();
+                            BSONObjIterator i(fe.embeddedObject());
+                            if ( i.more() ) {
+                                while ( 1 ) {
+                                    BSONElement ie = i.next();
+                                    if ( ie.eoo() )
+                                        break;
+                                    all->insert(ie);
+                                }
+                            }
+                            addBasic(e, opALL); // e not actually used at the moment for $all
+                            ok = true;
+                        }
+                        else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fe.isNumber() ) {
                             BSONObjBuilder *b = new BSONObjBuilder();
                             builders[nBuilders++] = b;
                             b->appendAs(fe, e.fieldName());
-                            addBasic(b->done().firstElement(), opSIZE);                            
+                            addBasic(b->done().firstElement(), opSIZE);    
+                            haveSize = true;
                             ok = true;
                         }
                         else
@@ -281,9 +305,12 @@ namespace mongo {
             // normal, simple case e.g. { a : "foo" }
             addBasic(e, Equality);
         }
+        
+        if ( keyMatch() )
+            constrainIndexKey_ = constrainIndexKey;
     }
 
-    inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op) {
+    inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep) {
         if ( op == 0 )
             return l.valuesEqual(r);
 
@@ -309,6 +336,26 @@ namespace mongo {
                 ++count;
             }
             return count == r.number();
+        }
+        
+        if ( op == opALL ) {
+            if ( l.type() != Array )
+                return 0;
+            set< BSONElement, element_lt > matches;
+            BSONObjIterator i( l.embeddedObject() );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                if ( all->count( e ) )
+                    matches.insert( e );
+            }
+            if ( all->size() == matches.size() ) {
+                if ( deep )
+                    *deep = true;
+                return true;
+            }
+            return false;
         }
         
         /* check LT, GTE, ... */
@@ -364,10 +411,10 @@ namespace mongo {
             }
         }
         
-        if ( valuesMatch(e, toMatch, compareOp) ) {
+        if ( valuesMatch(e, toMatch, compareOp, deep) ) {
             return 1;
         }
-        else if ( e.type() == Array ) {
+        else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.more() ) {
                 BSONElement z = ai.next();
