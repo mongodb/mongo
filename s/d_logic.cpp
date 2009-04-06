@@ -291,7 +291,13 @@ namespace mongo {
             
             // now we're locked
             myVersions[ns] = newVersion;
-
+            NSVersions * versions = clientShardVersions.get();
+            if ( ! versions ){
+                versions = new NSVersions();
+                clientShardVersions.reset( versions );
+            }
+            (*versions)[ns] = newVersion;
+            
             BSONObj res;
             bool ok;
             
