@@ -115,25 +115,25 @@ namespace mongo {
 
 namespace mongo {
     
-    KeyValJSMatcher::KeyValJSMatcher(const BSONObj &_jsobj, const BSONObj &indexKeyPattern) :
-    keyMatcher_(_jsobj.filterFieldsUndotted(indexKeyPattern, true), indexKeyPattern),
-    recordMatcher_(_jsobj.filterFieldsUndotted(indexKeyPattern, false)) {
-    }
-    
-    bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
-        if ( keyMatcher_.keyMatch() ) {
-            if ( !keyMatcher_.matches(key, deep) ) {
-                return false;
-            }
-        } else {
-            if ( !keyMatcher_.matches(recLoc.rec(), deep) ) {
-                return false;
-            }            
-        }
-        if ( recordMatcher_.trivial() )
-            return true;
-        return recordMatcher_.matches(recLoc.rec(), deep);
-    }
+//    KeyValJSMatcher::KeyValJSMatcher(const BSONObj &_jsobj, const BSONObj &indexKeyPattern) :
+//    keyMatcher_(_jsobj.filterFieldsUndotted(indexKeyPattern, true), indexKeyPattern),
+//    recordMatcher_(_jsobj.filterFieldsUndotted(indexKeyPattern, false)) {
+//    }
+//    
+//    bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
+//        if ( keyMatcher_.keyMatch() ) {
+//            if ( !keyMatcher_.matches(key, deep) ) {
+//                return false;
+//            }
+//        } else {
+//            if ( !keyMatcher_.matches(recLoc.rec(), deep) ) {
+//                return false;
+//            }            
+//        }
+//        if ( recordMatcher_.trivial() )
+//            return true;
+//        return recordMatcher_.matches(recLoc.rec(), deep);
+//    }
     
     
     /* _jsobj          - the query pattern

@@ -44,7 +44,7 @@ namespace mongo {
         ~ClientCursor();
         const CursorId cursorid;
         string ns;
-        auto_ptr<KeyValJSMatcher> matcher;
+        auto_ptr<JSMatcher> matcher;
         auto_ptr<Cursor> c;
         int pos; /* # objects into the cursor so far */
         DiskLoc lastLoc() const {
