@@ -9,8 +9,11 @@
 #include <map>
 #include <sstream>
 #include <vector>
+
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
+#endif
 
 using namespace std;
 using namespace v8;
@@ -545,6 +548,7 @@ Handle< Value > ThreadInject( const Arguments &args ) {
     return v8::Undefined();    
 }
 
+#ifndef _WIN32
 Handle< Value > AllocatePorts( const Arguments &args ) {
     jsassert( args.Length() == 1 , "allocatePorts takes exactly 1 argument" );
     jsassert( args[0]->IsInt32() , "allocatePorts needs to be passed an integer" );
@@ -578,6 +582,7 @@ Handle< Value > AllocatePorts( const Arguments &args ) {
     
     return ret;
 }
+#endif
 
 void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("sleep"), v8::FunctionTemplate::New(JSSleep));
@@ -587,8 +592,8 @@ void installShellUtils( Handle<v8::ObjectTemplate>& global ){
     global->Set(v8::String::New("quit"), v8::FunctionTemplate::New(Quit));
     global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
     global->Set(v8::String::New("threadInject"), v8::FunctionTemplate::New(ThreadInject));
-    global->Set(v8::String::New("allocatePorts"), v8::FunctionTemplate::New(AllocatePorts));
 #if !defined(_WIN32)
+    global->Set(v8::String::New("allocatePorts"), v8::FunctionTemplate::New(AllocatePorts));
     global->Set(v8::String::New("_startMongoProgram"), v8::FunctionTemplate::New(StartMongoProgram));
     global->Set(v8::String::New("stopMongod"), v8::FunctionTemplate::New(StopMongoProgram));
     global->Set(v8::String::New("stopMongoProgram"), v8::FunctionTemplate::New(StopMongoProgram));

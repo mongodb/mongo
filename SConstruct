@@ -439,7 +439,10 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         return False
 
     if shell:
-        myCheckLib( "v8" , True )
+        if windows:
+            myenv.Append( LIBS=["v8"] )
+        else:
+            myCheckLib( "v8" , True )
 
     if needPcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
         print( "can't find pcre" )
