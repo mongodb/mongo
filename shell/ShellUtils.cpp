@@ -179,7 +179,6 @@ bool ExecuteString(Handle<v8::String> source, Handle<v8::Value> name,
 }
 
 void sleepms( int ms ) {
-    cout << "TEMP sleeping " << ms << "ms" << endl;
     boost::xtime xt;
     boost::xtime_get(&xt, boost::TIME_UTC);
     xt.sec += ( ms / 1000 );
@@ -478,24 +477,23 @@ void killDb( int port, int signal ) {
     int i = 0;
     for( ; i < 65; ++i ) {
         if ( i == 5 ) {
-            cout << "process on port " << port << "not terminated, sending sigkill" << endl;
+            cout << "process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
             assert( 0 == kill( pid, SIGKILL ) );
         }        
         int temp;
         int ret = waitpid( pid, &temp, WNOHANG );
-        cout << "waitpid returns: " << ret << ", errno: " << errno << ", strerror: " << strerror( errno ) << endl;
         if ( ret == pid )
             break;
-        cout << "waiting for process on port " << port << " to terminate" << endl;
         sleepms( 1000 );
     }
-    if ( i == 65 )
+    if ( i == 65 ) {
+        cout << "failed to terminate process on port " << port << ", with pid " << pid << endl;
         assert( "Failed to terminate process" == 0 );
+    }
 
     close( dbs[ port ].second );
     dbs.erase( port );
     if ( i > 4 || signal == SIGKILL ) {
-        cout << "sleeping after sigkill" << endl;
         sleepms( 4000 ); // allow operating system to reclaim resources
     }
 }
