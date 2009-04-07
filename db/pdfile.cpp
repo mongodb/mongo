@@ -1144,7 +1144,9 @@ assert( !eloc.isNull() );
                Note that btree buckets which we insert aren't BSONObj's, but in that case god==true.
             */
             BSONObj io((const char *) obuf);
-            if( !io.hasField("_id") && !addIndex && strstr(ns, ".local.") == 0 ) {
+            BSONElement idField = io.getField( "_id" );
+            uassert( "_id cannot not be an array", idField.type() != Array );
+            if( idField.eoo() && !addIndex && strstr(ns, ".local.") == 0 ) {
                 addID = len;
                 if ( writeId.eoo() ) {
                     // Very likely we'll add this elt, so little harm in init'ing here.
