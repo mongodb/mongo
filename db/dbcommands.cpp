@@ -605,6 +605,49 @@ namespace mongo {
         }
     } cmdCreate;
 
+    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder ) {
+        
+        d->aboutToDeleteAnIndex();
+        
+        /* there may be pointers pointing at keys in the btree(s).  kill them. */
+        ClientCursor::invalidate(ns);
+        
+        // delete a specific index or all?
+        if ( *name == '*' && name[1] == 0 ) {
+            log() << "  d->nIndexes was " << d->nIndexes << '\n';
+            anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
+            anObjBuilder.append("msg", "all indexes deleted for collection");
+            if( d->nIndexes ) { 
+                for ( int i = 0; i < d->nIndexes; i++ )
+                    d->indexes[i].kill();
+                d->nIndexes = 0;
+            }
+        }
+        else {
+            // delete just one index
+            int x = d->findIndexByName(name);
+            if ( x >= 0 ) {
+                out() << "  d->nIndexes was " << d->nIndexes << endl;
+                anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
+                
+                /* note it is  important we remove the IndexDetails with this
+                 call, otherwise, on recreate, the old one would be reused, and its
+                 IndexDetails::info ptr would be bad info.
+                 */
+                d->indexes[x].kill();
+                
+                d->nIndexes--;
+                for ( int i = x; i < d->nIndexes; i++ )
+                    d->indexes[i] = d->indexes[i+1];
+            } else {
+                log() << "deleteIndexes: " << name << " not found" << endl;
+                errmsg = "index not found";
+                return false;
+            }
+        }
+        return true;
+    }
+    
     class CmdDeleteIndexes : public Command {
     public:
         virtual bool logTheOp() {
@@ -623,56 +666,18 @@ namespace mongo {
                 log() << "CMD: deleteIndexes " << toDeleteNs << endl;
             if ( d ) {
                 BSONElement f = jsobj.findElement("index");
-                if ( !f.eoo() ) {
-
-                    d->aboutToDeleteAnIndex();
-
-                    /* there may be pointers pointing at keys in the btree(s).  kill them. */
-                    ClientCursor::invalidate(toDeleteNs.c_str());
-
-                    // delete a specific index or all?
-                    if ( f.type() == String ) {
-                        const char *idxName = f.valuestr();
-                        if ( *idxName == '*' && idxName[1] == 0 ) {
-                            log() << "  d->nIndexes was " << d->nIndexes << '\n';
-                            anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
-                            anObjBuilder.append("msg", "all indexes deleted for collection");
-                            if( d->nIndexes ) { 
-                                for ( int i = 0; i < d->nIndexes; i++ )
-                                    d->indexes[i].kill();
-                                d->nIndexes = 0;
-                            }
-                        }
-                        else {
-                            // delete just one index
-                            int x = d->findIndexByName(idxName);
-                            if ( x >= 0 ) {
-                                out() << "  d->nIndexes was " << d->nIndexes << endl;
-                                anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
-
-                                /* note it is  important we remove the IndexDetails with this
-                                call, otherwise, on recreate, the old one would be reused, and its
-                                IndexDetails::info ptr would be bad info.
-                                */
-                                d->indexes[x].kill();
-
-                                d->nIndexes--;
-                                for ( int i = x; i < d->nIndexes; i++ )
-                                    d->indexes[i] = d->indexes[i+1];
-                            } else {
-                                log() << "deleteIndexes: " << idxName << " not found" << endl;
-                                errmsg = "index not found";
-                                return false;
-                            }
-                        }
-                    }
+                if ( f.type() == String ) {
+                    return deleteIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder );
+                }
+                else {
+                    errmsg = "invalid index name spec";
+                    return false;
                 }
             }
             else {
                 errmsg = "ns not found";
                 return false;
             }
-            return true;
         }
     } cmdDeleteIndexes;
     
