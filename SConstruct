@@ -729,6 +729,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeRecovery", [ "mongo", "mongod" ], [ jsDirTestSpec( "recovery" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "perf", "*.js" ] ) ] )
+    addSmoketest( "smokeQuota", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "quota", "*.js" ] ) ] )
 
 mongodForTests = None
 
@@ -767,7 +768,7 @@ testEnv.Alias( "startMongod", ["mongod"], [startMongodForTests] );
 testEnv.AlwaysBuild( "startMongod" );
 
 def addMongodReqTargets( env, target, source ):
-    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeJsPerf" ]
+    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeJsPerf", "smokeQuota" ]
     for target in mongodReqTargets:
         testEnv.Depends( target, "startMongod" )
         testEnv.Depends( "smokeAll", target )
