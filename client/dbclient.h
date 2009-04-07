@@ -359,7 +359,6 @@ namespace mongo {
 
             BSONObj info;
             
-            runCommand( db.c_str() , BSON( "deleteIndexes" << coll << "index" << "*" ) , info );
             return runCommand( db.c_str() , BSON( "drop" << coll ) , info );
         }
 
