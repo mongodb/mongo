@@ -91,7 +91,7 @@ startMongoProgram = function(){
     return m;
 }
 
-ShardingTest = function( testName , numServers , verboseLevel ){
+ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
     this._connections = [];
     this._serverNames = [];
 
@@ -104,8 +104,19 @@ ShardingTest = function( testName , numServers , verboseLevel ){
     }
 
     this._configDB = "localhost:30000";
-    this.s = startMongos( { port : 39999 , v : verboseLevel || 0 , configdb : this._configDB } );
     
+
+    this._mongos = [];
+    var startMongosPort = 39999;
+    for ( var i=0; i<(numMongos||1); i++ ){
+        var myPort =  startMongosPort - i;
+        var conn = startMongos( { port : startMongosPort - i , v : verboseLevel || 0 , configdb : this._configDB }  );
+        conn.name = "localhost:" + myPort;
+        this._mongos.push( conn );
+        if ( i == 0 )
+            this.s = conn;
+    }
+
     var admin = this.admin = this.s.getDB( "admin" );
     this.config = this.s.getDB( "config" );
     
