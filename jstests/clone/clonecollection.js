@@ -10,19 +10,19 @@ for( i = 0; i < 1000; ++i ) {
 }
 assert.eq( 1000, f.a.find().count() );
 
-assert.eq( 1, t.cloneCollection( "localhost:27018", "a" ).ok );
+assert.commandWorked( t.cloneCollection( "localhost:27018", "a" ) );
 assert.eq( 1000, t.a.find().count() );
 
 t.a.drop();
 
-assert.eq( 1, t.cloneCollection( "localhost:27018", "a", { i: { $gte: 10, $lt: 20 } } ).ok );
+assert.commandWorked( t.cloneCollection( "localhost:27018", "a", { i: { $gte: 10, $lt: 20 } } ) );
 assert.eq( 10, t.a.find().count() );
 
 t.a.drop();
 assert.eq( 0, t.system.indexes.find().count() );
 
 f.a.ensureIndex( { i: 1 } );
-assert.eq( 1, t.cloneCollection( "localhost:27018", "a" ).ok );
+assert.commandWorked( t.cloneCollection( "localhost:27018", "a" ) );
 assert.eq( 1, t.system.indexes.find().count() );
 // Verify index works
 assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().startKey.i );
@@ -38,7 +38,7 @@ for( i = 0; i < 100000; ++i ) {
 }
 
 finished = false;
-cc = fork( function() { assert.eq( 1, t.cloneCollection( "localhost:27018", "a", {i:{$gte:0}} ).ok ); finished = true; } );
+cc = fork( function() { assert.commandWorked( t.cloneCollection( "localhost:27018", "a", {i:{$gte:0}} ) ); finished = true; } );
 cc.start();
 
 sleep( 200 );
@@ -65,7 +65,7 @@ for( i = 0; i < 100000; ++i ) {
     f.a.save( { i: i } );
 }
 
-cc = fork( function() { assert.eq( 0, t.runCommand( { cloneCollection:"jstests_clonecollection.a", from:"localhost:27018", logSizeMb:1 } ).ok ); } );
+cc = fork( function() { assert.commandFailed( t.runCommand( { cloneCollection:"jstests_clonecollection.a", from:"localhost:27018", logSizeMb:1 } ) ); } );
 cc.start();
 
 sleep( 200 );
@@ -84,7 +84,7 @@ for( i = 0; i < 100000; ++i ) {
     f.a.save( { i: i } );
 }
 
-cc = fork( function() { assert.eq( 1, t.cloneCollection( "localhost:27018", "a" ).ok ); } );
+cc = fork( function() { assert.commandWorked( t.cloneCollection( "localhost:27018", "a" ) ); } );
 cc.start();
 
 sleep( 200 );
@@ -109,8 +109,8 @@ cc.start();
 sleep( 200 );
 f.a.save( { i: -1 } );
 
-ret = cc.returnData();
-assert.eq( 1, ret.ok );
+ret = cc.returnData()
+assert.commandWorked( ret );
 assert.eq( 100001, t.a.find().count() );
 
 f.a.save( { i: -2 } );
@@ -119,5 +119,5 @@ finishToken = ret.finishToken;
 // Date elements.  Date( 0 ) will correspond to a cursorId value of 0, which
 // makes the db start scanning from the beginning of the collection.
 finishToken.cursorId = new Date( 0 );
-assert.eq( 1, t.runCommand( {finishCloneCollection:finishToken} ).ok );
+assert.commandWorked( t.runCommand( {finishCloneCollection:finishToken} ) );
 assert.eq( 100002, t.a.find().count() );
