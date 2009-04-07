@@ -455,10 +455,26 @@ namespace mongo {
                 return -1;
             return l.date() == r.date() ? 0 : 1;
         case NumberInt:
-        case NumberDouble:
-            x = l.number() - r.number();
+        case NumberDouble: {
+            double left = l.number();
+            double right = r.number();
+            bool lNan = !( left <= numeric_limits< double >::max() &&
+                         left >= -numeric_limits< double >::max() );
+            bool rNan = !( right <= numeric_limits< double >::max() &&
+                         right >= -numeric_limits< double >::max() );
+            if ( lNan ) {
+                if ( rNan ) {
+                    return 0;
+                } else {
+                    return -1;
+                }
+            } else if ( rNan ) {
+                return 1;
+            }
+            x = left - right;
             if ( x < 0 ) return -1;
             return x == 0 ? 0 : 1;
+            }
         case jstOID:
             return memcmp(l.value(), r.value(), 12);
         case Code:

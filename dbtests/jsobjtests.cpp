@@ -175,6 +175,31 @@ namespace JsobjTests {
             }
         };
         
+        class Nan : public Base {
+        public:
+            void run() {
+                double inf = numeric_limits< double >::infinity();
+                double nan = numeric_limits< double >::quiet_NaN();
+                double nan2 = numeric_limits< double >::signaling_NaN();
+                
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << inf ) ) == 0 );
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << 1 ) ) < 0 );
+                ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << inf ) ) > 0 );
+                
+                ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << nan ) ) == 0 );
+                ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << 1 ) ) < 0 );
+                ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << nan ) ) > 0 );
+
+                ASSERT( BSON( "a" << nan2 ).woCompare( BSON( "a" << nan2 ) ) == 0 );
+                ASSERT( BSON( "a" << nan2 ).woCompare( BSON( "a" << 1 ) ) < 0 );
+                ASSERT( BSON( "a" << 1 ).woCompare( BSON( "a" << nan2 ) ) > 0 );
+                
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan ) ) == 0 );
+                ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << nan2 ) ) == 0 );
+                ASSERT( BSON( "a" << nan ).woCompare( BSON( "a" << nan2 ) ) == 0 );
+            }
+        };
+        
         namespace Validation {
             
             class Base {
@@ -619,6 +644,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareDifferentLength >();
             add< BSONObjTests::WoSortOrder >();
             add< BSONObjTests::TimestampTest >();
+            add< BSONObjTests::Nan >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();
