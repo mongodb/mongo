@@ -528,5 +528,93 @@ namespace mongo {
             return res;
         }
     } cmdcopydb;
+    
+    class CmdRenameCollection : public Command {
+    public:
+        CmdRenameCollection() : Command( "renameCollection" ) {}
+        virtual bool adminOnly() {
+            return true;
+        }
+        virtual bool slaveOk() {
+            return false;
+        }
+        virtual void help( stringstream &help ) const {
+            help << " example: { renameCollection: foo.a, to: bar.b }";
+        }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            string source = cmdObj.getStringField( name.c_str() );
+            string target = cmdObj.getStringField( "to" );
+            if ( source.empty() || target.empty() ) {
+                errmsg = "invalid command syntax";
+                return false;
+            }
+            
+            DBDirectClient bridge;
+            {
+                dbtemprelease t;
+                if ( !bridge.findOne( target, BSONObj() ).isEmpty() ) {
+                    errmsg = "target namespace not empty";
+                    return false;                    
+                }
+            }
+
+            auto_ptr< DBClientCursor > c;
+            setClient( target.c_str() );
+            {
+                dbtemprelease t;
+                c = bridge.query( source, BSONObj() );
+            }
+            while( 1 ) {
+                {
+                    dbtemprelease t;
+                    if ( !c->more() )
+                        break;
+                }
+                BSONObj o = c->next();
+                theDataFileMgr.insert( target.c_str(), o );
+            }
+            
+            char cl[256];
+            nsToClient( source.c_str(), cl );
+            string sourceIndexes = string( cl ) + ".system.indexes";
+            nsToClient( target.c_str(), cl );
+            string targetIndexes = string( cl ) + ".system.indexes";
+            {
+                dbtemprelease t;
+                c = bridge.query( sourceIndexes, QUERY( "ns" << source ) );
+            }
+            while( 1 ) {
+                {
+                    dbtemprelease t;
+                    if ( !c->more() )
+                        break;
+                }
+                BSONObj o = c->next();
+                BSONObjBuilder b;
+                BSONObjIterator i( o );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    if ( strcmp( e.fieldName(), "ns" ) == 0 ) {
+                        b.append( "ns", target );
+                    } else {
+                        b.append( e );
+                    }
+                }
+                BSONObj n = b.done();
+                theDataFileMgr.insert( targetIndexes.c_str(), n );
+            }
+            
+            {
+                dbtemprelease t;
+                if ( !bridge.dropCollection( source ) ) {
+                    errmsg = "failed to drop old name collection";
+                    return false;
+                }
+            }
+            return true;
+        }
+    } cmdrenamecollection;
 
 } // namespace mongo
