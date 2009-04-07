@@ -23,7 +23,7 @@ assert.eq( 3 , s._connections[0].getDB( "test" ).foo.find().toArray().length +
            s._connections[1].getDB( "test" ).foo.find().toArray().length  , "blah 3" );
 
 assert.eq( 3 , s.getDB( "test" ).foo.find().toArray().length , "normal B" );
-print( "HI" );
+
 assert.eq( 3 , s2.getDB( "test" ).foo.find().toArray().length , "other B" );
 
 
