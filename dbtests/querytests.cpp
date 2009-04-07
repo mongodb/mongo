@@ -322,6 +322,20 @@ namespace QueryTests {
         }
     };
     
+    class ArrayId : public ClientBase {
+    public:
+        ~ArrayId() {
+            client().dropCollection( "querytests.ArrayId" );
+        }
+        void run() {
+            const char *ns = "querytests.ArrayId";
+            client().ensureIndex( ns, BSON( "_id" << 1 ) );
+            ASSERT( !error() );
+            client().insert( ns, fromjson( "{'_id':[1,2]}" ) );
+            ASSERT( error() );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -338,6 +352,7 @@ namespace QueryTests {
             add< TailableDelete >();
             add< TailableInsertDelete >();
             add< OplogReplayMode >();
+            add< ArrayId >();
         }
     };
     

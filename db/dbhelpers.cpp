@@ -60,14 +60,14 @@ namespace mongo {
             if ( !c_->ok() )
                 setComplete();
             else
-                matcher_.reset( new JSMatcher( qp().query() ) );
+                matcher_.reset( new KeyValJSMatcher( qp().query(), qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
                 setComplete();
                 return;
             }
-            if ( matcher_->matches( c_->currLoc().rec() ) ) {
+            if ( matcher_->matches( c_->currKey(), c_->currLoc() ) ) {
                 one_ = c_->current();
                 setComplete();
             } else {
@@ -80,7 +80,7 @@ namespace mongo {
     private:
         bool requireIndex_;
         auto_ptr< Cursor > c_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
         BSONObj one_;
     };
     

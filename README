@@ -22,6 +22,8 @@ BUILDING
     $ cd v8
     $ scons libv8.a
 
+- Pre-requisite for 'test' binary, the MongoDB unit test suite:
+
   To compile the unit tests, you need to install the unit test framework from:
      http://unittest.red-bean.com/
 

@@ -143,15 +143,15 @@ namespace mongo {
         int nBuilders;
     };
     
-//    // If match succeeds on index key, then attempt to match full record.
-//    class KeyValJSMatcher : boost::noncopyable {
-//    public:
-//        KeyValJSMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
-//        bool matches(const BSONObj &j, bool *deep = 0);
-//        bool matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep = 0);
-//    private:
-//        JSMatcher keyMatcher_;
-//        JSMatcher recordMatcher_;
-//    };
+    // If match succeeds on index key, then attempt to match full record.
+    class KeyValJSMatcher : boost::noncopyable {
+    public:
+        KeyValJSMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
+        bool matches(const BSONObj &j, bool *deep = 0);
+        bool matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep = 0);
+    private:
+        JSMatcher keyMatcher_;
+        JSMatcher recordMatcher_;
+    };
 
 } // namespace mongo

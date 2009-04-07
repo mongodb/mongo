@@ -467,6 +467,16 @@ v8::Handle< v8::Value > ResetDbpath( const v8::Arguments &a ) {
     return v8::Undefined();
 }
 
+inline void time_t_to_String(time_t t, char *buf) {
+#if defined(_WIN32)
+    ctime_s(buf, 64, &t);
+#else
+    ctime_r(&t, buf);
+#endif
+    buf[24] = 0; // don't want the \n
+    buf[ 20 ] = 0;
+}
+
 void killDb( int port, int signal ) {
     if( dbs.count( port ) != 1 ) {
         cout << "No db started on port: " << port << endl;
@@ -479,7 +489,9 @@ void killDb( int port, int signal ) {
     int i = 0;
     for( ; i < 65; ++i ) {
         if ( i == 5 ) {
-            cout << "process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
+            char now[64];
+            time_t_to_String(time(0), now);
+            cout << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
             assert( 0 == kill( pid, SIGKILL ) );
         }        
         int temp;
@@ -489,7 +501,9 @@ void killDb( int port, int signal ) {
         sleepms( 1000 );
     }
     if ( i == 65 ) {
-        cout << "failed to terminate process on port " << port << ", with pid " << pid << endl;
+        char now[64];
+        time_t_to_String(time(0), now);
+        cout << now << " failed to terminate process on port " << port << ", with pid " << pid << endl;
         assert( "Failed to terminate process" == 0 );
     }
 
