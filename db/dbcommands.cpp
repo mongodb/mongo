@@ -551,7 +551,8 @@ namespace mongo {
                 return false;
             }
             if ( d->nIndexes != 0 ) {
-                deleteIndexes(d, nsToDrop.c_str(), "*", errmsg, result);
+                assert( deleteIndexes(d, nsToDrop.c_str(), "*", errmsg, result) );
+                assert( d->nIndexes == 0 );
             }
             result.append("ns", nsToDrop.c_str());
             ClientCursor::invalidate(nsToDrop.c_str());
