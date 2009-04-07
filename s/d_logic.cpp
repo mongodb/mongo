@@ -365,7 +365,9 @@ namespace mongo {
             return true;
         }
 
-        errmsg = "your version is too old!";
+        errmsg = "your version is too old.  ";
+        errmsg += " ns: " + ns;
+
         return false;
     }
 
@@ -390,7 +392,7 @@ namespace mongo {
             }
             
             QueryResult *qr = (QueryResult*)b.buf();
-            qr->resultFlags() = QueryResult::ResultFlag_ErrSet;
+            qr->resultFlags() = QueryResult::ResultFlag_ErrSet | QueryResult::ResultFlag_ShardConfigStale;
             qr->len = b.len();
             qr->setOperation( opReply );
             qr->cursorId = 0;
