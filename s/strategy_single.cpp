@@ -25,23 +25,23 @@ namespace mongo {
                         replyToQuery(0, r.p(), r.m(), x);
                         return;
                     }
-                }
-                
-                string commandName = q.query.firstElement().fieldName();
-                
-                if ( commandName == "count" ){
-                    string dbName = q.ns;
-                    dbName = dbName.substr( 0 , dbName.size() - 5 );
-                    string collection = q.query.firstElement().valuestrsafe();
-
-                    DBConfig * conf = grid.getDBConfig( dbName , false );
-                    if ( conf && conf->isPartitioned() && conf->sharded( dbName + "." + collection ) ){
-                        uassert( "can't handle sharded count yet" , 0 );
+                    
+                    string commandName = q.query.firstElement().fieldName();
+                    
+                    if ( commandName == "count" ){
+                        string dbName = q.ns;
+                        dbName = dbName.substr( 0 , dbName.size() - 5 );
+                        string collection = q.query.firstElement().valuestrsafe();
+                        
+                        DBConfig * conf = grid.getDBConfig( dbName , false );
+                        if ( conf && conf->isPartitioned() && conf->sharded( dbName + "." + collection ) ){
+                            uassert( "can't handle sharded count yet" , 0 );
+                        }
                     }
+                    
+                    log() << "don't know what i should do with command: " << commandName << " " << q.query << endl;
                 }
-                
-                log() << "don't know what i should do with command: " << commandName << endl;
-                
+
                 lateAssert = true;
                 doQuery( r , r.singleServerName() );
             }
