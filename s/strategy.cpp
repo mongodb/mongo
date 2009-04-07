@@ -27,11 +27,19 @@ namespace mongo {
             DBClientBase &_c = dbcon.conn();
             
             checkShardVersion( _c , r.getns() );
-
+            
             // TODO: This will not work with Paired connections.  Fix. 
             DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
             Message response;
             bool ok = c.port().call( r.m(), response);
+
+            {
+                QueryResult *qr = (QueryResult *) response.data;
+                if ( qr->resultFlags() & QueryResult::ResultFlag_ShardConfigStale ){
+                    throw StaleConfigException();
+                }
+            }
+
             uassert("mongos: error calling db", ok);
             r.reply( response );
             dbcon.done();

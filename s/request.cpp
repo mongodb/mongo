@@ -34,15 +34,20 @@ namespace mongo {
     Request::Request( Message& m, AbstractMessagingPort* p ) : _m(m) , _d( m ) , _p(p){
         assert( _d.getns() );
         _id = _m.data->id;
+        
+        reset();
+    }
+
+    void Request::reset( bool reload ){
         _config = grid.getDBConfig( getns() );
 
         if ( _config->sharded( getns() ) ){
-            _shardInfo = _config->getShardManager( getns() );
+            _shardInfo = _config->getShardManager( getns() , reload );
             uassert( (string)"no shard info for: " + getns() , _shardInfo );
         }
         else {
             _shardInfo = 0;
-        }
+        }        
     }
 
     string Request::singleServerName(){
@@ -56,7 +61,7 @@ namespace mongo {
         return s;
     }
     
-    void Request::process(){
+    void Request::process( int attempt ){
         
         int op = _m.data->operation();
         assert( op > dbMsg );
@@ -93,7 +98,18 @@ namespace mongo {
         }
         
         if ( op == dbQuery ) {
-            s->queryOp( *this );
+            try {
+                s->queryOp( *this );
+            }
+            catch ( StaleConfigException& staleConfig ){
+                log() << "got stale config exception ns:" << getns() << " attempt: " << attempt << endl;
+                uassert( "too many attempts to update config, failing" , attempt < 5 );
+
+                sleep( attempt );
+                reset( true );
+                process( attempt + 1 );
+                return;
+            }
         }
         else if ( op == dbGetMore ) {
             s->getMore( *this );

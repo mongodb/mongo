@@ -57,9 +57,12 @@ namespace mongo {
         DbMessage& d(){ return _d; }
         AbstractMessagingPort* p(){ return _p; }
 
-        void process();
-
+        void process( int attempt = 0 );
+        
     private:
+        
+        void reset( bool reload=true );
+        
         Message& _m;
         DbMessage _d;
         AbstractMessagingPort* _p;
@@ -68,7 +71,10 @@ namespace mongo {
         DBConfig * _config;
         ShardManager * _shardInfo;
     };
-
+    
+    class StaleConfigException : public std::exception {
+        
+    };
 }
 
 #include "strategy.h"
