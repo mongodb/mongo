@@ -60,7 +60,7 @@ namespace mongo {
         }
         virtual void init() {
             c_ = qp().newCursor();
-            matcher_.reset( new JSMatcher( qp().query() ) );
+            matcher_.reset( new KeyValJSMatcher( qp().query(), qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -71,7 +71,7 @@ namespace mongo {
             DiskLoc rloc = c_->currLoc();
             
             bool deep;
-            if ( matcher_->matches(rloc.rec(), &deep) ) {
+            if ( matcher_->matches(c_->currKey(), rloc, &deep) ) {
                 if ( !deep || !c_->getsetdup(rloc) )
                     ++count_;
             }
@@ -99,7 +99,7 @@ namespace mongo {
         int &bestCount_;
         long long nScanned_;
         auto_ptr< Cursor > c_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
     };
     
     /* ns:      namespace, e.g. <database>.<collection>
@@ -130,13 +130,13 @@ namespace mongo {
         if( !c->ok() )
             return nDeleted;
 
-        JSMatcher matcher(pattern);
+        KeyValJSMatcher matcher(pattern, c->indexKeyPattern());
 
         do {
             DiskLoc rloc = c->currLoc();
             
             bool deep;
-            if ( !matcher.matches(rloc.rec(), &deep) ) {
+            if ( !matcher.matches(c->currKey(), rloc, &deep) ) {
                 c->advance(); // advance must be after noMoreMatches() because it uses currKey()
             }
             else {
@@ -545,7 +545,7 @@ namespace mongo {
             if ( !c_->ok() )
                 setComplete();
             else
-                matcher_.reset( new JSMatcher( pattern ) );
+                matcher_.reset( new KeyValJSMatcher( pattern, qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -553,7 +553,7 @@ namespace mongo {
                 return;
             }
             nscanned_++;
-            if ( matcher_->matches(c_->currLoc().rec()) ) {
+            if ( matcher_->matches(c_->currKey(), c_->currLoc()) ) {
                 setComplete();
                 return;
             }
@@ -568,7 +568,7 @@ namespace mongo {
     private:
         auto_ptr< Cursor > c_;
         long long nscanned_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
     };
     
     int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
@@ -810,7 +810,7 @@ namespace mongo {
                     break;
                 }
                 bool deep;
-                if ( !cc->matcher->matches(c->currLoc().rec(), &deep) ) {
+                if ( !cc->matcher->matches(c->currKey(), c->currLoc(), &deep) ) {
                 }
                 else {
                     //out() << "matches " << c->currLoc().toString() << ' ' << deep << '\n';
@@ -862,7 +862,7 @@ namespace mongo {
                 bc_->forgetEndKey();
             }
             else {
-                matcher_.reset( new JSMatcher( query_ ) );
+                matcher_.reset( new KeyValJSMatcher( query_, c_->indexKeyPattern() ) );
             }
         }
         virtual void next() {
@@ -888,7 +888,7 @@ namespace mongo {
                 }
             } else {
                 bool deep;
-                if ( !matcher_->matches(c_->currLoc().rec(), &deep) ) {
+                if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
                 }
                 else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
                     bool match = true;
@@ -919,7 +919,7 @@ namespace mongo {
         BSONObj query_;
         set< string > fields_;
         BtreeCursor *bc_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
         BSONObj firstMatch_;
     };
     
@@ -978,7 +978,7 @@ namespace mongo {
             else
                 c_ = qp().newCursor();
             
-            matcher_.reset(new JSMatcher(qp().query()));
+            matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
             
             if ( qp().scanAndOrderRequired() ) {
                 ordering_ = true;
@@ -991,7 +991,7 @@ namespace mongo {
                 if ( !c_->ok() ) {
                     findingStart_ = false;
                     c_ = qp().newCursor();
-                } else if ( !matcher_->matches( c_->currLoc().rec() ) ) {
+                } else if ( !matcher_->matches( c_->currKey(), c_->currLoc() ) ) {
                     findingStart_ = false;
                     c_ = qp().newCursor( c_->currLoc() );
                 } else {
@@ -1007,7 +1007,7 @@ namespace mongo {
             
             nscanned_++;
             bool deep;
-            if ( !matcher_->matches(c_->currLoc().rec(), &deep) ) {
+            if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
             }
             else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
                 BSONObj js = c_->current();
@@ -1082,7 +1082,7 @@ namespace mongo {
         BufBuilder &builder() { return b_; }
         bool scanAndOrderRequired() const { return ordering_; }
         auto_ptr< Cursor > cursor() { return c_; }
-        auto_ptr< JSMatcher > matcher() { return matcher_; }
+        auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
         int n() const { return n_; }
         long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
@@ -1098,7 +1098,7 @@ namespace mongo {
         auto_ptr< Cursor > c_;
         long long nscanned_;
         int queryOptions_;
-        auto_ptr< JSMatcher > matcher_;
+        auto_ptr< KeyValJSMatcher > matcher_;
         int n_;
         int soSize_;
         bool saveClientCursor_;
