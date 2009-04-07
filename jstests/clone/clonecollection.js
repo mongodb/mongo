@@ -109,7 +109,8 @@ cc.start();
 sleep( 200 );
 f.a.save( { i: -1 } );
 
-assert.commandWorked( cc.returnData() );
+ret = cc.returnData()
+assert.commandWorked( ret );
 assert.eq( 100001, t.a.find().count() );
 
 f.a.save( { i: -2 } );
