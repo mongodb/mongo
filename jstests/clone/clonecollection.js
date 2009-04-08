@@ -23,10 +23,10 @@ assert.eq( 0, t.system.indexes.find().count() );
 
 f.a.ensureIndex( { i: 1 } );
 assert.commandWorked( t.cloneCollection( "localhost:27018", "a" ) );
-assert.eq( 1, t.system.indexes.find().count() );
+assert.eq( 1, t.system.indexes.find().count(), "expected index missing" );
 // Verify index works
 assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().startKey.i );
-assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length );
+assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length, "match length did not match expected" );
 
 
 // Now test insert + delete + update during clone

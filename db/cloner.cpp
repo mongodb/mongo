@@ -389,7 +389,7 @@ namespace mongo {
              */
             setClient( collection.c_str() );
             
-            log() << "cloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
+            log() << "cloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
             
             Cloner c;
             long long cursorId;
