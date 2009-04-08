@@ -540,9 +540,16 @@ namespace mongo {
             BSONObj temp = b.done();
             JavaJS->scopeSetObject(where->scope, "obj", &temp);
             }*/
-            if ( JavaJS->invoke(where->scope, where->func) ) {
-                uassert("error in invocation of $where function", false);
+            int err = JavaJS->invoke(where->scope, where->func);
+            if ( err == -3 ) { // INVOKE_ERROR
+                stringstream ss;
+                ss << "error on invocation of $where function:\n" 
+                    << JavaJS->scopeGetString(where->scope, "error");
+                uassert(ss.str(), false);
                 return false;
+            } else if ( err != 0 ) { // ! INVOKE_SUCCESS
+                uassert("error in invocation of $where function", false);
+                return false;                
             }
             return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
 #else
