@@ -335,6 +335,20 @@ namespace QueryTests {
             ASSERT( error() );
         }
     };
+
+    class UnderscoreNs : public ClientBase {
+    public:
+        ~UnderscoreNs() {
+            client().dropCollection( "querytests._UnderscoreNs" );            
+        }
+        void run() {
+            const char *ns = "querytests._UnderscoreNs";
+            ASSERT( client().findOne( ns, "{}" ).isEmpty() );
+            client().insert( ns, BSON( "a" << 1 ) );
+            ASSERT_EQUALS( 1, client().findOne( ns, "{}" ).getIntField( "a" ) );
+            ASSERT( !error() );
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -353,6 +367,7 @@ namespace QueryTests {
             add< TailableInsertDelete >();
             add< OplogReplayMode >();
             add< ArrayId >();
+            add< UnderscoreNs >();
         }
     };
     
