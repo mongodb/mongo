@@ -255,5 +255,65 @@ doTest2 = function() {
     ports.forEach( function( x ) { stopMongoProgram( x ); } );    
 }
 
+// recover from master - master setup
+doTest3 = function() {
+    ports = allocatePorts( 7 );
+    aPort = ports[ 0 ];
+    alPort = ports[ 1 ];
+    arPort = ports[ 2 ];
+    lPort = ports[ 3 ];
+    lpPort = ports[ 4 ];
+    rPort = ports[ 5 ];
+    rpPort = ports[ 6 ];
+    
+    connect();
+    
+    a = startMongod( "--port", aPort, "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface" );
+    l = startMongod( "--port", lPort, "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + rpPort, "127.0.0.1:" + alPort, "--oplogSize", "1", "--nohttpinterface" );
+    r = startMongod( "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + arPort, "--oplogSize", "1", "--nohttpinterface" );
+
+    // start normally
+    assert.soon( function() {
+                lm = ismaster( l );
+                rm = ismaster( r );
+                
+                assert( lm == -1 || lm == 0, "lm value invalid" );
+                assert( rm == -1 || rm == 0 || rm == 1, "rm value invalid" );
+                
+                return ( lm == 0 && rm == 1 );
+                } );
+    
+    stopMongoProgram( lpPort );
+    stopMongoProgram( rpPort );
+    
+    // now each can only talk to arbiter
+    assert.soon( function() {
+                lm = ismaster( l );
+                rm = ismaster( r );
+                
+                assert( lm == 1 || lm == 0, "lm value invalid" );
+                assert( rm == 1, "rm value invalid" );
+                
+                return ( lm == 1 && rm == 1 );
+                } );
+    
+    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
+    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
+    
+    // recover
+    assert.soon( function() {
+                lm = ismaster( l );
+                rm = ismaster( r );
+                
+                assert( lm == 1 || lm == 0, "lm value invalid" );
+                assert( rm == 1, "rm value invalid" );
+                
+                return ( lm == 0 && rm == 1 );
+                } );
+
+    ports.forEach( function( x ) { stopMongoProgram( x ); } );
+}
+
 doTest1();
 doTest2();
+doTest3();
