@@ -349,6 +349,20 @@ namespace QueryTests {
             ASSERT( !error() );
         }
     };
+
+    class EmptyFieldSpec : public ClientBase {
+    public:
+        ~EmptyFieldSpec() {
+            client().dropCollection( "querytests.EmptyFieldSpec" );            
+        }
+        void run() {
+            const char *ns = "querytests.EmptyFieldSpec";
+            client().insert( ns, BSON( "a" << 1 ) );
+            ASSERT( !client().findOne( ns, "" ).isEmpty() );
+            BSONObj empty;
+            ASSERT( !client().findOne( ns, "", &empty ).isEmpty() );            
+        }        
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -368,6 +382,7 @@ namespace QueryTests {
             add< OplogReplayMode >();
             add< ArrayId >();
             add< UnderscoreNs >();
+            add< EmptyFieldSpec >();
         }
     };
     

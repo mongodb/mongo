@@ -162,6 +162,8 @@ namespace mongo {
             if ( d.moreJSObjs() ) {
                 fields = auto_ptr< set<string> >(new set<string>());
                 d.nextJsObj().getFieldNames(*fields);
+                if ( fields->size() == 0 )
+                    fields.reset();
             }
             queryOptions = d.msg().data->dataAsInt();
         }
