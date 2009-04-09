@@ -618,6 +618,7 @@ namespace mongo {
 
     /* not using log() herein in case we are already locked */
     void dbexit(int rc, const char *why) {        
+        printStackTrace();
         {
             boostlock lk( exitMutex );
             if ( !firstExit ) {

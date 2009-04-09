@@ -125,7 +125,7 @@ namespace mongo {
     class ReplSource {
         bool resync(string db);
         bool sync_pullOpLog();
-        void sync_pullOpLog_applyOperation(BSONObj& op);
+        void sync_pullOpLog_applyOperation(BSONObj& op, const BSONObjSetDefaultOrder &ids, const BSONObjSetDefaultOrder &modIds);
         
         auto_ptr<DBClientConnection> conn;
         auto_ptr<DBClientCursor> cursor;
@@ -138,6 +138,8 @@ namespace mongo {
         string resyncDrop( const char *db, const char *requester );
         // returns true if connected on return
         bool connect();
+        // returns possibly unowned id spec for the operation.
+        static BSONObj idForOp( const BSONObj &op, bool &mod );
 
     public:
         static void applyOperation(const BSONObj& op);
@@ -152,6 +154,7 @@ namespace mongo {
 
         /* the last time point we have already synced up to. */
         OpTime syncedTo;
+        OpTime lastSavedLocalTs_;
 
         /* list of databases that we have synced.
            we need this so that if we encounter a new one, we know
@@ -195,7 +198,7 @@ namespace mongo {
        "c" db cmd
        "db" declares presence of a database (ns is set to the db name + '.')
     */
-    void _logOp(const char *opstr, const char *ns, const char *logNs, const BSONObj& obj, BSONObj *patt, bool *b);
+    void _logOp(const char *opstr, const char *ns, const char *logNs, const BSONObj& obj, BSONObj *patt, bool *b, const OpTime &ts);
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt = 0, bool *b = 0);
 
 } // namespace mongo

@@ -69,6 +69,9 @@ namespace mongo {
     extern bool autoresync;
     time_t lastForcedResync = 0;
     
+    set< string > localModifiedDbs;
+    OpTime lastLocalLog;
+    
 } // namespace mongo
 
 #include "replset.h"
@@ -447,6 +450,8 @@ namespace mongo {
             }
         }        
         
+        lastSavedLocalTs_ = OpTime( o.getField( "localLogTs" ).date() );
+        
         repopulateDbsList( o );
     }
 
@@ -468,6 +473,8 @@ namespace mongo {
         }
         if ( n )
             b.append("dbs", dbs_builder.done());
+        
+        b.appendDate("localLogTs", lastLocalLog.asDate());
         
         BSONObjBuilder dbsNextPassBuilder;
         n = 0;
@@ -792,7 +799,7 @@ namespace mongo {
          ...
        see logOp() comments.
     */
-    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op) {
+    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, const BSONObjSetDefaultOrder &ids, const BSONObjSetDefaultOrder &modIds) {
         char clientName[MaxClientLen];
         const char *ns = op.getStringField("ns");
         nsToClient(ns, clientName);
@@ -837,7 +844,7 @@ namespace mongo {
             throw SyncException();
         }
         
-        if ( newDb || justCreated ) {
+        if ( ( newDb || justCreated ) && localModifiedDbs.count( clientName ) == 0 ) {
             if ( !justCreated && strcmp( clientName, "admin" ) != 0  ) {
                 log() << "An earlier initial clone did not complete, resyncing." << endl;
             } else if ( !newDb ) {
@@ -848,12 +855,54 @@ namespace mongo {
             addDbNextPass.erase(clientName);
             save(); // persist dbs, next pass dbs
         } else {
-            applyOperation( op );            
+            bool mod;
+            BSONObj id = idForOp( op, mod );
+            out() << "op id: " << id << endl;
+            if ( ids.count( id ) == 0 ) {
+                out() << "applying op " << op << endl;
+                applyOperation( op );    
+            } else if ( mod ) {
+                BSONObj existing;
+                if ( Helpers::findOne( ns, id, existing ) )
+                    logOp( "i", ns, existing );
+            }
             addDbNextPass.erase( clientName );
         }
         database = 0;
     }
 
+    BSONObj ReplSource::idForOp( const BSONObj &op, bool &mod ) {
+        mod = false;
+        const char *opType = op.getStringField( "op" );
+        BSONObj o = op.getObjectField( "o" );
+        switch( opType[ 0 ] ) {
+            case 'i': {
+                BSONObjBuilder idBuilder;
+                BSONElement id;
+                if ( !o.getObjectID( id ) )
+                    return BSONObj();                    
+                idBuilder.append( id );
+                return idBuilder.obj();
+            }
+            case 'u': {
+                BSONObj o2 = op.getObjectField( "o2" );
+                if ( strcmp( o2.firstElement().fieldName(), "_id" ) != 0 )
+                    return BSONObj();
+                if ( o.firstElement().fieldName()[ 0 ] == '$' )
+                    mod = true;
+                return o2;
+            }
+            case 'd': {
+                if ( opType[ 1 ] != '\0' )
+                    return BSONObj(); // skip "db" op type
+                return o;
+            }
+            default:
+                break;
+        }        
+        return BSONObj();
+    }
+    
     /* note: not yet in mutex at this point. */
     bool ReplSource::sync_pullOpLog() {
         string ns = string("local.oplog.$") + sourceName();
@@ -866,10 +915,13 @@ namespace mongo {
             c = 0;
         }
 
+        BSONObjSetDefaultOrder localChangedSinceLastPass;
+        BSONObjSetDefaultOrder localModChangedSinceLastPass;
+        
         bool initial = syncedTo.isNull();
 
         if ( c == 0 ) {
-            if ( syncedTo == OpTime() ) {
+            if ( syncedTo == OpTime() && localModifiedDbs.empty() ) {
                 // Important to grab last oplog timestamp before listing databases.
                 BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
                 if ( !last.isEmpty() ) {
@@ -900,6 +952,32 @@ namespace mongo {
                             if ( only.empty() || only == name )
                                 addDbNextPass.insert( name );
                         }
+                    }
+                }
+            }
+            
+            if ( replPair && replPair->state == ReplPair::State_Master ) { // Will we know who is master at this point?
+                cout << "updating sets now" << endl;
+                // FIXME don't lock for so long.
+                dblock lk;
+                setClient( "local.oplog.$main" );
+                for( auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+                    localLog->ok(); localLog->advance() ) {
+                    BSONObj op = localLog->current();
+                    OpTime ts( localLog->current().getField( "ts" ).date() );
+                    if ( !( lastSavedLocalTs_ < ts ) )
+                        break;
+                    bool mod;
+                    BSONObj id = idForOp( op, mod );
+                    if ( !id.isEmpty() ) {
+                        id = id.getOwned();
+                        if ( mod ) {
+                            if ( localChangedSinceLastPass.count( id ) == 0 )
+                                localModChangedSinceLastPass.insert( id );
+                        } else
+                            localModChangedSinceLastPass.erase( id );
+                        out() << "adding id to set: " << id << ", mod? " << mod << endl;
+                        localChangedSinceLastPass.insert( id );
                     }
                 }
             }
@@ -939,7 +1017,7 @@ namespace mongo {
                 b.append("ns", *i + '.');
                 b.append("op", "db");
                 BSONObj op = b.done();
-                sync_pullOpLog_applyOperation(op);
+                sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass);
             }
         }
 
@@ -973,7 +1051,7 @@ namespace mongo {
                 log(1) << "pull:   initial run\n";
             else
                 assert( syncedTo < nextOpTime );
-            sync_pullOpLog_applyOperation(op);
+            sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass);
             n++;
         }
         else if ( nextOpTime != syncedTo ) {
@@ -1031,7 +1109,7 @@ namespace mongo {
                     uassert("bad 'ts' value in sources", false);
                 }
 
-                sync_pullOpLog_applyOperation(op);
+                sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass);
                 n++;
             }
         }
@@ -1144,12 +1222,16 @@ namespace mongo {
     Database *localOplogClient = 0;
 
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
-        if ( master )
-            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b);
+        if ( master ) {
+            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
+            char cl[ 256 ];
+            nsToClient( ns, cl );
+            localModifiedDbs.insert( cl );
+        }
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
         if ( t.logValid() ) {
             try {
-                _logOp(opstr, ns, t.logNS().c_str(), obj, patt, b);
+                _logOp(opstr, ns, t.logNS().c_str(), obj, patt, b, OpTime::now());
             } catch ( const DBException & ) {
                 t.invalidateLog();
             }
@@ -1172,7 +1254,7 @@ namespace mongo {
          when set, indicates this is the first thing we have logged for this database.
          thus, the slave does not need to copy down all the data when it sees this.
     */
-    void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb) {
+    void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
         if ( strncmp(ns, "local.", 6) == 0 )
             return;
 
@@ -1182,7 +1264,7 @@ namespace mongo {
         */
 
         BSONObjBuilder b;
-        b.appendDate("ts", OpTime::now().asDate());
+        b.appendDate("ts", ts.asDate());
         b.append("op", opstr);
         b.append("ns", ns);
         if ( bb )
