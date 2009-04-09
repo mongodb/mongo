@@ -904,9 +904,9 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insert( ns(), one );
                 theDataFileMgr.insert( ns(), two );
                 theDataFileMgr.insert( ns(), three );
-                BSONObj id;
-                deleteObjects( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ), true, &id );
-                ASSERT_EQUALS( 3, id.getIntField( "_id" ) );
+                deleteObjects( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ), true );
+                for( auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
+                    ASSERT( 3 != c->current().getIntField( "_id" ) );
             }
         };
 
@@ -920,9 +920,9 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insert( ns(), one );
                 theDataFileMgr.insert( ns(), two );
                 theDataFileMgr.insert( ns(), three );
-                BSONObj id;
-                deleteObjects( ns(), BSON( "a" << GTE << 0 << "_id" << GT << 0 ), true, &id );
-                ASSERT_EQUALS( 2, id.getIntField( "_id" ) );
+                deleteObjects( ns(), BSON( "a" << GTE << 0 << "_id" << GT << 0 ), true );
+                for( auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
+                    ASSERT( 2 != c->current().getIntField( "_id" ) );
             }
         };
 

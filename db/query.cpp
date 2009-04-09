@@ -106,7 +106,7 @@ namespace mongo {
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
     */
-    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, BSONObj *deletedId, bool god) {
+    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
         if ( strstr(ns, ".system.") && !god ) {
             /* note a delete from system.indexes would corrupt the db 
                if done here, as there are pointers into those objects in 
@@ -145,13 +145,16 @@ namespace mongo {
                 if ( !justOne )
                     c->noteLocation();
 
-                if ( justOne && deletedId ) {
+                if ( logop ) {
                     BSONElement e;
                     if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
                         BSONObjBuilder b;
                         b.append( e );
-                        *deletedId = b.obj();
-                    }                    
+                        bool replJustOne = true;
+                        logOp( "d", ns, b.done(), 0, &replJustOne );
+                    } else {
+                        problem() << "deleted object without id, not logging" << endl;
+                    }
                 }
                 theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
                 nDeleted++;

@@ -335,17 +335,8 @@ namespace mongo {
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
-        BSONObj deletedId = BSONObj();
-        int n = deleteObjects(ns, pattern, justOne, &deletedId);
+        int n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( n );
-        if ( justOne ) {
-            if ( deletedId.isEmpty() ) {
-                problem() << "deleted object without id, not logging" << endl;
-            } else {
-                logOp("d", ns, deletedId, 0, &justOne);
-            }
-        } else
-            logOp("d", ns, pattern, 0, &justOne);            
     }
 
     void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit) {

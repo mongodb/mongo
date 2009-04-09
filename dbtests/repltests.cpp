@@ -59,7 +59,7 @@ namespace ReplTests {
         static const char *logNs() {
             return "local.oplog.$main";
         }
-        DBClientInterface *client() const { return &client_; }
+        DBDirectClient *client() const { return &client_; }
         BSONObj one( const BSONObj &query = BSONObj() ) const {
             return client()->findOne( ns(), query );            
         }
@@ -671,6 +671,25 @@ namespace ReplTests {
         
     } // namespace Idempotence
     
+    class DeleteOpIsIdBased : public Base {
+    public:
+        void run() {
+            insert( BSON( "_id" << 0 << "a" << 10 ) );
+            insert( BSON( "_id" << 1 << "a" << 11 ) );
+            insert( BSON( "_id" << 3 << "a" << 10 ) );
+            client()->remove( ns(), BSON( "a" << 10 ) );
+            ASSERT_EQUALS( 1, client()->count( ns(), BSONObj() ) );
+            insert( BSON( "_id" << 0 << "a" << 11 ) );
+            insert( BSON( "_id" << 2 << "a" << 10 ) );            
+            insert( BSON( "_id" << 3 << "a" << 10 ) );
+            
+            applyAllOperations();
+            ASSERT_EQUALS( 2, client()->count( ns(), BSONObj() ) );
+            ASSERT( !one( BSON( "_id" << 1 ) ).isEmpty() );
+            ASSERT( !one( BSON( "_id" << 2 ) ).isEmpty() );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -702,6 +721,7 @@ namespace ReplTests {
             add< Idempotence::PushUpsert >();
             add< Idempotence::MultiPush >();
             add< Idempotence::EmptyPush >();
+            add< DeleteOpIsIdBased >();
         }
     };
     

@@ -76,7 +76,7 @@ namespace mongo {
     bool updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss);
 
     // If justOne is true, deletedId is set to the id of the deleted object.
-    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, BSONObj *deletedId = 0, bool god=false);
+    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop = false, bool god=false);
 
     long long runCount(const char *ns, const BSONObj& cmd, string& err);
     

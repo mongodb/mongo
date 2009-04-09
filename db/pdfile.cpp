@@ -532,7 +532,7 @@ assert( !eloc.isNull() );
             // remove from the system catalog
             BSONObj cond = BSON( "name" << nsToDrop );   // { name: "colltodropname" }
             string system_namespaces = database->name + ".system.namespaces";
-            /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, 0, true);
+            /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, false, true);
 			// no check of return code as this ns won't exist for some of the new storage engines
         }
 
@@ -587,7 +587,7 @@ assert( !eloc.isNull() );
         // clean up in system.indexes.  we do this last on purpose.  note we have 
         // to make the cond object before the drop() above though.
         string system_indexes = database->name + ".system.indexes";
-        int n = deleteObjects(system_indexes.c_str(), cond, false, 0, true);
+        int n = deleteObjects(system_indexes.c_str(), cond, false, false, true);
         wassert( n == 1 );
     }
 
