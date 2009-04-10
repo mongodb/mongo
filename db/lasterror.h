@@ -33,9 +33,9 @@ namespace mongo {
             reset( true );
             msg = _msg;
         }
-        void recordUpdate( bool _updatedExisting ) {
+        void recordUpdate( bool _updatedExisting, int nChanged ) {
             reset( true );
-            nObjects = 1;
+            nObjects = nChanged;
             updatedExisting = _updatedExisting ? True : False;
         }
         void recordDelete( int nDeleted ) {
@@ -67,10 +67,10 @@ namespace mongo {
         le->raiseError(msg);
     }
     
-    inline void recordUpdate( bool updatedExisting ) {
+    inline void recordUpdate( bool updatedExisting, int nChanged ) {
         LastError *le = lastError.get();
         if ( le )
-            le->recordUpdate( updatedExisting );        
+            le->recordUpdate( updatedExisting, nChanged );        
     }
 
     inline void recordDelete( int nDeleted ) {

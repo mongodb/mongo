@@ -321,8 +321,9 @@ namespace mongo {
 
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
+        bool upsert = flags & 1;
         bool updatedExisting = updateObjects(ns, toupdate, query, flags & 1, ss);
-        recordUpdate( updatedExisting );
+        recordUpdate( updatedExisting, ( upsert | updatedExisting ) ? 1 : 0 );
     }
 
     void receivedDelete(Message& m) {
