@@ -56,7 +56,7 @@ db2Coll = function( m ) {
     return m.getDB( baseName + "_second" ).getCollection( baseName );    
 }
 
-doTest = function() {
+doTest = function( recover, newMaster, newSlave ) {
     ports = allocatePorts( 5 );
     aPort = ports[ 0 ];
     lPort = ports[ 1 ];
@@ -98,34 +98,22 @@ doTest = function() {
                 return ( lm == 1 && rm == 1 );
                 } );
     
-    write( r, 10 );
-    check( r, 10 );
-    write( r, 100, "a" );
-    check( r, 100, "a" );
-    coll( r ).update( {n:1}, {$set:{n:2}} );
-    db2Coll( r ).save( {n:500} );
+    m = newMaster();
+    write( m, 10 );
+    write( m, 100, "a" );
+    coll( m ).update( {n:1}, {$set:{n:2}} );
+    db2Coll( m ).save( {n:500} );
     
-    write( l, 20 );
-    check( l, 20 );
-    write( l, 200, "a" );
-    check( l, 200, "a" );
-    coll( l ).update( {n:1}, {n:1,m:3} );
-    db2Coll( l ).save( {_id:"a",n:600} );
+    s = newSlave();
+    write( s, 20 );
+    write( s, 200, "a" );
+    coll( s ).update( {n:1}, {n:1,m:3} );
+    db2Coll( s ).save( {_id:"a",n:600} );
         
     // recover
-    connect();
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
+    recover();
     
-    checkCount( r, 5 );
-    checkCount( l, 5 );
+    [ r, l ].forEach( function( x ) { checkCount( x, 5 ); } );
     [ r, l ].forEach( function( x ) { [ 0, 10, 20, 100 ].forEach( function( y ) { check( x, y ); } ); } );
     
     checkM = function( c ) {
@@ -134,15 +122,40 @@ doTest = function() {
                     printjson( obj );
                     return obj.m == undefined;
                     }, "n:2 test for " + c + " failed" );
-    }
-    checkM( r );
-    checkM( l );
+    };
+    [ r, l ].forEach( function( x ) { checkM( x ); } );
 
     // check separate database
-    assert.eq( 600, db2Coll( r ).findOne( {_id:"a"} ).n );
+    [ r, l ].forEach( function( x ) { assert.eq( 600, db2Coll( x ).findOne( {_id:"a"} ).n ); } );
     
     ports.forEach( function( x ) { stopMongoProgram( x ); } );
     
 }
 
-doTest();
+doTest( function() {
+       connect();
+       assert.soon( function() {
+                   lm = ismaster( l );
+                   rm = ismaster( r );
+                   
+                   assert( lm == 1 || lm == 0, "lm value invalid" );
+                   assert( rm == 1, "rm value invalid" );
+                   
+                   return ( lm == 0 && rm == 1 );
+                   } );       
+       }, function() { return r; }, function() { return l; } );
+
+doTest( function() {
+       stopMongod( rPort );
+       connect();
+       r = startMongod( "mongod", "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
+       assert.soon( function() {
+                   lm = ismaster( l );
+                   rm = ismaster( r );
+                   
+                   assert( lm == 1, "lm value invalid" );
+                   assert( rm == -1 || rm == 0, "rm value invalid" );
+                   
+                   return ( lm == 1 && rm == 0 );
+                   } );       
+       }, function() { return l; }, function() { return r; } );
