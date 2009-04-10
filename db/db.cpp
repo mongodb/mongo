@@ -361,13 +361,14 @@ namespace mongo {
         
         acquirePathLock();
         
-        clearTmpFiles();
+        BOOST_CHECK_EXCEPTION( clearTmpFiles() );
+        
         clearTmpCollections();
-
+        
         if ( opLogging )
             log() << "opLogging = " << opLogging << endl;
         _oplog.init();
-
+        
 #if 0
         {
             stringstream indexpath;
@@ -382,12 +383,10 @@ namespace mongo {
             JavaJS = new JavaJSImpl(appserverLoc);
         }
 #endif
-      
         repairDatabases();
-
         /* this is for security on certain platforms */
         srand(curTimeMicros() ^ startupSrandTimer.micros());
-
+        
         listen(listenPort);
         
         // listen() will return when exit code closes its socket.
@@ -397,7 +396,7 @@ namespace mongo {
     void initAndListen(int listenPort, const char *appserverLoc = null) {
         try { _initAndListen(listenPort, appserverLoc); }
         catch(...) { 
-            log(1) << "assertion exception in initAndListen, terminating" << endl;
+            log() << " exception in initAndListen, terminating" << endl;
             dbexit(1);
         }
     }
