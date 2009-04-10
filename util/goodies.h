@@ -52,7 +52,7 @@ namespace mongo {
         strings = backtrace_symbols(b, size);
 
         for (i = 0; i < size; i++)
-            o << hex << b[i] << ' ';
+            o << hex << b[i] << dec << ' ';
         o << '\n';
         for (i = 0; i < size; i++)
             o << ' ' << strings[i] << '\n';
