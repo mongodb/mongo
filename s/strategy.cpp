@@ -76,6 +76,8 @@ namespace mongo {
         unsigned long long & sequenceNumber = checkShardVersionLastSequence[ &conn ];        
         if ( manager->getSequenceNumber() == sequenceNumber )
             return;
+        
+        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns << " my last seq: " << sequenceNumber << "  current: " << manager->getSequenceNumber() << endl;
 
         ServerShardVersion version = manager->getVersion( conn.getServerAddress() ); 
 
