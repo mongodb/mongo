@@ -339,7 +339,7 @@ namespace mongo {
 
             if ( !replPair->dominant( myname ) ) {
                 result.append( "you_are", N );
-                result.append( "i_am", N );
+                result.append( "i_am", replPair->state );
                 return true;
             }
 
@@ -361,7 +361,7 @@ namespace mongo {
         }
     } cmdnegotiatemaster;
     
-    void ReplPair::negotiate(DBClientConnection *conn, string method) {
+    int ReplPair::negotiate(DBClientConnection *conn, string method) {
         BSONObjBuilder b;
         b.append("negotiatemaster",1);
         b.append("i_was", state);
@@ -373,19 +373,19 @@ namespace mongo {
             string message = method + " negotiate failed";
             problem() << message << ": " << res.toString() << '\n';
             setMasterLocked(State_Confused, message.c_str());
-            return;
+            return State_Confused;
         }
         int x = res.getIntField("you_are");
+        int remote = res.getIntField("i_am");
         // State_Negotiating means the remote node is not dominant and cannot
         // choose who is master.
         if ( x != State_Slave && x != State_Master && x != State_Negotiating ) {
             problem() << method << " negotiate: bad you_are value " << res.toString() << endl;
-            return;
-        }
-        if ( x != State_Negotiating ) {
+        } else if ( x != State_Negotiating ) {
             string message = method + " negotiation";
             setMasterLocked(x, message.c_str());
         }
+        return remote;
     }
 
     OpTime last(0, 0);
@@ -919,8 +919,10 @@ namespace mongo {
         IdSets localModChangedSinceLastPass;
         
         bool initial = syncedTo.isNull();
-
+        bool newConnection = false;
+        
         if ( c == 0 ) {
+            newConnection = true;
             if ( syncedTo == OpTime() && localModifiedDbs.empty() ) {
                 // Important to grab last oplog timestamp before listing databases.
                 BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
@@ -952,33 +954,6 @@ namespace mongo {
                             if ( only.empty() || only == name )
                                 addDbNextPass.insert( name );
                         }
-                    }
-                }
-            }
-            
-            if ( replPair && replPair->state == ReplPair::State_Master ) { // Will we know who is master at this point?
-                cout << "updating sets now" << endl;
-                // FIXME don't lock for so long.
-                dblock lk;
-                setClient( "local.oplog.$main" );
-                for( auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
-                    localLog->ok(); localLog->advance() ) {
-                    BSONObj op = localLog->current();
-                    OpTime ts( localLog->current().getField( "ts" ).date() );
-                    if ( !( lastSavedLocalTs_ < ts ) )
-                        break;
-                    bool mod;
-                    BSONObj id = idForOp( op, mod );
-                    if ( !id.isEmpty() ) {
-                        const char *ns = op.getStringField( "ns" );
-                        id = id.getOwned();
-                        if ( mod ) {
-                            if ( localChangedSinceLastPass[ ns ].count( id ) == 0 )
-                                localModChangedSinceLastPass[ ns ].insert( id );
-                        } else
-                            localModChangedSinceLastPass.erase( id );
-                        out() << "adding id to set: " << id << ", mod? " << mod << endl;
-                        localChangedSinceLastPass[ ns ].insert( id );
                     }
                 }
             }
@@ -1031,6 +1006,33 @@ namespace mongo {
             return true;
         }
 
+        if ( newConnection && replPair && replPair->state == ReplPair::State_Master ) {
+            cout << "updating sets now" << endl;
+            // FIXME don't lock for so long.
+            dblock lk;
+            setClient( "local.oplog.$main" );
+            for( auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+                localLog->ok(); localLog->advance() ) {
+                BSONObj op = localLog->current();
+                OpTime ts( localLog->current().getField( "ts" ).date() );
+                if ( !( lastSavedLocalTs_ < ts ) )
+                    break;
+                bool mod;
+                BSONObj id = idForOp( op, mod );
+                if ( !id.isEmpty() ) {
+                    const char *ns = op.getStringField( "ns" );
+                    id = id.getOwned();
+                    if ( mod ) {
+                        if ( localChangedSinceLastPass[ ns ].count( id ) == 0 )
+                            localModChangedSinceLastPass[ ns ].insert( id );
+                    } else
+                        localModChangedSinceLastPass.erase( id );
+                    out() << "adding id to set: " << id << ", mod? " << mod << endl;
+                    localChangedSinceLastPass[ ns ].insert( id );
+                }
+            }
+        }        
+        
         int n = 0;
         BSONObj op = c->next();
         BSONElement ts = op.findElement("ts");
@@ -1197,8 +1199,14 @@ namespace mongo {
             return false;            
         }
         
-        if ( paired )
-            replPair->negotiate(conn.get(), "direct");
+        if ( paired ) {
+            int remote = replPair->negotiate(conn.get(), "direct");
+            int nMasters = ( remote == ReplPair::State_Master ) + ( replPair->state == ReplPair::State_Master );
+            if ( getInitialSyncCompleted() && nMasters != 1 ) {
+                log() << ( nMasters == 0 ? "no master" : "two masters" ) << ", deferring oplog pull" << endl;
+                return true;
+            }
+        }
 
         /*
         	// get current mtime at the server.
