@@ -370,7 +370,7 @@ namespace mongo {
 	try { \
 		expression; \
 	} catch ( const std::exception &e ) { \
-		problem() << e.what() << endl; \
+		problem() << "caught boost exception: " << e.what() << endl; \
 		assert( false ); \
 	} catch ( ... ) { \
 		assert( false ); \

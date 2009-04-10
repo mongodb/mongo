@@ -438,6 +438,7 @@ public:
             if ( ret == 0 ) {
                 if ( *last )
                     writeMongoProgramOutputLine( port_, last );
+                close( pipe_ );
                 break;
             }
             if ( last != buf ) {
