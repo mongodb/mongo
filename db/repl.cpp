@@ -799,7 +799,7 @@ namespace mongo {
          ...
        see logOp() comments.
     */
-    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, const BSONObjSetDefaultOrder &ids, const BSONObjSetDefaultOrder &modIds) {
+    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds) {
         char clientName[MaxClientLen];
         const char *ns = op.getStringField("ns");
         nsToClient(ns, clientName);
@@ -858,10 +858,10 @@ namespace mongo {
             bool mod;
             BSONObj id = idForOp( op, mod );
             out() << "op id: " << id << endl;
-            if ( ids.count( id ) == 0 ) {
+            if ( ids[ ns ].count( id ) == 0 ) {
                 out() << "applying op " << op << endl;
                 applyOperation( op );    
-            } else if ( mod ) {
+            } else if ( modIds[ ns ].count( id ) != 0 ) {
                 BSONObj existing;
                 if ( Helpers::findOne( ns, id, existing ) )
                     logOp( "i", ns, existing );
@@ -915,8 +915,8 @@ namespace mongo {
             c = 0;
         }
 
-        BSONObjSetDefaultOrder localChangedSinceLastPass;
-        BSONObjSetDefaultOrder localModChangedSinceLastPass;
+        IdSets localChangedSinceLastPass;
+        IdSets localModChangedSinceLastPass;
         
         bool initial = syncedTo.isNull();
 
@@ -970,14 +970,15 @@ namespace mongo {
                     bool mod;
                     BSONObj id = idForOp( op, mod );
                     if ( !id.isEmpty() ) {
+                        const char *ns = op.getStringField( "ns" );
                         id = id.getOwned();
                         if ( mod ) {
-                            if ( localChangedSinceLastPass.count( id ) == 0 )
-                                localModChangedSinceLastPass.insert( id );
+                            if ( localChangedSinceLastPass[ ns ].count( id ) == 0 )
+                                localModChangedSinceLastPass[ ns ].insert( id );
                         } else
                             localModChangedSinceLastPass.erase( id );
                         out() << "adding id to set: " << id << ", mod? " << mod << endl;
-                        localChangedSinceLastPass.insert( id );
+                        localChangedSinceLastPass[ ns ].insert( id );
                     }
                 }
             }

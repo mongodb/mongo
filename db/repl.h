@@ -125,7 +125,8 @@ namespace mongo {
     class ReplSource {
         bool resync(string db);
         bool sync_pullOpLog();
-        void sync_pullOpLog_applyOperation(BSONObj& op, const BSONObjSetDefaultOrder &ids, const BSONObjSetDefaultOrder &modIds);
+        typedef map< string, BSONObjSetDefaultOrder > IdSets;
+        void sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds);
         
         auto_ptr<DBClientConnection> conn;
         auto_ptr<DBClientCursor> cursor;

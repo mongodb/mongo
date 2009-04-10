@@ -52,6 +52,10 @@ coll = function( m ) {
     return m.getDB( baseName ).getCollection( baseName );
 }
 
+db2Coll = function( m ) {
+    return m.getDB( baseName + "_second" ).getCollection( baseName );    
+}
+
 doTest = function() {
     ports = allocatePorts( 5 );
     aPort = ports[ 0 ];
@@ -99,12 +103,14 @@ doTest = function() {
     write( r, 100, "a" );
     check( r, 100, "a" );
     coll( r ).update( {n:1}, {$set:{n:2}} );
+    db2Coll( r ).save( {n:500} );
     
     write( l, 20 );
     check( l, 20 );
     write( l, 200, "a" );
     check( l, 200, "a" );
-    coll( l ).update( {n:1}, {$set:{m:3}} );
+    coll( l ).update( {n:1}, {n:1,m:3} );
+    db2Coll( l ).save( {_id:"a",n:600} );
         
     // recover
     connect();
@@ -131,6 +137,9 @@ doTest = function() {
     }
     checkM( r );
     checkM( l );
+
+    // check separate database
+    assert.eq( 600, db2Coll( r ).findOne( {_id:"a"} ).n );
     
     ports.forEach( function( x ) { stopMongoProgram( x ); } );
     
