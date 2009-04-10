@@ -919,10 +919,8 @@ namespace mongo {
         IdSets localModChangedSinceLastPass;
         
         bool initial = syncedTo.isNull();
-        bool newConnection = false;
         
         if ( c == 0 ) {
-            newConnection = true;
             if ( syncedTo == OpTime() && localModifiedDbs.empty() ) {
                 // Important to grab last oplog timestamp before listing databases.
                 BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
@@ -1006,7 +1004,7 @@ namespace mongo {
             return true;
         }
 
-        if ( newConnection && replPair && replPair->state == ReplPair::State_Master ) {
+        if ( replPair && replPair->state == ReplPair::State_Master ) {
             cout << "updating sets now" << endl;
             // FIXME don't lock for so long.
             dblock lk;
