@@ -503,7 +503,7 @@ env = doConfigure( env )
 v8Home = GetOption( "v8home" )
 
 if not os.path.exists( v8Home ):
-    for poss in [ "../v8" , "../open-source/v8" ]:
+    for poss in [ "../v8" , "../../v8/" , "../open-source/v8" ]:
         if os.path.exists( poss ):
             v8Home = poss
             break
