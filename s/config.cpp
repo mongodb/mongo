@@ -78,6 +78,8 @@ namespace mongo {
             return m;
 
         uassert( (string)"not sharded:" + ns , sharded( ns ) );
+        if ( m && reload )
+            log() << "reloading shard info for: " << ns << endl;
         m = new ShardManager( this , ns , _sharded[ ns ] );
         _shards[ns] = m;
         return m;
