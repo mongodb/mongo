@@ -135,12 +135,22 @@ namespace mongo {
             return m;
         }
 
+        void markSet(){
+            mark = nextjsobj;
+        }
+        
+        void markReset(){
+            nextjsobj = mark;
+        }
+
     private:
         const Message& m;
         int reserved;
         const char *data;
         const char *nextjsobj;
         const char *theEnd;
+
+        const char * mark;
     };
 
     /* a request to run a query, received from the database */
