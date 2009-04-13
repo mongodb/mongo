@@ -103,6 +103,7 @@ namespace mongo {
 
     JSMatcher::~JSMatcher() {
         delete in;
+        delete nin;
         delete all;
         delete where;
     }
@@ -131,7 +132,7 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-            in(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
+            in(0), nin(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
     {
         BSONObjIterator i(jsobj);
         n = 0;
@@ -255,6 +256,22 @@ namespace mongo {
                             addBasic(e, opIN); // e not actually used at the moment for $in
                             ok = true;
                         }
+                        else if ( fn[1] == 'n' && fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0 && fe.type() == Array ) {
+                            // $nin
+                            uassert( "only 1 $nin statement per query supported", nin == 0 ); // todo...
+                            nin = new set<BSONElement,element_lt>();
+                            BSONObjIterator i(fe.embeddedObject());
+                            if ( i.more() ) {
+                                while ( 1 ) {
+                                    BSONElement ie = i.next();
+                                    if ( ie.eoo() )
+                                        break;
+                                    nin->insert(ie);
+                                }
+                            }
+                            addBasic(e, NIN); // e not actually used at the moment for $nin
+                            ok = true;
+                        }
                         else if ( fn[1] == 'a' && fn[2] == 'l' && fn[3] == 'l' && fn[4] == 0 && fe.type() == Array ) {
                             // $all
                             uassert( "only 1 $all statement per query supported", all == 0 ); // todo...
@@ -300,7 +317,7 @@ namespace mongo {
     }
 
     inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep) {
-        assert( op != NE );
+        assert( op != NE && op != NIN );
         
         if ( op == 0 )
             return l.valuesEqual(r);
@@ -383,6 +400,14 @@ namespace mongo {
     int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
         if ( compareOp == NE )
             return matchesNe( fieldName, toMatch, obj, deep );
+        if ( compareOp == NIN ) {
+            for( set<BSONElement,element_lt>::const_iterator i = nin->begin(); i != nin->end(); ++i ) {
+                int ret = matchesNe( fieldName, *i, obj, deep );
+                if ( ret != 1 )
+                    return ret;
+            }
+            return 1;
+        }
         
         BSONElement e;
         if ( !constrainIndexKey_.isEmpty() ) {
