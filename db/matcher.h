@@ -144,8 +144,7 @@ namespace mongo {
         int nRegex;
 
         // so we delete the mem when we're done:
-        BSONObjBuilder *builders[8];
-        int nBuilders;
+        vector< shared_ptr< BSONObjBuilder > > builders_;
     };
     
     // If match succeeds on index key, then attempt to match full record.

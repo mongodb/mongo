@@ -102,8 +102,6 @@ namespace mongo {
     };
 
     JSMatcher::~JSMatcher() {
-        for ( int i = 0; i < nBuilders; i++ )
-            delete builders[i];
         delete in;
         delete all;
         delete where;
@@ -135,7 +133,6 @@ namespace mongo {
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
             in(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
     {
-        nBuilders = 0;
         BSONObjIterator i(jsobj);
         n = 0;
         while ( i.more() ) {
@@ -223,9 +220,8 @@ namespace mongo {
                             else
                                 uassert("invalid $operator", false);
                             if ( op ) {
-                                uassert("too many items to match in query", nBuilders < 8);
-                                BSONObjBuilder *b = new BSONObjBuilder();
-                                builders[nBuilders++] = b;
+                                shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                                builders_.push_back( b );
                                 b->appendAs(fe, e.fieldName());
                                 addBasic(b->done().firstElement(), op);
                                 ok = true;
@@ -234,9 +230,8 @@ namespace mongo {
                         else if ( fn[2] == 'e' ) {
                             if ( fn[1] == 'n' && fn[3] == 0 ) {
                                 // $ne
-                                uassert("too many items to match in query", nBuilders < 8);
-                                BSONObjBuilder *b = new BSONObjBuilder();
-                                builders[nBuilders++] = b;
+                                shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                                builders_.push_back( b );
                                 b->appendAs(fe, e.fieldName());
                                 addBasic(b->done().firstElement(), NE);
                                 ok = true;
@@ -277,8 +272,8 @@ namespace mongo {
                             ok = true;
                         }
                         else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fe.isNumber() ) {
-                            BSONObjBuilder *b = new BSONObjBuilder();
-                            builders[nBuilders++] = b;
+                            shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                            builders_.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), opSIZE);    
                             haveSize = true;
