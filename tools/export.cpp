@@ -97,7 +97,7 @@ public:
                 cout << endl;
             }
             else {
-                cout << obj << endl;
+                cout << obj.jsonString() << endl;
             }
         }
 
