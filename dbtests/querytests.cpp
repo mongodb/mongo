@@ -363,6 +363,19 @@ namespace QueryTests {
             ASSERT( !client().findOne( ns, "", &empty ).isEmpty() );            
         }        
     };
+
+    class MultiNe : public ClientBase {
+    public:
+        ~MultiNe() {
+            client().dropCollection( "querytests.Ne" );            
+        }
+        void run() {
+            const char *ns = "querytests.Ne";
+            client().insert( ns, fromjson( "{a:[1,2]}" ) );
+            BSONObj spec = fromjson( "{a:{$ne:1,$ne:2}}" );
+            ASSERT( !client().findOne( ns, spec ).isEmpty() );
+        }                
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -383,6 +396,7 @@ namespace QueryTests {
             add< ArrayId >();
             add< UnderscoreNs >();
             add< EmptyFieldSpec >();
+            add< MultiNe >();
         }
     };
     
