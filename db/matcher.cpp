@@ -413,37 +413,30 @@ namespace mongo {
         
         if ( valuesMatch(e, toMatch, compareOp, deep) ) {
             return 1;
-        } else if ( compareOp != opALL && compareOp != opSIZE ) {
-            if ( e.type() == Array ) {
-                BSONObjIterator ai(e.embeddedObject());
-                while ( ai.more() ) {
-                    BSONElement z = ai.next();
-                    if ( valuesMatch( z, toMatch, compareOp) ) {
-                        if ( deep )
-                            *deep = true;
+        } else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE ) {
+            BSONObjIterator ai(e.embeddedObject());
+            while ( ai.more() ) {
+                BSONElement z = ai.next();
+                if ( valuesMatch( z, toMatch, compareOp) ) {
+                    if ( deep )
+                        *deep = true;
+                    return 1;
+                }
+            }
+        }
+        else if ( isArr ) {
+            BSONObjIterator ai(obj);
+            while ( ai.more() ) {
+                BSONElement z = ai.next();
+                if ( z.type() == Object ) {
+                    BSONObj eo = z.embeddedObject();
+                    int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep);
+                    if ( cmp > 0 ) {
+                        if ( deep ) *deep = true;
                         return 1;
                     }
                 }
             }
-            else if ( isArr ) {
-                BSONObjIterator ai(obj);
-                while ( ai.more() ) {
-                    BSONElement z = ai.next();
-                    if ( z.type() == Object ) {
-                        BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep);
-                        if ( cmp > 0 ) {
-                            if ( deep ) *deep = true;
-                            return 1;
-                        }
-                    }
-                }
-            }
-            else if ( e.eoo() ) {
-                // 0 indicatse "missing element"
-                return 0;
-            }
-            return -1;            
         }
         else if ( e.eoo() ) {
             // 0 indicatse "missing element"
