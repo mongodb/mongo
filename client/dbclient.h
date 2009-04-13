@@ -178,6 +178,10 @@ namespace mongo {
         bool tailable() const {
             return (opts & Option_CursorTailable) != 0;
         }
+        
+        bool hasResultFlag( int flag ){
+            return resultFlags & flag;
+        }
 
         bool init();
 
@@ -226,6 +230,7 @@ namespace mongo {
         int opts;
         auto_ptr<Message> m;
 
+        int resultFlags;
         long long cursorId;
         int nReturned;
         int pos;
@@ -234,7 +239,7 @@ namespace mongo {
         void requestMore();
         bool ownCursor_;
     };
-
+    
 
     /**
        The interface that any db connection should implement
