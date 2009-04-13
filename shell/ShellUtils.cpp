@@ -389,7 +389,10 @@ public:
         argv_[ args.Length() ] = 0;
         
         assert( port_ > 0 );
-        assert( dbs.count( port_ ) == 0 );        
+        if ( dbs.count( port_ ) != 0 ){
+            cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
+            assert( dbs.count( port_ ) == 0 );        
+        }
     }
     
     void start() {
