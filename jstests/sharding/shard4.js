@@ -36,7 +36,6 @@ print( s.config.shard.find().toArray().tojson( "\n" ) );
 print( "* A" );
 
 assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal B 1" );
-/*
 assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B 2" );
 print( "* B" );
 assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal B 3" );
@@ -46,5 +45,5 @@ for ( var i=0; i<10; i++ ){
     print( "* C " + i );
     assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B " + i );
 }
-*/
+
 s.stop();
