@@ -305,12 +305,10 @@ namespace mongo {
     }
 
     inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep) {
+        assert( op != NE );
+        
         if ( op == 0 )
             return l.valuesEqual(r);
-
-        if ( op == NE ) {
-            return !l.valuesEqual(r);
-        }
 
         if ( op == opIN ) {
             // { $in : [1,2,3] }
@@ -362,6 +360,11 @@ namespace mongo {
         return (op & z);
     }
 
+    int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, bool *deep) {
+        int ret = matchesDotted( fieldName, toMatch, obj, Equality, deep );
+        return -ret;
+    }
+    
     /* Check if a particular field matches.
 
        fieldName - field to match "a.b" if we are reaching into an embedded object.
@@ -383,6 +386,9 @@ namespace mongo {
         1 match
     */
     int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
+        if ( compareOp == NE )
+            return matchesNe( fieldName, toMatch, obj, deep );
+        
         BSONElement e;
         if ( !constrainIndexKey_.isEmpty() ) {
             e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
@@ -407,8 +413,7 @@ namespace mongo {
         
         if ( valuesMatch(e, toMatch, compareOp, deep) ) {
             return 1;
-        }
-        else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE ) {
+        } else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.more() ) {
                 BSONElement z = ai.next();

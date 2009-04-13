@@ -372,9 +372,22 @@ namespace QueryTests {
         void run() {
             const char *ns = "querytests.Ne";
             client().insert( ns, fromjson( "{a:[1,2]}" ) );
+            ASSERT( client().findOne( ns, fromjson( "{a:{$ne:1}}" ) ).isEmpty() );
             BSONObj spec = fromjson( "{a:{$ne:1,$ne:2}}" );
-            ASSERT( !client().findOne( ns, spec ).isEmpty() );
+            ASSERT( client().findOne( ns, spec ).isEmpty() );
         }                
+    };
+    
+    class EmbeddedNe : public ClientBase {
+    public:
+        ~EmbeddedNe() {
+            client().dropCollection( "querytests.NestedNe" );            
+        }
+        void run() {
+            const char *ns = "querytests.NestedNe";
+            client().insert( ns, fromjson( "{a:[{b:1},{b:2}]}" ) );
+            ASSERT( client().findOne( ns, fromjson( "{'a.b':{$ne:1}}" ) ).isEmpty() );
+        }                        
     };
     
     class All : public UnitTest::Suite {
@@ -397,6 +410,7 @@ namespace QueryTests {
             add< UnderscoreNs >();
             add< EmptyFieldSpec >();
             add< MultiNe >();
+            add< EmbeddedNe >();
         }
     };
     
