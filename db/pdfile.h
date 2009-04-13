@@ -460,5 +460,7 @@ namespace mongo {
         assert( dl.a() != -1 );
         return database->getFile(dl.a())->recordAt(dl);
     }
+    
+    void ensureHaveIdIndex(const char *ns);
 
 } // namespace mongo
