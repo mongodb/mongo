@@ -843,6 +843,19 @@ namespace JsonTests {
                 return "{ 'ab\\'c\"' : 'bb\\b \\'\"' }";
             }            
         };
+        
+        class ObjectId : public Base {
+            virtual BSONObj bson() const {
+                OID id;
+                id.init( "deadbeeff00ddeadbeeff00d" );
+                BSONObjBuilder b;
+                b.appendOID( "_id", &id );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"_id\": ObjectId( \"deadbeeff00ddeadbeeff00d\" ) }";
+            }                        
+        };
 
     } // namespace FromJsonTests
     
@@ -915,6 +928,7 @@ namespace JsonTests {
             add< FromJsonTests::UnquotedFieldName >();            
             add< FromJsonTests::UnquotedFieldNameDollar >();            
             add< FromJsonTests::SingleQuotes >();            
+            add< FromJsonTests::ObjectId >();            
         }
     };
     
