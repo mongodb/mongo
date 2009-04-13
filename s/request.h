@@ -61,7 +61,7 @@ namespace mongo {
         
     private:
         
-        void reset( bool reload=true );
+        void reset( bool reload=false );
         
         Message& _m;
         DbMessage _d;
@@ -73,7 +73,20 @@ namespace mongo {
     };
     
     class StaleConfigException : public std::exception {
+    public:
+        StaleConfigException( const string& ns , const string& msg){
+            stringstream s;
+            s << "StaleConfigException ns: " << ns << " " << msg;
+            _msg = s.str();
+        }
+
+        virtual ~StaleConfigException() throw(){}
         
+        virtual const char* what() const throw(){
+            return _msg.c_str();
+        }
+    private:
+        string _msg;
     };
 }
 
