@@ -68,6 +68,11 @@ namespace mongo {
             const BSONElement& toMatch, const BSONObj& obj,
             int compareOp, bool *deep, bool isArr = false);
 
+        int matchesNe(
+            const char *fieldName,
+            const BSONElement &toMatch, const BSONObj &obj,
+            bool *deep);
+        
         struct element_lt
         {
             bool operator()(const BSONElement& l, const BSONElement& r) const
