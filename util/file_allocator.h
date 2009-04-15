@@ -25,45 +25,54 @@ namespace mongo {
 
     // Handles allocation of contiguous files on disk.
     class FileAllocator {
-        // The public functions may not be called concurrently.  If
-        // allocateAsap() is called for a file after requestAllocation(), the
-        // sizes in each call must be the same.
+        // The public functions may not be called concurrently.  The allocation
+        // functions may be called multiple times per file, but only the first
+        // size specified per file will be used.
     public:
         void start() {
             Runner r( *this );
             boost::thread t( r );
         }
-        // May be called if file exists, but may not be called more than once
-        // for a file.
-        void requestAllocation( const string &name, int size ) {
-            if ( boost::filesystem::exists( name ) )
-                return;
+        // May be called if file exists. If file exists, or its allocation has
+        // been requested, size is updated to match existing file size.
+        void requestAllocation( const string &name, int &size ) {
             {
                 boostlock lk( pendingMutex_ );
-                pending_.push_back( make_pair( name, size ) );
+                int oldSize = prevSize( name );
+                if ( oldSize != -1 ) {
+                    size = oldSize;
+                    return;
+                }
+                pending_.push_back( name );
+                pendingSize_[ name ] = size;
             }
             pendingUpdated_.notify_all();
         }
-        // Returns when file has been allocated.
+        // Returns when file has been allocated.  If file exists, size is
+        // updated to match existing file size.
         void allocateAsap( const string &name, int size ) {
-            pair< string, int > spec( name, size );
             {
                 boostlock lk( pendingMutex_ );
-                if ( allocated( name ) )
-                    return;
+                int oldSize = prevSize( name );
+                if ( oldSize != -1 ) {
+                    size = oldSize;
+                    if ( !inProgress( name ) )
+                        return;
+                }
+                pendingSize_[ name ] = size;
                 if ( pending_.size() == 0 )
-                    pending_.push_back( spec );
-                else if ( pending_.front() != spec ) {
-                    pending_.remove( spec );
-                    list< pair< string, int > >::iterator i = pending_.begin();
+                    pending_.push_back( name );
+                else if ( pending_.front() != name ) {
+                    pending_.remove( name );
+                    list< string >::iterator i = pending_.begin();
                     ++i;
-                    pending_.insert( i, spec );
+                    pending_.insert( i, name );
                 }
             }
             pendingUpdated_.notify_all();
             boostlock lk( pendingMutex_ );
             while( 1 ) {
-                if ( allocated( name ) ) {
+                if ( !inProgress( name ) ) {
                     return;
                 }
                 pendingUpdated_.wait( lk );                    
@@ -80,19 +89,28 @@ namespace mongo {
         }
         
     private:
-        // caller must hold pendingMutex_ lock
-        bool allocated( const string &name ) const {
-            if ( !boost::filesystem::exists( name ) )
-                return false;
-            for( list< pair< string, int > >::const_iterator i = pending_.begin(); i != pending_.end(); ++i )
-                if ( i->first == name )
-                    return false;
-            return true;
+        // caller must hold pendingMutex_ lock.  Returns size if allocated or 
+        // allocation requested, -1 otherwise.
+        int prevSize( const string &name ) const {
+            if ( pendingSize_.count( name ) > 0 )
+                return pendingSize_[ name ];
+            if ( boost::filesystem::exists( name ) )
+                return boost::filesystem::file_size( name );
+            return -1;
+        }
+         
+        // caller must hold pendingMutex_ lock.
+        bool inProgress( const string &name ) const {
+            for( list< string >::const_iterator i = pending_.begin(); i != pending_.end(); ++i )
+                if ( *i == name )
+                    return true;
+            return false;
         }
 
         mutable boost::mutex pendingMutex_;
         mutable boost::condition_variable pendingUpdated_;
-        list< pair< string, int > > pending_;
+        list< string > pending_;
+        mutable map< string, int > pendingSize_;
         
         struct Runner {
             Runner( FileAllocator &allocator ) : a_( allocator ) {}
@@ -111,8 +129,8 @@ namespace mongo {
                             boostlock lk( a_.pendingMutex_ );
                             if ( a_.pending_.size() == 0 )
                                 break;
-                            name = a_.pending_.front().first;
-                            size = a_.pending_.front().second;
+                            name = a_.pending_.front();
+                            size = a_.pendingSize_[ name ];
                         }
                         try {
                             int fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
@@ -157,6 +175,7 @@ namespace mongo {
                         
                         {
                             boostlock lk( a_.pendingMutex_ );
+                            a_.pendingSize_.erase( name );
                             a_.pending_.pop_front();
                         }
                         a_.pendingUpdated_.notify_all();

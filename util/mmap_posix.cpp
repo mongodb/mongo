@@ -51,11 +51,10 @@ namespace mongo {
 #endif
 
     void* MemoryMappedFile::map(const char *filename, int length) {
-        updateLength( filename, length );
-        len = length;
-
+        // length may be updated by callee.
         theFileAllocator().allocateAsap( filename, length );
-
+        len = length;
+        
         fd = open(filename, O_RDWR | O_NOATIME);
         if ( fd <= 0 ) {
             out() << "couldn't open " << filename << ' ' << errno << endl;

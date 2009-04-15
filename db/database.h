@@ -108,8 +108,14 @@ namespace mongo {
             int n = (int) files.size();
             MongoDataFile *ret = getFile( n, sizeNeeded );
             if ( preallocateNextFile )
-                getFile( n + 1, 0, true );
+                preallocateAFile();
             return ret;
+        }
+        
+        // ok to call multiple times
+        void preallocateAFile() {
+            int n = (int) files.size();
+            getFile( n, 0, true );            
         }
 
         MongoDataFile* suitableFile( int sizeNeeded ) {
