@@ -55,7 +55,7 @@ namespace mongo {
                 delete files[i];
         }
 
-        MongoDataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false ) {
+        MongoDataFile* getFile( int n, int sizeNeeded = 0 ) {
             assert(this);
 
             namespaceIndex.init();
@@ -71,12 +71,9 @@ namespace mongo {
                 if ( n > 100 )
                     out() << "getFile(): n=" << n << "?" << endl;
             }
-            MongoDataFile* p = 0;
-            if ( !preallocateOnly ) {
-                while ( n >= (int) files.size() )
-                    files.push_back(0);
-                p = files[n];
-            }
+            while ( n >= (int) files.size() )
+                files.push_back(0);
+            MongoDataFile* p = files[n];
             if ( p == 0 ) {
                 stringstream ss;
                 ss << name << '.' << n;
@@ -90,26 +87,20 @@ namespace mongo {
                 if ( sizeNeeded + MDFHeader::headerSize() > minSize )
                     minSize = sizeNeeded + MDFHeader::headerSize();
                 try {
-                    p->open( fullNameString.c_str(), minSize, preallocateOnly );
+                    p->open( fullNameString.c_str(), minSize );
                 }
                 catch ( AssertionException& ) {
                     delete p;
                     throw;
                 }
-                if ( preallocateOnly )
-                    delete p;
-                else
-                    files[n] = p;
+                files[n] = p;
             }
-            return preallocateOnly ? 0 : p;
+            return p;
         }
 
-        MongoDataFile* addAFile( int sizeNeeded = 0, bool preallocateNextFile = false ) {
+        MongoDataFile* addAFile( int sizeNeeded = 0 ) {
             int n = (int) files.size();
-            MongoDataFile *ret = getFile( n, sizeNeeded );
-            if ( preallocateNextFile )
-                getFile( n + 1, 0, true );
-            return ret;
+            return getFile( n, sizeNeeded );
         }
 
         MongoDataFile* suitableFile( int sizeNeeded ) {

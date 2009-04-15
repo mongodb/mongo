@@ -30,7 +30,6 @@
 #include "reccache.h"
 #include "replset.h"
 #include "../s/d_logic.h"
-#include "../util/file_allocator.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -653,11 +652,6 @@ namespace mongo {
         /* must do this before unmapping mem or you may get a seg fault */
         closeAllSockets();
 
-        // wait until file preallocation finishes
-        // we would only hang here if the file_allocator code generates a
-        // synchronous signal, which we don't expect
-        theFileAllocator().waitUntilFinished();
-        
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );

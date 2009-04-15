@@ -44,7 +44,7 @@ namespace mongo {
             return len;
         }
 
-        static void updateLength( const char *filename, int &length );
+        void updateLength( const char *filename, int &length ) const;
 
     private:
         void created();
