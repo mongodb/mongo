@@ -335,7 +335,7 @@ namespace mongo {
     Timer startupSrandTimer;
 
     void acquirePathLock() {
-#if !defined(_WIN32) and !defined(__sunos__)
+#if !defined(_WIN32) && !defined(__sunos__)
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
         lockFile = open( name.c_str(), O_RDONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO );
         massert( "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
