@@ -1079,9 +1079,7 @@ assert( !eloc.isNull() );
             /* todo: shouldn't be in the namespace catalog until after the allocations here work.
                      also if this is an addIndex, those checks should happen before this!
             */
-            // This creates first file in the database.
             database->newestFile()->allocExtent(ns, initialExtentSize(len));
-            database->preallocateAFile();
             d = nsdetails(ns);
         }
         d->paddingFits();
