@@ -24,6 +24,7 @@
 #include "introspect.h"
 #include "repl.h"
 #include "../util/unittest.h"
+#include "../util/file_allocator.h"
 #include "dbmessage.h"
 #include "instance.h"
 #if !defined(_WIN32)
@@ -360,6 +361,8 @@ namespace mongo {
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         
         acquirePathLock();
+        
+        theFileAllocator().start();
         
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
         
