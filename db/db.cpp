@@ -72,7 +72,8 @@ namespace mongo {
         out() << "quicktest()\n";
 
         MemoryMappedFile mmf;
-        char *m = (char *) mmf.map("/tmp/quicktest", 16384);
+        int len = 16384;
+        char *m = (char *) mmf.map("/tmp/quicktest", len);
         //	out() << "mmf reads: " << m << endl;
         strcpy_s(m, 1000, "hello worldz");
     }

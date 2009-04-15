@@ -50,7 +50,7 @@ namespace mongo {
 #define O_NOATIME 0
 #endif
 
-    void* MemoryMappedFile::map(const char *filename, int length) {
+    void* MemoryMappedFile::map(const char *filename, int &length) {
         // length may be updated by callee.
         theFileAllocator().allocateAsap( filename, length );
         len = length;

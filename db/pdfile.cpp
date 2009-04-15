@@ -248,7 +248,6 @@ namespace mongo {
             uassert("can't map file memory - mongo requires 64 bit build for larger datasets", header);
         else
             uassert("can't map file memory", header);
-        // If opening an existing file, this is a no-op.
         header->init(fileNo, size);
     }
 
