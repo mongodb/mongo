@@ -119,6 +119,8 @@ namespace mongo {
             size += 256;
             size &= 0xffffffffffffff00LL;
         }
+        
+        uassert( "invalid size spec", size > 0 );
 
         bool newCapped = false;
         int mx = 0;
