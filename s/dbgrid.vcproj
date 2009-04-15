@@ -50,7 +50,7 @@
 				PrecompiledHeaderThrough="stdafx.h"
 				WarningLevel="3"
 				DebugInformationFormat="4"
-				DisableSpecificWarnings="4355"
+				DisableSpecificWarnings="4355;4800"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"

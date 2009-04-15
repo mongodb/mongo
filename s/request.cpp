@@ -110,7 +110,7 @@ namespace mongo {
                 log() << staleConfig.what() << " attempt: " << attempt << endl;
                 uassert( "too many attempts to update config, failing" , attempt < 5 );
                 
-                sleep( attempt );
+                sleepsecs( attempt );
                 reset( true );
                 _d.markReset();
                 process( attempt + 1 );
