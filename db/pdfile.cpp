@@ -143,18 +143,13 @@ namespace mongo {
             for ( int i = 0; i < nExtents; ++i ) {
                 database->suitableFile((int) size)->allocExtent( ns, (int) size, newCapped );
             }
-        } else {
+        } else
             while ( size > 0 ) {
                 int max = MongoDataFile::maxSize() - MDFHeader::headerSize();
                 int desiredExtentSize = (int) (size > max ? max : size);
                 Extent *e = database->suitableFile( desiredExtentSize )->allocExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
             }
-            if ( !newCapped ) {
-                // ok to call this multiple times
-                database->preallocateAFile();
-            }
-        }
 
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
@@ -238,6 +233,8 @@ namespace mongo {
 
         if ( preallocateOnly ) {
 #if !defined(_WIN32)
+            // if file exists, update 'size' to match existing file size.
+            MemoryMappedFile::updateLength( filename, size );
             theFileAllocator().requestAllocation( filename, size );
 #endif
             return;
