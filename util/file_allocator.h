@@ -16,6 +16,7 @@
 
 #include "stdafx.h"
 #include <fcntl.h>
+#include <errno.h>
 
 #ifndef O_NOATIME
 #define O_NOATIME 0
