@@ -1095,7 +1095,6 @@ assert( !eloc.isNull() );
             */
             // This creates first file in the database.
             database->newestFile()->allocExtent(ns, initialExtentSize(len));
-            database->preallocateAFile();
             d = nsdetails(ns);
         }
         d->paddingFits();
