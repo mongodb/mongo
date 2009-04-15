@@ -46,7 +46,7 @@ namespace mongo {
         --closingAllFiles;
     }
 
-    void MemoryMappedFile::updateLength( const char *filename, int &length ) const {
+    void MemoryMappedFile::updateLength( const char *filename, int &length ) {
         if ( !boost::filesystem::exists( filename ) )
             return;
         // make sure we map full length if preexisting file.
