@@ -108,7 +108,7 @@ namespace mongo {
         }
 
         mutable boost::mutex pendingMutex_;
-        mutable boost::condition pendingUpdated_;
+        mutable boost::condition_variable pendingUpdated_;
         list< string > pending_;
         mutable map< string, int > pendingSize_;
         
