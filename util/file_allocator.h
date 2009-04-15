@@ -158,10 +158,10 @@ namespace mongo {
                                 int left = size;
                                 while ( 1 ) {
                                     if ( left <= z ) {
-                                        write(fd, buf, left);
+                                        massert( "write failed", left == write(fd, buf, left) );
                                         break;
                                     }
-                                    write(fd, buf, z);
+                                    massert( "write failed", z == write(fd, buf, z) );
                                     left -= z;
                                 }
                                 log() << "done allocating datafile " << name << ", size: " << size << ", took " << ((double)t.millis())/1000.0 << " secs" << endl;
