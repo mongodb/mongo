@@ -188,6 +188,20 @@ namespace mongo {
         return true;
     }
     
+    long Shard::getPhysicalSize(){
+        ScopedDbConnection conn( getServer() );
+        
+        BSONObj result;
+        uassert( "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
+                                                                        << "keyPattern" << _manager->getShardKey().key() 
+                                                                        << "min" << getMin() 
+                                                                        << "max" << getMax() 
+                                                                        ) , result ) );
+        
+        conn.done();
+        return (long)result["size"].number();
+    }
+    
     bool Shard::operator==( const Shard& s ){
         return 
             _manager->getShardKey().compare( _min , s._min ) == 0 &&
