@@ -186,6 +186,7 @@ DBCollection.prototype.dropIndexes = function(){
 
 
 DBCollection.prototype.drop = function(){
+    this.resetIndexCache();
     return this._db.runCommand( { drop: this.getName() } );
 }
 
