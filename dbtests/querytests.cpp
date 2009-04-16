@@ -389,6 +389,32 @@ namespace QueryTests {
             ASSERT( client().findOne( ns, fromjson( "{'a.b':{$ne:1}}" ) ).isEmpty() );
         }                        
     };
+
+    class AutoResetIndexCache : public ClientBase {
+    public:
+        ~AutoResetIndexCache() {
+            client().dropCollection( "querytests.AutoResetIndexCache" );
+        }
+        static const char *ns() { return "querytests.AutoResetIndexCache"; }
+        static const char *idxNs() { return "querytests.system.indexes"; }
+        void index() const { ASSERT( !client().findOne( idxNs(), BSONObj() ).isEmpty() ); }
+        void noIndex() const { ASSERT( client().findOne( idxNs(), BSONObj() ).isEmpty() ); }
+        void checkIndex() {
+            client().ensureIndex( ns(), BSON( "a" << 1 ) );
+            index();            
+        }
+        void run() {
+            client().dropDatabase( "querytests" );
+            noIndex();
+            checkIndex();
+            client().dropCollection( ns() );
+            noIndex();
+            checkIndex();
+            client().dropDatabase( "querytests" );
+            noIndex();
+            checkIndex();
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -411,6 +437,7 @@ namespace QueryTests {
             add< EmptyFieldSpec >();
             add< MultiNe >();
             add< EmbeddedNe >();
+            add< AutoResetIndexCache >();
         }
     };
     
