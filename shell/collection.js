@@ -186,17 +186,7 @@ DBCollection.prototype.dropIndexes = function(){
 
 
 DBCollection.prototype.drop = function(){
-    var res = this.dropIndexes();
-    if( ! res )
-	return res;
-    
-    if( ! res.ok ) {
-	res.errmsg = "dropping indexes..." + res.errmsg;
-	return res;
-    }
-
-    res = this._db.runCommand( { drop: this.getName() } );
-    return res;
+    return this._db.runCommand( { drop: this.getName() } );
 }
 
 DBCollection.prototype.validate = function() {
