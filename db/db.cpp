@@ -363,7 +363,9 @@ namespace mongo {
         
         acquirePathLock();
         
+#if !defined(_WIN32)
         theFileAllocator().start();
+#endif
         
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
         

@@ -103,6 +103,7 @@ namespace mongo {
         }
         
         void _insert( Request& r , DbMessage& d, ShardManager* manager ){
+            
             while ( d.moreJSObjs() ){
                 BSONObj o = d.nextJsObj();
                 if ( ! manager->hasShardKey( o ) ){
@@ -113,6 +114,8 @@ namespace mongo {
                 Shard& s = manager->findShard( o );
                 log(4) << "  server:" << s.getServer() << " " << o << endl;
                 insert( s.getServer() , r.getns() , o );
+                
+                s.splitIfShould( o.objsize() );
             }            
         }
 
@@ -136,6 +139,8 @@ namespace mongo {
 
             Shard& s = manager->findShard( toupdate );
             doWrite( dbUpdate , r , s.getServer() );
+
+            s.splitIfShould( d.msg().data->dataLen() );
         }
         
         void _delete( Request& r , DbMessage& d, ShardManager* manager ){
