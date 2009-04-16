@@ -74,7 +74,13 @@ namespace mongo {
         BSONObj pickSplitPoint();
         Shard * split();
         Shard * split( const BSONObj& middle );
-        
+
+        /**
+         * @return size of shard in bytes
+         *  talks to mongod to do this
+         */
+        long getPhysicalSize();
+
         bool moveAndCommit( const string& to , string& errmsg );
 
         virtual const char * getNS(){ return "config.shard"; }
@@ -88,6 +94,7 @@ namespace mongo {
         
         void _markModified();
         
+
     private:
         
         ShardManager * _manager;

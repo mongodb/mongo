@@ -35,10 +35,10 @@ doTest = function( signal ) {
     rz = r.getDB( baseName ).z
     
     rz.save( { _id: new ObjectId() } );
-    sleep( 5000 );
     soonCount( 1 );
     assert.eq( 0, l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
 
+    sleep( 3000 ); // allow time to finish clone and save ReplSource
     stopMongod( ports[ 1 ], signal );
     
     big = new Array( 2000 ).toString();
@@ -47,7 +47,11 @@ doTest = function( signal ) {
     
     l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
     l.setSlaveOk();
-    assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
+    assert.soon( function() {
+                ret = l.getDB( "admin" ).runCommand( { "resync" : 1 } );
+//                printjson( ret );
+                return 1 == ret.ok;
+                } );
     
     sleep( 8000 );
     soonCount( 1001 );

@@ -30,9 +30,10 @@ namespace mongo {
         // Throws exception if file doesn't exist.
         void* map( const char *filename );
 
-        /* Creates with length if DNE, otherwise uses existing file length.
+        /* Creates with length if DNE, otherwise uses existing file length,
+           passed length.
         */
-        void* map(const char *filename, int length);
+        void* map(const char *filename, int &length);
 
         void flush(bool sync);
 
@@ -44,7 +45,7 @@ namespace mongo {
             return len;
         }
 
-        void updateLength( const char *filename, int &length ) const;
+        static void updateLength( const char *filename, int &length );
 
     private:
         void created();
