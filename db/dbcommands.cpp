@@ -934,7 +934,7 @@ namespace mongo {
         CmdDatasize() : Command( "datasize" ) {}
         virtual bool slaveOk() { return true; }
         virtual void help( stringstream &help ) const {
-            help << " example: { medianKey:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }\n"
+            help << " example: { datasize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }\n"
                 "NOTE: This command may take awhile to run";
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
