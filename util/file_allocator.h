@@ -23,7 +23,7 @@
 #endif
 
 namespace mongo {
-
+#if !defined(_WIN32)
     // Handles allocation of contiguous files on disk.
     class FileAllocator {
         // The public functions may not be called concurrently.  The allocation
@@ -187,5 +187,5 @@ namespace mongo {
     };
     
     FileAllocator &theFileAllocator();
-    
+#endif    
 } // namespace mongo
