@@ -132,6 +132,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> cursor;
 
         set<string> addDbNextPass;
+        set<string> incompleteCloneDbs;
 
         ReplSource();
         
@@ -141,6 +142,7 @@ namespace mongo {
         bool connect();
         // returns possibly unowned id spec for the operation.
         static BSONObj idForOp( const BSONObj &op, bool &mod );
+        bool initialPull_;
 
     public:
         static void applyOperation(const BSONObj& op);
@@ -165,7 +167,6 @@ namespace mongo {
         void repopulateDbsList( const BSONObj &o );
 
         int nClonedThisPass;
-        bool mustListDbs_;
 
         typedef vector< shared_ptr< ReplSource > > SourceVector;
         static void loadAll(SourceVector&);
@@ -184,12 +185,15 @@ namespace mongo {
         bool operator==(const ReplSource&r) const {
             return hostName == r.hostName && sourceName() == r.sourceName();
         }
-
+        operator string() const { return sourceName() + "@" + hostName; }
+        
         bool haveMoreDbsToSync() const { return !addDbNextPass.empty(); }        
 
         static bool throttledForceResyncDead( const char *requester );
         static void forceResyncDead( const char *requester );
         void forceResync( const char *requester );
+        
+        bool initialPull() const { return initialPull_; }
     };
 
     /* Write operation to the log (local.oplog.$main)

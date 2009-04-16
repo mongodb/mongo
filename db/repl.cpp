@@ -69,7 +69,6 @@ namespace mongo {
     extern bool autoresync;
     time_t lastForcedResync = 0;
     
-    set< string > localModifiedDbs;
     OpTime lastLocalLog;
     
 } // namespace mongo
@@ -417,13 +416,16 @@ namespace mongo {
     /* --------------------------------------------------------------*/
 
     ReplSource::ReplSource() {
+        out() << "new replsource" << endl;
+        initialPull_ = true;
         replacing = false;
         nClonedThisPass = 0;
         paired = false;
-        mustListDbs_ = true;
     }
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
+        out() << "new replsource" << endl;
+        initialPull_ = true;
         replacing = false;
         paired = false;
         only = o.getStringField("only");
@@ -450,6 +452,17 @@ namespace mongo {
             }
         }        
         
+        dbsObj = o.getObjectField("incompleteCloneDbs");
+        if ( !dbsObj.isEmpty() ) {
+            BSONObjIterator i(dbsObj);
+            while ( 1 ) {
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                incompleteCloneDbs.insert( e.fieldName() );
+            }
+        }        
+
         lastSavedLocalTs_ = OpTime( o.getField( "localLogTs" ).date() );
         
         repopulateDbsList( o );
@@ -484,6 +497,15 @@ namespace mongo {
         }
         if ( n )
             b.append("dbsNextPass", dbsNextPassBuilder.done());
+
+        BSONObjBuilder incompleteCloneDbsBuilder;
+        n = 0;
+        for ( set<string>::iterator i = incompleteCloneDbs.begin(); i != incompleteCloneDbs.end(); i++ ) {
+            n++;
+            incompleteCloneDbsBuilder.appendBool(i->c_str(), 1);
+        }
+        if ( n )
+            b.append("incompleteCloneDbs", incompleteCloneDbsBuilder.done());
 
         return b.obj();
     }
@@ -535,17 +557,20 @@ namespace mongo {
     }
     
     static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, const BSONObj &spec, ReplSource::SourceVector &old) {
-        if ( s.syncedTo != OpTime() ) { // Don't reuse old ReplSource if there was a forced resync.
+        if ( s.initialPull() ) { // Don't reuse old ReplSource if there was a forced resync.
             for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
                 if ( s == **i ) {
+                    out() << "reusing existing: " << **i << endl;
                     v.push_back(*i);
                     old.erase(i);
                     return;
                 }
+                out() << "not match: " << s << ", **i: " << **i << endl;
                 i++;
             }
         }
-        
+
+        out() << "not reusing; using new" << endl;
         v.push_back( shared_ptr< ReplSource >( new ReplSource( s ) ) );
     }
 
@@ -553,6 +578,7 @@ namespace mongo {
        and cursor in effect.
     */
     void ReplSource::loadAll(SourceVector &v) {
+        out() << "doing loadAll(), nOld: " << v.size() << endl;
         SourceVector old = v;
         v.clear();
 
@@ -646,6 +672,7 @@ namespace mongo {
         database = 0;
 
         if ( !gotPairWith && replPair ) {
+            out() << "not gotPairWith" << endl;
             /* add the --pairwith server */
             shared_ptr< ReplSource > s( new ReplSource() );
             s->paired = true;
@@ -702,7 +729,6 @@ namespace mongo {
         }        
         dbs.clear();
         syncedTo = OpTime();
-        mustListDbs_ = true;
         save();
     }
 
@@ -844,15 +870,22 @@ namespace mongo {
             throw SyncException();
         }
         
-        if ( ( newDb || justCreated ) && localModifiedDbs.count( clientName ) == 0 ) {
-            if ( !justCreated && strcmp( clientName, "admin" ) != 0  ) {
+        bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
+        
+        if ( justCreated || incompleteClone ) {
+            if ( incompleteClone ) {
                 log() << "An earlier initial clone did not complete, resyncing." << endl;
             } else if ( !newDb ) {
                 log() << "Db just created, but not new to repl source." << endl;
             }
+            incompleteCloneDbs.insert( clientName );
+            save();
+            setClientTempNs( ns );
             nClonedThisPass++;
+            out() << "database: " << unsigned( database ) << endl;
             resync(database->name);
             addDbNextPass.erase(clientName);
+            incompleteCloneDbs.erase( clientName );
             save(); // persist dbs, next pass dbs
         } else {
             bool mod;
@@ -917,11 +950,11 @@ namespace mongo {
 
         IdSets localChangedSinceLastPass;
         IdSets localModChangedSinceLastPass;
-        
+
         bool initial = syncedTo.isNull();
         
         if ( c == 0 ) {
-            if ( syncedTo == OpTime() && localModifiedDbs.empty() ) {
+            if ( syncedTo == OpTime() && initialPull_ ) {
                 // Important to grab last oplog timestamp before listing databases.
                 BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
                 if ( !last.isEmpty() ) {
@@ -929,33 +962,37 @@ namespace mongo {
                     massert( "non Date ts found", ts.type() == Date );
                     syncedTo = OpTime( ts.date() );
                 }
-                if ( mustListDbs_ ) {
-                    mustListDbs_ = false;
-                    set< string > localDbs;
-                    vector< string > diskDbs;
-                    getDatabaseNames( diskDbs );
-                    for( vector< string >::iterator i = diskDbs.begin(); i != diskDbs.end(); ++i )
-                        localDbs.insert( *i );
-                    for( map< string, Database* >::iterator i = databases.begin(); i != databases.end(); ++i )
-                        localDbs.insert( i->first );
-                    BSONObj info;
-                    bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
-                    massert( "Unable to get database list", ok );
-                    BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
-                    while( i.more() ) {
-                        BSONElement e = i.next();
-                        if ( e.eoo() )
-                            break;
-                        string name = e.embeddedObject().getField( "name" ).valuestr();
-                        // We may be paired, so only attempt to add databases not already present.
-                        if ( name != "local" && localDbs.count( name ) == 0 ) {
-                            if ( only.empty() || only == name )
-                                addDbNextPass.insert( name );
+            }
+
+            if ( initialPull_ ) {
+                initialPull_ = false;
+                out() << "this: " << unsigned( this ) << endl;
+                set< string > localDbs;
+                vector< string > diskDbs;
+                getDatabaseNames( diskDbs );
+                for( vector< string >::iterator i = diskDbs.begin(); i != diskDbs.end(); ++i )
+                    localDbs.insert( *i );
+                for( map< string, Database* >::iterator i = databases.begin(); i != databases.end(); ++i )
+                    localDbs.insert( i->first );
+                BSONObj info;
+                bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
+                massert( "Unable to get database list", ok );
+                BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.eoo() )
+                        break;
+                    string name = e.embeddedObject().getField( "name" ).valuestr();
+                    // We may be paired, so only attempt to add databases not already present.
+                    if ( name != "local" && localDbs.count( name ) == 0 ) {
+                        if ( only.empty() || only == name ) {
+                            out() << "adding for next pass: " << name << endl;
+                            addDbNextPass.insert( name );
                         }
                     }
                 }
             }
-            
+                        
             BSONObjBuilder q;
             q.appendDate("$gte", syncedTo.asDate());
             BSONObjBuilder query;
@@ -971,11 +1008,16 @@ namespace mongo {
             cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable | Option_SlaveOk | Option_OplogReplay );
             c = cursor.get();
             tailing = false;
+
+//            dblock lk;
+//            save();
         }
         else {
             log(2) << "repl: tailing=true\n";
         }
 
+        initialPull_ = false;
+    
         if ( c == 0 ) {
             problem() << "pull:   dbclient::query returns null (conn closed?)" << endl;
             resetConnection();
@@ -1233,7 +1275,6 @@ namespace mongo {
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
             char cl[ 256 ];
             nsToClient( ns, cl );
-            localModifiedDbs.insert( cl );
         }
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
         if ( t.logValid() ) {
@@ -1413,6 +1454,7 @@ namespace mongo {
                 string msg = ss.str();
                 ReplInfo r(msg.c_str());
                 sleepsecs(s);
+                out() << msg << endl;
             }
         }
     }

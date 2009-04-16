@@ -132,18 +132,18 @@ doTest = function( recover, newMaster, newSlave ) {
     
 }
 
-doTest( function() {
-       connect();
-       assert.soon( function() {
-                   lm = ismaster( l );
-                   rm = ismaster( r );
-                   
-                   assert( lm == 1 || lm == 0, "lm value invalid" );
-                   assert( rm == 1, "rm value invalid" );
-                   
-                   return ( lm == 0 && rm == 1 );
-                   } );       
-       }, function() { return r; }, function() { return l; } );
+//doTest( function() {
+//       connect();
+//       assert.soon( function() {
+//                   lm = ismaster( l );
+//                   rm = ismaster( r );
+//                   
+//                   assert( lm == 1 || lm == 0, "lm value invalid" );
+//                   assert( rm == 1, "rm value invalid" );
+//                   
+//                   return ( lm == 0 && rm == 1 );
+//                   } );       
+//       }, function() { return r; }, function() { return l; } );
 
 doTest( function() {
        stopMongod( rPort );
