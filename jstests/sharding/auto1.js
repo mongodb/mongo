@@ -35,7 +35,15 @@ for ( ; i<1500; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
-assert.eq( 3 , s.config.shard.count() , "shard didn't split " );
+assert.eq( 3 , s.config.shard.count() , "shard didn't split A " );
+print( s.config.shard.find().toArray().tojson( "\n" ) );
+
+for ( ; i<3000; i++ ){
+    coll.save( { num : i , s : bigString } );
+}
+
+assert.eq( 4 , s.config.shard.count() , "shard didn't split B " );
+print( s.config.shard.find().toArray().tojson( "\n" ) );
 
 
 s.stop();
