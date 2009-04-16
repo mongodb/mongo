@@ -26,10 +26,13 @@
 namespace mongo {
 
     // -------  Shard --------
+
+    long Shard::MaxShardSize = 1024 * 1204 * 50;
     
     Shard::Shard( ShardManager * manager ) : _manager( manager ){
         _modified = false;
         _lastmod = 0;
+        _dataWritten = 0;
     }
 
     void Shard::setServer( string s ){
@@ -193,6 +196,28 @@ namespace mongo {
         return true;
     }
     
+    bool Shard::splitIfShould( long dataWritten ){
+        _dataWritten += dataWritten;
+        
+        if ( _dataWritten < MaxShardSize / 5 )
+            return false;
+
+        _dataWritten = 0;
+        
+        if ( _min.woCompare( _max ) == 0 ){
+            log() << "SHARD PROBLEM** shard is too big, but can't split: " << toString() << endl;
+            return false;
+        }
+
+        long size = getPhysicalSize();
+        if ( size < MaxShardSize )
+            return false;
+        
+        log() << "autosplitting " << _ns << " size: " << size << " shard: " << toString() << endl;
+        split();
+        return true;
+    }
+
     long Shard::getPhysicalSize(){
         ScopedDbConnection conn( getServer() );
         

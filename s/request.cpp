@@ -98,7 +98,7 @@ namespace mongo {
         }
 
         if ( _shardInfo ){
-            if ( _shardInfo->numShards() > 1 )
+            //if ( _shardInfo->numShards() > 1 )
                 s = SHARDED;
         }
 
