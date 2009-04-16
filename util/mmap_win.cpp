@@ -49,7 +49,7 @@ namespace mongo {
 
     unsigned mapped = 0;
 
-    void* MemoryMappedFile::map(const char *_filename, int length) {
+    void* MemoryMappedFile::map(const char *_filename, int &length) {
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];
         strncpy(filename, _filename, 255);

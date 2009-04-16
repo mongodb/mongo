@@ -786,7 +786,7 @@ testEnv.Alias( "startMongod", ["mongod"], [startMongodForTests] );
 testEnv.AlwaysBuild( "startMongod" );
 
 def addMongodReqTargets( env, target, source ):
-    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeJsPerf", "smokeQuota" ]
+    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeQuota" ]
     for target in mongodReqTargets:
         testEnv.Depends( target, "startMongod" )
         testEnv.Depends( "smokeAll", target )

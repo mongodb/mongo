@@ -18,6 +18,7 @@
 
 #include "stdafx.h"
 #include "mmap.h"
+#include "file_allocator.h"
 
 #include <errno.h>
 #include <sys/mman.h>
@@ -49,49 +50,15 @@ namespace mongo {
 #define O_NOATIME 0
 #endif
 
-    void* MemoryMappedFile::map(const char *filename, int length) {
-        updateLength( filename, length );
+    void* MemoryMappedFile::map(const char *filename, int &length) {
+        // length may be updated by callee.
+        theFileAllocator().allocateAsap( filename, length );
         len = length;
-
-        fd = open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
+        
+        fd = open(filename, O_RDWR | O_NOATIME);
         if ( fd <= 0 ) {
             out() << "couldn't open " << filename << ' ' << errno << endl;
             return 0;
-        }
-
-        /* make sure the file is the full desired length */
-        off_t filelen = lseek(fd, 0, SEEK_END);
-        if ( filelen < length ) {
-            //        log() << "map: file length=" << (unsigned) filelen << " want:"
-            //        << length
-            //        << endl;
-            if ( filelen != 0 ) {
-                problem() << "failure mapping new file " << filename << " length:" << length << endl;
-                return 0;
-            }
-            // Check for end of disk.
-            massert( "Unable to allocate file of desired size",
-                    length - 1 == lseek(fd, length - 1, SEEK_SET) );
-            massert( "Unable to allocate file of desired size",
-                    1 == write(fd, "", 1) );
-            lseek(fd, 0, SEEK_SET);
-            Nullstream &l = log();
-            l << "new datafile " << filename << " filling with zeroes...";
-            l.flush();
-            Timer t;
-            int z = 8192;
-            char buf[z];
-            memset(buf, 0, z);
-            int left = length;
-            while ( 1 ) {
-                if ( left <= z ) {
-                    write(fd, buf, left);
-                    break;
-                }
-                write(fd, buf, z);
-                left -= z;
-            }
-            l << "done " << ((double)t.millis())/1000.0 << " secs" << endl;
         }
 
         view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);

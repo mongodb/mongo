@@ -24,6 +24,7 @@
 #include "introspect.h"
 #include "repl.h"
 #include "../util/unittest.h"
+#include "../util/file_allocator.h"
 #include "dbmessage.h"
 #include "instance.h"
 #if !defined(_WIN32)
@@ -71,7 +72,8 @@ namespace mongo {
         out() << "quicktest()\n";
 
         MemoryMappedFile mmf;
-        char *m = (char *) mmf.map("/tmp/quicktest", 16384);
+        int len = 16384;
+        char *m = (char *) mmf.map("/tmp/quicktest", len);
         //	out() << "mmf reads: " << m << endl;
         strcpy_s(m, 1000, "hello worldz");
     }
@@ -360,6 +362,8 @@ namespace mongo {
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         
         acquirePathLock();
+        
+        theFileAllocator().start();
         
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
         
