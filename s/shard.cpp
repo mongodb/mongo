@@ -102,6 +102,8 @@ namespace mongo {
         log(1) << " before split on: "  << m << "\n"
                << "\t self  : " << toString() << endl;
 
+        uassert( "locking namespace on server failed" , lockNamespaceOnServer( getServer() , _ns ) );
+
         Shard * s = new Shard( _manager );
         s->_ns = _ns;
         s->_server = _server;
@@ -118,7 +120,10 @@ namespace mongo {
         log(1) << " after split:\n" 
                << "\t left : " << toString() << "\n" 
                << "\t right: "<< s->toString() << endl;
-
+        
+        
+        _manager->save();
+        
         return s;
     }
 
