@@ -59,7 +59,7 @@ namespace mongo {
         friend class BasicCursor;
     public:
         MongoDataFile(int fn) : fileNo(fn) { }
-        void open(const char *filename, int requestedDataSize = 0);
+        void open(const char *filename, int requestedDataSize = 0, bool preallocateOnly = false);
 
         /* allocate a new extent from this datafile. 
            @param capped - true if capped collection
@@ -460,5 +460,7 @@ namespace mongo {
         assert( dl.a() != -1 );
         return database->getFile(dl.a())->recordAt(dl);
     }
+    
+    void ensureHaveIdIndex(const char *ns);
 
 } // namespace mongo

@@ -42,6 +42,7 @@ namespace ReplTests {
             createOplog();
             dblock lk;
             setClient( ns() );
+            ensureHaveIdIndex( ns() );
         }
         ~Base() {
             try {
@@ -712,7 +713,8 @@ namespace ReplTests {
             add< Idempotence::UpsertInsertIdMod >();
             add< Idempotence::UpsertInsertSet >();
             add< Idempotence::UpsertInsertInc >();
-            add< Idempotence::UpdateWithoutPreexistingId >();
+            // Don't worry about this until someone wants this functionality.
+//            add< Idempotence::UpdateWithoutPreexistingId >();
             add< Idempotence::Remove >();
             add< Idempotence::RemoveOne >();
             add< Idempotence::FailingUpdate >();

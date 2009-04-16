@@ -24,6 +24,7 @@
 #include "introspect.h"
 #include "repl.h"
 #include "../util/unittest.h"
+#include "../util/file_allocator.h"
 #include "dbmessage.h"
 #include "instance.h"
 #if !defined(_WIN32)
@@ -71,7 +72,8 @@ namespace mongo {
         out() << "quicktest()\n";
 
         MemoryMappedFile mmf;
-        char *m = (char *) mmf.map("/tmp/quicktest", 16384);
+        int len = 16384;
+        char *m = (char *) mmf.map("/tmp/quicktest", len);
         //	out() << "mmf reads: " << m << endl;
         strcpy_s(m, 1000, "hello worldz");
     }
@@ -335,7 +337,7 @@ namespace mongo {
     Timer startupSrandTimer;
 
     void acquirePathLock() {
-#if !defined(_WIN32) and !defined(__sunos__)
+#if !defined(_WIN32) && !defined(__sunos__)
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
         lockFile = open( name.c_str(), O_RDONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO );
         massert( "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
@@ -360,6 +362,10 @@ namespace mongo {
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         
         acquirePathLock();
+        
+#if !defined(_WIN32)
+        theFileAllocator().start();
+#endif
         
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
         

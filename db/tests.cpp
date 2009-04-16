@@ -32,7 +32,8 @@ namespace mongo {
 
         MemoryMappedFile f;
 
-        char *p = (char *) f.map("/tmp/test.dat", 64*1024*1024);
+        int len = 64*1024*1024;
+        char *p = (char *) f.map("/tmp/test.dat", len);
         char *start = p;
         char *end = p + 64*1024*1024-2;
         end[1] = 'z';

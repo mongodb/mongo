@@ -672,6 +672,7 @@ namespace mongo {
 
     void DBClientCursor::dataReceived() {
         QueryResult *qr = (QueryResult *) m->data;
+        resultFlags = qr->resultFlags();
         if ( qr->resultFlags() & QueryResult::ResultFlag_CursorNotFound ) {
             // cursor id no longer valid at the server.
             assert( qr->cursorId == 0 );

@@ -36,7 +36,7 @@ namespace mongo {
             {
                 QueryResult *qr = (QueryResult *) response.data;
                 if ( qr->resultFlags() & QueryResult::ResultFlag_ShardConfigStale ){
-                    throw StaleConfigException();
+                    throw StaleConfigException( r.getns() , "Strategy::doQuery" );
                 }
             }
 

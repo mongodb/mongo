@@ -74,6 +74,18 @@ namespace mongo {
         BSONObj pickSplitPoint();
         Shard * split();
         Shard * split( const BSONObj& middle );
+
+        /**
+         * @return size of shard in bytes
+         *  talks to mongod to do this
+         */
+        long getPhysicalSize();
+        
+        /**
+         * if the amount of data written nears the max size of a shard
+         * then we check the real size, and if its too big, we split
+         */
+        bool splitIfShould( long dataWritten );
         
         bool moveAndCommit( const string& to , string& errmsg );
 
@@ -88,7 +100,11 @@ namespace mongo {
         
         void _markModified();
         
+        static long MaxShardSize;
+
     private:
+        
+        // main shard info
         
         ShardManager * _manager;
         
@@ -99,6 +115,12 @@ namespace mongo {
         ServerShardVersion _lastmod;
 
         bool _modified;
+        
+        // transient stuff
+
+        long _dataWritten;
+
+        // methods, etc..
         
         void _split( BSONObj& middle );
 

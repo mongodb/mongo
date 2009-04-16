@@ -363,6 +363,58 @@ namespace QueryTests {
             ASSERT( !client().findOne( ns, "", &empty ).isEmpty() );            
         }        
     };
+
+    class MultiNe : public ClientBase {
+    public:
+        ~MultiNe() {
+            client().dropCollection( "querytests.Ne" );            
+        }
+        void run() {
+            const char *ns = "querytests.Ne";
+            client().insert( ns, fromjson( "{a:[1,2]}" ) );
+            ASSERT( client().findOne( ns, fromjson( "{a:{$ne:1}}" ) ).isEmpty() );
+            BSONObj spec = fromjson( "{a:{$ne:1,$ne:2}}" );
+            ASSERT( client().findOne( ns, spec ).isEmpty() );
+        }                
+    };
+    
+    class EmbeddedNe : public ClientBase {
+    public:
+        ~EmbeddedNe() {
+            client().dropCollection( "querytests.NestedNe" );            
+        }
+        void run() {
+            const char *ns = "querytests.NestedNe";
+            client().insert( ns, fromjson( "{a:[{b:1},{b:2}]}" ) );
+            ASSERT( client().findOne( ns, fromjson( "{'a.b':{$ne:1}}" ) ).isEmpty() );
+        }                        
+    };
+
+    class AutoResetIndexCache : public ClientBase {
+    public:
+        ~AutoResetIndexCache() {
+            client().dropCollection( "querytests.AutoResetIndexCache" );
+        }
+        static const char *ns() { return "querytests.AutoResetIndexCache"; }
+        static const char *idxNs() { return "querytests.system.indexes"; }
+        void index() const { ASSERT( !client().findOne( idxNs(), BSONObj() ).isEmpty() ); }
+        void noIndex() const { ASSERT( client().findOne( idxNs(), BSONObj() ).isEmpty() ); }
+        void checkIndex() {
+            client().ensureIndex( ns(), BSON( "a" << 1 ) );
+            index();            
+        }
+        void run() {
+            client().dropDatabase( "querytests" );
+            noIndex();
+            checkIndex();
+            client().dropCollection( ns() );
+            noIndex();
+            checkIndex();
+            client().dropDatabase( "querytests" );
+            noIndex();
+            checkIndex();
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -383,6 +435,9 @@ namespace QueryTests {
             add< ArrayId >();
             add< UnderscoreNs >();
             add< EmptyFieldSpec >();
+            add< MultiNe >();
+            add< EmbeddedNe >();
+            add< AutoResetIndexCache >();
         }
     };
     

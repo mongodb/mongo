@@ -155,7 +155,9 @@ ShardingTest.prototype.getOther = function( one ){
 }
 
 ShardingTest.prototype.stop = function(){
-    stopMongoProgram( 39999 );
+    for ( var i=0; i<this._mongos.length; i++ ){
+        stopMongoProgram( 39999 - i );
+    }
     for ( var i=0; i<this._connections.length; i++){
         stopMongod( 30000 + i );
     }

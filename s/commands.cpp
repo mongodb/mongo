@@ -339,17 +339,10 @@ namespace mongo {
                 
                 log() << "splitting: " << ns << "  shard: " << old << endl;
                 
-                if ( ! lockNamespaceOnServer( old.getServer() , ns ) ){
-                    log() << errmsg << endl;
-                    return false;
-                }
-
                 if ( middle.isEmpty() )
                     old.split();
                 else
                     old.split( middle );
-                
-                manager->save();
                 
                 result << "ok" << 1;
                 return true;

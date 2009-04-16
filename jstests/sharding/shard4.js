@@ -1,6 +1,6 @@
-// shard3.js
+// shard4.js
 
-s = new ShardingTest( "shard3" , 2 , 50 , 2 );
+s = new ShardingTest( "shard4" , 2 , 50 , 2 );
 
 s2 = s._mongos[1];
 
@@ -33,13 +33,17 @@ s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
 //s.adminCommand( { moveshard : "test.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
 print( s.config.shard.find().toArray().tojson( "\n" ) );
 
-assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal B" );
-assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B" );
-assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal B" );
-assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B" );
+print( "* A" );
+
+assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal B 1" );
+assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B 2" );
+print( "* B" );
+assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal B 3" );
+assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B 4" );
 
 for ( var i=0; i<10; i++ ){
-    assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B" );
+    print( "* C " + i );
+    assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B " + i );
 }
 
 s.stop();

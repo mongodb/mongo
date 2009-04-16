@@ -29,6 +29,7 @@ _ disallow system* manipulations from the database.
 #include "db.h"
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
+#include "../util/file_allocator.h"
 #include "btree.h"
 #include <algorithm>
 #include <list>
@@ -119,6 +120,8 @@ namespace mongo {
             size += 256;
             size &= 0xffffffffffffff00LL;
         }
+        
+        uassert( "invalid size spec", size > 0 );
 
         bool newCapped = false;
         int mx = 0;
@@ -140,13 +143,18 @@ namespace mongo {
             for ( int i = 0; i < nExtents; ++i ) {
                 database->suitableFile((int) size)->allocExtent( ns, (int) size, newCapped );
             }
-        } else
+        } else {
             while ( size > 0 ) {
                 int max = MongoDataFile::maxSize() - MDFHeader::headerSize();
                 int desiredExtentSize = (int) (size > max ? max : size);
                 Extent *e = database->suitableFile( desiredExtentSize )->allocExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
             }
+            if ( !newCapped ) {
+                // ok to call this multiple times
+                database->preallocateAFile();
+            }
+        }
 
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
@@ -194,7 +202,7 @@ namespace mongo {
         return size;
     }
 
-    void MongoDataFile::open( const char *filename, int minSize ) {
+    void MongoDataFile::open( const char *filename, int minSize, bool preallocateOnly ) {
         {
             /* check quotas
                very simple temporary implementation - we will in future look up
@@ -228,12 +236,18 @@ namespace mongo {
         assert( ( size >= 64*1024*1024 ) || ( strstr( filename, "_hudsonSmall" ) ) );
         assert( size % 4096 == 0 );
 
+        if ( preallocateOnly ) {
+#if !defined(_WIN32)
+            theFileAllocator().requestAllocation( filename, size );
+#endif
+            return;
+        }
+        
         header = (MDFHeader *) mmf.map(filename, size);
         if( sizeof(char *) == 4 ) 
             uassert("can't map file memory - mongo requires 64 bit build for larger datasets", header);
         else
             uassert("can't map file memory", header);
-        // If opening an existing file, this is a no-op.
         header->init(fileNo, size);
     }
 
@@ -272,7 +286,7 @@ assert( !eloc.isNull() );
                 out() << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
             }
             log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
-            return database->addAFile()->createExtent(ns, approxSize, newCapped, loops+1);
+            return database->addAFile( 0, true )->createExtent(ns, approxSize, newCapped, loops+1);
         }
         int offset = header->unused.getOfs();
         header->unused.setOfs( fileNo, offset + ExtentSize );
@@ -1079,6 +1093,7 @@ assert( !eloc.isNull() );
             /* todo: shouldn't be in the namespace catalog until after the allocations here work.
                      also if this is an addIndex, those checks should happen before this!
             */
+            // This creates first file in the database.
             database->newestFile()->allocExtent(ns, initialExtentSize(len));
             d = nsdetails(ns);
         }

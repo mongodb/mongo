@@ -208,6 +208,12 @@ def findVersion( root , choices ):
             return root + c
     raise "can't find a version of [" + root + "] choices: " + choices
 
+def choosePathExist( choices , default=None):
+    for c in choices:
+        if os.path.exists( c ):
+            return c
+    return default
+
 if "darwin" == os.sys.platform:
     darwin = True
     platform = "osx" # prettier than darwin
@@ -237,9 +243,7 @@ elif "linux2" == os.sys.platform:
     javaOS = "linux"
     platform = "linux"
 
-    if not os.path.exists( javaHome ):
-        #fedora standarm jvm location
-        javaHome = "/usr/lib/jvm/java/"
+    javaHome = choosePathExist( [ javaHome , "/usr/lib/jvm/java/" , os.environ.get( "JAVA_HOME" ) ] , "/usr/lib/jvm/java/" )
 
     if os.uname()[4] == "x86_64" and not force32:
         linux64 = True
@@ -768,7 +772,7 @@ testEnv.Alias( "startMongod", ["mongod"], [startMongodForTests] );
 testEnv.AlwaysBuild( "startMongod" );
 
 def addMongodReqTargets( env, target, source ):
-    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeJsPerf", "smokeQuota" ]
+    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeQuota" ]
     for target in mongodReqTargets:
         testEnv.Depends( target, "startMongod" )
         testEnv.Depends( "smokeAll", target )

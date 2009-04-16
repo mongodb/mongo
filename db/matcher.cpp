@@ -102,9 +102,8 @@ namespace mongo {
     };
 
     JSMatcher::~JSMatcher() {
-        for ( int i = 0; i < nBuilders; i++ )
-            delete builders[i];
         delete in;
+        delete nin;
         delete all;
         delete where;
     }
@@ -133,9 +132,8 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-            in(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
+            in(0), nin(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
     {
-        nBuilders = 0;
         BSONObjIterator i(jsobj);
         n = 0;
         while ( i.more() ) {
@@ -223,9 +221,8 @@ namespace mongo {
                             else
                                 uassert("invalid $operator", false);
                             if ( op ) {
-                                uassert("too many items to match in query", nBuilders < 8);
-                                BSONObjBuilder *b = new BSONObjBuilder();
-                                builders[nBuilders++] = b;
+                                shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                                builders_.push_back( b );
                                 b->appendAs(fe, e.fieldName());
                                 addBasic(b->done().firstElement(), op);
                                 ok = true;
@@ -234,9 +231,8 @@ namespace mongo {
                         else if ( fn[2] == 'e' ) {
                             if ( fn[1] == 'n' && fn[3] == 0 ) {
                                 // $ne
-                                uassert("too many items to match in query", nBuilders < 8);
-                                BSONObjBuilder *b = new BSONObjBuilder();
-                                builders[nBuilders++] = b;
+                                shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                                builders_.push_back( b );
                                 b->appendAs(fe, e.fieldName());
                                 addBasic(b->done().firstElement(), NE);
                                 ok = true;
@@ -260,6 +256,22 @@ namespace mongo {
                             addBasic(e, opIN); // e not actually used at the moment for $in
                             ok = true;
                         }
+                        else if ( fn[1] == 'n' && fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0 && fe.type() == Array ) {
+                            // $nin
+                            uassert( "only 1 $nin statement per query supported", nin == 0 ); // todo...
+                            nin = new set<BSONElement,element_lt>();
+                            BSONObjIterator i(fe.embeddedObject());
+                            if ( i.more() ) {
+                                while ( 1 ) {
+                                    BSONElement ie = i.next();
+                                    if ( ie.eoo() )
+                                        break;
+                                    nin->insert(ie);
+                                }
+                            }
+                            addBasic(e, NIN); // e not actually used at the moment for $nin
+                            ok = true;
+                        }
                         else if ( fn[1] == 'a' && fn[2] == 'l' && fn[3] == 'l' && fn[4] == 0 && fe.type() == Array ) {
                             // $all
                             uassert( "only 1 $all statement per query supported", all == 0 ); // todo...
@@ -277,8 +289,8 @@ namespace mongo {
                             ok = true;
                         }
                         else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fe.isNumber() ) {
-                            BSONObjBuilder *b = new BSONObjBuilder();
-                            builders[nBuilders++] = b;
+                            shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                            builders_.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), opSIZE);    
                             haveSize = true;
@@ -305,12 +317,10 @@ namespace mongo {
     }
 
     inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep) {
+        assert( op != NE && op != NIN );
+        
         if ( op == 0 )
             return l.valuesEqual(r);
-
-        if ( op == NE ) {
-            return !l.valuesEqual(r);
-        }
 
         if ( op == opIN ) {
             // { $in : [1,2,3] }
@@ -362,6 +372,11 @@ namespace mongo {
         return (op & z);
     }
 
+    int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, bool *deep) {
+        int ret = matchesDotted( fieldName, toMatch, obj, Equality, deep );
+        return -ret;
+    }
+    
     /* Check if a particular field matches.
 
        fieldName - field to match "a.b" if we are reaching into an embedded object.
@@ -383,6 +398,17 @@ namespace mongo {
         1 match
     */
     int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
+        if ( compareOp == NE )
+            return matchesNe( fieldName, toMatch, obj, deep );
+        if ( compareOp == NIN ) {
+            for( set<BSONElement,element_lt>::const_iterator i = nin->begin(); i != nin->end(); ++i ) {
+                int ret = matchesNe( fieldName, *i, obj, deep );
+                if ( ret != 1 )
+                    return ret;
+            }
+            return 1;
+        }
+        
         BSONElement e;
         if ( !constrainIndexKey_.isEmpty() ) {
             e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
@@ -407,8 +433,7 @@ namespace mongo {
         
         if ( valuesMatch(e, toMatch, compareOp, deep) ) {
             return 1;
-        }
-        else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE ) {
+        } else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.more() ) {
                 BSONElement z = ai.next();

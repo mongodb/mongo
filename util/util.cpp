@@ -20,6 +20,7 @@
 #include "goodies.h"
 #include "unittest.h"
 #include "top.h"
+#include "file_allocator.h"
 
 namespace mongo {
 
@@ -95,4 +96,9 @@ namespace mongo {
     Top::UsageMap &Top::snapshot_ = Top::snapshotA_;
     Top::UsageMap &Top::nextSnapshot_ = Top::snapshotB_;
     
+#if !defined(_WIN32)
+    // The mutex contained in this object may be held on shutdown.
+    FileAllocator &theFileAllocator_ = *(new FileAllocator());
+    FileAllocator &theFileAllocator() { return theFileAllocator_; }
+#endif
 } // namespace mongo

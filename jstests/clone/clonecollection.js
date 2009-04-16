@@ -114,6 +114,7 @@ assert.commandWorked( ret );
 assert.eq( 100001, t.a.find().count() );
 
 f.a.save( { i: -2 } );
+assert.eq( 100002, f.a.find().count() );
 finishToken = ret.finishToken;
 // Round-tripping through JS can corrupt the cursor ids we store as BSON
 // Date elements.  Date( 0 ) will correspond to a cursorId value of 0, which

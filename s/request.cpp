@@ -48,8 +48,10 @@ namespace mongo {
         else {
             _shardInfo = 0;
         }        
-    }
 
+        _m.data->id = _id;
+    }
+    
     string Request::singleServerName(){
         if ( _shardInfo ){
             if ( _shardInfo->numShards() > 1 )
@@ -62,12 +64,15 @@ namespace mongo {
     }
     
     void Request::process( int attempt ){
-        
+
+        log(2) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.data->id) << " attempt: " << attempt << endl;
+
         int op = _m.data->operation();
         assert( op > dbMsg );
         
         Strategy * s = SINGLE;
         
+        _d.markSet();
         if ( getConfig()->isPartitioned() && op == dbQuery ){
             // there are a few things we need to check here
             // 1. db.eval
@@ -75,7 +80,7 @@ namespace mongo {
             //            will need to make it look at function later
             // 2. $where - can't access DB
             //              TODO: make it smarter
-
+            //cerr << "E1.b" << endl;
             QueryMessage q( _d );
             BSONObj query = q.query;
             
@@ -89,24 +94,25 @@ namespace mongo {
             if ( query.hasField( "$where" ) )
                 throw UserException( "$where not supported for partitioned databases yet" );
 
-            _d.resetPull();
+            _d.markReset();
         }
 
         if ( _shardInfo ){
-            if ( _shardInfo->numShards() > 1 )
+            //if ( _shardInfo->numShards() > 1 )
                 s = SHARDED;
         }
-        
+
         if ( op == dbQuery ) {
             try {
                 s->queryOp( *this );
             }
             catch ( StaleConfigException& staleConfig ){
-                log() << "got stale config exception ns:" << getns() << " attempt: " << attempt << endl;
+                log() << staleConfig.what() << " attempt: " << attempt << endl;
                 uassert( "too many attempts to update config, failing" , attempt < 5 );
-
-                sleep( attempt );
+                
+                sleepsecs( attempt );
                 reset( true );
+                _d.markReset();
                 process( attempt + 1 );
                 return;
             }

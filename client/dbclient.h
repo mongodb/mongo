@@ -178,6 +178,10 @@ namespace mongo {
         bool tailable() const {
             return (opts & Option_CursorTailable) != 0;
         }
+        
+        bool hasResultFlag( int flag ){
+            return resultFlags & flag;
+        }
 
         bool init();
 
@@ -226,6 +230,7 @@ namespace mongo {
         int opts;
         auto_ptr<Message> m;
 
+        int resultFlags;
         long long cursorId;
         int nReturned;
         int pos;
@@ -234,7 +239,7 @@ namespace mongo {
         void requestMore();
         bool ownCursor_;
     };
-
+    
 
     /**
        The interface that any db connection should implement
@@ -347,12 +352,12 @@ namespace mongo {
         bool resetError() { return simpleCommand("admin", 0, "reseterror"); }
 
         /** Erase / drop an entire database */
-        bool dropDatabase(const string &dbname, BSONObj *info = 0) {
+        virtual bool dropDatabase(const string &dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "dropDatabase");
         }
 
         /** Delete the specified collection. */        
-        bool dropCollection( const string &ns ){
+        virtual bool dropCollection( const string &ns ){
             string db = nsGetDB( ns );
             string coll = nsGetCollection( ns );
             assert( coll.size() );
@@ -550,6 +555,20 @@ namespace mongo {
         virtual void resetIndexCache();
         
         virtual string getServerAddress() const = 0;
+        
+        /** Erase / drop an entire database */
+        virtual bool dropDatabase(const string &dbname, BSONObj *info = 0) {
+            bool ret = DBClientWithCommands::dropDatabase( dbname, info );
+            resetIndexCache();
+            return ret;
+        }
+        
+        /** Delete the specified collection. */        
+        virtual bool dropCollection( const string &ns ){
+            bool ret = DBClientWithCommands::dropCollection( ns );
+            resetIndexCache();
+            return ret;
+        }        
 
     private:
         set<string> _seenIndexes;

@@ -30,6 +30,7 @@
 #include "reccache.h"
 #include "replset.h"
 #include "../s/d_logic.h"
+#include "../util/file_allocator.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -652,6 +653,13 @@ namespace mongo {
         /* must do this before unmapping mem or you may get a seg fault */
         closeAllSockets();
 
+        // wait until file preallocation finishes
+        // we would only hang here if the file_allocator code generates a
+        // synchronous signal, which we don't expect
+#if !defined(_WIN32)
+        theFileAllocator().waitUntilFinished();
+#endif
+        
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );
@@ -659,7 +667,7 @@ namespace mongo {
         // should we be locked here?  we aren't. might be ok as-is.
         recCacheCloseAll();
         
-#if !defined(_WIN32) and !defined(__sunos__)
+#if !defined(_WIN32) && !defined(__sunos__)
         flock( lockFile, LOCK_UN );
 #endif
         

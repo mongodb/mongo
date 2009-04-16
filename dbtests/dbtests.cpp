@@ -22,6 +22,7 @@
 #include "dbtests.h"
 
 #include "../db/javajs.h"
+#include "../util/file_allocator.h"
 
 #include <unittest/Registry.hpp>
 
@@ -84,6 +85,10 @@ int main( int argc, char** argv ) {
     printSysInfo();
     out() << "random seed: " << seed << endl;
 
+#if !defined(_WIN32)
+    theFileAllocator().start();
+#endif
+    
     UnitTest::Registry tests;
 
     // NOTE Starting JNI changes global state (for example, locale and FPU precision);
