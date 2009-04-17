@@ -425,7 +425,7 @@ namespace mongo {
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
         out() << "new replsource" << endl;
-        initialPull_ = true;
+        initialPull_ = o.getBoolField( "initialPull" );
         replacing = false;
         paired = false;
         only = o.getStringField("only");
@@ -507,6 +507,8 @@ namespace mongo {
         if ( n )
             b.append("incompleteCloneDbs", incompleteCloneDbsBuilder.done());
 
+        b.appendBool( "initialPull", initialPull_ );
+        
         return b.obj();
     }
 
@@ -521,6 +523,7 @@ namespace mongo {
 
         BSONObj o = jsobj();
         log( 1 ) << "Saving repl source: " << o << endl;
+        log() << "Saving repl source: " << o << endl;
 
         stringstream ss;
         setClient("local.sources");
@@ -954,7 +957,9 @@ namespace mongo {
         bool initial = syncedTo.isNull();
         
         if ( c == 0 ) {
-            if ( syncedTo == OpTime() && initialPull_ ) {
+            if ( initialPull_ ) {
+                initialPull_ = false;
+                cout << "starting from tail of oplog" << endl;
                 // Important to grab last oplog timestamp before listing databases.
                 BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
                 if ( !last.isEmpty() ) {
@@ -962,10 +967,6 @@ namespace mongo {
                     massert( "non Date ts found", ts.type() == Date );
                     syncedTo = OpTime( ts.date() );
                 }
-            }
-
-            if ( initialPull_ ) {
-                initialPull_ = false;
                 out() << "this: " << unsigned( this ) << endl;
                 set< string > localDbs;
                 vector< string > diskDbs;
@@ -1016,8 +1017,6 @@ namespace mongo {
             log(2) << "repl: tailing=true\n";
         }
 
-        initialPull_ = false;
-    
         if ( c == 0 ) {
             problem() << "pull:   dbclient::query returns null (conn closed?)" << endl;
             resetConnection();
