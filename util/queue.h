@@ -51,7 +51,7 @@ namespace mongo {
         std::queue<T> _queue;
         
         mutable boost::mutex _lock;
-        boost::condition_variable _condition;
+        boost::condition _condition;
     };
 
 }
