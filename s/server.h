@@ -18,10 +18,12 @@
 
 #include <string>
 #include "../util/message.h"
+#include "../db/jsobj.h"
 
 namespace mongo {
-
+    
     extern std::string ourHostname;
+    extern OID serverID;
     
     // from request.cpp
     void processRequest(Message& m, MessagingPort& p);
