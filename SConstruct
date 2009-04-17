@@ -73,6 +73,13 @@ AddOption('--java',
           metavar='DIR',
           help='java home')
 
+AddOption('--nojni',
+          dest='nojni',
+          type="string",
+          nargs=0,
+          action="store",
+          help="turn off jni support" )
+
 AddOption( "--v8" ,
            dest="v8home",
            type="string",
@@ -173,6 +180,8 @@ release = not GetOption( "release" ) is None
 debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
 debugLogging = not GetOption( "debugBuildAndLogging" ) is None
 noshell = not GetOption( "noshell" ) is None
+nojni = not GetOption( "nojni" ) is None
+
 
 platform = os.sys.platform
 if "uname" in dir(os):
@@ -221,7 +230,8 @@ if "darwin" == os.sys.platform:
     env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
 
     env.Append( CPPFLAGS=" -mmacosx-version-min=10.4 " )
-    env.Append( FRAMEWORKS=["JavaVM"] )
+    if not nojni:
+        env.Append( FRAMEWORKS=["JavaVM"] )
 
     if os.path.exists( "/usr/bin/g++-4.2" ):
         env["CXX"] = "g++-4.2"
@@ -325,7 +335,8 @@ if useJavaHome:
     env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/" + javaOS ] )
     env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
 
-    javaLibs += [ "java" , "jvm" ]
+    if not nojni:
+        javaLibs += [ "java" , "jvm" ]
 
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
@@ -354,6 +365,9 @@ if nix:
         env.Append( CFLAGS="-m32" )
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
+
+if nojni:
+    env.Append( CPPFLAGS=" -DNOJNI " )
 
 
 # --- check system ---
