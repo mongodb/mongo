@@ -503,7 +503,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
         elif myCheckLib( "readline" ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
-            myCheckLib( "tinfo" )
+            myCheckLib( "tinfo" , staticOnly=release )
         else:
             print( "WARNING: no readline, shell will be a bit ugly" )
 
