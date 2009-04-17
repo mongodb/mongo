@@ -71,7 +71,7 @@ namespace mongo {
         while ( 1 ) {
             int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
             if ( s < 0 ) {
-                if ( errno == ECONNABORTED ) {
+                if ( errno == ECONNABORTED || errno == EBADF ) {
                     log() << "Listener on port " << port << " aborted" << endl;
                     return;
                 }
