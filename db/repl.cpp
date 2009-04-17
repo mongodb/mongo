@@ -828,7 +828,7 @@ namespace mongo {
          ...
        see logOp() comments.
     */
-    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds) {
+    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail) {
         char clientName[MaxClientLen];
         const char *ns = op.getStringField("ns");
         nsToClient(ns, clientName);
@@ -858,6 +858,25 @@ namespace mongo {
         }
 
         dblock lk;
+
+        if ( localLogTail && replPair && replPair->state == ReplPair::State_Master ) {
+            OpTime newTail;
+            // NOTE: For now, just locking this whole loop.  Alternatively we could 
+            // do a first loop unlocking periodically then a second loop locked.
+            setClient( "local.oplog.$main" );
+            for( auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+                localLog->ok(); localLog->advance() ) {
+                BSONObj op = localLog->current();
+                OpTime ts( localLog->current().getField( "ts" ).date() );
+                if ( newTail.isNull() )
+                    newTail = ts;
+                if ( !( *localLogTail < ts ) )
+                    break;
+                updateSetsWithOp( op, ids, modIds );
+            }
+            *localLogTail = newTail;
+        }
+        
         bool justCreated;
         try {
             justCreated = setClientTempNs(ns);
@@ -893,9 +912,9 @@ namespace mongo {
         } else {
             bool mod;
             BSONObj id = idForOp( op, mod );
-            out() << "op id: " << id << endl;
+//            out() << "op id: " << id << endl;
             if ( ids[ ns ].count( id ) == 0 ) {
-                out() << "applying op " << op << endl;
+//                out() << "applying op " << op << endl;
                 applyOperation( op );    
             } else if ( modIds[ ns ].count( id ) != 0 ) {
                 BSONObj existing;
@@ -939,6 +958,22 @@ namespace mongo {
         return BSONObj();
     }
     
+    void ReplSource::updateSetsWithOp( const BSONObj &op, IdSets &changed, IdSets &modChanged ) {
+        bool mod;
+        BSONObj id = idForOp( op, mod );
+        if ( !id.isEmpty() ) {
+            const char *ns = op.getStringField( "ns" );
+            id = id.getOwned();
+            if ( mod ) {
+                if ( changed[ ns ].count( id ) == 0 )
+                    modChanged[ ns ].insert( id );
+            } else
+                modChanged.erase( id );
+            out() << "adding id to set: " << id << ", mod? " << mod << endl;
+            changed[ ns ].insert( id );
+        }        
+    }
+    
     /* note: not yet in mutex at this point. */
     bool ReplSource::sync_pullOpLog() {
         string ns = string("local.oplog.$") + sourceName();
@@ -953,6 +988,7 @@ namespace mongo {
 
         IdSets localChangedSinceLastPass;
         IdSets localModChangedSinceLastPass;
+        OpTime localLogTail;
 
         bool initial = syncedTo.isNull();
         
@@ -1032,7 +1068,7 @@ namespace mongo {
                 b.append("ns", *i + '.');
                 b.append("op", "db");
                 BSONObj op = b.done();
-                sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass);
+                sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass, 0);
             }
         }
 
@@ -1047,30 +1083,20 @@ namespace mongo {
 
         if ( replPair && replPair->state == ReplPair::State_Master ) {
             cout << "updating sets now" << endl;
-            // FIXME don't lock for so long.
             dblock lk;
             setClient( "local.oplog.$main" );
             for( auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
                 localLog->ok(); localLog->advance() ) {
                 BSONObj op = localLog->current();
                 OpTime ts( localLog->current().getField( "ts" ).date() );
+                if ( localLogTail.isNull() )
+                    localLogTail = ts;
                 if ( !( lastSavedLocalTs_ < ts ) )
                     break;
-                bool mod;
-                BSONObj id = idForOp( op, mod );
-                if ( !id.isEmpty() ) {
-                    const char *ns = op.getStringField( "ns" );
-                    id = id.getOwned();
-                    if ( mod ) {
-                        if ( localChangedSinceLastPass[ ns ].count( id ) == 0 )
-                            localModChangedSinceLastPass[ ns ].insert( id );
-                    } else
-                        localModChangedSinceLastPass.erase( id );
-                    out() << "adding id to set: " << id << ", mod? " << mod << endl;
-                    localChangedSinceLastPass[ ns ].insert( id );
-                }
+                updateSetsWithOp( op, localChangedSinceLastPass, localModChangedSinceLastPass );
+                dbtemprelease t;
             }
-        }        
+        }
         
         int n = 0;
         BSONObj op = c->next();
@@ -1093,7 +1119,7 @@ namespace mongo {
                 log(1) << "pull:   initial run\n";
             else
                 assert( syncedTo < nextOpTime );
-            sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass);
+            sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass, &localLogTail);
             n++;
         }
         else if ( nextOpTime != syncedTo ) {
@@ -1151,7 +1177,7 @@ namespace mongo {
                     uassert("bad 'ts' value in sources", false);
                 }
 
-                sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass);
+                sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass, &localLogTail);
                 n++;
             }
         }

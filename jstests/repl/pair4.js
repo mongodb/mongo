@@ -132,6 +132,7 @@ doTest = function( recover, newMaster, newSlave ) {
     
 }
 
+// no restart
 doTest( function() {
        connect();
        assert.soon( function() {
@@ -145,17 +146,25 @@ doTest( function() {
                    } );       
        }, function() { return r; }, function() { return l; } );
 
-doTest( function() {
-       stopMongod( rPort );
-       connect();
-       r = startMongoProgram( "mongod", "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
-       assert.soon( function() {
-                   lm = ismaster( l );
-                   rm = ismaster( r );
-                   
-                   assert( lm == 1, "lm value invalid" );
-                   assert( rm == -1 || rm == 0, "rm value invalid" );
-                   
-                   return ( lm == 1 && rm == 0 );
-                   } );       
-       }, function() { return l; }, function() { return r; } );
+doRestartTest = function( signal ) {    
+    doTest( function() {
+           if ( signal == 9 ) {
+                sleep( 3000 );
+           }
+           stopMongod( rPort, signal );
+           connect();
+           r = startMongoProgram( "mongod", "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
+           assert.soon( function() {
+                       lm = ismaster( l );
+                       rm = ismaster( r );
+                       
+                       assert( lm == 1, "lm value invalid" );
+                       assert( rm == -1 || rm == 0, "rm value invalid" );
+                       
+                       return ( lm == 1 && rm == 0 );
+                       } );       
+           }, function() { return l; }, function() { return r; } );
+}
+
+doRestartTest( 15 ) // SIGTERM
+doRestartTest( 9 ) // SIGKILL

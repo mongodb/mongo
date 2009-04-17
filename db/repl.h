@@ -126,7 +126,7 @@ namespace mongo {
         bool resync(string db);
         bool sync_pullOpLog();
         typedef map< string, BSONObjSetDefaultOrder > IdSets;
-        void sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds);
+        void sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail);
         
         auto_ptr<DBClientConnection> conn;
         auto_ptr<DBClientCursor> cursor;
@@ -142,6 +142,7 @@ namespace mongo {
         bool connect();
         // returns possibly unowned id spec for the operation.
         static BSONObj idForOp( const BSONObj &op, bool &mod );
+        static void updateSetsWithOp( const BSONObj &op, IdSets &changed, IdSets &modChanged );
         bool initialPull_;
 
     public:
