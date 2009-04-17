@@ -701,10 +701,13 @@ namespace mongo {
             vector< BSONObj > dbInfos;
             
             set<string> seen;
+            boost::intmax_t totalSize = 0;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
                 BSONObjBuilder b;
                 b.append( "name", i->c_str() );
-                b.append( "sizeOnDisk", (double) dbSize( i->c_str() ) );
+                boost::intmax_t size = dbSize( i->c_str() );
+                b.append( "sizeOnDisk", (double) size );
+                totalSize += size;
                 dbInfos.push_back( b.obj() );
 
                 seen.insert( i->c_str() );
@@ -721,6 +724,7 @@ namespace mongo {
             }
 
             result.append( "databases", dbInfos );
+            result.append( "totalSize", double( totalSize ) );
             return true;
         }
     } cmdListDatabases;
