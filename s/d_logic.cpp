@@ -46,7 +46,7 @@ namespace mongo {
     string shardConfigServer;
 
     boost::thread_specific_ptr<OID> clientServerIds;
-    map< string , BlockingQueue<int>* > clientQueues;
+    map< string , BlockingQueue<BSONObj>* > clientQueues;
 
     unsigned long long getVersion( BSONElement e , string& errmsg ){
         if ( e.eoo() ){
@@ -93,12 +93,12 @@ namespace mongo {
             dbtemprelease unlock;
             
             if ( ! clientQueues[id.str()] )
-                clientQueues[id.str()] = new BlockingQueue<int>();
+                clientQueues[id.str()] = new BlockingQueue<BSONObj>();
 
-            int z = clientQueues[id.str()]->blockingPop();
-            log() << "WriteBackCommand got : " << z << endl;
+            BSONObj z = clientQueues[id.str()]->blockingPop();
+            log(1) << "WriteBackCommand got : " << z << endl;
             
-            result.append( "msg" , z );
+            result.append( "data" , z );
             
             return true;
         }
@@ -153,7 +153,7 @@ namespace mongo {
                         clientServerIds.reset( nid );
                         
                         if ( ! clientQueues[s] )
-                            clientQueues[s] = new BlockingQueue<int>();
+                            clientQueues[s] = new BlockingQueue<BSONObj>();
                     }
                     else if ( clientId != *clientServerIds.get() ){
                         errmsg = "server id has changed!";
@@ -470,7 +470,14 @@ namespace mongo {
         massert( "write with bad shard config and no server id!" , clientID );
         
         log() << "got write with an old config - writing back" << endl;
-        clientQueues[clientID->str()]->push( 5 );
+
+        BSONObjBuilder b;
+        b.appendBool( "writeBack" , true );
+        b.append( "ns" , ns );
+        b.appendBinData( "msg" , m.data->len , bdtCustom , (char*)(m.data) );
+        log() << "writing back msg with len: " << m.data->len << " op: " << m.data->_operation << endl;
+        clientQueues[clientID->str()]->push( b.obj() );
+
         return true;
     }
     

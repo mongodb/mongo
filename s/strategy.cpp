@@ -56,6 +56,7 @@ namespace mongo {
     
     void Strategy::insert( string server , const char * ns , const BSONObj& obj ){
         ScopedDbConnection dbcon( server );
+        checkShardVersion( dbcon.conn() , ns );
         dbcon->insert( ns , obj );
         dbcon.done();
     }
@@ -87,7 +88,25 @@ namespace mongo {
 
                     }
                     
-                    cout << "writebacklisten result: " << result << endl;
+                    log(1) << "writebacklisten result: " << result << endl;
+                    
+                    BSONObj data = result.getObjectField( "data" );
+                    if ( data.getBoolField( "writeBack" ) ){
+                        string ns = data["ns"].valuestrsafe();
+
+                        int len;
+
+                        Message m( (void*)data["msg"].binData( len ) , false );
+                        massert( "invalid writeback message" , m.data->valid() );                        
+
+                        grid.getDBConfig( ns )->getShardManager( ns , true );
+                        
+                        Request r( m , 0 );
+                        r.process();
+                    }
+                    else {
+                        log() << "unknown writeBack result: " << result << endl;
+                    }
                     
                     conn.done();
                     secsToSleep = 0;
