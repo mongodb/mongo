@@ -93,7 +93,7 @@ protected:
 };
 
 namespace Insert {
-    class NoIndex {
+    class IdIndex {
     public:
         void run() {
             string ns = testNs( this );
@@ -103,10 +103,10 @@ namespace Insert {
         }
     };
 
-    class OneIndex {
+    class TwoIndex {
     public:
-        OneIndex() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+        TwoIndex() : ns_( testNs( this ) ) {
+            client_->ensureIndex( ns_, BSON( "_id" << 1 ), "my_id" );
         }
         void run() {
             for( int i = 0; i < 100000; ++i )
@@ -118,8 +118,8 @@ namespace Insert {
     class TenIndex {
     public:
         TenIndex() : ns_( testNs( this ) ) {
-            const char *names = "aaaaaaaaaa";
-            for( int i = 0; i < 10; ++i ) {
+            const char *names = "aaaaaaaaa";
+            for( int i = 0; i < 9; ++i ) {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( "_id" << 1 ), false, names + i );
             }            
@@ -172,8 +172,8 @@ namespace Insert {
     class All : public RunnerSuite {
     public:
         All() {
-            add< NoIndex >();
-            add< OneIndex >();
+            add< IdIndex >();
+            add< TwoIndex >();
             add< TenIndex >();
             add< Capped >();
             add< OneIndexReverse >();
@@ -186,7 +186,6 @@ namespace Update {
     class Smaller {
     public:
         Smaller() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 100000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i << "b" << 2 ) );            
         }
@@ -200,7 +199,6 @@ namespace Update {
     class Bigger {
     public:
         Bigger() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 100000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i ) );            
         }
@@ -214,7 +212,6 @@ namespace Update {
     class Inc {
     public:
         Inc() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 10000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << 0 ) );            
         }
@@ -229,7 +226,6 @@ namespace Update {
     class Set {
     public:
         Set() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 10000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << 0 ) );            
         }
@@ -244,7 +240,6 @@ namespace Update {
     class SetGrow {
     public:
         SetGrow() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 10000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << "" ) );            
         }
@@ -353,10 +348,10 @@ namespace Index {
     public:
         Int() : ns_( testNs( this ) ) {
             for( int i = 0; i < 100000; ++i )
-                client_->insert( ns_.c_str(), BSON( "_id" << i ) );
+                client_->insert( ns_.c_str(), BSON( "a" << i ) );
         }
         void run() {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
         }
         string ns_;
     };
@@ -367,11 +362,11 @@ namespace Index {
             OID id;
             for( int i = 0; i < 100000; ++i ) {
                 id.init();
-                client_->insert( ns_.c_str(), BSON( "_id" << id ) );
+                client_->insert( ns_.c_str(), BSON( "a" << id ) );
             }
         }
         void run() {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
         }
         string ns_;
     };
@@ -382,11 +377,11 @@ namespace Index {
             for( int i = 0; i < 100000; ++i ) {
                 stringstream ss;
                 ss << i;
-                client_->insert( ns_.c_str(), BSON( "_id" << ss.str() ) );
+                client_->insert( ns_.c_str(), BSON( "a" << ss.str() ) );
             }
         }
         void run() {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
         }
         string ns_;
     };
@@ -395,11 +390,11 @@ namespace Index {
     public:
         Object() : ns_( testNs( this ) ) {
             for( int i = 0; i < 100000; ++i ) {
-                client_->insert( ns_.c_str(), BSON( "_id" << BSON( "a" << i ) ) );
+                client_->insert( ns_.c_str(), BSON( "a" << BSON( "a" << i ) ) );
             }
         }
         void run() {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
         }
         string ns_;
     };    
@@ -433,7 +428,6 @@ namespace QueryTests {
     class NoMatchIndex {
     public:
         NoMatchIndex() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 100000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i ) );
         }
