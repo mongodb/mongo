@@ -186,7 +186,7 @@ DBCollection.prototype.resetIndexCache = function(){
 DBCollection.prototype.reIndex = function(){
     var specs = this.getIndexSpecs();
     this.dropIndexes();
-    for ( var i in specs ){
+    for ( var i = 0; i < specs.length; ++i ){
         this.ensureIndex( specs[i].key, [ specs[i].unique, specs[i].name ] );
     }
 }
