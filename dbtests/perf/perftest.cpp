@@ -23,6 +23,7 @@
 #include "../../db/instance.h"
 #include "../../db/query.h"
 #include "../../db/queryoptimizer.h"
+#include "../../util/file_allocator.h"
 
 #include <unittest/Registry.hpp>
 #include <unittest/UnitTest.hpp>
@@ -68,9 +69,17 @@ public:
         boost::posix_time::ptime start = boost::posix_time::microsec_clock::universal_time();
         test.run();
         boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
-        cout << name << ": " << end - start << endl;
+        long long micro = ( end - start ).total_microseconds();
+        cout << "{'" << name << "': "
+             << micro / 1000000
+             << "."
+             << setw( 6 ) << setfill( '0' ) << micro % 1000000
+             << "}" << endl;
     }
     ~Runner() {
+#if !defined(_WIN32)
+        theFileAllocator().waitUntilFinished();
+#endif        
         client_->dropDatabase( testDb< T >().c_str() );        
     }
 };
@@ -88,8 +97,9 @@ namespace Insert {
     public:
         void run() {
             string ns = testNs( this );
-            for( int i = 0; i < 100000; ++i )
+            for( int i = 0; i < 100000; ++i ) {
                 client_->insert( ns.c_str(), BSON( "_id" << i ) );
+            }
         }
     };
 
@@ -695,8 +705,12 @@ int main( int argc, char **argv ) {
     boost::filesystem::create_directory( p );
     dbpath = p.native_directory_string().c_str();
     
-    client_ = new DBDirectClient();
+#if !defined(_WIN32)
+    theFileAllocator().start();
+#endif    
     
+    client_ = new DBDirectClient();
+
     UnitTest::Registry tests;
     tests.add( suite< Insert::All >(), "insert" );
     tests.add( suite< Update::All >(), "update" );
