@@ -962,38 +962,28 @@ assert( !eloc.isNull() );
     /* note there are faster ways to build an index in bulk, that can be
        done eventually */
     void addExistingToIndex(const char *ns, IndexDetails& idx) {
-/*UNIQUE*/
         bool dupsAllowed = !idx.unique();
 
         Timer t;
         Nullstream& l = log();
         l << "building new index on " << idx.keyPattern() << " for " << ns << "...";
         l.flush();
-        int err = 0;
         int n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         while ( c->ok() ) {
             BSONObj js = c->current();
             try { 
                 _indexRecord(idx, js, c->currLoc(),dupsAllowed);
-            } catch( AssertionException&  ) { 
-                err++;
+            } catch( AssertionException& e ) { 
+                l << endl;
+                log(2) << "addExistingToIndex exception " << e.what() << endl;
+                throw;
             }
             c->advance();
             n++;
         };
         l << "done for " << n << " records";
-        if( err )
-            l << ' ' << err << " (dupkey) errors during indexing";
         l << endl;
-
-        if( err ) { 
-            // if duplicate _id's, report the problem
-            stringstream ss;
-            ss << err << " dupkey errors building index for " << ns;
-            string s = ss.str();
-            uassert_nothrow(s.c_str());
-        }
     }
 
     /* add keys to indexes for a new record */
@@ -1075,6 +1065,8 @@ assert( !eloc.isNull() );
             o = BSONObj( loc.rec() );
         return loc;
     }
+
+    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder );
     
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId) {
         bool addIndex = false;
@@ -1243,8 +1235,19 @@ assert( !eloc.isNull() );
             idxinfo.info = loc;
             idxinfo.head = BtreeBucket::addHead(idxinfo);
             tableToIndex->addingIndex(tabletoidxns.c_str(), idxinfo);
-            /* todo: index existing records here */
-            addExistingToIndex(tabletoidxns.c_str(), idxinfo);
+            try {
+                addExistingToIndex(tabletoidxns.c_str(), idxinfo);
+            } catch( DBException& ) { 
+                // roll back this index
+                string name = idxinfo.indexName();
+                BSONObjBuilder b;
+                string errmsg;
+                bool ok = deleteIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b);
+                if( !ok ) {
+                    log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
+                }
+                throw;
+            }
         }
 
         /* add this record to our indexes */
