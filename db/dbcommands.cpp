@@ -988,6 +988,7 @@ namespace mongo {
     public:
         CmdBuildInfo() : Command( "buildinfo" ) {}
         virtual bool slaveOk() { return true; }
+        virtual bool adminOnly() { return true; }
         virtual void help( stringstream &help ) const {
             help << "example: { buildinfo:1 }";
         }
