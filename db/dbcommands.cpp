@@ -963,9 +963,11 @@ namespace mongo {
             
             Timer t;
             long long size = 0;
+            long long numObjects = 0;
             while( c->ok() ) {
                 size += c->current().objsize();
                 c->advance();
+                numObjects++;
             }
             int ms = t.millis();
             if ( ms > 100 ) {
@@ -977,6 +979,7 @@ namespace mongo {
             }
             
             result.append( "size", (double)size );
+            result.append( "numObjects" , (double)numObjects );
             return true;
         }
     } cmdDatasize;
