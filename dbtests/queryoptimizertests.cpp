@@ -26,6 +26,10 @@
 
 #include "dbtests.h"
 
+namespace mongo {
+    extern BSONObj id_obj;
+} // namespace mongo
+
 namespace QueryOptimizerTests {
 
     namespace FieldBoundTests {
@@ -335,6 +339,9 @@ namespace QueryOptimizerTests {
                 QueryPlan p2( FBS( BSONObj() ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( p2.scanAndOrderRequired() );                
                 ASSERT_EQUALS( 0, p2.direction() );
+                QueryPlan p3( FBS( BSONObj() ), BSON( "_id" << 1 ), index( id_obj ) );
+                ASSERT( !p3.scanAndOrderRequired() );
+                ASSERT_EQUALS( 1, p3.direction() );
             }            
         };
         
