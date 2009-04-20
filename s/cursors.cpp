@@ -123,7 +123,7 @@ namespace mongo {
         }
 
         bool hasMore = sendMore && more();
-        log(6) << "\t hasMore:" << hasMore << " id:" << _id << endl;
+        log(6) << "\t hasMore:" << hasMore << " id:" << _id << " totalSent: " << _totalSent << endl;
         
         replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , 0 , hasMore ? _id : 0 );
         _totalSent += num;
