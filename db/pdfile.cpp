@@ -685,7 +685,7 @@ assert( !eloc.isNull() );
 
     int nUnindexes = 0;
 
-    void _unindexRecord(const char *ns, IndexDetails& id, BSONObj& obj, const DiskLoc& dl) {
+    void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl) {
         BSONObjSetDefaultOrder keys;
         id.getKeysFromObject(obj, keys);
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
@@ -716,11 +716,11 @@ assert( !eloc.isNull() );
     }
 
     /* unindex all keys in all indexes for this record. */
-    void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete, const DiskLoc& dl) {
+    void  unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl) {
         if ( d->nIndexes == 0 ) return;
         BSONObj obj(todelete);
         for ( int i = 0; i < d->nIndexes; i++ ) {
-            _unindexRecord(ns, d->indexes[i], obj, dl);
+            _unindexRecord(d->indexes[i], obj, dl);
         }
     }
 
@@ -786,7 +786,7 @@ assert( !eloc.isNull() );
         /* check if any cursors point to us.  if so, advance them. */
         aboutToDelete(dl);
 
-        unindexRecord(ns, d, todelete, dl);
+        unindexRecord(d, todelete, dl);
 
         _deleteRecord(d, ns, todelete, dl);
         NamespaceDetailsTransient::get( ns ).registerWriteOp();
@@ -962,7 +962,8 @@ assert( !eloc.isNull() );
     /* note there are faster ways to build an index in bulk, that can be
        done eventually */
     void addExistingToIndex(const char *ns, IndexDetails& idx) {
-        bool dupsAllowed = !idx.isIdIndex();
+/*UNIQUE*/
+        bool dupsAllowed = !idx.unique();
 
         Timer t;
         Nullstream& l = log();
@@ -999,16 +1000,24 @@ assert( !eloc.isNull() );
     void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) {
         BSONObj obj((const char *)buf);
 
-        /* we index _id first so that on a dup key error for it we don't have to roll back 
-           the other work.
-        */
-        int id = d->findIdIndex();
-        if( id >= 0 )
-            _indexRecord(d->indexes[id], obj, newRecordLoc, /*dupsAllowed*/false);
-
+        /*UNIQUE*/
         for ( int i = 0; i < d->nIndexes; i++ ) {
-            if( i != id ) 
-                _indexRecord(d->indexes[i], obj, newRecordLoc, /*dupsAllowed*/true);
+            try { 
+                bool unique = d->indexes[i].unique();
+                _indexRecord(d->indexes[i], obj, newRecordLoc, /*dupsAllowed*/!unique);
+            }
+            catch( DBException& ) { 
+                // try to roll back previously added index entries
+                for( int j = 0; j < i; j++ ) { 
+                    try {
+                        _unindexRecord(d->indexes[j], obj, newRecordLoc);
+                    }
+                    catch(...) { 
+                        log(3) << "unindex fails on rollback after unique failure\n";
+                    }
+                }
+                throw;
+            }
         }
     }
 
