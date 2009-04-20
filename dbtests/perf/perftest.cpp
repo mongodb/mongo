@@ -111,7 +111,7 @@ namespace Insert {
             const char *names = "aaaaaaaaaa";
             for( int i = 0; i < 10; ++i ) {
                 client_->resetIndexCache();
-                client_->ensureIndex( ns_.c_str(), BSON( "_id" << 1 ), names + i );
+                client_->ensureIndex( ns_.c_str(), BSON( "_id" << 1 ), false, names + i );
             }            
         }
         void run() {
@@ -612,7 +612,7 @@ namespace Plan {
             const char *names = "aaaaaaaaaa";
             for( int i = 0; i < 10; ++i ) {
                 client_->resetIndexCache();
-                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), names + i );
+                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
             setClient( ns_.c_str() );
@@ -635,7 +635,7 @@ namespace Plan {
             const char *names = "aaaaaaaaaa";
             for( int i = 0; i < 10; ++i ) {
                 client_->resetIndexCache();
-                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), names + i );
+                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
             setClient( ns_.c_str() );
@@ -654,7 +654,7 @@ namespace Plan {
             const char *names = "aaaaaaaaaa";
             for( int i = 0; i < 10; ++i ) {
                 client_->resetIndexCache();
-                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), names + i );
+                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
             setClient( ns_.c_str() );

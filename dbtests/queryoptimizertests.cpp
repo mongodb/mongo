@@ -263,7 +263,7 @@ namespace QueryOptimizerTests {
                 ss << indexNum_++;
                 string name = ss.str();
                 client_.resetIndexCache();
-                client_.ensureIndex( ns(), key, name.c_str() );
+                client_.ensureIndex( ns(), key, false, name.c_str() );
                 NamespaceDetails *d = nsd();
                 for( int i = 0; i < d->nIndexes; ++i ) {
                     if ( d->indexes[ i ].indexName() == name )

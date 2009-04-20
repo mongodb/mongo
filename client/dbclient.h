@@ -542,12 +542,14 @@ namespace mongo {
         /** Create an index if it does not already exist.
             ensureIndex calls are remembered so it is safe/fast to call this function many 
             times in your code.
-           @param name if not isn't specified, it will be created from the keys (recommended)
+           @param ns collection to be indexed
            @param keys the "key pattern" for the index.  e.g., { name : 1 }
+           @param unique if true, indicates that key uniqueness should be enforced for this index
+           @param name if not isn't specified, it will be created from the keys (recommended)
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
-        virtual bool ensureIndex( const string &ns , BSONObj keys , const string &name = "" );
+        virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "" );
 
         /**
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server

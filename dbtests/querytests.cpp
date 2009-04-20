@@ -415,6 +415,39 @@ namespace QueryTests {
             checkIndex();
         }
     };
+
+    class UniqueIndex : public ClientBase {
+    public:
+        ~UniqueIndex() {
+            client().dropCollection( "querytests.UniqueIndex" );
+        }
+        void run() {
+            const char *ns = "querytests.UniqueIndex";
+            client().ensureIndex( ns, BSON( "a" << 1 ), true );
+            client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
+            client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
+            ASSERT_EQUALS( 1U, client().count( ns, BSONObj() ) );
+            client().dropCollection( ns );
+            client().ensureIndex( ns, BSON( "b" << 1 ), true );
+            client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
+            client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
+            ASSERT_EQUALS( 2U, client().count( ns, BSONObj() ) );
+        }
+    };
+
+    class UniqueIndexPreexistingData : public ClientBase {
+    public:
+        ~UniqueIndexPreexistingData() {
+            client().dropCollection( "querytests.UniqueIndexPreexistingData" );
+        }
+        void run() {
+            const char *ns = "querytests.UniqueIndexPreexistingData";
+            client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
+            client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
+            client().ensureIndex( ns, BSON( "a" << 1 ), true );
+            ASSERT_EQUALS( 0U, client().count( "querytests.system.indexes", BSON( "ns" << ns ) ) );
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -438,6 +471,8 @@ namespace QueryTests {
             add< MultiNe >();
             add< EmbeddedNe >();
             add< AutoResetIndexCache >();
+            add< UniqueIndex >();
+            add< UniqueIndexPreexistingData >();
         }
     };
     
