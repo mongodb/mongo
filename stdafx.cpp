@@ -123,8 +123,11 @@ namespace mongo {
 
 #ifndef _SCONS
     // only works in scons
-    void printGitVersion(){}
-    void printSysInfo(){}
+    const char * gitVersion(){ return ""; }
+    const char * sysInfo(){ return ""; }
 #endif
 
+    void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
+    void printSysInfo() { log() << "sys info: " << sysInfo() << endl; }
+    
 } // namespace mongo

@@ -984,6 +984,19 @@ namespace mongo {
         }
     } cmdDatasize;
 
+    class CmdBuildInfo : public Command {
+    public:
+        CmdBuildInfo() : Command( "buildinfo" ) {}
+        virtual bool slaveOk() { return true; }
+        virtual void help( stringstream &help ) const {
+            help << "example: { buildinfo:1 }";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            result << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
+            return true;
+        }
+    } cmdBuildInfo;
+    
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here
