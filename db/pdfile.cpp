@@ -1066,7 +1066,7 @@ assert( !eloc.isNull() );
         return loc;
     }
 
-    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder );
+    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
     
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId) {
         bool addIndex = false;
@@ -1097,6 +1097,9 @@ assert( !eloc.isNull() );
             // This creates first file in the database.
             database->newestFile()->allocExtent(ns, initialExtentSize(len));
             d = nsdetails(ns);
+            if ( !god && !strstr( ns, ".system." ) && !strstr( ns, ".oplog." ) ) {
+                ensureHaveIdIndex( ns );
+            }
         }
         d->paddingFits();
 
@@ -1242,7 +1245,7 @@ assert( !eloc.isNull() );
                 string name = idxinfo.indexName();
                 BSONObjBuilder b;
                 string errmsg;
-                bool ok = deleteIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b);
+                bool ok = deleteIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }
