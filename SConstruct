@@ -725,7 +725,7 @@ def testSetup( env , target , source ):
     Execute( Mkdir( "/tmp/unittest/" ) )
 
 addSmoketest( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
-addSmoketest( "smokePerf", [ "perftest" ] , [ testSetup , perftest[ 0 ].abspath ] )
+addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
 
 clientExec = [ x[0].abspath for x in clientTests ];
 addSmoketest( "smokeClient" , clientExec , clientExec )
@@ -811,6 +811,29 @@ testEnv.AlwaysBuild( "smokeAllNoJs" )
 
 import atexit
 atexit.register( stopMongodForTests )
+
+def submitStub( obj ):
+    print( obj )
+
+def recordPerformance( env, target, source ):
+    global perftest
+    import subprocess, re
+    p = subprocess.Popen( [ perftest[0].abspath ], stdout=subprocess.PIPE )
+    b = p.communicate()[ 0 ]
+    entries = re.findall( "{.*?}", b )
+    for e in entries:
+        matches = re.match( "{'(.*?)': (.*?)}", e )
+        name = matches.group( 1 )
+        val = float( matches.group( 2 ) )
+        sub = { "benchmark": { "project": "http://github.com/mongodb/mongo", "description": "" }, "trial": {} }
+        sub[ "benchmark" ][ "name" ] = name
+        sub[ "benchmark" ][ "tags" ] = [ "c++", re.match( "(.*)__", name ).group( 1 ) ]
+        sub[ "trial" ][ "server_hash" ] = getGitVersion()
+        sub[ "trial" ][ "client_hash" ] = ""
+        sub[ "trial" ][ "result" ] = val
+        submitStub( sub )
+    
+addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
 #  ----  INSTALL -------
 
