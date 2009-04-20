@@ -118,7 +118,7 @@ namespace mongo {
                     log() << "WriteBackListener uncaught exception!" << endl;
                 }
                 secsToSleep++;
-                sleep(secsToSleep);
+                sleepsecs(secsToSleep);
                 if ( secsToSleep > 10 )
                     secsToSleep = 0;
             }
