@@ -44,6 +44,9 @@ namespace mongo {
     void dbexit(int returnCode, const char *whyMsg = "");
     void exit( int status );
 
+    const char * gitVersion();
+    const char * sysInfo();
+    
     void printGitVersion();
     void printSysInfo();
 

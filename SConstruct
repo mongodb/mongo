@@ -397,8 +397,8 @@ def setupBuildInfoFile( outFile ):
     sysInfo = getSysInfo()
     contents = "#include \"stdafx.h\"\n"
     contents += "#include <iostream>\n"
-    contents += "namespace mongo { void printGitVersion(){ log() << \"git version: " + version + "\" << std::endl; } }\n"
-    contents += "namespace mongo { void printSysInfo(){ log() << \"sys info: " + sysInfo + "\" << std::endl; } }\n"
+    contents += "namespace mongo { const char * gitVersion(){ return \"" + version + "\"; } }\n"
+    contents += "namespace mongo { const char * sysInfo(){ return \"" + sysInfo + "\"; } }\n"
     
     if os.path.exists( outFile ) and open( outFile ).read().strip() == contents.strip():
         return
