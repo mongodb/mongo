@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    int elementDirection( const BSONElement &e ) {
+    double elementDirection( const BSONElement &e ) {
         if ( e.isNumber() )
             return e.number();
         return 1;
