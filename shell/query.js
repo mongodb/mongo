@@ -112,6 +112,18 @@ DBQuery.prototype.count = function(){
     throw "count failed: " + tojson( res );
 }
 
+/**
+* iterative count - only for testing
+*/
+DBQuery.prototype.itcount = function(){
+    var num = 0;
+    while ( this.hasNext() ){
+        num++;
+        this.next();
+    }
+    return num;
+}
+
 DBQuery.prototype.length = function(){
     return this.toArray().length;
 }

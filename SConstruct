@@ -474,7 +474,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             Exit(1)
 
     if conf.CheckCXXHeader( "boost/asio.hpp" ):
-        myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
+        # TODO: turn this back on when ASIO working
+        myenv.Append( CPPDEFINES=[ "USE_ASIO_OFF" ] ) 
     else:
         print( "WARNING: old version of boost - you should consider upgrading" )
 

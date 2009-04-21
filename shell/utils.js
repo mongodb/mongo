@@ -122,6 +122,24 @@ Date.prototype.tojson = function(){
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
 
+Array.prototype.contains = function( x ){
+    for ( var i=0; i<this.length; i++ ){
+        if ( this[i] == x )
+            return true;
+    }
+    return false;
+}
+
+Array.prototype.unique = function( ){
+    var u = [];
+    for ( var i=0; i<this.length; i++){
+        var o = this[i];
+        if ( ! u.contains( o ) )
+            u.push( o );
+    }
+    return u;
+}
+
 Array.prototype.tojson = function( sepLines ){
     var s = "[";
     if ( sepLines ) s += "\n";

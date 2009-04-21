@@ -30,3 +30,17 @@ t.save( { b: 4 } );
 assert.eq( 3, t.find().count() );
 assert.eq( 3, t.find().hint( {b:1} ).toArray().length );
 assert.eq( 3, t.find().hint( {a:1} ).toArray().length );
+
+t.drop();
+t.ensureIndex( { a: 1, b: -1 }, true );
+t.save( { a: 2, b: 3 } );
+t.save( { a: 2, b: 3 } );
+t.save( { a: 2, b: 4 } );
+t.save( { a: 1, b: 3 } );
+assert.eq( 3, t.find().count() );
+
+t.drop();
+t.ensureIndex( { a: 1 }, true );
+t.save( { a: [ 2, 3 ] } );
+t.save( { a: 2 } );
+assert.eq( 1, t.find().count() );

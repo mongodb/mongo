@@ -131,11 +131,13 @@ namespace mongo {
     }
 
     bool Shard::moveAndCommit( const string& to , string& errmsg ){
+        uassert( "can't move shard to its current location!" , to != getServer() );
+
         log() << "moving shard ns: " << _ns << " moving shard: " << toString() << " " << _server << " -> " << to << endl;
         
         string from = _server;
         ServerShardVersion oldVersion = _manager->getVersion( from );
-
+        
         BSONObj filter;
         {
             BSONObjBuilder b;
@@ -214,7 +216,42 @@ namespace mongo {
             return false;
         
         log() << "autosplitting " << _ns << " size: " << size << " shard: " << toString() << endl;
-        split();
+        Shard * newShard = split();
+
+        moveIfShould( newShard );
+        
+        return true;
+    }
+
+    bool Shard::moveIfShould( Shard * newShard ){
+        Shard * toMove = 0;
+       
+        if ( newShard->countObjects() <= 1 ){
+            toMove = newShard;
+        }
+        else if ( this->countObjects() <= 1 ){
+            toMove = this;
+        }
+        else {
+            log(1) << "don't know how to decide if i should move inner shard" << endl;
+        }
+
+        if ( ! toMove )
+            return false;
+        
+        string newLocation = grid.pickServerForNewDB();
+        if ( newLocation == getServer() ){
+            // if this is the best server, then we shouldn't do anything!
+            log(1) << "not moving shard: " << toString() << " b/c would move to same place  " << newLocation << " -> " << getServer() << endl;
+            return 0;
+        }
+
+        log() << "moving shard (auto): " << toMove->toString() << " to: " << newLocation << " #objcets: " << toMove->countObjects() << endl;
+
+        string errmsg;
+        massert( (string)"moveAndCommit failed: " + errmsg , 
+                 toMove->moveAndCommit( newLocation , errmsg ) );
+        
         return true;
     }
 
@@ -230,6 +267,21 @@ namespace mongo {
         
         conn.done();
         return (long)result["size"].number();
+    }
+
+    
+    long Shard::countObjects(){
+        ScopedDbConnection conn( getServer() );
+        
+        BSONObj result;
+        uassert( "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
+                                                                        << "keyPattern" << _manager->getShardKey().key() 
+                                                                        << "min" << getMin() 
+                                                                        << "max" << getMax() 
+                                                                        ) , result ) );
+        
+        conn.done();
+        return (long)result["numObjects"].number();
     }
     
     bool Shard::operator==( const Shard& s ){
@@ -314,6 +366,11 @@ namespace mongo {
         return ss.str();
     }
     
+    
+    ShardKeyPattern Shard::skey(){
+        return _manager->getShardKey();
+    }
+
     // -------  ShardManager --------
 
     unsigned long long ShardManager::NextSequenceNumber = 1;
