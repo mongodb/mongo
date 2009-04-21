@@ -25,6 +25,9 @@ namespace mongo {
         MessageServerSession( MessageHandler * handler , io_service& ioservice ) : _handler( handler ) , _socket( ioservice ){
             
         }
+        ~MessageServerSession(){
+            cout << "disconnect from: " << _socket.remote_endpoint() << endl;
+        }
 
         tcp::socket& socket(){
             return _socket;
@@ -36,6 +39,9 @@ namespace mongo {
         }
         
         void handleReadHeader( const boost::system::error_code& error ){
+            if ( _inHeader.len == 0 )
+                return;
+
             if ( ! _inHeader.valid() ){
                 cerr << "  got invalid header from: " << _socket.remote_endpoint() << " closing connected" << endl;
                 return;
@@ -91,6 +97,7 @@ namespace mongo {
     private:        
 
         void _startHeaderRead(){
+            _inHeader.len = 0;
             async_read( _socket , 
                         buffer( &_inHeader , sizeof( _inHeader ) ) ,
                         bind( &MessageServerSession::handleReadHeader , shared_from_this() , placeholders::error ) );
