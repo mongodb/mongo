@@ -217,7 +217,7 @@ namespace mongo {
     }
 
     /* insert a key in a bucket with no complexity -- no splits required */
-    bool BucketBasics::basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order) {
+    bool BucketBasics::basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, const BSONObj& key, const BSONObj &order) {
         modified(thisLoc);
         assert( keypos >= 0 && keypos <= n );
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
@@ -295,7 +295,7 @@ namespace mongo {
 
     extern DiskLoc minDiskLoc;
 
-    bool BtreeBucket::exists(const IndexDetails& idx, DiskLoc thisLoc, BSONObj& key, BSONObj order) { 
+    bool BtreeBucket::exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, BSONObj order) { 
         int pos;
         bool found;
         DiskLoc b = locate(idx, thisLoc, key, order, pos, found, minDiskLoc);
@@ -327,7 +327,7 @@ namespace mongo {
        note result might be an Unused location!
     */
 	char foo;
-    bool BtreeBucket::find(const IndexDetails& idx, BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup) {
+    bool BtreeBucket::find(const IndexDetails& idx, const BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup) {
 #if defined(_EXPERIMENT1)
 		{
 			char *z = (char *) this;
@@ -503,7 +503,7 @@ found:
        keypos - where to insert the key i3n range 0..n.  0=make leftmost, n=make rightmost.
     */
     void BtreeBucket::insertHere(DiskLoc thisLoc, int keypos,
-                                 DiskLoc recordLoc, BSONObj& key, const BSONObj& order,
+                                 DiskLoc recordLoc, const BSONObj& key, const BSONObj& order,
                                  DiskLoc lchild, DiskLoc rchild, IndexDetails& idx)
     {
         modified(thisLoc);
@@ -703,7 +703,7 @@ found:
         return DiskLoc();
     }
 
-    DiskLoc BtreeBucket::locate(const IndexDetails& idx, const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction) {
+    DiskLoc BtreeBucket::locate(const IndexDetails& idx, const DiskLoc& thisLoc, const BSONObj& key, const BSONObj &order, int& pos, bool& found, DiskLoc recordLoc, int direction) {
         int p;
         found = find(idx, key, recordLoc, order, p, /*assertIfDup*/ false);
         if ( found ) {
@@ -729,7 +729,7 @@ found:
     /* @thisLoc disk location of *this
     */
     int BtreeBucket::_insert(DiskLoc thisLoc, DiskLoc recordLoc,
-                             BSONObj& key, const BSONObj &order, bool dupsAllowed,
+                             const BSONObj& key, const BSONObj &order, bool dupsAllowed,
                              DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) {
         if ( key.objsize() > KeyMax ) {
             problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << idx.indexNamespace() << endl;
@@ -793,7 +793,7 @@ found:
 
     /* todo: meaning of return code unclear clean up */
     int BtreeBucket::bt_insert(DiskLoc thisLoc, DiskLoc recordLoc,
-                            BSONObj& key, const BSONObj &order, bool dupsAllowed,
+                            const BSONObj& key, const BSONObj &order, bool dupsAllowed,
                             IndexDetails& idx, bool toplevel)
     {
         if ( toplevel ) {

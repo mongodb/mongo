@@ -104,7 +104,7 @@ namespace mongo {
         /* returns false if node is full and must be split
            keypos is where to insert -- inserted after that key #.  so keypos=0 is the leftmost one.
         */
-        bool basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order);
+        bool basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, const BSONObj& key, const BSONObj &order);
         void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild);
         void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs.
 
@@ -163,12 +163,12 @@ namespace mongo {
     public:
         void dump();
 
-        bool exists(const IndexDetails& idx, DiskLoc thisLoc, BSONObj& key, BSONObj order);
+        bool exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, BSONObj order);
 
         static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
 
         int bt_insert(DiskLoc thisLoc, DiskLoc recordLoc,
-                   BSONObj& key, const BSONObj &order, bool dupsAllowed,
+                   const BSONObj& key, const BSONObj &order, bool dupsAllowed,
                    IndexDetails& idx, bool toplevel = true);
 
         bool unindex(const DiskLoc& thisLoc, IndexDetails& id, BSONObj& key, const DiskLoc& recordLoc);
@@ -176,7 +176,7 @@ namespace mongo {
         /* locate may return an "unused" key that is just a marker.  so be careful.
              looks for a key:recordloc pair.
         */
-        DiskLoc locate(const IndexDetails& , const DiskLoc& thisLoc, BSONObj& key, const BSONObj &order, 
+        DiskLoc locate(const IndexDetails& , const DiskLoc& thisLoc, const BSONObj& key, const BSONObj &order, 
                        int& pos, bool& found, DiskLoc recordLoc, int direction=1);
 
         /* advance one key position in the index: */
@@ -196,12 +196,12 @@ namespace mongo {
         }
         static BtreeBucket* allocTemp(); /* caller must release with free() */
         void insertHere(DiskLoc thisLoc, int keypos,
-                        DiskLoc recordLoc, BSONObj& key, const BSONObj &order,
+                        DiskLoc recordLoc, const BSONObj& key, const BSONObj &order,
                         DiskLoc lchild, DiskLoc rchild, IndexDetails&);
         int _insert(DiskLoc thisLoc, DiskLoc recordLoc,
-                    BSONObj& key, const BSONObj &order, bool dupsAllowed,
+                    const BSONObj& key, const BSONObj &order, bool dupsAllowed,
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
-        bool find(const IndexDetails& idx, BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
+        bool find(const IndexDetails& idx, const BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
     };
 
