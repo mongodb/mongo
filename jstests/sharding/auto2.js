@@ -26,6 +26,7 @@ for ( j=0; j<30; j++ ){
            ) );
     
 }
+s.adminCommand( "connpoolsync" );
 
 print( "done inserting data" );
 
