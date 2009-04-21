@@ -57,7 +57,7 @@ namespace mongo {
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
-        if ( !strstr( ns, ".system." ) && !strstr( ns, ".oplog." ) && !strstr( ns, ".$freelist" ) ) {
+        if ( !strstr( ns, ".system." ) && !strstr( ns, ".$freelist" ) ) {
             ensureHaveIdIndex( ns );
         }        
     }
@@ -163,7 +163,10 @@ namespace mongo {
 
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
-        ensureIdIndexForNewNs(ns);
+
+        bool autoIndexId = ( !j.getField( "autoIndexId" ).isBoolean() || j.getBoolField( "autoIndexId" ) );
+        if ( autoIndexId )
+            ensureIdIndexForNewNs(ns);
 
         if ( mx > 0 )
             d->max = mx;
@@ -953,7 +956,7 @@ assert( !eloc.isNull() );
             assert( !newRecordLoc.isNull() );
             try {
                 idx.head.btree()->bt_insert(idx.head, newRecordLoc,
-                                         (BSONObj&) *i, order, dupsAllowed, idx);
+                                         *i, order, dupsAllowed, idx);
             }
             catch (AssertionException& ) {
                 if( !dupsAllowed ) {

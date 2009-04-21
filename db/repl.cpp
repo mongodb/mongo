@@ -1389,6 +1389,7 @@ namespace mongo {
         }
         b.append("size", sz);
         b.appendBool("capped", 1);
+        b.appendBool("autoIndexId", false);
         setClientTempNs("local.oplog.$main");
         string err;
         BSONObj o = b.done();
