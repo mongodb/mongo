@@ -1007,7 +1007,7 @@ assert( !eloc.isNull() );
             }
             catch( DBException& ) { 
                 // try to roll back previously added index entries
-                for( int j = 0; j < i; j++ ) { 
+                for( int j = 0; j <= i; j++ ) { 
                     try {
                         _unindexRecord(d->indexes[j], obj, newRecordLoc);
                     }
