@@ -58,6 +58,7 @@ namespace mongo {
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
         if ( !strstr( ns, ".system." ) && !strstr( ns, ".$freelist" ) ) {
+            log( 1 ) << "adding _id index for new collection" << endl;
             ensureHaveIdIndex( ns );
         }        
     }
@@ -694,7 +695,7 @@ assert( !eloc.isNull() );
 
     int nUnindexes = 0;
 
-    void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl) {
+    void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
         BSONObjSetDefaultOrder keys;
         id.getKeysFromObject(obj, keys);
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
@@ -718,7 +719,7 @@ assert( !eloc.isNull() );
                 sayDbContext();
             }
 
-            if ( !ok ) {
+            if ( !ok && logMissing ) {
                 out() << "unindex failed (key too big?) " << id.indexNamespace() << '\n';
             }
         }
@@ -1011,7 +1012,7 @@ assert( !eloc.isNull() );
                 // try to roll back previously added index entries
                 for( int j = 0; j <= i; j++ ) { 
                     try {
-                        _unindexRecord(d->indexes[j], obj, newRecordLoc);
+                        _unindexRecord(d->indexes[j], obj, newRecordLoc, false);
                     }
                     catch(...) { 
                         log(3) << "unindex fails on rollback after unique failure\n";
