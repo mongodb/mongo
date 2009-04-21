@@ -56,6 +56,11 @@ namespace mongo {
 
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
+    void ensureIdIndexForNewNs(const char *ns) {
+        if ( !strstr( ns, ".system." ) && !strstr( ns, ".oplog." ) && !strstr( ns, ".$freelist" ) ) {
+            ensureHaveIdIndex( ns );
+        }        
+    }
 
     string getDbContext() {
         stringstream ss;
@@ -158,6 +163,7 @@ namespace mongo {
 
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
+        ensureIdIndexForNewNs(ns);
 
         if ( mx > 0 )
             d->max = mx;
@@ -1097,9 +1103,8 @@ assert( !eloc.isNull() );
             // This creates first file in the database.
             database->newestFile()->allocExtent(ns, initialExtentSize(len));
             d = nsdetails(ns);
-            if ( !god && !strstr( ns, ".system." ) && !strstr( ns, ".oplog." ) ) {
-                ensureHaveIdIndex( ns );
-            }
+            if ( !god )
+                ensureIdIndexForNewNs(ns);
         }
         d->paddingFits();
 
