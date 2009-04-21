@@ -18,6 +18,8 @@ for ( ; i<500; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
+s.adminCommand( "connpoolsync" );
+
 primary = s.getServer( "test" ).getDB( "test" );
 
 assert.eq( 1 , s.config.shard.count() );
