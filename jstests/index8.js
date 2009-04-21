@@ -28,6 +28,7 @@ assert.eq( 2, t.find().count() );
 t.save( { b: 4 } );
 t.save( { b: 4 } );
 assert.eq( 3, t.find().count() );
+assert.eq( 3, t.find().hint( {c:1} ).toArray().length );
 assert.eq( 3, t.find().hint( {b:1} ).toArray().length );
 assert.eq( 3, t.find().hint( {a:1} ).toArray().length );
 
