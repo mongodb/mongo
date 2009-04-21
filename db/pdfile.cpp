@@ -886,6 +886,8 @@ assert( !eloc.isNull() );
                 BSONObj oldObj = dl.obj();
                 for ( int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& idx = d->indexes[i];
+                    if ( addID && idx.isIdIndex() )
+                        continue;
                     BSONObj idxKey = idx.info.obj().getObjectField("key");
 
                     BSONObjSetDefaultOrder oldkeys;
