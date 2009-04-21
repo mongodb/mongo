@@ -42,3 +42,11 @@ t.ensureIndex( { a: 1 }, true );
 t.save( { a: [ 2, 3 ] } );
 t.save( { a: 2 } );
 assert.eq( 1, t.find().count() );
+
+t.drop();
+t.ensureIndex( { a: 1 }, true );
+t.save( { a: 2 } );
+t.save( { a: [ 1, 2, 3 ] } );
+t.save( { a: [ 3, 2, 1 ] } );
+assert.eq( 1, t.find().sort( { a: 1 } ).hint( { a: 1 } ).toArray().length );
+assert.eq( 1, t.find().sort( { a: -1 } ).hint( { a: 1 } ).toArray().length );
