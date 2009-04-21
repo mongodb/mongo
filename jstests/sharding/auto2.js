@@ -33,12 +33,11 @@ print( "done inserting data" );
 counta = s._connections[0].getDB( "test" ).foo.count(); 
 countb = s._connections[1].getDB( "test" ).foo.count(); 
 
+assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
+assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
+
 assert( counta > 50 , "server 0 doesn't have enough stuff: " + counta );
 assert( countb > 50 , "server 1 doesn't have enough stuff: " + countb );
-
-assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
-
-assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
 
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
 print( s.config.shard.find().toArray().tojson( "\n" ) );
