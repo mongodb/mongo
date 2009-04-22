@@ -865,7 +865,6 @@ namespace mongo {
             if ( incompleteClone ) {
                 log() << "An earlier initial clone of '" << clientName << "' did not complete, will resync." << endl;
             }
-            incompleteCloneDbs.insert( clientName );
             if ( nClonedThisPass ) {
                 /* we only clone one database per pass, even if a lot need done.  This helps us
                  avoid overflowing the master's transaction log by doing too much work before going
@@ -874,6 +873,7 @@ namespace mongo {
                  */
                 addDbNextPass.insert( clientName );
             } else {
+                incompleteCloneDbs.insert( clientName );
                 save();
                 setClientTempNs( ns );
                 nClonedThisPass++;
