@@ -144,7 +144,6 @@ namespace mongo {
         // returns possibly unowned id spec for the operation.
         static BSONObj idForOp( const BSONObj &op, bool &mod );
         static void updateSetsWithOp( const BSONObj &op, IdSets &changed, IdSets &modChanged );
-        bool initialPull_;
 
     public:
         static void applyOperation(const BSONObj& op);
@@ -194,8 +193,6 @@ namespace mongo {
         static bool throttledForceResyncDead( const char *requester );
         static void forceResyncDead( const char *requester );
         void forceResync( const char *requester );
-        
-        bool initialPull() const { return initialPull_; }
     };
 
     /* Write operation to the log (local.oplog.$main)

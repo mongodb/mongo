@@ -429,7 +429,6 @@ namespace mongo {
 
     ReplSource::ReplSource() {
         out() << "new replsource" << endl;
-        initialPull_ = true;
         replacing = false;
         nClonedThisPass = 0;
         paired = false;
@@ -437,7 +436,6 @@ namespace mongo {
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
         out() << "new replsource" << endl;
-        initialPull_ = o.getBoolField( "initialPull" );
         replacing = false;
         paired = false;
         only = o.getStringField("only");
@@ -450,7 +448,6 @@ namespace mongo {
             uassert( "bad sources 'syncedTo' field value", e.type() == Date );
             OpTime tmp( e.date() );
             syncedTo = tmp;
-            //syncedTo.asDate() = e.date();
         }
 
         BSONObj dbsObj = o.getObjectField("dbsNextPass");
@@ -519,8 +516,6 @@ namespace mongo {
         if ( n )
             b.append("incompleteCloneDbs", incompleteCloneDbsBuilder.done());
 
-        b.appendBool( "initialPull", initialPull_ );
-        
         return b.obj();
     }
 
@@ -572,7 +567,7 @@ namespace mongo {
     }
     
     static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, const BSONObj &spec, ReplSource::SourceVector &old) {
-        if ( !s.initialPull() ) { // Don't reuse old ReplSource if there was a forced resync.
+        if ( !s.syncedTo.isNull() ) { // Don't reuse old ReplSource if there was a forced resync.
             for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
                 if ( s == **i ) {
                     out() << "reusing existing: " << **i << endl;
@@ -753,7 +748,6 @@ namespace mongo {
         }        
         dbs.clear();
         syncedTo = OpTime();
-        initialPull_ = true;
         save();
     }
 
@@ -854,7 +848,7 @@ namespace mongo {
        see logOp() comments.
     */
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail) {
-        out() << "doing op: " << op << endl;
+//        out() << "doing op: " << op << endl;
         
         // skip no-op
         if ( op.getStringField( "op" )[ 0 ] == 'n' )
@@ -1023,8 +1017,7 @@ namespace mongo {
         bool initial = syncedTo.isNull();
         
         if ( c == 0 ) {
-            if ( initialPull_ ) {
-                initialPull_ = false;
+            if ( syncedTo.isNull() ) {
                 cout << "starting from tail of oplog" << endl;
                 // Important to grab last oplog timestamp before listing databases.
                 BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
