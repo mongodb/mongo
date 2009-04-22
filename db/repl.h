@@ -160,13 +160,6 @@ namespace mongo {
         OpTime syncedTo;
         OpTime lastSavedLocalTs_;
 
-        /* list of databases that we have synced.
-           we need this so that if we encounter a new one, we know
-           to go fetch the old data.
-        */
-        set<string> dbs;
-        void repopulateDbsList( const BSONObj &o );
-
         int nClonedThisPass;
 
         typedef vector< shared_ptr< ReplSource > > SourceVector;

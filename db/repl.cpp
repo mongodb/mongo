@@ -473,8 +473,6 @@ namespace mongo {
         }        
 
         lastSavedLocalTs_ = OpTime( o.getField( "localLogTs" ).date() );
-        
-        repopulateDbsList( o );
     }
 
     /* Turn our C++ Source object into a BSONObj */
@@ -487,19 +485,10 @@ namespace mongo {
         if ( !syncedTo.isNull() )
             b.appendDate("syncedTo", syncedTo.asDate());
 
-        BSONObjBuilder dbs_builder;
-        int n = 0;
-        for ( set<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
-            n++;
-            dbs_builder.appendBool(i->c_str(), 1);
-        }
-        if ( n )
-            b.append("dbs", dbs_builder.done());
-        
         b.appendDate("localLogTs", lastSavedLocalTs_.asDate());
         
         BSONObjBuilder dbsNextPassBuilder;
-        n = 0;
+        int n = 0;
         for ( set<string>::iterator i = addDbNextPass.begin(); i != addDbNextPass.end(); i++ ) {
             n++;
             dbsNextPassBuilder.appendBool(i->c_str(), 1);
@@ -552,20 +541,6 @@ namespace mongo {
     string dashDashSource;
     string dashDashOnly;
 
-    void ReplSource::repopulateDbsList( const BSONObj &o ) {
-        dbs.clear();
-        BSONObj dbsObj = o.getObjectField("dbs");
-        if ( !dbsObj.isEmpty() ) {
-            BSONObjIterator i(dbsObj);
-            while ( 1 ) {
-                BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                dbs.insert( e.fieldName() );
-            }
-        }
-    }
-    
     static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, const BSONObj &spec, ReplSource::SourceVector &old) {
         if ( !s.syncedTo.isNull() ) { // Don't reuse old ReplSource if there was a forced resync.
             for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
@@ -718,10 +693,6 @@ namespace mongo {
     
     void ReplSource::forceResync( const char *requester ) {
         out() << "forcing resync for source" << endl;
-        for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
-            resyncDrop( i->c_str(), requester );
-        }
-        out() << "handled saved dbs" << endl;
         BSONObj info;
         {
             out() << "going to get from other side" << endl;
@@ -740,13 +711,12 @@ namespace mongo {
             if ( e.eoo() )
                 break;
             string name = e.embeddedObject().getField( "name" ).valuestr();
-            if ( name != "local" && name != "admin" && dbs.count( name ) == 0 ) {
+            if ( name != "local" && name != "admin" ) {
                 if ( only.empty() || only == name ) {
                     resyncDrop( name.c_str(), requester );
                 }
             }
         }        
-        dbs.clear();
         syncedTo = OpTime();
         save();
     }
@@ -776,11 +746,6 @@ namespace mongo {
 
         log() << "resync: done " << db << endl;
 
-        /* add the db to our dbs array which we will write back to local.sources.
-           note we are not in a consistent state until the oplog gets applied,
-           which happens next when this returns.
-           */
-        dbs.insert(db);
         return true;
     }
 
@@ -871,17 +836,6 @@ namespace mongo {
         if ( !only.empty() && only != clientName )
             return;
 
-        bool newDb = dbs.count(clientName) == 0;
-        if ( newDb && nClonedThisPass ) {
-            /* we only clone one database per pass, even if a lot need done.  This helps us
-               avoid overflowing the master's transaction log by doing too much work before going
-               back to read more transactions. (Imagine a scenario of slave startup where we try to
-               clone 100 databases in one pass.)
-            */
-            addDbNextPass.insert(clientName);
-            return;
-        }
-
         dblock lk;
 
         if ( localLogTail && replPair && replPair->state == ReplPair::State_Master ) {
@@ -901,6 +855,12 @@ namespace mongo {
             }
             *localLogTail = newTail;
         }
+
+        if ( replAllDead ) {
+            // hmmm why is this check here and not at top of this function? does it get set between top and here?
+            log() << "replAllDead, throwing SyncException\n";
+            throw SyncException();
+        }
         
         bool justCreated;
         try {
@@ -911,29 +871,30 @@ namespace mongo {
             return;
         }
 
-        if ( replAllDead ) {
-            // hmmm why is this check here and not at top of this function? does it get set between top and here?
-            log() << "replAllDead, throwing SyncException\n";
-            throw SyncException();
-        }
-        
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
-        
+
         if ( justCreated || incompleteClone ) {
             if ( incompleteClone ) {
                 log() << "An earlier initial clone did not complete, resyncing." << endl;
-            } else if ( !newDb ) {
-                log() << "Db just created, but not new to repl source." << endl;
             }
             incompleteCloneDbs.insert( clientName );
+            if ( nClonedThisPass ) {
+                /* we only clone one database per pass, even if a lot need done.  This helps us
+                 avoid overflowing the master's transaction log by doing too much work before going
+                 back to read more transactions. (Imagine a scenario of slave startup where we try to
+                 clone 100 databases in one pass.)
+                 */
+                addDbNextPass.insert( clientName );
+            } else {
+                save();
+                setClientTempNs( ns );
+                nClonedThisPass++;
+                out() << "database: " << unsigned( database ) << endl;
+                resync(database->name);
+                addDbNextPass.erase(clientName);
+                incompleteCloneDbs.erase( clientName );
+            }
             save();
-            setClientTempNs( ns );
-            nClonedThisPass++;
-            out() << "database: " << unsigned( database ) << endl;
-            resync(database->name);
-            addDbNextPass.erase(clientName);
-            incompleteCloneDbs.erase( clientName );
-            save(); // persist dbs, next pass dbs
         } else {
             bool mod;
             BSONObj id = idForOp( op, mod );
@@ -1091,6 +1052,7 @@ namespace mongo {
                 b.append("ns", *i + '.');
                 b.append("op", "db");
                 BSONObj op = b.done();
+                out() << "adding 'next pass' db" << endl;
                 sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass, 0);
             }
         }
