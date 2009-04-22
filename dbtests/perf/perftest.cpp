@@ -23,6 +23,7 @@
 #include "../../db/instance.h"
 #include "../../db/query.h"
 #include "../../db/queryoptimizer.h"
+#include "../../util/file_allocator.h"
 
 #include <unittest/Registry.hpp>
 #include <unittest/UnitTest.hpp>
@@ -68,9 +69,17 @@ public:
         boost::posix_time::ptime start = boost::posix_time::microsec_clock::universal_time();
         test.run();
         boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
-        cout << name << ": " << end - start << endl;
+        long long micro = ( end - start ).total_microseconds();
+        cout << "{'" << name << "': "
+             << micro / 1000000
+             << "."
+             << setw( 6 ) << setfill( '0' ) << micro % 1000000
+             << "}" << endl;
     }
     ~Runner() {
+#if !defined(_WIN32)
+        theFileAllocator().waitUntilFinished();
+#endif        
         client_->dropDatabase( testDb< T >().c_str() );        
     }
 };
@@ -84,19 +93,20 @@ protected:
 };
 
 namespace Insert {
-    class NoIndex {
+    class IdIndex {
     public:
         void run() {
             string ns = testNs( this );
-            for( int i = 0; i < 100000; ++i )
+            for( int i = 0; i < 100000; ++i ) {
                 client_->insert( ns.c_str(), BSON( "_id" << i ) );
+            }
         }
     };
 
-    class OneIndex {
+    class TwoIndex {
     public:
-        OneIndex() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+        TwoIndex() : ns_( testNs( this ) ) {
+            client_->ensureIndex( ns_, BSON( "_id" << 1 ), "my_id" );
         }
         void run() {
             for( int i = 0; i < 100000; ++i )
@@ -108,10 +118,10 @@ namespace Insert {
     class TenIndex {
     public:
         TenIndex() : ns_( testNs( this ) ) {
-            const char *names = "aaaaaaaaaa";
-            for( int i = 0; i < 10; ++i ) {
+            const char *names = "aaaaaaaaa";
+            for( int i = 0; i < 9; ++i ) {
                 client_->resetIndexCache();
-                client_->ensureIndex( ns_.c_str(), BSON( "_id" << 1 ), names + i );
+                client_->ensureIndex( ns_.c_str(), BSON( "_id" << 1 ), false, names + i );
             }            
         }
         void run() {
@@ -162,8 +172,8 @@ namespace Insert {
     class All : public RunnerSuite {
     public:
         All() {
-            add< NoIndex >();
-            add< OneIndex >();
+            add< IdIndex >();
+            add< TwoIndex >();
             add< TenIndex >();
             add< Capped >();
             add< OneIndexReverse >();
@@ -176,7 +186,6 @@ namespace Update {
     class Smaller {
     public:
         Smaller() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 100000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i << "b" << 2 ) );            
         }
@@ -190,7 +199,6 @@ namespace Update {
     class Bigger {
     public:
         Bigger() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 100000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i ) );            
         }
@@ -204,7 +212,6 @@ namespace Update {
     class Inc {
     public:
         Inc() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 10000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << 0 ) );            
         }
@@ -219,7 +226,6 @@ namespace Update {
     class Set {
     public:
         Set() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 10000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << 0 ) );            
         }
@@ -234,7 +240,6 @@ namespace Update {
     class SetGrow {
     public:
         SetGrow() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 10000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i << "i" << "" ) );            
         }
@@ -343,10 +348,10 @@ namespace Index {
     public:
         Int() : ns_( testNs( this ) ) {
             for( int i = 0; i < 100000; ++i )
-                client_->insert( ns_.c_str(), BSON( "_id" << i ) );
+                client_->insert( ns_.c_str(), BSON( "a" << i ) );
         }
         void run() {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
         }
         string ns_;
     };
@@ -357,11 +362,11 @@ namespace Index {
             OID id;
             for( int i = 0; i < 100000; ++i ) {
                 id.init();
-                client_->insert( ns_.c_str(), BSON( "_id" << id ) );
+                client_->insert( ns_.c_str(), BSON( "a" << id ) );
             }
         }
         void run() {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
         }
         string ns_;
     };
@@ -372,11 +377,11 @@ namespace Index {
             for( int i = 0; i < 100000; ++i ) {
                 stringstream ss;
                 ss << i;
-                client_->insert( ns_.c_str(), BSON( "_id" << ss.str() ) );
+                client_->insert( ns_.c_str(), BSON( "a" << ss.str() ) );
             }
         }
         void run() {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
         }
         string ns_;
     };
@@ -385,11 +390,11 @@ namespace Index {
     public:
         Object() : ns_( testNs( this ) ) {
             for( int i = 0; i < 100000; ++i ) {
-                client_->insert( ns_.c_str(), BSON( "_id" << BSON( "a" << i ) ) );
+                client_->insert( ns_.c_str(), BSON( "a" << BSON( "a" << i ) ) );
             }
         }
         void run() {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
+            client_->ensureIndex( ns_, BSON( "a" << 1 ) );
         }
         string ns_;
     };    
@@ -423,7 +428,6 @@ namespace QueryTests {
     class NoMatchIndex {
     public:
         NoMatchIndex() : ns_( testNs( this ) ) {
-            client_->ensureIndex( ns_, BSON( "_id" << 1 ) );
             for( int i = 0; i < 100000; ++i )
                 client_->insert( ns_.c_str(), BSON( "_id" << i ) );
         }
@@ -612,7 +616,7 @@ namespace Plan {
             const char *names = "aaaaaaaaaa";
             for( int i = 0; i < 10; ++i ) {
                 client_->resetIndexCache();
-                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), names + i );
+                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
             setClient( ns_.c_str() );
@@ -635,7 +639,7 @@ namespace Plan {
             const char *names = "aaaaaaaaaa";
             for( int i = 0; i < 10; ++i ) {
                 client_->resetIndexCache();
-                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), names + i );
+                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
             setClient( ns_.c_str() );
@@ -654,7 +658,7 @@ namespace Plan {
             const char *names = "aaaaaaaaaa";
             for( int i = 0; i < 10; ++i ) {
                 client_->resetIndexCache();
-                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), names + i );
+                client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
             setClient( ns_.c_str() );
@@ -695,8 +699,12 @@ int main( int argc, char **argv ) {
     boost::filesystem::create_directory( p );
     dbpath = p.native_directory_string().c_str();
     
-    client_ = new DBDirectClient();
+#if !defined(_WIN32)
+    theFileAllocator().start();
+#endif    
     
+    client_ = new DBDirectClient();
+
     UnitTest::Registry tests;
     tests.add( suite< Insert::All >(), "insert" );
     tests.add( suite< Update::All >(), "update" );

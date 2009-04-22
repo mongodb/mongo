@@ -397,8 +397,8 @@ namespace QueryTests {
         }
         static const char *ns() { return "querytests.AutoResetIndexCache"; }
         static const char *idxNs() { return "querytests.system.indexes"; }
-        void index() const { ASSERT( !client().findOne( idxNs(), BSONObj() ).isEmpty() ); }
-        void noIndex() const { ASSERT( client().findOne( idxNs(), BSONObj() ).isEmpty() ); }
+        void index() const { ASSERT( !client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
+        void noIndex() const { ASSERT( client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
         void checkIndex() {
             client().ensureIndex( ns(), BSON( "a" << 1 ) );
             index();            
@@ -415,7 +415,53 @@ namespace QueryTests {
             checkIndex();
         }
     };
+
+    class UniqueIndex : public ClientBase {
+    public:
+        ~UniqueIndex() {
+            client().dropCollection( "querytests.UniqueIndex" );
+        }
+        void run() {
+            const char *ns = "querytests.UniqueIndex";
+            client().ensureIndex( ns, BSON( "a" << 1 ), true );
+            client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
+            client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
+            ASSERT_EQUALS( 1U, client().count( ns, BSONObj() ) );
+            client().dropCollection( ns );
+            client().ensureIndex( ns, BSON( "b" << 1 ), true );
+            client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
+            client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
+            ASSERT_EQUALS( 2U, client().count( ns, BSONObj() ) );
+        }
+    };
+
+    class UniqueIndexPreexistingData : public ClientBase {
+    public:
+        ~UniqueIndexPreexistingData() {
+            client().dropCollection( "querytests.UniqueIndexPreexistingData" );
+        }
+        void run() {
+            const char *ns = "querytests.UniqueIndexPreexistingData";
+            client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
+            client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
+            client().ensureIndex( ns, BSON( "a" << 1 ), true );
+            ASSERT_EQUALS( 0U, client().count( "querytests.system.indexes", BSON( "ns" << ns << "name" << NE << "_id_" ) ) );
+        }
+    };
     
+    class SubobjectInArray : public ClientBase {
+    public:
+        ~SubobjectInArray() {
+            client().dropCollection( "querytests.SubobjectInArray" );
+        }
+        void run() {
+            const char *ns = "querytests.SubobjectInArray";
+            client().insert( ns, fromjson( "{a:[{b:{c:1}}]}" ) );
+            ASSERT( !client().findOne( ns, BSON( "a.b.c" << 1 ) ).isEmpty() );
+            ASSERT( !client().findOne( ns, fromjson( "{'a.c':null}" ) ).isEmpty() );
+        }
+    };
+
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -438,6 +484,9 @@ namespace QueryTests {
             add< MultiNe >();
             add< EmbeddedNe >();
             add< AutoResetIndexCache >();
+            add< UniqueIndex >();
+            add< UniqueIndexPreexistingData >();
+            add< SubobjectInArray >();
         }
     };
     

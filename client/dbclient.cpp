@@ -518,7 +518,7 @@ namespace mongo {
         say( toSend );
     }
 
-    bool DBClientBase::ensureIndex( const string &ns , BSONObj keys , const string & name ) {
+    bool DBClientBase::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
@@ -556,6 +556,9 @@ namespace mongo {
             toSave.append( "name" , ss.str() );
             cacheKey += ss.str();
         }
+        
+        if ( unique )
+            toSave.appendBool( "unique", unique );
 
         if ( _seenIndexes.count( cacheKey ) )
             return 0;

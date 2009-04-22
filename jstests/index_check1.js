@@ -5,7 +5,7 @@ assert(db.system.namespaces.find({name:/somecollection/}).length() == 0, 1);
 
 db.somecollection.save({a:1});
 
-assert(db.system.namespaces.find({name:/somecollection/}).length() == 1, 2);
+assert(db.system.namespaces.find({name:/somecollection/}).length() == 2, 2);
 
 db.somecollection.ensureIndex({a:1});
 
@@ -21,7 +21,7 @@ assert(db.system.namespaces.find({name:/somecollection/}).length() == 0, 4);
 
 db.somecollection.save({a:1});
 
-assert(db.system.namespaces.find({name:/somecollection/}).length() == 1, 5);
+assert(db.system.namespaces.find({name:/somecollection/}).length() == 2, 5);
 
 db.somecollection.ensureIndex({a:1});
 

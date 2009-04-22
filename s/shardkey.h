@@ -44,6 +44,19 @@ namespace mongo {
          */
         BSONObj globalMax() const;
 
+        bool isGlobalMin( const BSONObj& k ){
+            return k.woCompare( globalMin() ) == 0;
+        }
+
+        bool isGlobalMax( const BSONObj& k ){
+            return k.woCompare( globalMax() ) == 0;
+        }
+        
+        bool isGlobal( const BSONObj& k ){
+            return isGlobalMin( k ) || isGlobalMax( k );
+        }
+
+
         /**
            @return the key central between min and max
            note: min and max could cross type boundaries

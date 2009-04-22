@@ -543,7 +543,7 @@ namespace mongo {
         logValid_ = true;
         stringstream spec;
         // 128MB
-        spec << "{size:" << logSizeMb * 1024 * 1024 << ",capped:true}";
+        spec << "{size:" << logSizeMb * 1024 * 1024 << ",capped:true,autoIndexId:false}";
         setClientTempNs( logNS_.c_str() );
         string err;
         massert( "Could not create log ns", userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false ) );

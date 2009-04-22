@@ -2,9 +2,11 @@
 
 #include "stdafx.h"
 #include "request.h"
+#include "../util/background.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
 #include "shard.h"
+#include "server.h"
 
 namespace mongo {
 
@@ -54,15 +56,97 @@ namespace mongo {
     
     void Strategy::insert( string server , const char * ns , const BSONObj& obj ){
         ScopedDbConnection dbcon( server );
+        checkShardVersion( dbcon.conn() , ns );
         dbcon->insert( ns , obj );
         dbcon.done();
     }
 
     map<DBClientBase*,unsigned long long> checkShardVersionLastSequence;
 
+    class WriteBackListener : public BackgroundJob {
+    protected:
+        
+        WriteBackListener( const string& addr ) : _addr( addr ){
+            cout << "creating WriteBackListener for: " << addr << endl;
+        }
+        
+        void run(){
+            int secsToSleep = 0;
+            while ( 1 ){
+                try {
+                    ScopedDbConnection conn( _addr );
+                    
+                    BSONObj result;
+                    
+                    {
+                        BSONObjBuilder cmd;
+                        cmd.appendOID( "writebacklisten" , &serverID );
+                        if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ){
+                            log() <<  "writebacklisten command failed!  "  << result << endl;
+                            continue;
+                        }
+
+                    }
+                    
+                    log(1) << "writebacklisten result: " << result << endl;
+                    
+                    BSONObj data = result.getObjectField( "data" );
+                    if ( data.getBoolField( "writeBack" ) ){
+                        string ns = data["ns"].valuestrsafe();
+
+                        int len;
+
+                        Message m( (void*)data["msg"].binData( len ) , false );
+                        massert( "invalid writeback message" , m.data->valid() );                        
+
+                        grid.getDBConfig( ns )->getShardManager( ns , true );
+                        
+                        Request r( m , 0 );
+                        r.process();
+                    }
+                    else {
+                        log() << "unknown writeBack result: " << result << endl;
+                    }
+                    
+                    conn.done();
+                    secsToSleep = 0;
+                }
+                catch ( std::exception e ){
+                    log() << "WriteBackListener exception : " << e.what() << endl;
+                }
+                catch ( ... ){
+                    log() << "WriteBackListener uncaught exception!" << endl;
+                }
+                secsToSleep++;
+                sleepsecs(secsToSleep);
+                if ( secsToSleep > 10 )
+                    secsToSleep = 0;
+            }
+        }
+        
+    private:
+        string _addr;
+        static map<string,WriteBackListener*> _cache;
+
+    public:
+        static void init( DBClientBase& conn ){
+            WriteBackListener*& l = _cache[conn.getServerAddress()];
+            if ( l )
+                return;
+            l = new WriteBackListener( conn.getServerAddress() );
+            l->go();
+        }
+
+    };
+
+    map<string,WriteBackListener*> WriteBackListener::_cache;
+    
+
     void checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative ){
         // TODO: cache, optimize, etc...
         
+        WriteBackListener::init( conn );
+
         DBConfig * conf = grid.getDBConfig( ns );
         if ( ! conf )
             return;
@@ -108,6 +192,7 @@ namespace mongo {
         cmdBuilder.append( "setShardVersion" , ns.c_str() );
         cmdBuilder.append( "configdb" , configServer.modelServer() );
         cmdBuilder.appendTimestamp( "version" , version );
+        cmdBuilder.appendOID( "serverID" , &serverID );
         if ( authoritative )
             cmdBuilder.appendBool( "authoritative" , 1 );
         BSONObj cmd = cmdBuilder.obj();
@@ -128,4 +213,6 @@ namespace mongo {
         BSONObj lockResult;
         return setShardVersion( conn , ns , grid.getNextOpTime() , true , lockResult );
     }
+
+    
 }

@@ -1,4 +1,4 @@
-// dbgrid/request.cpp
+// s/commands_admin.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -38,9 +38,9 @@
 namespace mongo {
 
     extern string ourHostname;
-    
+
     namespace dbgrid_cmds {
-        
+
         set<string> dbgridCommands;
 
         class GridAdminCmd : public Command {
@@ -55,7 +55,7 @@ namespace mongo {
                 return true;
             }
         };
-        
+
         // --------------- misc commands ----------------------
 
         class NetStatCmd : public GridAdminCmd {
@@ -72,45 +72,45 @@ namespace mongo {
         public:
             ListGridCommands() : GridAdminCmd("gridcommands") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                
+
                 BSONObjBuilder arr;
                 int num=0;
                 for ( set<string>::iterator i = dbgridCommands.begin(); i != dbgridCommands.end(); i++ ){
                     string s = BSONObjBuilder::numStr( num++ );
                     arr.append( s.c_str() , *i );
                 }
-                
+
                 result.appendArray( "commands" , arr.done() );
                 result.append("ok" , 1 );
                 return true;
             }
-        } listGridCommands;        
+        } listGridCommands;
 
 
         // ------------ database level commands -------------
-        
+
         class ListDatabaseCommand : public GridAdminCmd {
         public:
             ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection conn( configServer.getPrimary() );                
-        
+                ScopedDbConnection conn( configServer.getPrimary() );
+
 
                 auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , BSONObj() );
 
-                BSONObjBuilder list;                
+                BSONObjBuilder list;
                 int num = 0;
                 while ( cursor->more() ){
                     string s = BSONObjBuilder::numStr( num++ );
-                    
+
                     BSONObj o = cursor->next();
                     list.append( s.c_str() , o["name"].valuestrsafe() );
                 }
-                
+
                 result.appendArray("databases" , list.obj() );
                 conn.done();
 
-                return true;        
+                return true;
             }
         } gridListDatabase;
 
@@ -122,7 +122,7 @@ namespace mongo {
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string dbname = cmdObj["moveprimary"].valuestrsafe();
-                
+
                 if ( dbname.size() == 0 ){
                     errmsg = "no db";
                     return false;
@@ -132,13 +132,13 @@ namespace mongo {
                     errmsg = "can't move config db";
                     return false;
                 }
-                
+
                 DBConfig * config = grid.getDBConfig( dbname , false );
                 if ( ! config ){
                     errmsg = "can't find db!";
                     return false;
                 }
-                
+
                 string to = cmdObj["to"].valuestrsafe();
                 if ( ! to.size()  ){
                     errmsg = "you have to specify where you want to move it";
@@ -155,12 +155,12 @@ namespace mongo {
                     return false;
                 }
 
-                ScopedDbConnection conn( configServer.getPrimary() );                
-                
+                ScopedDbConnection conn( configServer.getPrimary() );
+
                 log() << "moving " << dbname << " primary from: " << config->getPrimary() << " to: " << to << endl;
-                
+
                 // TODO LOCKING: this is not safe with multiple mongos
-                
+
 
                 ScopedDbConnection toconn( to );
 
@@ -177,10 +177,10 @@ namespace mongo {
                 }
 
                 ScopedDbConnection fromconn( config->getPrimary() );
-                
+
                 config->setPrimary( to );
                 config->save( true );
-                
+
                 log() << " dropping " << dbname << " from old" << endl;
 
                 fromconn->dropDatabase( dbname.c_str() );
@@ -193,12 +193,12 @@ namespace mongo {
                 return true;
             }
         } movePrimary;
-        
+
         class PartitionCmd : public GridAdminCmd {
         public:
             PartitionCmd() : GridAdminCmd( "partition" ){}
             virtual void help( stringstream& help ) const {
-                help 
+                help
                     << "turns on partitioning for a db.  have to do this before sharding, etc.. will work.\n"
                     << "  { partition : \"alleyinsider\" }\n";
             }
@@ -224,7 +224,7 @@ namespace mongo {
         } partitionCmd;
 
         // ------------ collection level commands -------------
-        
+
         class ShardCmd : public GridAdminCmd {
         public:
             ShardCmd() : GridAdminCmd( "shard" ){}
@@ -240,40 +240,40 @@ namespace mongo {
                     errmsg = "db not partitioned ";
                     return false;
                 }
-                
+
                 if ( config->sharded( ns ) ){
                     errmsg = "already sharded";
                     return false;
                 }
-                
+
                 BSONObj key = cmdObj.getObjectField( "key" );
                 if ( key.isEmpty() ){
                     errmsg = "no shard key";
                     return false;
                 }
-                
+
                 config->turnOnSharding( ns , key );
                 config->save( true );
 
                 result << "ok" << 1;
                 return true;
-            }            
+            }
         } shardCmd;
-            
-        
+
+
         class SplitCollectionHelper : public GridAdminCmd {
         public:
             SplitCollectionHelper( const char * name ) : GridAdminCmd( name ) , _name( name ){}
             virtual void help( stringstream& help ) const {
-                help 
+                help
                     << " example: { shard : 'alleyinsider.blog.posts' , find : { ts : 1 } } - split the shard that contains give key \n"
                     << " example: { shard : 'alleyinsider.blog.posts' , middle : { ts : 1 } } - split the shard that contains the key with this as the middle \n"
                     << " NOTE: this does not move move the chunks, it merely creates a logical seperation \n"
                     ;
             }
-            
+
             virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ) = 0;
-            
+
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string ns = cmdObj[_name.c_str()].valuestrsafe();
                 if ( ns.size() == 0 ){
@@ -286,22 +286,22 @@ namespace mongo {
                     errmsg = "ns not sharded.  have to shard before can split";
                     return false;
                 }
-                
+
                 BSONObj find = cmdObj.getObjectField( "find" );
                 bool middle = false;
                 if ( find.isEmpty() ){
                     find = cmdObj.getObjectField( "middle" );
                     middle = true;
                 }
-                
+
                 if ( find.isEmpty() ){
                     errmsg = "need to specify find or middle";
                     return false;
                 }
-                
+
                 ShardManager * info = config->getShardManager( ns );
                 Shard& old = info->findShard( find );
-                
+
 
                 return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
             }
@@ -314,40 +314,40 @@ namespace mongo {
         public:
             SplitValueCommand() : SplitCollectionHelper( "splitvalue" ){}
             virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
-                
+
                 result << "shardinfo" << old.toString();
-                
+
                 result.appendBool( "auto" , middle.isEmpty() );
-                
+
                 if ( middle.isEmpty() )
                     middle = old.pickSplitPoint();
 
                 result.append( "middle" , middle );
-                
+
                 result << "ok" << 1;
                 return true;
-            }            
-            
+            }
+
 
         } splitValueCmd;
 
 
         class SplitCollection : public SplitCollectionHelper {
         public:
-            SplitCollection() : SplitCollectionHelper( "split" ){}            
+            SplitCollection() : SplitCollectionHelper( "split" ){}
             virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
-                
+
                 log() << "splitting: " << ns << "  shard: " << old << endl;
-                
+
                 if ( middle.isEmpty() )
                     old.split();
                 else
                     old.split( middle );
-                
+
                 result << "ok" << 1;
                 return true;
-            }            
-            
+            }
+
 
         } splitCollectionCmd;
 
@@ -369,7 +369,7 @@ namespace mongo {
                     errmsg = "ns not sharded.  have to split before can move a shard";
                     return false;
                 }
-                
+
                 BSONObj find = cmdObj.getObjectField( "find" );
                 if ( find.isEmpty() ){
                     errmsg = "need to specify find.  see help";
@@ -381,9 +381,9 @@ namespace mongo {
                     errmsg = "you have to specify where you want to move it";
                     return false;
                 }
-                
+
                 ShardManager * info = config->getShardManager( ns );
-                Shard& s = info->findShard( find );                
+                Shard& s = info->findShard( find );
                 string from = s.getServer();
 
                 if ( s.getServer() == to ){
@@ -395,17 +395,17 @@ namespace mongo {
                     errmsg = "that server isn't known to me";
                     return false;
                 }
-                
+
                 if ( ! s.moveAndCommit( to , errmsg ) )
                     return false;
-                
+
                 result << "ok" << 1;
                 return true;
             }
         } moveShardCmd;
 
         // ------------ server level commands -------------
-        
+
         class ListServers : public GridAdminCmd {
         public:
             ListServers() : GridAdminCmd("listservers") { }
@@ -418,7 +418,7 @@ namespace mongo {
                     BSONObj o = cursor->next();
                     all.push_back( o );
                 }
-                
+
                 result.append("servers" , all );
                 result.append("ok" , 1 );
                 conn.done();
@@ -426,16 +426,16 @@ namespace mongo {
                 return true;
             }
         } listServers;
-        
-        
+
+
         class AddServer : public GridAdminCmd {
         public:
             AddServer() : GridAdminCmd("addserver") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
-                
+
                 BSONObj server = BSON( "host" << cmdObj["addserver"].valuestrsafe() );
-                
+
                 BSONObj old = conn->findOne( "config.servers" , server );
                 if ( ! old.isEmpty() ){
                     result.append( "ok" , 0.0 );
@@ -443,7 +443,7 @@ namespace mongo {
                     conn.done();
                     return false;
                 }
-                
+
                 conn->insert( "config.servers" , server );
                 result.append( "ok", 1 );
                 result.append( "added" , server["host"].valuestrsafe() );
@@ -451,24 +451,24 @@ namespace mongo {
                 return true;
             }
         } addServer;
-        
+
         class RemoveServer : public GridAdminCmd {
         public:
             RemoveServer() : GridAdminCmd("removeserver") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
-                
+
                 BSONObj server = BSON( "host" << cmdObj["removeserver"].valuestrsafe() );
                 conn->remove( "config.servers" , server );
-                
+
                 conn.done();
                 return true;
             }
         } removeServer;
 
-        
+
         // --------------- public commands ----------------
-        
+
         class IsDbGridCmd : public Command {
         public:
             virtual bool slaveOk() {
@@ -478,10 +478,11 @@ namespace mongo {
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("isdbgrid", 1);
                 result.append("hostname", ourHostname);
+                result << "ok" << 1;
                 return true;
             }
         } isdbgrid;
-        
+
         class CmdIsMaster : public Command {
         public:
             virtual bool requiresAuth() { return false; }
@@ -490,12 +491,13 @@ namespace mongo {
             }
             CmdIsMaster() : Command("ismaster") { }
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-                result.append("ismaster", 0.0);
+                result.append("ismaster", 1.0 );
                 result.append("msg", "isdbgrid");
+                result.append("ok" , 1 );
                 return true;
             }
         } ismaster;
-        
+
         class CmdShardGetPrevError : public Command {
         public:
             virtual bool requiresAuth() { return false; }
@@ -509,7 +511,7 @@ namespace mongo {
                 return false;
             }
         } cmdGetPrevError;
-        
+
         class CmdShardGetLastError : public Command {
         public:
             virtual bool requiresAuth() { return false; }
@@ -523,7 +525,7 @@ namespace mongo {
                 return false;
             }
         } cmdGetLastError;
-        
+
     }
 
 } // namespace mongo

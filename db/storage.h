@@ -83,6 +83,7 @@ namespace mongo {
             ss << hex << fileNo << ':' << ofs;
             return ss.str();
         }
+        operator string() const { return toString(); }
 
         int& GETOFS() {
             return ofs;

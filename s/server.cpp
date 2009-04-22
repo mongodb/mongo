@@ -33,7 +33,10 @@ namespace mongo {
     const char *curNs = "";
     Database *database = 0;
     string ourHostname;
-
+    
+    OID serverID;
+    
+    
     string getDbContext() {
         return "?";
     }
@@ -65,6 +68,10 @@ namespace mongo {
             }
         }
     };
+
+    void init(){
+        serverID.init();
+    }
 
     void start() {
         log() << "waiting for connections on port " << port << endl;
@@ -152,6 +159,7 @@ int main(int argc, char* argv[], char *envp[] ) {
 
     assert( configServer.ok() );
 
+    init();
     start();
     dbexit(0);
     return 0;

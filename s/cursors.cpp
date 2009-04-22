@@ -115,7 +115,7 @@ namespace mongo {
                 break;
             }
 
-            if ( ( -1 * num + _totalSent ) == ntoreturn ){
+            if ( ntoreturn != 0 && ( -1 * num + _totalSent ) == ntoreturn ){
                 // hard limit - total to send
                 sendMore = false;
                 break;
@@ -123,9 +123,9 @@ namespace mongo {
         }
 
         bool hasMore = sendMore && more();
-        log(6) << "\t hasMore:" << hasMore << " id:" << _id << endl;
+        log(6) << "\t hasMore:" << hasMore << " wouldSendMoreIfHad: " << sendMore << " id:" << _id << " totalSent: " << _totalSent << endl;
         
-        replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , 0 , hasMore ? _id : 0 );
+        replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , _totalSent , hasMore ? _id : 0 );
         _totalSent += num;
         _done = ! hasMore;
         

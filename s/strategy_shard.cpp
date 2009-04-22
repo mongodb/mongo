@@ -35,11 +35,6 @@ namespace mongo {
                 num++;
             }
             
-            if ( servers.size() == 1 ){
-                doQuery( r , servers.begin()->_server );
-                return;
-            }
-            
             ShardedCursor * cursor = 0;
             
             BSONObj sort = query.getSort();

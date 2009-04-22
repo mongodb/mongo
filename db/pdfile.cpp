@@ -56,6 +56,12 @@ namespace mongo {
 
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
+    void ensureIdIndexForNewNs(const char *ns) {
+        if ( !strstr( ns, ".system." ) && !strstr( ns, ".$freelist" ) ) {
+            log( 1 ) << "adding _id index for new collection" << endl;
+            ensureHaveIdIndex( ns );
+        }        
+    }
 
     string getDbContext() {
         stringstream ss;
@@ -158,6 +164,10 @@ namespace mongo {
 
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
+
+        bool autoIndexId = ( !j.getField( "autoIndexId" ).isBoolean() || j.getBoolField( "autoIndexId" ) );
+        if ( autoIndexId )
+            ensureIdIndexForNewNs(ns);
 
         if ( mx > 0 )
             d->max = mx;
@@ -685,7 +695,7 @@ assert( !eloc.isNull() );
 
     int nUnindexes = 0;
 
-    void _unindexRecord(const char *ns, IndexDetails& id, BSONObj& obj, const DiskLoc& dl) {
+    void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
         BSONObjSetDefaultOrder keys;
         id.getKeysFromObject(obj, keys);
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
@@ -709,18 +719,18 @@ assert( !eloc.isNull() );
                 sayDbContext();
             }
 
-            if ( !ok ) {
+            if ( !ok && logMissing ) {
                 out() << "unindex failed (key too big?) " << id.indexNamespace() << '\n';
             }
         }
     }
 
     /* unindex all keys in all indexes for this record. */
-    void  unindexRecord(const char *ns, NamespaceDetails *d, Record *todelete, const DiskLoc& dl) {
+    void  unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl) {
         if ( d->nIndexes == 0 ) return;
         BSONObj obj(todelete);
         for ( int i = 0; i < d->nIndexes; i++ ) {
-            _unindexRecord(ns, d->indexes[i], obj, dl);
+            _unindexRecord(d->indexes[i], obj, dl);
         }
     }
 
@@ -786,7 +796,7 @@ assert( !eloc.isNull() );
         /* check if any cursors point to us.  if so, advance them. */
         aboutToDelete(dl);
 
-        unindexRecord(ns, d, todelete, dl);
+        unindexRecord(d, todelete, dl);
 
         _deleteRecord(d, ns, todelete, dl);
         NamespaceDetailsTransient::get( ns ).registerWriteOp();
@@ -877,6 +887,8 @@ assert( !eloc.isNull() );
                 BSONObj oldObj = dl.obj();
                 for ( int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& idx = d->indexes[i];
+                    if ( addID && idx.isIdIndex() )
+                        continue;
                     BSONObj idxKey = idx.info.obj().getObjectField("key");
 
                     BSONObjSetDefaultOrder oldkeys;
@@ -947,7 +959,7 @@ assert( !eloc.isNull() );
             assert( !newRecordLoc.isNull() );
             try {
                 idx.head.btree()->bt_insert(idx.head, newRecordLoc,
-                                         (BSONObj&) *i, order, dupsAllowed, idx);
+                                         *i, order, dupsAllowed, idx);
             }
             catch (AssertionException& ) {
                 if( !dupsAllowed ) {
@@ -962,53 +974,52 @@ assert( !eloc.isNull() );
     /* note there are faster ways to build an index in bulk, that can be
        done eventually */
     void addExistingToIndex(const char *ns, IndexDetails& idx) {
-        bool dupsAllowed = !idx.isIdIndex();
+        bool dupsAllowed = !idx.unique();
 
         Timer t;
         Nullstream& l = log();
         l << "building new index on " << idx.keyPattern() << " for " << ns << "...";
         l.flush();
-        int err = 0;
         int n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         while ( c->ok() ) {
             BSONObj js = c->current();
             try { 
                 _indexRecord(idx, js, c->currLoc(),dupsAllowed);
-            } catch( AssertionException&  ) { 
-                err++;
+            } catch( AssertionException& e ) { 
+                l << endl;
+                log(2) << "addExistingToIndex exception " << e.what() << endl;
+                throw;
             }
             c->advance();
             n++;
         };
         l << "done for " << n << " records";
-        if( err )
-            l << ' ' << err << " (dupkey) errors during indexing";
         l << endl;
-
-        if( err ) { 
-            // if duplicate _id's, report the problem
-            stringstream ss;
-            ss << err << " dupkey errors building index for " << ns;
-            string s = ss.str();
-            uassert_nothrow(s.c_str());
-        }
     }
 
     /* add keys to indexes for a new record */
     void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) {
         BSONObj obj((const char *)buf);
 
-        /* we index _id first so that on a dup key error for it we don't have to roll back 
-           the other work.
-        */
-        int id = d->findIdIndex();
-        if( id >= 0 )
-            _indexRecord(d->indexes[id], obj, newRecordLoc, /*dupsAllowed*/false);
-
+        /*UNIQUE*/
         for ( int i = 0; i < d->nIndexes; i++ ) {
-            if( i != id ) 
-                _indexRecord(d->indexes[i], obj, newRecordLoc, /*dupsAllowed*/true);
+            try { 
+                bool unique = d->indexes[i].unique();
+                _indexRecord(d->indexes[i], obj, newRecordLoc, /*dupsAllowed*/!unique);
+            }
+            catch( DBException& ) { 
+                // try to roll back previously added index entries
+                for( int j = 0; j <= i; j++ ) { 
+                    try {
+                        _unindexRecord(d->indexes[j], obj, newRecordLoc, false);
+                    }
+                    catch(...) { 
+                        log(3) << "unindex fails on rollback after unique failure\n";
+                    }
+                }
+                throw;
+            }
         }
     }
 
@@ -1066,6 +1077,8 @@ assert( !eloc.isNull() );
             o = BSONObj( loc.rec() );
         return loc;
     }
+
+    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
     
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId) {
         bool addIndex = false;
@@ -1096,6 +1109,8 @@ assert( !eloc.isNull() );
             // This creates first file in the database.
             database->newestFile()->allocExtent(ns, initialExtentSize(len));
             d = nsdetails(ns);
+            if ( !god )
+                ensureIdIndexForNewNs(ns);
         }
         d->paddingFits();
 
@@ -1234,8 +1249,19 @@ assert( !eloc.isNull() );
             idxinfo.info = loc;
             idxinfo.head = BtreeBucket::addHead(idxinfo);
             tableToIndex->addingIndex(tabletoidxns.c_str(), idxinfo);
-            /* todo: index existing records here */
-            addExistingToIndex(tabletoidxns.c_str(), idxinfo);
+            try {
+                addExistingToIndex(tabletoidxns.c_str(), idxinfo);
+            } catch( DBException& ) { 
+                // roll back this index
+                string name = idxinfo.indexName();
+                BSONObjBuilder b;
+                string errmsg;
+                bool ok = deleteIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
+                if( !ok ) {
+                    log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
+                }
+                throw;
+            }
         }
 
         /* add this record to our indexes */

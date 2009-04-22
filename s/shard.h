@@ -81,12 +81,21 @@ namespace mongo {
          */
         long getPhysicalSize();
         
+        long countObjects();
+        
         /**
          * if the amount of data written nears the max size of a shard
          * then we check the real size, and if its too big, we split
          */
         bool splitIfShould( long dataWritten );
         
+
+        /*
+         * moves either this shard or newShard if it makes sense too
+         * @return whether or not a shard was moved
+         */
+        bool moveIfShould( Shard * newShard = 0 );
+
         bool moveAndCommit( const string& to , string& errmsg );
 
         virtual const char * getNS(){ return "config.shard"; }
@@ -107,7 +116,8 @@ namespace mongo {
         // main shard info
         
         ShardManager * _manager;
-        
+        ShardKeyPattern skey();
+
         string _ns;
         BSONObj _min;
         BSONObj _max;

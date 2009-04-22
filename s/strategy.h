@@ -33,5 +33,6 @@ namespace mongo {
 
     bool lockNamespaceOnServer( const string& server , const string& ns );
     bool lockNamespaceOnServer( DBClientBase& conn , const string& ns );
+
 }
 

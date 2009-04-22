@@ -130,7 +130,7 @@ namespace mongo {
 
         /* Location of index info object. Format:
 
-             { name:"nameofindex", ns:"parentnsname", key: {keypattobject} }
+             { name:"nameofindex", ns:"parentnsname", key: {keypattobject}[, unique: <bool>] }
 
            This object is in the system.indexes collection.  Note that since we
            have a pointer to the object here, the object in system.indexes must
@@ -194,6 +194,13 @@ namespace mongo {
         string parentNS() const {
             BSONObj io = info.obj();
             return io.getStringField("ns");
+        }
+
+        bool unique() const { 
+            BSONObj io = info.obj();
+            return io.getBoolField("unique") || 
+                /* temp: can we juse make unique:true always be there for _id and get rid of this? */
+                isIdIndex();
         }
 
         /* delete this index.  does NOT clean up the system catalog

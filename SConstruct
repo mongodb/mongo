@@ -12,8 +12,9 @@
 
 import os
 import sys
-import types 
+import types
 import re
+import shutil
 
 # --- options ----
 AddOption('--prefix',
@@ -123,7 +124,7 @@ def printLocalInfo():
     import sys, SCons
     print( "scons version: " + SCons.__version__ )
     print( "python version: " + " ".join( [ `i` for i in sys.version_info ] ) )
-    
+
 printLocalInfo()
 
 env = Environment()
@@ -139,7 +140,7 @@ boostLibs = [ "thread" , "filesystem" , "program_options" ]
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ]
 commonFiles += Glob( "util/*.c" );
-commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" ) 
+commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" )
 
 #mmap stuff
 
@@ -161,7 +162,7 @@ coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.c
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
 
 coreShardFiles = []
-shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
+shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
@@ -237,7 +238,7 @@ if "darwin" == os.sys.platform:
         env["CXX"] = "g++-4.2"
 
     nix = True
-    
+
     if force64:
         env.Append( CPPPATH=["/usr/64/include"] )
         env.Append( LIBPATH=["/usr/64/lib"] )
@@ -261,7 +262,7 @@ elif "linux2" == os.sys.platform:
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
-    
+
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
 
@@ -277,16 +278,16 @@ elif "sunos5" == os.sys.platform:
 elif "win32" == os.sys.platform:
     windows = True
     boostDir = "C:/Program Files/Boost/boost_1_35_0"
-    
+
     if not os.path.exists( boostDir ):
         print( "can't find boost" )
         Exit(1)
 
     boostLibs = []
 
-    javaHome = findVersion( "C:/Program Files/java/" , 
+    javaHome = findVersion( "C:/Program Files/java/" ,
                             [ "jdk" , "jdk1.6.0_10" ] )
-    winSDKHome = findVersion( "C:/Program Files/Microsoft SDKs/Windows/" , 
+    winSDKHome = findVersion( "C:/Program Files/Microsoft SDKs/Windows/" ,
                               [ "v6.0" , "v6.0a" , "v6.1" ] )
 
     env.Append( CPPPATH=[ boostDir , javaHome + "/include" , javaHome + "/include/win32" , "pcre-7.4" , winSDKHome + "/Include" ] )
@@ -297,11 +298,11 @@ elif "win32" == os.sys.platform:
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
         env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
-        # /Yu"stdafx.h" /Fp"Release\db.pch" /Fo"Release\\" /Fd"Release\vc90.pdb" 
+        # /Yu"stdafx.h" /Fp"Release\db.pch" /Fo"Release\\" /Fd"Release\vc90.pdb"
     else:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )
         env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
-        # /Fo"Debug\\" /Fd"Debug\vc90.pdb" 
+        # /Fo"Debug\\" /Fd"Debug\vc90.pdb"
 
     env.Append( LIBPATH=[ boostDir + "/Lib" , javaHome + "/Lib" , winSDKHome + "/Lib" ] )
     javaLibs += [ "jvm" ];
@@ -325,7 +326,7 @@ elif "win32" == os.sys.platform:
     pcreFiles += filter( pcreFilter , Glob( "pcre-7.4/*.cc" ) )
     commonFiles += pcreFiles
     allClientFiles += pcreFiles
-    
+
     env.Append( LIBS=Split("ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib" ) )
 
 else:
@@ -352,7 +353,7 @@ if nix:
         env.Append( CPPFLAGS=" -O0 -fstack-protector -fstack-check" );
     else:
         env.Append( CPPFLAGS=" -O3" )
-    
+
     if debugLogging:
         env.Append( CPPFLAGS=" -D_DEBUG" );
 
@@ -397,12 +398,12 @@ def setupBuildInfoFile( outFile ):
     sysInfo = getSysInfo()
     contents = "#include \"stdafx.h\"\n"
     contents += "#include <iostream>\n"
-    contents += "namespace mongo { void printGitVersion(){ log() << \"git version: " + version + "\" << std::endl; } }\n"
-    contents += "namespace mongo { void printSysInfo(){ log() << \"sys info: " + sysInfo + "\" << std::endl; } }\n"
-    
+    contents += "namespace mongo { const char * gitVersion(){ return \"" + version + "\"; } }\n"
+    contents += "namespace mongo { const char * sysInfo(){ return \"" + sysInfo + "\"; } }\n"
+
     if os.path.exists( outFile ) and open( outFile ).read().strip() == contents.strip():
         return
-    
+
     out = open( outFile , 'w' )
     out.write( contents )
     out.close()
@@ -413,7 +414,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
     myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
-    
+
     if nix and not shell:
         if not conf.CheckLib( "stdc++" ):
             print( "can't find stdc++ library which is needed" );
@@ -429,7 +430,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             allPlaces += myenv["LIBPATH"]
             if not force64:
                 allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
-                
+
             for p in poss:
                 for loc in allPlaces:
                     fullPath = loc + "/lib" + p + ".a"
@@ -445,7 +446,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 extra += " 32 bit version for shell"
             print( "ERROR: can't find static version of: " + str( poss ) + extra + " in: " + str( allPlaces ) )
             Exit(1)
-            
+
         res = not staticOnly and conf.CheckLib( poss )
         if res:
             return True
@@ -453,7 +454,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         if failIfNotFound:
             print( "can't find " + str( poss ) + " in " + str( myenv["LIBPATH"] ) )
             Exit(1)
-            
+
         return False
 
     if shell:
@@ -474,7 +475,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             Exit(1)
 
     if conf.CheckCXXHeader( "boost/asio.hpp" ):
-        myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
+        # TODO: turn this back on when ASIO working
+        myenv.Append( CPPDEFINES=[ "USE_ASIO_OFF" ] )
     else:
         print( "WARNING: old version of boost - you should consider upgrading" )
 
@@ -503,7 +505,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
         elif myCheckLib( "readline" ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
-            myCheckLib( "tinfo" )
+            myCheckLib( "tinfo" , staticOnly=release )
         else:
             print( "WARNING: no readline, shell will be a bit ugly" )
 
@@ -529,16 +531,16 @@ if not os.path.exists( v8Home ):
 # --- js concat ---
 
 def concatjs(target, source, env):
-    
+
     outFile = str( target[0] )
-    
+
     fullSource = ""
 
     for s in source:
         f = open( str(s) , 'r' )
         for l in f:
             fullSource += l
-            
+
     out = open( outFile , 'w' )
     out.write( fullSource )
 
@@ -553,22 +555,22 @@ env.Append( BUILDERS={'JSConcat' : jsBuilder})
 # --- jsh ---
 
 def jsToH(target, source, env):
-    
+
     outFile = str( target[0] )
     if len( source ) != 1:
         raise Exception( "wrong" )
-    
+
     h = "const char * jsconcatcode = \n"
-    
+
     for l in open( str(source[0]) , 'r' ):
         l = l.strip()
         l = l.partition( "//" )[0]
         l = l.replace( '\\' , "\\\\" )
         l = l.replace( '"' , "\\\"" )
-        
+
 
         h += '"' + l + "\\n\"\n "
-        
+
     h += ";\n\n"
 
     out = open( outFile , 'w' )
@@ -681,7 +683,7 @@ elif not onlyServer:
         shellEnv["LIBPATH"].remove( "/usr/64/lib" )
         shellEnv.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
         shellEnv.Append( LIBPATH=[ "/sw/lib/", "/opt/local/lib"] )
-        
+
     l = shellEnv["LIBS"]
     if linux64:
         removeIfInList( l , "java" )
@@ -692,7 +694,7 @@ elif not onlyServer:
 
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
-    
+
     if weird:
         shell32BitFiles = Glob( "shell/*.cpp" )
         for f in allClientFiles:
@@ -725,7 +727,7 @@ def testSetup( env , target , source ):
     Execute( Mkdir( "/tmp/unittest/" ) )
 
 addSmoketest( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
-addSmoketest( "smokePerf", [ "perftest" ] , [ testSetup , perftest[ 0 ].abspath ] )
+addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
 
 clientExec = [ x[0].abspath for x in clientTests ];
 addSmoketest( "smokeClient" , clientExec , clientExec )
@@ -765,7 +767,7 @@ def startMongodForTests( env, target, source ):
         print( "Failed to start mongod" )
         mongodForTests = None
         Exit( 1 )
-    
+
 def stopMongodForTests():
     global mongodForTests
     if not mongodForTests:
@@ -812,6 +814,29 @@ testEnv.AlwaysBuild( "smokeAllNoJs" )
 import atexit
 atexit.register( stopMongodForTests )
 
+def submitStub( obj ):
+    print( obj )
+
+def recordPerformance( env, target, source ):
+    global perftest
+    import subprocess, re
+    p = subprocess.Popen( [ perftest[0].abspath ], stdout=subprocess.PIPE )
+    b = p.communicate()[ 0 ]
+    entries = re.findall( "{.*?}", b )
+    for e in entries:
+        matches = re.match( "{'(.*?)': (.*?)}", e )
+        name = matches.group( 1 )
+        val = float( matches.group( 2 ) )
+        sub = { "benchmark": { "project": "http://github.com/mongodb/mongo", "description": "" }, "trial": {} }
+        sub[ "benchmark" ][ "name" ] = name
+        sub[ "benchmark" ][ "tags" ] = [ "c++", re.match( "(.*)__", name ).group( 1 ) ]
+        sub[ "trial" ][ "server_hash" ] = getGitVersion()
+        sub[ "trial" ][ "client_hash" ] = ""
+        sub[ "trial" ][ "result" ] = val
+        submitStub( sub )
+
+addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
+
 #  ----  INSTALL -------
 
 if distBuild:
@@ -840,6 +865,7 @@ installBinary( env , "mongoimportjson" )
 installBinary( env , "mongofiles" )
 
 installBinary( env , "mongod" )
+installBinary( env , "mongos" )
 
 if not noshell:
     installBinary( env , "mongo" )
@@ -908,7 +934,7 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
 
     if remoteName is None:
         remoteName = localName
-        
+
     if fixName:
         (root,dot,suffix) = localName.rpartition( "." )
         name = remoteName + "-" + platform + "-" + processor + remotePrefix
@@ -946,5 +972,17 @@ env.Alias( "dist" , distFile )
 env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
 env.AlwaysBuild( "s3dist" )
 
+def clean_old_dist_builds(env, target, source):
+    prefix = "mongodb-%s-%s" % (platform, processor)
+    filenames = sorted(os.listdir("."))
+    filenames = [x for x in filenames if x.startswith(prefix)]
+    to_keep = [x for x in filenames if x.endswith(".tgz") or x.endswith(".zip")][-2:]
+    for filename in [x for x in filenames if x not in to_keep]:
+        print "removing %s" % filename
+        try:
+            shutil.rmtree(filename)
+        except:
+            os.remove(filename)
 
-
+env.Alias("dist_clean", [], [clean_old_dist_builds])
+env.AlwaysBuild("dist_clean")

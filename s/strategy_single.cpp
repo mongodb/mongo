@@ -14,10 +14,10 @@ namespace mongo {
             
             bool lateAssert = false;
         
-            log(3) << "single query: " << q.ns << "  " << q.query << endl;
-
+            log(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << endl;
+            
             try {
-                if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") ) {
+                if ( ( q.ntoreturn == -1 || q.ntoreturn == 1 ) && strstr(q.ns, ".$cmd") ) {
                     BSONObjBuilder builder;
                     bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
                     if ( ok ) {

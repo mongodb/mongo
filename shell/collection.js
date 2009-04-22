@@ -141,19 +141,40 @@ DBCollection.prototype._genIndexName = function( keys ){
     return name;
 }
 
-DBCollection.prototype.createIndex = function( keys , name ){
+DBCollection.prototype._indexSpec = function( keys, options ) {
+    var name;
+    var unique = false;
+    if ( !isObject( options ) ) {
+        options = [ options ];
+    }
+    for( var i = 0; i < options.length; ++i ) {
+        var o = options[ i ];
+        if ( isString( o ) ) {
+            name = o;
+        } else if ( typeof( o ) == "boolean" ) {
+            unique = o;
+        }
+    }
     name = name || this._genIndexName( keys );
-    var o = { ns : this._fullName , key : keys , name : name };
+    var ret = { ns : this._fullName , key : keys , name : name };
+    if ( unique == true ) {
+        ret.unique = true;
+    }
+    return ret;
+}
+
+DBCollection.prototype.createIndex = function( keys , options ){
+    var o = this._indexSpec( keys, options );
     this._db.getCollection( "system.indexes" ).insert( o );
 }
 
-DBCollection.prototype.ensureIndex = function( keys , name ){
-    name = name || this._genIndexName( keys );
+DBCollection.prototype.ensureIndex = function( keys , options ){
+    var name = this._indexSpec( keys, options ).name;
     this._indexCache = this._indexCache || {};
     if ( this._indexCache[ name ] )
         return false;
 
-    this.createIndex( keys , name );
+    this.createIndex( keys , options );
     this._indexCache[name] = true;
     return true;
 }
@@ -163,10 +184,10 @@ DBCollection.prototype.resetIndexCache = function(){
 }
 
 DBCollection.prototype.reIndex = function(){
-    var keys = this.getIndexKeys();
+    var specs = this.getIndexSpecs();
     this.dropIndexes();
-    for ( var i in keys ){
-        this.ensureIndex( keys[i] );
+    for ( var i = 0; i < specs.length; ++i ){
+        this.ensureIndex( specs[i].key, [ specs[i].unique, specs[i].name ] );
     }
 }
 
@@ -213,10 +234,10 @@ DBCollection.prototype.getIndexes = function(){
     return this.getDB().getCollection( "system.indexes" ).find( { ns : this.getFullName() } );
 }
 
-DBCollection.prototype.getIndexKeys = function(){
+DBCollection.prototype.getIndexSpecs = function(){
     return this.getIndexes().toArray().map( 
         function(i){
-            return i.key;
+            return i;
         }
     );
 }

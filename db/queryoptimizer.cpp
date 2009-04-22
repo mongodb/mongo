@@ -24,6 +24,12 @@
 
 namespace mongo {
 
+    double elementDirection( const BSONElement &e ) {
+        if ( e.isNumber() )
+            return e.number();
+        return 1;
+    }
+    
     QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index ) :
     fbs_( fbs ),
     order_( order ),
@@ -64,7 +70,7 @@ namespace mongo {
                 if ( !fbs.bound( ke.fieldName() ).equality() )
                     goto doneCheckOrder;
             }
-            int d = oe.number() == ke.number() ? 1 : -1;
+            int d = elementDirection( oe ) == elementDirection( ke ) ? 1 : -1;
             if ( direction_ == 0 )
                 direction_ = d;
             else if ( direction_ != d )

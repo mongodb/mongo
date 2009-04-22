@@ -438,6 +438,16 @@ namespace UpdateTests {
         }
     };
 
+    class PreserveIdWithIndex : public SetBase { // Not using $set, but base class is still useful
+    public:
+        void run() {
+            client().insert( ns(), BSON( "_id" << 55 << "i" << 5 ) );
+            client().update( ns(), BSON( "i" << 5 ), BSON( "i" << 6 ) );
+            ASSERT( !client().findOne( ns(), Query( BSON( "_id" << 55 ) ).hint
+                                     ( "{\"_id\":ObjectId(\"000000000000000000000000\")}" ) ).isEmpty() );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -483,6 +493,7 @@ namespace UpdateTests {
             add< InsertInEmpty >();
             add< IndexParentOfMod >();
             add< ModParentOfIndex >();
+            add< PreserveIdWithIndex >();
         }
     };
 

@@ -485,7 +485,7 @@ namespace mongo {
         }
     } cmdoplogging;
 
-    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder ) {
+    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
         
         d->aboutToDeleteAnIndex();
         
@@ -497,10 +497,20 @@ namespace mongo {
             log() << "  d->nIndexes was " << d->nIndexes << '\n';
             anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
             anObjBuilder.append("msg", "all indexes deleted for collection");
+            IndexDetails *idIndex = 0;
             if( d->nIndexes ) { 
-                for ( int i = 0; i < d->nIndexes; i++ )
-                    d->indexes[i].kill();
+                for ( int i = 0; i < d->nIndexes; i++ ) {
+                    if ( !mayDeleteIdIndex && d->indexes[i].isIdIndex() ) {
+                        idIndex = &d->indexes[i];
+                    } else {
+                        d->indexes[i].kill();
+                    }
+                }
                 d->nIndexes = 0;
+            }
+            if ( idIndex ) {
+                d->indexes[ 0 ] = *idIndex;
+                d->nIndexes = 1;
             }
         }
         else {
@@ -514,6 +524,11 @@ namespace mongo {
                  call, otherwise, on recreate, the old one would be reused, and its
                  IndexDetails::info ptr would be bad info.
                  */
+                IndexDetails *id = &d->indexes[x];
+                if ( !mayDeleteIdIndex && id->isIdIndex() ) {
+                    errmsg = "may not delete _id index";
+                    return false;
+                }
                 d->indexes[x].kill();
                 
                 d->nIndexes--;
@@ -551,7 +566,7 @@ namespace mongo {
                 return false;
             }
             if ( d->nIndexes != 0 ) {
-                assert( deleteIndexes(d, nsToDrop.c_str(), "*", errmsg, result) );
+                assert( deleteIndexes(d, nsToDrop.c_str(), "*", errmsg, result, true) );
                 assert( d->nIndexes == 0 );
             }
             result.append("ns", nsToDrop.c_str());
@@ -666,7 +681,7 @@ namespace mongo {
             if ( d ) {
                 BSONElement f = jsobj.findElement("index");
                 if ( f.type() == String ) {
-                    return deleteIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder );
+                    return deleteIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder, false );
                 }
                 else {
                     errmsg = "invalid index name spec";
@@ -701,10 +716,13 @@ namespace mongo {
             vector< BSONObj > dbInfos;
             
             set<string> seen;
+            boost::intmax_t totalSize = 0;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
                 BSONObjBuilder b;
                 b.append( "name", i->c_str() );
-                b.append( "sizeOnDisk", (double) dbSize( i->c_str() ) );
+                boost::intmax_t size = dbSize( i->c_str() );
+                b.append( "sizeOnDisk", (double) size );
+                totalSize += size;
                 dbInfos.push_back( b.obj() );
 
                 seen.insert( i->c_str() );
@@ -721,6 +739,7 @@ namespace mongo {
             }
 
             result.append( "databases", dbInfos );
+            result.append( "totalSize", double( totalSize ) );
             return true;
         }
     } cmdListDatabases;
@@ -959,9 +978,11 @@ namespace mongo {
             
             Timer t;
             long long size = 0;
+            long long numObjects = 0;
             while( c->ok() ) {
                 size += c->current().objsize();
                 c->advance();
+                numObjects++;
             }
             int ms = t.millis();
             if ( ms > 100 ) {
@@ -973,10 +994,25 @@ namespace mongo {
             }
             
             result.append( "size", (double)size );
+            result.append( "numObjects" , (double)numObjects );
             return true;
         }
     } cmdDatasize;
 
+    class CmdBuildInfo : public Command {
+    public:
+        CmdBuildInfo() : Command( "buildinfo" ) {}
+        virtual bool slaveOk() { return true; }
+        virtual bool adminOnly() { return true; }
+        virtual void help( stringstream &help ) const {
+            help << "example: { buildinfo:1 }";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            result << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
+            return true;
+        }
+    } cmdBuildInfo;
+    
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here

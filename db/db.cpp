@@ -166,7 +166,7 @@ namespace mongo {
 
 namespace mongo {
 
-  void sysInfo() { 
+  void sysRuntimeInfo() { 
     out() << "sysinfo:\n";
 #if defined(_SC_PAGE_SIZE)
     out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
@@ -534,7 +534,7 @@ int main(int argc, char* argv[], char *envp[] )
             else if ( s == "--auth" )
                 noauth = false;
             else if( s == "--sysinfo" ) { 
-                sysInfo();
+                sysRuntimeInfo();
                 return 0;
             }
             else if ( s == "--verbose" )
