@@ -273,15 +273,12 @@ namespace mongo {
     long Shard::countObjects(){
         ScopedDbConnection conn( getServer() );
         
+
         BSONObj result;
-        uassert( "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
-                                                                        << "keyPattern" << _manager->getShardKey().key() 
-                                                                        << "min" << getMin() 
-                                                                        << "max" << getMax() 
-                                                                        ) , result ) );
+        unsigned long long n = conn->count( _ns , getFilter() );
         
         conn.done();
-        return (long)result["numObjects"].number();
+        return (long)n;
     }
     
     bool Shard::operator==( const Shard& s ){

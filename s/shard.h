@@ -36,10 +36,13 @@ namespace mongo {
     class ShardObjUnitTest;
 
     typedef unsigned long long ServerShardVersion;
-
+    
     /**
        config.shard
        { ns : "alleyinsider.fs.chunks" , min : {} , max : {} , server : "localhost:30001" }
+       
+       x is in a shard iff
+       min <= x < max
      */    
     class Shard : public Model , boost::noncopyable {
     public:
@@ -70,6 +73,8 @@ namespace mongo {
         }
         
         void getFilter( BSONObjBuilder& b );
+        BSONObj getFilter(){ BSONObjBuilder b; getFilter( b ); return b.obj(); }
+            
 
         BSONObj pickSplitPoint();
         Shard * split();

@@ -15,6 +15,8 @@ import sys
 import types
 import re
 import shutil
+import urllib
+import urllib2
 
 # --- options ----
 AddOption('--prefix',
@@ -162,7 +164,7 @@ coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.c
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/javajs.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
 
 coreShardFiles = []
-shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
+shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
@@ -814,8 +816,57 @@ testEnv.AlwaysBuild( "smokeAllNoJs" )
 import atexit
 atexit.register( stopMongodForTests )
 
-def submitStub( obj ):
-    print( obj )
+def machine_info(extra_info=""):
+    """Get a dict representing the "machine" section of a benchmark result.
+
+    ie:
+    {
+        "os_name": "OS X",
+        "os_version": "10.5",
+        "processor": "2.4 GHz Intel Core 2 Duo",
+        "memory": "3 GB 667 MHz DDR2 SDRAM",
+        "extra_info": "Python 2.6"
+    }
+
+    Must have a settings.py file on sys.path that defines "processor" and "memory"
+    variables.
+    """
+    sys.path.append("")
+    import settings
+
+    machine = {}
+    (machine["os_name"], _, machine["os_version"], _, _) = os.uname()
+    machine["processor"] = settings.processor
+    machine["memory"] = settings.memory
+    machine["extra_info"] = extra_info
+    return machine
+
+def post_data(data, machine_extra_info="", post_url="http://mongo-db.appspot.com/benchmark"):
+    """Post a benchmark data point.
+
+    data should be a Python dict that looks like:
+        {
+          "benchmark": {
+            "project": "http://github.com/mongodb/mongo-python-driver",
+            "name": "insert test",
+            "description": "test inserting 10000 documents with the C extension enabled",
+            "tags": ["insert", "python"]
+          },
+          "trial": {
+            "server_hash": "4f5a8d52f47507a70b6c625dfb5dbfc87ba5656a",
+            "client_hash": "8bf2ad3d397cbde745fd92ad41c5b13976fac2b5",
+            "result": 67.5,
+            "extra_info": "some logs or something"
+          }
+        }
+    """
+    try:
+        import json
+    except:
+        import simplejson as json # needed for python < 2.6
+
+    data["machine"] = machine_info(machine_extra_info)
+    urllib2.urlopen(post_url, urllib.urlencode({"payload": json.dumps(data)}))
 
 def recordPerformance( env, target, source ):
     global perftest
@@ -833,7 +884,7 @@ def recordPerformance( env, target, source ):
         sub[ "trial" ][ "server_hash" ] = getGitVersion()
         sub[ "trial" ][ "client_hash" ] = ""
         sub[ "trial" ][ "result" ] = val
-        submitStub( sub )
+        post_data(sub)
 
 addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
