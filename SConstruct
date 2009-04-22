@@ -864,6 +864,7 @@ installBinary( env , "mongoimportjson" )
 installBinary( env , "mongofiles" )
 
 installBinary( env , "mongod" )
+installBinary( env , "mongos" )
 
 if not noshell:
     installBinary( env , "mongo" )
