@@ -92,6 +92,7 @@ namespace mongo {
             ss << hex << secs << ':' << i;
             return ss.str();
         }
+        operator string() const { return toString(); }
         bool operator==(const OpTime& r) const {
             return i == r.i && secs == r.secs;
         }

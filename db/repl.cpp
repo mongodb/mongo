@@ -69,8 +69,6 @@ namespace mongo {
     extern bool autoresync;
     time_t lastForcedResync = 0;
     
-    OpTime lastLocalLog;
-    
 } // namespace mongo
 
 #include "replset.h"
@@ -200,11 +198,28 @@ namespace mongo {
         }
         CmdResync() : Command("resync") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            out() << "got resync request" << endl;
+            if ( cmdObj.getBoolField( "force" ) ) {
+                if ( !waitForSyncToFinish( errmsg ) )
+                    return false;
+                replAllDead = "resync forced";
+            }            
+            out() << "done 1st wait" << endl;
             if ( !replAllDead ) {
                 errmsg = "not dead, no need to resync";
                 return false;
             }
+            out() << "all dead" << endl;
+            if ( !waitForSyncToFinish( errmsg ) )
+                return false;
+            out() << "done 2nd wait" << endl;
             
+            ReplSource::forceResyncDead( "client" );
+            result.append( "info", "triggered resync for all sources" );
+            out() << "finished initing resync" << endl;
+            return true;                
+        }        
+        bool waitForSyncToFinish( string &errmsg ) const {
             // Wait for slave thread to finish syncing, so sources will be be
             // reloaded with new saved state on next pass.
             Timer t;
@@ -220,11 +235,8 @@ namespace mongo {
                 errmsg = "timeout waiting for sync() to finish";
                 return false;
             }
-            
-            ReplSource::forceResyncDead( "user" );
-            result.append( "info", "triggered resync for all sources" );
-            return true;                
-        }        
+            return true;
+        }
     } cmdResync;
     
     class CmdIsMaster : public Command {
@@ -487,7 +499,7 @@ namespace mongo {
         if ( n )
             b.append("dbs", dbs_builder.done());
         
-        b.appendDate("localLogTs", lastLocalLog.asDate());
+        b.appendDate("localLogTs", lastSavedLocalTs_.asDate());
         
         BSONObjBuilder dbsNextPassBuilder;
         n = 0;
@@ -560,7 +572,7 @@ namespace mongo {
     }
     
     static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, const BSONObj &spec, ReplSource::SourceVector &old) {
-        if ( s.initialPull() ) { // Don't reuse old ReplSource if there was a forced resync.
+        if ( !s.initialPull() ) { // Don't reuse old ReplSource if there was a forced resync.
             for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
                 if ( s == **i ) {
                     out() << "reusing existing: " << **i << endl;
@@ -701,22 +713,31 @@ namespace mongo {
             return;
         SourceVector sources;
         ReplSource::loadAll(sources);
+        out() << "nSources: " << sources.size() << endl;
         for( SourceVector::iterator i = sources.begin(); i != sources.end(); ++i ) {
             (*i)->forceResync( requester );
         }
+        out() << "done forcing resync" << endl;
         replAllDead = 0;        
     }
     
     void ReplSource::forceResync( const char *requester ) {
+        out() << "forcing resync for source" << endl;
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             resyncDrop( i->c_str(), requester );
         }
+        out() << "handled saved dbs" << endl;
         BSONObj info;
         {
+            out() << "going to get from other side" << endl;
             dbtemprelease t;
+            out() << "released ok" << endl;
             connect();
+            out() << "connected ok" << endl;
             bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
+            out() << "don w/ command" << endl;
             massert( "Unable to get database list", ok );
+            out() << "got list" << endl;
         }
         BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
         while( i.more() ) {
@@ -732,6 +753,7 @@ namespace mongo {
         }        
         dbs.clear();
         syncedTo = OpTime();
+        initialPull_ = true;
         save();
     }
 
@@ -811,6 +833,9 @@ namespace mongo {
                 else
                     assert( opType[1] == 'b' ); // "db" advertisement
             }
+            else if ( *opType == 'n' ) {
+                // no op
+            }
             else {
                 BufBuilder bb;
                 BSONObjBuilder ob;
@@ -829,6 +854,12 @@ namespace mongo {
        see logOp() comments.
     */
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail) {
+        out() << "doing op: " << op << endl;
+        
+        // skip no-op
+        if ( op.getStringField( "op" )[ 0 ] == 'n' )
+            return;
+        
         char clientName[MaxClientLen];
         const char *ns = op.getStringField("ns");
         nsToClient(ns, clientName);
@@ -969,7 +1000,6 @@ namespace mongo {
                     modChanged[ ns ].insert( id );
             } else
                 modChanged.erase( id );
-            out() << "adding id to set: " << id << ", mod? " << mod << endl;
             changed[ ns ].insert( id );
         }        
     }
@@ -1081,23 +1111,6 @@ namespace mongo {
             return true;
         }
 
-        if ( replPair && replPair->state == ReplPair::State_Master ) {
-            cout << "updating sets now" << endl;
-            dblock lk;
-            setClient( "local.oplog.$main" );
-            for( auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
-                localLog->ok(); localLog->advance() ) {
-                BSONObj op = localLog->current();
-                OpTime ts( localLog->current().getField( "ts" ).date() );
-                if ( localLogTail.isNull() )
-                    localLogTail = ts;
-                if ( !( lastSavedLocalTs_ < ts ) )
-                    break;
-                updateSetsWithOp( op, localChangedSinceLastPass, localModChangedSinceLastPass );
-                dbtemprelease t;
-            }
-        }
-        
         int n = 0;
         BSONObj op = c->next();
         BSONElement ts = op.findElement("ts");
@@ -1112,6 +1125,81 @@ namespace mongo {
                 massert("pull: bad object read from remote oplog", false);
             }
         }
+        
+        if ( replPair && replPair->state == ReplPair::State_Master ) {
+            
+            OpTime nextOpTime( ts.date() );
+            log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
+            if ( tailing || initial ) {
+            }
+            else if ( nextOpTime != syncedTo ) {
+                cout << "remote log filled" << endl;
+                BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
+                if ( !last.isEmpty() ) {
+                    BSONElement ts = last.findElement( "ts" );
+                    massert( "non Date ts found", ts.type() == Date );
+                    syncedTo = OpTime( ts.date() );
+                }
+                {
+                    dblock lk;
+                    setClient( "local.oplog.$main" );
+                    auto_ptr< Cursor > c = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+                    if ( c->ok() )
+                        lastSavedLocalTs_ = OpTime( c->current().getField( "ts" ).date() );                    
+                    save();
+                    cursor.reset();
+                }
+                BSONObj info;
+                out() << "requesting resync" << endl;
+                massert( "request for slave to resync failed",
+                        conn->runCommand( "admin", fromjson( "{resync:1,force:true}" ), info ) );                
+                return true;
+            }            
+            
+            cout << "updating sets now" << endl;
+            dblock lk;
+            setClient( "local.oplog.$main" );
+            auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+            for( ; localLog->ok(); localLog->advance() ) {
+                BSONObj op = localLog->current();
+                OpTime ts( localLog->current().getField( "ts" ).date() );
+                if ( localLogTail.isNull() )
+                    localLogTail = ts;
+//                out() << "handling ts: " << ts << endl;
+                if ( !( lastSavedLocalTs_ < ts ) )
+                    break;
+                updateSetsWithOp( op, localChangedSinceLastPass, localModChangedSinceLastPass );
+                dbtemprelease t;
+            }
+            // local log filled up
+            out() << "saved: " << lastSavedLocalTs_ << "ok?: " << localLog->ok() << endl;
+            if ( !lastSavedLocalTs_.isNull() && !localLog->ok() ) {
+                dbtemprelease t;
+                cout << "local log filled" << endl;
+                localChangedSinceLastPass.clear();
+                localModChangedSinceLastPass.clear();
+                BSONObj last = conn->findOne( ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
+                if ( !last.isEmpty() ) {
+                    BSONElement ts = last.findElement( "ts" );
+                    massert( "non Date ts found", ts.type() == Date );
+                    syncedTo = OpTime( ts.date() );
+                }
+                {
+                    dblock lk;
+                    auto_ptr< Cursor > c = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+                    if ( c->ok() )
+                        lastSavedLocalTs_ = OpTime( c->current().getField( "ts" ).date() );                    
+                    save();
+                    cursor.reset();
+                }
+                BSONObj info;
+                out() << "requesting resync" << endl;
+                massert( "request for slave to resync failed",
+                        conn->runCommand( "admin", fromjson( "{resync:1,force:true}" ), info ) );
+                return true;
+            }
+        }
+        
         OpTime nextOpTime( ts.date() );
         log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
         if ( tailing || initial ) {
@@ -1152,6 +1240,10 @@ namespace mongo {
                     syncedTo = nextOpTime;
                     log(2) << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << '\n';
                     dblock lk;
+                    setClientTempNs( "local.oplog.$main" );
+                    auto_ptr< Cursor > c = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+                    if ( c->ok() )
+                        lastSavedLocalTs_ = OpTime( c->current().getField( "ts" ).date() );
                     save(); // note how far we are synced up to now
                     break;
                 }
@@ -1320,6 +1412,7 @@ namespace mongo {
         "d" delete
         "c" db cmd
         "db" declares presence of a database (ns is set to the db name + '.')
+        "n" no op
        bb:
          if not null, specifies a boolean to pass along to the other side as b: param.
          used for "justOne" or "upsert" flags on 'd', 'u'
@@ -1549,6 +1642,7 @@ namespace mongo {
         string err;
         BSONObj o = b.done();
         userCreateNS("local.oplog.$main", o, err, false);
+        logOp( "n", "dummy", BSONObj() );
         database = 0;
     }
     
