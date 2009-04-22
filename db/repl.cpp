@@ -697,6 +697,7 @@ namespace mongo {
             }
         }        
         syncedTo = OpTime();
+        addDbNextPass.clear();
         save();
     }
 
@@ -842,6 +843,8 @@ namespace mongo {
             if ( incompleteClone ) {
                 log() << "An earlier initial clone of '" << clientName << "' did not complete, will resync." << endl;
             }
+            // we must add to incomplete list now that setClient has been called
+            incompleteCloneDbs.insert( clientName );
             if ( nClonedThisPass ) {
                 /* we only clone one database per pass, even if a lot need done.  This helps us
                  avoid overflowing the master's transaction log by doing too much work before going
@@ -850,7 +853,6 @@ namespace mongo {
                  */
                 addDbNextPass.insert( clientName );
             } else {
-                incompleteCloneDbs.insert( clientName );
                 save();
                 setClientTempNs( ns );
                 nClonedThisPass++;
@@ -999,8 +1001,8 @@ namespace mongo {
 
         bool initial = syncedTo.isNull();
         
-        if ( c == 0 ) {
-            if ( syncedTo.isNull() ) {
+        if ( c == 0 || initial ) {
+            if ( initial ) {
                 // Important to grab last oplog timestamp before listing databases.
                 syncToTailOfRemoteLog();
                 BSONObj info;
