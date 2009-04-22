@@ -875,7 +875,7 @@ namespace mongo {
 
         if ( justCreated || incompleteClone ) {
             if ( incompleteClone ) {
-                log() << "An earlier initial clone did not complete, resyncing." << endl;
+                log() << "An earlier initial clone of '" << clientName << "' did not complete, will resync." << endl;
             }
             incompleteCloneDbs.insert( clientName );
             if ( nClonedThisPass ) {
