@@ -108,6 +108,9 @@
 		934223C80EF16DB400608550 /* storage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = storage.h; sourceTree = "<group>"; };
 		934223C90EF16DB400608550 /* tests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tests.cpp; sourceTree = "<group>"; };
 		9343373F0F9CD6900019D5C0 /* index8.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = index8.js; sourceTree = "<group>"; };
+		93433D780F9FCC6B0019D5C0 /* pair4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = pair4.js; sourceTree = "<group>"; };
+		93433D790F9FCC6B0019D5C0 /* pair5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = pair5.js; sourceTree = "<group>"; };
+		93433D7A0F9FCC6B0019D5C0 /* pair6.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = pair6.js; sourceTree = "<group>"; };
 		934DD87C0EFAD23B00459CC1 /* background.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = background.cpp; sourceTree = "<group>"; };
 		934DD87D0EFAD23B00459CC1 /* background.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = background.h; sourceTree = "<group>"; };
 		934DD87F0EFAD23B00459CC1 /* builder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = builder.h; sourceTree = "<group>"; };
@@ -632,6 +635,9 @@
 		93A8D2040F37544800C92B85 /* repl */ = {
 			isa = PBXGroup;
 			children = (
+				93433D780F9FCC6B0019D5C0 /* pair4.js */,
+				93433D790F9FCC6B0019D5C0 /* pair5.js */,
+				93433D7A0F9FCC6B0019D5C0 /* pair6.js */,
 				931187AE0F85463700A6DC44 /* pair3.js */,
 				931183420F8277FD00A6DC44 /* repl7.js */,
 				93D9469F0F7ABB0600C3C768 /* repl6.js */,

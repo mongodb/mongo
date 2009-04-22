@@ -2,6 +2,10 @@
 
 var baseName = "jstests_pair4test";
 
+debug = function( o ) {
+    printjson( o );
+}
+
 ismaster = function( n ) {
     var im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
     print( "ismaster: " + tojson( im ) );
@@ -103,12 +107,14 @@ doTest = function( recover, newMaster, newSlave ) {
     write( m, 100, "a" );
     coll( m ).update( {n:1}, {$set:{n:2}} );
     db2Coll( m ).save( {n:500} );
+    db2Coll( m ).findOne();
     
     s = newSlave();
     write( s, 20 );
     write( s, 200, "a" );
     coll( s ).update( {n:1}, {n:1,m:3} );
     db2Coll( s ).save( {_id:"a",n:600} );
+    db2Coll( s ).findOne();
         
     // recover
     recover();
@@ -126,13 +132,21 @@ doTest = function( recover, newMaster, newSlave ) {
     [ r, l ].forEach( function( x ) { checkM( x ); } );
 
     // check separate database
-    [ r, l ].forEach( function( x ) { assert.eq( 600, db2Coll( x ).findOne( {_id:"a"} ).n ); } );
+    [ r, l ].forEach( function( x ) { assert.soon( function() {
+                                                  r = db2Coll( x ).findOne( {_id:"a"} );
+                                                  debug( r );
+                                                  if ( r == null ) {
+                                                      return false;
+                                                  }
+                                                  return 600 == r.n;
+                                                  } ) } );
     
     ports.forEach( function( x ) { stopMongoProgram( x ); } );
     
 }
 
 // no restart
+debug( "basic test" );
 doTest( function() {
        connect();
        assert.soon( function() {
@@ -166,5 +180,8 @@ doRestartTest = function( signal ) {
            }, function() { return l; }, function() { return r; } );
 }
 
+debug( "sigterm restart test" );
 doRestartTest( 15 ) // SIGTERM
+
+debug( "sigkill restart test" );
 doRestartTest( 9 ) // SIGKILL

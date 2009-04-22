@@ -1,6 +1,6 @@
 // pairing cases where oplogs run out of space
 
-var baseName = "jstests_pair5test";
+var baseName = "jstests_pair6test";
 
 debug = function( p ) {
     print( p );
