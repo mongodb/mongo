@@ -1,8 +1,16 @@
-// key_string.js
+// count1.js
 
-s = new ShardingTest( "keystring" , 2 );
+s = new ShardingTest( "count1" , 2 );
 
 db = s.getDB( "test" );
+
+db.bar.save( { n : 1 } )
+db.bar.save( { n : 2 } )
+db.bar.save( { n : 3 } )
+
+assert.eq( 3 , db.bar.find().count() , "bar 1" );
+assert.eq( 1 , db.bar.find( { n : 1 } ).count() , "bar 2" );
+
 s.adminCommand( { partition : "test" } )
 s.adminCommand( { shard : "test.foo" , key : { name : 1 } } );
 
@@ -24,17 +32,17 @@ s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 
-s.adminCommand( { moveshard : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
+assert.eq( 6 , db.foo.find().count() , "basic count after split " );
 
-print( s.config.shard.find().toArray().tojson( "\n" ) );
+s.adminCommand( { moveshard : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
 
 assert.eq( 4 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 2 , seconday.foo.find().toArray().length , "secondary count" );
 
-assert.eq( 6 , db.foo.find().toArray().length , "total count" );
-assert.eq( 6 , db.foo.find().sort( { name : 1 } ).toArray().length , "total count sorted" );
+assert.eq( 6 , db.foo.find().toArray().length , "total count after move" );
+assert.eq( 6 , db.foo.find().sort( { name : 1 } ).toArray().length , "total count() sorted" );
 
-assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "total count with count()" );
+assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "total count with count() after move" );
 
 assert.eq( "allan,bob,eliot,joe,mark,sara" ,  db.foo.find().sort( { name : 1 } ).toArray().map( function(z){ return z.name; } ) , "sort 1" );
 assert.eq( "sara,mark,joe,eliot,bob,allan" ,  db.foo.find().sort( { name : -1 } ).toArray().map( function(z){ return z.name; } ) , "sort 2" );

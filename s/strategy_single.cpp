@@ -27,19 +27,7 @@ namespace mongo {
                     }
                     
                     string commandName = q.query.firstElement().fieldName();
-                    
-                    if ( commandName == "count" ){
-                        string dbName = q.ns;
-                        dbName = dbName.substr( 0 , dbName.size() - 5 );
-                        string collection = q.query.firstElement().valuestrsafe();
-                        
-                        DBConfig * conf = grid.getDBConfig( dbName , false );
-                        if ( conf && conf->isPartitioned() && conf->sharded( dbName + "." + collection ) ){
-                            uassert( "can't handle sharded count yet" , 0 );
-                        }
-                    }
-                    
-                    log() << "don't know what i should do with command: " << commandName << " " << q.query << endl;
+                    log() << "passing through command: " << commandName << " " << q.query << endl;
                 }
 
                 lateAssert = true;
