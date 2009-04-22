@@ -198,25 +198,20 @@ namespace mongo {
         }
         CmdResync() : Command("resync") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            out() << "got resync request" << endl;
             if ( cmdObj.getBoolField( "force" ) ) {
                 if ( !waitForSyncToFinish( errmsg ) )
                     return false;
                 replAllDead = "resync forced";
             }            
-            out() << "done 1st wait" << endl;
             if ( !replAllDead ) {
                 errmsg = "not dead, no need to resync";
                 return false;
             }
-            out() << "all dead" << endl;
             if ( !waitForSyncToFinish( errmsg ) )
                 return false;
-            out() << "done 2nd wait" << endl;
             
             ReplSource::forceResyncDead( "client" );
             result.append( "info", "triggered resync for all sources" );
-            out() << "finished initing resync" << endl;
             return true;                
         }        
         bool waitForSyncToFinish( string &errmsg ) const {
@@ -428,14 +423,12 @@ namespace mongo {
     /* --------------------------------------------------------------*/
 
     ReplSource::ReplSource() {
-        out() << "new replsource" << endl;
         replacing = false;
         nClonedThisPass = 0;
         paired = false;
     }
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
-        out() << "new replsource" << endl;
         replacing = false;
         paired = false;
         only = o.getStringField("only");
@@ -519,7 +512,6 @@ namespace mongo {
 
         BSONObj o = jsobj();
         log( 1 ) << "Saving repl source: " << o << endl;
-        log() << "Saving repl source: " << o << endl;
 
         stringstream ss;
         setClient("local.sources");
@@ -545,17 +537,14 @@ namespace mongo {
         if ( !s.syncedTo.isNull() ) { // Don't reuse old ReplSource if there was a forced resync.
             for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
                 if ( s == **i ) {
-                    out() << "reusing existing: " << **i << endl;
                     v.push_back(*i);
                     old.erase(i);
                     return;
                 }
-                out() << "not match: " << s << ", **i: " << **i << endl;
                 i++;
             }
         }
 
-        out() << "not reusing; using new" << endl;
         v.push_back( shared_ptr< ReplSource >( new ReplSource( s ) ) );
     }
 
@@ -563,7 +552,6 @@ namespace mongo {
        and cursor in effect.
     */
     void ReplSource::loadAll(SourceVector &v) {
-        out() << "doing loadAll(), nOld: " << v.size() << endl;
         SourceVector old = v;
         v.clear();
 
@@ -657,7 +645,6 @@ namespace mongo {
         database = 0;
 
         if ( !gotPairWith && replPair ) {
-            out() << "not gotPairWith" << endl;
             /* add the --pairwith server */
             shared_ptr< ReplSource > s( new ReplSource() );
             s->paired = true;
@@ -683,27 +670,19 @@ namespace mongo {
             return;
         SourceVector sources;
         ReplSource::loadAll(sources);
-        out() << "nSources: " << sources.size() << endl;
         for( SourceVector::iterator i = sources.begin(); i != sources.end(); ++i ) {
             (*i)->forceResync( requester );
         }
-        out() << "done forcing resync" << endl;
         replAllDead = 0;        
     }
     
     void ReplSource::forceResync( const char *requester ) {
-        out() << "forcing resync for source" << endl;
         BSONObj info;
         {
-            out() << "going to get from other side" << endl;
             dbtemprelease t;
-            out() << "released ok" << endl;
             connect();
-            out() << "connected ok" << endl;
             bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
-            out() << "don w/ command" << endl;
             massert( "Unable to get database list", ok );
-            out() << "got list" << endl;
         }
         BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
         while( i.more() ) {
@@ -813,8 +792,6 @@ namespace mongo {
        see logOp() comments.
     */
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail) {
-//        out() << "doing op: " << op << endl;
-        
         // skip no-op
         if ( op.getStringField( "op" )[ 0 ] == 'n' )
             return;
@@ -877,7 +854,6 @@ namespace mongo {
                 save();
                 setClientTempNs( ns );
                 nClonedThisPass++;
-                out() << "database: " << unsigned( database ) << endl;
                 resync(database->name);
                 addDbNextPass.erase(clientName);
                 incompleteCloneDbs.erase( clientName );
@@ -886,9 +862,7 @@ namespace mongo {
         } else {
             bool mod;
             BSONObj id = idForOp( op, mod );
-//            out() << "op id: " << id << endl;
             if ( ids[ ns ].count( id ) == 0 ) {
-//                out() << "applying op " << op << endl;
                 applyOperation( op );    
             } else if ( modIds[ ns ].count( id ) != 0 ) {
                 BSONObj existing;
@@ -973,7 +947,6 @@ namespace mongo {
             cursor.reset();
         }
         BSONObj info;
-        out() << "requesting resync" << endl;
         massert( "request for slave to resync failed",
                 conn->runCommand( "admin", fromjson( "{resync:1,force:true}" ), info ) );        
     }
@@ -996,9 +969,8 @@ namespace mongo {
                 dbtemprelease t;
             }
         }
-        // local log filled up
-        out() << "saved: " << lastSavedLocalTs_ << "ok?: " << localLog->ok() << endl;
         if ( !lastSavedLocalTs_.isNull() && !localLog->ok() ) {
+            // local log filled up
             dbtemprelease t;
             log() << "local master log filled, forcing slave resync" << endl;
             ids.clear();
@@ -1029,10 +1001,8 @@ namespace mongo {
         
         if ( c == 0 ) {
             if ( syncedTo.isNull() ) {
-                cout << "starting from tail of oplog" << endl;
                 // Important to grab last oplog timestamp before listing databases.
                 syncToTailOfRemoteLog();
-                out() << "this: " << unsigned( this ) << endl;
                 BSONObj info;
                 bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
                 massert( "Unable to get database list", ok );
@@ -1044,7 +1014,6 @@ namespace mongo {
                     string name = e.embeddedObject().getField( "name" ).valuestr();
                     if ( name != "local" ) {
                         if ( only.empty() || only == name ) {
-                            out() << "adding for next pass: " << name << endl;
                             addDbNextPass.insert( name );
                         }
                     }
@@ -1088,7 +1057,6 @@ namespace mongo {
                 b.append("ns", *i + '.');
                 b.append("op", "db");
                 BSONObj op = b.done();
-                out() << "adding 'next pass' db" << endl;
                 sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass, 0);
             }
         }
@@ -1126,7 +1094,6 @@ namespace mongo {
                 return true;
             }            
             
-            cout << "updating sets now" << endl;
             dblock lk;
             if ( !updateSetsWithLocalOps( localChangedSinceLastPass, localModChangedSinceLastPass, localLogTail, true ) )
                 return true;
