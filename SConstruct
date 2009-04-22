@@ -977,6 +977,7 @@ def clean_old_dist_builds(env, target, source):
     filenames = [x for x in filenames if x.startswith(prefix)]
     to_keep = [x for x in filenames if x.endswith(".tgz") or x.endswith(".zip")][-2:]
     for filename in [x for x in filenames if x not in to_keep]:
+        print "removing %s" % filename
         try:
             shutil.rmtree(filename)
         except:
