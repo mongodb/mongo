@@ -144,7 +144,17 @@ namespace mongo {
         // returns possibly unowned id spec for the operation.
         static BSONObj idForOp( const BSONObj &op, bool &mod );
         static void updateSetsWithOp( const BSONObj &op, IdSets &changed, IdSets &modChanged );
-
+        // call without the db mutex
+        void syncToTailOfRemoteLog();
+        // call with the db mutex
+        void updateLastSavedLocalTs();
+        // call without the db mutex
+        void resetSlave();
+        // call with the db mutex
+        // returns false if the slave has been reset
+        bool updateSetsWithLocalOps( IdSets &ids, IdSets &modIds, OpTime &localLogTail, bool unlock );
+        string ns() const { return string( "local.oplog.$" ) + sourceName(); }
+        
     public:
         static void applyOperation(const BSONObj& op);
         bool replacing; // in "replace mode" -- see CmdReplacePeer
