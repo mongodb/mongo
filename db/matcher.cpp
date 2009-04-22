@@ -405,6 +405,7 @@ namespace mongo {
                 int ret = matchesNe( fieldName, *i, obj, deep );
                 if ( ret != 1 )
                     return ret;
+                // code to handle 0 (missing) return value doesn't deal with nin yet
             }
             return 1;
         }
@@ -414,18 +415,36 @@ namespace mongo {
             e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
             assert( !e.eoo() );
         } else {
+            if ( isArr ) {
+                BSONObjIterator ai(obj);
+                bool found = false;
+                while ( ai.more() ) {
+                    BSONElement z = ai.next();
+                    if ( z.type() == Object ) {
+                        BSONObj eo = z.embeddedObject();
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep);
+                        if ( cmp > 0 ) {
+                            if ( deep ) *deep = true;
+                            return 1;
+                        } else if ( cmp < 0 ) {
+                            found = true;
+                        }
+                    }
+                }
+                return found ? -1 : 0;
+            }
             const char *p = strchr(fieldName, '.');
             if ( p ) {
                 string left(fieldName, p-fieldName);
 
-                BSONElement e = obj.getField(left.c_str());
-                if ( e.eoo() )
+                BSONElement se = obj.getField(left.c_str());
+                if ( se.eoo() )
                     return 0;
-                if ( e.type() != Object && e.type() != Array )
+                if ( se.type() != Object && se.type() != Array )
                     return -1;
 
-                BSONObj eo = e.embeddedObject();
-                return matchesDotted(p+1, toMatch, eo, compareOp, deep, e.type() == Array);
+                BSONObj eo = se.embeddedObject();
+                return matchesDotted(p+1, toMatch, eo, compareOp, deep, se.type() == Array);
             } else {
                 e = obj.getField(fieldName);
             }
@@ -444,22 +463,8 @@ namespace mongo {
                 }
             }
         }
-        else if ( isArr ) {
-            BSONObjIterator ai(obj);
-            while ( ai.more() ) {
-                BSONElement z = ai.next();
-                if ( z.type() == Object ) {
-                    BSONObj eo = z.embeddedObject();
-                    int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep);
-                    if ( cmp > 0 ) {
-                        if ( deep ) *deep = true;
-                        return 1;
-                    }
-                }
-            }
-        }
         else if ( e.eoo() ) {
-            // 0 indicatse "missing element"
+            // 0 indicates "missing element"
             return 0;
         }
         return -1;
