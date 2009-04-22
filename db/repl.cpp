@@ -988,13 +988,6 @@ namespace mongo {
                     syncedTo = OpTime( ts.date() );
                 }
                 out() << "this: " << unsigned( this ) << endl;
-                set< string > localDbs;
-                vector< string > diskDbs;
-                getDatabaseNames( diskDbs );
-                for( vector< string >::iterator i = diskDbs.begin(); i != diskDbs.end(); ++i )
-                    localDbs.insert( *i );
-                for( map< string, Database* >::iterator i = databases.begin(); i != databases.end(); ++i )
-                    localDbs.insert( i->first );
                 BSONObj info;
                 bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
                 massert( "Unable to get database list", ok );
@@ -1005,13 +998,15 @@ namespace mongo {
                         break;
                     string name = e.embeddedObject().getField( "name" ).valuestr();
                     // We may be paired, so only attempt to add databases not already present.
-                    if ( name != "local" && localDbs.count( name ) == 0 ) {
+                    if ( name != "local" ) {
                         if ( only.empty() || only == name ) {
                             out() << "adding for next pass: " << name << endl;
                             addDbNextPass.insert( name );
                         }
                     }
                 }
+                dblock lk;
+                save();
             }
                         
             BSONObjBuilder q;
