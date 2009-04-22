@@ -210,6 +210,7 @@ namespace mongo {
             {
                 string err;
                 const char *toname = to_name.c_str();
+                setClient( toname );
                 userCreateNS(toname, options, err, logForRepl);
 
                 /* chunks are big enough that we should create the _id index up front, that should
@@ -226,7 +227,7 @@ namespace mongo {
         // now build the indexes
         string system_indexes_from = fromdb + ".system.indexes";
         string system_indexes_to = todb + ".system.indexes";
-        copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, masterSameProcess, slaveOk);
+        copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, masterSameProcess, slaveOk, BSON( "name" << NE << "_id_" ) );
 
         return true;
     }
@@ -260,7 +261,7 @@ namespace mongo {
 
         if ( copyIndexes ) {
             string indexNs = string( db ) + ".system.indexes";
-            copy( indexNs.c_str(), indexNs.c_str(), true, logForRepl, false, false, BSON( "ns" << ns ) );
+            copy( indexNs.c_str(), indexNs.c_str(), true, logForRepl, false, false, BSON( "ns" << ns << "name" << NE << "_id_" ) );
         }
         
         auto_ptr< DBClientCursor > c;

@@ -491,9 +491,9 @@ namespace mongo {
             }
             CmdIsMaster() : Command("ismaster") { }
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-                result.append("ismaster", 0.0);
+                result.append("ismaster", 1.0 );
                 result.append("msg", "isdbgrid");
-                result << "ok" << 1;
+                result.append("ok" , 1 );
                 return true;
             }
         } ismaster;

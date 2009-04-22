@@ -397,8 +397,8 @@ namespace QueryTests {
         }
         static const char *ns() { return "querytests.AutoResetIndexCache"; }
         static const char *idxNs() { return "querytests.system.indexes"; }
-        void index() const { ASSERT( !client().findOne( idxNs(), BSONObj() ).isEmpty() ); }
-        void noIndex() const { ASSERT( client().findOne( idxNs(), BSONObj() ).isEmpty() ); }
+        void index() const { ASSERT( !client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
+        void noIndex() const { ASSERT( client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
         void checkIndex() {
             client().ensureIndex( ns(), BSON( "a" << 1 ) );
             index();            
@@ -445,7 +445,7 @@ namespace QueryTests {
             client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
             client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
             client().ensureIndex( ns, BSON( "a" << 1 ), true );
-            ASSERT_EQUALS( 0U, client().count( "querytests.system.indexes", BSON( "ns" << ns ) ) );
+            ASSERT_EQUALS( 0U, client().count( "querytests.system.indexes", BSON( "ns" << ns << "name" << NE << "_id_" ) ) );
         }
     };
     

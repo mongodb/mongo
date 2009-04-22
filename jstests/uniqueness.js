@@ -5,8 +5,6 @@ t.drop();
 
 // test uniqueness of _id
 
-t.ensureIndex({_id:1});
-
 t.save( { _id : 3 } );
 assert( !db.getLastError(), 1 );
 
@@ -25,8 +23,8 @@ assert( t.findOne( {_id:4} ), 5 );
 
 /* Check for an error message when we index and there are dups */
 db.bar.drop();
-db.bar.insert({_id:3});
-db.bar.insert({_id:3});
+db.bar.insert({a:3});
+db.bar.insert({a:3});
 assert( db.bar.count() == 2 , 6) ;
-db.bar.ensureIndex({_id:1});
+db.bar.ensureIndex({a:1}, true);
 assert( db.getLastError() , 7);

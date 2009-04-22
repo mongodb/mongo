@@ -1,5 +1,5 @@
 db.capped2.drop();
-db._dbCommand( { create: "capped2", capped: true, size: 1000, $nExtents: 11 } );
+db._dbCommand( { create: "capped2", capped: true, size: 1000, $nExtents: 11, autoIndexId: false } );
 t = db.capped2;
 
 var val = new Array( 1000 );

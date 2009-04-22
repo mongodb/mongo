@@ -20,5 +20,5 @@ assert.commandWorked( admin.runCommand( {renameCollection:"test.jstests_rename_a
 assert.eq( 0, a.find().count() );
 
 assert.eq( 2, b.find().count() );
-assert.eq( 2, db.system.indexes.find( {ns:"test.jstests_rename_b"} ).count() );
+assert.eq( 3, db.system.indexes.find( {ns:"test.jstests_rename_b"} ).count() );
 assert( b.find( {a:1} ).explain().cursor.match( /^BtreeCursor/ ) );

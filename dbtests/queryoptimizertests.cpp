@@ -26,6 +26,10 @@
 
 #include "dbtests.h"
 
+namespace mongo {
+    extern BSONObj id_obj;
+} // namespace mongo
+
 namespace QueryOptimizerTests {
 
     namespace FieldBoundTests {
@@ -335,6 +339,9 @@ namespace QueryOptimizerTests {
                 QueryPlan p2( FBS( BSONObj() ), BSON( "a" << 1 << "b" << -1 ), INDEX( "a" << 1 << "b" << 1 ) );
                 ASSERT( p2.scanAndOrderRequired() );                
                 ASSERT_EQUALS( 0, p2.direction() );
+                QueryPlan p3( FBS( BSONObj() ), BSON( "_id" << 1 ), index( id_obj ) );
+                ASSERT( !p3.scanAndOrderRequired() );
+                ASSERT_EQUALS( 1, p3.direction() );
             }            
         };
         
@@ -418,14 +425,14 @@ namespace QueryOptimizerTests {
                 ASSERT( p8.optimal() );
                 QueryPlan p9( FBS( BSON( "a" << 1 << "b" << LT << 1 ) ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
                 ASSERT( p9.optimal() );
-                QueryPlan p10( FBS( BSON( "a" << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
-                ASSERT( p10.optimal() );
             }
         };
         
         class MoreOptimal : public Base {
         public:
             void run() {
+                QueryPlan p10( FBS( BSON( "a" << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                ASSERT( p10.optimal() );
                 QueryPlan p11( FBS( BSON( "a" << 1 << "b" << LT << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
                 ASSERT( p11.optimal() );
                 QueryPlan p12( FBS( BSON( "a" << LT << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 << "c" << 1 ) );
@@ -648,12 +655,13 @@ namespace QueryOptimizerTests {
                 string err;
                 ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 BSONObj one = BSON( "a" << 1 );
-                BSONObj four = BSON( "a" << 4 );
+                BSONObj fourA = BSON( "a" << 4 );
+                BSONObj fourB = BSON( "a" << 4 );
                 theDataFileMgr.insert( ns(), one );
                 ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
-                theDataFileMgr.insert( ns(), four );
+                theDataFileMgr.insert( ns(), fourA );
                 ASSERT_EQUALS( 1, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
-                theDataFileMgr.insert( ns(), four );
+                theDataFileMgr.insert( ns(), fourB );
                 ASSERT_EQUALS( 2, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSONObj() ), err ) );
                 ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
