@@ -1,4 +1,4 @@
-// dbgrid/request.cpp
+// s/commands_admin.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.

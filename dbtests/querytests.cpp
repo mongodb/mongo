@@ -449,6 +449,19 @@ namespace QueryTests {
         }
     };
     
+    class SubobjectInArray : public ClientBase {
+    public:
+        ~SubobjectInArray() {
+            client().dropCollection( "querytests.SubobjectInArray" );
+        }
+        void run() {
+            const char *ns = "querytests.SubobjectInArray";
+            client().insert( ns, fromjson( "{a:[{b:{c:1}}]}" ) );
+            ASSERT( !client().findOne( ns, BSON( "a.b.c" << 1 ) ).isEmpty() );
+            ASSERT( !client().findOne( ns, fromjson( "{'a.c':null}" ) ).isEmpty() );
+        }
+    };
+
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -473,6 +486,7 @@ namespace QueryTests {
             add< AutoResetIndexCache >();
             add< UniqueIndex >();
             add< UniqueIndexPreexistingData >();
+            add< SubobjectInArray >();
         }
     };
     
