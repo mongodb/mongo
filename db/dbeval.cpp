@@ -59,13 +59,14 @@ namespace mongo {
         }
 
 #if !defined(NOJNI)
-        jlong f = JavaJS->functionCreate(code);
+        Scope s;
+
+        jlong f = s.createFunction(code);
         if ( f == 0 ) {
             errmsg = "compile failed";
             return false;
         }
 
-        Scope s;
         if ( e.type() == CodeWScope )
             s.init( e.codeWScopeScopeData() );
         s.setString("$client", database->name.c_str());
