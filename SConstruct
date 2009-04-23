@@ -136,8 +136,26 @@ if GetOption( "recstore" ) != None:
 env.Append( CPPDEFINES=[ "_SCONS" ] )
 env.Append( CPPPATH=[ "." ] )
 
-
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
+
+onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "mongod" )
+nix = False
+useJavaHome = False
+linux = False
+linux64  = False
+darwin = False
+windows = False
+force64 = not GetOption( "force64" ) is None
+force32 = not GetOption( "force32" ) is None
+release = not GetOption( "release" ) is None
+
+debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
+debugLogging = not GetOption( "debugBuildAndLogging" ) is None
+noshell = not GetOption( "noshell" ) is None
+nojni = not GetOption( "nojni" ) is None
+
+
+# ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ]
@@ -162,7 +180,12 @@ coreDbFiles = []
 coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
 
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
-serverOnlyFiles += [ "scripting/engine.cpp" , "scripting/engine_java.cpp" ]
+serverOnlyFiles += [ "scripting/engine.cpp" ]
+
+if not nojni:
+    serverOnlyFiles += [ "scripting/engine_java.cpp" ]
+else:
+    serverOnlyFiles += [ "scripting/engine_none.cpp" ]
 
 coreShardFiles = []
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
@@ -170,22 +193,7 @@ serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
-onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "mongod" )
-nix = False
-useJavaHome = False
-linux = False
-linux64  = False
-darwin = False
-windows = False
-force64 = not GetOption( "force64" ) is None
-force32 = not GetOption( "force32" ) is None
-release = not GetOption( "release" ) is None
-
-debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
-debugLogging = not GetOption( "debugBuildAndLogging" ) is None
-noshell = not GetOption( "noshell" ) is None
-nojni = not GetOption( "nojni" ) is None
-
+# ---- other build setup -----
 
 platform = os.sys.platform
 if "uname" in dir(os):
@@ -369,9 +377,6 @@ if nix:
         env.Append( CFLAGS="-m32" )
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
-
-if nojni:
-    env.Append( CPPFLAGS=" -DNOJNI " )
 
 
 # --- check system ---

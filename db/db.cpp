@@ -385,11 +385,10 @@ namespace mongo {
 #endif
 
 
-#if !defined(NOJNI)
         if ( useJNI ) {
             ScriptEngine::setup();
         }
-#endif
+
         repairDatabases();
         /* this is for security on certain platforms */
         srand(curTimeMicros() ^ startupSrandTimer.micros());
@@ -581,9 +580,6 @@ int main(int argc, char* argv[], char *envp[] )
 
 usage:
     out() << "Mongo db ";
-#if defined(NOJNI)
-    out() << "[nojni build] ";
-#endif
     out() << "usage:\n";
     out() << "  run                      run db" << endl;
     out() << "  msg [msg] [port]         send a request to the db server listening on port (or default)" << endl;

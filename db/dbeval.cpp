@@ -59,7 +59,6 @@ namespace mongo {
             return false;
         }
 
-#if !defined(NOJNI)
         auto_ptr<Scope> s( globalScriptEngine->createScope() );
 
         ScriptingFunction f = s->createFunction(code);
@@ -112,7 +111,7 @@ namespace mongo {
         else if ( type == Bool ) {
             result.appendBool("retval", s->getBoolean("return"));
         }
-#endif
+
         return true;
     }
 

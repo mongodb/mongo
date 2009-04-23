@@ -83,10 +83,10 @@ namespace mongo {
             jsScope = 0;
         }
         ~Where() {
-#if !defined(NOJNI)
+
             if ( scope )
                 delete scope;
-#endif
+
             if ( jsScope )
                 delete jsScope;
             scope = 0;
@@ -98,10 +98,8 @@ namespace mongo {
         BSONObj *jsScope;
         
         void setFunc(const char *code) {
-#if !defined(NOJNI)
             massert( "scope has to be created first!" , scope );
             func = scope->createFunction( code );
-#endif
         }
 
     };
@@ -151,7 +149,7 @@ namespace mongo {
                 uassert( "$where occurs twice?", where == 0 );
                 where = new Where();
                 uassert( "$where query, but no script engine", globalScriptEngine );
-#if !defined(NOJNI)
+
                 where->scope = globalScriptEngine->createScope();
                 where->scope->setString( "$client", database->name.c_str() );
 
@@ -163,7 +161,7 @@ namespace mongo {
                     const char *code = e.valuestr();
                     where->setFunc(code);
                 }
-#endif
+
                 continue;
             }
 
@@ -559,7 +557,6 @@ namespace mongo {
                 uassert("$where compile error", false);
                 return false; // didn't compile
             }
-#if !defined(NOJNI)
 
             /**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */
             {
@@ -587,9 +584,7 @@ namespace mongo {
                 return false;                
             }
             return where->scope->getBoolean( "return" ) != 0;
-#else
-            return false;
-#endif
+
         }
 
         return true;
