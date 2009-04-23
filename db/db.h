@@ -130,6 +130,9 @@ namespace mongo {
            variables.
         */
         assert( dbMutexInfo.isLocked() );
+        
+        log( 5 ) << "setClient: " << ns << endl;
+        
         Top::clientStart( ns );
         
         curNs = ns;
@@ -180,6 +183,10 @@ namespace mongo {
         return jc;
     }
 
+    inline bool clientIsEmpty() {
+        return !database->namespaceIndex.allocated();
+    }
+    
     struct dbtemprelease {
         string clientname;
         string clientpath;

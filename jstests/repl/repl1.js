@@ -5,10 +5,6 @@ var baseName = "jstests_repl1test";
 soonCount = function( count ) {
     assert.soon( function() { 
 //                print( "check count" );
-                if ( -1 == s.getDBNames().indexOf( baseName ) )
-                    return false;
-                if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "a" ) )
-                    return false;
 //                print( "count: " + s.getDB( baseName ).z.find().count() );
                 return s.getDB( baseName ).a.find().count() == count; 
                 } );    
