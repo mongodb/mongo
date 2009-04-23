@@ -69,8 +69,32 @@ namespace mongo {
     extern bool autoresync;
     time_t lastForcedResync = 0;
     
-    IdSets localChangedSinceLastPass;
-    IdSets localModChangedSinceLastPass;
+    class IdTracker {
+    public:
+        void reset() {
+            ids_.clear();
+            modIds_.clear();
+        }
+        bool haveId( const char *ns, const BSONObj &id ) { return ids_[ ns ].count( id ) != 0; }
+        bool haveModId( const char *ns, const BSONObj &id ) { return modIds_[ ns ].count( id ) != 0; }
+        void haveId( const char *ns, const BSONObj &id, bool val ) {
+            if ( val )
+                ids_[ ns ].insert( id );
+            else
+                ids_[ ns ].erase( id );
+        }
+        void haveModId( const char *ns, const BSONObj &id, bool val ) {
+            if ( val )
+                modIds_[ ns ].insert( id );
+            else
+                modIds_[ ns ].erase( id );            
+        }
+    private:
+        IdSets ids_;
+        IdSets modIds_;
+    };
+    
+    IdTracker idTracker;
     
 } // namespace mongo
 
@@ -889,9 +913,9 @@ namespace mongo {
         } else {
             bool mod;
             BSONObj id = idForOp( op, mod );
-            if ( localChangedSinceLastPass[ ns ].count( id ) == 0 ) {
+            if ( !idTracker.haveId( ns, id ) ) {
                 applyOperation( op );    
-            } else if ( localModChangedSinceLastPass[ ns ].count( id ) != 0 ) {
+            } else if ( idTracker.haveModId( ns, id ) ) {
                 BSONObj existing;
                 if ( Helpers::findOne( ns, id, existing ) )
                     logOp( "i", ns, existing );
@@ -940,13 +964,13 @@ namespace mongo {
             const char *ns = op.getStringField( "ns" );
             id = id.getOwned();
             if ( mod ) {
-                if ( localChangedSinceLastPass[ ns ].count( id ) == 0 ) {
-                    localModChangedSinceLastPass[ ns ].insert( id );
+                if ( !idTracker.haveId( ns, id ) ) {
+                    idTracker.haveModId( ns, id, true );
                 }
             } else {
-                localModChangedSinceLastPass[ ns ].erase( id );
+                idTracker.haveModId( ns, id, false );
             }
-            localChangedSinceLastPass[ ns ].insert( id );
+            idTracker.haveId( ns, id, true );
         }        
     }
     
@@ -1002,8 +1026,7 @@ namespace mongo {
             // local log filled up
             dbtemprelease t;
             log() << "local master log filled, forcing slave resync" << endl;
-            localChangedSinceLastPass.clear();
-            localModChangedSinceLastPass.clear();
+            idTracker.reset();
             resetSlave();
             return false;
         }        
@@ -1022,8 +1045,7 @@ namespace mongo {
             c = 0;
         }
 
-        localChangedSinceLastPass.clear();
-        localModChangedSinceLastPass.clear();
+        idTracker.reset();
         OpTime localLogTail;
 
         bool initial = syncedTo.isNull();
