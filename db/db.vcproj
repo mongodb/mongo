@@ -1499,10 +1499,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\javajs.cpp"
-					>
-				</File>
-				<File
 					RelativePath=".\jsobj.cpp"
 					>
 				</File>
@@ -1763,6 +1759,18 @@
 			>
 			<File
 				RelativePath="..\s\d_logic.cpp"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="scripting"
+			>
+			<File
+				RelativePath="..\scripting\engine.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\scripting\engine_java.cpp"
 				>
 			</File>
 		</Filter>

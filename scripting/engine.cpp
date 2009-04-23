@@ -1,5 +1,6 @@
 // engine.cpp
 
+#include "stdafx.h"
 #include "engine.h"
 
 namespace mongo {
