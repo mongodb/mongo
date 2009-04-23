@@ -21,7 +21,6 @@
 
 #include "dbtests.h"
 
-#include "../db/javajs.h"
 #include "../util/file_allocator.h"
 
 #include <unittest/Registry.hpp>

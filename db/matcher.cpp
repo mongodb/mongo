@@ -21,9 +21,10 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
-#include "javajs.h"
 #include "../util/unittest.h"
 #include "storage.h"
+
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -93,7 +94,7 @@ namespace mongo {
         }
         
         Scope * scope;
-        jlong func;
+        ScriptingFunction func;
         BSONObj *jsScope;
         
         void setFunc(const char *code) {
@@ -149,9 +150,9 @@ namespace mongo {
                 // $where: function()...
                 uassert( "$where occurs twice?", where == 0 );
                 where = new Where();
-                uassert( "$where query, but jni is disabled", JavaJS );
+                uassert( "$where query, but no script engine", globalScriptEngine );
 #if !defined(NOJNI)
-                where->scope = new Scope();
+                where->scope = globalScriptEngine->createScope();
                 where->scope->setString( "$client", database->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {

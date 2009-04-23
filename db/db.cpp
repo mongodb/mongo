@@ -19,7 +19,6 @@
 
 #include "stdafx.h"
 #include "db.h"
-#include "javajs.h"
 #include "query.h"
 #include "introspect.h"
 #include "repl.h"
@@ -30,6 +29,8 @@
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
+
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -386,7 +387,7 @@ namespace mongo {
 
 #if !defined(NOJNI)
         if ( useJNI ) {
-            JavaJS = new JavaJSImpl(appserverLoc);
+            ScriptEngine::setup();
         }
 #endif
         repairDatabases();
@@ -442,15 +443,6 @@ int main(int argc, char* argv[], char *envp[] )
     if ( argc >= 2 ) {
         if ( strcmp(argv[1], "quicktest") == 0 ) {
             quicktest();
-            return 0;
-        }
-        if ( strcmp(argv[1], "javatest") == 0 ) {
-#if !defined(NOJNI)
-            JavaJS = new JavaJSImpl();
-            javajstest();
-#else
-            out() << "NOJNI build cannot test" << endl;
-#endif
             return 0;
         }
         if ( strcmp(argv[1], "test2") == 0 ) {
