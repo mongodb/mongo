@@ -26,10 +26,25 @@ disconnect = function() {
 checkCount = function( m, c ) {
     m.setSlaveOk();
     assert.soon( function() {
+                if ( -1 == m.getDBNames().indexOf( baseName ) ) {
+                    return false;
+                }
+                if ( -1 == m.getDB( baseName ).getCollectionNames().indexOf( baseName ) ) {
+                    return false;
+                }
                 actual = m.getDB( baseName ).getCollection( baseName ).find().count();
                 print( actual );
                 return c == actual; },
                 "expected count " + c + " for " + m );
+}
+
+resetSlave = function( s ) {
+    s.setSlaveOk();
+    assert.soon( function() {
+                ret = s.getDB( "admin" ).runCommand( { "resync" : 1 } );
+                //                printjson( ret );
+                return 1 == ret.ok;
+                } );    
 }
 
 big = new Array( 2000 ).toString();
@@ -90,6 +105,8 @@ doTest = function() {
                 return ( lm == 0 && rm == 1 );
                 } );       
 
+    resetSlave( l );
+    
     checkCount( l, 1 );
     checkCount( r, 1 );
     
@@ -127,7 +144,9 @@ doTest = function() {
                 return ( lm == 0 && rm == 1 );
                 } );       
     
-    sleep( 30000 );
+    sleep( 15000 );
+    
+    resetSlave( l );
     
     checkCount( l, 1000 );
     checkCount( r, 1000 );

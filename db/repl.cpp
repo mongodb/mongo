@@ -185,6 +185,24 @@ namespace mongo {
         }
     } cmdReplacePeer;
 
+    class CmdForceDead : public Command {
+    public:
+        virtual bool slaveOk() {
+            return true;
+        }
+        virtual bool adminOnly() {
+            return true;
+        }
+        virtual bool logTheOp() {
+            return false;   
+        }
+        CmdForceDead() : Command("forcedead") { }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            replAllDead = "forced by command";
+            return true;
+        }
+    } cmdForceDead;
+    
     class CmdResync : public Command {
     public:
         virtual bool slaveOk() {
@@ -793,6 +811,7 @@ namespace mongo {
        see logOp() comments.
     */
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail) {
+        log( 6 ) << "processing op: " << op << endl;
         // skip no-op
         if ( op.getStringField( "op" )[ 0 ] == 'n' )
             return;
@@ -839,6 +858,8 @@ namespace mongo {
 
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
+        log( 6 ) << "ns: " << ns << ", justCreated: " << justCreated << ", incompleteClone: " << incompleteClone << endl;
+        
         if ( justCreated || incompleteClone ) {
             if ( incompleteClone ) {
                 log() << "An earlier initial clone of '" << clientName << "' did not complete, will resync." << endl;
@@ -948,9 +969,8 @@ namespace mongo {
             save();
             cursor.reset();
         }
-        BSONObj info;
-        massert( "request for slave to resync failed",
-                conn->runCommand( "admin", fromjson( "{resync:1,force:true}" ), info ) );        
+        massert( "request to kill slave replication falied",
+                conn->simpleCommand( "admin", 0, "forcedead" ) );        
     }
     
     bool ReplSource::updateSetsWithLocalOps( IdSets &ids, IdSets &modIds, OpTime &localLogTail, bool unlock ) {
@@ -1016,6 +1036,7 @@ namespace mongo {
                     string name = e.embeddedObject().getField( "name" ).valuestr();
                     if ( name != "local" ) {
                         if ( only.empty() || only == name ) {
+                            log( 2 ) << "adding to 'addDbNextPass': " << name << endl;
                             addDbNextPass.insert( name );
                         }
                     }

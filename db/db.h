@@ -130,6 +130,9 @@ namespace mongo {
            variables.
         */
         assert( dbMutexInfo.isLocked() );
+        
+        log( 5 ) << "setClient: " << ns << endl;
+        
         Top::clientStart( ns );
         
         curNs = ns;
