@@ -51,7 +51,8 @@ doTest = function( signal ) {
     
     checkWrite( r, l );
 
-    assert.eq( 1, l.getDB( "admin" ).runCommand( {replacepeer:1} ).ok );
+    // allow slave to finish initial sync
+    assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( {replacepeer:1} ).ok; } );
     
     // Should not be saved to l.
     writeOne( r );
