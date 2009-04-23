@@ -69,31 +69,105 @@ namespace mongo {
     extern bool autoresync;
     time_t lastForcedResync = 0;
     
-    class IdTracker {
+//    class IdTracker {
+//    public:
+//        void reset() {
+//            ids_.clear();
+//            modIds_.clear();
+//        }
+//        bool haveId( const char *ns, const BSONObj &id ) { return ids_[ ns ].count( id ) != 0; }
+//        bool haveModId( const char *ns, const BSONObj &id ) { return modIds_[ ns ].count( id ) != 0; }
+//        void haveId( const char *ns, const BSONObj &id, bool val ) {
+//            if ( val )
+//                ids_[ ns ].insert( id );
+//            else
+//                ids_[ ns ].erase( id );
+//        }
+//        void haveModId( const char *ns, const BSONObj &id, bool val ) {
+//            if ( val )
+//                modIds_[ ns ].insert( id );
+//            else
+//                modIds_[ ns ].erase( id );            
+//        }
+//    private:
+//        IdSets ids_;
+//        IdSets modIds_;
+//    };
+
+    class DbIds {
     public:
+        DbIds( const char * name ) : name_( name ) {}
         void reset() {
-            ids_.clear();
-            modIds_.clear();
+            dbcache c;
+            setClient( name_ );
+            Helpers::emptyCollection( name_ );
+            Helpers::ensureIndex( name_, BSON( "ns" << 1 << "id" << 1 ), "setIdx" );            
         }
-        bool haveId( const char *ns, const BSONObj &id ) { return ids_[ ns ].count( id ) != 0; }
-        bool haveModId( const char *ns, const BSONObj &id ) { return modIds_[ ns ].count( id ) != 0; }
-        void haveId( const char *ns, const BSONObj &id, bool val ) {
-            if ( val )
-                ids_[ ns ].insert( id );
-            else
-                ids_[ ns ].erase( id );
+        bool get( const char *ns, const BSONObj &id ) {
+            dbcache c;
+            setClientTempNs( name_ );
+            BSONObj temp;
+            return Helpers::findOne( name_, key( ns, id ), temp );                        
         }
-        void haveModId( const char *ns, const BSONObj &id, bool val ) {
-            if ( val )
-                modIds_[ ns ].insert( id );
-            else
-                modIds_[ ns ].erase( id );            
+        void set( const char *ns, const BSONObj &id, bool val ) {
+            dbcache c;
+            setClientTempNs( name_ );
+            if ( val ) {
+                BSONObj temp;
+                if ( !Helpers::findOne( name_, key( ns, id ), temp ) ) {
+                    BSONObj k = key( ns, id );
+                    theDataFileMgr.insert( name_, k );
+                }
+            } else {
+                deleteObjects( name_, key( ns, id ), true, false, false );
+            }            
         }
     private:
-        IdSets ids_;
-        IdSets modIds_;
+        struct dbcache {
+            Database *database_;
+            const char *curNs_;
+            dbcache() : database_( database ), curNs_( curNs ) {}
+            ~dbcache() {
+                database = database_;
+                curNs = curNs_;
+            }
+        };
+        static BSONObj key( const char *ns, const BSONObj &id ) {
+            BSONObjBuilder b;
+            b << "ns" << ns;
+            b.appendAs( id.firstElement(), "id" );
+            return b.obj();
+        }        
+        const char * name_;
     };
-    
+
+    class IdTracker {
+    public:
+        IdTracker() :
+        ids_( "local.temp.replIds" ),
+        modIds_( "local.temp.replModIds" ) {
+        }
+        void reset() {
+            ids_.reset();
+            modIds_.reset();
+        }
+        bool haveId( const char *ns, const BSONObj &id ) {
+            return ids_.get( ns, id );
+        }
+        bool haveModId( const char *ns, const BSONObj &id ) {
+            return modIds_.get( ns, id );
+        }
+        void haveId( const char *ns, const BSONObj &id, bool val ) {
+            ids_.set( ns, id, val );
+        }
+        void haveModId( const char *ns, const BSONObj &id, bool val ) {
+            modIds_.set( ns, id, val );
+        }
+    private:
+        DbIds ids_;
+        DbIds modIds_;
+    };
+
     IdTracker idTracker;
     
 } // namespace mongo
@@ -1024,9 +1098,9 @@ namespace mongo {
         }
         if ( !lastSavedLocalTs_.isNull() && !localLog->ok() ) {
             // local log filled up
-            dbtemprelease t;
             log() << "local master log filled, forcing slave resync" << endl;
             idTracker.reset();
+            dbtemprelease t;
             resetSlave();
             return false;
         }        
@@ -1045,7 +1119,10 @@ namespace mongo {
             c = 0;
         }
 
-        idTracker.reset();
+        {
+            dblock lk;
+            idTracker.reset();
+        }
         OpTime localLogTail;
 
         bool initial = syncedTo.isNull();
