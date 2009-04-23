@@ -43,7 +43,7 @@ namespace mongo {
 
 
 #include "../util/message.h"
-#include "db.h"
+#include "../db/db.h"
 
 using namespace std;
 
