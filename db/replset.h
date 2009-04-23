@@ -86,8 +86,8 @@ namespace mongo {
 
         void setMaster(int n, const char *_comment = "");
 
-        /* negotiate with our peer who is master */
-        void negotiate(DBClientConnection *conn, string method);
+        /* negotiate with our peer who is master; returns state of peer */
+        int negotiate(DBClientConnection *conn, string method);
 
         /* peer unreachable, try our arbitrator */
         void arbitrate();

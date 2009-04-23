@@ -162,11 +162,9 @@ namespace ReplTests {
     class LogBasic : public Base {
     public:
         void run() {
-            ASSERT( oneOp().isEmpty() );
-            
+            ASSERT_EQUALS( 1, opCount() );
             client()->insert( ns(), fromjson( "{\"a\":\"b\"}" ) );
-
-            ASSERT( !oneOp().isEmpty() );
+            ASSERT_EQUALS( 2, opCount() );
         }
     };
     

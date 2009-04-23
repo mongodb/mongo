@@ -92,6 +92,7 @@ namespace mongo {
             ss << hex << secs << ':' << i;
             return ss.str();
         }
+        operator string() const { return toString(); }
         bool operator==(const OpTime& r) const {
             return i == r.i && secs == r.secs;
         }
@@ -125,12 +126,14 @@ namespace mongo {
     class ReplSource {
         bool resync(string db);
         bool sync_pullOpLog();
-        void sync_pullOpLog_applyOperation(BSONObj& op);
+        typedef map< string, BSONObjSetDefaultOrder > IdSets;
+        void sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail);
         
         auto_ptr<DBClientConnection> conn;
         auto_ptr<DBClientCursor> cursor;
 
         set<string> addDbNextPass;
+        set<string> incompleteCloneDbs;
 
         ReplSource();
         
@@ -138,7 +141,20 @@ namespace mongo {
         string resyncDrop( const char *db, const char *requester );
         // returns true if connected on return
         bool connect();
-
+        // returns possibly unowned id spec for the operation.
+        static BSONObj idForOp( const BSONObj &op, bool &mod );
+        static void updateSetsWithOp( const BSONObj &op, IdSets &changed, IdSets &modChanged );
+        // call without the db mutex
+        void syncToTailOfRemoteLog();
+        // call with the db mutex
+        void updateLastSavedLocalTs();
+        // call without the db mutex
+        void resetSlave();
+        // call with the db mutex
+        // returns false if the slave has been reset
+        bool updateSetsWithLocalOps( IdSets &ids, IdSets &modIds, OpTime &localLogTail, bool unlock );
+        string ns() const { return string( "local.oplog.$" ) + sourceName(); }
+        
     public:
         static void applyOperation(const BSONObj& op);
         bool replacing; // in "replace mode" -- see CmdReplacePeer
@@ -152,16 +168,9 @@ namespace mongo {
 
         /* the last time point we have already synced up to. */
         OpTime syncedTo;
-
-        /* list of databases that we have synced.
-           we need this so that if we encounter a new one, we know
-           to go fetch the old data.
-        */
-        set<string> dbs;
-        void repopulateDbsList( const BSONObj &o );
+        OpTime lastSavedLocalTs_;
 
         int nClonedThisPass;
-        bool mustListDbs_;
 
         typedef vector< shared_ptr< ReplSource > > SourceVector;
         static void loadAll(SourceVector&);
@@ -180,7 +189,8 @@ namespace mongo {
         bool operator==(const ReplSource&r) const {
             return hostName == r.hostName && sourceName() == r.sourceName();
         }
-
+        operator string() const { return sourceName() + "@" + hostName; }
+        
         bool haveMoreDbsToSync() const { return !addDbNextPass.empty(); }        
 
         static bool throttledForceResyncDead( const char *requester );
@@ -195,7 +205,7 @@ namespace mongo {
        "c" db cmd
        "db" declares presence of a database (ns is set to the db name + '.')
     */
-    void _logOp(const char *opstr, const char *ns, const char *logNs, const BSONObj& obj, BSONObj *patt, bool *b);
+    void _logOp(const char *opstr, const char *ns, const char *logNs, const BSONObj& obj, BSONObj *patt, bool *b, const OpTime &ts);
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt = 0, bool *b = 0);
 
 } // namespace mongo

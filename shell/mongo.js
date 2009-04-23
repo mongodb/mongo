@@ -37,7 +37,7 @@ Mongo.prototype.getDBNames = function(){
 }
 
 Mongo.prototype.toString = function(){
-    return "mongo connection";
+    return "mongo connection to " + this.host;
 }
 
 connect = function( url , user , pass ){

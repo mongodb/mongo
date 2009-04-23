@@ -78,6 +78,7 @@ Handle<Value> mongoInit(const Arguments& args){
     // NOTE I don't believe the conn object will ever be freed.
     args.This()->Set( CONN_STRING , External::New( conn ) );
     args.This()->Set( String::New( "slaveOk" ) , Boolean::New( false ) );
+    args.This()->Set( String::New( "host" ), String::New( host ) );
     
     return v8::Undefined();
 }
