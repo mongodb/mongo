@@ -1,4 +1,4 @@
-// javajstests.cpp : Btree unit tests
+// javajstests.cpp 
 //
 
 /**
@@ -17,7 +17,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../db/javajs.h"
+#include "../scripting/engine.h"
 
 #include "dbtests.h"
 
@@ -30,8 +30,8 @@ namespace JavaJSTests {
             // signal handlers are pre-installed from JNI's perspective.  This allows
             // JNI to catch signals generated within the JVM and forward other signals
             // as appropriate.
-            JavaJS = new JavaJSImpl();
-            javajstest();
+            ScriptEngine::setup();
+            globalScriptEngine->runTest();
         }
     };
     

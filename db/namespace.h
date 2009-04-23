@@ -472,6 +472,10 @@ namespace mongo {
             }
             return false;
         }
+        
+        bool allocated() const {
+            return ht != 0;
+        }   
 
     private:
         boost::filesystem::path path() const;

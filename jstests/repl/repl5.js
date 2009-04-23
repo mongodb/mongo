@@ -4,10 +4,6 @@ var baseName = "jstests_repl5test";
 
 soonCountAtLeast = function( db, coll, count ) {
     assert.soon( function() { 
-                if ( -1 == s.getDBNames().indexOf( db ) )
-                    return false;
-                if ( -1 == s.getDB( db ).getCollectionNames().indexOf( coll ) )
-                    return false;
 //                print( "count: " + s.getDB( db )[ coll ].find().count() );
                 return s.getDB( db )[ coll ].find().count() >= count; 
                 } );    

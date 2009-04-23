@@ -25,7 +25,6 @@
 #include "introspect.h"
 #include "btree.h"
 #include "../util/lruishmap.h"
-#include "javajs.h"
 #include "json.h"
 #include "repl.h"
 #include "replset.h"

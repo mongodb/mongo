@@ -61,6 +61,10 @@ namespace mongo {
             return 0;
         }
 
+        off_t filelen = lseek(fd, 0, SEEK_END);
+        massert( "file size allocation failed", filelen == length );
+        lseek( fd, 0, SEEK_SET );
+        
         view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if ( view == MAP_FAILED ) {
             out() << "  mmap() failed for " << filename << " len:" << length << " errno:" << errno << endl;

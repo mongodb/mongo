@@ -21,9 +21,10 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
-#include "javajs.h"
 #include "../util/unittest.h"
 #include "storage.h"
+
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -78,25 +79,27 @@ namespace mongo {
     class Where {
     public:
         Where() {
+            scope = 0;
             jsScope = 0;
         }
         ~Where() {
-#if !defined(NOJNI)
-            JavaJS->scopeFree(scope);
-#endif
+
+            if ( scope )
+                delete scope;
+
             if ( jsScope )
                 delete jsScope;
             scope = 0;
             func = 0;
         }
-
-        jlong scope, func;
+        
+        Scope * scope;
+        ScriptingFunction func;
         BSONObj *jsScope;
-
+        
         void setFunc(const char *code) {
-#if !defined(NOJNI)
-            func = JavaJS->functionCreate( code );
-#endif
+            massert( "scope has to be created first!" , scope );
+            func = scope->createFunction( code );
         }
 
     };
@@ -145,10 +148,10 @@ namespace mongo {
                 // $where: function()...
                 uassert( "$where occurs twice?", where == 0 );
                 where = new Where();
-                uassert( "$where query, but jni is disabled", JavaJS );
-#if !defined(NOJNI)
-                where->scope = JavaJS->scopeCreate();
-                JavaJS->scopeSetString(where->scope, "$client", database->name.c_str());
+                uassert( "$where query, but no script engine", globalScriptEngine );
+
+                where->scope = globalScriptEngine->createScope();
+                where->scope->setString( "$client", database->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {
                     where->setFunc( e.codeWScopeCode() );
@@ -158,7 +161,7 @@ namespace mongo {
                     const char *code = e.valuestr();
                     where->setFunc(code);
                 }
-#endif
+
                 continue;
             }
 
@@ -554,37 +557,34 @@ namespace mongo {
                 uassert("$where compile error", false);
                 return false; // didn't compile
             }
-#if !defined(NOJNI)
 
             /**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */
             {
-                if ( where->jsScope ) {
-                    JavaJS->scopeInit( where->scope , where->jsScope );
+                if ( where->jsScope ){
+                    where->scope->init( where->jsScope );
                 }
-                JavaJS->scopeSetThis( where->scope, const_cast< BSONObj * >( &jsobj ) );
-                JavaJS->scopeSetObject( where->scope, "obj", const_cast< BSONObj * >( &jsobj ) );
+                where->scope->setThis( const_cast< BSONObj * >( &jsobj ) );
+                where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
             }
             /*else {
             BSONObjBuilder b;
             where->buildSubset(jsobj, b);
             BSONObj temp = b.done();
-            JavaJS->scopeSetObject(where->scope, "obj", &temp);
+            where->scope->setObject( "obj" , &temp );
             }*/
-            int err = JavaJS->invoke(where->scope, where->func);
+            int err = where->scope->invoke( where->func , BSONObj() );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
                 ss << "error on invocation of $where function:\n" 
-                    << JavaJS->scopeGetString(where->scope, "error");
+                   << where->scope->getString( "error" );
                 uassert(ss.str(), false);
                 return false;
             } else if ( err != 0 ) { // ! INVOKE_SUCCESS
-                uassert("error in invocation of $where function", false);
+                uassert("unknown error in invocation of $where function", false);
                 return false;                
             }
-            return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
-#else
-            return false;
-#endif
+            return where->scope->getBoolean( "return" ) != 0;
+
         }
 
         return true;

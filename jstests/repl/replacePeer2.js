@@ -24,10 +24,6 @@ checkWrite = function( m, s ) {
     assert.eq( 1, getCount( m ) );
     s.setSlaveOk();
     assert.soon( function() {
-                if ( -1 == s.getDBNames().indexOf( baseName ) )
-                    return false;
-                if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "z" ) )
-                    return false;
                 return 1 == getCount( s );
                 } );
 }
@@ -55,7 +51,8 @@ doTest = function( signal ) {
     
     checkWrite( r, l );
 
-    assert.eq( 1, l.getDB( "admin" ).runCommand( {replacepeer:1} ).ok );
+    // allow slave to finish initial sync
+    assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( {replacepeer:1} ).ok; } );
     
     // Should not be saved to l.
     writeOne( r );
