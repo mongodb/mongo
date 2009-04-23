@@ -689,6 +689,65 @@ namespace ReplTests {
         }
     };
     
+    class DbIdsTest {
+    public:
+        void run() {
+            dblock lk;
+            setClient( "foo.bar" );
+            
+            s_.reset( new DbIds( "local.temp.DbIdsTest" ) );
+            s_->reset();
+            check( false, false, false );
+
+            s_->set( "a", BSON( "_id" << 4 ), true );
+            check( true, false, false );
+            s_->set( "a", BSON( "_id" << 4 ), false );
+            check( false, false, false );
+            
+            s_->set( "b", BSON( "_id" << 4 ), true );
+            check( false, true, false );
+            s_->set( "b", BSON( "_id" << 4 ), false );
+            check( false, false, false );
+
+            s_->set( "a", BSON( "_id" << 5 ), true );
+            check( false, false, true );
+            s_->set( "a", BSON( "_id" << 5 ), false );
+            check( false, false, false );
+
+            s_->set( "a", BSON( "_id" << 4 ), true );
+            s_->set( "b", BSON( "_id" << 4 ), true );
+            s_->set( "a", BSON( "_id" << 5 ), true );
+            check( true, true, true );
+
+            s_->reset();
+            check( false, false, false );
+        }
+    private:
+        void check( bool one, bool two, bool three ) {
+            ASSERT_EQUALS( one, s_->get( "a", BSON( "_id" << 4 ) ) );
+            ASSERT_EQUALS( two, s_->get( "b", BSON( "_id" << 4 ) ) );
+            ASSERT_EQUALS( three, s_->get( "a", BSON( "_id" << 5 ) ) );            
+        }
+        auto_ptr< DbIds > s_;
+    };
+    
+    class MemIdsTest {
+    public:
+        MemIdsTest() : s_( "MemIdsTest" ) {}
+        void run() {
+            s_.reset();
+            ASSERT( !s_.get( "a", BSON( "_id" << 4 ) ) );
+            ASSERT( !s_.get( "b", BSON( "_id" << 4 ) ) );
+            s_.set( "a", BSON( "_id" << 4 ), true );
+            ASSERT( s_.get( "a", BSON( "_id" << 4 ) ) );
+            ASSERT( !s_.get( "b", BSON( "_id" << 4 ) ) );
+            s_.set( "a", BSON( "_id" << 4 ), false );
+            ASSERT( !s_.get( "a", BSON( "_id" << 4 ) ) );
+        }
+    private:
+        MemIds s_;
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -722,6 +781,7 @@ namespace ReplTests {
             add< Idempotence::MultiPush >();
             add< Idempotence::EmptyPush >();
             add< DeleteOpIsIdBased >();
+            add< DbIdsTest >();
         }
     };
     

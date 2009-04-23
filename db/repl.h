@@ -28,7 +28,14 @@
 
 #pragma once
 
+#include "pdfile.h"
+#include "db.h"
+#include "dbhelpers.h"
+#include "query.h"
+
 #include "../client/dbclient.h"
+
+#include "../util/optime.h"
 
 namespace mongo {
 
@@ -40,81 +47,12 @@ namespace mongo {
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth);
 
-    /* Operation sequence #.  A combination of current second plus an ordinal value.
-    */
-#pragma pack(4)
-    class OpTime {
-        unsigned i;
-        unsigned secs;
-    public:
-        unsigned getSecs() const {
-            return secs;
-        }
-        OpTime(unsigned long long date) {
-            reinterpret_cast<unsigned long long&>(*this) = date;
-        }
-        OpTime(unsigned a, unsigned b) {
-            secs = a;
-            i = b;
-        }
-        OpTime() {
-            secs = 0;
-            i = 0;
-        }
-        static OpTime now();
-
-        /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
-           64 bit "container" for these values.  While these are not really "Dates", that seems a
-           better choice for now than say, Number, which is floating point.  Note the BinData type
-           is perhaps the cleanest choice, lacking a true unsigned64 datatype, but BinData has 5 
-           bytes of overhead.
-        */
-        unsigned long long asDate() const {
-            return *((unsigned long long *) &i);
-        }
-//	  unsigned long long& asDate() { return *((unsigned long long *) &i); }
-
-        bool isNull() {
-            return secs == 0;
-        }
-
-        string toStringLong() const {
-            char buf[64];
-            time_t_to_String(secs, buf);
-            stringstream ss;
-            ss << buf << ' ';
-            ss << hex << secs << ':' << i;
-            return ss.str();
-        }
-
-        string toString() const {
-            stringstream ss;
-            ss << hex << secs << ':' << i;
-            return ss.str();
-        }
-        operator string() const { return toString(); }
-        bool operator==(const OpTime& r) const {
-            return i == r.i && secs == r.secs;
-        }
-        bool operator!=(const OpTime& r) const {
-            return !(*this == r);
-        }
-        bool operator<(const OpTime& r) const {
-            if ( secs != r.secs )
-                return secs < r.secs;
-            return i < r.i;
-        }
-    };
-#pragma pack()
-
     /* A replication exception */
     class SyncException : public DBException {
     public:
         virtual const char* what() const throw() { return "sync exception"; }
     };
     
-    typedef map< string, BSONObjSetDefaultOrder > IdSets;
-
     /* A Source is a source from which we can pull (replicate) data.
        stored in collection local.sources.
 
@@ -209,4 +147,94 @@ namespace mongo {
     void _logOp(const char *opstr, const char *ns, const char *logNs, const BSONObj& obj, BSONObj *patt, bool *b, const OpTime &ts);
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt = 0, bool *b = 0);
 
+    class MemIds {
+    public:
+        MemIds( const char *name ) {}
+        void reset() { imp_.clear(); }
+        bool get( const char *ns, const BSONObj &id ) { return imp_[ ns ].count( id ); }
+        void set( const char *ns, const BSONObj &id, bool val ) {
+            if ( val )
+                imp_[ ns ].insert( id );
+            else
+                imp_[ ns ].erase( id );
+        }
+    private:
+        typedef map< string, BSONObjSetDefaultOrder > IdSets;
+        IdSets imp_;
+    };
+        
+    class DbIds {
+    public:
+        DbIds( const char * name ) : name_( name ) {}
+        void reset() {
+            dbcache c;
+            setClientTempNs( name_ );
+            Helpers::emptyCollection( name_ );
+            Helpers::ensureIndex( name_, BSON( "ns" << 1 << "id" << 1 ), "setIdx" );            
+        }
+        bool get( const char *ns, const BSONObj &id ) {
+            dbcache c;
+            setClientTempNs( name_ );
+            BSONObj temp;
+            return Helpers::findOne( name_, key( ns, id ), temp );                        
+        }
+        void set( const char *ns, const BSONObj &id, bool val ) {
+            dbcache c;
+            setClientTempNs( name_ );
+            if ( val ) {
+                BSONObj temp;
+                if ( !Helpers::findOne( name_, key( ns, id ), temp ) ) {
+                    BSONObj k = key( ns, id );
+                    theDataFileMgr.insert( name_, k );
+                }
+            } else {
+                deleteObjects( name_, key( ns, id ), true, false, false );
+            }            
+        }
+    private:
+        struct dbcache {
+            Database *database_;
+            const char *curNs_;
+            dbcache() : database_( database ), curNs_( curNs ) {}
+            ~dbcache() {
+                database = database_;
+                curNs = curNs_;
+            }
+        };
+        static BSONObj key( const char *ns, const BSONObj &id ) {
+            BSONObjBuilder b;
+            b << "ns" << ns;
+            b.appendAs( id.firstElement(), "id" );
+            return b.obj();
+        }        
+        const char * name_;
+    };
+    
+    class IdTracker {
+    public:
+        IdTracker() :
+        ids_( "local.temp.replIds" ),
+        modIds_( "local.temp.replModIds" ) {
+        }
+        void reset() {
+            ids_.reset();
+            modIds_.reset();
+        }
+        bool haveId( const char *ns, const BSONObj &id ) {
+            return ids_.get( ns, id );
+        }
+        bool haveModId( const char *ns, const BSONObj &id ) {
+            return modIds_.get( ns, id );
+        }
+        void haveId( const char *ns, const BSONObj &id, bool val ) {
+            ids_.set( ns, id, val );
+        }
+        void haveModId( const char *ns, const BSONObj &id, bool val ) {
+            modIds_.set( ns, id, val );
+        }
+    private:
+        DbIds ids_;
+        DbIds modIds_;
+    };
+    
 } // namespace mongo

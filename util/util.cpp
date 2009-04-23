@@ -21,6 +21,7 @@
 #include "unittest.h"
 #include "top.h"
 #include "file_allocator.h"
+#include "optime.h"
 
 namespace mongo {
 
@@ -101,4 +102,7 @@ namespace mongo {
     FileAllocator &theFileAllocator_ = *(new FileAllocator());
     FileAllocator &theFileAllocator() { return theFileAllocator_; }
 #endif
+    
+    OpTime OpTime::last(0, 0);
+    
 } // namespace mongo

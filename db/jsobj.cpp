@@ -1197,4 +1197,11 @@ namespace mongo {
     Labeler::Label NE( "$ne" );
     Labeler::Label SIZE( "$size" );
 
+    void BSONElementManipulator::initTimestamp() {
+        massert( "Expected CurrentTime type", element_.type() == Timestamp );
+        unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
+        if ( timestamp == 0 )
+            timestamp = OpTime::now().asDate();
+    }    
+    
 } // namespace mongo
