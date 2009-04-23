@@ -83,6 +83,14 @@ AddOption('--nojni',
           action="store",
           help="turn off jni support" )
 
+
+AddOption('--usesm',
+          dest='usesm',
+          type="string",
+          nargs=0,
+          action="store",
+          help="use spider monkey for javascript" )
+
 AddOption( "--v8" ,
            dest="v8home",
            type="string",
@@ -153,6 +161,7 @@ debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debu
 debugLogging = not GetOption( "debugBuildAndLogging" ) is None
 noshell = not GetOption( "noshell" ) is None
 nojni = not GetOption( "nojni" ) is None
+usesm = not GetOption( "usesm" ) is None
 
 
 # ------    SOURCE FILE SETUP -----------
@@ -182,7 +191,9 @@ coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.c
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
 serverOnlyFiles += [ "scripting/engine.cpp" ]
 
-if not nojni:
+if usesm:
+    serverOnlyFiles += [ "scripting/engine_spidermonkey.cpp" ]
+elif not nojni:
     serverOnlyFiles += [ "scripting/engine_java.cpp" ]
 else:
     serverOnlyFiles += [ "scripting/engine_none.cpp" ]
@@ -353,7 +364,6 @@ if useJavaHome:
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
 
-
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas" )
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
@@ -378,6 +388,9 @@ if nix:
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
+    if usesm:
+        env.Append( CPPDEFINES=[ "XP_UNIX" ] )
+            
 
 # --- check system ---
 
@@ -499,8 +512,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if nix and needPcre:
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
-
+        
     myenv["_HAVEPCAP"] = myCheckLib( "pcap", staticOnly=release )
+
+    if usesm:
+        myCheckLib( "js" , True )
 
     if shell:
         haveReadLine = False
