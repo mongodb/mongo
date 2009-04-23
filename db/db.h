@@ -183,6 +183,10 @@ namespace mongo {
         return jc;
     }
 
+    inline bool clientIsEmpty() {
+        return !database->namespaceIndex.allocated();
+    }
+    
     struct dbtemprelease {
         string clientname;
         string clientpath;

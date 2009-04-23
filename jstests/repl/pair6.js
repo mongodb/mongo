@@ -26,12 +26,6 @@ disconnect = function() {
 checkCount = function( m, c ) {
     m.setSlaveOk();
     assert.soon( function() {
-                if ( -1 == m.getDBNames().indexOf( baseName ) ) {
-                    return false;
-                }
-                if ( -1 == m.getDB( baseName ).getCollectionNames().indexOf( baseName ) ) {
-                    return false;
-                }
                 actual = m.getDB( baseName ).getCollection( baseName ).find().count();
                 print( actual );
                 return c == actual; },

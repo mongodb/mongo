@@ -856,11 +856,12 @@ namespace mongo {
             return;
         }
 
+        bool empty = clientIsEmpty();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
-        log( 6 ) << "ns: " << ns << ", justCreated: " << justCreated << ", incompleteClone: " << incompleteClone << endl;
+        log( 6 ) << "ns: " << ns << ", justCreated: " << justCreated << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
         
-        if ( justCreated || incompleteClone ) {
+        if ( justCreated || empty || incompleteClone ) {
             if ( incompleteClone ) {
                 log() << "An earlier initial clone of '" << clientName << "' did not complete, will resync." << endl;
             }

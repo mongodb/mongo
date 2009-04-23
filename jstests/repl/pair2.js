@@ -11,11 +11,7 @@ ismaster = function( n ) {
 soonCount = function( count ) {
     assert.soon( function() { 
 //                print( "counting" );
-                if ( -1 == l.getDBNames().indexOf( baseName ) )
-                    return false;
-                if ( -1 == l.getDB( baseName ).getCollectionNames().indexOf( "z" ) )
-                    return false;
-//                print( "counted: " + l.getDB( baseName ).z.find().count() );
+////                print( "counted: " + l.getDB( baseName ).z.find().count() );
                 return l.getDB( baseName ).z.find().count() == count; 
                 } );    
 }

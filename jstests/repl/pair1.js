@@ -28,10 +28,6 @@ checkWrite = function( m, s ) {
 check = function( s ) {
     s.setSlaveOk();
     assert.soon( function() {
-                if ( -1 == s.getDBNames().indexOf( baseName ) )
-                    return false;
-                if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "z" ) )
-                    return false;
                 return 1 == getCount( s );
                 } );    
 }

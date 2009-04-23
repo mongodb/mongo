@@ -24,10 +24,6 @@ checkWrite = function( m, s ) {
     assert.eq( 1, getCount( m ) );
     s.setSlaveOk();
     assert.soon( function() {
-                if ( -1 == s.getDBNames().indexOf( baseName ) )
-                    return false;
-                if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "z" ) )
-                    return false;
                 return 1 == getCount( s );
                 } );
 }

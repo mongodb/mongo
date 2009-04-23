@@ -5,10 +5,6 @@ var baseName = "jstests_repl3test";
 soonCount = function( count ) {
     assert.soon( function() { 
 //                print( "check count" );
-                if ( -1 == s.getDBNames().indexOf( baseName ) )
-                    return false;
-                if ( -1 == s.getDB( baseName ).getCollectionNames().indexOf( "a" ) )
-                    return false;
 //                print( "count: " + s.getDB( baseName ).z.find().count() );
                 return s.getDB( baseName ).a.find().count() == count; 
                 } );    
@@ -38,9 +34,6 @@ doTest = function( signal ) {
     sleep( 15000 );
     
     // Need the 2 additional seconds timeout, since commands don't work on an 'allDead' node.
-    assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );
-    assert.soon( function() { return s.getDB( baseName ).getCollectionNames().indexOf( "a" ) != -1; } );
-
     soonCount( 1001 );
     as = s.getDB( baseName ).a
     assert.eq( 1, as.find( { i: 0 } ).count() );
