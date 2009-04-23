@@ -90,7 +90,7 @@ doTest = function( signal ) {
     
     writeOne( l );
     
-    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
+    r = startMongoProgram( "mongod", "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
     
     assert.soon( function() {
                 lm = ismaster( l );
@@ -115,7 +115,7 @@ doTest = function( signal ) {
                 return ( rm == 1 );
                 } );
     
-    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
+    l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
     
     assert.soon( function() {
                 lm = ismaster( l );
