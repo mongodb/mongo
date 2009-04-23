@@ -158,6 +158,15 @@ namespace mongo {
             else
                 imp_[ ns ].erase( id );
         }
+        long long roughSize() const {
+            long long size = 0;
+            for( map< string, BSONObjSetDefaultOrder >::const_iterator i = imp_.begin();
+                i != imp_.end(); ++i )
+                for( BSONObjSetDefaultOrder::const_iterator j = i->second.begin();
+                    j != i->second.end(); ++j )
+                    size += sizeof( BSONObj );
+            return size;
+        }
     private:
         typedef map< string, BSONObjSetDefaultOrder > IdSets;
         IdSets imp_;

@@ -735,14 +735,25 @@ namespace ReplTests {
     public:
         MemIdsTest() : s_( "MemIdsTest" ) {}
         void run() {
+            int n = sizeof( BSONObj );
+            
             s_.reset();
+            ASSERT_EQUALS( 0, s_.roughSize() );
             ASSERT( !s_.get( "a", BSON( "_id" << 4 ) ) );
             ASSERT( !s_.get( "b", BSON( "_id" << 4 ) ) );
             s_.set( "a", BSON( "_id" << 4 ), true );
+            ASSERT_EQUALS( n, s_.roughSize() );
             ASSERT( s_.get( "a", BSON( "_id" << 4 ) ) );
             ASSERT( !s_.get( "b", BSON( "_id" << 4 ) ) );
             s_.set( "a", BSON( "_id" << 4 ), false );
+            ASSERT_EQUALS( 0, s_.roughSize() );
             ASSERT( !s_.get( "a", BSON( "_id" << 4 ) ) );
+
+            s_.set( "a", BSON( "_id" << 4 ), true );
+            s_.set( "b", BSON( "_id" << 4 ), true );
+            s_.set( "b", BSON( "_id" << 100 ), true );
+            s_.set( "b", BSON( "_id" << 101 ), true );
+            ASSERT_EQUALS( n * 4, s_.roughSize() );
         }
     private:
         MemIds s_;
@@ -782,6 +793,7 @@ namespace ReplTests {
             add< Idempotence::EmptyPush >();
             add< DeleteOpIsIdBased >();
             add< DbIdsTest >();
+            add< MemIdsTest >();
         }
     };
     
