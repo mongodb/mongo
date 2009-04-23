@@ -112,6 +112,8 @@ namespace mongo {
     public:
         virtual const char* what() const throw() { return "sync exception"; }
     };
+    
+    typedef map< string, BSONObjSetDefaultOrder > IdSets;
 
     /* A Source is a source from which we can pull (replicate) data.
        stored in collection local.sources.
@@ -126,8 +128,7 @@ namespace mongo {
     class ReplSource {
         bool resync(string db);
         bool sync_pullOpLog();
-        typedef map< string, BSONObjSetDefaultOrder > IdSets;
-        void sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail);
+        void sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail);
         
         auto_ptr<DBClientConnection> conn;
         auto_ptr<DBClientCursor> cursor;
@@ -143,7 +144,7 @@ namespace mongo {
         bool connect();
         // returns possibly unowned id spec for the operation.
         static BSONObj idForOp( const BSONObj &op, bool &mod );
-        static void updateSetsWithOp( const BSONObj &op, IdSets &changed, IdSets &modChanged );
+        static void updateSetsWithOp( const BSONObj &op );
         // call without the db mutex
         void syncToTailOfRemoteLog();
         // call with the db mutex
@@ -152,7 +153,7 @@ namespace mongo {
         void resetSlave();
         // call with the db mutex
         // returns false if the slave has been reset
-        bool updateSetsWithLocalOps( IdSets &ids, IdSets &modIds, OpTime &localLogTail, bool unlock );
+        bool updateSetsWithLocalOps( OpTime &localLogTail, bool unlock );
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
         
     public:

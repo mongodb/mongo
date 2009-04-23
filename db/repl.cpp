@@ -69,6 +69,9 @@ namespace mongo {
     extern bool autoresync;
     time_t lastForcedResync = 0;
     
+    IdSets localChangedSinceLastPass;
+    IdSets localModChangedSinceLastPass;
+    
 } // namespace mongo
 
 #include "replset.h"
@@ -810,7 +813,7 @@ namespace mongo {
          ...
        see logOp() comments.
     */
-    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail) {
+    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail) {
         log( 6 ) << "processing op: " << op << endl;
         // skip no-op
         if ( op.getStringField( "op" )[ 0 ] == 'n' )
@@ -838,7 +841,7 @@ namespace mongo {
         if ( localLogTail && replPair && replPair->state == ReplPair::State_Master ) {
             // NOTE: For now, just locking this whole loop.  Alternatively we could 
             // do a first loop unlocking periodically then a second loop locked.
-            updateSetsWithLocalOps( ids, modIds, *localLogTail, false );
+            updateSetsWithLocalOps( *localLogTail, false );
         }
 
         if ( replAllDead ) {
@@ -886,9 +889,9 @@ namespace mongo {
         } else {
             bool mod;
             BSONObj id = idForOp( op, mod );
-            if ( ids[ ns ].count( id ) == 0 ) {
+            if ( localChangedSinceLastPass[ ns ].count( id ) == 0 ) {
                 applyOperation( op );    
-            } else if ( modIds[ ns ].count( id ) != 0 ) {
+            } else if ( localModChangedSinceLastPass[ ns ].count( id ) != 0 ) {
                 BSONObj existing;
                 if ( Helpers::findOne( ns, id, existing ) )
                     logOp( "i", ns, existing );
@@ -930,18 +933,20 @@ namespace mongo {
         return BSONObj();
     }
     
-    void ReplSource::updateSetsWithOp( const BSONObj &op, IdSets &changed, IdSets &modChanged ) {
+    void ReplSource::updateSetsWithOp( const BSONObj &op ) {
         bool mod;
         BSONObj id = idForOp( op, mod );
         if ( !id.isEmpty() ) {
             const char *ns = op.getStringField( "ns" );
             id = id.getOwned();
             if ( mod ) {
-                if ( changed[ ns ].count( id ) == 0 )
-                    modChanged[ ns ].insert( id );
-            } else
-                modChanged.erase( id );
-            changed[ ns ].insert( id );
+                if ( localChangedSinceLastPass[ ns ].count( id ) == 0 ) {
+                    localModChangedSinceLastPass[ ns ].insert( id );
+                }
+            } else {
+                localModChangedSinceLastPass[ ns ].erase( id );
+            }
+            localChangedSinceLastPass[ ns ].insert( id );
         }        
     }
     
@@ -960,6 +965,7 @@ namespace mongo {
         auto_ptr< Cursor > c = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         if ( c->ok() )
             lastSavedLocalTs_ = OpTime( c->current().getField( "ts" ).date() );        
+        log( 3 ) << "updated lastSavedLocalTs_ to: " << lastSavedLocalTs_ << endl;
     }
     
     void ReplSource::resetSlave() {
@@ -974,7 +980,7 @@ namespace mongo {
                 conn->simpleCommand( "admin", 0, "forcedead" ) );        
     }
     
-    bool ReplSource::updateSetsWithLocalOps( IdSets &ids, IdSets &modIds, OpTime &localLogTail, bool unlock ) {
+    bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool unlock ) {
         setClient( "local.oplog.$main" );
         auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         bool first = true;
@@ -987,7 +993,7 @@ namespace mongo {
             }
             if ( !( lastSavedLocalTs_ < ts ) )
                 break;
-            updateSetsWithOp( op, ids, modIds );
+            updateSetsWithOp( op );
             if ( unlock ) {
                 dbtemprelease t;
             }
@@ -996,8 +1002,8 @@ namespace mongo {
             // local log filled up
             dbtemprelease t;
             log() << "local master log filled, forcing slave resync" << endl;
-            ids.clear();
-            modIds.clear();
+            localChangedSinceLastPass.clear();
+            localModChangedSinceLastPass.clear();
             resetSlave();
             return false;
         }        
@@ -1016,8 +1022,8 @@ namespace mongo {
             c = 0;
         }
 
-        IdSets localChangedSinceLastPass;
-        IdSets localModChangedSinceLastPass;
+        localChangedSinceLastPass.clear();
+        localModChangedSinceLastPass.clear();
         OpTime localLogTail;
 
         bool initial = syncedTo.isNull();
@@ -1081,15 +1087,21 @@ namespace mongo {
                 b.append("ns", *i + '.');
                 b.append("op", "db");
                 BSONObj op = b.done();
-                sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass, 0);
+                sync_pullOpLog_applyOperation(op, 0);
             }
         }
 
         if ( !c->more() ) {
             if ( tailing ) {
                 log(2) << "repl: tailing & no new activity\n";
-            } else
+            } else {
                 log() << "pull:   " << ns << " oplog is empty\n";
+            }
+            {
+                dblock lk;
+                updateLastSavedLocalTs();
+                save();            
+            }
             sleepsecs(3);
             return true;
         }
@@ -1119,7 +1131,7 @@ namespace mongo {
             }            
             
             dblock lk;
-            if ( !updateSetsWithLocalOps( localChangedSinceLastPass, localModChangedSinceLastPass, localLogTail, true ) )
+            if ( !updateSetsWithLocalOps( localLogTail, true ) )
                 return true;
         }
         
@@ -1130,7 +1142,7 @@ namespace mongo {
                 log(1) << "pull:   initial run\n";
             else
                 assert( syncedTo < nextOpTime );
-            sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass, &localLogTail);
+            sync_pullOpLog_applyOperation(op, &localLogTail);
             n++;
         }
         else if ( nextOpTime != syncedTo ) {
@@ -1189,7 +1201,7 @@ namespace mongo {
                     uassert("bad 'ts' value in sources", false);
                 }
 
-                sync_pullOpLog_applyOperation(op, localChangedSinceLastPass, localModChangedSinceLastPass, &localLogTail);
+                sync_pullOpLog_applyOperation(op, &localLogTail);
                 n++;
             }
         }
