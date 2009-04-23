@@ -334,7 +334,7 @@ namespace mongo {
         return res;
     }
 
-    int JavaJSImpl::scopeInit( jlong id , BSONObj * obj ) {
+    int JavaJSImpl::scopeInit( jlong id , const BSONObj * obj ) {
         if ( ! obj )
             return 0;
 
@@ -346,7 +346,7 @@ namespace mongo {
         return res;
     }
 
-    int JavaJSImpl::scopeSetThis( jlong id , BSONObj * obj ) {
+    int JavaJSImpl::scopeSetThis( jlong id , const BSONObj * obj ) {
         if ( ! obj )
             return 0;
 

@@ -54,8 +54,8 @@ namespace mongo {
         ~JavaJSImpl();
 
         jlong scopeCreate();
-        int scopeInit( jlong id , BSONObj * obj );
-        int scopeSetThis( jlong id , BSONObj * obj );
+        int scopeInit( jlong id , const BSONObj * obj );
+        int scopeSetThis( jlong id , const BSONObj * obj );
         jboolean scopeReset( jlong id );
         void scopeFree( jlong id );
 
@@ -160,9 +160,13 @@ namespace mongo {
             JavaJS->scopeReset(s);
         }
 
+        void init( BSONObj * o ) {
+            JavaJS->scopeInit( s , o );
+        }
+        
         void init( const char * data ) {
             BSONObj o( data , 0 );
-            JavaJS->scopeInit( s , & o );
+            init( &o );
         }
 
         double getNumber(const char *field) {
@@ -181,6 +185,10 @@ namespace mongo {
             return JavaJS->scopeGetType(s,field);
         }
 
+        void setThis( const BSONObj * obj ){
+            JavaJS->scopeSetThis( s , obj );
+        }
+
         void setNumber(const char *field, double val ) {
             JavaJS->scopeSetNumber(s,field,val);
         }
@@ -192,6 +200,10 @@ namespace mongo {
         }
         void setBoolean(const char *field, jboolean val ) {
             JavaJS->scopeSetBoolean(s,field,val);
+        }
+        
+        jlong createFunction( const char * code ){
+            return JavaJS->functionCreate( code );
         }
 
         int invoke(jlong function) {

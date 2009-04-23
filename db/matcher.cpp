@@ -78,24 +78,28 @@ namespace mongo {
     class Where {
     public:
         Where() {
+            scope = 0;
             jsScope = 0;
         }
         ~Where() {
 #if !defined(NOJNI)
-            JavaJS->scopeFree(scope);
+            if ( scope )
+                delete scope;
 #endif
             if ( jsScope )
                 delete jsScope;
             scope = 0;
             func = 0;
         }
-
-        jlong scope, func;
+        
+        Scope * scope;
+        jlong func;
         BSONObj *jsScope;
-
+        
         void setFunc(const char *code) {
 #if !defined(NOJNI)
-            func = JavaJS->functionCreate( code );
+            massert( "scope has to be created first!" , scope );
+            func = scope->createFunction( code );
 #endif
         }
 
@@ -147,8 +151,8 @@ namespace mongo {
                 where = new Where();
                 uassert( "$where query, but jni is disabled", JavaJS );
 #if !defined(NOJNI)
-                where->scope = JavaJS->scopeCreate();
-                JavaJS->scopeSetString(where->scope, "$client", database->name.c_str());
+                where->scope = new Scope();
+                where->scope->setString( "$client", database->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {
                     where->setFunc( e.codeWScopeCode() );
@@ -558,30 +562,30 @@ namespace mongo {
 
             /**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */
             {
-                if ( where->jsScope ) {
-                    JavaJS->scopeInit( where->scope , where->jsScope );
+                if ( where->jsScope ){
+                    where->scope->init( where->jsScope );
                 }
-                JavaJS->scopeSetThis( where->scope, const_cast< BSONObj * >( &jsobj ) );
-                JavaJS->scopeSetObject( where->scope, "obj", const_cast< BSONObj * >( &jsobj ) );
+                where->scope->setThis( const_cast< BSONObj * >( &jsobj ) );
+                where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
             }
             /*else {
             BSONObjBuilder b;
             where->buildSubset(jsobj, b);
             BSONObj temp = b.done();
-            JavaJS->scopeSetObject(where->scope, "obj", &temp);
+            where->scope->setObject( "obj" , &temp );
             }*/
-            int err = JavaJS->invoke(where->scope, where->func);
+            int err = where->scope->invoke( where->func );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
                 ss << "error on invocation of $where function:\n" 
-                    << JavaJS->scopeGetString(where->scope, "error");
+                   << where->scope->getString( "error" );
                 uassert(ss.str(), false);
                 return false;
             } else if ( err != 0 ) { // ! INVOKE_SUCCESS
-                uassert("error in invocation of $where function", false);
+                uassert("unknown error in invocation of $where function", false);
                 return false;                
             }
-            return JavaJS->scopeGetBoolean(where->scope, "return") != 0;
+            return where->scope->getBoolean( "return" ) != 0;
 #else
             return false;
 #endif
