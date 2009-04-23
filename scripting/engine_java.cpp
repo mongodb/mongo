@@ -319,7 +319,7 @@ namespace mongo {
         return res;
     }
 
-    int JavaJSImpl::scopeSetObject( jlong id , const char * field , BSONObj * obj ) {
+    int JavaJSImpl::scopeSetObject( jlong id , const char * field , const BSONObj * obj ) {
         jobject bb = 0;
         if ( obj ) {
             bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );

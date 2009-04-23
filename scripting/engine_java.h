@@ -65,7 +65,7 @@ namespace mongo {
 
         int scopeSetNumber( jlong id , const char * field , double val );
         int scopeSetString( jlong id , const char * field , const char * val );
-        int scopeSetObject( jlong id , const char * field , BSONObj * obj );
+        int scopeSetObject( jlong id , const char * field , const BSONObj * obj );
         int scopeSetBoolean( jlong id , const char * field , jboolean val );
 
         jlong functionCreate( const char * code );
@@ -191,7 +191,7 @@ namespace mongo {
         void setString(const char *field, const char * val ) {
             JavaJS->scopeSetString(s,field,val);
         }
-        void setObject(const char *field, BSONObj& obj ) {
+        void setObject(const char *field, const BSONObj& obj ) {
             JavaJS->scopeSetObject(s,field,&obj);
         }
         void setBoolean(const char *field, bool val ) {
@@ -202,7 +202,8 @@ namespace mongo {
             return JavaJS->functionCreate( code );
         }
 
-        int invoke( ScriptingFunction function) {
+        int invoke( ScriptingFunction function , const BSONObj& args ){
+            setObject( "args" , args );
             return JavaJS->invoke(s,function);
         }
 

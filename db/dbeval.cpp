@@ -67,24 +67,27 @@ namespace mongo {
             errmsg = "compile failed";
             return false;
         }
-
+        
         if ( e.type() == CodeWScope )
             s->init( e.codeWScopeScopeData() );
         s->setString("$client", database->name.c_str());
-        BSONElement args = cmd.findElement("args");
-        if ( args.type() == Array ) {
-            BSONObj eo = args.embeddedObject();
-            if ( edebug ) {
-                out() << "args:" << eo.toString() << endl;
-                out() << "code:\n" << code << endl;
+
+        BSONObj args;
+        {
+            BSONElement argsElement = cmd.findElement("args");
+            if ( argsElement.type() == Array ) {
+                args = argsElement.embeddedObject();
+                if ( edebug ) {
+                    out() << "args:" << args.toString() << endl;
+                    out() << "code:\n" << code << endl;
+                }
             }
-            s->setObject("args", eo);
         }
 
         int res;
         {
             Timer t;
-            res = s->invoke(f);
+            res = s->invoke(f,args);
             int m = t.millis();
             if ( m > 100 ) {
                 out() << "dbeval slow, time: " << dec << m << "ms " << ns << endl;

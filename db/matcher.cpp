@@ -575,7 +575,7 @@ namespace mongo {
             BSONObj temp = b.done();
             where->scope->setObject( "obj" , &temp );
             }*/
-            int err = where->scope->invoke( where->func );
+            int err = where->scope->invoke( where->func , BSONObj() );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
                 ss << "error on invocation of $where function:\n" 
