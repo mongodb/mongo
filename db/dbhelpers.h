@@ -37,7 +37,7 @@ namespace mongo {
            Note: use ensureHaveIdIndex() for the _id index: it is faster.
            Note: does nothing if collection does not yet exist.
         */
-        static void ensureIndex(const char *ns, BSONObj keyPattern, const char *name);
+        static void ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name);
 
         /* fetch a single object from collection ns that matches query.
            set your db context first.

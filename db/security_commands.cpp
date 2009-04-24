@@ -107,7 +107,7 @@ namespace mongo {
 
             static BSONObj userPattern = fromjson("{\"user\":1}");
             string systemUsers = database->name + ".system.users";
-            OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, "user_1");
+            OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
 
             BSONObj userObj;
             {

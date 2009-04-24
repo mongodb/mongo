@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-    void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, const char *name) {
+    void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
         NamespaceDetails *d = nsdetails(ns);
         if( d == 0 )
             return;
@@ -46,6 +46,7 @@ namespace mongo {
         b.append("name", name);
         b.append("ns", ns);
         b.append("key", keyPattern);
+        b.appendBool("unique", unique);
         BSONObj o = b.done();
 
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
@@ -105,7 +106,7 @@ namespace mongo {
 
         {
             BSONObj kp = fromjson("{\"x\":1}");
-            Helpers::ensureIndex("dwight.foo", kp, "x_1");
+            Helpers::ensureIndex("dwight.foo", kp, false, "x_1");
         }
 
         cout << Helpers::findOne("dwight.foo", q, result, true) << endl;

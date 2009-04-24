@@ -564,8 +564,8 @@ namespace QueryOptimizerTests {
         class Optimal : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "b_2" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "b_2" );
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), BSONObj() );
                 ASSERT_EQUALS( 1, s.nPlans() );                
             }
@@ -574,8 +574,8 @@ namespace QueryOptimizerTests {
         class NoOptimal : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ASSERT_EQUALS( 3, s.nPlans() );
             }
@@ -584,8 +584,8 @@ namespace QueryOptimizerTests {
         class NoSpec : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 QueryPlanSet s( ns(), BSONObj(), BSONObj() );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
@@ -594,8 +594,8 @@ namespace QueryOptimizerTests {
         class HintSpec : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 BSONObj b = BSON( "hint" << BSON( "a" << 1 ) );
                 BSONElement e = b.firstElement();
                 QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
@@ -606,8 +606,8 @@ namespace QueryOptimizerTests {
         class HintName : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 BSONObj b = BSON( "hint" << "a_1" );
                 BSONElement e = b.firstElement();
                 QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
@@ -618,8 +618,8 @@ namespace QueryOptimizerTests {
         class NaturalHint : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 BSONObj b = BSON( "hint" << BSON( "$natural" << 1 ) );
                 BSONElement e = b.firstElement();
                 QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ), &e );
@@ -630,8 +630,8 @@ namespace QueryOptimizerTests {
         class NaturalSort : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "b_2" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "b_2" );
                 QueryPlanSet s( ns(), BSON( "a" << 1 ), BSON( "$natural" << 1 ) );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
@@ -650,8 +650,8 @@ namespace QueryOptimizerTests {
         class Count : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 string err;
                 ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 BSONObj one = BSON( "a" << 1 );
@@ -685,8 +685,8 @@ namespace QueryOptimizerTests {
         class UnhelpfulIndex : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 QueryPlanSet s( ns(), BSON( "a" << 1 << "c" << 2 ), BSONObj() );
                 ASSERT_EQUALS( 2, s.nPlans() );                
             }
@@ -695,8 +695,8 @@ namespace QueryOptimizerTests {
         class SingleException : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ASSERT_EQUALS( 3, s.nPlans() );
                 bool threw = false;
@@ -736,8 +736,8 @@ namespace QueryOptimizerTests {
         class AllException : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ASSERT_EQUALS( 3, s.nPlans() );
                 auto_ptr< TestOp > t( new TestOp() );
@@ -763,13 +763,13 @@ namespace QueryOptimizerTests {
         class SaveGoodIndex : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
-                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), "b_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 nPlans( 3 );
                 runQuery();
                 nPlans( 1 );
                 nPlans( 1 );
-                Helpers::ensureIndex( ns(), BSON( "c" << 1 ), "c_1" );
+                Helpers::ensureIndex( ns(), BSON( "c" << 1 ), false, "c_1" );
                 nPlans( 3 );
                 runQuery();
                 nPlans( 1 );
@@ -835,7 +835,7 @@ namespace QueryOptimizerTests {
         class TryAllPlansOnErr : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
 
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ScanOnlyTestOp op;
@@ -881,7 +881,7 @@ namespace QueryOptimizerTests {
                 BSONObj result;
                 ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result ) );
                 ASSERT( !Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ) );                
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ) );                
             }
         };
@@ -889,7 +889,7 @@ namespace QueryOptimizerTests {
         class Delete : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 for( int i = 0; i < 200; ++i ) {
                     BSONObj two = BSON( "a" << 2 );
                     theDataFileMgr.insert( ns(), two );
@@ -905,7 +905,7 @@ namespace QueryOptimizerTests {
         class DeleteOneScan : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "_id" << 1 ), "_id_1" );
+                Helpers::ensureIndex( ns(), BSON( "_id" << 1 ), false, "_id_1" );
                 BSONObj one = BSON( "_id" << 3 << "a" << 1 );
                 BSONObj two = BSON( "_id" << 2 << "a" << 1 );
                 BSONObj three = BSON( "_id" << 1 << "a" << -1 );
@@ -921,7 +921,7 @@ namespace QueryOptimizerTests {
         class DeleteOneIndex : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a" );
                 BSONObj one = BSON( "a" << 2 << "_id" << 0 );
                 BSONObj two = BSON( "a" << 1 << "_id" << 1 );
                 BSONObj three = BSON( "a" << 0 << "_id" << 2 );
@@ -937,7 +937,7 @@ namespace QueryOptimizerTests {
         class TryOtherPlansBeforeFinish : public Base {
         public:
             void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), "a_1" );
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 for( int i = 0; i < 100; ++i ) {
                     for( int j = 0; j < 2; ++j ) {
                         BSONObj temp = BSON( "a" << 100 - i - 1 << "b" << i );
