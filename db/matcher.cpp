@@ -21,9 +21,10 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
-#include "javajs.h"
 #include "../util/unittest.h"
 #include "storage.h"
+
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -82,10 +83,10 @@ namespace mongo {
             jsScope = 0;
         }
         ~Where() {
-#if !defined(NOJNI)
+
             if ( scope )
                 delete scope;
-#endif
+
             if ( jsScope )
                 delete jsScope;
             scope = 0;
@@ -93,14 +94,12 @@ namespace mongo {
         }
         
         Scope * scope;
-        jlong func;
+        ScriptingFunction func;
         BSONObj *jsScope;
         
         void setFunc(const char *code) {
-#if !defined(NOJNI)
             massert( "scope has to be created first!" , scope );
             func = scope->createFunction( code );
-#endif
         }
 
     };
@@ -149,9 +148,9 @@ namespace mongo {
                 // $where: function()...
                 uassert( "$where occurs twice?", where == 0 );
                 where = new Where();
-                uassert( "$where query, but jni is disabled", JavaJS );
-#if !defined(NOJNI)
-                where->scope = new Scope();
+                uassert( "$where query, but no script engine", globalScriptEngine );
+
+                where->scope = globalScriptEngine->createScope();
                 where->scope->setString( "$client", database->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {
@@ -162,7 +161,7 @@ namespace mongo {
                     const char *code = e.valuestr();
                     where->setFunc(code);
                 }
-#endif
+
                 continue;
             }
 
@@ -558,7 +557,6 @@ namespace mongo {
                 uassert("$where compile error", false);
                 return false; // didn't compile
             }
-#if !defined(NOJNI)
 
             /**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */
             {
@@ -574,7 +572,7 @@ namespace mongo {
             BSONObj temp = b.done();
             where->scope->setObject( "obj" , &temp );
             }*/
-            int err = where->scope->invoke( where->func );
+            int err = where->scope->invoke( where->func , BSONObj() );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
                 ss << "error on invocation of $where function:\n" 
@@ -586,9 +584,7 @@ namespace mongo {
                 return false;                
             }
             return where->scope->getBoolean( "return" ) != 0;
-#else
-            return false;
-#endif
+
         }
 
         return true;

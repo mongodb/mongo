@@ -21,7 +21,6 @@
 
 #include "dbtests.h"
 
-#include "../db/javajs.h"
 #include "../util/file_allocator.h"
 
 #include <unittest/Registry.hpp>
@@ -93,7 +92,7 @@ int main( int argc, char** argv ) {
 
     // NOTE Starting JNI changes global state (for example, locale and FPU precision);
     // make sure all tests run with this setup, by running javajs tests first.
-    tests.add( javajsTests(), "javajs" );
+    tests.add( jsTests(), "js" );
 
     tests.add( btreeTests(), "btree" );
     tests.add( jsobjTests(), "jsobj" );

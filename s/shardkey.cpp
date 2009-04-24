@@ -496,10 +496,20 @@ normal:
 
     class ShardKeyUnitTest : public UnitTest {
     public:
-        void hsk() { 
+        void hasshardkeytest() { 
             BSONObj x = fromjson("{ zid : \"abcdefg\", num: 1.0, name: \"eliot\" }");
             ShardKeyPattern k( BSON( "num" << 1 ) );
             assert( k.hasShardKey(x) );
+            assert( !k.hasShardKey( fromjson("{foo:'a'}") ) );
+
+            // try compound key
+            {
+                ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
+                assert( k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',b:9,k:99}") ) );
+                assert( !k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',bb:9,k:99}") ) );
+                assert( !k.hasShardKey( fromjson("{k:99}") ) );
+            }
+
         }
         void rfq() {
             ShardKeyPattern k( BSON( "key" << 1 ) );
@@ -552,7 +562,7 @@ normal:
         }
         void testGlobal(){
             ShardKeyPattern k( fromjson( "{num:1}" ) );
-            cout << "global middle:" << k.middle( k.globalMin() , k.globalMax() ) << endl;
+            DEV cout << "global middle:" << k.middle( k.globalMin() , k.globalMax() ) << endl;
         }
         void div(const char *a, const char *res) { 
             OID A,RES;
@@ -580,7 +590,7 @@ normal:
             assert( s > a );
             assert( s < b );
         }
-        void ms() { 
+        void middlestrtest() { 
             checkstr("a\377", "b");
             checkstr("a\377\377", "b");
             checkstr("a", "b");
@@ -598,9 +608,17 @@ normal:
             assert( k.canOrder( fromjson("{a:1,b:1}") ) == 0 );
             assert( k.canOrder( fromjson("{a:-1,b:1}") ) == -1 );
         }
+        void extractkeytest() { 
+            ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
+
+            BSONObj x = fromjson("{a:1,b:2,c:3}");
+            assert( k.extractKey( fromjson("{a:1,b:2,c:3}") ).woEqual(x) );
+            assert( k.extractKey( fromjson("{b:2,c:3,a:1}") ).woEqual(x) );
+        }
         void run(){
+            extractkeytest();
             oid();
-            ms();
+            middlestrtest();
 
             ShardKeyPattern k( BSON( "key" << 1 ) );
             
@@ -617,7 +635,7 @@ normal:
             assert( k.compare( max , min ) > 0 );
             assert( k.compare( min , min ) == 0 );
             
-            hsk();
+            hasshardkeytest();
             assert( k.hasShardKey( k1 ) );
             assert( ! k.hasShardKey( BSON( "key2" << 1 ) ) );
 

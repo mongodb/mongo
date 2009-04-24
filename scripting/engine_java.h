@@ -1,4 +1,4 @@
-// javajs.h
+// engine_java.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -22,8 +22,6 @@
 
 #include "../stdafx.h"
 
-#define J_USE_OBJ
-
 #include <jni.h>
 #include <boost/thread/tss.hpp>
 #include <errno.h>
@@ -33,14 +31,14 @@
 #include <dirent.h>
 #endif
 
-#include "jsobj.h"
+#include "../db/jsobj.h"
+
+#include "engine.h"
 
 namespace mongo {
 
     void jasserted(const char *msg, const char *file, unsigned line);
 #define jassert(_Expression) if ( ! ( _Expression ) ){ jasserted(#_Expression, __FILE__, __LINE__); }
-
-    int javajstest();
 
     const char * findEd();
     const char * findEd(const char *);
@@ -48,7 +46,7 @@ namespace mongo {
 
     class BSONObj;
 
-    class JavaJSImpl {
+    class JavaJSImpl : public ScriptEngine {
     public:
         JavaJSImpl(const char * = 0);
         ~JavaJSImpl();
@@ -67,7 +65,7 @@ namespace mongo {
 
         int scopeSetNumber( jlong id , const char * field , double val );
         int scopeSetString( jlong id , const char * field , const char * val );
-        int scopeSetObject( jlong id , const char * field , BSONObj * obj );
+        int scopeSetObject( jlong id , const char * field , const BSONObj * obj );
         int scopeSetBoolean( jlong id , const char * field , jboolean val );
 
         jlong functionCreate( const char * code );
@@ -88,6 +86,9 @@ namespace mongo {
             _jvm->DetachCurrentThread();
         }
 
+        Scope * createScope();
+
+        void runTest();
     private:
 
         jobject create( const char * name ) {
@@ -147,12 +148,12 @@ namespace mongo {
     extern JavaJSImpl *JavaJS;
 
 // a javascript "scope"
-    class Scope {
+    class JavaScope : public Scope {
     public:
-        Scope() {
+        JavaScope() {
             s = JavaJS->scopeCreate();
         }
-        ~Scope() {
+        virtual ~JavaScope() {
             JavaJS->scopeFree(s);
             s = 0;
         }
@@ -164,18 +165,13 @@ namespace mongo {
             JavaJS->scopeInit( s , o );
         }
         
-        void init( const char * data ) {
-            BSONObj o( data , 0 );
-            init( &o );
-        }
-
         double getNumber(const char *field) {
             return JavaJS->scopeGetNumber(s,field);
         }
         string getString(const char *field) {
             return JavaJS->scopeGetString(s,field);
         }
-        jboolean getBoolean(const char *field) {
+        bool getBoolean(const char *field) {
             return JavaJS->scopeGetBoolean(s,field);
         }
         BSONObj getObject(const char *field ) {
@@ -195,18 +191,19 @@ namespace mongo {
         void setString(const char *field, const char * val ) {
             JavaJS->scopeSetString(s,field,val);
         }
-        void setObject(const char *field, BSONObj& obj ) {
+        void setObject(const char *field, const BSONObj& obj ) {
             JavaJS->scopeSetObject(s,field,&obj);
         }
-        void setBoolean(const char *field, jboolean val ) {
+        void setBoolean(const char *field, bool val ) {
             JavaJS->scopeSetBoolean(s,field,val);
         }
         
-        jlong createFunction( const char * code ){
+        ScriptingFunction createFunction( const char * code ){
             return JavaJS->functionCreate( code );
         }
 
-        int invoke(jlong function) {
+        int invoke( ScriptingFunction function , const BSONObj& args ){
+            setObject( "args" , args );
             return JavaJS->invoke(s,function);
         }
 

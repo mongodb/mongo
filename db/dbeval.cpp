@@ -26,10 +26,11 @@
 #include "introspect.h"
 #include "btree.h"
 #include "../util/lruishmap.h"
-#include "javajs.h"
 #include "json.h"
 #include "repl.h"
 #include "commands.h"
+
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -53,37 +54,39 @@ namespace mongo {
         }
         assert( code );
 
-        if ( ! JavaJS ) {
+        if ( ! globalScriptEngine ) {
             errmsg = "db side execution is disabled";
             return false;
         }
 
-#if !defined(NOJNI)
-        Scope s;
+        auto_ptr<Scope> s( globalScriptEngine->createScope() );
 
-        jlong f = s.createFunction(code);
+        ScriptingFunction f = s->createFunction(code);
         if ( f == 0 ) {
             errmsg = "compile failed";
             return false;
         }
-
+        
         if ( e.type() == CodeWScope )
-            s.init( e.codeWScopeScopeData() );
-        s.setString("$client", database->name.c_str());
-        BSONElement args = cmd.findElement("args");
-        if ( args.type() == Array ) {
-            BSONObj eo = args.embeddedObject();
-            if ( edebug ) {
-                out() << "args:" << eo.toString() << endl;
-                out() << "code:\n" << code << endl;
+            s->init( e.codeWScopeScopeData() );
+        s->setString("$client", database->name.c_str());
+
+        BSONObj args;
+        {
+            BSONElement argsElement = cmd.findElement("args");
+            if ( argsElement.type() == Array ) {
+                args = argsElement.embeddedObject();
+                if ( edebug ) {
+                    out() << "args:" << args.toString() << endl;
+                    out() << "code:\n" << code << endl;
+                }
             }
-            s.setObject("args", eo);
         }
 
         int res;
         {
             Timer t;
-            res = s.invoke(f);
+            res = s->invoke(f,args);
             int m = t.millis();
             if ( m > 100 ) {
                 out() << "dbeval slow, time: " << dec << m << "ms " << ns << endl;
@@ -94,21 +97,21 @@ namespace mongo {
         if ( res ) {
             result.append("errno", (double) res);
             errmsg = "invoke failed: ";
-            errmsg += s.getString( "error" );
+            errmsg += s->getString( "error" );
             return false;
         }
 
-        int type = s.type("return");
+        int type = s->type("return");
         if ( type == Object || type == Array )
-            result.append("retval", s.getObject("return"));
+            result.append("retval", s->getObject("return"));
         else if ( type == NumberDouble )
-            result.append("retval", s.getNumber("return"));
+            result.append("retval", s->getNumber("return"));
         else if ( type == String )
-            result.append("retval", s.getString("return").c_str());
+            result.append("retval", s->getString("return").c_str());
         else if ( type == Bool ) {
-            result.appendBool("retval", s.getBoolean("return"));
+            result.appendBool("retval", s->getBoolean("return"));
         }
-#endif
+
         return true;
     }
 

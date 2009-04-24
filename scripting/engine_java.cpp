@@ -16,10 +16,13 @@
 */
 
 #include "stdafx.h"
-#include "javajs.h"
+#include "engine_java.h"
 #include <iostream>
 #include <map>
 #include <list>
+
+#include "../db/jsobj.h"
+#include "../db/db.h"
 
 using namespace boost::filesystem;
 
@@ -37,12 +40,10 @@ namespace mongo {
 
 } // namespace mongo
 
-#ifdef J_USE_OBJ
-#include "jsobj.h"
-#endif
+
 
 #include "../util/message.h"
-#include "db.h"
+#include "../db/db.h"
 
 using namespace std;
 
@@ -318,7 +319,7 @@ namespace mongo {
         return res;
     }
 
-    int JavaJSImpl::scopeSetObject( jlong id , const char * field , BSONObj * obj ) {
+    int JavaJSImpl::scopeSetObject( jlong id , const char * field , const BSONObj * obj ) {
         jobject bb = 0;
         if ( obj ) {
             bb = _getEnv()->NewDirectByteBuffer( (void*)(obj->objdata()) , (jlong)(obj->objsize()) );
@@ -395,7 +396,6 @@ namespace mongo {
         return retStr;
     }
 
-#ifdef J_USE_OBJ
     BSONObj JavaJSImpl::scopeGetObject( jlong id , const char * field )
     {
         jstring s1 = _getEnv()->NewStringUTF( field );
@@ -415,7 +415,6 @@ namespace mongo {
         assert( obj.objsize() <= guess );
         return obj;
     }
-#endif
 
 // other
 
@@ -467,6 +466,17 @@ namespace mongo {
 
         _envs->reset( env );
         return env;
+    }
+
+    Scope * JavaJSImpl::createScope(){
+        return new JavaScope();
+    }
+
+    void ScriptEngine::setup(){
+        if ( ! JavaJS ){
+            JavaJS = new JavaJSImpl();
+            globalScriptEngine = JavaJS;
+        }
     }
 
     void jasserted(const char *msg, const char *file, unsigned line) {
@@ -628,7 +638,7 @@ namespace mongo {
 
     };
 
-
+    
 // ---
 
     JNIEXPORT void JNICALL java_native_say(JNIEnv * env , jclass, jobject outBuffer ) {
@@ -667,7 +677,7 @@ namespace mongo {
 
 // ----
 
-    int javajstest() {
+    void JavaJSImpl::runTest() {
 
         const int debug = 0;
 
@@ -698,8 +708,6 @@ namespace mongo {
         jassert( ! JavaJS.invoke( scope , func3 ) );
         jassert( JavaJS.scopeGetBoolean( scope , "z" ) );
         if ( debug ) out() << "func3 done" << endl;
-
-#ifdef J_USE_OBJ
 
         if ( debug ) out() << "going to get object" << endl;
         BSONObj obj = JavaJS.scopeGetObject( scope , "abc" );
@@ -735,8 +743,6 @@ namespace mongo {
         jassert( ! JavaJS.invoke( scope , func5 ) );
         if ( debug ) out() << "func5 done" << endl;
 
-#endif
-
         if ( debug ) out() << "func6 start" << endl;
         for ( int i=0; i<100; i++ ) {
             double val = i + 5;
@@ -757,17 +763,8 @@ namespace mongo {
         jassert( ! JavaJS.invoke( scope , func8 ) );
         assert( 12 == JavaJS.scopeGetNumber( scope , "return" ) );
 
-
-        return 0;
-
     }
-
-#if defined(_MAIN)
-int main() {
-    return javajstest();
-}
-#endif
-
+    
 #endif
 
 } // namespace mongo
