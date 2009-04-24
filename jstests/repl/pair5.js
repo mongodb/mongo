@@ -96,8 +96,9 @@ doTest = function( nSlave, opIdMem ) {
                 
                 return ( lm == 0 && rm == 1 );
                 } );       
-    
+
     r.getDB( baseName ).getCollection( baseName ).update( {_id:nSlave - 1}, {_id:nSlave - 1,n:-1}, true );
+    assert.eq( -1, r.getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n );
     checkCount( r, 5000 + nSlave );
     assert.eq( -1, r.getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n );
     l.setSlaveOk();
@@ -112,4 +113,4 @@ doTest = function( nSlave, opIdMem ) {
 }
 
 doTest( 5000, 100000000 );
-doTest( 1000, 100 ); // force op id converstion to collection based storage
+doTest( 5000, 100 ); // force op id converstion to collection based storage

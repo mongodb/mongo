@@ -721,6 +721,12 @@ namespace ReplTests {
 
             s_->reset();
             check( false, false, false );
+            
+            s_->set( "a", BSON( "_id" << 4 ), true );
+            s_->set( "a", BSON( "_id" << 4 ), true );
+            check( true, false, false );
+            s_->set( "a", BSON( "_id" << 4 ), false );
+            check( false, false, false );
         }
     private:
         void check( bool one, bool two, bool three ) {
