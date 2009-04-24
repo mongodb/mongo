@@ -880,7 +880,7 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insert( ns(), one );
                 BSONObj result;
                 ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result ) );
-                ASSERT( !Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ) );                
+                ASSERT_EXCEPTION( Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ), AssertionException );                
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ) );                
             }
