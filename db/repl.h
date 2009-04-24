@@ -180,14 +180,19 @@ namespace mongo {
         void reset() {
             dbcache c;
             setClientTempNs( name_ );
-            Helpers::emptyCollection( name_ );
+            if ( nsdetails( name_ ) ) {
+                Helpers::emptyCollection( name_ );
+            } else {
+                string err;
+                massert( err, userCreateNS( name_, BSONObj(), err, false ) );
+            }
             Helpers::ensureIndex( name_, BSON( "ns" << 1 << "id" << 1 ), true, "setIdx" );            
         }
         bool get( const char *ns, const BSONObj &id ) {
             dbcache c;
             setClientTempNs( name_ );
             BSONObj temp;
-            return Helpers::findOne( name_, key( ns, id ), temp );                        
+            return Helpers::findOne( name_, key( ns, id ), temp, true );                        
         }
         void set( const char *ns, const BSONObj &id, bool val ) {
             dbcache c;
@@ -287,13 +292,14 @@ namespace mongo {
             ids.set( ns, id, val );
         }
         void upgrade( MemIds &a, DbIds &b ) {
-            for( MemIds::IdSets::const_iterator i = a.imp_.begin(); i != a.imp_.end(); ++i )
+            for( MemIds::IdSets::const_iterator i = a.imp_.begin(); i != a.imp_.end(); ++i ) {
                 for( BSONObjSetDefaultOrder::const_iterator j = i->second.begin(); j != i->second.end(); ++j ) {
                     set( b, i->first.c_str(), *j, true );            
                     RARELY {
                         dbtemprelease t;
                     }
                 }
+            }
         }
         MemIds memIds_;
         MemIds memModIds_;
