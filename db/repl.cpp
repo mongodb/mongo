@@ -874,13 +874,17 @@ namespace mongo {
             save();
         } else {
             bool mod;
-            BSONObj id = idForOp( op, mod );
-            if ( !idTracker.haveId( ns, id ) ) {
-                applyOperation( op );    
-            } else if ( idTracker.haveModId( ns, id ) ) {
-                BSONObj existing;
-                if ( Helpers::findOne( ns, id, existing ) )
-                    logOp( "i", ns, existing );
+            if ( replPair && replPair->state == ReplPair::State_Master ) {
+                BSONObj id = idForOp( op, mod );
+                if ( !idTracker.haveId( ns, id ) ) {
+                    applyOperation( op );    
+                } else if ( idTracker.haveModId( ns, id ) ) {
+                    BSONObj existing;
+                    if ( Helpers::findOne( ns, id, existing ) )
+                        logOp( "i", ns, existing );
+                }
+            } else {
+                applyOperation( op );
             }
             addDbNextPass.erase( clientName );
         }
