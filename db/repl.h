@@ -82,7 +82,7 @@ namespace mongo {
         bool connect();
         // returns possibly unowned id spec for the operation.
         static BSONObj idForOp( const BSONObj &op, bool &mod );
-        static void updateSetsWithOp( const BSONObj &op );
+        static void updateSetsWithOp( const BSONObj &op, bool mayUpdateStorage );
         // call without the db mutex
         void syncToTailOfRemoteLog();
         // call with the db mutex
@@ -91,7 +91,7 @@ namespace mongo {
         void resetSlave();
         // call with the db mutex
         // returns false if the slave has been reset
-        bool updateSetsWithLocalOps( OpTime &localLogTail, bool unlock );
+        bool updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock );
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
         
     public:
@@ -149,6 +149,7 @@ namespace mongo {
 
     class MemIds {
     public:
+        friend class IdTracker;
         MemIds( const char *name ) {}
         void reset() { imp_.clear(); }
         bool get( const char *ns, const BSONObj &id ) { return imp_[ ns ].count( id ); }
@@ -172,6 +173,7 @@ namespace mongo {
         IdSets imp_;
     };
         
+    // All functions must be called with db mutex held
     class DbIds {
     public:
         DbIds( const char * name ) : name_( name ) {}
@@ -213,37 +215,87 @@ namespace mongo {
         static BSONObj key( const char *ns, const BSONObj &id ) {
             BSONObjBuilder b;
             b << "ns" << ns;
+            // rename _id to id since there may be duplicates
             b.appendAs( id.firstElement(), "id" );
             return b.obj();
         }        
         const char * name_;
     };
     
+    // All functions must be called with db mutex held
+    // Kind of sloppy class structure, for now just want to keep the in mem
+    // version speedy.
     class IdTracker {
     public:
         IdTracker() :
-        ids_( "local.temp.replIds" ),
-        modIds_( "local.temp.replModIds" ) {
+        memIds_( "local.temp.replIds" ),
+        memModIds_( "local.temp.replModIds" ),
+        dbIds_( "local.temp.replIds" ),
+        dbModIds_( "local.temp.replModIds" ),
+        inMem_( true ),
+        maxMem_( 0 ) {
         }
-        void reset() {
-            ids_.reset();
-            modIds_.reset();
+        void reset( int maxMem = 0 ) {
+            memIds_.reset();
+            memModIds_.reset();
+            dbIds_.reset();
+            dbModIds_.reset();
+            maxMem_ = maxMem;
         }
         bool haveId( const char *ns, const BSONObj &id ) {
-            return ids_.get( ns, id );
+            if ( inMem_ )
+                return get( memIds_, ns, id );
+            else
+                return get( dbIds_, ns, id );
         }
         bool haveModId( const char *ns, const BSONObj &id ) {
-            return modIds_.get( ns, id );
+            if ( inMem_ )
+                return get( memModIds_, ns, id );
+            else
+                return get( dbModIds_, ns, id );
         }
         void haveId( const char *ns, const BSONObj &id, bool val ) {
-            ids_.set( ns, id, val );
+            if ( inMem_ )
+                set( memIds_, ns, id, val );
+            else
+                set( dbIds_, ns, id, val );
         }
         void haveModId( const char *ns, const BSONObj &id, bool val ) {
-            modIds_.set( ns, id, val );
+            if ( inMem_ )
+                set( memModIds_, ns, id, val );
+            else
+                set( dbModIds_, ns, id, val );
         }
+        void mayUpgradeStorage() {
+            if ( !inMem_ || memIds_.roughSize() + memModIds_.roughSize() <= maxMem_ )
+                return;
+            upgrade( memIds_, dbIds_ );
+            upgrade( memModIds_, dbModIds_ );
+            memIds_.reset();
+            memModIds_.reset();
+            inMem_ = false;
+        }
+        bool inMem() const { return inMem_; }
     private:
-        DbIds ids_;
-        DbIds modIds_;
+        template< class T >
+        bool get( T &ids, const char *ns, const BSONObj &id ) {
+            return ids.get( ns, id );
+        }
+        template< class T >
+        void set( T &ids, const char *ns, const BSONObj &id, bool val ) {
+            ids.set( ns, id, val );
+        }
+        void upgrade( MemIds &a, DbIds &b ) {
+            for( MemIds::IdSets::const_iterator i = a.imp_.begin(); i != a.imp_.end(); ++i )
+                for( BSONObjSetDefaultOrder::const_iterator j = i->second.begin(); j != i->second.end(); ++j )
+                    set( b, i->first.c_str(), *j, true );            
+        }
+        MemIds memIds_;
+        MemIds memModIds_;
+        DbIds dbIds_;
+        DbIds dbModIds_;
+        bool inMem_;
+        int maxMem_;
     };
     
 } // namespace mongo

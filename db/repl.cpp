@@ -827,9 +827,8 @@ namespace mongo {
         dblock lk;
 
         if ( localLogTail && replPair && replPair->state == ReplPair::State_Master ) {
-            // NOTE: For now, just locking this whole loop.  Alternatively we could 
-            // do a first loop unlocking periodically then a second loop locked.
-            updateSetsWithLocalOps( *localLogTail, false );
+            updateSetsWithLocalOps( *localLogTail, true ); // allow unlocking
+            updateSetsWithLocalOps( *localLogTail, false ); // don't allow unlocking or conversion to db backed storage
         }
 
         if ( replAllDead ) {
@@ -921,7 +920,10 @@ namespace mongo {
         return BSONObj();
     }
     
-    void ReplSource::updateSetsWithOp( const BSONObj &op ) {
+    void ReplSource::updateSetsWithOp( const BSONObj &op, bool mayUnlock ) {
+        if ( mayUnlock ) {
+            idTracker.mayUpgradeStorage();
+        }
         bool mod;
         BSONObj id = idForOp( op, mod );
         if ( !id.isEmpty() ) {
@@ -968,7 +970,7 @@ namespace mongo {
                 conn->simpleCommand( "admin", 0, "forcedead" ) );        
     }
     
-    bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool unlock ) {
+    bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock ) {
         setClient( "local.oplog.$main" );
         auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         bool first = true;
@@ -981,8 +983,8 @@ namespace mongo {
             }
             if ( !( lastSavedLocalTs_ < ts ) )
                 break;
-            updateSetsWithOp( op );
-            if ( unlock ) {
+            updateSetsWithOp( op, mayUnlock );
+            if ( mayUnlock ) {
                 dbtemprelease t;
             }
         }

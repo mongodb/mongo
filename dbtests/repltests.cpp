@@ -693,7 +693,7 @@ namespace ReplTests {
     public:
         void run() {
             dblock lk;
-            setClient( "foo.bar" );
+            setClient( "repltest.DbIdsTest" );
             
             s_.reset( new DbIds( "local.temp.DbIdsTest" ) );
             s_->reset();
@@ -758,6 +758,40 @@ namespace ReplTests {
     private:
         MemIds s_;
     };
+
+    class IdTrackerTest {
+    public:
+        void run() {
+            dblock lk;
+            setClient( "repltests.IdTrackerTest" );
+            
+            ASSERT( s_.inMem() );
+            s_.reset( 4 * sizeof( BSONObj ) - 1 );
+            s_.haveId( "a", BSON( "_id" << 0 ), true );
+            s_.haveId( "a", BSON( "_id" << 1 ), true );
+            s_.haveId( "b", BSON( "_id" << 0 ), true );
+            s_.haveModId( "b", BSON( "_id" << 0 ), true );
+            ASSERT( s_.inMem() );
+            check();
+            s_.mayUpgradeStorage();
+            ASSERT( !s_.inMem() );
+            check();
+            
+            s_.haveId( "a", BSON( "_id" << 1 ), false );
+            ASSERT( !s_.haveId( "a", BSON( "_id" << 1 ) ) );
+            s_.haveId( "a", BSON( "_id" << 1 ), true );
+            check();
+            ASSERT( !s_.inMem() );            
+        }
+    private:
+        void check() {
+            ASSERT( s_.haveId( "a", BSON( "_id" << 0 ) ) );
+            ASSERT( s_.haveId( "a", BSON( "_id" << 1 ) ) );
+            ASSERT( s_.haveId( "b", BSON( "_id" << 0 ) ) );
+            ASSERT( s_.haveModId( "b", BSON( "_id" << 0 ) ) );            
+        }
+        IdTracker s_;
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -794,6 +828,7 @@ namespace ReplTests {
             add< DeleteOpIsIdBased >();
             add< DbIdsTest >();
             add< MemIdsTest >();
+            add< IdTrackerTest >();
         }
     };
     
