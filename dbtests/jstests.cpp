@@ -103,8 +103,21 @@ namespace JSTests {
         }
     };
 
+    class ObjectMapping {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            BSONObj o = BSON( "x" << 17 );
+            s->setObject( "blah" , o );
+            s->invoke( "return z = blah.x;" , BSONObj() );
+            assert( 17 == s->getNumber( "return" ) );
+
+            delete s;
+        }
+    };
+
     // TODO:
-    // functions
     // setThis
     // init
     
@@ -115,6 +128,7 @@ namespace JSTests {
             add< BasicScope >();
             add< FalseTests >();
             add< SimpleFunctions >();
+            add< ObjectMapping >();
         }
     };
     
