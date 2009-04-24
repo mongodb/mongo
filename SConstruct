@@ -388,9 +388,6 @@ if nix:
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
-    if usesm:
-        env.Append( CPPDEFINES=[ "XP_UNIX" ] )
-            
 
 # --- check system ---
 

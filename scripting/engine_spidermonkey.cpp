@@ -2,6 +2,12 @@
 
 #include "engine.h"
 
+#ifdef _WIN32
+#define XP_WIN
+#else
+#define XP_UNIX
+#endif
+
 #include "js/jsapi.h"
 
 namespace mongo {
