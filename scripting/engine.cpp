@@ -17,5 +17,11 @@ namespace mongo {
     ScriptEngine::~ScriptEngine(){
     }
 
+    int Scope::invoke( const char* code , const BSONObj& args ){
+        ScriptingFunction func = createFunction( code );
+        uassert( "compile failed" , func );
+        return invoke( func , args );
+    }
+
     ScriptEngine * globalScriptEngine;
 }

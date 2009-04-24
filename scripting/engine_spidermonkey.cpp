@@ -168,7 +168,19 @@ namespace mongo {
         // ---- functions -----
         
         JSFunction * compileFunction( const char * code ){
-            return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , code , strlen( code ) , "nofile" , 0 );
+            if ( strstr( code , "function(" ) != code )
+                return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , code , strlen( code ) , "nofile" , 0 );
+
+            // TODO: there must be a way in spider monkey to do this - this is a total hack
+
+            string s = "return ";
+            s += code;
+            s += ";";
+
+            JSFunction * func = JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile" , 0 );
+            jsval ret;
+            JS_CallFunction( _context , 0 , func , 0 , 0 , &ret );
+            return JS_ValueToFunction( _context , ret );
         }
 
         ScriptingFunction createFunction( const char * code ){
@@ -178,6 +190,7 @@ namespace mongo {
         int invoke( JSFunction * func , const BSONObj& args ){
             jsval rval;
             JS_CallFunction( _context , 0 , func , 0 , 0 , &rval );
+            assert( JS_SetProperty( _context , _global , "return" , &rval ) );
             return 0;
         }
 

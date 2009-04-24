@@ -57,8 +57,6 @@ namespace JSTests {
                 assert( ! s->getBoolean( "b" ) );
             }
 
-            // TODO: setObject
-
             delete s;
         }
     };
@@ -77,7 +75,34 @@ namespace JSTests {
             delete s ;
         }
     };
-    
+
+    class SimpleFunctions {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+
+            s->invoke( "x=5;" , BSONObj() );
+            assert( 5 == s->getNumber( "x" ) );
+            
+            s->invoke( "return 17;" , BSONObj() );
+            assert( 17 == s->getNumber( "return" ) );
+            
+            s->invoke( "function(){ return 17; }" , BSONObj() );
+            cout << s->getString( "return" ) << endl;
+            assert( 17 == s->getNumber( "return" ) );
+            
+            s->setNumber( "x" , 1.76 );
+            s->invoke( "return x == 1.76; " , BSONObj() );
+            assert( s->getBoolean( "return" ) );
+
+            s->setNumber( "x" , 1.76 );
+            s->invoke( "return x == 1.79; " , BSONObj() );
+            assert( ! s->getBoolean( "return" ) );
+
+            delete s;
+        }
+    };
+
     // TODO:
     // functions
     // setThis
@@ -89,6 +114,7 @@ namespace JSTests {
             add< Fundamental >();
             add< BasicScope >();
             add< FalseTests >();
+            add< SimpleFunctions >();
         }
     };
     
