@@ -733,7 +733,6 @@ namespace ReplTests {
     
     class MemIdsTest {
     public:
-        MemIdsTest() : s_( "MemIdsTest" ) {}
         void run() {
             int n = sizeof( BSONObj );
             
@@ -782,6 +781,9 @@ namespace ReplTests {
             s_.haveId( "a", BSON( "_id" << 1 ), true );
             check();
             ASSERT( !s_.inMem() );            
+            
+            s_.reset();
+            ASSERT( s_.inMem() );                        
         }
     private:
         void check() {

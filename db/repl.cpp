@@ -69,7 +69,6 @@ namespace mongo {
     extern bool autoresync;
     time_t lastForcedResync = 0;
     
-
     IdTracker idTracker;
     
 } // namespace mongo
@@ -922,7 +921,9 @@ namespace mongo {
     
     void ReplSource::updateSetsWithOp( const BSONObj &op, bool mayUnlock ) {
         if ( mayUnlock ) {
-            idTracker.mayUpgradeStorage();
+            RARELY {
+                idTracker.mayUpgradeStorage();
+            }
         }
         bool mod;
         BSONObj id = idForOp( op, mod );
@@ -971,21 +972,23 @@ namespace mongo {
     }
     
     bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock ) {
+//        log() << "updating local modified _id sets, localTail:" << localLogTail << endl;
         setClient( "local.oplog.$main" );
         auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
-        bool first = true;
+        OpTime newTail;
         for( ; localLog->ok(); localLog->advance() ) {
             BSONObj op = localLog->current();
             OpTime ts( localLog->current().getField( "ts" ).date() );
-            if ( first ) {
-                localLogTail = ts;
-                first = false;
+            if ( newTail.isNull() ) {
+                newTail = ts;
             }
-            if ( !( lastSavedLocalTs_ < ts ) )
+            if ( !( localLogTail < ts ) )
                 break;
             updateSetsWithOp( op, mayUnlock );
             if ( mayUnlock ) {
-                dbtemprelease t;
+                OCCASIONALLY {
+                    dbtemprelease t;
+                }
             }
         }
         if ( !lastSavedLocalTs_.isNull() && !localLog->ok() ) {
@@ -996,6 +999,8 @@ namespace mongo {
             resetSlave();
             return false;
         }        
+        if ( !newTail.isNull() )
+            localLogTail = newTail;
         return true;
     }
     
@@ -1015,7 +1020,7 @@ namespace mongo {
             dblock lk;
             idTracker.reset();
         }
-        OpTime localLogTail;
+        OpTime localLogTail = lastSavedLocalTs_;
 
         bool initial = syncedTo.isNull();
         

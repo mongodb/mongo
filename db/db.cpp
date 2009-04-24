@@ -572,6 +572,12 @@ int main(int argc, char* argv[], char *envp[] )
                 oplogSize = x * 1024 * 1024;
                 assert(oplogSize > 0);
             }
+            else if ( s == "--opIdMem" ) {
+                long x = strtol( argv[ ++i ], 0, 10 );
+                uassert("bad arg", x > 0);
+                opIdMem = x;
+                assert(opIdMem > 0);
+            }
             else if ( strncmp(s.c_str(), "--oplog", 7) == 0 ) {
                 int x = s[7] - '0';
                 if ( x < 0 || x > 7 ) {
@@ -618,6 +624,7 @@ usage:
     out() << " --nojni" << endl;
     out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     out() << " --oplogSize <size_in_MB>  custom size if creating new replication operation log" << endl;
+    out() << " --opIdMem <size_in_Bytes> custom size limit for in-mem storage of op ids" << endl;
     out() << " --sysinfo                 print some diagnostic system information\n";
     out() << "\nReplication:" << endl;
     out() << " --master\n";

@@ -1,4 +1,4 @@
-// writes to new master while maing master-master logs consistent
+// writes to new master while making master-master logs consistent
 
 var baseName = "jstests_pair5test";
 
@@ -41,7 +41,7 @@ checkCount = function( m, c ) {
                 "count failed for " + m );
 }
 
-doTest = function() {
+doTest = function( nSlave, opIdMem ) {
     ports = allocatePorts( 5 );
     aPort = ports[ 0 ];
     lPort = ports[ 1 ];
@@ -52,8 +52,8 @@ doTest = function() {
     // start normally
     connect();
     a = startMongod( "--port", aPort, "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface" );
-    l = startMongod( "--port", lPort, "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
-    r = startMongod( "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
+    l = startMongod( "--port", lPort, "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--opIdMem", opIdMem, "--nohttpinterface" );
+    r = startMongod( "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--opIdMem", opIdMem, "--nohttpinterface" );
     assert.soon( function() {
                 lm = ismaster( l );
                 rm = ismaster( r );
@@ -76,14 +76,15 @@ doTest = function() {
                 return ( lm == 1 && rm == 1 );
                 } );
     
-    debug( "starting to do writes" );
-    
-    for( i = 0; i < 5000; ++i ) {
+    for( i = 0; i < nSlave; ++i ) {
         write( l, i, i );
-    }
-    
+    }    
     l.getDB( baseName ).getCollection( baseName ).findOne();
-    debug( "done doing writes" );
+
+    for( i = 10000; i < 15000; ++i ) {
+        write( r, i, i );
+    }    
+    r.getDB( baseName ).getCollection( baseName ).findOne();
 
     connect();
     assert.soon( function() {
@@ -96,12 +97,12 @@ doTest = function() {
                 return ( lm == 0 && rm == 1 );
                 } );       
     
-    r.getDB( baseName ).getCollection( baseName ).update( {_id:4999}, {_id:4999,n:-1}, true );
-    checkCount( r, 5000 );
-    assert.eq( -1, r.getDB( baseName ).getCollection( baseName ).findOne( {_id:4999} ).n );
+    r.getDB( baseName ).getCollection( baseName ).update( {_id:nSlave - 1}, {_id:nSlave - 1,n:-1}, true );
+    checkCount( r, 5000 + nSlave );
+    assert.eq( -1, r.getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n );
     l.setSlaveOk();
     assert.soon( function() {
-                n = l.getDB( baseName ).getCollection( baseName ).findOne( {_id:4999} ).n;
+                n = l.getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n;
                 print( n );
                 return -1 == n;
                 } );
@@ -110,4 +111,5 @@ doTest = function() {
     
 }
 
-doTest();
+doTest( 5000, 100000000 );
+doTest( 1000, 100 ); // force op id converstion to collection based storage

@@ -43,6 +43,7 @@ namespace mongo {
     class DBClientCursor;
     extern bool slave;
     extern bool master;
+    extern int opIdMem;
     
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth);
@@ -150,7 +151,6 @@ namespace mongo {
     class MemIds {
     public:
         friend class IdTracker;
-        MemIds( const char *name ) {}
         void reset() { imp_.clear(); }
         bool get( const char *ns, const BSONObj &id ) { return imp_[ ns ].count( id ); }
         void set( const char *ns, const BSONObj &id, bool val ) {
@@ -181,7 +181,7 @@ namespace mongo {
             dbcache c;
             setClientTempNs( name_ );
             Helpers::emptyCollection( name_ );
-            Helpers::ensureIndex( name_, BSON( "ns" << 1 << "id" << 1 ), "setIdx" );            
+            Helpers::ensureIndex( name_, BSON( "ns" << 1 << "id" << 1 ), true, "setIdx" );            
         }
         bool get( const char *ns, const BSONObj &id ) {
             dbcache c;
@@ -193,10 +193,11 @@ namespace mongo {
             dbcache c;
             setClientTempNs( name_ );
             if ( val ) {
-                BSONObj temp;
-                if ( !Helpers::findOne( name_, key( ns, id ), temp ) ) {
+                try {
                     BSONObj k = key( ns, id );
                     theDataFileMgr.insert( name_, k );
+                } catch ( DBException& ) {
+                    // dup key - already in set
                 }
             } else {
                 deleteObjects( name_, key( ns, id ), true, false, false );
@@ -228,19 +229,18 @@ namespace mongo {
     class IdTracker {
     public:
         IdTracker() :
-        memIds_( "local.temp.replIds" ),
-        memModIds_( "local.temp.replModIds" ),
         dbIds_( "local.temp.replIds" ),
         dbModIds_( "local.temp.replModIds" ),
         inMem_( true ),
-        maxMem_( 0 ) {
+        maxMem_( opIdMem ) {
         }
-        void reset( int maxMem = 0 ) {
+        void reset( int maxMem = opIdMem ) {
             memIds_.reset();
             memModIds_.reset();
             dbIds_.reset();
             dbModIds_.reset();
             maxMem_ = maxMem;
+            inMem_ = true;
         }
         bool haveId( const char *ns, const BSONObj &id ) {
             if ( inMem_ )
@@ -269,6 +269,7 @@ namespace mongo {
         void mayUpgradeStorage() {
             if ( !inMem_ || memIds_.roughSize() + memModIds_.roughSize() <= maxMem_ )
                 return;
+            log() << "saving master modified id information to collection" << endl;
             upgrade( memIds_, dbIds_ );
             upgrade( memModIds_, dbModIds_ );
             memIds_.reset();
@@ -287,8 +288,12 @@ namespace mongo {
         }
         void upgrade( MemIds &a, DbIds &b ) {
             for( MemIds::IdSets::const_iterator i = a.imp_.begin(); i != a.imp_.end(); ++i )
-                for( BSONObjSetDefaultOrder::const_iterator j = i->second.begin(); j != i->second.end(); ++j )
+                for( BSONObjSetDefaultOrder::const_iterator j = i->second.begin(); j != i->second.end(); ++j ) {
                     set( b, i->first.c_str(), *j, true );            
+                    RARELY {
+                        dbtemprelease t;
+                    }
+                }
         }
         MemIds memIds_;
         MemIds memModIds_;

@@ -64,6 +64,7 @@ namespace mongo {
     OpLog _oplog;
 //#define oplog (*(_oplog.f))
     long long oplogSize = 0;
+    int opIdMem = 100000000;
 
     bool useCursors = true;
     bool useHints = true;
