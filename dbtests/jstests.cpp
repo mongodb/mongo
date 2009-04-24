@@ -21,7 +21,7 @@
 
 #include "dbtests.h"
 
-namespace JavaJSTests {
+namespace JSTests {
 
     class Fundamental {
     public:
@@ -35,15 +35,49 @@ namespace JavaJSTests {
         }
     };
     
+    class BasicScope {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            s->setNumber( "x" , 5 );
+            assert( 5 == s->getNumber( "x" ) );
+
+            s->setNumber( "x" , 1.67 );
+            assert( 1.67 == s->getNumber( "x" ) );
+
+            s->setString( "s" , "eliot was here" );
+            assert( "eliot was here" == s->getString( "s" ) );
+            
+            s->setBoolean( "b" , true );
+            assert( s->getBoolean( "b" ) );
+
+            if ( 0 ){
+                s->setBoolean( "b" , false );
+                assert( ! s->getBoolean( "b" ) );
+            }
+
+            // TODO: setObject
+
+            delete s;
+        }
+    };
+    
+    // TODO:
+    // functions
+    // setThis
+    // init
+    
     class All : public UnitTest::Suite {
     public:
         All() {
             add< Fundamental >();
+            add< BasicScope >();
         }
     };
     
 } // namespace JavaJSTests
 
-UnitTest::TestPtr javajsTests() {
-    return UnitTest::createSuite< JavaJSTests::All >();
+UnitTest::TestPtr jsTests() {
+    return UnitTest::createSuite< JSTests::All >();
 }

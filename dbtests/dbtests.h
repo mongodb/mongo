@@ -22,7 +22,7 @@
 using namespace mongo;
 
 UnitTest::TestPtr btreeTests();
-UnitTest::TestPtr javajsTests();
+UnitTest::TestPtr jsTests();
 UnitTest::TestPtr jsobjTests();
 UnitTest::TestPtr jsonTests();
 UnitTest::TestPtr matcherTests();

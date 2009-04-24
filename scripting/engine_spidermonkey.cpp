@@ -114,12 +114,7 @@ namespace mongo {
     };
 
     void SMEngine::runTest(){
-        {
-            SMScope scope;
-            ScriptingFunction func = scope.createFunction( "x = 5" );
-            scope.invoke( func , BSONObj() );
-            assert( scope.getNumber( "x" ) == 5 );
-        }
+        // this is deprecated
     }
 
 }
