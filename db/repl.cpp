@@ -972,7 +972,6 @@ namespace mongo {
     }
     
     bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock ) {
-//        log() << "updating local modified _id sets, localTail:" << localLogTail << endl;
         setClient( "local.oplog.$main" );
         auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         OpTime newTail;
