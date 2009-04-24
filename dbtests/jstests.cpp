@@ -62,6 +62,21 @@ namespace JSTests {
             delete s;
         }
     };
+
+    class FalseTests {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+
+            assert( ! s->getBoolean( "x" ) );
+            
+            s->setString( "z" , "" );
+            assert( ! s->getBoolean( "z" ) );
+            
+            
+            delete s ;
+        }
+    };
     
     // TODO:
     // functions
@@ -73,6 +88,7 @@ namespace JSTests {
         All() {
             add< Fundamental >();
             add< BasicScope >();
+            add< FalseTests >();
         }
     };
     

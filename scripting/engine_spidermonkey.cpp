@@ -35,10 +35,7 @@ namespace mongo {
             JS_ShutDown();
         }
 
-        Scope * createScope(){
-            uassert( "not done" , 0 );
-            return 0;
-        }
+        Scope * createScope();
         
         void runTest();
        
@@ -56,7 +53,7 @@ namespace mongo {
     }
 
 
-    class SMScope {
+    class SMScope : public Scope {
     public:
         SMScope(){
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
@@ -68,11 +65,19 @@ namespace mongo {
             
             _global = JS_NewObject( _context , &global_class, NULL, NULL);
             massert( "JS_NewObject failed for global" , _global );
-            massert( "js init failed" , JS_InitStandardClasses( _context , _global ) == 0 );
+            massert( "js init failed" , JS_InitStandardClasses( _context , _global ) );
         }
 
         ~SMScope(){
             JS_DestroyContext( _context );
+        }
+        
+        void reset(){
+            massert( "not implemented yet" , 0 );
+        }
+        
+        void init( BSONObj * data ){
+            massert( "not implemented yet" , 0 );            
         }
 
         // ----- getters ------
@@ -86,6 +91,78 @@ namespace mongo {
             double d;
             uassert( "not a number" , JS_ValueToNumber( _context , v , &d ) );
             return d;
+        }
+
+        string convert( JSString * so ){
+            jschar * s = JS_GetStringChars( so );
+            size_t srclen = JS_GetStringLength( so );
+
+            size_t len = srclen * 2;
+            char * dst = (char*)malloc( len );
+            assert( JS_EncodeCharacters( _context , s , srclen , dst , &len) );
+            
+            string ss( dst , len );
+            free( dst );
+            return ss;
+        }
+
+        string getString( const char *field ){
+            jsval val;
+            assert( JS_GetProperty( _context , _global , field , &val ) );
+            JSString * s = JS_ValueToString( _context , val );
+            return convert( s );
+        }
+
+        bool getBoolean( const char *field ){
+            jsval val;
+            assert( JS_GetProperty( _context , _global , field , &val ) );
+
+            JSBool b;
+            assert( JS_ValueToBoolean( _context, val , &b ) );
+
+            return b;
+        }
+        
+        BSONObj getObject( const char *field ){
+            massert( "not implemented yet: getObject()" , 0 ); throw -1;  
+        }
+
+        int type( const char *field ){
+            massert( "not implemented yet: type()" , 0 ); throw -1;  
+        }
+
+        // ----- to value ----
+        
+        jsval toval( double d ){
+            jsval val;
+            assert( JS_NewNumberValue( _context, d , &val ) );
+            return val;
+        }
+        
+        // ----- setters ------
+        
+        void setNumber( const char *field , double val ){
+            jsval v = toval( val );
+            assert( JS_SetProperty( _context , _global , field , &v ) );
+        }
+
+        void setString( const char *field , const char * val ){
+            JSString * s = JS_NewStringCopyZ( _context , val );
+            jsval v = STRING_TO_JSVAL( s );
+            assert( JS_SetProperty( _context , _global , field , &v ) );
+        }
+
+        void setObject( const char *field , const BSONObj& obj ){
+            massert( "not implemented yet: setObject()" , 0 );            
+        }
+
+        void setBoolean( const char *field , bool val ){
+            jsval v = BOOLEAN_TO_JSVAL( val );
+            assert( JS_SetProperty( _context , _global , field , &v ) );            
+        }
+
+        void setThis( const BSONObj * obj ){
+            massert( "not implemented yet: setThis()" , 0 );            
         }
 
         // ---- functions -----
@@ -115,6 +192,10 @@ namespace mongo {
 
     void SMEngine::runTest(){
         // this is deprecated
+    }
+
+    Scope * SMEngine::createScope(){
+        return new SMScope();
     }
 
 }
