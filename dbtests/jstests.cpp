@@ -109,7 +109,7 @@ namespace JSTests {
             
             BSONObj o = BSON( "x" << 17 );
             s->setObject( "blah" , o );
-            s->invoke( "return z = blah.x;" , BSONObj() );
+            s->invoke( "return blah.x;" , BSONObj() );
             assert( 17 == s->getNumber( "return" ) );
 
             delete s;
