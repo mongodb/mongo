@@ -88,7 +88,6 @@ namespace JSTests {
             assert( 17 == s->getNumber( "return" ) );
             
             s->invoke( "function(){ return 17; }" , BSONObj() );
-            cout << s->getString( "return" ) << endl;
             assert( 17 == s->getNumber( "return" ) );
             
             s->setNumber( "x" , 1.76 );
