@@ -242,7 +242,7 @@ def findVersion( root , choices ):
 
 def choosePathExist( choices , default=None):
     for c in choices:
-        if os.path.exists( c ):
+        if c != None and os.path.exists( c ):
             return c
     return default
 
