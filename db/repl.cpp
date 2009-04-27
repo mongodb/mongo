@@ -925,15 +925,12 @@ namespace mongo {
     
     void ReplSource::updateSetsWithOp( const BSONObj &op, bool mayUnlock ) {
         if ( mayUnlock ) {
-            RARELY {
-                idTracker.mayUpgradeStorage();
-            }
+            idTracker.mayUpgradeStorage();
         }
         bool mod;
         BSONObj id = idForOp( op, mod );
         if ( !id.isEmpty() ) {
             const char *ns = op.getStringField( "ns" );
-            id = id.getOwned();
             if ( mod ) {
                 if ( !idTracker.haveId( ns, id ) ) {
                     idTracker.haveModId( ns, id, true );
@@ -989,7 +986,7 @@ namespace mongo {
                 break;
             updateSetsWithOp( op, mayUnlock );
             if ( mayUnlock ) {
-                OCCASIONALLY {
+                RARELY {
                     dbtemprelease t;
                 }
             }
