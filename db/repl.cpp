@@ -966,6 +966,8 @@ namespace mongo {
     }
     
     void ReplSource::resetSlave() {
+        massert( "request to kill slave replication falied",
+                conn->simpleCommand( "admin", 0, "forcedead" ) );        
         syncToTailOfRemoteLog();
         {
             dblock lk;
@@ -973,8 +975,6 @@ namespace mongo {
             save();
             cursor.reset();
         }
-        massert( "request to kill slave replication falied",
-                conn->simpleCommand( "admin", 0, "forcedead" ) );        
     }
     
     bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock ) {
