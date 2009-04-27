@@ -993,11 +993,10 @@ namespace mongo {
         }
         if ( !lastSavedLocalTs_.isNull() && !localLog->ok() ) {
             // local log filled up
-            log() << "local master log filled, forcing slave resync" << endl;
             idTracker.reset();
             dbtemprelease t;
             resetSlave();
-            return false;
+            massert( "local master log filled, forcing slave resync", false );
         }        
         if ( !newTail.isNull() )
             localLogTail = newTail;
@@ -1127,8 +1126,7 @@ namespace mongo {
             }            
             
             dblock lk;
-            if ( !updateSetsWithLocalOps( localLogTail, true ) )
-                return true;
+            updateSetsWithLocalOps( localLogTail, true );
         }
         
         OpTime nextOpTime( ts.date() );
