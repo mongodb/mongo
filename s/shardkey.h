@@ -78,7 +78,7 @@ namespace mongo {
         
         /**
            returns a query that filters results only for the range desired, i.e. returns 
-             { $gte : keyval(min), $lt : keyval(max) }
+             { "field" : { $gte: keyval(min), $lt: keyval(max) } }
         */
         void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max );
         

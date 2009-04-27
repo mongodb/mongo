@@ -494,6 +494,13 @@ normal:
         return pattern.toString();
     }
 
+    /* things to test for compound : 
+       x hasshardkey 
+       _ getFilter (hard?)
+       _ relevantForQuery
+       x canOrder
+       \ middle (deprecating?)
+    */
     class ShardKeyUnitTest : public UnitTest {
     public:
         void hasshardkeytest() { 
