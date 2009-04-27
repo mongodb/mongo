@@ -969,16 +969,22 @@ namespace mongo {
         n_(),
         soSize_(),
         saveClientCursor_(),
-        findingStart_( (queryOptions & Option_OplogReplay) != 0 ) 
+        findingStart_( (queryOptions & Option_OplogReplay) != 0 ),
+        findingStartCursor_()
         {}
 
         virtual void init() {
             b_.skip( sizeof( QueryResult ) );
             
-            if ( findingStart_ )
-                c_ = qp().newReverseCursor();
-            else
+            if ( findingStart_ ) {
+                // Use a ClientCursor here so we can release db mutex while scanning
+                // oplog (can take quite a while with large oplogs).
+                findingStartCursor_ = new ClientCursor();
+                findingStartCursor_->c = qp().newReverseCursor();
+                findingStartCursor_->ns = qp().ns();
+            } else {
                 c_ = qp().newCursor();
+            }
             
             matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
             
@@ -990,16 +996,29 @@ namespace mongo {
         }
         virtual void next() {
             if ( findingStart_ ) {
-                if ( !c_->ok() ) {
+                if ( !findingStartCursor_ || !findingStartCursor_->c->ok() ) {
                     findingStart_ = false;
                     c_ = qp().newCursor();
-                } else if ( !matcher_->matches( c_->currKey(), c_->currLoc() ) ) {
+                } else if ( !matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
                     findingStart_ = false;
-                    c_ = qp().newCursor( c_->currLoc() );
+                    c_ = qp().newCursor( findingStartCursor_->c->currLoc() );
                 } else {
-                    c_->advance();
+                    findingStartCursor_->c->advance();
+                    RARELY {
+                        CursorId id = findingStartCursor_->cursorid;
+                        findingStartCursor_->updateLocation();
+                        {
+                            dbtemprelease t;
+                        }
+                        findingStartCursor_ = ClientCursor::find( id, false );
+                    }
                     return;
                 }
+            }
+            
+            if ( findingStartCursor_ ) {
+                ClientCursor::erase( findingStartCursor_->cursorid );
+                findingStartCursor_ = 0;
             }
             
             if ( !c_->ok() ) {
@@ -1106,6 +1125,7 @@ namespace mongo {
         bool saveClientCursor_;
         auto_ptr< ScanAndOrder > so_;
         bool findingStart_;
+        ClientCursor * findingStartCursor_;
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
