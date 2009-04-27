@@ -66,7 +66,7 @@ namespace mongo {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, bool *deep, bool isArr = false);
+            int compareOp, bool *deep, bool isArr = false, bool nextArr = false);
 
         int matchesNe(
             const char *fieldName,
@@ -111,11 +111,6 @@ namespace mongo {
         */
         bool matches(const BSONObj& j, bool *deep = 0);
         
-        int getN() {
-            return n;
-        }
-
-        bool trivial() const { return n == 0 && nRegex == 0 && where == 0; }
         bool keyMatch() const { return !nin && !all && !haveSize; }
     private:
         void addBasic(const BSONElement &e, int c) {
@@ -126,7 +121,6 @@ namespace mongo {
             bm.toMatch = e;
             bm.compareOp = c;
             basics.push_back(bm);
-            n++;
         }
 
         int valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep=0);
@@ -139,7 +133,7 @@ namespace mongo {
         BSONObj constrainIndexKey_;
         
         vector<BasicMatcher> basics;
-        int n;                           // # of basicmatcher items
+//        int n;                           // # of basicmatcher items
         bool haveSize;
 
         RegexMatcher regexs[4];

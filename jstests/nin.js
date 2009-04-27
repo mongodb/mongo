@@ -26,7 +26,8 @@ doTest = function() {
     assert.eq( 4, t.find( { a: { $nin: [ 2 ] } } ).count() );    
     
     t.save( { a: [ { b: [ 10, 11 ] }, 11 ] } );
-    assert.eq( 0, t.find( { 'a.b': { $nin: [ 10 ] } } ).count() );
+    assert.eq( 1, t.find( { 'a.b': { $nin: [ 10 ] } } ).count() );
+    assert.eq( 0, t.find( { 'a.b': { $nin: [ [ 10, 11 ] ] } } ).count() );
     assert.eq( 7, t.find( { a: { $nin: [ 11 ] } } ).count() );
 
     t.save( { a: { b: [ 20, 30 ] } } );

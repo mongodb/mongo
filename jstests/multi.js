@@ -11,7 +11,7 @@ t.save( { a: [ [ [ 1 ] ] ] } );
 assert.eq( 0, t.find( { a:1 } ).count() );
 assert.eq( 0, t.find( { a: [ 1 ] } ).count() );
 assert.eq( 1, t.find( { a: [ [ 1 ] ] } ).count() );
-assert.eq( 1, t.find( { a: [ [ [ 1 ] ] ] } ).count() );
+assert.eq( 0, t.find( { a: [ [ [ 1 ] ] ] } ).count() );
 
 t.drop();
 t.save( { a: [ 1, 2 ] } );

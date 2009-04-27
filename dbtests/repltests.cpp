@@ -613,9 +613,10 @@ namespace ReplTests {
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
             }
+            using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( fromjson( "{'_id':0,a:[4,5]}" ) );
+                check( fromjson( "{'_id':0,a:[4,5]}" ), one( fromjson( "{'_id':0}" ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -628,9 +629,10 @@ namespace ReplTests {
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ), true );
             }
+            using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( fromjson( "{'_id':0,a:[4,5]}" ) );
+                check( fromjson( "{'_id':0,a:[4,5]}" ), one( fromjson( "{'_id':0}" ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -643,9 +645,10 @@ namespace ReplTests {
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) << "$push" << BSON( "b.c" << 6.0 ) ) );
             }
+            using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( fromjson( "{'_id':0,a:[4,5],b:{c:[6]}}" ) );
+                check( fromjson( "{'_id':0,a:[4,5],b:{c:[6]}}" ), one( fromjson( "{'_id':0}" ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -658,9 +661,10 @@ namespace ReplTests {
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
             }
+            using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( fromjson( "{'_id':0,a:[5]}" ) );
+                check( fromjson( "{'_id':0,a:[5]}" ), one( fromjson( "{'_id':0}" ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
