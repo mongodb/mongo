@@ -150,27 +150,28 @@ namespace mongo {
 
     class MemIds {
     public:
+        MemIds() : size_() {}
         friend class IdTracker;
         void reset() { imp_.clear(); }
         bool get( const char *ns, const BSONObj &id ) { return imp_[ ns ].count( id ); }
         void set( const char *ns, const BSONObj &id, bool val ) {
-            if ( val )
-                imp_[ ns ].insert( id );
-            else
-                imp_[ ns ].erase( id );
+            if ( val ) {
+                if ( imp_[ ns ].insert( id.getOwned() ).second ) {
+                    size_ += id.objsize() + sizeof( BSONObj );
+                }
+            } else {
+                if ( imp_[ ns ].erase( id ) == 1 ) {
+                    size_ -= id.objsize() + sizeof( BSONObj );
+                }
+            }
         }
         long long roughSize() const {
-            long long size = 0;
-            for( map< string, BSONObjSetDefaultOrder >::const_iterator i = imp_.begin();
-                i != imp_.end(); ++i )
-                for( BSONObjSetDefaultOrder::const_iterator j = i->second.begin();
-                    j != i->second.end(); ++j )
-                    size += sizeof( BSONObj );
-            return size;
+            return size_;
         }
     private:
         typedef map< string, BSONObjSetDefaultOrder > IdSets;
         IdSets imp_;
+        long long size_;
     };
         
     // All functions must be called with db mutex held

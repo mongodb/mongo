@@ -740,7 +740,7 @@ namespace ReplTests {
     class MemIdsTest {
     public:
         void run() {
-            int n = sizeof( BSONObj );
+            int n = sizeof( BSONObj ) + BSON( "_id" << 4 ).objsize();
             
             s_.reset();
             ASSERT_EQUALS( 0, s_.roughSize() );
