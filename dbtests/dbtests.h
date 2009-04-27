@@ -21,6 +21,7 @@
 
 using namespace mongo;
 
+UnitTest::TestPtr basicTests();
 UnitTest::TestPtr btreeTests();
 UnitTest::TestPtr jsTests();
 UnitTest::TestPtr jsobjTests();
