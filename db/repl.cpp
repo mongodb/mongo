@@ -952,11 +952,16 @@ namespace mongo {
         }        
     }
     
-    void ReplSource::updateLastSavedLocalTs() {
+    OpTime ReplSource::nextLastSavedLocalTs() const {
         setClient( "local.oplog.$main" );
         auto_ptr< Cursor > c = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         if ( c->ok() )
-            lastSavedLocalTs_ = OpTime( c->current().getField( "ts" ).date() );        
+            return OpTime( c->current().getField( "ts" ).date() );        
+        return OpTime();
+    }
+    
+    void ReplSource::setLastSavedLocalTs( const OpTime &nextLocalTs ) {
+        lastSavedLocalTs_ = nextLocalTs;
         log( 3 ) << "updated lastSavedLocalTs_ to: " << lastSavedLocalTs_ << endl;
     }
     
@@ -964,7 +969,7 @@ namespace mongo {
         syncToTailOfRemoteLog();
         {
             dblock lk;
-            updateLastSavedLocalTs();
+            setLastSavedLocalTs( nextLastSavedLocalTs() );
             save();
             cursor.reset();
         }
@@ -1094,7 +1099,13 @@ namespace mongo {
             }
             {
                 dblock lk;
-                updateLastSavedLocalTs();
+                OpTime nextLastSaved = nextLastSavedLocalTs();
+                {
+                    dbtemprelease t;
+                    if ( !c->more() ) {
+                        setLastSavedLocalTs( nextLastSaved );
+                    }
+                }
                 save();            
             }
             sleepsecs(3);
@@ -1165,11 +1176,19 @@ namespace mongo {
 			time_t saveLast = time(0);
             while ( 1 ) {
                 if ( !c->more() ) {
+                    dblock lk;
+                    OpTime nextLastSaved = nextLastSavedLocalTs();
+                    {
+                        dbtemprelease t;
+                        if ( c->more() ) {
+                            continue;
+                        } else {
+                            setLastSavedLocalTs( nextLastSaved );
+                        }
+                    }
                     log() << "pull:   applied " << n << " operations" << endl;
                     syncedTo = nextOpTime;
                     log(2) << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << '\n';
-                    dblock lk;
-                    updateLastSavedLocalTs();
                     save(); // note how far we are synced up to now
                     break;
                 }

@@ -87,7 +87,8 @@ namespace mongo {
         // call without the db mutex
         void syncToTailOfRemoteLog();
         // call with the db mutex
-        void updateLastSavedLocalTs();
+        OpTime nextLastSavedLocalTs() const;
+        void setLastSavedLocalTs( const OpTime &nextLocalTs );
         // call without the db mutex
         void resetSlave();
         // call with the db mutex
