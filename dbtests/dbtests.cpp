@@ -94,7 +94,6 @@ int main( int argc, char** argv ) {
     // make sure all tests run with this setup, by running javajs tests first.
     tests.add( jsTests(), "js" );
 
-    tests.add( basicTests(), "basic" );
     tests.add( btreeTests(), "btree" );
     tests.add( jsobjTests(), "jsobj" );
     tests.add( jsonTests(), "json" );
