@@ -1517,7 +1517,7 @@ namespace mongo {
                 string msg = ss.str();
                 ReplInfo r(msg.c_str());
                 sleepsecs(s);
-                out() << msg << endl;
+                log() << msg << endl;
             }
         }
     }
