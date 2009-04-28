@@ -295,6 +295,19 @@ namespace mongo {
         }
     } cmdismaster;
 
+    class CmdIsInitialSyncComplete : public Command {
+    public:
+        virtual bool requiresAuth() { return false; }
+        virtual bool slaveOk() {
+            return true;
+        }
+        CmdIsInitialSyncComplete() : Command( "isinitialsynccomplete" ) {}
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+            result.appendBool( "initialsynccomplete", getInitialSyncCompleted() );
+            return true;
+        }
+    } cmdisinitialsynccomplete;
+    
     /* negotiate who is master
 
        -1=not set (probably means we just booted)

@@ -231,7 +231,15 @@ ReplPair.prototype.start = function( reuseData ) {
 ReplPair.prototype.isMaster = function( mongo ) {
     var im = mongo.getDB( "admin" ).runCommand( { ismaster : 1 } );
     assert( im && im.ok, "command ismaster failed" );
+    printjson( im );
     return im.ismaster;
+}
+
+ReplPair.prototype.isInitialSyncComplete = function( mongo ) {
+    var isc = mongo.getDB( "admin" ).runCommand( { isinitialsynccomplete : 1 } );
+    assert( isc && isc.ok, "command isinitialsynccomplete failed" );
+    printjson( isc );
+    return isc.initialsynccomplete;
 }
 
 ReplPair.prototype.checkSteadyState = function( leftValues, rightValues ) {
@@ -239,31 +247,37 @@ ReplPair.prototype.checkSteadyState = function( leftValues, rightValues ) {
     rightValues = rightValues || {};
     
     var lm = null;
+    var lisc = null;
     if ( this.leftC_ != null ) {
         lm = this.isMaster( this.leftC_ );
         leftValues[ lm ] = true;
+        lisc = this.isInitialSyncComplete( this.leftC_ );
     }
     var rm = null;
+    var risc = null;
     if ( this.rightC_ != null ) {
         rm = this.isMaster( this.rightC_ );
         rightValues[ rm ] = true;
+        risc = this.isInitialSyncComplete( this.rightC_ );
     }
     
-    if ( rm == 1 && ( lm == null || lm == 0 ) ) {
-        assert( !( 1 in leftValues ) );
-        this.master_ = this.rightC_;
-        this.slave_ = this.leftC_;
-        return true;
-    } else if ( lm == 1 && ( rm == null || rm == 0 ) ) {
-        assert( !( 1 in rightValues ) );
-        this.master_ = this.leftC_;
-        this.slave_ = this.rightC_;        
-        return true;
-    } else {
-        this.master_ = null;
-        this.slave_ = null;
-        return false;
+    if ( ( risc || risc == null ) && ( lisc || lisc == null ) ) {
+        if ( rm == 1 && ( lm == null || lm == 0 ) ) {
+            assert( !( 1 in leftValues ) );
+            this.master_ = this.rightC_;
+            this.slave_ = this.leftC_;
+            return true;
+        } else if ( lm == 1 && ( rm == null || rm == 0 ) ) {
+            assert( !( 1 in rightValues ) );
+            this.master_ = this.leftC_;
+            this.slave_ = this.rightC_;        
+            return true;
+        }
     }
+    
+    this.master_ = null;
+    this.slave_ = null;
+    return false;
 }
 
 ReplPair.prototype.waitForSteadyState = function() {
