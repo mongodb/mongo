@@ -205,6 +205,8 @@ MongodRunner.prototype.start = function( reuseData ) {
 
 MongodRunner.prototype.port = function() { return this.port_; }
 
+MongodRunner.prototype.toString = function() { return [ this.port_, this.dbpath_, this.peer_, this.arbiter_ ].toString(); }
+
 ReplPair = function( left, right, arbiter ) {
     this.left_ = left;
     this.leftC_ = null;
@@ -246,7 +248,7 @@ ReplPair.prototype.isInitialSyncComplete = function( mongo, debug ) {
     return isc.initialsynccomplete;
 }
 
-ReplPair.prototype.checkSteadyState = function( leftValues, rightValues, debug ) {
+ReplPair.prototype.checkSteadyState = function( state, expectedMasterHost, twoMasterOk, leftValues, rightValues, debug ) {
     leftValues = leftValues || {};
     rightValues = rightValues || {};
     
@@ -266,16 +268,27 @@ ReplPair.prototype.checkSteadyState = function( leftValues, rightValues, debug )
     }
     
     if ( ( risc || risc == null ) && ( lisc || lisc == null ) ) {
-        if ( rm == 1 && ( lm == null || lm == 0 ) ) {
-            assert( !( 1 in leftValues ) );
+        if ( rm == 1 && lm != 1 ) {
+            assert( twoMasterOk || !( 1 in leftValues ) );
             this.master_ = this.rightC_;
             this.slave_ = this.leftC_;
-            return true;
-        } else if ( lm == 1 && ( rm == null || rm == 0 ) ) {
-            assert( !( 1 in rightValues ) );
+        } else if ( lm == 1 && rm != 1 ) {
+            assert( twoMasterOk || !( 1 in rightValues ) );
             this.master_ = this.leftC_;
             this.slave_ = this.rightC_;        
-            return true;
+        }
+        if ( !twoMasterOk ) {
+            assert( lm != 1 || rm != 1, "two masters" );
+        }
+        // check for expected state
+        if ( state.sort().toString() == [ lm, rm ].sort().toString() ) {
+            if ( expectedMasterHost != null ) {
+                if( expectedMasterHost == this.master_.host ) {
+                    return true;
+                }
+            } else {
+                return true;
+            }
         }
     }
     
@@ -284,11 +297,14 @@ ReplPair.prototype.checkSteadyState = function( leftValues, rightValues, debug )
     return false;
 }
 
-ReplPair.prototype.waitForSteadyState = function( debug ) {
+ReplPair.prototype.waitForSteadyState = function( state, expectedMasterHost, twoMasterOk, debug ) {
+    state = state || [ 1, 0 ];
+    twoMasterOk = twoMasterOk || false;
     var rp = this;
     var leftValues = {};
     var rightValues = {};
-    assert.soon( function() { return rp.checkSteadyState( leftValues, rightValues, debug ); } );
+    assert.soon( function() { return rp.checkSteadyState( state, expectedMasterHost, twoMasterOk, leftValues, rightValues, debug ); },
+                "rp (" + rp + ") failed to reach expected steady state (" + state + ")" );
 }
 
 ReplPair.prototype.master = function() { return this.master_; }
@@ -304,4 +320,27 @@ ReplPair.prototype.killNode = function( mongo, signal ) {
         stopMongod( this.right_.port_ );
         this.rightC_ = null;
     }    
+}
+
+ReplPair.prototype._annotatedNode = function( mongo ) {
+    var ret = "";
+    if ( mongo != null ) {
+        ret += " (connected)";
+        if ( this.master_ != null && mongo.host == this.master_.host ) {
+            ret += "(master)";
+        }
+        if ( this.slave_ != null && mongo.host == this.slave_.host ) {
+            ret += "(slave)";            
+        }
+    }    
+    return ret;
+}
+
+ReplPair.prototype.toString = function() {
+    var ret = "";
+    ret += "left: " + this.left_;
+    ret += " " + this._annotatedNode( this.leftC_ );
+    ret += " right: " + this.right_;
+    ret += " " + this._annotatedNode( this.rightC_ );
+    return ret;
 }
