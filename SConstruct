@@ -146,7 +146,7 @@ env.Append( CPPPATH=[ "." ] )
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
-onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "mongod" )
+onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
 nix = False
 useJavaHome = False
 linux = False
