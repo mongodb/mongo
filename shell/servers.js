@@ -228,37 +228,41 @@ ReplPair.prototype.start = function( reuseData ) {
     }
 }
 
-ReplPair.prototype.isMaster = function( mongo ) {
+ReplPair.prototype.isMaster = function( mongo, debug ) {
     var im = mongo.getDB( "admin" ).runCommand( { ismaster : 1 } );
     assert( im && im.ok, "command ismaster failed" );
-    printjson( im );
+    if ( debug ) {
+        printjson( im );
+    }
     return im.ismaster;
 }
 
-ReplPair.prototype.isInitialSyncComplete = function( mongo ) {
+ReplPair.prototype.isInitialSyncComplete = function( mongo, debug ) {
     var isc = mongo.getDB( "admin" ).runCommand( { isinitialsynccomplete : 1 } );
     assert( isc && isc.ok, "command isinitialsynccomplete failed" );
-    printjson( isc );
+    if ( debug ) {
+        printjson( isc );
+    }
     return isc.initialsynccomplete;
 }
 
-ReplPair.prototype.checkSteadyState = function( leftValues, rightValues ) {
+ReplPair.prototype.checkSteadyState = function( leftValues, rightValues, debug ) {
     leftValues = leftValues || {};
     rightValues = rightValues || {};
     
     var lm = null;
     var lisc = null;
     if ( this.leftC_ != null ) {
-        lm = this.isMaster( this.leftC_ );
+        lm = this.isMaster( this.leftC_, debug );
         leftValues[ lm ] = true;
-        lisc = this.isInitialSyncComplete( this.leftC_ );
+        lisc = this.isInitialSyncComplete( this.leftC_, debug );
     }
     var rm = null;
     var risc = null;
     if ( this.rightC_ != null ) {
-        rm = this.isMaster( this.rightC_ );
+        rm = this.isMaster( this.rightC_, debug );
         rightValues[ rm ] = true;
-        risc = this.isInitialSyncComplete( this.rightC_ );
+        risc = this.isInitialSyncComplete( this.rightC_, debug );
     }
     
     if ( ( risc || risc == null ) && ( lisc || lisc == null ) ) {
@@ -280,11 +284,11 @@ ReplPair.prototype.checkSteadyState = function( leftValues, rightValues ) {
     return false;
 }
 
-ReplPair.prototype.waitForSteadyState = function() {
+ReplPair.prototype.waitForSteadyState = function( debug ) {
     var rp = this;
     var leftValues = {};
     var rightValues = {};
-    assert.soon( function() { return rp.checkSteadyState( leftValues, rightValues ); } );
+    assert.soon( function() { return rp.checkSteadyState( leftValues, rightValues, debug ); } );
 }
 
 ReplPair.prototype.master = function() { return this.master_; }
