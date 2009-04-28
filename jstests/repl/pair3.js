@@ -9,14 +9,44 @@ ismaster = function( n ) {
     return im.ismaster;
 }
 
+// bring up node connections before arbiter connections so that arb can forward to node when expected
 connect = function() {
-    startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
-    startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
-    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
-    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
+    if ( lp == null ) {
+        lp = startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
+    }
+    if ( rp == null ) {
+        rp = startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
+    }
+    if ( al == null ) {
+        al = startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
+    }
+    if ( ar == null ) {
+        ar = startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
+    }
+}
+
+disconnectNode = function( mongo ) {
+    if ( lp ) {
+        stopMongoProgram( lpPort );
+        lp = null;
+    }
+    if ( rp ) {
+        stopMongoProgram( rpPort );
+        rp = null;
+    }
+    if ( mongo.host.match( new RegExp( "^127.0.0.1:" + lPort + "$" ) ) ) {
+        stopMongoProgram( alPort );
+        al = null;
+    } else if ( mongo.host.match( new RegExp( "^127.0.0.1:" + rPort + "$" ) ) ) {
+        stopMongoProgram( arPort );
+        ar = null;
+    } else {
+        assert( false, "don't know how to disconnect node: " + mongo );
+    }
 }
 
 doTest1 = function() {
+    al = ar = lp = rp = null;
     ports = allocatePorts( 7 );
     aPort = ports[ 0 ];
     alPort = ports[ 1 ];
@@ -28,166 +58,55 @@ doTest1 = function() {
     
     connect();
     
-    a = startMongod( "--port", aPort, "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface" );
-    l = startMongod( "--port", lPort, "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + rpPort, "127.0.0.1:" + alPort, "--oplogSize", "1", "--nohttpinterface" );
-    r = startMongod( "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + arPort, "--oplogSize", "1", "--nohttpinterface" );
-    
+    a = new MongodRunner( aPort, "/data/db/" + baseName + "-arbiter" );
+    l = new MongodRunner( lPort, "/data/db/" + baseName + "-left", "127.0.0.1:" + rpPort, "127.0.0.1:" + alPort );
+    r = new MongodRunner( rPort, "/data/db/" + baseName + "-right", "127.0.0.1:" + lpPort, "127.0.0.1:" + arPort );
+
+    pair = new ReplPair( l, r, a );
+
     // normal startup
+    pair.start();
+    pair.waitForSteadyState();
     
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == -1 || lm == 0, "lm value invalid" );
-                assert( rm == -1 || rm == 0 || rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
-
-    // disconnect l (slave)
+    // disconnect slave
+    disconnectNode( pair.slave() );
+    pair.waitForSteadyState( [ 1, -3 ], pair.master().host );
     
-    stopMongoProgram( alPort );
-    stopMongoProgram( lpPort );
-    stopMongoProgram( rpPort );
-    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 0 || lm == -3, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == -3 );
-                } );
-    
-    // disconnect r ( master )
-    
-    stopMongoProgram( arPort );
-    
-    assert.soon( function() {
-                rm = ismaster( r );
-                assert( rm == 1 || rm == -3, "rm value invalid" );
-                return ( rm == -3 );
-                } );
+    // disconnect master
+    disconnectNode( pair.master() );
+    pair.waitForSteadyState( [ -3, -3 ] );
     
     // reconnect
-    
-    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
-    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
-    // no arbiter yet, to ensure r becomes master.
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == -3 || lm == 0, "lm value invalid" );
-                assert( rm == -3 || rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
-    startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
-    startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
+    connect();
+    pair.waitForSteadyState();
 
-    // disconnect r ( master )
-    stopMongoProgram( arPort );
-    stopMongoProgram( lpPort );
-    stopMongoProgram( rpPort );
+    // disconnect master
+    disconnectNode( pair.master() );
+    pair.waitForSteadyState( [ 1, -3 ], pair.slave().host, true );
     
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 0 || lm == 1, "lm value invalid" );
-                assert( rm == 1 || rm == -3, "rm value invalid" );
-                
-                return ( rm == -3 && lm == 1 );
-                } );
+    // disconnect new master
+    disconnectNode( pair.master() );
+    pair.waitForSteadyState( [ -3, -3 ] );
     
-    // disconnect l ( new master )
-    stopMongoProgram( alPort );
-    
-    assert.soon( function() {
-                lm = ismaster( l );
-                assert( lm == 1 || lm == -3, "lm value invalid" );
-                return ( lm == -3 );
-                } );
-
     // reconnect
+    connect();
+    pair.waitForSteadyState();
     
-    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
-    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
-    // no arbiter yet, to ensure r becomes master.
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == -3 || lm == 0, "lm value invalid" );
-                assert( rm == -3 || rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
-    startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
-    startMongoProgram( "mongobridge", "--port", arPort, "--dest", "localhost:" + aPort );
-
-    // disconnect l ( slave )
-
-    stopMongoProgram( alPort );
-    stopMongoProgram( lpPort );
-    stopMongoProgram( rpPort );
+    // disconnect slave
+    disconnectNode( pair.slave() );
+    pair.waitForSteadyState( [ 1, -3 ], pair.master().host );
     
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 0 || lm == -3, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == -3 );
-                } );
-
-    // reconnect l
+    // reconnect slave
+    connect();
+    pair.waitForSteadyState( [ 1, 0 ], pair.master().host );
     
-    startMongoProgram( "mongobridge", "--port", alPort, "--dest", "localhost:" + aPort );
-    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
-    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
+    // disconnect master
+    disconnectNode( pair.master() );
+    pair.waitForSteadyState( [ 1, -3 ], pair.slave().host, true );
     
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 0 || lm == -3, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 );
-                } );
-    
-    // disconnect r ( master )
-    stopMongoProgram( arPort );
-    stopMongoProgram( lpPort );
-    stopMongoProgram( rpPort );
-    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 0 || lm == 1, "lm value invalid" );
-                assert( rm == 1 || rm == -3, "rm value invalid" );
-                
-                return ( rm == -3 && lm == 1 );
-                } );
-    
-    // reconnect r, without arbiter to prevent r becoming master.
-    startMongoProgram( "mongobridge", "--port", lpPort, "--dest", "localhost:" + lPort );
-    startMongoProgram( "mongobridge", "--port", rpPort, "--dest", "localhost:" + rPort );
-    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( rm == 0 || rm == -3, "rm value invalid" );
-                assert( lm == 1, "lm value invalid" );
-                
-                return ( rm == 0 );
-                } );
+    // reconnect old master
+    connect();
+    pair.waitForSteadyState( [ 1, 0 ], pair.master().host );
 
     ports.forEach( function( x ) { stopMongoProgram( x ); } );
 }

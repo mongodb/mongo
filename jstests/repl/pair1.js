@@ -62,29 +62,25 @@ doTest = function( signal ) {
     rp = new ReplPair( l, r, a );
     rp.start();
     rp.waitForSteadyState();
-    firstMaster = rp.master().host;
     
     checkSlaveGuard( rp.slave() );
     
     checkWrite( rp.master(), rp.slave() );
     
     rp.killNode( rp.master(), signal );
-    rp.waitForSteadyState();
+    rp.waitForSteadyState( [ 1, null ], rp.slave().host );
     writeOne( rp.master() );
     
     rp.start( true );
     rp.waitForSteadyState();
-    secondMaster = rp.master().host;
-    assert( firstMaster != secondMaster );
     check( rp.slave() );
     checkWrite( rp.master(), rp.slave() );
 
     rp.killNode( rp.master(), signal );
-    rp.waitForSteadyState();
+    rp.waitForSteadyState( [ 1, null ], rp.slave().host );
 
     rp.start( true );
-    rp.waitForSteadyState();
-    assert( firstMaster == rp.master().host );
+    rp.waitForSteadyState( [ 1, 0 ], rp.master().host );
     checkWrite( rp.master(), rp.slave() );
 
     ports.forEach( function( x ) { stopMongod( x ); } );
