@@ -170,3 +170,120 @@ ShardingTest.prototype.adminCommand = function(cmd){
     
     throw "command " + tojson( cmd ) + " failed: " + tojson( res );
 }
+
+MongodRunner = function( port, dbpath, peer, arbiter ) {
+    this.port_ = port;
+    this.dbpath_ = dbpath;
+    this.peer_ = peer;
+    this.arbiter_ = arbiter;
+}
+
+MongodRunner.prototype.start = function( reuseData ) {
+    var args = [];
+    if ( reuseData ) {
+        args.push( "mongod" );
+    }
+    args.push( "--port" );
+    args.push( this.port_ );
+    args.push( "--dbpath" );
+    args.push( this.dbpath_ );
+    if ( this.peer_ && this.arbiter_ ) {
+        args.push( "--pairwith" );
+        args.push( this.peer_ );
+        args.push( this.arbiter_ );
+        args.push( "--oplogSize" );
+        // small oplog by default so startup fast
+        args.push( "1" );
+    }
+    args.push( "--nohttpinterface" );
+    if ( reuseData ) {
+        return startMongoProgram.apply( null, args );
+    } else {
+        return startMongod.apply( null, args );
+    }
+}
+
+MongodRunner.prototype.port = function() { return this.port_; }
+
+ReplPair = function( left, right, arbiter ) {
+    this.left_ = left;
+    this.leftC_ = null;
+    this.right_ = right;
+    this.rightC_ = null;
+    this.arbiter_ = arbiter;
+    this.arbiterC_ = null;
+    this.master_ = null;
+    this.slave_ = null;
+}
+
+ReplPair.prototype.start = function( reuseData ) {
+    if ( this.arbiterC_ == null ) {
+        this.arbiterC_ = this.arbiter_.start();
+    }
+    if ( this.leftC_ == null ) {
+        this.leftC_ = this.left_.start( reuseData );
+    }
+    if ( this.rightC_ == null ) {
+        this.rightC_ = this.right_.start( reuseData );
+    }
+}
+
+ReplPair.prototype.isMaster = function( mongo ) {
+    var im = mongo.getDB( "admin" ).runCommand( { ismaster : 1 } );
+    assert( im && im.ok, "command ismaster failed" );
+    return im.ismaster;
+}
+
+ReplPair.prototype.checkSteadyState = function( leftValues, rightValues ) {
+    leftValues = leftValues || {};
+    rightValues = rightValues || {};
+    
+    var lm = null;
+    if ( this.leftC_ != null ) {
+        lm = this.isMaster( this.leftC_ );
+        leftValues[ lm ] = true;
+    }
+    var rm = null;
+    if ( this.rightC_ != null ) {
+        rm = this.isMaster( this.rightC_ );
+        rightValues[ rm ] = true;
+    }
+    
+    if ( rm == 1 ) {
+        assert( !( 1 in leftValues ) );
+        this.master_ = this.rightC_;
+        this.slave_ = this.leftC_;
+        return true;
+    } else if ( lm == 1 ) {
+        assert( !( 1 in rightValues ) );
+        this.master_ = this.leftC_;
+        this.slave_ = this.rightC_;        
+        return true;
+    } else {
+        this.master_ = null;
+        this.slave_ = null;
+        return false;
+    }
+}
+
+ReplPair.prototype.waitForSteadyState = function() {
+    var rp = this;
+    var leftValues = {};
+    var rightValues = {};
+    assert.soon( function() { return rp.checkSteadyState( leftValues, rightValues ); } );
+}
+
+ReplPair.prototype.master = function() { return this.master_; }
+ReplPair.prototype.slave = function() { return this.slave_; }
+
+ReplPair.prototype.killNode = function( mongo, signal ) {
+    signal = signal || 15;
+    if ( this.leftC_.host == mongo.host ) {
+        stopMongod( this.left_.port_ );
+        this.leftC_ = null;
+    }
+    if ( this.rightC_.host == mongo.host ) {
+        stopMongod( this.right_.port_ );
+        this.rightC_ = null;
+    }    
+}

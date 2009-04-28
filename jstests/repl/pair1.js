@@ -55,75 +55,33 @@ doTest = function( signal ) {
 
     ports = allocatePorts( 3 );
     
-    // spec small oplog for fast startup on 64bit machines
-    a = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface" );
-    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
-    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
+    a = new MongodRunner( ports[ 0 ], "/data/db/" + baseName + "-arbiter" );
+    l = new MongodRunner( ports[ 1 ], "/data/db/" + baseName + "-left", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ] );
+    r = new MongodRunner( ports[ 2 ], "/data/db/" + baseName + "-right", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ] ); 
+
+    rp = new ReplPair( l, r, a );
+    rp.start();
+    rp.waitForSteadyState();
     
-    assert.soon( function() {
-                am = ismaster( a );
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( am == 1, "am value invalid" );
-                assert( lm == -1 || lm == 0, "lm value invalid" );
-                assert( rm == -1 || rm == 0 || rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
+    checkSlaveGuard( rp.slave() );
     
-    checkSlaveGuard( l );
+    checkWrite( rp.master(), rp.slave() );
     
-    checkWrite( r, l );
+    rp.killNode( rp.master(), signal );
+    rp.waitForSteadyState();
+    writeOne( rp.master() );
     
-    stopMongod( ports[ 2 ], signal );
-    
-    assert.soon( function() {
-                lm = ismaster( l );
-                assert( lm == 0 || lm == 1, "lm value invalid" );
-                return ( lm == 1 );
-                } );
-    
-    writeOne( l );
-    
-    r = startMongoProgram( "mongod", "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
-    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1, "lm value invalid" );
-                assert( rm == -1 || rm == 0, "rm value invalid" );
-                
-                return ( rm == 0 );
-                } );
-    
-    // Once this returns, the initial sync for r will have completed.
-    check( r );
-    
-    checkWrite( l, r );
-    
-    stopMongod( ports[ 1 ], signal );
-    
-    assert.soon( function() {
-                rm = ismaster( r );
-                assert( rm == 0 || rm == 1, "rm value invalid" );
-                return ( rm == 1 );
-                } );
-    
-    l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface" );
-    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == -1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
-    
-    checkWrite( r, l );
+    rp.start( true );
+    rp.waitForSteadyState();
+    check( rp.slave() );
+    checkWrite( rp.master(), rp.slave() );
+
+    rp.killNode( rp.master(), signal );
+    rp.waitForSteadyState();
+
+    rp.start( true );
+    rp.waitForSteadyState();
+    checkWrite( rp.master(), rp.slave() );
 
     ports.forEach( function( x ) { stopMongod( x ); } );
 
