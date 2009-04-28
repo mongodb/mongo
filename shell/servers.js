@@ -249,12 +249,12 @@ ReplPair.prototype.checkSteadyState = function( leftValues, rightValues ) {
         rightValues[ rm ] = true;
     }
     
-    if ( rm == 1 ) {
+    if ( rm == 1 && ( lm == null || lm == 0 ) ) {
         assert( !( 1 in leftValues ) );
         this.master_ = this.rightC_;
         this.slave_ = this.leftC_;
         return true;
-    } else if ( lm == 1 ) {
+    } else if ( lm == 1 && ( rm == null || rm == 0 ) ) {
         assert( !( 1 in rightValues ) );
         this.master_ = this.leftC_;
         this.slave_ = this.rightC_;        
