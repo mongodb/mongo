@@ -613,9 +613,10 @@ namespace ReplTests {
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
             }
+            using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( fromjson( "{'_id':0,a:[4,5]}" ) );
+                check( fromjson( "{'_id':0,a:[4,5]}" ), one( fromjson( "{'_id':0}" ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -628,9 +629,10 @@ namespace ReplTests {
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ), true );
             }
+            using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( fromjson( "{'_id':0,a:[4,5]}" ) );
+                check( fromjson( "{'_id':0,a:[4,5]}" ), one( fromjson( "{'_id':0}" ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -643,9 +645,10 @@ namespace ReplTests {
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) << "$push" << BSON( "b.c" << 6.0 ) ) );
             }
+            using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( fromjson( "{'_id':0,a:[4,5],b:{c:[6]}}" ) );
+                check( fromjson( "{'_id':0,a:[4,5],b:{c:[6]}}" ), one( fromjson( "{'_id':0}" ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -658,9 +661,10 @@ namespace ReplTests {
             void doIt() const {
                 client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
             }
+            using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                checkOne( fromjson( "{'_id':0,a:[5]}" ) );
+                check( fromjson( "{'_id':0,a:[5]}" ), one( fromjson( "{'_id':0}" ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -687,6 +691,118 @@ namespace ReplTests {
             ASSERT( !one( BSON( "_id" << 1 ) ).isEmpty() );
             ASSERT( !one( BSON( "_id" << 2 ) ).isEmpty() );
         }
+    };
+    
+    class DbIdsTest {
+    public:
+        void run() {
+            dblock lk;
+            setClient( "repltest.DbIdsTest" );
+            
+            s_.reset( new DbIds( "local.temp.DbIdsTest" ) );
+            s_->reset();
+            check( false, false, false );
+
+            s_->set( "a", BSON( "_id" << 4 ), true );
+            check( true, false, false );
+            s_->set( "a", BSON( "_id" << 4 ), false );
+            check( false, false, false );
+            
+            s_->set( "b", BSON( "_id" << 4 ), true );
+            check( false, true, false );
+            s_->set( "b", BSON( "_id" << 4 ), false );
+            check( false, false, false );
+
+            s_->set( "a", BSON( "_id" << 5 ), true );
+            check( false, false, true );
+            s_->set( "a", BSON( "_id" << 5 ), false );
+            check( false, false, false );
+
+            s_->set( "a", BSON( "_id" << 4 ), true );
+            s_->set( "b", BSON( "_id" << 4 ), true );
+            s_->set( "a", BSON( "_id" << 5 ), true );
+            check( true, true, true );
+
+            s_->reset();
+            check( false, false, false );
+            
+            s_->set( "a", BSON( "_id" << 4 ), true );
+            s_->set( "a", BSON( "_id" << 4 ), true );
+            check( true, false, false );
+            s_->set( "a", BSON( "_id" << 4 ), false );
+            check( false, false, false );
+        }
+    private:
+        void check( bool one, bool two, bool three ) {
+            ASSERT_EQUALS( one, s_->get( "a", BSON( "_id" << 4 ) ) );
+            ASSERT_EQUALS( two, s_->get( "b", BSON( "_id" << 4 ) ) );
+            ASSERT_EQUALS( three, s_->get( "a", BSON( "_id" << 5 ) ) );            
+        }
+        auto_ptr< DbIds > s_;
+    };
+    
+    class MemIdsTest {
+    public:
+        void run() {
+            int n = sizeof( BSONObj ) + BSON( "_id" << 4 ).objsize();
+            
+            s_.reset();
+            ASSERT_EQUALS( 0, s_.roughSize() );
+            ASSERT( !s_.get( "a", BSON( "_id" << 4 ) ) );
+            ASSERT( !s_.get( "b", BSON( "_id" << 4 ) ) );
+            s_.set( "a", BSON( "_id" << 4 ), true );
+            ASSERT_EQUALS( n, s_.roughSize() );
+            ASSERT( s_.get( "a", BSON( "_id" << 4 ) ) );
+            ASSERT( !s_.get( "b", BSON( "_id" << 4 ) ) );
+            s_.set( "a", BSON( "_id" << 4 ), false );
+            ASSERT_EQUALS( 0, s_.roughSize() );
+            ASSERT( !s_.get( "a", BSON( "_id" << 4 ) ) );
+
+            s_.set( "a", BSON( "_id" << 4 ), true );
+            s_.set( "b", BSON( "_id" << 4 ), true );
+            s_.set( "b", BSON( "_id" << 100 ), true );
+            s_.set( "b", BSON( "_id" << 101 ), true );
+            ASSERT_EQUALS( n * 4, s_.roughSize() );
+        }
+    private:
+        MemIds s_;
+    };
+
+    class IdTrackerTest {
+    public:
+        void run() {
+            dblock lk;
+            setClient( "repltests.IdTrackerTest" );
+            
+            ASSERT( s_.inMem() );
+            s_.reset( 4 * sizeof( BSONObj ) - 1 );
+            s_.haveId( "a", BSON( "_id" << 0 ), true );
+            s_.haveId( "a", BSON( "_id" << 1 ), true );
+            s_.haveId( "b", BSON( "_id" << 0 ), true );
+            s_.haveModId( "b", BSON( "_id" << 0 ), true );
+            ASSERT( s_.inMem() );
+            check();
+            s_.mayUpgradeStorage();
+            ASSERT( !s_.inMem() );
+            check();
+            
+            s_.haveId( "a", BSON( "_id" << 1 ), false );
+            ASSERT( !s_.haveId( "a", BSON( "_id" << 1 ) ) );
+            s_.haveId( "a", BSON( "_id" << 1 ), true );
+            check();
+            ASSERT( !s_.inMem() );            
+            
+            s_.reset();
+            ASSERT( s_.inMem() );                        
+        }
+    private:
+        void check() {
+            ASSERT( s_.haveId( "a", BSON( "_id" << 0 ) ) );
+            ASSERT( s_.haveId( "a", BSON( "_id" << 1 ) ) );
+            ASSERT( s_.haveId( "b", BSON( "_id" << 0 ) ) );
+            ASSERT( s_.haveModId( "b", BSON( "_id" << 0 ) ) );            
+        }
+        IdTracker s_;
     };
     
     class All : public UnitTest::Suite {
@@ -722,6 +838,9 @@ namespace ReplTests {
             add< Idempotence::MultiPush >();
             add< Idempotence::EmptyPush >();
             add< DeleteOpIsIdBased >();
+            add< DbIdsTest >();
+            add< MemIdsTest >();
+            add< IdTrackerTest >();
         }
     };
     

@@ -37,7 +37,8 @@ namespace mongo {
                     
         virtual ScriptingFunction createFunction( const char * code ) = 0;
         virtual int invoke( ScriptingFunction func , const BSONObj& args ) = 0;
-
+        
+        int invoke( const char* code , const BSONObj& args );
     };
     
     class ScriptEngine : boost::noncopyable {

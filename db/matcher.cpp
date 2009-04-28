@@ -138,7 +138,6 @@ namespace mongo {
             in(0), nin(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
     {
         BSONObjIterator i(jsobj);
-        n = 0;
         while ( i.more() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
@@ -315,8 +314,7 @@ namespace mongo {
             addBasic(e, Equality);
         }
         
-        if ( keyMatch() )
-            constrainIndexKey_ = constrainIndexKey;
+        constrainIndexKey_ = constrainIndexKey;
     }
 
     inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep) {
@@ -400,7 +398,7 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
+    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr, bool nextArr) {
         if ( compareOp == NE )
             return matchesNe( fieldName, toMatch, obj, deep );
         if ( compareOp == NIN ) {
@@ -417,6 +415,7 @@ namespace mongo {
         if ( !constrainIndexKey_.isEmpty() ) {
             e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
             assert( !e.eoo() );
+            nextArr = true;
         } else {
             if ( isArr ) {
                 BSONObjIterator ai(obj);
@@ -425,7 +424,7 @@ namespace mongo {
                     BSONElement z = ai.next();
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep);
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep, false, nextArr);
                         if ( cmp > 0 ) {
                             if ( deep ) *deep = true;
                             return 1;
@@ -447,15 +446,16 @@ namespace mongo {
                     return -1;
 
                 BSONObj eo = se.embeddedObject();
-                return matchesDotted(p+1, toMatch, eo, compareOp, deep, se.type() == Array);
+                return matchesDotted(p+1, toMatch, eo, compareOp, deep, se.type() == Array, true);
             } else {
                 e = obj.getField(fieldName);
             }
         }
         
-        if ( valuesMatch(e, toMatch, compareOp, deep) ) {
+        if ( ( e.type() != Array || nextArr || compareOp == opALL || compareOp == opSIZE ) &&
+            valuesMatch(e, toMatch, compareOp, deep) ) {
             return 1;
-        } else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE ) {
+        } else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE && !nextArr ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.more() ) {
                 BSONElement z = ai.next();
@@ -520,7 +520,7 @@ namespace mongo {
         could be slow sometimes. */
 
         // check normal non-regex cases:
-        for ( int i = 0; i < n; i++ ) {
+        for ( unsigned i = 0; i < basics.size(); i++ ) {
             BasicMatcher& bm = basics[i];
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match

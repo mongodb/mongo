@@ -28,7 +28,14 @@
 
 #pragma once
 
+#include "pdfile.h"
+#include "db.h"
+#include "dbhelpers.h"
+#include "query.h"
+
 #include "../client/dbclient.h"
+
+#include "../util/optime.h"
 
 namespace mongo {
 
@@ -36,83 +43,17 @@ namespace mongo {
     class DBClientCursor;
     extern bool slave;
     extern bool master;
+    extern int opIdMem;
     
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth);
-
-    /* Operation sequence #.  A combination of current second plus an ordinal value.
-    */
-#pragma pack(4)
-    class OpTime {
-        unsigned i;
-        unsigned secs;
-    public:
-        unsigned getSecs() const {
-            return secs;
-        }
-        OpTime(unsigned long long date) {
-            reinterpret_cast<unsigned long long&>(*this) = date;
-        }
-        OpTime(unsigned a, unsigned b) {
-            secs = a;
-            i = b;
-        }
-        OpTime() {
-            secs = 0;
-            i = 0;
-        }
-        static OpTime now();
-
-        /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
-           64 bit "container" for these values.  While these are not really "Dates", that seems a
-           better choice for now than say, Number, which is floating point.  Note the BinData type
-           is perhaps the cleanest choice, lacking a true unsigned64 datatype, but BinData has 5 
-           bytes of overhead.
-        */
-        unsigned long long asDate() const {
-            return *((unsigned long long *) &i);
-        }
-//	  unsigned long long& asDate() { return *((unsigned long long *) &i); }
-
-        bool isNull() {
-            return secs == 0;
-        }
-
-        string toStringLong() const {
-            char buf[64];
-            time_t_to_String(secs, buf);
-            stringstream ss;
-            ss << buf << ' ';
-            ss << hex << secs << ':' << i;
-            return ss.str();
-        }
-
-        string toString() const {
-            stringstream ss;
-            ss << hex << secs << ':' << i;
-            return ss.str();
-        }
-        operator string() const { return toString(); }
-        bool operator==(const OpTime& r) const {
-            return i == r.i && secs == r.secs;
-        }
-        bool operator!=(const OpTime& r) const {
-            return !(*this == r);
-        }
-        bool operator<(const OpTime& r) const {
-            if ( secs != r.secs )
-                return secs < r.secs;
-            return i < r.i;
-        }
-    };
-#pragma pack()
 
     /* A replication exception */
     class SyncException : public DBException {
     public:
         virtual const char* what() const throw() { return "sync exception"; }
     };
-
+    
     /* A Source is a source from which we can pull (replicate) data.
        stored in collection local.sources.
 
@@ -126,8 +67,7 @@ namespace mongo {
     class ReplSource {
         bool resync(string db);
         bool sync_pullOpLog();
-        typedef map< string, BSONObjSetDefaultOrder > IdSets;
-        void sync_pullOpLog_applyOperation(BSONObj& op, IdSets &ids, IdSets &modIds, OpTime *localLogTail);
+        void sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail);
         
         auto_ptr<DBClientConnection> conn;
         auto_ptr<DBClientCursor> cursor;
@@ -143,16 +83,17 @@ namespace mongo {
         bool connect();
         // returns possibly unowned id spec for the operation.
         static BSONObj idForOp( const BSONObj &op, bool &mod );
-        static void updateSetsWithOp( const BSONObj &op, IdSets &changed, IdSets &modChanged );
+        static void updateSetsWithOp( const BSONObj &op, bool mayUpdateStorage );
         // call without the db mutex
         void syncToTailOfRemoteLog();
         // call with the db mutex
-        void updateLastSavedLocalTs();
+        OpTime nextLastSavedLocalTs() const;
+        void setLastSavedLocalTs( const OpTime &nextLocalTs );
         // call without the db mutex
         void resetSlave();
         // call with the db mutex
         // returns false if the slave has been reset
-        bool updateSetsWithLocalOps( IdSets &ids, IdSets &modIds, OpTime &localLogTail, bool unlock );
+        bool updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock );
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
         
     public:
@@ -208,4 +149,166 @@ namespace mongo {
     void _logOp(const char *opstr, const char *ns, const char *logNs, const BSONObj& obj, BSONObj *patt, bool *b, const OpTime &ts);
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt = 0, bool *b = 0);
 
+    class MemIds {
+    public:
+        MemIds() : size_() {}
+        friend class IdTracker;
+        void reset() { imp_.clear(); }
+        bool get( const char *ns, const BSONObj &id ) { return imp_[ ns ].count( id ); }
+        void set( const char *ns, const BSONObj &id, bool val ) {
+            if ( val ) {
+                if ( imp_[ ns ].insert( id.getOwned() ).second ) {
+                    size_ += id.objsize() + sizeof( BSONObj );
+                }
+            } else {
+                if ( imp_[ ns ].erase( id ) == 1 ) {
+                    size_ -= id.objsize() + sizeof( BSONObj );
+                }
+            }
+        }
+        long long roughSize() const {
+            return size_;
+        }
+    private:
+        typedef map< string, BSONObjSetDefaultOrder > IdSets;
+        IdSets imp_;
+        long long size_;
+    };
+        
+    // All functions must be called with db mutex held
+    class DbIds {
+    public:
+        DbIds( const char * name ) : name_( name ) {}
+        void reset() {
+            dbcache c;
+            setClientTempNs( name_ );
+            if ( nsdetails( name_ ) ) {
+                Helpers::emptyCollection( name_ );
+            } else {
+                string err;
+                massert( err, userCreateNS( name_, BSONObj(), err, false ) );
+            }
+            Helpers::ensureIndex( name_, BSON( "ns" << 1 << "id" << 1 ), true, "setIdx" );            
+        }
+        bool get( const char *ns, const BSONObj &id ) {
+            dbcache c;
+            setClientTempNs( name_ );
+            BSONObj temp;
+            return Helpers::findOne( name_, key( ns, id ), temp, true );                        
+        }
+        void set( const char *ns, const BSONObj &id, bool val ) {
+            dbcache c;
+            setClientTempNs( name_ );
+            if ( val ) {
+                try {
+                    BSONObj k = key( ns, id );
+                    theDataFileMgr.insert( name_, k );
+                } catch ( DBException& ) {
+                    // dup key - already in set
+                }
+            } else {
+                deleteObjects( name_, key( ns, id ), true, false, false );
+            }            
+        }
+    private:
+        struct dbcache {
+            Database *database_;
+            const char *curNs_;
+            dbcache() : database_( database ), curNs_( curNs ) {}
+            ~dbcache() {
+                database = database_;
+                curNs = curNs_;
+            }
+        };
+        static BSONObj key( const char *ns, const BSONObj &id ) {
+            BSONObjBuilder b;
+            b << "ns" << ns;
+            // rename _id to id since there may be duplicates
+            b.appendAs( id.firstElement(), "id" );
+            return b.obj();
+        }        
+        const char * name_;
+    };
+    
+    // All functions must be called with db mutex held
+    // Kind of sloppy class structure, for now just want to keep the in mem
+    // version speedy.
+    class IdTracker {
+    public:
+        IdTracker() :
+        dbIds_( "local.temp.replIds" ),
+        dbModIds_( "local.temp.replModIds" ),
+        inMem_( true ),
+        maxMem_( opIdMem ) {
+        }
+        void reset( int maxMem = opIdMem ) {
+            memIds_.reset();
+            memModIds_.reset();
+            dbIds_.reset();
+            dbModIds_.reset();
+            maxMem_ = maxMem;
+            inMem_ = true;
+        }
+        bool haveId( const char *ns, const BSONObj &id ) {
+            if ( inMem_ )
+                return get( memIds_, ns, id );
+            else
+                return get( dbIds_, ns, id );
+        }
+        bool haveModId( const char *ns, const BSONObj &id ) {
+            if ( inMem_ )
+                return get( memModIds_, ns, id );
+            else
+                return get( dbModIds_, ns, id );
+        }
+        void haveId( const char *ns, const BSONObj &id, bool val ) {
+            if ( inMem_ )
+                set( memIds_, ns, id, val );
+            else
+                set( dbIds_, ns, id, val );
+        }
+        void haveModId( const char *ns, const BSONObj &id, bool val ) {
+            if ( inMem_ )
+                set( memModIds_, ns, id, val );
+            else
+                set( dbModIds_, ns, id, val );
+        }
+        void mayUpgradeStorage() {
+            if ( !inMem_ || memIds_.roughSize() + memModIds_.roughSize() <= maxMem_ )
+                return;
+            log() << "saving master modified id information to collection" << endl;
+            upgrade( memIds_, dbIds_ );
+            upgrade( memModIds_, dbModIds_ );
+            memIds_.reset();
+            memModIds_.reset();
+            inMem_ = false;
+        }
+        bool inMem() const { return inMem_; }
+    private:
+        template< class T >
+        bool get( T &ids, const char *ns, const BSONObj &id ) {
+            return ids.get( ns, id );
+        }
+        template< class T >
+        void set( T &ids, const char *ns, const BSONObj &id, bool val ) {
+            ids.set( ns, id, val );
+        }
+        void upgrade( MemIds &a, DbIds &b ) {
+            for( MemIds::IdSets::const_iterator i = a.imp_.begin(); i != a.imp_.end(); ++i ) {
+                for( BSONObjSetDefaultOrder::const_iterator j = i->second.begin(); j != i->second.end(); ++j ) {
+                    set( b, i->first.c_str(), *j, true );            
+                    RARELY {
+                        dbtemprelease t;
+                    }
+                }
+            }
+        }
+        MemIds memIds_;
+        MemIds memModIds_;
+        DbIds dbIds_;
+        DbIds dbModIds_;
+        bool inMem_;
+        int maxMem_;
+    };
+    
 } // namespace mongo

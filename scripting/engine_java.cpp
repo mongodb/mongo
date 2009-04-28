@@ -401,6 +401,9 @@ namespace mongo {
         jstring s1 = _getEnv()->NewStringUTF( field );
         int guess = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _getEnv()->NewStringUTF( field ) );
         _getEnv()->DeleteLocalRef( s1 );
+        
+        if ( guess == 0 )
+            return BSONObj();
 
         char * buf = (char *) malloc(guess);
         jobject bb = _getEnv()->NewDirectByteBuffer( (void*)buf , guess );
@@ -408,7 +411,6 @@ namespace mongo {
 
         int len = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _getEnv()->NewStringUTF( field ) , bb );
         _getEnv()->DeleteLocalRef( bb );
-        //out() << "len : " << len << endl;
         jassert( len > 0 && len < guess );
 
         BSONObj obj(buf, true);
@@ -683,24 +685,14 @@ namespace mongo {
 
         JavaJSImpl& JavaJS = *mongo::JavaJS;
 
-        if ( debug ) log() << "about to create scope" << endl;
         jlong scope = JavaJS.scopeCreate();
         jassert( scope );
         if ( debug ) out() << "got scope" << endl;
 
 
         jlong func1 = JavaJS.functionCreate( "foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
-        jassert( ! JavaJS.invoke( scope , func1 ) );
+         jassert( ! JavaJS.invoke( scope , func1 ) );
 
-        jassert( 5.6 == JavaJS.scopeGetNumber( scope , "foo" ) );
-        jassert( ((string)"eliot") == JavaJS.scopeGetString( scope , "bar" ) );
-
-        if ( debug ) out() << "func2 start" << endl;
-        jassert( JavaJS.scopeSetNumber( scope , "a" , 5.17 ) );
-        jassert( JavaJS.scopeSetString( scope , "b" , "eliot" ) );
-        jlong func2 = JavaJS.functionCreate( "assert( 5.17 == a ); assert( \"eliot\" == b );" );
-        jassert( ! JavaJS.invoke( scope , func2 ) );
-        if ( debug ) out() << "func2 end" << endl;
 
         if ( debug ) out() << "func3 start" << endl;
         jlong func3 = JavaJS.functionCreate( "function(){ z = true; } " );

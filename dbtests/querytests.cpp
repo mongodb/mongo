@@ -462,6 +462,89 @@ namespace QueryTests {
         }
     };
 
+    class Size : public ClientBase {
+    public:
+        ~Size() {
+            client().dropCollection( "querytests.Size" );
+        }
+        void run() {
+            const char *ns = "querytests.Size";
+            client().insert( ns, fromjson( "{a:[1,2,3]}" ) );
+            client().ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT( client().query( ns, QUERY( "a" << SIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
+        }        
+    };
+    
+    class FullArray : public ClientBase {
+    public:
+        ~FullArray() {
+            client().dropCollection( "querytests.IndexedArray" );
+        }
+        void run() {
+            const char *ns = "querytests.IndexedArray";
+            client().insert( ns, fromjson( "{a:[1,2,3]}" ) );
+            ASSERT( !client().query( ns, Query( "{a:[1,2,3]}" ) )->more() );
+            client().ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT( !client().query( ns, Query( "{a:[1,2,3]}" ).hint( BSON( "a" << 1 ) ) )->more() );
+        }        
+    };
+
+    class InsideArray : public ClientBase {
+    public:
+        ~InsideArray() {
+            client().dropCollection( "querytests.InsideArray" );
+        }
+        void run() {
+            const char *ns = "querytests.InsideArray";
+            client().insert( ns, fromjson( "{a:[[1],2]}" ) );
+            check( "$natural" );
+            client().ensureIndex( ns, BSON( "a" << 1 ) );
+            check( "a" );
+        }        
+    private:
+        void check( const string &hintField ) {
+            const char *ns = "querytests.InsideArray";
+            ASSERT( !client().query( ns, Query( "{a:[[1],2]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( client().query( ns, Query( "{a:[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( client().query( ns, Query( "{a:2}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( !client().query( ns, Query( "{a:1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+        }
+    };
+
+    class IndexInsideArrayCorrect : public ClientBase {
+    public:
+        ~IndexInsideArrayCorrect() {
+            client().dropCollection( "querytests.IndexInsideArrayCorrect" );
+        }
+        void run() {
+            const char *ns = "querytests.IndexInsideArrayCorrect";
+            client().insert( ns, fromjson( "{'_id':1,a:[1]}" ) );
+            client().insert( ns, fromjson( "{'_id':2,a:[[1]]}" ) );
+            client().ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT_EQUALS( 2, client().query( ns, Query( "{a:[1]}" ).hint( BSON( "a" << 1 ) ) )->next().getIntField( "_id" ) );
+        }        
+    };
+    
+    class SubobjArr : public ClientBase {
+    public:
+        ~SubobjArr() {
+            client().dropCollection( "querytests.SubobjArr" );
+        }
+        void run() {
+            const char *ns = "querytests.SubobjArr";
+            client().insert( ns, fromjson( "{a:[{b:[1]}]}" ) );
+            check( "$natural" );
+            client().ensureIndex( ns, BSON( "a" << 1 ) );
+            check( "a" );
+        }        
+    private:
+        void check( const string &hintField ) {
+            const char *ns = "querytests.SubobjArr";
+            ASSERT( !client().query( ns, Query( "{'a.b':1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -487,6 +570,11 @@ namespace QueryTests {
             add< UniqueIndex >();
             add< UniqueIndexPreexistingData >();
             add< SubobjectInArray >();
+            add< Size >();
+            add< FullArray >();
+            add< InsideArray >();
+            add< IndexInsideArrayCorrect >();
+            add< SubobjArr >();
         }
     };
     

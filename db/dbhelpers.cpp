@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-    void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, const char *name) {
+    void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
         NamespaceDetails *d = nsdetails(ns);
         if( d == 0 )
             return;
@@ -46,6 +46,7 @@ namespace mongo {
         b.append("name", name);
         b.append("ns", ns);
         b.append("key", keyPattern);
+        b.appendBool("unique", unique);
         BSONObj o = b.done();
 
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
@@ -55,7 +56,8 @@ namespace mongo {
     public:
         FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
         virtual void init() {
-            massert( "Not an index cursor", !requireIndex_ || strcmp( qp().indexKey().firstElement().fieldName(), "$natural" ) != 0 );
+            if ( requireIndex_ && strcmp( qp().indexKey().firstElement().fieldName(), "$natural" ) == 0 )
+                throw MsgAssertionException( "Not an index cursor" );
             c_ = qp().newCursor();
             if ( !c_->ok() )
                 setComplete();
@@ -88,9 +90,10 @@ namespace mongo {
        set your db context first
     */
     bool Helpers::findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex) { 
-        QueryPlanSet s( ns, query, BSONObj() );
+        QueryPlanSet s( ns, query, BSONObj(), 0, !requireIndex );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );
+        massert( res->exceptionMessage(), res->complete() );
         if ( res->one().isEmpty() )
             return false;
         result = res->one();
@@ -105,7 +108,7 @@ namespace mongo {
 
         {
             BSONObj kp = fromjson("{\"x\":1}");
-            Helpers::ensureIndex("dwight.foo", kp, "x_1");
+            Helpers::ensureIndex("dwight.foo", kp, false, "x_1");
         }
 
         cout << Helpers::findOne("dwight.foo", q, result, true) << endl;

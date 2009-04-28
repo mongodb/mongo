@@ -19,7 +19,6 @@
 #pragma once
 
 #include "jsobj.h"
-#include "repl.h"
 
 namespace mongo {
 
@@ -34,12 +33,7 @@ public:
     /** Replace a Timestamp type with a Date type initialized to
      OpTime::now().asDate()
      */
-    void initTimestamp() {
-        massert( "Expected CurrentTime type", element_.type() == Timestamp );
-        unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
-        if ( timestamp == 0 )
-            timestamp = OpTime::now().asDate();
-    }
+    void initTimestamp();
     /** Change the value, in place, of the number. */
     void setNumber(double d) {
         if ( element_.type() == NumberDouble ) *reinterpret_cast< double * >( value() )  = d;
