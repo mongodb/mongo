@@ -299,14 +299,13 @@ namespace mongo {
 
 #define DEBUGGING if( 0 )
 
-    extern unsigned occasion;
-    extern unsigned occasionR;
-    extern unsigned once;
-
-#define OCCASIONALLY if( ++occasion % 16 == 0 )
-#define RARELY if( ++occasionR % 128 == 0 )
-#define ONCE if( ++once == 1 )
-
+    // The following declare one unique counter per enclosing function.
+    // NOTE The implementation double-increments on a match, but we don't really care.
+#define SOMETIMES( occasion, howOften ) for( static unsigned occasion = 0; ++occasion % howOften == 0; )
+#define OCCASIONALLY SOMETIMES( occasionally, 16 )
+#define RARELY SOMETIMES( rarely, 128 )
+#define ONCE for( static bool undone = true; undone; undone = false ) 
+    
 #if defined(_WIN32)
 #define strcasecmp _stricmp
     inline void our_debug_free(void *p) {

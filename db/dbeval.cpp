@@ -90,8 +90,8 @@ namespace mongo {
             int m = t.millis();
             if ( m > 100 ) {
                 out() << "dbeval slow, time: " << dec << m << "ms " << ns << endl;
-                OCCASIONALLY log() << code << endl;
-                else if ( m >= 1000 ) log() << code << endl;
+                if ( m >= 1000 ) log() << code << endl;
+                else OCCASIONALLY log() << code << endl;
             }
         }
         if ( res ) {
