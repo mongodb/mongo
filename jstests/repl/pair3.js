@@ -176,6 +176,7 @@ doTest2 = function() {
 
 // recover from master - master setup
 doTest3 = function() {
+    al = ar = lp = rp = null;
     ports = allocatePorts( 7 );
     aPort = ports[ 0 ];
     alPort = ports[ 1 ];
