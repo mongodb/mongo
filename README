@@ -86,3 +86,5 @@ COMPILING
    db\db run
 
 
+--- ubuntu ---
+ scons libboost-dev libpcre++-dev libmozjs-dev
