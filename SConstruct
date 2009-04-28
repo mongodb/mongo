@@ -193,6 +193,7 @@ serverOnlyFiles += [ "scripting/engine.cpp" ]
 
 if usesm:
     serverOnlyFiles += [ "scripting/engine_spidermonkey.cpp" ]
+    nojni = True
 elif not nojni:
     serverOnlyFiles += [ "scripting/engine_java.cpp" ]
 else:
@@ -242,7 +243,7 @@ def findVersion( root , choices ):
 
 def choosePathExist( choices , default=None):
     for c in choices:
-        if os.path.exists( c ):
+        if c != None and os.path.exists( c ):
             return c
     return default
 
@@ -428,6 +429,13 @@ def setupBuildInfoFile( outFile ):
 
 setupBuildInfoFile( "buildinfo.cpp" )
 
+def bigLibString( myenv ):
+    s = str( myenv["LIBS"] )
+    if 'SLIBS' in myenv._dict:
+        s += str( myenv["SLIBS"] )
+    return s
+    
+
 def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
@@ -513,7 +521,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     myenv["_HAVEPCAP"] = myCheckLib( "pcap", staticOnly=release )
 
     if usesm:
-        myCheckLib( "js" , True )
+        myCheckLib( [ "js" , "mozjs" ] , True )
+        if bigLibString(myenv).find( "mozjs" ) >= 0:
+            myenv.Append( CPPDEFINES=[ "MOZJS" ] )
 
     if shell:
         haveReadLine = False

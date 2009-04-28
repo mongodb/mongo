@@ -8,7 +8,11 @@
 #define XP_UNIX
 #endif
 
+#ifdef MOZJS
+#include "mozjs/jsapi.h"
+#else
 #include "js/jsapi.h"
+#endif
 
 namespace mongo {
 
