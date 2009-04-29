@@ -16,12 +16,83 @@
 
 namespace mongo {
 
+    class Convertor {
+    public:
+        Convertor( JSContext * cx ){
+            _context = cx;
+        }
+        
+        string toString( JSString * so ){
+            jschar * s = JS_GetStringChars( so );
+            size_t srclen = JS_GetStringLength( so );
+            
+            size_t len = srclen * 2;
+            char * dst = (char*)malloc( len );
+            assert( JS_EncodeCharacters( _context , s , srclen , dst , &len) );
+            
+            string ss( dst , len );
+            free( dst );
+            return ss;
+        }
+
+        string toString( jsval v ){
+            return toString( JS_ValueToString( _context , v ) );            
+        }
+
+        jsval toval( double d ){
+            jsval val;
+            assert( JS_NewNumberValue( _context, d , &val ) );
+            return val;
+        }
+        
+    private:
+        JSContext * _context;
+    };
+
     static JSClass global_class = {
         "global", JSCLASS_GLOBAL_FLAGS,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
         JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };    
+    
+    JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
+        Convertor c( cx );
+        
+        BSONObj * o = (BSONObj*)(JS_GetPrivate( cx , obj ));
+        cout << "yippee:" << o->toString() << endl;
+        
+        string s = c.toString( id );
+        cout << "the string: " << s << endl;
+        
+        jsval val;
+
+        BSONElement e = (*o)[ s.c_str() ];
+        switch( e.type() ){
+        case EOO:
+            *objp = 0;
+            return JS_TRUE;
+        case NumberDouble:
+        case NumberInt:
+            val = c.toval( e.number() );
+            assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
+            cout << "setting number" << endl;
+            break;
+        default:
+            log() << "resolveBSONField can't handle type: " << (int)(e.type()) << endl;
+            return JS_FALSE;
+        }
+        
+        *objp = obj;
+        return JS_TRUE;
+    }
+    
+    static JSClass bson_ro_class = {
+        "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
 
     class SMScope;
     
@@ -42,7 +113,7 @@ namespace mongo {
         Scope * createScope();
         
         void runTest();
-       
+        
     private:
         JSRuntime * _runtime;
         friend class SMScope;
@@ -61,6 +132,7 @@ namespace mongo {
     public:
         SMScope(){
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
+            _convertor = new Convertor( _context );
             massert( "JS_NewContext failed" , _context );
             
             JS_SetOptions( _context , JSOPTION_VAROBJFIX);
@@ -73,6 +145,7 @@ namespace mongo {
         }
 
         ~SMScope(){
+            delete _convertor;
             JS_DestroyContext( _context );
         }
         
@@ -97,24 +170,11 @@ namespace mongo {
             return d;
         }
 
-        string convert( JSString * so ){
-            jschar * s = JS_GetStringChars( so );
-            size_t srclen = JS_GetStringLength( so );
-
-            size_t len = srclen * 2;
-            char * dst = (char*)malloc( len );
-            assert( JS_EncodeCharacters( _context , s , srclen , dst , &len) );
-            
-            string ss( dst , len );
-            free( dst );
-            return ss;
-        }
-
         string getString( const char *field ){
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
             JSString * s = JS_ValueToString( _context , val );
-            return convert( s );
+            return _convertor->toString( s );
         }
 
         bool getBoolean( const char *field ){
@@ -135,18 +195,10 @@ namespace mongo {
             massert( "not implemented yet: type()" , 0 ); throw -1;  
         }
 
-        // ----- to value ----
-        
-        jsval toval( double d ){
-            jsval val;
-            assert( JS_NewNumberValue( _context, d , &val ) );
-            return val;
-        }
-        
         // ----- setters ------
         
         void setNumber( const char *field , double val ){
-            jsval v = toval( val );
+            jsval v = _convertor->toval( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
@@ -157,7 +209,11 @@ namespace mongo {
         }
 
         void setObject( const char *field , const BSONObj& obj ){
-            massert( "not implemented yet: setObject()" , 0 );            
+            JSObject * o = JS_NewObject( _context , &bson_ro_class , NULL, NULL);
+            JS_SetPrivate( _context , o , (void*)(&obj) );
+            // TODO: make a copy and then delete it
+            jsval v = OBJECT_TO_JSVAL( o );
+            JS_SetProperty( _context , _global , field , &v );
         }
 
         void setBoolean( const char *field , bool val ){
@@ -204,6 +260,7 @@ namespace mongo {
 
     private:
         JSContext * _context;
+        Convertor * _convertor;
         JSObject * _global;
     };
 
