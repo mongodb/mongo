@@ -864,9 +864,6 @@ namespace mongo {
         log( 6 ) << "ns: " << ns << ", justCreated: " << justCreated << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
         
         if ( justCreated || empty || incompleteClone ) {
-            if ( incompleteClone ) {
-                log() << "An earlier initial clone of '" << clientName << "' did not complete, will resync." << endl;
-            }
             // we must add to incomplete list now that setClient has been called
             incompleteCloneDbs.insert( clientName );
             if ( nClonedThisPass ) {
@@ -877,6 +874,9 @@ namespace mongo {
                  */
                 addDbNextPass.insert( clientName );
             } else {
+                if ( incompleteClone ) {
+                    log() << "An earlier initial clone of '" << clientName << "' did not complete, now resyncing." << endl;
+                }
                 save();
                 setClientTempNs( ns );
                 nClonedThisPass++;
