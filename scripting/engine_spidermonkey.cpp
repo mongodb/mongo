@@ -16,6 +16,12 @@
 
 namespace mongo {
 
+    void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){
+        log() << "JS Error: " << message << endl;
+        // TODO: send to Scope
+    }
+
+
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp );
 
     static JSClass bson_ro_class = {
@@ -49,7 +55,7 @@ namespace mongo {
             return toString( JS_ValueToString( _context , v ) );            
         }
 
-        // ---------- to spider monke ---------
+        // ---------- to spider monkey ---------
         
         jsval toval( double d ){
             jsval val;
@@ -90,7 +96,7 @@ namespace mongo {
         
         BSONObj * o = (BSONObj*)(JS_GetPrivate( cx , obj ));
         string s = c.toString( id );
-        
+       
         jsval val;
 
         BSONElement e = (*o)[ s.c_str() ];
@@ -160,7 +166,7 @@ namespace mongo {
             
             JS_SetOptions( _context , JSOPTION_VAROBJFIX);
             //JS_SetVersion( _context , JSVERSION_LATEST); TODO
-            //JS_SetErrorReporter( _context , reportError); TODO
+            JS_SetErrorReporter( _context , errorReporter );
             
             _global = JS_NewObject( _context , &global_class, NULL, NULL);
             massert( "JS_NewObject failed for global" , _global );
@@ -248,10 +254,20 @@ namespace mongo {
 
         // ---- functions -----
         
-        JSFunction * compileFunction( const char * code ){
-            if ( strstr( code , "function(" ) != code )
-                return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , code , strlen( code ) , "nofile" , 0 );
+        bool hasFunctionIdentifier( const string& code ){
+            return 
+                code.find( "function(" ) == 0 ||
+                code.find( "function (" ) ==0 ;
+        }
 
+        JSFunction * compileFunction( const char * code ){
+            if ( ! hasFunctionIdentifier( code ) ){
+                string s = code;
+                if ( strstr( code , "return" ) == 0 )
+                    s = "return " + s;
+                return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile" , 0 );
+            }
+            
             // TODO: there must be a way in spider monkey to do this - this is a total hack
 
             string s = "return ";
@@ -270,7 +286,8 @@ namespace mongo {
         
         int invoke( JSFunction * func , const BSONObj& args ){
             jsval rval;
-            JS_CallFunction( _context , _this , func , 0 , 0 , &rval );
+            if ( ! JS_CallFunction( _context , _this , func , 0 , 0 , &rval ) )
+                return -3;
             assert( JS_SetProperty( _context , _global , "return" , &rval ) );
             return 0;
         }
