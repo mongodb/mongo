@@ -316,7 +316,7 @@ ReplPair.prototype.left = function() { return this.leftC_; }
 
 ReplPair.prototype.killNode = function( mongo, signal ) {
     signal = signal || 15;
-    if ( this.lectC_ != null && this.leftC_.host == mongo.host ) {
+    if ( this.leftC_ != null && this.leftC_.host == mongo.host ) {
         stopMongod( this.left_.port_ );
         this.leftC_ = null;
     }
