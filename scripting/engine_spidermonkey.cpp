@@ -39,10 +39,17 @@ namespace mongo {
             return toString( JS_ValueToString( _context , v ) );            
         }
 
+        // ---------- to spider monke ---------
+        
         jsval toval( double d ){
             jsval val;
             assert( JS_NewNumberValue( _context, d , &val ) );
             return val;
+        }
+
+        jsval toval( const char * c ){
+            JSString * s = JS_NewStringCopyZ( _context , c );
+            return STRING_TO_JSVAL( s );
         }
         
     private:
@@ -60,10 +67,7 @@ namespace mongo {
         Convertor c( cx );
         
         BSONObj * o = (BSONObj*)(JS_GetPrivate( cx , obj ));
-        cout << "yippee:" << o->toString() << endl;
-        
         string s = c.toString( id );
-        cout << "the string: " << s << endl;
         
         jsval val;
 
@@ -75,14 +79,17 @@ namespace mongo {
         case NumberDouble:
         case NumberInt:
             val = c.toval( e.number() );
-            assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
-            cout << "setting number" << endl;
+            break;
+        case String:
+            val = c.toval( e.valuestr() );
             break;
         default:
             log() << "resolveBSONField can't handle type: " << (int)(e.type()) << endl;
+            uassert( "not done" , 0 );
             return JS_FALSE;
         }
-        
+
+        assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
         *objp = obj;
         return JS_TRUE;
     }
@@ -203,8 +210,7 @@ namespace mongo {
         }
 
         void setString( const char *field , const char * val ){
-            JSString * s = JS_NewStringCopyZ( _context , val );
-            jsval v = STRING_TO_JSVAL( s );
+            jsval v = _convertor->toval( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
