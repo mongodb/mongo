@@ -196,6 +196,40 @@ doTest3 = function() {
     ports.forEach( function( x ) { stopMongoProgram( x ); } );
 }
 
+// check that initial sync is persistent
+doTest4 = function( signal ) {
+    al = ar = lp = rp = null;
+    ports = allocatePorts( 7 );
+    aPort = ports[ 0 ];
+    alPort = ports[ 1 ];
+    arPort = ports[ 2 ];
+    lPort = ports[ 3 ];
+    lpPort = ports[ 4 ];
+    rPort = ports[ 5 ];
+    rpPort = ports[ 6 ];
+    
+    connect();
+    
+    a = new MongodRunner( aPort, "/data/db/" + baseName + "-arbiter" );
+    l = new MongodRunner( lPort, "/data/db/" + baseName + "-left", "127.0.0.1:" + rpPort, "127.0.0.1:" + alPort );
+    r = new MongodRunner( rPort, "/data/db/" + baseName + "-right", "127.0.0.1:" + lpPort, "127.0.0.1:" + arPort );
+    
+    pair = new ReplPair( l, r, a );
+    pair.start();
+    pair.waitForSteadyState();
+
+    pair.killNode( pair.left(), signal );
+    pair.killNode( pair.right(), signal );
+    stopMongoProgram( rpPort );
+    stopMongoProgram( lpPort );
+    
+    // now can only talk to arbiter
+    pair.start( true );
+    pair.waitForSteadyState( [ 1, 1 ], null, true );
+}
+
 doTest1();
 doTest2();
 doTest3();
+doTest4( 15 );
+doTest4( 9 );
