@@ -30,6 +30,7 @@
 namespace mongo {
 
     extern int port;
+    extern string bind_ip;
     extern const char *replInfo;
 
     bool getInitialSyncCompleted();
@@ -446,7 +447,7 @@ namespace mongo {
         authInfo.reset(ai);
         DbWebServer mini;
         int p = port + 1000;
-        if ( mini.init(p) ) {
+        if ( mini.init(bind_ip, p) ) {
             registerListenerSocket( mini.socket() );
             log() << "web admin interface listening on port " << p << '\n';
             mini.run();

@@ -27,7 +27,7 @@ namespace mongo {
         MiniWebServer();
         virtual ~MiniWebServer() {}
 
-        bool init(int _port);
+        bool init(const string &ip, int _port);
         void run();
 
         virtual void doRequest(

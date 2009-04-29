@@ -60,7 +60,7 @@ private:
 
 class MyListener : public Listener {
 public:
-    MyListener( int port ) : Listener( port ) {}
+    MyListener( int port ) : Listener( "", port ) {}
     virtual void accepted(MessagingPort *mp) {
         Forwarder f( *mp );
         boost::thread t( f );

@@ -28,9 +28,13 @@ namespace mongo {
         sock = 0;
     }
 
-    bool MiniWebServer::init(int _port) {
+    bool MiniWebServer::init(const string &ip, int _port) {
         port = _port;
-        SockAddr me(port);
+        SockAddr me;
+        if ( ip.empty() )
+            me = SockAddr( port );
+        else
+            me = SockAddr( ip.c_str(), port );
         sock = ::socket(AF_INET, SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
             log() << "ERROR: MiniWebServer listen(): invalid socket? " << errno << endl;
