@@ -70,37 +70,24 @@ doTest = function( recover, newMaster, newSlave ) {
     
     // start normally
     connect();
-    a = startMongod( "--port", aPort, "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface" );
-    l = startMongod( "--port", lPort, "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
-    r = startMongod( "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == -1 || lm == 0, "lm value invalid" );
-                assert( rm == -1 || rm == 0 || rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
+    a = new MongodRunner( aPort, "/data/db/" + baseName + "-arbiter" );
+    l = new MongodRunner( lPort, "/data/db/" + baseName + "-left", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort );
+    r = new MongodRunner( rPort, "/data/db/" + baseName + "-right", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort );
+    pair = new ReplPair( l, r, a );
+    pair.start();
+    pair.waitForSteadyState();
     
-    coll( r ).ensureIndex( {_id:1} );
-    
-    write( r, 0 );
-    write( r, 1 );
-    check( l, 0 );
-    check( l, 1 );
+    firstMaster = pair.master();
+    firstSlave = pair.slave();
+        
+    write( pair.master(), 0 );
+    write( pair.master(), 1 );
+    check( pair.slave(), 0 );
+    check( pair.slave(), 1 );
     
     // now each can only talk to arbiter
     disconnect();    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 1 && rm == 1 );
-                } );
+    pair.waitForSteadyState( [ 1, 1 ], null, true );
     
     m = newMaster();
     write( m, 10 );
@@ -119,8 +106,10 @@ doTest = function( recover, newMaster, newSlave ) {
     // recover
     recover();
     
-    [ r, l ].forEach( function( x ) { checkCount( x, 5 ); } );
-    [ r, l ].forEach( function( x ) { [ 0, 10, 20, 100 ].forEach( function( y ) { check( x, y ); } ); } );
+    nodes = [ pair.right(), pair.left() ];
+    
+    nodes.forEach( function( x ) { checkCount( x, 5 ); } );
+    nodes.forEach( function( x ) { [ 0, 10, 20, 100 ].forEach( function( y ) { check( x, y ); } ); } );
     
     checkM = function( c ) {
         assert.soon( function() {
@@ -129,10 +118,10 @@ doTest = function( recover, newMaster, newSlave ) {
                     return obj.m == undefined;
                     }, "n:2 test for " + c + " failed" );
     };
-    [ r, l ].forEach( function( x ) { checkM( x ); } );
+    nodes.forEach( function( x ) { checkM( x ); } );
 
     // check separate database
-    [ r, l ].forEach( function( x ) { assert.soon( function() {
+    nodes.forEach( function( x ) { assert.soon( function() {
                                                   r = db2Coll( x ).findOne( {_id:"a"} );
                                                   debug( r );
                                                   if ( r == null ) {
@@ -145,39 +134,22 @@ doTest = function( recover, newMaster, newSlave ) {
     
 }
 
-// no restart
 debug( "basic test" );
 doTest( function() {
        connect();
-       assert.soon( function() {
-                   lm = ismaster( l );
-                   rm = ismaster( r );
-                   
-                   assert( lm == 1 || lm == 0, "lm value invalid" );
-                   assert( rm == 1, "rm value invalid" );
-                   
-                   return ( lm == 0 && rm == 1 );
-                   } );       
-       }, function() { return r; }, function() { return l; } );
+       pair.waitForSteadyState( [ 1, 0 ], pair.right().host, true );
+       }, function() { return pair.right(); }, function() { return pair.left(); } );
 
 doRestartTest = function( signal ) {    
     doTest( function() {
            if ( signal == 9 ) {
                 sleep( 3000 );
            }
-           stopMongod( rPort, signal );
+           pair.killNode( firstMaster, signal );
            connect();
-           r = startMongoProgram( "mongod", "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
-           assert.soon( function() {
-                       lm = ismaster( l );
-                       rm = ismaster( r );
-                       
-                       assert( lm == 1, "lm value invalid" );
-                       assert( rm == -1 || rm == 0, "rm value invalid" );
-                       
-                       return ( lm == 1 && rm == 0 );
-                       } );       
-           }, function() { return l; }, function() { return r; } );
+           pair.start( true );
+           pair.waitForSteadyState( [ 1, 0 ], firstSlave.host, true );
+           }, function() { return firstSlave; }, function() { return firstMaster; } );
 }
 
 debug( "sigterm restart test" );

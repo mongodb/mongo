@@ -266,8 +266,10 @@ ReplPair.prototype.checkSteadyState = function( state, expectedMasterHost, twoMa
         rightValues[ rm ] = true;
         risc = this.isInitialSyncComplete( this.rightC_, debug );
     }
-    
-    if ( ( risc || risc == null ) && ( lisc || lisc == null ) ) {
+
+    var stateSet = {}
+    state.forEach( function( i ) { stateSet[ i ] = true; } );
+    if ( !( 1 in stateSet ) || ( ( risc || risc == null ) && ( lisc || lisc == null ) ) ) {
         if ( rm == 1 && lm != 1 ) {
             assert( twoMasterOk || !( 1 in leftValues ) );
             this.master_ = this.rightC_;
@@ -309,6 +311,8 @@ ReplPair.prototype.waitForSteadyState = function( state, expectedMasterHost, two
 
 ReplPair.prototype.master = function() { return this.master_; }
 ReplPair.prototype.slave = function() { return this.slave_; }
+ReplPair.prototype.right = function() { return this.rightC_; }
+ReplPair.prototype.left = function() { return this.leftC_; }
 
 ReplPair.prototype.killNode = function( mongo, signal ) {
     signal = signal || 15;

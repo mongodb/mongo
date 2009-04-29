@@ -53,98 +53,60 @@ doTest = function() {
     
     // start normally
     connect();
-    a = startMongod( "--port", aPort, "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface" );
-    l = startMongod( "--port", lPort, "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
-    r = startMongod( "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--nohttpinterface" );
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == -1 || lm == 0, "lm value invalid" );
-                assert( rm == -1 || rm == 0 || rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
+    a = new MongodRunner( aPort, "/data/db/" + baseName + "-arbiter" );
+    l = new MongodRunner( lPort, "/data/db/" + baseName + "-left", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort );
+    r = new MongodRunner( rPort, "/data/db/" + baseName + "-right", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort );
+    pair = new ReplPair( l, r, a );
+    pair.start();
+    pair.waitForSteadyState();
 
     disconnect();    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 1 && rm == 1 );
-                } );
+    pair.waitForSteadyState( [ 1, 1 ], null, true );
 
     print( "test one" );
     
-    // fill slave oplog
+    // fill new slave oplog
     for( i = 0; i < 1000; ++i ) {
-        l.getDB( baseName ).getCollection( baseName ).save( {b:big} );
+        pair.left().getDB( baseName ).getCollection( baseName ).save( {b:big} );
     }
-    l.getDB( baseName ).getCollection( baseName ).findOne();
+    pair.left().getDB( baseName ).getCollection( baseName ).findOne();
     
-    // write single to master
-    r.getDB( baseName ).getCollection( baseName ).save( {} );
+    // write single to new master
+    pair.right().getDB( baseName ).getCollection( baseName ).save( {} );
     
     connect();
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );       
+    pair.waitForSteadyState( [ 1, 0 ], pair.right().host, true );
 
-    resetSlave( l );
+    resetSlave( pair.left() );
     
-    checkCount( l, 1 );
-    checkCount( r, 1 );
+    checkCount( pair.left(), 1 );
+    checkCount( pair.right(), 1 );
     
-    r.getDB( baseName ).getCollection( baseName ).remove( {} );
-    checkCount( l, 0 );
+    pair.right().getDB( baseName ).getCollection( baseName ).remove( {} );
+    checkCount( pair.left(), 0 );
     
     disconnect();    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 1 && rm == 1 );
-                } );
+    pair.waitForSteadyState( [ 1, 1 ], null, true );
 
     print( "test two" );
     
-    // fill master oplog
+    // fill new master oplog
     for( i = 0; i < 1000; ++i ) {
-        r.getDB( baseName ).getCollection( baseName ).save( {b:big} );
+        pair.right().getDB( baseName ).getCollection( baseName ).save( {b:big} );
     }
 
-    l.getDB( baseName ).getCollection( baseName ).save( {_id:"abcde"} );
+    pair.left().getDB( baseName ).getCollection( baseName ).save( {_id:"abcde"} );
 
     connect();
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-              
-                return ( lm == 0 && rm == 1 );
-                } );       
+    pair.waitForSteadyState( [ 1, 0 ], pair.right().host, true );
     
     sleep( 15000 );
     
-    resetSlave( l );
+    resetSlave( pair.left() );
     
-    checkCount( l, 1000 );
-    checkCount( r, 1000 );
-    assert.eq( 0, l.getDB( baseName ).getCollection( baseName ).find( {_id:"abcde"} ).count() );
+    checkCount( pair.left(), 1000 );
+    checkCount( pair.right(), 1000 );
+    assert.eq( 0, pair.left().getDB( baseName ).getCollection( baseName ).find( {_id:"abcde"} ).count() );
     
     ports.forEach( function( x ) { stopMongoProgram( x ); } );
     

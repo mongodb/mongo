@@ -48,62 +48,41 @@ doTest = function( nSlave, opIdMem ) {
     lpPort = ports[ 2 ];
     rPort = ports[ 3 ];
     rpPort = ports[ 4 ];
-    
+        
     // start normally
     connect();
-    a = startMongod( "--port", aPort, "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface" );
-    l = startMongod( "--port", lPort, "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--opIdMem", opIdMem, "--nohttpinterface" );
-    r = startMongod( "--port", rPort, "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "--oplogSize", "1", "--opIdMem", opIdMem, "--nohttpinterface" );
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == -1 || lm == 0, "lm value invalid" );
-                assert( rm == -1 || rm == 0 || rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );
+    a = new MongodRunner( aPort, "/data/db/" + baseName + "-arbiter" );
+    l = new MongodRunner( lPort, "/data/db/" + baseName + "-left", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort );
+    r = new MongodRunner( rPort, "/data/db/" + baseName + "-right", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort );
+    pair = new ReplPair( l, r, a );
+    pair.start();
+    pair.waitForSteadyState();
     
     // now each can only talk to arbiter
     disconnect();    
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 1 && rm == 1 );
-                } );
+    pair.waitForSteadyState( [ 1, 1 ], null, true );
     
+    // left will become slave
     for( i = 0; i < nSlave; ++i ) {
-        write( l, i, i );
+        write( pair.left(), i, i );
     }    
-    l.getDB( baseName ).getCollection( baseName ).findOne();
+    pair.left().getDB( baseName ).getCollection( baseName ).findOne();
 
     for( i = 10000; i < 15000; ++i ) {
-        write( r, i, i );
+        write( pair.right(), i, i );
     }    
-    r.getDB( baseName ).getCollection( baseName ).findOne();
+    pair.right().getDB( baseName ).getCollection( baseName ).findOne();
 
     connect();
-    assert.soon( function() {
-                lm = ismaster( l );
-                rm = ismaster( r );
-                
-                assert( lm == 1 || lm == 0, "lm value invalid" );
-                assert( rm == 1, "rm value invalid" );
-                
-                return ( lm == 0 && rm == 1 );
-                } );       
+    pair.waitForSteadyState( [ 1, 0 ], pair.right().host, true );
 
-    r.getDB( baseName ).getCollection( baseName ).update( {_id:nSlave - 1}, {_id:nSlave - 1,n:-1}, true );
-    assert.eq( -1, r.getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n );
-    checkCount( r, 5000 + nSlave );
-    assert.eq( -1, r.getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n );
-    l.setSlaveOk();
+    pair.master().getDB( baseName ).getCollection( baseName ).update( {_id:nSlave - 1}, {_id:nSlave - 1,n:-1}, true );
+    assert.eq( -1, pair.master().getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n );
+    checkCount( pair.master(), 5000 + nSlave );
+    assert.eq( -1, pair.master().getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n );
+    pair.slave().setSlaveOk();
     assert.soon( function() {
-                n = l.getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n;
+                n = pair.slave().getDB( baseName ).getCollection( baseName ).findOne( {_id:nSlave - 1} ).n;
                 print( n );
                 return -1 == n;
                 } );
