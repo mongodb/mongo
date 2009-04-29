@@ -42,7 +42,11 @@ namespace mongo {
     /* listener ------------------------------------------------------------------- */
 
     bool Listener::init() {
-        SockAddr me(port);
+        SockAddr me;
+        if ( ip.empty() )
+            me = SockAddr( port );
+        else
+            me = SockAddr( ip.c_str(), port );
         sock = ::socket(AF_INET, SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
             log() << "ERROR: listen(): invalid socket? " << errno << endl;

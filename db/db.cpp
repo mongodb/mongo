@@ -45,6 +45,7 @@ namespace mongo {
     bool noHttpInterface = false;
     
     extern int port;
+    extern string bind_ip;
     extern int curOp;
     extern bool autoresync;
     extern string dashDashSource;
@@ -113,7 +114,7 @@ namespace mongo {
 
     class OurListener : public Listener {
     public:
-        OurListener(int p) : Listener(p) { }
+        OurListener(const string &ip, int p) : Listener(ip, p) { }
         virtual void accepted(MessagingPort *mp) {
             assert( grab == 0 );
             grab = mp;
@@ -138,7 +139,7 @@ namespace mongo {
         pdfileInit();
         //testTheDb();
         log() << "waiting for connections on port " << port << endl;
-        OurListener l(port);
+        OurListener l(bind_ip, port);
         startReplication();
         if ( !noHttpInterface )
             boost::thread thr(webServerThread);
@@ -506,6 +507,8 @@ int main(int argc, char* argv[], char *envp[] )
 
             if ( s == "--port" )
                 port = atoi(argv[++i]);
+            if ( s == "--bind_ip" )
+                bind_ip = argv[++i];
             else if ( s == "--nojni" )
                 useJNI = false;
             else if ( s == "--master" )
@@ -596,6 +599,7 @@ usage:
     out() << "\nOptions:\n";
     out() << " --help                    show this usage information\n";
     out() << " --port <portno>           specify port number, default is 27017\n";
+    out() << " --bind_ip <ip>            local ip address to bind listener; all local ips bound by default\n";
     out() << " --dbpath <root>           directory for datafiles, default is /data/db/\n";
     out() << " --quiet                   quieter output\n";
     out() << " --cpu                     show cpu+iowait utilization periodically\n";
