@@ -16,6 +16,16 @@
 
 namespace mongo {
 
+    JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp );
+
+    static JSClass bson_ro_class = {
+        "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+
     class Convertor {
     public:
         Convertor( JSContext * cx ){
@@ -50,6 +60,18 @@ namespace mongo {
         jsval toval( const char * c ){
             JSString * s = JS_NewStringCopyZ( _context , c );
             return STRING_TO_JSVAL( s );
+        }
+
+        JSObject * toObject( const BSONObj * obj , bool readOnly=true ){
+            // TODO: make a copy and then delete it
+            JSObject * o = JS_NewObject( _context , &bson_ro_class , NULL, NULL);
+            JS_SetPrivate( _context , o , (void*)obj );
+            return o;
+        }
+        
+        jsval toval( const BSONObj* obj , bool readOnly=true ){
+            JSObject * o = toObject( obj , readOnly );
+            return OBJECT_TO_JSVAL( o );
         }
         
     private:
@@ -94,12 +116,6 @@ namespace mongo {
         return JS_TRUE;
     }
     
-    static JSClass bson_ro_class = {
-        "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, JS_FinalizeStub,
-        JSCLASS_NO_OPTIONAL_MEMBERS
-    };
 
     class SMScope;
     
@@ -149,6 +165,8 @@ namespace mongo {
             _global = JS_NewObject( _context , &global_class, NULL, NULL);
             massert( "JS_NewObject failed for global" , _global );
             massert( "js init failed" , JS_InitStandardClasses( _context , _global ) );
+
+            _this = 0;
         }
 
         ~SMScope(){
@@ -215,10 +233,7 @@ namespace mongo {
         }
 
         void setObject( const char *field , const BSONObj& obj ){
-            JSObject * o = JS_NewObject( _context , &bson_ro_class , NULL, NULL);
-            JS_SetPrivate( _context , o , (void*)(&obj) );
-            // TODO: make a copy and then delete it
-            jsval v = OBJECT_TO_JSVAL( o );
+            jsval v = _convertor->toval( &obj );
             JS_SetProperty( _context , _global , field , &v );
         }
 
@@ -228,7 +243,7 @@ namespace mongo {
         }
 
         void setThis( const BSONObj * obj ){
-            massert( "not implemented yet: setThis()" , 0 );            
+            _this = _convertor->toObject( obj );
         }
 
         // ---- functions -----
@@ -255,7 +270,7 @@ namespace mongo {
         
         int invoke( JSFunction * func , const BSONObj& args ){
             jsval rval;
-            JS_CallFunction( _context , 0 , func , 0 , 0 , &rval );
+            JS_CallFunction( _context , _this , func , 0 , 0 , &rval );
             assert( JS_SetProperty( _context , _global , "return" , &rval ) );
             return 0;
         }
@@ -267,7 +282,9 @@ namespace mongo {
     private:
         JSContext * _context;
         Convertor * _convertor;
+
         JSObject * _global;
+        JSObject * _this;
     };
 
     void SMEngine::runTest(){

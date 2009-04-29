@@ -107,7 +107,7 @@ namespace JSTests {
         void run(){
             Scope * s = globalScriptEngine->createScope();
             
-            BSONObj o = BSON( "x" << 17 << "y" << "eliot" );
+            BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" );
             s->setObject( "blah" , o );
 
             s->invoke( "return blah.x;" , BSONObj() );
@@ -115,6 +115,11 @@ namespace JSTests {
             s->invoke( "return blah.y;" , BSONObj() );
             ASSERT_EQUALS( "eliot" , s->getString( "return" ) );
 
+            s->setThis( & o );
+            s->invoke( "return this.z;" , BSONObj() );
+            ASSERT_EQUALS( "sara" , s->getString( "return" ) );
+
+            
             delete s;
         }
     };
