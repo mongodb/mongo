@@ -80,6 +80,24 @@ namespace mongo {
             return OBJECT_TO_JSVAL( o );
         }
         
+        jsval toval( const BSONElement& e ){
+
+            switch( e.type() ){
+            case EOO:
+                return JSVAL_NULL;
+            case NumberDouble:
+            case NumberInt:
+                return toval( e.number() );
+            case String:
+                return toval( e.valuestr() );
+            default:
+                log() << "resolveBSONField can't handle type: " << (int)(e.type()) << endl;
+            }
+            
+            uassert( "not done" , 0 );
+            return 0;
+        }
+        
     private:
         JSContext * _context;
     };
@@ -97,25 +115,14 @@ namespace mongo {
         BSONObj * o = (BSONObj*)(JS_GetPrivate( cx , obj ));
         string s = c.toString( id );
        
-        jsval val;
-
         BSONElement e = (*o)[ s.c_str() ];
-        switch( e.type() ){
-        case EOO:
+
+        if ( e.type() == EOO ){
             *objp = 0;
             return JS_TRUE;
-        case NumberDouble:
-        case NumberInt:
-            val = c.toval( e.number() );
-            break;
-        case String:
-            val = c.toval( e.valuestr() );
-            break;
-        default:
-            log() << "resolveBSONField can't handle type: " << (int)(e.type()) << endl;
-            uassert( "not done" , 0 );
-            return JS_FALSE;
         }
+        
+        jsval val = c.toval( e );
 
         assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
         *objp = obj;
@@ -211,7 +218,7 @@ namespace mongo {
         bool getBoolean( const char *field ){
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
-
+            
             JSBool b;
             assert( JS_ValueToBoolean( _context, val , &b ) );
 
@@ -223,7 +230,21 @@ namespace mongo {
         }
 
         int type( const char *field ){
-            massert( "not implemented yet: type()" , 0 ); throw -1;  
+            jsval val;
+            assert( JS_GetProperty( _context , _global , field , &val ) );
+            
+            switch ( JS_TypeOfValue( _context , val ) ){
+            case JSTYPE_VOID: return Undefined;
+            case JSTYPE_NULL: return jstNULL;
+            case JSTYPE_OBJECT:	return Object;
+            case JSTYPE_FUNCTION: return Code;
+            case JSTYPE_STRING: return String;
+            case JSTYPE_NUMBER: return NumberDouble;
+            case JSTYPE_BOOLEAN: return Bool;
+            default:
+                uassert( "unknown type" , 0 );
+            }
+            return 0;
         }
 
         // ----- setters ------
@@ -286,8 +307,17 @@ namespace mongo {
         
         int invoke( JSFunction * func , const BSONObj& args ){
             jsval rval;
-            if ( ! JS_CallFunction( _context , _this , func , 0 , 0 , &rval ) )
+            
+            int nargs = args.nFields();
+            jsval smargs[nargs];
+            
+            BSONObjIterator it( args );
+            for ( int i=0; i<nargs; i++ )
+                smargs[i] = _convertor->toval( it.next() );
+            
+            if ( ! JS_CallFunction( _context , _this , func , nargs , smargs , &rval ) )
                 return -3;
+            
             assert( JS_SetProperty( _context , _global , "return" , &rval ) );
             return 0;
         }
