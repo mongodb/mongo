@@ -610,7 +610,7 @@ def jsToH(target, source, env):
     return None
 
 jshBuilder = Builder(action = jsToH,
-                    suffix = '.jsh',
+                    suffix = '.cpp',
                     src_suffix = '.jsall')
 
 env.Append( BUILDERS={'JSHeader' : jshBuilder})

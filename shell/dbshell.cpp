@@ -10,7 +10,7 @@
 #include "ShellUtils.h"
 #include "MongoJS.h"
 
-#include "mongo.jsh"
+extern const char * jsconcatcode;
 
 
 void shellHistoryInit(){

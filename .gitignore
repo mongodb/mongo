@@ -19,6 +19,7 @@
 *.log
 *#
 .#*
+shell/mongo.cpp
 
 db/Debug
 db/oplog*
