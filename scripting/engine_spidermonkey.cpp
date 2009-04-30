@@ -195,6 +195,10 @@ namespace mongo {
             massert( "not implemented yet" , 0 );            
         }
 
+        void localConnect( const char * dbName ){
+            uassert( "localConnect not done" , 0 );
+        }
+
         // ----- getters ------
         double getNumber( const char *field ){
             jsval val;

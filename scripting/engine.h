@@ -21,6 +21,7 @@ namespace mongo {
             init( &o );
         }
         
+        virtual void localConnect( const char * dbName ) = 0;
         
         virtual double getNumber( const char *field ) = 0;
         virtual string getString( const char *field ) = 0;

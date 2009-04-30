@@ -164,6 +164,10 @@ namespace mongo {
         void init( BSONObj * o ) {
             JavaJS->scopeInit( s , o );
         }
+
+        void localConnect( const char * dbName ){
+            setString("$client", dbName );
+        }
         
         double getNumber(const char *field) {
             return JavaJS->scopeGetNumber(s,field);
