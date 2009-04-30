@@ -575,11 +575,6 @@ namespace QueryTests {
                 ASSERT_EQUALS( 1, obj.getIntField( "b" ) );
                 ASSERT( !c->more() );
             }
-            
-            // TEMP
-            ASSERT( !error() );
-            client().findOne( ns, Query().min( BSON( "a" << 1 << "b" << 1 ) ) );
-            ASSERT( error() );
         }
     private:
         auto_ptr< DBClientCursor > query( int minA, int minB, int maxA, int maxB, const BSONObj &hint ) {

@@ -821,7 +821,15 @@ namespace mongo {
             return true;
         }
     } cmdFileMD5;
-    
+        
+    const IndexDetails *cmdIndexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
+        if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
+            errmsg = "invalid command syntax (note: min and max are required)";
+            return 0;
+        }
+        return indexDetailsForRange( ns, errmsg, min, max, keyPattern );
+    }
+        
     class CmdMedianKey : public Command {
     public:
         CmdMedianKey() : Command( "medianKey" ) {}
@@ -836,7 +844,7 @@ namespace mongo {
             BSONObj max = jsobj.getObjectField( "max" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
             
-            const IndexDetails *id = indexDetailsForRange( ns, errmsg, min, max, keyPattern );
+            const IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
             if ( id == 0 )
                 return false;
 
@@ -883,7 +891,7 @@ namespace mongo {
                 errmsg = "only one of min or max specified";
                 return false;
             } else {            
-                const IndexDetails *id = indexDetailsForRange( ns, errmsg, min, max, keyPattern );
+                const IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
                 if ( id == 0 )
                     return false;
                 c.reset( new BtreeCursor( *id, min, max, 1 ) );

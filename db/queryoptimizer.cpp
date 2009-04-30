@@ -199,9 +199,6 @@ namespace mongo {
     }
     
     void QueryPlanSet::init() {
-        // TEMP
-        uassert( "min and max must be specified together", ( min_.isEmpty() + max_.isEmpty() ) % 2 == 0 );
-        
         plans_.clear();
         mayRecordPlan_ = true;
         usingPrerecordedPlan_ = false;
@@ -441,11 +438,67 @@ namespace mongo {
         }
         return false;
     }
+
+    BSONObj extremeKeyForIndex( const BSONObj &idxPattern, int baseDirection ) {
+        BSONObjIterator i( idxPattern );
+        BSONObjBuilder b;
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            int idxDirection = e.number() >= 0 ? 1 : -1;
+            int direction = idxDirection * baseDirection;
+            switch( direction ) {
+                case 1:
+                    b.appendMaxKey( e.fieldName() );
+                    break;
+                case -1:
+                    b.appendMinKey( e.fieldName() );
+                    break;
+                default:
+                    assert( false );
+            }
+        }
+        return b.obj();        
+    }
+    
+    pair< int, int > keyAudit( const BSONObj &min, const BSONObj &max ) {
+        int direction = 0;
+        int firstSignificantField = 0;
+        BSONObjIterator i( min );
+        BSONObjIterator a( max );
+        while( 1 ) {
+            BSONElement ie = i.next();
+            BSONElement ae = a.next();
+            if ( ie.eoo() && ae.eoo() )
+                break;
+            if ( ie.eoo() || ae.eoo() || strcmp( ie.fieldName(), ae.fieldName() ) != 0 ) {
+                return make_pair( -1, -1 );
+            }
+            int cmp = ie.woCompare( ae );
+            if ( cmp < 0 )
+                direction = 1;
+            if ( cmp > 0 )
+                direction = -1;
+            if ( direction != 0 )
+                break;
+            ++firstSignificantField;
+        }
+        return make_pair( direction, firstSignificantField );
+    }
+
+    pair< int, int > flexibleKeyAudit( const BSONObj &min, const BSONObj &max ) {
+        if ( min.isEmpty() || max.isEmpty() ) {
+            return make_pair( 1, -1 );
+        } else {
+            return keyAudit( min, max );
+        }
+    }
     
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
     const IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
-        if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
-            errmsg = "invalid command syntax (note: min and max are required)";
+        if ( min.isEmpty() && max.isEmpty() ) {
+            errmsg = "one of min or max must be specified";
             return 0;
         }
         
@@ -457,32 +510,15 @@ namespace mongo {
             return 0;
         }
         
+        pair< int, int > ret = flexibleKeyAudit( min, max );
+        if ( ret == make_pair( -1, -1 ) ) {
+            errmsg = "min and max keys do not share pattern";
+            return 0;
+        }
         if ( keyPattern.isEmpty() ) {
-            BSONObjIterator i( min );
-            BSONObjIterator a( max );
-            int direction = 0;
-            int firstSignificantField = 0;
-            while( 1 ) {
-                BSONElement ie = i.next();
-                BSONElement ae = a.next();
-                if ( ie.eoo() && ae.eoo() )
-                    break;
-                if ( ie.eoo() || ae.eoo() || strcmp( ie.fieldName(), ae.fieldName() ) != 0 ) {
-                    errmsg = "min and max keys do not share pattern";
-                    return 0;
-                }
-                int cmp = ie.woCompare( ae );
-                if ( cmp < 0 )
-                    direction = 1;
-                if ( cmp > 0 )
-                    direction = -1;
-                if ( direction != 0 )
-                    break;
-                ++firstSignificantField;
-            }
             for (int i = 0; i < d->nIndexes; i++ ) {
                 IndexDetails& ii = d->indexes[i];
-                if ( indexWorks( ii.keyPattern(), min, direction, firstSignificantField ) ) {
+                if ( indexWorks( ii.keyPattern(), min.isEmpty() ? max : min, ret.first, ret.second ) ) {
                     id = &ii;
                     keyPattern = ii.keyPattern();
                     break;
@@ -490,6 +526,10 @@ namespace mongo {
             }
             
         } else {            
+            if ( !indexWorks( keyPattern, min.isEmpty() ? max : min, ret.first, ret.second ) ) {
+                errmsg = "requested keyPattern does not match specified keys";
+                return 0;
+            }
             for (int i = 0; i < d->nIndexes; i++ ) {
                 IndexDetails& ii = d->indexes[i];
                 if( ii.keyPattern().woCompare(keyPattern) == 0 ) {
@@ -498,7 +538,13 @@ namespace mongo {
                 }
             }
         }
-        
+
+        if ( min.isEmpty() ) {
+            min = extremeKeyForIndex( keyPattern, -1 );
+        } else if ( max.isEmpty() ) {
+            max = extremeKeyForIndex( keyPattern, 1 );
+        }
+                
         if ( !id ) {
             errmsg = "no index found for specified keyPattern";
             return 0;
@@ -506,7 +552,7 @@ namespace mongo {
         
         min = min.extractFieldsUnDotted( keyPattern );
         max = max.extractFieldsUnDotted( keyPattern );
-        
+
         return id;
     }
         

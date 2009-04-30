@@ -140,6 +140,17 @@ DBQuery.prototype.hint = function( hint ){
     return this;
 }
 
+DBQuery.prototype.min = function( min ) {
+    this._ensureSpecial();
+    this._query["$min"] = min;
+    return this;
+}
+
+DBQuery.prototype.max = function( max ) {
+    this._ensureSpecial();
+    this._query["$max"] = max;
+    return this;
+}
 
 DBQuery.prototype.forEach = function( func ){
     while ( this.hasNext() )
