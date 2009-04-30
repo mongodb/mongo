@@ -119,6 +119,7 @@ namespace mongo {
         auto_ptr<DBClientConnection> conn( newClientConnection() );
         string errmsg;
         if ( !conn->connect(arbHost.c_str(), errmsg) ) {
+            log() << "pull:   cantconn arbiter " << errmsg << endl;
             setMasterLocked(State_CantArb, "can't connect to arb");
             return;
         }
