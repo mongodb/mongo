@@ -544,6 +544,69 @@ namespace QueryTests {
             ASSERT( client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
         }
     };
+
+    class MinMax : public ClientBase {
+    public:
+        MinMax() : ns( "querytests.MinMax" ) {}
+        ~MinMax() {
+            client().dropCollection( "querytests.MinMax" );
+        }
+        void run() {
+            client().ensureIndex( ns, BSON( "a" << 1 << "b" << 1 ) );
+            client().insert( ns, BSON( "a" << 1 << "b" << 1 ) );
+            client().insert( ns, BSON( "a" << 1 << "b" << 2 ) );
+            client().insert( ns, BSON( "a" << 2 << "b" << 1 ) );
+            client().insert( ns, BSON( "a" << 2 << "b" << 2 ) );
+            
+            ASSERT_EQUALS( 4, count( client().query( ns, BSONObj() ) ) );
+            BSONObj hints[] = { BSONObj(), BSON( "a" << 1 << "b" << 1 ) };
+            for( int i = 0; i < 2; ++i ) {
+                check( 0, 0, 3, 3, 4, hints[ i ] );
+                check( 1, 1, 2, 2, 4, hints[ i ] );
+                check( 1, 2, 2, 2, 3, hints[ i ] );
+                check( 1, 2, 2, 1, 2, hints[ i ] );
+
+                auto_ptr< DBClientCursor > c = query( 1, 2, 2, 1, hints[ i ] );
+                BSONObj obj = c->next();
+                ASSERT_EQUALS( 1, obj.getIntField( "a" ) );
+                ASSERT_EQUALS( 2, obj.getIntField( "b" ) );
+                obj = c->next();
+                ASSERT_EQUALS( 2, obj.getIntField( "a" ) );
+                ASSERT_EQUALS( 1, obj.getIntField( "b" ) );
+                ASSERT( !c->more() );
+            }
+            
+            // TEMP
+            ASSERT( !error() );
+            client().findOne( ns, Query().min( BSON( "a" << 1 << "b" << 1 ) ) );
+            ASSERT( error() );
+        }
+    private:
+        auto_ptr< DBClientCursor > query( int minA, int minB, int maxA, int maxB, const BSONObj &hint ) {
+            Query q;
+            q = q.min( BSON( "a" << minA << "b" << minB ) ).max( BSON( "a" << maxA << "b" << maxB ) );
+            if ( !hint.isEmpty() )
+                q.hint( hint );
+            return client().query( ns, q );
+        }
+        void check( int minA, int minB, int maxA, int maxB, int expectedCount, const BSONObj &hint = empty_ ) {
+            ASSERT_EQUALS( expectedCount, count( query( minA, minB, maxA, maxB, hint ) ) );
+        }
+        int count( auto_ptr< DBClientCursor > c ) {
+            int ret = 0;
+            while( c->more() ) {
+                ++ret;
+                c->next();
+            }
+            return ret;
+        }
+        const char *ns;
+        static BSONObj empty_;
+    };
+    BSONObj MinMax::empty_;
+    
+    // TODO : Validate hint index key against min / max fields
+    //        Allow only one of min / max
     
     class All : public UnitTest::Suite {
     public:
@@ -575,6 +638,7 @@ namespace QueryTests {
             add< InsideArray >();
             add< IndexInsideArrayCorrect >();
             add< SubobjArr >();
+            add< MinMax >();
         }
     };
     

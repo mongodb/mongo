@@ -38,39 +38,39 @@ namespace mongo {
         return *this;
     }
 
-    Query& Query::sort(const BSONObj& s) { 
+    void Query::makeComplex() {
+        if ( obj.hasElement( "query" ) )
+            return;
         BSONObjBuilder b;
-        if( obj.hasElement("query") )
-            b.appendElements(obj);
-        else
-            b.append("query", obj);
-        b.append("orderby", s);
+        b.append( "query", obj );
         obj = b.obj();
+    }
+
+    Query& Query::sort(const BSONObj& s) { 
+        appendComplex( "orderby", s );
         return *this; 
     }
 
     Query& Query::hint(BSONObj keyPattern) {
-        BSONObjBuilder b;
-        if( obj.hasElement("query") )
-            b.appendElements(obj);
-        else
-            b.append("query", obj);
-        b.append("$hint", keyPattern);
-        obj = b.obj();
+        appendComplex( "$hint", keyPattern );
         return *this; 
     }
 
     Query& Query::explain() {
-        BSONObjBuilder b;
-        if( obj.hasElement("query") )
-            b.appendElements(obj);
-        else
-            b.append("query", obj);
-        b.append("$explain", true);
-        obj = b.obj();
+        appendComplex( "$explain", true );
         return *this; 
     }
     
+    Query& Query::min( const BSONObj &val ) {
+        appendComplex( "$min", val );
+        return *this; 
+    }
+
+    Query& Query::max( const BSONObj &val ) {
+        appendComplex( "$max", val );
+        return *this; 
+    }
+
     bool Query::isComplex() const{
         return obj.hasElement( "query" );
     }
@@ -364,7 +364,7 @@ namespace mongo {
 		return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
 	}
 
-    BSONObj DBClientBase::findOne(const string &ns, Query query, BSONObj *fieldsToReturn, int queryOptions) {
+    BSONObj DBClientBase::findOne(const string &ns, Query query, const BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
@@ -436,7 +436,7 @@ namespace mongo {
     }
 
     auto_ptr<DBClientCursor> DBClientBase::query(const string &ns, Query query, int nToReturn,
-            int nToSkip, BSONObj *fieldsToReturn, int queryOptions) {
+            int nToSkip, const BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c( new DBClientCursor( this,
                                     ns, query.obj, nToReturn, nToSkip,
                                     fieldsToReturn, queryOptions ) );
@@ -574,7 +574,7 @@ namespace mongo {
 
     /* -- DBClientCursor ---------------------------------------------- */
 
-    void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
+    void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
         CHECK_OBJECT( query , "assembleRequest query" );
         // see query.h for the protocol we are using here.
         BufBuilder b;
@@ -877,12 +877,12 @@ again:
 	}
 
     auto_ptr<DBClientCursor> DBClientPaired::query(const string &a, Query b, int c, int d,
-            BSONObj *e, int f)
+            const BSONObj *e, int f)
     {
         return checkMaster().query(a,b,c,d,e,f);
     }
 
-    BSONObj DBClientPaired::findOne(const string &a, Query b, BSONObj *c, int d) {
+    BSONObj DBClientPaired::findOne(const string &a, Query b, const BSONObj *c, int d) {
         return checkMaster().findOne(a,b,c,d);
     }
 

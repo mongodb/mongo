@@ -18,6 +18,7 @@
 
 #include "stdafx.h"
 
+#include "db.h"
 #include "btree.h"
 #include "pdfile.h"
 #include "queryoptimizer.h"
@@ -30,7 +31,7 @@ namespace mongo {
         return 1;
     }
     
-    QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index ) :
+    QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index, const BSONObj &startKey, const BSONObj &endKey ) :
     fbs_( fbs ),
     order_( order ),
     index_( index ),
@@ -39,6 +40,8 @@ namespace mongo {
     keyMatch_( false ),
     exactKeyMatch_( false ),
     direction_( 0 ),
+    startKey_( startKey ),
+    endKey_( endKey ),
     unhelpful_( false ) {
         // full table scan case
         if ( !index_ ) {
@@ -124,8 +127,10 @@ namespace mongo {
             if ( exactIndexedQueryCount == fbs.nNontrivialBounds() )
                 exactKeyMatch_ = true;
         }
-        startKey_ = startKeyBuilder.obj();
-        endKey_ = endKeyBuilder.obj();
+        if ( startKey_.isEmpty() )
+            startKey_ = startKeyBuilder.obj();
+        if ( endKey_.isEmpty() )
+            endKey_ = endKeyBuilder.obj();
         if ( !keyMatch_ &&
             ( scanAndOrderRequired_ || order_.isEmpty() ) &&
             !fbs.bound( idxKey.firstElement().fieldName() ).nontrivial() )
@@ -165,14 +170,16 @@ namespace mongo {
         NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
     }
     
-    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan ) :
+    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
     fbs_( ns, query ),
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
     hint_( BSONObj() ),
     order_( order.getOwned() ),
     oldNScanned_( 0 ),
-    honorRecordedPlan_( honorRecordedPlan ) {
+    honorRecordedPlan_( honorRecordedPlan ),
+    min_( min.getOwned() ),
+    max_( max.getOwned() ) {
         if ( hint && !hint->eoo() ) {
             BSONObjBuilder b;
             b.append( *hint );
@@ -181,7 +188,20 @@ namespace mongo {
         init();
     }
     
+    void QueryPlanSet::addHint( const IndexDetails &id ) {
+        if ( !min_.isEmpty() || !max_.isEmpty() ) {
+            string errmsg;
+            BSONObj keyPattern = id.keyPattern();
+            // This reformats min_ and max_ to be used for index lookup.
+            massert( errmsg, indexDetailsForRange( fbs_.ns(), errmsg, min_, max_, keyPattern ) );
+        }
+        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &id, min_, max_ ) ) );
+    }
+    
     void QueryPlanSet::init() {
+        // TEMP
+        uassert( "min and max must be specified together", ( min_.isEmpty() + max_.isEmpty() ) % 2 == 0 );
+        
         plans_.clear();
         mayRecordPlan_ = true;
         usingPrerecordedPlan_ = false;
@@ -202,7 +222,7 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if ( ii.indexName() == hintstr ) {
-                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
+                        addHint( ii );
                         return;
                     }
                 }
@@ -211,6 +231,7 @@ namespace mongo {
                 BSONObj hintobj = hint.embeddedObject();
                 uassert( "bad hint", !hintobj.isEmpty() );
                 if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
+                    massert( "natural order cannot be specified with $min/$max", min_.isEmpty() && max_.isEmpty() );
                     // Table scan plan
                     plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
                     return;
@@ -218,12 +239,21 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if( ii.keyPattern().woCompare(hintobj) == 0 ) {
-                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
+                        addHint( ii );
                         return;
                     }
                 }
             }
             uassert( "bad hint", false );
+        }
+        
+        if ( !min_.isEmpty() || !max_.isEmpty() ) {
+            string errmsg;
+            BSONObj keyPattern;
+            const IndexDetails *id = indexDetailsForRange( ns, errmsg, min_, max_, keyPattern );
+            massert( errmsg, id );
+            plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, id, min_, max_ ) ) );
+            return;
         }
         
         if ( honorRecordedPlan_ ) {
@@ -391,5 +421,93 @@ namespace mongo {
             op.setExceptionMessage( "Caught unknown exception" );
         }        
     }
+
+    bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
+        BSONObjIterator p( idxPattern );
+        BSONObjIterator k( sampleKey );
+        int i = 0;
+        while( 1 ) {
+            BSONElement pe = p.next();
+            BSONElement ke = k.next();
+            if ( pe.eoo() && ke.eoo() )
+                return true;
+            if ( pe.eoo() || ke.eoo() )
+                return false;
+            if ( strcmp( pe.fieldName(), ke.fieldName() ) != 0 )
+                return false;
+            if ( ( i == firstSignificantField ) && !( ( direction > 0 ) == ( pe.number() > 0 ) ) )
+                return false;
+            ++i;
+        }
+        return false;
+    }
     
+    // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
+    const IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
+        if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
+            errmsg = "invalid command syntax (note: min and max are required)";
+            return 0;
+        }
+        
+        setClient( ns );
+        const IndexDetails *id = 0;
+        NamespaceDetails *d = nsdetails( ns );
+        if ( !d ) {
+            errmsg = "ns not found";
+            return 0;
+        }
+        
+        if ( keyPattern.isEmpty() ) {
+            BSONObjIterator i( min );
+            BSONObjIterator a( max );
+            int direction = 0;
+            int firstSignificantField = 0;
+            while( 1 ) {
+                BSONElement ie = i.next();
+                BSONElement ae = a.next();
+                if ( ie.eoo() && ae.eoo() )
+                    break;
+                if ( ie.eoo() || ae.eoo() || strcmp( ie.fieldName(), ae.fieldName() ) != 0 ) {
+                    errmsg = "min and max keys do not share pattern";
+                    return 0;
+                }
+                int cmp = ie.woCompare( ae );
+                if ( cmp < 0 )
+                    direction = 1;
+                if ( cmp > 0 )
+                    direction = -1;
+                if ( direction != 0 )
+                    break;
+                ++firstSignificantField;
+            }
+            for (int i = 0; i < d->nIndexes; i++ ) {
+                IndexDetails& ii = d->indexes[i];
+                if ( indexWorks( ii.keyPattern(), min, direction, firstSignificantField ) ) {
+                    id = &ii;
+                    keyPattern = ii.keyPattern();
+                    break;
+                }
+            }
+            
+        } else {            
+            for (int i = 0; i < d->nIndexes; i++ ) {
+                IndexDetails& ii = d->indexes[i];
+                if( ii.keyPattern().woCompare(keyPattern) == 0 ) {
+                    id = &ii;
+                    break;
+                }
+            }
+        }
+        
+        if ( !id ) {
+            errmsg = "no index found for specified keyPattern";
+            return 0;
+        }
+        
+        min = min.extractFieldsUnDotted( keyPattern );
+        max = max.extractFieldsUnDotted( keyPattern );
+        
+        return id;
+    }
+        
 } // namespace mongo

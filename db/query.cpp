@@ -1189,6 +1189,8 @@ namespace mongo {
             uassert( "not master", isMaster() || (queryOptions & Option_SlaveOk) );
 
             BSONElement hint;
+            BSONObj min;
+            BSONObj max;
             bool explain = false;
             bool _gotquery = false;
             BSONObj query;// = jsobj.getObjectField("query");
@@ -1214,6 +1216,8 @@ namespace mongo {
                 explain = jsobj.getBoolField("$explain");
                 if ( useHints )
                     hint = jsobj.getField("$hint");
+                min = jsobj.getObjectField("$min");
+                max = jsobj.getObjectField("$max");
             }
             
             /* The ElemIter will not be happy if this isn't really an object. So throw exception
@@ -1228,12 +1232,12 @@ namespace mongo {
             }
 
             BSONObj oldPlan;
-            if ( explain && hint.eoo() ) {
+            if ( explain && hint.eoo() && min.isEmpty() && max.isEmpty() ) {
                 QueryPlanSet qps( ns, query, order );
                 if ( qps.usingPrerecordedPlan() )
                     oldPlan = qps.explain();
             }
-            QueryPlanSet qps( ns, query, order, &hint, !explain );
+            QueryPlanSet qps( ns, query, order, &hint, !explain, min, max );
             DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
             shared_ptr< DoQueryOp > o = qps.runOp( original );
             DoQueryOp &dqo = *o;

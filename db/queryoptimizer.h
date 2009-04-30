@@ -27,7 +27,11 @@ namespace mongo {
     class IndexDetails;
     class QueryPlan {
     public:
-        QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index = 0 );
+        QueryPlan( const FieldBoundSet &fbs,
+                  const BSONObj &order,
+                  const IndexDetails *index = 0,
+                  const BSONObj &startKey = BSONObj(),
+                  const BSONObj &endKey = BSONObj() );
         QueryPlan( const QueryPlan &other );
         /* If true, no other index can do better. */
         bool optimal() const { return optimal_; }
@@ -98,7 +102,13 @@ namespace mongo {
     
     class QueryPlanSet {
     public:
-        QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint = 0, bool honorRecordedPlan = true );
+        QueryPlanSet( const char *ns,
+                     const BSONObj &query,
+                     const BSONObj &order,
+                     const BSONElement *hint = 0,
+                     bool honorRecordedPlan = true,
+                     const BSONObj &min = BSONObj(),
+                     const BSONObj &max = BSONObj() );
         int nPlans() const { return plans_.size(); }
         shared_ptr< QueryOp > runOp( QueryOp &op );
         template< class T >
@@ -118,6 +128,7 @@ namespace mongo {
             plans_.push_back( plan );
         }
         void init();
+        void addHint( const IndexDetails &id );
         struct Runner {
             Runner( QueryPlanSet &plans, QueryOp &op );
             shared_ptr< QueryOp > run();
@@ -134,6 +145,11 @@ namespace mongo {
         BSONObj order_;
         long long oldNScanned_;
         bool honorRecordedPlan_;
+        BSONObj min_;
+        BSONObj max_;
     };
 
+    // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
+    const IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
+        
 } // namespace mongo

@@ -88,6 +88,11 @@ namespace mongo {
         Query& hint(BSONObj keyPattern);
         Query& hint(const string &jsonKeyPatt) { return hint(fromjson(jsonKeyPatt)); }
 
+        /** Provide min and/or max index limits for the query.
+         */
+        Query& min(const BSONObj &val);
+        Query& max(const BSONObj &val);
+
         /** Return explain information about execution of this query instead of the actual query results.
             Normally it is easier to use the mongo shell to run db.find(...).explain().
         */
@@ -125,6 +130,16 @@ namespace mongo {
         
         string toString() const;
         operator string() const { return toString(); }
+    private:
+        void makeComplex();
+        template< class T >
+        void appendComplex( const char *fieldName, const T& val ) {
+            makeComplex();
+            BSONObjBuilder b;
+            b.appendElements(obj);
+            b.append(fieldName, val);
+            obj = b.obj();            
+        }
     };
     
 /** Typically one uses the QUERY(...) macro to construct a Query object.
@@ -186,7 +201,7 @@ namespace mongo {
         bool init();
 
         DBClientCursor( DBConnector *_connector, const string &_ns, BSONObj _query, int _nToReturn,
-                        int _nToSkip, BSONObj *_fieldsToReturn, int queryOptions ) :
+                        int _nToSkip, const BSONObj *_fieldsToReturn, int queryOptions ) :
                 connector(_connector),
                 ns(_ns),
                 query(_query),
@@ -226,7 +241,7 @@ namespace mongo {
         BSONObj query;
         int nToReturn;
         int nToSkip;
-        BSONObj *fieldsToReturn;
+        const BSONObj *fieldsToReturn;
         int opts;
         auto_ptr<Message> m;
 
@@ -247,11 +262,11 @@ namespace mongo {
     class DBClientInterface : boost::noncopyable {
     public:
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
-                                               BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+                                               const BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
         
-        virtual BSONObj findOne(const string &ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
+        virtual BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
 
         virtual void insert( const string &ns, BSONObj obj ) = 0;
         
@@ -504,7 +519,7 @@ namespace mongo {
          @throws AssertionException
         */
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
-                                               BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+                                               const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /** @param cursorId id of cursor to retrieve
             @return an handle to a previously allocated cursor
@@ -516,7 +531,7 @@ namespace mongo {
            @return a single object that matches the query.  if none do, then the object is empty
            @throws AssertionException
         */
-        virtual BSONObj findOne(const string &ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        virtual BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
         
         /**
            insert an object into the database
@@ -635,7 +650,7 @@ namespace mongo {
         virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true);
 
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
-                                               BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+                                               const BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             checkConnection();
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions );
         }
@@ -719,11 +734,11 @@ namespace mongo {
         /** throws userassertion "no master found" */
         virtual
         auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
-                                       BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+                                       const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /** throws userassertion "no master found" */
         virtual
-        BSONObj findOne(const string &ns, Query query, BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /** insert */
         virtual void insert( const string &ns , BSONObj obj ) {
