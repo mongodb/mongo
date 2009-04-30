@@ -410,7 +410,13 @@ public:
             assert( "Unable to start program" == 0 );
         }
         
+        cout << "shell: started mongo program";
         int i = 0;
+        while( argv_[ i ] )
+            cout << " " << argv_[ i++ ];
+        cout << endl;
+        
+        i = 0;
         while( argv_[ i ] )
             free( argv_[ i++ ] );
         free( argv_ );
@@ -528,6 +534,7 @@ v8::Handle< v8::Value > StopMongoProgram( const v8::Arguments &a ) {
         signal = a[ 1 ]->ToInt32()->Value();
     }
     killDb( port, signal );
+    cout << "shell: stopped mongo program on port " << port << endl;
     return v8::Undefined();
 }
 
