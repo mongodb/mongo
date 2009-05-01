@@ -712,9 +712,11 @@ namespace mongo {
             if ( e.eoo() )
                 break;
             string name = e.embeddedObject().getField( "name" ).valuestr();
-            if ( name != "local" && name != "admin" ) {
-                if ( only.empty() || only == name ) {
-                    resyncDrop( name.c_str(), requester );
+            if ( !e.embeddedObject().getBoolField( "empty" ) ) {
+                if ( name != "local" ) {
+                    if ( only.empty() || only == name ) {
+                        resyncDrop( name.c_str(), requester );
+                    }
                 }
             }
         }        
@@ -1055,10 +1057,12 @@ namespace mongo {
                     if ( e.eoo() )
                         break;
                     string name = e.embeddedObject().getField( "name" ).valuestr();
-                    if ( name != "local" ) {
-                        if ( only.empty() || only == name ) {
-                            log( 2 ) << "adding to 'addDbNextPass': " << name << endl;
-                            addDbNextPass.insert( name );
+                    if ( !e.embeddedObject().getBoolField( "empty" ) ) {
+                        if ( name != "local" ) {
+                            if ( only.empty() || only == name ) {
+                                log( 2 ) << "adding to 'addDbNextPass': " << name << endl;
+                                addDbNextPass.insert( name );
+                            }
                         }
                     }
                 }
