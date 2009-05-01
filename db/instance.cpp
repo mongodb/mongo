@@ -608,6 +608,10 @@ namespace mongo {
 
     DBDirectClient::AlwaysAuthorized DBDirectClient::Authorizer::always;
 
+    DBClientBase * createDirectClient(){
+        return new DBDirectClient();
+    }
+
     void recCacheCloseAll();
 
     boost::mutex &listenerSocketMutex( *( new boost::mutex ) );

@@ -780,6 +780,8 @@ namespace mongo {
         virtual void checkResponse( const char *data, int nReturned ) { assert(false); }
 
     };
+    
 
-
+    DBClientBase * createDirectClient();
+    
 } // namespace mongo
