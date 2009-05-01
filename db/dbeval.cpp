@@ -97,7 +97,7 @@ namespace mongo {
         if ( res ) {
             result.append("errno", (double) res);
             errmsg = "invoke failed: ";
-            errmsg += s->getString( "error" );
+            errmsg += s->getError();
             return false;
         }
 

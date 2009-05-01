@@ -210,6 +210,10 @@ namespace mongo {
             setObject( "args" , args );
             return JavaJS->invoke(s,function);
         }
+        
+        string getError(){
+            return getString( "error" );
+        }
 
         jlong s;
     };
