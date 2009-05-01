@@ -613,8 +613,8 @@ namespace Plan {
     class Hint {
     public:
         Hint() : ns_( testNs( this ) ) {
-            const char *names = "aaaaaaaaaa";
-            for( int i = 0; i < 10; ++i ) {
+            const char *names = "aaaaaaaaa";
+            for( int i = 0; i < 9; ++i ) {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
