@@ -1012,7 +1012,7 @@ namespace mongo {
                 }
             }
         }
-        if ( !lastSavedLocalTs_.isNull() && !localLog->ok() ) {
+        if ( !localLogTail.isNull() && !localLog->ok() ) {
             // local log filled up
             idTracker.reset();
             dbtemprelease t;
@@ -1036,7 +1036,7 @@ namespace mongo {
             c = 0;
         }
 
-        {
+        if ( replPair && replPair->state == ReplPair::State_Master ) {
             dblock lk;
             idTracker.reset();
         }
