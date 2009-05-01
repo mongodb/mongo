@@ -7,12 +7,14 @@ if ( typeof Mongo == "undefined" ){
     }
 }
 
-Mongo.prototype.find = function( ns , query , fields , limit , skip ){ throw "find not implemented"; }
-Mongo.prototype.insert = function( ns , obj ){ throw "insert not implemented"; }
-Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented;" }
-Mongo.prototype.update = function( ns , query , obj ){ throw "update not implemented;" }
-
-mongoInject( Mongo.prototype );
+if ( typeof mongoInject == "function" ){
+    Mongo.prototype.find = function( ns , query , fields , limit , skip ){ throw "find not implemented"; }
+    Mongo.prototype.insert = function( ns , obj ){ throw "insert not implemented"; }
+    Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented;" }
+    Mongo.prototype.update = function( ns , query , obj ){ throw "update not implemented;" }
+    
+    mongoInject( Mongo.prototype );
+}
 
 Mongo.prototype.setSlaveOk = function() {
     this.slaveOk = true;
