@@ -902,6 +902,8 @@ def recordPerformance( env, target, source ):
     import subprocess, re
     p = subprocess.Popen( [ perftest[0].abspath ], stdout=subprocess.PIPE )
     b = p.communicate()[ 0 ]
+    print( "perftest results:" );
+    print( b );
     entries = re.findall( "{.*?}", b )
     for e in entries:
         matches = re.match( "{'(.*?)': (.*?)}", e )
