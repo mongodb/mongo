@@ -1195,7 +1195,9 @@ namespace mongo {
             bool _gotquery = false;
             BSONObj query;// = jsobj.getObjectField("query");
             {
-                BSONElement e = jsobj.findElement("query");
+                BSONElement e = jsobj.findElement("$query");
+                if ( e.eoo() )
+                    e = jsobj.findElement("query");                    
                 if ( !e.eoo() && (e.type() == Object || e.type() == Array) ) {
                     query = e.embeddedObject();
                     _gotquery = true;
@@ -1203,7 +1205,9 @@ namespace mongo {
             }
             BSONObj order;
             {
-                BSONElement e = jsobj.findElement("orderby");
+                BSONElement e = jsobj.findElement("$orderby");
+                if ( e.eoo() )
+                    e = jsobj.findElement("orderby");                    
                 if ( !e.eoo() ) {
                     order = e.embeddedObjectUserCheck();
                     if ( e.type() == Array )

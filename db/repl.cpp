@@ -712,9 +712,11 @@ namespace mongo {
             if ( e.eoo() )
                 break;
             string name = e.embeddedObject().getField( "name" ).valuestr();
-            if ( name != "local" && name != "admin" ) {
-                if ( only.empty() || only == name ) {
-                    resyncDrop( name.c_str(), requester );
+            if ( !e.embeddedObject().getBoolField( "empty" ) ) {
+                if ( name != "local" ) {
+                    if ( only.empty() || only == name ) {
+                        resyncDrop( name.c_str(), requester );
+                    }
                 }
             }
         }        
@@ -1010,7 +1012,7 @@ namespace mongo {
                 }
             }
         }
-        if ( !lastSavedLocalTs_.isNull() && !localLog->ok() ) {
+        if ( !localLogTail.isNull() && !localLog->ok() ) {
             // local log filled up
             idTracker.reset();
             dbtemprelease t;
@@ -1034,7 +1036,7 @@ namespace mongo {
             c = 0;
         }
 
-        {
+        if ( replPair && replPair->state == ReplPair::State_Master ) {
             dblock lk;
             idTracker.reset();
         }
@@ -1055,10 +1057,12 @@ namespace mongo {
                     if ( e.eoo() )
                         break;
                     string name = e.embeddedObject().getField( "name" ).valuestr();
-                    if ( name != "local" ) {
-                        if ( only.empty() || only == name ) {
-                            log( 2 ) << "adding to 'addDbNextPass': " << name << endl;
-                            addDbNextPass.insert( name );
+                    if ( !e.embeddedObject().getBoolField( "empty" ) ) {
+                        if ( name != "local" ) {
+                            if ( only.empty() || only == name ) {
+                                log( 2 ) << "adding to 'addDbNextPass': " << name << endl;
+                                addDbNextPass.insert( name );
+                            }
                         }
                     }
                 }

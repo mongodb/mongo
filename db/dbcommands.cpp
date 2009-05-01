@@ -723,6 +723,8 @@ namespace mongo {
                 b.append( "name", i->c_str() );
                 boost::intmax_t size = dbSize( i->c_str() );
                 b.append( "sizeOnDisk", (double) size );
+                setClientTempNs( i->c_str() );
+                b.appendBool( "empty", clientIsEmpty() );
                 totalSize += size;
                 dbInfos.push_back( b.obj() );
 
@@ -736,7 +738,12 @@ namespace mongo {
                 if ( seen.count( name ) )
                     continue;
                 
-                dbInfos.push_back( BSON( "name" << name << "sizeOnDisk" << double( 1 ) ) );
+                BSONObjBuilder b;
+                b << "name" << name << "sizeOnDisk" << double( 1 );
+                setClientTempNs( name.c_str() );
+                b.appendBool( "empty", clientIsEmpty() );
+                
+                dbInfos.push_back( b.obj() );
             }
 
             result.append( "databases", dbInfos );
