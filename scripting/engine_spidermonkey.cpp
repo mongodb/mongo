@@ -14,15 +14,19 @@
 #include "js/jsapi.h"
 #endif
 
+#include "../client/dbclient.h"
+
+extern const char * jsconcatcode;
+
 namespace mongo {
 
-    void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){
-        log() << "JS Error: " << message << endl;
-        // TODO: send to Scope
-    }
+    class SMScope;
+
+    boost::thread_specific_ptr<SMScope> currentScope;
 
 
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp );
+    void errorReporter( JSContext *cx, const char *message, JSErrorReport *report );
 
     static JSClass bson_ro_class = {
         "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
@@ -31,7 +35,7 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
-
+    
     class Convertor {
     public:
         Convertor( JSContext * cx ){
@@ -108,6 +112,27 @@ namespace mongo {
         JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };    
+
+    // --- global helpers ---
+
+    JSBool native_print( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ){
+        Convertor c( cx );
+        for ( uintN i=0; i<argc; i++ ){
+            if ( i > 0 )
+                cout << " ";
+            cout << c.toString( argv[i] );
+        }
+        cout << endl;
+        return JS_TRUE;
+    }
+
+    JSFunctionSpec globalHelpers[] = { 
+        {  "print" , &native_print , 0 , 0 , 0 } , 
+        { 0 , 0 , 0 , 0 , 0 } 
+    };
+
+    // ----END global helpers ----
+
     
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
         Convertor c( cx );
@@ -163,6 +188,59 @@ namespace mongo {
         globalScriptEngine = globalSMEngine;
     }
 
+    // ------ mongo stuff ------
+
+    JSBool mongo_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        uassert( "mongo_constructor not implemented yet" , 0 );
+        throw -1;
+    }
+    
+    JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        DBClientBase * client = createDirectClient();
+        JS_SetPrivate( cx , obj , (void*)client );
+        return JS_TRUE;
+    }
+
+    void mongo_finalize( JSContext * cx , JSObject * obj ){
+        DBClientBase * client = (DBClientBase*)JS_GetPrivate( cx , obj );
+        delete client;
+    }
+
+    static JSClass mongo_class = {
+        "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
+        0 , 0 , 0 , 
+        mongo_constructor , 
+        0 , 0 , 0 , 0
+    };
+
+    static JSClass mongo_local_class = {
+        "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
+        0 , 0 , 0 , 
+        mongo_constructor , 
+        0 , 0 , 0 , 0
+    };
+
+    JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        DBClientBase * client = createDirectClient();
+        JS_SetPrivate( cx , obj , (void*)client );
+        return JS_TRUE;
+    }
+
+    static JSClass object_id_class = {
+        "ObjectId" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
+        0 , 0 , 0 , 
+        object_id_constructor , 
+        0 , 0 , 0 , 0
+    }
+
+    // ------ scope ------
+
 
     class SMScope : public Scope {
     public:
@@ -178,6 +256,8 @@ namespace mongo {
             _global = JS_NewObject( _context , &global_class, NULL, NULL);
             massert( "JS_NewObject failed for global" , _global );
             massert( "js init failed" , JS_InitStandardClasses( _context , _global ) );
+            
+            JS_DefineFunctions( _context , _global , globalHelpers );
 
             _this = 0;
         }
@@ -196,7 +276,9 @@ namespace mongo {
         }
 
         void localConnect( const char * dbName ){
-            uassert( "localConnect not done" , 0 );
+            jsval mongo = OBJECT_TO_JSVAL( JS_NewObject( _context , &mongo_class , 0 , 0 ) );
+            assert( JS_SetProperty( _context , _global , "Mongo" , &mongo ) );
+            exec( jsconcatcode );
         }
 
         // ----- getters ------
@@ -308,8 +390,20 @@ namespace mongo {
         ScriptingFunction createFunction( const char * code ){
             return (ScriptingFunction)compileFunction( code );
         }
+
+        void precall(){
+            _error = "";
+            currentScope.reset( this );
+        }
         
+        void exec( const char * code ){
+            precall();
+            jsval ret;
+            assert( JS_EvaluateScript( _context , _global , code , strlen( code ) , "anon" , 0 , &ret ) );
+        }
+
         int invoke( JSFunction * func , const BSONObj& args ){
+            precall();
             jsval rval;
             
             int nargs = args.nFields();
@@ -319,8 +413,9 @@ namespace mongo {
             for ( int i=0; i<nargs; i++ )
                 smargs[i] = _convertor->toval( it.next() );
             
-            if ( ! JS_CallFunction( _context , _this , func , nargs , smargs , &rval ) )
+            if ( ! JS_CallFunction( _context , _this , func , nargs , smargs , &rval ) ){
                 return -3;
+            }
             
             assert( JS_SetProperty( _context , _global , "return" , &rval ) );
             return 0;
@@ -330,13 +425,39 @@ namespace mongo {
             return invoke( (JSFunction*)funcAddr , args );
         }
 
+        void gotError( string s ){
+            _error = s;
+        }
+        
+        string getError(){
+            return _error;
+        }
+
     private:
         JSContext * _context;
         Convertor * _convertor;
 
         JSObject * _global;
         JSObject * _this;
+
+        string _error;
     };
+
+    void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){
+        stringstream ss;
+        ss << "JS Error: " << message;
+        
+        if ( report ){
+            ss << " " << report->filename << ":" << report->lineno;
+        }
+        
+        log() << ss.str() << endl;
+        currentScope->gotError( ss.str() );
+        
+        // TODO: send to Scope
+    }
+
+
 
     void SMEngine::runTest(){
         // this is deprecated
@@ -345,5 +466,6 @@ namespace mongo {
     Scope * SMEngine::createScope(){
         return new SMScope();
     }
-
+    
+    
 }

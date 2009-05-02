@@ -192,7 +192,7 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 serverOnlyFiles += [ "scripting/engine.cpp" ]
 
 if usesm:
-    serverOnlyFiles += [ "scripting/engine_spidermonkey.cpp" ]
+    serverOnlyFiles += [ "scripting/engine_spidermonkey.cpp" , "shell/mongo.cpp" ]
     nojni = True
 elif not nojni:
     serverOnlyFiles += [ "scripting/engine_java.cpp" ]
@@ -677,6 +677,9 @@ if darwin or clientEnv["_HAVEPCAP"]:
 # --- shell ---
 # shell is complicated by the fact that v8 doesn't work 64-bit yet
 
+env.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
+env.JSHeader( "shell/mongo.jsall" )
+
 shellEnv = env.Clone();
 
 shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
@@ -687,8 +690,6 @@ if release and ( ( darwin and force64 ) or linux64 ):
     shellEnv["LIBS"] = env["LIBS_CLEAN"]
     shellEnv["SLIBS"] = ""
 
-shellEnv.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
-shellEnv.JSHeader( "shell/mongo.jsall" )
 
 def removeIfInList( lst , thing ):
     if thing in lst:
