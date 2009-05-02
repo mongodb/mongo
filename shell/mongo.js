@@ -16,6 +16,9 @@ if ( typeof mongoInject == "function" ){
     mongoInject( Mongo.prototype );
 }
 
+if ( ! Mongo.prototype )
+    Mongo.prototype = {};
+
 Mongo.prototype.setSlaveOk = function() {
     this.slaveOk = true;
 }
