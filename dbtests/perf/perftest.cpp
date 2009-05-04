@@ -697,6 +697,7 @@ int main( int argc, char **argv ) {
     if ( boost::filesystem::exists( p ) )
         boost::filesystem::remove_all( p );
     boost::filesystem::create_directory( p );
+    string dbpathString = p.native_directory_string();
     dbpath = p.native_directory_string().c_str();
     
 #if !defined(_WIN32)

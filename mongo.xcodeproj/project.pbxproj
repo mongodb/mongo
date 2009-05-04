@@ -83,8 +83,6 @@
 		934223A80EF16DB400608550 /* instance.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = instance.h; sourceTree = "<group>"; };
 		934223A90EF16DB400608550 /* introspect.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = introspect.cpp; sourceTree = "<group>"; };
 		934223AA0EF16DB400608550 /* introspect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = introspect.h; sourceTree = "<group>"; };
-		934223AB0EF16DB400608550 /* javajs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = javajs.cpp; sourceTree = "<group>"; };
-		934223AC0EF16DB400608550 /* javajs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = javajs.h; sourceTree = "<group>"; };
 		934223AD0EF16DB400608550 /* javatest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = javatest.cpp; sourceTree = "<group>"; };
 		934223AE0EF16DB400608550 /* jsobj.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobj.cpp; sourceTree = "<group>"; };
 		934223AF0EF16DB400608550 /* jsobj.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jsobj.h; sourceTree = "<group>"; };
@@ -170,6 +168,12 @@
 		93A13A3D0F4620E500AF1B0D /* sniffer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = sniffer.cpp; sourceTree = "<group>"; };
 		93A13A3F0F4620E500AF1B0D /* Tool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Tool.cpp; sourceTree = "<group>"; };
 		93A13A400F4620E500AF1B0D /* Tool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Tool.h; sourceTree = "<group>"; };
+		93A479F30FAF2A5000E760DD /* engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = engine.cpp; sourceTree = "<group>"; };
+		93A479F40FAF2A5000E760DD /* engine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = engine.h; sourceTree = "<group>"; };
+		93A479F60FAF2A5000E760DD /* engine_java.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = engine_java.cpp; sourceTree = "<group>"; };
+		93A479F70FAF2A5000E760DD /* engine_java.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = engine_java.h; sourceTree = "<group>"; };
+		93A479F90FAF2A5000E760DD /* engine_none.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = engine_none.cpp; sourceTree = "<group>"; };
+		93A479FA0FAF2A5000E760DD /* engine_spidermonkey.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = engine_spidermonkey.cpp; sourceTree = "<group>"; };
 		93A6E10C0F24CF9800DA4EBF /* lasterror.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lasterror.h; sourceTree = "<group>"; };
 		93A6E10D0F24CFB100DA4EBF /* flushtest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = flushtest.cpp; sourceTree = "<group>"; };
 		93A6E10E0F24CFD300DA4EBF /* security.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = security.h; sourceTree = "<group>"; };
@@ -289,6 +293,7 @@
 		08FB7795FE84155DC02AAC07 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				93A479F20FAF2A5000E760DD /* scripting */,
 				932AC4310F4A5E9D005BF8B0 /* SConstruct */,
 				93A13A320F4620E500AF1B0D /* tools */,
 				93A13A200F4620A500AF1B0D /* s */,
@@ -441,8 +446,6 @@
 				934223A80EF16DB400608550 /* instance.h */,
 				934223A90EF16DB400608550 /* introspect.cpp */,
 				934223AA0EF16DB400608550 /* introspect.h */,
-				934223AB0EF16DB400608550 /* javajs.cpp */,
-				934223AC0EF16DB400608550 /* javajs.h */,
 				934223AD0EF16DB400608550 /* javatest.cpp */,
 				934223AE0EF16DB400608550 /* jsobj.cpp */,
 				934223AF0EF16DB400608550 /* jsobj.h */,
@@ -543,6 +546,19 @@
 				93A13A400F4620E500AF1B0D /* Tool.h */,
 			);
 			path = tools;
+			sourceTree = "<group>";
+		};
+		93A479F20FAF2A5000E760DD /* scripting */ = {
+			isa = PBXGroup;
+			children = (
+				93A479F30FAF2A5000E760DD /* engine.cpp */,
+				93A479F40FAF2A5000E760DD /* engine.h */,
+				93A479F60FAF2A5000E760DD /* engine_java.cpp */,
+				93A479F70FAF2A5000E760DD /* engine_java.h */,
+				93A479F90FAF2A5000E760DD /* engine_none.cpp */,
+				93A479FA0FAF2A5000E760DD /* engine_spidermonkey.cpp */,
+			);
+			path = scripting;
 			sourceTree = "<group>";
 		};
 		93A8D1D10F37544800C92B85 /* jstests */ = {
