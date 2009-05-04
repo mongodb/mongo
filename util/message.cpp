@@ -265,7 +265,7 @@ again:
                 return false;
             }
             if ( x < 0 ) {
-                log() << "MessagingPort recv() error " << errno << ' ' << farEnd.toString()<<endl;
+                log() << "MessagingPort recv() error \"" << strerror( errno ) << "\" (" << errno << ") " << farEnd.toString()<<endl;
                 m.reset();
                 return false;
             }
