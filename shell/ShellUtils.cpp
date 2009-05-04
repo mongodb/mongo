@@ -116,7 +116,7 @@ BSONObj Load(const BSONObj& args) {
 BSONObj Quit(const BSONObj& args) {
     // If not arguments are given first element will be EOO, which
     // converts to the integer value 0.
-    int exit_code = args.firstElement().number();
+    int exit_code = int( args.firstElement().number() );
     ::exit(exit_code);
     return undefined_;
 }
@@ -210,7 +210,7 @@ void sleepms( int ms ) {
 mongo::BSONObj JSSleep(const mongo::BSONObj &args){
     assert( args.nFields() == 1 );
     assert( args.firstElement().isNumber() );
-    int ms = args.firstElement().number();
+    int ms = int( args.firstElement().number() );
     {
         v8::Unlocker u;
         sleepms( ms );
@@ -547,14 +547,14 @@ void killDb( int port, int signal ) {
 BSONObj StopMongoProgram( const BSONObj &a ) {
     assert( a.nFields() == 1 || a.nFields() == 2 );
     assert( a.firstElement().isNumber() );
-    int port = a.firstElement().number();
+    int port = int( a.firstElement().number() );
     int signal = SIGTERM;
     if ( a.nFields() == 2 ) {
         BSONObjIterator i( a );
         i.next();
         BSONElement e = i.next();
         assert( e.isNumber() );
-        signal = e.number();
+        signal = int( e.number() );
     }
     killDb( port, signal );
     cout << "shell: stopped mongo program on port " << port << endl;
@@ -601,7 +601,7 @@ BSONObj AllocatePorts( const BSONObj &args ) {
     jsassert( args.nFields() == 1 , "allocatePorts takes exactly 1 argument" );
     jsassert( args.firstElement().isNumber() , "allocatePorts needs to be passed an integer" );
 
-    int n = args.firstElement().number();
+    int n = int( args.firstElement().number() );
 
     vector< int > ports;
     for( int i = 0; i < n; ++i ) {
