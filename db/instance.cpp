@@ -325,6 +325,10 @@ namespace mongo {
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
         bool upsert = flags & 1;
+        {
+            string s = query.toString();
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
+        }        
         bool updatedExisting = updateObjects(ns, toupdate, query, flags & 1, ss);
         recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 );
     }
@@ -339,6 +343,10 @@ namespace mongo {
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
+        {
+            string s = pattern.toString();
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
+        }        
         int n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( n );
     }
