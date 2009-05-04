@@ -190,7 +190,7 @@ namespace mongo {
         friend class BSONObjIterator;
         friend class BSONObj;
     public:
-        string toString() const;
+        string toString( bool includeFieldName = true ) const;
         operator string() const { return toString(); }
         string jsonString( JsonStringFormat format, bool includeFieldNames = true ) const;
 
@@ -1043,6 +1043,11 @@ namespace mongo {
             b.append( ( void * )scope.objdata(), scope.objsize() );
         }
 
+        void appendUndefined( const char *fieldName ) {
+            b.append( (char) Undefined );
+            b.append( fieldName );
+        }
+        
         /* helper function -- see Query::where() for primary way to do this. */
         void appendWhere( const char *code, const BSONObj &scope ){
             appendCodeWScope( "$where" , code , scope );
@@ -1050,7 +1055,7 @@ namespace mongo {
         void appendWhere( const string &code, const BSONObj &scope ){
             appendWhere( code.c_str(), scope );
         }
-        
+
         /** Append an array of values. */
         template < class T >
         void append( const char *fieldName, const vector< T >& vals ) {

@@ -1,14 +1,14 @@
 #pragma once
 
 #include "engine.h"
+#include <v8.h>
+
+using namespace v8;
 
 namespace mongo {
     
     class V8Scope : public Scope {
     public:
-        V8Scope() {}
-        virtual ~V8Scope() {}
-        
         virtual void reset() {}
         virtual void init( BSONObj * data ) {}
 
@@ -31,6 +31,19 @@ namespace mongo {
         virtual int invoke( ScriptingFunction func , const BSONObj& args ) { assert( false ); return 0; }
         virtual string getError() { assert( false ); return ""; }
         
+        virtual void injectNative( const char *field, NativeFunction func ) {
+            Handle< FunctionTemplate > f( v8::FunctionTemplate::New( nativeCallback ) );
+            f->Set( v8::String::New( "_native_function" ), External::New( (void*)func ) );
+            global_->Set( v8::String::New( field ), f );
+        }
+
+        void setGlobal( const Handle< v8::ObjectTemplate > &global ) {
+            global_ = global;
+        }
+        
+    private:
+        static Handle< Value > nativeCallback( const Arguments &args );
+        Handle< v8::ObjectTemplate > global_;
     };
     
     class V8ScriptEngine : public ScriptEngine {

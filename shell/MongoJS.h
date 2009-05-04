@@ -15,8 +15,10 @@ void installMongoGlobals( v8::Handle<v8::ObjectTemplate>& global );
 v8::Handle<v8::Value> mongoInject(const v8::Arguments& args);
 
 // utils
-v8::Local<v8::Object> mongoToV8( mongo::BSONObj & m , bool array = 0 );
+v8::Local<v8::Object> mongoToV8( const mongo::BSONObj & m , bool array = 0 );
+v8::Handle<v8::Value> mongoToV8Element( const mongo::BSONElement &f );
 mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o );
+void v8ToMongoElement( mongo::BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value );
 
 mongo::DBClientConnection * getConnection( const v8::Arguments& args );
 

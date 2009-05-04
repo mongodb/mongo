@@ -86,7 +86,94 @@ Handle<Value> mongoInit(const Arguments& args){
 
 // ---
 
-Local<v8::Object> mongoToV8( BSONObj & m , bool array ){
+Handle<v8::Value> mongoToV8Element( const BSONElement &f ) {
+    assert( !f.eoo() );
+    switch ( f.type() ){
+            
+        case mongo::Code:
+            cout << "warning, code saved in database just turned into string right now" << endl;
+        case mongo::String: 
+            return v8::String::New( f.valuestr() );
+            
+        case mongo::jstOID: {
+            v8::Function * idCons = getObjectIdCons();
+            v8::Handle<v8::Value> argv[1];
+            argv[0] = v8::String::New( f.__oid().str().c_str() );
+            return idCons->NewInstance( 1 , argv );
+        }
+            
+        case mongo::NumberDouble:
+        case mongo::NumberInt:
+            return v8::Number::New( f.number() );
+            
+        case mongo::Array:
+        case mongo::Object:
+            return mongoToV8( f.embeddedObject() , f.type() == mongo::Array );
+            
+        case mongo::Date:
+            return v8::Date::New( f.date() );
+            
+        case mongo::Bool:
+            return v8::Boolean::New( f.boolean() );
+            
+        case mongo::jstNULL:
+            return v8::Null();
+            
+        case mongo::RegEx: {
+            v8::Function * regex = getNamedCons( "RegExp" );
+            
+            v8::Handle<v8::Value> argv[2];
+            argv[0] = v8::String::New( f.regex() );
+            argv[1] = v8::String::New( f.regexFlags() );
+            
+            return regex->NewInstance( 2 , argv );
+            break;
+        }
+            
+        case mongo::BinData: {
+            Local<v8::Object> b = v8::Object::New();
+            
+            int len;
+            f.binData( len );
+            
+            b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
+            b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
+            
+            return b;
+        };
+            
+        case mongo::Timestamp: {
+            Local<v8::Object> sub = v8::Object::New();            
+            
+            sub->Set( v8::String::New( "time" ) , v8::Date::New( f.timestampTime() ) );
+            sub->Set( v8::String::New( "i" ) , v8::Number::New( f.timestampInc() ) );
+            
+            return sub;
+        }
+            
+        case mongo::MinKey:
+            // TODO: make a special type
+            return v8::String::New( "MinKey" );
+            
+        case mongo::MaxKey:
+            // TODO: make a special type
+            return v8::String::New( "MaxKey" );
+            
+        case mongo::Undefined:
+            return v8::Undefined();
+            
+        default:
+            cout << "can't handle type: ";
+			cout  << f.type() << " ";
+			cout  << f.toString();
+			cout  << endl;
+            break;
+    }    
+    
+    return v8::Undefined();
+}
+
+Local<v8::Object> mongoToV8( const BSONObj & m , bool array ){
     Local<v8::Object> o;
     if ( array )
         o = v8::Array::New();
@@ -99,101 +186,7 @@ Local<v8::Object> mongoToV8( BSONObj & m , bool array ){
         BSONElement f = i.next();
         if ( f.eoo() )
             break;
-        
-        Local<Value> v;
-        
-        switch ( f.type() ){
-
-        case mongo::Code:
-            cout << "warning, code saved in database just turned into string right now" << endl;
-        case mongo::String: 
-            o->Set( v8::String::New( f.fieldName() ) , v8::String::New( f.valuestr() ) );
-            break;
-            
-        case mongo::jstOID: {
-            v8::Function * idCons = getObjectIdCons();
-            v8::Handle<v8::Value> argv[1];
-            argv[0] = v8::String::New( f.__oid().str().c_str() );
-            o->Set( v8::String::New( f.fieldName() ) , 
-                    idCons->NewInstance( 1 , argv ) );
-            break;
-        }
-            
-        case mongo::NumberDouble:
-        case mongo::NumberInt:
-            o->Set( v8::String::New( f.fieldName() ) , v8::Number::New( f.number() ) );
-            break;
-            
-        case mongo::Array:
-        case mongo::Object:
-            sub = f.embeddedObject();
-            o->Set( v8::String::New( f.fieldName() ) , mongoToV8( sub , f.type() == mongo::Array ) );
-            break;
-            
-        case mongo::Date:
-            o->Set( v8::String::New( f.fieldName() ) , v8::Date::New( f.date() ) );
-            break;
-
-        case mongo::Bool:
-            o->Set( v8::String::New( f.fieldName() ) , v8::Boolean::New( f.boolean() ) );
-            break;
-            
-        case mongo::jstNULL:
-            o->Set( v8::String::New( f.fieldName() ) , v8::Null() );
-            break;
-            
-        case mongo::RegEx: {
-            v8::Function * regex = getNamedCons( "RegExp" );
-            
-            v8::Handle<v8::Value> argv[2];
-            argv[0] = v8::String::New( f.regex() );
-            argv[1] = v8::String::New( f.regexFlags() );
-            
-            o->Set( v8::String::New( f.fieldName() ) , regex->NewInstance( 2 , argv ) );
-            break;
-        }
-            
-        case mongo::BinData: {
-            Local<v8::Object> b = v8::Object::New();
-
-            int len;
-            f.binData( len );
-            
-            b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
-            b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
-            
-            o->Set( v8::String::New( f.fieldName() ) , b );
-            break;
-        };
-            
-        case mongo::Timestamp: {
-            Local<v8::Object> sub = v8::Object::New();            
-
-            sub->Set( v8::String::New( "time" ) , v8::Date::New( f.timestampTime() ) );
-            sub->Set( v8::String::New( "i" ) , v8::Number::New( f.timestampInc() ) );
-            
-            o->Set( v8::String::New( f.fieldName() ) , sub );
-            break;
-        }
-            
-        case mongo::MinKey:
-            // TODO: make a special type
-            o->Set( v8::String::New( f.fieldName() ) , v8::String::New( "MinKey" ) );
-            break;
-
-        case mongo::MaxKey:
-            // TODO: make a special type
-            o->Set( v8::String::New( f.fieldName() ) , v8::String::New( "MaxKey" ) );
-            break;
-            
-        default:
-            cout << "can't handle type: ";
-			cout  << f.type() << " ";
-			cout  << f.toString();
-			cout  << endl;
-            break;
-        }
-        
+        o->Set( v8::String::New( f.fieldName() ), mongoToV8Element( f ) );
     }
 
     return o;

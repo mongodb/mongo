@@ -9,6 +9,9 @@
 
 #include "ShellUtils.h"
 #include "MongoJS.h"
+#include "../scripting/engine.h"
+#include "../scripting/engine_v8.h"
+
 
 extern const char * jsconcatcode;
 
@@ -125,14 +128,17 @@ int main(int argc, char* argv[]) {
     
     RecordMyLocation( argv[ 0 ] );
 
-    //v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
+    mongo::ScriptEngine::setup();
+    auto_ptr< mongo::V8Scope > scope( dynamic_cast< mongo::V8Scope* >( mongo::globalScriptEngine->createScope() ) );
     
     v8::Locker l;
     v8::HandleScope handle_scope;
 
     v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
+    
+    scope->setGlobal( global );
 
-    installShellUtils( global );
+    installShellUtils( *scope );
     installMongoGlobals( global );
 
     baseContext_ = v8::Context::New(NULL, global);

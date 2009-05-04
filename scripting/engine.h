@@ -8,6 +8,7 @@
 namespace mongo {
 
     typedef unsigned long long ScriptingFunction;
+    typedef BSONObj (*NativeFunction) ( const BSONObj &args );
     
     class Scope : boost::noncopyable {
     public:
@@ -42,6 +43,7 @@ namespace mongo {
         
         int invoke( const char* code , const BSONObj& args );
 
+        virtual void injectNative( const char *field, NativeFunction func ) {}
     };
     
     class ScriptEngine : boost::noncopyable {

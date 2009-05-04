@@ -10,6 +10,8 @@
 #include <assert.h>
 #include <iostream>
 
+#include "../scripting/engine.h"
+
 // Executes a string within the current v8 context.
 bool ExecuteString(v8::Handle<v8::String> source,
                    v8::Handle<v8::Value> name,
@@ -21,7 +23,6 @@ v8::Handle<v8::Value> Load(const v8::Arguments& args);
 v8::Handle<v8::Value> ListFiles(const v8::Arguments& args);
 v8::Handle<v8::Value> Quit(const v8::Arguments& args);
 v8::Handle<v8::Value> Version(const v8::Arguments& args);
-v8::Handle<v8::Value> JSSleep(const v8::Arguments& args);
 v8::Handle<v8::Value> JSFork(const v8::Arguments& args);
 v8::Handle<v8::Value> Join(const v8::Arguments& args);
 
@@ -31,7 +32,7 @@ v8::Handle<v8::String> ReadFile(const char* name);
 void ReportException(v8::TryCatch* handler);
 
 
-void installShellUtils( v8::Handle<v8::ObjectTemplate>& global );
+void installShellUtils( mongo::Scope &scope );
 
 #define jsassert(x,msg) assert(x)
 

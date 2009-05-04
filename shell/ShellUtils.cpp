@@ -1,6 +1,7 @@
 // ShellUtils.cpp
 
 #include "ShellUtils.h"
+#include "../db/jsobj.h"
 #include <boost/smart_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
@@ -18,21 +19,32 @@
 using namespace std;
 using namespace v8;
 using namespace boost::filesystem;
+using namespace mongo;
 
-Handle<v8::Value> Print(const Arguments& args) {
+BSONObj makeUndefined() {
+    BSONObjBuilder b;
+    b.appendUndefined( "" );
+    return b.obj();
+}
+BSONObj undefined_ = makeUndefined();
+
+BSONObj Print(const BSONObj &args) {
     bool first = true;
-    for (int i = 0; i < args.Length(); i++) {
-        HandleScope handle_scope;
+    BSONObjIterator i( args );
+    while( i.more() ) {
+        BSONElement e = i.next();
+        if ( e.eoo() )
+            break;
         if (first) {
             first = false;
         } else {
             printf(" ");
         }
-        v8::String::Utf8Value str(args[i]);
-        printf("%s", *str);
+        string str( e.toString( false ) );
+        printf("%s", str.c_str());        
     }
     printf("\n");
-    return v8::Undefined();
+    return undefined_;
 }
 
 std::string toSTLString( const Handle<v8::Value> & o ){
@@ -82,28 +94,27 @@ std::ostream& operator<<( std::ostream &s, const v8::TryCatch * try_catch ){
     return s;
 }
 
-Handle<v8::Value> Load(const Arguments& args) {
-    for (int i = 0; i < args.Length(); i++) {
-        HandleScope handle_scope;
-        v8::String::Utf8Value file(args[i]);
-        Handle<v8::String> source = ReadFile(*file);
-        if (source.IsEmpty()) {
-            return v8::ThrowException(v8::String::New("Error loading file"));
-        }
-        if (!ExecuteString(source, v8::String::New(*file), false, true)) {
-            return v8::ThrowException(v8::String::New("Error executing  file"));
-        }
+BSONObj Load(const BSONObj& args) {
+    BSONObjIterator i( args );
+    while( i.more() ) {
+        BSONElement e = i.next();
+        if ( e.eoo() )
+            break;
+        assert( e.type() == mongo::String );
+        Handle<v8::String> source = ReadFile(e.valuestr());
+        massert( "error loading file", !source.IsEmpty() );
+        massert( "error executing file", ExecuteString(source, v8::String::New(e.valuestr()), false, true));
     }
-    return v8::Undefined();
+    return undefined_;
 }
 
 
-Handle<v8::Value> Quit(const Arguments& args) {
-    // If not arguments are given args[0] will yield undefined which
+BSONObj Quit(const BSONObj& args) {
+    // If not arguments are given first element will be EOO, which
     // converts to the integer value 0.
-    int exit_code = args[0]->Int32Value();
-    exit(exit_code);
-    return v8::Undefined();
+    int exit_code = args.firstElement().number();
+    ::exit(exit_code);
+    return undefined_;
 }
 
 
@@ -162,7 +173,7 @@ bool ExecuteString(Handle<v8::String> source, Handle<v8::Value> name,
     if ( print_result ){
         
         Local<Context> current = Context::GetCurrent();
-        Local<Object> global = current->Global();
+        Local<v8::Object> global = current->Global();
         
         Local<Value> shellPrint = global->Get( String::New( "shellPrint" ) );
 
@@ -192,23 +203,23 @@ void sleepms( int ms ) {
     boost::thread::sleep(xt);    
 }
 
-Handle<v8::Value> JSSleep(const Arguments& args){
-    assert( args.Length() == 1 );
-    assert( args[0]->IsInt32() );
-    int ms = args[ 0 ]->ToInt32()->Value();
+mongo::BSONObj JSSleep(const mongo::BSONObj &args){
+    assert( args.nFields() == 1 );
+    assert( args.firstElement().isNumber() );
+    int ms = args.firstElement().number();
     {
         v8::Unlocker u;
         sleepms( ms );
     }
-    return v8::Undefined();
+    return undefined_;
 }
 
-Handle<v8::Value> ListFiles(const Arguments& args){
-    jsassert( args.Length() == 1 , "need to specify 1 argument to listFiles" );
+BSONObj ListFiles(const BSONObj& args){
+    jsassert( args.nFields() == 1 , "need to specify 1 argument to listFiles" );
     
-    Handle<v8::Array> lst = v8::Array::New();
+    BSONObjBuilder lst;
     
-    path root( toSTLString( args[0] ) );
+    path root( args.firstElement().valuestrsafe() );
     
     directory_iterator end;
     directory_iterator i( root);
@@ -217,17 +228,19 @@ Handle<v8::Value> ListFiles(const Arguments& args){
     while ( i != end ){
         path p = *i;
         
-        Handle<v8::Object> o = v8::Object::New();
-        o->Set( v8::String::New( "name" ) , v8::String::New( p.string().c_str() ) );
-        o->Set( v8::String::New( "isDirectory" ) , v8::Boolean::New( is_directory( p ) ) );
-
-        lst->Set( v8::Number::New( num ) , o );
-
+        BSONObjBuilder b;
+        b << "name" << p.string();
+        b.appendBool( "isDirectory", is_directory( p ) );
+        stringstream ss;
+        ss << num;
+        string name = ss.str();
+        lst.appendArray( name.c_str(), b.done() );
+        
         num++;
         i++;
     }
     
-    return lst;
+    return lst.obj();
 }
 
 void ReportException(v8::TryCatch* try_catch) {
@@ -241,8 +254,8 @@ public:
     JSThreadConfig( const Arguments &args ) : started_(), done_() {
         jsassert( args.Length() > 0, "need at least one argument" );
         jsassert( args[ 0 ]->IsFunction(), "first argument must be a function" );
-        Local< Function > f = Function::Cast( *args[ 0 ] );
-        f_ = Persistent< Function >::New( f );
+        Local< v8::Function > f = v8::Function::Cast( *args[ 0 ] );
+        f_ = Persistent< v8::Function >::New( f );
         for( int i = 1; i < args.Length(); ++i )
             args_.push_back( Persistent< Value >::New( args[ i ] ) );
     }
@@ -293,19 +306,19 @@ private:
 
     bool started_;
     bool done_;
-    Persistent< Function > f_;
+    Persistent< v8::Function > f_;
     vector< Persistent< Value > > args_;
     auto_ptr< boost::thread > thread_;
     Persistent< Value > returnData_;
 };
 
 Handle< Value > ThreadInit( const Arguments &args ) {
-    Handle<Object> it = args.This();
+    Handle<v8::Object> it = args.This();
     // NOTE I believe the passed JSThreadConfig will never be freed.  If this
     // policy is changed, JSThread may no longer be able to store JSThreadConfig
     // by reference.
     it->Set( String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
-    return Undefined();
+    return v8::Undefined();
 }
 
 JSThreadConfig *thisConfig( const Arguments &args ) {
@@ -316,12 +329,12 @@ JSThreadConfig *thisConfig( const Arguments &args ) {
 
 Handle< Value > ThreadStart( const Arguments &args ) {
     thisConfig( args )->start();
-    return Undefined();
+    return v8::Undefined();
 }
 
 Handle< Value > ThreadJoin( const Arguments &args ) {
     thisConfig( args )->join();
-    return Undefined();
+    return v8::Undefined();
 }
 
 Handle< Value > ThreadReturnData( const Arguments &args ) {
@@ -477,16 +490,6 @@ v8::Handle< v8::Value > ResetDbpath( const v8::Arguments &a ) {
     return v8::Undefined();
 }
 
-inline void time_t_to_String(time_t t, char *buf) {
-#if defined(_WIN32)
-    ctime_s(buf, 64, &t);
-#else
-    ctime_r(&t, buf);
-#endif
-    buf[24] = 0; // don't want the \n
-    buf[ 20 ] = 0;
-}
-
 void killDb( int port, int signal ) {
     if( dbs.count( port ) != 1 ) {
         cout << "No db started on port: " << port << endl;
@@ -501,6 +504,7 @@ void killDb( int port, int signal ) {
         if ( i == 5 ) {
             char now[64];
             time_t_to_String(time(0), now);
+            now[ 20 ] = 0;
             cout << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
             assert( 0 == kill( pid, SIGKILL ) );
         }        
@@ -513,6 +517,7 @@ void killDb( int port, int signal ) {
     if ( i == 65 ) {
         char now[64];
         time_t_to_String(time(0), now);
+        now[ 20 ] = 0;
         cout << now << " failed to terminate process on port " << port << ", with pid " << pid << endl;
         assert( "Failed to terminate process" == 0 );
     }
@@ -590,7 +595,7 @@ Handle< Value > AllocatePorts( const Arguments &args ) {
         address.sin_family = AF_INET;
         address.sin_port = 0;
         address.sin_addr.s_addr = 0;        
-        assert( 0 == bind( s, (sockaddr*)&address, sizeof( address ) ) );
+        assert( 0 == ::bind( s, (sockaddr*)&address, sizeof( address ) ) );
         
         sockaddr_in newAddress;
         socklen_t len = sizeof( newAddress );
@@ -601,7 +606,7 @@ Handle< Value > AllocatePorts( const Arguments &args ) {
     }
 
     sort( ports.begin(), ports.end() );
-    Local< Array > ret = Array::New( n );
+    Local< v8::Array > ret = v8::Array::New( n );
     for( unsigned i = 0; i < ports.size(); ++i )
         ret->Set( Number::New( i ), Number::New( ports[ i ] ) );
     
@@ -609,19 +614,19 @@ Handle< Value > AllocatePorts( const Arguments &args ) {
 }
 #endif
 
-void installShellUtils( Handle<v8::ObjectTemplate>& global ){
-    global->Set(v8::String::New("sleep"), v8::FunctionTemplate::New(JSSleep));
-    global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
-    global->Set(v8::String::New("load"), v8::FunctionTemplate::New(Load));
-    global->Set(v8::String::New("listFiles"), v8::FunctionTemplate::New(ListFiles));
-    global->Set(v8::String::New("quit"), v8::FunctionTemplate::New(Quit));
-    global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
-    global->Set(v8::String::New("threadInject"), v8::FunctionTemplate::New(ThreadInject));
+void installShellUtils( mongo::Scope &scope ) {
+    scope.injectNative( "sleep", JSSleep );
+    scope.injectNative( "print", Print );
+    scope.injectNative( "load", Load );
+    scope.injectNative( "listFiles", ListFiles );
+    scope.injectNative( "quit", Quit );
+//    scope->injectNative( "version", Version );
+//    scope->injectNative( "threadInject", ThreadInject );
 #if !defined(_WIN32)
-    global->Set(v8::String::New("allocatePorts"), v8::FunctionTemplate::New(AllocatePorts));
-    global->Set(v8::String::New("_startMongoProgram"), v8::FunctionTemplate::New(StartMongoProgram));
-    global->Set(v8::String::New("stopMongod"), v8::FunctionTemplate::New(StopMongoProgram));
-    global->Set(v8::String::New("stopMongoProgram"), v8::FunctionTemplate::New(StopMongoProgram));
-    global->Set(v8::String::New("resetDbpath"), v8::FunctionTemplate::New(ResetDbpath));
+//    scope->injectNative( "allocatePorts", AllocatePorts );
+//    scope->injectNative( "_startMongoProgram", StartMongoProgram );
+//    scope->injectNative( "stopMongod", StopMongoProgram );
+//    scope->injectNative( "stopMongoProgram", StopMongoProgram );
+//    scope->injectNative( "resetDbpath", ResetDbpath );
 #endif
 }

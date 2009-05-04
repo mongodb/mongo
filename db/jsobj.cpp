@@ -34,24 +34,25 @@ namespace mongo {
         return s;
     }
 
-    string BSONElement::toString() const {
+    string BSONElement::toString( bool includeFieldName ) const {
         stringstream s;
+        if ( includeFieldName && type() != EOO )
+            s << fieldName() << ": ";
         switch ( type() ) {
         case EOO:
             return "EOO";
         case Date:
-            s << fieldName() << ": Date(" << hex << date() << ')';
+            s << "Date(" << hex << date() << ')';
             break;
         case RegEx:
         {
-            s << fieldName() << ": /" << regex() << '/';
+            s << "/" << regex() << '/';
             const char *p = regexFlags();
             if ( p ) s << p;
         }
         break;
         case NumberDouble:
 			{
-				s << fieldName() << ": ";
 				stringstream tmp;
 				tmp.precision( 16 );
 				tmp << number();
@@ -64,34 +65,33 @@ namespace mongo {
             break;
         case NumberInt:
             s.precision( 16 );
-            s << fieldName() << ": " << number();
+            s << number();
             //s << "(" << ( type() == NumberInt ? "int" : "double" ) << ")";
             break;
         case Bool:
-            s << fieldName() << ": " << ( boolean() ? "true" : "false" );
+            s << ( boolean() ? "true" : "false" );
             break;
         case Object:
         case Array:
-            s << fieldName() << ": " << embeddedObject().toString();
+            s << embeddedObject().toString();
             break;
         case Undefined:
-            s << fieldName() << ": undefined";
+            s << "undefined";
             break;
         case jstNULL:
-            s << fieldName() << ": null";
+            s << "null";
             break;
         case MaxKey:
-            s << fieldName() << ": MaxKey";
+            s << "MaxKey";
             break;
         case MinKey:
-            s << fieldName() << ": MinKey";
+            s << "MinKey";
             break;
         case CodeWScope:
-            s << fieldName() << ": CodeWScope( "
+            s << "CodeWScope( "
                 << codeWScopeCode() << ", " << codeWScopeObject().toString() << ")";
             break;
         case Code:
-            s << fieldName() << ": ";
             if ( valuestrsize() > 80 )
                 s << string(valuestr()).substr(0, 70) << "...";
             else {
@@ -100,7 +100,6 @@ namespace mongo {
             break;
         case Symbol:
         case String:
-            s << fieldName() << ": ";
             if ( valuestrsize() > 80 )
                 s << '"' << string(valuestr()).substr(0, 70) << "...\"";
             else {
@@ -108,25 +107,24 @@ namespace mongo {
             }
             break;
         case DBRef:
-            s << fieldName();
-            s << " : DBRef('" << valuestr() << "',";
+            s << "DBRef('" << valuestr() << "',";
             {
                 OID *x = (OID *) (valuestr() + valuestrsize());
                 s << *x << ')';
             }
             break;
         case jstOID:
-            s << fieldName() << " : ObjId(";
+            s << "ObjId(";
             s << __oid() << ')';
             break;
         case BinData:
-            s << fieldName() << " : BinData";
+            s << "BinData";
             break;
         case Timestamp:
-            s << fieldName() << " : Timestamp " << timestampTime() << "|" << timestampInc();
+            s << "Timestamp " << timestampTime() << "|" << timestampInc();
             break;
         default:
-            s << fieldName() << ": ?type=" << type();
+            s << "?type=" << type();
             break;
         }
         return s.str();

@@ -62,8 +62,8 @@ namespace mongo {
         return x;
     }
 
-#define malloc ourmalloc
-#define realloc ourrealloc
+#define malloc mongo::ourmalloc
+#define realloc mongo::ourrealloc
 
 } // namespace mongo
 

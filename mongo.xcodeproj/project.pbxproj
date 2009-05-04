@@ -762,6 +762,19 @@
 			passBuildSettingsInEnvironment = 1;
 			productName = "scons db";
 		};
+		93A47B070FAF46EB00E760DD /* scons debug all */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "-j2 --d .";
+			buildConfigurationList = 93A47B0F0FAF474A00E760DD /* Build configuration list for PBXLegacyTarget "scons debug all" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/local/bin/scons;
+			dependencies = (
+			);
+			name = "scons debug all";
+			passBuildSettingsInEnvironment = 1;
+			productName = "scons debug all";
+		};
 		93A8D0700F36AE0200C92B85 /* scons debug test */ = {
 			isa = PBXLegacyTarget;
 			buildArgumentsString = "-j2 --d test";
@@ -820,6 +833,7 @@
 				9302D74E0F2E6E4400DFA4EF /* scons all 64 */,
 				9302D7520F2E6E4600DFA4EF /* scons test 64 */,
 				93A8D0700F36AE0200C92B85 /* scons debug test */,
+				93A47B070FAF46EB00E760DD /* scons debug all */,
 			);
 		};
 /* End PBXProject section */
@@ -933,6 +947,27 @@
 			};
 			name = Release;
 		};
+		93A47B080FAF46EB00E760DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = "scons debug all";
+			};
+			name = Debug;
+		};
+		93A47B090FAF46EB00E760DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = "scons debug all";
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
 		93A8D0720F36AE0200C92B85 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1040,6 +1075,15 @@
 			buildConfigurations = (
 				932F1DCD0F213B06008FA2E7 /* Debug */,
 				932F1DCE0F213B06008FA2E7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		93A47B0F0FAF474A00E760DD /* Build configuration list for PBXLegacyTarget "scons debug all" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				93A47B080FAF46EB00E760DD /* Debug */,
+				93A47B090FAF46EB00E760DD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
