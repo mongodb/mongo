@@ -32,7 +32,8 @@ v8::Handle<v8::String> ReadFile(const char* name);
 void ReportException(v8::TryCatch* handler);
 
 
-void installShellUtils( mongo::Scope &scope );
+void installShellUtils( mongo::Scope &scope, v8::Handle<v8::ObjectTemplate>& global );
+
 
 #define jsassert(x,msg) assert(x)
 

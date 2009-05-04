@@ -28,6 +28,10 @@ BSONObj makeUndefined() {
 }
 BSONObj undefined_ = makeUndefined();
 
+BSONObj encapsulate( const BSONObj &obj ) {
+    return BSON( "" << obj );
+}
+
 BSONObj Print(const BSONObj &args) {
     bool first = true;
     BSONObjIterator i( args );
@@ -118,8 +122,8 @@ BSONObj Quit(const BSONObj& args) {
 }
 
 
-Handle<v8::Value> Version(const Arguments& args) {
-    return v8::String::New(v8::V8::GetVersion());
+BSONObj Version(const BSONObj& args) {
+    return BSON( "" << v8::V8::GetVersion() );
 }
 
 Handle<v8::String> ReadFile(const char* name) {
@@ -234,13 +238,15 @@ BSONObj ListFiles(const BSONObj& args){
         stringstream ss;
         ss << num;
         string name = ss.str();
-        lst.appendArray( name.c_str(), b.done() );
+        lst.append( name.c_str(), b.done() );
         
         num++;
         i++;
     }
     
-    return lst.obj();
+    BSONObjBuilder ret;
+    ret.appendArray( "", lst.done() );
+    return ret.obj();
 }
 
 void ReportException(v8::TryCatch* try_catch) {
@@ -370,36 +376,44 @@ class MongoProgramRunner {
     int port_;
     int pipe_;
 public:
-    MongoProgramRunner( const v8::Arguments &args ) {
-        assert( args.Length() > 0 );
-        v8::String::Utf8Value programParse( args[ 0 ] );
-        assert( *programParse );
-        string program( *programParse );
+    MongoProgramRunner( const BSONObj &args ) {
+        assert( args.nFields() > 0 );
+        string program( args.firstElement().valuestrsafe() );
         
-        assert( argv0 );
+        assert( !program.empty() );
         boost::filesystem::path programPath = ( boost::filesystem::path( argv0 ) ).branch_path() / program;
         assert( boost::filesystem::exists( programPath ) );
         
         port_ = -1;
-        argv_ = new char *[ args.Length() + 1 ];
+        argv_ = new char *[ args.nFields() + 1 ];
         {
             string s = programPath.native_file_string();
             if ( s == program )
                 s = "./" + s;
             argv_[ 0 ] = copyString( s.c_str() );
         }
-        
-        for( int i = 1; i < args.Length(); ++i ) {
-            v8::String::Utf8Value str( args[ i ] );
-            assert( *str );
-            char *s = copyString( *str );
+
+        BSONObjIterator j( args );
+        j.next();
+        for( int i = 1; i < args.nFields(); ++i ) {
+            BSONElement e = j.next();
+            string str;
+            if ( e.isNumber() ) {
+                stringstream ss;
+                ss << e.number();
+                str = ss.str();
+            } else {
+                assert( e.type() == mongo::String );
+                str = e.valuestr();
+            }
+            char *s = copyString( str.c_str() );
             if ( string( "--port" ) == s )
                 port_ = -2;
             else if ( port_ == -2 )
                 port_ = strtol( s, 0, 10 );
             argv_[ i ] = s;
         }
-        argv_[ args.Length() ] = 0;
+        argv_[ args.nFields() ] = 0;
         
         assert( port_ > 0 );
         if ( dbs.count( port_ ) != 0 ){
@@ -474,20 +488,21 @@ public:
     }
 };
 
-v8::Handle< v8::Value > StartMongoProgram( const v8::Arguments &a ) {
+BSONObj StartMongoProgram( const BSONObj &a ) {
     MongoProgramRunner r( a );
     r.start();
     boost::thread t( r );
-    return v8::Undefined();
+    return undefined_;
 }
 
-v8::Handle< v8::Value > ResetDbpath( const v8::Arguments &a ) {
-    assert( a.Length() == 1 );
-    v8::String::Utf8Value path( a[ 0 ] );
-    if ( boost::filesystem::exists( *path ) )
-        boost::filesystem::remove_all( *path );
-    boost::filesystem::create_directory( *path );    
-    return v8::Undefined();
+BSONObj ResetDbpath( const BSONObj &a ) {
+    assert( a.nFields() == 1 );
+    string path = a.firstElement().valuestrsafe();
+    assert( !path.empty() );
+    if ( boost::filesystem::exists( path ) )
+        boost::filesystem::remove_all( path );
+    boost::filesystem::create_directory( path );    
+    return undefined_;
 }
 
 void killDb( int port, int signal ) {
@@ -529,18 +544,21 @@ void killDb( int port, int signal ) {
     }
 }
 
-v8::Handle< v8::Value > StopMongoProgram( const v8::Arguments &a ) {
-    assert( a.Length() == 1 || a.Length() == 2 );
-    assert( a[ 0 ]->IsInt32() );
-    int port = a[ 0 ]->ToInt32()->Value();
+BSONObj StopMongoProgram( const BSONObj &a ) {
+    assert( a.nFields() == 1 || a.nFields() == 2 );
+    assert( a.firstElement().isNumber() );
+    int port = a.firstElement().number();
     int signal = SIGTERM;
-    if ( a.Length() == 2 ) {
-        assert( a[ 1 ]->IsInt32() );
-        signal = a[ 1 ]->ToInt32()->Value();
+    if ( a.nFields() == 2 ) {
+        BSONObjIterator i( a );
+        i.next();
+        BSONElement e = i.next();
+        assert( e.isNumber() );
+        signal = e.number();
     }
     killDb( port, signal );
     cout << "shell: stopped mongo program on port " << port << endl;
-    return v8::Undefined();
+    return undefined_;
 }
 
 void KillMongoProgramInstances() {
@@ -579,11 +597,11 @@ Handle< Value > ThreadInject( const Arguments &args ) {
 }
 
 #ifndef _WIN32
-Handle< Value > AllocatePorts( const Arguments &args ) {
-    jsassert( args.Length() == 1 , "allocatePorts takes exactly 1 argument" );
-    jsassert( args[0]->IsInt32() , "allocatePorts needs to be passed an integer" );
+BSONObj AllocatePorts( const BSONObj &args ) {
+    jsassert( args.nFields() == 1 , "allocatePorts takes exactly 1 argument" );
+    jsassert( args.firstElement().isNumber() , "allocatePorts needs to be passed an integer" );
 
-    int n = args[0]->ToInt32()->Value();
+    int n = args.firstElement().number();
 
     vector< int > ports;
     for( int i = 0; i < n; ++i ) {
@@ -606,27 +624,25 @@ Handle< Value > AllocatePorts( const Arguments &args ) {
     }
 
     sort( ports.begin(), ports.end() );
-    Local< v8::Array > ret = v8::Array::New( n );
-    for( unsigned i = 0; i < ports.size(); ++i )
-        ret->Set( Number::New( i ), Number::New( ports[ i ] ) );
-    
-    return ret;
+    BSONObjBuilder b;
+    b.append( "", ports );
+    return b.obj();
 }
 #endif
 
-void installShellUtils( mongo::Scope &scope ) {
+void installShellUtils( mongo::Scope &scope, v8::Handle<v8::ObjectTemplate>& global ) {
     scope.injectNative( "sleep", JSSleep );
     scope.injectNative( "print", Print );
     scope.injectNative( "load", Load );
     scope.injectNative( "listFiles", ListFiles );
     scope.injectNative( "quit", Quit );
-//    scope->injectNative( "version", Version );
-//    scope->injectNative( "threadInject", ThreadInject );
+    scope.injectNative( "version", Version );
+    global->Set( String::New( "threadInject" ), FunctionTemplate::New( ThreadInject ) );
 #if !defined(_WIN32)
-//    scope->injectNative( "allocatePorts", AllocatePorts );
-//    scope->injectNative( "_startMongoProgram", StartMongoProgram );
-//    scope->injectNative( "stopMongod", StopMongoProgram );
-//    scope->injectNative( "stopMongoProgram", StopMongoProgram );
-//    scope->injectNative( "resetDbpath", ResetDbpath );
+    scope.injectNative( "allocatePorts", AllocatePorts );
+    scope.injectNative( "_startMongoProgram", StartMongoProgram );
+    scope.injectNative( "stopMongod", StopMongoProgram );
+    scope.injectNative( "stopMongoProgram", StopMongoProgram );
+    scope.injectNative( "resetDbpath", ResetDbpath );
 #endif
 }

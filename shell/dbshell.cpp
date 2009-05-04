@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) {
     
     scope->setGlobal( global );
 
-    installShellUtils( *scope );
+    installShellUtils( *scope, global );
     installMongoGlobals( global );
 
     baseContext_ = v8::Context::New(NULL, global);
