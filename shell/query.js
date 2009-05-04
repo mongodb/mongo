@@ -1,7 +1,6 @@
 // query.js
 
 if ( typeof DBQuery == "undefined" ){
-    print( "defining DBQuery" );
     DBQuery = function( mongo , db , collection , ns , query , fields , limit , skip ){
         
         this._mongo = mongo; // 0

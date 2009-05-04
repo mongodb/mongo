@@ -2,6 +2,7 @@
 
 if ( typeof DB == "undefined" ){                     
     DB = function( mongo , name ){
+        assert( typeof createDB != "function" , "createDB defined, so shouldn't do this" );
         this._mongo = mongo;
         this._name = name;
     }
