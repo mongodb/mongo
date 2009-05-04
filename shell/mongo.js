@@ -24,7 +24,7 @@ Mongo.prototype.setSlaveOk = function() {
 }
 
 Mongo.prototype.getDB = function( name ){
-    if ( createDB ){
+    if ( typeof createDB == "function" ){
         print( "here" );
         var newdb =  createDB( this , name );
         assert( this == newdb.getMongo() , "createDB sanity check 1" );
