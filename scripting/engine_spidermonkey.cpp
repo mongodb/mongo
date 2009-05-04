@@ -22,7 +22,9 @@ namespace mongo {
 
     class SMScope;
 
-    boost::thread_specific_ptr<SMScope> currentScope;
+    
+    void dontDeleteScope( SMScope * s ){}
+    boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
 
 
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp );
@@ -197,13 +199,18 @@ namespace mongo {
     
     JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         DBClientBase * client = createDirectClient();
+        cout << "client c: " << client << endl;
         JS_SetPrivate( cx , obj , (void*)client );
         return JS_TRUE;
     }
 
     void mongo_finalize( JSContext * cx , JSObject * obj ){
         DBClientBase * client = (DBClientBase*)JS_GetPrivate( cx , obj );
-        delete client;
+        if ( client ){
+            cout << "client x: " << client << endl;
+            cout << "Addr in finalize: " << client->getServerAddress() << endl;
+            delete client;
+        }
     }
 
     static JSClass mongo_class = {
@@ -220,24 +227,35 @@ namespace mongo {
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
         0 , 0 , 0 , 
-        mongo_constructor , 
+        mongo_local_constructor , 
         0 , 0 , 0 , 0
     };
 
-    JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        DBClientBase * client = createDirectClient();
-        JS_SetPrivate( cx , obj , (void*)client );
+    JSBool object_id_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+
+        OID oid;
+        if ( argc == 0 ){
+            oid.init();
+        }
+        else {
+            uassert( "not done yet" , 0 );
+        }
+        
+        Convertor c( cx );
+        jsval v = c.toval( oid.str().c_str() );
+        assert( JS_SetProperty( cx , obj , "str" , &v  ) );
+
         return JS_TRUE;
     }
 
     static JSClass object_id_class = {
         "ObjectId" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
         0 , 0 , 0 , 
         object_id_constructor , 
         0 , 0 , 0 , 0
-    }
+    };
 
     // ------ scope ------
 
@@ -263,8 +281,17 @@ namespace mongo {
         }
 
         ~SMScope(){
-            delete _convertor;
-            JS_DestroyContext( _context );
+            uassert( "deleted SMScope twice?" , _convertor );
+            
+            if ( _convertor ){
+                delete _convertor;
+                _convertor = 0;
+            }
+
+            if ( _context ){
+                JS_DestroyContext( _context );
+                _context = 0;
+            }
         }
         
         void reset(){
@@ -276,8 +303,11 @@ namespace mongo {
         }
 
         void localConnect( const char * dbName ){
-            jsval mongo = OBJECT_TO_JSVAL( JS_NewObject( _context , &mongo_class , 0 , 0 ) );
+            jsval mongo = OBJECT_TO_JSVAL( JS_NewObject( _context , &mongo_local_class , 0 , 0 ) );
             assert( JS_SetProperty( _context , _global , "Mongo" , &mongo ) );
+            
+            jsval objectid = OBJECT_TO_JSVAL( JS_NewObject( _context , &object_id_class , 0 , 0 ) );
+            assert( JS_SetProperty( _context , _global , "ObjectId" , &objectid ) );
             exec( jsconcatcode );
         }
 
