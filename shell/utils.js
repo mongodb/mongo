@@ -155,6 +155,9 @@ Array.prototype.tojson = function( sepLines ){
     return s;
 }
 
+if ( ! ObjectId.prototype )
+    ObjectId.prototype = {}
+
 ObjectId.prototype.toString = function(){
     return this.str;
 }
@@ -169,7 +172,10 @@ Thread = function(){
     this.init.apply( this, arguments );
 }
 
-threadInject( Thread.prototype );
+if ( typeof( threadInject ) == "function" )
+    threadInject( Thread.prototype );
+else
+    print( "warning: thread management won't work" );
 
 fork = function() {
     var t = new Thread( function() {} );
