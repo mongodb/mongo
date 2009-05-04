@@ -174,6 +174,8 @@
 		93A479F70FAF2A5000E760DD /* engine_java.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = engine_java.h; sourceTree = "<group>"; };
 		93A479F90FAF2A5000E760DD /* engine_none.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = engine_none.cpp; sourceTree = "<group>"; };
 		93A479FA0FAF2A5000E760DD /* engine_spidermonkey.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = engine_spidermonkey.cpp; sourceTree = "<group>"; };
+		93A47AA50FAF416F00E760DD /* engine_v8.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = engine_v8.cpp; sourceTree = "<group>"; };
+		93A47AA60FAF41B200E760DD /* engine_v8.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = engine_v8.h; sourceTree = "<group>"; };
 		93A6E10C0F24CF9800DA4EBF /* lasterror.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lasterror.h; sourceTree = "<group>"; };
 		93A6E10D0F24CFB100DA4EBF /* flushtest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = flushtest.cpp; sourceTree = "<group>"; };
 		93A6E10E0F24CFD300DA4EBF /* security.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = security.h; sourceTree = "<group>"; };
@@ -551,6 +553,8 @@
 		93A479F20FAF2A5000E760DD /* scripting */ = {
 			isa = PBXGroup;
 			children = (
+				93A47AA60FAF41B200E760DD /* engine_v8.h */,
+				93A47AA50FAF416F00E760DD /* engine_v8.cpp */,
 				93A479F30FAF2A5000E760DD /* engine.cpp */,
 				93A479F40FAF2A5000E760DD /* engine.h */,
 				93A479F60FAF2A5000E760DD /* engine_java.cpp */,
