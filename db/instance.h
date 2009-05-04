@@ -91,7 +91,7 @@ namespace mongo {
 
     void receivedKillCursors(Message& m);
     void receivedUpdate(Message& m, stringstream& ss);
-    void receivedDelete(Message& m);
+    void receivedDelete(Message& m, stringstream& ss);
     void receivedInsert(Message& m, stringstream& ss);
     void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss);
     void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit);

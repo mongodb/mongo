@@ -2,8 +2,6 @@
 
 
 if ( ( typeof  DBCollection ) == "undefined" ){
-    print( "defined DBCollection" );
-
     DBCollection = function( mongo , db , shortName , fullName ){
         this._mongo = mongo;
         this._db = db;

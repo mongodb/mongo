@@ -580,6 +580,13 @@ namespace NamespaceTests {
 //            }
 //        };
 
+        class Size {
+        public:
+            void run() {
+                ASSERT_EQUALS( 496U, sizeof( NamespaceDetails ) );
+            }
+        };
+        
     } // namespace NamespaceDetailsTests
 
     class All : public UnitTest::Suite {
@@ -605,6 +612,7 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::TwoExtent >();
             add< NamespaceDetailsTests::Migrate >();
 //            add< NamespaceDetailsTests::BigCollection >();
+            add< NamespaceDetailsTests::Size >();
         }
     };
 } // namespace NamespaceTests

@@ -100,13 +100,30 @@ namespace mongo {
                 log() << "resolveBSONField can't handle type: " << (int)(e.type()) << endl;
             }
             
-            uassert( "not done" , 0 );
+            uassert( "not done: toval" , 0 );
             return 0;
         }
         
     private:
         JSContext * _context;
     };
+
+    class ObjectWrapper {
+    public:
+        ObjectWrapper( JSContext * cx , JSObject * obj ) : _context( cx ) , _object( obj ){}
+
+        JSObject * getJSObject( const char * name ){
+            jsval v;
+            assert( JS_GetProperty( _context , _object , name , &v ) );
+            return JSVAL_TO_OBJECT( v );
+        }
+        
+    private:
+        JSContext * _context;
+        JSObject * _object;
+    };
+
+
 
     static JSClass global_class = {
         "global", JSCLASS_GLOBAL_FLAGS,
@@ -128,8 +145,11 @@ namespace mongo {
         return JS_TRUE;
     }
 
+    JSBool native_db_create( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval );
+
     JSFunctionSpec globalHelpers[] = { 
-        {  "print" , &native_print , 0 , 0 , 0 } , 
+        { "print" , &native_print , 0 , 0 , 0 } , 
+        { "createDB" , &native_db_create , 0 , 0 , 0 } , 
         { 0 , 0 , 0 , 0 , 0 } 
     };
 
@@ -198,9 +218,14 @@ namespace mongo {
     }
     
     JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        Convertor c( cx );
+
         DBClientBase * client = createDirectClient();
-        cout << "client c: " << client << endl;
         JS_SetPrivate( cx , obj , (void*)client );
+
+        jsval host = c.toval( "EMBEDDED" );
+        assert( JS_SetProperty( cx , obj , "host" , &host ) );
+
         return JS_TRUE;
     }
 
@@ -231,6 +256,72 @@ namespace mongo {
         0 , 0 , 0 , 0
     };
 
+    // --------------  DB ---------------
+
+    
+    JSBool db_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        cout << "db_constructor" << endl;
+        uassert( "wrong number of arguments to DB" , argc == 2 );
+        assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
+        assert( JS_SetProperty( cx , obj , "_name" , &(argv[1]) ) );
+        return JS_TRUE;
+    }
+
+    JSBool resolve_dbcollection( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
+        Convertor c( cx );
+        string collname = c.toString( id );
+
+        if ( collname == "prototype" || collname.find( "__" ) == 0 || 
+             collname == "_mongo" || collname == "_name" )
+            return JS_TRUE;
+        
+        JSObject * proto = JS_GetPrototype( cx , obj );
+        if ( proto ){
+            JSBool res;
+            assert( JS_HasProperty( cx , proto , collname.c_str() , &res ) );
+            if ( res )
+                return JS_TRUE;
+        } 
+
+        uassert( (string)"not done: resolve_dbcollection: " + collname , 0 );
+        return JS_TRUE;
+    }
+
+    static JSClass db_class = {
+        "DB" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, (JSResolveOp)(&resolve_dbcollection) , JS_ConvertStub, JS_FinalizeStub,
+        0 , 0 , 0 , 
+        db_constructor , 
+        0 , 0 , 0 , 0        
+    };
+
+    static JSPropertySpec db_props[] = {
+        { "_mongo" , 0 , 0 } , 
+        { "_name" , 0 , 0 } , 
+        { 0 }
+    };
+
+    JSBool native_db_create( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ){
+        uassert( "db needs 2 args" , argc == 2 );
+
+        ObjectWrapper a( cx , JS_GetGlobalObject( cx ) );
+        JSObject * DB = a.getJSObject( "DB" );
+        ObjectWrapper b( cx , DB );
+        JSObject * DBprototype = b.getJSObject( "prototype" );
+        uassert( "can't find DB prototype" , DBprototype );
+        
+        JSObject * db = JS_NewObject( cx , &db_class , 0 , 0 );
+        assert( JS_SetProperty( cx , db , "_mongo" , &(argv[0]) ) );
+        assert( JS_SetProperty( cx , db , "_name" , &(argv[1]) ) );
+        assert( JS_SetPrototype( cx , db , DBprototype ) );
+        
+        *rval = OBJECT_TO_JSVAL( db );
+        return JS_TRUE;
+    }
+
+    // -------------- object id -------------
+
     JSBool object_id_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
 
         OID oid;
@@ -238,7 +329,7 @@ namespace mongo {
             oid.init();
         }
         else {
-            uassert( "not done yet" , 0 );
+            uassert( "object_id_constructor 2nd case" , 0 );
         }
         
         Convertor c( cx );
@@ -259,7 +350,7 @@ namespace mongo {
 
     // ------ scope ------
 
-
+        
     class SMScope : public Scope {
     public:
         SMScope(){
@@ -303,12 +394,14 @@ namespace mongo {
         }
 
         void localConnect( const char * dbName ){
-            jsval mongo = OBJECT_TO_JSVAL( JS_NewObject( _context , &mongo_local_class , 0 , 0 ) );
-            assert( JS_SetProperty( _context , _global , "Mongo" , &mongo ) );
-            
-            jsval objectid = OBJECT_TO_JSVAL( JS_NewObject( _context , &object_id_class , 0 , 0 ) );
-            assert( JS_SetProperty( _context , _global , "ObjectId" , &objectid ) );
+            assert( JS_InitClass( _context , _global , 0 , &mongo_local_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+            assert( JS_InitClass( _context , _global , 0 , &object_id_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+            //assert( JS_InitClass( _context , _global , 0 , &db_class , 0 , 0 , db_props , 0 ,0  , 0 ) );
+
             exec( jsconcatcode );
+            
+            exec( "_mongo = new Mongo();" );
+            exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
         }
 
         // ----- getters ------
@@ -343,6 +436,11 @@ namespace mongo {
         
         BSONObj getObject( const char *field ){
             massert( "not implemented yet: getObject()" , 0 ); throw -1;  
+        }
+
+        JSObject * getJSObject( const char * field ){
+            ObjectWrapper o( _context , _global );
+            return o.getJSObject( field );
         }
 
         int type( const char *field ){
@@ -490,7 +588,12 @@ namespace mongo {
 
 
     void SMEngine::runTest(){
-        // this is deprecated
+        SMScope s;
+        
+        s.localConnect( "blah" );
+        s.exec( "print( '_mongo:' + _mongo );" );
+        s.exec( "assert( db.getMongo() )" );
+        s.exec( "assert( db.blah , 'collection getting does not work' ); " );
     }
 
     Scope * SMEngine::createScope(){

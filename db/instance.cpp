@@ -230,7 +230,7 @@ namespace mongo {
                 OPWRITE;
                 try {
                     ss << "remove ";
-                    receivedDelete(m);
+                    receivedDelete(m, ss);
                 }
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion receivedDelete, continuing" << endl;
@@ -327,13 +327,14 @@ namespace mongo {
         bool upsert = flags & 1;
         {
             string s = query.toString();
+            ss << " query: " << s;
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
         }        
         bool updatedExisting = updateObjects(ns, toupdate, query, flags & 1, ss);
         recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 );
     }
 
-    void receivedDelete(Message& m) {
+    void receivedDelete(Message& m, stringstream &ss) {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
@@ -345,6 +346,7 @@ namespace mongo {
         BSONObj pattern = d.nextJsObj();
         {
             string s = pattern.toString();
+            ss << " query: " << s;
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
         }        
         int n = deleteObjects(ns, pattern, justOne, true);
@@ -536,7 +538,7 @@ namespace mongo {
                 }
                 else if ( m.data->operation() == dbDelete ) {
                     ss << "remove ";
-                    receivedDelete(m);
+                    receivedDelete(m, ss);
                 }
                 else if ( m.data->operation() == dbGetMore ) {
                     DEV log = true;
