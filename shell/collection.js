@@ -8,11 +8,17 @@ if ( ( typeof  DBCollection ) == "undefined" ){
         this._shortName = shortName;
         this._fullName = fullName;
         
-        assert( this._mongo , "no mongo" );
-        assert( this._db , "no db" );
-        assert( this._shortName , "no shortName" );
-        assert( this._fullName , "no fullName" );
+        this.verify();
     }
+}
+
+DBCollection.prototype.verify = function(){
+    assert( this._mongo , "no mongo" );
+    assert( this._db , "no db" );
+    assert( this._shortName , "no shortName" );
+    assert( this._fullName , "no fullName" );
+    
+    assert.eq( this._fullName , this._db._name + "." + this._shortName , "name mismatch" );
 }
 
 DBCollection.prototype.getName = function(){
