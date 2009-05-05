@@ -5,6 +5,8 @@
 #include "../stdafx.h"
 #include "../db/jsobj.h"
 
+extern const char * jsconcatcode; // TODO: change name to mongoJSCode
+
 namespace mongo {
 
     typedef unsigned long long ScriptingFunction;

@@ -1,34 +1,12 @@
 // engine_spidermonkey.cpp
 
-#include "engine.h"
-
-#ifdef _WIN32
-#define XP_WIN
-#else
-#define XP_UNIX
-#endif
-
-#ifdef MOZJS
-#include "mozjs/jsapi.h"
-#else
-#include "js/jsapi.h"
-#endif
+#include "engine_spidermonkey.h"
 
 #include "../client/dbclient.h"
 
-extern const char * jsconcatcode;
-
 namespace mongo {
 
-    class SMScope;
-
-    
-    void dontDeleteScope( SMScope * s ){}
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
-
-
-    JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp );
-    void errorReporter( JSContext *cx, const char *message, JSErrorReport *report );
 
     static JSClass bson_ro_class = {
         "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
@@ -104,26 +82,41 @@ namespace mongo {
             return 0;
         }
         
-    private:
-        JSContext * _context;
-    };
+        // ------- object helpers ------
 
-    class ObjectWrapper {
-    public:
-        ObjectWrapper( JSContext * cx , JSObject * obj ) : _context( cx ) , _object( obj ){}
-
-        JSObject * getJSObject( const char * name ){
+        JSObject * getJSObject( JSObject * o , const char * name ){
             jsval v;
-            assert( JS_GetProperty( _context , _object , name , &v ) );
+            assert( JS_GetProperty( _context , o , name , &v ) );
             return JSVAL_TO_OBJECT( v );
+        }
+        
+        JSObject * getGlobalObject( const char * name ){
+            return getJSObject( JS_GetGlobalObject( _context ) , name );
+        }
+
+        JSObject * getGlobalPrototype( const char * name ){
+            return getJSObject( getGlobalObject( name ) , "prototype" );
+        }
+        
+        bool hasProperty( JSObject * o , const char * name ){
+            JSBool res;
+            assert( JS_HasProperty( _context , o , name , & res ) );
+            return res;
+        }
+
+        jsval getProperty( JSObject * o , const char * field ){
+            jsval v;
+            assert( JS_GetProperty( _context , o , field , &v ) );
+            return v;
+        }
+
+        void setProperty( JSObject * o , const char * field , jsval v ){
+            assert( JS_SetProperty( _context , o , field , &v ) );
         }
         
     private:
         JSContext * _context;
-        JSObject * _object;
     };
-
-
 
     static JSClass global_class = {
         "global", JSCLASS_GLOBAL_FLAGS,
@@ -144,8 +137,6 @@ namespace mongo {
         cout << endl;
         return JS_TRUE;
     }
-
-    JSBool native_db_create( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval );
 
     JSFunctionSpec globalHelpers[] = { 
         { "print" , &native_print , 0 , 0 , 0 } , 
@@ -210,143 +201,6 @@ namespace mongo {
         globalScriptEngine = globalSMEngine;
     }
 
-    // ------ mongo stuff ------
-
-    JSBool mongo_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        uassert( "mongo_constructor not implemented yet" , 0 );
-        throw -1;
-    }
-    
-    JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        Convertor c( cx );
-
-        DBClientBase * client = createDirectClient();
-        JS_SetPrivate( cx , obj , (void*)client );
-
-        jsval host = c.toval( "EMBEDDED" );
-        assert( JS_SetProperty( cx , obj , "host" , &host ) );
-
-        return JS_TRUE;
-    }
-
-    void mongo_finalize( JSContext * cx , JSObject * obj ){
-        DBClientBase * client = (DBClientBase*)JS_GetPrivate( cx , obj );
-        if ( client ){
-            cout << "client x: " << client << endl;
-            cout << "Addr in finalize: " << client->getServerAddress() << endl;
-            delete client;
-        }
-    }
-
-    static JSClass mongo_class = {
-        "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
-        0 , 0 , 0 , 
-        mongo_constructor , 
-        0 , 0 , 0 , 0
-    };
-
-    static JSClass mongo_local_class = {
-        "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
-        0 , 0 , 0 , 
-        mongo_local_constructor , 
-        0 , 0 , 0 , 0
-    };
-
-    // --------------  DB ---------------
-
-    
-    JSBool db_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        cout << "db_constructor" << endl;
-        uassert( "wrong number of arguments to DB" , argc == 2 );
-        assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
-        assert( JS_SetProperty( cx , obj , "_name" , &(argv[1]) ) );
-        return JS_TRUE;
-    }
-
-    JSBool resolve_dbcollection( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
-        Convertor c( cx );
-        string collname = c.toString( id );
-
-        if ( collname == "prototype" || collname.find( "__" ) == 0 || 
-             collname == "_mongo" || collname == "_name" )
-            return JS_TRUE;
-        
-        JSObject * proto = JS_GetPrototype( cx , obj );
-        if ( proto ){
-            JSBool res;
-            assert( JS_HasProperty( cx , proto , collname.c_str() , &res ) );
-            if ( res )
-                return JS_TRUE;
-        } 
-
-        uassert( (string)"not done: resolve_dbcollection: " + collname , 0 );
-        return JS_TRUE;
-    }
-
-    static JSClass db_class = {
-        "DB" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, (JSResolveOp)(&resolve_dbcollection) , JS_ConvertStub, JS_FinalizeStub,
-        0 , 0 , 0 , 
-        db_constructor , 
-        0 , 0 , 0 , 0        
-    };
-
-    static JSPropertySpec db_props[] = {
-        { "_mongo" , 0 , 0 } , 
-        { "_name" , 0 , 0 } , 
-        { 0 }
-    };
-
-    JSBool native_db_create( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ){
-        uassert( "db needs 2 args" , argc == 2 );
-
-        ObjectWrapper a( cx , JS_GetGlobalObject( cx ) );
-        JSObject * DB = a.getJSObject( "DB" );
-        ObjectWrapper b( cx , DB );
-        JSObject * DBprototype = b.getJSObject( "prototype" );
-        uassert( "can't find DB prototype" , DBprototype );
-        
-        JSObject * db = JS_NewObject( cx , &db_class , 0 , 0 );
-        assert( JS_SetProperty( cx , db , "_mongo" , &(argv[0]) ) );
-        assert( JS_SetProperty( cx , db , "_name" , &(argv[1]) ) );
-        assert( JS_SetPrototype( cx , db , DBprototype ) );
-        
-        *rval = OBJECT_TO_JSVAL( db );
-        return JS_TRUE;
-    }
-
-    // -------------- object id -------------
-
-    JSBool object_id_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-
-        OID oid;
-        if ( argc == 0 ){
-            oid.init();
-        }
-        else {
-            uassert( "object_id_constructor 2nd case" , 0 );
-        }
-        
-        Convertor c( cx );
-        jsval v = c.toval( oid.str().c_str() );
-        assert( JS_SetProperty( cx , obj , "str" , &v  ) );
-
-        return JS_TRUE;
-    }
-
-    static JSClass object_id_class = {
-        "ObjectId" , JSCLASS_HAS_PRIVATE ,
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
-        0 , 0 , 0 , 
-        object_id_constructor , 
-        0 , 0 , 0 , 0
-    };
 
     // ------ scope ------
 
@@ -396,7 +250,6 @@ namespace mongo {
         void localConnect( const char * dbName ){
             assert( JS_InitClass( _context , _global , 0 , &mongo_local_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
             assert( JS_InitClass( _context , _global , 0 , &object_id_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
-            //assert( JS_InitClass( _context , _global , 0 , &db_class , 0 , 0 , db_props , 0 ,0  , 0 ) );
 
             exec( jsconcatcode );
             
@@ -439,8 +292,7 @@ namespace mongo {
         }
 
         JSObject * getJSObject( const char * field ){
-            ObjectWrapper o( _context , _global );
-            return o.getJSObject( field );
+            return _convertor->getJSObject( _global , field );
         }
 
         int type( const char *field ){
@@ -590,10 +442,13 @@ namespace mongo {
     void SMEngine::runTest(){
         SMScope s;
         
-        s.localConnect( "blah" );
+        s.localConnect( "foo" );
         s.exec( "print( '_mongo:' + _mongo );" );
         s.exec( "assert( db.getMongo() )" );
-        s.exec( "assert( db.blah , 'collection getting does not work' ); " );
+        s.exec( "assert( db.bar , 'collection getting does not work' ); " );
+        s.exec( "db.bar.verify();" );
+        s.exec( "db.bar.silly.verify();" );
+        s.exec( "assert.eq( 'foo.bar.silly' , db.bar.silly._fullName )" );
     }
 
     Scope * SMEngine::createScope(){
@@ -602,3 +457,5 @@ namespace mongo {
     
     
 }
+
+#include "sm_db.cpp"
