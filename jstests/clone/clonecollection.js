@@ -24,7 +24,11 @@ t.a.drop();
 assert.eq( 0, t.system.indexes.find().count() );
 
 f.a.ensureIndex( { i: 1 } );
+assert.eq( 2, f.system.indexes.find().count(), "expected index missing" );
 assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a" ) );
+if ( t.system.indexes.find().count() != 2 ) {
+    printjson( t.system.indexes.find().toArray() );
+}
 assert.eq( 2, t.system.indexes.find().count(), "expected index missing" );
 // Verify index works
 assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().startKey.i );
