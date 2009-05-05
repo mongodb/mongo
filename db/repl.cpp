@@ -807,8 +807,11 @@ namespace mongo {
             }
         }
         catch ( UserException& e ) {
-            log() << "sync: caught user assertion " << e.msg << '\n';
-        }        
+            log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;;
+        }
+        catch ( DBException& e ) {
+            log() << "sync: caught db exception " << e << " while applying op: " << op << endl;;            
+        }
     }
     
     /* local.$oplog.main is of the form:
