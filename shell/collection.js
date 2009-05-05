@@ -13,12 +13,13 @@ if ( ( typeof  DBCollection ) == "undefined" ){
 }
 
 DBCollection.prototype.verify = function(){
-    assert( this._mongo , "no mongo" );
-    assert( this._db , "no db" );
-    assert( this._shortName , "no shortName" );
     assert( this._fullName , "no fullName" );
+    assert( this._shortName , "no shortName" );
+    assert( this._db , "no db" );
     
     assert.eq( this._fullName , this._db._name + "." + this._shortName , "name mismatch" );
+
+    assert( this._mongo , "no mongo in DBCollection" );
 }
 
 DBCollection.prototype.getName = function(){

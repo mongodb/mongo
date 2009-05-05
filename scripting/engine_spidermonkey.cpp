@@ -105,6 +105,7 @@ namespace mongo {
         }
 
         jsval getProperty( JSObject * o , const char * field ){
+            uassert( "object passed to getPropery is null" , o );
             jsval v;
             assert( JS_GetProperty( _context , o , field , &v ) );
             return v;
@@ -112,6 +113,11 @@ namespace mongo {
 
         void setProperty( JSObject * o , const char * field , jsval v ){
             assert( JS_SetProperty( _context , o , field , &v ) );
+        }
+        
+        string typeString( jsval v ){
+            JSType t = JS_TypeOfValue( _context , v );
+            return JS_GetTypeName( _context , t );
         }
         
     private:
@@ -140,7 +146,6 @@ namespace mongo {
 
     JSFunctionSpec globalHelpers[] = { 
         { "print" , &native_print , 0 , 0 , 0 } , 
-        { "createDB" , &native_db_create , 0 , 0 , 0 } , 
         { 0 , 0 , 0 , 0 , 0 } 
     };
 
@@ -250,6 +255,8 @@ namespace mongo {
         void localConnect( const char * dbName ){
             assert( JS_InitClass( _context , _global , 0 , &mongo_local_class , mongo_local_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
             assert( JS_InitClass( _context , _global , 0 , &object_id_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+            assert( JS_InitClass( _context , _global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
+            assert( JS_InitClass( _context , _global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
 
             exec( jsconcatcode );
             
@@ -443,10 +450,21 @@ namespace mongo {
         SMScope s;
         
         s.localConnect( "foo" );
-        s.exec( "print( '_mongo:' + _mongo );" );
+
         s.exec( "assert( db.getMongo() )" );
         s.exec( "assert( db.bar , 'collection getting does not work' ); " );
+        s.exec( "assert.eq( db._name , 'foo' );" );
+        s.exec( "assert( _mongo == db.getMongo() ); " );
+        s.exec( "assert( _mongo == db._mongo ); " );
+        s.exec( "assert( typeof DB.bar == 'undefined' ); " );
+        s.exec( "assert( typeof DB.prototype.bar == 'undefined' , 'resolution is happening on prototype, not object' ); " );
+
+        s.exec( "assert( db.bar ); " );
+        s.exec( "assert( typeof db.addUser == 'function' )" );
+        s.exec( "assert( db.addUser == DB.prototype.addUser )" );
+        s.exec( "assert.eq( 'foo.bar' , db.bar._fullName ); " );
         s.exec( "db.bar.verify();" );
+
         s.exec( "db.bar.silly.verify();" );
         s.exec( "assert.eq( 'foo.bar.silly' , db.bar.silly._fullName )" );
         s.exec( "assert.eq( 'function' , typeof _mongo.find , 'mongo.find is not a function' )" );
