@@ -110,8 +110,12 @@ namespace mongo {
             result.append("retval", s->getString("return").c_str());
         else if ( type == Bool )
             result.appendBool("retval", s->getBoolean("return"));
-        else 
-            uassert( "can't handle return type from db.eval" , 0 );
+        else {
+            stringstream temp;
+            temp << "can't handle return type from db.eval:";
+            temp << type;
+            uassert( temp.str() , 0 );
+        }
         return true;
     }
 
