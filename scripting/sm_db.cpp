@@ -44,11 +44,20 @@ namespace mongo {
     JSClass mongo_local_class = {
         "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
-         0 , 0 , 0 , 
-         mongo_local_constructor , 
-         0 , 0 , 0 , 0
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
+        JSCLASS_NO_OPTIONAL_MEMBERS
      };
+
+    JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+        uassert( "mongo_find not done - but yay" , 0 );
+        return JS_TRUE;
+    }
+
+
+    JSFunctionSpec mongo_functions[] = {
+        { "find" , mongo_find , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { 0 }
+    };
 
 
      // -------------  db_collection -------------

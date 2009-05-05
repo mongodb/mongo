@@ -31,9 +31,11 @@ namespace mongo {
 
 
     // mongo
+    JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval );
     JSBool native_db_create( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval );
     JSObject * doCreateCollection( JSContext * cx , JSObject * db , const string& shortName );
     extern JSClass mongo_local_class;
     extern JSClass object_id_class;
 
+    extern JSFunctionSpec mongo_functions[];
 }

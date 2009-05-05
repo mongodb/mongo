@@ -248,7 +248,7 @@ namespace mongo {
         }
 
         void localConnect( const char * dbName ){
-            assert( JS_InitClass( _context , _global , 0 , &mongo_local_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+            assert( JS_InitClass( _context , _global , 0 , &mongo_local_class , mongo_local_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
             assert( JS_InitClass( _context , _global , 0 , &object_id_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
 
             exec( jsconcatcode );
