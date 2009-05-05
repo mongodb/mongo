@@ -4,8 +4,8 @@ var baseName = "jstests_clonecollection";
 
 ports = allocatePorts( 2 );
 
-f = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "_from" ).getDB( baseName );
-t = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_to" ).getDB( baseName );
+f = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "_from", "--nohttpinterface" ).getDB( baseName );
+t = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_to", "--nohttpinterface" ).getDB( baseName );
 
 for( i = 0; i < 1000; ++i ) {
     f.a.save( { i: i } );
