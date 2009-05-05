@@ -449,6 +449,7 @@ namespace mongo {
         s.exec( "db.bar.verify();" );
         s.exec( "db.bar.silly.verify();" );
         s.exec( "assert.eq( 'foo.bar.silly' , db.bar.silly._fullName )" );
+        s.exec( "assert.eq( 'function' , typeof _mongo.find , 'mongo.find is not a function' )" );
     }
 
     Scope * SMEngine::createScope(){

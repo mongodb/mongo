@@ -7,17 +7,17 @@ if ( typeof Mongo == "undefined" ){
     }
 }
 
-if ( typeof mongoInject == "function" ){
-    Mongo.prototype.find = function( ns , query , fields , limit , skip ){ throw "find not implemented"; }
-    Mongo.prototype.insert = function( ns , obj ){ throw "insert not implemented"; }
-    Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented;" }
-    Mongo.prototype.update = function( ns , query , obj ){ throw "update not implemented;" }
-    
-    mongoInject( Mongo.prototype );
-}
-
 if ( ! Mongo.prototype )
     Mongo.prototype = {};
+
+Mongo.prototype.find = function( ns , query , fields , limit , skip ){ throw "find not implemented"; }
+Mongo.prototype.insert = function( ns , obj ){ throw "insert not implemented"; }
+Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented;" }
+Mongo.prototype.update = function( ns , query , obj ){ throw "update not implemented;" }
+
+if ( typeof mongoInject == "function" ){
+    mongoInject( Mongo.prototype );
+}
 
 Mongo.prototype.setSlaveOk = function() {
     this.slaveOk = true;
