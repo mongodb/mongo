@@ -170,10 +170,34 @@ namespace mongo {
         }
     }
 
+    JSBool mongo_insert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        uassert( "mongo_insert needs 2 args" , argc == 2 );
+        uassert( "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+        
+        DBClientConnection * conn = (DBClientConnection*)JS_GetPrivate( cx , obj );
+        uassert( "no connection!" , conn );
+
+        Convertor c( cx );
+        
+        string ns = c.toString( argv[0] );
+        BSONObj o = c.toObject( argv[1] );
+
+        // TODO: add _id
+        
+        try {
+            conn->insert( ns , o );
+            return JS_TRUE;
+        }
+        catch ( ... ){
+            JS_ReportError( cx , "error doing insert" );
+            return JS_FALSE;
+        }
+    }
 
     JSFunctionSpec mongo_functions[] = {
         { "find" , mongo_find , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
         { "update" , mongo_update , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { "insert" , mongo_insert , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
         { 0 }
     };
 
