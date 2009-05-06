@@ -100,7 +100,7 @@ DBCollection.prototype.findOne = function( query , fields ){
     if ( ! cursor.hasNext() )
         return null;
     var ret = cursor.next();
-    if ( cursor.hasNext() ) throw "something is wrong";
+    if ( cursor.hasNext() ) throw "findOne has more than 1 result!";
     if ( ret.$err )
         throw "error " + tojson( ret );
     return ret;

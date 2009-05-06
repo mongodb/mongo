@@ -10,7 +10,7 @@ f = function(id){
 }
 
 
-assert.eq( "eliot" , f( 1 ) );
-assert.eq( "sara" , f( 2 ) );
-assert.eq( "eliot" , db.eval( f , 1 ) );
-assert.eq( "sara" , db.eval( f , 2 ) );
+assert.eq( "eliot" , f( 1 ) , "A" );
+assert.eq( "sara" , f( 2 ) , "B" );
+assert.eq( "eliot" , db.eval( f , 1 ) , "C" );
+assert.eq( "sara" , db.eval( f , 2 ) , "D" );
