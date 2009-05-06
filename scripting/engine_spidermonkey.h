@@ -20,7 +20,8 @@
 namespace mongo {
 
     class SMScope;
-    
+    extern JSClass bson_ro_class;
+
     // internal things
     void dontDeleteScope( SMScope * s ){}
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report );

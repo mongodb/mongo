@@ -155,8 +155,9 @@ namespace JSTests {
                            
             BSONObj o = BSON( "x" << 17 );
             s->setObject( "blah" , o );   
-            ASSERT_EQUALS( o.toString() , s->getObject( "blah" ).toString() );
-
+            out = s->getObject( "blah" );
+            ASSERT_EQUALS( 17 , out["x"].number() );
+            
             delete s;
         }
     };

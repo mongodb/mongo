@@ -7,22 +7,6 @@
 namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
-
-    void bson_finalize( JSContext * cx , JSObject * obj ){
-        BSONObj * o = (BSONObj*)JS_GetPrivate( cx , obj );
-        if ( o ){
-            delete o;
-            JS_SetPrivate( cx , obj , 0 );
-        }
-    }
-
-    static JSClass bson_ro_class = {
-        "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
-        JSCLASS_NO_OPTIONAL_MEMBERS
-    };
-
     
     class Convertor {
     public:
@@ -67,7 +51,7 @@ namespace mongo {
             
             JSIdArray * properties = JS_Enumerate( _context , o );
             assert( properties );
-            cout << "num properties: " << properties->length << endl;
+
             for ( jsint i=0; i<properties->length; i++ ){
                 jsid id = properties->vector[i];
                 jsval nameval;
@@ -191,6 +175,62 @@ namespace mongo {
     private:
         JSContext * _context;
     };
+
+
+    void bson_finalize( JSContext * cx , JSObject * obj ){
+        BSONObj * o = (BSONObj*)JS_GetPrivate( cx , obj );
+        if ( o ){
+            delete o;
+            JS_SetPrivate( cx , obj , 0 );
+        }
+    }
+
+    JSBool bson_enumerate( JSContext *cx, JSObject *obj, JSIterateOp enum_op, jsval *statep, jsid *idp ){
+
+        if ( enum_op == JSENUMERATE_INIT ){
+            BSONObjIterator * it = new BSONObjIterator( ((BSONObj*)JS_GetPrivate( cx , obj ))->getOwned() );
+            *statep = PRIVATE_TO_JSVAL( it );
+            if ( idp )
+                *idp = JSVAL_ZERO;
+            return JS_TRUE;
+        }
+        
+        BSONObjIterator * it = (BSONObjIterator*)JSVAL_TO_PRIVATE( *statep );
+        
+        if ( enum_op == JSENUMERATE_NEXT ){
+            if ( it->more() ){
+                BSONElement e = it->next();
+                if ( e.eoo() ){
+                    *statep = 0;
+                }
+                else {
+                    Convertor c(cx);
+                    assert( JS_ValueToId( cx , c.toval( e.fieldName() ) , idp ) );
+                }
+            }
+            else {
+                *statep = 0;
+            }
+            return JS_TRUE;
+        }
+        
+        if ( enum_op == JSENUMERATE_DESTROY ){
+            delete it;
+        }
+        
+        uassert( "don't know what to do with this op" , 0 );
+        return JS_FALSE;
+    }
+
+    
+    JSClass bson_ro_class = {
+        "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE , 
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+
 
     static JSClass global_class = {
         "global", JSCLASS_GLOBAL_FLAGS,
