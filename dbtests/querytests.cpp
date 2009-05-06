@@ -562,11 +562,11 @@ namespace QueryTests {
             BSONObj hints[] = { BSONObj(), BSON( "a" << 1 << "b" << 1 ) };
             for( int i = 0; i < 2; ++i ) {
                 check( 0, 0, 3, 3, 4, hints[ i ] );
-                check( 1, 1, 2, 2, 4, hints[ i ] );
-                check( 1, 2, 2, 2, 3, hints[ i ] );
-                check( 1, 2, 2, 1, 2, hints[ i ] );
+                check( 1, 1, 2, 2, 3, hints[ i ] );
+                check( 1, 2, 2, 2, 2, hints[ i ] );
+                check( 1, 2, 2, 1, 1, hints[ i ] );
 
-                auto_ptr< DBClientCursor > c = query( 1, 2, 2, 1, hints[ i ] );
+                auto_ptr< DBClientCursor > c = query( 1, 2, 2, 2, hints[ i ] );
                 BSONObj obj = c->next();
                 ASSERT_EQUALS( 1, obj.getIntField( "a" ) );
                 ASSERT_EQUALS( 2, obj.getIntField( "b" ) );
