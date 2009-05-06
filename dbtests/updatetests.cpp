@@ -448,6 +448,14 @@ namespace UpdateTests {
         }
     };
     
+    class CheckNoMods : public SetBase {
+    public:
+        void run() {
+            client().update( ns(), BSONObj(), BSON( "i" << 5 << "$set" << BSON( "q" << 3 ) ), true );
+            ASSERT( error() );
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -494,6 +502,7 @@ namespace UpdateTests {
             add< IndexParentOfMod >();
             add< ModParentOfIndex >();
             add< PreserveIdWithIndex >();
+            add< CheckNoMods >();
         }
     };
 
