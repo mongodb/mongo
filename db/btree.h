@@ -209,8 +209,9 @@ namespace mongo {
         friend class BtreeBucket;
         BSONObj startKey;
         BSONObj endKey;
+        bool endKeyInclusive_;
     public:
-        BtreeCursor( const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, int direction );
+        BtreeCursor( const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
         virtual bool ok() {
             return !bucket.isNull();
         }

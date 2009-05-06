@@ -67,7 +67,7 @@ assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count() );
 f.a.drop();
 t.a.drop();
 
-for( i = 0; i < 100000; ++i ) {
+for( i = 0; i < 200000; ++i ) {
     f.a.save( { i: i } );
 }
 
@@ -75,7 +75,7 @@ cc = fork( function() { assert.commandFailed( t.runCommand( { cloneCollection:"j
 cc.start();
 
 sleep( 200 );
-for( i = 100000; i < 110000; ++i ) {
+for( i = 200000; i < 210000; ++i ) {
     f.a.save( { i: i } );
 }
 
@@ -86,7 +86,7 @@ cc.join();
 f.a.drop();
 t.a.drop();
 
-for( i = 0; i < 100000; ++i ) {
+for( i = 0; i < 200000; ++i ) {
     f.a.save( { i: i } );
 }
 
@@ -94,12 +94,12 @@ cc = fork( function() { assert.commandWorked( t.cloneCollection( "localhost:" + 
 cc.start();
 
 sleep( 200 );
-for( i = 100000; i < 110000; ++i ) {
+for( i = 200000; i < 210000; ++i ) {
     f.a.save( { i: i } );
 }
 
 cc.join();
-assert.eq( 110000, t.a.find().count() );
+assert.eq( 210000, t.a.find().count() );
 
 // Test startCloneCollection and finishCloneCollection commands.
 f.a.drop();

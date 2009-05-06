@@ -67,6 +67,7 @@ namespace mongo {
         int direction_;
         BSONObj startKey_;
         BSONObj endKey_;
+        bool endKeyInclusive_;
         bool unhelpful_;
     };
 
