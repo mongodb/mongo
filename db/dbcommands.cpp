@@ -857,9 +857,9 @@ namespace mongo {
 
             Timer t;
             int num = 0;
-            for( BtreeCursor c( *id, min, max, 1 ); c.ok(); c.advance(), ++num );
+            for( BtreeCursor c( *id, min, max, true, 1 ); c.ok(); c.advance(), ++num );
             num /= 2;
-            BtreeCursor c( *id, min, max, 1 );
+            BtreeCursor c( *id, min, max, true, 1 );
             for( ; num; c.advance(), --num );
             int ms = t.millis();
             if ( ms > 100 ) {
@@ -901,7 +901,7 @@ namespace mongo {
                 const IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
                 if ( id == 0 )
                     return false;
-                c.reset( new BtreeCursor( *id, min, max, 1 ) );
+                c.reset( new BtreeCursor( *id, min, max, true, 1 ) );
             }
             
             Timer t;
