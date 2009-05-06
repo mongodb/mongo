@@ -114,6 +114,7 @@ namespace mongo {
 
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/xtime.hpp>
 
 namespace mongo {
@@ -220,6 +221,7 @@ namespace mongo {
     }
     using namespace boost;
     typedef boost::mutex::scoped_lock boostlock;
+    typedef boost::recursive_mutex::scoped_lock recursive_boostlock;
 
 // simple scoped timer
     class Timer {

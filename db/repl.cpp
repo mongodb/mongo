@@ -48,7 +48,7 @@
 namespace mongo {
 
     extern bool quiet;
-    extern boost::mutex &dbMutex;
+    extern boost::recursive_mutex &dbMutex;
     extern long long oplogSize;
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
     void ensureHaveIdIndex(const char *ns);
