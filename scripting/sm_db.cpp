@@ -337,9 +337,7 @@ namespace mongo {
         "ObjectId" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
-        0 , 0 , 0 , 
-        object_id_constructor , 
-        0 , 0 , 0 , 0
+        JSCLASS_NO_OPTIONAL_MEMBERS
     };
     
 

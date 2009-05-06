@@ -21,6 +21,7 @@ namespace mongo {
 
     class SMScope;
     extern JSClass bson_ro_class;
+    extern JSClass object_id_class;
 
     // internal things
     void dontDeleteScope( SMScope * s ){}
@@ -33,5 +34,5 @@ namespace mongo {
 
     // mongo
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local );
-
+    
 }

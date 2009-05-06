@@ -128,6 +128,30 @@ namespace mongo {
                 BSONObj embed = e.embeddedObject();
                 return toval( &embed , true );
             }
+            case jstOID:{
+                OID oid = e.__oid();
+                JSObject * o = JS_NewObject( _context , &object_id_class , 0 , 0 );
+                setProperty( o , "str" , toval( oid.str().c_str() ) );
+                return OBJECT_TO_JSVAL( o );
+            }
+            case RegEx:{
+                const char * flags = e.regexFlags();
+                uintN flagNumber = 0;
+                while ( *flags ){
+                    switch ( *flags ){
+                    case 'g': flagNumber |= JSREG_GLOB; break;
+                    case 'i': flagNumber |= JSREG_FOLD; break;
+                    case 'm': flagNumber |= JSREG_MULTILINE; break;
+                        //case 'y': flagNumber |= JSREG_STICKY; break;
+                    default: uassert( "unknown regex flag" , 0 );
+                    }
+                    flags++;
+                }
+
+                JSObject * r = JS_NewRegExpObject( _context , (char*)e.regex() , strlen( e.regex() ) , flagNumber );
+                assert( r );
+                return OBJECT_TO_JSVAL( r );
+            }
             default:
                 log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
@@ -373,7 +397,7 @@ namespace mongo {
             exec( "_mongo = new Mongo();" );
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
         }
-
+        
         // ----- getters ------
         double getNumber( const char *field ){
             jsval val;
