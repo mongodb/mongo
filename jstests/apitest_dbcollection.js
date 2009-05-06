@@ -91,24 +91,24 @@ db.getCollection( "test_db" ).ensureIndex({a:1});
 db.getCollection( "test_db" ).ensureIndex({b:1});
 db.getCollection( "test_db" ).save({a:10, b:12});
 
-assert(db.getCollection( "test_db" ).getIndexes().length() == 3,18);  
+assert(db.getCollection( "test_db" ).getIndexes().length() == 3,19);  
 
 db.getCollection( "test_db" ).dropIndex({b:1});
-assert(db.getCollection( "test_db" ).getIndexes().length() == 2,19);  
+assert(db.getCollection( "test_db" ).getIndexes().length() == 2,20);  
 db.getCollection( "test_db" ).dropIndex({a:1});
-assert(db.getCollection( "test_db" ).getIndexes().length() == 1,20);  
+assert(db.getCollection( "test_db" ).getIndexes().length() == 1,21);  
 
 db.getCollection( "test_db" ).save({a:10, b:11});
 db.getCollection( "test_db" ).ensureIndex({a:1});
 db.getCollection( "test_db" ).ensureIndex({b:1});
 db.getCollection( "test_db" ).save({a:10, b:12});
 
-assert(db.getCollection( "test_db" ).getIndexes().length() == 3,21);  
+assert(db.getCollection( "test_db" ).getIndexes().length() == 3,22);  
 
 db.getCollection( "test_db" ).dropIndexes();
-assert(db.getCollection( "test_db" ).getIndexes().length() == 1,22);  
+assert(db.getCollection( "test_db" ).getIndexes().length() == 1,23);  
 
 db.getCollection( "test_db" ).find();
 
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).getIndexes().length() == 0,23);  
+assert(db.getCollection( "test_db" ).getIndexes().length() == 0,24);  
