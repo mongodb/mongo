@@ -8,10 +8,18 @@ namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
 
+    void bson_finalize( JSContext * cx , JSObject * obj ){
+        BSONObj * o = (BSONObj*)JS_GetPrivate( cx , obj );
+        if ( o ){
+            delete o;
+            JS_SetPrivate( cx , obj , 0 );
+        }
+    }
+
     static JSClass bson_ro_class = {
         "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, JS_FinalizeStub,
+        JS_EnumerateStub, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
@@ -39,6 +47,18 @@ namespace mongo {
             return toString( JS_ValueToString( _context , v ) );            
         }
 
+        double toNumber( jsval v ){
+            double d;
+            uassert( "not a number" , JS_ValueToNumber( _context , v , &d ) );
+            return d;
+        }
+
+        bool toBoolean( jsval v ){
+            JSBool b;
+            assert( JS_ValueToBoolean( _context, v , &b ) );
+            return b;
+        }
+
         // ---------- to spider monkey ---------
         
         jsval toval( double d ){
@@ -52,15 +72,17 @@ namespace mongo {
             return STRING_TO_JSVAL( s );
         }
 
-        JSObject * toObject( const BSONObj * obj , bool readOnly=true ){
-            // TODO: make a copy and then delete it
+        JSObject * toJSObject( const BSONObj * obj , bool readOnly=true ){
+            // TODO: check this
+
             JSObject * o = JS_NewObject( _context , &bson_ro_class , NULL, NULL);
-            JS_SetPrivate( _context , o , (void*)obj );
+
+            JS_SetPrivate( _context , o , (void*)(new BSONObj( obj->getOwned() ) ) );
             return o;
         }
         
         jsval toval( const BSONObj* obj , bool readOnly=true ){
-            JSObject * o = toObject( obj , readOnly );
+            JSObject * o = toJSObject( obj , readOnly );
             return OBJECT_TO_JSVAL( o );
         }
         
@@ -120,6 +142,10 @@ namespace mongo {
             return JS_GetTypeName( _context , t );
         }
         
+        bool getBoolean( JSObject * o , const char * field ){
+            return toBoolean( getProperty( o , field ) );
+        }
+
     private:
         JSContext * _context;
     };
@@ -253,12 +279,7 @@ namespace mongo {
         }
 
         void localConnect( const char * dbName ){
-            assert( JS_InitClass( _context , _global , 0 , &mongo_local_class , mongo_local_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
-            assert( JS_InitClass( _context , _global , 0 , &object_id_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
-            assert( JS_InitClass( _context , _global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
-            assert( JS_InitClass( _context , _global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
-
-            exec( jsconcatcode );
+            initMongoJS( this , _context , _global , true );
             
             exec( "_mongo = new Mongo();" );
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
@@ -268,15 +289,9 @@ namespace mongo {
         double getNumber( const char *field ){
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
-            return toNumber( val );
+            return _convertor->toNumber( val );
         }
         
-        double toNumber( jsval v ){
-            double d;
-            uassert( "not a number" , JS_ValueToNumber( _context , v , &d ) );
-            return d;
-        }
-
         string getString( const char *field ){
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
@@ -285,13 +300,7 @@ namespace mongo {
         }
 
         bool getBoolean( const char *field ){
-            jsval val;
-            assert( JS_GetProperty( _context , _global , field , &val ) );
-            
-            JSBool b;
-            assert( JS_ValueToBoolean( _context, val , &b ) );
-
-            return b;
+            return _convertor->getBoolean( _global , field );
         }
         
         BSONObj getObject( const char *field ){
@@ -343,7 +352,7 @@ namespace mongo {
         }
 
         void setThis( const BSONObj * obj ){
-            _this = _convertor->toObject( obj );
+            _this = _convertor->toJSObject( obj );
         }
 
         // ---- functions -----

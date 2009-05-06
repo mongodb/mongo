@@ -2,7 +2,16 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
+#include "../db/db.h"
+
 namespace mongo {
+    
+    // ------------    some defs needed ---------------
+    
+    JSObject * doCreateCollection( JSContext * cx , JSObject * db , const string& shortName );
+        
+    // ------------     utils          ------------------
+         
 
     bool isSpecialName( const string& name ){
         static set<string> names;
@@ -15,6 +24,58 @@ namespace mongo {
         }
         return names.count( name ) > 0;
     }
+
+
+    // ------ cursor ------
+
+    JSBool internal_cursor_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        uassert( "no args to internal_cursor_constructor" , argc == 0 );
+        JS_SetPrivate( cx , obj , 0 ); // just for safety
+        return JS_TRUE;
+    }
+
+
+    void internal_cursor_finalize( JSContext * cx , JSObject * obj ){
+        DBClientCursor * cursor = (DBClientCursor*)JS_GetPrivate( cx , obj );
+        if ( cursor ){
+            cout << "deleting cursor" << endl;
+            delete cursor;
+            JS_SetPrivate( cx , obj , 0 );
+        }
+    }
+
+    JSBool internal_cursor_hasNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+        DBClientCursor * cursor = (DBClientCursor*)JS_GetPrivate( cx , obj );
+        uassert( "no cursor in hasNext!" , cursor );
+        *rval = cursor->more() ? JSVAL_TRUE : JSVAL_FALSE;
+        return JS_TRUE;
+    }
+
+    JSBool internal_cursor_next(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+        DBClientCursor * cursor = (DBClientCursor*)JS_GetPrivate( cx , obj );
+        uassert( "no cursor in next!" , cursor );
+
+        Convertor c(cx);
+
+        BSONObj n = cursor->next();
+        *rval = c.toval( &n );
+        return JS_TRUE;
+    }
+    
+
+    JSFunctionSpec internal_cursor_functions[] = {
+        { "hasNext" , internal_cursor_hasNext , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { "next" , internal_cursor_next , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { 0 }
+    };
+
+    JSClass internal_cursor_class = {
+        "InternalCursor" , JSCLASS_HAS_PRIVATE  ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, internal_cursor_finalize,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
     
     // ------ mongo stuff ------
 
@@ -38,7 +99,7 @@ namespace mongo {
     void mongo_finalize( JSContext * cx , JSObject * obj ){
         DBClientBase * client = (DBClientBase*)JS_GetPrivate( cx , obj );
         if ( client ){
-            cout << "client x: " << client << endl;
+            cout << "deleting client: " << client << endl;
             cout << "Addr in finalize: " << client->getServerAddress() << endl;
             delete client;
         }
@@ -48,9 +109,7 @@ namespace mongo {
         "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
-        0 , 0 , 0 , 
-        mongo_constructor , 
-        0 , 0 , 0 , 0
+        JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
     JSClass mongo_local_class = {
@@ -61,8 +120,36 @@ namespace mongo {
      };
 
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        uassert( "mongo_find not done - but yay" , 0 );
-        return JS_TRUE;
+        uassert( "mongo_find neesd 5 args" , argc == 5 );
+        DBClientConnection * conn = (DBClientConnection*)JS_GetPrivate( cx , obj );
+        uassert( "no connection!" , conn );
+
+        Convertor c( cx );
+
+        string ns = c.toString( argv[0] );
+        
+        
+        
+        uassert( "field selector not supported yet in mongo_find" , argv[2] == JSVAL_NULL );
+        int nToReturn = c.toNumber( argv[3] );
+        int nToSkip = c.toNumber( argv[4] );
+        bool slaveOk = c.getBoolean( obj , "slaveOk" );
+
+        try {
+            dbtemprelease r; // TODO: remove
+
+            auto_ptr<DBClientCursor> cursor = conn->query( ns , BSONObj() , nToReturn , nToSkip , 0 , slaveOk ? Option_SlaveOk : 0 );
+            
+            
+            JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
+            JS_SetPrivate( cx , mycursor , cursor.release() );
+            *rval = OBJECT_TO_JSVAL( mycursor );
+            return JS_TRUE;
+        }
+        catch ( ... ){
+            JS_ReportError( cx , "error doing query" );
+            return JS_FALSE;
+        }
     }
 
 
@@ -211,6 +298,21 @@ namespace mongo {
         object_id_constructor , 
         0 , 0 , 0 , 0
     };
+    
 
+    // ---- other stuff ----
+
+    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local ){
+        uassert( "non-local not supported yet" , local );
+
+        assert( JS_InitClass( cx , global , 0 , &mongo_local_class , mongo_local_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &object_id_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
+
+        scope->exec( jsconcatcode );
+
+    }
 
 }
