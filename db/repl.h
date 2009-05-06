@@ -273,6 +273,7 @@ namespace mongo {
             else
                 set( dbModIds_, ns, id, val );
         }
+        // will release the db mutex
         void mayUpgradeStorage() {
             if ( !inMem_ || memIds_.roughSize() + memModIds_.roughSize() <= maxMem_ )
                 return;
