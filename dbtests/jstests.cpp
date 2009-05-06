@@ -137,10 +137,29 @@ namespace JSTests {
             delete s;
         }
     };
-    
-    // TODO:
-    // setThis
-    // init
+
+    class ObjectDecoding {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            s->invoke( "z = { num : 1 };" , BSONObj() );
+            BSONObj out = s->getObject( "z" );
+            ASSERT_EQUALS( 1 , out["num"].number() );
+            ASSERT_EQUALS( 1 , out.nFields() );
+
+            s->invoke( "z = { x : 'eliot' };" , BSONObj() );
+            out = s->getObject( "z" );
+            ASSERT_EQUALS( (string)"eliot" , out["x"].valuestr() );
+            ASSERT_EQUALS( 1 , out.nFields() );
+                           
+            BSONObj o = BSON( "x" << 17 );
+            s->setObject( "blah" , o );   
+            ASSERT_EQUALS( o.toString() , s->getObject( "blah" ).toString() );
+
+            delete s;
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -150,6 +169,7 @@ namespace JSTests {
             add< FalseTests >();
             add< SimpleFunctions >();
             add< ObjectMapping >();
+            add< ObjectDecoding >();
         }
     };
     

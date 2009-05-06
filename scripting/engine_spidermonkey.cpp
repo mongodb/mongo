@@ -58,6 +58,48 @@ namespace mongo {
             assert( JS_ValueToBoolean( _context, v , &b ) );
             return b;
         }
+        
+        BSONObj toObject( JSObject * o ){
+            if ( ! o )
+                return BSONObj();
+            
+            BSONObjBuilder b;
+            
+            JSIdArray * properties = JS_Enumerate( _context , o );
+            assert( properties );
+            cout << "num properties: " << properties->length << endl;
+            for ( jsint i=0; i<properties->length; i++ ){
+                jsid id = properties->vector[i];
+                jsval nameval;
+                assert( JS_IdToValue( _context ,id , &nameval ) );
+                string name = toString( nameval );
+                append( b , name , getProperty( o , name.c_str() ) );
+            }
+            
+            return b.obj();
+        }
+        
+        BSONObj toObject( jsval v ){
+            if ( JSVAL_IS_NULL( v ) || 
+                 JSVAL_IS_VOID( v ) )
+                return BSONObj();
+            
+            uassert( "not an object" , JSVAL_IS_OBJECT( v ) );
+            return toObject( JSVAL_TO_OBJECT( v ) );
+        }
+        
+        void append( BSONObjBuilder& b , string name , jsval val ){
+            switch ( JS_TypeOfValue( _context , val ) ){
+
+            case JSTYPE_VOID: b.appendUndefined( name.c_str() ); break;
+            case JSTYPE_NULL: b.appendNull( name.c_str() ); break;
+                
+            case JSTYPE_NUMBER: b.append( name.c_str() , toNumber( val ) ); break;
+            case JSTYPE_STRING: b.append( name.c_str() , toString( val ) ); break;
+
+            default: uassert( (string)"can't append type: " + typeString( val ) , 0 );
+            }
+        }
 
         // ---------- to spider monkey ---------
         
@@ -97,7 +139,7 @@ namespace mongo {
             case String:
                 return toval( e.valuestr() );
             default:
-                log() << "resolveBSONField can't handle type: " << (int)(e.type()) << endl;
+                log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
             
             uassert( "not done: toval" , 0 );
@@ -304,7 +346,7 @@ namespace mongo {
         }
         
         BSONObj getObject( const char *field ){
-            massert( "not implemented yet: getObject()" , 0 ); throw -1;  
+            return _convertor->toObject( _convertor->getProperty( _global , field ) );
         }
 
         JSObject * getJSObject( const char * field ){
