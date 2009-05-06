@@ -84,7 +84,7 @@ db.getCollection( "test_db" ).save({a:10});
 assert(db.getCollection( "test_db" ).getIndexes().length() == 2,17);  
 
 db.getCollection( "test_db" ).dropIndex("a_1");
-assert(db.getCollection( "test_db" ).getIndexes().length() == 1,18);  
+assert.eq( db.getCollection( "test_db" ).getIndexes().length() , 1,18);  
 
 db.getCollection( "test_db" ).save({a:10, b:11});
 db.getCollection( "test_db" ).ensureIndex({a:1});
