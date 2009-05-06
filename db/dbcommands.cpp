@@ -857,7 +857,7 @@ namespace mongo {
 
             Timer t;
             int num = 0;
-            for( BtreeCursor c( *id, min, max, true, 1 ); c.ok(); c.advance(), ++num );
+            for( BtreeCursor c( *id, min, max, false, 1 ); c.ok(); c.advance(), ++num );
             num /= 2;
             BtreeCursor c( *id, min, max, true, 1 );
             for( ; num; c.advance(), --num );
