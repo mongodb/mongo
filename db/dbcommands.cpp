@@ -901,7 +901,7 @@ namespace mongo {
                 const IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
                 if ( id == 0 )
                     return false;
-                c.reset( new BtreeCursor( *id, min, max, true, 1 ) );
+                c.reset( new BtreeCursor( *id, min, max, false, 1 ) );
             }
             
             Timer t;
