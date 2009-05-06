@@ -2,8 +2,6 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
-#include "../db/db.h"
-
 namespace mongo {
     
     // ------------    some defs needed ---------------
@@ -136,10 +134,8 @@ namespace mongo {
         bool slaveOk = c.getBoolean( obj , "slaveOk" );
 
         try {
-            dbtemprelease r; // TODO: remove
 
             auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , 0 , slaveOk ? Option_SlaveOk : 0 );
-            
             
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
             JS_SetPrivate( cx , mycursor , cursor.release() );
