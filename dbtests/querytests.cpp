@@ -600,8 +600,16 @@ namespace QueryTests {
     };
     BSONObj MinMax::empty_;
     
-    // TODO : Validate hint index key against min / max fields
-    //        Allow only one of min / max
+    class DirectLocking : public ClientBase {
+    public:
+        void run() {
+            dblock lk;
+            setClient( "foo.bar" );
+            client().remove( "a.b", BSONObj() );
+            ASSERT_EQUALS( "foo", database->name );
+        }
+        const char *ns;
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -634,6 +642,7 @@ namespace QueryTests {
             add< IndexInsideArrayCorrect >();
             add< SubobjArr >();
             add< MinMax >();
+            add< DirectLocking >();
         }
     };
     

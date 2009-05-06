@@ -46,7 +46,7 @@ namespace mongo {
     extern int curOp;
     bool autoresync = false;
     
-    boost::mutex &dbMutex( *(new boost::mutex) );
+    boost::recursive_mutex &dbMutex( *(new boost::recursive_mutex) );
     MutexInfo dbMutexInfo;
 //int dbLocked = 0;
 
@@ -602,7 +602,7 @@ namespace mongo {
     }
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
-        Authorizer a;
+        Context c;
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
         assert( dbResponse.response );
@@ -611,12 +611,12 @@ namespace mongo {
     }
 
     void DBDirectClient::say( Message &toSend ) {
-        Authorizer a;
+        Context c;
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
     }
 
-    DBDirectClient::AlwaysAuthorized DBDirectClient::Authorizer::always;
+    DBDirectClient::AlwaysAuthorized DBDirectClient::Context::always;
 
     DBClientBase * createDirectClient(){
         return new DBDirectClient();

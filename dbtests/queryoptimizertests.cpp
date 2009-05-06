@@ -262,7 +262,6 @@ namespace QueryOptimizerTests {
             static const char *ns() { return "QueryPlanTests.coll"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
             const IndexDetails *index( const BSONObj &key ) {
-                dbtemprelease r;
                 stringstream ss;
                 ss << indexNum_++;
                 string name = ss.str();
@@ -775,7 +774,6 @@ namespace QueryOptimizerTests {
                 nPlans( 1 );
                 
                 {
-                    dbtemprelease t;
                     DBDirectClient client;
                     for( int i = 0; i < 34; ++i ) {
                         client.insert( ns(), BSON( "i" << i ) );
