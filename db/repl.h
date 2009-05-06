@@ -19,7 +19,7 @@
 /* replication data overview
 
    at the slave:
-     local.sources { host: ..., source: ..., syncedTo: ..., dbs: { ... } }
+     local.sources { host: ..., source: ..., only: ..., syncedTo: ..., localLogTs: ..., dbsNextPass: { ... }, incompleteCloneDbs: { ... } }
 
    at the master:
      local.oplog.$<source>
@@ -59,7 +59,7 @@ namespace mongo {
 
        Can be a group of things to replicate for several databases.
 
-          { host: ..., source: ..., syncedTo: ..., dbs: { ... } }
+          { host: ..., source: ..., only: ..., syncedTo: ..., localLogTs: ..., dbsNextPass: { ... }, incompleteCloneDbs: { ... } }
 
        'source' defaults to 'main'; support for multiple source names is
        not done (always use main for now).
