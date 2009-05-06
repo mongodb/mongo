@@ -56,12 +56,6 @@ namespace mongo {
             return isGlobalMin( k ) || isGlobalMax( k );
         }
 
-        /**
-           @return the key central between min and max
-           note: min and max could cross type boundaries
-         */
-        BSONObj middle( const BSONObj & min , const BSONObj & max );
-
         /** compare shard keys from the objects specified
            l < r negative
            l == r 0

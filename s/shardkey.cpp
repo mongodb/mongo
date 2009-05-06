@@ -282,38 +282,6 @@ namespace mongo {
         averageValues(b, lt, l, r);
     }
 
-    BSONObj ShardKeyPattern::middle( const BSONObj &lo , const BSONObj &ro ) {
-        BSONObj L = extractKey(lo);
-        BSONObj R = extractKey(ro);
-        BSONElement l = L.firstElement();
-        BSONElement r = R.firstElement();
-        if( l == r || l.eoo() || r.eoo() )
-            return L;
-
-        BSONObjBuilder b;
-
-        massert("not done for compound patterns", patternfields.size() == 1);
-
-        middleVal(b, l, r);
-        BSONObj res = b.obj();
-
-        if( res.woEqual(ro) ) { 
-            // range is minimal, i.e., two adjacent values.  as RHS is open, 
-            // return LHS
-            return lo;
-        }
-
-        /* compound:
-        BSONObjIterator li(L);
-        BSONObjIterator ri(R);
-        while( 1 ) { 
-
-        }
-        */
-
-        return res;
-    }
-
     bool ShardKeyPattern::hasShardKey( const BSONObj& obj ) {
         /* this is written s.t. if obj has lots of fields, if the shard key fields are early, 
            it is fast.  so a bit more work to try to be semi-fast.
@@ -538,39 +506,6 @@ normal:
             BSONObj x = fromjson("{ key: { $gte: 30.0, $lt: 90.0 } }");
             assert( x.woEqual(b.obj()) );
         }
-        void mid(const char *a, const char *b) { 
-            ShardKeyPattern k( BSON( "key" << 1 ) );
-            BSONObj A = fromjson(a);
-            BSONObj B = fromjson(b);
-            BSONObj x = k.middle(A, B);
-            assert( A.woCompare(x) < 0 );
-            assert( x.woCompare(B) < 0 );
-        }
-        void testMiddle() { 
-            mid( "{key:10}", "{key:30}" );
-            mid( "{key:10}", "{key:null}" );
-            mid( "{key:\"Jane\"}", "{key:\"Tom\"}" );
-
-            BSONObjBuilder b;
-            b.appendMinKey("k");
-            BSONObj min = b.obj();
-            BSONObjBuilder b2;
-            b2.appendMaxKey("k");
-            BSONObj max = b2.obj();
-            ShardKeyPattern k( BSON( "k" << 1 ) );
-//            cout << min.toString() << endl;
-            BSONObj m = k.middle(min, max);
-//            cout << m << endl;
-            BSONObj n = k.middle(m, max);
-//            cout << n << endl;
-            BSONObj p = k.middle(min, m);
-//            cout << "\n" << min.toString() << " " << m.toString() << endl;
-//            cout << p << endl;
-        }
-        void testGlobal(){
-            ShardKeyPattern k( fromjson( "{num:1}" ) );
-            DEV cout << "global middle:" << k.middle( k.globalMin() , k.globalMax() ) << endl;
-        }
         void div(const char *a, const char *res) { 
             OID A,RES;
             A.init(a);
@@ -651,17 +586,11 @@ normal:
 
             assert( k.compare(a,b) < 0 );
 
-            assert( k.compare(a,k.middle(a,a)) == 0 );
-            assert( k.compare(a,k.middle(a,b)) <= 0 );
-            assert( k.compare(k.middle(a,b),b) <= 0 );
-
             assert( k.canOrder( fromjson("{key:1}") ) == 1 );
             assert( k.canOrder( fromjson("{zz:1}") ) == 0 );
             assert( k.canOrder( fromjson("{key:-1}") ) == -1 );
             
             testCanOrder();
-            testMiddle();
-            testGlobal();
             getfilt();
             rfq();
             // add middle multitype tests

@@ -2,8 +2,6 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
-#include "../db/db.h"
-
 namespace mongo {
     
     // ------------    some defs needed ---------------
@@ -128,18 +126,16 @@ namespace mongo {
 
         string ns = c.toString( argv[0] );
         
+        BSONObj q = c.toObject( argv[1] );
+        //uassert( "field selector not supported yet in mongo_find" , argv[2] == JSVAL_NULL );
         
-        
-        uassert( "field selector not supported yet in mongo_find" , argv[2] == JSVAL_NULL );
         int nToReturn = c.toNumber( argv[3] );
         int nToSkip = c.toNumber( argv[4] );
         bool slaveOk = c.getBoolean( obj , "slaveOk" );
 
         try {
-            dbtemprelease r; // TODO: remove
 
-            auto_ptr<DBClientCursor> cursor = conn->query( ns , BSONObj() , nToReturn , nToSkip , 0 , slaveOk ? Option_SlaveOk : 0 );
-            
+            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , 0 , slaveOk ? Option_SlaveOk : 0 );
             
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
             JS_SetPrivate( cx , mycursor , cursor.release() );

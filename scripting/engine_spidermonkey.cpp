@@ -7,22 +7,6 @@
 namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
-
-    void bson_finalize( JSContext * cx , JSObject * obj ){
-        BSONObj * o = (BSONObj*)JS_GetPrivate( cx , obj );
-        if ( o ){
-            delete o;
-            JS_SetPrivate( cx , obj , 0 );
-        }
-    }
-
-    static JSClass bson_ro_class = {
-        "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE , 
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
-        JSCLASS_NO_OPTIONAL_MEMBERS
-    };
-
     
     class Convertor {
     public:
@@ -57,6 +41,48 @@ namespace mongo {
             JSBool b;
             assert( JS_ValueToBoolean( _context, v , &b ) );
             return b;
+        }
+        
+        BSONObj toObject( JSObject * o ){
+            if ( ! o )
+                return BSONObj();
+            
+            BSONObjBuilder b;
+            
+            JSIdArray * properties = JS_Enumerate( _context , o );
+            assert( properties );
+
+            for ( jsint i=0; i<properties->length; i++ ){
+                jsid id = properties->vector[i];
+                jsval nameval;
+                assert( JS_IdToValue( _context ,id , &nameval ) );
+                string name = toString( nameval );
+                append( b , name , getProperty( o , name.c_str() ) );
+            }
+            
+            return b.obj();
+        }
+        
+        BSONObj toObject( jsval v ){
+            if ( JSVAL_IS_NULL( v ) || 
+                 JSVAL_IS_VOID( v ) )
+                return BSONObj();
+            
+            uassert( "not an object" , JSVAL_IS_OBJECT( v ) );
+            return toObject( JSVAL_TO_OBJECT( v ) );
+        }
+        
+        void append( BSONObjBuilder& b , string name , jsval val ){
+            switch ( JS_TypeOfValue( _context , val ) ){
+
+            case JSTYPE_VOID: b.appendUndefined( name.c_str() ); break;
+            case JSTYPE_NULL: b.appendNull( name.c_str() ); break;
+                
+            case JSTYPE_NUMBER: b.append( name.c_str() , toNumber( val ) ); break;
+            case JSTYPE_STRING: b.append( name.c_str() , toString( val ) ); break;
+
+            default: uassert( (string)"can't append type: " + typeString( val ) , 0 );
+            }
         }
 
         // ---------- to spider monkey ---------
@@ -97,7 +123,7 @@ namespace mongo {
             case String:
                 return toval( e.valuestr() );
             default:
-                log() << "resolveBSONField can't handle type: " << (int)(e.type()) << endl;
+                log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
             
             uassert( "not done: toval" , 0 );
@@ -149,6 +175,62 @@ namespace mongo {
     private:
         JSContext * _context;
     };
+
+
+    void bson_finalize( JSContext * cx , JSObject * obj ){
+        BSONObj * o = (BSONObj*)JS_GetPrivate( cx , obj );
+        if ( o ){
+            delete o;
+            JS_SetPrivate( cx , obj , 0 );
+        }
+    }
+
+    JSBool bson_enumerate( JSContext *cx, JSObject *obj, JSIterateOp enum_op, jsval *statep, jsid *idp ){
+
+        if ( enum_op == JSENUMERATE_INIT ){
+            BSONObjIterator * it = new BSONObjIterator( ((BSONObj*)JS_GetPrivate( cx , obj ))->getOwned() );
+            *statep = PRIVATE_TO_JSVAL( it );
+            if ( idp )
+                *idp = JSVAL_ZERO;
+            return JS_TRUE;
+        }
+        
+        BSONObjIterator * it = (BSONObjIterator*)JSVAL_TO_PRIVATE( *statep );
+        
+        if ( enum_op == JSENUMERATE_NEXT ){
+            if ( it->more() ){
+                BSONElement e = it->next();
+                if ( e.eoo() ){
+                    *statep = 0;
+                }
+                else {
+                    Convertor c(cx);
+                    assert( JS_ValueToId( cx , c.toval( e.fieldName() ) , idp ) );
+                }
+            }
+            else {
+                *statep = 0;
+            }
+            return JS_TRUE;
+        }
+        
+        if ( enum_op == JSENUMERATE_DESTROY ){
+            delete it;
+        }
+        
+        uassert( "don't know what to do with this op" , 0 );
+        return JS_FALSE;
+    }
+
+    
+    JSClass bson_ro_class = {
+        "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE , 
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+
 
     static JSClass global_class = {
         "global", JSCLASS_GLOBAL_FLAGS,
@@ -304,7 +386,7 @@ namespace mongo {
         }
         
         BSONObj getObject( const char *field ){
-            massert( "not implemented yet: getObject()" , 0 ); throw -1;  
+            return _convertor->toObject( _convertor->getProperty( _global , field ) );
         }
 
         JSObject * getJSObject( const char * field ){
