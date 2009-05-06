@@ -74,7 +74,7 @@ Object.extend = function( dst , src ){
     }
     return dst;
 }
-
+/*
 Object.prototype.keySet = function(){
     var all = [];
     for ( var k in this ){
@@ -82,7 +82,7 @@ Object.prototype.keySet = function(){
     }
     return all;
 }
-
+*/
 argumentsToArray = function( a ){
     var arr = [];
     for ( var i=0; i<a.length; i++ )
