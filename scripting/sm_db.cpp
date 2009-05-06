@@ -36,7 +36,6 @@ namespace mongo {
     void internal_cursor_finalize( JSContext * cx , JSObject * obj ){
         DBClientCursor * cursor = (DBClientCursor*)JS_GetPrivate( cx , obj );
         if ( cursor ){
-            cout << "deleting cursor" << endl;
             delete cursor;
             JS_SetPrivate( cx , obj , 0 );
         }
@@ -97,9 +96,8 @@ namespace mongo {
     void mongo_finalize( JSContext * cx , JSObject * obj ){
         DBClientBase * client = (DBClientBase*)JS_GetPrivate( cx , obj );
         if ( client ){
-            cout << "deleting client: " << client << endl;
-            cout << "Addr in finalize: " << client->getServerAddress() << endl;
             delete client;
+            JS_SetPrivate( cx , obj , 0 );
         }
     }
 
@@ -148,9 +146,34 @@ namespace mongo {
         }
     }
 
+    JSBool mongo_update(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+        uassert( "mongo_find needs at elast 3 args" , argc >= 3 );
+        uassert( "2nd param to update has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+        uassert( "3rd param to update has to be an object" , JSVAL_IS_OBJECT( argv[2] ) );
+        
+        DBClientConnection * conn = (DBClientConnection*)JS_GetPrivate( cx , obj );
+        uassert( "no connection!" , conn );
+
+        Convertor c( cx );
+
+        string ns = c.toString( argv[0] );
+
+        bool upsert = argc > 3 && c.toBoolean( argv[3] );
+
+        try {
+            conn->update( ns , c.toObject( argv[1] ) , c.toObject( argv[2] ) , upsert );
+            return JS_TRUE;
+        }
+        catch ( ... ){
+            JS_ReportError( cx , "error doing update" );
+            return JS_FALSE;
+        }
+    }
+
 
     JSFunctionSpec mongo_functions[] = {
         { "find" , mongo_find , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { "update" , mongo_update , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
         { 0 }
     };
 

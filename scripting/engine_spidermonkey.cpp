@@ -111,7 +111,7 @@ namespace mongo {
             JSObject * o = toJSObject( obj , readOnly );
             return OBJECT_TO_JSVAL( o );
         }
-        
+
         jsval toval( const BSONElement& e ){
 
             switch( e.type() ){
@@ -122,6 +122,12 @@ namespace mongo {
                 return toval( e.number() );
             case String:
                 return toval( e.valuestr() );
+            case Bool:
+                return e.boolean() ? JSVAL_TRUE : JSVAL_FALSE;
+            case Object:{
+                BSONObj embed = e.embeddedObject();
+                return toval( &embed , true );
+            }
             default:
                 log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
@@ -216,6 +222,7 @@ namespace mongo {
         
         if ( enum_op == JSENUMERATE_DESTROY ){
             delete it;
+            return JS_TRUE;
         }
         
         uassert( "don't know what to do with this op" , 0 );
@@ -440,9 +447,10 @@ namespace mongo {
         // ---- functions -----
         
         bool hasFunctionIdentifier( const string& code ){
-            return 
-                code.find( "function(" ) == 0 ||
-                code.find( "function (" ) ==0 ;
+            if ( code.size() < 9 || code.find( "function" ) != 0  )
+                return false;
+            
+            return code[8] == ' ' || code[8] == '(';
         }
 
         JSFunction * compileFunction( const char * code ){
@@ -491,10 +499,12 @@ namespace mongo {
             for ( int i=0; i<nargs; i++ )
                 smargs[i] = _convertor->toval( it.next() );
             
+            setObject( "args" , args ); // this is for backwards compatability
+
             if ( ! JS_CallFunction( _context , _this , func , nargs , smargs , &rval ) ){
                 return -3;
             }
-            
+
             assert( JS_SetProperty( _context , _global , "return" , &rval ) );
             return 0;
         }

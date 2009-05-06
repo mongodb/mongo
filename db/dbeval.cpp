@@ -110,7 +110,7 @@ namespace mongo {
             result.append("retval", s->getString("return").c_str());
         else if ( type == Bool )
             result.appendBool("retval", s->getBoolean("return"));
-        else if ( type == jstNULL )
+        else if ( type == jstNULL || type == Undefined )
             result.appendNull("retval");
         else {
             stringstream temp;

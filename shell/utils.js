@@ -322,3 +322,16 @@ shellHelper.show = function( what ){
     throw "don't know how to show [" + what + "]";
 
 }
+
+
+Map = function(){
+    print( "warning: Map isn't a good thing to use" );
+}
+
+Map.prototype.values = function(){
+    var a = [];
+    for ( var k in this ){
+        a.push( this[k] );
+    }
+    return a;
+}

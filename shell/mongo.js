@@ -19,7 +19,7 @@ if ( ! Mongo.prototype.insert )
 if ( ! Mongo.prototype.remove )
     Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented;" }
 if ( ! Mongo.prototype.update )
-    Mongo.prototype.update = function( ns , query , obj ){ throw "update not implemented;" }
+    Mongo.prototype.update = function( ns , query , obj , upsert ){ throw "update not implemented;" }
 
 if ( typeof mongoInject == "function" ){
     mongoInject( Mongo.prototype );
