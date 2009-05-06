@@ -821,6 +821,14 @@ namespace mongo {
                     }
                     else {
                         BSONObj js = c->current();
+                        BSONObjBuilder idBuilder;
+                        idBuilder.append( js.getField( "_id" ) );
+                        BSONObj id = idBuilder.obj();
+                        if ( cc->ids_->get( id ) ) {
+                            c->advance();
+                            continue;
+                        }
+                        cc->ids_->put( id );                        
                         bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
                         if ( ok ) {
                             n++;
@@ -1026,6 +1034,12 @@ namespace mongo {
                 return;
             }
             
+            bool mayCreateCursor1 = wantMore_ && ntoreturn_ != 1 && useCursors;
+            
+            if ( ( mayCreateCursor1 || mayCreateCursor2() ) && !ids_.get() ) {
+                ids_.reset( new IdSet() );
+            }
+            
             nscanned_++;
             bool deep;
             if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
@@ -1034,6 +1048,12 @@ namespace mongo {
                 BSONObj js = c_->current();
                 // got a match.
                 assert( js.objsize() >= 0 ); //defensive for segfaults
+                if ( ids_.get() ) {
+                    BSONObjBuilder b;
+                    b.append( js.getField( "_id" ) );
+                    BSONObj id = b.obj();
+                    ids_->put( id );
+                }
                 if ( ordering_ ) {
                     // note: no cursors for non-indexed, ordered results.  results must be fairly small.
                     so_->add(js);
@@ -1063,13 +1083,11 @@ namespace mongo {
                                  objects, which causes massive scanning server-side.
                                  */
                                 /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                                if ( wantMore_ && ntoreturn_ != 1 ) {
-                                    if ( useCursors ) {
-                                        c_->advance();
-                                        if ( c_->ok() ) {
-                                            // more...so save a cursor
-                                            saveClientCursor_ = true;
-                                        }
+                                if ( mayCreateCursor1 ) {
+                                    c_->advance();
+                                    if ( c_->ok() ) {
+                                        // more...so save a cursor
+                                        saveClientCursor_ = true;
                                     }
                                 }
                                 finish();
@@ -1087,7 +1105,7 @@ namespace mongo {
             } else if ( ordering_ ) {
                 so_->fill(b_, filter_, n_);
             }
-            if ( ( queryOptions_ & Option_CursorTailable ) && ntoreturn_ != 1 ) {
+            if ( mayCreateCursor2() ) {
                 c_->setTailable();
             }
             // If the tailing request succeeded.
@@ -1104,9 +1122,11 @@ namespace mongo {
         bool scanAndOrderRequired() const { return ordering_; }
         auto_ptr< Cursor > cursor() { return c_; }
         auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
+        auto_ptr< IdSet > ids() { return ids_; }
         int n() const { return n_; }
         long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
+        bool mayCreateCursor2() const { return ( queryOptions_ & Option_CursorTailable ) && ntoreturn_ != 1; }
     private:
         BufBuilder b_;
         int ntoskip_;
@@ -1126,6 +1146,7 @@ namespace mongo {
         auto_ptr< ScanAndOrder > so_;
         bool findingStart_;
         ClientCursor * findingStartCursor_;
+        auto_ptr< IdSet > ids_;
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
@@ -1257,6 +1278,7 @@ namespace mongo {
                 cursorid = cc->cursorid;
                 DEV out() << "  query has more, cursorid: " << cursorid << endl;
                 cc->matcher = dqo.matcher();
+                cc->ids_ = dqo.ids();
                 cc->ns = ns;
                 cc->pos = n;
                 cc->filter = filter;

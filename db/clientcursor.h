@@ -34,6 +34,23 @@ namespace mongo {
     typedef map<CursorId, ClientCursor*> CCById;
     extern CCById clientCursorsById;
 
+    class IdSet {
+    public:
+        IdSet() : size_() {}
+        ~IdSet() {
+        }
+        bool get( const BSONObj &id ) {
+            return mem_.count( id );
+        }
+        void put( const BSONObj &id ) {
+            mem_.insert( id.getOwned() );
+        }
+    private:
+        string name_;
+        BSONObjSetDefaultOrder mem_;
+        long long size_;
+    };
+    
     class ClientCursor {
         DiskLoc _lastLoc; // use getter and setter not this.
         static CursorId allocCursorId();
@@ -46,6 +63,7 @@ namespace mongo {
         string ns;
         auto_ptr<KeyValJSMatcher> matcher;
         auto_ptr<Cursor> c;
+        auto_ptr<IdSet> ids_;
         int pos; /* # objects into the cursor so far */
         DiskLoc lastLoc() const {
             return _lastLoc;
