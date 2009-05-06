@@ -677,6 +677,7 @@ namespace mongo {
                     logOp( "i", ns, newObj );
                 return 3;
             }
+            checkNoMods( updateobj );
             if ( profile )
                 ss << " upsert ";
             theDataFileMgr.insert(ns, updateobj);
