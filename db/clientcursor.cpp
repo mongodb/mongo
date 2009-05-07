@@ -35,6 +35,8 @@ namespace mongo {
 
     /* ------------------------------------------- */
 
+    long long IdSet::size_ = 0;
+    
     typedef multimap<DiskLoc, ClientCursor*> ByLoc;
     ByLoc byLoc;
     unsigned byLocSize() {
@@ -203,5 +205,5 @@ namespace mongo {
             return true;
         }
     } cmdCursorInfo;
-    
+
 } // namespace mongo

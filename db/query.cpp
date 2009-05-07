@@ -821,14 +821,17 @@ namespace mongo {
                     }
                     else {
                         BSONObj js = c->current();
-                        BSONObjBuilder idBuilder;
-                        idBuilder.append( js.getField( "_id" ) );
-                        BSONObj id = idBuilder.obj();
-                        if ( cc->ids_->get( id ) ) {
-                            c->advance();
-                            continue;
+                        BSONElement idRef = js.getField( "_id" );
+                        if ( !idRef.eoo() ) {
+                            BSONObjBuilder idBuilder;
+                            idBuilder.append( idRef );
+                            BSONObj id = idBuilder.obj();
+                            if ( cc->ids_->get( id ) ) {
+                                c->advance();
+                                continue;
+                            }
+                            cc->ids_->put( id ); 
                         }
-                        cc->ids_->put( id );                        
                         bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
                         if ( ok ) {
                             n++;
@@ -1049,10 +1052,13 @@ namespace mongo {
                 // got a match.
                 assert( js.objsize() >= 0 ); //defensive for segfaults
                 if ( ids_.get() ) {
-                    BSONObjBuilder b;
-                    b.append( js.getField( "_id" ) );
-                    BSONObj id = b.obj();
-                    ids_->put( id );
+                    BSONElement idRef = js.getField( "_id" );
+                    if ( !idRef.eoo() ) {
+                        BSONObjBuilder b;
+                        b.append( idRef );
+                        BSONObj id = b.obj();
+                        ids_->put( id );
+                    }
                 }
                 if ( ordering_ ) {
                     // note: no cursors for non-indexed, ordered results.  results must be fairly small.

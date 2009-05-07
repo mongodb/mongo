@@ -86,4 +86,19 @@ namespace mongo {
         }
     };
 
+    class DbSet {
+    public:
+        DbSet( const string &name, const BSONObj &key ) :
+        name_( name ),
+        key_( key.getOwned() ) {
+//            reset();
+        }
+        void reset();
+        bool get( const BSONObj &obj );
+        void set( const BSONObj &obj, bool val );
+    private:
+        string name_;
+        BSONObj key_;
+    };
+    
 } // namespace mongo

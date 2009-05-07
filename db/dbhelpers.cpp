@@ -143,4 +143,35 @@ namespace mongo {
         deleteObjects(ns, BSONObj(), false);
     }
 
+    void DbSet::reset() {
+        DBContext c( name_.c_str() );
+        if ( nsdetails( name_.c_str() ) ) {
+            Helpers::emptyCollection( name_.c_str() );
+        } else {
+            string err;
+            massert( err, userCreateNS( name_.c_str(), BSONObj(), err, false ) );
+        }
+        Helpers::ensureIndex( name_.c_str(), key_, true, "setIdx" );            
+    }
+    
+    bool DbSet::get( const BSONObj &obj ) {
+        DBContext c( name_.c_str() );
+        BSONObj temp;
+        return Helpers::findOne( name_.c_str(), obj, temp, true );
+    }
+    
+    void DbSet::set( const BSONObj &obj, bool val ) {
+        DBContext c( name_.c_str() );
+        if ( val ) {
+            try {
+                BSONObj k = obj;
+                theDataFileMgr.insert( name_.c_str(), k );
+            } catch ( DBException& ) {
+                // dup key - already in set
+            }
+        } else {
+            deleteObjects( name_.c_str(), obj, true, false, false );
+        }                        
+    }
+        
 } // namespace mongo

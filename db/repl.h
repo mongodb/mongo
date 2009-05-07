@@ -178,48 +178,17 @@ namespace mongo {
     // All functions must be called with db mutex held
     class DbIds {
     public:
-        DbIds( const char * name ) : name_( name ) {}
+        DbIds( const string & name ) : impl_( name, BSON( "ns" << 1 << "id" << 1 ) ) {}
         void reset() {
-            dbcache c;
-            setClientTempNs( name_ );
-            if ( nsdetails( name_ ) ) {
-                Helpers::emptyCollection( name_ );
-            } else {
-                string err;
-                massert( err, userCreateNS( name_, BSONObj(), err, false ) );
-            }
-            Helpers::ensureIndex( name_, BSON( "ns" << 1 << "id" << 1 ), true, "setIdx" );            
+            impl_.reset();
         }
         bool get( const char *ns, const BSONObj &id ) {
-            dbcache c;
-            setClientTempNs( name_ );
-            BSONObj temp;
-            return Helpers::findOne( name_, key( ns, id ), temp, true );                        
+            return impl_.get( key( ns, id ) );
         }
         void set( const char *ns, const BSONObj &id, bool val ) {
-            dbcache c;
-            setClientTempNs( name_ );
-            if ( val ) {
-                try {
-                    BSONObj k = key( ns, id );
-                    theDataFileMgr.insert( name_, k );
-                } catch ( DBException& ) {
-                    // dup key - already in set
-                }
-            } else {
-                deleteObjects( name_, key( ns, id ), true, false, false );
-            }            
+            impl_.set( key( ns, id ), val );
         }
     private:
-        struct dbcache {
-            Database *database_;
-            const char *curNs_;
-            dbcache() : database_( database ), curNs_( curNs ) {}
-            ~dbcache() {
-                database = database_;
-                curNs = curNs_;
-            }
-        };
         static BSONObj key( const char *ns, const BSONObj &id ) {
             BSONObjBuilder b;
             b << "ns" << ns;
@@ -227,7 +196,7 @@ namespace mongo {
             b.appendAs( id.firstElement(), "id" );
             return b.obj();
         }        
-        const char * name_;
+        DbSet impl_;
     };
     
     // All functions must be called with db mutex held

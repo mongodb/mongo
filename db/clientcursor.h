@@ -36,19 +36,29 @@ namespace mongo {
 
     class IdSet {
     public:
-        IdSet() : size_() {}
+        IdSet() : mySize_() {}
         ~IdSet() {
         }
-        bool get( const BSONObj &id ) {
+        bool get( const BSONObj &id ) const {
             return mem_.count( id );
         }
         void put( const BSONObj &id ) {
-            mem_.insert( id.getOwned() );
+            if ( mem_.insert( id.getOwned() ).second ) {
+                int sizeInc = id.objsize() + sizeof( BSONObj );
+                mySize_ += sizeInc;
+                size_ += sizeInc;
+            }
+        }
+        void mayUpgradeStorage( const string &name ) {
+            if ( size_ > 200 * 1024 * 1024 ) {
+                // upagrade storage
+            }
         }
     private:
         string name_;
         BSONObjSetDefaultOrder mem_;
-        long long size_;
+        long long mySize_;
+        static long long size_;
     };
     
     class ClientCursor {
