@@ -6,15 +6,16 @@ f.drop();
 
 f.save( {a:1} );
 
-c = f.find({$where : function(){ return a() }});
-try {
-    c.next();
-} catch( e ) {
-    assert( e.match( /java.lang.NullPointerException/ ) );
-}
+assert.throws( 
+    function(){
+        c = f.find({$where : function(){ return a() }});
+        c.next();
+    }
+);
 
-try {
-    db.eval( function() { return a(); } );
-} catch ( e ) {
-    assert( e.match( /java.lang.NullPointerException/ ) );
-}
+assert.throws(
+    function(){
+        db.eval( function() { return a(); } );
+    }
+);
+

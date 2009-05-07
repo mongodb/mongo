@@ -15,4 +15,3 @@ var f = db.group(
 );
 
 assert(f[0].a == 1 && f[0].csum == 2);  
-

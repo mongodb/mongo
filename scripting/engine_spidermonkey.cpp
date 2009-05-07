@@ -72,6 +72,15 @@ namespace mongo {
             return toObject( JSVAL_TO_OBJECT( v ) );
         }
         
+        string getFunctionCode( JSFunction * func ){
+            return toString( JS_DecompileFunction( _context , func , 0 ) );
+        }
+
+        string getFunctionCode( jsval v ){
+            uassert( "not a function" , JS_TypeOfValue( _context , v ) == JSTYPE_FUNCTION );
+            return getFunctionCode( JS_ValueToFunction( _context , v ) );
+        }
+
         void append( BSONObjBuilder& b , string name , jsval val ){
             switch ( JS_TypeOfValue( _context , val ) ){
 
@@ -81,11 +90,42 @@ namespace mongo {
             case JSTYPE_NUMBER: b.append( name.c_str() , toNumber( val ) ); break;
             case JSTYPE_STRING: b.append( name.c_str() , toString( val ) ); break;
 
-            default: uassert( (string)"can't append type: " + typeString( val ) , 0 );
+            case JSTYPE_OBJECT: b.append( name.c_str() , toObject( val ) ); break;
+            case JSTYPE_FUNCTION: b.appendCode( name.c_str() , getFunctionCode( val ).c_str() ); break;
+                
+            default: uassert( (string)"can't append field.  name:" + name + " type: " + typeString( val ) , 0 );
             }
         }
 
         // ---------- to spider monkey ---------
+
+        bool hasFunctionIdentifier( const string& code ){
+            if ( code.size() < 9 || code.find( "function" ) != 0  )
+                return false;
+            
+            return code[8] == ' ' || code[8] == '(';
+        }
+
+        JSFunction * compileFunction( const char * code ){
+            if ( ! hasFunctionIdentifier( code ) ){
+                string s = code;
+                if ( strstr( code , "return" ) == 0 )
+                    s = "return " + s;
+                return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile" , 0 );
+            }
+            
+            // TODO: there must be a way in spider monkey to do this - this is a total hack
+
+            string s = "return ";
+            s += code;
+            s += ";";
+
+            JSFunction * func = JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile" , 0 );
+            jsval ret;
+            JS_CallFunction( _context , 0 , func , 0 , 0 , &ret );
+            return JS_ValueToFunction( _context , ret );
+        }
+
         
         jsval toval( double d ){
             jsval val;
@@ -169,9 +209,13 @@ namespace mongo {
                 assert( r );
                 return OBJECT_TO_JSVAL( r );
             }
+            case 13:{
+                JSFunction * func = compileFunction( e.valuestr() );
+                return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
+            }
             case Date: 
                 return OBJECT_TO_JSVAL( js_NewDateObjectMsec( _context , e.date() ) );
-
+                
             default:
                 log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
@@ -516,35 +560,8 @@ namespace mongo {
 
         // ---- functions -----
         
-        bool hasFunctionIdentifier( const string& code ){
-            if ( code.size() < 9 || code.find( "function" ) != 0  )
-                return false;
-            
-            return code[8] == ' ' || code[8] == '(';
-        }
-
-        JSFunction * compileFunction( const char * code ){
-            if ( ! hasFunctionIdentifier( code ) ){
-                string s = code;
-                if ( strstr( code , "return" ) == 0 )
-                    s = "return " + s;
-                return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile" , 0 );
-            }
-            
-            // TODO: there must be a way in spider monkey to do this - this is a total hack
-
-            string s = "return ";
-            s += code;
-            s += ";";
-
-            JSFunction * func = JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile" , 0 );
-            jsval ret;
-            JS_CallFunction( _context , 0 , func , 0 , 0 , &ret );
-            return JS_ValueToFunction( _context , ret );
-        }
-
         ScriptingFunction createFunction( const char * code ){
-            return (ScriptingFunction)compileFunction( code );
+            return (ScriptingFunction)_convertor->compileFunction( code );
         }
 
         void precall(){
