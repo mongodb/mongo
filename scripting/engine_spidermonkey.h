@@ -13,8 +13,10 @@
 
 #ifdef MOZJS
 #include "mozjs/jsapi.h"
+#include "mozjs/jsdate.h"
 #else
 #include "js/jsapi.h"
+#include "js/jsdate.h"
 #endif
 
 namespace mongo {

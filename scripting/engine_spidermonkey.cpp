@@ -116,6 +116,8 @@ namespace mongo {
 
             switch( e.type() ){
             case EOO:
+            case jstNULL:
+            case Undefined:
                 return JSVAL_NULL;
             case NumberDouble:
             case NumberInt:
@@ -152,6 +154,9 @@ namespace mongo {
                 assert( r );
                 return OBJECT_TO_JSVAL( r );
             }
+            case Date: 
+                return OBJECT_TO_JSVAL( js_NewDateObjectMsec( _context , e.date() ) );
+
             default:
                 log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
@@ -346,6 +351,27 @@ namespace mongo {
     }
 
 
+    // ------ special helpers -------
+    
+    JSBool object_keyset(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+        
+        JSIdArray * properties = JS_Enumerate( cx , obj );
+        assert( properties );
+
+        JSObject * array = JS_NewArrayObject( cx , properties->length , 0 );
+        assert( array );
+        
+        for ( jsint i=0; i<properties->length; i++ ){
+            jsid id = properties->vector[i];
+            jsval idval;
+            assert( JS_IdToValue( cx , id , &idval ) );
+            assert( JS_SetElement( cx , array , i ,  &idval ) );
+        }
+        
+        *rval = OBJECT_TO_JSVAL( array );
+        return JS_TRUE;
+    }
+    
     // ------ scope ------
 
         
@@ -365,6 +391,11 @@ namespace mongo {
             massert( "js init failed" , JS_InitStandardClasses( _context , _global ) );
             
             JS_DefineFunctions( _context , _global , globalHelpers );
+            
+            // install my special helpers
+            
+            assert( JS_DefineFunction( _context , _convertor->getGlobalPrototype( "Object" ) , 
+                                       "keySet" , object_keyset , 0 , JSPROP_READONLY ) );
 
             _this = 0;
         }
