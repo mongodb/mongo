@@ -33,14 +33,16 @@ namespace mongo {
             start = curTimeMicros64();
         }
         void entered() {
-            enter = curTimeMicros64();
+            if ( locked == 0 )
+                enter = curTimeMicros64();
             locked++;
-            assert( locked == 1 );
+            assert( locked >= 1 );
         }
         void leaving() {
             locked--;
-            assert( locked == 0 );
-            timeLocked += curTimeMicros64() - enter;
+            assert( locked >= 0 );
+            if ( locked == 0 )
+                timeLocked += curTimeMicros64() - enter;
         }
         int isLocked() const {
             return locked;
@@ -51,13 +53,13 @@ namespace mongo {
         }
     };
 
-    extern boost::mutex &dbMutex;
+    extern boost::recursive_mutex &dbMutex;
     extern MutexInfo dbMutexInfo;
 
     struct lock {
-        boostlock bl_;
+        recursive_boostlock bl_;
         MutexInfo& info_;
-        lock( boost::mutex &mutex, MutexInfo &info ) :
+        lock( boost::recursive_mutex &mutex, MutexInfo &info ) :
                 bl_( mutex ),
                 info_( info ) {
             info_.entered();
@@ -200,14 +202,14 @@ namespace mongo {
 #if BOOST_VERSION >= 103500
             dbMutex.unlock();
 #else
-            boost::detail::thread::lock_ops<boost::mutex>::unlock(dbMutex);
+            boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(dbMutex);
 #endif
         }
         ~dbtemprelease() {
 #if BOOST_VERSION >= 103500
             dbMutex.lock();
 #else
-            boost::detail::thread::lock_ops<boost::mutex>::lock(dbMutex);
+            boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(dbMutex);
 #endif
             dbMutexInfo.entered();
             if ( clientname.empty() )

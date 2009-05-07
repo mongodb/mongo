@@ -36,8 +36,8 @@ assert.eq( 6 , db.foo.find().count() , "basic count after split " );
 
 s.adminCommand( { moveshard : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
 
-assert.eq( 4 , primary.foo.find().toArray().length , "primary count" );
-assert.eq( 2 , seconday.foo.find().toArray().length , "secondary count" );
+assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
+assert.eq( 3 , seconday.foo.find().toArray().length , "secondary count" );
 
 assert.eq( 6 , db.foo.find().toArray().length , "total count after move" );
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).toArray().length , "total count() sorted" );

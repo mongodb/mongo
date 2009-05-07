@@ -74,7 +74,15 @@ Object.extend = function( dst , src ){
     }
     return dst;
 }
-
+/*
+Object.prototype.keySet = function(){
+    var all = [];
+    for ( var k in this ){
+        all.push( k );
+    }
+    return all;
+}
+*/
 argumentsToArray = function( a ){
     var arr = [];
     for ( var i=0; i<a.length; i++ )
@@ -321,4 +329,17 @@ shellHelper.show = function( what ){
     
     throw "don't know how to show [" + what + "]";
 
+}
+
+
+Map = function(){
+    print( "warning: Map isn't a good thing to use" );
+}
+
+Map.prototype.values = function(){
+    var a = [];
+    for ( var k in this ){
+        a.push( this[k] );
+    }
+    return a;
 }

@@ -48,7 +48,7 @@
 namespace mongo {
 
     extern bool quiet;
-    extern boost::mutex &dbMutex;
+    extern boost::recursive_mutex &dbMutex;
     extern long long oplogSize;
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
     void ensureHaveIdIndex(const char *ns);
@@ -807,8 +807,11 @@ namespace mongo {
             }
         }
         catch ( UserException& e ) {
-            log() << "sync: caught user assertion " << e.msg << '\n';
-        }        
+            log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;;
+        }
+        catch ( DBException& e ) {
+            log() << "sync: caught db exception " << e << " while applying op: " << op << endl;;            
+        }
     }
     
     /* local.$oplog.main is of the form:

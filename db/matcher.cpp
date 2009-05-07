@@ -150,7 +150,7 @@ namespace mongo {
                 uassert( "$where query, but no script engine", globalScriptEngine );
 
                 where->scope = globalScriptEngine->createScope();
-                where->scope->setString( "$client", database->name.c_str() );
+                where->scope->localConnect( database->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {
                     where->setFunc( e.codeWScopeCode() );
@@ -551,7 +551,7 @@ namespace mongo {
             if ( !regexMatches(rm, e, deep) )
                 return false;
         }
-
+        
         if ( where ) {
             if ( where->func == 0 ) {
                 uassert("$where compile error", false);
@@ -565,6 +565,7 @@ namespace mongo {
                 }
                 where->scope->setThis( const_cast< BSONObj * >( &jsobj ) );
                 where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
+                where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
             }
             /*else {
             BSONObjBuilder b;

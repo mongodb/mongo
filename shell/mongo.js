@@ -7,29 +7,29 @@ if ( typeof Mongo == "undefined" ){
     }
 }
 
-if ( typeof mongoInject == "function" ){
-    Mongo.prototype.find = function( ns , query , fields , limit , skip ){ throw "find not implemented"; }
-    Mongo.prototype.insert = function( ns , obj ){ throw "insert not implemented"; }
-    Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented;" }
-    Mongo.prototype.update = function( ns , query , obj ){ throw "update not implemented;" }
-    
-    mongoInject( Mongo.prototype );
+if ( ! Mongo.prototype ){
+    throw "Mongo.prototype not defined";
 }
 
-if ( ! Mongo.prototype )
-    Mongo.prototype = {};
+
+if ( ! Mongo.prototype.find )
+    Mongo.prototype.find = function( ns , query , fields , limit , skip ){ throw "find not implemented"; }
+if ( ! Mongo.prototype.insert )
+    Mongo.prototype.insert = function( ns , obj ){ throw "insert not implemented"; }
+if ( ! Mongo.prototype.remove )
+    Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented;" }
+if ( ! Mongo.prototype.update )
+    Mongo.prototype.update = function( ns , query , obj , upsert ){ throw "update not implemented;" }
+
+if ( typeof mongoInject == "function" ){
+    mongoInject( Mongo.prototype );
+}
 
 Mongo.prototype.setSlaveOk = function() {
     this.slaveOk = true;
 }
 
 Mongo.prototype.getDB = function( name ){
-    if ( typeof createDB == "function" ){
-        var newdb =  createDB( this , name );
-        assert( this == newdb.getMongo() , "createDB sanity check 1" );
-        assert( this == newdb._mongo , "createDB sanity check 2" );
-        return newdb;
-    }
     return new DB( this , name );
 }
 

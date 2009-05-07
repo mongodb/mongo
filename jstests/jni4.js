@@ -16,13 +16,13 @@ assert.eq( "/abc/i" , real.c.toString() , "regex 1" );
 var cursor = t.find( { $where : 
 		      function(){
 			  fullObject;
-			  assert.eq( 7 , obj.keySet().length )
-			  assert.eq( 1 , obj.a );
-			  assert.eq( "abc" , obj.b );
-			  assert.eq( "/abc/i" , obj.c.toString() );
-			  assert.eq( 111911100111 , obj.d.getTime() );
-			  assert( obj.f );
-			  assert( ! obj.e );
+			  assert.eq( 7 , obj.keySet().length , "A" )
+			  assert.eq( 1 , obj.a , "B" );
+			  assert.eq( "abc" , obj.b , "C" );
+			  assert.eq( "/abc/i" , obj.c.toString() , "D" );
+			  assert.eq( 111911100111 , obj.d.getTime() , "E" );
+			  assert( obj.f , "F" );
+			  assert( ! obj.e , "G" );
 			  
 			  return true;
 		      } 

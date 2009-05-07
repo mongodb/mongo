@@ -8,11 +8,18 @@ if ( ( typeof  DBCollection ) == "undefined" ){
         this._shortName = shortName;
         this._fullName = fullName;
         
-        assert( this._mongo , "no mongo" );
-        assert( this._db , "no db" );
-        assert( this._shortName , "no shortName" );
-        assert( this._fullName , "no fullName" );
+        this.verify();
     }
+}
+
+DBCollection.prototype.verify = function(){
+    assert( this._fullName , "no fullName" );
+    assert( this._shortName , "no shortName" );
+    assert( this._db , "no db" );
+    
+    assert.eq( this._fullName , this._db._name + "." + this._shortName , "name mismatch" );
+
+    assert( this._mongo , "no mongo in DBCollection" );
 }
 
 DBCollection.prototype.getName = function(){
@@ -93,7 +100,7 @@ DBCollection.prototype.findOne = function( query , fields ){
     if ( ! cursor.hasNext() )
         return null;
     var ret = cursor.next();
-    if ( cursor.hasNext() ) throw "something is wrong";
+    if ( cursor.hasNext() ) throw "findOne has more than 1 result!";
     if ( ret.$err )
         throw "error " + tojson( ret );
     return ret;

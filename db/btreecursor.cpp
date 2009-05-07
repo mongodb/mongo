@@ -28,9 +28,10 @@ namespace mongo {
     DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
     DiskLoc minDiskLoc(0, 1);
 
-    BtreeCursor::BtreeCursor( const IndexDetails &_id, const BSONObj &_startKey, const BSONObj &_endKey, int _direction ) :
+    BtreeCursor::BtreeCursor( const IndexDetails &_id, const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction ) :
     startKey( _startKey ),
     endKey( _endKey ),
+    endKeyInclusive_( endKeyInclusive ),
     indexDetails( _id ),
     order( _id.keyPattern() ),
     direction( _direction ) {
@@ -84,7 +85,8 @@ namespace mongo {
             return;
         if ( !endKey.isEmpty() ) {
             int cmp = sgn( endKey.woCompare( currKey(), order ) );
-            if ( cmp != 0 && cmp != direction )
+            if ( ( cmp != 0 && cmp != direction ) ||
+                ( cmp == 0 && !endKeyInclusive_ ) )
                 bucket = DiskLoc();
         }
     }

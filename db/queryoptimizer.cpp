@@ -42,6 +42,7 @@ namespace mongo {
     direction_( 0 ),
     startKey_( startKey ),
     endKey_( endKey ),
+    endKeyInclusive_( endKey_.isEmpty() ),
     unhelpful_( false ) {
         // full table scan case
         if ( !index_ ) {
@@ -144,7 +145,7 @@ namespace mongo {
             return findTableScan( fbs_.ns(), order_, startLoc );
         massert( "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
         //TODO This constructor should really take a const ref to the index details.
-        return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, direction_ >= 0 ? 1 : -1 ) );
+        return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
     }
 
     auto_ptr< Cursor > QueryPlan::newReverseCursor() const {

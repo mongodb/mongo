@@ -7,19 +7,19 @@ t.ensureIndex( { a: 1 } );
 t.ensureIndex( { b: 1 }, true );
 t.ensureIndex( { c: 1 }, [ false, "cIndex" ] );
 
-checkIndexes = function() {
+checkIndexes = function( num ) {
 //    printjson( db.system.indexes.find( { ns: "test.jstests_index8" } ).toArray() );
     indexes = db.system.indexes.find( { ns: "test.jstests_index8" } ).sort( { key: 1 } );
-    assert( !indexes[ 0 ].unique );
-    assert( indexes[ 1 ].unique );
-    assert( !indexes[ 2 ].unique );
-    assert.eq( "cIndex", indexes[ 2 ].name );
+    assert( !indexes[ 0 ].unique , "A" + num );
+    assert( indexes[ 1 ].unique , "B" + num );
+    assert( !indexes[ 2 ].unique , "C" + num );
+    assert.eq( "cIndex", indexes[ 2 ].name , "D" + num );
 }
 
-checkIndexes();
+checkIndexes( 1 );
 
 t.reIndex();
-checkIndexes();
+checkIndexes( 2 );
 
 t.save( { a: 2, b: 1 } );
 t.save( { a: 2 } );

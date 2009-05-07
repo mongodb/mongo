@@ -120,20 +120,28 @@ namespace mongo {
                 return true;   
             }
         };
-        class Authorizer {
+        class Context {
         public:
-            Authorizer() {
+            Context() {
+                dblock lk;
+                if ( database )
+                    oldName_ = database->name;
                 backup_.reset( authInfo.release() );
                 // careful, don't want to free this.
                 authInfo.reset( &always );
             }
-            ~Authorizer() {
+            ~Context() {
                 authInfo.release();
                 authInfo.reset( backup_.release() );
+                if ( !oldName_.empty() ) {
+                    dblock lk;
+                    setClientTempNs( oldName_.c_str() );
+                }
             }
         private:
             static AlwaysAuthorized always;
             boost::thread_specific_ptr< AuthenticationInfo > backup_;
+            string oldName_;
         };
     };
     

@@ -562,11 +562,11 @@ namespace QueryTests {
             BSONObj hints[] = { BSONObj(), BSON( "a" << 1 << "b" << 1 ) };
             for( int i = 0; i < 2; ++i ) {
                 check( 0, 0, 3, 3, 4, hints[ i ] );
-                check( 1, 1, 2, 2, 4, hints[ i ] );
-                check( 1, 2, 2, 2, 3, hints[ i ] );
-                check( 1, 2, 2, 1, 2, hints[ i ] );
+                check( 1, 1, 2, 2, 3, hints[ i ] );
+                check( 1, 2, 2, 2, 2, hints[ i ] );
+                check( 1, 2, 2, 1, 1, hints[ i ] );
 
-                auto_ptr< DBClientCursor > c = query( 1, 2, 2, 1, hints[ i ] );
+                auto_ptr< DBClientCursor > c = query( 1, 2, 2, 2, hints[ i ] );
                 BSONObj obj = c->next();
                 ASSERT_EQUALS( 1, obj.getIntField( "a" ) );
                 ASSERT_EQUALS( 2, obj.getIntField( "b" ) );
@@ -600,8 +600,16 @@ namespace QueryTests {
     };
     BSONObj MinMax::empty_;
     
-    // TODO : Validate hint index key against min / max fields
-    //        Allow only one of min / max
+    class DirectLocking : public ClientBase {
+    public:
+        void run() {
+            dblock lk;
+            setClient( "foo.bar" );
+            client().remove( "a.b", BSONObj() );
+            ASSERT_EQUALS( "foo", database->name );
+        }
+        const char *ns;
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -634,6 +642,7 @@ namespace QueryTests {
             add< IndexInsideArrayCorrect >();
             add< SubobjArr >();
             add< MinMax >();
+            add< DirectLocking >();
         }
     };
     

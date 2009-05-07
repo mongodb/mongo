@@ -133,14 +133,37 @@ namespace JSTests {
 
             s->invoke( "function (){ return this.x == 17; }" , BSONObj() );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+
+            s->invoke( "function z(){ return this.x == 18; }" , BSONObj() );
+            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
             
             delete s;
         }
     };
-    
-    // TODO:
-    // setThis
-    // init
+
+    class ObjectDecoding {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            s->invoke( "z = { num : 1 };" , BSONObj() );
+            BSONObj out = s->getObject( "z" );
+            ASSERT_EQUALS( 1 , out["num"].number() );
+            ASSERT_EQUALS( 1 , out.nFields() );
+
+            s->invoke( "z = { x : 'eliot' };" , BSONObj() );
+            out = s->getObject( "z" );
+            ASSERT_EQUALS( (string)"eliot" , out["x"].valuestr() );
+            ASSERT_EQUALS( 1 , out.nFields() );
+                           
+            BSONObj o = BSON( "x" << 17 );
+            s->setObject( "blah" , o );   
+            out = s->getObject( "blah" );
+            ASSERT_EQUALS( 17 , out["x"].number() );
+            
+            delete s;
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -150,6 +173,7 @@ namespace JSTests {
             add< FalseTests >();
             add< SimpleFunctions >();
             add< ObjectMapping >();
+            add< ObjectDecoding >();
         }
     };
     

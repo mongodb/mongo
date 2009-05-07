@@ -2,27 +2,33 @@
 
 var baseName = "jstests_clonecollection";
 
-f = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "_from" ).getDB( baseName );
-t = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "_to" ).getDB( baseName );
+ports = allocatePorts( 2 );
+
+f = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "_from", "--nohttpinterface" ).getDB( baseName );
+t = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_to", "--nohttpinterface" ).getDB( baseName );
 
 for( i = 0; i < 1000; ++i ) {
     f.a.save( { i: i } );
 }
 assert.eq( 1000, f.a.find().count() );
 
-assert.commandWorked( t.cloneCollection( "localhost:27018", "a" ) );
+assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a" ) );
 assert.eq( 1000, t.a.find().count() );
 
 t.a.drop();
 
-assert.commandWorked( t.cloneCollection( "localhost:27018", "a", { i: { $gte: 10, $lt: 20 } } ) );
+assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a", { i: { $gte: 10, $lt: 20 } } ) );
 assert.eq( 10, t.a.find().count() );
 
 t.a.drop();
 assert.eq( 0, t.system.indexes.find().count() );
 
 f.a.ensureIndex( { i: 1 } );
-assert.commandWorked( t.cloneCollection( "localhost:27018", "a" ) );
+assert.eq( 2, f.system.indexes.find().count(), "expected index missing" );
+assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a" ) );
+if ( t.system.indexes.find().count() != 2 ) {
+    printjson( t.system.indexes.find().toArray() );
+}
 assert.eq( 2, t.system.indexes.find().count(), "expected index missing" );
 // Verify index works
 assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().startKey.i );
@@ -38,7 +44,7 @@ for( i = 0; i < 100000; ++i ) {
 }
 
 finished = false;
-cc = fork( function() { assert.commandWorked( t.cloneCollection( "localhost:27018", "a", {i:{$gte:0}} ) ); finished = true; } );
+cc = fork( function() { assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a", {i:{$gte:0}} ) ); finished = true; } );
 cc.start();
 
 sleep( 200 );
@@ -61,15 +67,15 @@ assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count() );
 f.a.drop();
 t.a.drop();
 
-for( i = 0; i < 100000; ++i ) {
+for( i = 0; i < 200000; ++i ) {
     f.a.save( { i: i } );
 }
 
-cc = fork( function() { assert.commandFailed( t.runCommand( { cloneCollection:"jstests_clonecollection.a", from:"localhost:27018", logSizeMb:1 } ) ); } );
+cc = fork( function() { assert.commandFailed( t.runCommand( { cloneCollection:"jstests_clonecollection.a", from:"localhost:" + ports[ 0 ], logSizeMb:1 } ) ); } );
 cc.start();
 
 sleep( 200 );
-for( i = 100000; i < 110000; ++i ) {
+for( i = 200000; i < 210000; ++i ) {
     f.a.save( { i: i } );
 }
 
@@ -80,20 +86,20 @@ cc.join();
 f.a.drop();
 t.a.drop();
 
-for( i = 0; i < 100000; ++i ) {
+for( i = 0; i < 200000; ++i ) {
     f.a.save( { i: i } );
 }
 
-cc = fork( function() { assert.commandWorked( t.cloneCollection( "localhost:27018", "a" ) ); } );
+cc = fork( function() { assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a" ) ); } );
 cc.start();
 
 sleep( 200 );
-for( i = 100000; i < 110000; ++i ) {
+for( i = 200000; i < 210000; ++i ) {
     f.a.save( { i: i } );
 }
 
 cc.join();
-assert.eq( 110000, t.a.find().count() );
+assert.eq( 210000, t.a.find().count() );
 
 // Test startCloneCollection and finishCloneCollection commands.
 f.a.drop();
@@ -103,7 +109,7 @@ for( i = 0; i < 100000; ++i ) {
     f.a.save( { i: i } );
 }
 
-cc = fork( function() { return t.runCommand( {startCloneCollection:"jstests_clonecollection.a", from:"localhost:27018" } ); } );
+cc = fork( function() { return t.runCommand( {startCloneCollection:"jstests_clonecollection.a", from:"localhost:" + ports[ 0 ] } ); } );
 cc.start();
 
 sleep( 200 );
