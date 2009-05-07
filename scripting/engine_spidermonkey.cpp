@@ -130,6 +130,21 @@ namespace mongo {
                 BSONObj embed = e.embeddedObject();
                 return toval( &embed , true );
             }
+            case Array:{
+
+                BSONObj embed = e.embeddedObject();
+                
+                int n = embed.nFields();
+                JSObject * array = JS_NewArrayObject( _context , embed.nFields() , 0 );
+                assert( array );
+
+                for ( int i=0; i<n; i++ ){
+                    jsval v = toval( embed[BSONObjBuilder::numStr( i ).c_str()] );
+                    assert( JS_SetElement( _context , array , i , &v ) );
+                }
+                
+                return OBJECT_TO_JSVAL( array );
+            }
             case jstOID:{
                 OID oid = e.__oid();
                 JSObject * o = JS_NewObject( _context , &object_id_class , 0 , 0 );
