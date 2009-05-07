@@ -905,6 +905,8 @@ def recordPerformance( env, target, source ):
     b = p.communicate()[ 0 ]
     print( "perftest results:" );
     print( b );
+    if p.returncode != 0:
+        return True
     entries = re.findall( "{.*?}", b )
     for e in entries:
         matches = re.match( "{'(.*?)': (.*?)}", e )
@@ -917,6 +919,7 @@ def recordPerformance( env, target, source ):
         sub[ "trial" ][ "client_hash" ] = ""
         sub[ "trial" ][ "result" ] = val
         post_data(sub)
+    return False
 
 addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
