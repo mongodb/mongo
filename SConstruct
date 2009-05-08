@@ -166,7 +166,7 @@ usesm = not GetOption( "usesm" ) is None
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp" )
+commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" )
@@ -192,7 +192,7 @@ coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.c
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
 
 if usesm:
-    serverOnlyFiles += [ "scripting/engine_spidermonkey.cpp" , "shell/mongo.cpp" ]
+    serverOnlyFiles += [ "scripting/engine_spidermonkey.cpp" ]
     nojni = True
 elif not nojni:
     serverOnlyFiles += [ "scripting/engine_java.cpp" ]
@@ -727,8 +727,10 @@ elif not onlyServer:
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
+    coreShellFiles = [ "shell/MongoJS.cpp" , "shell/ShellUtils.cpp" , "shell/dbshell.cpp" , "scripting/engine_v8.cpp" ]
+
     if weird:
-        shell32BitFiles = Glob( "shell/*.cpp" ) + [ "scripting/engine_v8.cpp" ]
+        shell32BitFiles = coreShellFiles
         for f in allClientFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
 
@@ -742,7 +744,7 @@ elif not onlyServer:
         mongo = shellEnv.Program( "mongo" , shell32BitFiles )
     else:
         shellEnv.Append( LIBS=[ "mongoclient"] )
-        mongo = shellEnv.Program( "mongo" , Glob( "shell/*.cpp" ) + [ "scripting/engine_v8.cpp" ] );
+        mongo = shellEnv.Program( "mongo" , coreShellFiles )
 
 
 #  ---- RUNNING TESTS ----

@@ -22,6 +22,8 @@
 namespace mongo {
 
     class SMScope;
+    class Convertor;
+
     extern JSClass bson_ro_class;
     extern JSClass object_id_class;
 
@@ -36,5 +38,5 @@ namespace mongo {
 
     // mongo
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local );
-    
+    bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o );
 }

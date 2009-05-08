@@ -165,6 +165,39 @@ namespace JSTests {
         }
     };
     
+    class JSOIDTests {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            s->localConnect( "blah" );
+            
+            s->invoke( "z = { _id : new ObjectId() , a : 123 };" , BSONObj() );
+            BSONObj out = s->getObject( "z" );
+            ASSERT_EQUALS( 123 , out["a"].number() );
+            ASSERT_EQUALS( jstOID , out["_id"].type() );
+            
+            OID save = out["_id"].__oid();
+            
+            s->setObject( "a" , out );
+            
+            s->invoke( "y = { _id : a._id , a : 124 };" , BSONObj() );            
+            out = s->getObject( "y" );
+            ASSERT_EQUALS( 124 , out["a"].number() );
+            ASSERT_EQUALS( jstOID , out["_id"].type() );            
+            ASSERT_EQUALS( out["_id"].__oid().str() , save.str() );
+
+            s->invoke( "y = { _id : new ObjectId( a._id ) , a : 125 };" , BSONObj() );            
+            out = s->getObject( "y" );
+            ASSERT_EQUALS( 125 , out["a"].number() );
+            ASSERT_EQUALS( jstOID , out["_id"].type() );            
+            ASSERT_EQUALS( out["_id"].__oid().str() , save.str() );
+
+
+            delete s;
+        }
+    };
+
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -174,6 +207,7 @@ namespace JSTests {
             add< SimpleFunctions >();
             add< ObjectMapping >();
             add< ObjectDecoding >();
+            add< JSOIDTests >();
         }
     };
     
