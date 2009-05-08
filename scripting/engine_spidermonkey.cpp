@@ -92,8 +92,15 @@ namespace mongo {
                 
             case JSTYPE_OBJECT: {
                 JSObject * o = JSVAL_TO_OBJECT( val );
-                if ( ! appendSpecialDBObject( this , b , name , o ) )
-                    b.append( name.c_str() , toObject( o ) ); 
+                if ( ! appendSpecialDBObject( this , b , name , o ) ){
+                    BSONObj sub = toObject( o );
+                    if ( JS_IsArrayObject( _context , o ) ){
+                        b.appendArray( name.c_str() , sub );
+                    }
+                    else {
+                        b.append( name.c_str() , sub );
+                    }
+                }
                 break;
             }
             case JSTYPE_FUNCTION: b.appendCode( name.c_str() , getFunctionCode( val ).c_str() ); break;
