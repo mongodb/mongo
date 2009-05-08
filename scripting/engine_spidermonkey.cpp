@@ -92,8 +92,15 @@ namespace mongo {
                 
             case JSTYPE_OBJECT: {
                 JSObject * o = JSVAL_TO_OBJECT( val );
-                if ( ! appendSpecialDBObject( this , b , name , o ) )
-                    b.append( name.c_str() , toObject( o ) ); 
+                if ( ! appendSpecialDBObject( this , b , name , o ) ){
+                    BSONObj sub = toObject( o );
+                    if ( JS_IsArrayObject( _context , o ) ){
+                        b.appendArray( name.c_str() , sub );
+                    }
+                    else {
+                        b.append( name.c_str() , sub );
+                    }
+                }
                 break;
             }
             case JSTYPE_FUNCTION: b.appendCode( name.c_str() , getFunctionCode( val ).c_str() ); break;
@@ -482,11 +489,22 @@ namespace mongo {
         }
         
         void reset(){
-            massert( "not implemented yet" , 0 );
+            massert( "SMScope::reset() not implemented yet" , 0 );
         }
         
         void init( BSONObj * data ){
-            massert( "not implemented yet" , 0 );            
+            if ( ! data )
+                return;
+                
+            BSONObjIterator i( *data );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                
+                _convertor->setProperty( _global , e.fieldName() , _convertor->toval( e ) );
+            }
+
         }
 
         void localConnect( const char * dbName ){
