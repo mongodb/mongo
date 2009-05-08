@@ -482,11 +482,22 @@ namespace mongo {
         }
         
         void reset(){
-            massert( "not implemented yet" , 0 );
+            massert( "SMScope::reset() not implemented yet" , 0 );
         }
         
         void init( BSONObj * data ){
-            massert( "not implemented yet" , 0 );            
+            if ( ! data )
+                return;
+                
+            BSONObjIterator i( *data );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                if ( e.eoo() )
+                    break;
+                
+                _convertor->setProperty( _global , e.fieldName() , _convertor->toval( e ) );
+            }
+
         }
 
         void localConnect( const char * dbName ){
