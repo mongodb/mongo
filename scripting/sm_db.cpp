@@ -342,15 +342,17 @@ namespace mongo {
 
     JSBool object_id_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
 
+        Convertor c( cx );
+
         OID oid;
         if ( argc == 0 ){
             oid.init();
         }
         else {
-            uassert( "object_id_constructor 2nd case" , 0 );
+            uassert( "object_id_constructor can't take more than 1 param" , argc == 1 );
+            oid.init( c.toString( argv[0] ) );
         }
-        
-        Convertor c( cx );
+
         jsval v = c.toval( oid.str().c_str() );
         assert( JS_SetProperty( cx , obj , "str" , &v  ) );
 
@@ -364,6 +366,16 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
     
+    JSBool object_id_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        return *rval = c.getProperty( obj , "str" );
+    }
+
+    JSFunctionSpec object_id_functions[] = {
+        { "toString" , object_id_tostring , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { 0 }
+    };
+    
 
     // ---- other stuff ----
 
@@ -371,13 +383,25 @@ namespace mongo {
         uassert( "non-local not supported yet" , local );
 
         assert( JS_InitClass( cx , global , 0 , &mongo_local_class , mongo_local_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &object_id_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , object_id_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
 
         scope->exec( jsconcatcode );
 
+    }
+
+    bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o ){
+
+        if ( JS_InstanceOf( c->_context , o , &object_id_class , 0 ) ){
+            OID oid;
+            oid.init( c->getString( o , "str" ) );
+            b.append( name.c_str() , oid );
+            return true;
+        }
+
+        return false;
     }
 
 }

@@ -40,6 +40,10 @@ namespace mongo {
         virtual void setThis( const BSONObj * obj ) = 0;
                     
         virtual ScriptingFunction createFunction( const char * code ) = 0;
+
+        /**
+         * @return 0 on success
+         */
         virtual int invoke( ScriptingFunction func , const BSONObj& args ) = 0;
         virtual string getError() = 0;
         

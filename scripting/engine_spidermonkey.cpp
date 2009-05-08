@@ -8,7 +8,7 @@ namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
     
-    class Convertor {
+    class Convertor : boost::noncopyable {
     public:
         Convertor( JSContext * cx ){
             _context = cx;
@@ -89,14 +89,19 @@ namespace mongo {
                 
             case JSTYPE_NUMBER: b.append( name.c_str() , toNumber( val ) ); break;
             case JSTYPE_STRING: b.append( name.c_str() , toString( val ) ); break;
-
-            case JSTYPE_OBJECT: b.append( name.c_str() , toObject( val ) ); break;
+                
+            case JSTYPE_OBJECT: {
+                JSObject * o = JSVAL_TO_OBJECT( val );
+                if ( ! appendSpecialDBObject( this , b , name , o ) )
+                    b.append( name.c_str() , toObject( o ) ); 
+                break;
+            }
             case JSTYPE_FUNCTION: b.appendCode( name.c_str() , getFunctionCode( val ).c_str() ); break;
                 
             default: uassert( (string)"can't append field.  name:" + name + " type: " + typeString( val ) , 0 );
             }
         }
-
+        
         // ---------- to spider monkey ---------
 
         bool hasFunctionIdentifier( const string& code ){
@@ -265,8 +270,11 @@ namespace mongo {
         bool getBoolean( JSObject * o , const char * field ){
             return toBoolean( getProperty( o , field ) );
         }
+        
+        string getString( JSObject * o , const char * field ){
+            return toString( getProperty( o , field ) );
+        }
 
-    private:
         JSContext * _context;
     };
 
