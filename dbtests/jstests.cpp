@@ -193,9 +193,9 @@ namespace JSTests {
             ASSERT_EQUALS( 125 , out["a"].number() );
             ASSERT_EQUALS( jstOID , out["_id"].type() );            
             ASSERT_EQUALS( out["_id"].__oid().str() , save.str() );
-#endif
 
             delete s;
+#endif
         }
     };
 
