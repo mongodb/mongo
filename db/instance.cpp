@@ -290,6 +290,8 @@ namespace mongo {
        path - db directory
     */
     void closeClient( const char *cl, const char *path ) {
+        assert( database );
+        assert( database->name == cl );
         if ( string("local") != cl ) {
             DBInfo i(cl);
             i.dbDropped();
