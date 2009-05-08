@@ -54,6 +54,7 @@ namespace mongo {
         BSONObj indexKey() const;
         const char *ns() const { return fbs_.ns(); }
         BSONObj query() const { return fbs_.query(); }
+        BSONObj simplifiedQuery() const { return fbs_.simplifiedQuery(); }
         const FieldBound &bound( const char *fieldName ) const { return fbs_.bound( fieldName ); }
         void registerSelf( long long nScanned ) const;
     private:
