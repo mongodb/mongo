@@ -620,7 +620,7 @@ namespace QueryTests {
             const char *ns = "querytests.FastCountIn";
             client().insert( ns, BSON( "i" << "a" ) );
             client().ensureIndex( ns, BSON( "i" << 1 ) );
-            ASSERT_EQUALS( 1, client().count( ns, fromjson( "{i:{$in:['a']}}" ) ) );
+            ASSERT_EQUALS( 1U, client().count( ns, fromjson( "{i:{$in:['a']}}" ) ) );
         }
     };
     
