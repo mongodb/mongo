@@ -210,7 +210,7 @@ namespace mongo {
             {
                 string err;
                 const char *toname = to_name.c_str();
-                setClient( toname );
+                DBContext c( toname );
                 userCreateNS(toname, options, err, logForRepl);
 
                 /* chunks are big enough that we should create the _id index up front, that should
@@ -220,8 +220,8 @@ namespace mongo {
                    */
                 if ( strstr(toname, "._chunks") )
                     ensureHaveIdIndex(toname);
+                copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk);
             }
-            copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk);
         }
 
         // now build the indexes
