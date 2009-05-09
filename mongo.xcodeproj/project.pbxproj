@@ -149,6 +149,7 @@
 		938A7A480F54873600FB7A07 /* reccache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = reccache.h; sourceTree = "<group>"; };
 		938A7A490F54873600FB7A07 /* reci.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = reci.h; sourceTree = "<group>"; };
 		938A7A4A0F54873600FB7A07 /* recstore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = recstore.h; sourceTree = "<group>"; };
+		938DECB70FB5017A00C393D8 /* repair.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = repair.js; sourceTree = "<group>"; };
 		939C67200F535D72006570D3 /* cursor8.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = cursor8.js; sourceTree = "<group>"; };
 		93A13A210F4620A500AF1B0D /* commands.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = commands.cpp; sourceTree = "<group>"; };
 		93A13A230F4620A500AF1B0D /* config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = config.cpp; sourceTree = "<group>"; };
@@ -575,6 +576,7 @@
 		93A8D1D10F37544800C92B85 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				938DECB70FB5017A00C393D8 /* repair.js */,
 				93A47EC50FB0B0BA00E760DD /* recovery */,
 				93C392D00FAA4162007D6E4A /* minmax.js */,
 				9343373F0F9CD6900019D5C0 /* index8.js */,
