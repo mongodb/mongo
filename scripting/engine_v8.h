@@ -21,11 +21,11 @@ namespace mongo {
         
         virtual int type( const char *field ) { assert( false ); return 0; }
         
-        virtual void setNumber( const char *field , double val ) {}
-        virtual void setString( const char *field , const char * val ) {}
-        virtual void setObject( const char *field , const BSONObj& obj ) {}
-        virtual void setBoolean( const char *field , bool val ) {}
-        virtual void setThis( const BSONObj * obj ) {}
+        virtual void setNumber( const char *field , double val ) { assert(0); }
+        virtual void setString( const char *field , const char * val ) { assert(0); }
+        virtual void setObject( const char *field , const BSONObj& obj , bool readOnly) { assert(0); }
+        virtual void setBoolean( const char *field , bool val ) { assert(0); }
+        virtual void setThis( const BSONObj * obj ) { assert(0); }
         
         virtual ScriptingFunction createFunction( const char * code ) { assert( false ); return 0; }
         virtual int invoke( ScriptingFunction func , const BSONObj& args ) { assert( false ); return 0; }
