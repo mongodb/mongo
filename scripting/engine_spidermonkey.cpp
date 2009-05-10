@@ -7,7 +7,25 @@
 namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
+
+#define GETHOLDER(x,o) ((BSONHolder*)JS_GetPrivate( x , o ))
     
+    class BSONHolder {
+    public:
+        
+        BSONHolder( BSONObj obj ){
+            _obj = obj;
+            _inResolve = false;
+        }
+        
+        BSONObjIterator * it(){
+            return new BSONObjIterator( _obj );
+        }
+
+        BSONObj _obj;
+        bool _inResolve;
+    };
+
     class Convertor : boost::noncopyable {
     public:
         Convertor( JSContext * cx ){
@@ -152,7 +170,7 @@ namespace mongo {
 
         JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ){
             JSObject * o = JS_NewObject( _context , readOnly ? &bson_ro_class : &bson_class , NULL, NULL);
-            JS_SetPrivate( _context , o , (void*)(new BSONObj( obj->getOwned() ) ) );
+            JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) );
             return o;
         }
         
@@ -284,7 +302,7 @@ namespace mongo {
 
 
     void bson_finalize( JSContext * cx , JSObject * obj ){
-        BSONObj * o = (BSONObj*)JS_GetPrivate( cx , obj );
+        BSONHolder * o = GETHOLDER( cx , obj );
         if ( o ){
             delete o;
             JS_SetPrivate( cx , obj , 0 );
@@ -294,7 +312,7 @@ namespace mongo {
     JSBool bson_enumerate( JSContext *cx, JSObject *obj, JSIterateOp enum_op, jsval *statep, jsid *idp ){
 
         if ( enum_op == JSENUMERATE_INIT ){
-            BSONObjIterator * it = new BSONObjIterator( ((BSONObj*)JS_GetPrivate( cx , obj ))->getOwned() );
+            BSONObjIterator * it = GETHOLDER( cx , obj )->it();
             *statep = PRIVATE_TO_JSVAL( it );
             if ( idp )
                 *idp = JSVAL_ZERO;
@@ -330,7 +348,8 @@ namespace mongo {
     }
 
     JSBool noaccess( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
-        if ( ! JS_GetPrivate( cx , obj ) )
+        BSONHolder * holder = GETHOLDER( cx , obj );
+        if ( holder->_inResolve )
             return JS_TRUE;
         JS_ReportError( cx , "doing write op on read only operation" );
         return JS_FALSE;
@@ -383,10 +402,10 @@ namespace mongo {
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
         Convertor c( cx );
         
-        BSONObj * o = (BSONObj*)(JS_GetPrivate( cx , obj ));
+        BSONHolder * holder = GETHOLDER( cx , obj );
         string s = c.toString( id );
        
-        BSONElement e = (*o)[ s.c_str() ];
+        BSONElement e = holder->_obj[ s.c_str() ];
 
         if ( e.type() == EOO ){
             *objp = 0;
@@ -395,9 +414,10 @@ namespace mongo {
         
         jsval val = c.toval( e );
 
-        JS_SetPrivate( cx , obj , 0 );
+        assert( ! holder->_inResolve );
+        holder->_inResolve = true;
         assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
-        JS_SetPrivate( cx , obj , (void*)o );
+        holder->_inResolve = false;
 
         *objp = obj;
         return JS_TRUE;
