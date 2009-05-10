@@ -150,16 +150,13 @@ namespace mongo {
             return STRING_TO_JSVAL( s );
         }
 
-        JSObject * toJSObject( const BSONObj * obj , bool readOnly=true ){
-            // TODO: check this
-
-            JSObject * o = JS_NewObject( _context , &bson_ro_class , NULL, NULL);
-
+        JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ){
+            JSObject * o = JS_NewObject( _context , readOnly ? &bson_ro_class : &bson_class , NULL, NULL);
             JS_SetPrivate( _context , o , (void*)(new BSONObj( obj->getOwned() ) ) );
             return o;
         }
         
-        jsval toval( const BSONObj* obj , bool readOnly=true ){
+        jsval toval( const BSONObj* obj , bool readOnly=false ){
             JSObject * o = toJSObject( obj , readOnly );
             return OBJECT_TO_JSVAL( o );
         }
@@ -180,7 +177,7 @@ namespace mongo {
                 return e.boolean() ? JSVAL_TRUE : JSVAL_FALSE;
             case Object:{
                 BSONObj embed = e.embeddedObject();
-                return toval( &embed , true );
+                return toval( &embed );
             }
             case Array:{
 
@@ -332,8 +329,21 @@ namespace mongo {
         return JS_FALSE;
     }
 
+    JSBool noaccess( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+        if ( ! JS_GetPrivate( cx , obj ) )
+            return JS_TRUE;
+        JS_ReportError( cx , "doing write op on read only operation" );
+        return JS_FALSE;
+    }
     
     JSClass bson_ro_class = {
+        "bson_ro_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE , 
+        noaccess, noaccess, JS_PropertyStub, noaccess,
+        (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSClass bson_class = {
         "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE , 
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
         (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
@@ -385,7 +395,10 @@ namespace mongo {
         
         jsval val = c.toval( e );
 
+        JS_SetPrivate( cx , obj , 0 );
         assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
+        JS_SetPrivate( cx , obj , (void*)o );
+
         *objp = obj;
         return JS_TRUE;
     }
@@ -570,8 +583,8 @@ namespace mongo {
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
-        void setObject( const char *field , const BSONObj& obj ){
-            jsval v = _convertor->toval( &obj );
+        void setObject( const char *field , const BSONObj& obj , bool readOnly ){
+            jsval v = _convertor->toval( &obj , readOnly );
             JS_SetProperty( _context , _global , field , &v );
         }
 
@@ -612,7 +625,7 @@ namespace mongo {
             for ( int i=0; i<nargs; i++ )
                 smargs[i] = _convertor->toval( it.next() );
             
-            setObject( "args" , args ); // this is for backwards compatability
+            setObject( "args" , args , true ); // this is for backwards compatability
 
             if ( ! JS_CallFunction( _context , _this , func , nargs , smargs , &rval ) ){
                 return -3;

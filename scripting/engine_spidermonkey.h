@@ -23,7 +23,8 @@ namespace mongo {
 
     class SMScope;
     class Convertor;
-
+    
+    extern JSClass bson_class;
     extern JSClass bson_ro_class;
     extern JSClass object_id_class;
 

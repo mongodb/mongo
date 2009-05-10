@@ -199,6 +199,22 @@ namespace JSTests {
         }
     };
 
+    class ObjectModTests {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" );
+            s->setObject( "blah" , o , true );
+            
+            s->invoke( "blah.a = 19;" , BSONObj() );
+            BSONObj out = s->getObject( "blah" );
+            ASSERT( out["a"].eoo() );
+
+            delete s;
+        }
+    };
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -209,6 +225,7 @@ namespace JSTests {
             add< ObjectMapping >();
             add< ObjectDecoding >();
             add< JSOIDTests >();
+            add< ObjectModTests >();
         }
     };
     
