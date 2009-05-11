@@ -25,6 +25,11 @@
 #pragma once
 
 #include "../stdafx.h"
+#include "cursor.h"
+#include "jsobj.h"
+#include "../util/message.h"
+#include "storage.h"
+#include "dbhelpers.h"
 
 namespace mongo {
 
@@ -34,31 +39,59 @@ namespace mongo {
     typedef map<CursorId, ClientCursor*> CCById;
     extern CCById clientCursorsById;
 
+    extern BSONObj id_obj;
+
     class IdSet {
     public:
-        IdSet() : mySize_() {}
+        IdSet() : mySize_(), inMem_( true ) {}
         ~IdSet() {
+            size_ -= mySize_;
         }
         bool get( const BSONObj &id ) const {
-            return mem_.count( id );
+            if ( inMem_ )
+                return mem_.count( id );
+            else
+                return db_.get( id );
         }
         void put( const BSONObj &id ) {
-            if ( mem_.insert( id.getOwned() ).second ) {
-                int sizeInc = id.objsize() + sizeof( BSONObj );
-                mySize_ += sizeInc;
-                size_ += sizeInc;
+            if ( inMem_ ) {
+                if ( mem_.insert( id.getOwned() ).second ) {
+                    int sizeInc = id.objsize() + sizeof( BSONObj );
+                    mySize_ += sizeInc;
+                    size_ += sizeInc;
+                }
+            } else {
+                db_.set( id, true );
             }
         }
         void mayUpgradeStorage( const string &name ) {
-            if ( size_ > 200 * 1024 * 1024 ) {
-                // upagrade storage
+            if ( size_ > maxSize_ || mySize_ > maxSizePerSet() ) {
+                if ( !inMem_ )
+                    return;
+                log() << "upgrading id set to collection backed storage, cursorid: " << name << endl;
+                inMem_ = false;
+                db_.reset( "local.temp.clientcursor." + name, id_obj );
+                for( BSONObjSetDefaultOrder::const_iterator i = mem_.begin(); i != mem_.end(); ++i )
+                    db_.set( *i, true );
+                mem_.clear();
+                size_ -= mySize_;
+                mySize_ = 0;
             }
         }
+        bool inMem() const { return inMem_; }
+        long long mySize() { return mySize_; }
+        static long long aggregateSize() { return size_; }
+        
+        static long long maxSize_;
     private:
         string name_;
         BSONObjSetDefaultOrder mem_;
+        DbSet db_;
         long long mySize_;
         static long long size_;
+        long long maxSizePerSet() const { return maxSize_ / 2; }
+        
+        bool inMem_;
     };
     
     class ClientCursor {
@@ -114,6 +147,12 @@ namespace mongo {
         void updateLocation();
 
         void cleanupByLocation(DiskLoc loc);
+        
+        void mayUpgradeStorage() {
+            stringstream ss;
+            ss << cursorid;
+            ids_->mayUpgradeStorage( ss.str() );
+        }
     };
 
 } // namespace mongo
