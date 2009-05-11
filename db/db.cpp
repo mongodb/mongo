@@ -26,6 +26,7 @@
 #include "../util/file_allocator.h"
 #include "dbmessage.h"
 #include "instance.h"
+#include "clientcursor.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -572,6 +573,12 @@ int main(int argc, char* argv[], char *envp[] )
                 opIdMem = x;
                 assert(opIdMem > 0);
             }
+            else if ( s == "--deDupMem" ) {
+                long x = strtol( argv[ ++i ], 0, 10 );
+                uassert("bad arg", x > 0);
+                IdSet::maxSize_ = x;
+                assert(IdSet::maxSize_ > 0);
+            }
             else if ( strncmp(s.c_str(), "--oplog", 7) == 0 ) {
                 int x = s[7] - '0';
                 if ( x < 0 || x > 7 ) {
@@ -615,9 +622,8 @@ usage:
     out() << " --nohttpinterface         disable http interface\n";
     out() << " --nojni" << endl;
     out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-    out() << " --oplogSize <size_in_MB>  custom size if creating new replication operation log" << endl;
-    out() << " --opIdMem <size_in_Bytes> custom size limit for in-mem storage of op ids" << endl;
     out() << " --sysinfo                 print some diagnostic system information\n";
+    out() << " --deDupMem <size_Bytes>   custom memory limit for query de-duping\n";
     out() << "\nReplication:" << endl;
     out() << " --master\n";
     out() << " --slave" << endl;
@@ -625,6 +631,8 @@ usage:
     out() << " --only <dbname>           when a slave, only replicate db <dbname>" << endl;
     out() << " --pairwith <server:port> <arbiter>" << endl;
     out() << " --autoresync" << endl;
+    out() << " --oplogSize <size_in_MB>  custom size if creating new replication operation log" << endl;
+    out() << " --opIdMem <size_in_Bytes> custom size limit for in-mem storage of op ids" << endl;
     out() << endl;
 
     return 0;

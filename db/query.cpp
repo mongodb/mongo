@@ -848,8 +848,10 @@ namespace mongo {
                 }
                 c->advance();
             }
-            if ( cc )
+            if ( cc ) {
                 cc->updateLocation();
+                cc->mayUpgradeStorage();
+            }
         }
 
         QueryResult *qr = (QueryResult *) b.buf();
