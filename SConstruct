@@ -177,7 +177,7 @@ if ( usesm and usejvm ):
     Exit(1)
 
 if ( not ( usesm or usejvm ) ):
-    usejvm = True
+    usesm = True
 
 # ------    SOURCE FILE SETUP -----------
 
