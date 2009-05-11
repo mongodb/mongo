@@ -846,7 +846,6 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod" ], [ jsDirTestSpec( "repl" ) ] )
     addSmoketest( "smokeDisk", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
-    addSmoketest( "smokeRecovery", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "perf", "*.js" ] ) ] )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
