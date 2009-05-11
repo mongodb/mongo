@@ -243,7 +243,6 @@
 		93A8D2100F37544800C92B85 /* update2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = update2.js; sourceTree = "<group>"; };
 		93A8D2110F37544800C92B85 /* where1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = where1.js; sourceTree = "<group>"; };
 		93A8D8200F38FE2400C92B85 /* autoid.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = autoid.js; sourceTree = "<group>"; };
-		93AB914E0F4F1C7A0020A046 /* javajstests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = javajstests.cpp; sourceTree = "<group>"; };
 		93AB914F0F4F1C970020A046 /* _runner_leak.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = _runner_leak.js; sourceTree = "<group>"; };
 		93AB91500F4F1C970020A046 /* _runner_leak_nojni.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = _runner_leak_nojni.js; sourceTree = "<group>"; };
 		93AB91510F4F1C970020A046 /* _runner_sharding.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = _runner_sharding.js; sourceTree = "<group>"; };
@@ -256,6 +255,8 @@
 		93B4A82A0F1C0256000C862C /* pdfiletests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = pdfiletests.cpp; sourceTree = "<group>"; };
 		93BC2ADF0FB87442006BC285 /* dbNoCreate.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = dbNoCreate.js; sourceTree = "<group>"; };
 		93BC2AE00FB87442006BC285 /* norepeat.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = norepeat.js; sourceTree = "<group>"; };
+		93BC2AE10FB87662006BC285 /* cursortests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cursortests.cpp; sourceTree = "<group>"; };
+		93BC2AE20FB87662006BC285 /* jstests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jstests.cpp; sourceTree = "<group>"; };
 		93C38E940FA66622007D6E4A /* basictests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = basictests.cpp; sourceTree = "<group>"; };
 		93C392D00FAA4162007D6E4A /* minmax.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = minmax.js; sourceTree = "<group>"; };
 		93CCC87F0F8562E900E20FA0 /* datasize.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = datasize.js; sourceTree = "<group>"; };
@@ -379,8 +380,9 @@
 		934223850EF16D7000608550 /* dbtests */ = {
 			isa = PBXGroup;
 			children = (
+				93BC2AE10FB87662006BC285 /* cursortests.cpp */,
+				93BC2AE20FB87662006BC285 /* jstests.cpp */,
 				93C38E940FA66622007D6E4A /* basictests.cpp */,
-				93AB914E0F4F1C7A0020A046 /* javajstests.cpp */,
 				932AC3EB0F4A5B34005BF8B0 /* queryoptimizertests.cpp */,
 				933E22100F4327B2000209E3 /* perf */,
 				937D0E340F28CB070071FFA9 /* repltests.cpp */,
