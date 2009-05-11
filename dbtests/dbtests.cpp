@@ -79,6 +79,13 @@ int main( int argc, char** argv ) {
         dbpathSpec += "/";
     dbpath = dbpathSpec.c_str();
 
+#if !defined(_WIN32) && !defined(__sunos__)
+    string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
+    int lockFile = open( name.c_str(), O_RDONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO );
+    massert( "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
+    massert( "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
+#endif        
+    
     srand( seed );
     printGitVersion();
     printSysInfo();
@@ -108,6 +115,12 @@ int main( int argc, char** argv ) {
     tests.add( replTests(), "repl" );
     tests.add( sockTests(), "sock" );
     tests.add( updateTests(), "update" );
+    
+    int ret = tests.run( argc, argv );
+    
+#if !defined(_WIN32) && !defined(__sunos__)
+    flock( lockFile, LOCK_UN );
+#endif    
 
-    return tests.run( argc, argv );
+    return ret;
 }
