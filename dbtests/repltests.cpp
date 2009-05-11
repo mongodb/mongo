@@ -696,7 +696,6 @@ namespace ReplTests {
     class DbIdsTest {
     public:
         void run() {
-            dblock lk;
             setClient( "repltest.DbIdsTest" );
             
             s_.reset( new DbIds( "local.temp.DbIdsTest" ) );
@@ -738,6 +737,7 @@ namespace ReplTests {
             ASSERT_EQUALS( two, s_->get( "b", BSON( "_id" << 4 ) ) );
             ASSERT_EQUALS( three, s_->get( "a", BSON( "_id" << 5 ) ) );            
         }
+        dblock lk_;
         auto_ptr< DbIds > s_;
     };
     
@@ -771,7 +771,6 @@ namespace ReplTests {
     class IdTrackerTest {
     public:
         void run() {
-            dblock lk;
             setClient( "repltests.IdTrackerTest" );
             
             ASSERT( s_.inMem() );
@@ -802,6 +801,7 @@ namespace ReplTests {
             ASSERT( s_.haveId( "b", BSON( "_id" << 0 ) ) );
             ASSERT( s_.haveModId( "b", BSON( "_id" << 0 ) ) );            
         }
+        dblock lk_;
         IdTracker s_;
     };
     
