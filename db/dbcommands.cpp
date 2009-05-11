@@ -566,13 +566,7 @@ namespace mongo {
                 errmsg = "ns not found";
                 return false;
             }
-            if ( d->nIndexes != 0 ) {
-                assert( deleteIndexes(d, nsToDrop.c_str(), "*", errmsg, result, true) );
-                assert( d->nIndexes == 0 );
-            }
-            result.append("ns", nsToDrop.c_str());
-            ClientCursor::invalidate(nsToDrop.c_str());
-            dropNS(nsToDrop);
+            dropCollection( nsToDrop, errmsg, result );
             return true;
         }
     } cmdDrop;

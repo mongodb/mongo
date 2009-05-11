@@ -44,7 +44,8 @@ namespace mongo {
 
     void dropDatabase(const char *ns);
     bool repairDatabase(const char *ns, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
-    void dropNS(const string& dropNs);;
+    void dropNS(const string& dropNs);
+    void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ); // also deletes indexes and cursors
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
     auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
 
@@ -462,5 +463,7 @@ namespace mongo {
     }
     
     void ensureHaveIdIndex(const char *ns);
-
+    
+    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
+        
 } // namespace mongo

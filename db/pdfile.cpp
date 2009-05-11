@@ -590,6 +590,18 @@ assert( !eloc.isNull() );
         database->namespaceIndex.kill(nsToDrop.c_str());
     }
 
+    void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
+        NamespaceDetails *d = nsdetails(name.c_str());
+        assert( d );
+        if ( d->nIndexes != 0 ) {
+            assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
+            assert( d->nIndexes == 0 );
+        }
+        result.append("ns", name.c_str());
+        ClientCursor::invalidate(name.c_str());
+        dropNS(name);        
+    }
+    
     /* delete this index.  does NOT clean up the system catalog
        (system.indexes or system.namespaces) -- only NamespaceIndex.
     */
@@ -1078,8 +1090,6 @@ assert( !eloc.isNull() );
         return loc;
     }
 
-    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
-    
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId) {
         bool addIndex = false;
         const char *sys = strstr(ns, "system.");
