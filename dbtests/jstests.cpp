@@ -168,6 +168,7 @@ namespace JSTests {
     class JSOIDTests {
     public:
         void run(){
+#ifdef MOZJS
             Scope * s = globalScriptEngine->createScope();
             
             s->localConnect( "blah" );
@@ -193,11 +194,27 @@ namespace JSTests {
             ASSERT_EQUALS( jstOID , out["_id"].type() );            
             ASSERT_EQUALS( out["_id"].__oid().str() , save.str() );
 
+            delete s;
+#endif
+        }
+    };
+
+    class ObjectModTests {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" );
+            s->setObject( "blah" , o , true );
+            
+            s->invoke( "blah.a = 19;" , BSONObj() );
+            BSONObj out = s->getObject( "blah" );
+            ASSERT( out["a"].eoo() );
 
             delete s;
         }
     };
-
+    
     class All : public UnitTest::Suite {
     public:
         All() {
@@ -208,6 +225,7 @@ namespace JSTests {
             add< ObjectMapping >();
             add< ObjectDecoding >();
             add< JSOIDTests >();
+            add< ObjectModTests >();
         }
     };
     

@@ -610,6 +610,19 @@ namespace QueryTests {
         }
         const char *ns;
     };
+
+    class FastCountIn : public ClientBase {
+    public:
+        ~FastCountIn() {
+            client().dropCollection( "querytests.FastCountIn" );
+        }        
+        void run() {
+            const char *ns = "querytests.FastCountIn";
+            client().insert( ns, BSON( "i" << "a" ) );
+            client().ensureIndex( ns, BSON( "i" << 1 ) );
+            ASSERT_EQUALS( 1U, client().count( ns, fromjson( "{i:{$in:['a']}}" ) ) );
+        }
+    };
     
     class All : public UnitTest::Suite {
     public:
@@ -643,6 +656,7 @@ namespace QueryTests {
             add< SubobjArr >();
             add< MinMax >();
             add< DirectLocking >();
+            add< FastCountIn >();
         }
     };
     

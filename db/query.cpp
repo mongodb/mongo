@@ -874,6 +874,7 @@ namespace mongo {
             spec_.getObjectField( "fields" ).getFieldNames( fields_ );
             c_ = qp().newCursor();
             if ( qp().exactKeyMatch() && fields_.empty() ) {
+                query_ = qp().simplifiedQuery();
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
                 bc_->forgetEndKey();
             }

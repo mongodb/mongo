@@ -91,6 +91,13 @@ AddOption('--usesm',
           action="store",
           help="use spider monkey for javascript" )
 
+AddOption('--usejvm',
+          dest='usejvm',
+          type="string",
+          nargs=0,
+          action="store",
+          help="use java for javascript" )
+
 AddOption( "--v8" ,
            dest="v8home",
            type="string",
@@ -161,8 +168,16 @@ debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debu
 debugLogging = not GetOption( "debugBuildAndLogging" ) is None
 noshell = not GetOption( "noshell" ) is None
 nojni = not GetOption( "nojni" ) is None
-usesm = not GetOption( "usesm" ) is None
 
+usesm = not GetOption( "usesm" ) is None
+usejvm = not GetOption( "usejvm" ) is None
+
+if ( usesm and usejvm ):
+    print( "can't say usesm and usejvm at the same time" )
+    Exit(1)
+
+if ( not ( usesm or usejvm ) ):
+    usejvm = True
 
 # ------    SOURCE FILE SETUP -----------
 

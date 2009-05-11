@@ -210,7 +210,6 @@ namespace mongo {
             {
                 string err;
                 const char *toname = to_name.c_str();
-                setClient( toname );
                 userCreateNS(toname, options, err, logForRepl);
 
                 /* chunks are big enough that we should create the _id index up front, that should

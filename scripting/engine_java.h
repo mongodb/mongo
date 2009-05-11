@@ -195,7 +195,8 @@ namespace mongo {
         void setString(const char *field, const char * val ) {
             JavaJS->scopeSetString(s,field,val);
         }
-        void setObject(const char *field, const BSONObj& obj ) {
+        void setObject(const char *field, const BSONObj& obj , bool readOnly ) {
+            uassert( "only readOnly setObject supported in java" , readOnly );
             JavaJS->scopeSetObject(s,field,&obj);
         }
         void setBoolean(const char *field, bool val ) {
@@ -207,7 +208,7 @@ namespace mongo {
         }
 
         int invoke( ScriptingFunction function , const BSONObj& args ){
-            setObject( "args" , args );
+            setObject( "args" , args , true );
             return JavaJS->invoke(s,function);
         }
         

@@ -125,7 +125,7 @@ namespace mongo {
         string ns = c.toString( argv[0] );
         
         BSONObj q = c.toObject( argv[1] );
-        //uassert( "field selector not supported yet in mongo_find" , argv[2] == JSVAL_NULL );
+        BSONObj f = c.toObject( argv[2] );
         
         int nToReturn = c.toNumber( argv[3] );
         int nToSkip = c.toNumber( argv[4] );
@@ -133,7 +133,7 @@ namespace mongo {
 
         try {
 
-            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , 0 , slaveOk ? Option_SlaveOk : 0 );
+            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? Option_SlaveOk : 0 );
             
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
             JS_SetPrivate( cx , mycursor , cursor.release() );

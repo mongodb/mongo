@@ -74,15 +74,7 @@ Object.extend = function( dst , src ){
     }
     return dst;
 }
-/*
-Object.prototype.keySet = function(){
-    var all = [];
-    for ( var k in this ){
-        all.push( k );
-    }
-    return all;
-}
-*/
+
 argumentsToArray = function( a ){
     var arr = [];
     for ( var i=0; i<a.length; i++ )
@@ -337,9 +329,13 @@ Map = function(){
 }
 
 Map.prototype.values = function(){
+    // TODO: move this to c?
     var a = [];
     for ( var k in this ){
-        a.push( this[k] );
+        var v = this[k];
+        if ( v == Map.prototype.values )
+            continue;
+        a.push( v );
     }
     return a;
 }
