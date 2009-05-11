@@ -69,13 +69,17 @@ DBQuery.prototype.hasNext = function(){
     if ( this._limit > 0 && this._cursorSeen >= this._limit )
         return false;
     var o = this._cursor.hasNext();
-    if ( o )
-        this._cursorSeen++;
     return o;
 }
 
 DBQuery.prototype.next = function(){
     this._exec();
+    
+    var o = this._cursor.hasNext();
+    if ( o )
+        this._cursorSeen++;
+    else
+        throw "error hasNext: " + o;
     
     var ret = this._cursor.next();
     if ( ret.$err && this._numReturned == 0 && ! this.hasNext() )
