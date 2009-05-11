@@ -807,9 +807,22 @@ def jsSpec( suffix ):
 def jsDirTestSpec( dir ):
     return mongo[0].abspath + " --nodb " + jsSpec( [ dir, "*.js" ] )
 
+def runShellTest( env, target, source ):
+    global mongodForTestsPort
+    import subprocess
+    target = str( target[0] )
+    if target == "smokeJs":
+        spec = jsSpec( [ "_runner.js" ] )
+    elif target == "smokeQuota":
+        spec = jsSpec( [ "quota", "*.js" ] )
+    else:
+        print( "invalid target for runShellTest()" )
+        Exit( 1 )
+    return subprocess.call( [ mongo[0].abspath, "--port", mongodForTestsPort, spec ] )
+
 # These tests require the mongo shell
 if not onlyServer and not noshell:
-    addSmoketest( "smokeJs", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "_runner.js" ] ) ] )
+    addSmoketest( "smokeJs", [ "mongo" ], runShellTest )
     addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod" ], [ jsDirTestSpec( "repl" ) ] )
     addSmoketest( "smokeDisk", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
