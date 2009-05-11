@@ -25,11 +25,19 @@ t.ensureIndex( { i: 1 } );
 for( i = 0; i < 10; ++i ) {
     t.save( { i: i } );
 }
+// apparently this means we also request 2 in subsequent getMore's
 c = t.find().hint( {i:1} ).limit( 2 );
-assert( 10 != c.next().i );
+assert.eq( 0, c.next().i );
 t.update( { i: 0 }, { i: 10 } );
 for( i = 1; i < 10; ++i ) {
-    assert( 10 != c.next().i );
+    if ( i == 7 ) {
+        t.update( { i: 6 }, { i: 11 } );
+        t.update( { i: 9 }, { i: 12 } );
+    }
+    if ( i == 9 ) {
+        i = 12;
+    }
+    assert.eq( i, c.next().i );
 }
 assert.throws( function() { c.next() }, [], "unexpected: object found" );
 
