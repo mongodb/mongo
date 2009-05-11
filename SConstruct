@@ -312,6 +312,7 @@ elif "sunos5" == os.sys.platform:
      javaHome = "/usr/lib/jvm/java-6-sun/"
      javaOS = "solaris"
      env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
+     env.Append( LIBS=["socket"] )
 
 elif "win32" == os.sys.platform:
     windows = True
