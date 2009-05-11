@@ -536,10 +536,27 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         
     myenv["_HAVEPCAP"] = myCheckLib( "pcap", staticOnly=release )
 
+    # this is outside of usesm block so don't have to rebuild for java
+    if windows:
+        myenv.Append( CPPDEFINES=[ "XP_WIN" ] )
+    else:
+        myenv.Append( CPPDEFINES=[ "XP_UNIX" ] )
+
     if usesm:
+
         myCheckLib( [ "js" , "mozjs" ] , True )
+        mozHeader = "js"
         if bigLibString(myenv).find( "mozjs" ) >= 0:
             myenv.Append( CPPDEFINES=[ "MOZJS" ] )
+            mozHeader = "mozjs"
+
+        if not conf.CheckHeader( mozHeader + "/jsapi.h" ):
+            if conf.CheckHeader( "jsapi.h" ):
+                myenv.Append( CPPDEFINES=[ "OLDJS" ] )
+                print( "warning: old spider monkey version" )
+            else:
+                print( "no spider monkey headers!" )
+                Exit(1)
 
     if shell:
         haveReadLine = False

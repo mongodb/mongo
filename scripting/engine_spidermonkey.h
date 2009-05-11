@@ -5,18 +5,24 @@
 
 #include "engine.h"
 
-#ifdef _WIN32
-#define XP_WIN
-#else
-#define XP_UNIX
-#endif
+#if defined( MOZJS )
 
-#ifdef MOZJS
 #include "mozjs/jsapi.h"
 #include "mozjs/jsdate.h"
+
+#elif defined( OLDJS )
+
+#include "jsapi.h"
+#include "jsdate.h"
+#ifndef JSCLASS_GLOBAL_FLAGS
+#define JSCLASS_GLOBAL_FLAGS 0
+#endif
+
 #else
+
 #include "js/jsapi.h"
 #include "js/jsdate.h"
+
 #endif
 
 namespace mongo {
