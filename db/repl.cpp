@@ -69,7 +69,7 @@ namespace mongo {
     extern bool autoresync;
     time_t lastForcedResync = 0;
     
-    IdTracker idTracker;
+    IdTracker &idTracker = *( new IdTracker() );
     
 } // namespace mongo
 

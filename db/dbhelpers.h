@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "db.h"
+
 namespace mongo {
 
     struct Helpers { 
@@ -88,13 +90,13 @@ namespace mongo {
 
     class DbSet {
     public:
-        DbSet( const string &name, const BSONObj &key ) :
+        DbSet( const string &name = "", const BSONObj &key = BSONObj() ) :
         name_( name ),
         key_( key.getOwned() ) {
-//            reset();
         }
-        void reset();
-        bool get( const BSONObj &obj );
+        ~DbSet();
+        void reset( const string &name = "", const BSONObj &key = BSONObj() );
+        bool get( const BSONObj &obj ) const;
         void set( const BSONObj &obj, bool val );
     private:
         string name_;
