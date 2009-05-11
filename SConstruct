@@ -814,7 +814,7 @@ def runShellTest( env, target, source ):
     if target == "smokeJs":
         spec = jsSpec( [ "_runner.js" ] )
     elif target == "smokeQuota":
-        spec = jsSpec( [ "quota", "*.js" ] )
+        spec = jsSpec( [ "quota", "quota1.js" ] )
     else:
         print( "invalid target for runShellTest()" )
         Exit( 1 )
@@ -829,7 +829,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeRecovery", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "perf", "*.js" ] ) ] )
-    addSmoketest( "smokeQuota", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "quota", "*.js" ] ) ] )
+    addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
 
 mongodForTests = None
 mongodForTestsPort = "27017"
