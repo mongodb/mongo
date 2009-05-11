@@ -96,6 +96,7 @@ int main( int argc, char** argv ) {
 
     tests.add( basicTests(), "basic" );
     tests.add( btreeTests(), "btree" );
+    tests.add( cursorTests(), "cursor" );
     tests.add( jsobjTests(), "jsobj" );
     tests.add( jsonTests(), "json" );
     tests.add( matcherTests(), "matcher" );
