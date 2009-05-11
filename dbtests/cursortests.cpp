@@ -30,15 +30,16 @@ namespace CursorTests {
             void run() {
                 IdSet a;
                 IdSet b;
+                int baseSize = BSON( "a" << 4 ).objsize() + sizeof( BSONObj );
                 ASSERT_EQUALS( 0, IdSet::aggregateSize() );
                 a.put( BSON( "a" << 4 ) );
-                ASSERT_EQUALS( 24, a.mySize() );
+                ASSERT_EQUALS( baseSize, a.mySize() );
                 a.put( BSON( "ab" << 4 ) );
-                ASSERT_EQUALS( 49, a.mySize() );
-                ASSERT_EQUALS( 49, IdSet::aggregateSize() );
+                ASSERT_EQUALS( baseSize * 2 + 1, a.mySize() );
+                ASSERT_EQUALS( baseSize * 2 + 1, IdSet::aggregateSize() );
                 b.put( BSON( "abc" << 4 ) );
-                ASSERT_EQUALS( 26, b.mySize() );
-                ASSERT_EQUALS( 75, IdSet::aggregateSize() );                
+                ASSERT_EQUALS( baseSize + 2, b.mySize() );
+                ASSERT_EQUALS( baseSize * 3 + 1 + 2, IdSet::aggregateSize() );                
             }
             ~BasicSize() {
                 if ( 0 != IdSet::aggregateSize() )
@@ -54,35 +55,35 @@ namespace CursorTests {
             void run() {
                 setClient( "foo.bar" );
                 
-                IdSet::maxSize_ = 200;
+                IdSet::maxSize_ = ( BSON( "_id" << int( 1 ) ).objsize() + sizeof( BSONObj ) - 1 ) * 8;
                 
                 IdSet a;
                 IdSet b;
                 ASSERT( a.inMem() );
                 ASSERT( b.inMem() );
-                a.put( twentySix() );
-                b.put( twentySix() );
-                b.put( twentySix() );
-                b.put( twentySix() );
+                a.put( obj() );
+                b.put( obj() );
+                b.put( obj() );
+                b.put( obj() );
                 b.mayUpgradeStorage( "b" );
                 ASSERT( b.inMem() );
-                a.put( twentySix() );
-                a.put( twentySix() );
+                a.put( obj() );
+                a.put( obj() );
                 a.mayUpgradeStorage( "a" );
                 ASSERT( a.inMem() );
-                a.put( twentySix() );
+                a.put( obj() );
                 a.mayUpgradeStorage( "a" );
                 ASSERT( !a.inMem() );
-                b.put( twentySix() );
+                b.put( obj() );
                 b.mayUpgradeStorage( "b" );
                 ASSERT( !b.inMem() );
                 
-                ASSERT( a.get( twentySix( 0 ) ) );
+                ASSERT( a.get( obj( 0 ) ) );
                 for( int i = 1; i < 4; ++i )
-                    ASSERT( b.get( twentySix( i ) ) );
+                    ASSERT( b.get( obj( i ) ) );
                 for( int i = 4; i < 7; ++i )
-                    ASSERT( a.get( twentySix( i ) ) );
-                ASSERT( b.get( twentySix( 7 ) ) );
+                    ASSERT( a.get( obj( i ) ) );
+                ASSERT( b.get( obj( 7 ) ) );
             }
             ~Upgrade() {
                 setClient( "local.temp" );
@@ -90,7 +91,7 @@ namespace CursorTests {
                     FAIL( "client cursor temp collection not deleted" );
             }
         private:
-            BSONObj twentySix( int i = -1 ) {
+            BSONObj obj( int i = -1 ) {
                 if ( i == -1 )
                     i = num_++;
                 return BSON( "_id" << i );
