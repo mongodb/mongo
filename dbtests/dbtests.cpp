@@ -25,6 +25,10 @@
 
 #include <unittest/Registry.hpp>
 
+#if !defined(_WIN32)
+#include <sys/file.h>
+#endif
+
 using namespace std;
 
 namespace mongo {
