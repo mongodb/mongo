@@ -772,14 +772,31 @@ def addSmoketest( name, deps, actions ):
     # Prevent smoke tests from running in parallel
     testEnv.SideEffect( "dummySmokeSideEffect", name )
 
+def ensureDir( name ):
+    d = os.path.dirname( name )
+    if not os.path.exists( d ):
+        print( "Creating dir: " + name );
+        os.makedirs( d )
+        if not os.path.exists( d ):
+            print( "Failed to create dir: " + name );
+            Exit( 1 )
+
 def testSetup( env , target , source ):
-    Execute( Mkdir( "/tmp/unittest/" ) )
+    ensureDir( "/tmp/unittest/" )
 
 addSmoketest( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
 
-clientExec = [ x[0].abspath for x in clientTests ];
-addSmoketest( "smokeClient" , clientExec , clientExec )
+clientExec = [ x[0].abspath for x in clientTests ]
+def runClientTests( env, target, source ):
+    global clientExec
+    global mongodForTestsPort
+    import subprocess
+    for i in clientExec:
+        if( subprocess.call( [ i, "--port", mongodForTestsPort ] ) != 0 ):
+            return True
+    return False
+addSmoketest( "smokeClient" , clientExec, runClientTests )
 addSmoketest( "mongosTest" , [ mongos[0].abspath ] , [ mongos[0].abspath + " --test" ] )
 
 def jsSpec( suffix ):
@@ -802,14 +819,20 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeQuota", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "quota", "*.js" ] ) ] )
 
 mongodForTests = None
+mongodForTestsPort = "27017"
 
 def startMongodForTests( env, target, source ):
     global mongodForTests
+    global mongodForTestsPort
     global mongod
     if mongodForTests:
         return
+    mongodForTestsPort = "40000"
+    import os
+    dirName = "/data/db/sconsTests/"
+    ensureDir( dirName )
     from subprocess import Popen
-    mongodForTests = Popen( [ mongod[0].abspath, "run" ] )
+    mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName ] )
     # Wait for mongod to start
     from time import sleep
     sleep( 2 )

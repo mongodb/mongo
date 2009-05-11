@@ -7,11 +7,18 @@
 using namespace std;
 using namespace mongo;
 
-int main() {
+int main( int argc, const char **argv ) {
+    
+    const char *port = "27017";
+    if ( argc != 1 ) {
+        if ( argc != 3 )
+            throw -12;
+        port = argv[ 2 ];
+    }
 
     DBClientConnection conn;
     string errmsg;
-    if ( ! conn.connect( "127.0.0.1" , errmsg ) ) {
+    if ( ! conn.connect( string( "127.0.0.1:" ) + port , errmsg ) ) {
         cout << "couldn't connect : " << errmsg << endl;
         throw -11;
     }

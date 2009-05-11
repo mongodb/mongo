@@ -15,11 +15,18 @@ void insert( mongo::DBClientConnection & conn , const char * name , int num ) {
     conn.insert( "test.people" , obj.obj() );
 }
 
-int main() {
+int main( int argc, const char **argv ) {
 
+    const char *port = "27017";
+    if ( argc != 1 ) {
+        if ( argc != 3 )
+            throw -12;
+        port = argv[ 2 ];
+    }
+    
     mongo::DBClientConnection conn;
     string errmsg;
-    if ( ! conn.connect( "127.0.0.1" , errmsg ) ) {
+    if ( ! conn.connect( string( "127.0.0.1:" ) + port , errmsg ) ) {
         cout << "couldn't connect : " << errmsg << endl;
         throw -11;
     }
