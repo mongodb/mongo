@@ -30,6 +30,7 @@
 #include "../util/message.h"
 #include "storage.h"
 #include "dbhelpers.h"
+#include "matcher.h"
 
 namespace mongo {
 

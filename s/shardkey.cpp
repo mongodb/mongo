@@ -332,24 +332,24 @@ namespace mongo {
                     break;
                 int op = f.getGtLtOp();
                 switch( op ) { 
-                    case JSMatcher::LT:
+                    case BSONObj::LT:
                         if( compareValues(f, LE) <= 0 )
                             return false;
                         break;
-                    case JSMatcher::LTE:
+                    case BSONObj::LTE:
                         if( compareValues(f, LE) < 0 )
                             return false;
                         break;
-                    case JSMatcher::GT:
-                    case JSMatcher::GTE:
+                    case BSONObj::GT:
+                    case BSONObj::GTE:
                         if( compareValues(f, RE) >= 0 )
                             return false;
                         break;
-                    case JSMatcher::opIN:
-                    case JSMatcher::NE:
-                    case JSMatcher::opSIZE:
+                    case BSONObj::opIN:
+                    case BSONObj::NE:
+                    case BSONObj::opSIZE:
                         massert("not implemented yet relevant()", false);
-                    case JSMatcher::Equality:
+                    case BSONObj::Equality:
                         goto normal;
                     default:
                         massert("bad operator in relevant()?", false);

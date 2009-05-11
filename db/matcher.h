@@ -84,21 +84,8 @@ namespace mongo {
             }
         };
     public:
-        enum MatchType {
-            Equality = 0,
-            LT = 0x1,
-            LTE = 0x3,
-            GTE = 0x6,
-            GT = 0x4,
-            opIN = 0x8, // { x : { $in : [1,2,3] } }
-            NE = 0x9,
-            opSIZE = 0x0A,
-            opALL = 0x0B,
-            NIN = 0x0C,
-        };
-
         static int opDirection(int op) {
-            return op <= LTE ? -1 : 1;
+            return op <= BSONObj::LTE ? -1 : 1;
         }
 
         // Only specify constrainIndexKey if matches() will be called with

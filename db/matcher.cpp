@@ -19,7 +19,7 @@
 */
 
 #include "stdafx.h"
-#include "jsobj.h"
+#include "matcher.h"
 #include "../util/goodies.h"
 #include "../util/unittest.h"
 #include "storage.h"
@@ -207,16 +207,16 @@ namespace mongo {
                     /* TODO: use getGtLtOp() here.  this code repeats ourself */
                     if ( fn[0] == '$' && fn[1] ) {
                         if ( fn[2] == 't' ) {
-                            int op = Equality;
+                            int op = BSONObj::Equality;
                             if ( fn[1] == 'g' ) {
-                                if ( fn[3] == 0 ) op = GT;
-                                else if ( fn[3] == 'e' && fn[4] == 0 ) op = GTE;
+                                if ( fn[3] == 0 ) op = BSONObj::GT;
+                                else if ( fn[3] == 'e' && fn[4] == 0 ) op = BSONObj::GTE;
                                 else
                                     uassert("invalid $operator", false);
                             }
                             else if ( fn[1] == 'l' ) {
-                                if ( fn[3] == 0 ) op = LT;
-                                else if ( fn[3] == 'e' && fn[4] == 0 ) op = LTE;
+                                if ( fn[3] == 0 ) op = BSONObj::LT;
+                                else if ( fn[3] == 'e' && fn[4] == 0 ) op = BSONObj::LTE;
                                 else
                                     uassert("invalid $operator", false);
                             }
@@ -236,7 +236,7 @@ namespace mongo {
                                 shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                                 builders_.push_back( b );
                                 b->appendAs(fe, e.fieldName());
-                                addBasic(b->done().firstElement(), NE);
+                                addBasic(b->done().firstElement(), BSONObj::NE);
                                 ok = true;
                             }
                             else
@@ -255,7 +255,7 @@ namespace mongo {
                                     in->insert(ie);
                                 }
                             }
-                            addBasic(e, opIN); // e not actually used at the moment for $in
+                            addBasic(e, BSONObj::opIN); // e not actually used at the moment for $in
                             ok = true;
                         }
                         else if ( fn[1] == 'n' && fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0 && fe.type() == Array ) {
@@ -271,7 +271,7 @@ namespace mongo {
                                     nin->insert(ie);
                                 }
                             }
-                            addBasic(e, NIN); // e not actually used at the moment for $nin
+                            addBasic(e, BSONObj::NIN); // e not actually used at the moment for $nin
                             ok = true;
                         }
                         else if ( fn[1] == 'a' && fn[2] == 'l' && fn[3] == 'l' && fn[4] == 0 && fe.type() == Array ) {
@@ -287,14 +287,14 @@ namespace mongo {
                                     all->insert(ie);
                                 }
                             }
-                            addBasic(e, opALL); // e not actually used at the moment for $all
+                            addBasic(e, BSONObj::opALL); // e not actually used at the moment for $all
                             ok = true;
                         }
                         else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fe.isNumber() ) {
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                             builders_.push_back( b );
                             b->appendAs(fe, e.fieldName());
-                            addBasic(b->done().firstElement(), opSIZE);    
+                            addBasic(b->done().firstElement(), BSONObj::opSIZE);    
                             haveSize = true;
                             ok = true;
                         }
@@ -311,25 +311,25 @@ namespace mongo {
             }
 
             // normal, simple case e.g. { a : "foo" }
-            addBasic(e, Equality);
+            addBasic(e, BSONObj::Equality);
         }
         
         constrainIndexKey_ = constrainIndexKey;
     }
 
     inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep) {
-        assert( op != NE && op != NIN );
+        assert( op != BSONObj::NE && op != BSONObj::NIN );
         
         if ( op == 0 )
             return l.valuesEqual(r);
 
-        if ( op == opIN ) {
+        if ( op == BSONObj::opIN ) {
             // { $in : [1,2,3] }
             int c = in->count(l);
             return c;
         }
 
-        if ( op == opSIZE ) {
+        if ( op == BSONObj::opSIZE ) {
             if ( l.type() != Array )
                 return 0;
             int count = 0;
@@ -343,7 +343,7 @@ namespace mongo {
             return count == r.number();
         }
         
-        if ( op == opALL ) {
+        if ( op == BSONObj::opALL ) {
             if ( l.type() != Array )
                 return 0;
             set< BSONElement, element_lt > matches;
@@ -374,7 +374,7 @@ namespace mongo {
     }
 
     int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, bool *deep) {
-        int ret = matchesDotted( fieldName, toMatch, obj, Equality, deep );
+        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, deep );
         return -ret;
     }
     
@@ -399,9 +399,9 @@ namespace mongo {
         1 match
     */
     int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr, bool nextArr) {
-        if ( compareOp == NE )
+        if ( compareOp == BSONObj::NE )
             return matchesNe( fieldName, toMatch, obj, deep );
-        if ( compareOp == NIN ) {
+        if ( compareOp == BSONObj::NIN ) {
             for( set<BSONElement,element_lt>::const_iterator i = nin->begin(); i != nin->end(); ++i ) {
                 int ret = matchesNe( fieldName, *i, obj, deep );
                 if ( ret != 1 )
@@ -452,10 +452,10 @@ namespace mongo {
             }
         }
         
-        if ( ( e.type() != Array || nextArr || compareOp == opALL || compareOp == opSIZE ) &&
+        if ( ( e.type() != Array || nextArr || compareOp == BSONObj::opALL || compareOp == BSONObj::opSIZE ) &&
             valuesMatch(e, toMatch, compareOp, deep) ) {
             return 1;
-        } else if ( e.type() == Array && compareOp != opALL && compareOp != opSIZE && !nextArr ) {
+        } else if ( e.type() == Array && compareOp != BSONObj::opALL && compareOp != BSONObj::opSIZE && !nextArr ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.more() ) {
                 BSONElement z = ai.next();
@@ -530,7 +530,7 @@ namespace mongo {
             if ( cmp == 0 ) {
                 /* missing is ok iff we were looking for null */
                 if ( m.type() == jstNULL || m.type() == Undefined ) {
-                    if ( bm.compareOp == NE ) {
+                    if ( bm.compareOp == BSONObj::NE ) {
                         return false;
                     }
                 } else {

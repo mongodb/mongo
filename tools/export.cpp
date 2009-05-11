@@ -26,6 +26,7 @@
 #include <iostream>
 
 #include <boost/program_options.hpp>
+#include <pcrecpp.h>
 
 using namespace mongo;
 
