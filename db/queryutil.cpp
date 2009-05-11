@@ -41,22 +41,22 @@ namespace mongo {
             return;
         }
         switch( e.getGtLtOp() ) {
-            case JSMatcher::Equality:
+            case BSONObj::Equality:
                 lower_ = e;
                 upper_ = e;
                 break;
-            case JSMatcher::LT:
+            case BSONObj::LT:
                 upperInclusive_ = false;
-            case JSMatcher::LTE:
+            case BSONObj::LTE:
                 upper_ = e;
                 break;
-            case JSMatcher::GT:
+            case BSONObj::GT:
                 lowerInclusive_ = false;
-            case JSMatcher::GTE:
+            case BSONObj::GTE:
                 lower_ = e;
                 break;
-            case JSMatcher::opIN:
-            case JSMatcher::opALL: {
+            case BSONObj::opIN:
+            case BSONObj::opALL: {
                 massert( "$in/$all require array", e.type() == Array );
                 BSONElement max = minKey.firstElement();
                 BSONElement min = maxKey.firstElement();
@@ -121,7 +121,7 @@ namespace mongo {
                 break;
             if ( strcmp( e.fieldName(), "$where" ) == 0 )
                 continue;
-            if ( getGtLtOp( e ) == JSMatcher::Equality ) {
+            if ( getGtLtOp( e ) == BSONObj::Equality ) {
                 bounds_[ e.fieldName() ] &= FieldBound( e );
             }
             else {

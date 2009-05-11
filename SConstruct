@@ -651,10 +651,17 @@ env.Append( BUILDERS={'JSHeader' : jshBuilder})
 
 # --- targets ----
 
+def removeIfInList( lst , thing ):
+    if thing in lst:
+        lst.remove( thing )
+
 clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )
 clientEnv.Prepend( LIBS=[ "libmongoclient.a"] )
 clientEnv.Append( LIBPATH=["."] )
+l = clientEnv[ "LIBS" ]
+removeIfInList( l , "pcre" )
+removeIfInList( l , "pcrecpp" )
 
 testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
@@ -722,11 +729,6 @@ if release and ( ( darwin and force64 ) or linux64 ):
     shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
     shellEnv["LIBS"] = env["LIBS_CLEAN"]
     shellEnv["SLIBS"] = ""
-
-
-def removeIfInList( lst , thing ):
-    if thing in lst:
-        lst.remove( thing )
 
 if noshell:
     print( "not building shell" )

@@ -21,10 +21,10 @@
 #include "dbclient.h"
 #include "../util/builder.h"
 #include "../db/jsobj.h"
-#include "../db/query.h"
 #include "../db/json.h"
 #include "../db/instance.h"
 #include "../util/md5.hpp"
+#include "../db/dbmessage.h"
 
 namespace mongo {
 

@@ -730,6 +730,19 @@ namespace mongo {
         
         /** true unless corrupt */
         bool valid() const;
+
+        enum MatchType {
+            Equality = 0,
+            LT = 0x1,
+            LTE = 0x3,
+            GTE = 0x6,
+            GT = 0x4,
+            opIN = 0x8, // { x : { $in : [1,2,3] } }
+            NE = 0x9,
+            opSIZE = 0x0A,
+            opALL = 0x0B,
+            NIN = 0x0C,
+        };        
     };
     ostream& operator<<( ostream &s, const BSONObj &o );
     ostream& operator<<( ostream &s, const BSONElement &e );
@@ -1199,12 +1212,6 @@ namespace mongo {
     	}
     };
     */
-
-} // namespace mongo
-
-#include "matcher.h"
-
-namespace mongo {
 
     extern BSONObj maxKey;
     extern BSONObj minKey;

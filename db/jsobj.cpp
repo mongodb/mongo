@@ -23,7 +23,8 @@
 #include <limits>
 #include "../util/unittest.h"
 #include "json.h"
-#include "repl.h"
+#include "jsobjmanipulator.h"
+#include "../util/optime.h"
 
 namespace mongo {
 
@@ -391,28 +392,28 @@ namespace mongo {
         if ( fn[0] == '$' && fn[1] ) {
             if ( fn[2] == 't' ) {
                 if ( fn[1] == 'g' ) {
-                    if ( fn[3] == 0 ) return JSMatcher::GT;
-                    else if ( fn[3] == 'e' && fn[4] == 0 ) return JSMatcher::GTE;
+                    if ( fn[3] == 0 ) return BSONObj::GT;
+                    else if ( fn[3] == 'e' && fn[4] == 0 ) return BSONObj::GTE;
                 }
                 else if ( fn[1] == 'l' ) {
-                    if ( fn[3] == 0 ) return JSMatcher::LT;
-                    else if ( fn[3] == 'e' && fn[4] == 0 ) return JSMatcher::LTE;
+                    if ( fn[3] == 0 ) return BSONObj::LT;
+                    else if ( fn[3] == 'e' && fn[4] == 0 ) return BSONObj::LTE;
                 }
             }
             else if ( fn[2] == 'e' ) {
                 if ( fn[1] == 'n' && fn[3] == 0 )
-                    return JSMatcher::NE;
+                    return BSONObj::NE;
             }
             else if ( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
-                return JSMatcher::opIN;
+                return BSONObj::opIN;
             else if ( fn[1] == 'n' && fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0 )
-                return JSMatcher::NIN;
+                return BSONObj::NIN;
             else if ( fn[1] == 'a' && fn[2] == 'l' && fn[3] == 'l' && fn[4] == 0 )
-                return JSMatcher::opALL;
+                return BSONObj::opALL;
             else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fn[5] == 0 )
-                return JSMatcher::opSIZE;
+                return BSONObj::opSIZE;
         }
-        return JSMatcher::Equality;
+        return BSONObj::Equality;
     }
 
     int BSONElement::woCompare( const BSONElement &e,
@@ -574,7 +575,7 @@ namespace mongo {
     
     int getGtLtOp(const BSONElement& e) {
         if ( e.type() != Object )
-            return JSMatcher::Equality;
+            return BSONObj::Equality;
 
         BSONElement fe = e.embeddedObject().firstElement();
         return fe.getGtLtOp();
