@@ -31,7 +31,7 @@ namespace mongo {
     const bool debug=false;
 #endif
 
-    const char versionString[] = "0.9.0";
+    const char versionString[] = "0.9.1+";
     // pdfile versions
     const int VERSION = 4;
     const int VERSION_MINOR = 4;
