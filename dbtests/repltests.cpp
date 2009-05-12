@@ -805,7 +805,7 @@ namespace ReplTests {
         IdTracker s_;
     };
     
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< LogBasic >();

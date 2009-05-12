@@ -959,7 +959,7 @@ namespace QueryOptimizerTests {
         
     } // namespace QueryPlanSetTests
     
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< FieldBoundTests::Empty >();

@@ -301,7 +301,7 @@ namespace PdfileTests {
         };
     } // namespace Insert
     
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< ScanCapped::Empty >();

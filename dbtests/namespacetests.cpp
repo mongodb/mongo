@@ -591,7 +591,7 @@ namespace NamespaceTests {
         
     } // namespace NamespaceDetailsTests
 
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< IndexDetailsTests::Create >();

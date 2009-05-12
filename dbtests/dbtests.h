@@ -21,6 +21,11 @@
 
 using namespace mongo;
 
+class Suite : public UnitTest::Suite {
+public:
+    ~Suite();
+};
+
 UnitTest::TestPtr basicTests();
 UnitTest::TestPtr btreeTests();
 UnitTest::TestPtr cursorTests();

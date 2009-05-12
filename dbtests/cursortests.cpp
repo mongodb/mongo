@@ -102,7 +102,7 @@ namespace CursorTests {
 
     } // namespace IdSetTests
     
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< IdSetTests::BasicSize >();
