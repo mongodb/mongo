@@ -19,8 +19,6 @@
 
 #include "stdafx.h"
 
-#include "dbtests.h"
-
 #include "../db/instance.h"
 #include "../util/file_allocator.h"
 
@@ -29,6 +27,8 @@
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
+
+#include "dbtests.h"
 
 using namespace std;
 
