@@ -50,7 +50,7 @@ namespace NamespaceTests {
                 // idx_.head = BtreeBucket::addHead( id_ );
             }
             static const char* ns() {
-                return "sys.unittest.indexdetailstests";
+                return "unittests.indexdetailstests";
             }
             IndexDetails& id() {
                 return id_;
@@ -406,12 +406,14 @@ namespace NamespaceTests {
 
         class Base {
         public:
-            Base( const char *ns = "foo" ) : ns_( ns ) {}
+            Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) {}
             virtual ~Base() {
                 if ( !nsd() )
                     return;
                 string s( ns() );
-                dropNS( s );
+                string errmsg;
+                BSONObjBuilder result;
+                dropCollection( s, errmsg, result );
             }
         protected:
             void create() {
@@ -511,7 +513,7 @@ namespace NamespaceTests {
 
                 DiskLoc l[ 8 ];
                 for ( int i = 0; i < 8; ++i ) {
-                  l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
+                    l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
                     ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
                     if ( i > 3 )

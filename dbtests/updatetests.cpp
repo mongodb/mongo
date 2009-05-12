@@ -63,7 +63,7 @@ namespace UpdateTests {
             ASSERT( error() );
         }
     protected:
-        const char *ns() { return "UpdateTests_Fail"; }
+        const char *ns() { return "unittests.UpdateTests_Fail"; }
         virtual void prep() {
             insert( ns(), fromjson( "{a:1}" ) );
         }
@@ -119,7 +119,7 @@ namespace UpdateTests {
             client().dropCollection( ns() );
         }
     protected:
-        const char *ns() { return "updatetests.SetBase"; }
+        const char *ns() { return "unittests.updatetests.SetBase"; }
     };
 
     class SetNum : public SetBase {

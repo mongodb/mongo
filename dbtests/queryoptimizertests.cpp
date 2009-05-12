@@ -259,7 +259,7 @@ namespace QueryOptimizerTests {
                 dropNS( s );
             }
         protected:
-            static const char *ns() { return "QueryPlanTests.coll"; }
+            static const char *ns() { return "unittests.QueryPlanTests"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
             const IndexDetails *index( const BSONObj &key ) {
                 stringstream ss;
@@ -546,7 +546,7 @@ namespace QueryOptimizerTests {
                 toSend.setData(dbQuery, b.buf(), b.len());
             }            
         protected:
-            static const char *ns() { return "QueryPlanSetTests.coll"; }
+            static const char *ns() { return "unittests.QueryPlanSetTests"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
         private:
             dblock lk_;

@@ -49,7 +49,7 @@ namespace QueryTests {
         }
     protected:
         static const char *ns() {
-            return "unittest.querytests";
+            return "unittests.querytests";
         }
         static void addIndex( const BSONObj &key ) {
             BSONObjBuilder b;
@@ -58,7 +58,7 @@ namespace QueryTests {
             b.append( "key", key );
             BSONObj o = b.done();
             stringstream indexNs;
-            indexNs << ns() << ".system.indexes";
+            indexNs << "unittests.system.indexes";
             theDataFileMgr.insert( indexNs.str().c_str(), o.objdata(), o.objsize() );
         }
         static void insert( const char *s ) {
@@ -153,7 +153,7 @@ namespace QueryTests {
     class BoundedKey : public ClientBase {
     public:
         void run() {
-            const char *ns = "querytests.BoundedKey";
+            const char *ns = "unittests.querytests.BoundedKey";
             insert( ns, BSON( "a" << 1 ) );
             BSONObjBuilder a;
             a.appendMaxKey( "$lt" );
@@ -167,10 +167,10 @@ namespace QueryTests {
     class GetMore : public ClientBase {
     public:
         ~GetMore() {
-            client().dropCollection( "querytests.GetMore" );
+            client().dropCollection( "unittests.querytests.GetMore" );
         }
         void run() {
-            const char *ns = "querytests.GetMore";
+            const char *ns = "unittests.querytests.GetMore";
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
             insert( ns, BSON( "a" << 3 ) );
@@ -187,10 +187,10 @@ namespace QueryTests {
     class ReturnOneOfManyAndTail : public ClientBase {
     public:
         ~ReturnOneOfManyAndTail() {
-            client().dropCollection( "querytests.ReturnOneOfManyAndTail" );
+            client().dropCollection( "unittests.querytests.ReturnOneOfManyAndTail" );
         }
         void run() {
-            const char *ns = "querytests.ReturnOneOfManyAndTail";
+            const char *ns = "unittests.querytests.ReturnOneOfManyAndTail";
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
@@ -205,10 +205,10 @@ namespace QueryTests {
     class TailNotAtEnd : public ClientBase {
     public:
         ~TailNotAtEnd() {
-            client().dropCollection( "querytests.TailNotAtEnd" );
+            client().dropCollection( "unittests.querytests.TailNotAtEnd" );
         }
         void run() {
-            const char *ns = "querytests.TailNotAtEnd";
+            const char *ns = "unittests.querytests.TailNotAtEnd";
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
@@ -229,10 +229,10 @@ namespace QueryTests {
     class EmptyTail : public ClientBase {
     public:
         ~EmptyTail() {
-            client().dropCollection( "querytests.EmptyTail" );
+            client().dropCollection( "unittests.querytests.EmptyTail" );
         }
         void run() {
-            const char *ns = "querytests.EmptyTail";
+            const char *ns = "unittests.querytests.EmptyTail";
             ASSERT_EQUALS( 0, client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable )->getCursorId() );
             insert( ns, BSON( "a" << 0 ) );
             ASSERT( 0 != client().query( ns, QUERY( "a" << 1 ).hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable )->getCursorId() );
@@ -242,10 +242,10 @@ namespace QueryTests {
     class TailableDelete : public ClientBase {
     public:
         ~TailableDelete() {
-            client().dropCollection( "querytests.TailableDelete" );
+            client().dropCollection( "unittests.querytests.TailableDelete" );
         }
         void run() {
-            const char *ns = "querytests.TailableDelete";
+            const char *ns = "unittests.querytests.TailableDelete";
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
@@ -262,10 +262,10 @@ namespace QueryTests {
     class TailableInsertDelete : public ClientBase {
     public:
         ~TailableInsertDelete() {
-            client().dropCollection( "querytests.TailableInsertDelete" );
+            client().dropCollection( "unittests.querytests.TailableInsertDelete" );
         }
         void run() {
-            const char *ns = "querytests.TailableInsertDelete";
+            const char *ns = "unittests.querytests.TailableInsertDelete";
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
@@ -283,10 +283,10 @@ namespace QueryTests {
     class OplogReplayMode : public ClientBase {
     public:
         ~OplogReplayMode() {
-            client().dropCollection( "querytests.OplogReplayMode" );            
+            client().dropCollection( "unittests.querytests.OplogReplayMode" );            
         }
         void run() {
-            const char *ns = "querytests.OplogReplayMode";
+            const char *ns = "unittests.querytests.OplogReplayMode";
             insert( ns, BSON( "a" << 3 ) );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
@@ -301,10 +301,10 @@ namespace QueryTests {
     class BasicCount : public ClientBase {
     public:
         ~BasicCount() {
-            client().dropCollection( "querytests.BasicCount" );
+            client().dropCollection( "unittests.querytests.BasicCount" );
         }
         void run() {
-            const char *ns = "querytests.BasicCount";
+            const char *ns = "unittests.querytests.BasicCount";
             client().ensureIndex( ns, BSON( "a" << 1 ) );
             count( 0 );
             insert( ns, BSON( "a" << 3 ) );
@@ -318,17 +318,17 @@ namespace QueryTests {
         }
     private:
         void count( unsigned long long c ) const {
-            ASSERT_EQUALS( c, client().count( "querytests.BasicCount", BSON( "a" << 4 ) ) );
+            ASSERT_EQUALS( c, client().count( "unittests.querytests.BasicCount", BSON( "a" << 4 ) ) );
         }
     };
     
     class ArrayId : public ClientBase {
     public:
         ~ArrayId() {
-            client().dropCollection( "querytests.ArrayId" );
+            client().dropCollection( "unittests.querytests.ArrayId" );
         }
         void run() {
-            const char *ns = "querytests.ArrayId";
+            const char *ns = "unittests.querytests.ArrayId";
             client().ensureIndex( ns, BSON( "_id" << 1 ) );
             ASSERT( !error() );
             client().insert( ns, fromjson( "{'_id':[1,2]}" ) );
@@ -339,10 +339,10 @@ namespace QueryTests {
     class UnderscoreNs : public ClientBase {
     public:
         ~UnderscoreNs() {
-            client().dropCollection( "querytests._UnderscoreNs" );            
+            client().dropCollection( "unittests.querytests._UnderscoreNs" );            
         }
         void run() {
-            const char *ns = "querytests._UnderscoreNs";
+            const char *ns = "unittests.querytests._UnderscoreNs";
             ASSERT( client().findOne( ns, "{}" ).isEmpty() );
             client().insert( ns, BSON( "a" << 1 ) );
             ASSERT_EQUALS( 1, client().findOne( ns, "{}" ).getIntField( "a" ) );
@@ -353,10 +353,10 @@ namespace QueryTests {
     class EmptyFieldSpec : public ClientBase {
     public:
         ~EmptyFieldSpec() {
-            client().dropCollection( "querytests.EmptyFieldSpec" );            
+            client().dropCollection( "unittests.querytests.EmptyFieldSpec" );            
         }
         void run() {
-            const char *ns = "querytests.EmptyFieldSpec";
+            const char *ns = "unittests.querytests.EmptyFieldSpec";
             client().insert( ns, BSON( "a" << 1 ) );
             ASSERT( !client().findOne( ns, "" ).isEmpty() );
             BSONObj empty;
@@ -367,10 +367,10 @@ namespace QueryTests {
     class MultiNe : public ClientBase {
     public:
         ~MultiNe() {
-            client().dropCollection( "querytests.Ne" );            
+            client().dropCollection( "unittests.querytests.Ne" );            
         }
         void run() {
-            const char *ns = "querytests.Ne";
+            const char *ns = "unittests.querytests.Ne";
             client().insert( ns, fromjson( "{a:[1,2]}" ) );
             ASSERT( client().findOne( ns, fromjson( "{a:{$ne:1}}" ) ).isEmpty() );
             BSONObj spec = fromjson( "{a:{$ne:1,$ne:2}}" );
@@ -381,10 +381,10 @@ namespace QueryTests {
     class EmbeddedNe : public ClientBase {
     public:
         ~EmbeddedNe() {
-            client().dropCollection( "querytests.NestedNe" );            
+            client().dropCollection( "unittests.querytests.NestedNe" );            
         }
         void run() {
-            const char *ns = "querytests.NestedNe";
+            const char *ns = "unittests.querytests.NestedNe";
             client().insert( ns, fromjson( "{a:[{b:1},{b:2}]}" ) );
             ASSERT( client().findOne( ns, fromjson( "{'a.b':{$ne:1}}" ) ).isEmpty() );
         }                        
@@ -393,10 +393,10 @@ namespace QueryTests {
     class AutoResetIndexCache : public ClientBase {
     public:
         ~AutoResetIndexCache() {
-            client().dropCollection( "querytests.AutoResetIndexCache" );
+            client().dropCollection( "unittests.querytests.AutoResetIndexCache" );
         }
-        static const char *ns() { return "querytests.AutoResetIndexCache"; }
-        static const char *idxNs() { return "querytests.system.indexes"; }
+        static const char *ns() { return "unittests.querytests.AutoResetIndexCache"; }
+        static const char *idxNs() { return "unittests.system.indexes"; }
         void index() const { ASSERT( !client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
         void noIndex() const { ASSERT( client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
         void checkIndex() {
@@ -404,13 +404,13 @@ namespace QueryTests {
             index();            
         }
         void run() {
-            client().dropDatabase( "querytests" );
+            client().dropDatabase( "unittests" );
             noIndex();
             checkIndex();
             client().dropCollection( ns() );
             noIndex();
             checkIndex();
-            client().dropDatabase( "querytests" );
+            client().dropDatabase( "unittests" );
             noIndex();
             checkIndex();
         }
@@ -419,10 +419,10 @@ namespace QueryTests {
     class UniqueIndex : public ClientBase {
     public:
         ~UniqueIndex() {
-            client().dropCollection( "querytests.UniqueIndex" );
+            client().dropCollection( "unittests.querytests.UniqueIndex" );
         }
         void run() {
-            const char *ns = "querytests.UniqueIndex";
+            const char *ns = "unittests.querytests.UniqueIndex";
             client().ensureIndex( ns, BSON( "a" << 1 ), true );
             client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
             client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
@@ -438,24 +438,24 @@ namespace QueryTests {
     class UniqueIndexPreexistingData : public ClientBase {
     public:
         ~UniqueIndexPreexistingData() {
-            client().dropCollection( "querytests.UniqueIndexPreexistingData" );
+            client().dropCollection( "unittests.querytests.UniqueIndexPreexistingData" );
         }
         void run() {
-            const char *ns = "querytests.UniqueIndexPreexistingData";
+            const char *ns = "unittests.querytests.UniqueIndexPreexistingData";
             client().insert( ns, BSON( "a" << 4 << "b" << 2 ) );
             client().insert( ns, BSON( "a" << 4 << "b" << 3 ) );
             client().ensureIndex( ns, BSON( "a" << 1 ), true );
-            ASSERT_EQUALS( 0U, client().count( "querytests.system.indexes", BSON( "ns" << ns << "name" << NE << "_id_" ) ) );
+            ASSERT_EQUALS( 0U, client().count( "unittests.system.indexes", BSON( "ns" << ns << "name" << NE << "_id_" ) ) );
         }
     };
     
     class SubobjectInArray : public ClientBase {
     public:
         ~SubobjectInArray() {
-            client().dropCollection( "querytests.SubobjectInArray" );
+            client().dropCollection( "unittests.querytests.SubobjectInArray" );
         }
         void run() {
-            const char *ns = "querytests.SubobjectInArray";
+            const char *ns = "unittests.querytests.SubobjectInArray";
             client().insert( ns, fromjson( "{a:[{b:{c:1}}]}" ) );
             ASSERT( !client().findOne( ns, BSON( "a.b.c" << 1 ) ).isEmpty() );
             ASSERT( !client().findOne( ns, fromjson( "{'a.c':null}" ) ).isEmpty() );
@@ -465,10 +465,10 @@ namespace QueryTests {
     class Size : public ClientBase {
     public:
         ~Size() {
-            client().dropCollection( "querytests.Size" );
+            client().dropCollection( "unittests.querytests.Size" );
         }
         void run() {
-            const char *ns = "querytests.Size";
+            const char *ns = "unittests.querytests.Size";
             client().insert( ns, fromjson( "{a:[1,2,3]}" ) );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
             ASSERT( client().query( ns, QUERY( "a" << SIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
@@ -478,10 +478,10 @@ namespace QueryTests {
     class FullArray : public ClientBase {
     public:
         ~FullArray() {
-            client().dropCollection( "querytests.IndexedArray" );
+            client().dropCollection( "unittests.querytests.IndexedArray" );
         }
         void run() {
-            const char *ns = "querytests.IndexedArray";
+            const char *ns = "unittests.querytests.IndexedArray";
             client().insert( ns, fromjson( "{a:[1,2,3]}" ) );
             ASSERT( !client().query( ns, Query( "{a:[1,2,3]}" ) )->more() );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
@@ -492,10 +492,10 @@ namespace QueryTests {
     class InsideArray : public ClientBase {
     public:
         ~InsideArray() {
-            client().dropCollection( "querytests.InsideArray" );
+            client().dropCollection( "unittests.querytests.InsideArray" );
         }
         void run() {
-            const char *ns = "querytests.InsideArray";
+            const char *ns = "unittests.querytests.InsideArray";
             client().insert( ns, fromjson( "{a:[[1],2]}" ) );
             check( "$natural" );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
@@ -503,7 +503,7 @@ namespace QueryTests {
         }        
     private:
         void check( const string &hintField ) {
-            const char *ns = "querytests.InsideArray";
+            const char *ns = "unittests.querytests.InsideArray";
             ASSERT( !client().query( ns, Query( "{a:[[1],2]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
             ASSERT( client().query( ns, Query( "{a:[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
             ASSERT( client().query( ns, Query( "{a:2}" ).hint( BSON( hintField << 1 ) ) )->more() );            
@@ -514,10 +514,10 @@ namespace QueryTests {
     class IndexInsideArrayCorrect : public ClientBase {
     public:
         ~IndexInsideArrayCorrect() {
-            client().dropCollection( "querytests.IndexInsideArrayCorrect" );
+            client().dropCollection( "unittests.querytests.IndexInsideArrayCorrect" );
         }
         void run() {
-            const char *ns = "querytests.IndexInsideArrayCorrect";
+            const char *ns = "unittests.querytests.IndexInsideArrayCorrect";
             client().insert( ns, fromjson( "{'_id':1,a:[1]}" ) );
             client().insert( ns, fromjson( "{'_id':2,a:[[1]]}" ) );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
@@ -528,10 +528,10 @@ namespace QueryTests {
     class SubobjArr : public ClientBase {
     public:
         ~SubobjArr() {
-            client().dropCollection( "querytests.SubobjArr" );
+            client().dropCollection( "unittests.querytests.SubobjArr" );
         }
         void run() {
-            const char *ns = "querytests.SubobjArr";
+            const char *ns = "unittests.querytests.SubobjArr";
             client().insert( ns, fromjson( "{a:[{b:[1]}]}" ) );
             check( "$natural" );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
@@ -539,7 +539,7 @@ namespace QueryTests {
         }        
     private:
         void check( const string &hintField ) {
-            const char *ns = "querytests.SubobjArr";
+            const char *ns = "unittests.querytests.SubobjArr";
             ASSERT( !client().query( ns, Query( "{'a.b':1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
             ASSERT( client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
         }
@@ -547,9 +547,9 @@ namespace QueryTests {
 
     class MinMax : public ClientBase {
     public:
-        MinMax() : ns( "querytests.MinMax" ) {}
+        MinMax() : ns( "unittests.querytests.MinMax" ) {}
         ~MinMax() {
-            client().dropCollection( "querytests.MinMax" );
+            client().dropCollection( "unittests.querytests.MinMax" );
         }
         void run() {
             client().ensureIndex( ns, BSON( "a" << 1 << "b" << 1 ) );
@@ -604,9 +604,9 @@ namespace QueryTests {
     public:
         void run() {
             dblock lk;
-            setClient( "foo.bar" );
+            setClient( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
-            ASSERT_EQUALS( "foo", database->name );
+            ASSERT_EQUALS( "unittests", database->name );
         }
         const char *ns;
     };
@@ -614,10 +614,10 @@ namespace QueryTests {
     class FastCountIn : public ClientBase {
     public:
         ~FastCountIn() {
-            client().dropCollection( "querytests.FastCountIn" );
+            client().dropCollection( "unittests.querytests.FastCountIn" );
         }        
         void run() {
-            const char *ns = "querytests.FastCountIn";
+            const char *ns = "unittests.querytests.FastCountIn";
             client().insert( ns, BSON( "i" << "a" ) );
             client().ensureIndex( ns, BSON( "i" << 1 ) );
             ASSERT_EQUALS( 1U, client().count( ns, fromjson( "{i:{$in:['a']}}" ) ) );

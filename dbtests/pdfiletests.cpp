@@ -91,7 +91,7 @@ namespace PdfileTests {
                 return dl;
             }
             static const char *ns() {
-                return "ScanCapped";
+                return "unittests.ScanCapped";
             }
             static NamespaceDetails *nsd() {
                 return nsdetails( ns() );
@@ -279,7 +279,7 @@ namespace PdfileTests {
             }
         protected:
             static const char *ns() {
-                return "pdfiletests.Insert";
+                return "unittests.pdfiletests.Insert";
             }
             static NamespaceDetails *nsd() {
                 return nsdetails( ns() );
