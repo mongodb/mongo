@@ -44,7 +44,7 @@ BSONObj Print(const BSONObj &args) {
         } else {
             printf(" ");
         }
-        string str( e.toString( false ) );
+        string str( e.jsonString( TenGen, false ) );
         printf("%s", str.c_str());        
     }
     printf("\n");
@@ -365,10 +365,19 @@ char *copyString( const char *original ) {
 }
 
 boost::mutex &mongoProgramOutputMutex( *( new boost::mutex ) );
+stringstream mongoProgramOutput_;
 
 void writeMongoProgramOutputLine( int port, const char *line ) {
     boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
-    cout << "m" << port << "| " << line << endl;
+    stringstream buf;
+    buf << "m" << port << "| " << line;
+    cout << buf.str() << endl;
+    mongoProgramOutput_ << buf.str() << endl;
+}
+
+BSONObj RawMongoProgramOutput( const BSONObj &args ) {
+    boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
+    return BSON( "" << mongoProgramOutput_.str() );
 }
 
 class MongoProgramRunner {
@@ -644,5 +653,6 @@ void installShellUtils( mongo::Scope &scope, v8::Handle<v8::ObjectTemplate>& glo
     scope.injectNative( "stopMongod", StopMongoProgram );
     scope.injectNative( "stopMongoProgram", StopMongoProgram );
     scope.injectNative( "resetDbpath", ResetDbpath );
+    scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
 #endif
 }
