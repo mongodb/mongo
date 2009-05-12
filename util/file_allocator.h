@@ -37,56 +37,44 @@ namespace mongo {
         // May be called if file exists. If file exists, or its allocation has
         // been requested, size is updated to match existing file size.
         void requestAllocation( const string &name, int &size ) {
-            {
-                boostlock lk( pendingMutex_ );
-                int oldSize = prevSize( name );
-                if ( oldSize != -1 ) {
-                    size = oldSize;
-                    return;
-                }
-                pending_.push_back( name );
-                pendingSize_[ name ] = size;
+            boostlock lk( pendingMutex_ );
+            int oldSize = prevSize( name );
+            if ( oldSize != -1 ) {
+                size = oldSize;
+                return;
             }
+            pending_.push_back( name );
+            pendingSize_[ name ] = size;
             pendingUpdated_.notify_all();
         }
         // Returns when file has been allocated.  If file exists, size is
         // updated to match existing file size.
         void allocateAsap( const string &name, int &size ) {
-            {
-                boostlock lk( pendingMutex_ );
-                int oldSize = prevSize( name );
-                if ( oldSize != -1 ) {
-                    size = oldSize;
-                    if ( !inProgress( name ) )
-                        return;
-                }
-                pendingSize_[ name ] = size;
-                if ( pending_.size() == 0 )
-                    pending_.push_back( name );
-                else if ( pending_.front() != name ) {
-                    pending_.remove( name );
-                    list< string >::iterator i = pending_.begin();
-                    ++i;
-                    pending_.insert( i, name );
-                }
+            boostlock lk( pendingMutex_ );
+            int oldSize = prevSize( name );
+            if ( oldSize != -1 ) {
+                size = oldSize;
+                if ( !inProgress( name ) )
+                    return;
+            }
+            pendingSize_[ name ] = size;
+            if ( pending_.size() == 0 )
+                pending_.push_back( name );
+            else if ( pending_.front() != name ) {
+                pending_.remove( name );
+                list< string >::iterator i = pending_.begin();
+                ++i;
+                pending_.insert( i, name );
             }
             pendingUpdated_.notify_all();
-            boostlock lk( pendingMutex_ );
-            while( 1 ) {
-                if ( !inProgress( name ) ) {
-                    return;
-                }
-                pendingUpdated_.wait( lk );                    
-            }
+            while( inProgress( name ) )
+                pendingUpdated_.wait( lk );
         }
 
         void waitUntilFinished() const {
             boostlock lk( pendingMutex_ );
-            while( 1 ) {
-                if ( pending_.size() == 0 )
-                    return;
+            while( pending_.size() != 0 )
                 pendingUpdated_.wait( lk );
-            }
         }
         
     private:
@@ -178,8 +166,8 @@ namespace mongo {
                             boostlock lk( a_.pendingMutex_ );
                             a_.pendingSize_.erase( name );
                             a_.pending_.pop_front();
+                            a_.pendingUpdated_.notify_all();
                         }
-                        a_.pendingUpdated_.notify_all();
                     }
                 }
             }
