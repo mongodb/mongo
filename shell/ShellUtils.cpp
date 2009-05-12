@@ -504,15 +504,6 @@ BSONObj StartMongoProgram( const BSONObj &a ) {
     return undefined_;
 }
 
-BSONObj EmptyDbpath( const BSONObj &a ) {
-    assert( a.nFields() == 1 );
-    string path = a.firstElement().valuestrsafe();
-    assert( !path.empty() );
-    if ( boost::filesystem::exists( path ) )
-        boost::filesystem::remove_all( path );
-    return undefined_;
-}
-
 BSONObj ResetDbpath( const BSONObj &a ) {
     assert( a.nFields() == 1 );
     string path = a.firstElement().valuestrsafe();
@@ -662,7 +653,6 @@ void installShellUtils( mongo::Scope &scope, v8::Handle<v8::ObjectTemplate>& glo
     scope.injectNative( "stopMongod", StopMongoProgram );
     scope.injectNative( "stopMongoProgram", StopMongoProgram );
     scope.injectNative( "resetDbpath", ResetDbpath );
-    scope.injectNative( "emptyDbpath", EmptyDbpath );
     scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
 #endif
 }
