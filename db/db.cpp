@@ -133,8 +133,7 @@ namespace mongo {
        115 replay, opLogging
     */
     void listen(int port) {
-        const char *Version = "db version v0.9.0";
-        log() << Version << ", pdfile version " << VERSION << "." << VERSION_MINOR << endl;
+        log() << mongodVersion() << endl;
         printGitVersion();
         printSysInfo();
         pdfileInit();
