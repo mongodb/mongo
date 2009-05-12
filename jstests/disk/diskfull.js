@@ -9,5 +9,6 @@ try {
 
 if ( doIt ) {
     m.getDB( "diskfulltest" ).getCollection( "diskfulltest" ).save( { a: 6 } );
-    assert.soon( function() { return rawMongoProgramOutput().match( /dbexit: really exiting now/ ); } );
+    assert.soon( function() { return rawMongoProgramOutput().match( /dbexit: really exiting now/ ); }, "didn't see 'really exiting now'" );
+    assert( !rawMongoProgramOutput().match( /Got signal/ ), "saw 'Got signal', not expected.  Output: " + rawMongoProgramOutput() );
 }
