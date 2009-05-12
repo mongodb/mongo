@@ -113,6 +113,7 @@ namespace mongo {
     public:
         // caller locks
         void doLockedStuff(stringstream& ss) {
+            ss << "currentOp: " << currentOp.infoNoauth() << "\n";
             ss << "# databases: " << databases.size() << '\n';
             if ( database ) {
                 ss << "curclient: " << database->name;
