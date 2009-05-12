@@ -367,16 +367,6 @@ namespace mongo {
 
 namespace mongo {
 
-#define BOOST_CHECK_EXCEPTION( expression ) \
-	try { \
-		expression; \
-	} catch ( const std::exception &e ) { \
-		problem() << "caught boost exception: " << e.what() << endl; \
-		assert( false ); \
-	} catch ( ... ) { \
-		assert( false ); \
-	}
-
     class FileOp {
     public:
         virtual ~FileOp() {}

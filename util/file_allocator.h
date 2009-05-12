@@ -30,6 +30,7 @@ namespace mongo {
         // functions may be called multiple times per file, but only the first
         // size specified per file will be used.
     public:
+    FileAllocator() : failed_() {}
         void start() {
             Runner r( *this );
             boost::thread t( r );
@@ -72,6 +73,8 @@ namespace mongo {
         }
 
         void waitUntilFinished() const {
+	  if ( failed_ )
+	    return;
             boostlock lk( pendingMutex_ );
             while( pending_.size() != 0 )
                 pendingUpdated_.wait( lk );
@@ -100,6 +103,7 @@ namespace mongo {
         mutable boost::condition pendingUpdated_;
         list< string > pending_;
         mutable map< string, int > pendingSize_;
+	bool failed_;
         
         struct Runner {
             Runner( FileAllocator &allocator ) : a_( allocator ) {}
@@ -160,6 +164,9 @@ namespace mongo {
                         } catch ( ... ) {
                             problem() << "Failed to allocate new file: " << name
                                       << ", size: " << size << ", aborting." << endl;
+			    BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
+			    a_.failed_ = true;
+			    dbexit( 45 );
                         }
                         
                         {

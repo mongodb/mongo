@@ -338,3 +338,13 @@ using namespace boost::filesystem;
 
 #include "util/goodies.h"
 #include "util/log.h"
+
+#define BOOST_CHECK_EXCEPTION( expression ) \
+	try { \
+		expression; \
+	} catch ( const std::exception &e ) { \
+		problem() << "caught boost exception: " << e.what() << endl; \
+		assert( false ); \
+	} catch ( ... ) { \
+		assert( false ); \
+	}
