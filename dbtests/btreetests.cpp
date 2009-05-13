@@ -53,7 +53,7 @@ namespace BtreeTests {
             return idx_;
         }
         static const char* ns() {
-            return "sys.unittest.btreetests";
+            return "unittests.btreetests";
         }
         // dummy, valid record loc
         static DiskLoc recordLoc() {

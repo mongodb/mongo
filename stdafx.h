@@ -31,6 +31,11 @@ namespace mongo {
     const bool debug=false;
 #endif
 
+    const char versionString[] = "0.9.1+";
+    // pdfile versions
+    const int VERSION = 4;
+    const int VERSION_MINOR = 4;
+    
 } // namespace mongo
 
 #include <memory>
@@ -43,13 +48,7 @@ namespace mongo {
     void sayDbContext(const char *msg = 0);
     void dbexit(int returnCode, const char *whyMsg = "");
     void exit( int status );
-
-    const char * gitVersion();
-    const char * sysInfo();
     
-    void printGitVersion();
-    void printSysInfo();
-
     inline void * ourmalloc(size_t size) {
         void *x = malloc(size);
         if ( x == 0 ) dbexit(42, "malloc fails");
@@ -75,6 +74,13 @@ namespace mongo {
 using namespace std;
 
 namespace mongo {
+
+    const char * gitVersion();
+    const char * sysInfo();
+    string mongodVersion();
+    
+    void printGitVersion();
+    void printSysInfo();
 
     /* these are manipulated outside of mutexes, so be careful */
     struct Assertion {
@@ -338,3 +344,13 @@ using namespace boost::filesystem;
 
 #include "util/goodies.h"
 #include "util/log.h"
+
+#define BOOST_CHECK_EXCEPTION( expression ) \
+	try { \
+		expression; \
+	} catch ( const std::exception &e ) { \
+		problem() << "caught boost exception: " << e.what() << endl; \
+		assert( false ); \
+	} catch ( ... ) { \
+		assert( false ); \
+	}

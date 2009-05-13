@@ -152,6 +152,10 @@ namespace mongo {
 
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
+            ss << mongodVersion() << "\n";
+            ss << "git hash: " << gitVersion() << "\n";
+            ss << "sys info: " << sysInfo() << "\n";
+            ss << "\n";
             ss << "dblocked:  " << dbMutexInfo.isLocked() << " (initial)\n";
             ss << "uptime:    " << time(0)-started << " seconds\n";
             if ( replAllDead )

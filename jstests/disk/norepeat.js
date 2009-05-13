@@ -1,7 +1,7 @@
 baseName = "jstests_disk_norepeat";
 
 ports = allocatePorts( 1 );
-m = startMongod( "--port", ports[ 0 ], "--deDupMem", "200", "--dbpath", "/data/db/" + baseName );
+m = startMongod( "--port", ports[ 0 ], "--deDupMem", "200", "--dbpath", "/data/db/" + baseName, "--nohttpinterface" );
 
 t = m.getDB( baseName ).getCollection( baseName );
 

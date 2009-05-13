@@ -384,7 +384,7 @@ if useJavaHome:
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas" )
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
-    env.Append( LINKFLAGS=" -fPIC " )
+    env.Append( LINKFLAGS=" -fPIC -pthread " )
     env.Append( LIBS=[] )
 
     if debugBuild:
@@ -969,6 +969,7 @@ def post_data(data, machine_extra_info="", post_url="http://mongo-db.appspot.com
         import simplejson as json # needed for python < 2.6
 
     data["machine"] = machine_info(machine_extra_info)
+    print( data )
     urllib2.urlopen(post_url, urllib.urlencode({"payload": json.dumps(data)}))
 
 def recordPerformance( env, target, source ):

@@ -323,7 +323,7 @@ namespace PairingTests {
         }
     };
 
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< ReplPairTests::Create >();

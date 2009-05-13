@@ -31,10 +31,6 @@
 #include "jsobjmanipulator.h"
 #include "namespace.h"
 
-// see version, versionMinor, below.
-const int VERSION = 4;
-const int VERSION_MINOR = 4;
-
 namespace mongo {
 
     class MDFHeader;
@@ -366,16 +362,6 @@ namespace mongo {
 #include "database.h"
 
 namespace mongo {
-
-#define BOOST_CHECK_EXCEPTION( expression ) \
-	try { \
-		expression; \
-	} catch ( const std::exception &e ) { \
-		problem() << "caught boost exception: " << e.what() << endl; \
-		assert( false ); \
-	} catch ( ... ) { \
-		assert( false ); \
-	}
 
     class FileOp {
     public:

@@ -91,7 +91,7 @@ namespace mongo {
         for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
             ByLoc::iterator j = i;
             i++;
-            if( (j->second->idleAgeMillis += millis) > 60000 ) {
+            if( (j->second->idleAgeMillis += millis) > 600000 ) {
                 log(2) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns << " idle:" << j->second->idleAgeMillis << "ms\n";
                 delete j->second;
             }

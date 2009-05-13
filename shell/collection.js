@@ -248,8 +248,8 @@ DBCollection.prototype.getIndexSpecs = function(){
 }
 
 
-DBCollection.prototype.count = function(){
-    return this.find().count();
+DBCollection.prototype.count = function( x ){
+    return this.find( x ).count();
 }
 
 /**
