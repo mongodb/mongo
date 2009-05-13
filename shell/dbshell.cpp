@@ -238,30 +238,27 @@ int main(int argc, char* argv[]) {
 
         break;
     }
+    
+    scope->externalSetup();
 
-    /*
     if ( !nodb ) { // connect to db
-        v8::HandleScope handle_scope;
         cout << "url: " << url << endl;
         string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
-        if ( ! ExecuteString( v8::String::New( setup.c_str() ) , v8::String::New( "(connect)" ) , false , true ) ){
+        if ( ! scope->exec( setup , "(connect)" , false , true , false ) )
             return -1;
-        }
-
+        
         if ( username.size() && password.size() ){
             stringstream ss;
             ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
 
-            if ( ! ExecuteString( v8::String::New( ss.str().c_str() ) , v8::String::New( "(auth)" ) , true , true ) ){
+            if ( ! scope->exec( ss.str() , "(auth)" , true , true , false ) ){
                 cout << "login failed" << endl;
                 return -1;
             }
-                
 
         }
 
     }    
-    */
     
     int numFiles = 0;
 

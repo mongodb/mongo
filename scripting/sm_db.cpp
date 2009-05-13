@@ -93,6 +93,28 @@ namespace mongo {
         return JS_TRUE;
     }
 
+    JSBool mongo_external_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        Convertor c( cx );
+        
+        uassert( "0 or 1 args to Mongo" , argc <= 1 );
+        
+        DBClientConnection * conn = new DBClientConnection( true );
+        
+        string host = "127.0.0.1";
+        if ( argc > 0 )
+            host = c.toString( argv[0] );
+
+        string errmsg;
+        if ( ! conn->connect( host , errmsg ) ){
+            JS_ReportError( cx , ((string)"couldn't connect: " + errmsg).c_str() );
+            return JS_FALSE;
+        }
+        
+        JS_SetPrivate( cx , obj , (void*)conn );
+        return JS_TRUE;
+
+    }
+
     void mongo_finalize( JSContext * cx , JSObject * obj ){
         DBClientBase * client = (DBClientBase*)JS_GetPrivate( cx , obj );
         if ( client ){
@@ -102,13 +124,6 @@ namespace mongo {
     }
 
     JSClass mongo_class = {
-        "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
-        JSCLASS_NO_OPTIONAL_MEMBERS
-    };
-
-    JSClass mongo_local_class = {
         "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
@@ -380,9 +395,9 @@ namespace mongo {
     // ---- other stuff ----
 
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local ){
-        uassert( "non-local not supported yet" , local );
 
-        assert( JS_InitClass( cx , global , 0 , &mongo_local_class , mongo_local_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
+        
         assert( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , object_id_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );

@@ -586,6 +586,10 @@ namespace mongo {
 
         }
 
+        void externalSetup(){
+            initMongoJS( this , _context , _global , false );
+        }
+
         void localConnect( const char * dbName ){
             initMongoJS( this , _context , _global , true );
             
@@ -684,8 +688,10 @@ namespace mongo {
             if ( assertOnError )
                 uassert( name + " exec failed" , worked );
             
-            if ( reportError && ! _error.empty() )
-                cout << "exec error: " << _error << endl;
+            if ( reportError && ! _error.empty() ){
+                // cout << "exec error: " << _error << endl;
+                // already printed in reportError, so... TODO
+            }
             
             if ( worked && printResult && ! JSVAL_IS_VOID( ret ) )
                 cout << _convertor->toString( ret ) << endl;
