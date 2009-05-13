@@ -982,6 +982,7 @@ def recordPerformance( env, target, source ):
     if p.returncode != 0:
         return True
     entries = re.findall( "{.*?}", b )
+    import sys
     for e in entries:
         matches = re.match( "{'(.*?)': (.*?)}", e )
         name = matches.group( 1 )
@@ -992,7 +993,11 @@ def recordPerformance( env, target, source ):
         sub[ "trial" ][ "server_hash" ] = getGitVersion()
         sub[ "trial" ][ "client_hash" ] = ""
         sub[ "trial" ][ "result" ] = val
-        post_data(sub)
+        try:
+            post_data(sub)
+        except:
+            print( "exception posting perf results" )
+            print( sys.exc_info() )
     return False
 
 addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
