@@ -71,8 +71,8 @@ doTest = function( recover, newMaster, newSlave ) {
     // start normally
     connect();
     a = new MongodRunner( aPort, "/data/db/" + baseName + "-arbiter" );
-    l = new MongodRunner( lPort, "/data/db/" + baseName + "-left", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort );
-    r = new MongodRunner( rPort, "/data/db/" + baseName + "-right", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort );
+    l = new MongodRunner( lPort, "/data/db/" + baseName + "-left", "127.0.0.1:" + rpPort, "127.0.0.1:" + aPort, "-vvvv" );
+    r = new MongodRunner( rPort, "/data/db/" + baseName + "-right", "127.0.0.1:" + lpPort, "127.0.0.1:" + aPort, "-vvvv" );
     pair = new ReplPair( l, r, a );
     pair.start();
     pair.waitForSteadyState();

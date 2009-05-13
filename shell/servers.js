@@ -171,11 +171,12 @@ ShardingTest.prototype.adminCommand = function(cmd){
     throw "command " + tojson( cmd ) + " failed: " + tojson( res );
 }
 
-MongodRunner = function( port, dbpath, peer, arbiter ) {
+MongodRunner = function( port, dbpath, peer, arbiter, extraArgs ) {
     this.port_ = port;
     this.dbpath_ = dbpath;
     this.peer_ = peer;
     this.arbiter_ = arbiter;
+    this.extraArgs_ = extraArgs;
 }
 
 MongodRunner.prototype.start = function( reuseData ) {
@@ -196,6 +197,9 @@ MongodRunner.prototype.start = function( reuseData ) {
         args.push( "1" );
     }
     args.push( "--nohttpinterface" );
+    if ( this.extraArgs_ ) {
+        args = args.concat( this.extraArgs_ );
+    }
     if ( reuseData ) {
         return startMongoProgram.apply( null, args );
     } else {
