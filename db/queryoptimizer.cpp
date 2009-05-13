@@ -37,7 +37,6 @@ namespace mongo {
     index_( index ),
     optimal_( false ),
     scanAndOrderRequired_( true ),
-    keyMatch_( false ),
     exactKeyMatch_( false ),
     direction_( 0 ),
     startKey_( startKey ),
@@ -124,7 +123,6 @@ namespace mongo {
             optimal_ = true;
         if ( indexedQueryCount == fbs.nNontrivialBounds() &&
             orderFieldsUnindexed.size() == 0 ) {
-            keyMatch_ = true;
             if ( exactIndexedQueryCount == fbs.nNontrivialBounds() )
                 exactKeyMatch_ = true;
         }
@@ -132,8 +130,7 @@ namespace mongo {
             startKey_ = startKeyBuilder.obj();
         if ( endKey_.isEmpty() )
             endKey_ = endKeyBuilder.obj();
-        if ( !keyMatch_ &&
-            ( scanAndOrderRequired_ || order_.isEmpty() ) &&
+        if ( ( scanAndOrderRequired_ || order_.isEmpty() ) &&
             !fbs.bound( idxKey.firstElement().fieldName() ).nontrivial() )
             unhelpful_ = true;
     }

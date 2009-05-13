@@ -40,11 +40,9 @@ namespace mongo {
         /* When true, the index we are using has keys such that it can completely resolve the
          query expression to match by itself without ever checking the main object.
          */
-        bool keyMatch() const { return keyMatch_; }
-        /* True if keyMatch() is true, and all matches will be equal according to woEqual() */
         bool exactKeyMatch() const { return exactKeyMatch_; }
-        /* If true, the startKey and endKey are unhelpful, the index order doesn't match the 
-           requested sort order, and keyMatch is false */
+        /* If true, the startKey and endKey are unhelpful and the index order doesn't match the 
+           requested sort order */
         bool unhelpful() const { return unhelpful_; }
         int direction() const { return direction_; }
         BSONObj startKey() const { return startKey_; }
@@ -63,7 +61,6 @@ namespace mongo {
         const IndexDetails *index_;
         bool optimal_;
         bool scanAndOrderRequired_;
-        bool keyMatch_;
         bool exactKeyMatch_;
         int direction_;
         BSONObj startKey_;
