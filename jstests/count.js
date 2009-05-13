@@ -21,3 +21,4 @@ t.save( {a:true,b:false} );
 t.ensureIndex( {b:1,a:1,c:1} );
 assert.eq( 1, t.find( {a:true,b:false} ).count() );
 assert.eq( 1, t.find( {b:false,a:true} ).count() );
+

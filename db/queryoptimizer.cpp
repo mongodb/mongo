@@ -120,7 +120,8 @@ namespace mongo {
             optimal_ = true;
         if ( exactIndexedQueryCount == fbs.nNontrivialBounds() &&
             orderFieldsUnindexed.size() == 0 &&
-            exactIndexedQueryCount == index->keyPattern().nFields() ) {
+            exactIndexedQueryCount == index->keyPattern().nFields() &&
+            exactIndexedQueryCount == fbs.query().nFields() ) {
             exactKeyMatch_ = true;
         }
         if ( startKey_.isEmpty() )

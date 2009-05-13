@@ -464,6 +464,14 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class MoreKeyMatch : public Base {
+        public:
+            void run() {
+                QueryPlan p( FBS( BSON( "a" << "r" << "b" << NE << "q" ) ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
+                ASSERT( !p.exactKeyMatch() );                
+            }
+        };
+        
         class ExactKeyQueryTypes : public Base {
         public:
             void run() {
@@ -980,6 +988,7 @@ namespace QueryOptimizerTests {
             add< QueryPlanTests::Optimal >();
             add< QueryPlanTests::MoreOptimal >();
             add< QueryPlanTests::KeyMatch >();
+            add< QueryPlanTests::MoreKeyMatch >();
             add< QueryPlanTests::ExactKeyQueryTypes >();
             add< QueryPlanTests::Unhelpful >();
             add< QueryPlanSetTests::NoIndexes >();
