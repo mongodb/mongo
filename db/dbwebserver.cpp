@@ -113,6 +113,7 @@ namespace mongo {
     public:
         // caller locks
         void doLockedStuff(stringstream& ss) {
+            ss << "currentOp: " << currentOp.infoNoauth() << "\n";
             ss << "# databases: " << databases.size() << '\n';
             if ( database ) {
                 ss << "curclient: " << database->name;
@@ -173,7 +174,10 @@ namespace mongo {
             ss << "\nreplInfo:  " << replInfo << '\n';
         }
         
-        bool allowed( const char * rq , vector<string>& headers ){
+        bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ){
+            
+            if ( from.localhost() )
+                return true;
             
             if ( db.findOne( "admin.system.users" , BSONObj() ).isEmpty() )
                 return true;
@@ -235,18 +239,18 @@ namespace mongo {
             // set these and return them:
             string& responseMsg,
             int& responseCode,
-            vector<string>& headers // if completely empty, content-type: text/html will be added
+            vector<string>& headers, // if completely empty, content-type: text/html will be added
+            const SockAddr &from
         )
         {
             //out() << "url [" << url << "]" << endl;
             
-            if ( ! allowed( rq , headers ) ){
-                responseCode = 401;
-                responseMsg = "not allowed\n";
-                return;
-            }
-
             if ( url.size() > 1 ) {
+                if ( ! allowed( rq , headers, from ) ){
+                    responseCode = 401;
+                    responseMsg = "not allowed\n";
+                    return;
+                }                
                 handleRESTRequest( rq , url , responseMsg , responseCode , headers );
                 return;
             }
@@ -286,6 +290,13 @@ namespace mongo {
 
             ss << "</pre></body></html>";
             responseMsg = ss.str();
+
+            // we want to return context from before the authentication was performed
+            if ( ! allowed( rq , headers, from ) ){
+                responseCode = 401;
+                responseMsg = "not allowed\n";
+                return;
+            }            
         }
 
         void handleRESTRequest( const char *rq, // the full request

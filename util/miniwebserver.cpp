@@ -137,7 +137,7 @@ namespace mongo {
         return false;
     }
 
-    void MiniWebServer::accepted(int s) {
+    void MiniWebServer::accepted(int s, const SockAddr &from) {
         char buf[4096];
         int len = 0;
         while ( 1 ) {
@@ -155,7 +155,7 @@ namespace mongo {
         string responseMsg;
         int responseCode = 599;
         vector<string> headers;
-        doRequest(buf, parseURL( buf ), responseMsg, responseCode, headers);
+        doRequest(buf, parseURL( buf ), responseMsg, responseCode, headers, from);
 
         stringstream ss;
         ss << "HTTP/1.0 " << responseCode;
@@ -206,7 +206,7 @@ namespace mongo {
             }
             disableNagle(s);
             RARELY log() << "MiniWebServer: connection accepted from " << from.toString() << endl;
-            accepted( s );
+            accepted( s, from );
             closesocket(s);
         }
     }

@@ -132,6 +132,8 @@ namespace mongo {
             return sa.sin_port;
         }
 
+        bool localhost() const { return inet_addr( "127.0.0.1" ) == sa.sin_addr.s_addr; }
+        
         bool operator==(const SockAddr& r) const {
             return sa.sin_addr.s_addr == r.sa.sin_addr.s_addr &&
                    sa.sin_port == r.sa.sin_port;

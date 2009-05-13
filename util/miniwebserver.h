@@ -36,7 +36,8 @@ namespace mongo {
             // set these and return them:
             string& responseMsg,
             int& responseCode,
-            vector<string>& headers // if completely empty, content-type: text/html will be added
+            vector<string>& headers, // if completely empty, content-type: text/html will be added
+            const SockAddr &from
         ) = 0;
 
         int socket() const { return sock; }
@@ -49,7 +50,7 @@ namespace mongo {
         static const char *body( const char *buf );
 
     private:
-        void accepted(int s);
+        void accepted(int s, const SockAddr &from);
         static bool fullReceive( const char *buf );
 
         int port;
