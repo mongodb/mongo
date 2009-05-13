@@ -293,7 +293,6 @@ namespace QueryOptimizerTests {
                 QueryPlan p( FBS( BSONObj() ), BSONObj(), 0 );
                 ASSERT( !p.optimal() );
                 ASSERT( !p.scanAndOrderRequired() );
-                ASSERT( !p.keyMatch() );
                 ASSERT( !p.exactKeyMatch() );
             }
         };
@@ -445,29 +444,23 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 QueryPlan p( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
-                ASSERT( p.keyMatch() );
-                ASSERT( p.exactKeyMatch() );
+                ASSERT( !p.exactKeyMatch() );
                 QueryPlan p2( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "b" << 1 << "a" << 1 ) );
-                ASSERT( p2.keyMatch() );
-                ASSERT( p2.exactKeyMatch() );
+                ASSERT( !p2.exactKeyMatch() );
                 QueryPlan p3( FBS( BSON( "b" << "z" ) ), BSON( "a" << 1 ), INDEX( "b" << 1 << "a" << 1 ) );
-                ASSERT( p3.keyMatch() );
-                ASSERT( p3.exactKeyMatch() );
+                ASSERT( !p3.exactKeyMatch() );
                 QueryPlan p4( FBS( BSON( "c" << "y" << "b" << "z" ) ), BSON( "a" << 1 ), INDEX( "b" << 1 << "a" << 1 << "c" << 1 ) );
-                ASSERT( p4.keyMatch() );
-                ASSERT( p4.exactKeyMatch() );
+                ASSERT( !p4.exactKeyMatch() );
                 QueryPlan p5( FBS( BSON( "c" << "y" << "b" << "z" ) ), BSONObj(), INDEX( "b" << 1 << "a" << 1 << "c" << 1 ) );
-                ASSERT( p5.keyMatch() );
-                ASSERT( p5.exactKeyMatch() );
+                ASSERT( !p5.exactKeyMatch() );
                 QueryPlan p6( FBS( BSON( "c" << LT << "y" << "b" << GT << "z" ) ), BSONObj(), INDEX( "b" << 1 << "a" << 1 << "c" << 1 ) );
-                ASSERT( p6.keyMatch() );
                 ASSERT( !p6.exactKeyMatch() );
                 QueryPlan p7( FBS( BSONObj() ), BSON( "a" << 1 ), INDEX( "b" << 1 ) );
-                ASSERT( !p7.keyMatch() );
                 ASSERT( !p7.exactKeyMatch() );
-                QueryPlan p8( FBS( BSON( "d" << "y" ) ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
-                ASSERT( !p8.keyMatch() );
-                ASSERT( !p8.exactKeyMatch() );
+                QueryPlan p8( FBS( BSON( "b" << "y" << "a" << "z" ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 ) );
+                ASSERT( p8.exactKeyMatch() );
+                QueryPlan p9( FBS( BSON( "a" << "z" ) ), BSON( "a" << 1 ), INDEX( "a" << 1 ) );
+                ASSERT( p9.exactKeyMatch() );
             }
         };
         
@@ -493,20 +486,16 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 QueryPlan p( FBS( BSON( "b" << 1 ) ), BSONObj(), INDEX( "a" << 1 << "b" << 1 ) );
-                ASSERT( p.keyMatch() );
                 ASSERT( !p.bound( "a" ).nontrivial() );
-                ASSERT( !p.unhelpful() );
+                ASSERT( p.unhelpful() );
                 QueryPlan p2( FBS( BSON( "b" << 1 << "c" << 1 ) ), BSON( "a" << 1 ), INDEX( "a" << 1 << "b" << 1 ) );
-                ASSERT( !p2.keyMatch() );
                 ASSERT( !p2.scanAndOrderRequired() );
                 ASSERT( !p2.bound( "a" ).nontrivial() );
                 ASSERT( !p2.unhelpful() );
                 QueryPlan p3( FBS( BSON( "b" << 1 << "c" << 1 ) ), BSONObj(), INDEX( "b" << 1 ) );
-                ASSERT( !p3.keyMatch() );
                 ASSERT( p3.bound( "b" ).nontrivial() );
                 ASSERT( !p3.unhelpful() );
                 QueryPlan p4( FBS( BSON( "c" << 1 << "d" << 1 ) ), BSONObj(), INDEX( "b" << 1 << "c" << 1 ) );
-                ASSERT( !p4.keyMatch() );
                 ASSERT( !p4.bound( "b" ).nontrivial() );
                 ASSERT( p4.unhelpful() );
             }
