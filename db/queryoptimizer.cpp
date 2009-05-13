@@ -83,7 +83,6 @@ namespace mongo {
         if ( scanAndOrderRequired_ )
             direction_ = 0;
         BSONObjIterator i( idxKey );
-        int indexedQueryCount = 0;
         int exactIndexedQueryCount = 0;
         int optimalIndexedQueryCount = 0;
         bool stillOptimalIndexedQueryCount = true;
@@ -100,8 +99,6 @@ namespace mongo {
             bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction_ >= 0 ? 1 : -1 ) > 0 );
             startKeyBuilder.appendAs( forward ? fb.lower() : fb.upper(), "" );
             endKeyBuilder.appendAs( forward ? fb.upper() : fb.lower(), "" );
-            if ( fb.nontrivial() )
-                ++indexedQueryCount;
             if ( stillOptimalIndexedQueryCount ) {
                 if ( fb.nontrivial() )
                     ++optimalIndexedQueryCount;
@@ -121,10 +118,10 @@ namespace mongo {
         if ( !scanAndOrderRequired_ &&
              ( optimalIndexedQueryCount == fbs.nNontrivialBounds() ) )
             optimal_ = true;
-        if ( indexedQueryCount == fbs.nNontrivialBounds() &&
-            orderFieldsUnindexed.size() == 0 ) {
-            if ( exactIndexedQueryCount == fbs.nNontrivialBounds() )
-                exactKeyMatch_ = true;
+        if ( exactIndexedQueryCount == fbs.nNontrivialBounds() &&
+            orderFieldsUnindexed.size() == 0 &&
+            exactIndexedQueryCount == index->keyPattern().nFields() ) {
+            exactKeyMatch_ = true;
         }
         if ( startKey_.isEmpty() )
             startKey_ = startKeyBuilder.obj();
