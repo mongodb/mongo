@@ -1773,6 +1773,18 @@
 				RelativePath="..\scripting\engine_spidermonkey.cpp"
 				>
 			</File>
+			<File
+				RelativePath="..\shell\mongo_vstudio.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

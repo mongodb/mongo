@@ -75,6 +75,8 @@ namespace mongo {
         string toString( JSString * so ){
             jschar * s = JS_GetStringChars( so );
             size_t srclen = JS_GetStringLength( so );
+            if( srclen == 0 )
+                return "";
             
             size_t len = srclen * 2;
             char * dst = (char*)malloc( len );
