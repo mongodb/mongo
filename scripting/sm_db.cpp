@@ -373,7 +373,7 @@ namespace mongo {
 
         return JS_TRUE;
     }
-
+    
     JSClass object_id_class = {
         "ObjectId" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
@@ -392,8 +392,65 @@ namespace mongo {
     };
     
 
-    // ---- other stuff ----
+    // dbquery
 
+    JSBool dbquery_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        uassert( "DDQuery needs at least 4 args" , argc >= 4 );
+        
+        Convertor c(cx);
+        c.setProperty( obj , "_mongo" , argv[0] );
+        c.setProperty( obj , "_db" , argv[1] );
+        c.setProperty( obj , "_collection" , argv[2] );
+        c.setProperty( obj , "_ns" , argv[3] );
+
+        if ( argc > 4 && JSVAL_IS_OBJECT( argv[4] ) )
+            c.setProperty( obj , "_query" , argv[4] );
+        else 
+            c.setProperty( obj , "_query" , OBJECT_TO_JSVAL( JS_NewObject( cx , 0 , 0 , 0 ) ) );
+        
+        if ( argc > 5 && JSVAL_IS_OBJECT( argv[5] ) )
+            c.setProperty( obj , "_fields" , argv[5] );
+        else
+            c.setProperty( obj , "_fields" , JSVAL_NULL );
+        
+        
+        if ( argc > 6 && JSVAL_IS_NUMBER( argv[6] ) )
+            c.setProperty( obj , "_limit" , argv[6] );
+        else 
+            c.setProperty( obj , "_limit" , JSVAL_ZERO );
+        
+        if ( argc > 7 && JSVAL_IS_NUMBER( argv[7] ) )
+            c.setProperty( obj , "_skip" , argv[7] );
+        else 
+            c.setProperty( obj , "_skip" , JSVAL_ZERO );
+        
+        c.setProperty( obj , "_cursor" , JSVAL_NULL );
+        c.setProperty( obj , "_numReturned" , JSVAL_ZERO );
+        c.setProperty( obj , "_special" , JSVAL_FALSE );
+
+        return JS_TRUE;
+    }
+
+    JSBool dbquery_resolve( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
+        if ( flags & JSRESOLVE_ASSIGNING )
+            return JS_TRUE;
+
+        if ( ! JSVAL_IS_NUMBER( id ) )
+            return JS_TRUE;
+
+        JS_ReportError( cx , "dbquery_resolve not done" );
+        return JS_FALSE;
+    }
+
+    JSClass dbquery_class = {
+        "DBQuery" , JSCLASS_NEW_RESOLVE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, (JSResolveOp)(&dbquery_resolve) , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+    
+    // ---- other stuff ----
+    
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local ){
 
         assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
@@ -402,7 +459,9 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
 
+        
         scope->exec( jsconcatcode );
 
     }
