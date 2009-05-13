@@ -898,9 +898,12 @@ namespace mongo {
                 if ( !idTracker.haveId( ns, id ) ) {
                     applyOperation( op );    
                 } else if ( idTracker.haveModId( ns, id ) ) {
+                    log( 6 ) << "skipping operation matching mod id object " << op << endl;
                     BSONObj existing;
                     if ( Helpers::findOne( ns, id, existing ) )
                         logOp( "i", ns, existing );
+                } else {
+                    log( 6 ) << "skipping operation matching changed id object " << op << endl;
                 }
             } else {
                 applyOperation( op );
