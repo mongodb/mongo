@@ -12,6 +12,14 @@
 
 #elif defined( OLDJS )
 
+#ifdef WIN32
+#include "jstypes.h"
+#undef JS_PUBLIC_API
+#undef JS_PUBLIC_DATA
+#define JS_PUBLIC_API(t)    t
+#define JS_PUBLIC_DATA(t)   t
+#endif
+
 #include "jsapi.h"
 #include "jsdate.h"
 #ifndef JSCLASS_GLOBAL_FLAGS
