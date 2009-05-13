@@ -253,12 +253,12 @@ namespace mongo {
      }
 
      JSBool db_collection_resolve( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
-         if ( flags & JSRESOLVE_ASSIGNING || flags & JSRESOLVE_DETECTING )
+         if ( flags & JSRESOLVE_ASSIGNING )
              return JS_TRUE;
          
          Convertor c( cx );
          string collname = c.toString( id );
-         
+
          if ( isSpecialName( collname ) )
              return JS_TRUE;
          
@@ -321,7 +321,7 @@ namespace mongo {
     }
 
     JSBool db_resolve( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
-        if ( flags & JSRESOLVE_ASSIGNING || flags & JSRESOLVE_DETECTING )
+        if ( flags & JSRESOLVE_ASSIGNING )
             return JS_TRUE;
 
         Convertor c( cx );
