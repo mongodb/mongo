@@ -90,16 +90,10 @@ namespace mongo {
     
     int lockFile = 0;
 
-    vector< CurOp > currentOps;
-    CurOp &currentOp() { return currentOps.back(); }
-    bool haveCurrentOp() { return !currentOps.empty(); }
-    void pushCurrentOp() { currentOps.push_back( CurOp() ); }
-    void popCurrentOp() { currentOps.pop_back(); }
-    vector< CurOp >::const_iterator currentOpsBegin() { return currentOps.begin(); }
-    vector< CurOp >::const_iterator currentOpsEnd() { return currentOps.end(); }
+    CurOp currentOp;
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
-        BSONObj obj = currentOp().info();
+        BSONObj obj = currentOp.info();
         replyToQuery(0, m, dbresponse, obj);
     }
     
@@ -146,11 +140,8 @@ namespace mongo {
         
         stringstream ss;
         char buf[64];
-        while ( haveCurrentOp() && !currentOp().active )
-            popCurrentOp();
-        pushCurrentOp();
         time_t now = time(0);
-        currentOp().reset(now);
+        currentOp.reset(now);
 
         time_t_to_String(now, buf);
         buf[20] = 0; // don't want the year
@@ -161,7 +152,7 @@ namespace mongo {
 
         int ms;
         bool log = false;
-        currentOp().op = curOp = m.data->operation();
+        currentOp.op = curOp = m.data->operation();
 
 #if 0
         /* use this if you only want to process operations for a particular namespace.
@@ -208,7 +199,7 @@ namespace mongo {
             const char *ns = m.data->_data + 4;
             char cl[256];
             nsToClient(ns, cl);
-            strncpy(currentOp().ns, ns, Namespace::MaxNsLen);
+            strncpy(currentOp.ns, ns, Namespace::MaxNsLen);
             AuthenticationInfo *ai = authInfo.get();
             if( !ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
@@ -260,7 +251,7 @@ namespace mongo {
             }
             else {
                 out() << "    operation isn't supported: " << m.data->operation() << endl;
-                currentOp().active = false;
+                currentOp.active = false;
                 assert(false);
             }
         }
@@ -278,7 +269,7 @@ namespace mongo {
             }
         }
 
-        currentOp().active = false;
+        currentOp.active = false;
         return true;
     }
 
@@ -339,7 +330,7 @@ namespace mongo {
         {
             string s = query.toString();
             ss << " query: " << s;
-            strncpy(currentOp().query, s.c_str(), sizeof(currentOp().query)-1);
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
         }        
         bool updatedExisting = updateObjects(ns, toupdate, query, flags & 1, ss);
         recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 );
@@ -358,7 +349,7 @@ namespace mongo {
         {
             string s = pattern.toString();
             ss << " query: " << s;
-            strncpy(currentOp().query, s.c_str(), sizeof(currentOp().query)-1);
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
         }        
         int n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( n );
@@ -387,7 +378,7 @@ namespace mongo {
             uassert( "not master", isMasterNs( q.ns ) || (q.queryOptions & Option_SlaveOk) || strstr( q.ns, ".$cmd" ) );
             
             setClient( q.ns );
-            strncpy(currentOp().ns, q.ns, Namespace::MaxNsLen);
+            strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);
             msgdata = runQuery(m, ss ).release();
         }
         catch ( AssertionException& e ) {
