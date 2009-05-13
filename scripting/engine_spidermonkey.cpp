@@ -674,10 +674,23 @@ namespace mongo {
             currentScope.reset( this );
         }
         
-        void exec( const char * code ){
+        bool exec( const string& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true ){
             precall();
-            jsval ret;
-            assert( JS_EvaluateScript( _context , _global , code , strlen( code ) , "anon" , 0 , &ret ) );
+            
+            jsval ret = JSVAL_VOID;
+            
+            JSBool worked = JS_EvaluateScript( _context , _global , code.c_str() , strlen( code.c_str() ) , name.c_str() , 0 , &ret );
+
+            if ( assertOnError )
+                uassert( name + " exec failed" , worked );
+            
+            if ( reportError && ! _error.empty() )
+                cout << "exec error: " << _error << endl;
+            
+            if ( worked && printResult && ! JSVAL_IS_VOID( ret ) )
+                cout << _convertor->toString( ret ) << endl;
+
+            return worked;
         }
 
         int invoke( JSFunction * func , const BSONObj& args ){

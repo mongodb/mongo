@@ -48,7 +48,10 @@ namespace mongo {
         virtual string getError() = 0;
         
         int invoke( const char* code , const BSONObj& args );
-
+        
+        virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError ) = 0;
+        virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError );
+        
         virtual void injectNative( const char *field, NativeFunction func ) {}
     };
     
@@ -63,7 +66,6 @@ namespace mongo {
 
         static void setup();
     };
-
 
     extern ScriptEngine * globalScriptEngine;
 }
