@@ -315,8 +315,11 @@ namespace mongo {
 #if defined(_WIN32)
 #define strcasecmp _stricmp
     inline void our_debug_free(void *p) {
+#if 0
+// this is not safe if you malloc < 4 bytes so we don't use anymore
         unsigned *u = (unsigned *) p;
         u[0] = 0xEEEEEEEE;
+#endif
         free(p);
     }
 #define free our_debug_free

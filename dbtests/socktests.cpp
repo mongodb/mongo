@@ -31,7 +31,7 @@ namespace SockTests {
         }
     };
     
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< HostByName >();
