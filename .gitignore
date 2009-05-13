@@ -11,12 +11,19 @@
 *.ncb
 *.idb 
 *.obj 
+*/*.obj
 *.opt 
 *.pch 
 *.jsh
 *.jsall
 *.pyc
 *.log
+*.exe
+*.exp
+*.lib
+*.idb
+*.pdb
+*.manifest
 *#
 .#*
 shell/mongo.cpp
@@ -54,6 +61,10 @@ mongosniff
 mongobridge
 
 *.tgz
+*.zip
+*.tar.gz
+
+mongodb-*
 
 #libs
 libmongoclient.*
