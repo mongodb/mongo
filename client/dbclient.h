@@ -195,7 +195,7 @@ namespace mongo {
         }
         
         bool hasResultFlag( int flag ){
-            return resultFlags & flag;
+            return (resultFlags & flag) != 0;
         }
 
         bool init();
