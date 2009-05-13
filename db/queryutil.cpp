@@ -143,18 +143,32 @@ namespace mongo {
         return *trivialBound_;
     }
     
-    BSONObj FieldBoundSet::simplifiedQuery() const {
+    BSONObj FieldBoundSet::simplifiedQuery( const BSONObj &_fields ) const {
+        BSONObj fields = _fields;
+        if ( fields.isEmpty() ) {
+            BSONObjBuilder b;
+            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i ) {
+                b.append( i->first.c_str(), 1 );
+            }
+            fields = b.obj();
+        }
         BSONObjBuilder b;
-        for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i ) {
-            if ( i->second.equality() )
-                b.appendAs( i->second.lower(), i->first.c_str() );
-            else if ( i->second.nontrivial() ) {
+        BSONObjIterator i( fields );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            const char *name = e.fieldName();
+            const FieldBound &bound = bounds_[ name ];
+            if ( bound.equality() )
+                b.appendAs( bound.lower(), name );
+            else if ( bound.nontrivial() ) {
                 BSONObjBuilder c;
-                if ( i->second.lower().type() != MinKey )
-                    c.appendAs( i->second.lower(), i->second.lowerInclusive() ? "$gte" : "$gt" );
-                if ( i->second.upper().type() != MaxKey )
-                    c.appendAs( i->second.upper(), i->second.upperInclusive() ? "$lte" : "$lt" );
-                b.append( i->first.c_str(), c.done() );
+                if ( bound.lower().type() != MinKey )
+                    c.appendAs( bound.lower(), bound.lowerInclusive() ? "$gte" : "$gt" );
+                if ( bound.upper().type() != MaxKey )
+                    c.appendAs( bound.upper(), bound.upperInclusive() ? "$lte" : "$lt" );
+                b.append( name, c.done() );                
             }
         }
         return b.obj();

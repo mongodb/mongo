@@ -132,7 +132,8 @@ namespace mongo {
         }
         const char *ns() const { return ns_; }
         BSONObj query() const { return query_; }
-        BSONObj simplifiedQuery() const;
+        // if fields is specified, order fields of returned object to match those of 'fields'
+        BSONObj simplifiedQuery( const BSONObj &fields = BSONObj() ) const;
         bool matchPossible() const {
             for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
                 if ( i->second.lower().woCompare( i->second.upper(), false ) > 0 )
@@ -143,7 +144,7 @@ namespace mongo {
     private:
         static FieldBound *trivialBound_;
         static FieldBound &trivialBound();
-        map< string, FieldBound > bounds_;
+        mutable map< string, FieldBound > bounds_;
         const char *ns_;
         BSONObj query_;
     };
