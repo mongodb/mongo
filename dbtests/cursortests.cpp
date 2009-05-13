@@ -53,7 +53,7 @@ namespace CursorTests {
         public:
             Upgrade() : num_() {}
             void run() {
-                setClient( "foo.bar" );
+                setClient( "unittests.bar" );
                 
                 IdSet::maxSize_ = ( BSON( "_id" << int( 1 ) ).objsize() + sizeof( BSONObj ) - 1 ) * 8;
                 
@@ -102,7 +102,7 @@ namespace CursorTests {
 
     } // namespace IdSetTests
     
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< IdSetTests::BasicSize >();

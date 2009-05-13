@@ -55,7 +55,7 @@ namespace ReplTests {
         }
     protected:
         static const char *ns() {
-            return "dbtests.repltests";
+            return "unittests.repltests";
         }
         static const char *logNs() {
             return "local.oplog.$main";
@@ -696,7 +696,7 @@ namespace ReplTests {
     class DbIdsTest {
     public:
         void run() {
-            setClient( "repltest.DbIdsTest" );
+            setClient( "unittests.repltest.DbIdsTest" );
             
             s_.reset( new DbIds( "local.temp.DbIdsTest" ) );
             s_->reset();
@@ -771,7 +771,7 @@ namespace ReplTests {
     class IdTrackerTest {
     public:
         void run() {
-            setClient( "repltests.IdTrackerTest" );
+            setClient( "unittests.repltests.IdTrackerTest" );
             
             ASSERT( s_.inMem() );
             s_.reset( 4 * sizeof( BSONObj ) - 1 );
@@ -805,7 +805,7 @@ namespace ReplTests {
         IdTracker s_;
     };
     
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
         All() {
             add< LogBasic >();

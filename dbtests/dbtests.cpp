@@ -19,8 +19,7 @@
 
 #include "stdafx.h"
 
-#include "dbtests.h"
-
+#include "../db/instance.h"
 #include "../util/file_allocator.h"
 
 #include <unittest/Registry.hpp>
@@ -29,12 +28,19 @@
 #include <sys/file.h>
 #endif
 
+#include "dbtests.h"
+
 using namespace std;
 
 namespace mongo {
     extern const char* dbpath;
 } // namespace mongo
 string dbpathSpec = "/tmp/unittest/";
+
+Suite::~Suite() {
+    DBDirectClient c;
+    c.dropDatabase( "unittests" );
+}
 
 void usage() {
     string instructions =

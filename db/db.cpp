@@ -133,8 +133,7 @@ namespace mongo {
        115 replay, opLogging
     */
     void listen(int port) {
-        const char *Version = "db version v0.9.0";
-        log() << Version << ", pdfile version " << VERSION << "." << VERSION_MINOR << endl;
+        log() << mongodVersion() << endl;
         printGitVersion();
         printSysInfo();
         pdfileInit();
@@ -574,7 +573,7 @@ int main(int argc, char* argv[], char *envp[] )
                 assert(opIdMem > 0);
             }
             else if ( s == "--deDupMem" ) {
-                long x = strtoll( argv[ ++i ], 0, 10 );
+                long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad arg", x > 0);
                 IdSet::maxSize_ = x;
                 assert(IdSet::maxSize_ > 0);

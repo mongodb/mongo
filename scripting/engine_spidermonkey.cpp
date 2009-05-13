@@ -1,5 +1,6 @@
 // engine_spidermonkey.cpp
 
+#include "stdafx.h"
 #include "engine_spidermonkey.h"
 
 #include "../client/dbclient.h"
@@ -682,8 +683,9 @@ namespace mongo {
             jsval rval;
             
             int nargs = args.nFields();
-            jsval smargs[nargs];
-            
+            auto_ptr<jsval> smargsPtr( new jsval[nargs] );
+            jsval* smargs = smargsPtr.get();
+
             BSONObjIterator it( args );
             for ( int i=0; i<nargs; i++ )
                 smargs[i] = _convertor->toval( it.next() );

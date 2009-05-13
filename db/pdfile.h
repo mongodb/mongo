@@ -31,10 +31,6 @@
 #include "jsobjmanipulator.h"
 #include "namespace.h"
 
-// see version, versionMinor, below.
-const int VERSION = 4;
-const int VERSION_MINOR = 4;
-
 namespace mongo {
 
     class MDFHeader;
