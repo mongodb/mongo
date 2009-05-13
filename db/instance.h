@@ -25,7 +25,9 @@
 
 namespace mongo {
 
-    extern CurOp currentOp;
+    CurOp& currentOp();
+    vector< CurOp >::const_iterator currentOpsBegin();
+    vector< CurOp >::const_iterator currentOpsEnd();
     
 // turn on or off the oplog.* files which the db can generate.
 // these files are for diagnostic purposes and are unrelated to

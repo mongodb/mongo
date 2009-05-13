@@ -669,7 +669,7 @@ namespace mongo {
         rawOut( ossSig.str() );
 
         ostringstream ossOp;
-        ossOp << "Last op: " << currentOp.infoNoauth() << endl;
+        ossOp << "Last op: " << currentOp().infoNoauth() << endl;
         rawOut( ossOp.str() );
 
         ostringstream oss;

@@ -113,7 +113,9 @@ namespace mongo {
     public:
         // caller locks
         void doLockedStuff(stringstream& ss) {
-            ss << "currentOp: " << currentOp.infoNoauth() << "\n";
+            ss << "current ops: \n";
+            for( vector< CurOp >::const_iterator i = currentOpsBegin(); i != currentOpsEnd(); ++i )
+                ss << "\t" << i->infoNoauth() << "\n";
             ss << "# databases: " << databases.size() << '\n';
             if ( database ) {
                 ss << "curclient: " << database->name;
@@ -241,13 +243,12 @@ namespace mongo {
         {
             //out() << "url [" << url << "]" << endl;
             
-            if ( ! allowed( rq , headers ) ){
-                responseCode = 401;
-                responseMsg = "not allowed\n";
-                return;
-            }
-
             if ( url.size() > 1 ) {
+                if ( ! allowed( rq , headers ) ){
+                    responseCode = 401;
+                    responseMsg = "not allowed\n";
+                    return;
+                }                
                 handleRESTRequest( rq , url , responseMsg , responseCode , headers );
                 return;
             }
@@ -287,6 +288,13 @@ namespace mongo {
 
             ss << "</pre></body></html>";
             responseMsg = ss.str();
+
+            // we want to return context from before the authentication was performed
+            if ( ! allowed( rq , headers ) ){
+                responseCode = 401;
+                responseMsg = "not allowed\n";
+                return;
+            }            
         }
 
         void handleRESTRequest( const char *rq, // the full request

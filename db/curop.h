@@ -7,7 +7,7 @@
 
 namespace mongo { 
 
-    extern struct CurOp {
+    struct CurOp {
         void reset(time_t now) { 
             active = true;
             opNum++;
@@ -41,7 +41,7 @@ namespace mongo {
             return infoNoauth();
         }
         
-        BSONObj infoNoauth() {
+        BSONObj infoNoauth() const {
             BSONObjBuilder b;
             b.append("opid", opNum);
             b.append("active", active);
@@ -64,6 +64,9 @@ namespace mongo {
             b.append("inLock",  dbMutexInfo.isLocked());
             return b.obj();
         }
-    } currentOp;
+    };
 
+    CurOp &currentOp();
+    void pushCurrentOp();
+    void popCurrentOp();
 }
