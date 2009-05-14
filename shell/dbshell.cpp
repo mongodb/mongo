@@ -240,7 +240,7 @@ int main(int argc, char* argv[]) {
         break;
     }
     
-    scope->externalSetup();
+    scope->externalSetup( false );
     mongo::shellUtils::installShellUtils( *scope );
 
     if ( !nodb ) { // connect to db

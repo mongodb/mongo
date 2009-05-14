@@ -637,12 +637,12 @@ namespace mongo {
 
         }
 
-        void externalSetup(){
-            initMongoJS( this , _context , _global , false );
+        void externalSetup( bool debug ){
+            initMongoJS( this , _context , _global , false, debug );
         }
 
         void localConnect( const char * dbName ){
-            initMongoJS( this , _context , _global , true );
+            initMongoJS( this , _context , _global , true, false );
             
             exec( "_mongo = new Mongo();" );
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );

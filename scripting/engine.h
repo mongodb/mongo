@@ -25,7 +25,7 @@ namespace mongo {
         }
         
         virtual void localConnect( const char * dbName ) = 0;
-        virtual void externalSetup() = 0;
+        virtual void externalSetup( bool debug ) = 0;
         
         virtual double getNumber( const char *field ) = 0;
         virtual string getString( const char *field ) = 0;
