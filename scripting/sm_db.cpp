@@ -485,6 +485,14 @@ namespace mongo {
             b.append( name.c_str() , oid );
             return true;
         }
+        
+        {
+            jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
+            if ( d ){
+                b.appendDate( name.c_str() , d );
+                return true;
+            }
+        }
 
         return false;
     }
