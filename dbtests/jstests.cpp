@@ -118,6 +118,12 @@ namespace JSTests {
             s->setThis( & o );
             s->invoke( "return this.z;" , BSONObj() );
             ASSERT_EQUALS( "sara" , s->getString( "return" ) );
+
+            s->invoke( "this.z == 'sara';" , BSONObj() );
+            ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+
+            s->invoke( "this.z == 'asara';" , BSONObj() );
+            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
             
             s->invoke( "return this.x == 17;" , BSONObj() );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
