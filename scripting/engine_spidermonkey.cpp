@@ -149,7 +149,8 @@ namespace mongo {
                 
             case JSTYPE_NUMBER: b.append( name.c_str() , toNumber( val ) ); break;
             case JSTYPE_STRING: b.append( name.c_str() , toString( val ) ); break;
-                
+            case JSTYPE_BOOLEAN: b.appendBool( name.c_str() , toBoolean( val ) ); break;
+
             case JSTYPE_OBJECT: {
                 JSObject * o = JSVAL_TO_OBJECT( val );
                 if ( ! appendSpecialDBObject( this , b , name , o ) ){
@@ -437,8 +438,35 @@ namespace mongo {
         return JS_TRUE;
     }
 
+    JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+        Convertor c(cx);
+        uassert( "native_helper needs at least 1 arg" , argc >= 1 );
+
+        NativeFunction func = (NativeFunction)JSVAL_TO_PRIVATE( argv[0] );
+
+        BSONObjBuilder args;
+        for ( uintN i=1; i<argc; i++ ){
+            c.append( args , args.numStr( i ) , argv[i] );
+        }
+
+        BSONObj out = func( args.obj() );
+        
+        if ( out.isEmpty() ){
+            *rval = JSVAL_VOID;
+        }
+        else {
+            *rval = c.toval( out.firstElement() );
+        }
+
+        return JS_TRUE;
+    }
+
+    JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval );
+
     JSFunctionSpec globalHelpers[] = { 
         { "print" , &native_print , 0 , 0 , 0 } , 
+        { "nativeHelper" , &native_helper , 1 , 0 , 0 } , 
+        { "load" , &native_load , 1 , 0 , 0 } , 
         { 0 , 0 , 0 , 0 , 0 } 
     };
 
@@ -733,6 +761,16 @@ namespace mongo {
             return _error;
         }
 
+        void injectNative( const char *field, NativeFunction func ){
+            string name = field;
+            _convertor->setProperty( _global , (name + "_").c_str() , PRIVATE_TO_JSVAL( func ) );
+            
+            stringstream code;
+            code << field << " = function(){ var a = [ " << field << "_ ]; for ( var i=0; i<arguments.length; i++ ){ a.push( arguments[i] ); } return nativeHelper.apply( null , a ); }";
+            exec( code.str().c_str() );
+            
+        }
+
     private:
         JSContext * _context;
         Convertor * _convertor;
@@ -757,6 +795,24 @@ namespace mongo {
         // TODO: send to Scope
     }
 
+    JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+        Convertor c(cx);
+
+        Scope * s = currentScope.get();
+
+        for ( uintN i=0; i<argc; i++ ){
+            string filename = c.toString( argv[i] );
+            cout << "should load [" << filename << "]" << endl;
+            
+            if ( ! s->execFile( filename , false , true , false ) ){
+                JS_ReportError( cx , ((string)"error loading file: " + filename ).c_str() );
+                return JS_FALSE;
+            }
+        }
+        
+        return JS_TRUE;
+    }
+    
 
 
     void SMEngine::runTest(){

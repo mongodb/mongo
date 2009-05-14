@@ -737,7 +737,7 @@ elif not onlyServer:
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
-    coreShellFiles = [ "shell/dbshell.cpp" ]
+    coreShellFiles = [ "shell/dbshell.cpp" , "shell/utils.cpp" ]
 
     if weird:
         shell32BitFiles = coreShellFiles

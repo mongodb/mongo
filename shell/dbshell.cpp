@@ -9,6 +9,7 @@
 
 #include "../scripting/engine.h"
 #include "../client/dbclient.h"
+#include "utils.h"
 
 extern const char * jsconcatcode;
 
@@ -240,6 +241,7 @@ int main(int argc, char* argv[]) {
     }
     
     scope->externalSetup();
+    mongo::shellUtils::installShellUtils( *scope );
 
     if ( !nodb ) { // connect to db
         cout << "url: " << url << endl;

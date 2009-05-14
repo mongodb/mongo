@@ -20,6 +20,13 @@ namespace mongo {
             names.insert( "_fullName" );
             names.insert( "_shortName" );
         }
+        
+        if ( name.length() == 0 )
+            return false;
+
+        if ( name[0] == '_' )
+            return true;
+        
         return names.count( name ) > 0;
     }
 
