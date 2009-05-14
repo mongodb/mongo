@@ -122,7 +122,7 @@ string fixHost( string url , string host , string port ){
 int main(int argc, char* argv[]) {
     setupSignals();
     
-    // RecordMyLocation( argv[ 0 ] ); TODO
+    mongo::shellUtils::RecordMyLocation( argv[ 0 ] );
 
     mongo::ScriptEngine::setup();
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->createScope() );
@@ -279,7 +279,7 @@ int main(int argc, char* argv[]) {
 
     if ( runShell ){
         
-        // MongoProgramScope s; TODO
+        mongo::shellUtils::MongoProgramScope s;
 
         shellHistoryInit();
         
