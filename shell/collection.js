@@ -124,7 +124,7 @@ DBCollection.prototype.update = function( query , obj , upsert ){
 }
 
 DBCollection.prototype.save = function( obj ){
-    if ( ! obj._id ){
+    if ( typeof( obj._id ) == "undefined" ){
         obj._id = new ObjectId();
         return this.insert( obj );
     }
