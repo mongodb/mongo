@@ -482,8 +482,10 @@ namespace mongo {
             for( uintN i = 0; i < argc_; ++i )
                 JS_AddRoot( cx, &argv_[ i ] );
             scope_.reset( dynamic_cast< SMScope * >( globalScriptEngine->createScope() ) );
+            scope_->externalSetup();
         }
         ~JSThreadConfig() {
+            thread_->join(); // don't want to deal with cleaning up while thread is running
             JS_RemoveRoot( cx_, &obj_ );
             JS_RemoveRoot( cx_, &fun_ );
             for( uintN i = 0; i < argc_; ++i )
