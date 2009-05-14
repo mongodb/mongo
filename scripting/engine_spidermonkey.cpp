@@ -164,7 +164,18 @@ namespace mongo {
                 }
                 break;
             }
-            case JSTYPE_FUNCTION: b.appendCode( name.c_str() , getFunctionCode( val ).c_str() ); break;
+            case JSTYPE_FUNCTION: {
+                string s = toString(val);
+                if ( s[0] == '/' ){
+                    s = s.substr(1);
+                    string::size_type end = s.rfind( '/' );
+                    b.appendRegex( name.c_str() , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
+                }
+                else {
+                    b.appendCode( name.c_str() , getFunctionCode( val ).c_str() ); 
+                }
+                break;
+            }
                 
             default: uassert( (string)"can't append field.  name:" + name + " type: " + typeString( val ) , 0 );
             }

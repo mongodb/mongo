@@ -260,9 +260,9 @@ namespace JSTests {
 
                 s->invoke( "z = { a : x.r };" , BSONObj() );
 
-                //BSONObj out = s->getObject("z");
-                //ASSERT_EQUALS( (string)"^a" , out["a"].regex() );
-                //ASSERT_EQUALS( (string)"i" , out["a"].regexFlags() );
+                BSONObj out = s->getObject("z");
+                ASSERT_EQUALS( (string)"^a" , out["a"].regex() );
+                ASSERT_EQUALS( (string)"i" , out["a"].regexFlags() );
 
             }
             
