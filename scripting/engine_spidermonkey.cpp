@@ -585,7 +585,6 @@ namespace mongo {
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
             _convertor = new Convertor( _context );
             massert( "JS_NewContext failed" , _context );
-//            JS_BeginRequest( _context );
             
             JS_SetOptions( _context , JSOPTION_VAROBJFIX);
             //JS_SetVersion( _context , JSVERSION_LATEST); TODO
@@ -614,7 +613,6 @@ namespace mongo {
             }
 
             if ( _context ){
-//                JS_EndRequest( _context );
                 JS_DestroyContext( _context );
                 _context = 0;
             }
