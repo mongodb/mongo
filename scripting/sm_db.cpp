@@ -118,6 +118,8 @@ namespace mongo {
         }
         
         JS_SetPrivate( cx , obj , (void*)conn );
+        jsval host_val = c.toval( host.c_str() );
+        assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
         return JS_TRUE;
 
     }
