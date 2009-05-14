@@ -445,8 +445,12 @@ namespace mongo {
         if ( ! JSVAL_IS_NUMBER( id ) )
             return JS_TRUE;
 
-        JS_ReportError( cx , "dbquery_resolve not done" );
-        return JS_FALSE;
+        jsval val;
+        assert( JS_CallFunctionName( cx , obj , "arrayAccess" , 1 , &id , &val ) );
+        Convertor c(cx);
+        c.setProperty( obj , c.toString( id ).c_str() , val );
+        *objp = obj;
+        return JS_TRUE;
     }
 
     JSClass dbquery_class = {
