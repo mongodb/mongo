@@ -822,16 +822,18 @@ namespace mongo {
                     }
                     else {
                         BSONObj js = c->current();
-                        BSONElement idRef = js.getField( "_id" );
-                        if ( !idRef.eoo() ) {
-                            BSONObjBuilder idBuilder;
-                            idBuilder.append( idRef );
-                            BSONObj id = idBuilder.obj();
-                            if ( cc->ids_->get( id ) ) {
-                                c->advance();
-                                continue;
+                        if ( cc->ids_.get() ) {
+                            BSONElement idRef = js.getField( "_id" );
+                            if ( !idRef.eoo() ) {
+                                BSONObjBuilder idBuilder;
+                                idBuilder.append( idRef );
+                                BSONObj id = idBuilder.obj();
+                                if ( cc->ids_->get( id ) ) {
+                                    c->advance();
+                                    continue;
+                                }
+                                cc->ids_->put( id ); 
                             }
-                            cc->ids_->put( id ); 
                         }
                         bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
                         if ( ok ) {
@@ -1043,7 +1045,7 @@ namespace mongo {
             
             bool mayCreateCursor1 = wantMore_ && ntoreturn_ != 1 && useCursors;
             
-            if ( ( mayCreateCursor1 || mayCreateCursor2() ) && !ids_.get() ) {
+            if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
                 ids_.reset( new IdSet() );
             }
             

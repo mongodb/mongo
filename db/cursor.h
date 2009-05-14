@@ -103,6 +103,7 @@ namespace mongo {
         virtual BSONObj prettyStartKey() const { return BSONObj(); }
         virtual BSONObj prettyEndKey() const { return BSONObj(); }
 
+        virtual bool capped() const { return false; }
     };
 
     class AdvanceStrategy {
@@ -197,6 +198,7 @@ namespace mongo {
             return "ForwardCappedCursor";
         }
         virtual DiskLoc next( const DiskLoc &prev ) const;
+        virtual bool capped() const { return true; }
     private:
         NamespaceDetails *nsd;
     };
@@ -208,6 +210,7 @@ namespace mongo {
             return "ReverseCappedCursor";
         }
         virtual DiskLoc next( const DiskLoc &prev ) const;
+        virtual bool capped() const { return true; }
     private:
         NamespaceDetails *nsd;
     };

@@ -151,7 +151,7 @@ namespace mongo {
         
         void mayUpgradeStorage() {
             stringstream ss;
-            ss << cursorid;
+            ss << ns << "." << cursorid;
             ids_->mayUpgradeStorage( ss.str() );
         }
     };
