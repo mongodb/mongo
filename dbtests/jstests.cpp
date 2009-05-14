@@ -214,6 +214,61 @@ namespace JSTests {
             delete s;
         }
     };
+
+    class OtherJSTypes {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            { // date
+                BSONObj o;
+                { 
+                    BSONObjBuilder b;
+                    b.appendDate( "d" , 123456789 );
+                    o = b.obj();
+                }
+                s->setObject( "x" , o );
+                
+                s->invoke( "return x.d.getTime() != 12;" , BSONObj() );
+                ASSERT_EQUALS( true, s->getBoolean( "return" ) );
+                
+                s->invoke( "z = x.d.getTime();" , BSONObj() );
+                ASSERT_EQUALS( 123456789 , s->getNumber( "z" ) );
+                
+                s->invoke( "z = { z : x.d }" , BSONObj() );
+                BSONObj out = s->getObject( "z" );
+                ASSERT( out["z"].type() == Date );
+            }
+
+            { // regex
+                BSONObj o;
+                { 
+                    BSONObjBuilder b;
+                    b.appendRegex( "r" , "^a" , "i" );
+                    o = b.obj();
+                }
+                s->setObject( "x" , o );
+                
+                s->invoke( "z = x.r.test( 'b' );" , BSONObj() );
+                ASSERT_EQUALS( false , s->getBoolean( "z" ) );
+
+                s->invoke( "z = x.r.test( 'a' );" , BSONObj() );
+                ASSERT_EQUALS( true , s->getBoolean( "z" ) );
+
+                s->invoke( "z = x.r.test( 'ba' );" , BSONObj() );
+                ASSERT_EQUALS( false , s->getBoolean( "z" ) );
+
+                s->invoke( "z = { a : x.r };" , BSONObj() );
+
+                BSONObj out = s->getObject("z");
+                ASSERT_EQUALS( (string)"^a" , out["a"].regex() );
+                ASSERT_EQUALS( (string)"i" , out["a"].regexFlags() );
+
+            }
+            
+            delete s;
+        }
+    };
     
     class All : public Suite {
     public:
@@ -226,6 +281,7 @@ namespace JSTests {
             add< ObjectDecoding >();
             add< JSOIDTests >();
             add< ObjectModTests >();
+            add< OtherJSTypes >();
         }
     };
     
