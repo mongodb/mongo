@@ -64,6 +64,7 @@ namespace mongo {
     void closeAllSockets();
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
+    void setRecCacheSize(unsigned MB);
 
     struct MyStartupTests {
         MyStartupTests() {
@@ -82,7 +83,6 @@ namespace mongo {
     }
 
     QueryResult* emptyMoreResult(long long);
-
 
     void testTheDb() {
         stringstream ss;
@@ -560,6 +560,11 @@ int main(int argc, char* argv[], char *envp[] )
                 useHints = false;
             else if ( s == "--nohttpinterface" )
                 noHttpInterface = true;
+            else if ( s == "--cacheSize" ) { 
+                long x = strtol( argv[ ++i ], 0, 10 );
+                uassert("bad --cacheSize arg", x > 0);
+                setRecCacheSize(x);
+            }
             else if ( s == "--oplogSize" ) {
                 long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad arg", x > 0);

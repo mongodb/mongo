@@ -10,9 +10,16 @@ namespace mongo {
 
 RecCache theRecCache(BucketSize);
 
-/* TODO MAKE CONFIGURABLE */
 // 100k * 8KB = 800MB
-unsigned RecCache::MAXNODES = 150000;
+unsigned RecCache::MAXNODES = 50000;
+
+void setRecCacheSize(unsigned mb) {
+    unsigned long long MB = mb;
+    log(2) << "reccache size: " << MB << "MB\n";
+    uassert( "bad cache size", MB > 0 && MB < 1000000 );
+    RecCache::MAXNODES = (unsigned) MB * 1024 * 1024 / 8192;
+    log(3) << "RecCache::MAXNODES=" << RecCache::MAXNODES << '\n';
+}
 
 void writerThread() { 
     sleepsecs(10);
