@@ -470,7 +470,11 @@ namespace mongo {
             DiskLoc fr = theCapExtent()->firstRecord;
             theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
             compact();
-            assert( ++passes < 5000 );
+            if( ++passes >= 5000 ) {
+                log() << "passes ns:" << ns << " len:" << len << '\n';
+                log() << "passes max:" << max << " nrecords:" << nrecords << " datasize: " << datasize << endl;
+                massert( "passes >= 5000 in capped collection alloc", false );
+            }
         }
 
         // Remember first record allocated on this iteration through capExtent.
