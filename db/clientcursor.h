@@ -150,6 +150,8 @@ namespace mongo {
         void cleanupByLocation(DiskLoc loc);
         
         void mayUpgradeStorage() {
+            if ( !ids_.get() )
+                return;
             stringstream ss;
             ss << ns << "." << cursorid;
             ids_->mayUpgradeStorage( ss.str() );
