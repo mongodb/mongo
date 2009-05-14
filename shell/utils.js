@@ -191,8 +191,12 @@ tojson = function( x ){
     case "object":
         return tojsonObject( x );
         
+    case "function":
+        return x.toString();
+        
+
     default:
-        throw "can't handle type " + ( typeof v );
+        throw "tojson can't handle type " + ( typeof x );
     }
     
 }
@@ -200,17 +204,22 @@ tojson = function( x ){
 tojsonObject = function( x ){
     assert.eq( ( typeof x ) , "object" , "tojsonObject needs object, not [" + ( typeof x ) + "]" );
     
-    if ( x.tojson )
+    if ( typeof( x.tojson ) == "function" && x.tojson != tojson )
         return x.tojson();
 
     var s = "{";
     
     var first = true;
     for ( var k in x ){
+
+        var val = x[k];
+        if ( val == DB.prototype || val == DBCollection.prototype )
+            continue;
+
         if ( first ) first = false;
         else s += " , ";
         
-        s += "\"" + k + "\" : " + tojson( x[k] );
+        s += "\"" + k + "\" : " + tojson( val );
     }
 
     return s + "}";
@@ -251,6 +260,13 @@ shellPrintHelper = function( x ){
         print( x.tojson() );
     else
         print( tojson( x ) );
+}
+
+execShellLine = function(){
+    var res = eval( __line__ );
+    if ( typeof( res ) != "undefined" ){
+        shellPrintHelper( res );
+    }
 }
 
 shellHelper = function( command , rest ){

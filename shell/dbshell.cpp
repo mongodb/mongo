@@ -318,7 +318,8 @@ int main(int argc, char* argv[]) {
             }
             */
             
-            scope->exec( code.c_str() , "(shell)" , true , true , false);
+            scope->setString( "__line__" , code.c_str() );
+            scope->exec( "execShellLine()" , "(shell)" , true , true , false);
             
             
             shellHistoryAdd( line );

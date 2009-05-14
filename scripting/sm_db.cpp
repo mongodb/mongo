@@ -21,11 +21,14 @@ namespace mongo {
             names.insert( "_name" );
             names.insert( "_fullName" );
             names.insert( "_shortName" );
+            names.insert( "tojson" );
+            names.insert( "toJson" );
+            names.insert( "toString" );
         }
         
         if ( name.length() == 0 )
             return false;
-
+        
         if ( name[0] == '_' )
             return true;
         
