@@ -502,8 +502,8 @@ namespace mongo {
             started_ = true;
         }
         void join() {
-            massert( "Thread not running", started_ && !done_ );
-            thread_->join();
+            if ( !done_ )
+                thread_->join();
         }
         jsval returnData() {
             if ( !done_ )
