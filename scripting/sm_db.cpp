@@ -471,11 +471,25 @@ namespace mongo {
         JSThreadConfig( JSContext *cx, JSObject *obj, uintN argc, jsval *argv ) : started_(), done_(), cx_( cx ), obj_( obj ) {
             massert( "need at least one argument", argc > 0 );
             massert( "first argument must be a function", JS_TypeOfValue( cx, argv[ 0 ] ) == JSTYPE_FUNCTION );
-            f_ = JS_ValueToFunction( cx, argv[ 0 ] );
+            fun_ = argv[ 0 ];
+            f_ = JS_ValueToFunction( cx, fun_ );
             argc_ = argc - 1;
             argv_.reset( new jsval[ argc_ ] );
             for( uintN i = 0; i < argc_; ++i )
                 argv_[ i ] = argv[ i + 1 ];
+            JS_AddRoot( cx, &obj_ );
+            JS_AddRoot( cx, &fun_ );
+            for( uintN i = 0; i < argc_; ++i )
+                JS_AddRoot( cx, &argv_[ i ] );
+            scope_.reset( dynamic_cast< SMScope * >( globalScriptEngine->createScope() ) );
+        }
+        ~JSThreadConfig() {
+            JS_RemoveRoot( cx_, &obj_ );
+            JS_RemoveRoot( cx_, &fun_ );
+            for( uintN i = 0; i < argc_; ++i )
+                JS_RemoveRoot( cx_, &argv_[ i ] );
+            if ( done_ )
+                JS_RemoveRoot( scope_->context(), &returnData_ );
         }
         void start() {
             massert( "Thread already started", !started_ );
@@ -486,7 +500,6 @@ namespace mongo {
         void join() {
             massert( "Thread not running", started_ && !done_ );
             thread_->join();
-            done_ = true;
         }
         jsval returnData() {
             if ( !done_ )
@@ -498,8 +511,15 @@ namespace mongo {
         public:
             JSThread( JSThreadConfig &config ) : config_( config ) {}
             void operator()() {
-                massert( "function call failure",
-                        JS_TRUE == JS_CallFunction( config_.cx_, config_.obj_, config_.f_, config_.argc_, config_.argv_.get(), &config_.returnData_ ) );
+                JS_SetContextThread( config_.scope_->context() );
+                try {
+                    massert( "function call failure",
+                            JS_TRUE == JS_CallFunction( config_.scope_->context(), config_.obj_, config_.f_, config_.argc_, config_.argv_.get(), &config_.returnData_ ) );
+                    JS_AddRoot( config_.scope_->context(), &config_.returnData_ );
+                    config_.done_ = true;
+                } catch ( ... ) {
+                }
+                JS_ClearContextThread( config_.scope_->context() );
             }
         private:
             JSThreadConfig &config_;
@@ -510,16 +530,26 @@ namespace mongo {
         JSContext *cx_;
         JSObject *obj_;
         JSFunction *f_;
+        jsval fun_;
         uintN argc_;
         boost::scoped_array< jsval > argv_;
         auto_ptr< boost::thread > thread_;
+        auto_ptr< SMScope > scope_;
         jsval returnData_;
     };
+    
+    void thread_finalize( JSContext * cx , JSObject * obj ){
+        JSThreadConfig * config = (JSThreadConfig*)JS_GetPrivate( cx , obj );
+        if ( config ){
+            delete config;
+            JS_SetPrivate( cx , obj , 0 );
+        }
+    }
     
     JSClass thread_class = {
         "Thread" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+        JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, thread_finalize,
         JSCLASS_NO_OPTIONAL_MEMBERS        
     };
     
