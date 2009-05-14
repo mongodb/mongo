@@ -340,3 +340,11 @@ Map.prototype.values = function(){
     }
     return a;
 }
+
+Math.sigFig = function( x , N ){
+    if ( ! N ){
+        N = 3;
+    }
+    var p = Math.pow( 10, N - Math.ceil( Math.log( Math.abs(x) ) / Math.log( 10 )) );
+    return Math.round(x*p)/p;
+}
