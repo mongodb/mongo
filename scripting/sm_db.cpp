@@ -127,8 +127,8 @@ namespace mongo {
         BSONObj q = c.toObject( argv[1] );
         BSONObj f = c.toObject( argv[2] );
         
-        int nToReturn = c.toNumber( argv[3] );
-        int nToSkip = c.toNumber( argv[4] );
+        int nToReturn = (int) c.toNumber( argv[3] );
+        int nToSkip = (int) c.toNumber( argv[4] );
         bool slaveOk = c.getBoolean( obj , "slaveOk" );
 
         try {
