@@ -142,6 +142,7 @@ namespace mongo {
         }
 
         void append( BSONObjBuilder& b , string name , jsval val ){
+            //cout << "name: " << name << "\t" << typeString( val ) << endl;
             switch ( JS_TypeOfValue( _context , val ) ){
 
             case JSTYPE_VOID: b.appendUndefined( name.c_str() ); break;
@@ -153,7 +154,10 @@ namespace mongo {
 
             case JSTYPE_OBJECT: {
                 JSObject * o = JSVAL_TO_OBJECT( val );
-                if ( ! appendSpecialDBObject( this , b , name , o ) ){
+                if ( ! o || o == JSVAL_NULL ){
+                    b.appendNull( name.c_str() );
+                }
+                else if ( ! appendSpecialDBObject( this , b , name , o ) ){
                     BSONObj sub = toObject( o );
                     if ( JS_IsArrayObject( _context , o ) ){
                         b.appendArray( name.c_str() , sub );
@@ -164,6 +168,7 @@ namespace mongo {
                 }
                 break;
             }
+
             case JSTYPE_FUNCTION: {
                 string s = toString(val);
                 if ( s[0] == '/' ){
