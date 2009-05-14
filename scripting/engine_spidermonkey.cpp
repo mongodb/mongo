@@ -109,6 +109,11 @@ namespace mongo {
             
             BSONObjBuilder b;
             
+            jsval theid = getProperty( o , "_id" );
+            if ( ! JSVAL_IS_VOID( theid ) ){
+                append( b , "_id" , theid );
+            }
+
             JSIdArray * properties = JS_Enumerate( _context , o );
             assert( properties );
 
@@ -117,6 +122,8 @@ namespace mongo {
                 jsval nameval;
                 assert( JS_IdToValue( _context ,id , &nameval ) );
                 string name = toString( nameval );
+                if ( name == "_id" )
+                    continue;
                 append( b , name , getProperty( o , name.c_str() ) );
             }
             
