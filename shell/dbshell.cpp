@@ -267,6 +267,8 @@ int main(int argc, char* argv[]) {
     for ( ; argNumber < argc; argNumber++) {
         const char* str = argv[argNumber];
 
+        mongo::shellUtils::MongoProgramScope s;
+
         if ( ! scope->execFile( str , false , true , false ) ){
             return -3;
         }
