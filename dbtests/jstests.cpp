@@ -214,6 +214,35 @@ namespace JSTests {
             delete s;
         }
     };
+
+    class OtherJSTypes {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            { // date
+                BSONObj o;
+                { 
+                    BSONObjBuilder b;
+                    b.appendDate( "d" , 123456789 );
+                    o = b.obj();
+                }
+                s->setObject( "x" , o );
+                
+                s->invoke( "return x.d.getTime() != 12;" , BSONObj() );
+                ASSERT_EQUALS( true, s->getBoolean( "return" ) );
+                
+                s->invoke( "z = x.d.getTime();" , BSONObj() );
+                ASSERT_EQUALS( 123456789 , s->getNumber( "z" ) );
+            }
+
+            { // regex 
+
+            }
+
+            delete s;
+        }
+    };
     
     class All : public Suite {
     public:
@@ -226,6 +255,7 @@ namespace JSTests {
             add< ObjectDecoding >();
             add< JSOIDTests >();
             add< ObjectModTests >();
+            add< OtherJSTypes >();
         }
     };
     
