@@ -481,11 +481,10 @@ namespace mongo {
             JS_AddRoot( cx, &fun_ );
             for( uintN i = 0; i < argc_; ++i )
                 JS_AddRoot( cx, &argv_[ i ] );
-            scope_.reset( dynamic_cast< SMScope * >( globalScriptEngine->createScope() ) );
-            scope_->externalSetup();
         }
         ~JSThreadConfig() {
-            thread_->join(); // don't want to deal with cleaning up while thread is running
+            if ( started_ )
+                thread_->join(); // don't want to deal with cleaning up while thread is running
             JS_RemoveRoot( cx_, &obj_ );
             JS_RemoveRoot( cx_, &fun_ );
             for( uintN i = 0; i < argc_; ++i )
@@ -495,6 +494,9 @@ namespace mongo {
         }
         void start() {
             massert( "Thread already started", !started_ );
+            scope_.reset( dynamic_cast< SMScope * >( globalScriptEngine->createScope() ) );
+            scope_->externalSetup( true );
+            // TODO install shell utils?
             JSThread jt( *this );
             thread_.reset( new boost::thread( jt ) );
             started_ = true;
@@ -587,7 +589,7 @@ namespace mongo {
     
     // ---- other stuff ----
     
-    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local ){
+    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local, bool debug ){
 
         assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
         
@@ -598,8 +600,11 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &thread_class , thread_constructor , 0 , 0 , thread_functions , 0 , 0 ) );
 
+        if ( !debug ) {
+                        
         scope->exec( jsconcatcode );
 
+        }
     }
 
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o ){
