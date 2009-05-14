@@ -2,6 +2,8 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
+#include <boost/smart_ptr.hpp>
+
 namespace mongo {
     
     // ------------    some defs needed ---------------
@@ -118,6 +120,8 @@ namespace mongo {
         }
         
         JS_SetPrivate( cx , obj , (void*)conn );
+        jsval host_val = c.toval( host.c_str() );
+        assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
         return JS_TRUE;
 
     }
@@ -460,6 +464,95 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
     
+    // thread
+    
+    class JSThreadConfig {
+    public:
+        JSThreadConfig( JSContext *cx, JSObject *obj, uintN argc, jsval *argv ) : started_(), done_(), cx_( cx ), obj_( obj ) {
+            massert( "need at least one argument", argc > 0 );
+            massert( "first argument must be a function", JS_TypeOfValue( cx, argv[ 0 ] ) == JSTYPE_FUNCTION );
+            f_ = JS_ValueToFunction( cx, argv[ 0 ] );
+            argc_ = argc - 1;
+            argv_.reset( new jsval[ argc_ ] );
+            for( uintN i = 0; i < argc_; ++i )
+                argv_[ i ] = argv[ i + 1 ];
+        }
+        void start() {
+            massert( "Thread already started", !started_ );
+            JSThread jt( *this );
+            thread_.reset( new boost::thread( jt ) );
+            started_ = true;
+        }
+        void join() {
+            massert( "Thread not running", started_ && !done_ );
+            thread_->join();
+            done_ = true;
+        }
+        jsval returnData() {
+            if ( !done_ )
+                join();
+            return returnData_;
+        }
+    private:
+        class JSThread {
+        public:
+            JSThread( JSThreadConfig &config ) : config_( config ) {}
+            void operator()() {
+                massert( "function call failure",
+                        JS_TRUE == JS_CallFunction( config_.cx_, config_.obj_, config_.f_, config_.argc_, config_.argv_.get(), &config_.returnData_ ) );
+            }
+        private:
+            JSThreadConfig &config_;
+        };
+        
+        bool started_;
+        bool done_;
+        JSContext *cx_;
+        JSObject *obj_;
+        JSFunction *f_;
+        uintN argc_;
+        boost::scoped_array< jsval > argv_;
+        auto_ptr< boost::thread > thread_;
+        jsval returnData_;
+    };
+    
+    JSClass thread_class = {
+        "Thread" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS        
+    };
+    
+    JSBool thread_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        JS_SetPrivate( cx , obj , (void*) new JSThreadConfig( cx, obj, argc, argv ) );
+        return JS_TRUE;
+    }
+
+    JSBool thread_start(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        JSThreadConfig * config = (JSThreadConfig*)JS_GetPrivate( cx , obj );
+        config->start();
+        return JS_TRUE;
+    }
+
+    JSBool thread_join(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        JSThreadConfig * config = (JSThreadConfig*)JS_GetPrivate( cx , obj );
+        config->join();
+        return JS_TRUE;
+    }
+    
+    JSBool thread_returnData(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        JSThreadConfig * config = (JSThreadConfig*)JS_GetPrivate( cx , obj );
+        *rval = config->returnData();
+        return JS_TRUE;
+    }
+    
+    JSFunctionSpec thread_functions[] = {
+        { "start" , thread_start , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { "join" , thread_join , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { "returnData" , thread_returnData , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
+        { 0 }
+    };
+    
     // ---- other stuff ----
     
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local ){
@@ -471,8 +564,8 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &thread_class , thread_constructor , 0 , 0 , thread_functions , 0 , 0 ) );
 
-        
         scope->exec( jsconcatcode );
 
     }

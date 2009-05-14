@@ -6,6 +6,14 @@
 
 #include <boost/filesystem/operations.hpp>
 
+namespace mongo {
+    DBClientBase *createDirectClient() {
+        cout << "no direct client available" << endl;
+        assert( false );
+        return 0;
+    }    
+} // namespace mongo
+
 using namespace std;
 using namespace mongo;
 

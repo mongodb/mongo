@@ -2,6 +2,10 @@
 
 var baseName = "jstests_pair1test";
 
+debug = function( p ) {
+//    print( p );
+}
+
 ismaster = function( n ) {
     var im = n.getDB( "admin" ).runCommand( { "ismaster" : 1 } );
 //    print( "ismaster: " + tojson( im ) );
@@ -67,18 +71,22 @@ doTest = function( signal ) {
     
     checkWrite( rp.master(), rp.slave() );
     
+    debug( "kill first" );
     rp.killNode( rp.master(), signal );
     rp.waitForSteadyState( [ 1, null ], rp.slave().host );
     writeOne( rp.master() );
     
+    debug( "restart first" );
     rp.start( true );
     rp.waitForSteadyState();
     check( rp.slave() );
     checkWrite( rp.master(), rp.slave() );
 
+    debug( "kill second" );
     rp.killNode( rp.master(), signal );
     rp.waitForSteadyState( [ 1, null ], rp.slave().host );
 
+    debug( "restart second" );
     rp.start( true );
     rp.waitForSteadyState( [ 1, 0 ], rp.master().host );
     checkWrite( rp.master(), rp.slave() );

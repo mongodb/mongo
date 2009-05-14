@@ -169,15 +169,6 @@ ObjectId.prototype.tojson = function(){
 
 ObjectId.prototype.isObjectId = true;
 
-Thread = function(){
-    this.init.apply( this, arguments );
-}
-
-if ( typeof( threadInject ) == "function" )
-    threadInject( Thread.prototype );
-else
-    print( "warning: thread management won't work" );
-
 fork = function() {
     var t = new Thread( function() {} );
     Thread.apply( t, arguments );
