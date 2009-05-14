@@ -234,12 +234,38 @@ namespace JSTests {
                 
                 s->invoke( "z = x.d.getTime();" , BSONObj() );
                 ASSERT_EQUALS( 123456789 , s->getNumber( "z" ) );
+                
+                s->invoke( "z = { z : x.d }" , BSONObj() );
+                BSONObj out = s->getObject( "z" );
+                ASSERT( out["z"].type() == Date );
             }
 
-            { // regex 
+            { // regex
+                BSONObj o;
+                { 
+                    BSONObjBuilder b;
+                    b.appendRegex( "r" , "^a" , "i" );
+                    o = b.obj();
+                }
+                s->setObject( "x" , o );
+                
+                s->invoke( "z = x.r.test( 'b' );" , BSONObj() );
+                ASSERT_EQUALS( false , s->getBoolean( "z" ) );
+
+                s->invoke( "z = x.r.test( 'a' );" , BSONObj() );
+                ASSERT_EQUALS( true , s->getBoolean( "z" ) );
+
+                s->invoke( "z = x.r.test( 'ba' );" , BSONObj() );
+                ASSERT_EQUALS( false , s->getBoolean( "z" ) );
+
+                s->invoke( "z = { a : x.r };" , BSONObj() );
+
+                //BSONObj out = s->getObject("z");
+                //ASSERT_EQUALS( (string)"^a" , out["a"].regex() );
+                //ASSERT_EQUALS( (string)"i" , out["a"].regexFlags() );
 
             }
-
+            
             delete s;
         }
     };
