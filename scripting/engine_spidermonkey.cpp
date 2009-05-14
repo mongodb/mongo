@@ -772,7 +772,6 @@ namespace mongo {
         }
 
         JSContext *context() const { return _context; }
-        JSObject *global() const { return _global; }
         
     private:
         JSContext * _context;
