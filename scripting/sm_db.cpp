@@ -526,12 +526,11 @@ namespace mongo {
             started_ = true;
         }
         void join() {
-            if ( !done_ )
+            if ( thread_.get() )
                 thread_->join();
         }
         jsval returnData() {
-            if ( !done_ )
-                join();
+            join();
             return returnData_;
         }
     private:
