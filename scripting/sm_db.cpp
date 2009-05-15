@@ -538,7 +538,9 @@ namespace mongo {
         public:
             JSThread( JSThreadConfig &config ) : config_( config ) {}
             void operator()() {
+#ifdef JS_THREADSAFE
                 JS_SetContextThread( config_.scope_->context() );
+#endif
                 try {
                     massert( "function call failure",
                             JS_TRUE == JS_CallFunction( config_.scope_->context(), config_.obj_, config_.f_, config_.argc_, config_.argv_.get(), &config_.returnData_ ) );
@@ -546,7 +548,9 @@ namespace mongo {
                     config_.done_ = true;
                 } catch ( ... ) {
                 }
+#ifdef JS_THREADSAFE
                 JS_ClearContextThread( config_.scope_->context() );
+#endif
             }
         private:
             JSThreadConfig &config_;

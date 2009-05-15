@@ -2,7 +2,7 @@
 
 #pragma once
 
-#define JS_THREADSAFE
+//#define JS_THREADSAFE
 
 #include "engine.h"
 
