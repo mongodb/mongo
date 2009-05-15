@@ -317,8 +317,8 @@ namespace mongo {
 
             case Timestamp: {
                 JSObject * o = JS_NewObject( _context , &timestamp_class , 0 , 0 );
-                setProperty( o , "time" , toval( (double)(e.timestampTime()) ) );
-                setProperty( o , "inc" , toval( (double)(e.timestampInc()) ) );
+                setProperty( o , "t" , toval( (double)(e.timestampTime()) ) );
+                setProperty( o , "i" , toval( (double)(e.timestampInc()) ) );
                 return OBJECT_TO_JSVAL( o );
             }
 

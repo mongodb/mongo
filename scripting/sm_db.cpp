@@ -652,7 +652,7 @@ namespace mongo {
         }
         
         if ( JS_InstanceOf( c->_context , o , &timestamp_class , 0 ) ){
-            b.appendTimestamp( name.c_str() , (unsigned long long)c->getNumber( o , "time" ) , (unsigned int )c->getNumber( o , "inc" ) );
+            b.appendTimestamp( name.c_str() , (unsigned long long)c->getNumber( o , "t" ) , (unsigned int )c->getNumber( o , "i" ) );
             return true;
         }
         
