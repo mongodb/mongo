@@ -290,8 +290,8 @@ namespace JSTests {
 
             {
                 BSONObj t = b.done();
-                ASSERT_EQUALS( 1234000 , t["d"].timestampTime() );
-                ASSERT_EQUALS( 9876 , t["d"].timestampInc() );
+                ASSERT_EQUALS( 1234000U , t["d"].timestampTime() );
+                ASSERT_EQUALS( 9876U , t["d"].timestampInc() );
             }
 
             s->setObject( "z" , b.obj() );
@@ -304,9 +304,9 @@ namespace JSTests {
             ASSERT_EQUALS( MaxKey , out["c"].type() );
             ASSERT_EQUALS( Timestamp , out["d"].type() );
 
-            ASSERT_EQUALS( 9876 , out["d"].timestampInc() );
-            ASSERT_EQUALS( 1234000 , out["d"].timestampTime() );
-            ASSERT_EQUALS( 123456789 , out["a"].date() );
+            ASSERT_EQUALS( 9876U , out["d"].timestampInc() );
+            ASSERT_EQUALS( 1234000U , out["d"].timestampTime() );
+            ASSERT_EQUALS( 123456789U , out["a"].date() );
 
 
             delete s;

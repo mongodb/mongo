@@ -659,7 +659,7 @@ namespace mongo {
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             if ( d ){
-                b.appendDate( name.c_str() , d );
+                b.appendDate( name.c_str() , (unsigned long long)d );
                 return true;
             }
         }
