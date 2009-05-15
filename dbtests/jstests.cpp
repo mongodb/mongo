@@ -293,14 +293,16 @@ namespace JSTests {
                 ASSERT_EQUALS( 1234000 , t["d"].timestampTime() );
                 ASSERT_EQUALS( 9876 , t["d"].timestampInc() );
             }
+
             s->setObject( "z" , b.obj() );
             
-            assert( s->invoke( "y = { a : z.a , b : z.b , c : z.c }" , BSONObj() ) == 0 );
+            assert( s->invoke( "y = { a : z.a , b : z.b , c : z.c , d: z.d }" , BSONObj() ) == 0 );
 
             BSONObj out = s->getObject( "y" );
             ASSERT_EQUALS( Timestamp , out["a"].type() );
             ASSERT_EQUALS( MinKey , out["b"].type() );
             ASSERT_EQUALS( MaxKey , out["c"].type() );
+            ASSERT_EQUALS( Timestamp , out["d"].type() );
 
             ASSERT_EQUALS( 9876 , out["d"].timestampInc() );
             ASSERT_EQUALS( 1234000 , out["d"].timestampTime() );

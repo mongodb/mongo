@@ -655,8 +655,6 @@ namespace mongo {
         }
         
         if ( JS_InstanceOf( c->_context , o , &timestamp_class , 0 ) ){
-            cout << "A: " << c->getNumber( o , "time" ) << endl;
-            cout << "B: " << c->getNumber( o , "inc" ) << endl;
             b.appendTimestamp( name.c_str() , (unsigned long long)c->getNumber( o , "time" ) , (unsigned int )c->getNumber( o , "inc" ) );
             return true;
         }
