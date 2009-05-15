@@ -28,6 +28,7 @@
 
 #include "../stdafx.h"
 #include "../util/builder.h"
+#include "../util/optime.h"
 #include "boost/utility.hpp"
 
 #include <set>
@@ -1006,6 +1007,11 @@ namespace mongo {
             b.append( (char) Timestamp );
             b.append( fieldName );
             b.append( val );
+        }
+
+        void appendTimestamp( const char *fieldName , unsigned long long time , unsigned int inc ){
+            OpTime t( time / 1000 , inc );
+            appendTimestamp( fieldName , t.asDate() );
         }
         
         /* Deprecated (but supported) */
