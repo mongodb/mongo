@@ -1020,7 +1020,8 @@ for id in [ "", "util/", "db/" , "client/" ]:
 
 #lib
 env.Install( installDir + "/" + nixLibPrefix, clientLibName )
-env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
+if usejvm:
+    env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #textfiles
 if distBuild or release:

@@ -1010,7 +1010,7 @@ namespace mongo {
         }
 
         void appendTimestamp( const char *fieldName , unsigned long long time , unsigned int inc ){
-            OpTime t( time / 1000 , inc );
+            OpTime t( (unsigned) (time / 1000) , inc );
             appendTimestamp( fieldName , t.asDate() );
         }
         

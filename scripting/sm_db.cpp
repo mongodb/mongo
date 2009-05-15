@@ -2,8 +2,6 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
-#include <boost/smart_ptr.hpp>
-
 namespace mongo {
     
     // ------------    some defs needed ---------------
@@ -473,7 +471,7 @@ namespace mongo {
         if ( ! JSVAL_IS_NUMBER( id ) )
             return JS_TRUE;
 
-        jsval val;
+        jsval val = JSVAL_VOID;
         assert( JS_CallFunctionName( cx , obj , "arrayAccess" , 1 , &id , &val ) );
         Convertor c(cx);
         c.setProperty( obj , c.toString( id ).c_str() , val );
