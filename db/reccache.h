@@ -33,7 +33,7 @@ class RecCache {
         bool dirty;
         Node *older, *newer; // lru
     };
-    boost::mutex rcmutex; // mainly to coordinate with the lazy writer thread
+    boost::mutex &rcmutex; // mainly to coordinate with the lazy writer thread
     unsigned recsize;
     map<DiskLoc, Node*> m; // the cache
     Node *newest, *oldest;
@@ -118,7 +118,7 @@ private:
 public:
     /* all public functions (except constructor) should use the mutex */
 
-    RecCache(unsigned recsz) : recsize(recsz) { 
+    RecCache(unsigned recsz) : rcmutex( *( new boost::mutex() ) ), recsize(recsz) { 
         nnodes = 0;
         newest = oldest = 0;
     }
