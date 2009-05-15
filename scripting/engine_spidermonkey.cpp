@@ -109,6 +109,11 @@ namespace mongo {
             
             BSONObjBuilder b;
             
+            jsval theid = getProperty( o , "_id" );
+            if ( ! JSVAL_IS_VOID( theid ) ){
+                append( b , "_id" , theid );
+            }
+
             JSIdArray * properties = JS_Enumerate( _context , o );
             assert( properties );
 
@@ -117,6 +122,8 @@ namespace mongo {
                 jsval nameval;
                 assert( JS_IdToValue( _context ,id , &nameval ) );
                 string name = toString( nameval );
+                if ( name == "_id" )
+                    continue;
                 append( b , name , getProperty( o , name.c_str() ) );
             }
             
@@ -142,6 +149,7 @@ namespace mongo {
         }
 
         void append( BSONObjBuilder& b , string name , jsval val ){
+            //cout << "name: " << name << "\t" << typeString( val ) << endl;
             switch ( JS_TypeOfValue( _context , val ) ){
 
             case JSTYPE_VOID: b.appendUndefined( name.c_str() ); break;
@@ -149,10 +157,14 @@ namespace mongo {
                 
             case JSTYPE_NUMBER: b.append( name.c_str() , toNumber( val ) ); break;
             case JSTYPE_STRING: b.append( name.c_str() , toString( val ) ); break;
-                
+            case JSTYPE_BOOLEAN: b.appendBool( name.c_str() , toBoolean( val ) ); break;
+
             case JSTYPE_OBJECT: {
                 JSObject * o = JSVAL_TO_OBJECT( val );
-                if ( ! appendSpecialDBObject( this , b , name , o ) ){
+                if ( ! o || o == JSVAL_NULL ){
+                    b.appendNull( name.c_str() );
+                }
+                else if ( ! appendSpecialDBObject( this , b , name , o ) ){
                     BSONObj sub = toObject( o );
                     if ( JS_IsArrayObject( _context , o ) ){
                         b.appendArray( name.c_str() , sub );
@@ -163,7 +175,19 @@ namespace mongo {
                 }
                 break;
             }
-            case JSTYPE_FUNCTION: b.appendCode( name.c_str() , getFunctionCode( val ).c_str() ); break;
+
+            case JSTYPE_FUNCTION: {
+                string s = toString(val);
+                if ( s[0] == '/' ){
+                    s = s.substr(1);
+                    string::size_type end = s.rfind( '/' );
+                    b.appendRegex( name.c_str() , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
+                }
+                else {
+                    b.appendCode( name.c_str() , getFunctionCode( val ).c_str() ); 
+                }
+                break;
+            }
                 
             default: uassert( (string)"can't append field.  name:" + name + " type: " + typeString( val ) , 0 );
             }
@@ -278,13 +302,26 @@ namespace mongo {
                 assert( r );
                 return OBJECT_TO_JSVAL( r );
             }
-            case 13:{
+            case Code:{
                 JSFunction * func = compileFunction( e.valuestr() );
                 return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
             }
             case Date: 
                 return OBJECT_TO_JSVAL( js_NewDateObjectMsec( _context , (jsdouble) e.date() ) );
                 
+            case MinKey:
+                return OBJECT_TO_JSVAL( JS_NewObject( _context , &minkey_class , 0 , 0 ) );
+
+            case MaxKey:
+                return OBJECT_TO_JSVAL( JS_NewObject( _context , &maxkey_class , 0 , 0 ) );
+
+            case Timestamp: {
+                JSObject * o = JS_NewObject( _context , &timestamp_class , 0 , 0 );
+                setProperty( o , "t" , toval( (double)(e.timestampTime()) ) );
+                setProperty( o , "i" , toval( (double)(e.timestampInc()) ) );
+                return OBJECT_TO_JSVAL( o );
+            }
+
             default:
                 log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
@@ -333,6 +370,10 @@ namespace mongo {
         
         bool getBoolean( JSObject * o , const char * field ){
             return toBoolean( getProperty( o , field ) );
+        }
+
+        double getNumber( JSObject * o , const char * field ){
+            return toNumber( getProperty( o , field ) );
         }
         
         string getString( JSObject * o , const char * field ){
@@ -437,8 +478,35 @@ namespace mongo {
         return JS_TRUE;
     }
 
+    JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+        Convertor c(cx);
+        uassert( "native_helper needs at least 1 arg" , argc >= 1 );
+
+        NativeFunction func = (NativeFunction)JSVAL_TO_PRIVATE( argv[0] );
+
+        BSONObjBuilder args;
+        for ( uintN i=1; i<argc; i++ ){
+            c.append( args , args.numStr( i ) , argv[i] );
+        }
+
+        BSONObj out = func( args.obj() );
+        
+        if ( out.isEmpty() ){
+            *rval = JSVAL_VOID;
+        }
+        else {
+            *rval = c.toval( out.firstElement() );
+        }
+
+        return JS_TRUE;
+    }
+
+    JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval );
+
     JSFunctionSpec globalHelpers[] = { 
         { "print" , &native_print , 0 , 0 , 0 } , 
+        { "nativeHelper" , &native_helper , 1 , 0 , 0 } , 
+        { "load" , &native_load , 1 , 0 , 0 } , 
         { 0 , 0 , 0 , 0 , 0 } 
     };
 
@@ -586,8 +654,12 @@ namespace mongo {
 
         }
 
+        void externalSetup( bool master ){
+            initMongoJS( this , _context , _global , false, master );
+        }
+
         void localConnect( const char * dbName ){
-            initMongoJS( this , _context , _global , true );
+            initMongoJS( this , _context , _global , true, true );
             
             exec( "_mongo = new Mongo();" );
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
@@ -674,10 +746,25 @@ namespace mongo {
             currentScope.reset( this );
         }
         
-        void exec( const char * code ){
+        bool exec( const string& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true ){
             precall();
-            jsval ret;
-            assert( JS_EvaluateScript( _context , _global , code , strlen( code ) , "anon" , 0 , &ret ) );
+            
+            jsval ret = JSVAL_VOID;
+            
+            JSBool worked = JS_EvaluateScript( _context , _global , code.c_str() , strlen( code.c_str() ) , name.c_str() , 0 , &ret );
+
+            if ( assertOnError )
+                uassert( name + " exec failed" , worked );
+            
+            if ( reportError && ! _error.empty() ){
+                // cout << "exec error: " << _error << endl;
+                // already printed in reportError, so... TODO
+            }
+            
+            if ( worked && printResult && ! JSVAL_IS_VOID( ret ) )
+                cout << _convertor->toString( ret ) << endl;
+
+            return worked;
         }
 
         int invoke( JSFunction * func , const BSONObj& args ){
@@ -714,6 +801,18 @@ namespace mongo {
             return _error;
         }
 
+        void injectNative( const char *field, NativeFunction func ){
+            string name = field;
+            _convertor->setProperty( _global , (name + "_").c_str() , PRIVATE_TO_JSVAL( func ) );
+            
+            stringstream code;
+            code << field << " = function(){ var a = [ " << field << "_ ]; for ( var i=0; i<arguments.length; i++ ){ a.push( arguments[i] ); } return nativeHelper.apply( null , a ); }";
+            exec( code.str().c_str() );
+            
+        }
+
+        JSContext *context() const { return _context; }
+        
     private:
         JSContext * _context;
         Convertor * _convertor;
@@ -738,6 +837,24 @@ namespace mongo {
         // TODO: send to Scope
     }
 
+    JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+        Convertor c(cx);
+
+        Scope * s = currentScope.get();
+
+        for ( uintN i=0; i<argc; i++ ){
+            string filename = c.toString( argv[i] );
+            cout << "should load [" << filename << "]" << endl;
+            
+            if ( ! s->execFile( filename , false , true , false ) ){
+                JS_ReportError( cx , ((string)"error loading file: " + filename ).c_str() );
+                return JS_FALSE;
+            }
+        }
+        
+        return JS_TRUE;
+    }
+    
 
 
     void SMEngine::runTest(){

@@ -118,6 +118,12 @@ namespace JSTests {
             s->setThis( & o );
             s->invoke( "return this.z;" , BSONObj() );
             ASSERT_EQUALS( "sara" , s->getString( "return" ) );
+
+            s->invoke( "this.z == 'sara';" , BSONObj() );
+            ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+
+            s->invoke( "this.z == 'asara';" , BSONObj() );
+            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
             
             s->invoke( "return this.x == 17;" , BSONObj() );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
@@ -214,7 +220,100 @@ namespace JSTests {
             delete s;
         }
     };
-    
+
+    class OtherJSTypes {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            { // date
+                BSONObj o;
+                { 
+                    BSONObjBuilder b;
+                    b.appendDate( "d" , 123456789 );
+                    o = b.obj();
+                }
+                s->setObject( "x" , o );
+                
+                s->invoke( "return x.d.getTime() != 12;" , BSONObj() );
+                ASSERT_EQUALS( true, s->getBoolean( "return" ) );
+                
+                s->invoke( "z = x.d.getTime();" , BSONObj() );
+                ASSERT_EQUALS( 123456789 , s->getNumber( "z" ) );
+                
+                s->invoke( "z = { z : x.d }" , BSONObj() );
+                BSONObj out = s->getObject( "z" );
+                ASSERT( out["z"].type() == Date );
+            }
+
+            { // regex
+                BSONObj o;
+                { 
+                    BSONObjBuilder b;
+                    b.appendRegex( "r" , "^a" , "i" );
+                    o = b.obj();
+                }
+                s->setObject( "x" , o );
+                
+                s->invoke( "z = x.r.test( 'b' );" , BSONObj() );
+                ASSERT_EQUALS( false , s->getBoolean( "z" ) );
+
+                s->invoke( "z = x.r.test( 'a' );" , BSONObj() );
+                ASSERT_EQUALS( true , s->getBoolean( "z" ) );
+
+                s->invoke( "z = x.r.test( 'ba' );" , BSONObj() );
+                ASSERT_EQUALS( false , s->getBoolean( "z" ) );
+
+                s->invoke( "z = { a : x.r };" , BSONObj() );
+
+                BSONObj out = s->getObject("z");
+                ASSERT_EQUALS( (string)"^a" , out["a"].regex() );
+                ASSERT_EQUALS( (string)"i" , out["a"].regexFlags() );
+
+            }
+            
+            delete s;
+        }
+    };
+
+    class SpecialDBTypes {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+
+            BSONObjBuilder b;
+            b.appendTimestamp( "a" , 123456789 );
+            b.appendMinKey( "b" );
+            b.appendMaxKey( "c" );
+            b.appendTimestamp( "d" , 1234000 , 9876 );
+            
+
+            {
+                BSONObj t = b.done();
+                ASSERT_EQUALS( 1234000 , t["d"].timestampTime() );
+                ASSERT_EQUALS( 9876 , t["d"].timestampInc() );
+            }
+
+            s->setObject( "z" , b.obj() );
+            
+            assert( s->invoke( "y = { a : z.a , b : z.b , c : z.c , d: z.d }" , BSONObj() ) == 0 );
+
+            BSONObj out = s->getObject( "y" );
+            ASSERT_EQUALS( Timestamp , out["a"].type() );
+            ASSERT_EQUALS( MinKey , out["b"].type() );
+            ASSERT_EQUALS( MaxKey , out["c"].type() );
+            ASSERT_EQUALS( Timestamp , out["d"].type() );
+
+            ASSERT_EQUALS( 9876 , out["d"].timestampInc() );
+            ASSERT_EQUALS( 1234000 , out["d"].timestampTime() );
+            ASSERT_EQUALS( 123456789 , out["a"].date() );
+
+
+            delete s;
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() {
@@ -226,6 +325,8 @@ namespace JSTests {
             add< ObjectDecoding >();
             add< JSOIDTests >();
             add< ObjectModTests >();
+            add< OtherJSTypes >();
+            add< SpecialDBTypes >();
         }
     };
     

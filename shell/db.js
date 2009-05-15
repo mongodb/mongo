@@ -435,7 +435,7 @@ DB.prototype.getCollectionNames = function(){
 }
 
 DB.prototype.tojson = function(){
-    return this.toString();
+    return this._name;
 }
 
 DB.prototype.toString = function(){

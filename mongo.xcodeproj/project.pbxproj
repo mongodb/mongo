@@ -27,6 +27,8 @@
 		931187AE0F85463700A6DC44 /* pair3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = pair3.js; sourceTree = "<group>"; };
 		931974610FB8C2BD001FE537 /* count.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = count.js; sourceTree = "<group>"; };
 		931974EE0FB9C3A5001FE537 /* diskfull.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = diskfull.js; sourceTree = "<group>"; };
+		931979800FBC67FB001FE537 /* mongo_vstudio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = mongo_vstudio.cpp; sourceTree = "<group>"; };
+		931979810FBC67FB001FE537 /* utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = utils.cpp; sourceTree = "<group>"; };
 		931A027A0F58AA4400147C0E /* jsobjmanipulator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jsobjmanipulator.h; sourceTree = "<group>"; };
 		93202DE40F879CB600AF3B71 /* all.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = all.js; sourceTree = "<group>"; };
 		93278F570F72D32900844664 /* gridfs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = gridfs.cpp; sourceTree = "<group>"; };
@@ -323,6 +325,8 @@
 		9302D9920F30AB8C00DFA4EF /* shell */ = {
 			isa = PBXGroup;
 			children = (
+				931979800FBC67FB001FE537 /* mongo_vstudio.cpp */,
+				931979810FBC67FB001FE537 /* utils.cpp */,
 				9302D9930F30AB8C00DFA4EF /* collection.js */,
 				9302D9940F30AB8C00DFA4EF /* db.js */,
 				9302D9950F30AB8C00DFA4EF /* dbshell.cpp */,

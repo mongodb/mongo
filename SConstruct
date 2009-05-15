@@ -207,12 +207,13 @@ coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.c
 serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp" )
 
 if usesm:
-    serverOnlyFiles += [ "scripting/engine_spidermonkey.cpp" ]
+    commonFiles += [ "scripting/engine_spidermonkey.cpp" ]
     nojni = True
 elif not nojni:
-    serverOnlyFiles += [ "scripting/engine_java.cpp" ]
+    commonFiles += [ "scripting/engine_java.cpp" ]
 else:
-    serverOnlyFiles += [ "scripting/engine_none.cpp" ]
+    commonFiles += [ "scripting/engine_none.cpp" ]
+    nojni = True
 
 coreShardFiles = []
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
@@ -499,12 +500,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
         return False
 
-    if shell:
-        if windows:
-            myenv.Append( LIBS=["v8"] )
-        else:
-            myCheckLib( "v8" , True )
-
     if needPcre and not conf.CheckCXXHeader( 'pcrecpp.h' ):
         print( "can't find pcre" )
         Exit(1)
@@ -582,15 +577,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     return conf.Finish()
 
 env = doConfigure( env )
-# --- v8 ---
-
-v8Home = GetOption( "v8home" )
-
-if not os.path.exists( v8Home ):
-    for poss in [ "../v8" , "../../v8/" , "../open-source/v8" ]:
-        if os.path.exists( poss ):
-            v8Home = poss
-            break
 
 # --- js concat ---
 
@@ -715,15 +701,11 @@ if darwin or clientEnv["_HAVEPCAP"]:
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
 # --- shell ---
-# shell is complicated by the fact that v8 doesn't work 64-bit yet
 
 env.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
 env.JSHeader( "shell/mongo.jsall" )
 
 shellEnv = env.Clone();
-
-shellEnv.Append( CPPPATH=[ "../" , v8Home + "/include/" ] )
-shellEnv.Append( LIBPATH=[ v8Home] )
 
 if release and ( ( darwin and force64 ) or linux64 ):
     shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
@@ -733,14 +715,7 @@ if release and ( ( darwin and force64 ) or linux64 ):
 if noshell:
     print( "not building shell" )
 elif not onlyServer:
-    weird = linux64 or force64
-
-    if linux64:
-        shellEnv.Append( CFLAGS="-m32" )
-        shellEnv.Append( CXXFLAGS="-m32" )
-        shellEnv.Append( LINKFLAGS="-m32" )
-        shellEnv.Append( LIBPATH=[ "/usr/lib32" , "/usr/lib" ] )
-        shellEnv["LIBPATH"].remove( "/usr/lib64" )
+    weird = force64
 
     if force64:
         shellEnv["CFLAGS"].remove("-m64")
@@ -762,7 +737,7 @@ elif not onlyServer:
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
-    coreShellFiles = [ "shell/MongoJS.cpp" , "shell/ShellUtils.cpp" , "shell/dbshell.cpp" , "scripting/engine_v8.cpp" ]
+    coreShellFiles = [ "shell/dbshell.cpp" , "shell/utils.cpp" ]
 
     if weird:
         shell32BitFiles = coreShellFiles

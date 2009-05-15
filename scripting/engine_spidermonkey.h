@@ -2,6 +2,7 @@
 
 #pragma once
 
+#define JS_THREADSAFE
 
 #include "engine.h"
 
@@ -40,7 +41,11 @@ namespace mongo {
     
     extern JSClass bson_class;
     extern JSClass bson_ro_class;
+
     extern JSClass object_id_class;
+    extern JSClass timestamp_class;
+    extern JSClass minkey_class;
+    extern JSClass maxkey_class;
 
     // internal things
     void dontDeleteScope( SMScope * s ){}
@@ -52,6 +57,6 @@ namespace mongo {
 
 
     // mongo
-    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local );
+    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local, bool master );
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o );
 }
