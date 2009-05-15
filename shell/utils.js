@@ -10,10 +10,11 @@ assert.eq = function( a , b , msg ){
     if ( a == b )
         return;
 
-    if ( a != null && b != null && a.toString() == b.toString() )
+    if ( ( a != null && b != null ) && 
+         ( a.toString() == b.toString() || a == b || tojson( a ) == tojson( b ) ) )
         return;
 
-    throw "[" + a + "] != [" + b + "] are not equal : " + msg;
+    throw "[" + tojson( a ) + "] != [" + tojson( b ) + "] are not equal : " + msg;
 }
 
 assert.neq = function( a , b , msg ){
