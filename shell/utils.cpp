@@ -142,6 +142,7 @@ namespace mongo {
         }
 
         map< int, pair< pid_t, int > > dbs;
+        map< pid_t, int > shells;
         
         char *copyString( const char *original ) {
             char *ret = reinterpret_cast< char * >( malloc( strlen( original ) + 1 ) );
@@ -152,10 +153,13 @@ namespace mongo {
         boost::mutex &mongoProgramOutputMutex( *( new boost::mutex ) );
         stringstream mongoProgramOutput_;
         
-        void writeMongoProgramOutputLine( int port, const char *line ) {
+        void writeMongoProgramOutputLine( int port, int pid, const char *line ) {
             boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
             stringstream buf;
-            buf << "m" << port << "| " << line;
+            if ( port > 0 )
+                buf << "m" << port << "| " << line;
+            else
+                buf << "sh" << pid << "| " << line;
             cout << buf.str() << endl;
             mongoProgramOutput_ << buf.str() << endl;
         }
@@ -169,7 +173,9 @@ namespace mongo {
             char **argv_;
             int port_;
             int pipe_;
+            pid_t pid_;
         public:
+            pid_t pid() const { return pid_; }
             MongoProgramRunner( const BSONObj &args ) {
                 assert( args.nFields() > 0 );
                 string program( args.firstElement().valuestrsafe() );
@@ -209,8 +215,11 @@ namespace mongo {
                 }
                 argv_[ args.nFields() ] = 0;
                 
-                assert( port_ > 0 );
-                if ( dbs.count( port_ ) != 0 ){
+                if ( program == "mongo" )
+                    port_ = 0;
+                else
+                    assert( port_ > 0 );
+                if ( port_ > 0 && dbs.count( port_ ) != 0 ){
                     cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
                     assert( dbs.count( port_ ) == 0 );        
                 }
@@ -221,10 +230,10 @@ namespace mongo {
                 assert( pipe( pipeEnds ) != -1 );
                 
                 fflush( 0 );
-                pid_t pid = fork();
-                assert( pid != -1 );
+                pid_ = fork();
+                assert( pid_ != -1 );
                 
-                if ( pid == 0 ) {
+                if ( pid_ == 0 ) {
                     assert( dup2( pipeEnds[ 1 ], STDOUT_FILENO ) != -1 );
                     assert( dup2( pipeEnds[ 1 ], STDERR_FILENO ) != -1 );
                     execvp( argv_[ 0 ], argv_ );
@@ -241,8 +250,11 @@ namespace mongo {
                 while( argv_[ i ] )
                     free( argv_[ i++ ] );
                 free( argv_ );
-                
-                dbs.insert( make_pair( port_, make_pair( pid, pipeEnds[ 1 ] ) ) );
+
+                if ( port_ > 0 )
+                    dbs.insert( make_pair( port_, make_pair( pid_, pipeEnds[ 1 ] ) ) );
+                else
+                    shells.insert( make_pair( pid_, pipeEnds[ 1 ] ) );
                 pipe_ = pipeEnds[ 0 ];
             }
             
@@ -259,15 +271,15 @@ namespace mongo {
                     assert( ret != -1 );
                     start[ ret ] = '\0';
                     if ( strlen( start ) != unsigned( ret ) )
-                        writeMongoProgramOutputLine( port_, "WARNING: mongod wrote null bytes to output" );
+                        writeMongoProgramOutputLine( port_, pid_, "WARNING: mongod wrote null bytes to output" );
                     char *last = buf;
                     for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
                         *i = '\0';
-                        writeMongoProgramOutputLine( port_, last );
+                        writeMongoProgramOutputLine( port_, pid_, last );
                     }
                     if ( ret == 0 ) {
                         if ( *last )
-                            writeMongoProgramOutputLine( port_, last );
+                            writeMongoProgramOutputLine( port_, pid_, last );
                         close( pipe_ );
                         break;
                     }
@@ -286,7 +298,7 @@ namespace mongo {
             MongoProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            return undefined_;
+            return BSON( "" << r.pid() );
         }
 
         BSONObj ResetDbpath( const BSONObj &a ) {
@@ -299,13 +311,18 @@ namespace mongo {
             return undefined_;
         }
         
-        void killDb( int port, int signal ) {
-            if( dbs.count( port ) != 1 ) {
-                cout << "No db started on port: " << port << endl;
-                return;
+        void killDb( int port, pid_t _pid, int signal ) {
+            pid_t pid;
+            if ( port > 0 ) {
+                if( dbs.count( port ) != 1 ) {
+                    cout << "No db started on port: " << port << endl;
+                    return;
+                }
+                pid = dbs[ port ].first;
+            } else {
+                pid = _pid;
             }
             
-            pid_t pid = dbs[ port ].first;
             assert( 0 == kill( pid, signal ) );
             
             int i = 0;
@@ -331,36 +348,59 @@ namespace mongo {
                 assert( "Failed to terminate process" == 0 );
             }
             
-            close( dbs[ port ].second );
-            dbs.erase( port );
+            if ( port > 0 ) {
+                close( dbs[ port ].second );
+                dbs.erase( port );
+            } else {
+                close( shells[ pid ] );
+                shells.erase( pid );
+            }
             if ( i > 4 || signal == SIGKILL ) {
                 sleepms( 4000 ); // allow operating system to reclaim resources
             }
         }
-                
-        BSONObj StopMongoProgram( const BSONObj &a ) {
-            assert( a.nFields() == 1 || a.nFields() == 2 );
-            assert( a.firstElement().isNumber() );
-            int port = int( a.firstElement().number() );
-            int signal = SIGTERM;
+
+        int getSignal( const BSONObj &a ) {
+            int ret = SIGTERM;
             if ( a.nFields() == 2 ) {
                 BSONObjIterator i( a );
                 i.next();
                 BSONElement e = i.next();
                 assert( e.isNumber() );
-                signal = int( e.number() );
+                ret = int( e.number() );
             }
-            killDb( port, signal );
+            return ret;
+        }
+        
+        BSONObj StopMongoProgram( const BSONObj &a ) {
+            assert( a.nFields() == 1 || a.nFields() == 2 );
+            assert( a.firstElement().isNumber() );
+            int port = int( a.firstElement().number() );
+            killDb( port, 0, getSignal( a ) );
             cout << "shell: stopped mongo program on port " << port << endl;
             return undefined_;
         }        
         
+        BSONObj StopMongoProgramByPid( const BSONObj &a ) {
+            assert( a.nFields() == 1 || a.nFields() == 2 );
+            assert( a.firstElement().isNumber() );
+            int pid = int( a.firstElement().number() );            
+            killDb( 0, pid, getSignal( a ) );
+            cout << "shell: stopped mongo program on pid " << pid << endl;
+            return undefined_;            
+        }
+                                                
         void KillMongoProgramInstances() {
             vector< int > ports;
             for( map< int, pair< pid_t, int > >::iterator i = dbs.begin(); i != dbs.end(); ++i )
                 ports.push_back( i->first );
             for( vector< int >::iterator i = ports.begin(); i != ports.end(); ++i )
-                killDb( *i, SIGTERM );
+                killDb( *i, 0, SIGTERM );            
+            vector< pid_t > pids;
+            for( map< pid_t, int >::iterator i = shells.begin(); i != shells.end(); ++i )
+                pids.push_back( i->first );
+            for( vector< pid_t >::iterator i = pids.begin(); i != pids.end(); ++i )
+                killDb( 0, *i, SIGTERM );
         }
         
         MongoProgramScope::~MongoProgramScope() {
@@ -385,6 +425,7 @@ namespace mongo {
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
             scope.injectNative( "stopMongoProgram", StopMongoProgram );        
+            scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );        
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
 #endif
