@@ -21,17 +21,6 @@ using namespace v8;
 using namespace boost::filesystem;
 using namespace mongo;
 
-BSONObj makeUndefined() {
-    BSONObjBuilder b;
-    b.appendUndefined( "" );
-    return b.obj();
-}
-BSONObj undefined_ = makeUndefined();
-
-BSONObj encapsulate( const BSONObj &obj ) {
-    return BSON( "" << obj );
-}
-
 BSONObj Print(const BSONObj &args) {
     bool first = true;
     BSONObjIterator i( args );
@@ -97,21 +86,6 @@ std::ostream& operator<<( std::ostream &s, const v8::TryCatch * try_catch ){
 
     return s;
 }
-
-BSONObj Load(const BSONObj& args) {
-    BSONObjIterator i( args );
-    while( i.more() ) {
-        BSONElement e = i.next();
-        if ( e.eoo() )
-            break;
-        assert( e.type() == mongo::String );
-        Handle<v8::String> source = ReadFile(e.valuestr());
-        massert( "error loading file", !source.IsEmpty() );
-        massert( "error executing file", ExecuteString(source, v8::String::New(e.valuestr()), false, true));
-    }
-    return undefined_;
-}
-
 
 BSONObj Quit(const BSONObj& args) {
     // If not arguments are given first element will be EOO, which
@@ -193,60 +167,6 @@ bool ExecuteString(Handle<v8::String> source, Handle<v8::Value> name,
     }
     
     return true;
-}
-
-void sleepms( int ms ) {
-    boost::xtime xt;
-    boost::xtime_get(&xt, boost::TIME_UTC);
-    xt.sec += ( ms / 1000 );
-    xt.nsec += ( ms % 1000 ) * 1000000;
-    if ( xt.nsec >= 1000000000 ) {
-        xt.nsec -= 1000000000;
-        xt.sec++;
-    }
-    boost::thread::sleep(xt);    
-}
-
-mongo::BSONObj JSSleep(const mongo::BSONObj &args){
-    assert( args.nFields() == 1 );
-    assert( args.firstElement().isNumber() );
-    int ms = int( args.firstElement().number() );
-    {
-        v8::Unlocker u;
-        sleepms( ms );
-    }
-    return undefined_;
-}
-
-BSONObj ListFiles(const BSONObj& args){
-    jsassert( args.nFields() == 1 , "need to specify 1 argument to listFiles" );
-    
-    BSONObjBuilder lst;
-    
-    path root( args.firstElement().valuestrsafe() );
-    
-    directory_iterator end;
-    directory_iterator i( root);
-    
-    int num =0;
-    while ( i != end ){
-        path p = *i;
-        
-        BSONObjBuilder b;
-        b << "name" << p.string();
-        b.appendBool( "isDirectory", is_directory( p ) );
-        stringstream ss;
-        ss << num;
-        string name = ss.str();
-        lst.append( name.c_str(), b.done() );
-        
-        num++;
-        i++;
-    }
-    
-    BSONObjBuilder ret;
-    ret.appendArray( "", lst.done() );
-    return ret.obj();
 }
 
 void ReportException(v8::TryCatch* try_catch) {
@@ -642,8 +562,6 @@ BSONObj AllocatePorts( const BSONObj &args ) {
 void installShellUtils( mongo::Scope &scope, v8::Handle<v8::ObjectTemplate>& global ) {
     scope.injectNative( "sleep", JSSleep );
     scope.injectNative( "print", Print );
-    scope.injectNative( "load", Load );
-    scope.injectNative( "listFiles", ListFiles );
     scope.injectNative( "quit", Quit );
     scope.injectNative( "version", Version );
     global->Set( String::New( "threadInject" ), FunctionTemplate::New( ThreadInject ) );

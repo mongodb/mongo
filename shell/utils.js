@@ -10,10 +10,11 @@ assert.eq = function( a , b , msg ){
     if ( a == b )
         return;
 
-    if ( a != null && b != null && a.toString() == b.toString() )
+    if ( ( a != null && b != null ) && 
+         ( a.toString() == b.toString() || a == b || tojson( a ) == tojson( b ) ) )
         return;
 
-    throw "[" + a + "] != [" + b + "] are not equal : " + msg;
+    throw "[" + tojson( a ) + "] != [" + tojson( b ) + "] are not equal : " + msg;
 }
 
 assert.neq = function( a , b , msg ){
@@ -23,16 +24,17 @@ assert.neq = function( a , b , msg ){
     throw "[" + a + "] != [" + b + "] are equal : " + msg;
 }
 
-assert.soon = function( f, msg, timeout ) {
+assert.soon = function( f, msg, timeout, interval ) {
     var start = new Date();
-    timeout = timeout || 30000
+    timeout = timeout || 30000;
+    interval = interval || 200;
     var last;
     while( 1 ) {
         if ( f() )
             return;
         if ( ( new Date() ).getTime() - start.getTime() > timeout )
             throw "assert.soon failed: " + f + ", msg:" + msg;
-        sleep( 200 );
+        sleep( interval );
     }
 }
 
@@ -169,21 +171,6 @@ ObjectId.prototype.tojson = function(){
 
 ObjectId.prototype.isObjectId = true;
 
-Thread = function(){
-    this.init.apply( this, arguments );
-}
-
-if ( typeof( threadInject ) == "function" )
-    threadInject( Thread.prototype );
-else
-    print( "warning: thread management won't work" );
-
-fork = function() {
-    var t = new Thread( function() {} );
-    Thread.apply( t, arguments );
-    return t;
-}
-
 tojson = function( x ){
     if ( x == null || x == undefined )
         return "";
@@ -200,8 +187,12 @@ tojson = function( x ){
     case "object":
         return tojsonObject( x );
         
+    case "function":
+        return x.toString();
+        
+
     default:
-        throw "can't handle type " + ( typeof v );
+        throw "tojson can't handle type " + ( typeof x );
     }
     
 }
@@ -209,17 +200,22 @@ tojson = function( x ){
 tojsonObject = function( x ){
     assert.eq( ( typeof x ) , "object" , "tojsonObject needs object, not [" + ( typeof x ) + "]" );
     
-    if ( x.tojson )
+    if ( typeof( x.tojson ) == "function" && x.tojson != tojson )
         return x.tojson();
 
     var s = "{";
     
     var first = true;
     for ( var k in x ){
+
+        var val = x[k];
+        if ( val == DB.prototype || val == DBCollection.prototype )
+            continue;
+
         if ( first ) first = false;
         else s += " , ";
         
-        s += "\"" + k + "\" : " + tojson( x[k] );
+        s += "\"" + k + "\" : " + tojson( val );
     }
 
     return s + "}";
@@ -260,6 +256,13 @@ shellPrintHelper = function( x ){
         print( x.tojson() );
     else
         print( tojson( x ) );
+}
+
+execShellLine = function(){
+    var res = eval( __line__ );
+    if ( typeof( res ) != "undefined" ){
+        shellPrintHelper( res );
+    }
 }
 
 shellHelper = function( command , rest ){
@@ -339,4 +342,12 @@ Map.prototype.values = function(){
         a.push( v );
     }
     return a;
+}
+
+Math.sigFig = function( x , N ){
+    if ( ! N ){
+        N = 3;
+    }
+    var p = Math.pow( 10, N - Math.ceil( Math.log( Math.abs(x) ) / Math.log( 10 )) );
+    return Math.round(x*p)/p;
 }

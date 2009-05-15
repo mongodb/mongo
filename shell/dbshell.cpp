@@ -1,17 +1,15 @@
 // dbshell.cpp
 
-#include <v8.h>
+#include <stdio.h>
 
 #ifdef USE_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
 #endif
 
-#include "ShellUtils.h"
-#include "MongoJS.h"
 #include "../scripting/engine.h"
-#include "../scripting/engine_v8.h"
-
+#include "../client/dbclient.h"
+#include "utils.h"
 
 extern const char * jsconcatcode;
 
@@ -80,7 +78,7 @@ inline void printStackTrace() {
 void quitAbruptly( int sig ) {
     cout << "mongo got signal " << sig << " (" << strsignal( sig ) << "), stack trace: " << endl;
     printStackTrace();
-    KillMongoProgramInstances();
+    mongo::shellUtils::KillMongoProgramInstances();
     exit(14);    
 }
 
@@ -121,34 +119,13 @@ string fixHost( string url , string host , string port ){
     return newurl;
 }
 
-v8::Handle< v8::Context > baseContext_;
-
 int main(int argc, char* argv[]) {
     setupSignals();
     
-    RecordMyLocation( argv[ 0 ] );
+    mongo::shellUtils::RecordMyLocation( argv[ 0 ] );
 
     mongo::ScriptEngine::setup();
-    auto_ptr< mongo::V8Scope > scope( dynamic_cast< mongo::V8Scope* >( mongo::globalScriptEngine->createScope() ) );
-    
-    v8::Locker l;
-    v8::HandleScope handle_scope;
-
-    v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
-    
-    scope->setGlobal( global );
-
-    installShellUtils( *scope, global );
-    installMongoGlobals( global );
-
-    baseContext_ = v8::Context::New(NULL, global);
-    v8::Context::Scope context_scope(baseContext_);
-    
-    { // init mongo code
-        v8::HandleScope handle_scope;
-        if ( ! ExecuteString( v8::String::New( jsconcatcode ) , v8::String::New( "(mongo init)" ) , false , true ) )
-            return -1;
-    }
+    auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->createScope() );
     
     string url = "test";
     string dbhost;
@@ -159,6 +136,8 @@ int main(int argc, char* argv[]) {
 
     bool runShell = false;
     bool nodb = false;
+    
+    string script;
     
     int argNumber = 1;
     for ( ; argNumber < argc; argNumber++) {
@@ -186,7 +165,12 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-
+        if ( strcmp( str , "--eval" ) == 0 ){
+            script = argv[argNumber+1];
+            argNumber++;
+            continue;
+        }
+        
         if ( strcmp( str , "-u" ) == 0 ){
             username = argv[argNumber+1];
             argNumber++;
@@ -221,6 +205,7 @@ int main(int argc, char* argv[]) {
                 << " --host <host> - server to connect to\n"
                 << " --port <port> - port to connect to\n"
                 << " --nodb don't connect to mongo program on startup.  No 'db address' arg expected.\n"
+                << " --eval <script> evaluate javascript.\n"
                 << "file names: a list of files to run.  will exit after unless --shell is specified\n"
                 ;
             
@@ -262,63 +247,62 @@ int main(int argc, char* argv[]) {
 
         break;
     }
+    
+    scope->externalSetup();
+    mongo::shellUtils::installShellUtils( *scope );
 
-    if ( !nodb ) { // init mongo code
-        v8::HandleScope handle_scope;
+    if ( !nodb ) { // connect to db
         cout << "url: " << url << endl;
         string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
-        if ( ! ExecuteString( v8::String::New( setup.c_str() ) , v8::String::New( "(connect)" ) , false , true ) ){
+        if ( ! scope->exec( setup , "(connect)" , false , true , false ) )
             return -1;
-        }
-
+        
         if ( username.size() && password.size() ){
             stringstream ss;
             ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
 
-            if ( ! ExecuteString( v8::String::New( ss.str().c_str() ) , v8::String::New( "(auth)" ) , true , true ) ){
+            if ( ! scope->exec( ss.str() , "(auth)" , true , true , false ) ){
                 cout << "login failed" << endl;
                 return -1;
             }
-                
 
         }
 
     }    
+    
+    if ( !script.empty() ) {
+        script = "function() { " + script + " }";
+        mongo::shellUtils::MongoProgramScope s;
+        if ( scope->invoke( script.c_str(), mongo::BSONObj() ) )
+            return -4;
+    }
     
     int numFiles = 0;
     
     for ( ; argNumber < argc; argNumber++) {
         const char* str = argv[argNumber];
 
-        v8::HandleScope handle_scope;
-        v8::Handle<v8::String> file_name = v8::String::New(str);
-        v8::Handle<v8::String> source = ReadFile(str);
-        if (source.IsEmpty()) {
-            printf("Error reading '%s'\n", str);
-            return 1;
-        }
-        
-        MongoProgramScope s;
-        if (!ExecuteString(source, file_name, false, true)){
-            cout << "error processing: " << file_name << endl;
-            return 1;
+        mongo::shellUtils::MongoProgramScope s;
+
+        if ( ! scope->execFile( str , false , true , false ) ){
+            return -3;
         }
         
         numFiles++;
     }
     
-    if ( numFiles == 0 )
+    if ( numFiles == 0 && script.empty() )
         runShell = true;
 
     if ( runShell ){
         
-        MongoProgramScope s;
+        mongo::shellUtils::MongoProgramScope s;
 
         shellHistoryInit();
         
         cout << "type \"help\" for help" << endl;
         
-        v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
+        //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
         
         while ( 1 ){
             
@@ -334,6 +318,7 @@ int main(int argc, char* argv[]) {
                 break;
             }
             
+            /*
             {
                 string cmd = line;
                 if ( cmd.find( " " ) > 0 )
@@ -346,12 +331,10 @@ int main(int argc, char* argv[]) {
                 }
                 
             }
+            */
             
-            v8::HandleScope handle_scope;
-            ExecuteString(v8::String::New( code.c_str() ),
-                          v8::String::New("(shell)"),
-                          true,
-                          true);
+            scope->setString( "__line__" , code.c_str() );
+            scope->exec( "execShellLine()" , "(shell)" , true , true , false);
             
             
             shellHistoryAdd( line );
@@ -363,4 +346,11 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+
+namespace mongo {
+    DBClientBase * createDirectClient(){
+        uassert( "no createDirectClient in shell" , 0 );
+        return 0;
+    }
+}
 

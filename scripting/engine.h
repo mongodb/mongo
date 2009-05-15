@@ -25,6 +25,7 @@ namespace mongo {
         }
         
         virtual void localConnect( const char * dbName ) = 0;
+        virtual void externalSetup() = 0;
         
         virtual double getNumber( const char *field ) = 0;
         virtual string getString( const char *field ) = 0;
@@ -48,8 +49,11 @@ namespace mongo {
         virtual string getError() = 0;
         
         int invoke( const char* code , const BSONObj& args );
-
-        virtual void injectNative( const char *field, NativeFunction func ) {}
+        
+        virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError ) = 0;
+        virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError );
+        
+        virtual void injectNative( const char *field, NativeFunction func ) = 0;
     };
     
     class ScriptEngine : boost::noncopyable {
@@ -63,7 +67,6 @@ namespace mongo {
 
         static void setup();
     };
-
 
     extern ScriptEngine * globalScriptEngine;
 }

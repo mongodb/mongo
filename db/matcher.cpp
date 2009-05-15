@@ -143,7 +143,7 @@ namespace mongo {
             if ( e.eoo() )
                 break;
 
-            if ( ( e.type() == CodeWScope || e.type() == Code ) && strcmp(e.fieldName(), "$where")==0 ) {
+            if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
                 // $where: function()...
                 uassert( "$where occurs twice?", where == 0 );
                 where = new Where();

@@ -19,7 +19,17 @@ namespace mongo {
             names.insert( "_name" );
             names.insert( "_fullName" );
             names.insert( "_shortName" );
+            names.insert( "tojson" );
+            names.insert( "toJson" );
+            names.insert( "toString" );
         }
+        
+        if ( name.length() == 0 )
+            return false;
+        
+        if ( name[0] == '_' )
+            return true;
+        
         return names.count( name ) > 0;
     }
 
@@ -93,6 +103,30 @@ namespace mongo {
         return JS_TRUE;
     }
 
+    JSBool mongo_external_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        Convertor c( cx );
+        
+        uassert( "0 or 1 args to Mongo" , argc <= 1 );
+        
+        DBClientConnection * conn = new DBClientConnection( true );
+        
+        string host = "127.0.0.1";
+        if ( argc > 0 )
+            host = c.toString( argv[0] );
+
+        string errmsg;
+        if ( ! conn->connect( host , errmsg ) ){
+            JS_ReportError( cx , ((string)"couldn't connect: " + errmsg).c_str() );
+            return JS_FALSE;
+        }
+        
+        JS_SetPrivate( cx , obj , (void*)conn );
+        jsval host_val = c.toval( host.c_str() );
+        assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
+        return JS_TRUE;
+
+    }
+
     void mongo_finalize( JSContext * cx , JSObject * obj ){
         DBClientBase * client = (DBClientBase*)JS_GetPrivate( cx , obj );
         if ( client ){
@@ -102,13 +136,6 @@ namespace mongo {
     }
 
     JSClass mongo_class = {
-        "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
-        JSCLASS_NO_OPTIONAL_MEMBERS
-    };
-
-    JSClass mongo_local_class = {
         "Mongo" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mongo_finalize,
@@ -238,12 +265,12 @@ namespace mongo {
      }
 
      JSBool db_collection_resolve( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
-         if ( flags & JSRESOLVE_ASSIGNING || flags & JSRESOLVE_DETECTING )
+         if ( flags & JSRESOLVE_ASSIGNING )
              return JS_TRUE;
          
          Convertor c( cx );
          string collname = c.toString( id );
-         
+
          if ( isSpecialName( collname ) )
              return JS_TRUE;
          
@@ -306,7 +333,7 @@ namespace mongo {
     }
 
     JSBool db_resolve( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
-        if ( flags & JSRESOLVE_ASSIGNING || flags & JSRESOLVE_DETECTING )
+        if ( flags & JSRESOLVE_ASSIGNING )
             return JS_TRUE;
 
         Convertor c( cx );
@@ -358,14 +385,14 @@ namespace mongo {
 
         return JS_TRUE;
     }
-
+    
     JSClass object_id_class = {
         "ObjectId" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
-    
+
     JSBool object_id_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
         return *rval = c.getProperty( obj , "str" );
@@ -377,19 +404,105 @@ namespace mongo {
     };
     
 
+    JSClass timestamp_class = {
+        "Timestamp" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSClass minkey_class = {
+        "MinKey" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSClass maxkey_class = {
+        "MaxKey" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+    
+    // dbquery
+
+    JSBool dbquery_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        uassert( "DDQuery needs at least 4 args" , argc >= 4 );
+        
+        Convertor c(cx);
+        c.setProperty( obj , "_mongo" , argv[0] );
+        c.setProperty( obj , "_db" , argv[1] );
+        c.setProperty( obj , "_collection" , argv[2] );
+        c.setProperty( obj , "_ns" , argv[3] );
+
+        if ( argc > 4 && JSVAL_IS_OBJECT( argv[4] ) )
+            c.setProperty( obj , "_query" , argv[4] );
+        else 
+            c.setProperty( obj , "_query" , OBJECT_TO_JSVAL( JS_NewObject( cx , 0 , 0 , 0 ) ) );
+        
+        if ( argc > 5 && JSVAL_IS_OBJECT( argv[5] ) )
+            c.setProperty( obj , "_fields" , argv[5] );
+        else
+            c.setProperty( obj , "_fields" , JSVAL_NULL );
+        
+        
+        if ( argc > 6 && JSVAL_IS_NUMBER( argv[6] ) )
+            c.setProperty( obj , "_limit" , argv[6] );
+        else 
+            c.setProperty( obj , "_limit" , JSVAL_ZERO );
+        
+        if ( argc > 7 && JSVAL_IS_NUMBER( argv[7] ) )
+            c.setProperty( obj , "_skip" , argv[7] );
+        else 
+            c.setProperty( obj , "_skip" , JSVAL_ZERO );
+        
+        c.setProperty( obj , "_cursor" , JSVAL_NULL );
+        c.setProperty( obj , "_numReturned" , JSVAL_ZERO );
+        c.setProperty( obj , "_special" , JSVAL_FALSE );
+
+        return JS_TRUE;
+    }
+
+    JSBool dbquery_resolve( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
+        if ( flags & JSRESOLVE_ASSIGNING )
+            return JS_TRUE;
+
+        if ( ! JSVAL_IS_NUMBER( id ) )
+            return JS_TRUE;
+
+        jsval val = JSVAL_VOID;
+        assert( JS_CallFunctionName( cx , obj , "arrayAccess" , 1 , &id , &val ) );
+        Convertor c(cx);
+        c.setProperty( obj , c.toString( id ).c_str() , val );
+        *objp = obj;
+        return JS_TRUE;
+    }
+
+    JSClass dbquery_class = {
+        "DBQuery" , JSCLASS_NEW_RESOLVE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, (JSResolveOp)(&dbquery_resolve) , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+    
     // ---- other stuff ----
-
+    
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local ){
-        uassert( "non-local not supported yet" , local );
 
-        assert( JS_InitClass( cx , global , 0 , &mongo_local_class , mongo_local_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
+        
         assert( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , object_id_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
 
+        assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        
         scope->exec( jsconcatcode );
-
     }
 
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o ){
@@ -400,6 +513,31 @@ namespace mongo {
             b.append( name.c_str() , oid );
             return true;
         }
+
+        if ( JS_InstanceOf( c->_context , o , &minkey_class , 0 ) ){
+            b.appendMinKey( name.c_str() );
+            return true;
+        }
+
+        if ( JS_InstanceOf( c->_context , o , &maxkey_class , 0 ) ){
+            b.appendMaxKey( name.c_str() );
+            return true;
+        }
+        
+        if ( JS_InstanceOf( c->_context , o , &timestamp_class , 0 ) ){
+            b.appendTimestamp( name.c_str() , (unsigned long long)c->getNumber( o , "t" ) , (unsigned int )c->getNumber( o , "i" ) );
+            return true;
+        }
+        
+        {
+            jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
+            if ( d ){
+                b.appendDate( name.c_str() , (unsigned long long)d );
+                return true;
+            }
+        }
+        
+        
 
         return false;
     }

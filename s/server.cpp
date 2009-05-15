@@ -82,6 +82,11 @@ namespace mongo {
         server->run();
     }
 
+    DBClientBase *createDirectClient(){
+        uassert( "createDirectClient not implemented for sharding yet" , 0 );
+        return 0;
+    }
+
 } // namespace mongo
 
 using namespace mongo;

@@ -124,7 +124,8 @@ DBCollection.prototype.update = function( query , obj , upsert ){
 }
 
 DBCollection.prototype.save = function( obj ){
-    if ( ! obj._id ){
+    if ( typeof( obj._id ) == "undefined" ){
+        obj._id = new ObjectId();
         return this.insert( obj );
     }
     else {
@@ -176,8 +177,9 @@ DBCollection.prototype.createIndex = function( keys , options ){
 DBCollection.prototype.ensureIndex = function( keys , options ){
     var name = this._indexSpec( keys, options ).name;
     this._indexCache = this._indexCache || {};
-    if ( this._indexCache[ name ] )
+    if ( this._indexCache[ name ] ){
         return false;
+    }
 
     this.createIndex( keys , options );
     this._indexCache[name] = true;
@@ -236,11 +238,11 @@ DBCollection.prototype.validate = function() {
 }
 
 DBCollection.prototype.getIndexes = function(){
-    return this.getDB().getCollection( "system.indexes" ).find( { ns : this.getFullName() } );
+    return this.getDB().getCollection( "system.indexes" ).find( { ns : this.getFullName() } ).toArray();
 }
 
 DBCollection.prototype.getIndexSpecs = function(){
-    return this.getIndexes().toArray().map( 
+    return this.getIndexes().map( 
         function(i){
             return i;
         }
