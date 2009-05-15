@@ -24,16 +24,17 @@ assert.neq = function( a , b , msg ){
     throw "[" + a + "] != [" + b + "] are equal : " + msg;
 }
 
-assert.soon = function( f, msg, timeout ) {
+assert.soon = function( f, msg, timeout, interval ) {
     var start = new Date();
-    timeout = timeout || 30000
+    timeout = timeout || 30000;
+    interval = interval || 200;
     var last;
     while( 1 ) {
         if ( f() )
             return;
         if ( ( new Date() ).getTime() - start.getTime() > timeout )
             throw "assert.soon failed: " + f + ", msg:" + msg;
-        sleep( 200 );
+        sleep( interval );
     }
 }
 
