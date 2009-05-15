@@ -91,6 +91,21 @@ startMongoProgram = function(){
     return m;
 }
 
+// Start a mongo program instance.  This function's first argument is the
+// program name, and subsequent arguments to this function are passed as
+// command line arguments to the program.  Returns pid of the spawned program.
+startMongoProgramNoConnect = function() {
+    return _startMongoProgram.apply( null, arguments );    
+}
+
+myPort = function() {
+    var m = db.getMongo();
+    if ( m.host.match( /:/ ) )
+        return m.host.match( /:(.*)/ )[ 1 ];
+    else
+        return 27017;
+}
+
 ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
     this._connections = [];
     this._serverNames = [];

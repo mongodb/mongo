@@ -137,6 +137,8 @@ int main(int argc, char* argv[]) {
     bool runShell = false;
     bool nodb = false;
     
+    string script;
+    
     int argNumber = 1;
     for ( ; argNumber < argc; argNumber++) {
         const char* str = argv[argNumber];
@@ -163,7 +165,12 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-
+        if ( strcmp( str , "--eval" ) == 0 ){
+            script = argv[argNumber+1];
+            argNumber++;
+            continue;
+        }
+        
         if ( strcmp( str , "-u" ) == 0 ){
             username = argv[argNumber+1];
             argNumber++;
@@ -198,6 +205,7 @@ int main(int argc, char* argv[]) {
                 << " --host <host> - server to connect to\n"
                 << " --port <port> - port to connect to\n"
                 << " --nodb don't connect to mongo program on startup.  No 'db address' arg expected.\n"
+                << " --eval <script> evaluate javascript.\n"
                 << "file names: a list of files to run.  will exit after unless --shell is specified\n"
                 ;
             
@@ -240,7 +248,7 @@ int main(int argc, char* argv[]) {
         break;
     }
     
-    scope->externalSetup( true );
+    scope->externalSetup();
     mongo::shellUtils::installShellUtils( *scope );
 
     if ( !nodb ) { // connect to db
@@ -262,8 +270,15 @@ int main(int argc, char* argv[]) {
 
     }    
     
+    if ( !script.empty() ) {
+        script = "function() { " + script + " }";
+        mongo::shellUtils::MongoProgramScope s;
+        if ( scope->invoke( script.c_str(), mongo::BSONObj() ) )
+            return -4;
+    }
+    
     int numFiles = 0;
-
+    
     for ( ; argNumber < argc; argNumber++) {
         const char* str = argv[argNumber];
 
@@ -276,7 +291,7 @@ int main(int argc, char* argv[]) {
         numFiles++;
     }
     
-    if ( numFiles == 0 )
+    if ( numFiles == 0 && script.empty() )
         runShell = true;
 
     if ( runShell ){

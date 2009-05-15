@@ -2,8 +2,6 @@
 
 #pragma once
 
-#define JS_THREADSAFE
-
 #include "engine.h"
 
 #if defined( MOZJS )
@@ -57,6 +55,6 @@ namespace mongo {
 
 
     // mongo
-    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local, bool master );
+    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local );
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o );
 }

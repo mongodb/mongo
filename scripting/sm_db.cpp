@@ -488,131 +488,9 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
     
-    // thread
-    
-    class JSThreadConfig {
-    public:
-        JSThreadConfig( JSContext *cx, JSObject *obj, uintN argc, jsval *argv ) : started_(), done_(), cx_( cx ), obj_( obj ) {
-            massert( "need at least one argument", argc > 0 );
-            massert( "first argument must be a function", JS_TypeOfValue( cx, argv[ 0 ] ) == JSTYPE_FUNCTION );
-            fun_ = argv[ 0 ];
-            f_ = JS_ValueToFunction( cx, fun_ );
-            argc_ = argc - 1;
-            argv_.reset( new jsval[ argc_ ] );
-            for( uintN i = 0; i < argc_; ++i )
-                argv_[ i ] = argv[ i + 1 ];
-            JS_AddRoot( cx, &obj_ );
-            JS_AddRoot( cx, &fun_ );
-            for( uintN i = 0; i < argc_; ++i )
-                JS_AddRoot( cx, &argv_[ i ] );
-        }
-        ~JSThreadConfig() {
-            if ( started_ )
-                thread_->join(); // don't want to deal with cleaning up while thread is running
-            JS_RemoveRoot( cx_, &obj_ );
-            JS_RemoveRoot( cx_, &fun_ );
-            for( uintN i = 0; i < argc_; ++i )
-                JS_RemoveRoot( cx_, &argv_[ i ] );
-            if ( done_ )
-                JS_RemoveRoot( scope_->context(), &returnData_ );
-        }
-        void start() {
-            massert( "Thread already started", !started_ );
-            scope_.reset( dynamic_cast< SMScope * >( globalScriptEngine->createScope() ) );
-            scope_->externalSetup( false );
-            // TODO install shell utils?
-            JSThread jt( *this );
-            thread_.reset( new boost::thread( jt ) );
-            started_ = true;
-        }
-        void join() {
-            if ( thread_.get() )
-                thread_->join();
-        }
-        jsval returnData() {
-            join();
-            return returnData_;
-        }
-    private:
-        class JSThread {
-        public:
-            JSThread( JSThreadConfig &config ) : config_( config ) {}
-            void operator()() {
-                JS_SetContextThread( config_.scope_->context() );
-                try {
-                    massert( "function call failure",
-                            JS_TRUE == JS_CallFunction( config_.scope_->context(), config_.obj_, config_.f_, config_.argc_, config_.argv_.get(), &config_.returnData_ ) );
-                    JS_AddRoot( config_.scope_->context(), &config_.returnData_ );
-                    config_.done_ = true;
-                } catch ( ... ) {
-                }
-                JS_ClearContextThread( config_.scope_->context() );
-            }
-        private:
-            JSThreadConfig &config_;
-        };
-        
-        bool started_;
-        bool done_;
-        JSContext *cx_;
-        JSObject *obj_;
-        JSFunction *f_;
-        jsval fun_;
-        uintN argc_;
-        boost::scoped_array< jsval > argv_;
-        auto_ptr< boost::thread > thread_;
-        auto_ptr< SMScope > scope_;
-        jsval returnData_;
-    };
-    
-    void thread_finalize( JSContext * cx , JSObject * obj ){
-        JSThreadConfig * config = (JSThreadConfig*)JS_GetPrivate( cx , obj );
-        if ( config ){
-            delete config;
-            JS_SetPrivate( cx , obj , 0 );
-        }
-    }
-    
-    JSClass thread_class = {
-        "Thread" , JSCLASS_HAS_PRIVATE ,
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, thread_finalize,
-        JSCLASS_NO_OPTIONAL_MEMBERS        
-    };
-    
-    JSBool thread_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        JS_SetPrivate( cx , obj , (void*) new JSThreadConfig( cx, obj, argc, argv ) );
-        return JS_TRUE;
-    }
-
-    JSBool thread_start(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        JSThreadConfig * config = (JSThreadConfig*)JS_GetPrivate( cx , obj );
-        config->start();
-        return JS_TRUE;
-    }
-
-    JSBool thread_join(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        JSThreadConfig * config = (JSThreadConfig*)JS_GetPrivate( cx , obj );
-        config->join();
-        return JS_TRUE;
-    }
-    
-    JSBool thread_returnData(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        JSThreadConfig * config = (JSThreadConfig*)JS_GetPrivate( cx , obj );
-        *rval = config->returnData();
-        return JS_TRUE;
-    }
-    
-    JSFunctionSpec thread_functions[] = {
-        { "start" , thread_start , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
-        { "join" , thread_join , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
-        { "returnData" , thread_returnData , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
-        { 0 }
-    };
-    
     // ---- other stuff ----
     
-    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local, bool master ){
+    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local ){
 
         assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
         
@@ -621,15 +499,12 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &thread_class , thread_constructor , 0 , 0 , thread_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         
-        if ( master ) {
-            scope->exec( jsconcatcode );
-        }
+        scope->exec( jsconcatcode );
     }
 
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o ){
@@ -659,7 +534,7 @@ namespace mongo {
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             if ( d ){
-                b.appendDate( name.c_str() , d );
+                b.appendDate( name.c_str() , (unsigned long long)d );
                 return true;
             }
         }
