@@ -19,6 +19,8 @@
 #pragma once
 
 #include <boost/thread/tss.hpp>
+#undef assert
+#define assert xassert
 
 namespace mongo {
     class BSONObjBuilder;

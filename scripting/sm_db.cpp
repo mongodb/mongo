@@ -2,8 +2,6 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
-#include <boost/smart_ptr.hpp>
-
 namespace mongo {
     
     // ------------    some defs needed ---------------

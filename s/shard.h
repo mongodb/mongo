@@ -28,6 +28,8 @@
 #include "../client/model.h"
 #include "shardkey.h"
 #include <boost/utility.hpp>
+#undef assert
+#define assert xassert
 
 namespace mongo {
 

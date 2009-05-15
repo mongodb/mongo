@@ -19,6 +19,8 @@
 #pragma once
 
 #include <boost/thread/tss.hpp>
+#undef assert
+#define assert xassert
 #include "db.h"
 #include "dbhelpers.h"
 #include "nonce.h"
