@@ -171,12 +171,6 @@ ObjectId.prototype.tojson = function(){
 
 ObjectId.prototype.isObjectId = true;
 
-fork = function() {
-    var t = new Thread( function() {} );
-    Thread.apply( t, arguments );
-    return t;
-}
-
 tojson = function( x ){
     if ( x == null || x == undefined )
         return "";

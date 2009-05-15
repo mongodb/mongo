@@ -654,12 +654,12 @@ namespace mongo {
 
         }
 
-        void externalSetup( bool master ){
-            initMongoJS( this , _context , _global , false, master );
+        void externalSetup(){
+            initMongoJS( this , _context , _global , false );
         }
 
         void localConnect( const char * dbName ){
-            initMongoJS( this , _context , _global , true, true );
+            initMongoJS( this , _context , _global , true );
             
             exec( "_mongo = new Mongo();" );
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
