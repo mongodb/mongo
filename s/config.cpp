@@ -95,7 +95,7 @@ namespace mongo {
             for ( map<string,ShardKeyPattern>::reverse_iterator i=_sharded.rbegin(); i != _sharded.rend(); i++){
                 a.append( i->first.c_str() , i->second.key() );
             }
-            to.appendArray( "sharded" , a.obj() );
+            to.append( "sharded" , a.obj() );
         }
     }
     
