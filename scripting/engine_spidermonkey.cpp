@@ -660,7 +660,7 @@ namespace mongo {
         }
 
         void localConnect( const char * dbName ){
-            initMongoJS( this , _context , _global , true, false );
+            initMongoJS( this , _context , _global , true, true );
             
             exec( "_mongo = new Mongo();" );
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );

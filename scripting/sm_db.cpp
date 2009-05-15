@@ -519,7 +519,7 @@ namespace mongo {
         void start() {
             massert( "Thread already started", !started_ );
             scope_.reset( dynamic_cast< SMScope * >( globalScriptEngine->createScope() ) );
-            scope_->externalSetup( true );
+            scope_->externalSetup( false );
             // TODO install shell utils?
             JSThread jt( *this );
             thread_.reset( new boost::thread( jt ) );

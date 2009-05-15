@@ -57,6 +57,6 @@ namespace mongo {
 
 
     // mongo
-    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local, bool debug );
+    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local, bool master );
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o );
 }
