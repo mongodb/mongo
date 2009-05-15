@@ -17,6 +17,7 @@ namespace mongo {
             MongoProgramScope() {} // Avoid 'unused variable' warning.
             ~MongoProgramScope();
         };
+        void KillMongoProgramInstances();
         
     }
 }

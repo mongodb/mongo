@@ -78,7 +78,7 @@ inline void printStackTrace() {
 void quitAbruptly( int sig ) {
     cout << "mongo got signal " << sig << " (" << strsignal( sig ) << "), stack trace: " << endl;
     printStackTrace();
-    // KillMongoProgramInstances(); TODO
+    mongo::shellUtils::KillMongoProgramInstances();
     exit(14);    
 }
 
