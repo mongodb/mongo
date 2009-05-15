@@ -612,7 +612,7 @@ namespace mongo {
     
     // ---- other stuff ----
     
-    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local, bool debug ){
+    void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local, bool master ){
 
         assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
         
@@ -627,9 +627,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         
-        
-
-        if ( !debug ) {
+        if ( master ) {
             scope->exec( jsconcatcode );
         }
     }

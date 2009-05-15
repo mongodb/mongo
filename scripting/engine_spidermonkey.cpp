@@ -655,8 +655,8 @@ namespace mongo {
 
         }
 
-        void externalSetup( bool debug ){
-            initMongoJS( this , _context , _global , false, debug );
+        void externalSetup( bool master ){
+            initMongoJS( this , _context , _global , false, master );
         }
 
         void localConnect( const char * dbName ){
