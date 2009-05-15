@@ -41,7 +41,11 @@ namespace mongo {
     
     extern JSClass bson_class;
     extern JSClass bson_ro_class;
+
     extern JSClass object_id_class;
+    extern JSClass timestamp_class;
+    extern JSClass minkey_class;
+    extern JSClass maxkey_class;
 
     // internal things
     void dontDeleteScope( SMScope * s ){}

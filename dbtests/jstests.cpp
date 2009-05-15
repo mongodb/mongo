@@ -275,7 +275,43 @@ namespace JSTests {
             delete s;
         }
     };
-    
+
+    class SpecialDBTypes {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+
+            BSONObjBuilder b;
+            b.appendTimestamp( "a" , 123456789 );
+            b.appendMinKey( "b" );
+            b.appendMaxKey( "c" );
+            b.appendTimestamp( "d" , 1234000 , 9876 );
+            
+
+            {
+                BSONObj t = b.done();
+                ASSERT_EQUALS( 1234000 , t["d"].timestampTime() );
+                ASSERT_EQUALS( 9876 , t["d"].timestampInc() );
+            }
+            s->setObject( "z" , b.obj() );
+            
+            assert( s->invoke( "y = { a : z.a , b : z.b , c : z.c }" , BSONObj() ) == 0 );
+
+            BSONObj out = s->getObject( "y" );
+            ASSERT_EQUALS( Timestamp , out["a"].type() );
+            ASSERT_EQUALS( MinKey , out["b"].type() );
+            ASSERT_EQUALS( MaxKey , out["c"].type() );
+
+            ASSERT_EQUALS( 9876 , out["d"].timestampInc() );
+            ASSERT_EQUALS( 1234000 , out["d"].timestampTime() );
+            ASSERT_EQUALS( 123456789 , out["a"].date() );
+
+
+            delete s;
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() {
@@ -288,6 +324,7 @@ namespace JSTests {
             add< JSOIDTests >();
             add< ObjectModTests >();
             add< OtherJSTypes >();
+            add< SpecialDBTypes >();
         }
     };
     

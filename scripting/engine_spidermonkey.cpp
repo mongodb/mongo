@@ -302,13 +302,27 @@ namespace mongo {
                 assert( r );
                 return OBJECT_TO_JSVAL( r );
             }
-            case 13:{
+            case Code:{
                 JSFunction * func = compileFunction( e.valuestr() );
                 return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
             }
             case Date: 
                 return OBJECT_TO_JSVAL( js_NewDateObjectMsec( _context , e.date() ) );
-                
+
+            case MinKey:
+                return OBJECT_TO_JSVAL( JS_NewObject( _context , &minkey_class , 0 , 0 ) );
+
+            case MaxKey:
+                return OBJECT_TO_JSVAL( JS_NewObject( _context , &maxkey_class , 0 , 0 ) );
+
+            case Timestamp: {
+                JSObject * o = JS_NewObject( _context , &timestamp_class , 0 , 0 );
+                setProperty( o , "time" , toval( (double)(e.timestampTime()) ) );
+                setProperty( o , "inc" , toval( (double)(e.timestampInc()) ) );
+                return OBJECT_TO_JSVAL( o );
+            }
+
+    
             default:
                 log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
@@ -357,6 +371,10 @@ namespace mongo {
         
         bool getBoolean( JSObject * o , const char * field ){
             return toBoolean( getProperty( o , field ) );
+        }
+
+        double getNumber( JSObject * o , const char * field ){
+            return toNumber( getProperty( o , field ) );
         }
         
         string getString( JSObject * o , const char * field ){

@@ -394,7 +394,7 @@ namespace mongo {
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
-    
+
     JSBool object_id_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
         return *rval = c.getProperty( obj , "str" );
@@ -406,6 +406,27 @@ namespace mongo {
     };
     
 
+    JSClass timestamp_class = {
+        "Timestamp" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSClass minkey_class = {
+        "MinKey" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSClass maxkey_class = {
+        "MaxKey" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+    
     // dbquery
 
     JSBool dbquery_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
@@ -603,10 +624,14 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &thread_class , thread_constructor , 0 , 0 , thread_functions , 0 , 0 ) );
 
-        if ( !debug ) {
-                        
-        scope->exec( jsconcatcode );
+        assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        
+        
 
+        if ( !debug ) {
+            scope->exec( jsconcatcode );
         }
     }
 
@@ -618,6 +643,23 @@ namespace mongo {
             b.append( name.c_str() , oid );
             return true;
         }
+
+        if ( JS_InstanceOf( c->_context , o , &minkey_class , 0 ) ){
+            b.appendMinKey( name.c_str() );
+            return true;
+        }
+
+        if ( JS_InstanceOf( c->_context , o , &maxkey_class , 0 ) ){
+            b.appendMaxKey( name.c_str() );
+            return true;
+        }
+        
+        if ( JS_InstanceOf( c->_context , o , &timestamp_class , 0 ) ){
+            cout << "A: " << c->getNumber( o , "time" ) << endl;
+            cout << "B: " << c->getNumber( o , "inc" ) << endl;
+            b.appendTimestamp( name.c_str() , (unsigned long long)c->getNumber( o , "time" ) , (unsigned int )c->getNumber( o , "inc" ) );
+            return true;
+        }
         
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
@@ -626,6 +668,8 @@ namespace mongo {
                 return true;
             }
         }
+        
+        
 
         return false;
     }
