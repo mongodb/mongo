@@ -44,6 +44,9 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.getIndexes()");
     print("\tdb.foo.drop() drop the collection");
     print("\tdb.foo.validate()");
+    print("\tdb.foo.stats() - stats about the collection");
+    print("\tdb.foo.dataSize() - size in bytes of all the data");
+    print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes");
 }
 
 DBCollection.prototype.getFullName = function(){
@@ -241,6 +244,8 @@ DBCollection.prototype.getIndexes = function(){
     return this.getDB().getCollection( "system.indexes" ).find( { ns : this.getFullName() } ).toArray();
 }
 
+DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;
+
 DBCollection.prototype.getIndexSpecs = function(){
     return this.getIndexes().map( 
         function(i){
@@ -309,6 +314,37 @@ DBCollection.prototype.copyTo = function( newName ){
 
 DBCollection.prototype.getCollection = function( subName ){
     return this._db.getCollection( this._shortName + "." + subName );
+}
+
+DBCollection.prototype.stats = function(){
+    var res = this.validate().result;
+    var p = /\b(\w+)\??: *(\d+)\b/g;
+    var m;
+
+    var o = {};
+    while ( m = p.exec( res ) ){
+        o[ m[1] ] = m[2];
+    }
+    return o;
+}
+
+DBCollection.prototype.dataSize = function(){
+    return parseInt( this.stats().datasize );
+}
+
+DBCollection.prototype.totalIndexSize = function(){
+    var total = 0;
+    var mydb = this._db;
+    var shortName = this._shortName;
+    this.getIndexes().forEach(
+        function( spec ){
+            var coll = mydb.getCollection( shortName + ".$" + spec.name );
+            var mysize = coll.dataSize();
+            //print( coll + "\t" + mysize + "\t" + tojson( coll.validate() ) );
+            total += coll.dataSize();
+        }
+    );
+    return total;
 }
 
 DBCollection.prototype.toString = function(){
