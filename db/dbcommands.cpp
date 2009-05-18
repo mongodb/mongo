@@ -998,6 +998,52 @@ namespace mongo {
         }        
     } cmdCloneCollectionAsCapped;
     
+    class CmdConvertToCapped : public Command {
+    public:
+        CmdConvertToCapped() : Command( "convertToCapped" ) {}
+        virtual bool slaveOk() { return false; }
+        virtual void help( stringstream &help ) const {
+            help << "example: { convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string from = jsobj.getStringField( "convertToCapped" );
+            long long size = (long long)jsobj.getField( "size" ).number();
+            
+            if ( from.empty() || size == 0 ) {
+                errmsg = "invalid command spec";
+                return false;
+            }
+            
+            char realDbName[256];
+            nsToClient( dbname, realDbName );
+
+            DBDirectClient client;
+            client.dropCollection( string( realDbName ) + "." + from + ".$temp_convertToCapped" );
+
+            BSONObj info;
+            if ( !client.runCommand( realDbName,
+                                    BSON( "cloneCollectionAsCapped" << from << "toCollection" << ( from + ".$temp_convertToCapped" ) << "size" << double( size ) ),
+                                    info ) ) {
+                errmsg = "cloneCollectionAsCapped failed: " + string(info);
+                return false;
+            }
+            
+            if ( !client.dropCollection( string( realDbName ) + "." + from ) ) {
+                errmsg = "failed to drop original collection";
+                return false;
+            }
+            
+            if ( !client.runCommand( "admin",
+                                    BSON( "renameCollection" << ( string( realDbName ) + "." + from + ".$temp_convertToCapped" ) << "to" << ( string( realDbName ) + "." + from ) ),
+                                    info ) ) {
+                errmsg = "renameCollection failed: " + string(info);
+                return false;
+            }
+
+            return true;
+        }
+    } cmdConvertToCapped;
+    
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here
