@@ -724,7 +724,7 @@ elif not onlyServer:
         shellEnv["CPPPATH"].remove( "/usr/64/include" )
         shellEnv["LIBPATH"].remove( "/usr/64/lib" )
         shellEnv.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
-        shellEnv.Append( LIBPATH=[ "/sw/lib/", "/opt/local/lib"] )
+        shellEnv.Append( LIBPATH=[ "/sw/lib/", "/opt/local/lib" , "/usr/lib" ] )
 
     l = shellEnv["LIBS"]
     if linux64:
