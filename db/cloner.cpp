@@ -549,24 +549,33 @@ namespace mongo {
                 return false;
             }
             
-            DBDirectClient bridge;
-            {
-                dbtemprelease t;
-                if ( !bridge.findOne( target, BSONObj() ).isEmpty() ) {
-                    errmsg = "target namespace not empty";
-                    return false;                    
-                }
-            }
-
-            auto_ptr< DBClientCursor > c;
+            setClient( source.c_str() );
+            NamespaceDetails *nsd = nsdetails( source.c_str() );
+            uassert( "source namespace does not exist", nsd );
+            bool capped = nsd->capped;
+            long long size = 0;
+            if ( capped )
+                for( DiskLoc i = nsd->firstExtent; !i.isNull(); i = i.ext()->xnext )
+                    size += i.ext()->length;
+            
             setClient( target.c_str() );
+
+            BSONObjBuilder spec;
+            if ( capped ) {
+                spec.appendBool( "capped", true );
+                spec.append( "size", double( size ) );
+            }
+            if ( !userCreateNS( target.c_str(), spec.done(), errmsg, true ) )
+                return false;
+            
+            auto_ptr< DBClientCursor > c;
+            DBDirectClient bridge;
+
             {
-                dbtemprelease t;
                 c = bridge.query( source, BSONObj() );
             }
             while( 1 ) {
                 {
-                    dbtemprelease t;
                     if ( !c->more() )
                         break;
                 }
@@ -580,12 +589,10 @@ namespace mongo {
             nsToClient( target.c_str(), cl );
             string targetIndexes = string( cl ) + ".system.indexes";
             {
-                dbtemprelease t;
                 c = bridge.query( sourceIndexes, QUERY( "ns" << source ) );
             }
             while( 1 ) {
                 {
-                    dbtemprelease t;
                     if ( !c->more() )
                         break;
                 }
@@ -607,7 +614,6 @@ namespace mongo {
             }
             
             {
-                dbtemprelease t;
                 if ( !bridge.dropCollection( source ) ) {
                     errmsg = "failed to drop old name collection";
                     return false;
