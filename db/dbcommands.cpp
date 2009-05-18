@@ -935,6 +935,69 @@ namespace mongo {
         }
     } cmdBuildInfo;
     
+    class CmdCloneCollectionAsCapped : public Command {
+    public:
+        CmdCloneCollectionAsCapped() : Command( "cloneCollectionAsCapped" ) {}
+        virtual bool slaveOk() { return false; }
+        virtual void help( stringstream &help ) const {
+            help << "example: { cloneCollectionAsCapped:<fromName>, toCollection:<toName>, size:<sizeInBytes> }";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string from = jsobj.getStringField( "cloneCollectionAsCapped" );
+            string to = jsobj.getStringField( "toCollection" );
+            long long size = (long long)jsobj.getField( "size" ).number();
+            
+            if ( from.empty() || to.empty() || size == 0 ) {
+                errmsg = "invalid command spec";
+                return false;
+            }
+
+            char realDbName[256];
+            nsToClient( dbname, realDbName );
+            
+            string fromNs = string( realDbName ) + "." + from;
+            string toNs = string( realDbName ) + "." + to;
+            massert( "source collection " + fromNs + " does not exist", !setClientTempNs( fromNs.c_str() ) );
+            NamespaceDetails *nsd = nsdetails( fromNs.c_str() );
+            massert( "source collection " + fromNs + " does not exist", nsd );
+            long long excessSize = nsd->datasize - size * 2;
+            DiskLoc extent = nsd->firstExtent;
+            for( ; excessSize > 0 && extent != nsd->lastExtent; extent = extent.ext()->xnext ) {
+                excessSize -= extent.ext()->length;
+                if ( excessSize > 0 )
+                    log( 2 ) << "cloneCollectionAsCapped skipping extent of size " << extent.ext()->length << endl;
+                log( 6 ) << "excessSize: " << excessSize << endl;
+            }
+            DiskLoc startLoc = extent.ext()->firstRecord;
+            
+            CursorId id;
+            {
+                auto_ptr< Cursor > c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
+                ClientCursor *cc = new ClientCursor();
+                cc->c = c;
+                cc->ns = fromNs;
+                cc->matcher.reset( new KeyValJSMatcher( BSONObj(), fromjson( "{$natural:1}" ) ) );
+                id = cc->cursorid;
+            }
+            
+            DBDirectClient client;
+            setClientTempNs( toNs.c_str() );
+            BSONObjBuilder spec;
+            spec.appendBool( "capped", true );
+            spec.append( "size", double( size ) );
+            if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, true ) )
+                return false;
+            
+            auto_ptr< DBClientCursor > c = client.getMore( fromNs, id );
+            while( c->more() ) {
+                BSONObj obj = c->next();
+                theDataFileMgr.insert( toNs.c_str(), obj );
+            }
+            
+            return true;
+        }        
+    } cmdCloneCollectionAsCapped;
+    
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here
