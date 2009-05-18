@@ -165,9 +165,15 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
 
-        bool autoIndexId = ( !j.getField( "autoIndexId" ).isBoolean() || j.getBoolField( "autoIndexId" ) );
-        if ( autoIndexId )
-            ensureIdIndexForNewNs(ns);
+        if ( j.getField( "autoIndexId" ).isBoolean() ) {
+            if ( j.getBoolField( "autoIndexId" ) ) {
+                ensureIdIndexForNewNs( ns );
+            }
+        } else {
+            if ( !newCapped ) {
+                ensureIdIndexForNewNs( ns );
+            }
+        }
 
         if ( mx > 0 )
             d->max = mx;
