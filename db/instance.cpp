@@ -315,6 +315,7 @@ namespace mongo {
         assert(*ns);
         uassert( "not master", isMaster( ns ) );
         setClient(ns);
+        Top::setWrite();
         //if( database->profile )
         ss << ns << ' ';
         int flags = d.pullInt();
@@ -342,6 +343,7 @@ namespace mongo {
         assert(*ns);
         uassert( "not master", isMaster( ns ) );
         setClient(ns);
+        Top::setWrite();
         int flags = d.pullInt();
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
@@ -378,6 +380,7 @@ namespace mongo {
             uassert( "not master", isMasterNs( q.ns ) || (q.queryOptions & Option_SlaveOk) || strstr( q.ns, ".$cmd" ) );
             
             setClient( q.ns );
+            Top::setRead();
             strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);
             msgdata = runQuery(m, ss ).release();
         }
@@ -431,6 +434,7 @@ namespace mongo {
         const char *ns = d.getns();
         ss << ns;
         setClient(ns);
+        Top::setRead();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
         ss << " cid:" << cursorid;
@@ -460,6 +464,7 @@ namespace mongo {
 		assert(*ns);
         uassert( "not master", isMaster( ns ) );
 		setClient(ns);
+        Top::setWrite();
 		ss << ns;
 		
         while ( d.moreJSObjs() ) {

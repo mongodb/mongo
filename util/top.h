@@ -29,14 +29,18 @@ public:
         currentStart_ = currentTime();
         current_ = client;
     }
+    static void setRead() { read_ = true; }
+    static void setWrite() { write_ = true; }
     static void clientStop() {
         if ( currentStart_ == T() )
             return;
         D d = currentTime() - currentStart_;
         recordUsage( current_, d );
         currentStart_ = T();
+        read_ = false;
+        write_ = false;
     }
-    struct Usage { string ns; D time; double pct; int calls; };
+    struct Usage { string ns; D time; double pct; int reads; int writes; int calls; };
     static void usage( vector< Usage > &res ) {
         // Populate parent namespaces
         UsageMap snapshot;
@@ -46,13 +50,15 @@ public:
         
         multimap< D, string, more > sorted;
         for( UsageMap::iterator i = snapshot.begin(); i != snapshot.end(); ++i )
-            sorted.insert( make_pair( i->second.first, i->first ) );
+            sorted.insert( make_pair( i->second.get<0>(), i->first ) );
         for( multimap< D, string, more >::iterator i = sorted.begin(); i != sorted.end(); ++i ) {
             Usage u;
             u.ns = i->second;
-            u.time = totalUsage[ u.ns ].first;
+            u.time = totalUsage[ u.ns ].get<0>();
             u.pct = snapshotDuration_ != D() ? 100.0 * i->first.ticks() / snapshotDuration_.ticks() : 0;
-            u.calls = snapshot[ u.ns ].second;
+            u.reads = snapshot[ u.ns ].get<1>();
+            u.writes = snapshot[ u.ns ].get<2>();
+            u.calls = snapshot[ u.ns ].get<3>();
             res.push_back( u );
         }
         for( UsageMap::iterator i = totalUsage.begin(); i != totalUsage.end(); ++i ) {
@@ -60,8 +66,10 @@ public:
                 continue;
             Usage u;
             u.ns = i->first;
-            u.time = i->second.first;
+            u.time = i->second.get<0>();
             u.pct = 0;
+            u.reads = 0;
+            u.writes = 0;
             u.calls = 0;
             res.push_back( u );
         }
@@ -79,31 +87,41 @@ public:
         nextSnapshot_.clear();
     }
 private:
-    typedef map< string, pair< D, int > > UsageMap;
+    typedef map< string, boost::tuple< D, int, int, int > > UsageMap; // duration, # reads, # writes, # total calls
     static T currentTime() {
         return boost::posix_time::microsec_clock::universal_time();
     }
     static void recordUsage( const string &client, D duration ) {
-        totalUsage_[ client ].first += duration;
-        totalUsage_[ client ].second++;
-        nextSnapshot_[ client ].first += duration;
-        nextSnapshot_[ client ].second++;
+        recordUsageForMap( totalUsage_, client, duration );
+        recordUsageForMap( nextSnapshot_, client, duration );
+    }
+    static void recordUsageForMap( UsageMap &map, const string &client, D duration ) {
+        map[ client ].get< 0 >() += duration;
+        if ( read_ && !write_ )
+            map[ client ].get< 1 >()++;
+        else if ( !read_ && write_ )
+            map[ client ].get< 2 >()++;
+        map[ client ].get< 3 >()++;        
     }
     static void fillParentNamespaces( UsageMap &to, const UsageMap &from ) {
         for( UsageMap::const_iterator i = from.begin(); i != from.end(); ++i ) {
             string current = i->first;
             size_t dot = current.rfind( "." );
             if ( dot == string::npos || dot != current_.length() - 1 ) {
-                to[ current ].first += i->second.first;
-                to[ current ].second += i->second.second;
+                inc( to[ current ], i->second );
             }
             while( dot != string::npos ) {
                 current = current.substr( 0, dot );
-                to[ current ].first += i->second.first;
-                to[ current ].second += i->second.second;
+                inc( to[ current ], i->second );
                 dot = current.rfind( "." );
             }            
         }        
+    }
+    static void inc( boost::tuple< D, int, int, int > &to, const boost::tuple< D, int, int, int > &from ) {
+        to.get<0>() += from.get<0>();
+        to.get<1>() += from.get<1>();
+        to.get<2>() += from.get<2>();
+        to.get<3>() += from.get<3>();
     }
     struct more { bool operator()( const D &a, const D &b ) { return a > b; } };
     static string current_;
@@ -115,6 +133,8 @@ private:
     static UsageMap snapshotB_;
     static UsageMap &snapshot_;
     static UsageMap &nextSnapshot_;
+    static bool read_;
+    static bool write_;
 };
 
 } // namespace mongo

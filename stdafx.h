@@ -341,6 +341,7 @@ namespace mongo {
 //#define BOOST_SPIRIT_DEBUG
 #include <boost/spirit/core.hpp>
 #include <boost/spirit/utility/loops.hpp>
+#include <boost/tuple/tuple.hpp>
 #undef assert
 #define assert xassert
 #define yassert 1
