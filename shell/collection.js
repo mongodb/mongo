@@ -245,11 +245,12 @@ DBCollection.prototype.getIndexes = function(){
 }
 
 DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;
+DBCollection.prototype.getIndexSpecs = DBCollection.prototype.getIndexes;
 
-DBCollection.prototype.getIndexSpecs = function(){
+DBCollection.prototype.getIndexKeys = function(){
     return this.getIndexes().map( 
         function(i){
-            return i;
+            return i.key;
         }
     );
 }
