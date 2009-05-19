@@ -20,3 +20,5 @@ assert( !t.findOne( { i : 19 } ) );
 assert( !c.hasNext() );
 assert( !d.hasNext() );
 assert( t.find().sort( { i : 1 } ).hint( { i : 1 } ).toArray().length > 10 );
+
+assert( t.validate().valid );

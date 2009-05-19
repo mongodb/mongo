@@ -133,12 +133,12 @@ namespace mongo {
                 i != toAdvance.end(); ++i )
         {
             Cursor *c = (*i)->c.get();
+            c->checkLocation();
             DiskLoc tmp1 = c->refLoc();
             if ( tmp1 != dl ) {
                 /* this might indicate a failure to call ClientCursor::updateLocation() */
-                problem() << "warning: cursor loc does not match byLoc position!" << endl;
+                problem() << "warning: cursor loc " << tmp1 << " does not match byLoc position " << dl << " !" << endl;
             }
-            c->checkLocation();
             c->advance();
             if ( c->eof() ) {
                 // advanced to end -- delete cursor
