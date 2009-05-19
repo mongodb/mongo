@@ -100,22 +100,6 @@ namespace mongo {
         return true;
     }
 
-    int test2_dbh() {
-        dblock lk;
-        DBContext c("dwight.foo");
-        BSONObj q = fromjson("{\"x\":9}");
-        BSONObj result;
-
-        {
-            BSONObj kp = fromjson("{\"x\":1}");
-            Helpers::ensureIndex("dwight.foo", kp, false, "x_1");
-        }
-
-        cout << Helpers::findOne("dwight.foo", q, result, true) << endl;
-        cout << result.toString() << endl;
-        return 0;
-    }
-
     /* Get the first object from a collection.  Generally only useful if the collection
        only ever has a single object -- which is a "singleton collection.
 

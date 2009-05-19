@@ -788,8 +788,12 @@ def runClientTests( env, target, source ):
     global mongodForTestsPort
     import subprocess
     for i in clientExec:
-        if( subprocess.call( [ i, "--port", mongodForTestsPort ] ) != 0 ):
+        if subprocess.call( [ i, "--port", mongodForTestsPort ] ) != 0:
             return True
+    if subprocess.Popen( [ mongod[0].abspath, "msg", "ping", mongodForTestsPort ], stdout=subprocess.PIPE ).communicate()[ 0 ].count( "****ok" ) == 0:
+        return True
+    if subprocess.call( [ mongod[0].abspath, "msg", "ping", mongodForTestsPort ] ) != 0:
+        return True
     return False
 addSmoketest( "smokeClient" , clientExec, runClientTests )
 addSmoketest( "mongosTest" , [ mongos[0].abspath ] , [ mongos[0].abspath + " --test" ] )

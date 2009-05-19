@@ -341,10 +341,6 @@ namespace mongo {
     }
 
 	void testPaired();
-    int test2() {
-        testSort();
-        return 0;
-    }
 
     /* --- dbclientconnection --- */
 
@@ -728,55 +724,6 @@ namespace mongo {
             connector->sayPiggyBack( m );
         }
 
-    }
-
-    /* ------------------------------------------------------ */
-
-// "./db testclient" to invoke
-    void testClient3() {
-        out() << "testClient()" << endl;
-//	DBClientConnection c(true);
-        DBClientPaired c;
-        string err;
-        if ( !c.connect("10.211.55.2", "1.2.3.4") ) {
-//    if( !c.connect("10.211.55.2", err) ) {
-            out() << "testClient: connect() failed" << endl;
-        }
-        else {
-            // temp:
-            out() << "test query returns: " << c.findOne("foo.bar", fromjson("{}")).toString() << endl;
-        }
-again:
-        out() << "query foo.bar..." << endl;
-        auto_ptr<DBClientCursor> cursor =
-            c.query("foo.bar", BSONObj(), 0, 0, 0, Option_CursorTailable);
-        DBClientCursor *cc = cursor.get();
-        if ( cc == 0 ) {
-            out() << "query() returned 0, sleeping 10 secs" << endl;
-            sleepsecs(10);
-            goto again;
-        }
-        while ( 1 ) {
-            bool m;
-            try {
-                m = cc->more();
-            } catch (AssertionException&) {
-                out() << "more() asserted, sleeping 10 sec" << endl;
-                goto again;
-            }
-            out() << "more: " << m << " dead:" << cc->isDead() << endl;
-            if ( !m ) {
-                if ( cc->isDead() )
-                    out() << "cursor dead, stopping" << endl;
-                else {
-                    out() << "Sleeping 10 seconds" << endl;
-                    sleepsecs(10);
-                    continue;
-                }
-                break;
-            }
-            out() << cc->next().toString() << endl;
-        }
     }
 
     /* --- class dbclientpaired --- */

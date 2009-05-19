@@ -865,16 +865,4 @@ namespace mongo {
         b->dumpTree(id.head, order);
     }
 
-    void testClient() { 
-        /* first do: 
-            test.foo.drop();
-            test.foo.ensureIndex({x:9});
-        */
-        dblock lk;
-        DBContext ctxt("test.foo");
-        assert( nsdetails("test.foo") );
-        assert( nsdetails("test.foo")->nIndexes > 0 );
-        BtreeBucket::a_test( nsdetails("test.foo")->indexes[0] );
-    }
-
 }
