@@ -136,6 +136,8 @@ namespace mongo {
             }
             
             sort( ports.begin(), ports.end() );
+            for( int i = 1; i < ports.size(); ++i )
+                massert( "duplicate ports allocated", ports[ i - 1 ] != ports[ i ] );
             BSONObjBuilder b;
             b.append( "", ports );
             return b.obj();
