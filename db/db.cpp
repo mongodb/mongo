@@ -72,16 +72,6 @@ namespace mongo {
         }
     } mystartupdbcpp;
 
-    void quicktest() {
-        out() << "quicktest()\n";
-
-        MemoryMappedFile mmf;
-        int len = 16384;
-        char *m = (char *) mmf.map("/tmp/quicktest", len);
-        //	out() << "mmf reads: " << m << endl;
-        strcpy_s(m, 1000, "hello worldz");
-    }
-
     QueryResult* emptyMoreResult(long long);
 
     void testTheDb() {
@@ -408,9 +398,6 @@ namespace mongo {
         }
     }
 
-    int test2();
-    void testClient();
-
 } // namespace mongo
 
 
@@ -441,13 +428,6 @@ int main(int argc, char* argv[], char *envp[] )
     UnitTest::runTests();
 
     if ( argc >= 2 ) {
-        if ( strcmp(argv[1], "quicktest") == 0 ) {
-            quicktest();
-            return 0;
-        }
-        if ( strcmp(argv[1], "test2") == 0 ) {
-            return test2();
-        }
         if ( strcmp(argv[1], "msg") == 0 ) {
 
             // msg(argc >= 3 ? argv[2] : "ping");
@@ -467,29 +447,8 @@ int main(int argc, char* argv[], char *envp[] )
 
             return 0;
         }
-        if ( strcmp(argv[1], "msglots") == 0 ) {
-            msg(argc >= 3 ? argv[2] : "ping", 1000);
-            return 0;
-        }
-        if ( strcmp( argv[1], "testclient") == 0 ) {
-            testClient();
-            return 0;
-        }
-        if ( strcmp(argv[1], "zzz") == 0 ) {
-            msg(argc >= 3 ? argv[2] : "ping", 1000);
-            return 0;
-        }
         if ( strcmp(argv[1], "run") == 0 ) {
             initAndListen(port);
-            return 0;
-        }
-        if ( strcmp(argv[1], "longmsg") == 0 ) {
-            char buf[800000];
-            memset(buf, 'a', 799999);
-            buf[799999] = 0;
-            buf[799998] = 'b';
-            buf[0] = 'c';
-            msg(buf);
             return 0;
         }
 
@@ -602,11 +561,6 @@ usage:
     out() << "Mongo db ";
     out() << "usage:\n";
     out() << "  run                      run db" << endl;
-    out() << "  msg [msg] [port]         send a request to the db server listening on port (or default)" << endl;
-    out() << "  msglots                  send many test messages, and then wait for answer on the last one" << endl;
-    out() << "  longmsg                  send a long test message to the db server" << endl;
-    out() << "  quicktest                just check basic assertions and exit" << endl;
-    out() << "  test2                    run test2() - see code" << endl;
     out() << "\nOptions:\n";
     out() << " --help                    show this usage information\n";
     out() << " --port <portno>           specify port number, default is 27017\n";
