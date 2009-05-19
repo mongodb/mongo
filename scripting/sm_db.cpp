@@ -39,14 +39,14 @@ namespace mongo {
     class CursorHolder {
     public:
         CursorHolder( auto_ptr< DBClientCursor > &cursor, const shared_ptr< DBClientBase > &connection ) :
-        cursor_( cursor ),
-        connection_( connection ) {
+        connection_( connection ),
+        cursor_( cursor ) {
             assert( cursor_.get() );
         }
         DBClientCursor *get() const { return cursor_.get(); }
     private:
-        auto_ptr< DBClientCursor > cursor_;
         shared_ptr< DBClientBase > connection_;
+        auto_ptr< DBClientCursor > cursor_;
     };
     
     DBClientCursor *getCursor( JSContext *cx, JSObject *obj ) {
