@@ -845,8 +845,8 @@ def startMongodForTests( env, target, source ):
     from subprocess import Popen
     mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName ] )
     # Wait for mongod to start
-    from time import sleep
-    sleep( 2 )
+    import time
+    time.sleep( 2 )
     if mongodForTests.poll() is not None:
         print( "Failed to start mongod" )
         mongodForTests = None
@@ -870,6 +870,7 @@ def stopMongodForTests():
 
 testEnv.Alias( "startMongod", ["mongod"], [startMongodForTests] );
 testEnv.AlwaysBuild( "startMongod" );
+testEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
 
 def addMongodReqTargets( env, target, source ):
     mongodReqTargets = [ "smokeClient", "smokeJs", "smokeQuota" ]
