@@ -259,7 +259,18 @@ shellPrintHelper = function( x ){
 }
 
 execShellLine = function(){
-    var res = eval( __line__ );
+    var l = __line__.trim();
+    
+    var cmd = l.substring( 0 , ( l.indexOf( " " ) || l.length ) );
+    if ( cmd.length == 0 )
+        cmd = l;
+
+    if ( shellHelper[ cmd ] ){
+        shellHelper( cmd , l.substring( cmd.length + 1 ).trim() );
+        return;
+    }
+
+    var res = eval( l );
     if ( typeof( res ) != "undefined" ){
         shellPrintHelper( res );
     }
