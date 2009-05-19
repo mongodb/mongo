@@ -64,7 +64,7 @@ int mongo::Tool::main( int argc , char ** argv ){
         return -1;
     }
     
-    cout << "connected to: " << host << endl;
+    cerr << "connected to: " << host << endl;
 
     if ( _params.count( "db" ) )
         _db = _params["db"].as<string>();

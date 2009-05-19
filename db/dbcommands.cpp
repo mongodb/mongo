@@ -935,6 +935,115 @@ namespace mongo {
         }
     } cmdBuildInfo;
     
+    class CmdCloneCollectionAsCapped : public Command {
+    public:
+        CmdCloneCollectionAsCapped() : Command( "cloneCollectionAsCapped" ) {}
+        virtual bool slaveOk() { return false; }
+        virtual void help( stringstream &help ) const {
+            help << "example: { cloneCollectionAsCapped:<fromName>, toCollection:<toName>, size:<sizeInBytes> }";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string from = jsobj.getStringField( "cloneCollectionAsCapped" );
+            string to = jsobj.getStringField( "toCollection" );
+            long long size = (long long)jsobj.getField( "size" ).number();
+            
+            if ( from.empty() || to.empty() || size == 0 ) {
+                errmsg = "invalid command spec";
+                return false;
+            }
+
+            char realDbName[256];
+            nsToClient( dbname, realDbName );
+            
+            string fromNs = string( realDbName ) + "." + from;
+            string toNs = string( realDbName ) + "." + to;
+            massert( "source collection " + fromNs + " does not exist", !setClientTempNs( fromNs.c_str() ) );
+            NamespaceDetails *nsd = nsdetails( fromNs.c_str() );
+            massert( "source collection " + fromNs + " does not exist", nsd );
+            long long excessSize = nsd->datasize - size * 2;
+            DiskLoc extent = nsd->firstExtent;
+            for( ; excessSize > 0 && extent != nsd->lastExtent; extent = extent.ext()->xnext ) {
+                excessSize -= extent.ext()->length;
+                if ( excessSize > 0 )
+                    log( 2 ) << "cloneCollectionAsCapped skipping extent of size " << extent.ext()->length << endl;
+                log( 6 ) << "excessSize: " << excessSize << endl;
+            }
+            DiskLoc startLoc = extent.ext()->firstRecord;
+            
+            CursorId id;
+            {
+                auto_ptr< Cursor > c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
+                ClientCursor *cc = new ClientCursor();
+                cc->c = c;
+                cc->ns = fromNs;
+                cc->matcher.reset( new KeyValJSMatcher( BSONObj(), fromjson( "{$natural:1}" ) ) );
+                id = cc->cursorid;
+            }
+            
+            DBDirectClient client;
+            setClientTempNs( toNs.c_str() );
+            BSONObjBuilder spec;
+            spec.appendBool( "capped", true );
+            spec.append( "size", double( size ) );
+            if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, true ) )
+                return false;
+            
+            auto_ptr< DBClientCursor > c = client.getMore( fromNs, id );
+            while( c->more() ) {
+                BSONObj obj = c->next();
+                theDataFileMgr.insert( toNs.c_str(), obj );
+            }
+            
+            return true;
+        }        
+    } cmdCloneCollectionAsCapped;
+    
+    class CmdConvertToCapped : public Command {
+    public:
+        CmdConvertToCapped() : Command( "convertToCapped" ) {}
+        virtual bool slaveOk() { return false; }
+        virtual void help( stringstream &help ) const {
+            help << "example: { convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string from = jsobj.getStringField( "convertToCapped" );
+            long long size = (long long)jsobj.getField( "size" ).number();
+            
+            if ( from.empty() || size == 0 ) {
+                errmsg = "invalid command spec";
+                return false;
+            }
+            
+            char realDbName[256];
+            nsToClient( dbname, realDbName );
+
+            DBDirectClient client;
+            client.dropCollection( string( realDbName ) + "." + from + ".$temp_convertToCapped" );
+
+            BSONObj info;
+            if ( !client.runCommand( realDbName,
+                                    BSON( "cloneCollectionAsCapped" << from << "toCollection" << ( from + ".$temp_convertToCapped" ) << "size" << double( size ) ),
+                                    info ) ) {
+                errmsg = "cloneCollectionAsCapped failed: " + string(info);
+                return false;
+            }
+            
+            if ( !client.dropCollection( string( realDbName ) + "." + from ) ) {
+                errmsg = "failed to drop original collection";
+                return false;
+            }
+            
+            if ( !client.runCommand( "admin",
+                                    BSON( "renameCollection" << ( string( realDbName ) + "." + from + ".$temp_convertToCapped" ) << "to" << ( string( realDbName ) + "." + from ) ),
+                                    info ) ) {
+                errmsg = "renameCollection failed: " + string(info);
+                return false;
+            }
+
+            return true;
+        }
+    } cmdConvertToCapped;
+    
     extern map<string,Command*> *commands;
 
     /* TODO make these all command objects -- legacy stuff here

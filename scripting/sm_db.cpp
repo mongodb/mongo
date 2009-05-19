@@ -36,32 +36,47 @@ namespace mongo {
 
     // ------ cursor ------
 
+    class CursorHolder {
+    public:
+        CursorHolder( auto_ptr< DBClientCursor > &cursor, const shared_ptr< DBClientBase > &connection ) :
+        cursor_( cursor ),
+        connection_( connection ) {
+            assert( cursor_.get() );
+        }
+        DBClientCursor *get() const { return cursor_.get(); }
+    private:
+        auto_ptr< DBClientCursor > cursor_;
+        shared_ptr< DBClientBase > connection_;
+    };
+    
+    DBClientCursor *getCursor( JSContext *cx, JSObject *obj ) {
+        CursorHolder * holder = (CursorHolder*)JS_GetPrivate( cx , obj );
+        uassert( "no cursor!" , holder );
+        return holder->get();
+    }
+    
     JSBool internal_cursor_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         uassert( "no args to internal_cursor_constructor" , argc == 0 );
         JS_SetPrivate( cx , obj , 0 ); // just for safety
         return JS_TRUE;
     }
 
-
     void internal_cursor_finalize( JSContext * cx , JSObject * obj ){
-        DBClientCursor * cursor = (DBClientCursor*)JS_GetPrivate( cx , obj );
-        if ( cursor ){
-            delete cursor;
+        CursorHolder * holder = (CursorHolder*)JS_GetPrivate( cx , obj );
+        if ( holder ){
+            delete holder;
             JS_SetPrivate( cx , obj , 0 );
         }
     }
 
     JSBool internal_cursor_hasNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        DBClientCursor * cursor = (DBClientCursor*)JS_GetPrivate( cx , obj );
-        uassert( "no cursor in hasNext!" , cursor );
+        DBClientCursor *cursor = getCursor( cx, obj );
         *rval = cursor->more() ? JSVAL_TRUE : JSVAL_FALSE;
         return JS_TRUE;
     }
 
     JSBool internal_cursor_next(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        DBClientCursor * cursor = (DBClientCursor*)JS_GetPrivate( cx , obj );
-        uassert( "no cursor in next!" , cursor );
-
+        DBClientCursor *cursor = getCursor( cx, obj );
         Convertor c(cx);
 
         BSONObj n = cursor->next();
@@ -94,8 +109,8 @@ namespace mongo {
     JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         Convertor c( cx );
 
-        DBClientBase * client = createDirectClient();
-        JS_SetPrivate( cx , obj , (void*)client );
+        shared_ptr< DBClientBase > client( createDirectClient() );
+        JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientBase >( client ) ) );
 
         jsval host = c.toval( "EMBEDDED" );
         assert( JS_SetProperty( cx , obj , "host" , &host ) );
@@ -108,7 +123,7 @@ namespace mongo {
         
         uassert( "0 or 1 args to Mongo" , argc <= 1 );
         
-        DBClientConnection * conn = new DBClientConnection( true );
+        shared_ptr< DBClientConnection > conn( new DBClientConnection( true ) );
         
         string host = "127.0.0.1";
         if ( argc > 0 )
@@ -120,17 +135,23 @@ namespace mongo {
             return JS_FALSE;
         }
         
-        JS_SetPrivate( cx , obj , (void*)conn );
+        JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientConnection >( conn ) ) );
         jsval host_val = c.toval( host.c_str() );
         assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
         return JS_TRUE;
 
     }
 
+    DBClientBase *getConnection( JSContext *cx, JSObject *obj ) {
+        shared_ptr< DBClientBase > * connHolder = (shared_ptr< DBClientBase >*)JS_GetPrivate( cx , obj );
+        uassert( "no connection!" , connHolder && connHolder->get() );
+        return connHolder->get();
+    }
+    
     void mongo_finalize( JSContext * cx , JSObject * obj ){
-        DBClientBase * client = (DBClientBase*)JS_GetPrivate( cx , obj );
-        if ( client ){
-            delete client;
+        shared_ptr< DBClientBase > * connHolder = (shared_ptr< DBClientBase >*)JS_GetPrivate( cx , obj );
+        if ( connHolder ){
+            delete connHolder;
             JS_SetPrivate( cx , obj , 0 );
         }
     }
@@ -144,9 +165,10 @@ namespace mongo {
 
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
         uassert( "mongo_find neesd 5 args" , argc == 5 );
-        DBClientConnection * conn = (DBClientConnection*)JS_GetPrivate( cx , obj );
-        uassert( "no connection!" , conn );
-
+        shared_ptr< DBClientBase > * connHolder = (shared_ptr< DBClientBase >*)JS_GetPrivate( cx , obj );
+        uassert( "no connection!" , connHolder && connHolder->get() );
+        DBClientBase *conn = connHolder->get();
+                      
         Convertor c( cx );
 
         string ns = c.toString( argv[0] );
@@ -163,7 +185,7 @@ namespace mongo {
             auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? Option_SlaveOk : 0 );
             
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
-            JS_SetPrivate( cx , mycursor , cursor.release() );
+            JS_SetPrivate( cx , mycursor , new CursorHolder( cursor, *connHolder ) );
             *rval = OBJECT_TO_JSVAL( mycursor );
             return JS_TRUE;
         }
@@ -178,7 +200,7 @@ namespace mongo {
         uassert( "2nd param to update has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
         uassert( "3rd param to update has to be an object" , JSVAL_IS_OBJECT( argv[2] ) );
         
-        DBClientConnection * conn = (DBClientConnection*)JS_GetPrivate( cx , obj );
+        DBClientBase * conn = getConnection( cx, obj );
         uassert( "no connection!" , conn );
 
         Convertor c( cx );
@@ -201,7 +223,7 @@ namespace mongo {
         uassert( "mongo_insert needs 2 args" , argc == 2 );
         uassert( "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
         
-        DBClientConnection * conn = (DBClientConnection*)JS_GetPrivate( cx , obj );
+        DBClientBase * conn = getConnection( cx, obj );
         uassert( "no connection!" , conn );
         
         Convertor c( cx );
@@ -225,7 +247,7 @@ namespace mongo {
         uassert( "mongo_remove needs 2 arguments" , argc == 2 );
         uassert( "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
-        DBClientConnection * conn = (DBClientConnection*)JS_GetPrivate( cx , obj );
+        DBClientBase * conn = getConnection( cx, obj );
         uassert( "no connection!" , conn );
 
         Convertor c( cx );
