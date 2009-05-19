@@ -86,7 +86,7 @@ namespace mongo {
         int res;
         {
             Timer t;
-            res = s->invoke(f,args);
+            res = s->invoke(f,args, 10 * 60 * 1000);
             int m = t.millis();
             if ( m > 100 ) {
                 out() << "dbeval slow, time: " << dec << m << "ms " << ns << endl;

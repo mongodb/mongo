@@ -45,13 +45,13 @@ namespace mongo {
         /**
          * @return 0 on success
          */
-        virtual int invoke( ScriptingFunction func , const BSONObj& args ) = 0;
+        virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 ) = 0;
         virtual string getError() = 0;
         
-        int invoke( const char* code , const BSONObj& args );
+        int invoke( const char* code , const BSONObj& args, int timeoutMs = 0 );
         
-        virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError ) = 0;
-        virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError );
+        virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) = 0;
+        virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 );
         
         virtual void injectNative( const char *field, NativeFunction func ) = 0;
     };

@@ -741,18 +741,57 @@ namespace mongo {
             return (ScriptingFunction)_convertor->compileFunction( code );
         }
 
+        struct TimeoutSpec {
+            boost::posix_time::ptime start;
+            boost::posix_time::time_duration timeout;
+            int count;
+        };
+        
+        static JSBool checkTimeout( JSContext *cx, JSScript *script ) {
+            TimeoutSpec &spec = *(TimeoutSpec *)( JS_GetContextPrivate( cx ) );
+            if ( ++spec.count % 1000 != 0 )
+                return JS_TRUE;
+            boost::posix_time::time_duration elapsed = ( boost::posix_time::microsec_clock::local_time() - spec.start );
+            if ( elapsed < spec.timeout ) {
+                return JS_TRUE;
+            }
+            JS_ReportError( cx, "Timeout exceeded" );
+            return JS_FALSE;
+        }
+
+        void installCheckTimeout( int timeoutMs ) {
+            if ( timeoutMs > 0 ) {
+                TimeoutSpec *spec = new TimeoutSpec;
+                spec->timeout = boost::posix_time::millisec( timeoutMs );
+                spec->start = boost::posix_time::microsec_clock::local_time();
+                spec->count = 0;
+                JS_SetContextPrivate( _context, (void*)spec );
+                JS_SetBranchCallback( _context, checkTimeout );
+            }            
+        }
+
+        void uninstallCheckTimeout( int timeoutMs ) {
+            if ( timeoutMs > 0 ) {
+                JS_SetBranchCallback( _context, 0 );
+                delete (TimeoutSpec *)JS_GetContextPrivate( _context );
+                JS_SetContextPrivate( _context, 0 );
+            }
+        }
+        
         void precall(){
             _error = "";
             currentScope.reset( this );
         }
         
-        bool exec( const string& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true ){
+        bool exec( const string& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ){
             precall();
             
             jsval ret = JSVAL_VOID;
             
+            installCheckTimeout( timeoutMs );
             JSBool worked = JS_EvaluateScript( _context , _global , code.c_str() , strlen( code.c_str() ) , name.c_str() , 0 , &ret );
-
+            uninstallCheckTimeout( timeoutMs );
+            
             if ( assertOnError )
                 uassert( name + " exec failed" , worked );
             
@@ -767,7 +806,7 @@ namespace mongo {
             return worked;
         }
 
-        int invoke( JSFunction * func , const BSONObj& args ){
+        int invoke( JSFunction * func , const BSONObj& args, int timeoutMs ){
             precall();
             jsval rval;
             
@@ -781,7 +820,11 @@ namespace mongo {
             
             setObject( "args" , args , true ); // this is for backwards compatability
 
-            if ( ! JS_CallFunction( _context , _this , func , nargs , smargs , &rval ) ){
+            installCheckTimeout( timeoutMs );
+            JSBool ret = JS_CallFunction( _context , _this , func , nargs , smargs , &rval );
+            uninstallCheckTimeout( timeoutMs );
+            
+            if ( !ret ) {
                 return -3;
             }
 
@@ -789,8 +832,8 @@ namespace mongo {
             return 0;
         }
 
-        int invoke( ScriptingFunction funcAddr , const BSONObj& args ){
-            return invoke( (JSFunction*)funcAddr , args );
+        int invoke( ScriptingFunction funcAddr , const BSONObj& args, int timeoutMs = 0 ){
+            return invoke( (JSFunction*)funcAddr , args , timeoutMs );
         }
 
         void gotError( string s ){

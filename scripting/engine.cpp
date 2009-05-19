@@ -18,13 +18,13 @@ namespace mongo {
     ScriptEngine::~ScriptEngine(){
     }
 
-    int Scope::invoke( const char* code , const BSONObj& args ){
+    int Scope::invoke( const char* code , const BSONObj& args, int timeoutMs ){
         ScriptingFunction func = createFunction( code );
         uassert( "compile failed" , func );
-        return invoke( func , args );
+        return invoke( func , args, timeoutMs );
     }
 
-    bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError ){
+    bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){
         
         path p( filename );
         if ( is_directory( p ) ){
@@ -42,7 +42,7 @@ namespace mongo {
         
         f.read( 0 , data , f.len() );
         
-        return exec( data , filename , printResult , reportError , assertOnError );
+        return exec( data , filename , printResult , reportError , assertOnError, timeoutMs );
     }
 
 
