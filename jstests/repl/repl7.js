@@ -17,7 +17,7 @@ doTest = function( signal ) {
     
     assert.soon( function() {
                 return -1 != s.getDBNames().indexOf( "aa" );
-                } );
+                }, "aa timeout", 60000, 1000 );
     
     stopMongod( ports[ 1 ], signal );
     
@@ -29,11 +29,15 @@ doTest = function( signal ) {
                         return false;                    
                 }
                 return true;
-                } );
+                }, "a-aaaa timeout", 60000, 1000 );
 
-    for( n = "a"; n != "aaaaa"; n += "a" ) {
-        assert.eq( 1, m.getDB( n ).a.find().count() );
-    }    
+    assert.soon( function() {
+                for( n = "a"; n != "aaaaa"; n += "a" ) {
+                    if ( 1 != m.getDB( n ).a.find().count() ) {
+                        return false;
+                    }
+                }
+                return true; }, "a-aaaa count timeout" );
 
     sleep( 300 );
     
