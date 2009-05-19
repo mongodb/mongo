@@ -953,13 +953,11 @@ namespace mongo {
         BSONObj id = idForOp( op, mod );
         if ( !id.isEmpty() ) {
             const char *ns = op.getStringField( "ns" );
-            if ( mod ) {
-                if ( !idTracker.haveId( ns, id ) ) {
-                    idTracker.haveModId( ns, id, true );
-                }
-            } else {
-                idTracker.haveModId( ns, id, false );
-            }
+            // Since our range of local ops may not be the same as our peer's
+            // range of unapplied ops, it is always necessary to rewrite objects
+            // to the oplog after a mod update.
+            if ( mod )
+                idTracker.haveModId( ns, id, true );
             idTracker.haveId( ns, id, true );
         }        
     }
