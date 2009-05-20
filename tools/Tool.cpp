@@ -6,6 +6,8 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include "util/file_allocator.h"
+
 using namespace std;
 using namespace mongo;
 
@@ -64,6 +66,9 @@ int mongo::Tool::main( int argc , char ** argv ){
         static string myDbpath = getParam( "dbpath" );
         mongo::dbpath = myDbpath.c_str();
         mongo::acquirePathLock();
+#if !defined(_WIN32)
+        theFileAllocator().start();
+#endif        
     }
     
     if ( _params.count( "db" ) )
