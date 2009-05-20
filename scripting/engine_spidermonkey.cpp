@@ -17,14 +17,20 @@ namespace mongo {
     public:
         
         BSONHolder( BSONObj obj ){
-            _obj = obj;
+            _obj = obj.getOwned();
             _inResolve = false;
+            _magic = 17;
         }
         
+        void check(){
+            uassert( "holder magic value is wrong" , _magic == 17 );
+        }
+
         BSONFieldIterator * it();
 
         BSONObj _obj;
         bool _inResolve;
+        char _magic;
         list<string> _extra;
     };
 
@@ -527,6 +533,8 @@ namespace mongo {
         Convertor c( cx );
         
         BSONHolder * holder = GETHOLDER( cx , obj );
+        holder->check();
+
         string s = c.toString( id );
        
         BSONElement e = holder->_obj[ s.c_str() ];
