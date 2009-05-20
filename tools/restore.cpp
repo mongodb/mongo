@@ -79,8 +79,10 @@ public:
             ns += "." + l;
         }
         
-	if ( boost::filesystem::file_size( root ) == 0 )
-	  return;
+        if ( boost::filesystem::file_size( root ) == 0 ) {
+            out() << "file " + root.native_file_string() + " empty, aborting" << endl;
+            return;
+        }
 
         out() << "\t going into namespace [" << ns << "]" << endl;
         
