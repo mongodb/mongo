@@ -58,26 +58,17 @@ private:
     MessagingPort &mp_;
 };
 
+set<MessagingPort*> ports;
+
 class MyListener : public Listener {
 public:
     MyListener( int port ) : Listener( "", port ) {}
     virtual void accepted(MessagingPort *mp) {
+        ports.insert( mp );
         Forwarder f( *mp );
         boost::thread t( f );
     }
 };
-
-void helpExit() {
-    cout << "usage mongobridge --port <port> --dest <destUri>" << endl;
-    cout << "    port: port to listen for mongo messages" << endl;
-    cout << "    destUri: uri of remote mongod instance" << endl;
-    ::exit( -1 );
-}
-
-void check( bool b ) {
-    if ( !b )
-        helpExit();
-}
 
 auto_ptr< MyListener > listener;
 
@@ -85,6 +76,8 @@ auto_ptr< MyListener > listener;
 #include <execinfo.h>
 void cleanup( int sig ) {
     close( listener->socket() );
+    for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
+        (*i)->shutdown();
     ::exit( 0 );    
 }
 
@@ -100,6 +93,18 @@ void setupSignals() {
 #else
 inline void setupSignals() {}
 #endif
+
+void helpExit() {
+    cout << "usage mongobridge --port <port> --dest <destUri>" << endl;
+    cout << "    port: port to listen for mongo messages" << endl;
+    cout << "    destUri: uri of remote mongod instance" << endl;
+    ::exit( -1 );
+}
+
+void check( bool b ) {
+    if ( !b )
+        helpExit();
+}
 
 int main( int argc, char **argv ) {
     setupSignals();
