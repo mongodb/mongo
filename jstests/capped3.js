@@ -32,7 +32,8 @@ t2.drop();
 for( i = 0; i < 1000; ++i ) {
     t.save( {i:i} );
 }
-assert.commandWorked( db.runCommand( { convertToCapped:"jstests_capped3", size:1000 } ) );
+//assert.commandWorked( db.runCommand( { convertToCapped:"jstests_capped3", size:1000 } ) );
+assert( t.convertToCapped( 1000 ).ok )
 c = t.find().sort( {$natural:-1} );
 i = 999;
 while( c.hasNext() ) {

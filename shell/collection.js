@@ -348,6 +348,12 @@ DBCollection.prototype.totalIndexSize = function(){
     return total;
 }
 
+DBCollection.prototype.convertToCapped = function( bytes ){
+    if ( ! bytes )
+        throw "have to specify # of bytes";
+    return this._dbCommand( { convertToCapped : this._shortName , size : bytes } )
+}
+
 DBCollection.prototype.toString = function(){
     return this.getFullName();
 }
