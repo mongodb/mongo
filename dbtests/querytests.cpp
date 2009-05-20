@@ -623,6 +623,22 @@ namespace QueryTests {
             ASSERT_EQUALS( 1U, client().count( ns, fromjson( "{i:{$in:['a']}}" ) ) );
         }
     };
+
+    class EmbeddedArray : public ClientBase {
+    public:
+        ~EmbeddedArray() {
+            client().dropCollection( "unittests.querytests.EmbeddedArray" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.EmbeddedArray";
+            client().insert( ns, fromjson( "{foo:{bar:['spam']}}" ) );
+            client().insert( ns, fromjson( "{foo:{bar:['spam','eggs']}}" ) );
+            client().insert( ns, fromjson( "{bar:['spam']}" ) );
+            client().insert( ns, fromjson( "{bar:['spam','eggs']}" ) );
+            ASSERT_EQUALS( 2U, client().count( ns, BSON( "bar" << "spam" ) ) );
+            ASSERT_EQUALS( 2U, client().count( ns, BSON( "foo.bar" << "spam" ) ) );
+        }
+    };
     
     class All : public Suite {
     public:
@@ -657,6 +673,7 @@ namespace QueryTests {
             add< MinMax >();
             add< DirectLocking >();
             add< FastCountIn >();
+            add< EmbeddedArray >();
         }
     };
     

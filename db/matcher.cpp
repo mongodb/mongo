@@ -386,6 +386,7 @@ namespace mongo {
        compareOp - Equality, LT, GT, etc.
        deep      - out param.  set to true/false if we scanned an array
        isArr     -
+       nextArr   - true if an array has already been found
 
        Special forms:
 
@@ -424,7 +425,7 @@ namespace mongo {
                     BSONElement z = ai.next();
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep, false, nextArr);
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep, false, true);
                         if ( cmp > 0 ) {
                             if ( deep ) *deep = true;
                             return 1;
@@ -446,7 +447,7 @@ namespace mongo {
                     return -1;
 
                 BSONObj eo = se.embeddedObject();
-                return matchesDotted(p+1, toMatch, eo, compareOp, deep, se.type() == Array, true);
+                return matchesDotted(p+1, toMatch, eo, compareOp, deep, se.type() == Array, nextArr);
             } else {
                 e = obj.getField(fieldName);
             }

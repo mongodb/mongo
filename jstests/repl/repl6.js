@@ -4,10 +4,8 @@ var baseName = "jstests_repl6test";
 
 soonCount = function( m, count ) {
     assert.soon( function() { 
-                //                print( "check count" );
-                //                print( "count: " + s.getDB( baseName ).z.find().count() );
                 return m.getDB( baseName ).a.find().count() == count; 
-                } );    
+                }, "expected count: " + count + " from : " + m );    
 }
 
 doTest = function( signal ) {

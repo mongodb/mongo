@@ -144,5 +144,8 @@ namespace mongo {
             string oldName_;
         };
     };
+
+    extern int lockFile;
+    void acquirePathLock();
     
 } // namespace mongo

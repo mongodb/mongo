@@ -54,6 +54,7 @@
 		933E22110F4327B2000209E3 /* perftest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = perftest.cpp; sourceTree = "<group>"; };
 		933E22120F4327B2000209E3 /* perftest.o */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.objfile"; path = perftest.o; sourceTree = "<group>"; };
 		933EF9C70FC3434000C4B294 /* quota1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = quota1.js; sourceTree = "<group>"; };
+		9340BBEA0FC4521C00656DE0 /* tool1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = tool1.js; sourceTree = "<group>"; };
 		9342232B0EF16D4F00608550 /* connpool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = connpool.cpp; sourceTree = "<group>"; };
 		9342232C0EF16D4F00608550 /* connpool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = connpool.h; sourceTree = "<group>"; };
 		9342232D0EF16D4F00608550 /* dbclient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbclient.cpp; sourceTree = "<group>"; };
@@ -378,6 +379,14 @@
 			path = quota;
 			sourceTree = "<group>";
 		};
+		9340BBE90FC4521C00656DE0 /* tool */ = {
+			isa = PBXGroup;
+			children = (
+				9340BBEA0FC4521C00656DE0 /* tool1.js */,
+			);
+			path = tool;
+			sourceTree = "<group>";
+		};
 		9342232A0EF16D4F00608550 /* client */ = {
 			isa = PBXGroup;
 			children = (
@@ -588,6 +597,7 @@
 		93A8D1D10F37544800C92B85 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				9340BBE90FC4521C00656DE0 /* tool */,
 				933EF9C60FC3434000C4B294 /* quota */,
 				93DB95170FC1D3D50047F950 /* capped4.js */,
 				93DB94A40FC1BFA30047F950 /* capped3.js */,
