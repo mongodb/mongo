@@ -828,6 +828,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "perf", "*.js" ] ) ] )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
+    addSmoketest( "smokeTool", [ "mongo" ], [ jsDirTestSpec( "tool" ) ] )
 
 mongodForTests = None
 mongodForTestsPort = "27017"
@@ -881,7 +882,7 @@ def addMongodReqTargets( env, target, source ):
 testEnv.Alias( "addMongodReqTargets", [], [addMongodReqTargets] )
 testEnv.AlwaysBuild( "addMongodReqTargets" )
 
-testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeSharding" ] )
+testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeSharding", "smokeTool" ] )
 testEnv.AlwaysBuild( "smokeAll" )
 
 def addMongodReqNoJsTargets( env, target, source ):

@@ -136,7 +136,7 @@ namespace mongo {
             }
             
             sort( ports.begin(), ports.end() );
-            for( int i = 1; i < ports.size(); ++i )
+            for( unsigned i = 1; i < ports.size(); ++i )
                 massert( "duplicate ports allocated", ports[ i - 1 ] != ports[ i ] );
             BSONObjBuilder b;
             b.append( "", ports );
@@ -217,7 +217,7 @@ namespace mongo {
                 }
                 argv_[ args.nFields() ] = 0;
                 
-                if ( program == "mongo" )
+                if ( program != "mongod" && program != "mongos" )
                     port_ = 0;
                 else
                     assert( port_ > 0 );
