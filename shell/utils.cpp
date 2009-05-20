@@ -300,7 +300,7 @@ namespace mongo {
             MongoProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            return BSON( "" << r.pid() );
+            return BSON( string( "" ) << int( r.pid() ) );
         }
 
         BSONObj ResetDbpath( const BSONObj &a ) {
