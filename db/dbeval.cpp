@@ -63,7 +63,7 @@ namespace mongo {
 
         ScriptingFunction f = s->createFunction(code);
         if ( f == 0 ) {
-            errmsg = "compile failed";
+            errmsg = (string)"compile failed: " + s->getError();
             return false;
         }
         

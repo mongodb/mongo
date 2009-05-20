@@ -17,14 +17,20 @@ namespace mongo {
     public:
         
         BSONHolder( BSONObj obj ){
-            _obj = obj;
+            _obj = obj.getOwned();
             _inResolve = false;
+            _magic = 17;
         }
         
+        void check(){
+            uassert( "holder magic value is wrong" , _magic == 17 );
+        }
+
         BSONFieldIterator * it();
 
         BSONObj _obj;
         bool _inResolve;
+        char _magic;
         list<string> _extra;
     };
 
@@ -207,7 +213,7 @@ namespace mongo {
                 string s = code;
                 if ( strstr( code , "return" ) == 0 )
                     s = "return " + s;
-                return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile" , 0 );
+                return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
             }
             
             // TODO: there must be a way in spider monkey to do this - this is a total hack
@@ -216,9 +222,19 @@ namespace mongo {
             s += code;
             s += ";";
 
-            JSFunction * func = JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile" , 0 );
+            JSFunction * func = JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_b" , 0 );
+            if ( ! func ){
+                cerr << "compile for hack failed" << endl;
+                return 0;
+            }
+            
             jsval ret;
-            JS_CallFunction( _context , 0 , func , 0 , 0 , &ret );
+            if ( ! JS_CallFunction( _context , 0 , func , 0 , 0 , &ret ) ){
+                cerr << "call function for hack failed" << endl;
+                return 0;
+            }
+
+            uassert( "return for compile hack failed" , JS_TypeOfValue( _context , ret ) == JSTYPE_FUNCTION );
             return JS_ValueToFunction( _context , ret );
         }
 
@@ -272,7 +288,7 @@ namespace mongo {
                 assert( array );
 
                 for ( int i=0; i<n; i++ ){
-                    jsval v = toval( embed[BSONObjBuilder::numStr( i ).c_str()] );
+                    jsval v = toval( embed[i] );
                     assert( JS_SetElement( _context , array , i , &v ) );
                 }
                 
@@ -517,6 +533,8 @@ namespace mongo {
         Convertor c( cx );
         
         BSONHolder * holder = GETHOLDER( cx , obj );
+        holder->check();
+
         string s = c.toString( id );
        
         BSONElement e = holder->_obj[ s.c_str() ];
@@ -738,6 +756,7 @@ namespace mongo {
         // ---- functions -----
         
         ScriptingFunction createFunction( const char * code ){
+            precall();
             return (ScriptingFunction)_convertor->compileFunction( code );
         }
 
@@ -875,9 +894,10 @@ namespace mongo {
         }
         
         log() << ss.str() << endl;
-        currentScope->gotError( ss.str() );
-        
-        // TODO: send to Scope
+
+        if ( currentScope.get() ){
+            currentScope->gotError( ss.str() );
+        }
     }
 
     JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
