@@ -288,7 +288,7 @@ namespace mongo {
                 assert( array );
 
                 for ( int i=0; i<n; i++ ){
-                    jsval v = toval( embed[BSONObjBuilder::numStr( i ).c_str()] );
+                    jsval v = toval( embed[i] );
                     assert( JS_SetElement( _context , array , i , &v ) );
                 }
                 
