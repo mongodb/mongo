@@ -576,6 +576,13 @@ namespace mongo {
             return getField(field);
         }
 
+        BSONElement operator[] (int field) const { 
+            stringstream ss;
+            ss << field;
+            string s = ss.str();
+            return getField(s.c_str());
+        }
+
 		/** @return true if field exists */
         bool hasField( const char * name )const {
             return ! getField( name ).eoo();
