@@ -217,7 +217,7 @@ namespace mongo {
                 }
                 argv_[ args.nFields() ] = 0;
                 
-                if ( program == "mongo" )
+                if ( program != "mongod" && program != "mongos" )
                     port_ = 0;
                 else
                     assert( port_ > 0 );
