@@ -217,7 +217,7 @@ namespace mongo {
                 }
                 argv_[ args.nFields() ] = 0;
                 
-                if ( program != "mongod" && program != "mongos" )
+                if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
                     port_ = 0;
                 else
                     assert( port_ > 0 );
