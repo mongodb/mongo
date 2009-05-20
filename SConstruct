@@ -828,6 +828,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "perf", "*.js" ] ) ] )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
+    addSmoketest( "smokeTool", [ "mongo" ], [ jsDirTestSpec( "tool" ) ] )
 
 mongodForTests = None
 mongodForTestsPort = "27017"
