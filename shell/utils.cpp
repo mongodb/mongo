@@ -124,7 +124,7 @@ namespace mongo {
                 memset(address.sin_zero, 0, sizeof(address.sin_zero));
                 address.sin_family = AF_INET;
                 address.sin_port = 0;
-                address.sin_addr.s_addr = 0;        
+                address.sin_addr.s_addr = inet_addr( "127.0.0.1" );
                 assert( 0 == ::bind( s, (sockaddr*)&address, sizeof( address ) ) );
                 
                 sockaddr_in newAddress;
