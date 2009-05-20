@@ -882,7 +882,7 @@ def addMongodReqTargets( env, target, source ):
 testEnv.Alias( "addMongodReqTargets", [], [addMongodReqTargets] )
 testEnv.AlwaysBuild( "addMongodReqTargets" )
 
-testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeSharding" ] )
+testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeSharding", "smokeTool" ] )
 testEnv.AlwaysBuild( "smokeAll" )
 
 def addMongodReqNoJsTargets( env, target, source ):
