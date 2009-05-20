@@ -11,6 +11,7 @@
 #endif
 
 #include "client/dbclient.h"
+#include "db/instance.h"
 
 using std::string;
 
@@ -48,17 +49,21 @@ namespace mongo {
         }
 
         virtual int run() = 0;
-
+        
         virtual void printExtraHelp( ostream & out );
         
     protected:
         string _name;
-        mongo::DBClientConnection _conn;
 
         string _db;
         string _coll;
 
+        mongo::DBClientBase &conn() { return _useDirect ? (mongo::DBClientBase&)_direct : (mongo::DBClientBase&)_conn; };
+        
     private:
+        mongo::DBClientConnection _conn;
+        mongo::DBDirectClient _direct;
+        bool _useDirect;
         boost::program_options::options_description * _options;
         boost::program_options::positional_options_description _positonalOptions;
 

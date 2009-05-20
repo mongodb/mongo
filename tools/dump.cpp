@@ -40,7 +40,7 @@ public:
         int out = open( outputFile.string().c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
         assert( out );
         
-        auto_ptr<DBClientCursor> cursor = _conn.query( coll.c_str() , BSONObj() , 0 , 0 , 0 , Option_SlaveOk );
+        auto_ptr<DBClientCursor> cursor = conn().query( coll.c_str() , BSONObj() , 0 , 0 , 0 , Option_SlaveOk );
 
         int num = 0;
         while ( cursor->more() ) {
@@ -61,7 +61,7 @@ public:
         
         string sns = db + ".system.namespaces";
 
-        auto_ptr<DBClientCursor> cursor = _conn.query( sns.c_str() , BSONObj() , 0 , 0 , 0 , Option_SlaveOk );
+        auto_ptr<DBClientCursor> cursor = conn().query( sns.c_str() , BSONObj() , 0 , 0 , 0 , Option_SlaveOk );
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
             if ( obj.toString().find( ".$" ) != string::npos )
@@ -84,7 +84,7 @@ public:
         if ( db == "*" ){
             cout << "all dbs" << endl;
 
-            BSONObj res = _conn.findOne( "admin.$cmd" , BSON( "listDatabases" << 1 ) );
+            BSONObj res = conn().findOne( "admin.$cmd" , BSON( "listDatabases" << 1 ) );
             BSONObj dbs = res.getField( "databases" ).embeddedObjectUserCheck();
             set<string> keys;
             dbs.getFieldNames( keys );
@@ -105,6 +105,7 @@ public:
         }
         return 0;
     }
+
 };
 
 int main( int argc , char ** argv ) {

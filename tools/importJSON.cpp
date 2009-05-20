@@ -63,11 +63,11 @@ public:
 
         if ( hasParam( "drop" ) ){
             cout << "dropping: " << ns << endl;
-            _conn.dropCollection( ns.c_str() );
+            conn().dropCollection( ns.c_str() );
         }
 
         if ( hasParam( "idbefore" ) ){
-            _conn.ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
+            conn().ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
         }
 
         int num = 0;
@@ -87,7 +87,7 @@ public:
 
             try {
                 BSONObj o = fromjson( line );
-                _conn.insert( ns.c_str() , o );
+                conn().insert( ns.c_str() , o );
             }
             catch ( MsgAssertionException& ma ){
                 cout << "exception:" << ma.toString() << endl;
@@ -101,7 +101,7 @@ public:
         }
 
         if ( hasParam( "id" ) ){
-            _conn.ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
+            conn().ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
         }
 
         return 0;

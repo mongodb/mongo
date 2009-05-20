@@ -95,7 +95,7 @@ public:
         while ( read < mmf.length() ) {
             BSONObj o( data );
             
-            _conn.insert( ns.c_str() , o );
+            conn().insert( ns.c_str() , o );
             
             read += o.objsize();
             data += o.objsize();

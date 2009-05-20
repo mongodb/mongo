@@ -663,7 +663,7 @@ mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [
 Default( mongod )
 
 # tools
-allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
+allToolFiles = commonFiles + coreDbFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/Tool.cpp" ]
 env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
 env.Program( "mongorestore" , allToolFiles + [ "tools/restore.cpp" ] )
 
