@@ -540,8 +540,8 @@ namespace QueryTests {
     private:
         void check( const string &hintField ) {
             const char *ns = "unittests.querytests.SubobjArr";
-            ASSERT( !client().query( ns, Query( "{'a.b':1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
-            ASSERT( client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( client().query( ns, Query( "{'a.b':1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( !client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
         }
     };
 

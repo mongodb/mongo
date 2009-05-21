@@ -66,7 +66,7 @@ namespace mongo {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, bool *deep, bool isArr = false, bool nextArr = false);
+            int compareOp, bool *deep, bool isArr = false);
 
         int matchesNe(
             const char *fieldName,

@@ -386,7 +386,6 @@ namespace mongo {
        compareOp - Equality, LT, GT, etc.
        deep      - out param.  set to true/false if we scanned an array
        isArr     -
-       nextArr   - true if an array has already been found
 
        Special forms:
 
@@ -399,7 +398,8 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr, bool nextArr) {
+    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
+        
         if ( compareOp == BSONObj::NE )
             return matchesNe( fieldName, toMatch, obj, deep );
         if ( compareOp == BSONObj::NIN ) {
@@ -413,10 +413,10 @@ namespace mongo {
         }
         
         BSONElement e;
-        if ( !constrainIndexKey_.isEmpty() ) {
+        bool indexed = !constrainIndexKey_.isEmpty();
+        if ( indexed ) {
             e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
             assert( !e.eoo() );
-            nextArr = true;
         } else {
             if ( isArr ) {
                 BSONObjIterator ai(obj);
@@ -425,7 +425,7 @@ namespace mongo {
                     BSONElement z = ai.next();
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep, false, true);
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep, false);
                         if ( cmp > 0 ) {
                             if ( deep ) *deep = true;
                             return 1;
@@ -447,16 +447,16 @@ namespace mongo {
                     return -1;
 
                 BSONObj eo = se.embeddedObject();
-                return matchesDotted(p+1, toMatch, eo, compareOp, deep, se.type() == Array, nextArr);
+                return matchesDotted(p+1, toMatch, eo, compareOp, deep, se.type() == Array);
             } else {
                 e = obj.getField(fieldName);
             }
         }
         
-        if ( ( e.type() != Array || nextArr || compareOp == BSONObj::opALL || compareOp == BSONObj::opSIZE ) &&
+        if ( ( e.type() != Array || indexed || compareOp == BSONObj::opALL || compareOp == BSONObj::opSIZE ) &&
             valuesMatch(e, toMatch, compareOp, deep) ) {
             return 1;
-        } else if ( e.type() == Array && compareOp != BSONObj::opALL && compareOp != BSONObj::opSIZE && !nextArr ) {
+        } else if ( e.type() == Array && compareOp != BSONObj::opALL && compareOp != BSONObj::opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.more() ) {
                 BSONElement z = ai.next();
