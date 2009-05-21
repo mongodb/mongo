@@ -1434,8 +1434,10 @@ namespace mongo {
         p += obj.objsize();
         *p = EOO;
         
-        //BSONObj temp(r);
-        //out() << "temp:" << temp.toString() << endl;
+        if ( logLevel >= 6 ) {
+            BSONObj temp(r);
+            log( 6 ) << "logging op:" << temp << endl;
+        }
 
         database = oldClient;
     }

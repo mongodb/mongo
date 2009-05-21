@@ -184,9 +184,21 @@ namespace mongo {
 // { ..., capped: true, size: ..., max: ... }
 // returns true if successful
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication) {
+        const char *coll = strchr( ns, '.' ) + 1;
+        massert( "invalid ns", coll && *coll );
+        char cl[ 256 ];
+        nsToClient( ns, cl );
         bool ok = _userCreateNS(ns, j, err);
-        if ( logForReplication && ok )
-            logOp("c", ns, j);
+        if ( logForReplication && ok ) {
+            if ( j.getField( "create" ).eoo() ) {
+                BSONObjBuilder b;
+                b << "create" << coll;
+                b.appendElements( j );
+                j = b.obj();
+            }
+            string logNs = string( cl ) + ".$cmd";
+            logOp("c", logNs.c_str(), j);
+        }
         return ok;
     }
 
@@ -1088,6 +1100,12 @@ assert( !eloc.isNull() );
         IDToInsert() : BSONElement( ( char * )( &idToInsert_ ) ) {}
     } idToInsert;
 #pragma pack()
+    
+    void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o ) {
+        BSONObj tmp = o;
+        insert( ns, tmp );
+        logOp( "i", ns, tmp );
+    }
     
     DiskLoc DataFileMgr::insert(const char *ns, BSONObj &o) {
         DiskLoc loc = insert( ns, o.objdata(), o.objsize() );

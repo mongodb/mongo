@@ -639,7 +639,7 @@ namespace mongo {
     public:
         CmdCreate() : Command("create") { }
         virtual bool logTheOp() {
-            return true;
+            return false;
         }
         virtual bool slaveOk() {
             return false;
@@ -991,7 +991,7 @@ namespace mongo {
             auto_ptr< DBClientCursor > c = client.getMore( fromNs, id );
             while( c->more() ) {
                 BSONObj obj = c->next();
-                theDataFileMgr.insert( toNs.c_str(), obj );
+                theDataFileMgr.insertAndLog( toNs.c_str(), obj );
             }
             
             return true;

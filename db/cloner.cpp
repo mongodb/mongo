@@ -580,7 +580,7 @@ namespace mongo {
                         break;
                 }
                 BSONObj o = c->next();
-                theDataFileMgr.insert( target.c_str(), o );
+                theDataFileMgr.insertAndLog( target.c_str(), o );
             }
             
             char cl[256];
@@ -610,7 +610,7 @@ namespace mongo {
                     }
                 }
                 BSONObj n = b.done();
-                theDataFileMgr.insert( targetIndexes.c_str(), n );
+                theDataFileMgr.insertAndLog( targetIndexes.c_str(), n );
             }
             
             {
