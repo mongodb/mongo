@@ -134,5 +134,5 @@ namespace mongo {
         ss << "db version v" << versionString << ", pdfile version " << VERSION << "." << VERSION_MINOR;
         return ss.str();
     }
-    
+
 } // namespace mongo
