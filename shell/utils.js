@@ -244,6 +244,14 @@ printjson = function(x){
 
 shellPrintHelper = function( x ){
     
+    if ( typeof( x ) == "undefined" )
+        return;
+    
+    if ( x == null ){
+        print( "null" );
+        return;
+    }
+
     if ( typeof x != "object" ) 
         return print( x );
     
