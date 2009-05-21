@@ -208,11 +208,29 @@ namespace mongo {
             return code[8] == ' ' || code[8] == '(';
         }
 
+        bool isSimpleStatement( const string& code ){
+            if ( code.find( "return" ) != string::npos )
+                return false;
+
+            if ( code.find( ";" ) != string::npos &&
+                 code.find( ";" ) != code.rfind( ";" ) )
+                return false;
+
+            if ( code.find( "for(" ) != string::npos ||
+                 code.find( "for (" ) != string::npos ||
+                 code.find( "while (" ) != string::npos ||
+                 code.find( "while(" ) != string::npos )
+                return false;
+
+            return true;
+        }
+
         JSFunction * compileFunction( const char * code ){
             if ( ! hasFunctionIdentifier( code ) ){
                 string s = code;
-                if ( strstr( code , "return" ) == 0 )
+                if ( isSimpleStatement( s ) ){
                     s = "return " + s;
+                }
                 return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
             }
             

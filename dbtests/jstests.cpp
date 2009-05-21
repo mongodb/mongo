@@ -139,9 +139,12 @@ namespace JSTests {
 
             s->invoke( "function (){ return this.x == 17; }" , BSONObj() );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
-
+            
             s->invoke( "function z(){ return this.x == 18; }" , BSONObj() );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+
+            s->invoke( "x = 5; for( ; x <10; x++){ a = 1; }" , BSONObj() );
+            ASSERT_EQUALS( 10 , s->getNumber( "x" ) );
             
             delete s;
         }

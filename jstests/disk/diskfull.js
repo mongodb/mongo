@@ -1,7 +1,7 @@
 port = allocatePorts( 1 )[ 0 ];
 doIt = true;
 try {
-    m = startMongoProgram( "mongod", "--port", port, "--dbpath", "/data/db/diskfulltest", "--nohttpinterface" );
+    m = startMongoProgram( "mongod", "--port", port, "--dbpath", "/data/db/diskfulltest", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 } catch ( e ) {
     print( "path /data/db/diskfulltest/ missing, skipping diskfull test" );
     doIt = false;
