@@ -1194,7 +1194,6 @@ namespace mongo {
 
         // apply operations
         {
-			unsigned nSaveLast = 0;
 			time_t saveLast = time(0);
             while ( 1 ) {
                 if ( !c->more() ) {
@@ -1208,23 +1207,25 @@ namespace mongo {
                             setLastSavedLocalTs( nextLastSaved );
                         }
                     }
-                    log() << "pull:   applied " << n << " operations" << endl;
                     syncedTo = nextOpTime;
-                    log(2) << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << '\n';
                     save(); // note how far we are synced up to now
+                    log() << "pull:   applied " << n << " operations" << endl;
+                    log(2) << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << '\n';
                     break;
                 }
 
-				nSaveLast++;
-				OCCASIONALLY if( nSaveLast > 100000 || time(0) - saveLast > 5 * 60 ) { 
+				OCCASIONALLY if( n > 100000 || time(0) - saveLast > 5 * 60 ) { 
 					// periodically note our progress, in case we are doing a lot of work and crash
 					dblock lk;
+                    syncedTo = nextOpTime;
+                    // can't update local log ts since there are pending operations from our peer
 					save();
+                    log() << "pull:   applied " << n << " operations" << endl;
+                    log(2) << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << '\n';
 					saveLast = time(0);
-					nSaveLast = 0;
+					n = 0;
 				}
 
-                /* todo: get out of the mutex for the next()? */
                 BSONObj op = c->next();
                 ts = op.findElement("ts");
                 assert( ts.type() == Date );
