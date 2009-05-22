@@ -579,7 +579,7 @@ namespace QueryTests {
     private:
         auto_ptr< DBClientCursor > query( int minA, int minB, int maxA, int maxB, const BSONObj &hint ) {
             Query q;
-            q = q.min( BSON( "a" << minA << "b" << minB ) ).max( BSON( "a" << maxA << "b" << maxB ) );
+            q = q.minKey( BSON( "a" << minA << "b" << minB ) ).maxKey( BSON( "a" << maxA << "b" << maxB ) );
             if ( !hint.isEmpty() )
                 q.hint( hint );
             return client().query( ns, q );
