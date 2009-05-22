@@ -145,6 +145,7 @@ def printLocalInfo():
 printLocalInfo()
 
 env = Environment()
+env["LIBPATH"] = []
 
 if GetOption( "recstore" ) != None:
     env.Append( CPPDEFINES=[ "_RECSTORE" ] )
