@@ -29,6 +29,7 @@ class BSONElementManipulator {
 public:
     BSONElementManipulator( const BSONElement &element ) :
     element_( element ) {
+        assert( !element_.eoo() );
     }
     /** Replace a Timestamp type with a Date type initialized to
      OpTime::now().asDate()

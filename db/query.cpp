@@ -355,21 +355,25 @@ namespace mongo {
         for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
-            switch( m.op ) {
-                case Mod::INC:
-                    uassert( "Cannot apply $inc modifier to non-number", e.isNumber() || e.eoo() );
-                    if ( !e.isNumber() )
+            if ( e.eoo() ) {
+                inPlacePossible = false;
+            } else {
+                switch( m.op ) {
+                    case Mod::INC:
+                        uassert( "Cannot apply $inc modifier to non-number", e.isNumber() || e.eoo() );
+                        if ( !e.isNumber() )
+                            inPlacePossible = false;
+                        break;
+                    case Mod::SET:
+                        if ( !( e.isNumber() && m.elt.isNumber() ) &&
+                            m.elt.valuesize() != e.valuesize() )
+                            inPlacePossible = false;
+                        break;
+                    case Mod::PUSH:
+                        uassert( "Cannot apply $push modifier to non-array", e.type() == Array || e.eoo() );
                         inPlacePossible = false;
-                    break;
-                case Mod::SET:
-                    if ( !( e.isNumber() && m.elt.isNumber() ) &&
-                        m.elt.valuesize() != e.valuesize() )
-                        inPlacePossible = false;
-                    break;
-                case Mod::PUSH:
-                    uassert( "Cannot apply $push modifier to non-array", e.type() == Array || e.eoo() );
-                    inPlacePossible = false;
-                    break;
+                        break;
+                }
             }
         }
         if ( !inPlacePossible ) {
