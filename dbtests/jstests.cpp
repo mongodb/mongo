@@ -315,7 +315,57 @@ namespace JSTests {
             delete s;
         }
     };
+    
+    class TypeConservation {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            //  --  A  --
+            
+            BSONObj o;
+            {
+                BSONObjBuilder b ;
+                b.append( "a" , (int)5 );
+                b.append( "b" , 5.6 );
+                o = b.obj();
+            }
+            ASSERT_EQUALS( NumberInt , o["a"].type() );
+            ASSERT_EQUALS( NumberDouble , o["b"].type() );
+            
+            s->setObject( "z" , o );
+            s->invoke( "return z" , BSONObj() );
+            BSONObj out = s->getObject( "return" );
+            ASSERT_EQUALS( 5 , out["a"].number() );
+            ASSERT_EQUALS( 5.6 , out["b"].number() );
 
+            ASSERT_EQUALS( NumberDouble , out["b"].type() );
+            ASSERT_EQUALS( NumberInt , out["a"].type() );
+
+            //  --  B  --
+            
+            {
+                BSONObjBuilder b ;
+                b.append( "a" , (int)5 );
+                b.append( "b" , 5.6 );
+                o = b.obj();
+            }
+
+            s->setObject( "z" , o , false );
+            s->invoke( "return z" , BSONObj() );
+            out = s->getObject( "return" );
+            ASSERT_EQUALS( 5 , out["a"].number() );
+            ASSERT_EQUALS( 5.6 , out["b"].number() );
+
+            ASSERT_EQUALS( NumberDouble , out["b"].type() );
+            ASSERT_EQUALS( NumberInt , out["a"].type() );
+            
+            
+
+            delete s;
+        }
+        
+    };
 
     class All : public Suite {
     public:
@@ -330,6 +380,7 @@ namespace JSTests {
             add< ObjectModTests >();
             add< OtherJSTypes >();
             add< SpecialDBTypes >();
+            add< TypeConservation >();
         }
     };
     

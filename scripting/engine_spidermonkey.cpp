@@ -116,13 +116,22 @@ namespace mongo {
             if ( ! o )
                 return BSONObj();
             
+            if ( JS_InstanceOf( _context , o , &bson_ro_class , 0 ) ){
+                return GETHOLDER( _context , o )->_obj.getOwned();
+            }
+
+            BSONObj orig;
+            if ( JS_InstanceOf( _context , o , &bson_class , 0 ) ){
+                orig = GETHOLDER(_context,o)->_obj;
+            }
+            
             BSONObjBuilder b;
             
             jsval theid = getProperty( o , "_id" );
             if ( ! JSVAL_IS_VOID( theid ) ){
                 append( b , "_id" , theid );
             }
-
+            
             JSIdArray * properties = JS_Enumerate( _context , o );
             assert( properties );
 
@@ -133,7 +142,8 @@ namespace mongo {
                 string name = toString( nameval );
                 if ( name == "_id" )
                     continue;
-                append( b , name , getProperty( o , name.c_str() ) );
+                
+                append( b , name , getProperty( o , name.c_str() ) , orig[name].type() );
             }
             
             return b.obj();
@@ -157,14 +167,21 @@ namespace mongo {
             return getFunctionCode( JS_ValueToFunction( _context , v ) );
         }
 
-        void append( BSONObjBuilder& b , string name , jsval val ){
-            //cout << "name: " << name << "\t" << typeString( val ) << endl;
+        void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO  ){
+            //cout << "name: " << name << "\t" << typeString( val ) << " oldType: " << oldType << endl;
             switch ( JS_TypeOfValue( _context , val ) ){
-
+                
             case JSTYPE_VOID: b.appendUndefined( name.c_str() ); break;
             case JSTYPE_NULL: b.appendNull( name.c_str() ); break;
                 
-            case JSTYPE_NUMBER: b.append( name.c_str() , toNumber( val ) ); break;
+            case JSTYPE_NUMBER: {
+                double d = toNumber( val );
+                if ( oldType == NumberInt && ((int)d) == d )
+                    b.append( name.c_str() , (int)d );
+                else
+                    b.append( name.c_str() , d );
+                break;
+            }
             case JSTYPE_STRING: b.append( name.c_str() , toString( val ) ); break;
             case JSTYPE_BOOLEAN: b.appendBool( name.c_str() , toBoolean( val ) ); break;
 

@@ -576,6 +576,10 @@ namespace mongo {
             return getField(field);
         }
 
+        BSONElement operator[] (const string& field) const { 
+            return getField(field);
+        }
+
         BSONElement operator[] (int field) const { 
             stringstream ss;
             ss << field;
