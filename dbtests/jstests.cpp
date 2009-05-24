@@ -366,6 +366,34 @@ namespace JSTests {
         }
         
     };
+    
+    class WeirdObjects {
+    public:
+
+        BSONObj build( int depth ){
+            BSONObjBuilder b;
+            b.append( "0" , depth );
+            if ( depth > 0 )
+                b.appendArray( "1" , build( depth - 1 ) );
+            return b.obj();
+        }
+        
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+
+            s->localConnect( "blah" );
+            
+            for ( int i=5; i<100 ; i += 10 ){
+                s->setObject( "a" , build(i) , false );
+                s->invokeSafe( "tojson( a )" , BSONObj() );
+                
+                s->setObject( "a" , build(5) , true );
+                s->invokeSafe( "tojson( a )" , BSONObj() );
+            }
+
+            delete s;
+        }
+    };
 
     class All : public Suite {
     public:
@@ -381,6 +409,7 @@ namespace JSTests {
             add< OtherJSTypes >();
             add< SpecialDBTypes >();
             add< TypeConservation >();
+            add< WeirdObjects >();
         }
     };
     
