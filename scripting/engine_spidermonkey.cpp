@@ -285,12 +285,14 @@ namespace mongo {
 
         jsval toval( const char * c ){
             JSString * s = JS_NewStringCopyZ( _context , c );
+            assert( s );
             return STRING_TO_JSVAL( s );
         }
 
         JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ){
             JSObject * o = JS_NewObject( _context , readOnly ? &bson_ro_class : &bson_class , NULL, NULL);
-            JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) );
+            assert( o );
+            assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );
             return o;
         }
         
@@ -314,14 +316,20 @@ namespace mongo {
             case Bool:
                 return e.boolean() ? JSVAL_TRUE : JSVAL_FALSE;
             case Object:{
-                BSONObj embed = e.embeddedObject();
+                BSONObj embed = e.embeddedObject().getOwned();
                 return toval( &embed );
             }
             case Array:{
-
-                BSONObj embed = e.embeddedObject();
+            
+                BSONObj embed = e.embeddedObject().getOwned();
                 
+                if ( embed.isEmpty() ){
+                    return OBJECT_TO_JSVAL( JS_NewArrayObject( _context , 0 , 0 ) );
+                }
+
                 int n = embed.nFields();
+                assert( n > 0 );
+                
                 JSObject * array = JS_NewArrayObject( _context , embed.nFields() , 0 );
                 assert( array );
 
@@ -442,7 +450,7 @@ namespace mongo {
         BSONHolder * o = GETHOLDER( cx , obj );
         if ( o ){
             delete o;
-            JS_SetPrivate( cx , obj , 0 );
+            assert( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
