@@ -442,6 +442,15 @@ DB.prototype.toString = function(){
     return this._name;
 }
 
+DB.prototype.currentOp = function(){
+    return db.$cmd.sys.inprog.findOne();
+}
+DB.prototype.currentOP = DB.prototype.currentOp;
+
+DB.prototype.killOp = function(){
+    return db.$cmd.sys.killop.findOne();
+}
+DB.prototype.killOP = DB.prototype.killOp;
 
 /** 
   Get a replication log information summary.
