@@ -17,6 +17,7 @@
 #endif
 
 #include "../client/dbclient.h"
+#include "../util/processinfo.h"
 #include "utils.h"
 
 namespace mongo {
@@ -101,6 +102,20 @@ namespace mongo {
             int exit_code = int( args.firstElement().number() );
             ::exit(exit_code);
             return undefined_;
+        }
+
+        BSONObj JSGetMemInfo( const BSONObj& args ){
+            ProcessInfo pi;
+            uassert( "processinfo not supported" , pi.supported() );
+            
+            BSONObjBuilder e;
+            e.append( "virtual" , pi.getVirtualMemorySize() );
+            e.append( "resident" , pi.getResidentSize() );
+            
+            BSONObjBuilder b;
+            b.append( "ret" , e.obj() );
+            
+            return b.obj();
         }
         
 #ifndef _WIN32
@@ -422,6 +437,7 @@ namespace mongo {
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
+            scope.injectNative( "getMemInfo" , JSGetMemInfo );
 #if !defined(_WIN32)
             scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );

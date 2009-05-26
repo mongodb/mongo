@@ -145,6 +145,7 @@ def printLocalInfo():
 printLocalInfo()
 
 env = Environment()
+env["LIBPATH"] = []
 
 if GetOption( "recstore" ) != None:
     env.Append( CPPDEFINES=[ "_RECSTORE" ] )
@@ -556,7 +557,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         if not conf.CheckHeader( mozHeader + "/jsapi.h" ):
             if conf.CheckHeader( "jsapi.h" ):
                 myenv.Append( CPPDEFINES=[ "OLDJS" ] )
-                print( "warning: old spider monkey version" )
             else:
                 print( "no spider monkey headers!" )
                 Exit(1)

@@ -21,6 +21,7 @@ namespace mongo {
         BSONHolder( BSONObj obj ){
             _obj = obj.getOwned();
             _inResolve = false;
+            _modified = false;
             _magic = 17;
         }
         
@@ -34,6 +35,7 @@ namespace mongo {
         bool _inResolve;
         char _magic;
         list<string> _extra;
+        bool _modified;
     };
 
     class BSONFieldIterator {
@@ -134,7 +136,10 @@ namespace mongo {
 
             BSONObj orig;
             if ( JS_InstanceOf( _context , o , &bson_class , 0 ) ){
-                orig = GETHOLDER(_context,o)->_obj;
+                BSONHolder * holder = GETHOLDER(_context,o);
+                if ( ! holder->_modified )
+                    return holder->_obj;
+                orig = holder->_obj;
             }
             
             BSONObjBuilder b;
@@ -301,12 +306,14 @@ namespace mongo {
             string str( c );
             moToSmStr( str );
             JSString * s = JS_NewStringCopyZ( _context , str.c_str() );
+            assert( s );
             return STRING_TO_JSVAL( s );
         }
 
         JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ){
             JSObject * o = JS_NewObject( _context , readOnly ? &bson_ro_class : &bson_class , NULL, NULL);
-            JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) );
+            assert( o );
+            assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );
             return o;
         }
         
@@ -330,23 +337,31 @@ namespace mongo {
             case Bool:
                 return e.boolean() ? JSVAL_TRUE : JSVAL_FALSE;
             case Object:{
-                BSONObj embed = e.embeddedObject();
+                BSONObj embed = e.embeddedObject().getOwned();
                 return toval( &embed );
             }
             case Array:{
-
-                BSONObj embed = e.embeddedObject();
+            
+                BSONObj embed = e.embeddedObject().getOwned();
                 
+                if ( embed.isEmpty() ){
+                    return OBJECT_TO_JSVAL( JS_NewArrayObject( _context , 0 , 0 ) );
+                }
+
                 int n = embed.nFields();
+                assert( n > 0 );
+
                 JSObject * array = JS_NewArrayObject( _context , embed.nFields() , 0 );
                 assert( array );
-
+                
+                jsval myarray = OBJECT_TO_JSVAL( array );
+                
                 for ( int i=0; i<n; i++ ){
                     jsval v = toval( embed[i] );
                     assert( JS_SetElement( _context , array , i , &v ) );
                 }
                 
-                return OBJECT_TO_JSVAL( array );
+                return myarray;
             }
             case jstOID:{
                 OID oid = e.__oid();
@@ -367,7 +382,6 @@ namespace mongo {
                     }
                     flags++;
                 }
-
                 string regex( e.regex() );
                 moToSmStr( regex );
                 JSObject * r = JS_NewRegExpObject( _context , (char*)regex.c_str() , regex.length() , flagNumber );
@@ -462,7 +476,7 @@ namespace mongo {
         BSONHolder * o = GETHOLDER( cx , obj );
         if ( o ){
             delete o;
-            JS_SetPrivate( cx , obj , 0 );
+            assert( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
@@ -519,18 +533,26 @@ namespace mongo {
         if ( ! holder->_inResolve ){
             Convertor c(cx);
             holder->_extra.push_back( c.toString( idval ) );
+            holder->_modified = true;
         }
+        return JS_TRUE;
+    }
+
+    
+    JSBool mark_modified( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+        BSONHolder * holder = GETHOLDER( cx , obj );
+        if ( holder->_inResolve )
+            return JS_TRUE;
+        holder->_modified = true;
         return JS_TRUE;
     }
 
     JSClass bson_class = {
         "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE , 
-        bson_add_prop, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        bson_add_prop, mark_modified, JS_PropertyStub, mark_modified,
         (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
-    
-
 
     static JSClass global_class = {
         "global", JSCLASS_GLOBAL_FLAGS,
@@ -577,10 +599,17 @@ namespace mongo {
 
     JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval );
 
+    JSBool native_gc( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+        JS_GC( cx );
+        return JS_TRUE;
+    }
+
     JSFunctionSpec globalHelpers[] = { 
         { "print" , &native_print , 0 , 0 , 0 } , 
         { "nativeHelper" , &native_helper , 1 , 0 , 0 } , 
         { "load" , &native_load , 1 , 0 , 0 } , 
+        { "gc" , &native_gc , 1 , 0 , 0 } , 
+        
         { 0 , 0 , 0 , 0 , 0 } 
     };
 
@@ -588,17 +617,19 @@ namespace mongo {
 
     
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
+        assert( JS_EnterLocalRootScope( cx ) );
         Convertor c( cx );
         
         BSONHolder * holder = GETHOLDER( cx , obj );
         holder->check();
-
+        
         string s = c.toString( id );
        
         BSONElement e = holder->_obj[ s.c_str() ];
 
         if ( e.type() == EOO ){
             *objp = 0;
+            JS_LeaveLocalRootScope( cx );
             return JS_TRUE;
         }
         
@@ -610,6 +641,7 @@ namespace mongo {
         holder->_inResolve = false;
 
         *objp = obj;
+        JS_LeaveLocalRootScope( cx );
         return JS_TRUE;
     }
     
@@ -931,6 +963,10 @@ namespace mongo {
             code << field << " = function(){ var a = [ " << field << "_ ]; for ( var i=0; i<arguments.length; i++ ){ a.push( arguments[i] ); } return nativeHelper.apply( null , a ); }";
             exec( code.str().c_str() );
             
+        }
+
+        virtual void gc(){
+            JS_GC( _context );
         }
 
         JSContext *context() const { return _context; }
