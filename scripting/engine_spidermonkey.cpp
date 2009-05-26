@@ -329,16 +329,20 @@ namespace mongo {
 
                 int n = embed.nFields();
                 assert( n > 0 );
-                
+
                 JSObject * array = JS_NewArrayObject( _context , embed.nFields() , 0 );
                 assert( array );
-
+                
+                jsval myarray = OBJECT_TO_JSVAL( array );
+                JS_AddRoot( _context , &myarray );
+                
                 for ( int i=0; i<n; i++ ){
                     jsval v = toval( embed[i] );
                     assert( JS_SetElement( _context , array , i , &v ) );
                 }
+                JS_RemoveRoot( _context , &myarray );
                 
-                return OBJECT_TO_JSVAL( array );
+                return myarray;
             }
             case jstOID:{
                 OID oid = e.__oid();
@@ -359,7 +363,7 @@ namespace mongo {
                     }
                     flags++;
                 }
-
+                
                 JSObject * r = JS_NewRegExpObject( _context , (char*)e.regex() , strlen( e.regex() ) , flagNumber );
                 assert( r );
                 return OBJECT_TO_JSVAL( r );
@@ -565,10 +569,17 @@ namespace mongo {
 
     JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval );
 
+    JSBool native_gc( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+        JS_GC( cx );
+        return JS_TRUE;
+    }
+
     JSFunctionSpec globalHelpers[] = { 
         { "print" , &native_print , 0 , 0 , 0 } , 
         { "nativeHelper" , &native_helper , 1 , 0 , 0 } , 
         { "load" , &native_load , 1 , 0 , 0 } , 
+        { "gc" , &native_gc , 1 , 0 , 0 } , 
+        
         { 0 , 0 , 0 , 0 , 0 } 
     };
 
