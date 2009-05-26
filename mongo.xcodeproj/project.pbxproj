@@ -56,6 +56,7 @@
 		933EF9C70FC3434000C4B294 /* quota1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = quota1.js; sourceTree = "<group>"; };
 		9340BBEA0FC4521C00656DE0 /* tool1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = tool1.js; sourceTree = "<group>"; };
 		9340BD520FC4A3FF00656DE0 /* repl8.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = repl8.js; sourceTree = "<group>"; };
+		9340C0A30FC7512A00656DE0 /* encoding.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = encoding.h; sourceTree = "<group>"; };
 		9342232B0EF16D4F00608550 /* connpool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = connpool.cpp; sourceTree = "<group>"; };
 		9342232C0EF16D4F00608550 /* connpool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = connpool.h; sourceTree = "<group>"; };
 		9342232D0EF16D4F00608550 /* dbclient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbclient.cpp; sourceTree = "<group>"; };
@@ -508,6 +509,7 @@
 		934DD87B0EFAD23B00459CC1 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				9340C0A30FC7512A00656DE0 /* encoding.h */,
 				930B844D0FA10D1C00F22B4B /* optime.h */,
 				93DCDBD30F9515AF005349BC /* file_allocator.h */,
 				931184DC0F83C95800A6DC44 /* message_server_port.cpp */,

@@ -21,6 +21,12 @@
 
 #include "dbtests.h"
 
+#include "../db/instance.h"
+
+namespace mongo {
+    bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
+} // namespace mongo
+
 namespace JSTests {
 
     class Fundamental {
@@ -366,6 +372,47 @@ namespace JSTests {
         }
         
     };
+    
+    void dummy_function_to_force_dbeval_cpp_linking() {
+        BSONObj cmd;
+        BSONObjBuilder result;
+        string errmsg;
+        dbEval( "", cmd, result, errmsg);        
+    }
+    
+    DBDirectClient client;
+    
+    class Encoding {
+    public:
+        Encoding() { reset(); }
+        ~Encoding() { reset(); }
+        void run() {
+            string utf8ObjSpec = "{'_id':'\\u0001\\u007f\\u07ff\\uffff'}";
+            BSONObj utf8Obj = fromjson( utf8ObjSpec );
+            string code = string( "db.jstests.encoding.insert(" ) + utf8ObjSpec + ");";
+            cout << "code: " << code << endl;
+            BSONObj info;
+            BSONElement ret;
+            ASSERT( client.eval( "unittest", code, info, ret, 0 ) );
+            check( utf8Obj, client.findOne( "unittest.jstests.encoding", BSONObj() ) );
+            
+//            reset();
+//            Scope * s = globalScriptEngine->createScope();
+//            code = "db = new Mongo().getDB( \"unittest\" ); " + code;
+//            ASSERT( s->exec( code, "foo", true, true, true ) );
+//            check( utf8Obj, client.findOne( "unittest.jstests.encoding", BSONObj() ) );
+        }
+    private:
+        void check( const BSONObj &one, const BSONObj &two ) {
+            if ( one.woCompare( two ) != 0 ) {
+                static string fail = string( "Assertion failure expected " ) + string( one ) + ", got " + string( two );
+                FAIL( fail.c_str() );
+            }
+        }
+        void reset() {
+            client.dropCollection( "unittest.jstests.encoding" );            
+        }
+    };
 
     class All : public Suite {
     public:
@@ -381,6 +428,7 @@ namespace JSTests {
             add< OtherJSTypes >();
             add< SpecialDBTypes >();
             add< TypeConservation >();
+            add< Encoding >();
         }
     };
     

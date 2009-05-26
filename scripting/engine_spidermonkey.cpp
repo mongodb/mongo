@@ -3,6 +3,8 @@
 #include "stdafx.h"
 #include "engine_spidermonkey.h"
 
+#include "../util/encoding.h"
+
 #include "../client/dbclient.h"
 
 namespace mongo {
@@ -71,13 +73,22 @@ namespace mongo {
         return new BSONFieldIterator( this );
     }
 
-
     class Convertor : boost::noncopyable {
     public:
         Convertor( JSContext * cx ){
             _context = cx;
         }
         
+        static void smToMoStr( string &in ) {
+            if ( !JS_CStringsAreUTF8() )
+                in = latin1ToUtf8( in );
+        }
+        
+        static void moToSmStr( string &in ) {
+            if ( !JS_CStringsAreUTF8() )
+                in = utf8ToLatin1( in );
+        }
+
         string toString( JSString * so ){
             jschar * s = JS_GetStringChars( so );
             size_t srclen = JS_GetStringLength( so );
@@ -93,6 +104,7 @@ namespace mongo {
 
             string ss( dst , len );
             free( dst );
+            smToMoStr( ss );
             return ss;
         }
 
@@ -245,7 +257,9 @@ namespace mongo {
             return true;
         }
 
-        JSFunction * compileFunction( const char * code ){
+        JSFunction * compileFunction( string code ){
+            moToSmStr( code );
+            
             if ( ! hasFunctionIdentifier( code ) ){
                 string s = code;
                 if ( isSimpleStatement( s ) ){
@@ -284,7 +298,9 @@ namespace mongo {
         }
 
         jsval toval( const char * c ){
-            JSString * s = JS_NewStringCopyZ( _context , c );
+            string str( c );
+            moToSmStr( str );
+            JSString * s = JS_NewStringCopyZ( _context , str.c_str() );
             return STRING_TO_JSVAL( s );
         }
 
@@ -298,7 +314,7 @@ namespace mongo {
             JSObject * o = toJSObject( obj , readOnly );
             return OBJECT_TO_JSVAL( o );
         }
-
+        
         jsval toval( const BSONElement& e ){
 
             switch( e.type() ){
@@ -352,7 +368,9 @@ namespace mongo {
                     flags++;
                 }
 
-                JSObject * r = JS_NewRegExpObject( _context , (char*)e.regex() , strlen( e.regex() ) , flagNumber );
+                string regex( e.regex() );
+                moToSmStr( regex );
+                JSObject * r = JS_NewRegExpObject( _context , (char*)regex.c_str() , regex.length() , flagNumber );
                 assert( r );
                 return OBJECT_TO_JSVAL( r );
             }
@@ -388,7 +406,9 @@ namespace mongo {
 
         JSObject * getJSObject( JSObject * o , const char * name ){
             jsval v;
-            assert( JS_GetProperty( _context , o , name , &v ) );
+            string nameStr( name );
+            moToSmStr( nameStr );
+            assert( JS_GetProperty( _context , o , nameStr.c_str() , &v ) );
             return JSVAL_TO_OBJECT( v );
         }
         
@@ -674,6 +694,8 @@ namespace mongo {
             assert( JS_DefineFunction( _context , _convertor->getGlobalPrototype( "Object" ) , 
                                        "keySet" , object_keyset , 0 , JSPROP_READONLY ) );
 
+            log() << "utf8? " << JS_CStringsAreUTF8() << endl;
+            
             _this = 0;
         }
 
