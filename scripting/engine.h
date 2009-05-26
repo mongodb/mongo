@@ -60,6 +60,8 @@ namespace mongo {
         virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 );
         
         virtual void injectNative( const char *field, NativeFunction func ) = 0;
+
+        virtual void gc() = 0;
     };
     
     class ScriptEngine : boost::noncopyable {

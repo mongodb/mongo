@@ -339,13 +339,11 @@ namespace mongo {
                 assert( array );
                 
                 jsval myarray = OBJECT_TO_JSVAL( array );
-                JS_AddRoot( _context , &myarray );
                 
                 for ( int i=0; i<n; i++ ){
                     jsval v = toval( embed[i] );
                     assert( JS_SetElement( _context , array , i , &v ) );
                 }
-                JS_RemoveRoot( _context , &myarray );
                 
                 return myarray;
             }
@@ -600,17 +598,19 @@ namespace mongo {
 
     
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
+        assert( JS_EnterLocalRootScope( cx ) );
         Convertor c( cx );
         
         BSONHolder * holder = GETHOLDER( cx , obj );
         holder->check();
-
+        
         string s = c.toString( id );
        
         BSONElement e = holder->_obj[ s.c_str() ];
 
         if ( e.type() == EOO ){
             *objp = 0;
+            JS_LeaveLocalRootScope( cx );
             return JS_TRUE;
         }
         
@@ -622,6 +622,7 @@ namespace mongo {
         holder->_inResolve = false;
 
         *objp = obj;
+        JS_LeaveLocalRootScope( cx );
         return JS_TRUE;
     }
     
@@ -941,6 +942,10 @@ namespace mongo {
             code << field << " = function(){ var a = [ " << field << "_ ]; for ( var i=0; i<arguments.length; i++ ){ a.push( arguments[i] ); } return nativeHelper.apply( null , a ); }";
             exec( code.str().c_str() );
             
+        }
+
+        virtual void gc(){
+            JS_GC( _context );
         }
 
         JSContext *context() const { return _context; }
