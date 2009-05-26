@@ -201,7 +201,7 @@ namespace mongo {
                 le->nPrev++;
 
                 DbResponse dbresponse;
-                if ( !assembleResponse( m, dbresponse ) ) {
+                if ( !assembleResponse( m, dbresponse, dbMsgPort.farEnd.sa ) ) {
                     out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
                     /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
                     if ( dbMsgPort.farEnd.isLocalHost() ) {
