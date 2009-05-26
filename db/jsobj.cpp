@@ -779,7 +779,7 @@ namespace mongo {
                     BSONElement f = i.next();
                     if ( f.eoo() )
                         break;
-                    ret.insert( e );
+                    ret.insert( f );
                 }
             } else {
                 ret.insert( e );

@@ -12,5 +12,13 @@ t.save( { a: { b: "cde" } } );
 assert.eq( 1, t.count( { 'a.b': /de/ } ) );
 
 t.drop();
+t.save( { a: { b: [ "cde" ] } } );
+assert.eq( 1, t.count( { 'a.b': /de/ } ) );
+
+t.drop();
 t.save( { a: [ { b: "cde" } ] } );
+assert.eq( 1, t.count( { 'a.b': /de/ } ) );
+
+t.drop();
+t.save( { a: [ { b: [ "cde" ] } ] } );
 assert.eq( 1, t.count( { 'a.b': /de/ } ) );
