@@ -55,6 +55,14 @@ assert.eq( 2, t.system.indexes.find().count(), "expected index missing" );
 assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().startKey.i );
 assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length, "match length did not match expected" );
 
+// Check that capped-ness is preserved on clone
+f.a.drop();
+t.a.drop();
+
+f.createCollection( "a", {capped:true,size:1000} );
+assert( f.a.isCapped() );
+assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a" ) );
+assert( t.a.isCapped(), "cloned collection not capped" );
 
 // Now test insert + delete + update during clone
 f.a.drop();
