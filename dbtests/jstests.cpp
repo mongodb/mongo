@@ -359,8 +359,37 @@ namespace JSTests {
 
             ASSERT_EQUALS( NumberDouble , out["b"].type() );
             ASSERT_EQUALS( NumberInt , out["a"].type() );
+
             
+            //  -- C --
             
+            {
+                BSONObjBuilder b ;
+                
+                {
+                    BSONObjBuilder c;
+                    c.append( "0" , 5.5 );
+                    c.append( "1" , 6 );
+                    b.appendArray( "a" , c.obj() );
+                }
+                
+                o = b.obj();
+            }
+            
+            ASSERT_EQUALS( NumberDouble , o["a"].embeddedObjectUserCheck()["0"].type() );
+            ASSERT_EQUALS( NumberInt , o["a"].embeddedObjectUserCheck()["1"].type() );
+            
+            s->setObject( "z" , o , false );
+            out = s->getObject( "z" );
+
+            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["0"].type() );
+            ASSERT_EQUALS( NumberInt , out["a"].embeddedObjectUserCheck()["1"].type() );
+            
+            s->invokeSafe( "z.z = 5;" , BSONObj() );
+            out = s->getObject( "z" );
+            ASSERT_EQUALS( 5 , out["z"].number() );
+            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["0"].type() );
+            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["1"].type() ); // TODO: this is technically bad, but here to make sure that i understand the behavior
 
             delete s;
         }
