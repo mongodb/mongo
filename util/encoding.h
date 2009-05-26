@@ -46,7 +46,7 @@ namespace mongo {
                 massert( "invalid utf8 input", second < 0xC0 );
                 out << char( ( first << 6 ) | ( ~0xc0 & second ) );
             } else {
-                out << "?";
+                out << char( 255 ); // this is the value spidermonkey uses
                 for( ; i < in.size() && (unsigned char)in[ i ] > 0x7F; ++i );
             }
         }
