@@ -19,6 +19,7 @@ namespace mongo {
         BSONHolder( BSONObj obj ){
             _obj = obj.getOwned();
             _inResolve = false;
+            _modified = false;
             _magic = 17;
         }
         
@@ -32,6 +33,7 @@ namespace mongo {
         bool _inResolve;
         char _magic;
         list<string> _extra;
+        bool _modified;
     };
 
     class BSONFieldIterator {
@@ -122,7 +124,10 @@ namespace mongo {
 
             BSONObj orig;
             if ( JS_InstanceOf( _context , o , &bson_class , 0 ) ){
-                orig = GETHOLDER(_context,o)->_obj;
+                BSONHolder * holder = GETHOLDER(_context,o);
+                if ( ! holder->_modified )
+                    return holder->_obj;
+                orig = holder->_obj;
             }
             
             BSONObjBuilder b;
@@ -334,13 +339,11 @@ namespace mongo {
                 assert( array );
                 
                 jsval myarray = OBJECT_TO_JSVAL( array );
-                JS_AddRoot( _context , &myarray );
                 
                 for ( int i=0; i<n; i++ ){
                     jsval v = toval( embed[i] );
                     assert( JS_SetElement( _context , array , i , &v ) );
                 }
-                JS_RemoveRoot( _context , &myarray );
                 
                 return myarray;
             }
@@ -511,18 +514,26 @@ namespace mongo {
         if ( ! holder->_inResolve ){
             Convertor c(cx);
             holder->_extra.push_back( c.toString( idval ) );
+            holder->_modified = true;
         }
+        return JS_TRUE;
+    }
+
+    
+    JSBool mark_modified( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+        BSONHolder * holder = GETHOLDER( cx , obj );
+        if ( holder->_inResolve )
+            return JS_TRUE;
+        holder->_modified = true;
         return JS_TRUE;
     }
 
     JSClass bson_class = {
         "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE , 
-        bson_add_prop, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        bson_add_prop, mark_modified, JS_PropertyStub, mark_modified,
         (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
-    
-
 
     static JSClass global_class = {
         "global", JSCLASS_GLOBAL_FLAGS,
@@ -587,17 +598,19 @@ namespace mongo {
 
     
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
+        assert( JS_EnterLocalRootScope( cx ) );
         Convertor c( cx );
         
         BSONHolder * holder = GETHOLDER( cx , obj );
         holder->check();
-
+        
         string s = c.toString( id );
        
         BSONElement e = holder->_obj[ s.c_str() ];
 
         if ( e.type() == EOO ){
             *objp = 0;
+            JS_LeaveLocalRootScope( cx );
             return JS_TRUE;
         }
         
@@ -609,6 +622,7 @@ namespace mongo {
         holder->_inResolve = false;
 
         *objp = obj;
+        JS_LeaveLocalRootScope( cx );
         return JS_TRUE;
     }
     
@@ -928,6 +942,10 @@ namespace mongo {
             code << field << " = function(){ var a = [ " << field << "_ ]; for ( var i=0; i<arguments.length; i++ ){ a.push( arguments[i] ); } return nativeHelper.apply( null , a ); }";
             exec( code.str().c_str() );
             
+        }
+
+        virtual void gc(){
+            JS_GC( _context );
         }
 
         JSContext *context() const { return _context; }
