@@ -1201,7 +1201,7 @@ assert( !eloc.isNull() );
                 return DiskLoc();
             }
             if ( !god && IndexDetails::isIdIndexPattern( key ) ) {
-                ensureHaveIdIndex( ns );
+                ensureHaveIdIndex( tabletoidxns.c_str() );
                 return DiskLoc();
             }
             //indexFullNS = tabletoidxns;
