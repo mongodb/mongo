@@ -180,12 +180,16 @@ namespace mongo {
             return io.getStringField("name");
         }
 
-        /* returns true if this is the _id index. */
-        bool isIdIndex() const { 
-            BSONObjIterator i(keyPattern());
+        static bool isIdIndexPattern( const BSONObj &pattern ) {
+            BSONObjIterator i(pattern);
             BSONElement e = i.next();
             if( strcmp(e.fieldName(), "_id") != 0 ) return false;
-            return i.next().eoo();
+            return i.next().eoo();            
+        }
+        
+        /* returns true if this is the _id index. */
+        bool isIdIndex() const { 
+            return isIdIndexPattern( keyPattern() );
         }
 
         /* gets not our namespace name (indexNamespace for that),
