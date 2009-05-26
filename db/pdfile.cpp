@@ -1062,6 +1062,10 @@ assert( !eloc.isNull() );
 
         d->flags |= NamespaceDetails::Flag_HaveIdIndex;
 
+        for( int i = 0; i < d->nIndexes; ++i )
+            if ( d->indexes[ i ].isIdIndex() )
+                return;
+        
         string system_indexes = database->name + ".system.indexes";
 
         BSONObjBuilder b;
@@ -1071,7 +1075,7 @@ assert( !eloc.isNull() );
         BSONObj o = b.done();
 
         /* edge case: note the insert could fail if we have hit maxindexes already */
-        theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
+        theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), true);
     }
 
     // should be { <something> : <simpletype[1|-1]>, .keyp.. } 
@@ -1194,6 +1198,10 @@ assert( !eloc.isNull() );
             }
             if ( tableToIndex->findIndexByName(name) >= 0 ) {
                 //out() << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;
+                return DiskLoc();
+            }
+            if ( !god && IndexDetails::isIdIndexPattern( key ) ) {
+                ensureHaveIdIndex( ns );
                 return DiskLoc();
             }
             //indexFullNS = tabletoidxns;
