@@ -476,7 +476,7 @@ namespace mongo {
 
     extern int dump;
 
-    inline bool _regexMatches(RegexMatcher& rm, const BSONElement& e) {
+    inline bool regexMatches(RegexMatcher& rm, const BSONElement& e) {
         char buf[64];
         const char *p = buf;
         if ( e.type() == String || e.type() == Symbol )
@@ -492,22 +492,6 @@ namespace mongo {
         else
             return false;
         return rm.re->PartialMatch(p);
-    }
-    /* todo: internal dotted notation scans -- not done yet here. */
-    inline bool regexMatches(RegexMatcher& rm, const BSONElement& e, bool *deep) {
-        if ( e.type() != Array )
-            return _regexMatches(rm, e);
-
-        BSONObjIterator ai(e.embeddedObject());
-        while ( ai.more() ) {
-            BSONElement z = ai.next();
-            if ( _regexMatches(rm, z) ) {
-                if ( deep )
-                    *deep = true;
-                return true;
-            }
-        }
-        return false;
     }
 
     /* See if an object matches the query.
@@ -542,14 +526,19 @@ namespace mongo {
 
         for ( int r = 0; r < nRegex; r++ ) {
             RegexMatcher& rm = regexs[r];
-            BSONElement e;
-            if ( !constrainIndexKey_.isEmpty() )
-                e = jsobj.getFieldUsingIndexNames(rm.fieldName, constrainIndexKey_);
-            else
-                e = jsobj.getFieldDotted(rm.fieldName);
-            if ( e.eoo() )
-                return false;
-            if ( !regexMatches(rm, e, deep) )
+            BSONElementSet s;
+            if ( !constrainIndexKey_.isEmpty() ) {
+                BSONElement e = jsobj.getFieldUsingIndexNames(rm.fieldName, constrainIndexKey_);
+                if ( !e.eoo() )
+                    s.insert( e );
+            } else {
+                jsobj.getFieldsDotted( rm.fieldName, s, deep );
+            }
+            bool match = false;
+            for( BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i )
+                if ( regexMatches(rm, *i) )
+                    match = true;
+            if ( !match )
                 return false;
         }
         
