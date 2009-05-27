@@ -1192,7 +1192,7 @@ namespace mongo {
         ss << "query " << ns << " ntoreturn:" << ntoreturn;
         {
             string s = jsobj.toString();
-            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }
         
         BufBuilder bb;

@@ -17,6 +17,9 @@
 #include "../stdafx.h"
 #include <fcntl.h>
 #include <errno.h>
+#if defined(__freebsd__)
+#include <sys/stat.h>
+#endif
 
 #ifndef O_NOATIME
 #define O_NOATIME 0

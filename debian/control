@@ -1,0 +1,29 @@
+Source: mongodb
+Section: devel
+Priority: optional
+Maintainer: Kristina Chodorow <kristina@10gen.com>
+Build-Depends: debhelper (>= 7), libboost-dev, libpcre3, libpcre3-dev, scons, libmozjs-dev
+Standards-Version: 3.8.0
+Homepage: http://www.mongodb.org
+
+Package: mongodb
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: An object/document-oriented database
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented  data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Auto-sharding for cloud-level scalability (Q209)
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+

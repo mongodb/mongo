@@ -1,0 +1,6 @@
+mongodb (0.9.1-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Kristina Chodorow <kristina@10gen.com>  Tue, 07 Apr 2009 10:18:58 -0400
+

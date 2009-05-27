@@ -256,6 +256,10 @@ namespace mongo {
             }
         }
         
+        BSONObj spec = conn->findOne( string( db ) + ".system.namespaces", BSON( "name" << ns ) );
+        if ( !userCreateNS( ns, spec.getObjectField( "options" ), errmsg, true ) )
+            return false;
+        
         copy( ns, ns, false, logForRepl, false, false, query );
 
         if ( copyIndexes ) {

@@ -161,6 +161,7 @@ linux = False
 linux64  = False
 darwin = False
 windows = False
+freebsd = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
@@ -315,6 +316,13 @@ elif "sunos5" == os.sys.platform:
      javaOS = "solaris"
      env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
      env.Append( LIBS=["socket"] )
+
+elif "freebsd7" == os.sys.platform:
+    nix = True
+    freebsd = True
+    env.Append( CPPPATH=[ "/usr/local/include" ] )
+    env.Append( LIBPATH=[ "/usr/local/lib" ] )
+    env.Append( CPPDEFINES=[ "__freebsd__" ] )
 
 elif "win32" == os.sys.platform:
     windows = True
@@ -578,6 +586,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
         if linux:
             myCheckLib( "rt" , True )
+
+    # requires ports devel/libexecinfo to be installed
+    if freebsd:
+        myCheckLib( "execinfo", True )
+        env.Append( LIBS=[ "execinfo" ] )
 
     # this will add it iff it exists and works
     myCheckLib( "boost_system-mt" )

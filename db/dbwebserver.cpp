@@ -173,6 +173,7 @@ namespace mongo {
             }
 
             ss << "\nreplInfo:  " << replInfo << '\n';
+            ss << "currentOp (unlocked): " << currentOp.infoNoauth() << "\n";
         }
         
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ){
