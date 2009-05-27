@@ -9,15 +9,14 @@
 
 #include "wt_internal.h"
 
-static void *__wt_engine(void *);
-
 /*
  * wt_start --
  *	Start the engine.
  */
 int
-wt_start(u_int32_t flags)
+__wt_env_start(ENV *env, u_int32_t flags)
 {
+	WT_STOC *stoc;
 	static int initial_tasks = 0;
 	int ret;
 
@@ -38,17 +37,27 @@ wt_start(u_int32_t flags)
 
 	WT_ENV_FCHK(NULL, "wt_start", flags, WT_APIMASK_WT_START);
 
+	/* Create the primary thread-of-control structure. */
+	stoc = WT_GLOBAL(sq) + WT_GLOBAL(sq_next);
+	stoc->id = ++WT_GLOBAL(sq_next);
+
+	__wt_stoc_init(env, stoc);
+
 	/* If we're single-threaded, we're done. */
 	if (LF_ISSET(WT_SINGLE_THREADED)) {
 		WT_GLOBAL(single_threaded) = WT_GLOBAL(running) = 1;
 		return (0);
 	}
 
-	/* Spawn the engine, and wait until it's ready to proceed. */
-	if (pthread_create(&WT_GLOBAL(tid), NULL, __wt_engine, NULL) != 0) {
-		__wt_env_err(NULL, errno, "wt_start: engine thread");
+	/*
+	 * The first thread is our house-keeping thread; spawn the engine,
+	 * and wait until it's ready to proceed.
+	 */
+	if (pthread_create(&stoc->tid, NULL, __wt_workq, STOC_PRIME) != 0) {
+		__wt_env_err(NULL, errno, "wt_start: house-keeping thread");
 		return (WT_ERROR);
 	}
+
 	while (!WT_GLOBAL(running))
 		__wt_sleep(0, 1000);
 
@@ -60,39 +69,96 @@ wt_start(u_int32_t flags)
  *	Stop the engine.
  */
 int
-wt_stop(u_int32_t flags)
+__wt_env_stop(ENV *env, u_int32_t flags)
 {
+	WT_STOC *stoc;
+	u_int i;
+
 	WT_ENV_FCHK(NULL, "wt_start", flags, WT_APIMASK_WT_STOP);
 
-	/*
-	 * We'll need real cleanup at some point, but for now, just flag the
-	 * engine to quit and wait for the thread to exit.
-	 */
+	/* If we're single-threaded, we're done. */
+	if (WT_GLOBAL(single_threaded))
+		return (0);
+
+	/* Flag all threads to quit, and wait for them to exit. */
 	WT_GLOBAL(running) = 0;
 	WT_FLUSH_MEMORY;
 
-	if (!WT_GLOBAL(single_threaded))
-		(void)pthread_join(WT_GLOBAL(tid), NULL);
+	for (i = 0, stoc = WT_GLOBAL(sq); i < WT_GLOBAL(sq_next); ++i, ++stoc)
+		(void)pthread_join(stoc->tid, NULL);
 
 	return (0);
 }
 
 /*
- * __wt_engine --
- *      Engine main routine.
+ * __wt_stoc_init --
+ *	Initialize the server thread-of-control structure.
  */
-static void *
-__wt_engine(void *notused)
+int
+__wt_stoc_init(ENV *env, WT_STOC *stoc)
 {
-	WT_TOC **q, **eq, *toc;
+	u_int32_t i;
+	int ret;
+
+	/*
+	 * Initialize the cache page queues.  Size for a cache filled with
+	 * 16KB pages, and 8 pages per bucket (which works out to 8 buckets
+	 * per MB).
+	 */
+	stoc->hashsize = __wt_prime(env->cachesize * 8);
+	if ((ret = __wt_calloc(env,
+	    stoc->hashsize, sizeof(stoc->hqh[0]), &stoc->hqh)) != 0)
+		return (ret);
+	for (i = 0; i < stoc->hashsize; ++i)
+		TAILQ_INIT(&stoc->hqh[i]);
+	TAILQ_INIT(&stoc->lqh);
+
+	return (0);
+}
+
+/*
+ * __wt_stoc_close --
+ *	Clean out the server thread-of-control structure.
+ */
+int
+__wt_stoc_close(ENV *env, WT_STOC *stoc)
+{
+	WT_PAGE *page;
+	int ret, tret;
+
+	ret = 0;
+
+	/* Discard pages. */
+	while ((page = TAILQ_FIRST(&stoc->lqh)) != NULL) {
+		/* There shouldn't be any pinned pages. */
+		WT_ASSERT(env, page->ref == 0);
+
+		if ((tret =
+		    __wt_cache_discard(env, stoc, page)) != 0 && ret == 0)
+			ret = tret;
+	}
+
+	/* Discard buckets. */
+	__wt_free(env, stoc->hqh);
+
+	/* There shouldn't be any allocated bytes. */
+	WT_ASSERT(env, stoc->cache_bytes == 0);
+
+	return (ret);
+}
+
+/*
+ * __wt_workq --
+ *      Routine to process the work queue for a thread.
+ */
+void *
+__wt_workq(void *arg)
+{
+	WT_STOC *stoc;
+	WT_WORKQ *q, *eq;
 	int not_found, tenths;
 
-	/* Allocate the work queue. */
-#define	WT_WORKQ_SIZE	32
-	WT_GLOBAL(workq_entries) = WT_WORKQ_SIZE;
-	if (__wt_calloc(
-	    NULL, WT_WORKQ_SIZE, sizeof(WT_TOC *), &WT_GLOBAL(workq)) != 0)
-		return (NULL);
+	stoc = arg;
 
 	/* We're running. */
 	WT_GLOBAL(running) = 1;
@@ -100,20 +166,28 @@ __wt_engine(void *notused)
 
 	/* Walk the queue, executing work. */
 	for (not_found = 1, tenths = 0,
-	    q = WT_GLOBAL(workq), eq = q + WT_WORKQ_SIZE;;) {
-		if ((toc = *q) != NULL) {
+	    q = WT_GLOBAL(workq), eq = q + WT_GLOBAL(workq_entries);;) {
+		if (q->sid == stoc->id) {
 			not_found = 0;
 
-			F_SET(toc, WT_RUNNING);
-			__wt_api_switch(toc);
-			F_CLR(toc, WT_RUNNING);
+			F_SET(q->toc, WT_RUNNING);
+			__wt_api_switch(q->toc);
+			F_CLR(q->toc, WT_RUNNING);
 
-			/* Clear the slot and flush memory. */
-			*q = NULL;
-			WT_FLUSH_MEMORY;
+			/*
+			 * Ignore operations handed off to another server (the
+			 * server ID will have changed).   Wake threads waiting
+			 * on completed operations.
+			 */
+			if (q->sid == stoc->id) {
+				q->sid = WT_PSTOC_NOT_SET;
 
-			/* Wake the waiting thread. */
-			(void)__wt_unlock(toc->mtx);
+				/*
+				 * !!!
+				 * No flush needed, we're unlocking a mutex.
+				 */
+				(void)__wt_unlock(q->toc->mtx);
+			}
 		}
 		if (++q == eq) {
 			/*

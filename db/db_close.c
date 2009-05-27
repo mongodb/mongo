@@ -36,11 +36,6 @@ __wt_db_close(WT_TOC *toc)
 	if ((tret = __wt_idb_destroy(db, 1)) != 0 && ret == 0)
 		ret = tret;
 
-	/* Close any private environment. */
-	if (F_ISSET(env, WT_PRIVATE_ENV) &&
-	    (tret = env->close(env, toc, 0)) != 0 && ret == 0)
-		ret = tret;
-
 	/*
 	 * Reset the methods that are permitted.
 	 * If anything failed, we're done with this handle.

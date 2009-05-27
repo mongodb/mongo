@@ -522,20 +522,22 @@ static int __wt_api_env_close(
 	wt_args_env_toc_sched(WT_OP_ENV_CLOSE);
 }
 
-static int __wt_api_env_destroy(
+static int __wt_api_env_db_create(
 	ENV *env,
 	WT_TOC *toc,
-	u_int32_t flags);
-static int __wt_api_env_destroy(
+	u_int32_t flags,
+	DB **dbp);
+static int __wt_api_env_db_create(
 	ENV *env,
 	WT_TOC *toc,
-	u_int32_t flags)
+	u_int32_t flags,
+	DB **dbp)
 {
-	wt_args_env_destroy args;
+	wt_args_env_db_create args;
 
-	wt_args_env_destroy_pack;
+	wt_args_env_db_create_pack;
 
-	wt_args_env_toc_sched(WT_OP_ENV_DESTROY);
+	wt_args_env_toc_sched(WT_OP_ENV_DB_CREATE);
 }
 
 static int __wt_api_env_get_cachesize(
@@ -975,6 +977,10 @@ static int __wt_env_set_cachesize(WT_TOC *toc);
 static int __wt_env_set_cachesize(WT_TOC *toc)
 {
 	wt_args_env_set_cachesize_unpack;
+	int ret;
+
+	if ((ret = __wt_env_set_cachesize_verify(toc)) != 0)
+		return (ret);
 
 	env->cachesize = cachesize;
 	return (0);
@@ -1024,7 +1030,8 @@ void
 __wt_env_config_methods(ENV *env)
 {
 	env->close = __wt_api_env_close;
-	env->destroy = __wt_api_env_destroy;
+	env->db_create = __wt_api_env_db_create;
+	env->destroy = __wt_env_destroy;
 	env->err = __wt_env_err;
 	env->errx = __wt_env_errx;
 	env->get_cachesize = __wt_api_env_get_cachesize;
@@ -1038,8 +1045,11 @@ __wt_env_config_methods(ENV *env)
 	env->set_errfile = __wt_api_env_set_errfile;
 	env->set_errpfx = __wt_api_env_set_errpfx;
 	env->set_verbose = __wt_api_env_set_verbose;
+	env->start = __wt_env_start;
 	env->stat_clear = __wt_api_env_stat_clear;
 	env->stat_print = __wt_api_env_stat_print;
+	env->stop = __wt_env_stop;
+	env->toc_create = __wt_env_toc_create;
 }
 
 void
@@ -1052,6 +1062,9 @@ __wt_env_config_methods_lockout(ENV *env)
 {
 	env->close = (int (*)
 	    (ENV *, WT_TOC *, u_int32_t ))
+	    __wt_env_lockout_err;
+	env->db_create = (int (*)
+	    (ENV *, WT_TOC *, u_int32_t , DB **))
 	    __wt_env_lockout_err;
 	env->err = (void (*)
 	    (ENV *, int , const char *, ...))
@@ -1092,11 +1105,20 @@ __wt_env_config_methods_lockout(ENV *env)
 	env->set_verbose = (int (*)
 	    (ENV *, WT_TOC *, u_int32_t ))
 	    __wt_env_lockout_err;
+	env->start = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout_err;
 	env->stat_clear = (int (*)
 	    (ENV *, WT_TOC *, u_int32_t ))
 	    __wt_env_lockout_err;
 	env->stat_print = (int (*)
 	    (ENV *, WT_TOC *, FILE *, u_int32_t ))
+	    __wt_env_lockout_err;
+	env->stop = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout_err;
+	env->toc_create = (int (*)
+	    (ENV *, u_int32_t , WT_TOC **))
 	    __wt_env_lockout_err;
 }
 
@@ -1346,8 +1368,8 @@ __wt_api_switch(WT_TOC *toc)
 	case WT_OP_ENV_CLOSE:
 		ret = __wt_env_close(toc);
 		break;
-	case WT_OP_ENV_DESTROY:
-		ret = __wt_env_destroy(toc);
+	case WT_OP_ENV_DB_CREATE:
+		ret = __wt_env_db_create(toc);
 		break;
 	case WT_OP_ENV_GET_CACHESIZE:
 		ret = __wt_env_get_cachesize(toc);

@@ -115,6 +115,8 @@ struct __wt_page {
 	/*********************************************************
 	 * The following fields are owned by the btree layer.
 	 *********************************************************/
+	u_int16_t sid;			/* Server ID. */
+
 	u_int8_t *first_free;		/* First free byte address */
 	u_int32_t space_avail;		/* Available page memory */
 

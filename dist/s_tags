@@ -26,6 +26,6 @@ chmod 444 tags
 dirs="build_posix `python -c\
      'from dist import directory_files;\
      directory_files();'`"
-for i in $dirs; do
+for i in $dirs inc_posix; do
 	(cd ../$i && rm -f tags && ln -s ../dist/tags .)
 done

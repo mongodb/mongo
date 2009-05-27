@@ -232,14 +232,14 @@ tfile.write('\ttoc->op = (oparg);\\\n')
 tfile.write('\ttoc->env = env;\\\n')
 tfile.write('\ttoc->db = NULL;\\\n')
 tfile.write('\ttoc->argp = &args;\\\n')
-tfile.write('\treturn (__wt_toc_sched(toc))\n')
+tfile.write('\treturn (__wt_env_toc_sched(toc))\n')
 
 tfile.write('#define\twt_args_db_toc_sched(oparg)\\\n')
 tfile.write('\ttoc->op = (oparg);\\\n')
 tfile.write('\ttoc->env = db->env;\\\n')
 tfile.write('\ttoc->db = db;\\\n')
 tfile.write('\ttoc->argp = &args;\\\n')
-tfile.write('\treturn (__wt_toc_sched(toc))\n')
+tfile.write('\treturn (__wt_env_toc_sched(toc))\n')
 
 # Write the connect structures.
 for i in sorted(\
@@ -248,7 +248,7 @@ for i in sorted(\
 	    i[0].split('.')[0], i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 
 tfile.close()
-compare_srcfile(tmp_file, '../inc_posix/connect.h')
+compare_srcfile(tmp_file, '../inc_posix/connect_auto.h')
 
 #####################################################################
 # Update api.c.
@@ -270,28 +270,28 @@ for i in sorted(filter(lambda _i: _i[1][0].count('getset'), api.iteritems())):
 
 # Write the Env/Db method configuration functions.
 tfile.write('void\n__wt_env_config_methods(ENV *env)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('env'), api.iteritems())):
+for i in sorted(filter(lambda _i: _i[0].count('env.'), api.iteritems())):
 	func_method_init('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
 tfile.write('void\n__wt_env_config_methods_open(ENV *env)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('env'), api.iteritems())):
+for i in sorted(filter(lambda _i: _i[0].count('env.'), api.iteritems())):
 	func_method_open('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
 tfile.write('void\n__wt_env_config_methods_lockout(ENV *env)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('env'), api.iteritems())):
+for i in sorted(filter(lambda _i: _i[0].count('env.'), api.iteritems())):
 	func_method_lockout('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
 
 tfile.write('void\n__wt_db_config_methods(DB *db)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('db'), api.iteritems())):
+for i in sorted(filter(lambda _i: _i[0].count('db.'), api.iteritems())):
 	func_method_init('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
 tfile.write('void\n__wt_db_config_methods_open(DB *db)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('db'), api.iteritems())):
+for i in sorted(filter(lambda _i: _i[0].count('db.'), api.iteritems())):
 	func_method_open('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n')
 tfile.write('void\n__wt_db_config_methods_lockout(DB *db)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('db'), api.iteritems())):
+for i in sorted(filter(lambda _i: _i[0].count('db.'), api.iteritems())):
 	func_method_lockout('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
 
@@ -331,21 +331,21 @@ for line in open('../inc_posix/wiredtiger.in', 'r'):
 		skip = 1
 		tfile.write('\t */')
 		for i in sorted(\
-		    filter(lambda _i: _i[0].count('env'), api.iteritems())):
+		    filter(lambda _i: _i[0].count('env.'), api.iteritems())):
 			func_decl('env',
 			    i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 	elif line.count('Db handle api section: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
 		for i in sorted(\
-		    filter(lambda _i: _i[0].count('db'), api.iteritems())):
+		    filter(lambda _i: _i[0].count('db.'), api.iteritems())):
 			func_decl('db',
 			    i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 	elif line.count('WT_TOC handle api section: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
 		for i in sorted(\
-		    filter(lambda _i: _i[0].count('wt_toc'), api.iteritems())):
+		    filter(lambda _i: _i[0].count('wt_toc.'), api.iteritems())):
 			func_decl('wt_toc',
 			    i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 

@@ -59,9 +59,10 @@ __wt_bt_ovfl_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
 int
 __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep);
 int
-__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep);
+__wt_bt_page_in(DB *db,
+    WT_STOC *stoc, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep);
 int
-__wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags);
+__wt_bt_page_out(DB *db, WT_STOC *stoc, WT_PAGE *page, u_int32_t flags);
 void
 __wt_bt_page_recycle(ENV *env, WT_PAGE *page);
 int
@@ -81,7 +82,19 @@ __wt_bt_verify_int(DB *db, FILE *fp);
 int
 __wt_bt_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp);
 int
-__wt_toc_sched(WT_TOC *toc);
+__wt_env_start(ENV *env, u_int32_t flags);
+int
+__wt_env_stop(ENV *env, u_int32_t flags);
+int
+__wt_stoc_init(ENV *env, WT_STOC *stoc);
+int
+__wt_stoc_close(ENV *env, WT_STOC *stoc);
+void *
+__wt_workq(void *arg);
+int
+__wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp);
+int
+__wt_env_toc_sched(WT_TOC *toc);
 int
 __wt_db_close(WT_TOC *toc);
 void
@@ -90,6 +103,8 @@ void
 __wt_db_errx(DB *db, const char *fmt, ...);
 int
 __wt_db_set_btree_compare_int_verify(WT_TOC *toc);
+int
+__wt_env_db_create(WT_TOC *toc);
 int
 __wt_db_destroy(WT_TOC *toc);
 int
@@ -107,22 +122,20 @@ __wt_db_stat_clear(WT_TOC *toc);
 int
 __wt_db_sync(WT_TOC *toc);
 int
-__wt_cache_open(ENV *env);
-int
-__wt_cache_close(ENV *env);
-int
 __wt_cache_db_open(DB *db);
 int
-__wt_cache_db_close(DB *db);
+__wt_cache_db_close(DB *db, WT_STOC *stoc);
 int
-__wt_cache_db_sync(DB *db);
+__wt_cache_db_sync(DB *db, WT_STOC *stoc);
 int
-__wt_cache_db_alloc(DB *db, u_int32_t bytes, WT_PAGE **pagep);
+__wt_cache_db_alloc(DB *db, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep);
 int
-__wt_cache_db_in(DB *db,
+__wt_cache_db_in(DB *db, WT_STOC *stoc,
     off_t offset, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep);
 int
-__wt_cache_db_out(DB *db, WT_PAGE *page, u_int32_t flags);
+__wt_cache_db_out(DB *db, WT_STOC *stoc, WT_PAGE *page, u_int32_t flags);
+int
+__wt_cache_discard(ENV *env, WT_STOC *stoc, WT_PAGE *page);
 int
 __wt_env_close(WT_TOC *toc);
 void
@@ -132,13 +145,15 @@ __wt_env_errx(ENV *env, const char *fmt, ...);
 int
 __wt_env_set_verbose_verify(WT_TOC *toc);
 int
+__wt_env_set_cachesize_verify(WT_TOC *toc);
+int
 __wt_build_verify(void);
 int
 __wt_global_init(void);
 int
 __wt_breakpoint(void);
 int
-__wt_env_destroy(WT_TOC *toc);
+__wt_env_destroy(ENV *env, u_int32_t flags);
 int
 __wt_ienv_destroy(ENV *env, int refresh);
 int

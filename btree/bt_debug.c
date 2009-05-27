@@ -69,8 +69,8 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	 * should have in-memory page information.
 	 */
 	offset = WT_ADDR_TO_OFF(db, addr);
-	if ((ret = __wt_cache_db_in(
-	    db, offset, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)) != 0)
+	if ((ret = __wt_cache_db_in(db, STOC_PRIME,
+	    offset, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)) != 0)
 		return (ret);
 	if (page->indx_count == 0) {
 		switch (page->hdr->type) {
@@ -88,15 +88,18 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 			break;
 		WT_DEFAULT_FORMAT(db);
 		}
-		if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
+		if ((ret = __wt_cache_db_out(
+		    db, STOC_PRIME, page, WT_UNFORMATTED)) != 0)
 			return (ret);
-		if ((ret = __wt_cache_db_in(db, offset, bytes, 0, &page)) != 0)
+		if ((ret = __wt_cache_db_in(
+		    db, STOC_PRIME, offset, bytes, 0, &page)) != 0)
 			return (ret);
 	}
 
 	ret = __wt_bt_dump_page(db, page, ofile, fp);
 
-	if ((tret = __wt_cache_db_out(db, page, 0)) != 0 && ret == 0)
+	if ((tret =
+	    __wt_cache_db_out(db, STOC_PRIME, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -259,7 +262,7 @@ __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		if (__wt_bt_ovfl_in(db,
 		    ovfl->addr, (u_int32_t)ovfl->len, &page) == 0) {
 			__wt_bt_print(WT_PAGE_BYTE(page), ovfl->len, fp);
-			(void)__wt_bt_page_out(db, page, 0);
+			(void)__wt_bt_page_out(db, STOC_PRIME, page, 0);
 		}
 		break;
 	case WT_ITEM_OFFP_INTL:

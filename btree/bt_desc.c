@@ -138,7 +138,7 @@ __wt_bt_desc_read(DB *db)
 	 * Read in the first fragment of the database and get the root addr
 	 * and pagesizes from it.
 	 */
-	if ((ret = __wt_cache_db_in(db,
+	if ((ret = __wt_cache_db_in(db, STOC_PRIME,
 	    WT_ADDR_TO_OFF(db, WT_ADDR_FIRST_PAGE),
 	    (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)) != 0)
 		return (ret);
@@ -150,7 +150,8 @@ __wt_bt_desc_read(DB *db)
 	idb->root_addr = desc.root_addr;
 
 	/* Then discard it from the cache, it's probably the wrong size. */
-	if ((ret = __wt_cache_db_out(db, page, WT_UNFORMATTED)) != 0)
+	if ((ret =
+	    __wt_cache_db_out(db, STOC_PRIME, page, WT_UNFORMATTED)) != 0)
 		return (ret);
 
 	return (0);
@@ -170,8 +171,9 @@ __wt_bt_desc_write(DB *db, u_int32_t root_addr)
 
 	idb = db->idb;
 
-	if ((ret = __wt_cache_db_in(db, WT_ADDR_TO_OFF(
-	    db, WT_ADDR_FIRST_PAGE), db->leafsize, 0, &page)) != 0)
+	if ((ret = __wt_cache_db_in(db, STOC_PRIME,
+	    WT_ADDR_TO_OFF(db, WT_ADDR_FIRST_PAGE),
+	    db->leafsize, 0, &page)) != 0)
 		return (ret);
 
 	idb->root_addr = root_addr;
@@ -184,6 +186,6 @@ __wt_bt_desc_write(DB *db, u_int32_t root_addr)
 	memcpy(
 	    (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, &desc, WT_PAGE_DESC_SIZE);
 
-	return (__wt_cache_db_out(db, page, WT_MODIFIED));
+	return (__wt_cache_db_out(db, STOC_PRIME, page, WT_MODIFIED));
 }
 

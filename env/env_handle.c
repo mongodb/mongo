@@ -9,8 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_env_config_default(WT_TOC *);
-static int __wt_env_destroy_int(ENV *, u_int32_t);
+static int __wt_env_config_default(ENV *);
 static int __wt_ienv_config_default(ENV *);
 
 /*
@@ -18,7 +17,7 @@ static int __wt_ienv_config_default(ENV *);
  *	ENV constructor.
  */
 int
-wt_env_create(ENV **envp, WT_TOC *toc, u_int32_t flags)
+wt_env_create(u_int32_t flags, ENV **envp)
 {
 	ENV *env;
 	IENV *ienv;
@@ -39,7 +38,6 @@ wt_env_create(ENV **envp, WT_TOC *toc, u_int32_t flags)
 	}
 
 	/* Connect everything together. */
-	toc->env = env;
 	env->ienv = ienv;
 	ienv->env = env;
 
@@ -50,7 +48,7 @@ wt_env_create(ENV **envp, WT_TOC *toc, u_int32_t flags)
 		goto err;
 
 	/* Configure the ENV and the IENV. */
-	if ((ret = __wt_env_config_default(toc)) != 0)
+	if ((ret = __wt_env_config_default(env)) != 0)
 		goto err;
 	if ((ret = __wt_ienv_config_default(env)) != 0)
 		goto err;
@@ -58,7 +56,7 @@ wt_env_create(ENV **envp, WT_TOC *toc, u_int32_t flags)
 	*envp = env;
 	return (0);
 
-err:	(void)__wt_env_destroy_int(env, 0);
+err:	(void)__wt_env_destroy(env, 0);
 	return (ret);
 }
 
@@ -67,19 +65,7 @@ err:	(void)__wt_env_destroy_int(env, 0);
  *	Env.destroy method (ENV destructor).
  */
 int
-__wt_env_destroy(WT_TOC *toc)
-{
-	wt_args_env_destroy_unpack;
-
-	return (__wt_env_destroy_int(env, flags));
-}
-
-/*
- * __wt_env_destroy_int --
- *	Env.destroy method (ENV destructor), internal version.
- */
-static int
-__wt_env_destroy_int(ENV *env, u_int32_t flags)
+__wt_env_destroy(ENV *env, u_int32_t flags)
 {
 	int ret, tret;
 
@@ -123,21 +109,15 @@ __wt_env_destroy_int(ENV *env, u_int32_t flags)
  *	Set default configuration for a just-created ENV handle.
  */
 static int
-__wt_env_config_default(WT_TOC *toc)
+__wt_env_config_default(ENV *env)
 {
-	ENV *env;
 	int ret;
-
-	env = toc->env;
 
 	__wt_env_config_methods(env);
 
 	TAILQ_INIT(&env->dbqh);
 
 	if ((ret = __wt_stat_alloc_env_hstats(env, &env->hstats)) != 0)
-		return (ret);
-
-	if ((ret = env->set_cachesize(env, toc, WT_CACHE_DEFAULT_SIZE)) != 0)
 		return (ret);
 
 	return (0);

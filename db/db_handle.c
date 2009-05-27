@@ -18,25 +18,15 @@ static int __wt_idb_config_default(DB *);
  *	DB constructor.
  */
 int
-wt_db_create(DB **dbp, WT_TOC *toc, ENV *env, u_int32_t flags)
+__wt_env_db_create(WT_TOC *toc)
 {
+	wt_args_env_db_create_unpack;
 	DB *db;
 	IDB *idb;
 	int ret;
 
 	db = NULL;
 	idb = NULL;
-
-	/*
-	 * !!!
-	 * We may not have been passed an ENV structure -- get one
-	 * before doing anything else.
-	 */
-	if (env == NULL) {
-		if ((ret = wt_env_create(&env, toc, 0)) != 0)
-			return (ret);
-		F_SET(env, WT_PRIVATE_ENV);
-	}
 
 	/*
 	 * !!!
@@ -113,11 +103,6 @@ __wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 	/* Free the DB structure. */
 	memset(db, OVERWRITE_BYTE, sizeof(db));
 	__wt_free(env, db);
-
-	/* We have to destroy the environment too, if it was private. */
-	if (env != NULL && F_ISSET(env, WT_PRIVATE_ENV) &&
-	    (tret = env->destroy(env, toc, 0)) != 0 && ret == 0)
-		ret = tret;
 
 	return (ret);
 }

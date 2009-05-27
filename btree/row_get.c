@@ -21,12 +21,15 @@ __wt_db_get(WT_TOC *toc)
 {
 	wt_args_db_get_unpack;
 	ENV *env;
+	IDB *idb;
 	WT_PAGE *page;
 	WT_INDX *indx;
 	u_int32_t type;
 	int ret, tret;
 
 	env = toc->env;
+	idb = db->idb;
+
 	WT_ASSERT(env, pkey == NULL);			/* NOT YET */
 
 	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
@@ -48,8 +51,11 @@ __wt_db_get(WT_TOC *toc)
 	} else
 		ret = __wt_bt_dbt_return(db, key, data, page, indx, 0);
 
-	if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
+	/* Discard any page other than the root page, which remains pinned. */
+	if (page != idb->root_page &&
+	    (tret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0 && ret == 0)
 		ret = tret;
+
 	return (ret);
 
 }
@@ -63,12 +69,15 @@ __wt_db_get_recno(WT_TOC *toc)
 {
 	wt_args_db_get_recno_unpack;
 	ENV *env;
+	IDB *idb;
 	WT_PAGE *page;
 	WT_INDX *indx;
 	u_int32_t type;
 	int ret, tret;
 
 	env = toc->env;
+	idb = db->idb;
+
 	WT_ASSERT(env, pkey == NULL);			/* NOT YET */
 
 	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
@@ -90,10 +99,12 @@ __wt_db_get_recno(WT_TOC *toc)
 	} else
 		ret = __wt_bt_dbt_return(db, key, data, page, indx, 1);
 
-	if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
+	/* Discard any page other than the root page, which remains pinned. */
+	if (page != idb->root_page &&
+	    (tret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0 && ret == 0)
 		ret = tret;
-	return (ret);
 
+	return (ret);
 }
 
 /*
@@ -107,7 +118,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 	WT_INDX *ip;
 	WT_PAGE *page;
 	u_int32_t addr, base, indx, limit;
-	int cmp, isleaf, next_isleaf, ret;
+	int cmp, isleaf, next_isleaf, put_page, ret;
 
 	idb = db->idb;
 
@@ -115,18 +126,10 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
 		return (WT_NOTFOUND);
 
-	/*
-	 * The isleaf value tells us how big a page to read.  If the tree has
-	 * split, the root page is an internal page, otherwise it's a leaf
-	 * page.
-	 */
-	isleaf = addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
-
 	/* Search the tree. */
-	for (;;) {
-		if ((ret = __wt_bt_page_in(db, addr, isleaf, 1, &page)) != 0)
-			return (ret);
-
+	page = idb->root_page;
+	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
+	for (put_page = 0;; put_page = 1) {
 		/*
 		 * Do a binary search of the page -- this loop needs to be
 		 * tight.
@@ -146,7 +149,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 
 			/*
 			 * If we're about to compare an application key with
-			 * the 0th index on an internal page; pretend the 0th
+			 * the 0th index on an internal page, pretend the 0th
 			 * index sorts less than any application key.  This
 			 * test is so we don't have to update internal pages
 			 * if the application stores a new, "smallest" key in
@@ -155,7 +158,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 * For the record, we still maintain the key at the
 			 * 0th location because it means tree verification
 			 * and other code that processes a level of the tree
-			 * doesn't need to know about this.
+			 * doesn't need to know about this hack.
 			 */
 			if (indx != 0 || isleaf) {
 				cmp = db->btree_compare(db, key, (DBT *)ip);
@@ -196,7 +199,8 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		    WT_ITEM_TYPE(ip->ditem) == WT_ITEM_OFFP_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
+		if (put_page &&
+		    (ret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0)
 			return (ret);
 
 		/*
@@ -204,12 +208,19 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		 * failure.
 		 */
 		if (isleaf)
-			break;
+			return (WT_NOTFOUND);
 		isleaf = next_isleaf;
-	}
-	return (WT_NOTFOUND);
 
-err:	(void)__wt_bt_page_out(db, page, 0);
+		/* Get the next page. */
+		if ((ret = __wt_bt_page_in(
+		    db, STOC_PRIME, addr, isleaf, 1, &page)) != 0)
+			return (ret);
+	}
+	/* NOTREACHED */
+
+	/* Discard any page we've read other than the root page. */
+err:	if (put_page)
+		(void)__wt_bt_page_out(db, STOC_PRIME, page, 0);
 	return (ret);
 }
 
@@ -225,7 +236,7 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 	WT_PAGE *page;
 	u_int64_t total;
 	u_int32_t addr, i;
-	int isleaf, next_isleaf, ret;
+	int isleaf, next_isleaf, put_page, ret;
 
 	idb = db->idb;
 
@@ -233,18 +244,10 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
 		return (WT_NOTFOUND);
 
-	/*
-	 * The isleaf value tells us how big a page to read.  If the tree has
-	 * split, the root page is an internal page, otherwise it's a leaf
-	 * page.
-	 */
-	isleaf = addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
-
 	/* Search the tree. */
-	for (total = 0;;) {
-		if ((ret = __wt_bt_page_in(db, addr, isleaf, 1, &page)) != 0)
-			return (ret);
-
+	page = idb->root_page;
+	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
+	for (total = 0, put_page = 0;; put_page = 1) {
 		/* Check for a record past the end of the database. */
 		if (total == 0 && page->records < recno)
 			break;
@@ -269,12 +272,20 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 		    WT_ITEM_TYPE(ip->ditem) == WT_ITEM_OFFP_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
+		if (put_page &&
+		    (ret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0)
 			return (ret);
 
 		isleaf = next_isleaf;
+
+		/* Get the next page. */
+		if ((ret = __wt_bt_page_in(
+		    db, STOC_PRIME, addr, isleaf, 1, &page)) != 0)
+			return (ret);
 	}
 
-	(void)__wt_bt_page_out(db, page, 0);
+	/* Discard any page we've read other than the root page. */
+	if (put_page)
+		(void)__wt_bt_page_out(db, STOC_PRIME, page, 0);
 	return (WT_NOTFOUND);
 }

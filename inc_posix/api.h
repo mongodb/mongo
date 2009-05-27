@@ -5,13 +5,13 @@
 	toc->env = env;\
 	toc->db = NULL;\
 	toc->argp = &args;\
-	return (__wt_toc_sched(toc))
+	return (__wt_env_toc_sched(toc))
 #define	wt_args_db_toc_sched(oparg)\
 	toc->op = (oparg);\
 	toc->env = db->env;\
 	toc->db = db;\
 	toc->argp = &args;\
-	return (__wt_toc_sched(toc))
+	return (__wt_env_toc_sched(toc))
 
 #define	WT_OP_DB_BULK_LOAD	1
 typedef struct {
@@ -373,15 +373,18 @@ typedef struct {
 	ENV *env = toc->env;\
 	u_int32_t flags = ((wt_args_env_close *)(toc->argp))->flags
 
-#define	WT_OP_ENV_DESTROY	31
+#define	WT_OP_ENV_DB_CREATE	31
 typedef struct {
 	u_int32_t flags;
-} wt_args_env_destroy;
-#define	wt_args_env_destroy_pack\
-	args.flags = flags
-#define	wt_args_env_destroy_unpack\
+	DB **dbp;
+} wt_args_env_db_create;
+#define	wt_args_env_db_create_pack\
+	args.flags = flags;\
+	args.dbp = dbp
+#define	wt_args_env_db_create_unpack\
 	ENV *env = toc->env;\
-	u_int32_t flags = ((wt_args_env_destroy *)(toc->argp))->flags
+	u_int32_t flags = ((wt_args_env_db_create *)(toc->argp))->flags;\
+	DB **dbp = ((wt_args_env_db_create *)(toc->argp))->dbp
 
 #define	WT_OP_ENV_GET_CACHESIZE	32
 typedef struct {

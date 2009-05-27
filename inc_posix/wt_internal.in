@@ -47,6 +47,8 @@ struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_page_hqh;		typedef struct __wt_page_hqh WT_PAGE_HQH;
 struct __wt_stat;		typedef struct __wt_stat WT_STAT;
+struct __wt_stoc;		typedef struct __wt_stoc WT_STOC;
+struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 
 /*******************************************
  * Internal include files.
@@ -60,16 +62,14 @@ struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 #include "global.h"
 #include "btree.h"
 #include "connect.h"
+#include "connect_auto.h"
 #include "stat.h"
 
 /*******************************************
  * Database handle information that doesn't persist.
  *******************************************/
 struct __idb {
-	WT_TOC *toc;			/* Enclosing thread of control */
 	DB *db;				/* Public object */
-
-	DBT	  key, data;		/* Returned key/data pairs */
 
 	char	 *dbname;		/* Database name */
 	mode_t	  mode;			/* Database file create mode */
@@ -78,8 +78,11 @@ struct __idb {
 	WT_FH	 *fh;			/* Backing file handle */
 
 	u_int32_t root_addr;		/* Root address */
+	WT_PAGE  *root_page;		/* Root page */
 
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
+
+	DBT	  key, data;		/* Returned key/data pairs */
 
 	u_int32_t flags;
 };
@@ -99,23 +102,6 @@ struct __idbc {
 struct __ienv {
 	WT_TOC *toc;			/* Enclosing thread of control */
 	ENV *env;			/* Public object */
-
-	/*
-	 * Cache information.
-	 */
-#define	WT_CACHE_DEFAULT_SIZE		(20)		/* 20MB */
-
-	/*
-	 * Each in-memory page is threaded on two queues: a hash queue
-	 * based on its file and page number, and an LRU list.
-	 */
-	u_int32_t hashsize;
-#define	WT_HASH(ienv, addr)	((addr) % (ienv)->hashsize)
-	TAILQ_HEAD(__wt_page_hqh, __wt_page) *hqh;
-	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;
-
-	u_int64_t cache_bytes;		/* Cache bytes allocated */
-	u_int64_t cache_bytes_max;	/* Cache bytes maximum */
 
 	u_int32_t flags;
 };

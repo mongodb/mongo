@@ -237,8 +237,8 @@ skip_read:
 			    db, page, page->records, NULL)) != 0)
 				goto err;
 			next->hdr->prntaddr = page->hdr->prntaddr;
-			if ((ret =
-			    __wt_bt_page_out(db, page, WT_MODIFIED)) != 0)
+			if ((ret = __wt_bt_page_out(
+			    db, STOC_PRIME, page, WT_MODIFIED)) != 0)
 				goto err;
 
 			/* Switch to the next page. */
@@ -343,8 +343,8 @@ skip_read:
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(db, page, page->records, NULL);
-			if ((tret = __wt_bt_page_out(
-			    db, page, WT_MODIFIED)) != 0 && ret == 0)
+			if ((tret = __wt_bt_page_out(db,
+			    STOC_PRIME, page, WT_MODIFIED)) != 0 && ret == 0)
 				ret = tret;
 			page = NULL;
 		}
@@ -353,7 +353,7 @@ skip_read:
 	if (0) {
 err:		ret = WT_ERROR;
 		if (page != NULL)
-			(void)__wt_bt_page_out(db, page, 0);
+			(void)__wt_bt_page_out(db, STOC_PRIME, page, 0);
 	}
 
 	WT_FREE_AND_CLEAR(env, lastkey_ovfl.data);
@@ -494,8 +494,8 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 			    db, page, page->records, &root_addr)) != 0)
 				goto err;
 			next->hdr->prntaddr = page->hdr->prntaddr;
-			if ((ret =
-			    __wt_bt_page_out(db, page, WT_MODIFIED)) != 0)
+			if ((ret = __wt_bt_page_out(
+			    db, STOC_PRIME, page, WT_MODIFIED)) != 0)
 				goto err;
 
 			/* Switch to the next page. */
@@ -525,7 +525,7 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	    page, page->records, &root_addr)) != 0 && (ret == 0 || ret == 1))
 		ret = tret;
 	if ((tret = __wt_bt_page_out(
-	    db, page, WT_MODIFIED)) != 0 && (ret == 0 || ret == 1))
+	    db, STOC_PRIME, page, WT_MODIFIED)) != 0 && (ret == 0 || ret == 1))
 		ret = tret;
 
 	/*
@@ -706,8 +706,8 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 			next->hdr->prntaddr = parent->hdr->prntaddr;
 
 			/* Discard the old parent page, we have a new one. */
-			if ((ret =
-			    __wt_bt_page_out(db, parent, WT_MODIFIED)) != 0)
+			if ((ret = __wt_bt_page_out(
+			    db, STOC_PRIME, parent, WT_MODIFIED)) != 0)
 				goto err;
 
 			need_promotion = 1;
@@ -731,7 +731,8 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 		next = NULL;
 	} else {
 		if ((ret =
-		    __wt_bt_page_in(db, parent_addr, 0, 1, &parent)) != 0)
+		    __wt_bt_page_in(
+			db, STOC_PRIME, parent_addr, 0, 1, &parent)) != 0)
 			goto err;
 
 		need_promotion = 0;
@@ -794,12 +795,12 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 			if ((parent_addr =
 			    parent->hdr->prntaddr) == WT_ADDR_INVALID)
 				break;
-			if ((ret =
-			    __wt_bt_page_out(db, parent, WT_MODIFIED)) != 0)
+			if ((ret = __wt_bt_page_out(
+			    db, STOC_PRIME, parent, WT_MODIFIED)) != 0)
 				goto err;
 			parent = NULL;
 			if ((ret = __wt_bt_page_in(
-			    db, parent_addr, 0, 1, &parent)) != 0)
+			    db, STOC_PRIME, parent_addr, 0, 1, &parent)) != 0)
 				goto err;
 
 			/*
@@ -814,11 +815,12 @@ split:		if ((ret = __wt_bt_page_alloc(db, 0, &next)) != 0)
 		}
 
 err:	/* Discard the parent page. */
-	if (parent != NULL && (tret =
-	    __wt_bt_page_out(db, parent, WT_MODIFIED)) != 0 && ret == 0)
+	if (parent != NULL && (tret = __wt_bt_page_out(
+	    db, STOC_PRIME, parent, WT_MODIFIED)) != 0 && ret == 0)
 		ret = tret;
-	if (next != NULL && (tret =
-	    __wt_bt_page_out(db, next, WT_MODIFIED)) != 0 && ret == 0)
+	if (next != NULL &&
+	    (tret = __wt_bt_page_out(
+	    db, STOC_PRIME, next, WT_MODIFIED)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);

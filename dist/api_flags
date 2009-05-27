@@ -42,7 +42,6 @@ Env.stat_print
 # Databases.
 #############################################
 Db					# Public handle
-	PRIVATE_ENV			# Application never created an Env
 
 IDb					# Private handle
 	CREATE				# Create any backing files

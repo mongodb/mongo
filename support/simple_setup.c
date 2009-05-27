@@ -11,34 +11,50 @@
 
 extern const char *progname;
 
+static ENV *env;
+
 /*
  * __wt_single_thread_setup --
  *	Standard setup for single-threaded applications.
  */
 int
-__wt_single_thread_setup(WT_TOC **toc, DB **db)
+__wt_single_thread_setup(const char *progname, WT_TOC **tocp, DB **dbp)
 {
+	DB *db;
+	WT_TOC *toc;
 	int ret;
 
-	*toc = NULL;
-	*db = NULL;
+	env = NULL;
+	*tocp = toc = NULL;
+	*dbp = db = NULL;
 
-	if ((ret = wt_start(WT_SINGLE_THREADED)) != 0) {
+	if ((ret = wt_env_create(0, &env)) != 0) {
 		fprintf(stderr,
-		    "%s: wt_start: %s\n", progname, wt_strerror(ret));
+		    "%s: wt_env_create: %s\n", progname, wt_strerror(ret));
 		return (ret);
 	}
-	if ((ret = wt_toc_create(toc, 0)) != 0) {
+	if ((ret = env->start(env, WT_SINGLE_THREADED)) != 0) {
 		fprintf(stderr,
-		    "%s: wt_toc_create: %s\n", progname, wt_strerror(ret));
+		    "%s: Env.start: %s\n", progname, wt_strerror(ret));
+		goto err;
+	}
+	if ((ret = env->toc_create(env, 0, &toc)) != 0) {
+		fprintf(stderr,
+		    "%s: Env.toc_create: %s\n", progname, wt_strerror(ret));
 		return (ret);
 	}
-	if ((ret = wt_db_create(db, *toc, NULL, 0)) != 0) {
+	if ((ret = env->db_create(env, toc, 0, &db)) != 0) {
 		fprintf(stderr,
-		    "%s: wt_db_create: %s\n", progname, wt_strerror(ret));
+		    "%s: Env.db_create: %s\n", progname, wt_strerror(ret));
 		return (ret);
 	}
-	return (0);
+
+	*tocp = toc;
+	*dbp = db;
+	return (EXIT_SUCCESS);
+
+err:	(void)__wt_single_thread_teardown(progname, toc, db);
+	return (EXIT_FAILURE);
 }
 
 /*
@@ -46,7 +62,7 @@ __wt_single_thread_setup(WT_TOC **toc, DB **db)
  *	Standard teardown for single-threaded applications.
  */
 int
-__wt_single_thread_teardown(WT_TOC *toc, DB *db)
+__wt_single_thread_teardown(const char *progname, WT_TOC *toc, DB *db)
 {
 	int ret, tret;
 
@@ -73,9 +89,15 @@ __wt_single_thread_teardown(WT_TOC *toc, DB *db)
 			if (ret == 0)
 				ret = tret;
 		}
-	if ((tret = wt_stop(0)) != 0) {
+	if ((tret = env->stop(env, 0)) != 0) {
 		fprintf(stderr,
-		    "%s: wt_stop: %s\n", progname, wt_strerror(ret));
+		    "%s: Env.stop: %s\n", progname, wt_strerror(ret));
+		if (ret == 0)
+			ret = tret;
+	}
+	if ((tret = env->destroy(env, 0)) != 0) {
+		fprintf(stderr,
+		    "%s: Env.destroy: %s\n", progname, wt_strerror(ret));
 		if (ret == 0)
 			ret = tret;
 	}

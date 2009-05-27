@@ -48,6 +48,21 @@ __wt_global_init(void)
 
 	__wt_addr = &WT_GLOBAL(running);
 
+	/* Allocate an initial list of server slots. */
+#define	WT_SERVERQ_SIZE	64
+	WT_GLOBAL(sq_entries) = WT_SERVERQ_SIZE;
+	if ((ret = __wt_calloc(
+	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &WT_GLOBAL(sq))) != 0)
+		return (ret);
+
+	/* Allocate the work queue. */
+#define	WT_WORKQ_SIZE	64
+	WT_GLOBAL(workq_entries) = WT_WORKQ_SIZE;
+	if ((ret = __wt_calloc(
+	    NULL, WT_WORKQ_SIZE, sizeof(WT_WORKQ), &WT_GLOBAL(workq))) != 0)
+		return (ret);
+
+	/* Initialize the global mutex. */
 	if ((ret = __wt_mtx_init(&WT_GLOBAL(mtx))) != 0)
 		return (ret);
 

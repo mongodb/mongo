@@ -9,14 +9,14 @@
 
 #include "wt_internal.h"
 
-static int __wt_toc_destroy(WT_TOC *, u_int32_t);
+static int __wt_env_toc_destroy(WT_TOC *, u_int32_t);
 
 /*
  * wt_toc_create --
  *	WT_TOC constructor.
  */
 int
-wt_toc_create(WT_TOC **tocp, u_int32_t flags)
+__wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp)
 {
 	WT_TOC *toc;
 	int ret;
@@ -38,12 +38,12 @@ wt_toc_create(WT_TOC **tocp, u_int32_t flags)
 		F_SET(toc, WT_SINGLE_THREADED);
 	else
 		toc->slot = WT_GLOBAL(workq_next)++;
-	toc->destroy = __wt_toc_destroy;
+	toc->destroy = __wt_env_toc_destroy;
 
 	*tocp = toc;
 	return (0);
 
-err:	(void)__wt_toc_destroy(toc, 0);
+err:	(void)__wt_env_toc_destroy(toc, 0);
 	return (ret);
 }
 
@@ -52,7 +52,7 @@ err:	(void)__wt_toc_destroy(toc, 0);
  *	toc.destroy method (WT_TOC destructor).
  */
 static int
-__wt_toc_destroy(WT_TOC *toc, u_int32_t flags)
+__wt_env_toc_destroy(WT_TOC *toc, u_int32_t flags)
 {
 	int ret, tret;
 
@@ -72,13 +72,13 @@ __wt_toc_destroy(WT_TOC *toc, u_int32_t flags)
 }
 
 /*
- * __wt_toc_sched --
+ * __wt_env_toc_sched --
  *	Schedule an operation.
  */
 int
-__wt_toc_sched(WT_TOC *toc)
+__wt_env_toc_sched(WT_TOC *toc)
 {
-	WT_TOC **q;
+	WT_WORKQ *q;
 
 	/*
 	 * The engine may be single-threaded or threads of control may re-enter
@@ -94,9 +94,11 @@ __wt_toc_sched(WT_TOC *toc)
 	if (WT_GLOBAL(workq) == NULL)
 		return (WT_ERROR);
 
+
 	/* Otherwise, schedule the call and go to sleep until it completes. */
 	q = WT_GLOBAL(workq) + toc->slot;
-	*q = toc;
+	q->toc = toc;
+	q->sid = WT_PSTOC_ID;
 	WT_FLUSH_MEMORY;
 
 	(void)__wt_lock(toc->mtx);

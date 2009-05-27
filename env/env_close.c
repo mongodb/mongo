@@ -24,10 +24,6 @@ __wt_env_close(WT_TOC *toc)
 	WT_ENV_FCHK_NOTFATAL(
 	    env, "ENV.close", flags, WT_APIMASK_ENV_CLOSE, ret);
 
-	/* Destroy the cache. */
-	if ((tret = __wt_cache_close(env)) != 0 && ret == 0)
-		ret = tret;
-
 	/* Re-cycle the underlying IENV structure. */
 	if ((tret = __wt_ienv_destroy(env, 1)) != 0 && ret == 0)
 		ret = tret;

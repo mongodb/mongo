@@ -20,5 +20,5 @@ __wt_db_sync(WT_TOC *toc)
 
 	WT_DB_FCHK(db, "Db.sync", flags, WT_APIMASK_DB_SYNC);
 
-	return (__wt_cache_db_sync(db));
+	return (__wt_cache_db_sync(db, STOC_PRIME));
 }

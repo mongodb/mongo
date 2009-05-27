@@ -30,11 +30,6 @@ __wt_db_open(WT_TOC *toc)
 	if ((ret = __wt_db_idb_open(db, dbname, mode, flags)) != 0)
 		return (ret);
 
-	/* Open any private environment. */
-	if (F_ISSET(env, WT_PRIVATE_ENV) &&
-	    (ret = env->open(env, toc, NULL, 0, 0)) != 0)
-		return (ret);
-
 	/* Insert the database on the environment's list. */
 	TAILQ_INSERT_TAIL(&env->dbqh, db, q);
 

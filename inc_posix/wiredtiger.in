@@ -281,8 +281,11 @@ struct __env {
 	int (*close)(
 	    ENV *, WT_TOC *, u_int32_t );
 
+	int (*db_create)(
+	    ENV *, WT_TOC *, u_int32_t , DB **);
+
 	int (*destroy)(
-	    ENV *, WT_TOC *, u_int32_t );
+	    ENV *, u_int32_t );
 
 	void (*err)(
 	    ENV *, int , const char *, ...);
@@ -328,11 +331,20 @@ struct __env {
 	int (*set_verbose)(
 	    ENV *, WT_TOC *, u_int32_t );
 
+	int (*start)(
+	    ENV *, u_int32_t );
+
 	int (*stat_clear)(
 	    ENV *, WT_TOC *, u_int32_t );
 
 	int (*stat_print)(
 	    ENV *, WT_TOC *, FILE *, u_int32_t );
+
+	int (*stop)(
+	    ENV *, u_int32_t );
+
+	int (*toc_create)(
+	    ENV *, u_int32_t , WT_TOC **);
 	/*
 	 * Env handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -344,12 +356,8 @@ struct __env {
 /*******************************************
  * Prototypes.
  *******************************************/
-int	 wt_db_create(DB **, WT_TOC *, ENV *, u_int32_t);
-int	 wt_env_create(ENV **, WT_TOC *, u_int32_t);
-int	 wt_start(u_int32_t);
-int	 wt_stop(u_int32_t);
+int	 wt_env_create(u_int32_t, ENV **);
 char	*wt_strerror(int);
-int	 wt_toc_create(WT_TOC **, u_int32_t);
 char	*wt_version(int *, int *, int *);
 
 /*******************************************
@@ -367,7 +375,6 @@ char	*wt_version(int *, int *, int *);
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MODIFIED					0x00000002
 #define	WT_PRINTABLES					0x00000001
-#define	WT_PRIVATE_ENV					0x00000001
 #define	WT_RUNNING					0x00000002
 #define	WT_SINGLE_THREADED				0x00000001
 #define	WT_SORTED_INPUT					0x00000001
@@ -375,7 +382,7 @@ char	*wt_version(int *, int *, int *);
 #define	WT_VERB_FILEOPS					0x00000002
 #define	WT_VERB_FILEOPS_ALL				0x00000001
 
-#define	WT_APIMASK_DB					0x00000001
+#define	WT_APIMASK_DB					0x00000000
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000003
 #define	WT_APIMASK_DB_CLOSE				0x00000000
 #define	WT_APIMASK_DB_DESTROY				0x00000000

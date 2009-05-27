@@ -17,16 +17,19 @@ extern "C" {
 struct __wt_globals {
 	u_int  running;				/* Engine is running */
 
-	pthread_t tid;				/* Engine thread ID */
 	u_int single_threaded;			/* Engine is single-threaded */
+
+	WT_STOC *sq;				/* Server thread queue */
+	u_int sq_next;				/* Next server slot */
+	u_int sq_entries;			/* Total server entries */
+
+	WT_WORKQ *workq;			/* Work queue */
+	u_int workq_next;			/* Next empty work queue slot */
+	u_int workq_entries;			/* Total work queue entries */
 
 	WT_MTX mtx;				/* Global mutex */
 
 	u_int32_t file_id;			/* Serial file ID */
-
-	WT_TOC **workq;				/* Work queue */
-	u_int workq_next;			/* Next empty connection slot */
-	u_int workq_entries;			/* Total connection entries */
 
 	char *sep;				/* Display separator line */
 

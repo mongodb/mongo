@@ -24,9 +24,5 @@ __wt_env_open(WT_TOC *toc)
 	/* Turn on the methods that require open. */
 	__wt_env_config_methods_open(env);
 
-	/* Initialize the cache. */
-	if ((ret = __wt_cache_open(env)) != 0)
-		return (ret);
-
 	return (0);
 }

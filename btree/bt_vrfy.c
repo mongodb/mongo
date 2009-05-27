@@ -81,11 +81,11 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
 		if ((ret = __wt_bt_page_in(
-		    db, WT_ADDR_FIRST_PAGE, 1, 0, &page)) != 0)
+		    db, STOC_PRIME, WT_ADDR_FIRST_PAGE, 1, 0, &page)) != 0)
 			return (ret);
 		if ((ret = __wt_bt_verify_page(db, page, fragbits, fp)) != 0)
 			goto err;
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
+		if ((ret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0)
 			goto err;
 		page = NULL;
 	} else {
@@ -103,7 +103,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	ret = __wt_bt_verify_checkfrag(db, fragbits);
 
 err:	if (page != NULL &&
-	    (tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
+	    (tret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0 && ret == 0)
 		ret = tret;
 	__wt_free(env, fragbits);
 	return (ret);
@@ -214,7 +214,8 @@ __wt_bt_verify_level(
 	    addr != WT_ADDR_INVALID;
 	    addr = hdr->nextaddr, prev = page, page = NULL) {
 		/* Get the next page and set the address. */
-		if ((ret = __wt_bt_page_in(db, addr, isleaf, 0, &page)) != 0)
+		if ((ret = __wt_bt_page_in(
+		    db, STOC_PRIME, addr, isleaf, 0, &page)) != 0)
 			goto err;
 
 		/* Verify the page. */
@@ -285,15 +286,15 @@ __wt_bt_verify_level(
 		}
 
 		/* We're done with the previous page. */
-		if ((ret = __wt_bt_page_out(db, prev, 0)) != 0)
+		if ((ret = __wt_bt_page_out(db, STOC_PRIME, prev, 0)) != 0)
 			goto err;
 	}
 
 err:	if (prev != NULL &&
-	    (tret = __wt_bt_page_out(db, prev, 0)) != 0 && ret == 0)
+	    (tret = __wt_bt_page_out(db, STOC_PRIME, prev, 0)) != 0 && ret == 0)
 		ret = tret;
 	if (page != NULL &&
-	    (tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
+	    (tret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	if (ret == 0 && addr_arg != WT_ADDR_INVALID)
@@ -374,7 +375,8 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
-	if ((ret = __wt_bt_page_in(db, hdr->prntaddr, 0, 1, &parent)) != 0)
+	if ((ret = __wt_bt_page_in(
+	    db, STOC_PRIME, hdr->prntaddr, 0, 1, &parent)) != 0)
 		return (ret);
 
 	/*
@@ -476,13 +478,13 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		}
 
 		/* Switch for the subsequent page at the parent level. */
-		if ((ret = __wt_bt_page_out(db, parent, 0)) != 0)
+		if ((ret = __wt_bt_page_out(db, STOC_PRIME, parent, 0)) != 0)
 			return (ret);
 		if (nextaddr == WT_ADDR_INVALID)
 			parent = NULL;
 		else {
-			if ((ret =
-			    __wt_bt_page_in(db, nextaddr, 0, 1, &parent)) != 0)
+			if ((ret = __wt_bt_page_in(
+			    db, STOC_PRIME, nextaddr, 0, 1, &parent)) != 0)
 				return (ret);
 			parent_indx = parent->indx;
 		}
@@ -512,8 +514,8 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 err:		ret = WT_ERROR;
 	}
 
-	if (parent != NULL &&
-	    (tret = __wt_bt_page_out(db, parent, 0)) != 0 && ret == 0)
+	if (parent != NULL && (tret =
+	    __wt_bt_page_out(db, STOC_PRIME, parent, 0)) != 0 && ret == 0)
 		ret = tret;
 	return (ret);
 }
@@ -864,7 +866,8 @@ __wt_bt_verify_ovfl(DB *db, WT_ITEM_OVFL *ovfl, bitstr_t *fragbits, FILE *fp)
 
 	ret = __wt_bt_verify_page(db, ovfl_page, fragbits, fp);
 
-	if ((tret = __wt_bt_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret =
+	    __wt_bt_page_out(db, STOC_PRIME, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
