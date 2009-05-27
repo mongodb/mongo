@@ -212,6 +212,8 @@ MongodRunner.prototype.start = function( reuseData ) {
         args.push( "1" );
     }
     args.push( "--nohttpinterface" );
+    args.push( "--bind_ip" );
+    args.push( "127.0.0.1" );
     if ( this.extraArgs_ ) {
         args = args.concat( this.extraArgs_ );
     }

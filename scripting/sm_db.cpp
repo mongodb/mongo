@@ -57,7 +57,7 @@ namespace mongo {
     
     JSBool internal_cursor_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         uassert( "no args to internal_cursor_constructor" , argc == 0 );
-        JS_SetPrivate( cx , obj , 0 ); // just for safety
+        assert( JS_SetPrivate( cx , obj , 0 ) ); // just for safety
         return JS_TRUE;
     }
 
@@ -65,7 +65,7 @@ namespace mongo {
         CursorHolder * holder = (CursorHolder*)JS_GetPrivate( cx , obj );
         if ( holder ){
             delete holder;
-            JS_SetPrivate( cx , obj , 0 );
+            assert( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
@@ -110,7 +110,7 @@ namespace mongo {
         Convertor c( cx );
 
         shared_ptr< DBClientBase > client( createDirectClient() );
-        JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientBase >( client ) ) );
+        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientBase >( client ) ) ) );
 
         jsval host = c.toval( "EMBEDDED" );
         assert( JS_SetProperty( cx , obj , "host" , &host ) );
@@ -135,7 +135,7 @@ namespace mongo {
             return JS_FALSE;
         }
         
-        JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientConnection >( conn ) ) );
+        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientConnection >( conn ) ) ) );
         jsval host_val = c.toval( host.c_str() );
         assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
         return JS_TRUE;
@@ -152,7 +152,7 @@ namespace mongo {
         shared_ptr< DBClientBase > * connHolder = (shared_ptr< DBClientBase >*)JS_GetPrivate( cx , obj );
         if ( connHolder ){
             delete connHolder;
-            JS_SetPrivate( cx , obj , 0 );
+            assert( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
@@ -185,7 +185,7 @@ namespace mongo {
             auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? Option_SlaveOk : 0 );
             
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
-            JS_SetPrivate( cx , mycursor , new CursorHolder( cursor, *connHolder ) );
+            assert( JS_SetPrivate( cx , mycursor , new CursorHolder( cursor, *connHolder ) ) );
             *rval = OBJECT_TO_JSVAL( mycursor );
             return JS_TRUE;
         }

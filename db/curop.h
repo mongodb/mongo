@@ -8,25 +8,30 @@
 namespace mongo { 
 
     extern struct CurOp {
-        void reset(time_t now) { 
+        void reset(time_t now, const sockaddr_in &_client) { 
             active = true;
             opNum++;
             startTime = now;
             ns[0] = '?'; // just in case not set later
             *query = 0;
             killCurrentOp = 0;
+            client = _client;
         }
 
         bool active;
         unsigned opNum;
         time_t startTime;
         int op;
-        char ns[Namespace::MaxNsLen+1];
+        char ns[Namespace::MaxNsLen+2];
         char query[128];
         char zero;
+        struct sockaddr_in client;
 
         CurOp() { 
             opNum = 0; 
+            // These addresses should never be written to again.  The zeroes are
+            // placed here as a precaution because currentOp may be accessed
+            // without the db mutex.
             ns[sizeof(ns)-1] = 0;
             query[sizeof(query)-1] = 0;
         }
@@ -62,6 +67,9 @@ namespace mongo {
             b.append("ns", ns);
             b.append("query", query);
             b.append("inLock",  dbMutexInfo.isLocked());
+            stringstream clientStr;
+            clientStr << inet_ntoa( client.sin_addr ) << ":" << ntohs( client.sin_port );
+            b.append("client", clientStr.str());
             return b.obj();
         }
     } currentOp;

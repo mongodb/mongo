@@ -58,14 +58,41 @@ private:
     MessagingPort &mp_;
 };
 
+set<MessagingPort*> ports;
+
 class MyListener : public Listener {
 public:
     MyListener( int port ) : Listener( "", port ) {}
     virtual void accepted(MessagingPort *mp) {
+        ports.insert( mp );
         Forwarder f( *mp );
         boost::thread t( f );
     }
 };
+
+auto_ptr< MyListener > listener;
+
+#if !defined(_WIN32)
+#include <execinfo.h>
+void cleanup( int sig ) {
+    close( listener->socket() );
+    for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
+        (*i)->shutdown();
+    ::exit( 0 );    
+}
+
+void setupSignals() {
+    signal( SIGINT , cleanup );
+    signal( SIGTERM , cleanup );
+    signal( SIGPIPE , cleanup );
+    signal( SIGABRT , cleanup );
+    signal( SIGSEGV , cleanup );
+    signal( SIGBUS , cleanup );
+    signal( SIGFPE , cleanup );
+}
+#else
+inline void setupSignals() {}
+#endif
 
 void helpExit() {
     cout << "usage mongobridge --port <port> --dest <destUri>" << endl;
@@ -80,7 +107,8 @@ void check( bool b ) {
 }
 
 int main( int argc, char **argv ) {
-
+    setupSignals();
+    
     check( argc == 5 );
 
     for( int i = 1; i < 5; ++i ) {
@@ -95,9 +123,9 @@ int main( int argc, char **argv ) {
     }
     check( port != 0 && !destUri.empty() );
 
-    MyListener l( port );
-    l.init();
-    l.listen();
+    listener.reset( new MyListener( port ) );
+    listener->init();
+    listener->listen();
 
     return 0;
 }

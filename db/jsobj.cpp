@@ -743,19 +743,52 @@ namespace mongo {
         }
 
         return e;
-        /*
-        	BSONObjIterator i(*this);
-        	while( i.more() ) {
-        		BSONElement e = i.next();
-        		if( e.eoo() )
-        			break;
-        		if( strcmp(e.fieldName(), name) == 0 )
-        			return e;
-        	}
-        	return nullElement;
-        */
     }
 
+    void trueDat( bool *deep ) {
+        if( deep )
+            *deep = true;
+    }
+    
+    void BSONObj::getFieldsDotted(const char *name, BSONElementSet &ret, bool *deep ) const {
+        BSONElement e = getField( name );
+        if ( e.eoo() ) {
+            const char *p = strchr(name, '.');
+            if ( p ) {
+                string left(name, p-name);
+                BSONElement e = getField( left );
+                if ( e.type() == Array ) {
+                    trueDat( deep );
+                    BSONObjIterator i( e.embeddedObject() );
+                    while( i.more() ) {
+                        BSONElement f = i.next();
+                        if ( f.eoo() )
+                            break;
+                        if ( f.type() == Object )
+                            f.embeddedObject().getFieldsDotted(p+1, ret);
+                    }
+                } else if ( e.type() == Object ) {
+                    e.embeddedObject().getFieldsDotted(p+1, ret);
+                }
+            }
+        } else {
+            if ( e.type() == Array ) {
+                trueDat( deep );
+                BSONObjIterator i( e.embeddedObject() );
+                while( i.more() ) {
+                    BSONElement f = i.next();
+                    if ( f.eoo() )
+                        break;
+                    ret.insert( f );
+                }
+            } else {
+                ret.insert( e );
+            }
+        }
+        if ( ret.empty() && deep )
+            *deep = false;
+    }    
+    
     BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
         const char *p = strchr(name, '.');
         string left;

@@ -441,6 +441,14 @@ namespace mongo {
         return compareElementValues(l,r);
     }
 
+    struct BSONElementCmpWithoutField {
+        bool operator()( const BSONElement &l, const BSONElement &r ) const {
+            return l.woCompare( r, false );
+        }
+    };
+    
+    typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
+    
     /**
 	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
        object in a binary representation.
@@ -552,6 +560,9 @@ namespace mongo {
            supports "." notation to reach into embedded objects
         */
         BSONElement getFieldDotted(const char *name) const;
+        /** Like getFieldDotted(), but expands multikey arrays and returns all matching objects
+         */
+        void getFieldsDotted(const char *name, BSONElementSet &ret, bool *deep = 0) const;
         /** Like getFieldDotted(), but returns first array encountered while traversing the
             dotted fields of name.  The name variable is updated to represent field
             names with respect to the returned element. */
@@ -574,6 +585,17 @@ namespace mongo {
         */
         BSONElement operator[] (const char *field) const { 
             return getField(field);
+        }
+
+        BSONElement operator[] (const string& field) const { 
+            return getField(field);
+        }
+
+        BSONElement operator[] (int field) const { 
+            stringstream ss;
+            ss << field;
+            string s = ss.str();
+            return getField(s.c_str());
         }
 
 		/** @return true if field exists */

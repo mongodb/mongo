@@ -104,7 +104,7 @@ namespace mongo {
     
 #define LOGIT { boostlock lk(mutex); cout << x; return *this; }
     class Logstream : public Nullstream {
-        static boost::mutex mutex;
+        static boost::mutex &mutex;
     public:
         void flush() {
             boostlock lk(mutex);

@@ -113,7 +113,7 @@ namespace mongo {
     }
     
     // Returns false when request includes 'end'
-    bool assembleResponse( Message &m, DbResponse &dbresponse ) {
+    bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
         // before we lock...
         if ( m.data->operation() == dbQuery ) {
             const char *ns = m.data->_data + 4;
@@ -141,7 +141,7 @@ namespace mongo {
         stringstream ss;
         char buf[64];
         time_t now = time(0);
-        currentOp.reset(now);
+        currentOp.reset(now, client);
 
         time_t_to_String(now, buf);
         buf[20] = 0; // don't want the year
@@ -331,7 +331,7 @@ namespace mongo {
         {
             string s = query.toString();
             ss << " query: " << s;
-            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
         bool updatedExisting = updateObjects(ns, toupdate, query, flags & 1, ss);
         recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 );
@@ -351,7 +351,7 @@ namespace mongo {
         {
             string s = pattern.toString();
             ss << " query: " << s;
-            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-1);
+            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
         int n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( n );
@@ -698,4 +698,13 @@ namespace mongo {
         ::exit(rc);
     }
 
+    void acquirePathLock() {
+#if !defined(_WIN32) && !defined(__sunos__)
+        string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
+        lockFile = open( name.c_str(), O_RDONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO );
+        massert( "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
+        massert( "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
+#endif        
+    }
+        
 } // namespace mongo

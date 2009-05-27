@@ -348,6 +348,24 @@ DBCollection.prototype.totalIndexSize = function(){
     return total;
 }
 
+DBCollection.prototype.convertToCapped = function( bytes ){
+    if ( ! bytes )
+        throw "have to specify # of bytes";
+    return this._dbCommand( { convertToCapped : this._shortName , size : bytes } )
+}
+
+DBCollection.prototype.exists = function(){
+    return this._db.system.namespaces.findOne( { name : this._fullName } );
+}
+
+DBCollection.prototype.isCapped = function(){
+    var e = this.exists();
+    return ( e && e.options && e.options.capped ) ? true : false;
+}
+
+
+
+
 DBCollection.prototype.toString = function(){
     return this.getFullName();
 }

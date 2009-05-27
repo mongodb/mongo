@@ -6,13 +6,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
-namespace mongo {
-    DBClientBase *createDirectClient() {
-        cout << "no direct client available" << endl;
-        assert( false );
-        return 0;
-    }    
-} // namespace mongo
+#include "util/file_allocator.h"
 
 using namespace std;
 using namespace mongo;
@@ -20,7 +14,7 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) : 
-    _name( name ) , _db( defaultDB ) , _coll( defaultCollection ){
+    _name( name ) , _db( defaultDB ) , _coll( defaultCollection ), _useDirect() {
     
     _options = new po::options_description( name + " options" );
     _options->add_options()
@@ -28,6 +22,7 @@ mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
         ("host,h",po::value<string>(), "mongo host to connect to" )
         ("db,d",po::value<string>(), "database to use" )
         ("collection,c",po::value<string>(), "collection to use (some commands)" )
+        ("dbpath",po::value<string>(), "directly access mongod data files in this path, instead of connecting to a mongod instance" )
         ;
 
 }
@@ -53,19 +48,29 @@ int mongo::Tool::main( int argc , char ** argv ){
         printExtraHelp( cerr );
         return 0;
     }
-    
-    const char * host = "127.0.0.1";
-    if ( _params.count( "host" ) )
-        host = _params["host"].as<string>().c_str();
-    
-    string errmsg;
-    if ( ! _conn.connect( host , errmsg ) ){
-        cerr << "couldn't connect to [" << host << "] " << errmsg << endl;
-        return -1;
+
+    if ( !hasParam( "dbpath" ) ) {
+        const char * host = "127.0.0.1";
+        if ( _params.count( "host" ) )
+            host = _params["host"].as<string>().c_str();
+        
+        string errmsg;
+        if ( ! _conn.connect( host , errmsg ) ){
+            cerr << "couldn't connect to [" << host << "] " << errmsg << endl;
+            return -1;
+        }
+        
+        cerr << "connected to: " << host << endl;
+    } else {
+        _useDirect = true;
+        static string myDbpath = getParam( "dbpath" );
+        mongo::dbpath = myDbpath.c_str();
+        mongo::acquirePathLock();
+#if !defined(_WIN32)
+        theFileAllocator().start();
+#endif        
     }
     
-    cerr << "connected to: " << host << endl;
-
     if ( _params.count( "db" ) )
         _db = _params["db"].as<string>();
     

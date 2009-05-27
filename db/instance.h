@@ -87,7 +87,9 @@ namespace mongo {
         }
     };
 
-    bool assembleResponse( Message &m, DbResponse &dbresponse );
+    static SockAddr unknownAddress( "0.0.0.0", 0 );
+    
+    bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client = unknownAddress.sa );
 
     void receivedKillCursors(Message& m);
     void receivedUpdate(Message& m, stringstream& ss);
@@ -144,5 +146,8 @@ namespace mongo {
             string oldName_;
         };
     };
+
+    extern int lockFile;
+    void acquirePathLock();
     
 } // namespace mongo

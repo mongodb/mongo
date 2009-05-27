@@ -17,6 +17,7 @@
 #endif
 
 #include "../client/dbclient.h"
+#include "../util/processinfo.h"
 #include "utils.h"
 
 namespace mongo {
@@ -102,6 +103,20 @@ namespace mongo {
             ::exit(exit_code);
             return undefined_;
         }
+
+        BSONObj JSGetMemInfo( const BSONObj& args ){
+            ProcessInfo pi;
+            uassert( "processinfo not supported" , pi.supported() );
+            
+            BSONObjBuilder e;
+            e.append( "virtual" , pi.getVirtualMemorySize() );
+            e.append( "resident" , pi.getResidentSize() );
+            
+            BSONObjBuilder b;
+            b.append( "ret" , e.obj() );
+            
+            return b.obj();
+        }
         
 #ifndef _WIN32
 #include <signal.h>
@@ -124,7 +139,7 @@ namespace mongo {
                 memset(address.sin_zero, 0, sizeof(address.sin_zero));
                 address.sin_family = AF_INET;
                 address.sin_port = 0;
-                address.sin_addr.s_addr = 0;        
+                address.sin_addr.s_addr = inet_addr( "127.0.0.1" );
                 assert( 0 == ::bind( s, (sockaddr*)&address, sizeof( address ) ) );
                 
                 sockaddr_in newAddress;
@@ -136,7 +151,7 @@ namespace mongo {
             }
             
             sort( ports.begin(), ports.end() );
-            for( int i = 1; i < ports.size(); ++i )
+            for( unsigned i = 1; i < ports.size(); ++i )
                 massert( "duplicate ports allocated", ports[ i - 1 ] != ports[ i ] );
             BSONObjBuilder b;
             b.append( "", ports );
@@ -217,7 +232,7 @@ namespace mongo {
                 }
                 argv_[ args.nFields() ] = 0;
                 
-                if ( program == "mongo" )
+                if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
                     port_ = 0;
                 else
                     assert( port_ > 0 );
@@ -300,7 +315,7 @@ namespace mongo {
             MongoProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            return BSON( "" << r.pid() );
+            return BSON( string( "" ) << int( r.pid() ) );
         }
 
         BSONObj ResetDbpath( const BSONObj &a ) {
@@ -422,6 +437,7 @@ namespace mongo {
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
+            scope.injectNative( "getMemInfo" , JSGetMemInfo );
 #if !defined(_WIN32)
             scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );

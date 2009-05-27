@@ -456,6 +456,15 @@ namespace UpdateTests {
         }
     };
     
+    class UpdateMissingToNull : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), BSON( "a" << 5 ) );
+            client().update( ns(), BSON( "a" << 5 ), fromjson( "{$set:{b:null}}" ) );
+            ASSERT_EQUALS( jstNULL, client().findOne( ns(), QUERY( "a" << 5 ) ).getField( "b" ).type() );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() {
@@ -503,6 +512,7 @@ namespace UpdateTests {
             add< ModParentOfIndex >();
             add< PreserveIdWithIndex >();
             add< CheckNoMods >();
+            add< UpdateMissingToNull >();
         }
     };
 

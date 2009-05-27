@@ -256,6 +256,10 @@ namespace mongo {
             }
         }
         
+        BSONObj spec = conn->findOne( string( db ) + ".system.namespaces", BSON( "name" << ns ) );
+        if ( !userCreateNS( ns, spec.getObjectField( "options" ), errmsg, true ) )
+            return false;
+        
         copy( ns, ns, false, logForRepl, false, false, query );
 
         if ( copyIndexes ) {
@@ -580,7 +584,7 @@ namespace mongo {
                         break;
                 }
                 BSONObj o = c->next();
-                theDataFileMgr.insert( target.c_str(), o );
+                theDataFileMgr.insertAndLog( target.c_str(), o );
             }
             
             char cl[256];
@@ -610,7 +614,7 @@ namespace mongo {
                     }
                 }
                 BSONObj n = b.done();
-                theDataFileMgr.insert( targetIndexes.c_str(), n );
+                theDataFileMgr.insertAndLog( targetIndexes.c_str(), n );
             }
             
             {

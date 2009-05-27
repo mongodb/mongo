@@ -89,9 +89,13 @@ namespace mongo {
         Query& hint(const string &jsonKeyPatt) { return hint(fromjson(jsonKeyPatt)); }
 
         /** Provide min and/or max index limits for the query.
+            min <= x < max
          */
-        Query& min(const BSONObj &val);
-        Query& max(const BSONObj &val);
+        Query& minKey(const BSONObj &val);
+        /**
+           max is exclusive
+         */
+        Query& maxKey(const BSONObj &val);
 
         /** Return explain information about execution of this query instead of the actual query results.
             Normally it is easier to use the mongo shell to run db.find(...).explain().

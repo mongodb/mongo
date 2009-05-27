@@ -65,7 +65,7 @@ public:
             return -1;
         }
         
-        GridFS g( _conn , _db );
+        GridFS g( conn() , _db );
         string filename = getParam( "file" );
 
         if ( cmd == "list" ){

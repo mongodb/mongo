@@ -79,8 +79,10 @@ public:
             ns += "." + l;
         }
         
-	if ( boost::filesystem::file_size( root ) == 0 )
-	  return;
+        if ( boost::filesystem::file_size( root ) == 0 ) {
+            out() << "file " + root.native_file_string() + " empty, aborting" << endl;
+            return;
+        }
 
         out() << "\t going into namespace [" << ns << "]" << endl;
         
@@ -95,7 +97,7 @@ public:
         while ( read < mmf.length() ) {
             BSONObj o( data );
             
-            _conn.insert( ns.c_str() , o );
+            conn().insert( ns.c_str() , o );
             
             read += o.objsize();
             data += o.objsize();

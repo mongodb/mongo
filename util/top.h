@@ -52,6 +52,8 @@ public:
         for( UsageMap::iterator i = snapshot.begin(); i != snapshot.end(); ++i )
             sorted.insert( make_pair( i->second.get<0>(), i->first ) );
         for( multimap< D, string, more >::iterator i = sorted.begin(); i != sorted.end(); ++i ) {
+            if ( trivialNs( i->second.c_str() ) )
+                continue;
             Usage u;
             u.ns = i->second;
             u.time = totalUsage[ u.ns ].get<0>();
@@ -62,7 +64,7 @@ public:
             res.push_back( u );
         }
         for( UsageMap::iterator i = totalUsage.begin(); i != totalUsage.end(); ++i ) {
-            if ( snapshot.count( i->first ) != 0 )
+            if ( snapshot.count( i->first ) != 0 || trivialNs( i->first.c_str() ) )
                 continue;
             Usage u;
             u.ns = i->first;
@@ -87,6 +89,10 @@ public:
         nextSnapshot_.clear();
     }
 private:
+    static bool trivialNs( const char *ns ) {
+        const char *ret = strrchr( ns, '.' );
+        return ret && ret[ 1 ] == '\0';
+    }
     typedef map< string, boost::tuple< D, int, int, int > > UsageMap; // duration, # reads, # writes, # total calls
     static T currentTime() {
         return boost::posix_time::microsec_clock::universal_time();

@@ -61,12 +61,12 @@ namespace mongo {
         return *this; 
     }
     
-    Query& Query::min( const BSONObj &val ) {
+    Query& Query::minKey( const BSONObj &val ) {
         appendComplex( "$min", val );
         return *this; 
     }
 
-    Query& Query::max( const BSONObj &val ) {
+    Query& Query::maxKey( const BSONObj &val ) {
         appendComplex( "$max", val );
         return *this; 
     }

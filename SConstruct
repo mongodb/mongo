@@ -145,6 +145,7 @@ def printLocalInfo():
 printLocalInfo()
 
 env = Environment()
+env["LIBPATH"] = []
 
 if GetOption( "recstore" ) != None:
     env.Append( CPPDEFINES=[ "_RECSTORE" ] )
@@ -325,27 +326,35 @@ elif "win32" == os.sys.platform:
 
     boostLibs = []
 
-    javaHome = findVersion( "C:/Program Files/java/" ,
-                            [ "jdk" , "jdk1.6.0_10" ] )
+    if usesm:
+        env.Append( CPPPATH=[ "js/src/" ] )
+        env.Append( CPPDEFINES=[ "OLDJS" ] )
+    else:
+        javaHome = findVersion( "C:/Program Files/java/" ,
+                                [ "jdk" , "jdk1.6.0_10" ] )
+        env.Append( CPPPATH=[ javaHome + "/include" , javaHome + "/include/win32" ] )
+        env.Append( LIBPATH=[ javaHome + "/Lib" ] )
+        javaLibs += [ "jvm" ];
+
     winSDKHome = findVersion( "C:/Program Files/Microsoft SDKs/Windows/" ,
                               [ "v6.0" , "v6.0a" , "v6.1" ] )
 
-    env.Append( CPPPATH=[ boostDir , javaHome + "/include" , javaHome + "/include/win32" , "pcre-7.4" , winSDKHome + "/Include" ] )
+    env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
 
     env.Append( CPPFLAGS=" /EHsc /W3 " )
     env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
 
+    #env.Append( CPPFLAGS='  /Yu"stdafx.h" ' ) # this would be for pre-compiled headers, could play with it later
+    
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
         env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
-        # /Yu"stdafx.h" /Fp"Release\db.pch" /Fo"Release\\" /Fd"Release\vc90.pdb"
     else:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )
         env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
-        # /Fo"Debug\\" /Fd"Debug\vc90.pdb"
+        env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
 
-    env.Append( LIBPATH=[ boostDir + "/Lib" , javaHome + "/Lib" , winSDKHome + "/Lib" ] )
-    javaLibs += [ "jvm" ];
+    env.Append( LIBPATH=[ boostDir + "/Lib" , winSDKHome + "/Lib" ] )
 
     def pcreFilter(x):
         name = x.name
@@ -372,7 +381,7 @@ elif "win32" == os.sys.platform:
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
-if useJavaHome:
+if not nojni and useJavaHome:
     env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/" + javaOS ] )
     env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
 
@@ -483,7 +492,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                         return True
 
 
-        if release and not java and failIfNotFound:
+        if release and not java and not windows and failIfNotFound:
             extra = ""
             if linux64 and shell:
                 extra += " 32 bit version for shell"
@@ -548,7 +557,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         if not conf.CheckHeader( mozHeader + "/jsapi.h" ):
             if conf.CheckHeader( "jsapi.h" ):
                 myenv.Append( CPPDEFINES=[ "OLDJS" ] )
-                print( "warning: old spider monkey version" )
             else:
                 print( "no spider monkey headers!" )
                 Exit(1)
@@ -663,7 +671,7 @@ mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [
 Default( mongod )
 
 # tools
-allToolFiles = allClientFiles + [ "tools/Tool.cpp" ]
+allToolFiles = commonFiles + coreDbFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/Tool.cpp" ]
 env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
 env.Program( "mongorestore" , allToolFiles + [ "tools/restore.cpp" ] )
 
@@ -828,6 +836,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "perf", "*.js" ] ) ] )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
+    addSmoketest( "smokeTool", [ "mongo" ], [ jsDirTestSpec( "tool" ) ] )
 
 mongodForTests = None
 mongodForTestsPort = "27017"
@@ -881,7 +890,7 @@ def addMongodReqTargets( env, target, source ):
 testEnv.Alias( "addMongodReqTargets", [], [addMongodReqTargets] )
 testEnv.AlwaysBuild( "addMongodReqTargets" )
 
-testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeSharding" ] )
+testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeSharding", "smokeTool" ] )
 testEnv.AlwaysBuild( "smokeAll" )
 
 def addMongodReqNoJsTargets( env, target, source ):

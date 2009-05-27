@@ -64,7 +64,7 @@ namespace mongo {
 
     private:
         static BackgroundJob *grab;
-        static boost::mutex mutex;
+        static boost::mutex &mutex;
         static void thr();
         volatile State state;
     };

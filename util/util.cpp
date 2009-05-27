@@ -31,7 +31,7 @@ namespace mongo {
     Nullstream nullstream;
     Logstream logstream;
     int logLevel = 0;
-    boost::mutex Logstream::mutex;
+    boost::mutex &Logstream::mutex = *( new boost::mutex );
 
     bool goingAway = false;
 

@@ -98,6 +98,7 @@ namespace mongo {
             Record *toupdate, const DiskLoc& dl,
             const char *buf, int len, stringstream& profiling);
         // The object o may be updated if modified on insert.                                
+        void insertAndLog( const char *ns, const BSONObj &o );
         DiskLoc insert(const char *ns, BSONObj &o);
         DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, const BSONElement &writeId = BSONElement());
         void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false);

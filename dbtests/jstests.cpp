@@ -139,9 +139,12 @@ namespace JSTests {
 
             s->invoke( "function (){ return this.x == 17; }" , BSONObj() );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
-
+            
             s->invoke( "function z(){ return this.x == 18; }" , BSONObj() );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+
+            s->invoke( "x = 5; for( ; x <10; x++){ a = 1; }" , BSONObj() );
+            ASSERT_EQUALS( 10 , s->getNumber( "x" ) );
             
             delete s;
         }
@@ -312,7 +315,114 @@ namespace JSTests {
             delete s;
         }
     };
+    
+    class TypeConservation {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            //  --  A  --
+            
+            BSONObj o;
+            {
+                BSONObjBuilder b ;
+                b.append( "a" , (int)5 );
+                b.append( "b" , 5.6 );
+                o = b.obj();
+            }
+            ASSERT_EQUALS( NumberInt , o["a"].type() );
+            ASSERT_EQUALS( NumberDouble , o["b"].type() );
+            
+            s->setObject( "z" , o );
+            s->invoke( "return z" , BSONObj() );
+            BSONObj out = s->getObject( "return" );
+            ASSERT_EQUALS( 5 , out["a"].number() );
+            ASSERT_EQUALS( 5.6 , out["b"].number() );
 
+            ASSERT_EQUALS( NumberDouble , out["b"].type() );
+            ASSERT_EQUALS( NumberInt , out["a"].type() );
+
+            //  --  B  --
+            
+            {
+                BSONObjBuilder b ;
+                b.append( "a" , (int)5 );
+                b.append( "b" , 5.6 );
+                o = b.obj();
+            }
+
+            s->setObject( "z" , o , false );
+            s->invoke( "return z" , BSONObj() );
+            out = s->getObject( "return" );
+            ASSERT_EQUALS( 5 , out["a"].number() );
+            ASSERT_EQUALS( 5.6 , out["b"].number() );
+
+            ASSERT_EQUALS( NumberDouble , out["b"].type() );
+            ASSERT_EQUALS( NumberInt , out["a"].type() );
+
+            
+            //  -- C --
+            
+            {
+                BSONObjBuilder b ;
+                
+                {
+                    BSONObjBuilder c;
+                    c.append( "0" , 5.5 );
+                    c.append( "1" , 6 );
+                    b.appendArray( "a" , c.obj() );
+                }
+                
+                o = b.obj();
+            }
+            
+            ASSERT_EQUALS( NumberDouble , o["a"].embeddedObjectUserCheck()["0"].type() );
+            ASSERT_EQUALS( NumberInt , o["a"].embeddedObjectUserCheck()["1"].type() );
+            
+            s->setObject( "z" , o , false );
+            out = s->getObject( "z" );
+
+            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["0"].type() );
+            ASSERT_EQUALS( NumberInt , out["a"].embeddedObjectUserCheck()["1"].type() );
+            
+            s->invokeSafe( "z.z = 5;" , BSONObj() );
+            out = s->getObject( "z" );
+            ASSERT_EQUALS( 5 , out["z"].number() );
+            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["0"].type() );
+            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["1"].type() ); // TODO: this is technically bad, but here to make sure that i understand the behavior
+
+            delete s;
+        }
+        
+    };
+    
+    class WeirdObjects {
+    public:
+
+        BSONObj build( int depth ){
+            BSONObjBuilder b;
+            b.append( "0" , depth );
+            if ( depth > 0 )
+                b.appendArray( "1" , build( depth - 1 ) );
+            return b.obj();
+        }
+        
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+
+            s->localConnect( "blah" );
+            
+            for ( int i=5; i<100 ; i += 10 ){
+                s->setObject( "a" , build(i) , false );
+                s->invokeSafe( "tojson( a )" , BSONObj() );
+                
+                s->setObject( "a" , build(5) , true );
+                s->invokeSafe( "tojson( a )" , BSONObj() );
+            }
+
+            delete s;
+        }
+    };
 
     class All : public Suite {
     public:
@@ -327,6 +437,8 @@ namespace JSTests {
             add< ObjectModTests >();
             add< OtherJSTypes >();
             add< SpecialDBTypes >();
+            add< TypeConservation >();
+            add< WeirdObjects >();
         }
     };
     

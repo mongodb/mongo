@@ -540,8 +540,8 @@ namespace QueryTests {
     private:
         void check( const string &hintField ) {
             const char *ns = "unittests.querytests.SubobjArr";
-            ASSERT( !client().query( ns, Query( "{'a.b':1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
-            ASSERT( client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( client().query( ns, Query( "{'a.b':1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( !client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
         }
     };
 
@@ -579,7 +579,7 @@ namespace QueryTests {
     private:
         auto_ptr< DBClientCursor > query( int minA, int minB, int maxA, int maxB, const BSONObj &hint ) {
             Query q;
-            q = q.min( BSON( "a" << minA << "b" << minB ) ).max( BSON( "a" << maxA << "b" << maxB ) );
+            q = q.minKey( BSON( "a" << minA << "b" << minB ) ).maxKey( BSON( "a" << maxA << "b" << maxB ) );
             if ( !hint.isEmpty() )
                 q.hint( hint );
             return client().query( ns, q );
@@ -623,6 +623,22 @@ namespace QueryTests {
             ASSERT_EQUALS( 1U, client().count( ns, fromjson( "{i:{$in:['a']}}" ) ) );
         }
     };
+
+    class EmbeddedArray : public ClientBase {
+    public:
+        ~EmbeddedArray() {
+            client().dropCollection( "unittests.querytests.EmbeddedArray" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.EmbeddedArray";
+            client().insert( ns, fromjson( "{foo:{bar:['spam']}}" ) );
+            client().insert( ns, fromjson( "{foo:{bar:['spam','eggs']}}" ) );
+            client().insert( ns, fromjson( "{bar:['spam']}" ) );
+            client().insert( ns, fromjson( "{bar:['spam','eggs']}" ) );
+            ASSERT_EQUALS( 2U, client().count( ns, BSON( "bar" << "spam" ) ) );
+            ASSERT_EQUALS( 2U, client().count( ns, BSON( "foo.bar" << "spam" ) ) );
+        }
+    };
     
     class All : public Suite {
     public:
@@ -657,6 +673,7 @@ namespace QueryTests {
             add< MinMax >();
             add< DirectLocking >();
             add< FastCountIn >();
+            add< EmbeddedArray >();
         }
     };
     

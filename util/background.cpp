@@ -21,7 +21,7 @@
 namespace mongo {
 
     BackgroundJob *BackgroundJob::grab = 0;
-    boost::mutex BackgroundJob::mutex;
+    boost::mutex &BackgroundJob::mutex = *( new boost::mutex );
 
     /* static */
     void BackgroundJob::thr() {

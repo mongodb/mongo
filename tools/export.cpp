@@ -36,15 +36,21 @@ class Export : public Tool {
 public:
     Export() : Tool( "export" ){
         add_options()
-            ("query,q" , po::value<string>() , " query filter" )
-            ("fields,f" , po::value<string>() , " comma seperated list of field names e.g. -f=name,age " )
+            ("query,q" , po::value<string>() , "query filter" )
+            ("fields,f" , po::value<string>() , "comma seperated list of field names e.g. -f=name,age " )
             ("csv","export to csv instead of json")
+            ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
             ;
     }
     
     int run(){
         const string ns = getNS();
         const bool csv = hasParam( "csv" );
+        ostream *outPtr = &cout;
+        string outfile = getParam( "out" );
+        if ( hasParam( "out" ) )
+            outPtr = new ofstream( outfile.c_str() );
+        ostream &out = *outPtr;
      
         BSONObj * fieldsToReturn = 0;
         BSONObj realFieldsToReturn;
@@ -74,15 +80,15 @@ public:
         }
             
 
-        auto_ptr<DBClientCursor> cursor = _conn.query( ns.c_str() , getParam( "query" , "" ) , 0 , 0 , fieldsToReturn , Option_SlaveOk );
+        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , getParam( "query" , "" ) , 0 , 0 , fieldsToReturn , Option_SlaveOk );
         
         if ( csv ){
             for ( vector<string>::iterator i=fields.begin(); i != fields.end(); i++ ){
                 if ( i != fields.begin() )
-                    cout << ",";
-                cout << *i;
+                    out << ",";
+                out << *i;
             }
-            cout << endl;
+            out << endl;
         }
         
         while ( cursor->more() ) {
@@ -90,15 +96,15 @@ public:
             if ( csv ){
                 for ( vector<string>::iterator i=fields.begin(); i != fields.end(); i++ ){
                     if ( i != fields.begin() )
-                        cout << ",";
+                        out << ",";
                     const BSONElement & e = obj[i->c_str()];
                     if ( ! e.eoo() )
-                        cout << e.jsonString( TenGen , false );
+                        out << e.jsonString( TenGen , false );
                 }              
-                cout << endl;
+                out << endl;
             }
             else {
-                cout << obj.jsonString() << endl;
+                out << obj.jsonString() << endl;
             }
         }
 
