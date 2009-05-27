@@ -21,12 +21,6 @@
 
 #include "dbtests.h"
 
-#include "../db/instance.h"
-
-namespace mongo {
-    bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
-} // namespace mongo
-
 namespace JSTests {
 
     class Fundamental {
@@ -402,48 +396,6 @@ namespace JSTests {
         
     };
     
-    void dummy_function_to_force_dbeval_cpp_linking() {
-        BSONObj cmd;
-        BSONObjBuilder result;
-        string errmsg;
-        dbEval( "", cmd, result, errmsg);        
-    }
-    
-    DBDirectClient client;
-    
-    class Encoding {
-    public:
-        Encoding() { reset(); }
-        ~Encoding() { reset(); }
-        void run() {
-            string unicodeSpec = "{'_id':'\\u0001\\u007f\\u07ff\\uffff'}";
-//            BSONObj unicodeObj = fromjson( unicodeSpec );
-            string code = string( "db.jstests.encoding.insert(" ) + unicodeSpec + ");";
-            cout << "code: " << code << endl;
-            BSONObj info;
-            BSONElement ret;
-            ASSERT( !client.eval( "unittest", code, info, ret, 0 ) );
-//            char expected[] = { 1, 127, 0xC3, 0xBF, 0xC3, 0xBF, 0 }; // this is 1, 127, 255, 255 as utf-8
-//            ASSERT_EQUALS( string( expected ), client.findOne( "unittest.jstests.encoding", BSONObj() ).getStringField( "_id" ) );
-//            
-//            reset();
-//            Scope * s = globalScriptEngine->createScope();
-//            s->localConnect( "unittest" );
-//            ASSERT( s->exec( code, "foo", true, true, true ) );
-//            ASSERT_EQUALS( string( expected ), client.findOne( "unittest.jstests.encoding", BSONObj() ).getStringField( "_id" ) );
-        }
-    private:
-        void check( const BSONObj &one, const BSONObj &two ) {
-            if ( one.woCompare( two ) != 0 ) {
-                static string fail = string( "Assertion failure expected " ) + string( one ) + ", got " + string( two );
-                FAIL( fail.c_str() );
-            }
-        }
-        void reset() {
-            client.dropCollection( "unittest.jstests.encoding" );            
-        }
-    };
-
     class WeirdObjects {
     public:
 
@@ -486,7 +438,6 @@ namespace JSTests {
             add< OtherJSTypes >();
             add< SpecialDBTypes >();
             add< TypeConservation >();
-            add< Encoding >();
             add< WeirdObjects >();
         }
     };
