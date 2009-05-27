@@ -442,6 +442,8 @@ namespace JSTests {
     
     class Utf8Check {
     public:
+        Utf8Check() { reset(); }
+        ~Utf8Check() { reset(); }
         void run() {
             if( !globalScriptEngine->utf8Ok() ) {
                 log() << "utf8 not supported" << endl;
