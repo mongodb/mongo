@@ -1415,7 +1415,7 @@ namespace mongo {
                 return "renaming";
             }
         } renamer( reservedPath );
-        _applyOpToDataFiles( database, renamer );
+        _applyOpToDataFiles( database, renamer, true );
     }
 
 // move temp files to standard data dir
@@ -1431,7 +1431,7 @@ namespace mongo {
                 return "renaming";
             }
         } renamer;
-        _applyOpToDataFiles( database, renamer, reservedPathString );
+        _applyOpToDataFiles( database, renamer, true, reservedPathString );
     }
 
 // generate a directory name for storing temp data files
@@ -1544,4 +1544,36 @@ namespace mongo {
         return true;
     }
 
+    void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator, const char *path ) {
+        if ( afterAllocator )
+            theFileAllocator().waitUntilFinished();
+        string c = database;
+        c += '.';
+        boost::filesystem::path p(path);
+        boost::filesystem::path q;
+        q = p / (c+"ns");
+        bool ok = false;
+        BOOST_CHECK_EXCEPTION( ok = fo.apply( q ) );
+        if ( ok )
+            log( 1 ) << fo.op() << " file " << q.string() << '\n';
+        int i = 0;
+        int extra = 10; // should not be necessary, this is defensive in case there are missing files
+        while ( 1 ) {
+            assert( i <= DiskLoc::MaxFiles );
+            stringstream ss;
+            ss << c << i;
+            q = p / ss.str();
+            BOOST_CHECK_EXCEPTION( ok = fo.apply(q) );
+            if ( ok ) {
+                if ( extra != 10 ){
+                    log(1) << fo.op() << " file " << q.string() << '\n';
+                    log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;
+                }
+            }
+            else if ( --extra <= 0 )
+                break;
+            i++;
+        }
+    }
+    
 } // namespace mongo
