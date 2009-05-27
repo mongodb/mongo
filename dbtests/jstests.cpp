@@ -17,11 +17,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "../db/instance.h"
+
+#include "../stdafx.h"
 #include "../scripting/engine.h"
 
 #include "dbtests.h"
-
-#include "../db/instance.h"
 
 namespace mongo {
     bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
