@@ -77,3 +77,13 @@ COMPILING
    db\db run
 
 
+--- ubuntu ---
+ scons libboost-dev libpcre++-dev libmozjs-dev
+
+--- FreeBSD ---
+
+Install the following ports:
+  - devel/boost
+  - devel/libexecinfo
+  - devel/pcre
+  - lang/spidermonkey

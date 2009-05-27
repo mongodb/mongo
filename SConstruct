@@ -317,6 +317,13 @@ elif "sunos5" == os.sys.platform:
      env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
      env.Append( LIBS=["socket"] )
 
+elif "freebsd7" == os.sys.platform:
+    nix = True
+    freebsd = True
+    env.Append( CPPPATH=[ "/usr/local/include" ] )
+    env.Append( LIBPATH=[ "/usr/local/lib" ] )
+    env.Append( CPPDEFINES=[ "__freebsd__" ] )
+
 elif "win32" == os.sys.platform:
     windows = True
     boostDir = "C:/Program Files/Boost/boost_1_35_0"
@@ -579,6 +586,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
         if linux:
             myCheckLib( "rt" , True )
+
+    # requires ports devel/libexecinfo to be installed
+    if freebsd:
+        myCheckLib( "execinfo", True )
+        env.Append( LIBS=[ "execinfo" ] )
 
     # this will add it iff it exists and works
     myCheckLib( "boost_system-mt" )
