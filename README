@@ -12,18 +12,14 @@ mongo  - The interact javascript db shell.
 
 BUILDING
 
-- Pre-requisite for 'mongo', the MongoDB interactive shell:
+  For detail information about building, please see:
 
-  The shell requires the library ../v8/libv8.  There is no v8 binary distro, so
-  we recommend you install and build V8 as follows:
+  http://www.mongodb.org/display/DOCS/Building
 
-    $ cd ..
-    $ svn checkout http://v8.googlecode.com/svn/trunk/ v8
-    $ cd v8
-    $ scons libv8.a
-
+  
 - Pre-requisite for 'test' binary, the MongoDB unit test suite:
-
+  This is not required for building or running the database
+  
   To compile the unit tests, you need to install the unit test framework from:
      http://unittest.red-bean.com/
 
@@ -44,6 +40,10 @@ BUILDING
 
      $ scons
 
+  To install
+     
+     $ scons --prefix=/opt/mongo install
+
 RUNNING
 
 Run ./mongod and command line options will display.
@@ -54,12 +54,6 @@ Mongo has been tested with GCC 4.1.2 and Visual Studio 2008.  Older versions
 of GCC may not be happy.
 
 NOTES
-
-Mongo uses the 10gen appserver and the Java Virtual Machine to execute
-user program code in the database.  This feature is optional -- if you would
-like to run the database without these installed, run with the --nojni
-option.  With --nojni specified, the db.eval() and $where features are no
-longer available.  You may still need JVM libraries which are statically linked.
 
 Mongo uses memory mapped files.  If built as a 32 bit executable, you will
 not be able to work with large (multi-gigabyte) databases.  However, 32 bit
@@ -76,9 +70,6 @@ COMPILING
      - boost 1.35
      - vc++ express
      - windows sdk - tested with v6.0 v6.0a
-     - java sdk 1.6
-
-    you have to add java\jdk\bin\ to your path
 
    scons
    mkdir \data\
@@ -86,5 +77,3 @@ COMPILING
    db\db run
 
 
---- ubuntu ---
- scons libboost-dev libpcre++-dev libmozjs-dev
