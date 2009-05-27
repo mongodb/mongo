@@ -21,6 +21,12 @@
 
 #include "dbtests.h"
 
+#include "../db/instance.h"
+
+namespace mongo {
+    bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
+} // namespace mongo
+
 namespace JSTests {
 
     class Fundamental {
@@ -424,6 +430,16 @@ namespace JSTests {
         }
     };
 
+
+    void dummy_function_to_force_dbeval_cpp_linking() {
+        BSONObj cmd;
+        BSONObjBuilder result;
+        string errmsg;
+        dbEval( "", cmd, result, errmsg);
+    }
+
+    DBDirectClient client;
+    
     class Utf8Check {
     public:
         void run() {
@@ -431,7 +447,23 @@ namespace JSTests {
                 log() << "utf8 not supported" << endl;
                 return;
             }
+            string utf8ObjSpec = "{'_id':'\\u0001\\u007f\\u07ff\\uffff'}";
+            BSONObj utf8Obj = fromjson( utf8ObjSpec );
+            client.insert( ns(), utf8Obj );
+            client.eval( "unittest", "v = db.jstests.utf8check.findOne(); db.jstests.utf8check.remove( {} ); db.jstests.utf8check.insert( v );" );
+            check( utf8Obj, client.findOne( ns(), BSONObj() ) );
         }
+    private:
+        void check( const BSONObj &one, const BSONObj &two ) {
+            if ( one.woCompare( two ) != 0 ) {
+                static string fail = string( "Assertion failure expected " ) + string( one ) + ", got " + string( two );
+                FAIL( fail.c_str() );
+            }
+        }
+        void reset() {
+            client.dropCollection( ns() );
+        }        
+        static const char *ns() { return "unittest.jstests.utf8check"; }
     };
     
     class All : public Suite {
