@@ -563,11 +563,11 @@ namespace mongo {
             BSONObj temp = b.done();
             where->scope->setObject( "obj" , &temp );
             }*/
-            int err = where->scope->invoke( where->func , BSONObj() );
+            int err = where->scope->invoke( where->func , BSONObj() , 1000 * 60 );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
                 ss << "error on invocation of $where function:\n" 
-                   << where->scope->getString( "error" );
+                   << where->scope->getError();
                 uassert(ss.str(), false);
                 return false;
             } else if ( err != 0 ) { // ! INVOKE_SUCCESS
