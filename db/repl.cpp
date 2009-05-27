@@ -327,6 +327,17 @@ namespace mongo {
        { ok:1, you_are:..., i_am:... }
     */
     class CmdNegotiateMaster : public Command {
+    private:
+        static bool negotiating_;
+        struct ReentranceChecker {
+            ReentranceChecker() {
+                massert( "Another mongod instance believes incorrectly that this node is its peer", !CmdNegotiateMaster::negotiating_ );
+                CmdNegotiateMaster::negotiating_ = true;
+            }
+            ~ReentranceChecker() {
+                CmdNegotiateMaster::negotiating_ = false;
+            }
+        };
     public:
         CmdNegotiateMaster() : Command("negotiatemaster") { }
         virtual bool slaveOk() {
@@ -337,6 +348,7 @@ namespace mongo {
         }
 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            ReentranceChecker c;
             if ( replPair == 0 ) {
                 // assume that we are an arbiter and should forward the request
                 string host = cmdObj.getStringField("your_name");
@@ -349,12 +361,16 @@ namespace mongo {
                 stringstream ss;
                 ss << host << ":" << port;
                 string remote = ss.str();
-                auto_ptr<DBClientConnection> conn( new DBClientConnection() );
-                if ( !conn->connect( remote.c_str(), errmsg ) ) {
-                    result.append( "you_are", ReplPair::State_Master );
-                    return true;
+                BSONObj ret;
+                {
+                    dbtemprelease t;
+                    auto_ptr<DBClientConnection> conn( new DBClientConnection() );
+                    if ( !conn->connect( remote.c_str(), errmsg ) ) {
+                        result.append( "you_are", ReplPair::State_Master );
+                        return true;
+                    }
+                    ret = conn->findOne( "admin.$cmd", cmdObj );
                 }
-                BSONObj ret = conn->findOne( "admin.$cmd", cmdObj );
                 BSONObjIterator i( ret );
                 while( i.more() ) {
                     BSONElement e = i.next();
@@ -400,6 +416,8 @@ namespace mongo {
             return true;
         }
     } cmdnegotiatemaster;
+    
+    bool CmdNegotiateMaster::negotiating_ = false;
     
     int ReplPair::negotiate(DBClientConnection *conn, string method) {
         BSONObjBuilder b;

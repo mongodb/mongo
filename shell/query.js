@@ -116,6 +116,18 @@ DBQuery.prototype.count = function(){
     throw "count failed: " + tojson( res );
 }
 
+DBQuery.prototype.countReturn = function(){
+    var c = this.count();
+
+    if ( this._skip )
+        c = c - this._skip;
+
+    if ( this._limit > 0 && this._limit < c )
+        return this._limit;
+    
+    return c;
+}
+
 /**
 * iterative count - only for testing
 */
