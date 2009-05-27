@@ -650,6 +650,8 @@ namespace mongo {
         
         void runTest();
         
+        virtual bool utf8Ok() const { return JS_CStringsAreUTF8(); }
+        
     private:
         JSRuntime * _runtime;
         friend class SMScope;

@@ -72,6 +72,8 @@ namespace mongo {
         virtual Scope * createScope() = 0;
         
         virtual void runTest() = 0;
+        
+        virtual bool utf8Ok() const = 0;
 
         static void setup();
     };

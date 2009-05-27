@@ -424,6 +424,16 @@ namespace JSTests {
         }
     };
 
+    class Utf8Check {
+    public:
+        void run() {
+            if( !globalScriptEngine->utf8Ok() ) {
+                log() << "utf8 not supported" << endl;
+                return;
+            }
+        }
+    };
+    
     class All : public Suite {
     public:
         All() {
@@ -439,6 +449,7 @@ namespace JSTests {
             add< SpecialDBTypes >();
             add< TypeConservation >();
             add< WeirdObjects >();
+            add< Utf8Check >();
         }
     };
     
