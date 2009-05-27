@@ -149,7 +149,7 @@ load()
 	DB *db;
 	FILE *fp;
 
-	__wt_single_thread_setup(&toc, &db);
+	__wt_single_thread_setup(progname, &toc, &db);
 
 	db->set_errpfx(db, toc, progname);
 	assert(db->env->set_cachesize(
@@ -185,7 +185,7 @@ load()
 		(void)printf("\n");
 	}
 
-	__wt_single_thread_teardown(toc, db);
+	__wt_single_thread_teardown(progname, toc, db);
 
 	return (0);
 }
@@ -203,7 +203,7 @@ read_check()
 	memset(&key, 0, sizeof(key));
 	memset(&data, 0, sizeof(data));
 
-	__wt_single_thread_setup(&toc, &db);
+	__wt_single_thread_setup(progname, &toc, &db);
 
 	db->set_errpfx(db, toc, progname);
 	assert(db->env->set_cachesize(db->env, toc, (u_int32_t)cachesize) == 0);
@@ -282,7 +282,7 @@ read_check()
 		(void)printf("\n");
 	}
 
-	__wt_single_thread_teardown(toc, db);
+	__wt_single_thread_teardown(progname, toc, db);
 	return (0);
 
 }
