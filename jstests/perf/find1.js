@@ -84,8 +84,6 @@ function testFindGTFrontBack(dbConn) {
 
 }
 
-var db = connect( "ed_perf_find_tests" );
-
 testSetup(db);
 
 testFindLTFrontBack(db);

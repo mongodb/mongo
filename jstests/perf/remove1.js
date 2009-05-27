@@ -65,6 +65,4 @@ function testRemoveWithMultiField(dbConn) {
             results.indexOnly /  results.withAnother + " not in [0.65, 1.35]" );
 }
 
-var db = connect( "ed_perf_remove1" );
-
 testRemoveWithMultiField(db);

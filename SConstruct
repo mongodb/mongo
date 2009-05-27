@@ -832,13 +832,17 @@ def runShellTest( env, target, source ):
     import subprocess
     target = str( target[0] )
     if target == "smokeJs":
-        spec = jsSpec( [ "_runner.js" ] )
+        spec = [ jsSpec( [ "_runner.js" ] ) ]
     elif target == "smokeQuota":
-        spec = jsSpec( [ "quota", "quota1.js" ] )
+        g = Glob( jsSpec( [ "quota", "*.js" ] ) )
+        spec = [ x.abspath for x in g ]
+    elif target == "smokeJsPerf":
+        g = Glob( jsSpec( [ "perf", "*.js" ] ) )
+        spec = [ x.abspath for x in g ]
     else:
         print( "invalid target for runShellTest()" )
         Exit( 1 )
-    return subprocess.call( [ mongo[0].abspath, "--port", mongodForTestsPort, spec ] )
+    return subprocess.call( [ mongo[0].abspath, "--port", mongodForTestsPort ] + spec )
 
 # These tests require the mongo shell
 if not onlyServer and not noshell:
@@ -847,7 +851,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeRepl", [ "mongo", "mongod" ], [ jsDirTestSpec( "repl" ) ] )
     addSmoketest( "smokeDisk", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
-    addSmoketest( "smokeJsPerf", [ "mongo" ], [ mongo[0].abspath + " " + jsSpec( [ "perf", "*.js" ] ) ] )
+    addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
     addSmoketest( "smokeTool", [ "mongo" ], [ jsDirTestSpec( "tool" ) ] )
 
