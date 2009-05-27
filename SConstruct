@@ -774,7 +774,7 @@ elif not onlyServer:
     if weird:
         mongo = shellEnv.Program( "mongo" , shell32BitFiles )
     else:
-        shellEnv.Append( LIBS=[ "mongoclient"] )
+        shellEnv.Prepend( LIBS=[ "mongoclient"] )
         mongo = shellEnv.Program( "mongo" , coreShellFiles )
 
 
