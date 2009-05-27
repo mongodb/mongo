@@ -348,7 +348,6 @@ shellHelper.show = function( what ){
 
 
 Map = function(){
-    print( "warning: Map isn't a good thing to use" );
 }
 
 Map.prototype.values = function(){

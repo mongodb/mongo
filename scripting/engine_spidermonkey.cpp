@@ -638,7 +638,9 @@ namespace mongo {
         SMEngine(){
             _runtime = JS_NewRuntime(8L * 1024L * 1024L);
             uassert( "JS_NewRuntime failed" , _runtime );
-
+            if ( ! utf8Ok() ){
+                cerr << "*** WARNING: spider monkey build without utf8 support" << endl;
+            }
         }
 
         ~SMEngine(){
