@@ -86,10 +86,13 @@ namespace mongo {
             if( srclen == 0 )
                 return "";
             
-            size_t len = srclen * 4;
+            size_t len = srclen * 6; // we only need *3, but see note on len below
             char * dst = (char*)malloc( len );
             
-            len /= 2; // weird JS_EncodeCharacters api expects len in 16bit units but modifies it to represent size in 8bit units.
+            len /= 2;
+            // doc re weird JS_EncodeCharacters api claims len expected in 16bit
+            // units, but experiments suggest 8bit units expected.  We allocate
+            // enough memory that either will work.
 
             assert( JS_EncodeCharacters( _context , s , srclen , dst , &len) );
 

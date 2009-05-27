@@ -467,6 +467,22 @@ namespace JSTests {
         }        
         static const char *ns() { return "unittest.jstests.utf8check"; }
     };
+
+    class LongUtf8String {
+    public:
+        LongUtf8String() { reset(); }
+        ~LongUtf8String() { reset(); }
+        void run() {
+            if( !globalScriptEngine->utf8Ok() )
+                return;
+            client.eval( "unittest", "db.jstests.longutf8string.save( {_id:'\\uffff\uffff\uffff\uffff'} )" );
+        }
+    private:
+        void reset() {
+            client.dropCollection( ns() );
+        }        
+        static const char *ns() { return "unittest.jstests.longutf8string"; }
+    };
     
     class All : public Suite {
     public:
@@ -484,6 +500,7 @@ namespace JSTests {
             add< TypeConservation >();
             add< WeirdObjects >();
             add< Utf8Check >();
+            add< LongUtf8String >();
         }
     };
     
