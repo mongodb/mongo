@@ -475,7 +475,7 @@ namespace JSTests {
         void run() {
             if( !globalScriptEngine->utf8Ok() )
                 return;
-            client.eval( "unittest", "db.jstests.longutf8string.save( {_id:'\\uffff\uffff\uffff\uffff'} )" );
+            client.eval( "unittest", "db.jstests.longutf8string.save( {_id:'\\uffff\\uffff\\uffff\\uffff'} )" );
         }
     private:
         void reset() {
