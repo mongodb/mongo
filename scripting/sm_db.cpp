@@ -390,7 +390,6 @@ namespace mongo {
     // -------------- object id -------------
 
     JSBool object_id_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-
         Convertor c( cx );
 
         OID oid;
@@ -401,7 +400,13 @@ namespace mongo {
             uassert( "object_id_constructor can't take more than 1 param" , argc == 1 );
             oid.init( c.toString( argv[0] ) );
         }
-
+        
+        if ( ! JS_InstanceOf( cx , obj , &object_id_class , 0 ) ){
+            obj = JS_NewObject( cx , &object_id_class , 0 , 0 );
+            assert( obj );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+        
         jsval v = c.toval( oid.str().c_str() );
         assert( JS_SetProperty( cx , obj , "str" , &v  ) );
 
