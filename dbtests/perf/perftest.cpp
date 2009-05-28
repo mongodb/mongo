@@ -77,9 +77,7 @@ public:
              << "}" << endl;
     }
     ~Runner() {
-#if !defined(_WIN32)
         theFileAllocator().waitUntilFinished();
-#endif        
         client_->dropDatabase( testDb< T >().c_str() );        
     }
 };
@@ -700,9 +698,7 @@ int main( int argc, char **argv ) {
     string dbpathString = p.native_directory_string();
     dbpath = dbpathString.c_str();
     
-#if !defined(_WIN32)
     theFileAllocator().start();
-#endif    
     
     client_ = new DBDirectClient();
 

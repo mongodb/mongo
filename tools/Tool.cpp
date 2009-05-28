@@ -66,9 +66,7 @@ int mongo::Tool::main( int argc , char ** argv ){
         static string myDbpath = getParam( "dbpath" );
         mongo::dbpath = myDbpath.c_str();
         mongo::acquirePathLock();
-#if !defined(_WIN32)
         theFileAllocator().start();
-#endif        
     }
     
     if ( _params.count( "db" ) )

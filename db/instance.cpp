@@ -679,9 +679,7 @@ namespace mongo {
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
-#if !defined(_WIN32)
         theFileAllocator().waitUntilFinished();
-#endif
         
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );

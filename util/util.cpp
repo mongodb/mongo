@@ -96,11 +96,9 @@ namespace mongo {
     bool Top::read_ = false;
     bool Top::write_ = false;
     
-#if !defined(_WIN32)
     // The mutex contained in this object may be held on shutdown.
     FileAllocator &theFileAllocator_ = *(new FileAllocator());
     FileAllocator &theFileAllocator() { return theFileAllocator_; }
-#endif
     
     OpTime OpTime::last(0, 0);
     

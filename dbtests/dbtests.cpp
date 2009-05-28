@@ -96,9 +96,7 @@ int main( int argc, char** argv ) {
     printSysInfo();
     out() << "random seed: " << seed << endl;
 
-#if !defined(_WIN32)
     theFileAllocator().start();
-#endif
     
     UnitTest::Registry tests;
 

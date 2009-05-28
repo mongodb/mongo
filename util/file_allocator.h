@@ -26,21 +26,25 @@
 #endif
 
 namespace mongo {
-#if !defined(_WIN32)
     // Handles allocation of contiguous files on disk.
     class FileAllocator {
         // The public functions may not be called concurrently.  The allocation
         // functions may be called multiple times per file, but only the first
         // size specified per file will be used.
     public:
+#if !defined(_WIN32)
         FileAllocator() : failed_() {}
+#endif
         void start() {
+#if !defined(_WIN32)
             Runner r( *this );
             boost::thread t( r );
+#endif
         }
         // May be called if file exists. If file exists, or its allocation has
         // been requested, size is updated to match existing file size.
         void requestAllocation( const string &name, int &size ) {
+#if !defined(_WIN32)
             boostlock lk( pendingMutex_ );
             int oldSize = prevSize( name );
             if ( oldSize != -1 ) {
@@ -50,10 +54,12 @@ namespace mongo {
             pending_.push_back( name );
             pendingSize_[ name ] = size;
             pendingUpdated_.notify_all();
+#endif
         }
         // Returns when file has been allocated.  If file exists, size is
         // updated to match existing file size.
         void allocateAsap( const string &name, int &size ) {
+#if !defined(_WIN32)
             boostlock lk( pendingMutex_ );
             int oldSize = prevSize( name );
             if ( oldSize != -1 ) {
@@ -73,17 +79,21 @@ namespace mongo {
             pendingUpdated_.notify_all();
             while( inProgress( name ) )
                 pendingUpdated_.wait( lk );
+#endif
         }
 
         void waitUntilFinished() const {
+#if !defined(_WIN32)
             if ( failed_ )
                 return;
             boostlock lk( pendingMutex_ );
             while( pending_.size() != 0 )
                 pendingUpdated_.wait( lk );
+#endif
         }
         
     private:
+#if !defined(_WIN32)
         // caller must hold pendingMutex_ lock.  Returns size if allocated or 
         // allocation requested, -1 otherwise.
         int prevSize( const string &name ) const {
@@ -185,8 +195,8 @@ namespace mongo {
                 }
             }
         };
+#endif    
     };
     
     FileAllocator &theFileAllocator();
-#endif    
 } // namespace mongo
