@@ -117,6 +117,13 @@ namespace mongo {
             
             return b.obj();
         }
+
+        BSONObj JSVersion( const BSONObj& args ){
+            cout << "version: " << versionString << endl;
+            if ( strstr( versionString , "+" ) )
+                printGitVersion();
+            return BSONObj();
+        }
         
 #ifndef _WIN32
 #include <signal.h>
@@ -440,6 +447,7 @@ namespace mongo {
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
+            scope.injectNative( "version" , JSVersion );
 #if !defined(_WIN32)
             scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
