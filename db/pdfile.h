@@ -364,9 +364,12 @@ namespace mongo {
 
 namespace mongo {
 
+    // Heritable class to implement an operation that may be applied to all
+    // files in a database using _applyOpToDataFiles()
     class FileOp {
     public:
         virtual ~FileOp() {}
+        // Return true if file exists and operation successful
         virtual bool apply( const boost::filesystem::path &p ) = 0;
         virtual const char * op() const = 0;
     };

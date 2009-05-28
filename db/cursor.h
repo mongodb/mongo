@@ -106,6 +106,7 @@ namespace mongo {
         virtual bool capped() const { return false; }
     };
 
+    // strategy object implementing direction of traversal.
     class AdvanceStrategy {
     public:
         virtual ~AdvanceStrategy() {}

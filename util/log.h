@@ -20,12 +20,14 @@
 
 namespace mongo {
 
+    // Utility interface for stringifying object only when val() called.
     class LazyString {
     public:
         virtual ~LazyString() {}
         virtual string val() const = 0;
     };
-    
+
+    // Utility class for stringifying object only when val() called.
     template< class T >
     class LazyStringImpl : public LazyString {
     public:

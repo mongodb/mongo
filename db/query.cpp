@@ -166,6 +166,7 @@ namespace mongo {
         return nDeleted;
     }
 
+    // utility class for assembling hierarchical objects
     class EmbeddedBuilder {
     public:
         EmbeddedBuilder( BSONObjBuilder *b ) {

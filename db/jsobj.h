@@ -798,6 +798,7 @@ namespace mongo {
 */
 #define BSON(x) (( BSONObjBuilder() << x ).obj())
 
+    // Utility class to implement GT, GTE, etc as described above.
     class Labeler {
     public:
         struct Label {
@@ -826,6 +827,7 @@ namespace mongo {
     extern Labeler::Label NE;
     extern Labeler::Label SIZE;
     
+    // Utility class to implement BSON( key << val ) as described above.
     class BSONObjBuilderValueStream : public boost::noncopyable {
     public:
         friend class Labeler;

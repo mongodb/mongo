@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    // bounds on a field's value that may be determined from query -- used to
+    // determine index limits
     class FieldBound {
     public:
         FieldBound( const BSONElement &e = BSONObj().firstElement() );
@@ -51,6 +53,8 @@ namespace mongo {
         vector< BSONObj > objData_;
     };
     
+    // implements query pattern matching, used to determine if a query is
+    // similar to an earlier query and should use the same plan
     class QueryPattern {
     public:
         friend class FieldBoundSet;
@@ -114,6 +118,8 @@ namespace mongo {
         BSONObj sort_;
     };
     
+    // bounds on fields' value that may be determined from query -- used to
+    // determine index limits
     class FieldBoundSet {
     public:
         FieldBoundSet( const char *ns, const BSONObj &query );

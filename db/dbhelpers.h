@@ -88,6 +88,7 @@ namespace mongo {
         }
     };
 
+    // manage a set using collection backed storage
     class DbSet {
     public:
         DbSet( const string &name = "", const BSONObj &key = BSONObj() ) :
