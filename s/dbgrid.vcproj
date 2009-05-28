@@ -120,13 +120,13 @@
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="&quot;..\pcre-7.4&quot;;&quot;c:\Program Files\boost\boost_1_35_0\&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;PCRE_STATIC"
+				PreprocessorDefinitions="USE_ASIO;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;PCRE_STATIC"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
 				DebugInformationFormat="3"
-				DisableSpecificWarnings="4355"
+				DisableSpecificWarnings="4355;4800"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -282,7 +282,7 @@
 				PrecompiledHeaderThrough="stdafx.h"
 				WarningLevel="3"
 				DebugInformationFormat="4"
-				DisableSpecificWarnings="4355"
+				DisableSpecificWarnings="4355;4800"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
