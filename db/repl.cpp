@@ -1222,7 +1222,7 @@ namespace mongo {
                     break;
                 }
 
-				OCCASIONALLY if( n > 100000 || time(0) - saveLast > 5 * 60 ) { 
+				OCCASIONALLY if( n > 100000 || time(0) - saveLast > 60 ) { 
 					// periodically note our progress, in case we are doing a lot of work and crash
 					dblock lk;
                     syncedTo = nextOpTime;
