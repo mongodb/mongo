@@ -134,6 +134,23 @@
 		934DD88D0EFAD23B00459CC1 /* unittest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = unittest.h; sourceTree = "<group>"; };
 		934DD88E0EFAD23B00459CC1 /* util.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = util.cpp; sourceTree = "<group>"; };
 		9350E1220F8CFFB300B07A1C /* error2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = error2.js; sourceTree = "<group>"; };
+		935E7B8B0FCF37D40024B2E5 /* auto1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = auto1.js; sourceTree = "<group>"; };
+		935E7B8C0FCF37D40024B2E5 /* auto2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = auto2.js; sourceTree = "<group>"; };
+		935E7B8D0FCF37D40024B2E5 /* count1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = count1.js; sourceTree = "<group>"; };
+		935E7B8E0FCF37D40024B2E5 /* diffservers1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = diffservers1.js; sourceTree = "<group>"; };
+		935E7B8F0FCF37D40024B2E5 /* key_string.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = key_string.js; sourceTree = "<group>"; };
+		935E7B900FCF37D40024B2E5 /* movePrimary1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = movePrimary1.js; sourceTree = "<group>"; };
+		935E7B910FCF37D40024B2E5 /* moveshard1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = moveshard1.js; sourceTree = "<group>"; };
+		935E7B920FCF37D40024B2E5 /* passthrough1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = passthrough1.js; sourceTree = "<group>"; };
+		935E7B930FCF37D40024B2E5 /* shard1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shard1.js; sourceTree = "<group>"; };
+		935E7B940FCF37D40024B2E5 /* shard2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shard2.js; sourceTree = "<group>"; };
+		935E7B950FCF37D40024B2E5 /* shard3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shard3.js; sourceTree = "<group>"; };
+		935E7B960FCF37D40024B2E5 /* shard4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shard4.js; sourceTree = "<group>"; };
+		935E7B970FCF37D40024B2E5 /* shard5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shard5.js; sourceTree = "<group>"; };
+		935E7B980FCF37D40024B2E5 /* shard6.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shard6.js; sourceTree = "<group>"; };
+		935E7B990FCF37D40024B2E5 /* splitpick.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = splitpick.js; sourceTree = "<group>"; };
+		935E7B9A0FCF37D40024B2E5 /* version1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = version1.js; sourceTree = "<group>"; };
+		935E7B9B0FCF37D40024B2E5 /* version2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = version2.js; sourceTree = "<group>"; };
 		936AB4BB0F3A5B0300D5015F /* update3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = update3.js; sourceTree = "<group>"; };
 		936AB9350F3C8AB800D5015F /* _lodeRunner.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = _lodeRunner.js; sourceTree = "<group>"; };
 		936B89590F4C899400934AF2 /* file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = file.h; sourceTree = "<group>"; };
@@ -540,6 +557,30 @@
 			path = util;
 			sourceTree = "<group>";
 		};
+		935E7B8A0FCF37D40024B2E5 /* sharding */ = {
+			isa = PBXGroup;
+			children = (
+				935E7B8B0FCF37D40024B2E5 /* auto1.js */,
+				935E7B8C0FCF37D40024B2E5 /* auto2.js */,
+				935E7B8D0FCF37D40024B2E5 /* count1.js */,
+				935E7B8E0FCF37D40024B2E5 /* diffservers1.js */,
+				935E7B8F0FCF37D40024B2E5 /* key_string.js */,
+				935E7B900FCF37D40024B2E5 /* movePrimary1.js */,
+				935E7B910FCF37D40024B2E5 /* moveshard1.js */,
+				935E7B920FCF37D40024B2E5 /* passthrough1.js */,
+				935E7B930FCF37D40024B2E5 /* shard1.js */,
+				935E7B940FCF37D40024B2E5 /* shard2.js */,
+				935E7B950FCF37D40024B2E5 /* shard3.js */,
+				935E7B960FCF37D40024B2E5 /* shard4.js */,
+				935E7B970FCF37D40024B2E5 /* shard5.js */,
+				935E7B980FCF37D40024B2E5 /* shard6.js */,
+				935E7B990FCF37D40024B2E5 /* splitpick.js */,
+				935E7B9A0FCF37D40024B2E5 /* version1.js */,
+				935E7B9B0FCF37D40024B2E5 /* version2.js */,
+			);
+			path = sharding;
+			sourceTree = "<group>";
+		};
 		93A13A200F4620A500AF1B0D /* s */ = {
 			isa = PBXGroup;
 			children = (
@@ -600,6 +641,7 @@
 		93A8D1D10F37544800C92B85 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				935E7B8A0FCF37D40024B2E5 /* sharding */,
 				936D937F0FCC67C700004410 /* index9.js */,
 				936D931B0FCC58C900004410 /* regex.js */,
 				9340BBE90FC4521C00656DE0 /* tool */,
