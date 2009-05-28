@@ -37,10 +37,11 @@ namespace mongo {
         File f;
         f.open( filename.c_str() );
         
-        char * data = (char*)malloc( f.len() + 1 );
-        data[f.len()] = 0;
-        
-        f.read( 0 , data , f.len() );
+        fileofs L = f.len();
+        assert( L <= 0x7ffffffe );
+        char * data = (char*)malloc( (size_t) L+1 );
+        data[L] = 0;
+        f.read( 0 , data , (size_t) L );
         
         return exec( data , filename , printResult , reportError , assertOnError, timeoutMs );
     }

@@ -58,7 +58,7 @@ namespace mongo {
     void* MemoryMappedFile::map(const char *filename) {
         boost::uintmax_t l = boost::filesystem::file_size( filename );
         assert( l <= 0x7fffffff );
-        int i = l;
+        int i = (int) l;
         return map( filename , i );
     }
 
