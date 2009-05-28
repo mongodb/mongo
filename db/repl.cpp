@@ -327,17 +327,6 @@ namespace mongo {
        { ok:1, you_are:..., i_am:... }
     */
     class CmdNegotiateMaster : public Command {
-    private:
-        static bool negotiating_;
-        struct ReentranceChecker {
-            ReentranceChecker() {
-                massert( "Another mongod instance believes incorrectly that this node is its peer", !CmdNegotiateMaster::negotiating_ );
-                CmdNegotiateMaster::negotiating_ = true;
-            }
-            ~ReentranceChecker() {
-                CmdNegotiateMaster::negotiating_ = false;
-            }
-        };
     public:
         CmdNegotiateMaster() : Command("negotiatemaster") { }
         virtual bool slaveOk() {
@@ -348,8 +337,8 @@ namespace mongo {
         }
 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            ReentranceChecker c;
             if ( replPair == 0 ) {
+                massert( "Another mongod instance believes incorrectly that this node is its peer", !cmdObj.getBoolField( "fromArbiter" ) );
                 // assume that we are an arbiter and should forward the request
                 string host = cmdObj.getStringField("your_name");
                 int port = cmdObj.getIntField( "your_port" );
@@ -369,7 +358,10 @@ namespace mongo {
                         result.append( "you_are", ReplPair::State_Master );
                         return true;
                     }
-                    ret = conn->findOne( "admin.$cmd", cmdObj );
+                    BSONObjBuilder forwardCommand;
+                    forwardCommand.appendElements( cmdObj );
+                    forwardCommand.appendBool( "fromArbiter", true );
+                    ret = conn->findOne( "admin.$cmd", forwardCommand.done() );
                 }
                 BSONObjIterator i( ret );
                 while( i.more() ) {
@@ -416,8 +408,6 @@ namespace mongo {
             return true;
         }
     } cmdnegotiatemaster;
-    
-    bool CmdNegotiateMaster::negotiating_ = false;
     
     int ReplPair::negotiate(DBClientConnection *conn, string method) {
         BSONObjBuilder b;
