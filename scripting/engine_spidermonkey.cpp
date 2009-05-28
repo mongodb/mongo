@@ -156,7 +156,9 @@ namespace mongo {
                 
                 append( b , name , getProperty( o , name.c_str() ) , orig[name].type() );
             }
-            
+                        
+            JS_DestroyIdArray( _context , properties );
+
             return b.obj();
         }
         
