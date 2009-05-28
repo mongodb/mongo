@@ -475,6 +475,10 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
     myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
 
+    if not conf.CheckCXX():
+        print( "c++ compiled not installed!" )
+        Exit(1)
+
     if nix and not shell:
         if not conf.CheckLib( "stdc++" ):
             print( "can't find stdc++ library which is needed" );
