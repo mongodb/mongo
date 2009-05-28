@@ -156,7 +156,9 @@ namespace mongo {
                 
                 append( b , name , getProperty( o , name.c_str() ) , orig[name].type() );
             }
-            
+                        
+            JS_DestroyIdArray( _context , properties );
+
             return b.obj();
         }
         
@@ -486,13 +488,15 @@ namespace mongo {
                 assert( JS_ValueToId( cx , c.toval( name.c_str() ) , idp ) );
             }
             else {
+                delete it;
                 *statep = 0;
             }
             return JS_TRUE;
         }
         
         if ( enum_op == JSENUMERATE_DESTROY ){
-            delete it;
+            if ( it ) 
+                delete it;
             return JS_TRUE;
         }
         
