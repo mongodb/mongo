@@ -477,7 +477,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     if 'CheckCXX' in dir( conf ):
         if  not conf.CheckCXX():
-            print( "c++ compiled not installed!" )
+            print( "c++ compiler not installed!" )
             Exit(1)
 
     if nix and not shell:
