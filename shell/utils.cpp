@@ -34,7 +34,7 @@ namespace mongo {
             b.appendUndefined( "" );
             return b.obj();
         }
-        BSONObj undefined_ = makeUndefined();
+        const BSONObj undefined_ = makeUndefined();
         
         BSONObj encapsulate( const BSONObj &obj ) {
             return BSON( "" << obj );
