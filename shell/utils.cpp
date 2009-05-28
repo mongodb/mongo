@@ -131,6 +131,7 @@ namespace mongo {
             int n = int( args.firstElement().number() );
             
             vector< int > ports;
+            vector< int > sockets;
             for( int i = 0; i < n; ++i ) {
                 int s = socket( AF_INET, SOCK_STREAM, 0 );
                 assert( s );
@@ -146,9 +147,10 @@ namespace mongo {
                 socklen_t len = sizeof( newAddress );
                 assert( 0 == getsockname( s, (sockaddr*)&newAddress, &len ) );
                 ports.push_back( ntohs( newAddress.sin_port ) );
-                
-                assert( 0 == close( s ) );
+                sockets.push_back( s );
             }
+            for( vector< int >::const_iterator i = sockets.begin(); i != sockets.end(); ++i )
+                assert( 0 == close( *i ) );
             
             sort( ports.begin(), ports.end() );
             for( unsigned i = 1; i < ports.size(); ++i )

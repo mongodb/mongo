@@ -42,6 +42,7 @@ namespace mongo {
 
     extern BSONObj id_obj;
 
+    // utility class for de duping ids
     class IdSet {
     public:
         IdSet() : mySize_(), inMem_( true ) {}

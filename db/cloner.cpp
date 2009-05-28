@@ -94,6 +94,8 @@ namespace mongo {
             c = conn->query( from_collection, query, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
         }
         assert( c.get() );
+        long long n = 0;
+        time_t saveLast = time( 0 );
         while ( 1 ) {
             {
                 dbtemprelease r;
@@ -108,6 +110,8 @@ namespace mongo {
                 continue;
             }
 
+            ++n;
+            
             BSONObj js = tmp;
             if ( isindex ) {
                 assert( strstr(from_collection, "system.indexes") );
@@ -121,6 +125,11 @@ namespace mongo {
             }
             catch( UserException& e ) { 
                 log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
+            }
+            
+            RARELY if ( time( 0 ) - saveLast > 60 ) {
+                log() << n << " objects cloned so far from collection " << from_collection << endl;
+                saveLast = time( 0 );
             }
         }
     }

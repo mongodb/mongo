@@ -21,6 +21,7 @@
 
 using namespace mongo;
 
+// Utility class to handle per suite cleanup
 class Suite : public UnitTest::Suite {
 public:
     ~Suite();

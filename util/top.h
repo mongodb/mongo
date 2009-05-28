@@ -19,6 +19,7 @@
 
 namespace mongo {
 
+// Records per namespace utilization of the mongod process.
 // No two functions of this class may be called concurrently.
 class Top {
 public:

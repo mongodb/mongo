@@ -99,6 +99,8 @@ namespace mongo {
         bool error_;
     };
     
+    // Set of candidate query plans for a particular query.  Used for running
+    // a QueryOp on these plans.
     class QueryPlanSet {
     public:
         QueryPlanSet( const char *ns,
