@@ -40,7 +40,11 @@ print( "* A" );
 assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal B 1" );
 
 s2.getDB( "test" ).foo.save( { num : 2 } );
-sleep( 500 ); // give the write back time to happen
-assert.eq( 8 , s2.getDB( "test" ).foo.find().toArray().length , "other B 2" );
+
+assert.soon( 
+    function(){
+        return 8 == s2.getDB( "test" ).foo.find().toArray().length;
+    } , "other B 2" , 5000 , 100 )
+    
 
 s.stop();
