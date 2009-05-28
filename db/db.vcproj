@@ -350,6 +350,18 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\js\js\Debug\js.lib"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\..\js\js\Release\js.lib"
 				>
 				<FileConfiguration
@@ -362,18 +374,6 @@
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Debug Recstore|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\..\js\js\Debug\js.lib"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -1287,22 +1287,6 @@
 			</Filter>
 		</Filter>
 		<Filter
-			Name="btree related"
-			>
-			<File
-				RelativePath=".\btree.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\btree.h"
-				>
-			</File>
-			<File
-				RelativePath=".\btreecursor.cpp"
-				>
-			</File>
-		</Filter>
-		<Filter
 			Name="storage related"
 			>
 			<File
@@ -1357,6 +1341,22 @@
 				RelativePath="..\client\model.h"
 				>
 			</File>
+			<Filter
+				Name="btree related"
+				>
+				<File
+					RelativePath=".\btree.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\btree.h"
+					>
+				</File>
+				<File
+					RelativePath=".\btreecursor.cpp"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="db"
