@@ -664,7 +664,7 @@ def removeIfInList( lst , thing ):
 
 clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )
-clientEnv.Prepend( LIBS=[ "libmongoclient.a"] )
+clientEnv.Prepend( LIBS=[ "mongoclient"] )
 clientEnv.Append( LIBPATH=["."] )
 l = clientEnv[ "LIBS" ]
 removeIfInList( l , "pcre" )
@@ -672,7 +672,7 @@ removeIfInList( l , "pcrecpp" )
 
 testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
-testEnv.Prepend( LIBS=[ "libmongotestfiles.a" , "unittest" ] )
+testEnv.Prepend( LIBS=[ "mongotestfiles" , "unittest" ] )
 testEnv.Append( LIBPATH=["."] )
 
 
