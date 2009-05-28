@@ -21,9 +21,6 @@
 
 #include "jsapi.h"
 #include "jsdate.h"
-#ifndef JSCLASS_GLOBAL_FLAGS
-#define JSCLASS_GLOBAL_FLAGS 0
-#endif
 
 #else
 
@@ -31,6 +28,20 @@
 #include "js/jsdate.h"
 
 #endif
+
+// -- SM 1.6 hacks ---
+#ifndef JSCLASS_GLOBAL_FLAGS
+
+#warning old version of spider monkey ( probably 1.6 ) you should upgrade to at least 1.7
+
+#define JSCLASS_GLOBAL_FLAGS 0
+
+JSBool JS_CStringsAreUTF8(){
+    return false;
+}
+
+#endif
+// -- END SM 1.6 hacks ---
 
 namespace mongo {
 
