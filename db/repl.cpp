@@ -1218,7 +1218,7 @@ namespace mongo {
                     syncedTo = nextOpTime;
                     save(); // note how far we are synced up to now
                     log() << "pull:   applied " << n << " operations" << endl;
-                    log(2) << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << '\n';
+                    log() << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
                     break;
                 }
 
@@ -1229,7 +1229,7 @@ namespace mongo {
                     // can't update local log ts since there are pending operations from our peer
 					save();
                     log() << "pull:   applied " << n << " operations" << endl;
-                    log(2) << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << '\n';
+                    log() << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
 					saveLast = time(0);
 					n = 0;
 				}
