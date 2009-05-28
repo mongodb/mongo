@@ -371,35 +371,7 @@ namespace mongo {
         virtual const char * op() const = 0;
     };
 
-    inline void _applyOpToDataFiles( const char *database, FileOp &fo, const char *path = dbpath ) {
-        string c = database;
-        c += '.';
-        boost::filesystem::path p(path);
-        boost::filesystem::path q;
-        q = p / (c+"ns");
-        bool ok = false;
-        BOOST_CHECK_EXCEPTION( ok = fo.apply( q ) );
-        if ( ok )
-            log( 1 ) << fo.op() << " file " << q.string() << '\n';
-        int i = 0;
-        int extra = 10; // should not be necessary, this is defensive in case there are missing files
-        while ( 1 ) {
-            assert( i <= DiskLoc::MaxFiles );
-            stringstream ss;
-            ss << c << i;
-            q = p / ss.str();
-            BOOST_CHECK_EXCEPTION( ok = fo.apply(q) );
-            if ( ok ) {
-                if ( extra != 10 ){
-                    log(1) << fo.op() << " file " << q.string() << '\n';
-                    log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;
-                }
-            }
-            else if ( --extra <= 0 )
-                break;
-            i++;
-        }
-    }
+    void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator = false, const char *path = dbpath );
 
     inline void _deleteDataFiles(const char *database) {
         class : public FileOp {
@@ -410,7 +382,7 @@ namespace mongo {
                 return "remove";
             }
         } deleter;
-        _applyOpToDataFiles( database, deleter );
+        _applyOpToDataFiles( database, deleter, true );
     }
 
     boost::intmax_t dbSize( const char *database );

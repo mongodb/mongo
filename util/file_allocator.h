@@ -76,8 +76,8 @@ namespace mongo {
         }
 
         void waitUntilFinished() const {
-	  if ( failed_ )
-	    return;
+            if ( failed_ )
+                return;
             boostlock lk( pendingMutex_ );
             while( pending_.size() != 0 )
                 pendingUpdated_.wait( lk );
