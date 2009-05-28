@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="db"
+	Name="mongod"
 	ProjectGUID="{215B2D68-0A70-4D10-8E75-B31010C62A91}"
 	RootNamespace="db"
 	Keyword="Win32Proj"
@@ -1287,22 +1287,6 @@
 			</Filter>
 		</Filter>
 		<Filter
-			Name="btree related"
-			>
-			<File
-				RelativePath=".\btree.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\btree.h"
-				>
-			</File>
-			<File
-				RelativePath=".\btreecursor.cpp"
-				>
-			</File>
-		</Filter>
-		<Filter
 			Name="storage related"
 			>
 			<File
@@ -1357,6 +1341,22 @@
 				RelativePath="..\client\model.h"
 				>
 			</File>
+			<Filter
+				Name="btree related"
+				>
+				<File
+					RelativePath=".\btree.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\btree.h"
+					>
+				</File>
+				<File
+					RelativePath=".\btreecursor.cpp"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="db"
