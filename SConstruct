@@ -581,7 +581,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 myCheckLib( "ncurses" , True )
             else:
                 myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
-        elif myCheckLib( "readline" , release , staticOnly=release ):
+        elif myCheckLib( "readline" , release and nix , staticOnly=release ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
             myCheckLib( "tinfo" , staticOnly=release )
         else:
