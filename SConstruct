@@ -506,10 +506,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
 
         if release and not java and not windows and failIfNotFound:
-            extra = ""
-            if linux64 and shell:
-                extra += " 32 bit version for shell"
-            print( "ERROR: can't find static version of: " + str( poss ) + extra + " in: " + str( allPlaces ) )
+            print( "ERROR: can't find static version of: " + str( poss ) + " in: " + str( allPlaces ) )
             Exit(1)
 
         res = not staticOnly and conf.CheckLib( poss )
@@ -583,11 +580,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 myCheckLib( "ncurses" , True )
             else:
                 myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
-        elif myCheckLib( "readline" ):
+        elif myCheckLib( "readline" , release , staticOnly=release ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
             myCheckLib( "tinfo" , staticOnly=release )
         else:
-            print( "WARNING: no readline, shell will be a bit ugly" )
+            print( "warning: no readline, shell will be a bit ugly" )
 
         if linux:
             myCheckLib( "rt" , True )
@@ -1042,7 +1039,6 @@ if distBuild:
     installDir = "mongodb-" + platform + "-" + processor + "-";
     installDir += getDistName( installDir )
     print "going to make dist: " + installDir
-    Exit(1)
 
 # binaries
 
