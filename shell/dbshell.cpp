@@ -52,32 +52,21 @@ char * shellReadline( const char * prompt ){
 #include <string.h>
 
 void quitNicely( int sig ){
+    if ( sig == SIGPIPE )
+        mongo::rawOut( "mongo got signal SIGPIPE\n" );
     shellHistoryDone();
     exit(0);
 }
 
-/* use "addr2line -CFe <exe>" to parse. */
-inline void printStackTrace() {
-    void *b[20];
-    size_t size;
-    char **strings;
-    size_t i;
-    
-    size = backtrace(b, 20);
-    strings = backtrace_symbols(b, size);
-    
-    for (i = 0; i < size; i++)
-        cout << hex << b[i] << ' ';
-    cout << '\n';
-    for (i = 0; i < size; i++)
-        cout << ' ' << strings[i] << '\n';
-    cout << dec;
-    free (strings);    
-}
-
 void quitAbruptly( int sig ) {
-    cout << "mongo got signal " << sig << " (" << strsignal( sig ) << "), stack trace: " << endl;
-    printStackTrace();
+    ostringstream ossSig;
+    ossSig << "mongo got signal " << sig << " (" << strsignal( sig ) << "), stack trace: " << endl;
+    mongo::rawOut( ossSig.str() );
+    
+    ostringstream ossBt;
+    mongo::printStackTrace( ossBt );
+    mongo::rawOut( ossBt.str() );
+    
     mongo::shellUtils::KillMongoProgramInstances();
     exit(14);    
 }
