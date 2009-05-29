@@ -1015,15 +1015,34 @@ addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
 #  ----  INSTALL -------
 
+def getCodeVersion():
+    fullSource = open( "stdafx.cpp" , "r" ).read()
+    allMatches = re.findall( r"versionString.. = \"(.*?)\"" , fullSource );
+    if len(allMatches) != 1:
+        print( "can't find version # in code" )
+        return None
+    return allMatches[0]
+
+def getDistName( sofar ):
+    global distName
+    
+    if distName is not None:
+        return distName
+
+    if str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
+        version = getCodeVersion()
+        if not version.endswith( "+" ):
+            print( "maybe a real version" )
+
+    return today.strftime( "%Y-%m-%d" )
+
 if distBuild:
     from datetime import date
     today = date.today()
     installDir = "mongodb-" + platform + "-" + processor + "-";
-    if distName is None:
-        installDir += today.strftime( "%Y-%m-%d" )
-    else:
-        installDir += distName
+    installDir += getDistName( installDir )
     print "going to make dist: " + installDir
+    Exit(1)
 
 # binaries
 
