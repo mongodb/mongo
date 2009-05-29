@@ -241,6 +241,7 @@ installDir = DEFAULT_INSTALl_DIR
 nixLibPrefix = "lib"
 
 distName = GetOption( "distname" )
+dontReplacePackage = False
 
 javaHome = GetOption( "javaHome" )
 javaVersion = "i386";
@@ -1022,14 +1023,18 @@ def getCodeVersion():
 
 def getDistName( sofar ):
     global distName
-    
+    global dontReplacePackage
+
     if distName is not None:
         return distName
 
     if str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         version = getCodeVersion()
         if not version.endswith( "+" ):
-            print( "maybe a real version" )
+            print( "got real code version, doing release build for: " + version )
+            dontReplacePackage = True
+            distName = version
+            return version
 
     return today.strftime( "%Y-%m-%d" )
 
@@ -1147,6 +1152,10 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
         name = platform + "/" + name
 
     print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
+    if dontReplacePackage:
+        for ( key , modify , etag , size ) in s.listdir( prefix=name ):
+            print( "error: already a file with that name, not uploading" )
+            Exit(2)
     s.put( name  , open( localName , "rb" ).read() , acl="public-read" );
     print( "  done uploading!" )
 
