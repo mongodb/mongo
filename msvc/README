@@ -1,0 +1,54 @@
+
+Instructions for compiling MongoDB in Visual Studio 2008
+========================================================
+
+Visual Studio Solution:
+-----------------------
+
+mongo.sln -> MongoDB solution that contains all projects necessary for building applications and libraries.
+
+
+
+Static Library Projects:
+------------------------
+
+mongo_common -> common MongoDB files
+core_server -> score server files
+server_only -> files for building server-only applications 
+shard_server -> shard server files
+
+
+Console Application Projects:
+-----------------------------
+
+mongod -> MongoDB server (links mongo_common and server_only)
+mongo -> MongoDB shell (links mongo_common)
+mongobridge -> MongoDB bridge server shell (links mongo_common and server_only)
+mongodump -> MongoDB dump application (links mongo_common and server_only)
+mongoexport -> MongoDB export application (links mongo_common and server_only)
+mongofiles -> MongoDB files application (links mongo_common and server_only)
+mongoimportjson -> MongoDB import json application (links mongo_common and server_only)
+mongorestore -> MongoDB restore application (links mongo_common and server_only)
+mongos -> MongoDB shard server (links mongo_common, core_server and shard_server)
+
+
+Client Driver Library:
+-----------------------------
+
+mongoclient -> static library containing client driver files
+
+
+
+Notes:
+======
+
+1) All static libraries derive project settings from Project Property Sheet "mongo_lib" 
+(View->Other Windows->Property Manager).  Settings configured in this Property Sheet will
+be inherited by all static library projects (Include Directories, Library Directories, etc).
+
+2) All console applications derive project settings from "mongo_app".
+
+3) msvc_scripting.cpp is used to control the javascript library to use - to change, simply
+modify the "Preprocessor" project setting in the Property Sheets to reflect the required
+javascript option (USESM or NOJNI).
+
