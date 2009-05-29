@@ -786,6 +786,10 @@ elif not onlyServer:
 testEnv.Alias( "dummySmokeSideEffect", [], [] )
 
 def addSmoketest( name, deps, actions ):
+    if type( actions ) == type( list() ):
+        actions = [ testSetup ] + actions
+    else:
+        actions = [ testSetup, actions ]
     testEnv.Alias( name, deps, actions )
     testEnv.AlwaysBuild( name )
     # Prevent smoke tests from running in parallel
@@ -800,10 +804,15 @@ def ensureDir( name ):
             print( "Failed to create dir: " + name );
             Exit( 1 )
 
-def testSetup( env , target , source ):
+def ensureTestDirs():
     ensureDir( "/tmp/unittest/" )
+    ensureDir( "/data/" )
+    ensureDir( "/data/db/" )
 
-addSmoketest( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
+def testSetup( env , target , source ):
+    ensureTestDirs()
+
+addSmoketest( "smoke", [ "test" ] , [ test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
 
 clientExec = [ x[0].abspath for x in clientTests ]
@@ -869,6 +878,7 @@ def startMongodForTests( env, target, source ):
         return
     mongodForTestsPort = "40000"
     import os
+    ensureTestDirs()
     dirName = "/data/db/sconsTests/"
     ensureDir( dirName )
     from subprocess import Popen
