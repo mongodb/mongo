@@ -6,6 +6,8 @@
 
 #if defined( MOZJS )
 
+#define MOZILLA_1_8_BRANCH
+
 #include "mozjs/jsapi.h"
 #include "mozjs/jsdate.h"
 
