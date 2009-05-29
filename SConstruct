@@ -1051,10 +1051,15 @@ allBinaries = []
 
 def installBinary( e , name ):
     global allBinaries
+
     if windows:
         name += ".exe"
-    env.Install( installDir + "/bin" , name )
+
+    inst = e.Install( installDir + "/bin" , name )
+
     allBinaries += [ name ]
+    if nix:
+        e.AddPostAction( inst, e.Action( 'strip ' + installDir + "/bin/" + name ) )
 
 installBinary( env , "mongodump" )
 installBinary( env , "mongorestore" )
