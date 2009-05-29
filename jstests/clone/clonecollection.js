@@ -138,7 +138,15 @@ sleep( 200 );
 f.a.save( { i: -1 } );
 
 waitParallel();
-ret = rawMongoProgramOutput().match( /clone_clone_clone_commandResult:::::(.*):::::/ )[ 1 ];
+// even after parallel shell finished, must wait for finishToken line to appear in log
+assert.soon( function() {
+            ret = rawMongoProgramOutput().match( /clone_clone_clone_commandResult:::::(.*):::::/ );
+            if ( ret == null ) {
+                return false;
+            }
+            ret = ret[ 1 ];
+            return true;
+            } );
 
 eval( "ret = " + ret );
 
