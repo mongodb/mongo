@@ -43,10 +43,10 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.dropIndex(name)");
     print("\tdb.foo.getIndexes()");
     print("\tdb.foo.drop() drop the collection");
-    print("\tdb.foo.validate()");
-    print("\tdb.foo.stats() - stats about the collection");
-    print("\tdb.foo.dataSize() - size in bytes of all the data");
-    print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes");
+    print("\tdb.foo.validate() - SLOW");
+    print("\tdb.foo.stats() - stats about the collection - SLOW");
+    print("\tdb.foo.dataSize() - size in bytes of all the data - SLOW");
+    print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes - SLOW");
 }
 
 DBCollection.prototype.getFullName = function(){
