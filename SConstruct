@@ -162,6 +162,7 @@ linux64  = False
 darwin = False
 windows = False
 freebsd = False
+solaris = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
@@ -312,6 +313,7 @@ elif "linux2" == os.sys.platform:
 
 elif "sunos5" == os.sys.platform:
      nix = True
+     solaris = True
      useJavaHome = True
      javaHome = "/usr/lib/jvm/java-6-sun/"
      javaOS = "solaris"
@@ -1075,7 +1077,7 @@ def installBinary( e , name ):
     inst = e.Install( installDir + "/bin" , name )
 
     allBinaries += [ name ]
-    if nix:
+    if linux or solaris:
         e.AddPostAction( inst, e.Action( 'strip ' + installDir + "/bin/" + name ) )
 
 installBinary( env , "mongodump" )
