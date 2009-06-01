@@ -203,6 +203,7 @@ namespace mongo {
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
         bool find(const IndexDetails& idx, const BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
+        string dupKeyError( const IndexDetails& idx , const BSONObj& key );
     };
 
     class BtreeCursor : public Cursor {

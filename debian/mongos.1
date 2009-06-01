@@ -1,0 +1,39 @@
+.\" Documentation for the MongoDB dump tool
+.TH MONGOS "1" "June 2009" "10gen" "Mongo Database"
+.SH "NAME"
+mongos \- the Mongo sharding server
+.SH "SYNOPSIS"
+\fBmongos [\fIOPTIONS\fR]\fR
+.SH "DESCRIPTION"
+.PP
+\fBmongos\fR
+is used to setup, configure, and get information about sharded databases.
+.SH "EXAMPLES"
+.PP
+.B ./mongod --port 9999 --dbpath /data/db/a # first server
+.PP
+.B ./mongod --port 9998 --dbpath /data/db/b # second server
+.PP
+.B ./mongos --configdb localhost:9999 # mongos
+.PP
+starts three servers to set up sharding
+.SH "OPTIONS"
+.TP
+.B \-\-help
+show usage information
+.TP
+.B \-\-port N
+port on which to listen
+.TP
+.B \-\-configdb DATABASE+
+one or more databases to use as the configuration databases
+.TP
+.B \-v+
+verbosity
+.SH "COPYRIGHT"
+.PP
+Copyright 2007\-2009 10gen
+.SH "SEE ALSO"
+For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+.SH "AUTHOR"
+Kristina Chodorow
