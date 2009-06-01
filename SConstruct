@@ -858,9 +858,14 @@ def runShellTest( env, target, source ):
         Exit( 1 )
     return subprocess.call( [ mongo[0].abspath, "--port", mongodForTestsPort ] + spec )
 
+def add_exe(target):
+    if windows:
+        return target + ".exe"
+    return target
+
 # These tests require the mongo shell
 if not onlyServer and not noshell:
-    addSmoketest( "smokeJs", [ "mongo" ], runShellTest )
+    addSmoketest( "smokeJs", [add_exe("mongo")], runShellTest )
     addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], [ jsDirTestSpec( "repl" ) ] )
     addSmoketest( "smokeDisk", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
@@ -909,7 +914,7 @@ def stopMongodForTests():
         kill( mongodForTests.pid, 15 )
     mongodForTests.wait()
 
-testEnv.Alias( "startMongod", ["mongod"], [startMongodForTests] );
+testEnv.Alias( "startMongod", [add_exe("mongod")], [startMongodForTests] );
 testEnv.AlwaysBuild( "startMongod" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
 
