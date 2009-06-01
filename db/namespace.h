@@ -164,7 +164,7 @@ namespace mongo {
 
         // returns name of this index's storage area
         // database.table.$index
-        string indexNamespace() {
+        string indexNamespace() const {
             BSONObj io = info.obj();
             string s;
             s.reserve(Namespace::MaxNsLen);
