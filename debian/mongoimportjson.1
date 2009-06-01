@@ -1,0 +1,45 @@
+.\" Documentation for the MongoDB shell
+.TH MONGOIMPORTJSON "1" "June 2009" "10gen" "Mongo Database"
+.SH "NAME"
+mongoimportjson \- the Mongo import tool
+.SH "SYNOPSIS"
+\fBmongoimportjson [\fIOPTIONS\fR]\fR
+.SH "DESCRIPTION"
+.PP
+\fBmongoimportjson\fR
+is a tool to import JSON documents into MongoDB.  This utility takes a single file that contains one JSON string per line and inserts it. A databaase and collection must be specified.
+.SH "OPTIONS"
+.TP
+.B \-\-help
+show usage information
+.TP
+.B \-h, \-\-host HOST
+server to connect to (default HOST=localhost)
+.TP
+.B \-d, \-\-db DATABASE
+database to use
+.TP
+.B \-c, \-\-c COLLECTION
+collection to use
+.TP
+.B \-\-file FILE
+file from which to import
+.TP
+.B \-\-dbpath PATH
+directly access mongod data files in this path, instead of connecting to a mongod instance
+.TP
+.B \-\-idbefore
+create id index before importing
+.TP
+.B \-\-id
+create id index after importing (recommended)
+.TP
+.B \-\-drop
+drop collection before importing
+.SH "COPYRIGHT"
+.PP
+Copyright 2007\-2009 10gen
+.SH "SEE ALSO"
+For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+.SH "AUTHOR"
+Kristina Chodorow
