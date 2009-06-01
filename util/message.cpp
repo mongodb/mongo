@@ -142,13 +142,33 @@ namespace mongo {
         }
     } msgstart;
 
-// we "new" this so it guaranteed to still be around when other automatic global vars
-// are being destructed during termination.
-    set<MessagingPort*>& ports = *(new set<MessagingPort*>());
+    class Ports { 
+        set<MessagingPort*>& ports;
+        boost::mutex& m;
+    public:
+        // we "new" this so it is still be around when other automatic global vars
+        // are being destructed during termination.
+        Ports() : ports( *(new set<MessagingPort*>()) ), 
+            m( *(new boost::mutex()) ) { }
+        void closeAll() { \
+            boostlock bl(m);
+            for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
+                (*i)->shutdown();
+        }
+        void insert(MessagingPort* p) { 
+            boostlock bl(m);
+            ports.insert(p);
+        }
+        void erase(MessagingPort* p) { 
+            boostlock bl(m);
+            ports.erase(p);
+        }
+    } ports;
+
+
 
     void closeAllSockets() {
-        for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
-            (*i)->shutdown();
+        ports.closeAll();
     }
 
     MessagingPort::MessagingPort(int _sock, SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far) {
