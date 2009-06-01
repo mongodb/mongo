@@ -337,6 +337,8 @@ elif "win32" == os.sys.platform:
 
     if usesm:
         env.Append( CPPPATH=[ "js/src/" ] )
+        env.Append(CPPPATH=["../js/src/"])
+        env.Append(LIBPATH=["../js/src"])
         env.Append( CPPDEFINES=[ "OLDJS" ] )
     else:
         javaHome = findVersion( "C:/Program Files/java/" ,
@@ -354,7 +356,7 @@ elif "win32" == os.sys.platform:
     env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
 
     #env.Append( CPPFLAGS='  /Yu"stdafx.h" ' ) # this would be for pre-compiled headers, could play with it later
-    
+
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
         env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
@@ -469,7 +471,7 @@ def bigLibString( myenv ):
     if 'SLIBS' in myenv._dict:
         s += str( myenv["SLIBS"] )
     return s
-    
+
 
 def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)
@@ -548,7 +550,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if nix and needPcre:
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
-        
+
     myenv["_HAVEPCAP"] = myCheckLib( "pcap", staticOnly=release )
 
     # this is outside of usesm block so don't have to rebuild for java
