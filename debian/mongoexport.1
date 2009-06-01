@@ -1,0 +1,51 @@
+.\" Documentation for the MongoDB shell
+.TH MONGOEXPORT "1" "June 2009" "10gen" "Mongo Database"
+.SH "NAME"
+mongoexport \- the Mongo export tool
+.SH "SYNOPSIS"
+\fBmongoexport [\fIOPTIONS\fR]\fR
+.SH "DESCRIPTION"
+.PP
+\fBmongoexport\fR
+is a tool to export a MongoDB collection to either JSON or CSV. The query can be filtered or a list of fields to output can be given.
+.PP
+If the output is CSV, the fields must be specified in order.
+.SH "EXAMPLES"
+.TP
+.B mongoexport -d test -c test1 --csv -f "name,num"
+export documents from test.test1 in CSV format
+.SH "OPTIONS"
+.TP
+.B \-\-help
+show usage information
+.TP
+.B \-h, \-\-host HOST
+server to connect to (default HOST=localhost)
+.TP
+.B \-d, \-\-db DATABASE
+database to use
+.TP
+.B \-c, \-\-c COLLECTION
+collection to use
+.TP
+.B \-q, \-\-query QUERY
+query filter
+.TP
+.B \-f, \-\-fields FIELDS
+comma\-separated list of field names
+.TP
+.B \-\-csv
+export to CSV instead of JSON
+.TP
+.B \-o, \-\-out FILE
+output file, if not specified, stdout is used
+.TP
+.B \-\-dbpath PATH
+directly access mongod data files in this path, instead of connecting to a mongod instance
+.SH "COPYRIGHT"
+.PP
+Copyright 2007\-2009 10gen
+.SH "SEE ALSO"
+For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+.SH "AUTHOR"
+Kristina Chodorow

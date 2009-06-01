@@ -1,0 +1,52 @@
+.\" Documentation for the MongoDB dump tool
+.TH MONGOFILES "1" "June 2009" "10gen" "Mongo Database"
+.SH "NAME"
+mongofiles \- a simple GridFS interface
+.SH "SYNOPSIS"
+\fBmongofiles [\fIOPTIONS\fR]\fR
+.SH "DESCRIPTION"
+.PP
+\fBmongofiles\fR
+is used to list, get, and insert files in the database.
+.SH "EXAMPLES"
+.TP
+.B mongofiles list
+lists files in test.fs.files
+.TP
+.B mongofiles put README.txt
+inserts the file README.txt into the collection test.fs.files
+.TP
+.B mongofiles get photo.jpg
+retrieves photo.jpg from test.fs.files and saves it locally
+.SH "OPTIONS"
+.TP
+.B \-\-help
+show usage information
+.TP
+.B \-h, \-\-host HOST
+mongo host to which to connect
+.TP
+.B \-d, \-\-db DB
+database to use (default DB=test)
+.TP
+.B \-c, \-\-collection COLLECTION (default COLLECTION=fs.files)
+collection to use
+.TP
+.B \-\-command [list\||\|search\||\|put\||\|get]
+execute a command
+.TP
+.B \-\-file FILE
+filename for get or put
+.TP
+.B list
+list all files.  takes an optional filename.  the file has to start with the filename
+.TP
+.B search
+search all files for something that contains the string
+.SH "COPYRIGHT"
+.PP
+Copyright 2007\-2009 10gen
+.SH "SEE ALSO"
+For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+.SH "AUTHOR"
+Kristina Chodorow
