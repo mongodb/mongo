@@ -42,7 +42,7 @@ JSBool JS_CStringsAreUTF8(){
     return false;
 }
 
-#define js_DateClass date_class
+#define SM16
 
 #endif
 // -- END SM 1.6 hacks ---
