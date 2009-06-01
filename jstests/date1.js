@@ -1,8 +1,14 @@
 
 t = db.date1;
-t.drop();
 
-d = new Date()
-t.save( { a : 1 , d : d } );
 
-assert.eq( d , t.findOne().d , "A" )
+function go( d , msg ){
+    t.drop();
+    t.save( { a : 1 , d : d } );
+    assert.eq( d , t.findOne().d , msg )
+}
+
+go( new Date() , "A" )
+go( new Date( 1 ) , "B")
+go( new Date( 0 ) , "C")
+

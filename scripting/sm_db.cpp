@@ -555,17 +555,12 @@ namespace mongo {
             b.appendTimestamp( name.c_str() , (unsigned long long)c->getNumber( o , "t" ) , (unsigned int )c->getNumber( o , "i" ) );
             return true;
         }
-        
-        {
-            jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
-            if ( d ){
-                b.appendDate( name.c_str() , (unsigned long long)d );
-                return true;
-            }
-        }
-        
-        
 
+        if ( JS_InstanceOf( c->_context , o, &js_DateClass, 0 ) ){
+            jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
+            b.appendDate( name.c_str() , (unsigned long long)d );
+            return true;
+        }
         return false;
     }
 
