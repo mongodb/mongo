@@ -259,6 +259,14 @@ namespace mongo {
         }
 
         JSFunction * compileFunction( const char * code, JSObject * assoc = 0 ){
+            JSFunction * f = _compileFunction( code , assoc );
+            if ( f ){
+                JS_AddRoot( _context , f );
+            }
+            return f;
+        }
+        
+        JSFunction * _compileFunction( const char * code, JSObject * assoc ){
             if ( ! hasFunctionIdentifier( code ) ){
                 string s = code;
                 if ( isSimpleStatement( s ) ){
@@ -625,7 +633,7 @@ namespace mongo {
         holder->check();
         
         string s = c.toString( id );
-       
+        
         BSONElement e = holder->_obj[ s.c_str() ];
 
         if ( e.type() == EOO ){
