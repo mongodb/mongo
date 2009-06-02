@@ -313,6 +313,14 @@ namespace mongo {
         return false;
     }
 
+    string BtreeBucket::dupKeyError( const IndexDetails& idx , const BSONObj& key ){
+        stringstream ss;
+        ss << "E11000 duplicate key error";
+        ss << "index: " << idx.indexNamespace() << "  ";
+        ss << "dup key: " << key;
+        return ss.str();
+    }
+
     /* Find a key withing this btree bucket.
  
        When duplicate keys are allowed, we use the DiskLoc of the record as if it were part of the 
@@ -357,11 +365,11 @@ namespace mongo {
                         if( !dupsChecked ) { 
                             dupsChecked = true;
                             if( idx.head.btree()->exists(idx, idx.head, key, order) )
-                                uasserted("E11000 duplicate key error");
+                                uasserted( dupKeyError( idx , key ) );
                         }
                     }
                     else
-                        uasserted("E11000 duplicate key error");
+                        uasserted( dupKeyError( idx , key ) );
                 }
 
                 // dup keys allowed.  use recordLoc as if it is part of the key

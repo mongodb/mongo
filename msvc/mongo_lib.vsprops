@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="mongo_lib"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="&quot;c:\Program Files\boost\boost_1_35_0&quot;;&quot;..\..\pcre-7.4&quot;;..\..\.;..\..\..\js\src;&quot;C:\Program Files\Java\jdk\lib&quot;"
+		PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;USESM;OLDJS;STATIC_JS_API;XP_WIN;USE_ASIO"
+		UsePrecompiledHeader="0"
+		DisableSpecificWarnings="4355;4800;4244;4996"
+	/>
+	<Tool
+		Name="VCLibrarianTool"
+		AdditionalLibraryDirectories="..\lib\$(ConfigurationName)"
+	/>
+	<Tool
+		Name="VCPostBuildEventTool"
+		CommandLine="copy &quot;$(OutDir)\$(ProjectName).lib&quot; &quot;..\lib\$(ConfigurationName)\.&quot;"
+	/>
+</VisualStudioPropertySheet>

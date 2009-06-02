@@ -162,6 +162,7 @@ linux64  = False
 darwin = False
 windows = False
 freebsd = False
+solaris = False
 force64 = not GetOption( "force64" ) is None
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
@@ -241,6 +242,7 @@ installDir = DEFAULT_INSTALl_DIR
 nixLibPrefix = "lib"
 
 distName = GetOption( "distname" )
+dontReplacePackage = False
 
 javaHome = GetOption( "javaHome" )
 javaVersion = "i386";
@@ -311,6 +313,7 @@ elif "linux2" == os.sys.platform:
 
 elif "sunos5" == os.sys.platform:
      nix = True
+     solaris = True
      useJavaHome = True
      javaHome = "/usr/lib/jvm/java-6-sun/"
      javaOS = "solaris"
@@ -336,6 +339,8 @@ elif "win32" == os.sys.platform:
 
     if usesm:
         env.Append( CPPPATH=[ "js/src/" ] )
+        env.Append(CPPPATH=["../js/src/"])
+        env.Append(LIBPATH=["../js/src"])
         env.Append( CPPDEFINES=[ "OLDJS" ] )
     else:
         javaHome = findVersion( "C:/Program Files/java/" ,
@@ -353,7 +358,7 @@ elif "win32" == os.sys.platform:
     env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
 
     #env.Append( CPPFLAGS='  /Yu"stdafx.h" ' ) # this would be for pre-compiled headers, could play with it later
-    
+
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
         env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
@@ -468,7 +473,7 @@ def bigLibString( myenv ):
     if 'SLIBS' in myenv._dict:
         s += str( myenv["SLIBS"] )
     return s
-    
+
 
 def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     conf = Configure(myenv)
@@ -506,10 +511,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
 
         if release and not java and not windows and failIfNotFound:
-            extra = ""
-            if linux64 and shell:
-                extra += " 32 bit version for shell"
-            print( "ERROR: can't find static version of: " + str( poss ) + extra + " in: " + str( allPlaces ) )
+            print( "ERROR: can't find static version of: " + str( poss ) + " in: " + str( allPlaces ) )
             Exit(1)
 
         res = not staticOnly and conf.CheckLib( poss )
@@ -550,7 +552,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if nix and needPcre:
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
-        
+
     myenv["_HAVEPCAP"] = myCheckLib( "pcap", staticOnly=release )
 
     # this is outside of usesm block so don't have to rebuild for java
@@ -583,11 +585,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 myCheckLib( "ncurses" , True )
             else:
                 myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
-        elif myCheckLib( "readline" ):
+        elif myCheckLib( "readline" , release and nix , staticOnly=release ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
             myCheckLib( "tinfo" , staticOnly=release )
         else:
-            print( "WARNING: no readline, shell will be a bit ugly" )
+            print( "warning: no readline, shell will be a bit ugly" )
 
         if linux:
             myCheckLib( "rt" , True )
@@ -788,6 +790,10 @@ elif not onlyServer:
 testEnv.Alias( "dummySmokeSideEffect", [], [] )
 
 def addSmoketest( name, deps, actions ):
+    if type( actions ) == type( list() ):
+        actions = [ testSetup ] + actions
+    else:
+        actions = [ testSetup, actions ]
     testEnv.Alias( name, deps, actions )
     testEnv.AlwaysBuild( name )
     # Prevent smoke tests from running in parallel
@@ -802,10 +808,15 @@ def ensureDir( name ):
             print( "Failed to create dir: " + name );
             Exit( 1 )
 
-def testSetup( env , target , source ):
+def ensureTestDirs():
     ensureDir( "/tmp/unittest/" )
+    ensureDir( "/data/" )
+    ensureDir( "/data/db/" )
 
-addSmoketest( "smoke", [ "test" ] , [ testSetup , test[ 0 ].abspath ] )
+def testSetup( env , target , source ):
+    ensureTestDirs()
+
+addSmoketest( "smoke", [ "test" ] , [ test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
 
 clientExec = [ x[0].abspath for x in clientTests ]
@@ -849,11 +860,16 @@ def runShellTest( env, target, source ):
         Exit( 1 )
     return subprocess.call( [ mongo[0].abspath, "--port", mongodForTestsPort ] + spec )
 
+def add_exe(target):
+    if windows:
+        return target + ".exe"
+    return target
+
 # These tests require the mongo shell
 if not onlyServer and not noshell:
-    addSmoketest( "smokeJs", [ "mongo" ], runShellTest )
+    addSmoketest( "smokeJs", [add_exe("mongo")], runShellTest )
     addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
-    addSmoketest( "smokeRepl", [ "mongo", "mongod" ], [ jsDirTestSpec( "repl" ) ] )
+    addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], [ jsDirTestSpec( "repl" ) ] )
     addSmoketest( "smokeDisk", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
@@ -871,6 +887,7 @@ def startMongodForTests( env, target, source ):
         return
     mongodForTestsPort = "40000"
     import os
+    ensureTestDirs()
     dirName = "/data/db/sconsTests/"
     ensureDir( dirName )
     from subprocess import Popen
@@ -899,7 +916,7 @@ def stopMongodForTests():
         kill( mongodForTests.pid, 15 )
     mongodForTests.wait()
 
-testEnv.Alias( "startMongod", ["mongod"], [startMongodForTests] );
+testEnv.Alias( "startMongod", [add_exe("mongod")], [startMongodForTests] );
 testEnv.AlwaysBuild( "startMongod" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
 
@@ -1025,14 +1042,18 @@ def getCodeVersion():
 
 def getDistName( sofar ):
     global distName
-    
+    global dontReplacePackage
+
     if distName is not None:
         return distName
 
     if str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         version = getCodeVersion()
         if not version.endswith( "+" ):
-            print( "maybe a real version" )
+            print( "got real code version, doing release build for: " + version )
+            dontReplacePackage = True
+            distName = version
+            return version
 
     return today.strftime( "%Y-%m-%d" )
 
@@ -1042,7 +1063,6 @@ if distBuild:
     installDir = "mongodb-" + platform + "-" + processor + "-";
     installDir += getDistName( installDir )
     print "going to make dist: " + installDir
-    Exit(1)
 
 # binaries
 
@@ -1050,10 +1070,15 @@ allBinaries = []
 
 def installBinary( e , name ):
     global allBinaries
+
     if windows:
         name += ".exe"
-    env.Install( installDir + "/bin" , name )
+
+    inst = e.Install( installDir + "/bin" , name )
+
     allBinaries += [ name ]
+    if linux or solaris:
+        e.AddPostAction( inst, e.Action( 'strip ' + installDir + "/bin/" + name ) )
 
 installBinary( env , "mongodump" )
 installBinary( env , "mongorestore" )
@@ -1151,6 +1176,10 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
         name = platform + "/" + name
 
     print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
+    if dontReplacePackage:
+        for ( key , modify , etag , size ) in s.listdir( prefix=name ):
+            print( "error: already a file with that name, not uploading" )
+            Exit(2)
     s.put( name  , open( localName , "rb" ).read() , acl="public-read" );
     print( "  done uploading!" )
 

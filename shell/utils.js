@@ -329,8 +329,10 @@ shellHelper.show = function( what ){
 	return "";
     }
 
-    if ( what == "users" )
-	return db.system.users.find();
+    if ( what == "users" ){
+	db.system.users.find().forEach( printjson );
+        return "";
+    }
 
     if ( what == "collections" || what == "tables" ) {
         db.getCollectionNames().forEach( function(x){print(x)} );

@@ -6,6 +6,8 @@
 
 #if defined( MOZJS )
 
+#define MOZILLA_1_8_BRANCH
+
 #include "mozjs/jsapi.h"
 #include "mozjs/jsdate.h"
 
@@ -39,6 +41,8 @@
 JSBool JS_CStringsAreUTF8(){
     return false;
 }
+
+#define SM16
 
 #endif
 // -- END SM 1.6 hacks ---

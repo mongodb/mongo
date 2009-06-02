@@ -485,6 +485,36 @@ namespace JSTests {
         static const char *ns() { return "unittest.jstests.longutf8string"; }
     };
     
+    class CodeTests {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            {
+                BSONObjBuilder b;
+                b.append( "a" , 1 );
+                b.appendCode( "b" , "function(){ out.b = 11; }" );
+                b.appendCodeWScope( "c" , "function(){ out.c = 12; }" , BSONObj() );
+                b.appendCodeWScope( "d" , "function(){ out.d = 13 + bleh; }" , BSON( "bleh" << 5 ) );
+                s->setObject( "foo" , b.obj() );
+            }
+            
+            s->invokeSafe( "out = {}; out.a = foo.a; foo.b(); foo.c();" , BSONObj() );
+            BSONObj out = s->getObject( "out" );
+            
+            ASSERT_EQUALS( 1 , out["a"].number() );
+            ASSERT_EQUALS( 11 , out["b"].number() );
+            ASSERT_EQUALS( 12 , out["c"].number() );
+
+            //s->invokeSafe( "foo.d() " , BSONObj() );
+            //out = s->getObject( "out" );
+            //ASSERT_EQUALS( 18 , out["d"].number() );
+            
+
+            delete s;
+        }
+    };
+
     class All : public Suite {
     public:
         All() {
@@ -492,6 +522,7 @@ namespace JSTests {
             add< BasicScope >();
             add< FalseTests >();
             add< SimpleFunctions >();
+
             add< ObjectMapping >();
             add< ObjectDecoding >();
             add< JSOIDTests >();
@@ -499,9 +530,11 @@ namespace JSTests {
             add< OtherJSTypes >();
             add< SpecialDBTypes >();
             add< TypeConservation >();
+
             add< WeirdObjects >();
             add< Utf8Check >();
             add< LongUtf8String >();
+            add< CodeTests >();
         }
     };
     

@@ -1,0 +1,36 @@
+.\" Documentation for the MongoDB dump tool
+.TH MONGODUMP "1" "June 2009" "10gen" "Mongo Database"
+.SH "NAME"
+mongodump \- the Mongo dump tool
+.SH "SYNOPSIS"
+\fBmongodump [\fIOPTIONS\fR]\fR
+.SH "DESCRIPTION"
+.PP
+\fBmongodump\fR
+is a tool to output a binary representation of a database.  It is mostly used for doing hot backups of a database.
+.SH "OPTIONS"
+.TP
+.B \-\-help
+show usage information
+.TP
+.B \-h, \-\-host HOST
+server to connect to (default HOST=localhost)
+.TP
+.B \-d, \-\-db DATABASE
+database to use
+.TP
+.B \-c, \-\-c COLLECTION
+collection to use
+.TP
+.B \-o, \-\-out FILE
+output file, if not specified, stdout is used
+.TP
+.B \-\-dbpath PATH
+directly access mongod data files in this path, instead of connecting to a mongod instance
+.SH "COPYRIGHT"
+.PP
+Copyright 2007\-2009 10gen
+.SH "SEE ALSO"
+For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+.SH "AUTHOR"
+Kristina Chodorow

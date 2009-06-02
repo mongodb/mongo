@@ -258,13 +258,21 @@ namespace mongo {
             return true;
         }
 
-        JSFunction * compileFunction( const char * code ){
+        JSFunction * compileFunction( const char * code, JSObject * assoc = 0 ){
+            JSFunction * f = _compileFunction( code , assoc );
+            if ( f ){
+                JS_AddRoot( _context , f );
+            }
+            return f;
+        }
+        
+        JSFunction * _compileFunction( const char * code, JSObject * assoc ){
             if ( ! hasFunctionIdentifier( code ) ){
                 string s = code;
                 if ( isSimpleStatement( s ) ){
                     s = "return " + s;
                 }
-                return JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
+                return JS_CompileFunction( _context , assoc , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
             }
             
             // TODO: there must be a way in spider monkey to do this - this is a total hack
@@ -273,7 +281,7 @@ namespace mongo {
             s += code;
             s += ";";
 
-            JSFunction * func = JS_CompileFunction( _context , 0 , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_b" , 0 );
+            JSFunction * func = JS_CompileFunction( _context , assoc , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_b" , 0 );
             if ( ! func ){
                 cerr << "compile for hack failed" << endl;
                 return 0;
@@ -381,6 +389,16 @@ namespace mongo {
             }
             case Code:{
                 JSFunction * func = compileFunction( e.valuestr() );
+                return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
+            }
+            case CodeWScope:{
+                JSFunction * func = compileFunction( e.codeWScopeCode() );
+                
+                BSONObj extraScope = e.codeWScopeObject();
+                if ( ! extraScope.isEmpty() ){
+                    log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
+                }
+
                 return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
             }
             case Date: 
@@ -615,7 +633,7 @@ namespace mongo {
         holder->check();
         
         string s = c.toString( id );
-       
+        
         BSONElement e = holder->_obj[ s.c_str() ];
 
         if ( e.type() == EOO ){

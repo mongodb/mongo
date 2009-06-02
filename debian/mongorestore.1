@@ -1,0 +1,36 @@
+.\" Documentation for the MongoDB dump tool
+.TH MONGORESTORE "1" "June 2009" "10gen" "Mongo Database"
+.SH "NAME"
+mongorestore \- the Mongo restoration tool
+.SH "SYNOPSIS"
+\fBmongorestore [\fIOPTIONS\fR]\fR
+.SH "DESCRIPTION"
+.PP
+\fBmongorestore\fR
+is a tool to use the output from mongodump to restore a database.
+.SH "OPTIONS"
+.TP
+.B \-\-help
+show usage information
+.TP
+.B \-h, \-\-host HOST
+server to connect to (default HOST=localhost)
+.TP
+.B \-d, \-\-db DATABASE
+database to use
+.TP
+.B \-c, \-\-c COLLECTION
+collection to use
+.TP
+.B \-\-dir PATH
+directory from which to restore
+.TP
+.B \-\-dbpath PATH
+directly access mongod data files in this path, instead of connecting to a mongod instance
+.SH "COPYRIGHT"
+.PP
+Copyright 2007\-2009 10gen
+.SH "SEE ALSO"
+For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+.SH "AUTHOR"
+Kristina Chodorow
