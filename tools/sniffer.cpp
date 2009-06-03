@@ -228,7 +228,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     }
     case mongo::dbQuery:{
         mongo::QueryMessage q(d);
-        cout << "\tquery: " << q.query << endl;
+        cout << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip << endl;
         break;
     }
     case mongo::dbUpdate:{
