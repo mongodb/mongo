@@ -56,6 +56,7 @@ namespace mongo {
     extern JSClass bson_ro_class;
 
     extern JSClass object_id_class;
+    extern JSClass dbref_class;
     extern JSClass timestamp_class;
     extern JSClass minkey_class;
     extern JSClass maxkey_class;
@@ -72,4 +73,8 @@ namespace mongo {
     // mongo
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local );
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o );
+
+#define JSVAL_IS_OID(v) ( JSVAL_IS_OBJECT( v ) && JS_InstanceOf( cx , JSVAL_TO_OBJECT( v ) , &object_id_class , 0 ) )
+    
+
 }

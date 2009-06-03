@@ -3,7 +3,7 @@
 // hacked in right now from engine_spidermonkey.cpp
 
 namespace mongo {
-    
+
     // ------------    some defs needed ---------------
     
     JSObject * doCreateCollection( JSContext * cx , JSObject * db , const string& shortName );
@@ -446,7 +446,41 @@ namespace mongo {
         { "toString" , object_id_tostring , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } ,
         { 0 }
     };
-    
+
+    // dbref
+
+    JSBool dbref_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        Convertor c( cx );
+                
+        if ( argc == 2 ){
+
+            if ( ! JSVAL_IS_OID( argv[1] ) ){
+                JS_ReportError( cx , "2nd arg to DBRef needs to be oid" );
+                return JS_FALSE;            
+            }
+            
+            assert( JS_SetProperty( cx , obj , "ns" , &(argv[0]) ) );
+            assert( JS_SetProperty( cx , obj , "id" , &(argv[1]) ) );
+            return JS_TRUE;
+        }
+        else {
+            JS_ReportError( cx , "DBRef needs 2 arguments" );
+            return JS_FALSE;            
+        }
+    }
+ 
+    JSClass dbref_class = {
+        "DBRef" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSFunctionSpec dbref_functions[] = {
+        { 0 }
+    };
+
+    // -----
 
     JSClass timestamp_class = {
         "Timestamp" , JSCLASS_HAS_PRIVATE ,
@@ -541,6 +575,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 0 , 0 , dbref_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
@@ -570,6 +605,11 @@ namespace mongo {
         
         if ( JS_InstanceOf( c->_context , o , &timestamp_class , 0 ) ){
             b.appendTimestamp( name.c_str() , (unsigned long long)c->getNumber( o , "t" ) , (unsigned int )c->getNumber( o , "i" ) );
+            return true;
+        }
+
+        if ( JS_InstanceOf( c->_context , o , &dbref_class , 0 ) ){
+            b.appendDBRef( name.c_str() , c->getString( o , "ns" ).c_str() , c->toOID( c->getProperty( o , "id" ) ) );
             return true;
         }
         

@@ -171,6 +171,21 @@ ObjectId.prototype.tojson = function(){
 
 ObjectId.prototype.isObjectId = true;
 
+DBRef.prototype.fetch = function(){
+    assert( this.ns , "need a ns" );
+    assert( this.id , "need an id" );
+    
+    return db[ this.ns ].findOne( { _id : this.id } );
+}
+
+DBRef.prototype.tojson = function(){
+    return "{ 'ns' : \"" + this.ns + "\" , 'id' : \"" + this.id + "\" } ";
+}
+
+DBRef.prototype.toString = function(){
+    return "DBRef " + this.ns + ":" + this.id;
+}
+
 tojson = function( x ){
     if ( x == null || x == undefined )
         return "";

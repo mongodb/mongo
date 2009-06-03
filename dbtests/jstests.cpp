@@ -29,7 +29,7 @@ namespace mongo {
 } // namespace mongo
 
 namespace JSTests {
-
+    
     class Fundamental {
     public:
         void run() {
@@ -515,6 +515,42 @@ namespace JSTests {
         }
     };
 
+    class DBRefTest {
+    public:
+        DBRefTest(){
+            _a = "unittest.dbref.a";
+            _b = "unittest.dbref.b";
+            reset();
+        }
+        ~DBRefTest(){
+            //reset();
+        }
+        
+        void run(){
+
+            client.insert( _a , BSON( "a" << "17" ) );
+            
+            {
+                BSONObj fromA = client.findOne( _a , BSONObj() );
+                cout << "Froma : " << fromA << endl;
+                BSONObjBuilder b;
+                b.append( "b" , 18 );
+                b.appendDBRef( "c" , "dbref.a" , fromA["_id"].__oid() );
+                client.insert( _b , b.obj() );
+            }
+            
+            assert( client.eval( "unittest" , "x = db.dbref.b.findOne(); assert.eq( 17 , x.c.fetch().a , 'ref working' );" ) );
+        }
+        
+        void reset(){
+            client.dropCollection( _a );
+            client.dropCollection( _b );
+        }
+        
+        const char * _a;
+        const char * _b;
+    };
+
     class All : public Suite {
     public:
         All() {
@@ -535,6 +571,7 @@ namespace JSTests {
             add< Utf8Check >();
             add< LongUtf8String >();
             add< CodeTests >();
+            add< DBRefTest >();
         }
     };
     

@@ -119,6 +119,16 @@ namespace mongo {
             assert( JS_ValueToBoolean( _context, v , &b ) );
             return b;
         }
+
+        OID toOID( jsval v ){
+            JSContext * cx = _context;
+            assert( JSVAL_IS_OID( v ) );
+
+            JSObject * o = JSVAL_TO_OBJECT( v );
+            OID oid;
+            oid.init( getString( o , "str" ) );
+            return oid;
+        }
         
         BSONObj toObject( JSObject * o ){
             if ( ! o )
@@ -419,6 +429,16 @@ namespace mongo {
                 return OBJECT_TO_JSVAL( o );
             }
 
+            case DBRef: {
+                JSObject * o = JS_NewObject( _context , &dbref_class , 0 , 0 );
+                setProperty( o , "ns" , toval( e.dbrefNS() ) );
+
+                JSObject * oid = JS_NewObject( _context , &object_id_class , 0 , 0 );
+                setProperty( oid , "str" , toval( e.dbrefOID().str().c_str() ) );
+
+                setProperty( o , "id" , OBJECT_TO_JSVAL( oid ) );
+                return OBJECT_TO_JSVAL( o );
+            }
             default:
                 log() << "toval can't handle type: " << (int)(e.type()) << endl;
             }
@@ -666,7 +686,7 @@ namespace mongo {
             _runtime = JS_NewRuntime(8L * 1024L * 1024L);
             uassert( "JS_NewRuntime failed" , _runtime );
             if ( ! utf8Ok() ){
-                cerr << "*** warning: spider monkey build without utf8 support" << endl;
+                cerr << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
             }
         }
 

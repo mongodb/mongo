@@ -400,6 +400,18 @@ namespace mongo {
         unsigned int timestampInc() const{
             return ((unsigned int*)(value() ))[0];
         }
+
+        const char * dbrefNS() const {
+            uassert( "not a dbref" , type() == DBRef );
+            return value() + 4;
+        }
+
+        const OID& dbrefOID() const {
+            uassert( "not a dbref" , type() == DBRef );
+            const char * start = value();
+            start += 4 + *reinterpret_cast< const int* >( start );
+            return *reinterpret_cast< const OID* >( start );
+        }
         
     protected:
         // If maxLen is specified, don't scan more than maxLen bytes.
