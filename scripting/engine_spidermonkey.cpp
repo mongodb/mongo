@@ -258,11 +258,11 @@ namespace mongo {
             return true;
         }
 
+        void addRoot( JSFunction * f );
+
         JSFunction * compileFunction( const char * code, JSObject * assoc = 0 ){
             JSFunction * f = _compileFunction( code , assoc );
-            if ( f ){
-                JS_AddRoot( _context , f );
-            }
+            addRoot( f );
             return f;
         }
         
@@ -292,6 +292,8 @@ namespace mongo {
                 cerr << "call function for hack failed" << endl;
                 return 0;
             }
+
+            addRoot( func );
 
             uassert( "return for compile hack failed" , JS_TypeOfValue( _context , ret ) == JSTYPE_FUNCTION );
             return JS_ValueToFunction( _context , ret );
@@ -716,6 +718,10 @@ namespace mongo {
     
     // ------ scope ------
 
+
+    JSBool no_gc(JSContext *cx, JSGCStatus status){
+        return JS_FALSE;
+    }
         
     class SMScope : public Scope {
     public:
@@ -740,11 +746,16 @@ namespace mongo {
                                        "keySet" , object_keyset , 0 , JSPROP_READONLY ) );
 
             _this = 0;
+            //JS_SetGCCallback( _context , no_gc ); // this is useful for seeing if something is a gc problem
         }
 
         ~SMScope(){
             uassert( "deleted SMScope twice?" , _convertor );
-            
+
+            for ( list<void*>::iterator i=_roots.begin(); i != _roots.end(); i++ ){
+                JS_RemoveRoot( _context , *i );
+            }
+
             if ( _convertor ){
                 delete _convertor;
                 _convertor = 0;
@@ -758,6 +769,11 @@ namespace mongo {
         
         void reset(){
             massert( "SMScope::reset() not implemented yet" , 0 );
+        }
+        
+        void addRoot( void * root , const char * name ){
+            JS_AddNamedRoot( _context , root , name );
+            _roots.push_back( root );
         }
         
         void init( BSONObj * data ){
@@ -990,6 +1006,7 @@ namespace mongo {
         JSObject * _this;
 
         string _error;
+        list<void*> _roots;
     };
 
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){
@@ -1054,7 +1071,16 @@ namespace mongo {
     Scope * SMEngine::createScope(){
         return new SMScope();
     }
-    
+
+    void Convertor::addRoot( JSFunction * f ){
+        if ( ! f )
+            return;
+        
+        SMScope * scope = currentScope.get();
+        uassert( "need a scope" , scope );
+        
+        scope->addRoot( f , "cf" );
+    }    
     
 }
 
