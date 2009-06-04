@@ -11,7 +11,7 @@
 #include "mozjs/jsapi.h"
 #include "mozjs/jsdate.h"
 
-#warning if you are using an ubuntu version of spider monkey, we reccomend installing spider monkey from source
+#warning if you are using an ubuntu version of spider monkey, we recommend installing spider monkey from source
 
 #elif defined( OLDJS )
 
