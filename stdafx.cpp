@@ -130,7 +130,9 @@ namespace mongo {
 #endif
 
     void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
-    void printSysInfo() { log() << "sys info: " << sysInfo() << endl; }
+    void printSysInfo() { 
+        log() << "sys info: " << sysInfo() << endl; 
+    }
     string mongodVersion() {
         stringstream ss;
         ss << "db version v" << versionString << ", pdfile version " << VERSION << "." << VERSION_MINOR;

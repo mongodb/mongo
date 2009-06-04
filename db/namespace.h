@@ -441,7 +441,7 @@ namespace mongo {
             init();
             Namespace n(ns);
             NamespaceDetails details( loc, capped );
-            ht->put(n, details);
+            uassert("too many namespaces/collections", ht->put(n, details));
         }
 
         /* just for diagnostics */

@@ -54,6 +54,7 @@ namespace mongo {
             }
         } *nodes;
         int n;
+        int maxChain;
 
         int _find(const Key& k, bool& found) {
             found = false;
@@ -72,11 +73,16 @@ namespace mongo {
                 chain++;
                 i = (i+1) % n;
                 if ( i == start ) {
-                    out() << "warning: hashtable is full " << name << endl;
+                    // shouldn't get here / defensive for infinite loops
+                    out() << "error: hashtable " << name << " is full n:" << n << endl;
+                    return -1;
+                }
+                if( chain >= maxChain ) { 
+                    out() << "error: hashtable " << name << " max chain n:" << n << endl;
                     return -1;
                 }
                 if ( chain == 200 )
-                    out() << "warning: hashtable long chain " << name << endl;
+                    out() << "warning: hashtable " << name << " long chain " << endl;
             }
         }
 
@@ -88,6 +94,7 @@ namespace mongo {
             n = buflen / m;
             if ( (n & 1) == 0 )
                 n--;
+            maxChain = (int) (n * 0.05);
             nodes = (Node *) buf;
 
             assert( sizeof(Node) == 628 );
@@ -111,11 +118,12 @@ namespace mongo {
             }
         }
 
-        void put(const Key& k, const Type& value) {
+        /** returns false if too full */
+        bool put(const Key& k, const Type& value) {
             bool found;
             int i = _find(k, found);
             if ( i < 0 )
-                return;
+                return false;
             if ( !found ) {
                 nodes[i].k = k;
                 nodes[i].hash = k.hash();
@@ -124,6 +132,7 @@ namespace mongo {
                 assert( nodes[i].hash == k.hash() );
             }
             nodes[i].value = value;
+            return true;
         }
 
     };
