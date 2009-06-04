@@ -364,8 +364,10 @@ DBCollection.prototype.isCapped = function(){
 }
 
 
-
-
 DBCollection.prototype.toString = function(){
     return this.getFullName();
 }
+
+DBCollection.prototype.shellPrint = DBCollection.prototype.toString;
+
+
