@@ -405,8 +405,6 @@ namespace mongo {
 
 using namespace mongo;
 
-bool mongo::initService();
-
 int main(int argc, char* argv[], char *envp[] )
 {
     setupSignals();
