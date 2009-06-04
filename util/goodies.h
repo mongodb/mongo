@@ -307,5 +307,14 @@ namespace mongo {
                 return i;
         return -1;
     }
+    
+#if !defined(_WIN32)
+    typedef int HANDLE;
+    inline void strcpy_s(char *dst, unsigned len, const char *src) {
+        strcpy(dst, src);
+    }
+#else
+    typedef void *HANDLE;
+#endif
 
 } // namespace mongo

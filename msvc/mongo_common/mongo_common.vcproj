@@ -790,11 +790,31 @@
 			Name="util"
 			>
 			<File
+				RelativePath="..\..\util\allocator.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\util\assert_util.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\util\assert_util.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\util\background.cpp"
 				>
 			</File>
 			<File
 				RelativePath="..\..\util\background.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\util\debug_util.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\util\goodies.h"
 				>
 			</File>
 			<File

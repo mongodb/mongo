@@ -20,6 +20,8 @@
 
 namespace mongo {
 
+    extern const char *curNs;
+    
     // Utility interface for stringifying object only when val() called.
     class LazyString {
     public:

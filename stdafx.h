@@ -31,301 +31,33 @@ namespace mongo {
     const bool debug=false;
 #endif
 
-    extern const char versionString[];
     // pdfile versions
     const int VERSION = 4;
     const int VERSION_MINOR = 4;
     
+    // mongo version
+    extern const char versionString[];
+    
 } // namespace mongo
 
 #include <memory>
-#include "stdlib.h"
-#include "string.h"
-#include "limits.h"
-
-namespace mongo {
-
-    void sayDbContext(const char *msg = 0);
-    void dbexit(int returnCode, const char *whyMsg = "");
-    void exit( int status );
-    
-    inline void * ourmalloc(size_t size) {
-        void *x = malloc(size);
-        if ( x == 0 ) dbexit(42, "malloc fails");
-        return x;
-    }
-
-    inline void * ourrealloc(void *ptr, size_t size) {
-        void *x = realloc(ptr, size);
-        if ( x == 0 ) dbexit(43, "realloc fails");
-        return x;
-    }
-
-#define malloc mongo::ourmalloc
-#define realloc mongo::ourrealloc
-
-} // namespace mongo
-
-#include "targetver.h"
-
 #include <string>
-#include "time.h"
-
-using namespace std;
-
-namespace mongo {
-
-    const char * gitVersion();
-    const char * sysInfo();
-    string mongodVersion();
-    
-    void printGitVersion();
-    void printSysInfo();
-
-    /* these are manipulated outside of mutexes, so be careful */
-    struct Assertion {
-        Assertion() {
-            msg[0] = msg[127] = 0;
-            context[0] = context[127] = 0;
-            file = "";
-            line = 0;
-            when = 0;
-        }
-        char msg[128];
-        char context[128];
-        const char *file;
-        unsigned line;
-        time_t when;
-        void set(const char *m, const char *ctxt, const char *f, unsigned l) {
-            strncpy(msg, m, 127);
-            strncpy(context, ctxt, 127);
-            file = f;
-            line = l;
-            when = time(0);
-        }
-        string toString();
-        bool isSet() {
-            return when != 0;
-        }
-    };
-
-    enum {
-        AssertRegular = 0,
-        AssertW = 1,
-        AssertMsg = 2,
-        AssertUser = 3
-    };
-
-    /* last assert of diff types: regular, wassert, msgassert, uassert: */
-    extern Assertion lastAssert[4];
-
-    class DBException : public exception {
-    public:
-        virtual const char* what() const throw() = 0;
-        virtual string toString() const {
-            return what();
-        }
-        operator string() const { return toString(); }
-    };
-
-    class AssertionException : public DBException {
-    public:
-        string msg;
-        AssertionException() { }
-        virtual ~AssertionException() throw() { }
-        virtual bool severe() {
-            return true;
-        }
-        virtual bool isUserAssertion() {
-            return false;
-        }
-        virtual const char* what() const throw() { return msg.c_str(); }
-    };
-
-    /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */
-    class UserException : public AssertionException {
-    public:
-        UserException(const char *_msg) {
-            msg = _msg;
-        }
-        UserException(string _msg) {
-            msg = _msg;
-        }
-        virtual bool severe() {
-            return false;
-        }
-        virtual bool isUserAssertion() {
-            return true;
-        }
-        virtual string toString() const {
-            return "userassert:" + msg;
-        }
-    };
-
-    class MsgAssertionException : public AssertionException {
-    public:
-        MsgAssertionException(const char *_msg) {
-            msg = _msg;
-        }
-        virtual bool severe() {
-            return false;
-        }
-        virtual string toString() const {
-            return "massert:" + msg;
-        }
-    };
-
-    void asserted(const char *msg, const char *file, unsigned line);
-    void wasserted(const char *msg, const char *file, unsigned line);
-    void uasserted(const char *msg);
-    inline void uasserted(string msg) { uasserted(msg.c_str()); }
-    void uassert_nothrow(const char *msg); // reported via lasterror, but don't throw exception
-    void msgasserted(const char *msg);
-    inline void msgasserted(string msg) { msgasserted(msg.c_str()); }
-
-#ifdef assert
-#undef assert
-#endif
-
-#define assert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
-
-    /* "user assert".  if asserts, user did something wrong, not our code */
-//#define uassert(_Expression) (void)( (!!(_Expression)) || (uasserted(#_Expression, __FILE__, __LINE__), 0) )
-#define uassert(msg,_Expression) (void)( (!!(_Expression)) || (uasserted(msg), 0) )
-
-#define xassert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
-
-#define yassert 1
-
-    /* warning only - keeps going */
-#define wassert(_Expression) (void)( (!!(_Expression)) || (wasserted(#_Expression, __FILE__, __LINE__), 0) )
-
-    /* display a message, no context, and throw assertionexception
-
-       easy way to throw an exception and log something without our stack trace
-       display happening.
-    */
-#define massert(msg,_Expression) (void)( (!!(_Expression)) || (msgasserted(msg), 0) )
-
-    /* dassert is 'debug assert' -- might want to turn off for production as these
-       could be slow.
-    */
-#if defined(_DEBUG)
-#define dassert assert
-#else
-#define dassert(x) 
-#endif
-
-} // namespace mongo
-
-#include <stdio.h>
-#include <sstream>
-#include <signal.h>
-
-namespace mongo {
-
-    typedef char _TCHAR;
-
-} // namespace mongo
-
 #include <iostream>
 #include <fstream>
 #include <map>
 #include <vector>
 #include <set>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sstream>
+#include <signal.h>
 
-namespace mongo {
+#include "targetver.h"
+#include "time.h"
+#include "string.h"
+#include "limits.h"
 
-//using namespace std;
-
-#if !defined(_WIN32)
-    typedef int HANDLE;
-    inline void strcpy_s(char *dst, unsigned len, const char *src) {
-        strcpy(dst, src);
-    }
-#else
-    typedef void *HANDLE;
-#endif
-
-//#if defined(CHAR)
-//#error CHAR already defined?
-//#endif
-
-//#if defined(_WIN32_WINNT)
-//typedef wchar_t CHAR;
-//#else
-// more to be done...linux unicode is 32 bit.
-//typedef unsigned short CHAR; // 16 bit unicode
-//#endif
-
-#define null (0)
-
-    void rawOut( const string &s );
-    
-} // namespace mongo
-
-#include <vector>
-
-namespace mongo {
-
-// for debugging
-    typedef struct _Ints {
-        int i[100];
-    } *Ints;
-    typedef struct _Chars {
-        char c[200];
-    } *Chars;
-
-    typedef char CHARS[400];
-
-    typedef struct _OWS {
-        int size;
-        char type;
-        char string[400];
-    } *OWS;
-
-    class Database;
-    //extern Database *database;
-    extern const char *curNs;
-
-    /* for now, running on win32 means development not production --
-       use this to log things just there.
-    */
-#if defined(_WIN32)
-#define WIN if( 1 )
-#else
-#define WIN if( 0 )
-#endif
-
-#if defined(_DEBUG)
-#define DEV if( 1 )
-#else
-#define DEV if( 0 )
-#endif
-
-#define DEBUGGING if( 0 )
-
-    // The following declare one unique counter per enclosing function.
-    // NOTE The implementation double-increments on a match, but we don't really care.
-#define SOMETIMES( occasion, howOften ) for( static unsigned occasion = 0; ++occasion % howOften == 0; )
-#define OCCASIONALLY SOMETIMES( occasionally, 16 )
-#define RARELY SOMETIMES( rarely, 128 )
-#define ONCE for( static bool undone = true; undone; undone = false ) 
-    
-#if defined(_WIN32)
-#define strcasecmp _stricmp
-    inline void our_debug_free(void *p) {
-#if 0
-// this is not safe if you malloc < 4 bytes so we don't use anymore
-        unsigned *u = (unsigned *) p;
-        u[0] = 0xEEEEEEEE;
-#endif
-        free(p);
-    }
-#define free our_debug_free
-#endif
-
-} // namespace mongo
+using namespace std;
 
 #undef yassert
 #include <boost/archive/iterators/base64_from_binary.hpp>
@@ -338,7 +70,6 @@ namespace mongo {
 #include <boost/shared_ptr.hpp>
 #include <boost/smart_ptr.hpp>
 #define BOOST_SPIRIT_THREADSAFE
-//#define BOOST_SPIRIT_DEBUG
 #include <boost/spirit/core.hpp>
 #include <boost/spirit/utility/loops.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -347,15 +78,32 @@ namespace mongo {
 #define yassert 1
 using namespace boost::filesystem;
 
+#include "util/debug_util.h"
 #include "util/goodies.h"
 #include "util/log.h"
+#include "util/allocator.h"
+#include "util/assert_util.h"
 
-#define BOOST_CHECK_EXCEPTION( expression ) \
-	try { \
-		expression; \
-	} catch ( const std::exception &e ) { \
-		problem() << "caught boost exception: " << e.what() << endl; \
-		assert( false ); \
-	} catch ( ... ) { \
-		assert( false ); \
-	}
+namespace mongo {
+
+    void sayDbContext(const char *msg = 0);
+    void dbexit(int returnCode, const char *whyMsg = "");
+    void exit( int status );
+    void rawOut( const string &s );
+
+} // namespace mongo
+
+namespace mongo {
+
+    const char * gitVersion();
+    const char * sysInfo();
+    string mongodVersion();
+    
+    void printGitVersion();
+    void printSysInfo();
+
+    typedef char _TCHAR;
+
+#define null (0)
+
+} // namespace mongo
