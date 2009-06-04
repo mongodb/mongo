@@ -59,7 +59,7 @@ namespace mongo {
     /* last assert of diff types: regular, wassert, msgassert, uassert: */
     extern Assertion lastAssert[4];
 
-    class DBException : public exception {
+    class DBException : public std::exception {
     public:
         virtual const char* what() const throw() = 0;
         virtual string toString() const {
