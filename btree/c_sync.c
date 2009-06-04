@@ -9,36 +9,42 @@
 
 #include "wt_internal.h"
 
-static int __wt_cache_clean(ENV *, WT_STOC *, u_int32_t, WT_PAGE **);
-static int __wt_cache_write(ENV *, DB *, WT_PAGE *);
+static int __wt_cache_clean(WT_STOC *, u_int32_t, WT_PAGE **);
+static int __wt_cache_write(WT_STOC *, WT_PAGE *);
 
 #ifdef HAVE_DIAGNOSTIC
-static int __wt_cache_dump(ENV *, WT_STOC *, char *, FILE *);
+static int __wt_cache_dump(WT_STOC *, char *, FILE *);
 #endif
 
 /*
- * __wt_cache_db_open --
- *	Open an underlying database file in the cache.
+ * __wt_cache_open --
+ *	Open an underlying database file in a cache.
  */
 int
-__wt_cache_db_open(DB *db)
+__wt_cache_open(DB *db)
 {
-	WT_FH *fh;
-	DB *tdb;
+	WT_STOC *stoc;
 	ENV *env;
 	IDB *idb;
+	u_int32_t i;
+	int ret;
 
 	env = db->env;
 	idb = db->idb;
+	stoc = idb->stoc;
 
-	/* Increment the reference count if we already have the file open. */
-	TAILQ_FOREACH(tdb, &env->dbqh, q)
-		if ((fh = tdb->idb->fh) != NULL &&
-		    strcmp(fh->name, idb->dbname) == 0) {
-			++fh->refcnt;
-			idb->fh = fh;
-			return (0);
-		}
+	/*
+	 * Initialize the cache page queues.  Size for a cache filled with
+	 * 16KB pages, and 8 pages per bucket (which works out to 8 buckets
+	 * per MB).
+	 */
+	stoc->hashsize = __wt_prime(env->cachesize * 8);
+	if ((ret = __wt_calloc(env,
+	    stoc->hashsize, sizeof(stoc->hqh[0]), &stoc->hqh)) != 0)
+		return (ret);
+	for (i = 0; i < stoc->hashsize; ++i)
+		TAILQ_INIT(&stoc->hqh[i]);
+	TAILQ_INIT(&stoc->lqh);
 
 	/* Open the fle. */
 	return (__wt_open(env, idb->dbname, idb->mode,
@@ -46,42 +52,52 @@ __wt_cache_db_open(DB *db)
 }
 
 /*
- * __wt_cache_db_close --
- *	Close an underlying database file in the cache.
+ * __wt_cache_close --
+ *	Close an underlying database file in a cache.
  */
 int
-__wt_cache_db_close(DB *db, WT_STOC *stoc)
+__wt_cache_close(DB *db)
 {
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
+	WT_STOC *stoc;
 	int ret, tret;
 
 	env = db->env;
 	idb = db->idb;
+	stoc = idb->stoc; 
 	ret = 0;
+
+	/*
+	 * BUG:
+	 * Walk the list of STOCs, find all of them associated with this
+	 * DB handle and close them.
+	 */
 
 	/* Write any modified pages, discard pages. */
 	while ((page = TAILQ_FIRST(&stoc->lqh)) != NULL) {
-		/* Ignore other files */
-		if (page->file_id != idb->file_id)
-			continue;
-
 		/* There shouldn't be any pinned pages. */
 		WT_ASSERT(env, page->ref == 0);
 
 		if (F_ISSET(page, WT_MODIFIED) &&
-		    (tret = __wt_cache_write(env, db, page)) != 0 && ret == 0)
+		    (tret = __wt_cache_write(stoc, page)) != 0 && ret == 0)
 			ret = tret;
-		if ((tret =
-		    __wt_cache_discard(env, stoc, page)) != 0 && ret == 0)
+		if ((tret = __wt_cache_discard(stoc, page)) != 0 && ret == 0)
 			ret = tret;
 	}
 
+	/* There shouldn't be any allocated bytes. */
+	WT_ASSERT(env, stoc->cache_bytes == 0);
+
+	/* Close the underlying file handle. */
 	if ((tret = __wt_close(env, idb->fh)) != 0 && ret == 0)
 		ret = tret;
-		
 	idb->fh = NULL;
+
+	/* Discard buckets. */
+	WT_FREE_AND_CLEAR(env, stoc->hqh);
+		
 	return (ret);
 }
 
@@ -90,27 +106,29 @@ __wt_cache_db_close(DB *db, WT_STOC *stoc)
  *	Flush an underlying database file to disk.
  */
 int
-__wt_cache_db_sync(DB *db, WT_STOC *stoc)
+__wt_cache_sync(DB *db)
 {
-	IDB *idb;
 	ENV *env;
 	WT_PAGE *page;
+	WT_STOC *stoc;
 	int ret;
 
 	env = db->env;
-	idb = db->idb;
+	stoc = db->idb->stoc;
+
+	/*
+	 * BUG:
+	 * Walk the list of STOCs, find all of them associated with this
+	 * DB handle and close them.
+	 */
 
 	/* Write any modified pages. */
 	TAILQ_FOREACH(page, &stoc->lqh, q) {
-		/* Ignore other files */
-		if (page->file_id != idb->file_id)
-			continue;
-
 		/* There shouldn't be any pinned pages. */
 		WT_ASSERT(env, page->ref == 0);
 
 		if (F_ISSET(page, WT_MODIFIED) &&
-		    (ret = __wt_cache_write(env, db, page)) != 0)
+		    (ret = __wt_cache_write(stoc, page)) != 0)
 			return (ret);
 	}
 	return (0);
@@ -138,12 +156,13 @@ __wt_cache_db_sync(DB *db, WT_STOC *stoc)
 } while (0)
 
 /*
- * __wt_cache_db_alloc --
+ * __wt_cache_alloc --
  *	Allocate bytes from a file.
  */
 int
-__wt_cache_db_alloc(DB *db, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
+__wt_cache_alloc(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
@@ -151,8 +170,9 @@ __wt_cache_db_alloc(DB *db, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 
 	*pagep = NULL;
 
+	idb = stoc->idb;
+	db = idb->db;
 	env = db->env;
-	idb = db->idb;
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
@@ -160,25 +180,12 @@ __wt_cache_db_alloc(DB *db, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 	WT_STAT_INCR(
 	    db->hstats, DB_CACHE_ALLOC, "pages allocated in the cache");
 
-	/* Check for exceeding the size of the cache. */
-	if (stoc->cache_bytes > stoc->cache_bytes_max) {
-		/*
-		 * __wt_cache_clean will pass us back a page it free'd, if
-		 * it's of the correct size.
-		 */
-		if ((ret = __wt_cache_clean(env, stoc, bytes, &page)) != 0)
-			return (ret);
-	} else
-		page = NULL;
-
-	if (page == NULL)
-		WT_PAGE_ALLOC(env, stoc, bytes, page, ret);
+	WT_PAGE_ALLOC(env, stoc, bytes, page, ret);
 
 	/* Initialize the page. */
 	page->offset = idb->fh->file_size;
 	page->addr = WT_OFF_TO_ADDR(db, page->offset);
 	page->bytes = bytes;
-	page->file_id = idb->file_id;
 	page->ref = 1;
 	TAILQ_INSERT_TAIL(&stoc->lqh, page, q);
 	TAILQ_INSERT_HEAD(&stoc->hqh[WT_HASH(stoc, page->offset)], page, hq);
@@ -190,13 +197,14 @@ __wt_cache_db_alloc(DB *db, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 }
 
 /*
- * __wt_cache_db_in --
+ * __wt_cache_in --
  *	Pin bytes of a file, reading as necessary.
  */
 int
-__wt_cache_db_in(DB *db, WT_STOC *stoc,
+__wt_cache_in(WT_STOC *stoc,
     off_t offset, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
@@ -206,17 +214,17 @@ __wt_cache_db_in(DB *db, WT_STOC *stoc,
 
 	*pagep = NULL;
 
-	WT_DB_FCHK(db, "__wt_cache_in", flags, WT_APIMASK_WT_CACHE_DB_IN);
-
+	idb = stoc->idb;
+	db = idb->db;
 	env = db->env;
-	idb = db->idb;
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
+	WT_ENV_FCHK(env, "__wt_cache_in", flags, WT_APIMASK_WT_CACHE_DB_IN);
 
 	/* Check for the page in the cache. */
 	hashq = &stoc->hqh[WT_HASH(stoc, offset)];
 	TAILQ_FOREACH(page, hashq, hq)
-		if (page->offset == offset && page->file_id == idb->file_id)
+		if (page->offset == offset)
 			break;
 	if (page != NULL) {
 		++page->ref;
@@ -243,25 +251,12 @@ __wt_cache_db_in(DB *db, WT_STOC *stoc,
 	WT_STAT_INCR(db->hstats,
 	    DB_CACHE_MISS, "cache miss: reads not found in the cache");
 
-	/* Check for exceeding the size of the cache. */
-	if (stoc->cache_bytes > stoc->cache_bytes_max) {
-		/*
-		 * __wt_cache_clean will pass us back a page it free'd, if
-		 * it's of the correct size.
-		 */
-		if ((ret = __wt_cache_clean(env, stoc, bytes, &page)) != 0)
-			return (ret);
-	} else
-		page = NULL;
-
-	if (page == NULL)
-		WT_PAGE_ALLOC(env, stoc, bytes, page, ret);
+	WT_PAGE_ALLOC(env, stoc, bytes, page, ret);
 
 	/* Initialize the page. */
 	page->offset = offset;
 	page->addr = WT_OFF_TO_ADDR(db, offset);
 	page->bytes = bytes;
-	page->file_id = idb->file_id;
 	page->ref = 1;
 	TAILQ_INSERT_TAIL(&stoc->lqh, page, q);
 	TAILQ_INSERT_HEAD(hashq, page, hq);
@@ -288,23 +283,23 @@ __wt_cache_db_in(DB *db, WT_STOC *stoc,
 	*pagep = page;
 	return (0);
 
-err:	(void)__wt_cache_discard(env, stoc, page);
+err:	(void)__wt_cache_discard(stoc, page);
 	return (ret);
 }
 
 /*
- * __wt_cache_db_out --
+ * __wt_cache_out --
  *	Unpin bytes of a file, writing as necessary.
  */
 int
-__wt_cache_db_out(DB *db, WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
+__wt_cache_out(WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
 {
 	ENV *env;
 	int ret;
 
-	env = db->env;
+	env = stoc->idb->db->env;
 
-	WT_DB_FCHK(db, "__wt_cache_db_out", flags, WT_APIMASK_WT_CACHE_DB_OUT);
+	WT_ENV_FCHK(env, "__wt_cache_out", flags, WT_APIMASK_WT_CACHE_DB_OUT);
 
 	/* Check and decrement the reference count. */
 	WT_ASSERT(env, page->ref > 0);
@@ -326,9 +321,9 @@ __wt_cache_db_out(DB *db, WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
 	 */
 	if (LF_ISSET(WT_UNFORMATTED)) {
 		if (F_ISSET(page, WT_MODIFIED) &&
-		    (ret = __wt_cache_write(env, db, page)) != 0)
+		    (ret = __wt_cache_write(stoc, page)) != 0)
 			return (ret);
-		if ((ret = __wt_cache_discard(env, stoc, page)) != 0)
+		if ((ret = __wt_cache_discard(stoc, page)) != 0)
 			return (ret);
 	}
 
@@ -340,8 +335,9 @@ __wt_cache_db_out(DB *db, WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
  *	Clear some space out of the cache.
  */
 static int
-__wt_cache_clean(ENV *env, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
+__wt_cache_clean(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 {
+	ENV *env;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int64_t bytes_free, bytes_need_free;
@@ -349,12 +345,12 @@ __wt_cache_clean(ENV *env, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 
 	*pagep = NULL;
 
-	ret = 0;
-
+	env = stoc->idb->db->env;
 	bytes_free = 0;
 	bytes_need_free = bytes * 3;
+	ret = 0;
 
-	for (;;) {
+	do {
 		TAILQ_FOREACH(page, &stoc->lqh, q)
 			if (page->ref == 0)
 				break;
@@ -366,7 +362,7 @@ __wt_cache_clean(ENV *env, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 			WT_STAT_INCR(env->hstats, CACHE_WRITE_EVICT,
 			    "dirty pages evicted from the cache");
 
-			if ((ret = __wt_cache_write(env, NULL, page)) != 0)
+			if ((ret = __wt_cache_write(stoc, page)) != 0)
 				return (ret);
 		} else
 			WT_STAT_INCR(env->hstats, CACHE_EVICT,
@@ -393,20 +389,10 @@ __wt_cache_clean(ENV *env, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 		bytes_free += page->bytes;
 
 		/* Discard the page. */
-		if ((ret = __wt_cache_discard(env, stoc, page)) != 0)
+		if ((ret = __wt_cache_discard(stoc, page)) != 0)
 			break;
+	} while (bytes_free < bytes_need_free);
 
-		/*
-		 * We return any page we find of the right size, so getting
-		 * here means there were pages at the head of the LRU chain
-		 * that weren't useful, nor were they the right size.   So,
-		 * let's free some memory -- keep going until we've free'd
-		 * 3x what we need.
-		 */
-		if (bytes_free > bytes_need_free &&
-		    stoc->cache_bytes <= stoc->cache_bytes_max)
-			break;
-	}
 	return (ret);
 }
 
@@ -415,20 +401,17 @@ __wt_cache_clean(ENV *env, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
  *	Write a page to the backing database file.
  */
 static int
-__wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
+__wt_cache_write(WT_STOC *stoc, WT_PAGE *page)
 {
+	ENV *env;
+	IDB *idb;
 	WT_PAGE_HDR *hdr;
 	int ret;
 
-	WT_STAT_INCR(env->hstats, CACHE_WRITE, "writes from the cache");
+	idb = stoc->idb;
+	env = idb->db->env;
 
-	/* If not included, find the underlying DB handle. */
-	if (db == NULL) {
-		TAILQ_FOREACH(db, &env->dbqh, q)
-			if (page->file_id == db->idb->file_id)
-				break;
-		WT_ASSERT(env, db != NULL);
-	}
+	WT_STAT_INCR(env->hstats, CACHE_WRITE, "writes from the cache");
 
 	/* Update the checksum. */
 	hdr = page->hdr;
@@ -437,7 +420,7 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 
 	/* Write, and if successful, clear the modified flag. */
 	if ((ret = __wt_write(
-	    env, db->idb->fh, page->offset, page->bytes, hdr)) == 0) {
+	    env, idb->fh, page->offset, page->bytes, hdr)) == 0) {
 		F_CLR(page, WT_MODIFIED);
 
 		WT_STAT_DECR(env->hstats, CACHE_DIRTY, NULL);
@@ -452,8 +435,12 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
  *	Discard a page of a file.
  */
 int
-__wt_cache_discard(ENV *env, WT_STOC *stoc, WT_PAGE *page)
+__wt_cache_discard(WT_STOC *stoc, WT_PAGE *page)
 {
+	ENV *env;
+
+	env = stoc->idb->db->env;
+
 	WT_ASSERT(env, page->ref == 0);
 
 	WT_ASSERT(env, stoc->cache_bytes >= page->bytes);
@@ -474,10 +461,10 @@ __wt_cache_discard(ENV *env, WT_STOC *stoc, WT_PAGE *page)
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_cache_dump --
- *	Dump the current hash and LRU queues.
+ *	Dump a STOC's hash and LRU queues.
  */
 static int
-__wt_cache_dump(ENV *env, WT_STOC *stoc, char *ofile, FILE *fp)
+__wt_cache_dump(WT_STOC *stoc, char *ofile, FILE *fp)
 {
 	WT_PAGE *page;
 	WT_PAGE_HQH *hashq;

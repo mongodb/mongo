@@ -17,7 +17,6 @@ int
 __wt_env_open(WT_TOC *toc)
 {
 	wt_args_env_open_unpack;
-	int ret;
 
 	WT_ENV_FCHK(env, "Env.open", flags, WT_APIMASK_ENV_OPEN);
 

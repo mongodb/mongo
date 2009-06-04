@@ -31,11 +31,11 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/btree_debug.c (C)
                                                     _
 			__wt_bt_dump_dbt((DBT *)indx, fp);
-../btree/btree_debug.c  129  Info 740: Unusual pointer cast (incompatible
+../btree/btree_debug.c  132  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                                                 _
 		    (u_long)offp->addr, WT_64_CAST(offp->records));
-../btree/btree_debug.c  269  Info 740: Unusual pointer cast (incompatible
+../btree/btree_debug.c  272  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
     --- Wrap-up for Module: ../btree/btree_debug.c
@@ -51,27 +51,27 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/btree_get.c (C)
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/btree_get.c  161  Info 740: Unusual pointer cast (incompatible
+../btree/btree_get.c  164  Info 740: Unusual pointer cast (incompatible
     indirect types)
                             _
 		if (cmp == 0) {
-../btree/btree_get.c  178  Warning 644: Variable 'cmp' (line 110) may not have
+../btree/btree_get.c  181  Warning 644: Variable 'cmp' (line 121) may not have
     been initialized
-../btree/btree_get.c  110  Info 830: Location cited in prior message
+../btree/btree_get.c  121  Info 830: Location cited in prior message
                                            _
 				*indxp = ip;
-../btree/btree_get.c  181  Info 771: Symbol 'ip' (line 107) conceivably not
+../btree/btree_get.c  184  Info 771: Symbol 'ip' (line 118) conceivably not
     initialized
-../btree/btree_get.c  107  Info 830: Location cited in prior message
+../btree/btree_get.c  118  Info 830: Location cited in prior message
                                                            _
 #... T(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			if (total + WT_INDX_OFFP_RECORDS(ip) >= recno)
-../btree/btree_get.c  261  Info 740: Unusual pointer cast (incompatible
+../btree/btree_get.c  262  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                                         _
 #... (WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			total += WT_INDX_OFFP_RECORDS(ip);
-../btree/btree_get.c  263  Info 740: Unusual pointer cast (incompatible
+../btree/btree_get.c  264  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/btree_misc.c (C)
@@ -87,7 +87,7 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/btree_page.c (C)
                                                            _
 			records += WT_64_CAST(offp->records);
-../btree/btree_page.c  293  Info 740: Unusual pointer cast (incompatible
+../btree/btree_page.c  299  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/btree_ret.c (C)
@@ -98,6 +98,8 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 ../btree/btree_stat.c  89  Warning 644: Variable 'isleaf_arg' (line 54) may not
     have been initialized
 ../btree/btree_stat.c  54  Info 830: Location cited in prior message
+
+--- Module:   ../btree/btree_sync.c (C)
 
 --- Module:   ../btree/btree_vrfy.c (C)
                                                        _
@@ -215,32 +217,33 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../connect/engine.c (C)
         _
 	WT_FLUSH_MEMORY;
-../connect/engine.c  72  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../connect/engine.c  72  Warning 522: Expected void type, assignment, increment
-    or decrement
-        _
-	WT_FLUSH_MEMORY;
-../connect/engine.c  99  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../connect/engine.c  99  Warning 522: Expected void type, assignment, increment
+../connect/engine.c  93  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
+../connect/engine.c  93  Warning 522: Expected void type, assignment, increment
     or decrement
                         _
 			WT_FLUSH_MEMORY;
-../connect/engine.c  113  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../connect/engine.c  113  Warning 522: Expected void type, assignment,
+../connect/engine.c  98  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
+../connect/engine.c  98  Warning 522: Expected void type, assignment, increment
+    or decrement
+        _
+	WT_FLUSH_MEMORY;
+../connect/engine.c  121  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
+../connect/engine.c  121  Warning 522: Expected void type, assignment,
     increment or decrement
-_
-}
-../connect/engine.c  145  Info 715: Symbol 'notused' (line 85) not referenced
-../connect/engine.c  85  Info 830: Location cited in prior message
 
 --- Module:   ../connect/toc.c (C)
         _
 	WT_FLUSH_MEMORY;
-../connect/toc.c  100  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../connect/toc.c  100  Warning 522: Expected void type, assignment, increment
+../connect/toc.c  104  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
+../connect/toc.c  104  Warning 522: Expected void type, assignment, increment
     or decrement
 
 --- Module:   ../db/db_close.c (C)
+                _
+		WT_FLUSH_MEMORY;
+../db/db_close.c  41  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
+../db/db_close.c  41  Warning 522: Expected void type, assignment, increment or
+    decrement
 
 --- Module:   ../db/db_err.c (C)
 
@@ -249,9 +252,9 @@ _
 --- Module:   ../db/db_handle.c (C)
 _
 }
-../db/db_handle.c  86  Warning 529: Symbol 'db' (line 83) not subsequently
+../db/db_handle.c  71  Warning 529: Symbol 'db' (line 68) not subsequently
     referenced
-../db/db_handle.c  83  Info 830: Location cited in prior message
+../db/db_handle.c  68  Info 830: Location cited in prior message
 
 --- Module:   ../db/db_open.c (C)
 
@@ -260,23 +263,23 @@ _
 --- Module:   ../db/db_sync.c (C)
 
 --- Module:   ../env/env_cache.c (C)
-                                                 _
-	ienv->cache_bytes_max = env->cachesize * WT_MEGABYTE;
-../env/env_cache.c  46  Warning 647: Suspicious truncation
                                    _
 	bytes_need_free = bytes * 3;
-../env/env_cache.c  428  Warning 647: Suspicious truncation
+../env/env_cache.c  350  Warning 647: Suspicious truncation
                                       _
-	for (i = 0; i < ienv->hashsize; ++i) {
-../env/env_cache.c  583  Warning 574: Signed-unsigned mix with relational
-../env/env_cache.c  583  Info 737: Loss of sign in promotion from int to
+	for (i = 0; i < stoc->hashsize; ++i) {
+../env/env_cache.c  490  Warning 574: Signed-unsigned mix with relational
+../env/env_cache.c  490  Info 737: Loss of sign in promotion from int to
     unsigned int
 
     --- Wrap-up for Module: ../env/env_cache.c
 
-Warning 528: Symbol '__wt_cache_dump(struct __env *, char *, struct __sFILE *)'
-    (line 557, file ../env/env_cache.c) not referenced
-../env/env_cache.c  557  Info 830: Location cited in prior message
+Warning 528: Symbol '__wt_cache_clean(struct __wt_stoc *, unsigned int, struct
+    __wt_page **)' (line 338, file ../env/env_cache.c) not referenced
+../env/env_cache.c  338  Info 830: Location cited in prior message
+Warning 528: Symbol '__wt_cache_dump(struct __wt_stoc *, char *, struct __sFILE
+    *)' (line 467, file ../env/env_cache.c) not referenced
+../env/env_cache.c  467  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_close.c (C)
 
@@ -289,18 +292,18 @@ Warning 528: Symbol '__wt_cache_dump(struct __env *, char *, struct __sFILE *)'
 --- Module:   ../env/env_handle.c (C)
 _
 }
-../env/env_handle.c  192  Info 715: Symbol 'env' (line 189) not referenced
-../env/env_handle.c  189  Info 830: Location cited in prior message
+../env/env_handle.c  172  Info 715: Symbol 'env' (line 169) not referenced
+../env/env_handle.c  169  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_open.c (C)
 _
 }
-../env/env_open.c  32  Warning 529: Symbol 'mode' (line 19) not subsequently
+../env/env_open.c  27  Warning 529: Symbol 'mode' (line 19) not subsequently
     referenced
 ../env/env_open.c  19  Info 830: Location cited in prior message
 _
 }
-../env/env_open.c  32  Warning 529: Symbol 'home' (line 19) not subsequently
+../env/env_open.c  27  Warning 529: Symbol 'home' (line 19) not subsequently
     referenced
 ../env/env_open.c  19  Info 830: Location cited in prior message
 

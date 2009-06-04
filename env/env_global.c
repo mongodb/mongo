@@ -44,23 +44,27 @@ void *__wt_addr;				/* Memory flush address. */
 int
 __wt_global_init(void)
 {
+	WT_STOC *stoc;
+	u_int i;
 	int ret;
 
 	__wt_addr = &WT_GLOBAL(running);
 
-	/* Allocate an initial list of server slots. */
+	/*
+	 * Allocate an initial list of server slots.
+	 *
+	 * The normal state of the blocking mutex is locked.
+	 */
 #define	WT_SERVERQ_SIZE	64
 	WT_GLOBAL(sq_entries) = WT_SERVERQ_SIZE;
 	if ((ret = __wt_calloc(
 	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &WT_GLOBAL(sq))) != 0)
 		return (ret);
-
-	/* Allocate the work queue. */
-#define	WT_WORKQ_SIZE	64
-	WT_GLOBAL(workq_entries) = WT_WORKQ_SIZE;
-	if ((ret = __wt_calloc(
-	    NULL, WT_WORKQ_SIZE, sizeof(WT_WORKQ), &WT_GLOBAL(workq))) != 0)
-		return (ret);
+	for (i = 0; i < WT_GLOBAL(sq_entries); ++i) {
+		stoc = WT_GLOBAL(sq) + i;
+		if ((ret = __wt_stat_alloc_stoc_stats(NULL, &stoc->stats)) != 0)
+			return (ret);
+	}
 
 	/* Initialize the global mutex. */
 	if ((ret = __wt_mtx_init(&WT_GLOBAL(mtx))) != 0)

@@ -59,10 +59,9 @@ __wt_bt_ovfl_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip);
 int
 __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep);
 int
-__wt_bt_page_in(DB *db,
-    WT_STOC *stoc, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep);
+__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep);
 int
-__wt_bt_page_out(DB *db, WT_STOC *stoc, WT_PAGE *page, u_int32_t flags);
+__wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags);
 void
 __wt_bt_page_recycle(ENV *env, WT_PAGE *page);
 int
@@ -76,6 +75,8 @@ __wt_bt_dbt_return(DB *db,
 int
 __wt_bt_stat(DB *db);
 int
+__wt_bt_sync(DB *db);
+int
 __wt_db_verify(WT_TOC *toc);
 int
 __wt_bt_verify_int(DB *db, FILE *fp);
@@ -85,10 +86,6 @@ int
 __wt_env_start(ENV *env, u_int32_t flags);
 int
 __wt_env_stop(ENV *env, u_int32_t flags);
-int
-__wt_stoc_init(ENV *env, WT_STOC *stoc);
-int
-__wt_stoc_close(ENV *env, WT_STOC *stoc);
 void *
 __wt_workq(void *arg);
 int
@@ -122,20 +119,20 @@ __wt_db_stat_clear(WT_TOC *toc);
 int
 __wt_db_sync(WT_TOC *toc);
 int
-__wt_cache_db_open(DB *db);
+__wt_cache_open(DB *db);
 int
-__wt_cache_db_close(DB *db, WT_STOC *stoc);
+__wt_cache_close(DB *db);
 int
-__wt_cache_db_sync(DB *db, WT_STOC *stoc);
+__wt_cache_sync(DB *db);
 int
-__wt_cache_db_alloc(DB *db, WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep);
+__wt_cache_alloc(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep);
 int
-__wt_cache_db_in(DB *db, WT_STOC *stoc,
+__wt_cache_in(WT_STOC *stoc,
     off_t offset, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep);
 int
-__wt_cache_db_out(DB *db, WT_STOC *stoc, WT_PAGE *page, u_int32_t flags);
+__wt_cache_out(WT_STOC *stoc, WT_PAGE *page, u_int32_t flags);
 int
-__wt_cache_discard(ENV *env, WT_STOC *stoc, WT_PAGE *page);
+__wt_cache_discard(WT_STOC *stoc, WT_PAGE *page);
 int
 __wt_env_close(WT_TOC *toc);
 void
@@ -144,8 +141,6 @@ void
 __wt_env_errx(ENV *env, const char *fmt, ...);
 int
 __wt_env_set_verbose_verify(WT_TOC *toc);
-int
-__wt_env_set_cachesize_verify(WT_TOC *toc);
 int
 __wt_build_verify(void);
 int
@@ -245,3 +240,7 @@ int
 __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp);
 int
 __wt_stat_clear_fh_stats(WT_STATS *stats);
+int
+__wt_stat_alloc_stoc_stats(ENV *env, WT_STATS **statsp);
+int
+__wt_stat_clear_stoc_stats(WT_STATS *stats);

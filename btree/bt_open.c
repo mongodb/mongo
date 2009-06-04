@@ -9,7 +9,6 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_server_start(DB *, u_int32_t);
 static int __wt_bt_vrfy_sizes(DB *);
 
 /*
@@ -20,7 +19,6 @@ int
 __wt_bt_open(DB *db)
 {
 	IDB *idb;
-	u_int32_t addr;
 	int isleaf, ret;
 
 	idb = db->idb;
@@ -30,7 +28,7 @@ __wt_bt_open(DB *db)
 		return (ret);
 
 	/* Open the underlying database file. */
-	if ((ret = __wt_cache_db_open(db)) != 0)
+	if ((ret = __wt_cache_open(db)) != 0)
 		return (ret);
 
 	/* If the file is empty, we're done. */
@@ -54,51 +52,9 @@ __wt_bt_open(DB *db)
 	 */
 	isleaf = idb->root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
 	if ((ret = __wt_bt_page_in(
-	    db, STOC_PRIME, idb->root_addr, isleaf, 1, &idb->root_page)) != 0)
+	    db, idb->root_addr, isleaf, 1, &idb->root_page)) != 0)
 		return (ret);
 
-	/*
-	 * Fork off a server thread for every second-level internal page in
-	 * the tree.
-	 */
-	if (!isleaf) {
-		__wt_bt_first_offp(idb->root_page, &addr, &isleaf);
-		if (!isleaf && (ret = __wt_bt_server_start(db, addr)) != 0)
-			return (ret);
-	}
-
-	return (0);
-}
-
-/*
- * __wt_bt_server_start --
- *	Fork off a server thread for every second-level internal page in
- *	the tree.
- */
-static int
-__wt_bt_server_start(DB *db, u_int32_t addr)
-{
-	IDB *idb;
-	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
-	int ret;
-
-	idb = db->idb;
-
-	while (addr != WT_ADDR_INVALID) {
-		if ((ret = __wt_bt_page_in(
-		    db, STOC_PRIME, addr, 0, 0, &page)) != 0)
-			return (ret);
-
-		hdr = page->hdr;
-		addr = hdr->nextaddr;
-
-/* XXX: fork off threads */
-
-		if ((ret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0)
-			return (ret);
-	}
-	
 	return (0);
 }
 

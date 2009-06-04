@@ -18,11 +18,13 @@ __wt_bt_ovfl_in(DB *db, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
 {
 	ENV *env;
 	WT_PAGE *page;
+	WT_STOC *stoc;
 	int ret;
 
 	env = db->env;
+	stoc = db->idb->stoc;
 
-	if ((ret = __wt_cache_db_in(db, STOC_PRIME,
+	if ((ret = __wt_cache_in(stoc,
 	    WT_ADDR_TO_OFF(db, addr), WT_OVFL_BYTES(db, len), 0, &page)) != 0)
 		return (ret);
 
@@ -42,11 +44,14 @@ int
 __wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 {
 	WT_PAGE *page;
+	WT_STOC *stoc;
 	int ret;
 
+	stoc = db->idb->stoc;
+
 	/* Allocate a chunk of file space. */
-	if ((ret = __wt_cache_db_alloc(db,
-	    STOC_PRIME, WT_OVFL_BYTES(db, dbt->size), &page)) != 0)
+	if ((ret =
+	    __wt_cache_alloc(stoc, WT_OVFL_BYTES(db, dbt->size), &page)) != 0)
 		return (ret);
 
 	/* Initialize the page and copy the overflow item in. */
@@ -62,7 +67,7 @@ __wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
 
 	/* Write the overflow item back to the file. */
-	return (__wt_bt_page_out(db, STOC_PRIME, page, WT_MODIFIED));
+	return (__wt_bt_page_out(db, page, WT_MODIFIED));
 }
 
 /*
@@ -94,8 +99,7 @@ __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 	copy->len = from->len;
 
 	/* Discard the overflow record. */
-	if ((tret =
-	    __wt_bt_page_out(db, STOC_PRIME, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_bt_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -117,8 +121,7 @@ __wt_bt_ovfl_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 	ret = __wt_bt_data_copy_to_dbt(
 	    db, WT_PAGE_BYTE(ovfl_page), ovfl->len, copy);
 
-	if ((tret = __wt_bt_page_out(
-	    db, STOC_PRIME, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_bt_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -145,8 +148,7 @@ __wt_bt_ovfl_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
 		return (ret);
 	memcpy(ip->data, WT_PAGE_BYTE(ovfl_page), ip->size);
 
-	if ((tret =
-	    __wt_bt_page_out(db, STOC_PRIME, ovfl_page, 0)) != 0 && ret == 0)
+	if ((tret = __wt_bt_page_out(db, ovfl_page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	F_SET(ip, WT_ALLOCATED);

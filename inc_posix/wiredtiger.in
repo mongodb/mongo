@@ -85,15 +85,15 @@ struct __dbt {
  * Connection information
  *******************************************/
 struct __wt_toc {
-	u_int slot;			/* Connection slot */
-
-	WT_MTX *mtx;			/* Thread's blocking mutex */
+	WT_MTX  *block;			/* Thread's blocking mutex */
 
 	int	 op;			/* Operation code */
 	ENV	*env;			/* Operation environment */
 	DB	*db;			/* Operation database */
 	void	*argp;			/* Operation parameters */
 	int	 ret;			/* Operation result */
+
+	int	 slot;			/* Server slot */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.

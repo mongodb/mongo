@@ -128,7 +128,7 @@ env.get_cachesize
 	method,getset
 	cachesize	u_int32_t *@S
 env.set_cachesize
-	method,getset,verify
+	method,getset
 	cachesize	u_int32_t @S
 
 ###################################################

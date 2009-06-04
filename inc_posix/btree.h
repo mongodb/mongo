@@ -103,8 +103,10 @@ struct __wt_page {
 	 */
 	u_int32_t bytes;		/* Page size */
 
-	u_int32_t file_id;		/* File ID */
-
+	/*
+	 * We don't require a page reference count; leave it as a debugging
+	 * aid so we detect immediately if a code change leaks a page.
+	 */
 	u_int8_t ref;			/* Reference count */
 
 	TAILQ_ENTRY(__wt_page) q;	/* LRU queue */
@@ -115,8 +117,6 @@ struct __wt_page {
 	/*********************************************************
 	 * The following fields are owned by the btree layer.
 	 *********************************************************/
-	u_int16_t sid;			/* Server ID. */
-
 	u_int8_t *first_free;		/* First free byte address */
 	u_int32_t space_avail;		/* Available page memory */
 

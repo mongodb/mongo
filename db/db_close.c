@@ -18,9 +18,11 @@ __wt_db_close(WT_TOC *toc)
 {
 	wt_args_db_close_unpack;
 	ENV *env;
+	WT_STOC *stoc;
 	int ret, tret;
 
 	env = toc->env;
+	stoc = db->idb->stoc;
 	ret = 0;
 
 	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
@@ -29,7 +31,18 @@ __wt_db_close(WT_TOC *toc)
 	if ((tret = __wt_bt_close(db)) != 0 && ret == 0)
 		ret = tret;
 
-	/* Disconnect from the list. */
+	/* Discard the cache. */
+	if ((tret = __wt_cache_close(db)) != 0 && ret == 0)
+		ret = tret;
+
+	/* Discard the server thread. */
+	if (WT_GLOBAL(single_threaded)) {
+		stoc->running = 0;
+		WT_FLUSH_MEMORY;
+		(void)pthread_join(stoc->tid, NULL);
+	}
+
+	/* Remove from the environment's list. */
 	TAILQ_REMOVE(&env->dbqh, db, q);
 
 	/* Re-cycle the underlying IDB structure. */

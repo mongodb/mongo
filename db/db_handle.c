@@ -28,11 +28,9 @@ __wt_env_db_create(WT_TOC *toc)
 	db = NULL;
 	idb = NULL;
 
-	/*
-	 * !!!
-	 * Get valid DB and IDB structures next, then everything should
-	 * work.
-	 */
+	WT_ENV_FCHK(env, "Env.db_create", flags, WT_APIMASK_WT_DB_CREATE);
+
+	/* Create the DB and IDB structures. */
 	if ((ret = __wt_calloc(env, 1, sizeof(DB), &db)) != 0 ||
 	    (ret = __wt_calloc(env, 1, sizeof(IDB), &idb)) != 0)
 		goto err;
@@ -44,17 +42,14 @@ __wt_env_db_create(WT_TOC *toc)
 	db->env = env;
 	db->ienv = env->ienv;
 
-	/* We have an environment -- check the API flags. */
-	WT_DB_FCHK_NOTFATAL(
-	    db, "wt_db_create", flags, WT_APIMASK_WT_DB_CREATE, ret);
-	if (ret != 0)
-		goto err;
-
 	/* Configure the DB and the IDB. */
 	if ((ret = __wt_db_config_default(db)) != 0)
 		goto err;
 	if ((ret = __wt_idb_config_default(db)) != 0)
 		goto err;
+
+	/* Insert the database on the environment's list. */
+	TAILQ_INSERT_TAIL(&env->dbqh, db, q);
 
 	*dbp = db;
 	return (0);
@@ -94,7 +89,8 @@ __wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 	    db, "Db.destroy", flags, WT_APIMASK_DB_DESTROY, ret);
 
 	/* Discard the underlying IDB structure. */
-	ret = __wt_idb_destroy(db, 0);
+	if ((tret = __wt_idb_destroy(db, 0)) != 0 && ret == 0)
+		ret = tret;
 
 	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, db->hstats);
@@ -103,6 +99,7 @@ __wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 	/* Free the DB structure. */
 	memset(db, OVERWRITE_BYTE, sizeof(db));
 	__wt_free(env, db);
+	toc->db = NULL;
 
 	return (ret);
 }

@@ -11,18 +11,26 @@
 extern "C" {
 #endif
 
-#define	STOC_PRIME		WT_GLOBAL(sq)
 #define	WT_PSTOC_NOT_SET	0
 #define	WT_PSTOC_ID		1
 
 struct __wt_stoc {
-	u_int16_t id;				/* Server's ID */
+#define	WT_SERVER_QSIZE		 40		/* Queued operations max */
+	WT_TOC *ops[WT_SERVER_QSIZE];		/* Queued operations */
+
+	u_int32_t id;				/* Server ID */
 	pthread_t tid;				/* System thread ID */
+
+	int running;				/* Thread active */
+
+	IDB *idb;				/* Enclosing DB */
 
 	/*
 	 * Per-server thread cache of database pages.
 	 */
 #define	WT_CACHE_DEFAULT_SIZE		(20)		/* 20MB */
+
+	u_int64_t cache_bytes;			/* Cache bytes allocated */
 
 	/*
 	 * Each in-memory page is threaded on two queues: a hash queue
@@ -33,14 +41,7 @@ struct __wt_stoc {
 	TAILQ_HEAD(__wt_page_hqh, __wt_page) *hqh;
 	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;
 
-	u_int64_t cache_bytes;		/* Cache bytes allocated */
-	u_int64_t cache_bytes_max;	/* Cache bytes maximum */
-};
-
-struct __wt_workq {
-	u_int16_t sid;				/* Server ID */
-
-	WT_TOC *toc;				/* Queued operation */
+	WT_STATS *stats;			/* Server statistics */
 };
 
 #if defined(__cplusplus)

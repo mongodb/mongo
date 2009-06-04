@@ -165,3 +165,32 @@ __wt_stat_clear_fh_stats(WT_STATS *stats)
 	stats[WT_STAT_WRITE_IO].v = 0;
 	return (0);
 }
+
+int
+__wt_stat_alloc_stoc_stats(ENV *env, WT_STATS **statsp)
+{
+	WT_STATS *stats;
+	int ret;
+
+	if ((ret = __wt_calloc(env,
+	    WT_STAT_STOC_STATS_TOTAL + 1, sizeof(WT_STATS), &stats)) != 0)
+		return (ret);
+
+	stats[WT_STAT_STOC_ARRAY].desc = "server thread array passes";
+	stats[WT_STAT_STOC_OPS].desc = "server thread operations";
+	stats[WT_STAT_STOC_SLEEP].desc = "server thread sleeps";
+	stats[WT_STAT_STOC_YIELD].desc = "server thread yields";
+
+	*statsp = stats;
+	return (0);
+}
+
+int
+__wt_stat_clear_stoc_stats(WT_STATS *stats)
+{
+	stats[WT_STAT_STOC_ARRAY].v = 0;
+	stats[WT_STAT_STOC_OPS].v = 0;
+	stats[WT_STAT_STOC_SLEEP].v = 0;
+	stats[WT_STAT_STOC_YIELD].v = 0;
+	return (0);
+}

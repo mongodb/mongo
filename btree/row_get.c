@@ -53,7 +53,7 @@ __wt_db_get(WT_TOC *toc)
 
 	/* Discard any page other than the root page, which remains pinned. */
 	if (page != idb->root_page &&
-	    (tret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0 && ret == 0)
+	    (tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -101,7 +101,7 @@ __wt_db_get_recno(WT_TOC *toc)
 
 	/* Discard any page other than the root page, which remains pinned. */
 	if (page != idb->root_page &&
-	    (tret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0 && ret == 0)
+	    (tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);
@@ -199,8 +199,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		    WT_ITEM_TYPE(ip->ditem) == WT_ITEM_OFFP_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
-		if (put_page &&
-		    (ret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0)
+		if (put_page && (ret = __wt_bt_page_out(db, page, 0)) != 0)
 			return (ret);
 
 		/*
@@ -212,15 +211,14 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		isleaf = next_isleaf;
 
 		/* Get the next page. */
-		if ((ret = __wt_bt_page_in(
-		    db, STOC_PRIME, addr, isleaf, 1, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, 1, &page)) != 0)
 			return (ret);
 	}
 	/* NOTREACHED */
 
 	/* Discard any page we've read other than the root page. */
 err:	if (put_page)
-		(void)__wt_bt_page_out(db, STOC_PRIME, page, 0);
+		(void)__wt_bt_page_out(db, page, 0);
 	return (ret);
 }
 
@@ -272,20 +270,18 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 		    WT_ITEM_TYPE(ip->ditem) == WT_ITEM_OFFP_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
-		if (put_page &&
-		    (ret = __wt_bt_page_out(db, STOC_PRIME, page, 0)) != 0)
+		if (put_page && (ret = __wt_bt_page_out(db, page, 0)) != 0)
 			return (ret);
 
 		isleaf = next_isleaf;
 
 		/* Get the next page. */
-		if ((ret = __wt_bt_page_in(
-		    db, STOC_PRIME, addr, isleaf, 1, &page)) != 0)
+		if ((ret = __wt_bt_page_in(db, addr, isleaf, 1, &page)) != 0)
 			return (ret);
 	}
 
 	/* Discard any page we've read other than the root page. */
 	if (put_page)
-		(void)__wt_bt_page_out(db, STOC_PRIME, page, 0);
+		(void)__wt_bt_page_out(db, page, 0);
 	return (WT_NOTFOUND);
 }

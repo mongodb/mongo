@@ -74,7 +74,9 @@ struct __idb {
 	char	 *dbname;		/* Database name */
 	mode_t	  mode;			/* Database file create mode */
 
-	u_int32_t file_id;		/* In-memory file id */
+	WT_STOC *stoc;			/* Server thread */
+
+	u_int32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
 	u_int32_t root_addr;		/* Root address */

@@ -16,6 +16,7 @@ btree/btree_ovfl.c
 btree/btree_page.c
 btree/btree_ret.c
 btree/btree_stat.c
+btree/btree_sync.c
 btree/btree_vrfy.c
 connect/engine.c
 connect/toc.c

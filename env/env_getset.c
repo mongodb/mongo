@@ -21,17 +21,3 @@ __wt_env_set_verbose_verify(WT_TOC *toc)
 	WT_ENV_FCHK(env, "Env.set_verbose", verbose, WT_APIMASK_ENV_VERBOSE);
 	return (0);
 }
-
-/*
- * __wt_env_set_cachesize_verify --
- *	Set the server thread-of-control's cache size.
- */
-int
-__wt_env_set_cachesize_verify(WT_TOC *toc)
-{
-	wt_args_env_set_cachesize_unpack;
-
-	STOC_PRIME->cache_bytes_max = cachesize * WT_MEGABYTE;
-
-	return (0);
-}

@@ -92,6 +92,15 @@ struct __wt_stats {
 #define	WT_STAT_WRITE_IO		    1
 #define	WT_STAT_FH_STATS_TOTAL		    2
 
+/*
+ * Statistics entries for STOC_STATS
+ */
+#define	WT_STAT_STOC_ARRAY		    0
+#define	WT_STAT_STOC_OPS		    1
+#define	WT_STAT_STOC_SLEEP		    2
+#define	WT_STAT_STOC_YIELD		    3
+#define	WT_STAT_STOC_STATS_TOTAL	    4
+
 /* Statistics section: END */
 
 #else

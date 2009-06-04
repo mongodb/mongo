@@ -20,9 +20,12 @@ __wt_db_open(WT_TOC *toc)
 {
 	wt_args_db_open_unpack;
 	ENV *env;
+	WT_STOC *stoc;
+	IDB *idb;
 	int ret;
 
 	env = toc->env;
+	idb = db->idb;
 
 	WT_DB_FCHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
 
@@ -30,8 +33,24 @@ __wt_db_open(WT_TOC *toc)
 	if ((ret = __wt_db_idb_open(db, dbname, mode, flags)) != 0)
 		return (ret);
 
-	/* Insert the database on the environment's list. */
-	TAILQ_INSERT_TAIL(&env->dbqh, db, q);
+	/*
+	 * If we're using a single thread, reference it.   Otherwise create
+	 * a server thread.
+	 */
+	if (WT_GLOBAL(single_threaded))
+		stoc = WT_GLOBAL(sq);
+	else {
+		stoc = WT_GLOBAL(sq) + WT_GLOBAL(sq_next);
+		stoc->id = ++WT_GLOBAL(sq_next);
+		stoc->running = 1;
+		if (pthread_create(&stoc->tid, NULL, __wt_workq, stoc) != 0) {
+			__wt_env_err(
+			    env, errno, "Env.db_create: thread create");
+			return (WT_ERROR);
+		}
+	}
+	idb->stoc = stoc;
+	stoc->idb = idb;
 
 	/* Open the underlying Btree. */
 	if ((ret = __wt_bt_open(db)) != 0)

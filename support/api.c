@@ -977,10 +977,6 @@ static int __wt_env_set_cachesize(WT_TOC *toc);
 static int __wt_env_set_cachesize(WT_TOC *toc)
 {
 	wt_args_env_set_cachesize_unpack;
-	int ret;
-
-	if ((ret = __wt_env_set_cachesize_verify(toc)) != 0)
-		return (ret);
 
 	env->cachesize = cachesize;
 	return (0);
