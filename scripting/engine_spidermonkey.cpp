@@ -756,6 +756,7 @@ namespace mongo {
             
             _global = JS_NewObject( _context , &global_class, NULL, NULL);
             massert( "JS_NewObject failed for global" , _global );
+            JS_SetGlobalObject( _context , _global );
             massert( "js init failed" , JS_InitStandardClasses( _context , _global ) );
             
             JS_DefineFunctions( _context , _global , globalHelpers );
