@@ -58,6 +58,7 @@ namespace mongo {
        7 = log a few reads, and all writes.
     */
     int opLogging = 0;
+    char *appsrvPath = null;
 
     int getOpLogging() {
         return opLogging;
@@ -640,6 +641,7 @@ namespace mongo {
     
     boost::mutex &exitMutex( *( new boost::mutex ) );
     bool firstExit = true;
+    void shutdown();
 
     /* not using log() herein in case we are already locked */
     void dbexit(int rc, const char *why) {        
@@ -657,6 +659,14 @@ namespace mongo {
         stringstream ss;
         ss << "dbexit: " << why << endl;
         rawOut( ss.str() );
+
+		shutdown(); // gracefully shutdown instance
+
+        rawOut( "dbexit: really exiting now\n" );
+        ::exit(rc);
+    }
+    
+    void shutdown() {
 
 #ifndef _WIN32
         {
@@ -691,9 +701,6 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         flock( lockFile, LOCK_UN );
 #endif
-        
-        rawOut( "dbexit: really exiting now\n" );
-        ::exit(rc);
     }
 
     void acquirePathLock() {

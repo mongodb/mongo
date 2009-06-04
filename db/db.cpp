@@ -31,6 +31,10 @@
 #include <sys/file.h>
 #endif
 
+#if defined(_WIN32)
+#include "../util/ntservice.h"
+#endif
+
 #include "../scripting/engine.h"
 
 namespace mongo {
@@ -47,6 +51,7 @@ namespace mongo {
     
     extern int port;
     extern string bind_ip;
+	extern char *appsrvPath;
     extern int curOp;
     extern bool autoresync;
     extern string dashDashSource;
@@ -387,12 +392,20 @@ namespace mongo {
         }
     }
 
+	#if defined(_WIN32)
+    bool initService() {
+		ServiceController::reportStatus( SERVICE_RUNNING );
+		initAndListen( port, appsrvPath );		
+		return true;
+	}
+	#endif
+
 } // namespace mongo
 
 
 using namespace mongo;
 
-int q;
+bool mongo::initService();
 
 int main(int argc, char* argv[], char *envp[] )
 {
@@ -446,7 +459,9 @@ int main(int argc, char* argv[], char *envp[] )
          *     slightly different mode where "run" is assumed and we can set values
          */
 
-        char *appsrvPath = null;
+        bool installService = false;
+        bool removeService = false;
+        bool startService = false;
 
         for (int i = 1; i < argc; i++)  {
 
@@ -508,7 +523,13 @@ int main(int argc, char* argv[], char *envp[] )
                 useHints = false;
             else if ( s == "--nohttpinterface" )
                 noHttpInterface = true;
-            else if ( s == "--cacheSize" ) { 
+            else if ( s == "--install" )
+                installService = true;
+            else if ( s == "--remove" )
+                removeService = true;
+            else if ( s == "--service" )
+                startService = true;
+			else if ( s == "--cacheSize" ) { 
                 long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad --cacheSize arg", x > 0);
                 setRecCacheSize(x);
@@ -541,7 +562,22 @@ int main(int argc, char* argv[], char *envp[] )
             }
         }
         
-        initAndListen(port, appsrvPath);
+        #if defined(_WIN32)
+        if ( installService ) {
+			if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
+				dbexit( 1 );
+		}
+		else if ( removeService ) {
+			if ( !ServiceController::removeService( L"MongoDB" ) )
+				dbexit( 1 );
+		}
+		else if ( startService ) {
+			if ( !ServiceController::startService( L"MongoDB", mongo::initService ) )
+				dbexit( 1 );
+		}
+		else
+		#endif
+        	initAndListen( port, appsrvPath );
 
         dbexit(0);
     }
@@ -571,6 +607,10 @@ usage:
     out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     out() << " --sysinfo                 print some diagnostic system information\n";
     out() << " --deDupMem <size_Bytes>   custom memory limit for query de-duping\n";
+	#if defined(_WIN32)
+    out() << " --install                 install mongo db service\n";
+    out() << " --remove                  remove mongo db service\n";
+    #endif
     out() << "\nReplication:" << endl;
     out() << " --master\n";
     out() << " --slave" << endl;
