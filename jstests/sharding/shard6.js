@@ -20,4 +20,20 @@ for ( ; num<100; num++ ){
 
 assert.eq( 100 , db.data.find().toArray().length );
 
+// limit
+
+assert.eq( 77 , db.data.find().limit(77).itcount() , "limit test 1" );
+assert.eq( 1 , db.data.find().limit(1).itcount() , "limit test 2" );
+for ( var i=1; i<10; i++ ){
+    assert.eq( i , db.data.find().limit(i).itcount() , "limit test 3 : " + i );
+}
+
+
+// --- test save support ---
+
+o = db.data.findOne();
+o.x = 16;
+db.data.save( o );
+assert.eq( 16 , db.data.findOne( { _id : o._id } ).x , "x1 - did save fail?" );
+
 s.stop();

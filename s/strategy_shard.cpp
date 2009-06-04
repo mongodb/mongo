@@ -126,11 +126,16 @@ namespace mongo {
             if ( upsert && ! manager->hasShardKey( toupdate ) )
                 throw UserException( "can't upsert something without shard key" );
 
-            if ( ! manager->hasShardKey( query ) )
-                throw UserException( "can't do update with query that doesn't have the shard key" );
+            bool save = false;
+            if ( ! manager->hasShardKey( query ) ){
+                if ( query.nFields() != 1 || strcmp( query.firstElement().fieldName() , "_id" ) )
+                    throw UserException( "can't do update with query that doesn't have the shard key" );
+                save = true;
+            }
             
-            if ( manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) )
+            if ( ! save && manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) ){
                 throw UserException( "change would move shards!" );
+            }
 
             Shard& s = manager->findShard( toupdate );
             doWrite( dbUpdate , r , s.getServer() );
