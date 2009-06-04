@@ -331,6 +331,8 @@ elif "win32" == os.sys.platform:
     windows = True
     boostDir = "C:/Program Files/Boost/boost_1_35_0"
 
+    serverOnlyFiles += [ "util/ntservice.cpp" ]
+
     if not os.path.exists( boostDir ):
         print( "can't find boost" )
         Exit(1)
