@@ -53,3 +53,7 @@ t.save( { a: [ 1, 2, 3 ] } );
 t.save( { a: [ 3, 2, 1 ] } );
 assert.eq( 1, t.find().sort( { a: 1 } ).hint( { a: 1 } ).toArray().length );
 assert.eq( 1, t.find().sort( { a: -1 } ).hint( { a: 1 } ).toArray().length );
+
+assert.eq( t._indexSpec( { x : 1 } , true ) , t._indexSpec( { x : 1 } , [ true ] ) , "spec 1" );
+assert.eq( t._indexSpec( { x : 1 } , "eliot" ) , t._indexSpec( { x : 1 } , [ "eliot" ] ) , "spec 2" );
+
