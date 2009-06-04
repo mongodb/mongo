@@ -861,7 +861,7 @@ assert( !eloc.isNull() );
         BSONElement idOld;
         int addID = 0;
         {
-            /* duplicate _id check... */
+            /* xxx duplicate _id check... */
             BSONObj objNew(buf);
             BSONElement idNew;
             objOld.getObjectID(idOld);
@@ -901,6 +901,7 @@ assert( !eloc.isNull() );
                 ss << " moved ";
             deleteRecord(ns, toupdate, dl);
             insert(ns, buf, len, false, idOld);
+            /* xxx TODO: handle dup key exception here! */
             return;
         }
 
@@ -940,6 +941,7 @@ assert( !eloc.isNull() );
                     assert( !dl.isNull() );
                     for ( unsigned i = 0; i < added.size(); i++ ) {
                         try {
+                            /* TODO xxx dup keys handle */
                             idx.head.btree()->bt_insert(
                                 idx.head,
                                 dl, *added[i], idxKey, /*dupsAllowed*/true, idx);
@@ -1122,7 +1124,7 @@ assert( !eloc.isNull() );
         if ( sys ) {
             uassert("attempt to insert in reserved database name 'system'", sys != ns);
             if ( strstr(ns, ".system.") ) {
-                // todo later: check for dba-type permissions here.
+                // later:check for dba-type permissions here if have that at some point separate
                 if ( strstr(ns, ".system.indexes") )
                     addIndex = true;
                 else if ( strstr(ns, ".system.users") )
