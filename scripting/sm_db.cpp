@@ -613,7 +613,7 @@ namespace mongo {
             return true;
         }
         
-#ifdef SM16
+#if defined( SM16 ) || defined( MOZJS )
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             if ( d ){
