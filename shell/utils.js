@@ -11,7 +11,7 @@ assert.eq = function( a , b , msg ){
         return;
 
     if ( ( a != null && b != null ) && 
-         ( a.toString() == b.toString() || a == b || tojson( a ) == tojson( b ) ) )
+         ( /*a.toString() == b.toString() || */a == b || tojson( a ) == tojson( b ) ) )
         return;
 
     throw "[" + tojson( a ) + "] != [" + tojson( b ) + "] are not equal : " + msg;
