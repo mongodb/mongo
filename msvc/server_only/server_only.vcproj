@@ -335,6 +335,14 @@
 				RelativePath="..\..\util\miniwebserver.h"
 				>
 			</File>
+			<File
+				RelativePath="..\..\util\ntservice.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\util\ntservice.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="s"
