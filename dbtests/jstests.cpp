@@ -550,6 +550,47 @@ namespace JSTests {
         const char * _a;
         const char * _b;
     };
+    
+    class BinDataType {
+    public:
+        
+        void pp( const char * s , BSONElement e ){
+            int len;
+            const char * data = e.binData( len );
+            cout << s << ":" << e.binDataType() << "\t" << len << endl;
+            cout << "\t";
+            for ( int i=0; i<len; i++ )
+                cout << (int)(data[i]) << " ";
+            cout << endl;
+        }
+
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            s->localConnect( "asd" );
+            const char * foo = "asdasdasdasd";
+
+            
+            BSONObj in;
+            {
+                BSONObjBuilder b;
+                b.append( "a" , 7 );
+                b.appendBinData( "b" , strlen( foo ) , ByteArray , foo );
+                in = b.obj();
+                s->setObject( "x" , in );
+            }
+            
+            s->invokeSafe( "myb = x.b; print( myb ); printjson( myb );" , BSONObj() );
+            s->invokeSafe( "y = { c : myb };" , BSONObj() );
+            
+            BSONObj out = s->getObject( "y" );
+            ASSERT_EQUALS( BinData , out["c"].type() );
+            //blah( "in " , in["b"] );
+            //blah( "out" , out["c"] );
+            ASSERT_EQUALS( 0 , in["b"].woCompare( out["c"] , false ) );
+
+            delete s;
+        }
+    };
 
     class All : public Suite {
     public:
@@ -572,6 +613,7 @@ namespace JSTests {
             add< LongUtf8String >();
             add< CodeTests >();
             add< DBRefTest >();
+            add< BinDataType >();
         }
     };
     
