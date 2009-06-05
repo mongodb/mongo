@@ -32,8 +32,10 @@ scanned1 = t.find(q1).explain().nscanned;
 scanned2 = t.find(q2).explain().nscanned;
 scanned3 = t.find(q3).explain().nscanned;
 
-print( "scanned1: " + scanned1 + " scanned2: " + scanned2 + " scanned3: " + scanned3 );
+//print( "scanned1: " + scanned1 + " scanned2: " + scanned2 + " scanned3: " + scanned3 );
 
 // $all should just iterate either of the words
-//assert( scanned3 <= Math.max( scanned1 , scanned2 ) , "$all makes query optimizer not work well" );
+assert( scanned3 <= Math.max( scanned1 , scanned2 ) , "$all makes query optimizer not work well" );
 
+exp3 = t.find( q3 ).explain();
+assert.eq( exp3.startKey, exp3.endKey, "$all range not a single key" );
