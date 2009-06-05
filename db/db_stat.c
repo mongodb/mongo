@@ -18,11 +18,13 @@ __wt_db_stat_print(WT_TOC *toc)
 {
 	wt_args_db_stat_print_unpack;
 	IDB *idb;
+	IENV *ienv;
 	WT_STATS *stats;
 	WT_STOC *stoc;
 	int ret;
 
 	idb = db->idb;
+	ienv = toc->env->ienv;
 
 	WT_DB_FCHK(db, "Db.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
 
@@ -38,14 +40,14 @@ __wt_db_stat_print(WT_TOC *toc)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
 	/* Database handle statistics. */
-	fprintf(stream, "%s\n", WT_GLOBAL(sep));
+	fprintf(stream, "%s\n", ienv->sep);
 	fprintf(stream, "Database handle statistics: %s\n", db->idb->dbname);
 	for (stats = db->hstats; stats->desc != NULL; ++stats)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
 	/* Underlying file handle statistics. */
 	if (idb->fh != NULL) {
-		fprintf(stream, "%s\n", WT_GLOBAL(sep));
+		fprintf(stream, "%s\n", ienv->sep);
 		fprintf(stream,
 		    "Underlying file I/O statistics: %s\n", db->idb->dbname);
 		for (stats = idb->fh->stats; stats->desc != NULL; ++stats)
@@ -53,8 +55,8 @@ __wt_db_stat_print(WT_TOC *toc)
 	}
 
 	/* Underlying server thread statistics. */
-	if (!WT_GLOBAL(single_threaded) && idb->stoc != NULL) {
-		fprintf(stream, "%s\n", WT_GLOBAL(sep));
+	if (!F_ISSET(ienv, WT_SINGLE_THREADED) && idb->stoc != NULL) {
+		fprintf(stream, "%s\n", ienv->sep);
 		fprintf(stream,
 		    "Database handle's server thread statistics\n");
 		for (stats = idb->stoc->stats; stats->desc != NULL; ++stats)

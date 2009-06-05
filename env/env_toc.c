@@ -18,10 +18,13 @@ static int __wt_env_toc_destroy(WT_TOC *, u_int32_t);
 int
 __wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp)
 {
+	IENV *ienv;
 	WT_TOC *toc;
 	int ret;
 
-	WT_ENV_FCHK(env, "wt_toc_create", flags, WT_APIMASK_WT_TOC_CREATE);
+	ienv = env->ienv;
+
+	WT_ENV_FCHK(env, "wt_toc_create", flags, WT_APIMASK_ENV_TOC_CREATE);
 
 	if ((ret = __wt_calloc(env, 1, sizeof(WT_TOC), &toc)) != 0)
 		return (ret);
@@ -35,18 +38,18 @@ __wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp)
 		goto err;
 
 	/* Get a server slot ID. */
-	if ((ret = __wt_lock(&WT_GLOBAL(mtx))) != 0)
+	if ((ret = __wt_lock(&ienv->mtx)) != 0)
 		goto err;
-	toc->slot = WT_GLOBAL(toc_slot)++;
+	toc->slot = ienv->toc_slot++;
 	if (toc->slot >= WT_SERVER_QSIZE) {
-		__wt_db_errx(NULL, "wt_env_toc_create: too many threads");
+		__wt_env_errx(env, "wt_env_toc_create: too many threads");
 		ret = WT_ERROR;
 		goto err;
 	}
-	if ((ret = __wt_unlock(&WT_GLOBAL(mtx))) != 0)
+	if ((ret = __wt_unlock(&ienv->mtx)) != 0)
 		goto err;
 
-	if (WT_GLOBAL(single_threaded))
+	if (F_ISSET(ienv, WT_SINGLE_THREADED))
 		F_SET(toc, WT_SINGLE_THREADED);
 	toc->destroy = __wt_env_toc_destroy;
 
@@ -71,7 +74,7 @@ __wt_env_toc_destroy(WT_TOC *toc, u_int32_t flags)
 	ret = 0;
 
 	WT_ENV_FCHK_NOTFATAL(
-	    env, "WtToc.destroy", flags, WT_APIMASK_WT_TOC_DESTROY, ret);
+	    env, "WtToc.destroy", flags, WT_APIMASK_TOC_DESTROY, ret);
 
 	if ((tret = __wt_mtx_destroy(toc->block)) != 0 && ret == 0)
 		ret = tret;
@@ -90,6 +93,7 @@ __wt_env_toc_destroy(WT_TOC *toc, u_int32_t flags)
 int
 __wt_env_toc_sched(WT_TOC *toc)
 {
+	IENV *ienv;
 	WT_STOC *stoc;
 	WT_TOC **q, **eq;
 	u_int sid;
@@ -110,13 +114,8 @@ __wt_env_toc_sched(WT_TOC *toc)
 	 * Decide what server to use: use the specified server if doing a DB
 	 * handle operation, all other calls are handled by the primary server.
 	 */
-	if (toc->db == NULL || toc->db->idb->stoc == NULL)
-		sid = WT_PSTOC_ID;
-	else
-		sid = toc->db->idb->stoc->id;
-	stoc = WT_GLOBAL(sq) + (sid - 1);
-
-	stoc->ops[toc->slot] = toc;
+	if (toc->db == NULL || (stoc = toc->db->idb->stoc) == NULL)
+		stoc = ienv->sq;
 
 	(void)__wt_lock(toc->block);
 

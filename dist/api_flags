@@ -10,16 +10,10 @@
 #############################################
 # Threads-of-control.
 #############################################
-wt_start
-	SINGLE_THREADED			# Single-threaded access only
+Toc
+	RUNNING				# Thread being served
 
-wt_toc
-	RUNNING				# Thread of control is running
-	SINGLE_THREADED			# Single-threaded access only
-
-wt_toc_create				# Flags argument, but no flags
-wt_toc.destroy
-wt_stop
+Toc.destroy
 
 #############################################
 # Environments.
@@ -27,17 +21,26 @@ wt_stop
 Env					# Public handle
 
 IEnv					# Private handle
+	SINGLE_THREADED
+
+wt_env_create
+Env.close
+Env.db_create
+Env.destroy
+Env.open
+
+Env.start
+	SINGLE_THREADED
+
+Env.stat_clear
+Env.stat_print
+Env.stop
+Env.toc_create
 
 Env.verbose
 	VERB_FILEOPS			# Verbose, major file operations
 	VERB_FILEOPS_ALL		# Verbose, all file operations
 
-wt_env_create				# Flags argument, but no flags
-Env.close
-Env.destroy
-Env.open
-Env.stat_clear
-Env.stat_print
 #############################################
 # Databases.
 #############################################
@@ -46,22 +49,25 @@ Db					# Public handle
 IDb					# Private handle
 	CREATE				# Create any backing files
 
+wt_db_create				# Flags argument, but no flags
+
 Db.bulk_load
 	DUPLICATES			# Load contains duplicates
 	SORTED_INPUT			# Load input is in sorted order
+
+Db.close
+Db.destroy
 
 Db.dump
 	DEBUG				# Debugging format
 	PRINTABLES			# Display printable characters
 
+Db.get
+Db.get_recno
+
 Db.open
 	CREATE				# Create any backing files
 
-wt_db_create				# Flags argument, but no flags
-Db.close
-Db.destroy
-Db.get
-Db.get_recno
 Db.stat_clear
 Db.stat_print
 Db.sync

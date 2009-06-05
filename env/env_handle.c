@@ -161,6 +161,8 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	return (0);
 }
 
+void *__wt_addr;				/* Memory flush address. */
+
 /*
  * __wt_ienv_config_default --
  *	Set default configuration for a just-created IENV handle.
@@ -168,6 +170,40 @@ __wt_ienv_destroy(ENV *env, int refresh)
 static int
 __wt_ienv_config_default(ENV *env)
 {
+	IENV *ienv;
+	WT_STOC *stoc;
+	u_int i;
+	int ret;
+
+	ienv = env->ienv;
+
+	/*
+	 * We need an address for memory flushing -- it doesn't matter which
+	 * one we choose.
+	 */
+	__wt_addr = &ienv->running;
+
+	/*
+	 * Allocate an initial list of server slots.
+	 *
+	 * The normal state of the blocking mutex is locked.
+	 */
+#define	WT_SERVERQ_SIZE	64
+	ienv->sq_entries = WT_SERVERQ_SIZE;
+	if ((ret = __wt_calloc(
+	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq)) != 0)
+		return (ret);
+	for (i = 0, stoc = ienv->sq; i < ienv->sq_entries; ++i, ++stoc)
+		if ((ret = __wt_stat_alloc_stoc_stats(NULL, &stoc->stats)) != 0)
+			return (ret);
+
+	/* Initialize the global mutex. */
+	if ((ret = __wt_mtx_init(&ienv->mtx)) != 0)
+		return (ret);
+
+	/* Diagnostic output separator. */
+	ienv->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
+
 	return (0);
 }
 

@@ -20,11 +20,13 @@ __wt_db_open(WT_TOC *toc)
 {
 	wt_args_db_open_unpack;
 	ENV *env;
+	IENV *ienv;
 	WT_STOC *stoc;
 	IDB *idb;
 	int ret;
 
 	env = toc->env;
+	ienv = env->ienv;
 	idb = db->idb;
 
 	WT_DB_FCHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
@@ -37,11 +39,11 @@ __wt_db_open(WT_TOC *toc)
 	 * If we're using a single thread, reference it.   Otherwise create
 	 * a server thread.
 	 */
-	if (WT_GLOBAL(single_threaded))
-		stoc = WT_GLOBAL(sq);
+	if (F_ISSET(ienv, WT_SINGLE_THREADED))
+		stoc = ienv->sq;
 	else {
-		stoc = WT_GLOBAL(sq) + WT_GLOBAL(sq_next);
-		stoc->id = ++WT_GLOBAL(sq_next);
+		stoc = ienv->sq + ienv->sq_next;
+		stoc->id = ++ienv->sq_next;
 		stoc->running = 1;
 		if (pthread_create(&stoc->tid, NULL, __wt_workq, stoc) != 0) {
 			__wt_env_err(
@@ -70,17 +72,19 @@ static int
 __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 {
 	ENV *env;
+	IENV *ienv;
 	IDB *idb;
 	int ret;
 
 	env = db->env;
+	ienv = env->ienv;
 	idb = db->idb;
 
 	if ((ret = __wt_strdup(env, dbname, &idb->dbname)) != 0)
 		return (ret);
 	idb->mode = mode;
 
-	idb->file_id = ++WT_GLOBAL(file_id);
+	idb->file_id = ++ienv->file_id;
 
 	if (LF_ISSET(WT_CREATE))
 		F_SET(idb, WT_CREATE);

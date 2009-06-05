@@ -37,7 +37,6 @@ extern "C" {
  *******************************************/
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
-struct __wt_globals;		typedef struct __wt_globals WT_GLOBALS;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_item_offp;		typedef struct __wt_item_offp WT_ITEM_OFFP;
 struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
@@ -59,7 +58,6 @@ struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 #include "misc.h"			/* Internal */
 #include "mutex.h"
 #include "fh.h"
-#include "global.h"
 #include "btree.h"
 #include "connect.h"
 #include "connect_auto.h"
@@ -102,8 +100,20 @@ struct __idbc {
  * Environment handle information that doesn't persist.
  *******************************************/
 struct __ienv {
-	WT_TOC *toc;			/* Enclosing thread of control */
 	ENV *env;			/* Public object */
+
+	WT_MTX mtx;			/* Global mutex */
+	int running;			/* Environment active */
+
+	WT_STOC *sq;			/* Server thread queue */
+	int sq_next;			/* Next server slot */
+	int sq_entries;			/* Total server entries */
+	int toc_slot;			/* TOC server slot */
+
+	u_int file_id;			/* Serial file ID */
+
+	char *sep;			/* Display separator line */
+	char err_buf[32];		/* Last-ditch error buffer */
 
 	u_int32_t flags;
 };

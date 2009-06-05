@@ -18,10 +18,12 @@ __wt_db_close(WT_TOC *toc)
 {
 	wt_args_db_close_unpack;
 	ENV *env;
+	IENV *ienv;
 	WT_STOC *stoc;
 	int ret, tret;
 
 	env = toc->env;
+	ienv = env->ienv;
 	stoc = db->idb->stoc;
 	ret = 0;
 
@@ -36,7 +38,7 @@ __wt_db_close(WT_TOC *toc)
 		ret = tret;
 
 	/* Discard the server thread. */
-	if (!WT_GLOBAL(single_threaded)) {
+	if (!F_ISSET(ienv, WT_SINGLE_THREADED)) {
 		stoc->running = 0;
 		WT_FLUSH_MEMORY;
 		(void)pthread_join(stoc->tid, NULL);

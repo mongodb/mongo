@@ -10,17 +10,20 @@
 #include "wt_internal.h"
 
 /*
- * wt_start --
+ * __wt_env_start --
  *	Start the engine.
  */
 int
 __wt_env_start(ENV *env, u_int32_t flags)
 {
+	IENV *ienv;
 	WT_STOC *stoc;
 	static int initial_tasks = 0;
 	int ret;
 
-	WT_ENV_FCHK(NULL, "wt_start", flags, WT_APIMASK_WT_START);
+	ienv = env->ienv;
+
+	WT_ENV_FCHK(NULL, "Env.start", flags, WT_APIMASK_ENV_START);
 
 	/*
 	 * No matter what we're doing, we end up here before we do any real
@@ -30,49 +33,48 @@ __wt_env_start(ENV *env, u_int32_t flags)
 	if (!initial_tasks) {
 		if ((ret = __wt_build_verify()) != 0)
 			return (ret);
-		if ((ret = __wt_global_init()) != 0)
-			return (ret);
 		initial_tasks = 1;
 	}
 
-	WT_ENV_FCHK(NULL, "wt_start", flags, WT_APIMASK_WT_START);
-
 	/* Create the primary thread-of-control structure. */
-	stoc = WT_GLOBAL(sq) + WT_GLOBAL(sq_next);
-	stoc->id = ++WT_GLOBAL(sq_next);
+	stoc = ienv->sq  + ienv->sq_next;
+	stoc->id = ++ienv->sq_next;
 	stoc->running = 1;
 
 	/* If we're single-threaded, we're done. */
 	if (LF_ISSET(WT_SINGLE_THREADED)) {
-		WT_GLOBAL(single_threaded) = WT_GLOBAL(running) = 1;
+		F_SET(ienv, WT_SINGLE_THREADED);
 		return (0);
 	}
 
 	/* Spawn our primary thread. */
 	if (pthread_create(&stoc->tid, NULL, __wt_workq, stoc) != 0) {
-		__wt_env_err(env, errno, "wt_start: primary server thread");
+		__wt_env_err(env, errno, "Env.start: primary server thread");
 		return (WT_ERROR);
 	}
 
 	/* We're running. */
-	WT_GLOBAL(running) = 1;
+	ienv->running = 1;
 	WT_FLUSH_MEMORY;
 
 	return (0);
 }
 
 /*
- * wt_stop --
+ * __wt_env_stop --
  *	Stop the engine.
  */
 int
 __wt_env_stop(ENV *env, u_int32_t flags)
 {
+	IENV *ienv;
 	DB *db;
 	WT_STOC *stoc;
 	u_int i;
 
-	WT_ENV_FCHK(NULL, "Env.stop", flags, WT_APIMASK_WT_STOP);
+	ienv = env->ienv;
+
+	WT_ENV_FCHK(NULL, "Env.stop", flags, WT_APIMASK_ENV_STOP);
 
 	/*
 	 * We don't close open databases -- we need a TOC to do that, and we
@@ -83,14 +85,14 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 		    "Env.stop: database %s left open", db->idb->dbname);
 
 	/* If we're single-threaded, we're done. */
-	if (WT_GLOBAL(single_threaded))
+	if (F_ISSET(ienv, WT_SINGLE_THREADED))
 		return (0);
 
 	/* Flag all running threads to quit, and wait for them to exit. */
-	WT_GLOBAL(running) = 0;
+	ienv->running = 0;
 	WT_FLUSH_MEMORY;
-	for (i = 0; i < WT_GLOBAL(sq_entries); ++i) {
-		stoc = WT_GLOBAL(sq) + i;
+	for (i = 0; i < ienv->sq_entries; ++i) {
+		stoc = ienv->sq + i;
 		if (stoc->running) {
 			stoc->running = 0;
 			WT_FLUSH_MEMORY;
@@ -108,11 +110,13 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 void *
 __wt_workq(void *arg)
 {
+	IENV *ienv;
 	WT_STOC *stoc;
 	WT_TOC **q, **eq, *toc;
 	int maxsleep, not_found;
 
 	stoc = arg;
+	ienv = stoc->idb->db->env->ienv;
 
 	/* Walk the queue, executing work. */
 	not_found = 1;
@@ -157,7 +161,7 @@ __wt_workq(void *arg)
 				}
 			q = stoc->ops;
 		}
-	} while (WT_GLOBAL(running) == 1 && stoc->running == 1);
+	} while (ienv->running == 1 && stoc->running == 1);
 
 	return (NULL);
 }

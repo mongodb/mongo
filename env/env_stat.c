@@ -18,10 +18,13 @@ __wt_env_stat_print(WT_TOC *toc)
 {
 	wt_args_env_stat_print_unpack;
 	DB *db;
+	IENV *ienv;
 	WT_STATS *stats;
 	WT_STOC *stoc;
 	u_int i;
 	int ret;
+
+	ienv = env->ienv;
 
 	WT_ENV_FCHK(env, "Env.stat_print", flags, WT_APIMASK_ENV_STAT_PRINT);
 
@@ -29,9 +32,8 @@ __wt_env_stat_print(WT_TOC *toc)
 	for (stats = env->hstats; stats->desc != NULL; ++stats)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
-	fprintf(stream, "%s\n", WT_GLOBAL(sep));
-	for (i = 0; i < WT_GLOBAL(sq_entries); ++i) {
-		stoc = WT_GLOBAL(sq) + i;
+	fprintf(stream, "%s\n", ienv->sep);
+	for (i = 0, stoc = ienv->sq; i < ienv->sq_entries; ++i, ++stoc) {
 		if (!stoc->running)
 			continue;
 		fprintf(stream, "Server #%d thread statistics\n", stoc->id);
@@ -39,7 +41,7 @@ __wt_env_stat_print(WT_TOC *toc)
 			fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 	}
 
-	fprintf(stream, "%s\n", WT_GLOBAL(sep));
+	fprintf(stream, "%s\n", ienv->sep);
 	TAILQ_FOREACH(db, &env->dbqh, q)
 		if ((ret = db->stat_print(db, toc, stream, flags)) != 0)
 			return (ret);
