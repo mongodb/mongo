@@ -636,7 +636,7 @@ namespace mongo {
         
         if ( JS_InstanceOf( c->_context , o , &bindata_class , 0 ) ){
             b.appendBinData( name.c_str() , 
-                             (int)(c->getNumber( o , "len" )) , (BinDataType)(c->getNumber( o , "type" ) ) , 
+                             (int)(c->getNumber( o , "len" )) , (BinDataType)((char)(c->getNumber( o , "type" ) ) ) , 
                              (char*)JS_GetPrivate( c->_context , o ) + 1
                              );
             return true;
