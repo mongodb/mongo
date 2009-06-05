@@ -36,7 +36,7 @@ __wt_db_close(WT_TOC *toc)
 		ret = tret;
 
 	/* Discard the server thread. */
-	if (WT_GLOBAL(single_threaded)) {
+	if (!WT_GLOBAL(single_threaded)) {
 		stoc->running = 0;
 		WT_FLUSH_MEMORY;
 		(void)pthread_join(stoc->tid, NULL);
