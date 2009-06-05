@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
-#if 0
+/*
 The memory debugger included in the WiredTiger sources tracks allocations and
 frees, but doesn't do any kind of overrun detection.
 
@@ -34,7 +34,7 @@ a repeatable pattern of allocations.  To get a stack trace to review:
 If your debugger doesn't change memory allocation patterns from run to run,
 you can also set a breakpoint in the __wt_debug_loadme function and run the
 program under a debugger.
-#endif
+*/
 
 #define	WT_MEMORY_FILE	"memory.out"
 static FILE *__wt_mfp;
