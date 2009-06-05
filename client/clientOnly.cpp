@@ -3,6 +3,9 @@
 namespace mongo {
 
     const char * curNs = "in client mode";
+
+    bool quiet = false;
+
     //    Database* database = 0;
 
     void dbexit(int returnCode, const char *whyMsg ) {

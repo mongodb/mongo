@@ -480,6 +480,26 @@ namespace mongo {
         { 0 }
     };
 
+    // BinData
+
+
+    JSBool bindata_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        JS_ReportError( cx , "can't create a BinData yet" );
+        return JS_FALSE;            
+    }
+ 
+    JSClass bindata_class = {
+        "BinData" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSFunctionSpec bindata_functions[] = {
+        { 0 }
+    };
+    
+
     // -----
 
     JSClass timestamp_class = {
@@ -576,6 +596,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 0 , 0 , dbref_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
@@ -613,6 +634,14 @@ namespace mongo {
             return true;
         }
         
+        if ( JS_InstanceOf( c->_context , o , &bindata_class , 0 ) ){
+            b.appendBinData( name.c_str() , 
+                             (int)(c->getNumber( o , "len" )) , (BinDataType)((char)(c->getNumber( o , "type" ) ) ) , 
+                             (char*)JS_GetPrivate( c->_context , o ) + 1
+                             );
+            return true;
+        }
+
 #if defined( SM16 ) || defined( MOZJS )
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );

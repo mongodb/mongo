@@ -186,6 +186,10 @@ DBRef.prototype.toString = function(){
     return "DBRef " + this.ns + ":" + this.id;
 }
 
+BinData.prototype.tojson = function(){
+    return "BinData type: " + this.type + " len: " + this.len;
+}
+
 tojson = function( x ){
     if ( x == null || x == undefined )
         return "";

@@ -198,7 +198,7 @@ namespace mongo {
                 m.reset();
 
                 if ( !dbMsgPort.recv(m) ) {
-                    log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
+                    lognoquiet() << "end connection " << dbMsgPort.farEnd.toString() << endl;
                     dbMsgPort.shutdown();
                     break;
                 }

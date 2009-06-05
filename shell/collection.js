@@ -363,6 +363,10 @@ DBCollection.prototype.isCapped = function(){
     return ( e && e.options && e.options.capped ) ? true : false;
 }
 
+DBCollection.prototype.group = function( params ){
+    params.ns = this._shortName;
+    return this._db.group( params );
+}
 
 DBCollection.prototype.toString = function(){
     return this.getFullName();

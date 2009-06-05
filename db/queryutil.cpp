@@ -55,9 +55,18 @@ namespace mongo {
             case BSONObj::GTE:
                 lower_ = e;
                 break;
-            case BSONObj::opIN:
-            case BSONObj::opALL: {
-                massert( "$in/$all require array", e.type() == Array );
+	    case BSONObj::opALL: {
+	        massert( "$all requires array", e.type() == Array );
+		BSONObjIterator i( e.embeddedObject() );
+		if ( i.more() ) {
+ 		    BSONElement f = i.next();
+		    if ( !f.eoo() )
+		      lower_ = upper_ = f;
+		}
+		break;
+	    }
+	    case BSONObj::opIN: {
+                massert( "$in requires array", e.type() == Array );
                 BSONElement max = minKey.firstElement();
                 BSONElement min = maxKey.firstElement();
                 BSONObjIterator i( e.embeddedObject() );

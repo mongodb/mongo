@@ -335,7 +335,7 @@ namespace mongo {
         }
 
         jsval toval( const BSONElement& e ){
-
+            
             switch( e.type() ){
             case EOO:
             case jstNULL:
@@ -344,6 +344,7 @@ namespace mongo {
             case NumberDouble:
             case NumberInt:
                 return toval( e.number() );
+            case Symbol: // TODO: should we make a special class for this
             case String:
                 return toval( e.valuestr() );
             case Bool:
@@ -435,12 +436,20 @@ namespace mongo {
 
                 JSObject * oid = JS_NewObject( _context , &object_id_class , 0 , 0 );
                 setProperty( oid , "str" , toval( e.dbrefOID().str().c_str() ) );
-
+                
                 setProperty( o , "id" , OBJECT_TO_JSVAL( oid ) );
                 return OBJECT_TO_JSVAL( o );
             }
-            default:
-                log() << "toval can't handle type: " << (int)(e.type()) << endl;
+            case BinData:{
+                JSObject * o = JS_NewObject( _context , &bindata_class , 0 , 0 );
+                int len;
+                void * data = (void*)e.binData( len );
+                assert( JS_SetPrivate( _context , o , data ) );
+                
+                setProperty( o , "len" , toval( len ) );
+                setProperty( o , "type" , toval( (int)e.binDataType() ) );
+                return OBJECT_TO_JSVAL( o );
+            }
             }
             
             uassert( "not done: toval" , 0 );

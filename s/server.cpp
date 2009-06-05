@@ -33,7 +33,7 @@ namespace mongo {
     const char *curNs = "";
     Database *database = 0;
     string ourHostname;
-    
+    bool quiet = false;
     OID serverID;
     
     

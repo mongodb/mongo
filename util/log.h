@@ -20,6 +20,8 @@
 
 namespace mongo {
 
+    extern bool quiet;
+
     // Utility interface for stringifying object only when val() called.
     class LazyString {
     public:
@@ -182,8 +184,15 @@ namespace mongo {
         return logstream.prolog();
     }
 
+    inline Nullstream& lognoquiet(){
+        if ( quiet )
+            return nullstream;
+        return log();
+    }
+
     inline ostream& stdcout() {
         return cout;
     }
+
 
 } // namespace mongo
