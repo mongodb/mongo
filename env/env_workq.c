@@ -84,14 +84,13 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 	/* Flag all running threads to quit, and wait for them to exit. */
 	ienv->running = 0;
 	WT_FLUSH_MEMORY;
-	for (i = 0; i < ienv->sq_entries; ++i) {
-		stoc = ienv->sq + i;
+
+	WT_STOC_FOREACH(ienv, stoc, i)
 		if (stoc->running) {
 			stoc->running = 0;
 			WT_FLUSH_MEMORY;
 			(void)pthread_join(stoc->tid, NULL);
 		}
-	}
 
 	return (0);
 }

@@ -32,7 +32,7 @@ __wt_env_stat_print(WT_TOC *toc)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
 	fprintf(stream, "%s\n", ienv->sep);
-	for (i = 0, stoc = ienv->sq; i < ienv->sq_entries; ++i, ++stoc) {
+	WT_STOC_FOREACH {
 		if (!stoc->running)
 			continue;
 		fprintf(stream, "Server #%d thread statistics\n", stoc->id);

@@ -182,7 +182,7 @@ __wt_ienv_config_default(ENV *env)
 	ienv->sq_entries = WT_SERVERQ_SIZE;
 	WT_RET((__wt_calloc(
 	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq)));
-	for (i = 0, stoc = ienv->sq; i < ienv->sq_entries; ++i, ++stoc)
+	WT_STOC_FOREACH(ienv, stoc, i)
 		WT_RET((__wt_stat_alloc_stoc_stats(NULL, &stoc->stats)));
 
 	/* Initialize the global mutex. */

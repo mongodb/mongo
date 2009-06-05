@@ -44,6 +44,10 @@ struct __wt_stoc {
 	WT_STATS *stats;			/* Server statistics */
 };
 
+#define	WT_STOC_FOREACH(ienv, stoc, i)					\
+	for ((i) = 0, (stoc) = (ienv)->sq;				\
+	    (i) < (ienv)->sq_entries; ++(i), ++(stoc))
+
 #if defined(__cplusplus)
 }
 #endif
