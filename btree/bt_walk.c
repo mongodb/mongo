@@ -21,7 +21,7 @@ __wt_bt_stat(DB *db)
 {
 	IDB *idb;
 	WT_PAGE *page;
-	int ret, tret;
+	int ret;
 
 	idb = db->idb;
 
@@ -29,12 +29,9 @@ __wt_bt_stat(DB *db)
 
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
-		if ((ret =
-		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, 0, &page)) != 0)
-			return (ret);
+		WT_RET((__wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, 0, &page)));
 		ret = __wt_bt_stat_page(db, page);
-		if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0)
-			ret = tret;
+		WT_TRET((__wt_bt_page_out(db, page, 0)));
 		return (ret);
 	}
 
@@ -51,15 +48,14 @@ __wt_bt_stat_level(DB *db, u_int32_t addr, int isleaf)
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr_arg;
-	int first, isleaf_arg, ret, tret;
+	int first, isleaf_arg, ret;
 
 	ret = 0;
 	addr_arg = WT_ADDR_INVALID;
 
 	for (first = 1; addr != WT_ADDR_INVALID;) {
 		/* Get the next page and stat it. */
-		if ((ret = __wt_bt_page_in(db, addr, isleaf, 0, &page)) != 0)
-			return (ret);
+		WT_RET((__wt_bt_page_in(db, addr, isleaf, 0, &page)));
 
 		ret = __wt_bt_stat_page(db, page);
 
@@ -78,10 +74,9 @@ __wt_bt_stat_level(DB *db, u_int32_t addr, int isleaf)
 				    page, &addr_arg, &isleaf_arg);
 		}
 
-		if ((tret = __wt_bt_page_out(db, page, 0)) != 0 && ret == 0) {
-			ret = tret;
+		WT_TRET((__wt_bt_page_out(db, page, 0)));
+		if (ret != 0)
 			return (ret);
-		}
 	}
 
 	if (addr_arg != WT_ADDR_INVALID) {
@@ -102,7 +97,6 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, i;
-	int ret;
 
 	hdr = page->hdr;
 	addr = page->addr;
@@ -180,11 +174,10 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 		case WT_ITEM_OFFP_LEAF:
 			if (hdr->type != WT_PAGE_LEAF)
 				break;
-			if ((ret = __wt_bt_stat_level(db,
+			WT_RET((__wt_bt_stat_level(db,
 			    ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr,
 			    WT_ITEM_TYPE(item) ==
-			    WT_ITEM_OFFP_LEAF ? 1 : 0)) != 0)
-				return (ret);
+			    WT_ITEM_OFFP_LEAF ? 1 : 0)));
 			break;
 		default:
 			break;

@@ -79,6 +79,25 @@ extern "C" {
 	default:							\
 		return (__wt_database_format(db))
 
+/*
+ * Standard macros that set return values and optionally branch to an error
+ * label.
+ */
+#define	WT_ERR(a) {							\
+	if ((ret = a) != 0)						\
+		goto err;						\
+}
+#define	WT_RET(a) {							\
+	int __ret;							\
+	if ((__ret = a) != 0)						\
+		return (__ret);						\
+}
+#define	WT_TRET(a) {							\
+	int __ret;							\
+	if ((__ret = a) != 0 && ret == 0)				\
+		ret = __ret;						\
+}
+
 #if defined(__cplusplus)
 }
 #endif

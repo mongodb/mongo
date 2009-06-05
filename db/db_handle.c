@@ -31,9 +31,8 @@ __wt_env_db_create(WT_TOC *toc)
 	WT_ENV_FCHK(env, "Env.db_create", flags, WT_APIMASK_WT_DB_CREATE);
 
 	/* Create the DB and IDB structures. */
-	if ((ret = __wt_calloc(env, 1, sizeof(DB), &db)) != 0 ||
-	    (ret = __wt_calloc(env, 1, sizeof(IDB), &idb)) != 0)
-		goto err;
+	WT_ERR((__wt_calloc(env, 1, sizeof(DB), &db)));
+	WT_ERR((__wt_calloc(env, 1, sizeof(IDB), &idb)));
 
 	/* Connect everything together. */
 	toc->db = db;
@@ -43,10 +42,8 @@ __wt_env_db_create(WT_TOC *toc)
 	db->ienv = env->ienv;
 
 	/* Configure the DB and the IDB. */
-	if ((ret = __wt_db_config_default(db)) != 0)
-		goto err;
-	if ((ret = __wt_idb_config_default(db)) != 0)
-		goto err;
+	WT_ERR((__wt_db_config_default(db)));
+	WT_ERR((__wt_idb_config_default(db)));
 
 	/* Insert the database on the environment's list. */
 	TAILQ_INSERT_TAIL(&env->dbqh, db, q);
@@ -79,7 +76,7 @@ __wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 {
 	DB *db;
 	ENV *env;
-	int ret, tret;
+	int ret;
 
 	db = toc->db;
 	env = toc->env;
@@ -89,8 +86,7 @@ __wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 	    db, "Db.destroy", flags, WT_APIMASK_DB_DESTROY, ret);
 
 	/* Discard the underlying IDB structure. */
-	if ((tret = __wt_idb_destroy(db, 0)) != 0 && ret == 0)
-		ret = tret;
+	WT_TRET((__wt_idb_destroy(db, 0)));
 
 	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, db->hstats);
@@ -112,7 +108,6 @@ static int
 __wt_db_config_default(DB *db)
 {
 	ENV *env;
-	int ret;
 
 	env = db->env;
 
@@ -120,10 +115,8 @@ __wt_db_config_default(DB *db)
 
 	db->btree_compare = db->btree_dup_compare = __wt_bt_lex_compare;
 
-	if ((ret = __wt_stat_alloc_db_hstats(env, &db->hstats)) != 0)
-		return (ret);
-	if ((ret = __wt_stat_alloc_db_dstats(env, &db->dstats)) != 0)
-		return (ret);
+	WT_RET((__wt_stat_alloc_db_hstats(env, &db->hstats)));
+	WT_RET((__wt_stat_alloc_db_dstats(env, &db->dstats)));
 
 	return (0);
 }
@@ -137,7 +130,6 @@ __wt_idb_destroy(DB *db, int refresh)
 {
 	ENV *env;
 	IDB *idb;
-	int ret;
 
 	env = db->env;
 	idb = db->idb;
@@ -167,8 +159,7 @@ __wt_idb_destroy(DB *db, int refresh)
 	 * by DB configuration, we'd lose that configuration here.
 	 */
 	memset(idb, 0, sizeof(idb));
-	if ((ret = __wt_idb_config_default(db)) != 0)
-		return (ret);
+	WT_RET((__wt_idb_config_default(db)));
 
 	return (0);
 }

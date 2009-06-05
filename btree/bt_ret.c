@@ -25,7 +25,6 @@ __wt_bt_dbt_return(DB *db,
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	int (*callback)(DB *, DBT *, DBT *);
-	int ret;
 
 	idb = db->idb;
 
@@ -50,13 +49,11 @@ __wt_bt_dbt_return(DB *db,
 	 * If the key is an overflow, it may not have been instantiated yet.
 	 */
 	if (key_return) {
-		if (ip->data == NULL &&
-		    (ret = __wt_bt_ovfl_to_indx(db, page, ip)) != 0)
-			return (ret);
+		if (ip->data == NULL)
+			WT_RET((__wt_bt_ovfl_to_indx(db, page, ip)));
 		if (callback == NULL) {
-			if ((ret = __wt_bt_dbt_copyout(
-			    db, key, &idb->key, ip->data, ip->size)) != 0)
-				return (ret);
+			WT_RET((__wt_bt_dbt_copyout(
+			    db, key, &idb->key, ip->data, ip->size)));
 		} else {
 			key->data = ip->data;
 			key->size = ip->size;
@@ -73,10 +70,9 @@ __wt_bt_dbt_return(DB *db,
 			goto overflow;
 
 		if (callback == NULL) {
-			if ((ret = __wt_bt_dbt_copyout(db, data,
+			WT_RET((__wt_bt_dbt_copyout(db, data,
 			    &idb->data, WT_ITEM_BYTE(item),
-			    (u_int32_t)WT_ITEM_LEN(item))) != 0)
-				return (ret);
+			    (u_int32_t)WT_ITEM_LEN(item))));
 		} else {
 			data->data = WT_ITEM_BYTE(item);
 			data->size = (u_int32_t)WT_ITEM_LEN(item);
@@ -87,9 +83,8 @@ __wt_bt_dbt_return(DB *db,
 			goto overflow;
 
 		if (callback == NULL) {
-			if ((ret = __wt_bt_dbt_copyout(db, data,
-			    &idb->data, ip->data, ip->size)) != 0)
-				return (ret);
+			WT_RET((__wt_bt_dbt_copyout(db, data,
+			    &idb->data, ip->data, ip->size)));
 		} else {
 			data->data = ip->data;
 			data->size = ip->size;
@@ -111,12 +106,9 @@ overflow:	/*
 			if (F_ISSET(data, WT_DBT_APPMEM) &&
 			    data->data_len < ovfl->len)
 				return (WT_TOOSMALL);
-			if ((ret = __wt_bt_ovfl_to_dbt(db, ovfl, data)) != 0)
-				return (ret);
+			WT_RET((__wt_bt_ovfl_to_dbt(db, ovfl, data)));
 		} else {
-			if ((ret =
-			    __wt_bt_ovfl_to_dbt(db, ovfl, &idb->data)) != 0)
-				return (ret);
+			WT_RET((__wt_bt_ovfl_to_dbt(db, ovfl, &idb->data)));
 			data->data = idb->data.data;
 			data->size = idb->data.size;
 		}
@@ -137,7 +129,6 @@ __wt_bt_dbt_copyout(
     DB *db, DBT *dbt, DBT *local_dbt, u_int8_t *p, u_int32_t size)
 {
 	ENV *env;
-	int ret;
 
 	env = db->env;
 
@@ -149,9 +140,8 @@ __wt_bt_dbt_copyout(
 	 */
 	if (F_ISSET(dbt, WT_DBT_ALLOC)) {
 		if (dbt->data_len < size) {
-			if ((ret = __wt_realloc(
-			    env, dbt->data_len, size, &dbt->data)) != 0)
-				return (ret);
+			WT_RET((__wt_realloc(
+			    env, dbt->data_len, size, &dbt->data)));
 			dbt->data_len = size;
 		}
 	} else if (F_ISSET(dbt, WT_DBT_APPMEM)) {
@@ -159,9 +149,8 @@ __wt_bt_dbt_copyout(
 			return (WT_TOOSMALL);
 	} else {
 		if (local_dbt->data_len < size) {
-			if ((ret = __wt_realloc(
-			    env, size, size + 40, &local_dbt->data)) != 0)
-				return (ret);
+			WT_RET((__wt_realloc(
+			    env, size, size + 40, &local_dbt->data)));
 			local_dbt->data_len = size + 40;
 		}
 		dbt->data = local_dbt->data;

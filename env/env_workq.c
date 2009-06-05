@@ -18,8 +18,6 @@ __wt_env_start(ENV *env, u_int32_t flags)
 {
 	IENV *ienv;
 	WT_STOC *stoc;
-	static int initial_tasks = 0;
-	int ret;
 
 	ienv = env->ienv;
 
@@ -27,14 +25,9 @@ __wt_env_start(ENV *env, u_int32_t flags)
 
 	/*
 	 * No matter what we're doing, we end up here before we do any real
-	 * work.   The first time, check the build itself and initialize the
-	 * global structure.
+	 * work.   Check the build itself.
 	 */
-	if (!initial_tasks) {
-		if ((ret = __wt_build_verify()) != 0)
-			return (ret);
-		initial_tasks = 1;
-	}
+	WT_RET((__wt_build_verify()));
 
 	/* Create the primary thread-of-control structure. */
 	stoc = ienv->sq  + ienv->sq_next;

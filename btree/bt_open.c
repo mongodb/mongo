@@ -19,17 +19,15 @@ int
 __wt_bt_open(DB *db)
 {
 	IDB *idb;
-	int isleaf, ret;
+	int isleaf;
 
 	idb = db->idb;
 
 	/* Check page size configuration. */
-	if ((ret = __wt_bt_vrfy_sizes(db)) != 0)
-		return (ret);
+	WT_RET((__wt_bt_vrfy_sizes(db)));
 
 	/* Open the underlying database file. */
-	if ((ret = __wt_cache_open(db)) != 0)
-		return (ret);
+	WT_RET((__wt_cache_open(db)));
 
 	/* If the file is empty, we're done. */
 	if (idb->fh->file_size == 0) {
@@ -43,17 +41,15 @@ __wt_bt_open(DB *db)
 	 * there had better be a description record.)  Then, read in the root
 	 * page.
 	 */
-	if ((ret = __wt_bt_desc_read(db)) != 0)
-		return (ret);
+	WT_RET((__wt_bt_desc_read(db)));
 
 	/*
 	 * The isleaf value tells us how big a page to read.  If the tree has
 	 * split, the root page is an internal page, otherwise it's a leaf page.
 	 */
 	isleaf = idb->root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
-	if ((ret = __wt_bt_page_in(
-	    db, idb->root_addr, isleaf, 1, &idb->root_page)) != 0)
-		return (ret);
+	WT_RET((__wt_bt_page_in(
+	    db, idb->root_addr, isleaf, 1, &idb->root_page)));
 
 	return (0);
 }

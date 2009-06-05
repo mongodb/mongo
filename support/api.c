@@ -852,11 +852,8 @@ static int __wt_db_set_btree_compare_int(WT_TOC *toc);
 static int __wt_db_set_btree_compare_int(WT_TOC *toc)
 {
 	wt_args_db_set_btree_compare_int_unpack;
-	int ret;
 
-	if ((ret = __wt_db_set_btree_compare_int_verify(toc)) != 0)
-		return (ret);
-
+	WT_RET((__wt_db_set_btree_compare_int_verify(toc)));
 	db->btree_compare_int = btree_compare_int;
 	return (0);
 }
@@ -1013,11 +1010,8 @@ static int __wt_env_set_verbose(WT_TOC *toc);
 static int __wt_env_set_verbose(WT_TOC *toc)
 {
 	wt_args_env_set_verbose_unpack;
-	int ret;
 
-	if ((ret = __wt_env_set_verbose_verify(toc)) != 0)
-		return (ret);
-
+	WT_RET((__wt_env_set_verbose_verify(toc)));
 	env->verbose = verbose;
 	return (0);
 }

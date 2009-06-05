@@ -142,6 +142,10 @@ __wt_env_errx(ENV *env, const char *fmt, ...);
 int
 __wt_env_set_verbose_verify(WT_TOC *toc);
 int
+__wt_build_verify(void);
+int
+__wt_breakpoint(void);
+int
 __wt_env_destroy(ENV *env, u_int32_t flags);
 int
 __wt_ienv_destroy(ENV *env, int refresh);

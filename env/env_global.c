@@ -16,18 +16,14 @@
 int
 __wt_build_verify(void)
 {
-	int ret;
-
 	/*
 	 * Check the build & compiler itself before going further.
 	 */
-	if ((ret = __wt_bt_build_verify()) != 0)
-		return (ret);
+	WT_RET((__wt_bt_build_verify()));
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Load debug code the compiler might optimize out. */
-	if ((ret = __wt_breakpoint()) != 0)
-		return (ret);
+	WT_RET((__wt_breakpoint()));
 #endif
 
 	return (0);

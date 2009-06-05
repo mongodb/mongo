@@ -30,8 +30,7 @@ wt_env_create(u_int32_t flags, ENV **envp)
 	 * that can handle NULL structures are the memory allocation and free
 	 * functions, no other functions may be called.
 	 */
-	if ((ret = __wt_calloc(NULL, 1, sizeof(ENV), &env)) != 0)
-		return (ret);
+	WT_RET((__wt_calloc(NULL, 1, sizeof(ENV), &env)));
 	if ((ret = __wt_calloc(NULL, 1, sizeof(IENV), &ienv)) != 0) {
 		__wt_free(NULL, env);
 		return (ret);
@@ -48,10 +47,8 @@ wt_env_create(u_int32_t flags, ENV **envp)
 		goto err;
 
 	/* Configure the ENV and the IENV. */
-	if ((ret = __wt_env_config_default(env)) != 0)
-		goto err;
-	if ((ret = __wt_ienv_config_default(env)) != 0)
-		goto err;
+	WT_ERR((__wt_env_config_default(env)));
+	WT_ERR((__wt_ienv_config_default(env)));
 
 	*envp = env;
 	return (0);
@@ -67,7 +64,7 @@ err:	(void)__wt_env_destroy(env, 0);
 int
 __wt_env_destroy(ENV *env, u_int32_t flags)
 {
-	int ret, tret;
+	int ret;
 
 	ret = 0;
 
@@ -83,8 +80,7 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 	 *
 	 * Discard the underlying IENV structure.
 	 */
-	if ((tret = __wt_ienv_destroy(env, 0)) != 0 && ret == 0)
-		ret = tret;
+	WT_TRET((__wt_ienv_destroy(env, 0)));
 
 	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, env->hstats);
@@ -111,14 +107,11 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 static int
 __wt_env_config_default(ENV *env)
 {
-	int ret;
-
 	__wt_env_config_methods(env);
 
 	TAILQ_INIT(&env->dbqh);
 
-	if ((ret = __wt_stat_alloc_env_hstats(env, &env->hstats)) != 0)
-		return (ret);
+	WT_RET((__wt_stat_alloc_env_hstats(env, &env->hstats)));
 
 	return (0);
 }
@@ -131,7 +124,6 @@ int
 __wt_ienv_destroy(ENV *env, int refresh)
 {
 	IENV *ienv;
-	int ret;
 
 	ienv = env->ienv;
 
@@ -155,8 +147,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	 * by ENV configuration, we'd lose that configuration here.
 	 */
 	memset(ienv, 0, sizeof(ienv));
-	if ((ret = __wt_ienv_config_default(env)) != 0)
-		return (ret);
+	WT_RET((__wt_ienv_config_default(env)));
 
 	return (0);
 }
@@ -173,7 +164,6 @@ __wt_ienv_config_default(ENV *env)
 	IENV *ienv;
 	WT_STOC *stoc;
 	u_int i;
-	int ret;
 
 	ienv = env->ienv;
 
@@ -190,16 +180,13 @@ __wt_ienv_config_default(ENV *env)
 	 */
 #define	WT_SERVERQ_SIZE	64
 	ienv->sq_entries = WT_SERVERQ_SIZE;
-	if ((ret = __wt_calloc(
-	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq)) != 0)
-		return (ret);
+	WT_RET((__wt_calloc(
+	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq)));
 	for (i = 0, stoc = ienv->sq; i < ienv->sq_entries; ++i, ++stoc)
-		if ((ret = __wt_stat_alloc_stoc_stats(NULL, &stoc->stats)) != 0)
-			return (ret);
+		WT_RET((__wt_stat_alloc_stoc_stats(NULL, &stoc->stats)));
 
 	/* Initialize the global mutex. */
-	if ((ret = __wt_mtx_init(&ienv->mtx)) != 0)
-		return (ret);
+	WT_RET((__wt_mtx_init(&ienv->mtx)));
 
 	/* Diagnostic output separator. */
 	ienv->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";

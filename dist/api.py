@@ -127,9 +127,8 @@ def func_getset(handle, method, flags, args, f):
 	# constraints or side-effects on setting the value.  The setter fails
 	# if the verification routine fails.
 	if flags.count('verify'):
-		f.write('\tint ret;\n\n')
-		f.write('\tif ((ret = __wt_' + handle + '_' +\
-		    method + '_verify(toc)) != 0)\n\t\treturn (ret);\n\n')
+		f.write('\n\tWT_RET((__wt_' +\
+		    handle + '_' + method + '_verify(toc)));\n')
 	else:
 		f.write('\n')
 

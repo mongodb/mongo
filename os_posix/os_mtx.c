@@ -116,8 +116,7 @@ __wt_mtx_destroy(WT_MTX *mtx)
 
 	ret = pthread_cond_destroy(&mtx->cond);
 
-	if ((tret = pthread_mutex_destroy(&mtx->mtx)) != 0 && ret == 0)
-		ret = tret;
+	WT_TRET((pthread_mutex_destroy(&mtx->mtx)));
 
 	return (ret == 0 ? 0 : WT_ERROR);
 }

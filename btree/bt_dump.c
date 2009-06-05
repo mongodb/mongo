@@ -65,8 +65,7 @@ __wt_db_dump(WT_TOC *toc)
 	WT_CLEAR(last_key_ovfl);
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		if ((ret = __wt_bt_page_in(db, addr, 1, 0, &page)) != 0)
-			return (ret);
+		WT_RET((__wt_bt_page_in(db, addr, 1, 0, &page)));
 
 		WT_ITEM_FOREACH(page, item, i) {
 			item_len = WT_ITEM_LEN(item);
@@ -104,9 +103,8 @@ __wt_db_dump(WT_TOC *toc)
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_bt_ovfl_in(db,
-				    ovfl->addr, ovfl->len, &ovfl_page)) != 0)
-					goto err;
+				WT_RET((__wt_bt_ovfl_in(db,
+				    ovfl->addr, ovfl->len, &ovfl_page)));
 
 				/*
 				 * If we're already in a duplicate set, dump
@@ -122,33 +120,28 @@ __wt_db_dump(WT_TOC *toc)
 				 * later display.  Otherwise, dump this item.
 				 */
 				if (dup_ahead) {
-					if ((ret = __wt_bt_data_copy_to_dbt(db,
+					WT_RET((__wt_bt_data_copy_to_dbt(db,
 					    WT_PAGE_BYTE(ovfl_page), ovfl->len,
-					    &last_key_ovfl)) != 0)
-						goto err;
+					    &last_key_ovfl)));
 					last_key = &last_key_ovfl;
 					dup_ahead = 0;
 				} else
 					func(WT_PAGE_BYTE(ovfl_page),
 					    ovfl->len, stream);
 
-				if ((ret =
-				    __wt_bt_page_out(db, ovfl_page, 0)) != 0)
-					goto err;
+				WT_RET((__wt_bt_page_out(db, ovfl_page, 0)));
 				break;
 			case WT_ITEM_OFFP_INTL:
 			case WT_ITEM_OFFP_LEAF:
-				if ((ret = __wt_bt_dump_offpage(
-				    db, last_key, item, stream, func)) != 0)
-					goto err;
+				WT_RET((__wt_bt_dump_offpage(
+				    db, last_key, item, stream, func)));
 				break;
 			WT_DEFAULT_FORMAT(db);
 			}
 		}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0)
-			return (ret);
+		WT_RET((__wt_bt_page_out(db, page, 0)));
 		if (addr == WT_ADDR_INVALID)
 			break;
 	}
@@ -156,9 +149,6 @@ __wt_db_dump(WT_TOC *toc)
 	/* Discard any space allocated to hold an overflow key. */
 	WT_FREE_AND_CLEAR(env, last_key_ovfl.data);
 
-	if (0) {
-err:		ret = WT_ERROR;
-	}
 	return (ret);
 }
 
@@ -187,8 +177,7 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 
 	/* Walk down the duplicates tree to the first leaf page. */
 	for (;;) {
-		if ((ret = __wt_bt_page_in(db, addr, isleaf, 0, &page)) != 0)
-			return (ret);
+		WT_RET((__wt_bt_page_in(db, addr, isleaf, 0, &page)));
 		if (isleaf)
 			break;
 
@@ -211,14 +200,11 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 				break;
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				if ((ret = __wt_bt_ovfl_in(db,
-				    ovfl->addr, ovfl->len, &ovfl_page)) != 0)
-					goto err;
+				WT_ERR((__wt_bt_ovfl_in(db,
+				    ovfl->addr, ovfl->len, &ovfl_page)));
 				func(
 				    WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
-				if ((ret =
-				    __wt_bt_page_out(db, ovfl_page, 0)) != 0)
-					goto err;
+				WT_ERR((__wt_bt_page_out(db, ovfl_page, 0)));
 				break;
 			WT_DEFAULT_FORMAT(db);
 			}
@@ -232,13 +218,11 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 		if (addr == WT_ADDR_INVALID)
 			break;
 
-		if ((ret = __wt_bt_page_in(db, addr, 1, 0, &page)) != 0)
-			goto err;
+		WT_ERR((__wt_bt_page_in(db, addr, 1, 0, &page)));
 	}
 
 	if (0) {
-err:		ret = WT_ERROR;
-		if (page != NULL)
+err:		if (page != NULL)
 			(void)__wt_bt_page_out(db, page, 0);
 	}
 	return (ret);

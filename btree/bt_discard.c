@@ -27,9 +27,8 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
 
 	stoc = db->idb->stoc;
 
-	if ((ret = __wt_cache_alloc(
-	    stoc, isleaf ? db->leafsize : db->intlsize, &page)) != 0)
-		return (ret);
+	WT_RET((__wt_cache_alloc(
+	    stoc, isleaf ? db->leafsize : db->intlsize, &page)));
 
 	/*
 	 * Generally, the defaults values of 0 on page are correct; set
@@ -59,22 +58,19 @@ __wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep)
 	ENV *env;
 	WT_PAGE *page;
 	WT_STOC *stoc;
-	int ret;
 
 	env = db->env;
 	stoc = db->idb->stoc;
 
-	if ((ret = __wt_cache_in(stoc, WT_ADDR_TO_OFF(db, addr),
-	    isleaf ? db->leafsize : db->intlsize, 0, &page)) != 0)
-		return (ret);
+	WT_RET((__wt_cache_in(stoc, WT_ADDR_TO_OFF(db, addr),
+	    isleaf ? db->leafsize : db->intlsize, 0, &page)));
 
 	/* Verify the page. */
 	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
 
 	/* Optionally build the in-memory version of the page. */
-	if (inmem &&
-	    page->indx_count == 0 && (ret = __wt_bt_page_inmem(db, page)) != 0)
-		return (ret);
+	if (inmem && page->indx_count == 0)
+		WT_RET((__wt_bt_page_inmem(db, page)));
 
 	*pagep = page;
 	return (0);
@@ -179,9 +175,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 		WT_FREE_AND_CLEAR(env, page->indx);
 
 	if (page->indx == NULL) {
-		if ((ret =
-		    __wt_calloc(env, nindx, sizeof(WT_INDX), &page->indx)) != 0)
-			return (ret);
+		WT_RET((__wt_calloc(env, nindx, sizeof(WT_INDX), &page->indx)));
 		page->indx_size = nindx;
 	}
 
@@ -230,10 +224,9 @@ __wt_bt_page_inmem_append(DB *db,
 			idb->indx_size_hint = n;
 		else
 			n = idb->indx_size_hint;
-		if ((ret = __wt_realloc(env,
+		WT_RET((__wt_realloc(env,
 		    page->indx_size * sizeof(page->indx[0]),
-		    n * sizeof(page->indx[0]), &page->indx)) != 0)
-			return (ret);
+		    n * sizeof(page->indx[0]), &page->indx)));
 		page->indx_size = n;
 	}
 	indx = page->indx + page->indx_count;

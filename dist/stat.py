@@ -70,12 +70,10 @@ for d in sorted(stats.iteritems()):
 	f.write('int\n')
 	f.write('__wt_stat_alloc_' + d[0] + '(ENV *env, WT_STATS **statsp)\n')
 	f.write('{\n')
-	f.write('\tWT_STATS *stats;\n')
-	f.write('\tint ret;\n\n')
-	f.write('\tif ((ret = __wt_calloc(env,\n')
+	f.write('\tWT_STATS *stats;\n\n')
+	f.write('\tWT_RET((__wt_calloc(env,\n')
 	f.write('\t    WT_STAT_' + d[0].upper() +\
-	    '_TOTAL + 1, sizeof(WT_STATS), &stats)) != 0)\n')
-	f.write('\t\treturn (ret);\n\n');
+	    '_TOTAL + 1, sizeof(WT_STATS), &stats)));\n\n')
 	for l in sorted(d[1]):
 		o = '\tstats[WT_STAT_' + l[0] + '].desc = ' + l[1] + ';\n'
 		if len(o) + 7  > 80:

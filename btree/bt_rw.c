@@ -27,7 +27,6 @@ __wt_cache_open(DB *db)
 	ENV *env;
 	IDB *idb;
 	u_int32_t i;
-	int ret;
 
 	env = db->env;
 	idb = db->idb;
@@ -39,9 +38,8 @@ __wt_cache_open(DB *db)
 	 * per MB).
 	 */
 	stoc->hashsize = __wt_prime(env->cachesize * 8);
-	if ((ret = __wt_calloc(env,
-	    stoc->hashsize, sizeof(stoc->hqh[0]), &stoc->hqh)) != 0)
-		return (ret);
+	WT_RET((__wt_calloc(env,
+	    stoc->hashsize, sizeof(stoc->hqh[0]), &stoc->hqh)));
 	for (i = 0; i < stoc->hashsize; ++i)
 		TAILQ_INIT(&stoc->hqh[i]);
 	TAILQ_INIT(&stoc->lqh);
@@ -62,7 +60,7 @@ __wt_cache_close(DB *db)
 	IDB *idb;
 	WT_PAGE *page;
 	WT_STOC *stoc;
-	int ret, tret;
+	int ret;
 
 	env = db->env;
 	idb = db->idb;
@@ -80,19 +78,16 @@ __wt_cache_close(DB *db)
 		/* There shouldn't be any pinned pages. */
 		WT_ASSERT(env, page->ref == 0);
 
-		if (F_ISSET(page, WT_MODIFIED) &&
-		    (tret = __wt_cache_write(stoc, page)) != 0 && ret == 0)
-			ret = tret;
-		if ((tret = __wt_cache_discard(stoc, page)) != 0 && ret == 0)
-			ret = tret;
+		if (F_ISSET(page, WT_MODIFIED))
+			WT_TRET((__wt_cache_write(stoc, page)));
+		WT_TRET((__wt_cache_discard(stoc, page)));
 	}
 
 	/* There shouldn't be any allocated bytes. */
 	WT_ASSERT(env, stoc->cache_bytes == 0);
 
 	/* Close the underlying file handle. */
-	if ((tret = __wt_close(env, idb->fh)) != 0 && ret == 0)
-		ret = tret;
+	WT_TRET((__wt_close(env, idb->fh)));
 	idb->fh = NULL;
 
 	/* Discard buckets. */
@@ -111,7 +106,6 @@ __wt_cache_sync(DB *db)
 	ENV *env;
 	WT_PAGE *page;
 	WT_STOC *stoc;
-	int ret;
 
 	env = db->env;
 	stoc = db->idb->stoc;
@@ -127,9 +121,8 @@ __wt_cache_sync(DB *db)
 		/* There shouldn't be any pinned pages. */
 		WT_ASSERT(env, page->ref == 0);
 
-		if (F_ISSET(page, WT_MODIFIED) &&
-		    (ret = __wt_cache_write(stoc, page)) != 0)
-			return (ret);
+		if (F_ISSET(page, WT_MODIFIED))
+			WT_RET((__wt_cache_write(stoc, page)));
 	}
 	return (0);
 }
@@ -142,14 +135,13 @@ __wt_cache_sync(DB *db)
  *
  *	Clear the memory because code depends on initial values of 0.
  */
-#define	WT_PAGE_ALLOC(env, stoc, bytes, page, ret) do {			\
-	if (((ret) = __wt_calloc(					\
-	    (env), 1, sizeof(WT_PAGE), &(page))) != 0)			\
-		return ((ret));						\
-	if (((ret) = __wt_calloc(					\
+#define	WT_PAGE_ALLOC(env, stoc, bytes, page) do {			\
+	int __ret;							\
+	WT_RET((__wt_calloc((env), 1, sizeof(WT_PAGE), &(page))));	\
+	if (((__ret) = __wt_calloc(					\
 	    (env), 1, (size_t)(bytes), &(page)->hdr)) != 0) {		\
 		__wt_free((env), (page));				\
-		return ((ret));						\
+		return ((__ret));					\
 	}								\
 	(stoc)->cache_bytes += (bytes);					\
 	WT_STAT_INCR((env)->hstats, CACHE_CLEAN, NULL);			\
@@ -166,7 +158,6 @@ __wt_cache_alloc(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
-	int ret;
 
 	*pagep = NULL;
 
@@ -180,7 +171,7 @@ __wt_cache_alloc(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 	WT_STAT_INCR(
 	    db->hstats, DB_CACHE_ALLOC, "pages allocated in the cache");
 
-	WT_PAGE_ALLOC(env, stoc, bytes, page, ret);
+	WT_PAGE_ALLOC(env, stoc, bytes, page);
 
 	/* Initialize the page. */
 	page->offset = idb->fh->file_size;
@@ -251,7 +242,7 @@ __wt_cache_in(WT_STOC *stoc,
 	WT_STAT_INCR(db->hstats,
 	    DB_CACHE_MISS, "cache miss: reads not found in the cache");
 
-	WT_PAGE_ALLOC(env, stoc, bytes, page, ret);
+	WT_PAGE_ALLOC(env, stoc, bytes, page);
 
 	/* Initialize the page. */
 	page->offset = offset;
@@ -262,8 +253,7 @@ __wt_cache_in(WT_STOC *stoc,
 	TAILQ_INSERT_HEAD(hashq, page, hq);
 
 	/* Read the page. */
-	if ((ret = __wt_read(env, idb->fh, offset, bytes, page->hdr)) != 0)
-		goto err;
+	WT_ERR((__wt_read(env, idb->fh, offset, bytes, page->hdr)));
 
 	/* Verify the checksum. */
 	if (!LF_ISSET(WT_UNFORMATTED)) {
@@ -295,7 +285,6 @@ int
 __wt_cache_out(WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
 {
 	ENV *env;
-	int ret;
 
 	env = stoc->idb->db->env;
 
@@ -320,11 +309,9 @@ __wt_cache_out(WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
 	 * dirty, and discard it.
 	 */
 	if (LF_ISSET(WT_UNFORMATTED)) {
-		if (F_ISSET(page, WT_MODIFIED) &&
-		    (ret = __wt_cache_write(stoc, page)) != 0)
-			return (ret);
-		if ((ret = __wt_cache_discard(stoc, page)) != 0)
-			return (ret);
+		if (F_ISSET(page, WT_MODIFIED))
+			WT_RET((__wt_cache_write(stoc, page)));
+		WT_RET((__wt_cache_discard(stoc, page)));
 	}
 
 	return (0);
@@ -341,14 +328,12 @@ __wt_cache_clean(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int64_t bytes_free, bytes_need_free;
-	int ret;
 
 	*pagep = NULL;
 
 	env = stoc->idb->db->env;
 	bytes_free = 0;
 	bytes_need_free = bytes * 3;
-	ret = 0;
 
 	do {
 		TAILQ_FOREACH(page, &stoc->lqh, q)
@@ -362,8 +347,7 @@ __wt_cache_clean(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 			WT_STAT_INCR(env->hstats, CACHE_WRITE_EVICT,
 			    "dirty pages evicted from the cache");
 
-			if ((ret = __wt_cache_write(stoc, page)) != 0)
-				return (ret);
+			WT_RET((__wt_cache_write(stoc, page)));
 		} else
 			WT_STAT_INCR(env->hstats, CACHE_EVICT,
 			    "clean pages evicted from the cache");
@@ -389,11 +373,10 @@ __wt_cache_clean(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 		bytes_free += page->bytes;
 
 		/* Discard the page. */
-		if ((ret = __wt_cache_discard(stoc, page)) != 0)
-			break;
+		WT_RET((__wt_cache_discard(stoc, page)));
 	} while (bytes_free < bytes_need_free);
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -406,7 +389,6 @@ __wt_cache_write(WT_STOC *stoc, WT_PAGE *page)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE_HDR *hdr;
-	int ret;
 
 	idb = stoc->idb;
 	env = idb->db->env;
@@ -419,15 +401,14 @@ __wt_cache_write(WT_STOC *stoc, WT_PAGE *page)
 	hdr->checksum = __wt_cksum(hdr, page->bytes);
 
 	/* Write, and if successful, clear the modified flag. */
-	if ((ret = __wt_write(
-	    env, idb->fh, page->offset, page->bytes, hdr)) == 0) {
-		F_CLR(page, WT_MODIFIED);
+	WT_RET((__wt_write(env, idb->fh, page->offset, page->bytes, hdr)));
 
-		WT_STAT_DECR(env->hstats, CACHE_DIRTY, NULL);
-		WT_STAT_INCR(env->hstats, CACHE_CLEAN, NULL);
-	}
+	F_CLR(page, WT_MODIFIED);
 
-	return (ret);
+	WT_STAT_DECR(env->hstats, CACHE_DIRTY, NULL);
+	WT_STAT_INCR(env->hstats, CACHE_CLEAN, NULL);
+
+	return (0);
 }
 
 /*

@@ -164,7 +164,6 @@ int
 __wt_strdup(ENV *env, const char *str, void *retp)
 {
 	size_t len;
-	int ret;
 	void *p;
 
 	/*
@@ -173,8 +172,7 @@ __wt_strdup(ENV *env, const char *str, void *retp)
 	 */
 
 	len = strlen(str) + 1;
-	if ((ret = __wt_calloc(env, len, 1, &p)) != 0)
-		return (ret);
+	WT_RET((__wt_calloc(env, len, 1, &p)));
 
 	memcpy(p, str, len);
 

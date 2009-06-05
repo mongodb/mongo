@@ -72,14 +72,11 @@ int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 {
 	ENV *env;
-	int ret;
 
 	env = db->env;
 
 	if (copy->data == NULL || copy->data_len < len) {
-		if ((ret =
-		    __wt_realloc(env, copy->data_len, len, &copy->data)) != 0)
-			return (ret);
+		WT_RET((__wt_realloc(env, copy->data_len, len, &copy->data)));
 		copy->data_len = len;
 	}
 	memcpy(copy->data, data, copy->size = len);
