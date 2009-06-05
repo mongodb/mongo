@@ -37,7 +37,6 @@ __wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp)
 	WT_ERR((__wt_lock(&ienv->mtx)));
 	toc->slot = ienv->toc_slot++;
 	WT_ERR((__wt_unlock(&ienv->mtx)));
-		goto err;
 	if (toc->slot >= WT_SERVER_QSIZE) {
 		__wt_env_errx(env, "wt_env_toc_create: too many threads");
 		ret = WT_ERROR;
