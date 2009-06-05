@@ -11,7 +11,6 @@
 extern "C" {
 #endif
 
-#define	WT_PSTOC_NOT_SET	0
 #define	WT_PSTOC_ID		1
 
 struct __wt_stoc {
