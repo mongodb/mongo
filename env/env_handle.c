@@ -31,7 +31,7 @@ wt_env_create(u_int32_t flags, ENV **envp)
 	 * functions, no other functions may be called.
 	 */
 	WT_RET((__wt_calloc(NULL, 1, sizeof(ENV), &env)));
-	WT_ERR((__wt_calloc(NULL, 1, sizeof(IENV), &ienv));
+	WT_ERR((__wt_calloc(NULL, 1, sizeof(IENV), &ienv)));
 
 	/* Connect everything together. */
 	env->ienv = ienv;
