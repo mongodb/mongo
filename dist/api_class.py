@@ -16,7 +16,7 @@
 #	handles:
 #		env	-- DbEnv handle
 #		db	-- Db handle
-#	flags:
+#	tags:
 #		getset  -- an API getter/setter method
 #		local	-- no need to connect to the server[1]
 #		method	-- a method returning an int
