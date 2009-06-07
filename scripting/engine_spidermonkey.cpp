@@ -741,6 +741,8 @@ namespace mongo {
             assert( JS_SetElement( cx , array , i ,  &idval ) );
         }
         
+        JS_DestroyIdArray( cx , properties );
+
         *rval = OBJECT_TO_JSVAL( array );
         return JS_TRUE;
     }
