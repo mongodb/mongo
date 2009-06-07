@@ -71,6 +71,18 @@ assert.isnull = function( what , msg ){
     throw "supposed to null (" + ( msg || "" ) + ") was: " + tojson( what );
 }
 
+assert.lt = function( a , b , msg ){
+    if ( a < b )
+        return;
+    throw a + " is not less than " + b + " : " + msg;
+}
+
+assert.gt = function( a , b , msg ){
+    if ( a > b )
+        return;
+    throw a + " is not greater than " + b + " : " + msg;
+}
+
 Object.extend = function( dst , src ){
     for ( var k in src ){
         dst[k] = src[k];
