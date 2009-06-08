@@ -43,7 +43,7 @@ namespace mongo {
         case EOO:
             return "EOO";
         case Date:
-            s << "Date(" << hex << date() << ')';
+            s << "new Date(" << date() << ')';
             break;
         case RegEx:
         {
