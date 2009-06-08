@@ -867,7 +867,12 @@ namespace mongo {
             switch ( JS_TypeOfValue( _context , val ) ){
             case JSTYPE_VOID: return Undefined;
             case JSTYPE_NULL: return jstNULL;
-            case JSTYPE_OBJECT:	return Object;
+            case JSTYPE_OBJECT:	{
+                JSObject * o = JSVAL_TO_OBJECT( val );
+                if ( JS_IsArrayObject( _context , o ) )
+                    return Array;
+                return Object;
+            }
             case JSTYPE_FUNCTION: return Code;
             case JSTYPE_STRING: return String;
             case JSTYPE_NUMBER: return NumberDouble;
