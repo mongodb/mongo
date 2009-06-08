@@ -102,8 +102,10 @@ namespace mongo {
         }
 
         int type = s->type("return");
-        if ( type == Object || type == Array )
+        if ( type == Object )
             result.append("retval", s->getObject("return"));
+        else if ( type == Array )
+            result.appendArray("retval", s->getObject("return"));
         else if ( type == NumberDouble )
             result.append("retval", s->getNumber("return"));
         else if ( type == String )
