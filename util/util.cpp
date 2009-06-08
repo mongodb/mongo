@@ -102,4 +102,47 @@ namespace mongo {
     
     OpTime OpTime::last(0, 0);
     
+    /* this is a good place to set a breakpoint when debugging, as lots of warning things
+       (assert, wassert) call it.
+    */
+    void sayDbContext(const char *errmsg) {
+        if ( errmsg ) {
+            problem() << errmsg << endl;
+        }
+        printStackTrace();
+    }
+    
+    void exit( int status ){
+        dbexit( status );
+    }
+
+    void rawOut( const string &s ) {
+        if( s.empty() ) return;
+        char now[64];
+        time_t_to_String(time(0), now);
+        now[20] = 0;        
+#if defined(_WIN32)
+        (std::cout << now << " " << s).flush();
+#else
+        write( STDOUT_FILENO, now, 20 );
+        write( STDOUT_FILENO, " ", 1 );
+        write( STDOUT_FILENO, s.c_str(), s.length() );
+        fsync( STDOUT_FILENO );        
+#endif
+    }
+
+#ifndef _SCONS
+    // only works in scons
+    const char * gitVersion(){ return ""; }
+    const char * sysInfo(){ return ""; }
+#endif
+
+    void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
+    void printSysInfo() { log() << "sys info: " << sysInfo() << endl; }
+    string mongodVersion() {
+        stringstream ss;
+        ss << "db version v" << versionString << ", pdfile version " << VERSION << "." << VERSION_MINOR;
+        return ss.str();
+    }
+    
 } // namespace mongo
