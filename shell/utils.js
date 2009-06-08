@@ -1,4 +1,15 @@
 
+friendlyEqual = function( a , b ){
+    if ( a == b )
+        return true;
+
+    if ( tojson( a ) == tojson( b ) )
+        return true;
+
+    return false;
+}
+
+
 assert = function( b , msg ){
     if ( b )
         return;
@@ -10,8 +21,7 @@ assert.eq = function( a , b , msg ){
     if ( a == b )
         return;
 
-    if ( ( a != null && b != null ) && 
-         ( /*a.toString() == b.toString() || */a == b || tojson( a ) == tojson( b ) ) )
+    if ( ( a != null && b != null ) && friendlyEqual( a , b ) )
         return;
 
     throw "[" + tojson( a ) + "] != [" + tojson( b ) + "] are not equal : " + msg;
@@ -379,20 +389,36 @@ shellHelper.show = function( what ){
 
 }
 
+if ( typeof( Map ) == "undefined" ){
+    Map = function(){
+        this._data = [];
+    }
+}
 
-Map = function(){
+Map.prototype.put = function( key , value ){
+    var o = this._get( key );
+    var old = o.value;
+    o.value = value;
+    return old;
+}
+
+Map.prototype.get = function( key ){
+    return this._get( key ).value;
+}
+
+Map.prototype._get = function( key ){
+    for ( var i=0; i<this._data.length; i++ ){
+        if ( friendlyEqual( key , this._data[i].key ) ){
+            return this._data[i];
+        }
+    }
+    var o = { key : key , value : null };
+    this._data.push( o );
+    return o;
 }
 
 Map.prototype.values = function(){
-    // TODO: move this to c?
-    var a = [];
-    for ( var k in this ){
-        var v = this[k];
-        if ( v == Map.prototype.values )
-            continue;
-        a.push( v );
-    }
-    return a;
+    return this._data.map( function(z){ return z.value } );
 }
 
 Math.sigFig = function( x , N ){

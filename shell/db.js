@@ -356,7 +356,6 @@ DB.prototype.group = function(parmsObj) {
         
     	while( c.hasNext() ) {
 	    var obj = c.next();
-            
 	    var key = {};
 	    if( parms.key ) {
 	    	for( var i in parms.key )
@@ -365,17 +364,16 @@ DB.prototype.group = function(parmsObj) {
 	    else {
 	    	key = parms.$keyf(obj);
 	    }
-            
-	    var aggObj = map[key];
+	    var aggObj = map.get(key);
 	    if( aggObj == null ) {
 		var newObj = Object.extend({}, key); // clone
-	    	aggObj = map[key] = Object.extend(newObj, parms.initial)
+	    	aggObj = Object.extend(newObj, parms.initial)
+                map.put( key , aggObj );
 	    }
 	    parms.$reduce(obj, aggObj);
 	}
         
-	var ret = map.values();
-   	return ret;
+	return map.values();
     }
     
     var parms = Object.extend({}, parmsObj);

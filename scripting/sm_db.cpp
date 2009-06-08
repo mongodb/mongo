@@ -499,6 +499,48 @@ namespace mongo {
         { 0 }
     };
     
+    // Map
+
+    bool specialMapString( const string& s ){
+        return s == "put" || s == "get" || s == "_get" || s == "values" || s == "_data" || s == "constructor" ;
+    }
+
+    JSBool map_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        if ( argc > 0 ){
+            JS_ReportError( cx , "Map takes no arguments" );
+            return JS_FALSE;
+        }
+
+        JSObject * array = JS_NewArrayObject( cx , 0 , 0 );
+        assert( array );
+
+        jsval a = OBJECT_TO_JSVAL( array );
+        JS_SetProperty( cx , obj , "_data" , &a );
+
+        return JS_TRUE;
+    }
+ 
+    JSBool map_prop( JSContext *cx, JSObject *obj, jsval idval, jsval *vp ){
+        Convertor c(cx);
+        if ( specialMapString( c.toString( idval ) ) )
+            return JS_TRUE;
+        
+        log() << "illegal prop access: " << c.toString( idval ) << endl;
+        JS_ReportError( cx , "can't use array access with Map" );
+        return JS_FALSE;
+    }
+    
+    JSClass map_class = {
+        "Map" , JSCLASS_HAS_PRIVATE ,
+        map_prop, JS_PropertyStub, map_prop, map_prop,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+    
+    JSFunctionSpec map_functions[] = {
+        { 0 }
+    };
+    
 
     // -----
 
@@ -601,6 +643,8 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+
+        assert( JS_InitClass( cx , global , 0 , &map_class , map_constructor , 0 , 0 , map_functions , 0 , 0 ) );
         
         scope->exec( jsconcatcode );
     }
