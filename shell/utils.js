@@ -354,6 +354,14 @@ shellHelper.use = function( dbname ){
     print( "switched to db " + db.getName() );
 }
 
+shellHelper.it = function(){
+    if ( typeof( ___it___ ) == "undefined" || ___it___ == null ){
+        print( "no cursor" );
+        return;
+    }
+    shellPrintHelper( ___it___ );
+}
+
 shellHelper.show = function( what ){
     assert( typeof what == "string" );
     

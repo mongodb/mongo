@@ -192,8 +192,13 @@ DBQuery.prototype.shellPrint = function(){
             print( s );
             n++;
         }
-        if ( this.hasNext() )
+        if ( this.hasNext() ){
             print( "has more" );
+            ___it___  = this;
+        }
+        else {
+            ___it___  = null;
+        }
     }
     catch ( e ){
         print( e );
