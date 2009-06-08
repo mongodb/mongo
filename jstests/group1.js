@@ -14,4 +14,9 @@ res = t.group( { key : { a : true } ,
                }
              );
 
-printjson( res );
+assert( res.length == 2 , "A" );
+assert( res[0].a == 1 , "B" );
+assert( res[0].count == 2 , "C" );
+assert( res[1].a == 2 , "D" );
+assert( res[1].count == 3 , "E" );
+
