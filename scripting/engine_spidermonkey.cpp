@@ -785,6 +785,9 @@ namespace mongo {
             for ( list<void*>::iterator i=_roots.begin(); i != _roots.end(); i++ ){
                 JS_RemoveRoot( _context , *i );
             }
+            
+            if ( _this )
+                JS_RemoveRoot( _context , &_this );
 
             if ( _convertor ){
                 delete _convertor;
@@ -899,9 +902,14 @@ namespace mongo {
             jsval v = BOOLEAN_TO_JSVAL( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );            
         }
-
+        
         void setThis( const BSONObj * obj ){
+            if ( _this )
+                JS_RemoveRoot( _context , &_this );
+            
             _this = _convertor->toJSObject( obj );
+            
+            JS_AddNamedRoot( _context , &_this , "scope this" );
         }
 
         // ---- functions -----
