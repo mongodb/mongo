@@ -53,15 +53,15 @@ namespace mongo {
         BSONObj idxKey = index->keyPattern();
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
-        if ( !o.more() )
+        if ( !o.moreWithEOO() )
             scanAndOrderRequired_ = false;
-        while( o.more() ) {
+        while( o.moreWithEOO() ) {
             BSONElement oe = o.next();
             if ( oe.eoo() ) {
                 scanAndOrderRequired_ = false;
                 break;
             }
-            if ( !k.more() )
+            if ( !k.moreWithEOO() )
                 break;
             BSONElement ke;
             while( 1 ) {
@@ -90,7 +90,7 @@ namespace mongo {
         order.getFieldNames( orderFieldsUnindexed );
         BSONObjBuilder startKeyBuilder;
         BSONObjBuilder endKeyBuilder;
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -438,7 +438,7 @@ namespace mongo {
     BSONObj extremeKeyForIndex( const BSONObj &idxPattern, int baseDirection ) {
         BSONObjIterator i( idxPattern );
         BSONObjBuilder b;
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;

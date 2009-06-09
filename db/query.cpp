@@ -403,7 +403,7 @@ namespace mongo {
         }
         BSONObjIterator i( top.embeddedObject() );
         bool empty = true;
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -420,7 +420,7 @@ namespace mongo {
         
         BSONObjBuilder b;
         BSONObjIterator i( obj );
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -451,7 +451,7 @@ namespace mongo {
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
                     int count = 0;
-                    while( i.more() ) {
+                    while( i.moreWithEOO() ) {
                         BSONElement arrI = i.next();
                         if ( arrI.eoo() )
                             break;
@@ -495,7 +495,7 @@ namespace mongo {
     */
     void ModSet::getMods(const BSONObj &from) {
         BSONObjIterator it(from);
-        while ( it.more() ) {
+        while ( it.moreWithEOO() ) {
             BSONElement e = it.next();
             if ( e.eoo() )
                 break;
@@ -506,7 +506,7 @@ namespace mongo {
             Mod::Op op = opFromStr( fn );
             if ( op == Mod::INC )
                 strcpy((char *) fn, "$set"); // rewrite for op log
-            while ( jt.more() ) {
+            while ( jt.moreWithEOO() ) {
                 BSONElement f = jt.next();
                 if ( f.eoo() )
                     break;
@@ -535,7 +535,7 @@ namespace mongo {
 
     void checkNoMods( BSONObj o ) {
         BSONObjIterator i( o );
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;

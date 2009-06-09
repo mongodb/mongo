@@ -663,7 +663,7 @@ assert( !eloc.isNull() );
         BSONObjIterator keyIter( key );
         BSONElement arrayElt;
         int arrayPos = -1;
-        for ( int i = 0; keyIter.more(); ++i ) {
+        for ( int i = 0; keyIter.moreWithEOO(); ++i ) {
             BSONElement e = keyIter.next();
             if ( e.eoo() )
                 break;
@@ -678,7 +678,7 @@ assert( !eloc.isNull() );
             assert( strlen( nameWithinArray ) == 0 );
             BSONObjBuilder b;
             BSONObjIterator keyIter( key );
-            while ( keyIter.more() ) {
+            while ( keyIter.moreWithEOO() ) {
                 BSONElement f = keyIter.next();
                 if ( f.eoo() )
                     break;
@@ -691,7 +691,7 @@ assert( !eloc.isNull() );
         }
         BSONObj arr = arrayElt.embeddedObject();
         BSONObjIterator arrIter(arr);
-        while ( arrIter.more() ) {
+        while ( arrIter.moreWithEOO() ) {
             BSONElement e = arrIter.next();
             if ( e.eoo() )
                 break;
@@ -705,7 +705,7 @@ assert( !eloc.isNull() );
             }
             BSONObjBuilder b;
             BSONObjIterator keyIter( key );
-            for ( int i = 0; keyIter.more(); ++i ) {
+            for ( int i = 0; keyIter.moreWithEOO(); ++i ) {
                 BSONElement f = keyIter.next();
                 if ( f.eoo() )
                     break;
@@ -1128,7 +1128,7 @@ assert( !eloc.isNull() );
     // should be { <something> : <simpletype[1|-1]>, .keyp.. } 
     bool validKeyPattern(BSONObj kp) { 
         BSONObjIterator i(kp);
-        while( i.more() ) { 
+        while( i.moreWithEOO() ) { 
             BSONElement e = i.next();
             if( e.type() == Object || e.type() == Array ) 
                 return false;

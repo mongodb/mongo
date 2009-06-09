@@ -108,11 +108,9 @@ namespace mongo {
         BSONObj sharded = from.getObjectField( "sharded" );
         if ( ! sharded.isEmpty() ){
             BSONObjIterator i(sharded);
-            while ( i.more() ){
+            while ( i._more() ){
                 BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                uassert( "shared things have to be objects" , e.type() == Object );
+                uassert( "sharded things have to be objects" , e.type() == Object );
                 _sharded[e.fieldName()] = e.embeddedObject();
             }
         }

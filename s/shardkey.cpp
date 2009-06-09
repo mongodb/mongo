@@ -432,7 +432,7 @@ normal:
             BSONElement e = s.next();
             if( e.eoo() )
                 break;
-            if( !p.more() ) 
+            if( !p.moreWithEOO() ) 
                 return 0;
             BSONElement ep = p.next();
             bool same = e == ep;

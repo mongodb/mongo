@@ -58,7 +58,7 @@ namespace mongo {
     BSONObj fixindex(BSONObj o) {
         BSONObjBuilder b;
         BSONObjIterator i(o);
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -612,7 +612,7 @@ namespace mongo {
                 BSONObj o = c->next();
                 BSONObjBuilder b;
                 BSONObjIterator i( o );
-                while( i.more() ) {
+                while( i.moreWithEOO() ) {
                     BSONElement e = i.next();
                     if ( e.eoo() )
                         break;

@@ -58,7 +58,7 @@ namespace mongo {
 	    case BSONObj::opALL: {
 	        massert( "$all requires array", e.type() == Array );
 		BSONObjIterator i( e.embeddedObject() );
-		if ( i.more() ) {
+		if ( i.moreWithEOO() ) {
  		    BSONElement f = i.next();
 		    if ( !f.eoo() )
 		      lower_ = upper_ = f;
@@ -70,7 +70,7 @@ namespace mongo {
                 BSONElement max = minKey.firstElement();
                 BSONElement min = maxKey.firstElement();
                 BSONObjIterator i( e.embeddedObject() );
-                while( i.more() ) {
+                while( i.moreWithEOO() ) {
                     BSONElement f = i.next();
                     if ( f.eoo() )
                         break;
@@ -124,7 +124,7 @@ namespace mongo {
     ns_( ns ),
     query_( query.getOwned() ) {
         BSONObjIterator i( query_ );
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -135,7 +135,7 @@ namespace mongo {
             }
             else {
                 BSONObjIterator i( e.embeddedObject() );
-                while( i.more() ) {
+                while( i.moreWithEOO() ) {
                     BSONElement f = i.next();
                     if ( f.eoo() )
                         break;
@@ -163,7 +163,7 @@ namespace mongo {
         }
         BSONObjBuilder b;
         BSONObjIterator i( fields );
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;

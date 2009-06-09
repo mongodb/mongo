@@ -1227,8 +1227,11 @@ namespace mongo {
             theend = jso.objdata() + sz;
         }
         /** @return true if more elements exist to be enumerated. */
-        bool more() {
+        bool moreWithEOO() {
             return pos < theend;
+        }
+        bool _more(){
+            return pos < theend && pos[0];
         }
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd = false ) {
@@ -1327,7 +1330,7 @@ namespace mongo {
     inline bool BSONObj::hasElement(const char *name) const {
         if ( !isEmpty() ) {
             BSONObjIterator it(*this);
-            while ( it.more() ) {
+            while ( it.moreWithEOO() ) {
                 BSONElement e = it.next();
                 if ( strcmp(name, e.fieldName()) == 0 )
                     return true;
@@ -1339,7 +1342,7 @@ namespace mongo {
     inline BSONElement BSONObj::findElement(const char *name) const {
         if ( !isEmpty() ) {
             BSONObjIterator it(*this);
-            while ( it.more() ) {
+            while ( it.moreWithEOO() ) {
                 BSONElement e = it.next();
                 if ( strcmp(name, e.fieldName()) == 0 )
                     return e;
@@ -1351,7 +1354,7 @@ namespace mongo {
     /* add all the fields from the object specified to this object */
     inline BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
         BSONObjIterator it(x);
-        while ( it.more() ) {
+        while ( it.moreWithEOO() ) {
             BSONElement e = it.next();
             if ( e.eoo() ) break;
             append(e);

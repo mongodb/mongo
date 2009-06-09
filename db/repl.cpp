@@ -364,7 +364,7 @@ namespace mongo {
                     ret = conn->findOne( "admin.$cmd", forwardCommand.done() );
                 }
                 BSONObjIterator i( ret );
-                while( i.more() ) {
+                while( i.moreWithEOO() ) {
                     BSONElement e = i.next();
                     if ( e.eoo() )
                         break;
@@ -715,7 +715,7 @@ namespace mongo {
             massert( "Unable to get database list", ok );
         }
         BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -1064,7 +1064,7 @@ namespace mongo {
                 bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
                 massert( "Unable to get database list", ok );
                 BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
-                while( i.more() ) {
+                while( i.moreWithEOO() ) {
                     BSONElement e = i.next();
                     if ( e.eoo() )
                         break;

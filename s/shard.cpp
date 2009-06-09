@@ -66,10 +66,8 @@ namespace mongo {
                 BSONObjBuilder r;
                 
                 BSONObjIterator i(k);
-                while( i.more() ) {
+                while( i._more() ) {
                     BSONElement e = i.next();
-                    if ( e.eoo() )
-                        break;
                     uassert( "can only handle numbers here - which i think is correct" , e.isNumber() );
                     r.append( e.fieldName() , -1 * e.number() );
                 }

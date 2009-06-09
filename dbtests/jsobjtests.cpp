@@ -155,10 +155,14 @@ namespace JsobjTests {
                 ASSERT( o.valid() );
                 ASSERT_EQUALS( Timestamp, o.getField( "a" ).type() );
                 BSONObjIterator i( o );
-                ASSERT( i.more() );
+                ASSERT( i.moreWithEOO() );
+                ASSERT( i._more() );
+
                 BSONElement e = i.next();
                 ASSERT_EQUALS( Timestamp, e.type() );
-                ASSERT( i.more() );
+                ASSERT( i.moreWithEOO() );
+                ASSERT( ! i._more() );
+                
                 e = i.next();
                 ASSERT( e.eoo() );
                 
