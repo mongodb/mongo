@@ -530,7 +530,7 @@ namespace mongo {
             stringstream ss;
             
             bool first = 1;
-            for ( BSONObjIterator i(keys); i._more(); ) {
+            for ( BSONObjIterator i(keys); i.more(); ) {
                 BSONElement f = i.next();
 
                 if ( first )

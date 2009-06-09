@@ -1230,7 +1230,7 @@ namespace mongo {
         bool moreWithEOO() {
             return pos < theend;
         }
-        bool _more(){
+        bool more(){
             return pos < theend && pos[0];
         }
         /** @return the next element in the object. For the final element, element.eoo() will be true. */

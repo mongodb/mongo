@@ -42,7 +42,7 @@ namespace mongo {
         BSONFieldIterator( BSONHolder * holder ){
 
             BSONObjIterator it( holder->_obj );
-            while ( it._more() ){
+            while ( it.more() ){
                 BSONElement e = it.next();
                 _names.push_back( e.fieldName() );
             }
@@ -811,7 +811,7 @@ namespace mongo {
                 return;
                 
             BSONObjIterator i( *data );
-            while ( i._more() ){
+            while ( i.more() ){
                 BSONElement e = i.next();
                 _convertor->setProperty( _global , e.fieldName() , _convertor->toval( e ) );
             }

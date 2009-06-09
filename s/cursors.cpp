@@ -65,7 +65,7 @@ namespace mongo {
         
         BSONObjBuilder b;
         BSONObjIterator i( query );
-        while ( i._more() ){
+        while ( i.more() ){
             BSONElement e = i.next();
 
             if ( strcmp( e.fieldName() , "query" ) ){
