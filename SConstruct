@@ -305,6 +305,10 @@ elif "linux2" == os.sys.platform:
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
+        
+        if force64:
+            print( "error: force64 doesn't make sense on a 64-bit machine" )
+            Exit(1)
 
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
