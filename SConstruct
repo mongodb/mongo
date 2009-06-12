@@ -822,6 +822,9 @@ def ensureTestDirs():
 def testSetup( env , target , source ):
     ensureTestDirs()
 
+if len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "test":
+    ensureDir( "/tmp/unittest/" );
+
 addSmoketest( "smoke", [ "test" ] , [ test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
 
