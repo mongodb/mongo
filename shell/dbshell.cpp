@@ -321,8 +321,10 @@ int main(int argc, char* argv[]) {
                 
             }
             
-            if ( ! wascmd )
-                scope->exec( code.c_str() , "(shell)" , true , true , false );
+            if ( ! wascmd ){
+                scope->exec( code.c_str() , "(shell)" , false , true , false );
+                scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+            }
             
             
             shellHistoryAdd( line );

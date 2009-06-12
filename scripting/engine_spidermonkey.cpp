@@ -980,6 +980,9 @@ namespace mongo {
                 // already printed in reportError, so... TODO
             }
             
+            if ( worked )
+                _convertor->setProperty( _global , "__lastres__" , ret );
+            
             if ( worked && printResult && ! JSVAL_IS_VOID( ret ) )
                 cout << _convertor->toString( ret ) << endl;
 
