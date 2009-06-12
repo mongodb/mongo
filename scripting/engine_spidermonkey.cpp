@@ -768,6 +768,8 @@ namespace mongo {
             JS_SetGlobalObject( _context , _global );
             massert( "js init failed" , JS_InitStandardClasses( _context , _global ) );
             
+            JS_SetOptions( _context , JS_GetOptions( _context ) | JSOPTION_VAROBJFIX );
+
             JS_DefineFunctions( _context , _global , globalHelpers );
             
             // install my special helpers
