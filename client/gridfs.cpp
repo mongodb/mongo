@@ -68,11 +68,11 @@ namespace mongo {
         
         char buf[DEFAULT_CHUNK_SIZE];
         gridfs_offset pos = 0;
-        int fd = open( filename.c_str() , O_RDONLY );
+        FILE* fd = fopen( filename.c_str() , "rb" );
         
         int chunkNumber = 0;
         while ( pos < length ){
-            int l = read( fd , buf , MIN( DEFAULT_CHUNK_SIZE , length - pos ) );
+            int l = fread( buf , 1, MIN( DEFAULT_CHUNK_SIZE , length - pos ), fd );
             
             Chunk c( idObj , chunkNumber , buf , l );
             _client.insert( _chunksNS.c_str() , c._data );
@@ -80,6 +80,8 @@ namespace mongo {
             pos += l;
             chunkNumber++;
         }
+        
+        fclose( fd );
 
         BSONObj res;
         if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id << "root" << _prefix ) , res ) )
