@@ -30,7 +30,7 @@ namespace mongo {
     }
 
 
-    GridFS::GridFS( DBClientBase& client , string dbName , string prefix ) : _client( client ) , _dbName( dbName ) , _prefix( prefix ){
+    GridFS::GridFS( DBClientBase& client , const string& dbName , const string& prefix ) : _client( client ) , _dbName( dbName ) , _prefix( prefix ){
         _filesNS = dbName + "." + prefix + ".files";
         _chunksNS = dbName + "." + prefix + ".chunks";
 
@@ -43,10 +43,10 @@ namespace mongo {
         
     }
     
-    BSONObj GridFS::storeFile( string filename ){
-        uassert( "file doesn't exist" , boost::filesystem::exists( filename ) );
+    BSONObj GridFS::storeFile( const string& fileName ){
+        uassert( "file doesn't exist" , boost::filesystem::exists( fileName ) );
         
-        gridfs_offset length = boost::filesystem::file_size( filename );
+        gridfs_offset length = boost::filesystem::file_size( fileName );
         
         BSONObjBuilder fileObject;
         BSONObj idObj;
@@ -56,7 +56,7 @@ namespace mongo {
             id.init();
             fileObject.appendOID( "_id" , &id );
 
-            fileObject << "filename" << filename ;
+            fileObject << "filename" << fileName ;
             massert("large files not yet implemented", length <= 0xffffffff);
             fileObject << "length" << (unsigned) length ;
             fileObject << "chunkSize" << DEFAULT_CHUNK_SIZE ;
@@ -68,7 +68,7 @@ namespace mongo {
         
         char buf[DEFAULT_CHUNK_SIZE];
         gridfs_offset pos = 0;
-        FILE* fd = fopen( filename.c_str() , "rb" );
+        FILE* fd = fopen( fileName.c_str() , "rb" );
         
         int chunkNumber = 0;
         while ( pos < length ){
@@ -95,13 +95,21 @@ namespace mongo {
         return real;
     }
 
+    void GridFS::removeFile( const string& fileName ){
+        BSONObj idObj = _client.findOne( _filesNS , BSON( "filename" << fileName ) );
+        if ( !idObj.isEmpty() ){
+			_client.remove( _filesNS.c_str() , BSON( "filename" << fileName ) );
+			_client.remove( _chunksNS.c_str() , BSON( "files_id" << idObj["_id"] ) );
+		}
+    }
+
     GridFile::GridFile( GridFS * grid , BSONObj obj ){
         _grid = grid;
         _obj = obj;
     }
     
-    GridFile GridFS::findFile( string filename){ 
-        return findFile( BSON( "filename" << filename ) ); 
+    GridFile GridFS::findFile( const string& fileName ){ 
+        return findFile( BSON( "filename" << fileName ) ); 
     };
 
     GridFile GridFS::findFile( BSONObj query ){
@@ -143,7 +151,7 @@ namespace mongo {
         return getContentLength();
     }
     
-    gridfs_offset GridFile::write( string where ){
+    gridfs_offset GridFile::write( const string& where ){
         ofstream out(where.c_str() , ios::out | ios::binary );
         return write( out );
     }

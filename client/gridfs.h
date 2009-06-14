@@ -47,9 +47,9 @@ namespace mongo {
         /**
          * @param client - db connection
          * @param dbName - root database name
-         * @param prefix - if you want your data somewhere beisdes <dbname>.fs
+         * @param prefix - if you want your data somewhere besides <dbname>.fs
          */
-        GridFS( DBClientBase& client , string dbName , string prefix="fs" );
+        GridFS( DBClientBase& client , const string& dbName , const string& prefix="fs" );
         ~GridFS();
 
         /**
@@ -57,7 +57,14 @@ namespace mongo {
          * @param fileName relative to process
          * @return the file object
          */
-        BSONObj storeFile( string fileName );
+        BSONObj storeFile( const string& fileName );
+        
+        /**
+         * removes file referenced by fileName from the db
+         * @param fileName relative to process
+         * @return the file object
+         */
+        void removeFile( const string& fileName );
         
         /**
          * returns a file object matching the query
@@ -67,7 +74,7 @@ namespace mongo {
         /**
          * equiv to findFile( { filename : filename } )
          */
-        GridFile findFile( string filename);
+        GridFile findFile( const string& fileName );
 
         /**
          * convenience method to get all the files
@@ -121,14 +128,14 @@ namespace mongo {
         Chunk getChunk( int n );
 
         /**
-           write the file to the ouput stream
+           write the file to the output stream
          */
         gridfs_offset write( ostream & out );
 
         /**
            write the file to this filename
          */
-        gridfs_offset write( string where );
+        gridfs_offset write( const string& where );
         
     private:
         GridFile( GridFS * grid , BSONObj obj );
