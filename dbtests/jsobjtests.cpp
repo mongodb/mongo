@@ -617,6 +617,17 @@ namespace JsobjTests {
             }
         };
         
+        class ElementAppend {
+        public:
+            void run(){
+                BSONObj a = BSON( "a" << 17 );
+                BSONObj b = BSON( "b" << a["a"] );
+                ASSERT_EQUALS( NumberInt , a["a"].type() );
+                ASSERT_EQUALS( NumberInt , b["b"].type() );
+                ASSERT_EQUALS( 17 , b["b"].number() );
+            }
+        };
+        
     } // namespace ValueStreamTests
     
     class SubObjectBuilder {
@@ -692,6 +703,7 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelSize >();
             add< ValueStreamTests::LabelMulti >();
             add< ValueStreamTests::Unallowed >();
+            add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
         }
     };

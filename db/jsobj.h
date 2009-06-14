@@ -845,6 +845,8 @@ namespace mongo {
         friend class Labeler;
         BSONObjBuilderValueStream( BSONObjBuilder * builder );
 
+        BSONObjBuilder& operator<<( const BSONElement& e );
+        
         template<class T> 
         BSONObjBuilder& operator<<( T value );
         
@@ -1380,9 +1382,15 @@ namespace mongo {
         _builder = builder;
     }
     
-    template<class T> inline 
-    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) { 
+    template<class T> 
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) { 
         _builder->append(_fieldName, value);
+        _fieldName = 0;
+        return *_builder;
+    }
+
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) { 
+        _builder->appendAs( e , _fieldName );
         _fieldName = 0;
         return *_builder;
     }
