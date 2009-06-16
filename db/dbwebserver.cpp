@@ -423,11 +423,11 @@ namespace mongo {
                 out << "    " << obj.jsonString();
 
             }
-            out << "\n  ]\n\n";
+            out << "\n  ],\n\n";
 
             out << "  \"total_rows\" : " << howMany << " ,\n";
             out << "  \"query\" : " << query.jsonString() << " ,\n";
-            out << "  \"millis\" : " << t.millis() << " ,\n";
+            out << "  \"millis\" : " << t.millis() << "\n";
             out << "}\n";
         }
 
