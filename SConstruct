@@ -185,7 +185,7 @@ if ( not ( usesm or usejvm ) ):
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
-commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" ]
+commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , "util/assert_util.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" )
 commonFiles += [ "scripting/engine.cpp" ]
@@ -305,6 +305,10 @@ elif "linux2" == os.sys.platform:
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
+        
+        if force64:
+            print( "error: force64 doesn't make sense on a 64-bit machine" )
+            Exit(1)
 
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
@@ -817,6 +821,9 @@ def ensureTestDirs():
 
 def testSetup( env , target , source ):
     ensureTestDirs()
+
+if len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "test":
+    ensureDir( "/tmp/unittest/" );
 
 addSmoketest( "smoke", [ "test" ] , [ test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )

@@ -155,10 +155,14 @@ namespace JsobjTests {
                 ASSERT( o.valid() );
                 ASSERT_EQUALS( Timestamp, o.getField( "a" ).type() );
                 BSONObjIterator i( o );
+                ASSERT( i.moreWithEOO() );
                 ASSERT( i.more() );
+
                 BSONElement e = i.next();
                 ASSERT_EQUALS( Timestamp, e.type() );
-                ASSERT( i.more() );
+                ASSERT( i.moreWithEOO() );
+                ASSERT( ! i.more() );
+                
                 e = i.next();
                 ASSERT( e.eoo() );
                 
@@ -613,6 +617,17 @@ namespace JsobjTests {
             }
         };
         
+        class ElementAppend {
+        public:
+            void run(){
+                BSONObj a = BSON( "a" << 17 );
+                BSONObj b = BSON( "b" << a["a"] );
+                ASSERT_EQUALS( NumberInt , a["a"].type() );
+                ASSERT_EQUALS( NumberInt , b["b"].type() );
+                ASSERT_EQUALS( 17 , b["b"].number() );
+            }
+        };
+        
     } // namespace ValueStreamTests
     
     class SubObjectBuilder {
@@ -688,6 +703,7 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelSize >();
             add< ValueStreamTests::LabelMulti >();
             add< ValueStreamTests::Unallowed >();
+            add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
         }
     };

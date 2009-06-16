@@ -307,32 +307,18 @@ shellPrintHelper = function( x ){
         print( tojson( x ) );
 }
 
-execShellLine = function(){
-    var l = __line__.trim();
-    
-    var cmd = l.substring( 0 , ( l.indexOf( " " ) || l.length ) );
-    if ( cmd.length == 0 )
-        cmd = l;
-
-    if ( shellHelper[ cmd ] ){
-        shellHelper( cmd , l.substring( cmd.length + 1 ).trim() );
-        return;
-    }
-
-    var res = eval( l );
-    if ( typeof( res ) != "undefined" ){
-        shellPrintHelper( res );
-    }
-}
-
-shellHelper = function( command , rest ){
+shellHelper = function( command , rest , shouldPrint ){
     command = command.trim();
     var args = rest.trim().replace(/;$/,"").split( "\s+" );
     
     if ( ! shellHelper[command] )
         throw "no command [" + command + "]";
     
-    return shellHelper[command].apply( null , args );
+    var res = shellHelper[command].apply( null , args );
+    if ( shouldPrint ){
+        shellPrintHelper( res );
+    }
+    return res;
 }
 
 help = shellHelper.help = function(){

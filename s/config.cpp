@@ -110,9 +110,7 @@ namespace mongo {
             BSONObjIterator i(sharded);
             while ( i.more() ){
                 BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                uassert( "shared things have to be objects" , e.type() == Object );
+                uassert( "sharded things have to be objects" , e.type() == Object );
                 _sharded[e.fieldName()] = e.embeddedObject();
             }
         }

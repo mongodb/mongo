@@ -845,6 +845,8 @@ namespace mongo {
         friend class Labeler;
         BSONObjBuilderValueStream( BSONObjBuilder * builder );
 
+        BSONObjBuilder& operator<<( const BSONElement& e );
+        
         template<class T> 
         BSONObjBuilder& operator<<( T value );
         
@@ -1227,8 +1229,11 @@ namespace mongo {
             theend = jso.objdata() + sz;
         }
         /** @return true if more elements exist to be enumerated. */
-        bool more() {
+        bool moreWithEOO() {
             return pos < theend;
+        }
+        bool more(){
+            return pos < theend && pos[0];
         }
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd = false ) {
@@ -1327,7 +1332,7 @@ namespace mongo {
     inline bool BSONObj::hasElement(const char *name) const {
         if ( !isEmpty() ) {
             BSONObjIterator it(*this);
-            while ( it.more() ) {
+            while ( it.moreWithEOO() ) {
                 BSONElement e = it.next();
                 if ( strcmp(name, e.fieldName()) == 0 )
                     return true;
@@ -1339,7 +1344,7 @@ namespace mongo {
     inline BSONElement BSONObj::findElement(const char *name) const {
         if ( !isEmpty() ) {
             BSONObjIterator it(*this);
-            while ( it.more() ) {
+            while ( it.moreWithEOO() ) {
                 BSONElement e = it.next();
                 if ( strcmp(name, e.fieldName()) == 0 )
                     return e;
@@ -1351,7 +1356,7 @@ namespace mongo {
     /* add all the fields from the object specified to this object */
     inline BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
         BSONObjIterator it(x);
-        while ( it.more() ) {
+        while ( it.moreWithEOO() ) {
             BSONElement e = it.next();
             if ( e.eoo() ) break;
             append(e);
@@ -1377,9 +1382,15 @@ namespace mongo {
         _builder = builder;
     }
     
-    template<class T> inline 
-    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) { 
+    template<class T> 
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) { 
         _builder->append(_fieldName, value);
+        _fieldName = 0;
+        return *_builder;
+    }
+
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) { 
+        _builder->appendAs( e , _fieldName );
         _fieldName = 0;
         return *_builder;
     }

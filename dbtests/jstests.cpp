@@ -592,6 +592,21 @@ namespace JSTests {
         }
     };
 
+    class VarTests {
+    public:
+        void run(){
+            Scope * s = globalScriptEngine->createScope();
+            
+            assert( s->exec( "a = 5;" , "a" , false , true , false ) );
+            ASSERT_EQUALS( 5 , s->getNumber("a" ) );
+
+            assert( s->exec( "var b = 6;" , "b" , false , true , false ) );
+            ASSERT_EQUALS( 6 , s->getNumber("b" ) );
+            cout << "WTF: " << s->getNumber("b" ) << endl;
+            delete s;
+        }
+    };
+
     class All : public Suite {
     public:
         All() {
@@ -614,6 +629,8 @@ namespace JSTests {
             add< CodeTests >();
             add< DBRefTest >();
             add< BinDataType >();
+
+            add< VarTests >();
         }
     };
     

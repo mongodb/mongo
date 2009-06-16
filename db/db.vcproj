@@ -1679,6 +1679,10 @@
 				Name="cpp"
 				>
 				<File
+					RelativePath="..\util\assert_util.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\util\background.cpp"
 					>
 				</File>

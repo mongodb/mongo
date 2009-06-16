@@ -44,8 +44,6 @@ namespace mongo {
             BSONObjIterator it( holder->_obj );
             while ( it.more() ){
                 BSONElement e = it.next();
-                if ( e.eoo() )
-                    break;
                 _names.push_back( e.fieldName() );
             }
             
@@ -770,6 +768,8 @@ namespace mongo {
             JS_SetGlobalObject( _context , _global );
             massert( "js init failed" , JS_InitStandardClasses( _context , _global ) );
             
+            JS_SetOptions( _context , JS_GetOptions( _context ) | JSOPTION_VAROBJFIX );
+
             JS_DefineFunctions( _context , _global , globalHelpers );
             
             // install my special helpers
@@ -787,6 +787,9 @@ namespace mongo {
             for ( list<void*>::iterator i=_roots.begin(); i != _roots.end(); i++ ){
                 JS_RemoveRoot( _context , *i );
             }
+            
+            if ( _this )
+                JS_RemoveRoot( _context , &_this );
 
             if ( _convertor ){
                 delete _convertor;
@@ -815,9 +818,6 @@ namespace mongo {
             BSONObjIterator i( *data );
             while ( i.more() ){
                 BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                
                 _convertor->setProperty( _global , e.fieldName() , _convertor->toval( e ) );
             }
 
@@ -904,9 +904,14 @@ namespace mongo {
             jsval v = BOOLEAN_TO_JSVAL( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );            
         }
-
+        
         void setThis( const BSONObj * obj ){
+            if ( _this )
+                JS_RemoveRoot( _context , &_this );
+            
             _this = _convertor->toJSObject( obj );
+            
+            JS_AddNamedRoot( _context , &_this , "scope this" );
         }
 
         // ---- functions -----
@@ -974,6 +979,9 @@ namespace mongo {
                 // cout << "exec error: " << _error << endl;
                 // already printed in reportError, so... TODO
             }
+            
+            if ( worked )
+                _convertor->setProperty( _global , "__lastres__" , ret );
             
             if ( worked && printResult && ! JSVAL_IS_VOID( ret ) )
                 cout << _convertor->toString( ret ) << endl;

@@ -307,23 +307,24 @@ int main(int argc, char* argv[]) {
                 break;
             }
             
-            /*
+            bool wascmd = false;
             {
                 string cmd = line;
                 if ( cmd.find( " " ) > 0 )
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
                 
-                if ( shellHelper->HasRealNamedProperty( v8::String::New( cmd.c_str() ) ) ){
-                    stringstream ss;
-                    ss << "shellHelper( \"" << cmd << "\" , \"" << code.substr( cmd.size() ) << "\" )";
-                    code = ss.str();
+                scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
+                if ( scope->getBoolean( "__iscmd__" )  ){
+                    scope->exec( (string)"shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");" , "(shellhelp2)" , false , true , false );
+                    wascmd = true;
                 }
                 
             }
-            */
             
-            scope->setString( "__line__" , code.c_str() );
-            scope->exec( "execShellLine()" , "(shell)" , true , true , false);
+            if ( ! wascmd ){
+                scope->exec( code.c_str() , "(shell)" , false , true , false );
+                scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+            }
             
             
             shellHistoryAdd( line );

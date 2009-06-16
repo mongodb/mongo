@@ -138,7 +138,7 @@ namespace mongo {
             in(0), nin(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
     {
         BSONObjIterator i(jsobj);
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -198,7 +198,7 @@ namespace mongo {
                 // e.g., fe == { $gt : 3 }
                 BSONObjIterator j(e.embeddedObject());
                 bool ok = false;
-                while ( j.more() ) {
+                while ( j.moreWithEOO() ) {
                     BSONElement fe = j.next();
                     if ( fe.eoo() )
                         break;
@@ -247,7 +247,7 @@ namespace mongo {
                             uassert( "only 1 $in statement per query supported", in == 0 ); // todo...
                             in = new set<BSONElement,element_lt>();
                             BSONObjIterator i(fe.embeddedObject());
-                            if ( i.more() ) {
+                            if ( i.moreWithEOO() ) {
                                 while ( 1 ) {
                                     BSONElement ie = i.next();
                                     if ( ie.eoo() )
@@ -263,7 +263,7 @@ namespace mongo {
                             uassert( "only 1 $nin statement per query supported", nin == 0 ); // todo...
                             nin = new set<BSONElement,element_lt>();
                             BSONObjIterator i(fe.embeddedObject());
-                            if ( i.more() ) {
+                            if ( i.moreWithEOO() ) {
                                 while ( 1 ) {
                                     BSONElement ie = i.next();
                                     if ( ie.eoo() )
@@ -279,7 +279,7 @@ namespace mongo {
                             uassert( "only 1 $all statement per query supported", all == 0 ); // todo...
                             all = new set<BSONElement,element_lt>();
                             BSONObjIterator i(fe.embeddedObject());
-                            if ( i.more() ) {
+                            if ( i.moreWithEOO() ) {
                                 while ( 1 ) {
                                     BSONElement ie = i.next();
                                     if ( ie.eoo() )
@@ -334,7 +334,7 @@ namespace mongo {
                 return 0;
             int count = 0;
             BSONObjIterator i( l.embeddedObject() );
-            while( i.more() ) {
+            while( i.moreWithEOO() ) {
                 BSONElement e = i.next();
                 if ( e.eoo() )
                     break;
@@ -348,7 +348,7 @@ namespace mongo {
                 return 0;
             set< BSONElement, element_lt > matches;
             BSONObjIterator i( l.embeddedObject() );
-            while( i.more() ) {
+            while( i.moreWithEOO() ) {
                 BSONElement e = i.next();
                 if ( e.eoo() )
                     break;
@@ -421,7 +421,7 @@ namespace mongo {
             if ( isArr ) {
                 BSONObjIterator ai(obj);
                 bool found = false;
-                while ( ai.more() ) {
+                while ( ai.moreWithEOO() ) {
                     BSONElement z = ai.next();
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
@@ -458,7 +458,7 @@ namespace mongo {
             return 1;
         } else if ( e.type() == Array && compareOp != BSONObj::opALL && compareOp != BSONObj::opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
-            while ( ai.more() ) {
+            while ( ai.moreWithEOO() ) {
                 BSONElement z = ai.next();
                 if ( valuesMatch( z, toMatch, compareOp) ) {
                     if ( deep )

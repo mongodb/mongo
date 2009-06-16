@@ -532,8 +532,6 @@ namespace mongo {
             bool first = 1;
             for ( BSONObjIterator i(keys); i.more(); ) {
                 BSONElement f = i.next();
-                if ( f.eoo() )
-                    break;
 
                 if ( first )
                     first = 0;

@@ -593,7 +593,7 @@ namespace mongo {
         BSONObjIterator i(*this);
         bool first = true;
         while ( 1 ) {
-            massert( "Object does not end with EOO", i.more() );
+            massert( "Object does not end with EOO", i.moreWithEOO() );
             BSONElement e = i.next( true );
             massert( "Invalid element size", e.size() > 0 );
             massert( "Element too large", e.size() < ( 1 << 30 ) );
@@ -718,7 +718,7 @@ namespace mongo {
 
     BSONElement BSONObj::getField(const char *name) const {
         BSONObjIterator i(*this);
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -760,7 +760,7 @@ namespace mongo {
                 if ( e.type() == Array ) {
                     trueDat( deep );
                     BSONObjIterator i( e.embeddedObject() );
-                    while( i.more() ) {
+                    while( i.moreWithEOO() ) {
                         BSONElement f = i.next();
                         if ( f.eoo() )
                             break;
@@ -775,7 +775,7 @@ namespace mongo {
             if ( e.type() == Array ) {
                 trueDat( deep );
                 BSONObjIterator i( e.embeddedObject() );
-                while( i.more() ) {
+                while( i.moreWithEOO() ) {
                     BSONElement f = i.next();
                     if ( f.eoo() )
                         break;
@@ -821,7 +821,7 @@ namespace mongo {
     BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b, const char *&nameWithinArray) const {
         nameWithinArray = "";
         BSONObjIterator i(pattern);
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -847,7 +847,7 @@ namespace mongo {
     BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) const {
         BSONObjBuilder b;
         BSONObjIterator i(pattern);
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -861,7 +861,7 @@ namespace mongo {
     BSONObj BSONObj::extractFields(const BSONObj& pattern) const {
         BSONObjBuilder b(32); // scanandorder.h can make a zillion of these, so we start the allocation very small
         BSONObjIterator i(pattern);
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -876,7 +876,7 @@ namespace mongo {
     BSONObj BSONObj::filterFieldsUndotted( const BSONObj &filter, bool inFilter ) const {
         BSONObjBuilder b;
         BSONObjIterator i( *this );
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -891,7 +891,7 @@ namespace mongo {
     BSONElement BSONObj::getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const {
         BSONObjIterator i( indexKey );
         int j = 0;
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement f = i.next();
             if ( f.eoo() )
                 return BSONElement();
@@ -900,7 +900,7 @@ namespace mongo {
             ++j;
         }
         BSONObjIterator k( *this );
-        while( k.more() ) {
+        while( k.moreWithEOO() ) {
             BSONElement g = k.next();
             if ( g.eoo() )
                 return BSONElement();
@@ -936,7 +936,7 @@ namespace mongo {
     int BSONObj::nFields() const {
         int n = 0;
         BSONObjIterator i(*this);
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -949,7 +949,7 @@ namespace mongo {
     int BSONObj::getFieldNames(set<string>& fields) const {
         int n = 0;
         BSONObjIterator i(*this);
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -971,7 +971,7 @@ namespace mongo {
         int n = 0;
         BSONObjIterator i(from);
         bool gotId = false;
-        while ( i.more() ) {
+        while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
             const char *fname = e.fieldName();
             if ( fields.count(fname) ) {
@@ -999,7 +999,7 @@ namespace mongo {
     BSONObj BSONObj::clientReadable() const {
         BSONObjBuilder b;
         BSONObjIterator i( *this );
-        while( i.more() ) {
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
@@ -1027,8 +1027,8 @@ namespace mongo {
         BSONObjBuilder b;
         BSONObjIterator i( *this );
         BSONObjIterator j( names );
-        BSONElement f = j.more() ? j.next() : BSONObj().firstElement();
-        while( i.more() ) {
+        BSONElement f = j.moreWithEOO() ? j.next() : BSONObj().firstElement();
+        while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;

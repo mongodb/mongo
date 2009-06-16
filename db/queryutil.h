@@ -106,7 +106,7 @@ namespace mongo {
             int direction = ( spec.firstElement().number() >= 0 ) ? 1 : -1;
             BSONObjIterator i( spec );
             BSONObjBuilder b;
-            while( i.more() ) {
+            while( i.moreWithEOO() ) {
                 BSONElement e = i.next();
                 if ( e.eoo() )
                     break;

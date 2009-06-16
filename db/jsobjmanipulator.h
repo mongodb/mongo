@@ -54,7 +54,7 @@ public:
         // replacement policy is a work in progress.
         
         BSONObjIterator i( obj );
-        for( int j = 0; i.more() && j < 2; ++j ) {
+        for( int j = 0; i.moreWithEOO() && j < 2; ++j ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;

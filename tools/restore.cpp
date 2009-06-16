@@ -87,7 +87,8 @@ public:
         out() << "\t going into namespace [" << ns << "]" << endl;
         
         MemoryMappedFile mmf;
-        assert( mmf.map( root.string().c_str() ) );
+        int fileLength;
+        assert( mmf.map( root.string().c_str() , fileLength ) );
         
         char * data = (char*)mmf.viewOfs();
         int read = 0;

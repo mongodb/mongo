@@ -67,8 +67,6 @@ namespace mongo {
         BSONObjIterator i( query );
         while ( i.more() ){
             BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
 
             if ( strcmp( e.fieldName() , "query" ) ){
                 b.append( e );
