@@ -846,11 +846,18 @@ assert( !eloc.isNull() );
         }
     }
 
-    struct IndexChanges {
+    struct IndexChanges/*on an update*/ {
         BSONObjSetDefaultOrder oldkeys;
         BSONObjSetDefaultOrder newkeys;
         vector<BSONObj*> removed; // these keys were removed as part of the change
         vector<BSONObj*> added;   // these keys were added as part of the change
+
+        void dupCheck(IndexDetails& idx) {
+            if( added.empty() || !idx.unique() )
+                return;
+            for( vector<BSONObj*>::iterator i = added.begin(); i != added.end(); i++ )
+                uassert("E11001 duplicate key on update", !idx.hasKey(**i));
+        }
     };
 
     inline void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj) { 
@@ -863,6 +870,13 @@ assert( !eloc.isNull() );
             idx.getKeysFromObject(newObj, ch.newkeys);
             setDifference(ch.oldkeys, ch.newkeys, ch.removed);
             setDifference(ch.newkeys, ch.oldkeys, ch.added);
+        }
+    }
+
+    inline void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d) {
+        for ( int i = 0; i < d.nIndexes; i++ ) {
+            IndexDetails& idx = d.indexes[i];
+            v[i].dupCheck(idx);
         }
     }
 
@@ -880,19 +894,23 @@ assert( !eloc.isNull() );
         BSONObj objOld(toupdate);
         BSONObj objNew(buf);
         BSONElement idOld;
+
+        /* addID - if the udpate lacks an _id field, but the old object has one, we stick it back in. 
+        */
         int addID = 0;
+
         {
             /* xxx duplicate _id check... */
 
             BSONElement idNew;
             objOld.getObjectID(idOld);
             if( objNew.getObjectID(idNew) ) { 
+// /*
                 if( idOld == idNew ) 
                     ; 
                 else {
-                    /* check if idNew would be a duplicate. very unusual that an _id would change, 
-                       so not worried about the bit of extra work here.
-                       */
+                    // check if idNew would be a duplicate. very unusual that an _id would change, 
+                    //   so not worried about the bit of extra work here.
                     if( d->findIdIndex() >= 0 ) {
                         BSONObj result;
                         BSONObjBuilder b;
@@ -901,6 +919,7 @@ assert( !eloc.isNull() );
                                 !Helpers::findOne(ns, b.done(), result));
                     }
                 }
+// */
             } else {
                 if ( !idOld.eoo() ) {
                     /* if the old copy had the _id, force it back into the updated version.  insert() adds 

@@ -163,6 +163,12 @@ namespace mongo {
     public:
         void dump();
 
+        /* @return true if key exists in index 
+
+           order - indicates order of keys in the index.  this is basically the index's key pattern, e.g.:
+             BSONObj order = ((IndexDetails&)idx).keyPattern();
+           likewise below in bt_insert() etc.
+        */
         bool exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, BSONObj order);
 
         static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
@@ -297,5 +303,9 @@ namespace mongo {
     };
 
 #pragma pack()
+
+    inline bool IndexDetails::hasKey(const BSONObj& key) { 
+        return head.btree()->exists(*this, head, key, keyPattern());
+    }
 
 } // namespace mongo;
