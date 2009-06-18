@@ -15,5 +15,6 @@ t.update( {x:'B'}, { x:'A' } );
 a = t.find().toArray();
 u = a.map( function(z){ return z.x } ).unique();
 
+print("test commented out in indexa.js...");
 //assert( a.length == u.length , "unique index update is broken" );
 
