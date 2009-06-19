@@ -275,6 +275,10 @@ namespace mongo {
         }
 
         JSFunction * _compileFunction( const char * code, JSObject * assoc ){
+            while (isspace(*code)) {
+                code++;
+            }
+
             if ( ! hasFunctionIdentifier( code ) ){
                 string s = code;
                 if ( isSimpleStatement( s ) ){
