@@ -885,23 +885,33 @@ assert( !eloc.isNull() );
     void DataFileMgr::update(
         const char *ns,
         Record *toupdate, const DiskLoc& dl,
-        const char *buf, int len, stringstream& ss)
+        const char *_buf, int _len, stringstream& ss)
     {
         dassert( toupdate == dl.rec() );
 
         NamespaceDetails *d = nsdetails(ns);
 
         BSONObj objOld(toupdate);
-        BSONObj objNew(buf);
-        BSONElement idOld;
+        BSONObj objNew(_buf);
+        assert( objNew.objsize() == _len );
+        assert( objNew.objdata() == _buf );
 
-        /* addID - if the udpate lacks an _id field, but the old object has one, we stick it back in. 
-        */
-        int addID = 0;
+        if( !objNew.hasElement("_id") && objOld.hasElement("_id") ) {
+            /* add back the old _id value if the update removes it.  Note this implementation is slow 
+               (copies entire object multiple times), but this shouldn't happen often, so going for simple
+               code, not speed.
+               */
+            BSONObjBuilder b;
+            BSONElement e;
+            assert( objOld.getObjectID(e) );
+            b.append(e); // put _id first, for best performance
+            b.appendElements(objNew);
+            objNew = b.obj();
+        }
 
         {
             /* xxx duplicate _id check... */
-
+            BSONElement idOld;
             BSONElement idNew;
             objOld.getObjectID(idOld);
             if( objNew.getObjectID(idNew) ) { 
@@ -920,26 +930,27 @@ assert( !eloc.isNull() );
                     }
                 }
 // */
-            } else {
+            }/* else {
                 if ( !idOld.eoo() ) {
-                    /* if the old copy had the _id, force it back into the updated version.  insert() adds 
+                    / if the old copy had the _id, force it back into the updated version.  insert() adds 
                        one so old should have it unless this is a special table like system.* or 
                        local.oplog.*
-                    */
+                    /
                     addID = len;
                     len += idOld.size();
                 }
-            }
+            }*/
         }
-        if ( toupdate->netLength() < len ) {
+        if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
             uassert("E10003 failing update: objects in a capped ns cannot grow", !(d && d->capped));
             d->paddingTooSmall();
             if ( database->profile )
                 ss << " moved ";
             // xxx TODO fix dup key error - old copy should not be deleted
+
             deleteRecord(ns, toupdate, dl);
-            insert(ns, buf, len, false, idOld);
+            insert(ns, objNew.objdata(), objNew.objsize(), false);
             return;
         }
 
@@ -952,8 +963,8 @@ assert( !eloc.isNull() );
             getIndexChanges(changes, *d, objNew, objOld);
             for ( int x = 0; x < d->nIndexes; x++ ) {
                 IndexDetails& idx = d->indexes[x];
-                if ( addID && idx.isIdIndex() )
-                    continue;
+                //if ( addID && idx.isIdIndex() )
+                //    continue;
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
                     try {
                         idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
@@ -984,55 +995,14 @@ assert( !eloc.isNull() );
             }
         }
 
-/*
-                    BSONObj idxKey = idx.info.obj().getObjectField("key");
-                    BSONObjSetDefaultOrder oldkeys;
-                    BSONObjSetDefaultOrder newkeys;
-                    idx.getKeysFromObject(oldObj, oldkeys);
-                    idx.getKeysFromObject(newObj, newkeys);
-                    vector<BSONObj*> removed;
-                    setDifference(oldkeys, newkeys, removed);
-                    string idxns = idx.indexNamespace();
-                    for ( unsigned i = 0; i < removed.size(); i++ ) {
-                        try {
-                            idx.head.btree()->unindex(idx.head, idx, *removed[i], dl);
-                        }
-                        catch (AssertionException&) {
-                            ss << " exception update unindex ";
-                            problem() << " caught assertion update unindex " << idxns.c_str() << endl;
-                        }
-                    }
-                    vector<BSONObj*> added;
-                    setDifference(newkeys, oldkeys, added);
-                    assert( !dl.isNull() );
-                    for ( unsigned i = 0; i < added.size(); i++ ) {
-                        try {
-                            ** TODO xxx dup keys handle **
-                            idx.head.btree()->bt_insert(
-                                idx.head,
-                                dl, *added[i], idxKey, **dupsAllowed**true, idx);
-                        }
-                        catch (AssertionException&) {
-                            ss << " exception update index ";
-                            out() << " caught assertion update index " << idxns.c_str() << '\n';
-                            problem() << " caught assertion update index " << idxns.c_str() << endl;
-                        }
-                    }
-                    if ( database->profile )
-                        ss << '\n' << added.size() << " key updates ";
-                }
-            }
-        }
-*/
-
         //	update in place
-        if ( addID ) {
+        /*if ( addID ) {
             ((int&)*toupdate->data) = *((int*) buf) + idOld.size();
             memcpy(toupdate->data+4, idOld.rawdata(), idOld.size());
             memcpy(toupdate->data+4+idOld.size(), ((char *)buf)+4, addID-4);
-        } else {
-            memcpy(toupdate->data, buf, len);
-        }
+        } else {*/
+        memcpy(toupdate->data, objNew.objdata(), objNew.objsize());
+        /*}*/
     }
 
     int followupExtentSize(int len, int lastExtentLen) {
