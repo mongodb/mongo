@@ -15,17 +15,16 @@ t.insert({a:1});
 x = { a : 2 };
 t.save(x);
 
-print("test commented out indexb.js");
-if( 0 ) {
+{
 
-assert( t.count() == 2, "count wrong B");
+ assert( t.count() == 2, "count wrong B");
 
-x.a = 1;
-x.filler = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-t.save(x); // should fail, not unique.
+ x.a = 1;
+ x.filler = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+ t.save(x); // should fail, not unique.
 
-assert( t.count() == 2,"count wrong" );
-assert( t.find({a:1}).count() == 1,"bfail1" );
-assert( t.find({a:2}).count() == 1,"bfail2" );
+ assert( t.count() == 2,"count wrong" );
+ assert( t.find({a:1}).count() == 1,"bfail1" );
+ assert( t.find({a:2}).count() == 1,"bfail2" );
 
 }

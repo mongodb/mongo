@@ -909,38 +909,13 @@ assert( !eloc.isNull() );
             objNew = b.obj();
         }
 
-        {
-            /* xxx duplicate _id check... */
-            BSONElement idOld;
-            BSONElement idNew;
-            objOld.getObjectID(idOld);
-            if( objNew.getObjectID(idNew) ) { 
-// /*
-                if( idOld == idNew ) 
-                    ; 
-                else {
-                    // check if idNew would be a duplicate. very unusual that an _id would change, 
-                    //   so not worried about the bit of extra work here.
-                    if( d->findIdIndex() >= 0 ) {
-                        BSONObj result;
-                        BSONObjBuilder b;
-                        b.append(idNew);
-                        uassert("duplicate _id key on update", 
-                                !Helpers::findOne(ns, b.done(), result));
-                    }
-                }
-// */
-            }/* else {
-                if ( !idOld.eoo() ) {
-                    / if the old copy had the _id, force it back into the updated version.  insert() adds 
-                       one so old should have it unless this is a special table like system.* or 
-                       local.oplog.*
-                    /
-                    addID = len;
-                    len += idOld.size();
-                }
-            }*/
-        }
+        /* duplicate key check. we descend the btree twice - once for this check, and once for the actual inserts, further  
+           below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
+        */
+        vector<IndexChanges> changes;
+        getIndexChanges(changes, *d, objNew, objOld);
+        dupCheck(changes, *d);
+
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
             uassert("E10003 failing update: objects in a capped ns cannot grow", !(d && d->capped));
@@ -959,12 +934,8 @@ assert( !eloc.isNull() );
 
         /* have any index keys changed? */
         if( d->nIndexes ) {
-            vector<IndexChanges> changes;
-            getIndexChanges(changes, *d, objNew, objOld);
             for ( int x = 0; x < d->nIndexes; x++ ) {
                 IndexDetails& idx = d->indexes[x];
-                //if ( addID && idx.isIdIndex() )
-                //    continue;
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
                     try {
                         idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
@@ -1002,7 +973,6 @@ assert( !eloc.isNull() );
             memcpy(toupdate->data+4+idOld.size(), ((char *)buf)+4, addID-4);
         } else {*/
         memcpy(toupdate->data, objNew.objdata(), objNew.objsize());
-        /*}*/
     }
 
     int followupExtentSize(int len, int lastExtentLen) {

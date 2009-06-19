@@ -31,13 +31,13 @@ assert( db.getLastError() , 7);
 
 /* Check that if we update and remove _id, it gets added back by the DB */
 
-/* test when object grows */
+/* - test when object grows */
 t.drop();
 t.save( { _id : 'Z' } );
 t.update( {}, { k : 2 } );
 assert( t.findOne()._id == 'Z', "uniqueness.js problem with adding back _id" );
 
-/* test when doesn't grow */
+/* - test when doesn't grow */
 t.drop();
 t.save( { _id : 'Z', k : 3 } );
 t.update( {}, { k : 2 } );
