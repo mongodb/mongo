@@ -173,6 +173,13 @@ DBQuery.prototype.forEach = function( func ){
         func( this.next() );
 }
 
+DBQuery.prototype.map = function( func ){
+    var a = [];
+    while ( this.hasNext() )
+        a.push( func( this.next() ) );
+    return a;
+}
+
 DBQuery.prototype.arrayAccess = function( idx ){
     return this.toArray()[idx];
 }
