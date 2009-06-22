@@ -96,6 +96,10 @@ namespace mongo {
             return l;
         }
 
+        void setlen( int newLen ){
+            l = newLen;
+        }
+
     private:
         /* returns the pre-grow write position */
         char* grow(int by) {
