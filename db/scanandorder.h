@@ -50,19 +50,36 @@ namespace mongo {
        _ response size limit from runquery; push it up a bit.
     */
 
-    inline bool fillQueryResultFromObj(BufBuilder& b, set<string> *filter, BSONObj& js) {
+    inline bool fillQueryResultFromObj(BufBuilder& bb, set<string> *filter, BSONObj& js) {
         if ( filter ) {
-            BSONObj x;
-            bool ok = x.addFields(js, *filter) > 0;
-            if ( ok )
-                b.append((void*) x.objdata(), x.objsize());
-            return ok;
+            BSONObjBuilder b( bb );
+            BSONObjIterator i( js );
+            int N = filter->size();
+            int n=0;
+            bool gotId = false;
+            while ( i.more() ){
+                BSONElement e = i.next();
+                const char * fname = e.fieldName();
+                
+                if ( strcmp( fname , "_id" ) == 0 ){
+                    b.append( e );
+                    gotId = true;
+                }
+                else if ( filter->count( fname ) ){
+                    b.append( e );
+                    n++;
+                    if ( n == N && gotId )
+                        break;
+                }
+            }
+            b.done();
+            return n;
         }
-
-        b.append((void*) js.objdata(), js.objsize());
+        
+        bb.append((void*) js.objdata(), js.objsize());
         return true;
     }
-
+    
     typedef multimap<BSONObj,BSONObj,BSONObjCmp> BestMap;
     class ScanAndOrder {
         BestMap best; // key -> full object

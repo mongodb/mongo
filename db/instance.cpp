@@ -152,7 +152,7 @@ namespace mongo {
         database = 0;
 
         int ms;
-        bool log = false;
+        bool log = logLevel >= 1;
         currentOp.op = curOp = m.data->operation();
 
 #if 0
@@ -523,7 +523,7 @@ namespace mongo {
             {
                 Timer t;
 
-                bool log = false;
+                bool log = logLevel >= 1;
                 curOp = m.data->operation();
 
                 if ( m.data->operation() == dbQuery ) {
@@ -575,7 +575,7 @@ namespace mongo {
                 log = log || ctr++ % 128 == 0;
                 if ( log || ms > 100 ) {
                     ss << ' ' << t.millis() << "ms";
-		    mongo::out() << ss.str().c_str() << endl;
+                    mongo::out() << ss.str().c_str() << endl;
                 }
                 if ( database && database->profile >= 1 ) {
                     if ( database->profile >= 2 || ms >= 100 ) {

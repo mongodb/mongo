@@ -1,3 +1,5 @@
+// unique index constraint test for updates 
+// case where object doesn't grow tested here
 
 t = db.indexa;
 t.drop();
@@ -8,12 +10,13 @@ t.insert( { 'x':'A' } );
 t.insert( { 'x':'B' } );
 t.insert( { 'x':'A' } );
 
-assert.eq( 2 , t.count() , "A" );
+assert.eq( 2 , t.count() , "indexa 1" );
 
 t.update( {x:'B'}, { x:'A' } );
 
 a = t.find().toArray();
 u = a.map( function(z){ return z.x } ).unique();
+assert.eq( 2 , t.count() , "indexa 2" );
 
-//assert( a.length == u.length , "unique index update is broken" );
+assert( a.length == u.length , "unique index update is broken" );
 

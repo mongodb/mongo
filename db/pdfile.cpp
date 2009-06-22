@@ -846,11 +846,18 @@ assert( !eloc.isNull() );
         }
     }
 
-    struct IndexChanges {
+    struct IndexChanges/*on an update*/ {
         BSONObjSetDefaultOrder oldkeys;
         BSONObjSetDefaultOrder newkeys;
         vector<BSONObj*> removed; // these keys were removed as part of the change
         vector<BSONObj*> added;   // these keys were added as part of the change
+
+        void dupCheck(IndexDetails& idx) {
+            if( added.empty() || !idx.unique() )
+                return;
+            for( vector<BSONObj*>::iterator i = added.begin(); i != added.end(); i++ )
+                uassert("E11001 duplicate key on update", !idx.hasKey(**i));
+        }
     };
 
     inline void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj) { 
@@ -866,61 +873,59 @@ assert( !eloc.isNull() );
         }
     }
 
+    inline void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d) {
+        for ( int i = 0; i < d.nIndexes; i++ ) {
+            IndexDetails& idx = d.indexes[i];
+            v[i].dupCheck(idx);
+        }
+    }
+
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
     */
     void DataFileMgr::update(
         const char *ns,
         Record *toupdate, const DiskLoc& dl,
-        const char *buf, int len, stringstream& ss)
+        const char *_buf, int _len, stringstream& ss)
     {
         dassert( toupdate == dl.rec() );
 
         NamespaceDetails *d = nsdetails(ns);
 
         BSONObj objOld(toupdate);
-        BSONObj objNew(buf);
-        BSONElement idOld;
-        int addID = 0;
-        {
-            /* xxx duplicate _id check... */
+        BSONObj objNew(_buf);
+        assert( objNew.objsize() == _len );
+        assert( objNew.objdata() == _buf );
 
-            BSONElement idNew;
-            objOld.getObjectID(idOld);
-            if( objNew.getObjectID(idNew) ) { 
-                if( idOld == idNew ) 
-                    ; 
-                else {
-                    /* check if idNew would be a duplicate. very unusual that an _id would change, 
-                       so not worried about the bit of extra work here.
-                       */
-                    if( d->findIdIndex() >= 0 ) {
-                        BSONObj result;
-                        BSONObjBuilder b;
-                        b.append(idNew);
-                        uassert("duplicate _id key on update", 
-                                !Helpers::findOne(ns, b.done(), result));
-                    }
-                }
-            } else {
-                if ( !idOld.eoo() ) {
-                    /* if the old copy had the _id, force it back into the updated version.  insert() adds 
-                       one so old should have it unless this is a special table like system.* or 
-                       local.oplog.*
-                    */
-                    addID = len;
-                    len += idOld.size();
-                }
-            }
+        if( !objNew.hasElement("_id") && objOld.hasElement("_id") ) {
+            /* add back the old _id value if the update removes it.  Note this implementation is slow 
+               (copies entire object multiple times), but this shouldn't happen often, so going for simple
+               code, not speed.
+               */
+            BSONObjBuilder b;
+            BSONElement e;
+            assert( objOld.getObjectID(e) );
+            b.append(e); // put _id first, for best performance
+            b.appendElements(objNew);
+            objNew = b.obj();
         }
-        if ( toupdate->netLength() < len ) {
+
+        /* duplicate key check. we descend the btree twice - once for this check, and once for the actual inserts, further  
+           below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
+        */
+        vector<IndexChanges> changes;
+        getIndexChanges(changes, *d, objNew, objOld);
+        dupCheck(changes, *d);
+
+        if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
             uassert("E10003 failing update: objects in a capped ns cannot grow", !(d && d->capped));
             d->paddingTooSmall();
             if ( database->profile )
                 ss << " moved ";
             // xxx TODO fix dup key error - old copy should not be deleted
+
             deleteRecord(ns, toupdate, dl);
-            insert(ns, buf, len, false, idOld);
+            insert(ns, objNew.objdata(), objNew.objsize(), false);
             return;
         }
 
@@ -929,12 +934,8 @@ assert( !eloc.isNull() );
 
         /* have any index keys changed? */
         if( d->nIndexes ) {
-            vector<IndexChanges> changes;
-            getIndexChanges(changes, *d, objNew, objOld);
             for ( int x = 0; x < d->nIndexes; x++ ) {
                 IndexDetails& idx = d->indexes[x];
-                if ( addID && idx.isIdIndex() )
-                    continue;
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
                     try {
                         idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
@@ -965,55 +966,13 @@ assert( !eloc.isNull() );
             }
         }
 
-/*
-                    BSONObj idxKey = idx.info.obj().getObjectField("key");
-                    BSONObjSetDefaultOrder oldkeys;
-                    BSONObjSetDefaultOrder newkeys;
-                    idx.getKeysFromObject(oldObj, oldkeys);
-                    idx.getKeysFromObject(newObj, newkeys);
-                    vector<BSONObj*> removed;
-                    setDifference(oldkeys, newkeys, removed);
-                    string idxns = idx.indexNamespace();
-                    for ( unsigned i = 0; i < removed.size(); i++ ) {
-                        try {
-                            idx.head.btree()->unindex(idx.head, idx, *removed[i], dl);
-                        }
-                        catch (AssertionException&) {
-                            ss << " exception update unindex ";
-                            problem() << " caught assertion update unindex " << idxns.c_str() << endl;
-                        }
-                    }
-                    vector<BSONObj*> added;
-                    setDifference(newkeys, oldkeys, added);
-                    assert( !dl.isNull() );
-                    for ( unsigned i = 0; i < added.size(); i++ ) {
-                        try {
-                            ** TODO xxx dup keys handle **
-                            idx.head.btree()->bt_insert(
-                                idx.head,
-                                dl, *added[i], idxKey, **dupsAllowed**true, idx);
-                        }
-                        catch (AssertionException&) {
-                            ss << " exception update index ";
-                            out() << " caught assertion update index " << idxns.c_str() << '\n';
-                            problem() << " caught assertion update index " << idxns.c_str() << endl;
-                        }
-                    }
-                    if ( database->profile )
-                        ss << '\n' << added.size() << " key updates ";
-                }
-            }
-        }
-*/
-
         //	update in place
-        if ( addID ) {
+        /*if ( addID ) {
             ((int&)*toupdate->data) = *((int*) buf) + idOld.size();
             memcpy(toupdate->data+4, idOld.rawdata(), idOld.size());
             memcpy(toupdate->data+4+idOld.size(), ((char *)buf)+4, addID-4);
-        } else {
-            memcpy(toupdate->data, buf, len);
-        }
+        } else {*/
+        memcpy(toupdate->data, objNew.objdata(), objNew.objsize());
     }
 
     int followupExtentSize(int len, int lastExtentLen) {
