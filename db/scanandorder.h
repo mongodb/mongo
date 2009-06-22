@@ -64,6 +64,8 @@ namespace mongo {
                 if ( strcmp( fname , "_id" ) == 0 ){
                     b.append( e );
                     gotId = true;
+                    if ( filter->count( "_id" ) )
+                        n++;
                 }
                 else if ( filter->count( fname ) ){
                     b.append( e );
