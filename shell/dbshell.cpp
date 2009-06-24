@@ -240,6 +240,8 @@ int main(int argc, char* argv[]) {
     scope->externalSetup();
     mongo::shellUtils::installShellUtils( *scope );
 
+    cout << "MongoDB shell version: " << mongo::versionString << endl;
+
     if ( !nodb ) { // connect to db
         cout << "url: " << url << endl;
         string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
