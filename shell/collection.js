@@ -86,12 +86,20 @@ DBCollection.prototype._massageObject = function( q ){
         
 }
 
+
+DBCollection.prototype._validateObject = function( o ){
+    if ( o._ensureSpecial && o._checkModify )
+        throw "can't save a DBQuery object";
+}
+
 DBCollection.prototype._validateForStorage = function( o ){
+    this._validateObject( o );
     for ( var k in o ){
         if ( k.indexOf( "." ) >= 0 )
             throw "can't have . in field names [" + k + "]" ;
     }
 }
+
 
 DBCollection.prototype.find = function( query , fields , limit , skip ){
     return new DBQuery( this._mongo , this._db , this , 
@@ -123,6 +131,7 @@ DBCollection.prototype.remove = function( t ){
 DBCollection.prototype.update = function( query , obj , upsert ){
     assert( query , "need a query" );
     assert( obj , "need an object" );
+    this._validateObject( obj );
     return this._mongo.update( this._fullName , query , obj , upsert ? true : false );
 }
 
