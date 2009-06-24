@@ -78,8 +78,9 @@ namespace mongo {
             bool operator()(const BSONElement& l, const BSONElement& r) const
             {
                 int x = (int) l.type() - (int) r.type();
-                if ( x < 0 ) return true;
-                if ( x > 0 ) return false;
+                if ( x == ( NumberInt - NumberDouble ) || x == ( NumberDouble - NumberInt ) );
+                else if ( x < 0 ) return true;
+                else if ( x > 0 ) return false;
                 return compareElementValues(l,r) < 0;
             }
         };
