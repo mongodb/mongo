@@ -359,6 +359,7 @@ int main(int argc, char **argv){
                 forwardAddress = args[ ++i ];
             } else if ( arg == string( "--source" ) ) {
                 assert( source == false );
+                assert(args.size() > i + 2);
                 source = true;
                 replay = ( args[ ++i ] == string( "FILE" ) );
                 if ( replay )
@@ -381,18 +382,18 @@ int main(int argc, char **argv){
         if ( !dev ) {
             dev = pcap_lookupdev(errbuf);
             if ( ! dev ) {
-                cerr << "error finding device" << endl;
+                cerr << "error finding device: " << errbuf << endl;
                 return -1;
             }
             cout << "found device: " << dev << endl;
         }
         if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1){
-            cerr << "can't get netmask!" << endl;
+            cerr << "can't get netmask: " << errbuf << endl;
             return -1;
         }
         handle = pcap_open_live(dev, SNAP_LEN, 1, 1000, errbuf);
         if ( ! handle ){
-            cerr << "error opening device!" << endl;
+            cerr << "error opening device: " << errbuf << endl;
             return -1;
         }
     } else {
