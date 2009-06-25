@@ -42,7 +42,7 @@ public:
             ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
             ;
     }
-    
+
     int run(){
         const string ns = getNS();
         const bool csv = hasParam( "csv" );
@@ -51,37 +51,37 @@ public:
         if ( hasParam( "out" ) )
             outPtr = new ofstream( outfile.c_str() );
         ostream &out = *outPtr;
-     
+
         BSONObj * fieldsToReturn = 0;
         BSONObj realFieldsToReturn;
-        
+
         vector<string> fields;
-        
+
         if ( hasParam( "fields" ) ){
-            
+
             BSONObjBuilder b;
-            
+
             pcrecpp::StringPiece input( getParam( "fields" ) );
-            
+
             string f;
             pcrecpp::RE re("(\\w+),?" );
             while ( re.Consume( &input, &f ) ){
                 fields.push_back( f );
                 b.append( f.c_str() , 1 );
             }
-            
+
             realFieldsToReturn = b.obj();
             fieldsToReturn = &realFieldsToReturn;
         }
-        
+
         if ( csv && fields.size() == 0 ){
             cerr << "csv mode requires a field list" << endl;
             return -1;
         }
-            
+
 
         auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , getParam( "query" , "" ) , 0 , 0 , fieldsToReturn , Option_SlaveOk );
-        
+
         if ( csv ){
             for ( vector<string>::iterator i=fields.begin(); i != fields.end(); i++ ){
                 if ( i != fields.begin() )
@@ -90,7 +90,7 @@ public:
             }
             out << endl;
         }
-        
+
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
             if ( csv ){
@@ -100,7 +100,7 @@ public:
                     const BSONElement & e = obj[i->c_str()];
                     if ( ! e.eoo() )
                         out << e.jsonString( TenGen , false );
-                }              
+                }
                 out << endl;
             }
             else {
