@@ -4,7 +4,7 @@
   TODO:
     large messages - need to track what's left and ingore
     single object over packet size - can only display begging of object
-    
+
     getmore
     delete
     killcursors
@@ -122,43 +122,43 @@ map< Connection, long long > lastCursor;
 map< Connection, map< long long, long long > > mapCursor;
 
 void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
-	
-	const struct sniff_ip* ip = (struct sniff_ip*)(packet + captureHeaderSize);
-	int size_ip = IP_HL(ip)*4;
-	if ( size_ip < 20 ){
-		cerr << "*** Invalid IP header length: " << size_ip << " bytes" << endl;
-		return;
-	}
-    
+
+    const struct sniff_ip* ip = (struct sniff_ip*)(packet + captureHeaderSize);
+    int size_ip = IP_HL(ip)*4;
+    if ( size_ip < 20 ){
+        cerr << "*** Invalid IP header length: " << size_ip << " bytes" << endl;
+        return;
+    }
+
     assert( ip->ip_p == IPPROTO_TCP );
 
-	const struct sniff_tcp* tcp = (struct sniff_tcp*)(packet + captureHeaderSize + size_ip);
-	int size_tcp = TH_OFF(tcp)*4;
-	if (size_tcp < 20){
-		cerr << "*** Invalid TCP header length: " << size_tcp << " bytes" << endl;
-		return;
-	}
+    const struct sniff_tcp* tcp = (struct sniff_tcp*)(packet + captureHeaderSize + size_ip);
+    int size_tcp = TH_OFF(tcp)*4;
+    if (size_tcp < 20){
+        cerr << "*** Invalid TCP header length: " << size_tcp << " bytes" << endl;
+        return;
+    }
 
     if ( ! ( serverPorts.count( ntohs( tcp->th_sport ) ) ||
              serverPorts.count( ntohs( tcp->th_dport ) ) ) ){
         return;
     }
-	
-	const u_char * payload = (const u_char*)(packet + captureHeaderSize + size_ip + size_tcp);
 
-	unsigned totalSize = ntohs(ip->ip_len);
+    const u_char * payload = (const u_char*)(packet + captureHeaderSize + size_ip + size_tcp);
+
+    unsigned totalSize = ntohs(ip->ip_len);
     assert( totalSize <= header->caplen );
 
     int size_payload = totalSize - (size_ip + size_tcp);
-	if (size_payload <= 0 )
+    if (size_payload <= 0 )
         return;
-        
+
     Connection c;
     c.srcAddr = ip->ip_src;
     c.srcPort = tcp->th_sport;
     c.dstAddr = ip->ip_dst;
     c.dstPort = tcp->th_dport;
-    
+
     if ( seen[ c ] ) {
         if ( expectedSeq[ c ] != ntohl( tcp->th_seq ) ) {
             cerr << "Warning: sequence # mismatch, there may be dropped packets" << endl;
@@ -166,11 +166,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     } else {
         seen[ c ] = true;
     }
-    
+
     expectedSeq[ c ] = ntohl( tcp->th_seq ) + size_payload;
-    
+
     Message m;
-    
+
     if ( bytesRemainingInMessage[ c ] == 0 ) {
         m.setData( (MsgData*)payload , false );
         if ( !m.data->valid() ) {
@@ -204,14 +204,14 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     }
 
     DbMessage d( m );
-    
-    cout << inet_ntoa(ip->ip_src) << ":" << ntohs( tcp->th_sport ) 
+
+    cout << inet_ntoa(ip->ip_src) << ":" << ntohs( tcp->th_sport )
          << ( serverPorts.count( ntohs( tcp->th_dport ) ) ? "  -->> " : "  <<--  " )
-         << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport ) 
-         << " " << d.getns() 
+         << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport )
+         << " " << d.getns()
          << "  " << m.data->len << " bytes "
          << m.data->id;
-    
+
     if ( m.data->operation() == mongo::opReply )
         cout << " - " << m.data->responseTo;
     cout << endl;
@@ -248,13 +248,13 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         int nToReturn = d.pullInt();
         long long cursorId = d.pullInt64();
         cout << "\tgetMore nToReturn: " << nToReturn << " cursorId: " << cursorId << endl;
-        break;        
+        break;
     }
     case mongo::dbDelete:{
         int flags = d.pullInt();
         BSONObj q = d.nextJsObj();
         cout << "\tdelete flags: " << flags << " q: " << q << endl;
-        break;                
+        break;
     }
     case mongo::dbKillCursors:{
         int *x = (int *) m.data->_data;
@@ -265,8 +265,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     }
     default:
         cerr << "*** CANNOT HANDLE TYPE: " << m.data->operation() << endl;
-    }    
-    
+    }
+
     if ( !forwardAddress.empty() ) {
         if ( m.data->operation() != mongo::opReply ) {
             DBClientConnection *conn = forwarder[ c ];
@@ -333,22 +333,22 @@ void usage() {
 
 int main(int argc, char **argv){
 
-	const char *dev = NULL;
-	char errbuf[PCAP_ERRBUF_SIZE];
-	pcap_t *handle;
+    const char *dev = NULL;
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *handle;
 
-	struct bpf_program fp;
-	bpf_u_int32 mask;
-	bpf_u_int32 net;
-    
+    struct bpf_program fp;
+    bpf_u_int32 mask;
+    bpf_u_int32 net;
+
     bool source = false;
     bool replay = false;
-    const char *file = 0;    
+    const char *file = 0;
 
     vector< const char * > args;
     for( int i = 1; i < argc; ++i )
         args.push_back( argv[ i ] );
-    
+
     try {
         for( unsigned i = 0; i < args.size(); ++i ) {
             const char *arg = args[ i ];
@@ -373,10 +373,10 @@ int main(int argc, char **argv){
         usage();
         return -1;
     }
-    
+
     if ( !serverPorts.size() )
         serverPorts.insert( 27017 );
-    
+
     if ( !replay ) {
         if ( !dev ) {
             dev = pcap_lookupdev(errbuf);
@@ -400,11 +400,11 @@ int main(int argc, char **argv){
         if ( ! handle ){
             cerr << "error opening capture file!" << endl;
             return -1;
-        }        
+        }
     }
-    
+
     switch ( pcap_datalink( handle ) ){
-    case DLT_EN10MB: 
+    case DLT_EN10MB:
         captureHeaderSize = 14;
         break;
     case DLT_NULL:
@@ -413,23 +413,23 @@ int main(int argc, char **argv){
     default:
         cerr << "don't know how to handle datalink type: " << pcap_datalink( handle ) << endl;
     }
-    
-	assert( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, net) != -1 );
-	assert( pcap_setfilter(handle, &fp) != -1 );
-    
+
+    assert( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, net) != -1 );
+    assert( pcap_setfilter(handle, &fp) != -1 );
+
     cout << "sniffing... ";
     for ( set<int>::iterator i = serverPorts.begin(); i != serverPorts.end(); i++ )
         cout << *i << " ";
     cout << endl;
-    
-	pcap_loop(handle, 0 , got_packet, NULL);
 
-	pcap_freecode(&fp);
-	pcap_close(handle);
+    pcap_loop(handle, 0 , got_packet, NULL);
+
+    pcap_freecode(&fp);
+    pcap_close(handle);
 
     for( map< Connection, DBClientConnection* >::iterator i = forwarder.begin(); i != forwarder.end(); ++i )
         free( i->second );
-    
+
     return 0;
 }
 
