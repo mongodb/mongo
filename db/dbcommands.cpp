@@ -930,7 +930,7 @@ namespace mongo {
             help << "example: { buildinfo:1 }";
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            result << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
+            result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
             return true;
         }
     } cmdBuildInfo;
