@@ -34,6 +34,11 @@ mongo::Tool::~Tool(){
 void mongo::Tool::printExtraHelp( ostream & out ){
 }
 
+void mongo::Tool::printHelp(ostream &out) {
+    _options->print(out);
+    printExtraHelp(out);
+}
+
 int mongo::Tool::main( int argc , char ** argv ){
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
@@ -44,8 +49,7 @@ int mongo::Tool::main( int argc , char ** argv ){
     po::notify( _params );
 
     if ( _params.count( "help" ) ){
-        _options->print( cerr );
-        printExtraHelp( cerr );
+        printHelp(cerr);
         return 0;
     }
 

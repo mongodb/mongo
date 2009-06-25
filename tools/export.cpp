@@ -44,7 +44,7 @@ public:
     }
 
     int run(){
-        const string ns = getNS();
+        string ns;
         const bool csv = hasParam( "csv" );
         ostream *outPtr = &cout;
         string outfile = getParam( "out" );
@@ -56,6 +56,13 @@ public:
         BSONObj realFieldsToReturn;
 
         vector<string> fields;
+
+        try {
+            ns = getNS();
+        } catch (...) {
+            printHelp(cerr);
+            return 1;
+        }
 
         if ( hasParam( "fields" ) ){
 

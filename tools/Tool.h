@@ -50,6 +50,8 @@ namespace mongo {
 
         virtual int run() = 0;
 
+        virtual void printHelp(ostream &out);
+
         virtual void printExtraHelp( ostream & out );
 
     protected:
