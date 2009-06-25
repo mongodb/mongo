@@ -47,6 +47,7 @@ public:
         string filename = getParam( "file" );
         if ( filename.size() == 0 ){
             cerr << "need to specify a file!" << endl;
+            printHelp(cerr);
             return -1;
 
         }
@@ -59,7 +60,14 @@ public:
             in = &file;
         }
 
-        string ns = getNS();
+        string ns;
+
+        try {
+            ns = getNS();
+        } catch (...) {
+            printHelp(cerr);
+            return -1;
+        }
 
         if ( hasParam( "drop" ) ){
             cout << "dropping: " << ns << endl;
