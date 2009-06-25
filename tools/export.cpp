@@ -36,7 +36,7 @@ class Export : public Tool {
 public:
     Export() : Tool( "export" ){
         add_options()
-            ("query,q" , po::value<string>() , "query filter" )
+            ("query,q" , po::value<string>() , "query filter, as a JSON string" )
             ("fields,f" , po::value<string>() , "comma seperated list of field names e.g. -f=name,age " )
             ("csv","export to csv instead of json")
             ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
