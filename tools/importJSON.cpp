@@ -35,7 +35,7 @@ class ImportJSON : public Tool {
 public:
     ImportJSON() : Tool( "importjson" ){
         add_options()
-            ("file",po::value<string>() , "file to import from" )
+            ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
             ("idbefore", "create id index before importing " )
             ("id", "create id index after importing (recommended) " )
             ("drop", "drop collection first " )
@@ -45,18 +45,12 @@ public:
 
     int run(){
         string filename = getParam( "file" );
-        if ( filename.size() == 0 ){
-            cerr << "need to specify a file!" << endl;
-            printHelp(cerr);
-            return -1;
-
-        }
 
         istream * in = &cin;
 
         ifstream file( filename.c_str() , ios_base::in | ios_base::binary);
 
-        if ( filename != "-" ){
+        if ( filename.size() > 0 && filename != "-" ){
             in = &file;
         }
 
