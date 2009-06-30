@@ -163,7 +163,10 @@ darwin = False
 windows = False
 freebsd = False
 solaris = False
-force64 = not GetOption( "force64" ) is None
+force64 = not GetOption( "force64" ) is None 
+if not force64 and os.getcwd().endswith( "mongo-64" ):
+    force64 = True
+    print( "*** assuming you want a 64-bit build b/c of directory *** " )
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 
