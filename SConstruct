@@ -135,6 +135,13 @@ AddOption( "--noshell",
            action="store",
            help="don't build shell" )
 
+AddOption( "--extrapath",
+           dest="extrapath",
+           type="string",
+           nargs=1,
+           action="store",
+           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo" )
+
 # --- environment setup ---
 
 def printLocalInfo():
@@ -185,6 +192,12 @@ if ( usesm and usejvm ):
 if ( not ( usesm or usejvm ) ):
     usesm = True
 
+if GetOption( "extrapath" ) is not None:
+    for x in GetOption( "extrapath" ).split( "," ):
+        env.Append( CPPPATH=[ x + "/include" ] )
+        env.Append( LIBPATH=[ x + "/lib" ] )
+    release = True
+    
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
