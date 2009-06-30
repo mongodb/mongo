@@ -377,7 +377,7 @@ elif "win32" == os.sys.platform:
     env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
 
     env.Append( CPPFLAGS=" /EHsc /W3 " )
-    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
+    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE","SUPPORT_UCP","SUPPORT_UTF8" ] )
 
     #env.Append( CPPFLAGS='  /Yu"stdafx.h" ' ) # this would be for pre-compiled headers, could play with it later
 
