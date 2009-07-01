@@ -202,5 +202,34 @@ namespace mongo {
         qp.setSort( sort );
         return qp;
     }
+
+    void FieldMatcher::add( const BSONObj& o ){
+        BSONObjIterator i( o );
+        while ( i.more() ){
+            string s = i.next().fieldName();
+            if ( s.find( "." ) == string::npos ){
+                baseFields.insert( s );
+            }
+            else {
+                baseFields.insert( s.substr( 0 , s.find( "." ) ) );
+            }
+        }
+    }
+
+    int FieldMatcher::size() const {
+        return baseFields.size();
+    }
+
+    bool FieldMatcher::matches( const string& s ) const {
+        return baseFields.count( s );
+    }
+    
+    BSONObj FieldMatcher::getSpec() const{
+        BSONObjBuilder b;
+        for ( set<string>::const_iterator i=baseFields.begin(); i!=baseFields.end(); i++)
+            b.append( i->c_str() , 1 );
+        return b.obj();
+    }
+
     
 } // namespace mongo

@@ -155,4 +155,22 @@ namespace mongo {
         BSONObj query_;
     };
 
+    /**
+       used for doing field limiting
+     */
+    class FieldMatcher {
+    public:
+        
+        void add( const BSONObj& o );
+        int size() const;
+
+        bool matches( const string& s ) const;
+        
+        BSONObj getSpec() const;
+
+    private:
+        set<string> baseFields;
+    };
+
+
 } // namespace mongo

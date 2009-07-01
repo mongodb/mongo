@@ -153,6 +153,7 @@ namespace mongo {
         const char * mark;
     };
 
+
     /* a request to run a query, received from the database */
     class QueryMessage {
     public:
@@ -161,8 +162,8 @@ namespace mongo {
         int ntoreturn;
         int queryOptions;
         BSONObj query;
-        auto_ptr< set<string> > fields;
-
+        auto_ptr< FieldMatcher > fields;
+        
         /* parses the message into the above fields */
         QueryMessage(DbMessage& d) {
             ns = d.getns();
@@ -170,8 +171,8 @@ namespace mongo {
             ntoreturn = d.pullInt();
             query = d.nextJsObj();
             if ( d.moreJSObjs() ) {
-                fields = auto_ptr< set<string> >(new set<string>());
-                d.nextJsObj().getFieldNames(*fields);
+                fields = auto_ptr< FieldMatcher >(new FieldMatcher() );
+                fields->add( d.nextJsObj() );
                 if ( fields->size() == 0 )
                     fields.reset();
             }

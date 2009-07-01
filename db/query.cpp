@@ -977,7 +977,7 @@ namespace mongo {
     class DoQueryOp : public QueryOp {
     public:
         DoQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
-                  bool explain, set< string > *filter, int queryOptions ) :
+                  bool explain, FieldMatcher *filter, int queryOptions ) :
         b_( 32768 ),
         ntoskip_( ntoskip ),
         ntoreturn_( ntoreturn ),
@@ -1153,7 +1153,7 @@ namespace mongo {
         BSONObj order_;
         bool wantMore_;
         bool explain_;
-        set< string > *filter_;   
+        FieldMatcher *filter_;   
         bool ordering_;
         auto_ptr< Cursor > c_;
         long long nscanned_;
@@ -1175,7 +1175,7 @@ namespace mongo {
         int ntoskip = q.ntoskip;
         int _ntoreturn = q.ntoreturn;
         BSONObj jsobj = q.query;
-        auto_ptr< set< string > > filter = q.fields;
+        auto_ptr< FieldMatcher > filter = q.fields;
         int queryOptions = q.queryOptions;
         
         Timer t;
