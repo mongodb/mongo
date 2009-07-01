@@ -72,8 +72,8 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	 * should have in-memory page information.
 	 */
 	offset = WT_ADDR_TO_OFF(db, addr);
-	WT_RET((__wt_cache_in(stoc,
-	    offset, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)));
+	WT_RET((__wt_cache_in(
+	    stoc, offset, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)));
 	if (page->indx_count == 0) {
 		switch (page->hdr->type) {
 		case WT_PAGE_OVFL:
