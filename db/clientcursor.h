@@ -114,7 +114,7 @@ namespace mongo {
             return _lastLoc;
         }
         void setLastLoc(DiskLoc);
-        auto_ptr< set<string> > filter; // which fields query wants returned
+        auto_ptr< FieldMatcher > filter; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
         unsigned idleAgeMillis; // how long has the cursor been around, relative to server idle time
 

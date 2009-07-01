@@ -50,7 +50,7 @@ namespace mongo {
        _ response size limit from runquery; push it up a bit.
     */
 
-    inline bool fillQueryResultFromObj(BufBuilder& bb, set<string> *filter, BSONObj& js) {
+    inline bool fillQueryResultFromObj(BufBuilder& bb, FieldMatcher *filter, BSONObj& js) {
         if ( filter ) {
             
             const int mark = bb.len();
@@ -67,10 +67,10 @@ namespace mongo {
                 if ( strcmp( fname , "_id" ) == 0 ){
                     b.append( e );
                     gotId = true;
-                    if ( filter->count( "_id" ) )
+                    if ( filter->matches( "_id" ) )
                         n++;
                 }
-                else if ( filter->count( fname ) ){
+                else if ( filter->matches( fname ) ){
                     b.append( e );
                     n++;
                     if ( n == N && gotId )
@@ -136,7 +136,7 @@ namespace mongo {
             _addIfBetter(k, o, i);
         }
 
-        void _fill(BufBuilder& b, set<string> *filter, int& nout, BestMap::iterator begin, BestMap::iterator end) {
+        void _fill(BufBuilder& b, FieldMatcher *filter, int& nout, BestMap::iterator begin, BestMap::iterator end) {
             int n = 0;
             int nFilled = 0;
             for ( BestMap::iterator i = begin; i != end; i++ ) {
@@ -156,7 +156,7 @@ done:
         }
 
         /* scanning complete. stick the query result in b for n objects. */
-        void fill(BufBuilder& b, set<string> *filter, int& nout) {
+        void fill(BufBuilder& b, FieldMatcher *filter, int& nout) {
             _fill(b, filter, nout, best.begin(), best.end());
         }
 

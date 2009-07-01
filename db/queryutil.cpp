@@ -202,5 +202,18 @@ namespace mongo {
         qp.setSort( sort );
         return qp;
     }
+
+    void FieldMatcher::add( const BSONObj& o ){
+        o.getFieldNames( baseFields );
+    }
+
+    int FieldMatcher::size() const {
+        return baseFields.size();
+    }
+
+    bool FieldMatcher::matches( const string& s ) const {
+        return baseFields.count( s );
+    }
+
     
 } // namespace mongo
