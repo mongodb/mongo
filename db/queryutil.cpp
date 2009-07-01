@@ -204,7 +204,16 @@ namespace mongo {
     }
 
     void FieldMatcher::add( const BSONObj& o ){
-        o.getFieldNames( baseFields );
+        BSONObjIterator i( o );
+        while ( i.more() ){
+            string s = i.next().fieldName();
+            if ( s.find( "." ) == string::npos ){
+                baseFields.insert( s );
+            }
+            else {
+                baseFields.insert( s.substr( 0 , s.find( "." ) ) );
+            }
+        }
     }
 
     int FieldMatcher::size() const {
