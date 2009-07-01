@@ -1049,7 +1049,7 @@ namespace mongo {
             }
             
             bool mayCreateCursor1 = wantMore_ && ntoreturn_ != 1 && useCursors;
-            
+            /* todo: the line above and below should perhaps be in initialization instead of in next()??? */
             if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
                 ids_.reset( new IdSet() );
             }
@@ -1065,6 +1065,8 @@ namespace mongo {
                 if ( ids_.get() ) {
                     BSONElement idRef = js.getField( "_id" );
                     if ( !idRef.eoo() ) {
+                        /* todo: it would be better to a just put the _id value in an ids_ set instead of 
+                           a full bsonobj - that's a little fatter. */
                         BSONObjBuilder b;
                         b.append( idRef );
                         BSONObj id = b.obj();
@@ -1163,7 +1165,7 @@ namespace mongo {
         auto_ptr< ScanAndOrder > so_;
         bool findingStart_;
         ClientCursor * findingStartCursor_;
-        auto_ptr< IdSet > ids_;
+        auto_ptr< IdSet > ids_; /* for dedupping traversal of multikey indexes */
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
@@ -1231,7 +1233,7 @@ namespace mongo {
             BSONObj max;
             bool explain = false;
             bool _gotquery = false;
-            BSONObj query;// = jsobj.getObjectField("query");
+            BSONObj query;
             {
                 BSONElement e = jsobj.findElement("$query");
                 if ( e.eoo() )
@@ -1264,7 +1266,7 @@ namespace mongo {
             
             /* The ElemIter will not be happy if this isn't really an object. So throw exception
              here when that is true.
-             (Which may indicate bad data from appserver?)
+             (Which may indicate bad data from client.)
              */
             if ( query.objsize() == 0 ) {
                 out() << "Bad query object?\n  jsobj:";
