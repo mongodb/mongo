@@ -338,6 +338,9 @@ namespace mongo {
     shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
         massert( "no plans", plans_.plans_.size() > 0 );
         
+        if ( plans_.plans_.size() > 1 )
+            log(1) << "running multiple plans" << endl;
+
         vector< shared_ptr< QueryOp > > ops;
         for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
             shared_ptr< QueryOp > op( op_.clone() );
