@@ -90,12 +90,12 @@ wt_page
 #############################################
 # Internal functions
 #############################################
-wt_cache_db_in
+wt_cache_in
 	UNFORMATTED			# Page may not be a valid database page.
 
-wt_cache_db_out
-	MODIFIED			# Page is modified
+wt_cache_out
 	UNFORMATTED			# Page may not be a valid database page.
+	MODIFIED			# Page is modified
 
 wt_open
 	CREATE				# Create the file
