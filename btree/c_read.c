@@ -110,12 +110,6 @@ __wt_cache_sync(DB *db)
 	env = db->env;
 	stoc = db->idb->stoc;
 
-	/*
-	 * BUG:
-	 * Walk the list of STOCs, find all of them associated with this
-	 * DB handle and close them.
-	 */
-
 	/* Write any modified pages. */
 	TAILQ_FOREACH(page, &stoc->lqh, q) {
 		/* There shouldn't be any pinned pages. */
@@ -123,6 +117,28 @@ __wt_cache_sync(DB *db)
 
 		if (F_ISSET(page, WT_MODIFIED))
 			WT_RET((__wt_cache_write(stoc, page)));
+	}
+	return (0);
+}
+
+/*
+ * __wt_cache_stoc_lru --
+ *	Discard cache pages if we're holding too much memory.
+ */
+int
+__wt_cache_stoc_lru(WT_STOC *stoc, ENV *env)
+{
+	WT_PAGE *page;
+
+	/* Discard pages until we're below our threshold. */
+	TAILQ_FOREACH(page, &stoc->lqh, q) {
+		if (stoc->cache_bytes <= env->cachesize * WT_MEGABYTE)
+			break;
+		if (page->ref == 0) {
+			if (F_ISSET(page, WT_MODIFIED))
+				WT_RET((__wt_cache_write(stoc, page)));
+			WT_RET((__wt_cache_discard(stoc, page)));
+		}
 	}
 	return (0);
 }
@@ -137,6 +153,8 @@ __wt_cache_sync(DB *db)
  */
 #define	WT_PAGE_ALLOC(env, stoc, bytes, page) do {			\
 	int __ret;							\
+	if ((stoc)->cache_bytes > (env)->cachesize * WT_MEGABYTE)	\
+		WT_RET((__wt_cache_stoc_lru(stoc, env)));		\
 	WT_RET((__wt_calloc((env), 1, sizeof(WT_PAGE), &(page))));	\
 	if (((__ret) = __wt_calloc(					\
 	    (env), 1, (size_t)(bytes), &(page)->hdr)) != 0) {		\
@@ -167,11 +185,11 @@ __wt_cache_alloc(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
+	WT_PAGE_ALLOC(env, stoc, bytes, page);
+
 	WT_STAT_INCR(env->hstats, CACHE_ALLOC, "pages allocated in the cache");
 	WT_STAT_INCR(
 	    db->hstats, DB_CACHE_ALLOC, "pages allocated in the cache");
-
-	WT_PAGE_ALLOC(env, stoc, bytes, page);
 
 	/* Initialize the page. */
 	page->offset = idb->fh->file_size;
@@ -210,7 +228,7 @@ __wt_cache_in(WT_STOC *stoc,
 	env = db->env;
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
-	WT_ENV_FCHK(env, "__wt_cache_in", flags, WT_APIMASK_WT_CACHE_DB_IN);
+	WT_ENV_FCHK(env, "__wt_cache_in", flags, WT_APIMASK_WT_CACHE_IN);
 
 	/* Check for the page in the cache. */
 	hashq = &stoc->hqh[WT_HASH(stoc, offset)];
@@ -288,7 +306,7 @@ __wt_cache_out(WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
 
 	env = stoc->idb->db->env;
 
-	WT_ENV_FCHK(env, "__wt_cache_out", flags, WT_APIMASK_WT_CACHE_DB_OUT);
+	WT_ENV_FCHK(env, "__wt_cache_out", flags, WT_APIMASK_WT_CACHE_OUT);
 
 	/* Check and decrement the reference count. */
 	WT_ASSERT(env, page->ref > 0);
