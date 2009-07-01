@@ -1289,6 +1289,7 @@ namespace mongo {
             if ( dqo.scanAndOrderRequired() )
                 ss << " scanAndOrder ";
             auto_ptr< Cursor > c = dqo.cursor();
+            log( 5 ) << "   used cursor: " << c->toString() << endl;
             if ( dqo.saveClientCursor() ) {
                 ClientCursor *cc = new ClientCursor();
                 cc->c = c;
