@@ -517,7 +517,7 @@ namespace mongo {
             if ( ifree )
                 _holder.reset( new Holder( data ) );
             _objdata = data;
-            assert( "Invalid BSONObj spec size" && isValid() );
+            massert( "Invalid BSONObj spec size" , isValid() );
         }
 #pragma pack(1)
         static struct EmptyObject {
