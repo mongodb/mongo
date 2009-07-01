@@ -226,7 +226,7 @@ namespace mongo {
     
     BSONObj FieldMatcher::getSpec() const{
         BSONObjBuilder b;
-        for ( set<string>::iterator i=baseFields.begin(); i!=baseFields.end(); i++)
+        for ( set<string>::const_iterator i=baseFields.begin(); i!=baseFields.end(); i++)
             b.append( i->c_str() , 1 );
         return b.obj();
     }
