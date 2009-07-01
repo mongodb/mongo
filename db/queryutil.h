@@ -166,6 +166,8 @@ namespace mongo {
 
         bool matches( const string& s ) const;
         
+        BSONObj getSpec() const;
+
     private:
         set<string> baseFields;
     };

@@ -223,6 +223,13 @@ namespace mongo {
     bool FieldMatcher::matches( const string& s ) const {
         return baseFields.count( s );
     }
+    
+    BSONObj FieldMatcher::getSpec() const{
+        BSONObjBuilder b;
+        for ( set<string>::iterator i=baseFields.begin(); i!=baseFields.end(); i++)
+            b.append( i->c_str() , 1 );
+        return b.obj();
+    }
 
     
 } // namespace mongo
