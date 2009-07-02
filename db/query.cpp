@@ -1054,63 +1054,72 @@ namespace mongo {
                 ids_.reset( new IdSet() );
             }
             
+            if( 0 ) { 
+                BSONObj js = c_->current();
+                cout << "SCANNING " << js << endl;
+            }
+
             nscanned_++;
             bool deep;
             if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
+                ;
             }
-            else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
-                BSONObj js = c_->current();
-                // got a match.
-                assert( js.objsize() >= 0 ); //defensive for segfaults
-                if ( ids_.get() ) {
-                    BSONElement idRef = js.getField( "_id" );
-                    if ( !idRef.eoo() ) {
-                        /* todo: it would be better to a just put the _id value in an ids_ set instead of 
-                           a full bsonobj - that's a little fatter. */
-                        BSONObjBuilder b;
-                        b.append( idRef );
-                        BSONObj id = b.obj();
-                        ids_->put( id );
-                    }
-                }
-                if ( ordering_ ) {
-                    // note: no cursors for non-indexed, ordered results.  results must be fairly small.
-                    so_->add(js);
-                }
-                else if ( ntoskip_ > 0 ) {
-                    ntoskip_--;
-                } else {
-                    if ( explain_ ) {
-                        n_++;
-                        if ( n_ >= ntoreturn_ && !wantMore_ ) {
-                            // .limit() was used, show just that much.
-                            finish();
-                            return;
+            else {
+                DiskLoc cl = c_->currLoc();
+                if ( !deep || !c_->getsetdup(cl) ) { // i.e., check for dups on deep items only
+                    BSONObj js = c_->current();
+                    // got a match.
+                    assert( js.objsize() >= 0 ); //defensive for segfaults
+                    if ( ids_.get() ) {
+                        BSONElement idRef = js.getField( "_id" );
+                        if ( !idRef.eoo() ) {
+                            /* todo: it would be better to a just put the _id value in an ids_ set instead of 
+                            a full bsonobj - that's a little fatter. */
+                            BSONObjBuilder b;
+                            b.append( idRef );
+                            BSONObj id = b.obj();
+                            ids_->put( id );
                         }
                     }
-                    else {
-                        bool ok = fillQueryResultFromObj(b_, filter_, js);
-                        if ( ok ) n_++;
-                        if ( ok ) {
-                            if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
-                                /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-                                 is only a size limit.  The idea is that on a find() where one doesn't use much results,
-                                 we don't return much, but once getmore kicks in, we start pushing significant quantities.
-                                 
-                                 The n limit (vs. size) is important when someone fetches only one small field from big
-                                 objects, which causes massive scanning server-side.
-                                 */
-                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                                if ( mayCreateCursor1 ) {
-                                    c_->advance();
-                                    if ( c_->ok() ) {
-                                        // more...so save a cursor
-                                        saveClientCursor_ = true;
-                                    }
-                                }
+                    if ( ordering_ ) {
+                        // note: no cursors for non-indexed, ordered results.  results must be fairly small.
+                        so_->add(js);
+                    }
+                    else if ( ntoskip_ > 0 ) {
+                        ntoskip_--;
+                    } else {
+                        if ( explain_ ) {
+                            n_++;
+                            if ( n_ >= ntoreturn_ && !wantMore_ ) {
+                                // .limit() was used, show just that much.
                                 finish();
                                 return;
+                            }
+                        }
+                        else {
+                            bool ok = fillQueryResultFromObj(b_, filter_, js);
+                            if ( ok ) n_++;
+                            if ( ok ) {
+                                if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
+                                (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
+                                    /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+                                    is only a size limit.  The idea is that on a find() where one doesn't use much results,
+                                    we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                                 
+                                    The n limit (vs. size) is important when someone fetches only one small field from big
+                                    objects, which causes massive scanning server-side.
+                                 */
+                                    /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                                    if ( mayCreateCursor1 ) {
+                                        c_->advance();
+                                        if ( c_->ok() ) {
+                                            // more...so save a cursor
+                                            saveClientCursor_ = true;
+                                        }
+                                    }
+                                    finish();
+                                    return;
+                                }
                             }
                         }
                     }
