@@ -71,7 +71,7 @@ namespace mongo {
                         n++;
                 }
                 else if ( filter->matches( fname ) ){
-                    b.append( e );
+                    filter->append( b , e );
                     n++;
                     if ( n == N && gotId )
                         break;
