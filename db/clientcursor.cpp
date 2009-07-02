@@ -35,8 +35,8 @@ namespace mongo {
 
     /* ------------------------------------------- */
 
-    long long IdSet::size_ = 0;
-    long long IdSet::maxSize_ = 200 * 1024 * 1024;
+//    long long IdSet::size_ = 0;
+//    long long IdSet::maxSize_ = 200 * 1024 * 1024;
     
     typedef multimap<DiskLoc, ClientCursor*> ByLoc;
     ByLoc byLoc;

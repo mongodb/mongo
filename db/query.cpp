@@ -827,7 +827,7 @@ namespace mongo {
                     }
                     else {
                         BSONObj js = c->current();
-                        if ( cc->ids_.get() ) {
+                        /* if ( cc->ids_.get() ) {
                             BSONElement idRef = js.getField( "_id" );
                             if ( !idRef.eoo() ) {
                                 BSONObjBuilder idBuilder;
@@ -839,7 +839,7 @@ namespace mongo {
                                 }
                                 cc->ids_->put( id ); 
                             }
-                        }
+                        }*/
                         bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
                         if ( ok ) {
                             n++;
@@ -1049,10 +1049,9 @@ namespace mongo {
             }
             
             bool mayCreateCursor1 = wantMore_ && ntoreturn_ != 1 && useCursors;
-            /* todo: the line above and below should perhaps be in initialization instead of in next()??? */
-            if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
+/*            if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
                 ids_.reset( new IdSet() );
-            }
+            }*/
             
             if( 0 ) { 
                 BSONObj js = c_->current();
@@ -1070,17 +1069,15 @@ namespace mongo {
                     BSONObj js = c_->current();
                     // got a match.
                     assert( js.objsize() >= 0 ); //defensive for segfaults
-                    if ( ids_.get() ) {
+                    /*if ( ids_.get() ) {
                         BSONElement idRef = js.getField( "_id" );
                         if ( !idRef.eoo() ) {
-                            /* todo: it would be better to a just put the _id value in an ids_ set instead of 
-                            a full bsonobj - that's a little fatter. */
                             BSONObjBuilder b;
                             b.append( idRef );
                             BSONObj id = b.obj();
                             ids_->put( id );
                         }
-                    }
+                    }*/
                     if ( ordering_ ) {
                         // note: no cursors for non-indexed, ordered results.  results must be fairly small.
                         so_->add(js);
@@ -1150,7 +1147,7 @@ namespace mongo {
         bool scanAndOrderRequired() const { return ordering_; }
         auto_ptr< Cursor > cursor() { return c_; }
         auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
-        auto_ptr< IdSet > ids() { return ids_; }
+//        auto_ptr< IdSet > ids() { return ids_; }
         int n() const { return n_; }
         long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
@@ -1174,7 +1171,7 @@ namespace mongo {
         auto_ptr< ScanAndOrder > so_;
         bool findingStart_;
         ClientCursor * findingStartCursor_;
-        auto_ptr< IdSet > ids_; /* for dedupping traversal of multikey indexes */
+//        auto_ptr< IdSet > ids_; /* for dedupping traversal of multikey indexes */
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
@@ -1307,7 +1304,7 @@ namespace mongo {
                 cursorid = cc->cursorid;
                 DEV out() << "  query has more, cursorid: " << cursorid << endl;
                 cc->matcher = dqo.matcher();
-                cc->ids_ = dqo.ids();
+//                cc->ids_ = dqo.ids();
                 cc->ns = ns;
                 cc->pos = n;
                 cc->filter = filter;
