@@ -27,7 +27,7 @@
 #endif
 
 #else
-#warning unknown compiler
+// unknown compiler
 #endif 
 
 
