@@ -241,7 +241,7 @@ namespace mongo {
     }
 
     BSONObj FieldMatcher::extractDotted( const string& path , const BSONObj& o ) const {
-        unsigned int i = path.find( "." );
+        string::size_type i = path.find( "." );
         if ( i == string::npos )
             return o.getField( path.c_str() ).wrap();
         
