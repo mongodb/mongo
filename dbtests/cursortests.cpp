@@ -23,6 +23,8 @@
 
 namespace CursorTests {
     
+    typedef IdSet_Deprecated IdSet;
+
     namespace IdSetTests {
         
         class BasicSize {
