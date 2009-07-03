@@ -1,3 +1,4 @@
+/*
 baseName = "jstests_disk_norepeat";
 
 ports = allocatePorts( 1 );
@@ -57,3 +58,4 @@ assert.eq( "a", c.next()._id );
 assert( !c.hasNext() );
 
 assert( t.validate().valid );
+*/
