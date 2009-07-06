@@ -29,8 +29,8 @@ for ( var i=0; i<100; i++ ){
 
 t.ensureIndex( { foo : 1 } );
 
-//printjson( t.find( { foo : { $lt : 50 } } ).explain() );
+printjson( t.find( { foo : { $lt : 50 } } ).explain() );
 assert.gt( 30 , t.find( { foo : { $lt : 50 } } ).explain().nscanned , "lt" )
-//printjson( t.find( { foo : { $gt : 50 } } ).explain() );
-//assert.gt( 30 , t.find( { foo : { $gt : 50 } } ).explain().nscanned , "gt" )
+printjson( t.find( { foo : { $gt : 50 } } ).explain() );
+assert.gt( 30 , t.find( { foo : { $gt : 50 } } ).explain().nscanned , "gt" )
 

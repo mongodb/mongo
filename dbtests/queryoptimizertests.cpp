@@ -59,6 +59,19 @@ namespace QueryOptimizerTests {
             }
         };
         
+
+        class NumericBase : public Base {
+        public:
+            NumericBase(){
+                o = BSON( "min" << -numeric_limits<double>::max() << "max" << numeric_limits<double>::max() );
+            }
+            
+            virtual BSONElement lower() { return o["min"]; }
+            virtual BSONElement upper() { return o["max"]; }
+        private:
+            BSONObj o;
+        };
+
         class Empty : public Base {
             virtual BSONObj query() { return BSONObj(); }
         };
@@ -77,7 +90,7 @@ namespace QueryOptimizerTests {
             virtual BSONObj query() { return BSON( "a" << 1 << "b" << 2 << "a" << 1 ); }
         };        
 
-        class Lt : public Base {
+        class Lt : public NumericBase {
         public:
             Lt() : o_( BSON( "-" << 1 ) ) {}
             virtual BSONObj query() { return BSON( "a" << LT << 1 ); }
@@ -91,7 +104,7 @@ namespace QueryOptimizerTests {
             virtual bool upperInclusive() { return true; }
         };
         
-        class Gt : public Base {
+        class Gt : public NumericBase {
         public:
             Gt() : o_( BSON( "-" << 1 ) ) {}
             virtual BSONObj query() { return BSON( "a" << GT << 1 ); }
@@ -192,10 +205,11 @@ namespace QueryOptimizerTests {
             void run() {
                 FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 << GT << 0 << "e" << GTE << 0 << LTE << 10 ) );
                 BSONObj simple = fbs.simplifiedQuery();
+                cout << "simple: " << simple << endl;
                 ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gt:5,$lt:10}" ) ) );
                 ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
-                ASSERT( !simple.getObjectField( "c" ).woCompare( fromjson( "{$lt:4}" ) ) );
-                ASSERT( !simple.getObjectField( "d" ).woCompare( fromjson( "{$gt:0}" ) ) );
+                ASSERT( !simple.getObjectField( "c" ).woCompare( BSON("$gte" << -numeric_limits<double>::max() << "$lt" << 4 ) ) );
+                ASSERT( !simple.getObjectField( "d" ).woCompare( BSON("$gt" << 0 << "$lte" << numeric_limits<double>::max() ) ) );
                 ASSERT( !simple.getObjectField( "e" ).woCompare( fromjson( "{$gte:0,$lte:10}" ) ) );
             }
         };
