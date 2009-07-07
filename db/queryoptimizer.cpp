@@ -33,11 +33,11 @@ namespace mongo {
     
     QueryPlan::QueryPlan( 
         NamespaceDetails *_d, int _idxNo,
-        const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index, const BSONObj &startKey, const BSONObj &endKey ) :
+        const FieldBoundSet &fbs, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey ) :
     d(_d), idxNo(_idxNo),
     fbs_( fbs ),
     order_( order ),
-    index_( index ),
+    index_( 0 ),
     optimal_( false ),
     scanAndOrderRequired_( true ),
     exactKeyMatch_( false ),
@@ -46,14 +46,17 @@ namespace mongo {
     endKey_( endKey ),
     endKeyInclusive_( endKey_.isEmpty() ),
     unhelpful_( false ) {
-        // full table scan case
-        if ( !index_ ) {
+
+        if( idxNo >= 0 ) {
+            index_ = &d->indexes[idxNo];
+        } else {
+            // full table scan case
             if ( order_.isEmpty() || !strcmp( order_.firstElement().fieldName(), "$natural" ) )
                 scanAndOrderRequired_ = false;
             return;
         }
 
-        BSONObj idxKey = index->keyPattern();
+        BSONObj idxKey = index_->keyPattern();
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
         if ( !o.moreWithEOO() )
@@ -123,7 +126,7 @@ namespace mongo {
             optimal_ = true;
         if ( exactIndexedQueryCount == fbs.nNontrivialBounds() &&
             orderFieldsUnindexed.size() == 0 &&
-            exactIndexedQueryCount == index->keyPattern().nFields() &&
+            exactIndexedQueryCount == index_->keyPattern().nFields() &&
             exactIndexedQueryCount == fbs.query().nFields() ) {
             exactKeyMatch_ = true;
         }
@@ -196,7 +199,7 @@ namespace mongo {
             massert( errmsg, indexDetailsForRange( fbs_.ns(), errmsg, min_, max_, keyPattern ) );
         }
         NamespaceDetails *d = nsdetails(ns);
-        plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(id), fbs_, order_, &id, min_, max_ ) ) );
+        plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(id), fbs_, order_, min_, max_ ) ) );
     }
     
     void QueryPlanSet::init() {
@@ -250,7 +253,7 @@ namespace mongo {
             BSONObj keyPattern;
             IndexDetails *idx = indexDetailsForRange( ns, errmsg, min_, max_, keyPattern );
             massert( errmsg, idx );
-            plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(*idx), fbs_, order_, idx, min_, max_ ) ) );
+            plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(*idx), fbs_, order_, min_, max_ ) ) );
             return;
         }
         
@@ -268,7 +271,7 @@ namespace mongo {
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                        plans_.push_back( PlanPtr( new QueryPlan( d, i, fbs_, order_, &ii ) ) );
+                        plans_.push_back( PlanPtr( new QueryPlan( d, i, fbs_, order_ ) ) );
                         return;
                     }
                 }
@@ -295,7 +298,7 @@ namespace mongo {
         
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
-            PlanPtr p( new QueryPlan( d, i, fbs_, order_, &d->indexes[ i ] ) );
+            PlanPtr p( new QueryPlan( d, i, fbs_, order_ ) );
             if ( p->optimal() ) {
                 addPlan( p, checkFirst );
                 return;

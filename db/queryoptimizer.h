@@ -25,15 +25,16 @@
 namespace mongo {
     
     class IndexDetails;
-    class QueryPlan {
+    class QueryPlan : boost::noncopyable {
     public:
-        QueryPlan(NamespaceDetails *_d, int _idxNo, 
+        QueryPlan(NamespaceDetails *_d, 
+                  int _idxNo, // -1 = no index
                   const FieldBoundSet &fbs,
                   const BSONObj &order,
-                  const IndexDetails *index = 0,
                   const BSONObj &startKey = BSONObj(),
                   const BSONObj &endKey = BSONObj() );
-        QueryPlan( const QueryPlan &other );
+
+//        QueryPlan( const QueryPlan &other );
         /* If true, no other index can do better. */
         bool optimal() const { return optimal_; }
         /* ScanAndOrder processing will be required if true */
