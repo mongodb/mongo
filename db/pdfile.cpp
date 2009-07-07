@@ -924,8 +924,6 @@ assert( !eloc.isNull() );
             d->paddingTooSmall();
             if ( database->profile )
                 ss << " moved ";
-            // xxx TODO fix dup key error - old copy should not be deleted
-
             deleteRecord(ns, toupdate, dl);
             insert(ns, objNew.objdata(), objNew.objsize(), false);
             return;
@@ -951,7 +949,7 @@ assert( !eloc.isNull() );
                 BSONObj idxKey = idx.info.obj().getObjectField("key");
                 for ( unsigned i = 0; i < changes[x].added.size(); i++ ) {
                     try {
-                        /* TODO xxx dup keys handle */
+                        /* we did the dupCheck() above.  so we don't have to worry about it here. */
                         idx.head.btree()->bt_insert(
                             idx.head,
                             dl, *changes[x].added[i], idxKey, /*dupsAllowed*/true, idx);
@@ -969,11 +967,6 @@ assert( !eloc.isNull() );
         }
 
         //	update in place
-        /*if ( addID ) {
-            ((int&)*toupdate->data) = *((int*) buf) + idOld.size();
-            memcpy(toupdate->data+4, idOld.rawdata(), idOld.size());
-            memcpy(toupdate->data+4+idOld.size(), ((char *)buf)+4, addID-4);
-        } else {*/
         memcpy(toupdate->data, objNew.objdata(), objNew.objsize());
     }
 
