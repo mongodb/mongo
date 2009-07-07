@@ -67,6 +67,15 @@ AddOption( "--release",
            action="store",
            help="relase build")
 
+
+AddOption( "--static",
+           dest="static",
+           type="string",
+           nargs=0,
+           action="store",
+           help="fully static build")
+
+
 AddOption('--java',
           dest='javaHome',
           type='string',
@@ -175,6 +184,7 @@ if not force64 and os.getcwd().endswith( "mongo-64" ):
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
+static = not GetOption( "static" ) is None
 
 debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
 debugLogging = not GetOption( "debugBuildAndLogging" ) is None
@@ -335,6 +345,9 @@ elif "linux2" == os.sys.platform:
         env.Append( LIBPATH=["/usr/lib32"] )
 
     nix = True
+
+    if static:
+        env.Append( LINKFLAGS=" -static " )
 
 elif "sunos5" == os.sys.platform:
      nix = True
@@ -1092,7 +1105,9 @@ def getDistName( sofar ):
 if distBuild:
     from datetime import date
     today = date.today()
-    installDir = "mongodb-" + platform + "-" + processor + "-";
+    installDir = "mongodb-" + platform + "-" + processor + "-"
+    if static:
+        installDir += "static-"
     installDir += getDistName( installDir )
     print "going to make dist: " + installDir
 
@@ -1210,7 +1225,10 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
 
     if fixName:
         (root,dot,suffix) = localName.rpartition( "." )
-        name = remoteName + "-" + platform + "-" + processor + remotePrefix
+        name = remoteName + "-" + platform + "-" + processor
+        if static:
+            name += "-static"
+        name += remotePrefix
         if dot == "." :
             name += "." + suffix
         name = name.lower()
