@@ -44,16 +44,23 @@
 #                    
 #                    High performance, scalability, and reasonable depth of
 #                    functionality are the goals for the project.
-#
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=/bin/mongod
-DAEMON_OPTS='--dbpath /var/lib/mongodb run'
+DAEMON=/usr/bin/mongod
+DATA=/var/lib/mongodb
+DAEMON_OPTS="--dbpath $DATA run"
 NAME=MongoDB
 DESC=database
 
-test -x $DAEMON || exit 0
+if test ! -x $DAEMON; then
+    echo "Could not find $DAEMON"
+    exit 0
+fi
+
+if test ! -x $DATA; then
+    mkdir $DATA || exit 0
+fi
 
 . /lib/lsb/init-functions
 
