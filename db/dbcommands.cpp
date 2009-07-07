@@ -486,6 +486,23 @@ namespace mongo {
         }
     } cmdoplogging;
 
+    unsigned removeBit(unsigned b, int x) {
+        unsigned tmp = b;
+        return 
+            (tmp & ((1 << x)-1)) | 
+            ((tmp >> (x+1)) << x);
+    }
+
+    struct DBCommandsUnitTest {
+        DBCommandsUnitTest() {
+            assert( removeBit(1, 0) == 0 );
+            assert( removeBit(2, 0) == 1 );
+            assert( removeBit(2, 1) == 0 );
+            assert( removeBit(255, 1) == 127 );
+            assert( removeBit(21, 2) == 9 );
+        }
+    } dbc_unittest;
+
     bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
         
         d->aboutToDeleteAnIndex();
@@ -513,6 +530,8 @@ namespace mongo {
                 d->indexes[ 0 ] = *idIndex;
                 d->nIndexes = 1;
             }
+            /* assuming here that id index is not multikey: */
+            d->multiKeyIndexBits = 0;
         }
         else {
             // delete just one index
@@ -531,7 +550,7 @@ namespace mongo {
                     return false;
                 }
                 d->indexes[x].kill();
-                
+                d->multiKeyIndexBits = removeBit(d->multiKeyIndexBits, x);
                 d->nIndexes--;
                 for ( int i = x; i < d->nIndexes; i++ )
                     d->indexes[i] = d->indexes[i+1];
@@ -823,7 +842,7 @@ namespace mongo {
         }
     } cmdFileMD5;
         
-    const IndexDetails *cmdIndexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
+    IndexDetails *cmdIndexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
         if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
             errmsg = "invalid command syntax (note: min and max are required)";
             return 0;
@@ -845,15 +864,17 @@ namespace mongo {
             BSONObj max = jsobj.getObjectField( "max" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
             
-            const IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
+            IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
             if ( id == 0 )
                 return false;
 
             Timer t;
             int num = 0;
-            for( BtreeCursor c( *id, min, max, false, 1 ); c.ok(); c.advance(), ++num );
+            NamespaceDetails *d = nsdetails(ns);
+            int idxNo = d->idxNo(*id);
+            for( BtreeCursor c( d, idxNo, *id, min, max, false, 1 ); c.ok(); c.advance(), ++num );
             num /= 2;
-            BtreeCursor c( *id, min, max, false, 1 );
+            BtreeCursor c( d, idxNo, *id, min, max, false, 1 );
             for( ; num; c.advance(), --num );
             int ms = t.millis();
             if ( ms > 100 ) {
@@ -892,10 +913,11 @@ namespace mongo {
                 errmsg = "only one of min or max specified";
                 return false;
             } else {            
-                const IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
-                if ( id == 0 )
+                IndexDetails *idx = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
+                if ( idx == 0 )
                     return false;
-                c.reset( new BtreeCursor( *id, min, max, false, 1 ) );
+                NamespaceDetails *d = nsdetails(ns);
+                c.reset( new BtreeCursor( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }
             
             Timer t;

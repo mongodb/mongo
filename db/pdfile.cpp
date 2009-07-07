@@ -868,6 +868,8 @@ assert( !eloc.isNull() );
             IndexChanges& ch = v[i];
             idx.getKeysFromObject(oldObj, ch.oldkeys);
             idx.getKeysFromObject(newObj, ch.newkeys);
+            if( ch.newkeys.size() > 1 ) 
+                d.setIndexIsMultikey(i);
             setDifference(ch.oldkeys, ch.newkeys, ch.removed);
             setDifference(ch.newkeys, ch.oldkeys, ch.added);
         }
@@ -987,11 +989,16 @@ assert( !eloc.isNull() );
     int deb=0;
 
    /* add keys to indexes for a new record */
-    inline void  _indexRecord(IndexDetails& idx, BSONObj& obj, DiskLoc newRecordLoc, bool dupsAllowed) {
+    inline void  _indexRecord(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc newRecordLoc, bool dupsAllowed) {
+        IndexDetails& idx = d->indexes[idxNo];
         BSONObjSetDefaultOrder keys;
         idx.getKeysFromObject(obj, keys);
         BSONObj order = idx.keyPattern();
+        int n = 0;
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+            if( ++n == 2 ) { 
+                d->setIndexIsMultikey(idxNo);
+            }
             assert( !newRecordLoc.isNull() );
             try {
                 idx.head.btree()->bt_insert(idx.head, newRecordLoc,
@@ -1009,7 +1016,7 @@ assert( !eloc.isNull() );
 
     /* note there are faster ways to build an index in bulk, that can be
        done eventually */
-    void addExistingToIndex(const char *ns, IndexDetails& idx) {
+    void addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         bool dupsAllowed = !idx.unique();
 
         Timer t;
@@ -1021,7 +1028,7 @@ assert( !eloc.isNull() );
         while ( c->ok() ) {
             BSONObj js = c->current();
             try { 
-                _indexRecord(idx, js, c->currLoc(),dupsAllowed);
+                _indexRecord(d, idxNo, js, c->currLoc(),dupsAllowed);
             } catch( AssertionException& e ) { 
                 l << endl;
                 log(2) << "addExistingToIndex exception " << e.what() << endl;
@@ -1042,7 +1049,7 @@ assert( !eloc.isNull() );
         for ( int i = 0; i < d->nIndexes; i++ ) {
             try { 
                 bool unique = d->indexes[i].unique();
-                _indexRecord(d->indexes[i], obj, newRecordLoc, /*dupsAllowed*/!unique);
+                _indexRecord(d, i, obj, newRecordLoc, /*dupsAllowed*/!unique);
             }
             catch( DBException& ) { 
                 // try to roll back previously added index entries
@@ -1293,15 +1300,16 @@ assert( !eloc.isNull() );
             NamespaceDetailsTransient::get( ns ).registerWriteOp();
         
         if ( tableToIndex ) {
-            IndexDetails& idxinfo = tableToIndex->indexes[tableToIndex->nIndexes];
-            idxinfo.info = loc;
-            idxinfo.head = BtreeBucket::addHead(idxinfo);
-            tableToIndex->addingIndex(tabletoidxns.c_str(), idxinfo);
+            int idxNo = tableToIndex->nIndexes;
+            IndexDetails& idx = tableToIndex->indexes[idxNo];
+            idx.info = loc;
+            idx.head = BtreeBucket::addHead(idx);
+            tableToIndex->addingIndex(tabletoidxns.c_str(), idx);
             try {
-                addExistingToIndex(tabletoidxns.c_str(), idxinfo);
+                addExistingToIndex(tabletoidxns.c_str(), tableToIndex, idx, idxNo);
             } catch( DBException& ) { 
                 // roll back this index
-                string name = idxinfo.indexName();
+                string name = idx.indexName();
                 BSONObjBuilder b;
                 string errmsg;
                 bool ok = deleteIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);

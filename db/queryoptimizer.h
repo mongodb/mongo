@@ -27,7 +27,8 @@ namespace mongo {
     class IndexDetails;
     class QueryPlan {
     public:
-        QueryPlan( const FieldBoundSet &fbs,
+        QueryPlan(NamespaceDetails *_d, int _idxNo, 
+                  const FieldBoundSet &fbs,
                   const BSONObj &order,
                   const IndexDetails *index = 0,
                   const BSONObj &startKey = BSONObj(),
@@ -56,6 +57,8 @@ namespace mongo {
         const FieldBound &bound( const char *fieldName ) const { return fbs_.bound( fieldName ); }
         void registerSelf( long long nScanned ) const;
     private:
+        NamespaceDetails *d;
+        int idxNo;
         const FieldBoundSet &fbs_;
         const BSONObj &order_;
         const IndexDetails *index_;
@@ -129,7 +132,7 @@ namespace mongo {
             plans_.push_back( plan );
         }
         void init();
-        void addHint( const IndexDetails &id );
+        void addHint( IndexDetails &id );
         struct Runner {
             Runner( QueryPlanSet &plans, QueryOp &op );
             shared_ptr< QueryOp > run();
@@ -138,6 +141,7 @@ namespace mongo {
             static void initOp( QueryOp &op );
             static void nextOp( QueryOp &op );
         };
+        const char *ns;
         FieldBoundSet fbs_;
         PlanSet plans_;
         bool mayRecordPlan_;
@@ -151,6 +155,6 @@ namespace mongo {
     };
 
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
-    const IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
+    IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
         
 } // namespace mongo

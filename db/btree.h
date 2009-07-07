@@ -214,11 +214,14 @@ namespace mongo {
 
     class BtreeCursor : public Cursor {
         friend class BtreeBucket;
+        NamespaceDetails *d;
+        int idxNo;
         BSONObj startKey;
         BSONObj endKey;
         bool endKeyInclusive_;
+        bool multikey; // note this must be updated every getmore batch in case someone added a multikey...
     public:
-        BtreeCursor( const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
         virtual bool ok() {
             return !bucket.isNull();
         }
@@ -229,6 +232,23 @@ namespace mongo {
 
         virtual void noteLocation(); // updates keyAtKeyOfs...
         virtual void checkLocation();
+
+        /* used for multikey index traversal to avoid sending back dups. see JSMatcher::matches().
+           if a multikey index traversal:
+             if loc has already been sent, returns true.
+             otherwise, marks loc as sent.
+           @param deep - match was against an array, so we know it is multikey.  this is legacy and kept
+                         for backwards datafile compatibility.  'deep' can be eliminated next time we 
+                         force a data file conversion. 7Jul09
+        */
+        set<DiskLoc> dups;
+        virtual bool getsetdup(bool deep, DiskLoc loc) {
+            if( deep || multikey ) { 
+                pair<set<DiskLoc>::iterator, bool> p = dups.insert(loc);
+                return !p.second;
+            }
+            return false;
+        }
 
         _KeyNode& _currKeyNode() {
             assert( !bucket.isNull() );

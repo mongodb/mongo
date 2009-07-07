@@ -90,15 +90,24 @@ namespace mongo {
             return "abstract?";
         }
 
-        /* used for multikey index traversal to avoid sending back dups. see JSMatcher::matches() */
+        /* used for multikey index traversal to avoid sending back dups. see JSMatcher::matches().
+           if a multikey index traversal:
+             if loc has already been sent, returns true.
+             otherwise, marks loc as sent.
+           @param deep - match was against an array, so we know it is multikey.  this is legacy and kept
+                         for backwards datafile compatibility.  'deep' can be eliminated next time we 
+                         force a data file conversion. 7Jul09
+        */
+        virtual bool getsetdup(bool deep, DiskLoc loc) = 0;
+/*
         set<DiskLoc> dups;
         bool getsetdup(DiskLoc loc) {
-            /* to save mem only call this when there is risk of dups (e.g. when 'deep'/multikey) */
             if ( dups.count(loc) > 0 )
                 return true;
             dups.insert(loc);
             return false;
         }
+*/
 
         virtual BSONObj prettyStartKey() const { return BSONObj(); }
         virtual BSONObj prettyEndKey() const { return BSONObj(); }
@@ -178,6 +187,7 @@ namespace mongo {
         virtual bool tailable() {
             return tailable_;
         }
+        virtual bool getsetdup(bool deep, DiskLoc loc) { return false; }
     };
 
     /* used for order { $natural: -1 } */
