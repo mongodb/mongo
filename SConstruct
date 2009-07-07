@@ -98,15 +98,6 @@ AddOption('--usejvm',
           action="store",
           help="use java for javascript" )
 
-AddOption( "--v8" ,
-           dest="v8home",
-           type="string",
-           default="../v8/",
-           nargs=1,
-           action="store",
-           metavar="dir",
-           help="v8 location")
-
 AddOption( "--d",
            dest="debugBuild",
            type="string",
