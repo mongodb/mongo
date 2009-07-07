@@ -135,6 +135,13 @@ AddOption( "--noshell",
            action="store",
            help="don't build shell" )
 
+AddOption( "--extrapath",
+           dest="extrapath",
+           type="string",
+           nargs=1,
+           action="store",
+           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo" )
+
 # --- environment setup ---
 
 def printLocalInfo():
@@ -163,7 +170,10 @@ darwin = False
 windows = False
 freebsd = False
 solaris = False
-force64 = not GetOption( "force64" ) is None
+force64 = not GetOption( "force64" ) is None 
+if not force64 and os.getcwd().endswith( "mongo-64" ):
+    force64 = True
+    print( "*** assuming you want a 64-bit build b/c of directory *** " )
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 
@@ -182,6 +192,12 @@ if ( usesm and usejvm ):
 if ( not ( usesm or usejvm ) ):
     usesm = True
 
+if GetOption( "extrapath" ) is not None:
+    for x in GetOption( "extrapath" ).split( "," ):
+        env.Append( CPPPATH=[ x + "/include" ] )
+        env.Append( LIBPATH=[ x + "/lib" ] )
+    release = True
+    
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
@@ -361,7 +377,8 @@ elif "win32" == os.sys.platform:
     env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
 
     env.Append( CPPFLAGS=" /EHsc /W3 " )
-    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE" ] )
+    env.Append( CPPFLAGS=" /wd4355 /wd4800 " ) #some warnings we don't like
+    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE","SUPPORT_UCP","SUPPORT_UTF8" ] )
 
     #env.Append( CPPFLAGS='  /Yu"stdafx.h" ' ) # this would be for pre-compiled headers, could play with it later
 
@@ -593,6 +610,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
         elif myCheckLib( "readline" , release and nix , staticOnly=release ):
             myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
+            myCheckLib( "ncurses" , staticOnly=release )
             myCheckLib( "tinfo" , staticOnly=release )
         else:
             print( "warning: no readline, shell will be a bit ugly" )

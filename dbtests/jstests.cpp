@@ -447,7 +447,7 @@ namespace JSTests {
         ~Utf8Check() { reset(); }
         void run() {
             if( !globalScriptEngine->utf8Ok() ) {
-                log() << "utf8 not supported" << endl;
+                log() << "warning: utf8 not supported" << endl;
                 return;
             }
             string utf8ObjSpec = "{'_id':'\\u0001\\u007f\\u07ff\\uffff'}";

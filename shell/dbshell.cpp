@@ -240,6 +240,8 @@ int main(int argc, char* argv[]) {
     scope->externalSetup();
     mongo::shellUtils::installShellUtils( *scope );
 
+    cout << "MongoDB shell version: " << mongo::versionString << endl;
+
     if ( !nodb ) { // connect to db
         cout << "url: " << url << endl;
         string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
@@ -313,10 +315,12 @@ int main(int argc, char* argv[]) {
                 if ( cmd.find( " " ) > 0 )
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
                 
-                scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
-                if ( scope->getBoolean( "__iscmd__" )  ){
-                    scope->exec( (string)"shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");" , "(shellhelp2)" , false , true , false );
-                    wascmd = true;
+                if ( cmd.find( "\"" ) == string::npos ){
+                    scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
+                    if ( scope->getBoolean( "__iscmd__" )  ){
+                        scope->exec( (string)"shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");" , "(shellhelp2)" , false , true , false );
+                        wascmd = true;
+                    }
                 }
                 
             }

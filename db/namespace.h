@@ -162,6 +162,9 @@ namespace mongo {
             return info.obj().getObjectField("key");
         }
 
+        /* true if the specified key is in the index */
+        bool hasKey(const BSONObj& key);
+
         // returns name of this index's storage area
         // database.table.$index
         string indexNamespace() const {

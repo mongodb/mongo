@@ -545,10 +545,11 @@ int main(int argc, char* argv[], char *envp[] )
                 assert(opIdMem > 0);
             }
             else if ( s == "--deDupMem" ) {
+                uasserted("deprecated");
                 long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad arg", x > 0);
-                IdSet::maxSize_ = x;
-                assert(IdSet::maxSize_ > 0);
+//                IdSet::maxSize_ = x;
+//                assert(IdSet::maxSize_ > 0);
             }
             else if ( strncmp(s.c_str(), "--oplog", 7) == 0 ) {
                 int x = s[7] - '0';

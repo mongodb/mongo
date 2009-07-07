@@ -13,9 +13,9 @@ using namespace mongo;
 
 namespace po = boost::program_options;
 
-mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) : 
+mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
     _name( name ) , _db( defaultDB ) , _coll( defaultCollection ), _useDirect() {
-    
+
     _options = new po::options_description( name + " options" );
     _options->add_options()
         ("help","produce help message")
@@ -34,9 +34,14 @@ mongo::Tool::~Tool(){
 void mongo::Tool::printExtraHelp( ostream & out ){
 }
 
+void mongo::Tool::printHelp(ostream &out) {
+    _options->print(out);
+    printExtraHelp(out);
+}
+
 int mongo::Tool::main( int argc , char ** argv ){
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
-    
+
     po::store( po::command_line_parser( argc , argv ).
                options( *_options ).
                positional( _positonalOptions ).run() , _params );
@@ -44,8 +49,7 @@ int mongo::Tool::main( int argc , char ** argv ){
     po::notify( _params );
 
     if ( _params.count( "help" ) ){
-        _options->print( cerr );
-        printExtraHelp( cerr );
+        printHelp(cerr);
         return 0;
     }
 
@@ -53,13 +57,13 @@ int mongo::Tool::main( int argc , char ** argv ){
         const char * host = "127.0.0.1";
         if ( _params.count( "host" ) )
             host = _params["host"].as<string>().c_str();
-        
+
         string errmsg;
         if ( ! _conn.connect( host , errmsg ) ){
             cerr << "couldn't connect to [" << host << "] " << errmsg << endl;
             return -1;
         }
-        
+
         cerr << "connected to: " << host << endl;
     } else {
         _useDirect = true;
@@ -68,10 +72,10 @@ int mongo::Tool::main( int argc , char ** argv ){
         mongo::acquirePathLock();
         theFileAllocator().start();
     }
-    
+
     if ( _params.count( "db" ) )
         _db = _params["db"].as<string>();
-    
+
     if ( _params.count( "collection" ) )
         _coll = _params["collection"].as<string>();
 

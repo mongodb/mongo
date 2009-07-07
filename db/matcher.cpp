@@ -646,6 +646,16 @@ namespace mongo {
             options.set_utf8(true);
             pcrecpp::RE part("dwi", options);
             assert( part.PartialMatch("dwight") );
+
+            int ret = 0;
+            
+            pcre_config( PCRE_CONFIG_UTF8 , &ret );
+            assert( ret );
+
+            pcre_config( PCRE_CONFIG_UNICODE_PROPERTIES , &ret );
+            if ( ! ret )
+                cerr << "warning: some regex utf8 things will not work.  pcre build doesn't have --enable-unicode-properties" << endl;
+            
         }
     } rxtest;
 

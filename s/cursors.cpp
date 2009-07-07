@@ -20,10 +20,7 @@ namespace mongo {
         _done = false;
 
         if ( q.fields.get() ){
-            BSONObjBuilder b;
-            for ( set<string>::iterator i=q.fields->begin(); i!=q.fields->end(); i++)
-                b.append( i->c_str() , 1 );
-            _fields = b.obj();
+            _fields = q.fields->getSpec();
         }
         else {
             _fields = BSONObj();

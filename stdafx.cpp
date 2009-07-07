@@ -18,8 +18,21 @@
 
 #include "stdafx.h"
 
+#if defined( __MSVC__ )
+// should probably check VS version here
+#elif defined( __GNUC__ )
+
+#if __GNUC__ < 4
+#error gcc < 4 not supported
+#endif
+
+#else
+// unknown compiler
+#endif 
+
+
 namespace mongo {
 
-    const char versionString[] = "0.9.4+";
+    const char versionString[] = "0.9.5+";
 
 } // namespace mongo

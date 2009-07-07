@@ -43,10 +43,10 @@ namespace mongo {
     extern BSONObj id_obj;
 
     // utility class for de duping ids
-    class IdSet {
+    class IdSet_Deprecated {
     public:
-        IdSet() : mySize_(), inMem_( true ) {}
-        ~IdSet() {
+        IdSet_Deprecated() : mySize_(), inMem_( true ) {}
+        ~IdSet_Deprecated() {
             size_ -= mySize_;
         }
         bool get( const BSONObj &id ) const {
@@ -108,13 +108,13 @@ namespace mongo {
         string ns;
         auto_ptr<KeyValJSMatcher> matcher;
         auto_ptr<Cursor> c;
-        auto_ptr<IdSet> ids_;
+//        auto_ptr<IdSet> ids_;
         int pos; /* # objects into the cursor so far */
         DiskLoc lastLoc() const {
             return _lastLoc;
         }
         void setLastLoc(DiskLoc);
-        auto_ptr< set<string> > filter; // which fields query wants returned
+        auto_ptr< FieldMatcher > filter; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
         unsigned idleAgeMillis; // how long has the cursor been around, relative to server idle time
 
@@ -151,11 +151,11 @@ namespace mongo {
         void cleanupByLocation(DiskLoc loc);
         
         void mayUpgradeStorage() {
-            if ( !ids_.get() )
+/*            if ( !ids_.get() )
                 return;
             stringstream ss;
             ss << ns << "." << cursorid;
-            ids_->mayUpgradeStorage( ss.str() );
+            ids_->mayUpgradeStorage( ss.str() );*/
         }
     };
 

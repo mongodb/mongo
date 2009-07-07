@@ -85,6 +85,14 @@ namespace mongo {
             default:
                 break;
         }
+
+        if ( lower_.isNumber() && upper_.type() == MaxKey ){
+            upper_ = addObj( BSON( lower_.fieldName() << numeric_limits<double>::max() ) ).firstElement();
+        }
+        else if ( upper_.isNumber() && lower_.type() == MinKey ){
+            lower_ = addObj( BSON( upper_.fieldName() << - numeric_limits<double>::max() ) ).firstElement();
+        }
+
     }
     
     const FieldBound &FieldBound::operator&=( const FieldBound &other ) {
@@ -201,6 +209,72 @@ namespace mongo {
         }
         qp.setSort( sort );
         return qp;
+    }
+    
+    void FieldMatcher::add( const BSONObj& o ){
+        BSONObjIterator i( o );
+        while ( i.more() ){
+            string s = i.next().fieldName();
+            if ( s.find( "." ) == string::npos ){
+                fields[ s ] = "";
+            }
+            else {
+                string sub = s.substr( 0 , s.find( "." ) );
+                if ( fields[sub].size() )
+                    fields[sub] = ".";
+                else
+                    fields[sub] = s.substr( sub.size() + 1 );
+            }
+        }
+
+    }
+    
+    int FieldMatcher::size() const {
+        return fields.size();
+    }
+
+    bool FieldMatcher::matches( const string& s ) const {
+        return fields.find( s ) != fields.end();
+    }
+    
+    BSONObj FieldMatcher::getSpec() const{
+        BSONObjBuilder b;
+        for ( map<string,string>::const_iterator i=fields.begin(); i!=fields.end(); i++){
+            string s = i->first;
+            if ( i->second.size() > 0 )
+                s += "." + i->second;
+            b.append( s.c_str() , 1 );
+        }
+        return b.obj();
+    }
+
+    BSONObj FieldMatcher::extractDotted( const string& path , const BSONObj& o ) const {
+        string::size_type i = path.find( "." );
+        if ( i == string::npos )
+            return o.getField( path.c_str() ).wrap();
+        
+        string left = path.substr( 0 , i );
+        BSONElement e = o[left];
+        if ( e.type() != Object )
+            return BSONObj();
+
+        BSONObj sub = e.embeddedObject();
+        if ( sub.isEmpty() )
+            return sub;
+        
+        BSONObjBuilder b(32);
+        b.append( left.c_str() , extractDotted( path.substr( i + 1 ) , sub ) );
+        return b.obj();
+    }
+    
+    void FieldMatcher::append( BSONObjBuilder& b , const BSONElement& e ) const {
+        string next = fields.find( e.fieldName() )->second;
+        if ( next.size() == 0 || next == "." || e.type() != Object ){
+            b.append( e );
+        }
+        else {
+            b.append( e.fieldName() , extractDotted( next , e.embeddedObject() ) );
+        }
     }
     
 } // namespace mongo

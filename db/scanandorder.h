@@ -50,19 +50,43 @@ namespace mongo {
        _ response size limit from runquery; push it up a bit.
     */
 
-    inline bool fillQueryResultFromObj(BufBuilder& b, set<string> *filter, BSONObj& js) {
+    inline bool fillQueryResultFromObj(BufBuilder& bb, FieldMatcher *filter, BSONObj& js) {
         if ( filter ) {
-            BSONObj x;
-            bool ok = x.addFields(js, *filter) > 0;
-            if ( ok )
-                b.append((void*) x.objdata(), x.objsize());
-            return ok;
+            
+            const int mark = bb.len();
+            
+            BSONObjBuilder b( bb );
+            BSONObjIterator i( js );
+            int N = filter->size();
+            int n=0;
+            bool gotId = false;
+            while ( i.more() ){
+                BSONElement e = i.next();
+                const char * fname = e.fieldName();
+                
+                if ( strcmp( fname , "_id" ) == 0 ){
+                    b.append( e );
+                    gotId = true;
+                    if ( filter->matches( "_id" ) )
+                        n++;
+                }
+                else if ( filter->matches( fname ) ){
+                    filter->append( b , e );
+                    n++;
+                    if ( n == N && gotId )
+                        break;
+                }
+            }
+            b.done();
+            if ( ! n )
+                bb.setlen( mark );
+            return n;
         }
-
-        b.append((void*) js.objdata(), js.objsize());
+        
+        bb.append((void*) js.objdata(), js.objsize());
         return true;
     }
-
+    
     typedef multimap<BSONObj,BSONObj,BSONObjCmp> BestMap;
     class ScanAndOrder {
         BestMap best; // key -> full object
@@ -112,7 +136,7 @@ namespace mongo {
             _addIfBetter(k, o, i);
         }
 
-        void _fill(BufBuilder& b, set<string> *filter, int& nout, BestMap::iterator begin, BestMap::iterator end) {
+        void _fill(BufBuilder& b, FieldMatcher *filter, int& nout, BestMap::iterator begin, BestMap::iterator end) {
             int n = 0;
             int nFilled = 0;
             for ( BestMap::iterator i = begin; i != end; i++ ) {
@@ -132,7 +156,7 @@ done:
         }
 
         /* scanning complete. stick the query result in b for n objects. */
-        void fill(BufBuilder& b, set<string> *filter, int& nout) {
+        void fill(BufBuilder& b, FieldMatcher *filter, int& nout) {
             _fill(b, filter, nout, best.begin(), best.end());
         }
 

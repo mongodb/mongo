@@ -16,21 +16,21 @@
 using std::string;
 
 namespace mongo {
-    
+
     class Tool {
     public:
         Tool( string name , string defaultDB="test" , string defaultCollection="");
         virtual ~Tool();
 
         int main( int argc , char ** argv );
-        
+
         boost::program_options::options_description_easy_init add_options(){
             return _options->add_options();
         }
         void addPositionArg( const char * name , int pos ){
             _positonalOptions.add( name , pos );
         }
-        
+
         string getParam( string name , string def="" ){
             if ( _params.count( name ) )
                 return _params[name.c_str()].as<string>();
@@ -49,9 +49,11 @@ namespace mongo {
         }
 
         virtual int run() = 0;
-        
+
+        virtual void printHelp(ostream &out);
+
         virtual void printExtraHelp( ostream & out );
-        
+
     protected:
         string _name;
 
@@ -59,7 +61,7 @@ namespace mongo {
         string _coll;
 
         mongo::DBClientBase &conn() { return _useDirect ? (mongo::DBClientBase&)_direct : (mongo::DBClientBase&)_conn; };
-        
+
     private:
         mongo::DBClientConnection _conn;
         mongo::DBDirectClient _direct;
@@ -68,7 +70,7 @@ namespace mongo {
         boost::program_options::positional_options_description _positonalOptions;
 
         boost::program_options::variables_map _params;
-        
+
     };
-    
+
 }

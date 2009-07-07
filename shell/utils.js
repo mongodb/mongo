@@ -188,7 +188,7 @@ ObjectId.prototype.toString = function(){
 }
 
 ObjectId.prototype.tojson = function(){
-    return "\"" + this.str + "\"";
+    return " ObjectId( \"" + this.str + "\") ";
 }
 
 ObjectId.prototype.isObjectId = true;
@@ -213,13 +213,25 @@ BinData.prototype.tojson = function(){
 }
 
 tojson = function( x ){
-    if ( x == null || x == undefined )
+    if ( x == null )
+        return "null";
+    
+    if ( x == undefined )
         return "";
     
     switch ( typeof x ){
         
-    case "string": 
-        return "\"" + x + "\"";
+    case "string": {
+        var s = "\"";
+        for ( var i=0; i<x.length; i++ ){
+            if ( x[i] == '"' ){
+                s += "\\\"";
+            }
+            else
+                s += x[i];
+        }
+        return s + "\"";
+    }
         
     case "number": 
     case "boolean":

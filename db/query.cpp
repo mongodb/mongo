@@ -827,7 +827,7 @@ namespace mongo {
                     }
                     else {
                         BSONObj js = c->current();
-                        if ( cc->ids_.get() ) {
+                        /* if ( cc->ids_.get() ) {
                             BSONElement idRef = js.getField( "_id" );
                             if ( !idRef.eoo() ) {
                                 BSONObjBuilder idBuilder;
@@ -839,7 +839,7 @@ namespace mongo {
                                 }
                                 cc->ids_->put( id ); 
                             }
-                        }
+                        }*/
                         bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
                         if ( ok ) {
                             n++;
@@ -977,7 +977,7 @@ namespace mongo {
     class DoQueryOp : public QueryOp {
     public:
         DoQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
-                  bool explain, set< string > *filter, int queryOptions ) :
+                  bool explain, FieldMatcher *filter, int queryOptions ) :
         b_( 32768 ),
         ntoskip_( ntoskip ),
         ntoreturn_( ntoreturn ),
@@ -1049,66 +1049,74 @@ namespace mongo {
             }
             
             bool mayCreateCursor1 = wantMore_ && ntoreturn_ != 1 && useCursors;
-            
-            if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
+/*            if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
                 ids_.reset( new IdSet() );
-            }
+            }*/
             
+            if( 0 ) { 
+                BSONObj js = c_->current();
+                cout << "SCANNING " << js << endl;
+            }
+
             nscanned_++;
             bool deep;
             if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
+                ;
             }
-            else if ( !deep || !c_->getsetdup(c_->currLoc()) ) { // i.e., check for dups on deep items only
-                BSONObj js = c_->current();
-                // got a match.
-                assert( js.objsize() >= 0 ); //defensive for segfaults
-                if ( ids_.get() ) {
-                    BSONElement idRef = js.getField( "_id" );
-                    if ( !idRef.eoo() ) {
-                        BSONObjBuilder b;
-                        b.append( idRef );
-                        BSONObj id = b.obj();
-                        ids_->put( id );
-                    }
-                }
-                if ( ordering_ ) {
-                    // note: no cursors for non-indexed, ordered results.  results must be fairly small.
-                    so_->add(js);
-                }
-                else if ( ntoskip_ > 0 ) {
-                    ntoskip_--;
-                } else {
-                    if ( explain_ ) {
-                        n_++;
-                        if ( n_ >= ntoreturn_ && !wantMore_ ) {
-                            // .limit() was used, show just that much.
-                            finish();
-                            return;
+            else {
+                DiskLoc cl = c_->currLoc();
+                if ( !deep || !c_->getsetdup(cl) ) { // i.e., check for dups on deep items only
+                    BSONObj js = c_->current();
+                    // got a match.
+                    assert( js.objsize() >= 0 ); //defensive for segfaults
+                    /*if ( ids_.get() ) {
+                        BSONElement idRef = js.getField( "_id" );
+                        if ( !idRef.eoo() ) {
+                            BSONObjBuilder b;
+                            b.append( idRef );
+                            BSONObj id = b.obj();
+                            ids_->put( id );
                         }
+                    }*/
+                    if ( ordering_ ) {
+                        // note: no cursors for non-indexed, ordered results.  results must be fairly small.
+                        so_->add(js);
                     }
-                    else {
-                        bool ok = fillQueryResultFromObj(b_, filter_, js);
-                        if ( ok ) n_++;
-                        if ( ok ) {
-                            if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
-                                /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-                                 is only a size limit.  The idea is that on a find() where one doesn't use much results,
-                                 we don't return much, but once getmore kicks in, we start pushing significant quantities.
-                                 
-                                 The n limit (vs. size) is important when someone fetches only one small field from big
-                                 objects, which causes massive scanning server-side.
-                                 */
-                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                                if ( mayCreateCursor1 ) {
-                                    c_->advance();
-                                    if ( c_->ok() ) {
-                                        // more...so save a cursor
-                                        saveClientCursor_ = true;
-                                    }
-                                }
+                    else if ( ntoskip_ > 0 ) {
+                        ntoskip_--;
+                    } else {
+                        if ( explain_ ) {
+                            n_++;
+                            if ( n_ >= ntoreturn_ && !wantMore_ ) {
+                                // .limit() was used, show just that much.
                                 finish();
                                 return;
+                            }
+                        }
+                        else {
+                            bool ok = fillQueryResultFromObj(b_, filter_, js);
+                            if ( ok ) n_++;
+                            if ( ok ) {
+                                if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
+                                (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
+                                    /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+                                    is only a size limit.  The idea is that on a find() where one doesn't use much results,
+                                    we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                                 
+                                    The n limit (vs. size) is important when someone fetches only one small field from big
+                                    objects, which causes massive scanning server-side.
+                                 */
+                                    /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                                    if ( mayCreateCursor1 ) {
+                                        c_->advance();
+                                        if ( c_->ok() ) {
+                                            // more...so save a cursor
+                                            saveClientCursor_ = true;
+                                        }
+                                    }
+                                    finish();
+                                    return;
+                                }
                             }
                         }
                     }
@@ -1139,7 +1147,7 @@ namespace mongo {
         bool scanAndOrderRequired() const { return ordering_; }
         auto_ptr< Cursor > cursor() { return c_; }
         auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
-        auto_ptr< IdSet > ids() { return ids_; }
+//        auto_ptr< IdSet > ids() { return ids_; }
         int n() const { return n_; }
         long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
@@ -1151,7 +1159,7 @@ namespace mongo {
         BSONObj order_;
         bool wantMore_;
         bool explain_;
-        set< string > *filter_;   
+        FieldMatcher *filter_;   
         bool ordering_;
         auto_ptr< Cursor > c_;
         long long nscanned_;
@@ -1163,7 +1171,7 @@ namespace mongo {
         auto_ptr< ScanAndOrder > so_;
         bool findingStart_;
         ClientCursor * findingStartCursor_;
-        auto_ptr< IdSet > ids_;
+//        auto_ptr< IdSet > ids_; /* for dedupping traversal of multikey indexes */
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
@@ -1173,7 +1181,7 @@ namespace mongo {
         int ntoskip = q.ntoskip;
         int _ntoreturn = q.ntoreturn;
         BSONObj jsobj = q.query;
-        auto_ptr< set< string > > filter = q.fields;
+        auto_ptr< FieldMatcher > filter = q.fields;
         int queryOptions = q.queryOptions;
         
         Timer t;
@@ -1231,7 +1239,7 @@ namespace mongo {
             BSONObj max;
             bool explain = false;
             bool _gotquery = false;
-            BSONObj query;// = jsobj.getObjectField("query");
+            BSONObj query;
             {
                 BSONElement e = jsobj.findElement("$query");
                 if ( e.eoo() )
@@ -1264,7 +1272,7 @@ namespace mongo {
             
             /* The ElemIter will not be happy if this isn't really an object. So throw exception
              here when that is true.
-             (Which may indicate bad data from appserver?)
+             (Which may indicate bad data from client.)
              */
             if ( query.objsize() == 0 ) {
                 out() << "Bad query object?\n  jsobj:";
@@ -1289,13 +1297,14 @@ namespace mongo {
             if ( dqo.scanAndOrderRequired() )
                 ss << " scanAndOrder ";
             auto_ptr< Cursor > c = dqo.cursor();
+            log( 5 ) << "   used cursor: " << c->toString() << endl;
             if ( dqo.saveClientCursor() ) {
                 ClientCursor *cc = new ClientCursor();
                 cc->c = c;
                 cursorid = cc->cursorid;
                 DEV out() << "  query has more, cursorid: " << cursorid << endl;
                 cc->matcher = dqo.matcher();
-                cc->ids_ = dqo.ids();
+//                cc->ids_ = dqo.ids();
                 cc->ns = ns;
                 cc->pos = n;
                 cc->filter = filter;

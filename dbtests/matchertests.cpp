@@ -63,7 +63,39 @@ namespace MatcherTests {
             ASSERT( m.matches( b.done() ) );
         }        
     };
+    
+    class MixedNumericIN {
+    public:
+        void run(){
+            BSONObj query = fromjson( "{ a : { $in : [4,6] } }" );
+            ASSERT_EQUALS( 4 , query["a"].embeddedObject()["$in"].embeddedObject()["0"].number() );
+            ASSERT_EQUALS( NumberDouble , query["a"].embeddedObject()["$in"].embeddedObject()["0"].type() );
+            
+            JSMatcher m( query );
 
+            {
+                BSONObjBuilder b;
+                b.append( "a" , 4.0 );
+                ASSERT( m.matches( b.done() ) );
+            }
+
+            {
+                BSONObjBuilder b;
+                b.append( "a" , 5 );
+                ASSERT( ! m.matches( b.done() ) );
+            }
+
+
+            {
+                BSONObjBuilder b;
+                b.append( "a" , 4 );
+                ASSERT( m.matches( b.done() ) );
+            }
+                
+        }
+    };
+
+    
     class Size {
     public:
         void run() {
@@ -75,6 +107,7 @@ namespace MatcherTests {
         }        
     };
     
+
     class All : public Suite {
     public:
         All() {
@@ -82,6 +115,7 @@ namespace MatcherTests {
             add< DoubleEqual >();
             add< MixedNumericEqual >();
             add< MixedNumericGt >();
+            add< MixedNumericIN >();
             add< Size >();
         }
     };

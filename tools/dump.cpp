@@ -69,7 +69,10 @@ public:
             
             const string name = obj.getField( "name" ).valuestr();
             const string filename = name.substr( db.size() + 1 );
-            
+        
+            if ( _coll.length() > 0 && db + "." + _coll != name && _coll != name )
+                continue;
+    
             doCollection( name.c_str() , outdir / ( filename + ".bson" ) );
             
         }
