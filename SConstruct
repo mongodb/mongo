@@ -67,6 +67,15 @@ AddOption( "--release",
            action="store",
            help="relase build")
 
+
+AddOption( "--static",
+           dest="static",
+           type="string",
+           nargs=0,
+           action="store",
+           help="fully static build")
+
+
 AddOption('--java',
           dest='javaHome',
           type='string',
@@ -97,15 +106,6 @@ AddOption('--usejvm',
           nargs=0,
           action="store",
           help="use java for javascript" )
-
-AddOption( "--v8" ,
-           dest="v8home",
-           type="string",
-           default="../v8/",
-           nargs=1,
-           action="store",
-           metavar="dir",
-           help="v8 location")
 
 AddOption( "--d",
            dest="debugBuild",
@@ -142,6 +142,14 @@ AddOption( "--extrapath",
            action="store",
            help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo" )
 
+
+AddOption( "--boost-compiler",
+           dest="boostCompiler",
+           type="string",
+           nargs=1,
+           action="store",
+           help="compiler used for boost (gcc41)" )
+
 # --- environment setup ---
 
 def printLocalInfo():
@@ -176,6 +184,7 @@ if not force64 and os.getcwd().endswith( "mongo-64" ):
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
+static = not GetOption( "static" ) is None
 
 debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
 debugLogging = not GetOption( "debugBuildAndLogging" ) is None
@@ -184,6 +193,12 @@ nojni = not GetOption( "nojni" ) is None
 
 usesm = not GetOption( "usesm" ) is None
 usejvm = not GetOption( "usejvm" ) is None
+
+boostCompiler = GetOption( "boostCompiler" )
+if boostCompiler is None:
+    boostCompiler = ""
+else:
+    boostCompiler = "-" + boostCompiler
 
 if ( usesm and usejvm ):
     print( "can't say usesm and usejvm at the same time" )
@@ -330,6 +345,9 @@ elif "linux2" == os.sys.platform:
         env.Append( LIBPATH=["/usr/lib32"] )
 
     nix = True
+
+    if static:
+        env.Append( LINKFLAGS=" -static " )
 
 elif "sunos5" == os.sys.platform:
      nix = True
@@ -566,7 +584,10 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     for b in boostLibs:
         l = "boost_" + b
-        myCheckLib( [ l + "-mt" , l ] , release or not shell)
+        myCheckLib( [ l + boostCompiler + "-mt" , l + boostCompiler ] , release or not shell)
+
+    # this will add it iff it exists and works
+    myCheckLib( "boost_system" + boostCompiler + "-mt" )
 
     if needJava:
         for j in javaLibs:
@@ -622,9 +643,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if freebsd:
         myCheckLib( "execinfo", True )
         env.Append( LIBS=[ "execinfo" ] )
-
-    # this will add it iff it exists and works
-    myCheckLib( "boost_system-mt" )
 
     return conf.Finish()
 
@@ -1087,11 +1105,21 @@ def getDistName( sofar ):
 if distBuild:
     from datetime import date
     today = date.today()
-    installDir = "mongodb-" + platform + "-" + processor + "-";
+    installDir = "mongodb-" + platform + "-" + processor + "-"
+    if static:
+        installDir += "static-"
     installDir += getDistName( installDir )
     print "going to make dist: " + installDir
 
 # binaries
+
+def checkGlibc(target,source,env):
+    import subprocess
+    stringProcess = subprocess.Popen( [ "strings" , str( target[0] ) ] , stdout=subprocess.PIPE )
+    stringResult = stringProcess.communicate()[0]
+    if stringResult.count( "GLIBC_2.4" ) > 0:
+        print( str( target[0] ) + " has GLIBC_2.4 dependencies!" )
+        Exit(-3)
 
 allBinaries = []
 
@@ -1102,10 +1130,15 @@ def installBinary( e , name ):
         name += ".exe"
 
     inst = e.Install( installDir + "/bin" , name )
+    
+    fullInstallName = installDir + "/bin/" + name
 
     allBinaries += [ name ]
-    if linux or solaris:
-        e.AddPostAction( inst, e.Action( 'strip ' + installDir + "/bin/" + name ) )
+    if solaris or linux:
+        e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
+        
+    if linux and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
+        e.AddPostAction( inst , checkGlibc )
 
 installBinary( env , "mongodump" )
 installBinary( env , "mongorestore" )
@@ -1192,7 +1225,10 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
 
     if fixName:
         (root,dot,suffix) = localName.rpartition( "." )
-        name = remoteName + "-" + platform + "-" + processor + remotePrefix
+        name = remoteName + "-" + platform + "-" + processor
+        if static:
+            name += "-static"
+        name += remotePrefix
         if dot == "." :
             name += "." + suffix
         name = name.lower()
