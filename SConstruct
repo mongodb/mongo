@@ -133,6 +133,14 @@ AddOption( "--extrapath",
            action="store",
            help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo" )
 
+
+AddOption( "--boost-compiler",
+           dest="boostCompiler",
+           type="string",
+           nargs=1,
+           action="store",
+           help="compiler used for boost (gcc41)" )
+
 # --- environment setup ---
 
 def printLocalInfo():
@@ -175,6 +183,12 @@ nojni = not GetOption( "nojni" ) is None
 
 usesm = not GetOption( "usesm" ) is None
 usejvm = not GetOption( "usejvm" ) is None
+
+boostCompiler = GetOption( "boostCompiler" )
+if boostCompiler is None:
+    boostCompiler = ""
+else:
+    boostCompiler = "-" + boostCompiler
 
 if ( usesm and usejvm ):
     print( "can't say usesm and usejvm at the same time" )
@@ -557,7 +571,10 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     for b in boostLibs:
         l = "boost_" + b
-        myCheckLib( [ l + "-mt" , l ] , release or not shell)
+        myCheckLib( [ l + boostCompiler + "-mt" , l + boostCompiler ] , release or not shell)
+
+    # this will add it iff it exists and works
+    myCheckLib( "boost_system" + boostCompiler + "-mt" )
 
     if needJava:
         for j in javaLibs:
@@ -613,9 +630,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if freebsd:
         myCheckLib( "execinfo", True )
         env.Append( LIBS=[ "execinfo" ] )
-
-    # this will add it iff it exists and works
-    myCheckLib( "boost_system-mt" )
 
     return conf.Finish()
 
@@ -1084,6 +1098,14 @@ if distBuild:
 
 # binaries
 
+def checkGlibc(target,source,env):
+    import subprocess
+    stringProcess = subprocess.Popen( [ "strings" , str( target[0] ) ] , stdout=subprocess.PIPE )
+    stringResult = stringProcess.communicate()[0]
+    if stringResult.count( "GLIBC_2.4" ) > 0:
+        print( str( target[0] ) + " has GLIBC_2.4 dependencies!" )
+        Exit(-3)
+
 allBinaries = []
 
 def installBinary( e , name ):
@@ -1093,10 +1115,15 @@ def installBinary( e , name ):
         name += ".exe"
 
     inst = e.Install( installDir + "/bin" , name )
+    
+    fullInstallName = installDir + "/bin/" + name
 
     allBinaries += [ name ]
-    if linux or solaris:
-        e.AddPostAction( inst, e.Action( 'strip ' + installDir + "/bin/" + name ) )
+    if solaris or linux:
+        e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
+        
+    if linux and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
+        e.AddPostAction( inst , checkGlibc )
 
 installBinary( env , "mongodump" )
 installBinary( env , "mongorestore" )
