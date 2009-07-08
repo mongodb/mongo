@@ -48,10 +48,10 @@ namespace mongo {
     extern bool useHints;
 
     bool noHttpInterface = false;
-    
+
     extern int port;
     extern string bind_ip;
-	extern char *appsrvPath;
+    extern char *appsrvPath;
     extern int curOp;
     extern bool autoresync;
     extern string dashDashSource;
@@ -64,7 +64,7 @@ namespace mongo {
     extern int callDepth;
 
     extern int lockFile;
-    
+
     void setupSignals();
     void closeAllSockets();
     void startReplication();
@@ -163,7 +163,7 @@ namespace mongo {
 
 namespace mongo {
 
-  void sysRuntimeInfo() { 
+  void sysRuntimeInfo() {
     out() << "sysinfo:\n";
 #if defined(_SC_PAGE_SIZE)
     out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
@@ -191,7 +191,7 @@ namespace mongo {
 
         try {
 
-			ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
+            ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
 
             Message m;
             while ( 1 ) {
@@ -248,10 +248,10 @@ namespace mongo {
 
         SockAddr db(address, port);
 
-//	SockAddr db("127.0.0.1", DBPort);
-//	SockAddr db("192.168.37.1", MessagingPort::DBPort);
-//	SockAddr db("10.0.21.60", MessagingPort::DBPort);
-//	SockAddr db("172.16.0.179", MessagingPort::DBPort);
+//  SockAddr db("127.0.0.1", DBPort);
+//  SockAddr db("192.168.37.1", MessagingPort::DBPort);
+//  SockAddr db("10.0.21.60", MessagingPort::DBPort);
+//  SockAddr db("172.16.0.179", MessagingPort::DBPort);
 
         MessagingPort p;
         if ( !p.connect(db) )
@@ -318,7 +318,7 @@ namespace mongo {
                 boost::filesystem::remove_all( *i );
         }
     }
-    
+
     void clearTmpCollections() {
         vector< string > toDelete;
         DBDirectClient cli;
@@ -344,23 +344,23 @@ namespace mongo {
 
         log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
               <<  " master = " << master << " slave = " << slave << endl;
-        
+
         stringstream ss;
         ss << "dbpath (" << dbpath << ") does not exist";
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
-        
+
         acquirePathLock();
-        
+
         theFileAllocator().start();
-        
+
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
-        
+
         clearTmpCollections();
-        
+
         if ( opLogging )
             log() << "opLogging = " << opLogging << endl;
         _oplog.init();
-        
+
 #if 0
         {
             stringstream indexpath;
@@ -377,28 +377,28 @@ namespace mongo {
         repairDatabases();
         /* this is for security on certain platforms */
         srand(curTimeMicros() ^ startupSrandTimer.micros());
-        
+
         listen(listenPort);
-        
+
         // listen() will return when exit code closes its socket.
         while( 1 )
             sleepsecs( 100 );
     }
     void initAndListen(int listenPort, const char *appserverLoc = null) {
         try { _initAndListen(listenPort, appserverLoc); }
-        catch(...) { 
+        catch(...) {
             log() << " exception in initAndListen, terminating" << endl;
             dbexit(1);
         }
     }
 
-	#if defined(_WIN32)
+    #if defined(_WIN32)
     bool initService() {
-		ServiceController::reportStatus( SERVICE_RUNNING );
-		initAndListen( port, appsrvPath );		
-		return true;
-	}
-	#endif
+        ServiceController::reportStatus( SERVICE_RUNNING );
+        initAndListen( port, appsrvPath );
+        return true;
+    }
+    #endif
 
 } // namespace mongo
 
@@ -408,9 +408,9 @@ using namespace mongo;
 int main(int argc, char* argv[], char *envp[] )
 {
     setupSignals();
-    
+
     dbExecCommand = argv[0];
-    
+
     srand(curTimeMicros());
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
@@ -424,7 +424,7 @@ int main(int argc, char* argv[], char *envp[] )
     }
 
     DEV out() << "warning: DEV mode enabled\n";
-    
+
     UnitTest::runTests();
 
     if ( argc >= 2 ) {
@@ -488,7 +488,7 @@ int main(int argc, char* argv[], char *envp[] )
                 noauth = true;
             else if ( s == "--auth" )
                 noauth = false;
-            else if( s == "--sysinfo" ) { 
+            else if( s == "--sysinfo" ) {
                 sysRuntimeInfo();
                 return 0;
             }
@@ -501,7 +501,7 @@ int main(int argc, char* argv[], char *envp[] )
                 quota = true;
             else if ( s == "--objcheck" )
                 objcheck = true;
-            else if( s == "--only" ) 
+            else if( s == "--only" )
                 dashDashOnly = argv[++i];
             else if ( s == "--source" ) {
                 /* specifies what the source in local.sources should be */
@@ -527,7 +527,7 @@ int main(int argc, char* argv[], char *envp[] )
                 removeService = true;
             else if ( s == "--service" )
                 startService = true;
-			else if ( s == "--cacheSize" ) { 
+            else if ( s == "--cacheSize" ) {
                 long x = strtol( argv[ ++i ], 0, 10 );
                 uassert("bad --cacheSize arg", x > 0);
                 setRecCacheSize(x);
@@ -560,23 +560,23 @@ int main(int argc, char* argv[], char *envp[] )
                 opLogging = x;
             }
         }
-        
+
         #if defined(_WIN32)
         if ( installService ) {
-			if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
-				dbexit( 1 );
-		}
-		else if ( removeService ) {
-			if ( !ServiceController::removeService( L"MongoDB" ) )
-				dbexit( 1 );
-		}
-		else if ( startService ) {
-			if ( !ServiceController::startService( L"MongoDB", mongo::initService ) )
-				dbexit( 1 );
-		}
-		else
-		#endif
-        	initAndListen( port, appsrvPath );
+            if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
+                dbexit( 1 );
+        }
+        else if ( removeService ) {
+            if ( !ServiceController::removeService( L"MongoDB" ) )
+                dbexit( 1 );
+        }
+        else if ( startService ) {
+            if ( !ServiceController::startService( L"MongoDB", mongo::initService ) )
+                dbexit( 1 );
+        }
+        else
+        #endif
+            initAndListen( port, appsrvPath );
 
         dbexit(0);
     }
@@ -606,7 +606,7 @@ usage:
     out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
     out() << " --sysinfo                 print some diagnostic system information\n";
     out() << " --deDupMem <size_Bytes>   custom memory limit for query de-duping\n";
-	#if defined(_WIN32)
+    #if defined(_WIN32)
     out() << " --install                 install mongo db service\n";
     out() << " --remove                  remove mongo db service\n";
     #endif
@@ -679,7 +679,7 @@ namespace mongo {
             exit(12);
         }
     }
-        
+
     void setupSignals() {
         assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
         assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
