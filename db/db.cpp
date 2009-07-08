@@ -422,10 +422,10 @@ int main(int argc, char* argv[], char *envp[] )
     /* NOTE / TODO
      * no longer supporting -? --?
      * both --verbose and -v take an integer paramater for verbosity level (no more -v+++ or plain --verbose)
-     * msg uses the port specified by --port rather than msg [msg] [port]
      * do we really need auth and noauth separately?
      * autoresync needs better help text
      * should cacheSize be a hidden option or not? */
+    /* TODO add help text for run / msg */
     general_options.add_options()
         ("help,h", "show this usage information")
         ("port", po::value<int>(&port)->default_value(DBPort), "specify port number")
@@ -626,18 +626,22 @@ int main(int argc, char* argv[], char *envp[] )
             vector<string> command = params["command"].as< vector<string> >();
 
             if (command[0].compare("msg") == 0) {
-                const char *m = "ping";
+                const char *m;
 
-                if (command.size() == 2) {
-                    m = command[1].c_str();
-                }
-                if (command.size() > 2) {
+                if (command.size() > 3) {
                     cout << "Too many parameters to 'msg' command" << endl;
                     cout << visible_options << endl;
                     return 0;
                 }
+                if (command.size() < 3) {
+                    cout << "Too few parameters to 'msg' command" << endl;
+                    cout << visible_options << endl;
+                    return 0;
+                }
 
-                msg(m, "127.0.0.1", port);
+                m = command[1].c_str();
+
+                msg(m, "127.0.0.1", atoi(command[2].c_str()));
                 return 0;
             }
             if (command[0].compare("run") == 0) {
