@@ -24,7 +24,7 @@
 #include <pcrecpp.h>
 
 namespace mongo {
-
+    
     class RegexMatcher {
     public:
         const char *fieldName;
@@ -36,11 +36,44 @@ namespace mongo {
             delete re;
         }
     };
+    
+    struct element_lt
+    {
+        bool operator()(const BSONElement& l, const BSONElement& r) const
+        {
+            int x = (int) l.type() - (int) r.type();
+            if ( x == ( NumberInt - NumberDouble ) || x == ( NumberDouble - NumberInt ) );
+            else if ( x < 0 ) return true;
+            else if ( x > 0 ) return false;
+            return compareElementValues(l,r) < 0;
+        }
+    };
 
+    
     class BasicMatcher {
     public:
+    
+        BasicMatcher(){
+        }
+        
+        BasicMatcher( BSONElement _e , int _op ) : toMatch( _e ) , compareOp( _op ){
+        }
+
+
+        BasicMatcher( BSONElement _e , int _op , const BSONObj& array ) : toMatch( _e ) , compareOp( _op ){
+            
+            myset.reset( new set<BSONElement,element_lt>() );
+            
+            BSONObjIterator i( array );
+            while ( i.more() ) {
+                BSONElement ie = i.next();
+                myset->insert(ie);
+            }
+        }
+        
         BSONElement toMatch;
         int compareOp;
+        shared_ptr< set<BSONElement,element_lt> > myset;
     };
 
 // SQL where clause equivalent
@@ -66,24 +99,13 @@ namespace mongo {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, bool *deep, bool isArr = false);
+            int compareOp, const BasicMatcher& bm, bool *deep, bool isArr = false);
 
         int matchesNe(
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
-            bool *deep);
+            const BasicMatcher&bm, bool *deep);
         
-        struct element_lt
-        {
-            bool operator()(const BSONElement& l, const BSONElement& r) const
-            {
-                int x = (int) l.type() - (int) r.type();
-                if ( x == ( NumberInt - NumberDouble ) || x == ( NumberDouble - NumberInt ) );
-                else if ( x < 0 ) return true;
-                else if ( x > 0 ) return false;
-                return compareElementValues(l,r) < 0;
-            }
-        };
     public:
         static int opDirection(int op) {
             return op <= BSONObj::LTE ? -1 : 1;
@@ -105,17 +127,11 @@ namespace mongo {
             // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
                 return;
-            BasicMatcher bm;
-            bm.toMatch = e;
-            bm.compareOp = c;
-            basics.push_back(bm);
+            basics.push_back( BasicMatcher( e , c ) );
         }
 
-        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep=0);
+        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm , bool *deep=0);
 
-        set<BSONElement,element_lt> *in; // set if query uses $in
-        set<BSONElement,element_lt> *nin; // set if query uses $nin
-        set<BSONElement,element_lt> *all; // set if query uses $all
         Where *where;                    // set if query uses $where
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
         BSONObj constrainIndexKey_;
@@ -123,6 +139,7 @@ namespace mongo {
         vector<BasicMatcher> basics;
 //        int n;                           // # of basicmatcher items
         bool haveSize;
+        bool all;
 
         RegexMatcher regexs[4];
         int nRegex;

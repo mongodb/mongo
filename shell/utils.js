@@ -188,7 +188,7 @@ ObjectId.prototype.toString = function(){
 }
 
 ObjectId.prototype.tojson = function(){
-    return "\"" + this.str + "\"";
+    return " ObjectId( \"" + this.str + "\") ";
 }
 
 ObjectId.prototype.isObjectId = true;

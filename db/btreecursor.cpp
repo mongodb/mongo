@@ -28,13 +28,19 @@ namespace mongo {
     DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
     DiskLoc minDiskLoc(0, 1);
 
-    BtreeCursor::BtreeCursor( const IndexDetails &_id, const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction ) :
-    startKey( _startKey ),
-    endKey( _endKey ),
-    endKeyInclusive_( endKeyInclusive ),
-    indexDetails( _id ),
-    order( _id.keyPattern() ),
-    direction( _direction ) {
+    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails &_id, 
+                              const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction ) :
+            d(_d), idxNo(_idxNo), 
+            startKey( _startKey ),
+            endKey( _endKey ),
+            endKeyInclusive_( endKeyInclusive ),
+            indexDetails( _id ),
+            order( _id.keyPattern() ),
+            direction( _direction ) 
+    {
+        dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
+        multikey = d->isMultikey(idxNo);
+
         bool found;
         if ( otherTraceLevel >= 12 ) {
             if ( otherTraceLevel >= 200 ) {
@@ -121,6 +127,8 @@ namespace mongo {
     void BtreeCursor::checkLocation() {
         if ( eof() )
             return;
+
+        multikey = d->isMultikey(idxNo);
 
         if ( keyOfs >= 0 ) {
             BtreeBucket *b = bucket.btree();

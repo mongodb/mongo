@@ -85,6 +85,14 @@ namespace mongo {
             default:
                 break;
         }
+
+        if ( lower_.isNumber() && upper_.type() == MaxKey ){
+            upper_ = addObj( BSON( lower_.fieldName() << numeric_limits<double>::max() ) ).firstElement();
+        }
+        else if ( upper_.isNumber() && lower_.type() == MinKey ){
+            lower_ = addObj( BSON( upper_.fieldName() << - numeric_limits<double>::max() ) ).firstElement();
+        }
+
     }
     
     const FieldBound &FieldBound::operator&=( const FieldBound &other ) {

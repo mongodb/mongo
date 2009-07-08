@@ -105,9 +105,6 @@ namespace mongo {
     };
 
     JSMatcher::~JSMatcher() {
-        delete in;
-        delete nin;
-        delete all;
         delete where;
     }
 
@@ -135,8 +132,8 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-            in(0), nin(0), all(0), where(0), jsobj(_jsobj), haveSize(), nRegex(0)
-    {
+        where(0), jsobj(_jsobj), haveSize(), all(), nRegex(0){
+
         BSONObjIterator i(jsobj);
         while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
@@ -189,7 +186,7 @@ namespace mongo {
                 }
                 continue;
             }
-
+            
             // greater than / less than...
             // e.g., e == { a : { $gt : 3 } }
             //       or
@@ -244,51 +241,19 @@ namespace mongo {
                         }
                         else if ( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 && fe.type() == Array ) {
                             // $in
-                            uassert( "only 1 $in statement per query supported", in == 0 ); // todo...
-                            in = new set<BSONElement,element_lt>();
-                            BSONObjIterator i(fe.embeddedObject());
-                            if ( i.moreWithEOO() ) {
-                                while ( 1 ) {
-                                    BSONElement ie = i.next();
-                                    if ( ie.eoo() )
-                                        break;
-                                    in->insert(ie);
-                                }
-                            }
-                            addBasic(e, BSONObj::opIN); // e not actually used at the moment for $in
+                            basics.push_back( BasicMatcher( e , BSONObj::opIN , fe.embeddedObject() ) );
                             ok = true;
                         }
                         else if ( fn[1] == 'n' && fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0 && fe.type() == Array ) {
                             // $nin
-                            uassert( "only 1 $nin statement per query supported", nin == 0 ); // todo...
-                            nin = new set<BSONElement,element_lt>();
-                            BSONObjIterator i(fe.embeddedObject());
-                            if ( i.moreWithEOO() ) {
-                                while ( 1 ) {
-                                    BSONElement ie = i.next();
-                                    if ( ie.eoo() )
-                                        break;
-                                    nin->insert(ie);
-                                }
-                            }
-                            addBasic(e, BSONObj::NIN); // e not actually used at the moment for $nin
+                            basics.push_back( BasicMatcher( e , BSONObj::NIN , fe.embeddedObject() ) );
                             ok = true;
                         }
                         else if ( fn[1] == 'a' && fn[2] == 'l' && fn[3] == 'l' && fn[4] == 0 && fe.type() == Array ) {
                             // $all
-                            uassert( "only 1 $all statement per query supported", all == 0 ); // todo...
-                            all = new set<BSONElement,element_lt>();
-                            BSONObjIterator i(fe.embeddedObject());
-                            if ( i.moreWithEOO() ) {
-                                while ( 1 ) {
-                                    BSONElement ie = i.next();
-                                    if ( ie.eoo() )
-                                        break;
-                                    all->insert(ie);
-                                }
-                            }
-                            addBasic(e, BSONObj::opALL); // e not actually used at the moment for $all
+                            basics.push_back( BasicMatcher( e , BSONObj::opALL , fe.embeddedObject() ) );
                             ok = true;
+                            all = true;
                         }
                         else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fe.isNumber() ) {
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
@@ -309,7 +274,7 @@ namespace mongo {
                 if ( ok )
                     continue;
             }
-
+            
             // normal, simple case e.g. { a : "foo" }
             addBasic(e, BSONObj::Equality);
         }
@@ -317,16 +282,15 @@ namespace mongo {
         constrainIndexKey_ = constrainIndexKey;
     }
 
-    inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, bool *deep) {
+    inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm, bool *deep) {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
         
         if ( op == 0 )
             return l.valuesEqual(r);
-
+        
         if ( op == BSONObj::opIN ) {
             // { $in : [1,2,3] }
-            int c = in->count(l);
-            return c;
+            return bm.myset->count(l);
         }
 
         if ( op == BSONObj::opSIZE ) {
@@ -352,10 +316,10 @@ namespace mongo {
                 BSONElement e = i.next();
                 if ( e.eoo() )
                     break;
-                if ( all->count( e ) )
+                if ( bm.myset->count( e ) )
                     matches.insert( e );
             }
-            if ( all->size() == matches.size() ) {
+            if ( bm.myset->size() == matches.size() ) {
                 if ( deep )
                     *deep = true;
                 return true;
@@ -373,8 +337,8 @@ namespace mongo {
         return (op & z);
     }
 
-    int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, bool *deep) {
-        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, deep );
+    int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const BasicMatcher& bm, bool *deep) {
+        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm, deep );
         return -ret;
     }
     
@@ -392,19 +356,19 @@ namespace mongo {
          { "a.b" : 3 }             means       obj.a.b == 3
          { a : { $lt : 3 } }       means       obj.a < 3
     	 { a : { $in : [1,2] } }   means       [1,2].contains(obj.a)
-
-       return value
+         
+         return value
        -1 mismatch
         0 missing element
         1 match
     */
-    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, bool *deep, bool isArr) {
-        
+    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const BasicMatcher& bm , bool *deep, bool isArr) {
+
         if ( compareOp == BSONObj::NE )
-            return matchesNe( fieldName, toMatch, obj, deep );
+            return matchesNe( fieldName, toMatch, obj, bm, deep );
         if ( compareOp == BSONObj::NIN ) {
-            for( set<BSONElement,element_lt>::const_iterator i = nin->begin(); i != nin->end(); ++i ) {
-                int ret = matchesNe( fieldName, *i, obj, deep );
+            for( set<BSONElement,element_lt>::const_iterator i = bm.myset->begin(); i != bm.myset->end(); ++i ) {
+                int ret = matchesNe( fieldName, *i, obj, bm, deep );
                 if ( ret != 1 )
                     return ret;
                 // code to handle 0 (missing) return value doesn't deal with nin yet
@@ -425,7 +389,7 @@ namespace mongo {
                     BSONElement z = ai.next();
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, deep, false);
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, bm, deep, false);
                         if ( cmp > 0 ) {
                             if ( deep ) *deep = true;
                             return 1;
@@ -447,20 +411,20 @@ namespace mongo {
                     return -1;
 
                 BSONObj eo = se.embeddedObject();
-                return matchesDotted(p+1, toMatch, eo, compareOp, deep, se.type() == Array);
+                return matchesDotted(p+1, toMatch, eo, compareOp, bm, deep, se.type() == Array);
             } else {
                 e = obj.getField(fieldName);
             }
         }
         
         if ( ( e.type() != Array || indexed || compareOp == BSONObj::opALL || compareOp == BSONObj::opSIZE ) &&
-            valuesMatch(e, toMatch, compareOp, deep) ) {
+            valuesMatch(e, toMatch, compareOp, bm, deep) ) {
             return 1;
         } else if ( e.type() == Array && compareOp != BSONObj::opALL && compareOp != BSONObj::opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.moreWithEOO() ) {
                 BSONElement z = ai.next();
-                if ( valuesMatch( z, toMatch, compareOp) ) {
+                if ( valuesMatch( z, toMatch, compareOp, bm) ) {
                     if ( deep )
                         *deep = true;
                     return 1;
@@ -509,7 +473,7 @@ namespace mongo {
             BasicMatcher& bm = basics[i];
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
-            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, deep);
+            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm, deep);
             if ( cmp < 0 )
                 return false;
             if ( cmp == 0 ) {

@@ -31,10 +31,13 @@ namespace mongo {
         return 1;
     }
     
-    QueryPlan::QueryPlan( const FieldBoundSet &fbs, const BSONObj &order, const IndexDetails *index, const BSONObj &startKey, const BSONObj &endKey ) :
+    QueryPlan::QueryPlan( 
+        NamespaceDetails *_d, int _idxNo,
+        const FieldBoundSet &fbs, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey ) :
+    d(_d), idxNo(_idxNo),
     fbs_( fbs ),
     order_( order ),
-    index_( index ),
+    index_( 0 ),
     optimal_( false ),
     scanAndOrderRequired_( true ),
     exactKeyMatch_( false ),
@@ -43,14 +46,17 @@ namespace mongo {
     endKey_( endKey ),
     endKeyInclusive_( endKey_.isEmpty() ),
     unhelpful_( false ) {
-        // full table scan case
-        if ( !index_ ) {
+
+        if( idxNo >= 0 ) {
+            index_ = &d->indexes[idxNo];
+        } else {
+            // full table scan case
             if ( order_.isEmpty() || !strcmp( order_.firstElement().fieldName(), "$natural" ) )
                 scanAndOrderRequired_ = false;
             return;
         }
 
-        BSONObj idxKey = index->keyPattern();
+        BSONObj idxKey = index_->keyPattern();
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
         if ( !o.moreWithEOO() )
@@ -120,7 +126,7 @@ namespace mongo {
             optimal_ = true;
         if ( exactIndexedQueryCount == fbs.nNontrivialBounds() &&
             orderFieldsUnindexed.size() == 0 &&
-            exactIndexedQueryCount == index->keyPattern().nFields() &&
+            exactIndexedQueryCount == index_->keyPattern().nFields() &&
             exactIndexedQueryCount == fbs.query().nFields() ) {
             exactKeyMatch_ = true;
         }
@@ -140,7 +146,7 @@ namespace mongo {
             return findTableScan( fbs_.ns(), order_, startLoc );
         massert( "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
         //TODO This constructor should really take a const ref to the index details.
-        return auto_ptr< Cursor >( new BtreeCursor( *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
+        return auto_ptr< Cursor >( new BtreeCursor( d, idxNo, *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
     }
 
     auto_ptr< Cursor > QueryPlan::newReverseCursor() const {
@@ -166,8 +172,9 @@ namespace mongo {
         NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
     }
     
-    QueryPlanSet::QueryPlanSet( const char *ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
-    fbs_( ns, query ),
+    QueryPlanSet::QueryPlanSet( const char *_ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
+    ns(_ns),
+    fbs_( _ns, query ),
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
     hint_( BSONObj() ),
@@ -184,14 +191,15 @@ namespace mongo {
         init();
     }
     
-    void QueryPlanSet::addHint( const IndexDetails &id ) {
+    void QueryPlanSet::addHint( IndexDetails &id ) {
         if ( !min_.isEmpty() || !max_.isEmpty() ) {
             string errmsg;
             BSONObj keyPattern = id.keyPattern();
             // This reformats min_ and max_ to be used for index lookup.
             massert( errmsg, indexDetailsForRange( fbs_.ns(), errmsg, min_, max_, keyPattern ) );
         }
-        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &id, min_, max_ ) ) );
+        NamespaceDetails *d = nsdetails(ns);
+        plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(id), fbs_, order_, min_, max_ ) ) );
     }
     
     void QueryPlanSet::init() {
@@ -203,7 +211,7 @@ namespace mongo {
         NamespaceDetails *d = nsdetails( ns );
         if ( !d || !fbs_.matchPossible() ) {
             // Table scan plan, when no matches are possible
-            plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
+            plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
             return;
         }
         
@@ -226,7 +234,7 @@ namespace mongo {
                 if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
                     massert( "natural order cannot be specified with $min/$max", min_.isEmpty() && max_.isEmpty() );
                     // Table scan plan
-                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
+                    plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
                     return;
                 }
                 for (int i = 0; i < d->nIndexes; i++ ) {
@@ -243,9 +251,9 @@ namespace mongo {
         if ( !min_.isEmpty() || !max_.isEmpty() ) {
             string errmsg;
             BSONObj keyPattern;
-            const IndexDetails *id = indexDetailsForRange( ns, errmsg, min_, max_, keyPattern );
-            massert( errmsg, id );
-            plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, id, min_, max_ ) ) );
+            IndexDetails *idx = indexDetailsForRange( ns, errmsg, min_, max_, keyPattern );
+            massert( errmsg, idx );
+            plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(*idx), fbs_, order_, min_, max_ ) ) );
             return;
         }
         
@@ -257,13 +265,13 @@ namespace mongo {
                 oldNScanned_ = NamespaceDetailsTransient::get( ns ).nScannedForPattern( fbs_.pattern( order_ ) );
                 if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
                     // Table scan plan
-                    plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_ ) ) );
+                    plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
                     return;
                 }
                 for (int i = 0; i < d->nIndexes; i++ ) {
                     IndexDetails& ii = d->indexes[i];
                     if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                        plans_.push_back( PlanPtr( new QueryPlan( fbs_, order_, &ii ) ) );
+                        plans_.push_back( PlanPtr( new QueryPlan( d, i, fbs_, order_ ) ) );
                         return;
                     }
                 }
@@ -284,13 +292,13 @@ namespace mongo {
         if ( ( fbs_.nNontrivialBounds() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan
-            addPlan( PlanPtr( new QueryPlan( fbs_, order_ ) ), checkFirst );
+            addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );
             return;
         }
         
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
-            PlanPtr p( new QueryPlan( fbs_, order_, &d->indexes[ i ] ) );
+            PlanPtr p( new QueryPlan( d, i, fbs_, order_ ) );
             if ( p->optimal() ) {
                 addPlan( p, checkFirst );
                 return;
@@ -302,7 +310,7 @@ namespace mongo {
             addPlan( *i, checkFirst );
 
         // Table scan plan
-        addPlan( PlanPtr( new QueryPlan( fbs_, order_ ) ), checkFirst );
+        addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );
     }
     
     shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
@@ -495,14 +503,14 @@ namespace mongo {
     }
     
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
-    const IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
+    IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
         if ( min.isEmpty() && max.isEmpty() ) {
             errmsg = "one of min or max must be specified";
             return 0;
         }
         
         setClient( ns );
-        const IndexDetails *id = 0;
+        IndexDetails *id = 0;
         NamespaceDetails *d = nsdetails( ns );
         if ( !d ) {
             errmsg = "ns not found";

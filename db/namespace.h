@@ -238,6 +238,8 @@ namespace mongo {
             // For capped case, signal that we are doing initial extent allocation.
             if ( capped )
                 deletedList[ 1 ].setInvalid();
+            version = 0;
+            multiKeyIndexBits = 0;
             memset(reserved, 0, sizeof(reserved));
         }
         DiskLoc firstExtent;
@@ -254,12 +256,43 @@ namespace mongo {
         int flags;
         DiskLoc capExtent;
         DiskLoc capFirstNewRecord;
-        char reserved[108];
+
+        /* NamespaceDetails version.  So we can do backward compatibility in the future.
+        */
+        unsigned version;
+
+        unsigned multiKeyIndexBits;
+
+        char reserved[100];
 
         enum NamespaceFlags {
             Flag_HaveIdIndex = 1 << 0, // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
             Flag_CappedDisallowDelete = 1 << 1 // set when deletes not allowed during capped table allocation.
         };
+
+        /* hackish */
+        int idxNo(IndexDetails& idx) { 
+            for( int i = 0; i < nIndexes; i++ )
+                if( &indexes[i] == &idx ) 
+                    return i;
+            massert("E12000 idxNo fails", false);
+            return -1;
+        }
+
+        /* multikey indexes are indexes where there are more than one key in the index
+           for a single document. see multikey in wiki.
+        */
+        bool isMultikey(int i) { 
+            return (multiKeyIndexBits & (1 << i)) != 0;
+        }
+        void setIndexIsMultikey(int i) { 
+            dassert( i < 32 && i <MaxIndexes );
+            multiKeyIndexBits |= (1 << i);
+        }
+        void clearIndexIsMultikey(int i) { 
+            dassert( i < 32 && i <MaxIndexes );
+            multiKeyIndexBits &= ~(1 << i);
+        }
 
         /* you MUST call when adding an index.  see pdfile.cpp */
         void addingIndex(const char *thisns, IndexDetails& details);
