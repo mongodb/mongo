@@ -405,8 +405,78 @@ namespace mongo {
 
 using namespace mongo;
 
+#include <boost/program_options.hpp>
+
+namespace po = boost::program_options;
+
 int main(int argc, char* argv[], char *envp[] )
 {
+    po::options_description general_options("General options");
+    po::options_description replication_options("Replication options");
+    po::options_description visible_options("Allowed options");
+    po::options_description hidden_options("Hidden options");
+    po::options_description cmdline_options("Command line options");
+
+    po::positional_options_description positional_options;
+
+    /* NOTE / TODO
+     * no longer supporting -? --?
+     * both --verbose and -v take an integer paramater for verbosity level (no more -v+++ or plain --verbose)
+     * msg uses the port specified by --port rather than msg [msg] [port]
+     * do we really need auth and noauth separately?
+     * autoresync needs better help text
+     * should cacheSize be a hidden option or not? */
+    general_options.add_options()
+        ("help,h", "show this usage information")
+        ("port", po::value<int>(&port)->default_value(DBPort), "specify port number")
+        ("bind_ip", po::value<string>(&bind_ip),
+         "local ip address to bind listener - all local ips bound by default")
+        ("verbose,v", po::value<int>(&logLevel)->default_value(0),
+         "set verbosity level (higher is more verbose)")
+        ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
+        ("quiet", "quieter output")
+        ("cpu", "periodically show cpu and iowait utilization")
+        ("noauth", "run without security")
+        ("auth", "run with security")
+        ("objcheck", "inspect client data for validity on receipt")
+        ("quota", "enable db quota management")
+        ("appsrvpath", po::value<string>(), "root directy for the babble app server")
+        ("nocursors", "diagnostic/debugging option")
+        ("nohints", "ignore query hints")
+        ("nohttpinterface", "disable http interface")
+        ("noscripting", "disable scripting engine")
+        ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
+        ("sysinfo", "print some diagnostic system information")
+#if defined(_WIN32)
+        ("install", "install mongodb service")
+        ("remove", "remove mongodb service")
+        ("service", "start mongodb service")
+#endif
+        ;
+
+    replication_options.add_options()
+        ("master", "master mode")
+        ("slave", "slave mode")
+        ("source", po::value<string>(), "when slave: specify master as <server:port>")
+        ("only", po::value<string>(), "when slave: specify a single database to replicate")
+        ("pairwith", po::value< vector<string> >()->multitoken(), "e.g. --pairwith <server:port> <arbiter>")
+        ("autoresync", "autoresync")
+        ("oplogSize", po::value<long>(), "size limit (in MB) for op log")
+        ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
+        ;
+
+    hidden_options.add_options()
+        ("command", po::value< vector<string> >(), "command")
+        /* hiding this because it is deprecated */
+        ("deDupMem", po::value<long>(), "custom memory limit (in bytes) for query de-duping")
+        /* TODO should this be hidden? it wasn't printed in the help text in the old args setup. */
+        ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
+        ;
+
+    positional_options.add("command", -1);
+    visible_options.add(general_options).add(replication_options);
+    cmdline_options.add(general_options).add(replication_options).add(hidden_options);
+
     setupSignals();
 
     dbExecCommand = argv[0];
@@ -427,138 +497,163 @@ int main(int argc, char* argv[], char *envp[] )
 
     UnitTest::runTests();
 
-    if ( argc >= 2 ) {
-        if ( strcmp(argv[1], "msg") == 0 ) {
-
-            // msg(argc >= 3 ? argv[2] : "ping");
-
-            const char *m = "ping";
-            int thePort = DBPort;
-
-            if (argc >= 3) {
-                m = argv[2];
-
-                if (argc > 3) {
-                    thePort = atoi(argv[3]);
-                }
-            }
-
-            msg(m, "127.0.0.1", thePort);
-
-            return 0;
-        }
-        if ( strcmp(argv[1], "run") == 0 ) {
-            initAndListen(port);
-            return 0;
-        }
-
-        /*
-         *  *** POST STANDARD SWITCH METHOD - if we don't satisfy, we switch to a
-         *     slightly different mode where "run" is assumed and we can set values
-         */
-
+    if (argc >= 2) {
         bool installService = false;
         bool removeService = false;
         bool startService = false;
 
-        for (int i = 1; i < argc; i++)  {
+        /* TODO handle exceptions. */
+        po::variables_map params;
 
-            if ( argv[i] == 0 ) continue;
-            string s = argv[i];
+        /* don't allow guessing - creates ambiguities when some options are
+         * prefixes of others. */
+        int command_line_style = (po::command_line_style::unix_style ^
+                                  po::command_line_style::allow_guessing);
 
-            if ( s == "--port" )
-                port = atoi(argv[++i]);
-            if ( s == "--bind_ip" )
-                bind_ip = argv[++i];
-            else if ( s == "--nojni" )
-                useJNI = false;
-            else if ( s == "--master" )
-                master = true;
-            else if ( s == "--slave" )
-                slave = true;
-            else if ( s == "--autoresync" )
-                autoresync = true;
-            else if ( s == "--help" || s == "-?" || s == "--?" )
-                goto usage;
-            else if ( s == "--quiet" )
-                quiet = true;
-            else if ( s == "--cpu" )
-                cpu = true;
-            else if ( s == "--noauth" )
-                noauth = true;
-            else if ( s == "--auth" )
-                noauth = false;
-            else if( s == "--sysinfo" ) {
-                sysRuntimeInfo();
+        po::store(po::command_line_parser(argc, argv).options(cmdline_options).
+                  positional(positional_options).
+                  style(command_line_style).run(), params);
+        po::notify(params);
+
+        if (params.count("help")) {
+            cout << visible_options << endl;
+            return 0;
+        }
+        dbpath = params["dbpath"].as<string>().c_str();
+        if (params.count("quiet")) {
+            quiet = true;
+        }
+        if (params.count("cpu")) {
+            cpu = true;
+        }
+        if (params.count("noauth")) {
+            noauth = true;
+        }
+        if (params.count("auth")) {
+            noauth = false;
+        }
+        if (params.count("quota")) {
+            quota = true;
+        }
+        if (params.count("objcheck")) {
+            objcheck = true;
+        }
+        if (params.count("appsrvpath")) {
+            /* casting away the const-ness here */
+            appsrvPath = (char*)(params["appsrvpath"].as<string>().c_str());
+        }
+        if (params.count("nocursors")) {
+            useCursors = false;
+        }
+        if (params.count("nohints")) {
+            useHints = false;
+        }
+        if (params.count("nohttpinterface")) {
+            noHttpInterface = true;
+        }
+        if (params.count("noscripting")) {
+            useJNI = false;
+        }
+        if (params.count("oplog")) {
+            int x = params["oplog"].as<int>();
+            if ( x < 0 || x > 7 ) {
+                out() << "can't interpret --oplog setting" << endl;
+                dbexit(13);
+            }
+            opLogging = x;
+        }
+        if (params.count("sysinfo")) {
+            sysRuntimeInfo();
+            return 0;
+        }
+        if (params.count("deDupMem")) {
+            uasserted("deprecated");
+            long x = params["deDupMem"].as<long>();
+            uassert("bad arg", x > 0);
+            // IdSet::maxSize_ = x;
+            // assert(IdSet::maxSize_ > 0);
+        }
+        if (params.count("install")) {
+            installService = true;
+        }
+        if (params.count("remove")) {
+            removeService = true;
+        }
+        if (params.count("service")) {
+            startService = true;
+        }
+        if (params.count("master")) {
+            master = true;
+        }
+        if (params.count("slave")) {
+            slave = true;
+        }
+        if (params.count("source")) {
+            /* specifies what the source in local.sources should be */
+            dashDashSource = params["source"].as<string>().c_str();
+        }
+        if (params.count("only")) {
+            dashDashOnly = params["only"].as<string>().c_str();
+        }
+        if (params.count("pairwith")) {
+            vector<string> pair = params["pairwith"].as< vector<string> >();
+
+            uassert("--pairwith must specify paired server and arbiter", pair.size() == 2);
+            pairWith(pair[0].c_str(), pair[1].c_str());
+        }
+        if (params.count("autoresync")) {
+            autoresync = true;
+        }
+        if (params.count("oplogSize")) {
+            long x = params["oplogSize"].as<long>();
+            uassert("bad --oplogSize arg", x > 0);
+            oplogSize = x * 1024 * 1024;
+            assert(oplogSize > 0);
+        }
+        if (params.count("opIdMem")) {
+            long x = params["opIdMem"].as<long>();
+            uassert("bad --opIdMem arg", x > 0);
+            opIdMem = x;
+            assert(opIdMem > 0);
+        }
+        if (params.count("cacheSize")) {
+            long x = params["cacheSize"].as<long>();
+            uassert("bad --cacheSize arg", x > 0);
+            setRecCacheSize(x);
+        }
+
+        if (params.count("command")) {
+            vector<string> command = params["command"].as< vector<string> >();
+
+            if (command[0].compare("msg") == 0) {
+                const char *m = "ping";
+
+                if (command.size() == 2) {
+                    m = command[1].c_str();
+                }
+                if (command.size() > 2) {
+                    cout << "Too many parameters to 'msg' command" << endl;
+                    cout << visible_options << endl;
+                    return 0;
+                }
+
+                msg(m, "127.0.0.1", port);
                 return 0;
             }
-            else if ( s == "--verbose" )
-                logLevel = 1;
-            else if ( s.find( "-v" ) == 0 ){
-                logLevel = s.size() - 1;
-            }
-            else if ( s == "--quota" )
-                quota = true;
-            else if ( s == "--objcheck" )
-                objcheck = true;
-            else if( s == "--only" )
-                dashDashOnly = argv[++i];
-            else if ( s == "--source" ) {
-                /* specifies what the source in local.sources should be */
-                dashDashSource = argv[++i];
-            }
-            else if ( s == "--pairwith" ) {
-                pairWith( argv[i+1], argv[i+2] );
-                i += 2;
-            }
-            else if ( s == "--dbpath" )
-                dbpath = argv[++i];
-            else if ( s == "--appsrvpath" )
-                appsrvPath = argv[++i];
-            else if ( s == "--nocursors" )
-                useCursors = false;
-            else if ( s == "--nohints" )
-                useHints = false;
-            else if ( s == "--nohttpinterface" )
-                noHttpInterface = true;
-            else if ( s == "--install" )
-                installService = true;
-            else if ( s == "--remove" )
-                removeService = true;
-            else if ( s == "--service" )
-                startService = true;
-            else if ( s == "--cacheSize" ) {
-                long x = strtol( argv[ ++i ], 0, 10 );
-                uassert("bad --cacheSize arg", x > 0);
-                setRecCacheSize(x);
-            }
-            else if ( s == "--oplogSize" ) {
-                long x = strtol( argv[ ++i ], 0, 10 );
-                uassert("bad arg", x > 0);
-                oplogSize = x * 1024 * 1024;
-                assert(oplogSize > 0);
-            }
-            else if ( s == "--opIdMem" ) {
-                long x = strtol( argv[ ++i ], 0, 10 );
-                uassert("bad arg", x > 0);
-                opIdMem = x;
-                assert(opIdMem > 0);
-            }
-            else if ( s == "--deDupMem" ) {
-                uasserted("deprecated");
-                long x = strtol( argv[ ++i ], 0, 10 );
-                uassert("bad arg", x > 0);
-//                IdSet::maxSize_ = x;
-//                assert(IdSet::maxSize_ > 0);
-            }
-            else if ( strncmp(s.c_str(), "--oplog", 7) == 0 ) {
-                int x = s[7] - '0';
-                if ( x < 0 || x > 7 ) {
-                    out() << "can't interpret --oplog setting" << endl;
-                    dbexit(13);
+            if (command[0].compare("run") == 0) {
+                if (command.size() > 1) {
+                    cout << "Too many parameters to 'run' command" << endl;
+                    cout << visible_options << endl;
+                    return 0;
                 }
-                opLogging = x;
+
+                initAndListen(port);
+                return 0;
             }
+
+            cout << "Invalid command: " << command[0] << endl;
+            cout << visible_options << endl;
+            return 0;
         }
 
         #if defined(_WIN32)
@@ -581,45 +676,7 @@ int main(int argc, char* argv[], char *envp[] )
         dbexit(0);
     }
 
-usage:
-    out() << "Mongo db ";
-    out() << "usage:\n";
-    out() << "  run                      run db" << endl;
-    out() << "\nOptions:\n";
-    out() << " --help                    show this usage information\n";
-    out() << " --port <portno>           specify port number, default is 27017\n";
-    out() << " --bind_ip <ip>            local ip address to bind listener; all local ips bound by default\n";
-    out() << " --dbpath <root>           directory for datafiles, default is /data/db/\n";
-    out() << " --quiet                   quieter output\n";
-    out() << " --cpu                     show cpu+iowait utilization periodically\n";
-    out() << " --noauth                  run without security\n";
-    out() << " --auth                    run with security\n";
-    out() << " --verbose\n";
-    out() << " -v+                       increase verbose level -v = --verbose\n";
-    out() << " --objcheck                inspect client data for validity on receipt\n";
-    out() << " --quota                   enable db quota management\n";
-    out() << " --appsrvpath <path>       root directory for the babble app server\n";
-    out() << " --nocursors               diagnostic/debugging option\n";
-    out() << " --nohints                 ignore query hints\n";
-    out() << " --nohttpinterface         disable http interface\n";
-    out() << " --nojni" << endl;
-    out() << " --oplog<n>                0=off 1=W 2=R 3=both 7=W+some reads" << endl;
-    out() << " --sysinfo                 print some diagnostic system information\n";
-    out() << " --deDupMem <size_Bytes>   custom memory limit for query de-duping\n";
-    #if defined(_WIN32)
-    out() << " --install                 install mongo db service\n";
-    out() << " --remove                  remove mongo db service\n";
-    #endif
-    out() << "\nReplication:" << endl;
-    out() << " --master\n";
-    out() << " --slave" << endl;
-    out() << " --source <server:port>    when a slave, specifies master" << endl;
-    out() << " --only <dbname>           when a slave, only replicate db <dbname>" << endl;
-    out() << " --pairwith <server:port> <arbiter>" << endl;
-    out() << " --autoresync" << endl;
-    out() << " --oplogSize <size_in_MB>  custom size if creating new replication operation log" << endl;
-    out() << " --opIdMem <size_in_Bytes> custom size limit for in-mem storage of op ids" << endl;
-    out() << endl;
+    cout << visible_options << endl;
 
     return 0;
 }
