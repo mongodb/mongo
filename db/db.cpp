@@ -409,6 +409,11 @@ using namespace mongo;
 
 namespace po = boost::program_options;
 
+void show_help_text(po::options_description options) {
+    cout << "To run mongod with the default options use 'mongod run'." << endl << endl;
+    cout << options << endl;
+};
+
 int main(int argc, char* argv[], char *envp[] )
 {
     po::options_description general_options("General options");
@@ -527,7 +532,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
 
         if (params.count("help")) {
-            cout << visible_options << endl;
+            show_help_text(visible_options);
             return 0;
         }
         dbpath = params["dbpath"].as<string>().c_str();
@@ -699,8 +704,7 @@ int main(int argc, char* argv[], char *envp[] )
         dbexit(0);
     }
 
-    cout << "To run mongod with the default options try 'mongod run'." << endl << endl;
-    cout << visible_options << endl;
+    show_help_text(visible_options);
 
     return 0;
 }
