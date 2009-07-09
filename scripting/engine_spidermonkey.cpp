@@ -33,9 +33,10 @@ namespace mongo {
         bool _inResolve;
         char _magic;
         list<string> _extra;
+        set<string> _removed;
         bool _modified;
     };
-
+    
     class BSONFieldIterator {
     public:
 
@@ -44,9 +45,11 @@ namespace mongo {
             BSONObjIterator it( holder->_obj );
             while ( it.more() ){
                 BSONElement e = it.next();
+                if ( holder->_removed.count( e.fieldName() ) )
+                    continue;
                 _names.push_back( e.fieldName() );
             }
-
+            
             _names.merge( holder->_extra );
 
             _it = _names.begin();
@@ -569,29 +572,43 @@ namespace mongo {
         (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
-
+    
     JSBool bson_add_prop( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
         BSONHolder * holder = GETHOLDER( cx , obj );
         if ( ! holder->_inResolve ){
             Convertor c(cx);
-            holder->_extra.push_back( c.toString( idval ) );
+            string name = c.toString( idval );
+            if ( holder->_obj[name].eoo() )
+                holder->_extra.push_back( name );
             holder->_modified = true;
         }
         return JS_TRUE;
     }
-
+    
 
     JSBool mark_modified( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+        Convertor c(cx);
         BSONHolder * holder = GETHOLDER( cx , obj );
         if ( holder->_inResolve )
             return JS_TRUE;
         holder->_modified = true;
+        holder->_removed.erase( c.toString( idval ) );
+        return JS_TRUE;
+    }
+    
+    JSBool mark_modified_remove( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+        Convertor c(cx);
+        BSONHolder * holder = GETHOLDER( cx , obj );
+        if ( holder->_inResolve )
+            return JS_TRUE;
+        holder->_modified = true;
+        holder->_removed.insert( c.toString( idval ) );
         return JS_TRUE;
     }
 
     JSClass bson_class = {
         "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE ,
-        bson_add_prop, mark_modified, JS_PropertyStub, mark_modified,
+        bson_add_prop, mark_modified_remove, JS_PropertyStub, mark_modified,
         (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
@@ -664,12 +681,12 @@ namespace mongo {
 
         BSONHolder * holder = GETHOLDER( cx , obj );
         holder->check();
-
+        
         string s = c.toString( id );
 
         BSONElement e = holder->_obj[ s.c_str() ];
 
-        if ( e.type() == EOO ){
+        if ( e.type() == EOO || holder->_removed.count( s ) ){
             *objp = 0;
             JS_LeaveLocalRootScope( cx );
             return JS_TRUE;
