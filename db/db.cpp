@@ -506,7 +506,6 @@ int main(int argc, char* argv[], char *envp[] )
         bool removeService = false;
         bool startService = false;
 
-        /* TODO handle exceptions. */
         po::variables_map params;
 
         /* don't allow guessing - creates ambiguities when some options are
@@ -516,10 +515,16 @@ int main(int argc, char* argv[], char *envp[] )
                                   po::command_line_style::allow_long_disguise ^
                                   po::command_line_style::allow_sticky);
 
-        po::store(po::command_line_parser(argc, argv).options(cmdline_options).
-                  positional(positional_options).
-                  style(command_line_style).run(), params);
-        po::notify(params);
+        try {
+            po::store(po::command_line_parser(argc, argv).options(cmdline_options).
+                      positional(positional_options).
+                      style(command_line_style).run(), params);
+            po::notify(params);
+        } catch (po::error &e) {
+            cout << "ERROR: " << e.what() << endl << endl;
+            cout << visible_options << endl;
+            return 0;
+        }
 
         if (params.count("help")) {
             cout << visible_options << endl;
@@ -694,6 +699,7 @@ int main(int argc, char* argv[], char *envp[] )
         dbexit(0);
     }
 
+    cout << "To run mongod with the default options try 'mongod run'." << endl << endl;
     cout << visible_options << endl;
 
     return 0;
