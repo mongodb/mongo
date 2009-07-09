@@ -33,7 +33,7 @@ namespace mongo {
         /* Creates with length if DNE, otherwise uses existing file length,
            passed length.
         */
-        void* map(const char *filename, int &length);
+        void* map(const char *filename, long &length);
 
         void flush(bool sync);
 
@@ -41,11 +41,11 @@ namespace mongo {
             return view;
         }
 
-        int length() {
+        long length() {
             return len;
         }
-
-        static void updateLength( const char *filename, int &length );
+        
+        static void updateLength( const char *filename, long &length );
 
     private:
         void created();
@@ -53,8 +53,8 @@ namespace mongo {
         HANDLE fd;
         HANDLE maphandle;
         void *view;
-        int len;
+        long len;
     };
-
+    
 
 } // namespace mongo

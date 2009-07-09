@@ -50,7 +50,7 @@ namespace mongo {
 #define O_NOATIME 0
 #endif
 
-    void* MemoryMappedFile::map(const char *filename, int &length) {
+    void* MemoryMappedFile::map(const char *filename, long &length) {
         // length may be updated by callee.
         theFileAllocator().allocateAsap( filename, length );
         len = length;
@@ -62,7 +62,11 @@ namespace mongo {
         }
 
         off_t filelen = lseek(fd, 0, SEEK_END);
-        massert( "file size allocation failed", filelen == length );
+        if ( filelen != length ){
+            cerr << "wanted length: " << length << " filelen: " << filelen << endl;
+            cerr << sizeof(size_t) << endl;
+            massert( "file size allocation failed", filelen == length );
+        }
         lseek( fd, 0, SEEK_SET );
         
         view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);

@@ -46,19 +46,19 @@ namespace mongo {
         --closingAllFiles;
     }
 
-    void MemoryMappedFile::updateLength( const char *filename, int &length ) {
+    void MemoryMappedFile::updateLength( const char *filename, long &length ) {
         if ( !boost::filesystem::exists( filename ) )
             return;
         // make sure we map full length if preexisting file.
         boost::uintmax_t l = boost::filesystem::file_size( filename );
         assert( l <= 0x7fffffff );
-        length = (int) l;
+        length = l;
     }
 
     void* MemoryMappedFile::map(const char *filename) {
         boost::uintmax_t l = boost::filesystem::file_size( filename );
         assert( l <= 0x7fffffff );
-        int i = (int) l;
+        long i = (long)l;
         return map( filename , i );
     }
 
