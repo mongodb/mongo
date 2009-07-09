@@ -431,8 +431,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("port", po::value<int>(&port)->default_value(DBPort), "specify port number")
         ("bind_ip", po::value<string>(&bind_ip),
          "local ip address to bind listener - all local ips bound by default")
-        ("verbose,v", po::value<int>(&logLevel)->default_value(0),
-         "set verbosity level (higher is more verbose)")
+        ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
         ("quiet", "quieter output")
         ("cpu", "periodically show cpu and iowait utilization")
@@ -473,6 +472,11 @@ int main(int argc, char* argv[], char *envp[] )
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
         ;
 
+    /* support for -vv -vvvv etc. */
+    for (string s = "vv"; s.length() <= 10; s.append("v")) {
+        hidden_options.add_options()(s.c_str(), "verbose");
+    }
+
     positional_options.add("command", -1);
     visible_options.add(general_options).add(replication_options);
     cmdline_options.add(general_options).add(replication_options).add(hidden_options);
@@ -508,7 +512,9 @@ int main(int argc, char* argv[], char *envp[] )
         /* don't allow guessing - creates ambiguities when some options are
          * prefixes of others. */
         int command_line_style = (po::command_line_style::unix_style ^
-                                  po::command_line_style::allow_guessing);
+                                  po::command_line_style::allow_guessing |
+                                  po::command_line_style::allow_long_disguise ^
+                                  po::command_line_style::allow_sticky);
 
         po::store(po::command_line_parser(argc, argv).options(cmdline_options).
                   positional(positional_options).
@@ -522,6 +528,14 @@ int main(int argc, char* argv[], char *envp[] )
         dbpath = params["dbpath"].as<string>().c_str();
         if (params.count("quiet")) {
             quiet = true;
+        }
+        if (params.count("verbose")) {
+            logLevel = 1;
+        }
+        for (string s = "vv"; s.length() <= 10; s.append("v")) {
+            if (params.count(s)) {
+                logLevel = s.length();
+            }
         }
         if (params.count("cpu")) {
             cpu = true;
