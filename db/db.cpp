@@ -424,13 +424,6 @@ int main(int argc, char* argv[], char *envp[] )
 
     po::positional_options_description positional_options;
 
-    /* NOTE / TODO
-     * no longer supporting -? --?
-     * both --verbose and -v take an integer paramater for verbosity level (no more -v+++ or plain --verbose)
-     * do we really need auth and noauth separately?
-     * autoresync needs better help text
-     * should cacheSize be a hidden option or not? */
-    /* TODO add help text for run / msg */
     general_options.add_options()
         ("help,h", "show this usage information")
         ("port", po::value<int>(&port)->default_value(DBPort), "specify port number")
@@ -464,17 +457,16 @@ int main(int argc, char* argv[], char *envp[] )
         ("source", po::value<string>(), "when slave: specify master as <server:port>")
         ("only", po::value<string>(), "when slave: specify a single database to replicate")
         ("pairwith", po::value< vector<string> >()->multitoken(), "e.g. --pairwith <server:port> <arbiter>")
-        ("autoresync", "autoresync")
+        ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<long>(), "size limit (in MB) for op log")
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
         ;
 
     hidden_options.add_options()
         ("command", po::value< vector<string> >(), "command")
+        ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
         /* hiding this because it is deprecated */
         ("deDupMem", po::value<long>(), "custom memory limit (in bytes) for query de-duping")
-        /* TODO should this be hidden? it wasn't printed in the help text in the old args setup. */
-        ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
         ;
 
     /* support for -vv -vvvv etc. */
