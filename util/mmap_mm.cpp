@@ -37,7 +37,7 @@ namespace mongo {
         len = 0;
     }
 
-    void* MemoryMappedFile::map(const char *filename, int length) {
+    void* MemoryMappedFile::map(const char *filename, size_t length) {
         path p( filename );
 
         view = malloc( length );

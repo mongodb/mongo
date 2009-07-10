@@ -249,7 +249,7 @@ namespace mongo {
             }
         }
 
-        int size = defaultSize( filename );
+        long size = defaultSize( filename );
         while ( size < minSize ) {
             if ( size < maxSize() / 2 )
                 size *= 2;

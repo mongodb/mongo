@@ -63,7 +63,7 @@ namespace mongo {
             i.dbDropped();
         }
 
-        int LEN = 16 * 1024 * 1024;
+        long LEN = 16 * 1024 * 1024;
         string pathString = path().string();
         void *p = f.map(pathString.c_str(), LEN);
         if ( p == 0 ) {

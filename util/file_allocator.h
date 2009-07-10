@@ -44,10 +44,10 @@ namespace mongo {
         }
         // May be called if file exists. If file exists, or its allocation has
         // been requested, size is updated to match existing file size.
-        void requestAllocation( const string &name, int &size ) {
+        void requestAllocation( const string &name, long &size ) {
 #if !defined(_WIN32)
             boostlock lk( pendingMutex_ );
-            int oldSize = prevSize( name );
+            long oldSize = prevSize( name );
             if ( oldSize != -1 ) {
                 size = oldSize;
                 return;
@@ -59,10 +59,10 @@ namespace mongo {
         }
         // Returns when file has been allocated.  If file exists, size is
         // updated to match existing file size.
-        void allocateAsap( const string &name, int &size ) {
+        void allocateAsap( const string &name, long &size ) {
 #if !defined(_WIN32)
             boostlock lk( pendingMutex_ );
-            int oldSize = prevSize( name );
+            long oldSize = prevSize( name );
             if ( oldSize != -1 ) {
                 size = oldSize;
                 if ( !inProgress( name ) )
@@ -97,7 +97,7 @@ namespace mongo {
 #if !defined(_WIN32)
         // caller must hold pendingMutex_ lock.  Returns size if allocated or 
         // allocation requested, -1 otherwise.
-        int prevSize( const string &name ) const {
+        long prevSize( const string &name ) const {
             if ( pendingSize_.count( name ) > 0 )
                 return pendingSize_[ name ];
             if ( boost::filesystem::exists( name ) )
@@ -116,7 +116,7 @@ namespace mongo {
         mutable boost::mutex pendingMutex_;
         mutable boost::condition pendingUpdated_;
         list< string > pending_;
-        mutable map< string, int > pendingSize_;
+        mutable map< string, long > pendingSize_;
         bool failed_;
         
         struct Runner {
@@ -131,7 +131,7 @@ namespace mongo {
                     }
                     while( 1 ) {
                         string name;
-                        int size;
+                        long size;
                         {
                             boostlock lk( a_.pendingMutex_ );
                             if ( a_.pending_.size() == 0 )
@@ -140,7 +140,7 @@ namespace mongo {
                             size = a_.pendingSize_[ name ];
                         }
                         try {
-                            int fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
+                            long fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                             if ( fd <= 0 ) {
                                 stringstream ss;
                                 ss << "couldn't open " << name << ' ' << errno;
@@ -159,10 +159,10 @@ namespace mongo {
                                 lseek(fd, 0, SEEK_SET);
                                 log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
                                 Timer t;
-                                int z = 8192;
+                                long z = 8192;
                                 char buf[z];
                                 memset(buf, 0, z);
-                                int left = size;
+                                long left = size;
                                 while ( 1 ) {
                                     if ( left <= z ) {
                                         massert( "write failed", left == write(fd, buf, left) );

@@ -1137,7 +1137,7 @@ def installBinary( e , name ):
     if solaris or linux:
         e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
         
-    if linux and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
+    if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         e.AddPostAction( inst , checkGlibc )
 
 installBinary( env , "mongodump" )
