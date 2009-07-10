@@ -319,7 +319,7 @@ namespace mongo {
                 if ( bm.myset->count( e ) )
                     matches.insert( e );
             }
-            if ( bm.myset->size() == matches.size() ) {
+            if ( matches.size() > 0 && bm.myset->size() == matches.size() ) {
                 if ( deep )
                     *deep = true;
                 return true;
