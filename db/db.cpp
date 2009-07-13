@@ -503,6 +503,25 @@ int main(int argc, char* argv[], char *envp[] )
         bool removeService = false;
         bool startService = false;
 
+        /* TODO we preprocess for pairwith because boost is broken for multitokens. */
+        int found = 0;
+        for (int i = 1; i < argc; i++) {
+            string s = argv[i];
+            if (s == "--pairwith") {
+                uassert("--pairwith must specify paired server and arbiter", argc >= i + 2);
+                pairWith(argv[i + 1], argv[i + 2]);
+                found = i;
+            }
+            /* we need to shift the array now. this sucks but we need boost to
+             * ignore the options we parsed manually. */
+            if (found && i > found + 2) {
+                argv[i - 3] = argv[i];
+            }
+        }
+        if (found) {
+            argc = argc - 3;
+        }
+
         po::variables_map params;
 
         /* don't allow guessing - creates ambiguities when some options are
@@ -611,12 +630,14 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("only")) {
             dashDashOnly = params["only"].as<string>().c_str();
         }
-        if (params.count("pairwith")) {
+        /* TODO for now we are manually parsing pairwith above. this sucks but
+         * so do all the various incompatible changes to options parsing in
+         * different versions of boost... */
+        /*        if (params.count("pairwith")) {
             vector<string> pair = params["pairwith"].as< vector<string> >();
-
             uassert("--pairwith must specify paired server and arbiter", pair.size() == 2);
             pairWith(pair[0].c_str(), pair[1].c_str());
-        }
+            }*/
         if (params.count("autoresync")) {
             autoresync = true;
         }
