@@ -23,6 +23,7 @@ mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
         ("db,d",po::value<string>(), "database to use" )
         ("collection,c",po::value<string>(), "collection to use (some commands)" )
         ("dbpath",po::value<string>(), "directly access mongod data files in this path, instead of connecting to a mongod instance" )
+        ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ;
 
 }
@@ -52,6 +53,9 @@ int mongo::Tool::main( int argc , char ** argv ){
         printHelp(cerr);
         return 0;
     }
+
+    if ( _params.count( "verbose" ) )
+        logLevel = 1;
 
     if ( !hasParam( "dbpath" ) ) {
         const char * host = "127.0.0.1";
