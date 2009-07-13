@@ -706,4 +706,12 @@ namespace mongo {
         return false;
     }
 
+    bool isDate( JSContext * cx , JSObject * o ){
+#if defined( SM16 ) || defined( MOZJS )
+        return js_DateGetMsecSinceEpoch( cx , o ) != 0;
+#else
+        return JS_InstanceOf( cx , o, &js_DateClass, 0 );
+#endif
+    }
+
 }

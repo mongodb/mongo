@@ -889,9 +889,13 @@ namespace mongo {
             case JSTYPE_VOID: return Undefined;
             case JSTYPE_NULL: return jstNULL;
             case JSTYPE_OBJECT: {
+                if ( val == JSVAL_NULL )
+                    return jstNULL;
                 JSObject * o = JSVAL_TO_OBJECT( val );
                 if ( JS_IsArrayObject( _context , o ) )
                     return Array;
+                if ( isDate( _context , o ) )
+                    return Date;
                 return Object;
             }
             case JSTYPE_FUNCTION: return Code;

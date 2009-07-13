@@ -79,5 +79,6 @@ namespace mongo {
 
 #define JSVAL_IS_OID(v) ( JSVAL_IS_OBJECT( v ) && JS_InstanceOf( cx , JSVAL_TO_OBJECT( v ) , &object_id_class , 0 ) )
     
-
+    bool isDate( JSContext * cx , JSObject * o );
+    
 }
