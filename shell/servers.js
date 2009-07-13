@@ -206,6 +206,7 @@ MongodRunner.prototype.start = function( reuseData ) {
     if ( this.peer_ && this.arbiter_ ) {
         args.push( "--pairwith" );
         args.push( this.peer_ );
+        args.push( "--arbiter" );
         args.push( this.arbiter_ );
         args.push( "--oplogSize" );
         // small oplog by default so startup fast
