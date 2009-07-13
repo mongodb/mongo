@@ -80,7 +80,7 @@ public:
         }
         
         if ( boost::filesystem::file_size( root ) == 0 ) {
-            out() << "file " + root.native_file_string() + " empty, aborting" << endl;
+            out() << "file " + root.native_file_string() + " empty, skipping" << endl;
             return;
         }
 
