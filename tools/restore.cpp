@@ -91,10 +91,11 @@ public:
         assert( mmf.map( root.string().c_str() , fileLength ) );
         
         char * data = (char*)mmf.viewOfs();
-        int read = 0;
+        long read = 0;
         
-        int num = 0;
+        long num = 0;
         
+        int msgDelay = 1000 * ( mmf.length() / ( 1024 * 1024 * 400 ) );
         while ( read < mmf.length() ) {
             BSONObj o( data );
             
@@ -103,8 +104,8 @@ public:
             read += o.objsize();
             data += o.objsize();
 
-            if ( ! ( ++num % 1000 ) )
-                out() << "read " << read << "/" << mmf.length() << " bytes so far. " << num << " objects" << endl;
+            if ( ! ( ++num % msgDelay ) )
+                out() << "read " << read << "/" << mmf.length() << " bytes so far. (" << (int)(read * 100 / mmf.length()) << "%) " << num << " objects" << endl;
         }
         
         out() << "\t "  << num << " objects" << endl;
