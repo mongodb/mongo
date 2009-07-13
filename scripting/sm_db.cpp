@@ -183,14 +183,17 @@ namespace mongo {
         try {
 
             auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? Option_SlaveOk : 0 );
-            
+            if ( ! cursor.get() ){
+                JS_ReportError( cx , "error doing query: failed" );
+                return JS_FALSE;
+            }
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
             assert( JS_SetPrivate( cx , mycursor , new CursorHolder( cursor, *connHolder ) ) );
             *rval = OBJECT_TO_JSVAL( mycursor );
             return JS_TRUE;
         }
         catch ( ... ){
-            JS_ReportError( cx , "error doing query" );
+            JS_ReportError( cx , "error doing query: unknown" );
             return JS_FALSE;
         }
     }
