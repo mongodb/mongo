@@ -414,6 +414,23 @@ void show_help_text(po::options_description options) {
     cout << options << endl;
 };
 
+/* Return error string or "" if no errors. */
+string arg_error_check(int argc, char* argv[]) {
+    for (int i = 1; i < argc; i++) {
+        string s = argv[i];
+        /* check for inclusion of old-style arbiter setting. */
+        if (s == "--pairwith") {
+            if (argc > i + 2) {
+                string old_arbiter = argv[i + 2];
+                if (old_arbiter == "-" || old_arbiter.substr(0, 1) != "-") {
+                    return "Specifying arbiter using --pairwith is no longer supported, please use --arbiter";
+                }
+            }
+        }
+    }
+    return "";
+}
+
 int main(int argc, char* argv[], char *envp[] )
 {
     po::options_description general_options("General options");
@@ -456,7 +473,8 @@ int main(int argc, char* argv[], char *envp[] )
         ("slave", "slave mode")
         ("source", po::value<string>(), "when slave: specify master as <server:port>")
         ("only", po::value<string>(), "when slave: specify a single database to replicate")
-        ("pairwith", po::value< vector<string> >()->multitoken(), "e.g. --pairwith <server:port> <arbiter>")
+        ("pairwith", po::value<string>(), "address of server to pair with")
+        ("arbiter", po::value<string>(), "address of arbiter server")
         ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<long>(), "size limit (in MB) for op log")
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
@@ -502,27 +520,14 @@ int main(int argc, char* argv[], char *envp[] )
         bool installService = false;
         bool removeService = false;
         bool startService = false;
-
-        /* TODO we preprocess for pairwith because boost is broken for multitokens. */
-        int found = 0;
-        for (int i = 1; i < argc; i++) {
-            string s = argv[i];
-            if (s == "--pairwith") {
-                uassert("--pairwith must specify paired server and arbiter", argc >= i + 2);
-                pairWith(argv[i + 1], argv[i + 2]);
-                found = i;
-            }
-            /* we need to shift the array now. this sucks but we need boost to
-             * ignore the options we parsed manually. */
-            if (found && i > found + 2) {
-                argv[i - 3] = argv[i];
-            }
-        }
-        if (found) {
-            argc = argc - 3;
-        }
-
         po::variables_map params;
+
+        string error_message = arg_error_check(argc, argv);
+        if (error_message != "") {
+            cout << error_message << endl << endl;
+            show_help_text(visible_options);
+            return 0;
+        }
 
         /* don't allow guessing - creates ambiguities when some options are
          * prefixes of others. */
@@ -630,14 +635,17 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("only")) {
             dashDashOnly = params["only"].as<string>().c_str();
         }
-        /* TODO for now we are manually parsing pairwith above. this sucks but
-         * so do all the various incompatible changes to options parsing in
-         * different versions of boost... */
-        /*        if (params.count("pairwith")) {
-            vector<string> pair = params["pairwith"].as< vector<string> >();
-            uassert("--pairwith must specify paired server and arbiter", pair.size() == 2);
-            pairWith(pair[0].c_str(), pair[1].c_str());
-            }*/
+        if (params.count("pairwith")) {
+            string paired = params["pairwith"].as<string>();
+            if (params.count("arbiter")) {
+                string arbiter = params["pairwith"].as<string>();
+                pairWith(paired.c_str(), arbiter.c_str());
+            } else {
+                pairWith(paired.c_str(), "-");
+            }
+        } else if (params.count("arbiter")) {
+            uasserted("specifying --arbitor without --pairwith");
+        }
         if (params.count("autoresync")) {
             autoresync = true;
         }
