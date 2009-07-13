@@ -298,7 +298,11 @@ int main(int argc, char* argv[]) {
         while ( 1 ){
             
             char * line = shellReadline( "> " );
-            
+
+            if ( line )
+                while ( line[0] == ' ' )
+                    line++;
+
             if ( ! line || ( strlen(line) == 4 && strstr( line , "exit" ) ) ){
                 cout << "bye" << endl;
                 break;

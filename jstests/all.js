@@ -30,6 +30,13 @@ doTest = function() {
     t.save( { a: { b: [ 20, 30 ] } } );
     assert.eq( 1, t.find( { 'a.b': { $all: [ 20 ] } } ).count() );
     assert.eq( 1, t.find( { 'a.b': { $all: [ 20, 30 ] } } ).count() );
+
+
+    assert.eq( 5 , t.find( { a : { $all : [1] } } ).count() , "E1" );    
+    assert.eq( 0 , t.find( { a : { $all : [19] } } ).count() , "E2" );
+    assert.eq( 0 , t.find( { a : { $all : [] } } ).count() , "E3" );
+
+
 }
 
 doTest();

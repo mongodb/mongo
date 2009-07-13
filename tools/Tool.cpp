@@ -78,6 +78,12 @@ int mongo::Tool::main( int argc , char ** argv ){
 
     if ( _params.count( "collection" ) )
         _coll = _params["collection"].as<string>();
-
-    return run();
+    
+    try {
+        return run();
+    }
+    catch ( DBException& e ){
+        cerr << "assertion: " << e.toString() << endl;
+        return -1;
+    }
 }
