@@ -443,6 +443,7 @@ int main(int argc, char* argv[], char *envp[] )
 
     general_options.add_options()
         ("help,h", "show this usage information")
+        ("config,f", po::value<string>(), "configuration file specifying additional options")
         ("port", po::value<int>(&port)->default_value(DBPort), "specify port number")
         ("bind_ip", po::value<string>(&bind_ip),
          "local ip address to bind listener - all local ips bound by default")
@@ -540,6 +541,19 @@ int main(int argc, char* argv[], char *envp[] )
             po::store(po::command_line_parser(argc, argv).options(cmdline_options).
                       positional(positional_options).
                       style(command_line_style).run(), params);
+
+            if (params.count("config")) {
+                ifstream config_file (params["config"].as<string>().c_str());
+                if (config_file.is_open()) {
+                    po::store(po::parse_config_file(config_file, cmdline_options), params);
+                    config_file.close();
+                } else {
+                    cout << "ERROR: could not read from config file" << endl << endl;
+                    cout << visible_options << endl;
+                    return 0;
+                }
+            }
+
             po::notify(params);
         } catch (po::error &e) {
             cout << "ERROR: " << e.what() << endl << endl;
