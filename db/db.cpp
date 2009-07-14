@@ -638,13 +638,13 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("pairwith")) {
             string paired = params["pairwith"].as<string>();
             if (params.count("arbiter")) {
-                string arbiter = params["pairwith"].as<string>();
+                string arbiter = params["arbiter"].as<string>();
                 pairWith(paired.c_str(), arbiter.c_str());
             } else {
                 pairWith(paired.c_str(), "-");
             }
         } else if (params.count("arbiter")) {
-            uasserted("specifying --arbitor without --pairwith");
+            uasserted("specifying --arbiter without --pairwith");
         }
         if (params.count("autoresync")) {
             autoresync = true;
