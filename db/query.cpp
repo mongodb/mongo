@@ -229,12 +229,12 @@ namespace mongo {
     };
     
     struct Mod {
-        enum Op { INC, SET, PUSH } op;
+      enum Op { INC, SET, PUSH, PULL } op;
         const char *fieldName;
         double *ndouble;
         int *nint;
         BSONElement elt;
-        int pushStartSize;
+      int pushStartSize;
         void setn(double n) const {
             if ( ndouble ) *ndouble = n;
             else *nint = (int) n;
@@ -277,8 +277,8 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-            const char *valid[] = { "$inc", "$set", "$push" };
-            for( int i = 0; i < 3; ++i )
+	  const char *valid[] = { "$inc", "$set", "$push", "$pull" };
+            for( int i = 0; i < 4; ++i )
                 if ( strcmp( fn, valid[ i ] ) == 0 )
                     return Mod::Op( i );
             uassert( "Invalid modifier specified", false );
@@ -374,6 +374,18 @@ namespace mongo {
                         uassert( "Cannot apply $push modifier to non-array", e.type() == Array || e.eoo() );
                         inPlacePossible = false;
                         break;
+       		case Mod::PULL: {
+                        uassert( "Cannot apply $pull modifier to non-array", e.type() == Array || e.eoo() );
+			BSONObjIterator i( e.embeddedObject() );
+			while( i.moreWithEOO() ) {
+			  BSONElement arrI = i.next();
+			  if ( arrI.woCompare( m.elt, false ) == 0 ) {
+			    inPlacePossible = false;
+			    break;
+			  }
+			}
+                        break;
+		}
                 }
             }
         }
@@ -383,6 +395,8 @@ namespace mongo {
         for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
+	    if ( m.op == Mod::PULL )
+	      continue;
             if ( m.op == Mod::INC ) {
                 m.setn( e.number() + m.getn() );
                 BSONElementManipulator( e ).setNumber( m.getn() );
@@ -464,20 +478,38 @@ namespace mongo {
                     arr.appendAs( m->elt, nextIndex.c_str() );
                     arr.done();
                     m->pushStartSize = count;
-                }
-                ++m;
-                ++p;
+                } else if ( m->op == Mod::PULL ) {
+		  BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
+		  BSONObjIterator i( e.embeddedObject() );
+		  int count = 0;
+		  while( i.moreWithEOO() ) {
+		    BSONElement arrI = i.next();
+		    if ( arrI.eoo() )
+		      break;
+		    if ( arrI.woCompare( m->elt, false ) != 0 ) {
+		      stringstream ss;
+		      ss << count++;
+		      string index = ss.str();
+		      arr.appendAs( arrI, index.c_str() );
+		    }
+		  }
+		  arr.done();
+		}
+		++m;
+		++p;
             } else if ( cmp < 0 ) {
+	      // $ modifier applied to missing field -- create field from scratch
                 if ( m->op == Mod::PUSH ) {
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     arr.appendAs( m->elt, "0" );
                     arr.done();
                     m->pushStartSize = -1;
-                } else {
+                } else if ( m->op != Mod::PULL ) {
                     b2.appendAs( m->elt, m->fieldName );
                 }
                 ++m;
             } else if ( cmp > 0 ) {
+	      // No $ modifier
                 if ( mayAddEmbedded( existing, p->first ) )
                     b2.appendAs( p->second, p->first ); 
                 ++p;
@@ -491,6 +523,7 @@ namespace mongo {
        { $inc: { a:1, b:1 } }
        { $set: { a:77 } }
        { $push: { a:55 } }
+       { $pull: { a:66 } }
        NOTE: MODIFIES source from object!
     */
     void ModSet::getMods(const BSONObj &from) {
