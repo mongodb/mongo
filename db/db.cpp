@@ -343,7 +343,7 @@ namespace mongo {
 #endif
 
         log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
-              <<  " master = " << master << " slave = " << slave << endl;
+              <<  " master = " << master << " slave = " << slave << "  " << ( ( sizeof(int*) == 4 ) ? "32" : "64" ) << "-bit " << endl;
 
         stringstream ss;
         ss << "dbpath (" << dbpath << ") does not exist";
