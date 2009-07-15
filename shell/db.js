@@ -128,7 +128,15 @@ DB.prototype.dropDatabase = function() {
 DB.prototype.shutdownServer = function() { 
     if( "admin" != db )
 	return "shutdown command only works with the admin database; try 'use admin'";
-    return this._dbCommand("shutdown");
+
+    try {
+        this._dbCommand("shutdown");
+        throw "shutdownServer failed";
+    }
+    catch ( e ){
+        assert( tojson( e ).indexOf( "error doing query: failed" ) >= 0 , "unexpected error: " + tojson( e ) );
+        print( "server should be down..." );
+    }
 }
 
 /**

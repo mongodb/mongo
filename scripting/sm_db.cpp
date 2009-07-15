@@ -183,14 +183,17 @@ namespace mongo {
         try {
 
             auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? Option_SlaveOk : 0 );
-            
+            if ( ! cursor.get() ){
+                JS_ReportError( cx , "error doing query: failed" );
+                return JS_FALSE;
+            }
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
             assert( JS_SetPrivate( cx , mycursor , new CursorHolder( cursor, *connHolder ) ) );
             *rval = OBJECT_TO_JSVAL( mycursor );
             return JS_TRUE;
         }
         catch ( ... ){
-            JS_ReportError( cx , "error doing query" );
+            JS_ReportError( cx , "error doing query: unknown" );
             return JS_FALSE;
         }
     }
@@ -685,7 +688,7 @@ namespace mongo {
                              );
             return true;
         }
-
+        
 #if defined( SM16 ) || defined( MOZJS )
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
@@ -702,8 +705,24 @@ namespace mongo {
         }
 #endif
 
+        
+        if ( JS_InstanceOf( c->_context , o , &dbquery_class , 0 ) ||
+             JS_InstanceOf( c->_context , o , &mongo_class , 0 ) || 
+             JS_InstanceOf( c->_context , o , &db_collection_class , 0 ) ){
+            b.append( name.c_str() , c->toString( OBJECT_TO_JSVAL(o) ) );
+            return true;
+        }
+
 
         return false;
     }
 
+    bool isDate( JSContext * cx , JSObject * o ){
+#if defined( SM16 ) || defined( MOZJS )
+        return js_DateGetMsecSinceEpoch( cx , o ) != 0;
+#else
+        return JS_InstanceOf( cx , o, &js_DateClass, 0 );
+#endif
+    }
+    
 }

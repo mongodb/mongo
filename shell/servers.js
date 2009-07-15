@@ -5,10 +5,10 @@ _parsePath = function() {
     for( var i = 0; i < arguments.length; ++i )
         if ( arguments[ i ] == "--dbpath" )
             dbpath = arguments[ i + 1 ];
-    
+
     if ( dbpath == "" )
         throw "No dbpath specified";
-    
+
     return dbpath;
 }
 
@@ -17,7 +17,7 @@ _parsePort = function() {
     for( var i = 0; i < arguments.length; ++i )
         if ( arguments[ i ] == "--port" )
             port = arguments[ i + 1 ];
-    
+
     if ( port == "" )
         throw "No port specified";
     return port;
@@ -57,7 +57,7 @@ createMongoArgs = function( binaryName , args ){
 startMongod = function(){
 
     var args = createMongoArgs( "mongod" , arguments );
-    
+
     var dbpath = _parsePath.apply( null, args );
     resetDbpath( dbpath );
 
@@ -76,7 +76,7 @@ startMongoProgram = function(){
     var port = _parsePort.apply( null, arguments );
 
     _startMongoProgram.apply( null, arguments );
-    
+
     var m;
     assert.soon
     ( function() {
@@ -87,7 +87,7 @@ startMongoProgram = function(){
         }
         return false;
     }, "unable to connect to mongo program on port " + port, 10000 );
-    
+
     return m;
 }
 
@@ -95,7 +95,7 @@ startMongoProgram = function(){
 // program name, and subsequent arguments to this function are passed as
 // command line arguments to the program.  Returns pid of the spawned program.
 startMongoProgramNoConnect = function() {
-    return _startMongoProgram.apply( null, arguments );    
+    return _startMongoProgram.apply( null, arguments );
 }
 
 myPort = function() {
@@ -113,13 +113,13 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
     for ( var i=0; i<numServers; i++){
         var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i } );
         conn.name = "localhost:" + ( 30000 + i );
-        
+
         this._connections.push( conn );
         this._serverNames.push( conn.name );
     }
 
     this._configDB = "localhost:30000";
-    
+
 
     this._mongos = [];
     var startMongosPort = 39999;
@@ -134,8 +134,8 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
 
     var admin = this.admin = this.s.getDB( "admin" );
     this.config = this.s.getDB( "config" );
-    
-    this._serverNames.forEach( 
+
+    this._serverNames.forEach(
         function(z){
             admin.runCommand( { addserver : z } );
         }
@@ -163,7 +163,7 @@ ShardingTest.prototype.getServer = function( dbname ){
 ShardingTest.prototype.getOther = function( one ){
     if ( this._connections.length != 2 )
         throw "getOther only works with 2 servers";
-    
+
     if ( this._connections[0] == one )
         return this._connections[1];
     return this._connections[0];
@@ -182,7 +182,7 @@ ShardingTest.prototype.adminCommand = function(cmd){
     var res = this.admin.runCommand( cmd );
     if ( res && res.ok == 1 )
         return true;
-    
+
     throw "command " + tojson( cmd ) + " failed: " + tojson( res );
 }
 
@@ -206,6 +206,7 @@ MongodRunner.prototype.start = function( reuseData ) {
     if ( this.peer_ && this.arbiter_ ) {
         args.push( "--pairwith" );
         args.push( this.peer_ );
+        args.push( "--arbiter" );
         args.push( this.arbiter_ );
         args.push( "--oplogSize" );
         // small oplog by default so startup fast
@@ -272,7 +273,7 @@ ReplPair.prototype.isInitialSyncComplete = function( mongo, debug ) {
 ReplPair.prototype.checkSteadyState = function( state, expectedMasterHost, twoMasterOk, leftValues, rightValues, debug ) {
     leftValues = leftValues || {};
     rightValues = rightValues || {};
-    
+
     var lm = null;
     var lisc = null;
     if ( this.leftC_ != null ) {
@@ -298,7 +299,7 @@ ReplPair.prototype.checkSteadyState = function( state, expectedMasterHost, twoMa
         } else if ( lm == 1 && rm != 1 ) {
             assert( twoMasterOk || !( 1 in rightValues ) );
             this.master_ = this.leftC_;
-            this.slave_ = this.rightC_;        
+            this.slave_ = this.rightC_;
         }
         if ( !twoMasterOk ) {
             assert( lm != 1 || rm != 1, "two masters" );
@@ -314,7 +315,7 @@ ReplPair.prototype.checkSteadyState = function( state, expectedMasterHost, twoMa
             }
         }
     }
-    
+
     this.master_ = null;
     this.slave_ = null;
     return false;
@@ -344,7 +345,7 @@ ReplPair.prototype.killNode = function( mongo, signal ) {
     if ( this.rightC_ != null && this.rightC_.host == mongo.host ) {
         stopMongod( this.right_.port_ );
         this.rightC_ = null;
-    }    
+    }
 }
 
 ReplPair.prototype._annotatedNode = function( mongo ) {
@@ -355,9 +356,9 @@ ReplPair.prototype._annotatedNode = function( mongo ) {
             ret += "(master)";
         }
         if ( this.slave_ != null && mongo.host == this.slave_.host ) {
-            ret += "(slave)";            
+            ret += "(slave)";
         }
-    }    
+    }
     return ret;
 }
 

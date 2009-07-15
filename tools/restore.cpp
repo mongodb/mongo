@@ -80,7 +80,7 @@ public:
         }
         
         if ( boost::filesystem::file_size( root ) == 0 ) {
-            out() << "file " + root.native_file_string() + " empty, aborting" << endl;
+            out() << "file " + root.native_file_string() + " empty, skipping" << endl;
             return;
         }
 
@@ -90,12 +90,16 @@ public:
         long fileLength;
         assert( mmf.map( root.string().c_str() , fileLength ) );
         
+        log(1) << "\t file size: " << fileLength << endl;
+
         char * data = (char*)mmf.viewOfs();
         long read = 0;
         
         long num = 0;
         
-        int msgDelay = 1000 * ( mmf.length() / ( 1024 * 1024 * 400 ) );
+        int msgDelay = (int)(1000 * ( 1 + ( mmf.length() / ( 1024.0 * 1024 * 400 ) ) ) );
+        log(1) << "\t msg delay: " << msgDelay << endl;
+
         while ( read < mmf.length() ) {
             BSONObj o( data );
             
@@ -104,8 +108,9 @@ public:
             read += o.objsize();
             data += o.objsize();
 
-            if ( ! ( ++num % msgDelay ) )
-                out() << "read " << read << "/" << mmf.length() << " bytes so far. (" << (int)(read * 100 / mmf.length()) << "%) " << num << " objects" << endl;
+            num++;
+            if ( logLevel > 0 && num < 10 || ! ( num % msgDelay ) )
+                out() << "read " << read << "/" << mmf.length() << " bytes so far. (" << (int)( (read * 100) / mmf.length()) << "%) " << num << " objects" << endl;
         }
         
         out() << "\t "  << num << " objects" << endl;

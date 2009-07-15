@@ -31,39 +31,39 @@ checkWrite = function( m, s ) {
 doTest = function( signal ) {
 
     ports = allocatePorts( 4 );
-    
+
     // spec small oplog for fast startup on 64bit machines
     a = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 3 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-    r = startMongod( "--port", ports[ 3 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 3 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    r = startMongod( "--port", ports[ 3 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 
     assert.soon( function() {
                 am = ismaster( a );
                 lm = ismaster( l );
                 rm = ismaster( r );
-                
+
                 assert( am == 1 );
                 assert( lm == -1 || lm == 0 );
                 assert( rm == -1 || rm == 0 || rm == 1 );
-                
+
                 return ( lm == 0 && rm == 1 );
                 } );
-    
+
     checkWrite( r, l );
 
     // allow slave to finish initial sync
     assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( {replacepeer:1} ).ok; } );
-    
+
     // Should not be saved to l.
     writeOne( r );
     // Make sure there would be enough time to save to l if we hadn't called replacepeer.
     sleep( 10000 );
-    
+
     stopMongod( ports[ 3 ], signal );
     stopMongod( ports[ 1 ], signal );
 
-    l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 
     assert.soon( function() {
                 am = ismaster( a );
@@ -73,7 +73,7 @@ doTest = function( signal ) {
                 assert( am == 1 );
                 assert( lm == -1 || lm == 0 || lm == 1 );
                 assert( rm == -1 || rm == 0 );
-                
+
                 return ( lm == 1 && rm == 0 );
                 } );
 
