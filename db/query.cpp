@@ -1239,6 +1239,7 @@ namespace mongo {
             BSONObj max;
             bool explain = false;
             bool _gotquery = false;
+            bool snapshot = false;
             BSONObj query;
             {
                 BSONElement e = jsobj.findElement("$query");
@@ -1268,6 +1269,12 @@ namespace mongo {
                     hint = jsobj.getField("$hint");
                 min = jsobj.getObjectField("$min");
                 max = jsobj.getObjectField("$max");
+                BSONElement e = jsobj.getField("$snapshot");
+                snapshot = !e.eoo() && e.trueValue();
+                if( snapshot ) { 
+                    uassert("E12001 can't sort with $snapshot", order.isEmpty());
+                    uasserted("code not finished");
+                }
             }
             
             /* The ElemIter will not be happy if this isn't really an object. So throw exception

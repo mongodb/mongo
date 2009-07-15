@@ -251,6 +251,25 @@ namespace mongo {
             return *reinterpret_cast< const unsigned long long* >( value() );
         }
 
+        /** Convert the value to boolean, regardless of its type, in a javascript-like fashion 
+            (i.e., treat zero and null as false).
+            */
+        bool trueValue() const {
+            switch( type() ) {
+                case NumberDouble:
+                    return *reinterpret_cast< const double* >( value() ) != 0;
+                case NumberInt:
+                    return *reinterpret_cast< const int* >( value() ) != 0;
+                case Bool:
+                    return boolean();
+                case jstNULL:
+                    return false;
+                default:
+                    ;
+            }
+            return true;
+        }
+
         /** True if element is of a numeric type. */
         bool isNumber() const {
             return type() == NumberDouble || type() == NumberInt;
