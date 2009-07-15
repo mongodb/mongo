@@ -149,26 +149,29 @@ namespace mongo {
 
             BSONObjBuilder b;
 
-            jsval theid = getProperty( o , "_id" );
-            if ( ! JSVAL_IS_VOID( theid ) ){
-                append( b , "_id" , theid );
+            if ( ! appendSpecialDBObject( this , b , "value" , o ) ){
+
+                jsval theid = getProperty( o , "_id" );
+                if ( ! JSVAL_IS_VOID( theid ) ){
+                    append( b , "_id" , theid );
+                }
+                
+                JSIdArray * properties = JS_Enumerate( _context , o );
+                assert( properties );
+                
+                for ( jsint i=0; i<properties->length; i++ ){
+                    jsid id = properties->vector[i];
+                    jsval nameval;
+                    assert( JS_IdToValue( _context ,id , &nameval ) );
+                    string name = toString( nameval );
+                    if ( name == "_id" )
+                        continue;
+                    
+                    append( b , name , getProperty( o , name.c_str() ) , orig[name].type() );
+                }
+
+                JS_DestroyIdArray( _context , properties );
             }
-
-            JSIdArray * properties = JS_Enumerate( _context , o );
-            assert( properties );
-
-            for ( jsint i=0; i<properties->length; i++ ){
-                jsid id = properties->vector[i];
-                jsval nameval;
-                assert( JS_IdToValue( _context ,id , &nameval ) );
-                string name = toString( nameval );
-                if ( name == "_id" )
-                    continue;
-
-                append( b , name , getProperty( o , name.c_str() ) , orig[name].type() );
-            }
-
-            JS_DestroyIdArray( _context , properties );
 
             return b.obj();
         }

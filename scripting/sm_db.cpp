@@ -688,7 +688,7 @@ namespace mongo {
                              );
             return true;
         }
-
+        
 #if defined( SM16 ) || defined( MOZJS )
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
@@ -705,6 +705,14 @@ namespace mongo {
         }
 #endif
 
+        
+        if ( JS_InstanceOf( c->_context , o , &dbquery_class , 0 ) ||
+             JS_InstanceOf( c->_context , o , &mongo_class , 0 ) || 
+             JS_InstanceOf( c->_context , o , &db_collection_class , 0 ) ){
+            b.append( name.c_str() , c->toString( OBJECT_TO_JSVAL(o) ) );
+            return true;
+        }
+
 
         return false;
     }
@@ -716,5 +724,5 @@ namespace mongo {
         return JS_InstanceOf( cx , o, &js_DateClass, 0 );
 #endif
     }
-
+    
 }
