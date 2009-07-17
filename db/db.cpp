@@ -36,6 +36,7 @@
 #endif
 
 #include "../scripting/engine.h"
+#include "mms.h"
 
 namespace mongo {
 
@@ -361,6 +362,8 @@ namespace mongo {
             log() << "opLogging = " << opLogging << endl;
         _oplog.init();
 
+        mms.go();
+
 #if 0
         {
             stringstream indexpath;
@@ -467,6 +470,9 @@ int main(int argc, char* argv[], char *envp[] )
         ("remove", "remove mongodb service")
         ("service", "start mongodb service")
 #endif
+        ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
+        ( "mms-name" , po::value<string>() , "server name mongo monitoring server" )
+        ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server (defaut 30)" )
         ;
 
     replication_options.add_options()
@@ -560,7 +566,7 @@ int main(int argc, char* argv[], char *envp[] )
             cout << visible_options << endl;
             return 0;
         }
-
+        
         if (params.count("help")) {
             show_help_text(visible_options);
             return 0;
@@ -681,6 +687,14 @@ int main(int argc, char* argv[], char *envp[] )
             setRecCacheSize(x);
         }
 
+        if ( params.count( "mms-token" ) ){
+            mms.setToken( params["mms-token"].as<string>() );
+        }
+        if ( params.count( "mms-name" ) ){
+            mms.setName( params["mms-name"].as<string>() );
+        }
+        mms.setPingInterval( params["mms-interval"].as<int>() );
+
         if (params.count("command")) {
             vector<string> command = params["command"].as< vector<string> >();
 
@@ -718,7 +732,7 @@ int main(int argc, char* argv[], char *envp[] )
             cout << visible_options << endl;
             return 0;
         }
-
+        
         #if defined(_WIN32)
         if ( installService ) {
             if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
