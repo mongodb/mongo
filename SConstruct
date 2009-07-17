@@ -356,7 +356,7 @@ elif "sunos5" == os.sys.platform:
      javaHome = "/usr/lib/jvm/java-6-sun/"
      javaOS = "solaris"
      env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
-     env.Append( LIBS=["socket"] )
+     env.Append( LIBS=["socket","resolv"] )
 
 elif "freebsd7" == os.sys.platform:
     nix = True
