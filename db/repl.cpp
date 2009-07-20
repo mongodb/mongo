@@ -288,7 +288,7 @@ namespace mongo {
 				}
 			}
             else {
-                result.append("ismaster", 1);
+                result.append("ismaster", slave ? 0 : 1);
 				result.append("msg", "not paired");
             }
             
