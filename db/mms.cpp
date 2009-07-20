@@ -1,5 +1,6 @@
 // mms.cpp
 
+#include "stdafx.h"
 #include "mms.h"
 #include "db.h"
 #include "instance.h"
@@ -51,8 +52,8 @@ namespace mongo {
                 unsigned long long start , lock;
                 dbMutexInfo.timingInfo( start , lock );
                 if ( lastTime ){
-                    double timeDiff = time - lastTime;
-                    double lockDiff = lock - lastLockTime;
+                    double timeDiff = (double) (time - lastTime);
+                    double lockDiff = (double) (lock - lastLockTime);
                     url << "percent_locked=" << (int)ceil( 100 * ( lockDiff / timeDiff ) ) << "&";
                 }
                 lastTime = time;

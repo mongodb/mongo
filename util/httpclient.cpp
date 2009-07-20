@@ -1,5 +1,6 @@
 // httpclient.cpp
 
+#include "stdafx.h"
 #include "httpclient.h"
 
 namespace mongo {
