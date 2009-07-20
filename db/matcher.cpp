@@ -430,6 +430,8 @@ namespace mongo {
                     return 1;
                 }
             }
+            if ( compareOp == BSONObj::Equality && e.woCompare( toMatch ) == 0 )
+                return 1;
         }
         else if ( e.eoo() ) {
             // 0 indicates "missing element"
