@@ -106,6 +106,20 @@ namespace UpdateTests {
         }
     };
 
+    class PushAllNonArray : public Fail {
+        void doIt() {
+	  insert( ns(), fromjson( "{a:[1]}" ) );
+            update( ns(), BSONObj(), fromjson( "{$pushAll:{a:'d'}}" ) );
+        }
+    };
+
+    class PullAllNonArray : public Fail {
+        void doIt() {
+	  insert( ns(), fromjson( "{a:[1]}" ) );
+            update( ns(), BSONObj(), fromjson( "{$pullAll:{a:'d'}}" ) );
+        }
+    };
+
     class IncTargetNonNumber : public Fail {
         void doIt() {
             insert( ns(), BSON( "a" << "a" ) );
@@ -474,6 +488,8 @@ namespace UpdateTests {
             add< ModNotFirst >();
             add< ModDuplicateFieldSpec >();
             add< IncNonNumber >();
+            add< PushAllNonArray >();
+            add< PullAllNonArray >();
             add< IncTargetNonNumber >();
             add< SetNum >();
             add< SetString >();
