@@ -7,7 +7,7 @@ if ( ( typeof  DBCollection ) == "undefined" ){
         this._db = db;
         this._shortName = shortName;
         this._fullName = fullName;
-        
+
         this.verify();
     }
 }
@@ -16,7 +16,7 @@ DBCollection.prototype.verify = function(){
     assert( this._fullName , "no fullName" );
     assert( this._shortName , "no shortName" );
     assert( this._db , "no db" );
-    
+
     assert.eq( this._fullName , this._db._name + "." + this._shortName , "name mismatch" );
 
     assert( this._mongo , "no mongo in DBCollection" );
@@ -65,25 +65,25 @@ DBCollection.prototype._massageObject = function( q ){
         return {};
 
     var type = typeof q;
-    
+
     if ( type == "function" )
         return { $where : q };
-    
+
     if ( q.isObjectId )
         return { _id : q };
-    
+
     if ( type == "object" )
         return q;
-    
+
     if ( type == "string" ){
         if ( q.length == 24 )
             return { _id : q };
-        
+
         return { $where : q };
     }
 
     throw "don't know how to massage : " + type;
-        
+
 }
 
 
@@ -102,7 +102,7 @@ DBCollection.prototype._validateForStorage = function( o ){
 
 
 DBCollection.prototype.find = function( query , fields , limit , skip ){
-    return new DBQuery( this._mongo , this._db , this , 
+    return new DBQuery( this._mongo , this._db , this ,
                         this._fullName , this._massageObject( query ) , fields , limit , skip );
 }
 
@@ -217,7 +217,7 @@ DBCollection.prototype.dropIndexes = function(){
     assert( res , "no result from dropIndex result" );
     if ( res.ok )
         return res;
-    
+
     if ( res.errmsg.match( /not found/ ) )
         return res;
 
@@ -232,7 +232,7 @@ DBCollection.prototype.drop = function(){
 
 DBCollection.prototype.validate = function() {
     var res = this._db.runCommand( { validate: this.getName() } );
-    
+
     res.valid = false;
 
     if ( res.result ){
@@ -245,7 +245,7 @@ DBCollection.prototype.validate = function() {
             res.lastExtentSize = Number( r[1] );
         }
     }
-    
+
     return res;
 }
 
@@ -257,7 +257,7 @@ DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;
 DBCollection.prototype.getIndexSpecs = DBCollection.prototype.getIndexes;
 
 DBCollection.prototype.getIndexKeys = function(){
-    return this.getIndexes().map( 
+    return this.getIndexes().map(
         function(i){
             return i.key;
         }
@@ -293,32 +293,32 @@ DBCollection.prototype.clean = function() {
  */
 DBCollection.prototype.dropIndex =  function(index) {
     assert(index , "need to specify index to dropIndex" );
-    
+
     if ( ! isString( index ) && isObject( index ) )
     	index = this._genIndexName( index );
-    
+
     var res = this._dbCommand( { deleteIndexes: this.getName(), index: index } );
     this.resetIndexCache();
     return res;
 }
 
 DBCollection.prototype.copyTo = function( newName ){
-    return this.getDB().eval( 
+    return this.getDB().eval(
         function( collName , newName ){
             var from = db[collName];
             var to = db[newName];
             to.ensureIndex( { _id : 1 } );
             var count = 0;
-            
+
             var cursor = from.find();
             while ( cursor.hasNext() ){
                 var o = cursor.next();
                 count++;
                 to.save( o );
             }
-            
+
             return count;
-        } , this.getName() , newName 
+        } , this.getName() , newName
     );
 }
 
