@@ -229,7 +229,7 @@ namespace mongo {
     };
     
     struct Mod {
-      enum Op { INC, SET, PUSH, PULL } op;
+      enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL } op;
         const char *fieldName;
         double *ndouble;
         int *nint;
@@ -277,7 +277,7 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-	  const char *valid[] = { "$inc", "$set", "$push", "$pull" };
+	  const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" };
             for( int i = 0; i < 4; ++i )
                 if ( strcmp( fn, valid[ i ] ) == 0 )
                     return Mod::Op( i );
@@ -371,7 +371,8 @@ namespace mongo {
                             inPlacePossible = false;
                         break;
                     case Mod::PUSH:
-                        uassert( "Cannot apply $push modifier to non-array", e.type() == Array || e.eoo() );
+                    case Mod::PUSH_ALL:
+                        uassert( "Cannot apply $push/$pushAll modifier to non-array", e.type() == Array || e.eoo() );
                         inPlacePossible = false;
                         break;
        		case Mod::PULL: {
@@ -455,29 +456,46 @@ namespace mongo {
                          " or is referenced in another $set clause",
                         mayAddEmbedded( existing, m->fieldName ) );                
             if ( cmp == 0 ) {
+	      out() << "an op!" << endl;
                 BSONElement e = p->second;
                 if ( m->op == Mod::INC ) {
                     m->setn( m->getn() + e.number() );
                     b2.appendAs( m->elt, m->fieldName );
                 } else if ( m->op == Mod::SET ) {
                     b2.appendAs( m->elt, m->fieldName );
-                } else if ( m->op == Mod::PUSH ) {
+                } else if ( m->op == Mod::PUSH || m->op == Mod::PUSH_ALL ) {
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
-                    int count = 0;
+                    int startCount = 0;
                     while( i.moreWithEOO() ) {
                         BSONElement arrI = i.next();
-                        if ( arrI.eoo() )
-                            break;
+			if ( arrI.eoo() )
+			  break;
                         arr.append( arrI );
-                        ++count;
+                        ++startCount;
                     }
-                    stringstream ss;
-                    ss << count;
-                    string nextIndex = ss.str();
-                    arr.appendAs( m->elt, nextIndex.c_str() );
+		    if ( m->op == Mod::PUSH ) {
+		      out() << "Mod::PUSH" << endl;
+		      stringstream ss;
+		      ss << startCount;
+		      string nextIndex = ss.str();
+		      arr.appendAs( m->elt, nextIndex.c_str() );
+		    } else {
+		      out() << "Mod::PUSH_ALL" << endl;
+		      BSONObjIterator i( m->elt.embeddedObject() );
+		      int count = startCount;
+		      while( i.moreWithEOO() ) {
+			BSONElement arrI = i.next();
+			if ( arrI.eoo() )
+			  break;
+			stringstream ss;
+			ss << count++;
+			string nextIndex = ss.str();
+			arr.appendAs( arrI, nextIndex.c_str() );
+		      }
+		    }
                     arr.done();
-                    m->pushStartSize = count;
+                    m->pushStartSize = startCount;
                 } else if ( m->op == Mod::PULL ) {
 		  BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
 		  BSONObjIterator i( e.embeddedObject() );
@@ -504,7 +522,10 @@ namespace mongo {
                     arr.appendAs( m->elt, "0" );
                     arr.done();
                     m->pushStartSize = -1;
-                } else if ( m->op != Mod::PULL ) {
+		} else if ( m->op == Mod::PUSH_ALL ) {
+		  b2.appendAs( m->elt, m->fieldName );
+		  m->pushStartSize = -1;
+                } else if ( m->op != Mod::PULL && m->op != Mod::PULL_ALL ) {
                     b2.appendAs( m->elt, m->fieldName );
                 }
                 ++m;
@@ -523,7 +544,9 @@ namespace mongo {
        { $inc: { a:1, b:1 } }
        { $set: { a:77 } }
        { $push: { a:55 } }
+       { $pushAll: { a:[77,88] } }
        { $pull: { a:66 } }
+       { $pullAll : { a:[99,1010] } }
        NOTE: MODIFIES source from object!
     */
     void ModSet::getMods(const BSONObj &from) {
