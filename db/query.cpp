@@ -380,6 +380,8 @@ namespace mongo {
 			BSONObjIterator i( e.embeddedObject() );
 			while( i.moreWithEOO() ) {
 			  BSONElement arrI = i.next();
+			  if ( arrI.eoo() )
+			    break;
 			  if ( arrI.woCompare( m.elt, false ) == 0 ) {
 			    inPlacePossible = false;
 			    break;
