@@ -95,10 +95,19 @@ DBCollection.prototype._validateObject = function( o ){
 DBCollection.prototype._validateForStorage = function( o ){
     this._validateObject( o );
     for ( var k in o ){
-        if ( k.indexOf( "." ) >= 0 )
+        if ( k.indexOf( "." ) >= 0 ) {
             throw "can't have . in field names [" + k + "]" ;
+        }
+
+        if ( k.indexOf( "$" ) == 0 ) {
+            throw "field names cannot start with $ [" + k + "]" ;
+        }
+
+        if ( o[k] !== null && typeof( o[k] ) === "object" ) {
+            this._validateForStorage( o[k] );
+        }
     }
-}
+};
 
 
 DBCollection.prototype.find = function( query , fields , limit , skip ){
@@ -117,10 +126,12 @@ DBCollection.prototype.findOne = function( query , fields ){
     return ret;
 }
 
-DBCollection.prototype.insert = function( obj ){
+DBCollection.prototype.insert = function( obj , _allow_dot ){
     if ( ! obj )
         throw "no object!";
-    this._validateForStorage( obj );
+    if ( ! _allow_dot ) {
+        this._validateForStorage( obj );
+    }
     return this._mongo.insert( this._fullName , obj );
 }
 
@@ -183,7 +194,7 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
 
 DBCollection.prototype.createIndex = function( keys , options ){
     var o = this._indexSpec( keys, options );
-    this._db.getCollection( "system.indexes" ).insert( o );
+    this._db.getCollection( "system.indexes" ).insert( o , true );
 }
 
 DBCollection.prototype.ensureIndex = function( keys , options ){
