@@ -1148,6 +1148,8 @@ installBinary( env , "mongoimportjson" )
 
 installBinary( env , "mongofiles" )
 
+installBinary(env, "mongosniff")
+
 installBinary( env , "mongod" )
 installBinary( env , "mongos" )
 
