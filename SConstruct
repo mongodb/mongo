@@ -178,7 +178,7 @@ darwin = False
 windows = False
 freebsd = False
 solaris = False
-force64 = not GetOption( "force64" ) is None 
+force64 = not GetOption( "force64" ) is None
 if not force64 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
@@ -212,7 +212,7 @@ if GetOption( "extrapath" ) is not None:
         env.Append( CPPPATH=[ x + "/include" ] )
         env.Append( LIBPATH=[ x + "/lib" ] )
     release = True
-    
+
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
@@ -336,7 +336,7 @@ elif "linux2" == os.sys.platform:
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
-        
+
         if force64:
             print( "error: force64 doesn't make sense on a 64-bit machine" )
             Exit(1)
@@ -1130,13 +1130,13 @@ def installBinary( e , name ):
         name += ".exe"
 
     inst = e.Install( installDir + "/bin" , name )
-    
+
     fullInstallName = installDir + "/bin/" + name
 
     allBinaries += [ name ]
     if solaris or linux:
         e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
-        
+
     if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         e.AddPostAction( inst , checkGlibc )
 
