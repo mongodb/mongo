@@ -178,7 +178,7 @@ darwin = False
 windows = False
 freebsd = False
 solaris = False
-force64 = not GetOption( "force64" ) is None 
+force64 = not GetOption( "force64" ) is None
 if not force64 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
@@ -212,11 +212,11 @@ if GetOption( "extrapath" ) is not None:
         env.Append( CPPPATH=[ x + "/include" ] )
         env.Append( LIBPATH=[ x + "/lib" ] )
     release = True
-    
+
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
-commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , "util/assert_util.cpp" ]
+commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , "util/assert_util.cpp" , "util/httpclient.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" )
 commonFiles += [ "scripting/engine.cpp" ]
@@ -336,7 +336,7 @@ elif "linux2" == os.sys.platform:
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
-        
+
         if force64:
             print( "error: force64 doesn't make sense on a 64-bit machine" )
             Exit(1)
@@ -356,7 +356,7 @@ elif "sunos5" == os.sys.platform:
      javaHome = "/usr/lib/jvm/java-6-sun/"
      javaOS = "solaris"
      env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
-     env.Append( LIBS=["socket"] )
+     env.Append( LIBS=["socket","resolv"] )
 
 elif "freebsd7" == os.sys.platform:
     nix = True
@@ -597,7 +597,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
-    myenv["_HAVEPCAP"] = myCheckLib( "pcap", staticOnly=release )
+    myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
@@ -729,7 +729,7 @@ testEnv.Prepend( LIBPATH=["."] )
 
 
 # main db target
-mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ]  )
+mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" , "db/mms.cpp" ]  )
 Default( mongod )
 
 # tools
@@ -765,7 +765,9 @@ perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
+mongosniff_built = False
 if darwin or clientEnv["_HAVEPCAP"]:
+    mongosniff_built = True
     sniffEnv = clientEnv.Clone()
     sniffEnv.Append( LIBS=[ "pcap" ] )
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
@@ -1130,13 +1132,13 @@ def installBinary( e , name ):
         name += ".exe"
 
     inst = e.Install( installDir + "/bin" , name )
-    
+
     fullInstallName = installDir + "/bin/" + name
 
     allBinaries += [ name ]
     if solaris or linux:
         e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
-        
+
     if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         e.AddPostAction( inst , checkGlibc )
 
@@ -1147,6 +1149,9 @@ installBinary( env , "mongoexport" )
 installBinary( env , "mongoimportjson" )
 
 installBinary( env , "mongofiles" )
+
+if mongosniff_built:
+    installBinary(env, "mongosniff")
 
 installBinary( env , "mongod" )
 installBinary( env , "mongos" )

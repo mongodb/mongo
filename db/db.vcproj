@@ -1547,6 +1547,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\mms.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\namespace.cpp"
 					>
 				</File>
@@ -1684,6 +1688,10 @@
 				</File>
 				<File
 					RelativePath="..\util\background.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\httpclient.cpp"
 					>
 				</File>
 				<File

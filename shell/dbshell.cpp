@@ -182,7 +182,7 @@ int main(int argc, char* argv[]) {
              strcmp(str, "-h" ) == 0 ) {
 
             cout 
-                << "usage: " << argv[0] << " [options] [db address] [file names]\n" 
+                << "usage: " << argv[0] << " [options] [db address] [file names (ending in .js)]\n" 
                 << "db address can be:\n"
                 << "   foo   =   foo database on local machine\n" 
                 << "   192.169.0.5/foo   =   foo database on 192.168.0.5 machine\n" 
@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
                 << " --port <port> - port to connect to\n"
                 << " --nodb don't connect to mongo program on startup.  No 'db address' arg expected.\n"
                 << " --eval <script> evaluate javascript.\n"
-                << "file names: a list of files to run.  will exit after unless --shell is specified\n"
+                << "file names: a list of files to run.  files have to end in .js will exit after unless --shell is specified\n"
                 ;
             
             return 0;
