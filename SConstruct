@@ -597,7 +597,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
-    myenv["_HAVEPCAP"] = myCheckLib( "pcap", staticOnly=release )
+    myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
