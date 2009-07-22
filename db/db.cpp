@@ -472,7 +472,7 @@ int main(int argc, char* argv[], char *envp[] )
 #endif
         ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
         ( "mms-name" , po::value<string>() , "server name mongo monitoring server" )
-        ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server (defaut 30)" )
+        ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server (default 30)" )
         ;
 
     replication_options.add_options()
@@ -566,7 +566,7 @@ int main(int argc, char* argv[], char *envp[] )
             cout << visible_options << endl;
             return 0;
         }
-        
+
         if (params.count("help")) {
             show_help_text(visible_options);
             return 0;
@@ -732,7 +732,7 @@ int main(int argc, char* argv[], char *envp[] )
             cout << visible_options << endl;
             return 0;
         }
-        
+
         #if defined(_WIN32)
         if ( installService ) {
             if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
