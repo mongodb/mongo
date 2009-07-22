@@ -765,7 +765,9 @@ perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
+mongosniff_built = False
 if darwin or clientEnv["_HAVEPCAP"]:
+    mongosniff_built = True
     sniffEnv = clientEnv.Clone()
     sniffEnv.Append( LIBS=[ "pcap" ] )
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
@@ -1148,7 +1150,8 @@ installBinary( env , "mongoimportjson" )
 
 installBinary( env , "mongofiles" )
 
-installBinary(env, "mongosniff")
+if mongosniff_built:
+    installBinary(env, "mongosniff")
 
 installBinary( env , "mongod" )
 installBinary( env , "mongos" )
