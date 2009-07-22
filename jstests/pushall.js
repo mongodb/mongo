@@ -14,3 +14,7 @@ assert.eq( [ 1, 2, 3, 4, 5 ], t.findOne().a );
 t.update( {}, { $pushAll: { a: [] } } );
 assert.eq( [ 1, 2, 3, 4, 5 ], t.findOne().a );
 
+t.drop();
+t.save( {} );
+t.update( {}, { $pushAll: { a: [ 1, 2 ] } } );
+assert.eq( [ 1, 2 ], t.findOne().a );
