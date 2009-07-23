@@ -1,20 +1,20 @@
 // query.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ *    Copyright (C) 2008 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "stdafx.h"
 #include "query.h"
@@ -42,7 +42,7 @@ namespace mongo {
     */
     const int MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 
-//ns->query->DiskLoc
+    //ns->query->DiskLoc
     LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
 
     extern bool useCursors;
@@ -52,10 +52,10 @@ namespace mongo {
     class DeleteOp : public QueryOp {
     public:
         DeleteOp( bool justOne, int& bestCount ) :
-        justOne_( justOne ),
-        count_(),
-        bestCount_( bestCount ),
-        nScanned_() {
+            justOne_( justOne ),
+            count_(),
+            bestCount_( bestCount ),
+            nScanned_() {
         }
         virtual void init() {
             c_ = qp().newCursor();
@@ -229,12 +229,12 @@ namespace mongo {
     };
     
     struct Mod {
-      enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL } op;
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL } op;
         const char *fieldName;
         double *ndouble;
         int *nint;
         BSONElement elt;
-      int pushStartSize;
+        int pushStartSize;
         void setn(double n) const {
             if ( ndouble ) *ndouble = n;
             else *nint = (int) n;
@@ -267,8 +267,8 @@ namespace mongo {
         }
         bool mayAddEmbedded( map< string, BSONElement > &existing, string right ) {
             for( string left = EmbeddedBuilder::splitDot( right );
-                left.length() > 0 && left[ left.length() - 1 ] != '.';
-                left += "." + EmbeddedBuilder::splitDot( right ) ) {
+                 left.length() > 0 && left[ left.length() - 1 ] != '.';
+                 left += "." + EmbeddedBuilder::splitDot( right ) ) {
                 if ( existing.count( left ) > 0 && existing[ left ].type() != Object )
                     return false;
                 if ( modForField( left.c_str() ) )
@@ -277,7 +277,7 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-	  const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" };
+            const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" };
             for( int i = 0; i < 6; ++i )
                 if ( strcmp( fn, valid[ i ] ) == 0 )
                     return Mod::Op( i );
@@ -333,13 +333,13 @@ namespace mongo {
         }
         bool havePush() const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
-	      if ( i->op == Mod::PUSH || i->op == Mod::PUSH_ALL )
+                if ( i->op == Mod::PUSH || i->op == Mod::PUSH_ALL )
                     return true;
             return false;
         }
         void appendSizeSpecForPushes( BSONObjBuilder &b ) const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
-	      if ( i->op == Mod::PUSH || i->op == Mod::PUSH_ALL ) {
+                if ( i->op == Mod::PUSH || i->op == Mod::PUSH_ALL ) {
                     if ( i->pushStartSize == -1 )
                         b.appendNull( i->fieldName );
                     else
@@ -360,47 +360,47 @@ namespace mongo {
                 inPlacePossible = false;
             } else {
                 switch( m.op ) {
-                    case Mod::INC:
-                        uassert( "Cannot apply $inc modifier to non-number", e.isNumber() || e.eoo() );
-                        if ( !e.isNumber() )
-                            inPlacePossible = false;
-                        break;
-                    case Mod::SET:
-                        if ( !( e.isNumber() && m.elt.isNumber() ) &&
-                            m.elt.valuesize() != e.valuesize() )
-                            inPlacePossible = false;
-                        break;
-                    case Mod::PUSH:
-                    case Mod::PUSH_ALL:
-                        uassert( "Cannot apply $push/$pushAll modifier to non-array", e.type() == Array || e.eoo() );
+                case Mod::INC:
+                    uassert( "Cannot apply $inc modifier to non-number", e.isNumber() || e.eoo() );
+                    if ( !e.isNumber() )
                         inPlacePossible = false;
-                        break;
-       		case Mod::PULL:
-		case Mod::PULL_ALL: {
-                        uassert( "Cannot apply $pull/$pullAll modifier to non-array", e.type() == Array || e.eoo() );
-			BSONObjIterator i( e.embeddedObject() );
-			while( inPlacePossible && i.moreWithEOO() ) {
-			  BSONElement arrI = i.next();
-			  if ( arrI.eoo() )
-			    break;
-			  if ( m.op == Mod::PULL ) {
-			    if ( arrI.woCompare( m.elt, false ) == 0 ) {
-			      inPlacePossible = false;
-			    }
-			  } else if ( m.op == Mod::PULL_ALL ) {
-			    BSONObjIterator j( m.elt.embeddedObject() );
-			    while( inPlacePossible && j.moreWithEOO() ) {
-			      BSONElement arrJ = j.next();
-			      if ( arrJ.eoo() )
-				break;
-			      if ( arrI.woCompare( arrJ, false ) == 0 ) {
-				inPlacePossible = false;
-			      }
-			    }
-			  }
-			}
-                        break;
-		}
+                    break;
+                case Mod::SET:
+                    if ( !( e.isNumber() && m.elt.isNumber() ) &&
+                         m.elt.valuesize() != e.valuesize() )
+                        inPlacePossible = false;
+                    break;
+                case Mod::PUSH:
+                case Mod::PUSH_ALL:
+                    uassert( "Cannot apply $push/$pushAll modifier to non-array", e.type() == Array || e.eoo() );
+                    inPlacePossible = false;
+                    break;
+                case Mod::PULL:
+                case Mod::PULL_ALL: {
+                    uassert( "Cannot apply $pull/$pullAll modifier to non-array", e.type() == Array || e.eoo() );
+                    BSONObjIterator i( e.embeddedObject() );
+                    while( inPlacePossible && i.moreWithEOO() ) {
+                        BSONElement arrI = i.next();
+                        if ( arrI.eoo() )
+                            break;
+                        if ( m.op == Mod::PULL ) {
+                            if ( arrI.woCompare( m.elt, false ) == 0 ) {
+                                inPlacePossible = false;
+                            }
+                        } else if ( m.op == Mod::PULL_ALL ) {
+                            BSONObjIterator j( m.elt.embeddedObject() );
+                            while( inPlacePossible && j.moreWithEOO() ) {
+                                BSONElement arrJ = j.next();
+                                if ( arrJ.eoo() )
+                                    break;
+                                if ( arrI.woCompare( arrJ, false ) == 0 ) {
+                                    inPlacePossible = false;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
                 }
             }
         }
@@ -410,8 +410,8 @@ namespace mongo {
         for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
-	    if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL )
-	      continue;
+            if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL )
+                continue;
             if ( m.op == Mod::INC ) {
                 m.setn( e.number() + m.getn() );
                 BSONElementManipulator( e ).setNumber( m.getn() );
@@ -468,7 +468,7 @@ namespace mongo {
             if ( cmp <= 0 )
                 uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
                          " or is referenced in another $set clause",
-                        mayAddEmbedded( existing, m->fieldName ) );                
+                         mayAddEmbedded( existing, m->fieldName ) );                
             if ( cmp == 0 ) {
                 BSONElement e = p->second;
                 if ( m->op == Mod::INC ) {
@@ -482,78 +482,78 @@ namespace mongo {
                     int startCount = 0;
                     while( i.moreWithEOO() ) {
                         BSONElement arrI = i.next();
-			if ( arrI.eoo() )
-			  break;
+                        if ( arrI.eoo() )
+                            break;
                         arr.append( arrI );
                         ++startCount;
                     }
-		    if ( m->op == Mod::PUSH ) {
-		      stringstream ss;
-		      ss << startCount;
-		      string nextIndex = ss.str();
-		      arr.appendAs( m->elt, nextIndex.c_str() );
-		    } else {
-		      BSONObjIterator i( m->elt.embeddedObject() );
-		      int count = startCount;
-		      while( i.moreWithEOO() ) {
-			BSONElement arrI = i.next();
-			if ( arrI.eoo() )
-			  break;
-			stringstream ss;
-			ss << count++;
-			string nextIndex = ss.str();
-			arr.appendAs( arrI, nextIndex.c_str() );
-		      }
-		    }
+                    if ( m->op == Mod::PUSH ) {
+                        stringstream ss;
+                        ss << startCount;
+                        string nextIndex = ss.str();
+                        arr.appendAs( m->elt, nextIndex.c_str() );
+                    } else {
+                        BSONObjIterator i( m->elt.embeddedObject() );
+                        int count = startCount;
+                        while( i.moreWithEOO() ) {
+                            BSONElement arrI = i.next();
+                            if ( arrI.eoo() )
+                                break;
+                            stringstream ss;
+                            ss << count++;
+                            string nextIndex = ss.str();
+                            arr.appendAs( arrI, nextIndex.c_str() );
+                        }
+                    }
                     arr.done();
                     m->pushStartSize = startCount;
                 } else if ( m->op == Mod::PULL || m->op == Mod::PULL_ALL ) {
-		  BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
-		  BSONObjIterator i( e.embeddedObject() );
-		  int count = 0;
-		  while( i.moreWithEOO() ) {
-		    BSONElement arrI = i.next();
-		    if ( arrI.eoo() )
-		      break;
-		    bool allowed = true;
-		    if ( m->op == Mod::PULL ) {
-		      allowed = ( arrI.woCompare( m->elt, false ) != 0 );
-		    } else {
-		      BSONObjIterator j( m->elt.embeddedObject() );
-		      while( allowed && j.moreWithEOO() ) {
-			BSONElement arrJ = j.next();
-			if ( arrJ.eoo() )
-			  break;
-			allowed = ( arrI.woCompare( arrJ, false ) != 0 );
-		      }
-		    }
-		    if ( allowed ) {
-		      stringstream ss;
-		      ss << count++;
-		      string index = ss.str();
-		      arr.appendAs( arrI, index.c_str() );
-		    }
-		  }
-		  arr.done();
-		}
-		++m;
-		++p;
+                    BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
+                    BSONObjIterator i( e.embeddedObject() );
+                    int count = 0;
+                    while( i.moreWithEOO() ) {
+                        BSONElement arrI = i.next();
+                        if ( arrI.eoo() )
+                            break;
+                        bool allowed = true;
+                        if ( m->op == Mod::PULL ) {
+                            allowed = ( arrI.woCompare( m->elt, false ) != 0 );
+                        } else {
+                            BSONObjIterator j( m->elt.embeddedObject() );
+                            while( allowed && j.moreWithEOO() ) {
+                                BSONElement arrJ = j.next();
+                                if ( arrJ.eoo() )
+                                    break;
+                                allowed = ( arrI.woCompare( arrJ, false ) != 0 );
+                            }
+                        }
+                        if ( allowed ) {
+                            stringstream ss;
+                            ss << count++;
+                            string index = ss.str();
+                            arr.appendAs( arrI, index.c_str() );
+                        }
+                    }
+                    arr.done();
+                }
+                ++m;
+                ++p;
             } else if ( cmp < 0 ) {
-	      // $ modifier applied to missing field -- create field from scratch
+                // $ modifier applied to missing field -- create field from scratch
                 if ( m->op == Mod::PUSH ) {
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     arr.appendAs( m->elt, "0" );
                     arr.done();
                     m->pushStartSize = -1;
-		} else if ( m->op == Mod::PUSH_ALL ) {
-		  b2.appendAs( m->elt, m->fieldName );
-		  m->pushStartSize = -1;
+                } else if ( m->op == Mod::PUSH_ALL ) {
+                    b2.appendAs( m->elt, m->fieldName );
+                    m->pushStartSize = -1;
                 } else if ( m->op != Mod::PULL && m->op != Mod::PULL_ALL ) {
                     b2.appendAs( m->elt, m->fieldName );
                 }
                 ++m;
             } else if ( cmp > 0 ) {
-	      // No $ modifier
+                // No $ modifier
                 if ( mayAddEmbedded( existing, p->first ) )
                     b2.appendAs( p->second, p->first ); 
                 ++p;
@@ -596,7 +596,7 @@ namespace mongo {
                 uassert( "Invalid mod field name, may not end in a period", m.fieldName[ strlen( m.fieldName ) - 1 ] != '.' );
                 for ( vector<Mod>::iterator i = mods_.begin(); i != mods_.end(); i++ ) {
                     uassert( "Field name duplication not allowed with modifiers",
-                            strcmp( m.fieldName, i->fieldName ) != 0 );
+                             strcmp( m.fieldName, i->fieldName ) != 0 );
                 }
                 uassert( "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
@@ -694,15 +694,15 @@ namespace mongo {
             }
             
             /* note: we only update one row and quit.  if you do multiple later,
-             be careful or multikeys in arrays could break things badly.  best
-             to only allow updating a single row with a multikey lookup.
-             */
+               be careful or multikeys in arrays could break things badly.  best
+               to only allow updating a single row with a multikey lookup.
+            */
             
             if ( profile )
                 ss << " nscanned:" << u->nscanned();
             
             /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
-             regular ones at the moment. */
+               regular ones at the moment. */
             const char *firstField = updateobj.firstElement().fieldName();
             if ( firstField[0] == '$' ) {
                 ModSet mods;
@@ -774,9 +774,9 @@ namespace mongo {
     }
     
     /* todo:
-     _ smart requery find record immediately
-     (clean return codes up later...)
-     */
+       _ smart requery find record immediately
+       (clean return codes up later...)
+    */
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
         return __updateObjects( ns, updateobj, pattern, upsert, ss, logop );
     }
@@ -847,7 +847,7 @@ namespace mongo {
     }
 
 
-//int dump = 0;
+    //int dump = 0;
 
     /* empty result for error conditions */
     QueryResult* emptyMoreResult(long long cursorid) {
@@ -908,23 +908,23 @@ namespace mongo {
                     else {
                         BSONObj js = c->current();
                         /* if ( cc->ids_.get() ) {
-                            BSONElement idRef = js.getField( "_id" );
-                            if ( !idRef.eoo() ) {
-                                BSONObjBuilder idBuilder;
-                                idBuilder.append( idRef );
-                                BSONObj id = idBuilder.obj();
-                                if ( cc->ids_->get( id ) ) {
-                                    c->advance();
-                                    continue;
-                                }
-                                cc->ids_->put( id ); 
-                            }
-                        }*/
+                           BSONElement idRef = js.getField( "_id" );
+                           if ( !idRef.eoo() ) {
+                           BSONObjBuilder idBuilder;
+                           idBuilder.append( idRef );
+                           BSONObj id = idBuilder.obj();
+                           if ( cc->ids_->get( id ) ) {
+                           c->advance();
+                           continue;
+                           }
+                           cc->ids_->put( id ); 
+                           }
+                           }*/
                         bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
                         if ( ok ) {
                             n++;
                             if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                    (ntoreturn==0 && b.len()>1*1024*1024) ) {
+                                 (ntoreturn==0 && b.len()>1*1024*1024) ) {
                                 c->advance();
                                 cc->pos += n;
                                 //cc->updateLocation();
@@ -1028,7 +1028,7 @@ namespace mongo {
     };
     
     /* { count: "collectionname"[, query: <query>] }
-         returns -1 on ns does not exist error.
+       returns -1 on ns does not exist error.
     */    
     long long runCount( const char *ns, const BSONObj &cmd, string &err ) {
         NamespaceDetails *d = nsdetails( ns );
@@ -1057,22 +1057,22 @@ namespace mongo {
     class DoQueryOp : public QueryOp {
     public:
         DoQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
-                  bool explain, FieldMatcher *filter, int queryOptions ) :
-        b_( 32768 ),
-        ntoskip_( ntoskip ),
-        ntoreturn_( ntoreturn ),
-        order_( order ),
-        wantMore_( wantMore ),
-        explain_( explain ),
-        filter_( filter ),
-        ordering_(),
-        nscanned_(),
-        queryOptions_( queryOptions ),
-        n_(),
-        soSize_(),
-        saveClientCursor_(),
-        findingStart_( (queryOptions & Option_OplogReplay) != 0 ),
-        findingStartCursor_()
+                   bool explain, FieldMatcher *filter, int queryOptions ) :
+            b_( 32768 ),
+            ntoskip_( ntoskip ),
+            ntoreturn_( ntoreturn ),
+            order_( order ),
+            wantMore_( wantMore ),
+            explain_( explain ),
+            filter_( filter ),
+            ordering_(),
+            nscanned_(),
+            queryOptions_( queryOptions ),
+            n_(),
+            soSize_(),
+            saveClientCursor_(),
+            findingStart_( (queryOptions & Option_OplogReplay) != 0 ),
+            findingStartCursor_()
         {}
 
         virtual void init() {
@@ -1129,9 +1129,9 @@ namespace mongo {
             }
             
             bool mayCreateCursor1 = wantMore_ && ntoreturn_ != 1 && useCursors;
-/*            if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
-                ids_.reset( new IdSet() );
-            }*/
+            /*            if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
+                          ids_.reset( new IdSet() );
+                          }*/
             
             if( 0 ) { 
                 BSONObj js = c_->current();
@@ -1150,14 +1150,14 @@ namespace mongo {
                     // got a match.
                     assert( js.objsize() >= 0 ); //defensive for segfaults
                     /*if ( ids_.get() ) {
-                        BSONElement idRef = js.getField( "_id" );
-                        if ( !idRef.eoo() ) {
-                            BSONObjBuilder b;
-                            b.append( idRef );
-                            BSONObj id = b.obj();
-                            ids_->put( id );
-                        }
-                    }*/
+                      BSONElement idRef = js.getField( "_id" );
+                      if ( !idRef.eoo() ) {
+                      BSONObjBuilder b;
+                      b.append( idRef );
+                      BSONObj id = b.obj();
+                      ids_->put( id );
+                      }
+                      }*/
                     if ( ordering_ ) {
                         // note: no cursors for non-indexed, ordered results.  results must be fairly small.
                         so_->add(js);
@@ -1178,14 +1178,14 @@ namespace mongo {
                             if ( ok ) n_++;
                             if ( ok ) {
                                 if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
+                                     (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
                                     /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-                                    is only a size limit.  The idea is that on a find() where one doesn't use much results,
-                                    we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                                       is only a size limit.  The idea is that on a find() where one doesn't use much results,
+                                       we don't return much, but once getmore kicks in, we start pushing significant quantities.
                                  
-                                    The n limit (vs. size) is important when someone fetches only one small field from big
-                                    objects, which causes massive scanning server-side.
-                                 */
+                                       The n limit (vs. size) is important when someone fetches only one small field from big
+                                       objects, which causes massive scanning server-side.
+                                    */
                                     /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                                     if ( mayCreateCursor1 ) {
                                         c_->advance();
@@ -1227,7 +1227,7 @@ namespace mongo {
         bool scanAndOrderRequired() const { return ordering_; }
         auto_ptr< Cursor > cursor() { return c_; }
         auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
-//        auto_ptr< IdSet > ids() { return ids_; }
+        //        auto_ptr< IdSet > ids() { return ids_; }
         int n() const { return n_; }
         long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
@@ -1251,7 +1251,7 @@ namespace mongo {
         auto_ptr< ScanAndOrder > so_;
         bool findingStart_;
         ClientCursor * findingStartCursor_;
-//        auto_ptr< IdSet > ids_; /* for dedupping traversal of multikey indexes */
+        //        auto_ptr< IdSet > ids_; /* for dedupping traversal of multikey indexes */
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
@@ -1272,9 +1272,9 @@ namespace mongo {
         int ntoreturn = _ntoreturn;
         if ( _ntoreturn < 0 ) {
             /* _ntoreturn greater than zero is simply a hint on how many objects to send back per 
-             "cursor batch".
-             A negative number indicates a hard limit.
-             */
+               "cursor batch".
+               A negative number indicates a hard limit.
+            */
             ntoreturn = -_ntoreturn;
             wantMore = false;
         }
@@ -1358,9 +1358,9 @@ namespace mongo {
             }
             
             /* The ElemIter will not be happy if this isn't really an object. So throw exception
-             here when that is true.
-             (Which may indicate bad data from client.)
-             */
+               here when that is true.
+               (Which may indicate bad data from client.)
+            */
             if ( query.objsize() == 0 ) {
                 out() << "Bad query object?\n  jsobj:";
                 out() << jsobj.toString() << "\n  query:";
@@ -1391,7 +1391,7 @@ namespace mongo {
                 cursorid = cc->cursorid;
                 DEV out() << "  query has more, cursorid: " << cursorid << endl;
                 cc->matcher = dqo.matcher();
-//                cc->ids_ = dqo.ids();
+                //                cc->ids_ = dqo.ids();
                 cc->ns = ns;
                 cc->pos = n;
                 cc->filter = filter;
