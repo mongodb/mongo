@@ -148,8 +148,9 @@ namespace mongo {
             BSONObj orig;
             if ( JS_InstanceOf( _context , o , &bson_class , 0 ) ){
                 BSONHolder * holder = GETHOLDER(_context,o);
-                if ( ! holder->_modified )
+                if ( ! holder->_modified ){
                     return holder->_obj;
+                }
                 orig = holder->_obj;
             }
 
@@ -708,6 +709,13 @@ namespace mongo {
         holder->_inResolve = true;
         assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
         holder->_inResolve = false;
+        
+        if ( JSVAL_IS_OBJECT( val ) && 
+             ( JS_InstanceOf( cx , JSVAL_TO_OBJECT( val ) , &bson_class , 0 ) || 
+               JS_IsArrayObject( cx , JSVAL_TO_OBJECT( val ) ) ) ){
+            // TODO: this is a hack to get around sub objects being modified
+            holder->_modified = true;
+        }
 
         *objp = obj;
         JS_LeaveLocalRootScope( cx );
