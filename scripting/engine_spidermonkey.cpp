@@ -710,11 +710,13 @@ namespace mongo {
         assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
         holder->_inResolve = false;
         
-        if ( JSVAL_IS_OBJECT( val ) && 
-             ( JS_InstanceOf( cx , JSVAL_TO_OBJECT( val ) , &bson_class , 0 ) || 
-               JS_IsArrayObject( cx , JSVAL_TO_OBJECT( val ) ) ) ){
+        if ( val != JSVAL_NULL && val != JSVAL_VOID && JSVAL_IS_OBJECT( val ) ){
             // TODO: this is a hack to get around sub objects being modified
-            holder->_modified = true;
+            JSObject * oo = JSVAL_TO_OBJECT( val );
+            if ( JS_InstanceOf( cx , oo , &bson_class , 0 ) || 
+                 JS_IsArrayObject( cx , oo ) ){
+                holder->_modified = true;
+            }
         }
 
         *objp = obj;
