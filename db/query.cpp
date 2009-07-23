@@ -308,7 +308,7 @@ namespace mongo {
         bool haveModForField( const char *fieldName ) const {
             // Presumably the number of mods is small, so this loop isn't too expensive.
             for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
-                if ( strcmp( fieldName, i->fieldName ) == 0 )
+                if ( strlen( fieldName ) == strlen( i->fieldName ) && strcmp( fieldName, i->fieldName ) == 0 )
                     return true;
             }
             return false;
@@ -317,8 +317,8 @@ namespace mongo {
             // Presumably the number of mods is small, so this loop isn't too expensive.
             for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
                 const char *dot = strchr( i->fieldName, '.' );
-                int len = dot ? dot - i->fieldName : strlen( i->fieldName );
-                if ( strncmp( fieldName, i->fieldName, len ) == 0 )
+                size_t len = dot ? dot - i->fieldName : strlen( i->fieldName );
+                if ( len == strlen( fieldName ) && strncmp( fieldName, i->fieldName, len ) == 0 )
                     return true;
             }
             return false;
