@@ -229,12 +229,12 @@ namespace mongo {
     };
     
     struct Mod {
-        enum Op { INC, SET, PUSH } op;
+      enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL } op;
         const char *fieldName;
         double *ndouble;
         int *nint;
         BSONElement elt;
-        int pushStartSize;
+      int pushStartSize;
         void setn(double n) const {
             if ( ndouble ) *ndouble = n;
             else *nint = (int) n;
@@ -277,11 +277,11 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-            const char *valid[] = { "$inc", "$set", "$push" };
-            for( int i = 0; i < 3; ++i )
+	  const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" };
+            for( int i = 0; i < 6; ++i )
                 if ( strcmp( fn, valid[ i ] ) == 0 )
                     return Mod::Op( i );
-            uassert( "Invalid modifier specified", false );
+            uassert( "Invalid modifier specified " + string( fn ), false );
             return Mod::INC;
         }
     public:
@@ -333,13 +333,13 @@ namespace mongo {
         }
         bool havePush() const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
-                if ( i->op == Mod::PUSH )
+	      if ( i->op == Mod::PUSH || i->op == Mod::PUSH_ALL )
                     return true;
             return false;
         }
         void appendSizeSpecForPushes( BSONObjBuilder &b ) const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
-                if ( i->op == Mod::PUSH ) {
+	      if ( i->op == Mod::PUSH || i->op == Mod::PUSH_ALL ) {
                     if ( i->pushStartSize == -1 )
                         b.appendNull( i->fieldName );
                     else
@@ -371,9 +371,36 @@ namespace mongo {
                             inPlacePossible = false;
                         break;
                     case Mod::PUSH:
-                        uassert( "Cannot apply $push modifier to non-array", e.type() == Array || e.eoo() );
+                    case Mod::PUSH_ALL:
+                        uassert( "Cannot apply $push/$pushAll modifier to non-array", e.type() == Array || e.eoo() );
                         inPlacePossible = false;
                         break;
+       		case Mod::PULL:
+		case Mod::PULL_ALL: {
+                        uassert( "Cannot apply $pull/$pullAll modifier to non-array", e.type() == Array || e.eoo() );
+			BSONObjIterator i( e.embeddedObject() );
+			while( inPlacePossible && i.moreWithEOO() ) {
+			  BSONElement arrI = i.next();
+			  if ( arrI.eoo() )
+			    break;
+			  if ( m.op == Mod::PULL ) {
+			    if ( arrI.woCompare( m.elt, false ) == 0 ) {
+			      inPlacePossible = false;
+			    }
+			  } else if ( m.op == Mod::PULL_ALL ) {
+			    BSONObjIterator j( m.elt.embeddedObject() );
+			    while( inPlacePossible && j.moreWithEOO() ) {
+			      BSONElement arrJ = j.next();
+			      if ( arrJ.eoo() )
+				break;
+			      if ( arrI.woCompare( arrJ, false ) == 0 ) {
+				inPlacePossible = false;
+			      }
+			    }
+			  }
+			}
+                        break;
+		}
                 }
             }
         }
@@ -383,6 +410,8 @@ namespace mongo {
         for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
+	    if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL )
+	      continue;
             if ( m.op == Mod::INC ) {
                 m.setn( e.number() + m.getn() );
                 BSONElementManipulator( e ).setNumber( m.getn() );
@@ -447,37 +476,84 @@ namespace mongo {
                     b2.appendAs( m->elt, m->fieldName );
                 } else if ( m->op == Mod::SET ) {
                     b2.appendAs( m->elt, m->fieldName );
-                } else if ( m->op == Mod::PUSH ) {
+                } else if ( m->op == Mod::PUSH || m->op == Mod::PUSH_ALL ) {
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
-                    int count = 0;
+                    int startCount = 0;
                     while( i.moreWithEOO() ) {
                         BSONElement arrI = i.next();
-                        if ( arrI.eoo() )
-                            break;
+			if ( arrI.eoo() )
+			  break;
                         arr.append( arrI );
-                        ++count;
+                        ++startCount;
                     }
-                    stringstream ss;
-                    ss << count;
-                    string nextIndex = ss.str();
-                    arr.appendAs( m->elt, nextIndex.c_str() );
+		    if ( m->op == Mod::PUSH ) {
+		      stringstream ss;
+		      ss << startCount;
+		      string nextIndex = ss.str();
+		      arr.appendAs( m->elt, nextIndex.c_str() );
+		    } else {
+		      BSONObjIterator i( m->elt.embeddedObject() );
+		      int count = startCount;
+		      while( i.moreWithEOO() ) {
+			BSONElement arrI = i.next();
+			if ( arrI.eoo() )
+			  break;
+			stringstream ss;
+			ss << count++;
+			string nextIndex = ss.str();
+			arr.appendAs( arrI, nextIndex.c_str() );
+		      }
+		    }
                     arr.done();
-                    m->pushStartSize = count;
-                }
-                ++m;
-                ++p;
+                    m->pushStartSize = startCount;
+                } else if ( m->op == Mod::PULL || m->op == Mod::PULL_ALL ) {
+		  BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
+		  BSONObjIterator i( e.embeddedObject() );
+		  int count = 0;
+		  while( i.moreWithEOO() ) {
+		    BSONElement arrI = i.next();
+		    if ( arrI.eoo() )
+		      break;
+		    bool allowed = true;
+		    if ( m->op == Mod::PULL ) {
+		      allowed = ( arrI.woCompare( m->elt, false ) != 0 );
+		    } else {
+		      BSONObjIterator j( m->elt.embeddedObject() );
+		      while( allowed && j.moreWithEOO() ) {
+			BSONElement arrJ = j.next();
+			if ( arrJ.eoo() )
+			  break;
+			allowed = ( arrI.woCompare( arrJ, false ) != 0 );
+		      }
+		    }
+		    if ( allowed ) {
+		      stringstream ss;
+		      ss << count++;
+		      string index = ss.str();
+		      arr.appendAs( arrI, index.c_str() );
+		    }
+		  }
+		  arr.done();
+		}
+		++m;
+		++p;
             } else if ( cmp < 0 ) {
+	      // $ modifier applied to missing field -- create field from scratch
                 if ( m->op == Mod::PUSH ) {
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     arr.appendAs( m->elt, "0" );
                     arr.done();
                     m->pushStartSize = -1;
-                } else {
+		} else if ( m->op == Mod::PUSH_ALL ) {
+		  b2.appendAs( m->elt, m->fieldName );
+		  m->pushStartSize = -1;
+                } else if ( m->op != Mod::PULL && m->op != Mod::PULL_ALL ) {
                     b2.appendAs( m->elt, m->fieldName );
                 }
                 ++m;
             } else if ( cmp > 0 ) {
+	      // No $ modifier
                 if ( mayAddEmbedded( existing, p->first ) )
                     b2.appendAs( p->second, p->first ); 
                 ++p;
@@ -491,6 +567,9 @@ namespace mongo {
        { $inc: { a:1, b:1 } }
        { $set: { a:77 } }
        { $push: { a:55 } }
+       { $pushAll: { a:[77,88] } }
+       { $pull: { a:66 } }
+       { $pullAll : { a:[99,1010] } }
        NOTE: MODIFIES source from object!
     */
     void ModSet::getMods(const BSONObj &from) {
@@ -500,7 +579,7 @@ namespace mongo {
             if ( e.eoo() )
                 break;
             const char *fn = e.fieldName();
-            uassert( "Invalid modifier specified", e.type() == Object );
+            uassert( "Invalid modifier specified" + string( fn ), e.type() == Object );
             BSONObj j = e.embeddedObject();
             BSONObjIterator jt(j);
             Mod::Op op = opFromStr( fn );
@@ -520,6 +599,7 @@ namespace mongo {
                             strcmp( m.fieldName, i->fieldName ) != 0 );
                 }
                 uassert( "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
+                uassert( "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
                 m.elt = f;
                 if ( f.type() == NumberDouble ) {
                     m.ndouble = (double *) f.value();

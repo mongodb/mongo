@@ -671,7 +671,103 @@ namespace ReplTests {
                 insert( fromjson( "{'_id':0}" ) );
             }                        
         };
+
+        class PushAll : public Base {
+        public:
+            void doIt() const {
+	      client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0,a:[4,5,6]}" ), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4]}" ) );
+            }            
+        };
         
+        class PushAllUpsert : public Base {
+        public:
+            void doIt() const {
+	      client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ), true );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0,a:[4,5,6]}" ), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4]}" ) );
+            }            
+        };
+
+        class EmptyPushAll : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0,a:[5,6]}" ), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0}" ) );
+            }                        
+        };
+
+        class Pull : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$pull" << BSON( "a" << 4.0 ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0,a:[5]}" ), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4,5]}" ) );
+            }            
+        };
+                
+        class PullNothing : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$pull" << BSON( "a" << 6.0 ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0,a:[4,5]}" ), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4,5]}" ) );
+            }            
+        };
+                
+        class PullAll : public Base {
+        public:
+            void doIt() const {
+	      client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pullAll:{a:[4,5]}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0,a:[6]}" ), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4,5,6]}" ) );
+            }            
+        };
+
     } // namespace Idempotence
     
     class DeleteOpIsIdBased : public Base {
@@ -837,6 +933,12 @@ namespace ReplTests {
             add< Idempotence::PushUpsert >();
             add< Idempotence::MultiPush >();
             add< Idempotence::EmptyPush >();
+            add< Idempotence::PushAll >();
+            add< Idempotence::PushAllUpsert >();
+            add< Idempotence::EmptyPushAll >();
+            add< Idempotence::Pull >();
+            add< Idempotence::PullNothing >();
+            add< Idempotence::PullAll >();
             add< DeleteOpIsIdBased >();
             add< DbIdsTest >();
             add< MemIdsTest >();

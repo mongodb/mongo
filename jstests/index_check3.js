@@ -30,7 +30,22 @@ for ( var i=0; i<100; i++ ){
 t.ensureIndex( { foo : 1 } );
 
 printjson( t.find( { foo : { $lt : 50 } } ).explain() );
-assert.gt( 30 , t.find( { foo : { $lt : 50 } } ).explain().nscanned , "lt" )
+assert.gt( 30 , t.find( { foo : { $lt : 50 } } ).explain().nscanned , "lt" );
 printjson( t.find( { foo : { $gt : 50 } } ).explain() );
-assert.gt( 30 , t.find( { foo : { $gt : 50 } } ).explain().nscanned , "gt" )
+assert.gt( 30 , t.find( { foo : { $gt : 50 } } ).explain().nscanned , "gt" );
+
+
+t.drop();
+t.save( {i:'a'} );
+for( var i=0; i < 10; ++i ) {
+    t.save( {} );
+}
+
+t.ensureIndex( { i : 1 } );
+
+printjson( t.find( { i : { $lte : 'a' } } ).explain() );
+assert.gt( 3 , t.find( { i : { $lte : 'a' } } ).explain().nscanned , "lte" );
+printjson( t.find( { i : { $gte : 'a' } } ).explain() );
+// bug SERVER-99
+// assert.gt( 3 , t.find( { i : { $gte : 'a' } } ).explain().nscanned , "gte" );
 
