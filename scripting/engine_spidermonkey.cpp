@@ -42,15 +42,21 @@ namespace mongo {
 
         BSONFieldIterator( BSONHolder * holder ){
 
+            set<string> added;
+
             BSONObjIterator it( holder->_obj );
             while ( it.more() ){
                 BSONElement e = it.next();
                 if ( holder->_removed.count( e.fieldName() ) )
                     continue;
                 _names.push_back( e.fieldName() );
+                added.insert( e.fieldName() );
             }
             
-            _names.merge( holder->_extra );
+            for ( list<string>::iterator i = holder->_extra.begin(); i != holder->_extra.end(); i++ ){
+                if ( ! added.count( *i ) )
+                    _names.push_back( *i );
+            }
 
             _it = _names.begin();
         }
@@ -581,8 +587,9 @@ namespace mongo {
         if ( ! holder->_inResolve ){
             Convertor c(cx);
             string name = c.toString( idval );
-            if ( holder->_obj[name].eoo() )
+            if ( holder->_obj[name].eoo() ){
                 holder->_extra.push_back( name );
+            }
             holder->_modified = true;
         }
         return JS_TRUE;
