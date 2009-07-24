@@ -4,6 +4,7 @@
 #include "engine_spidermonkey.h"
 
 #include "../client/dbclient.h"
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace mongo {
 
