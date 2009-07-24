@@ -152,6 +152,10 @@ AddOption( "--boost-compiler",
 
 # --- environment setup ---
 
+def removeIfInList( lst , thing ):
+    if thing in lst:
+        lst.remove( thing )
+
 def printLocalInfo():
     import sys, SCons
     print( "scons version: " + SCons.__version__ )
@@ -598,6 +602,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcre" , True )
 
     myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
+    removeIfInList( myenv["LIBS"] , "pcap" )
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
@@ -706,10 +711,6 @@ env.Append( BUILDERS={'JSHeader' : jshBuilder})
 
 
 # --- targets ----
-
-def removeIfInList( lst , thing ):
-    if thing in lst:
-        lst.remove( thing )
 
 clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )
