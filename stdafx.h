@@ -73,6 +73,10 @@ using namespace std;
 #include <boost/spirit/core.hpp>
 #include <boost/spirit/utility/loops.hpp>
 #include <boost/tuple/tuple.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/thread/condition.hpp>
+#include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/xtime.hpp>
 #undef assert
 #define assert xassert
 #define yassert 1
