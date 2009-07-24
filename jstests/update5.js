@@ -36,5 +36,6 @@ go( { a : 5 , b : 7 } );
 go( { a : null , b : 7 } );
 
 go( { referer: 'blah' } );
-//go( { referer: 'blah', name: 'bar' } );
-//go( { date: null, referer: 'blah', name: 'bar' } );
+go( { referer: 'blah', lame: 'bar' } );
+go( { referer: 'blah', name: 'bar' } );
+go( { date: null, referer: 'blah', name: 'bar' } );
