@@ -652,8 +652,8 @@ namespace mongo {
         scope->exec( jsconcatcode );
     }
 
-    bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o ){
-
+    bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , jsval val , JSObject * o ){
+        
         if ( JS_InstanceOf( c->_context , o , &object_id_class , 0 ) ){
             OID oid;
             oid.init( c->getString( o , "str" ) );
@@ -709,11 +709,17 @@ namespace mongo {
         if ( JS_InstanceOf( c->_context , o , &dbquery_class , 0 ) ||
              JS_InstanceOf( c->_context , o , &mongo_class , 0 ) || 
              JS_InstanceOf( c->_context , o , &db_collection_class , 0 ) ){
-            b.append( name.c_str() , c->toString( OBJECT_TO_JSVAL(o) ) );
+            b.append( name.c_str() , c->toString( val ) );
             return true;
         }
 
-
+#ifdef SM18
+        if ( JS_InstanceOf( c->_context , o , &js_RegExpClass , 0 ) ){
+            c->appendRegex( b , name , c->toString( val ) );
+            return true;
+        }
+#endif
+        
         return false;
     }
 
