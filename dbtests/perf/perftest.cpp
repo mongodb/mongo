@@ -27,6 +27,7 @@
 
 #include <unittest/Registry.hpp>
 #include <unittest/UnitTest.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace mongo {
     extern const char* dbpath;
