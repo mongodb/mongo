@@ -159,14 +159,6 @@ def printLocalInfo():
 
 printLocalInfo()
 
-env = Environment()
-env["LIBPATH"] = []
-
-if GetOption( "recstore" ) != None:
-    env.Append( CPPDEFINES=[ "_RECSTORE" ] )
-env.Append( CPPDEFINES=[ "_SCONS" ] )
-env.Append( CPPPATH=[ "." ] )
-
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
@@ -182,6 +174,10 @@ force64 = not GetOption( "force64" ) is None
 if not force64 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
+msarch = None
+if force64:
+    msarch = "amd64"
+
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 static = not GetOption( "static" ) is None
@@ -193,6 +189,16 @@ nojni = not GetOption( "nojni" ) is None
 
 usesm = not GetOption( "usesm" ) is None
 usejvm = not GetOption( "usejvm" ) is None
+
+env = Environment( MSVS_ARCH=msarch )
+env["LIBPATH"] = []
+
+if GetOption( "recstore" ) != None:
+    env.Append( CPPDEFINES=[ "_RECSTORE" ] )
+env.Append( CPPDEFINES=[ "_SCONS" ] )
+env.Append( CPPPATH=[ "." ] )
+
+
 
 boostCompiler = GetOption( "boostCompiler" )
 if boostCompiler is None:
@@ -367,7 +373,11 @@ elif "freebsd7" == os.sys.platform:
 
 elif "win32" == os.sys.platform:
     windows = True
-    boostDir = "C:/Program Files/Boost/boost_1_35_0"
+    
+    for bv in range(3,10):
+        boostDir = "C:/Program Files/Boost/boost_1_3" + str(bv) + "_0"
+        if os.path.exists( boostDir ):
+            break
 
     serverOnlyFiles += [ "util/ntservice.cpp" ]
 
@@ -408,7 +418,14 @@ elif "win32" == os.sys.platform:
         env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
 
-    env.Append( LIBPATH=[ boostDir + "/Lib" , winSDKHome + "/Lib" ] )
+    env.Append( LIBPATH=[ boostDir + "/Lib" ] )
+    if force64: 
+        env.Append( LIBPATH=[ winSDKHome + "/Lib/x64" ] )
+        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCRT " )
+        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVPRT " )
+    else:
+        env.Append( LIBPATH=[ winSDKHome + "/Lib" ] )
+
 
     def pcreFilter(x):
         name = x.name
@@ -430,8 +447,14 @@ elif "win32" == os.sys.platform:
     commonFiles += pcreFiles
     allClientFiles += pcreFiles
 
-    env.Append( LIBS=Split("ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib" ) )
-
+    winLibString = "ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib"
+    env.Append( LIBS=Split(winLibString) )
+    
+    if force64:
+        env.Append( CPPDEFINES=["_AMD64_=1"] )
+    else:
+        env.Append( CPPDEFINES=["_X86_=1"] )
+    
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
@@ -1281,3 +1304,4 @@ def clean_old_dist_builds(env, target, source):
 
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
+
