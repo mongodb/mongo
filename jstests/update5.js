@@ -7,7 +7,6 @@ function go( key ){
 
     function check( num , name ){
         assert.eq( 1 , t.find().count() , tojson( key ) + " count " + name );
-        printjson( t.findOne() );
         assert.eq( num , t.findOne().n , tojson( key ) +  " value " + name );
     }
     
