@@ -156,7 +156,7 @@ namespace mongo {
 
             BSONObjBuilder b;
 
-            if ( ! appendSpecialDBObject( this , b , "value" , o ) ){
+            if ( ! appendSpecialDBObject( this , b , "value" , OBJECT_TO_JSVAL( o ) , o ) ){
 
                 jsval theid = getProperty( o , "_id" );
                 if ( ! JSVAL_IS_VOID( theid ) ){
@@ -200,6 +200,13 @@ namespace mongo {
             uassert( "not a function" , JS_TypeOfValue( _context , v ) == JSTYPE_FUNCTION );
             return getFunctionCode( JS_ValueToFunction( _context , v ) );
         }
+        
+        void appendRegex( BSONObjBuilder& b , const string& name , string s ){
+            assert( s[0] == '/' );
+            s = s.substr(1);
+            string::size_type end = s.rfind( '/' );
+            b.appendRegex( name.c_str() , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
+        }
 
         void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO  ){
             //cout << "name: " << name << "\t" << typeString( val ) << " oldType: " << oldType << endl;
@@ -224,7 +231,7 @@ namespace mongo {
                 if ( ! o || o == JSVAL_NULL ){
                     b.appendNull( name.c_str() );
                 }
-                else if ( ! appendSpecialDBObject( this , b , name , o ) ){
+                else if ( ! appendSpecialDBObject( this , b , name , val , o ) ){
                     BSONObj sub = toObject( o );
                     if ( JS_IsArrayObject( _context , o ) ){
                         b.appendArray( name.c_str() , sub );
@@ -239,9 +246,7 @@ namespace mongo {
             case JSTYPE_FUNCTION: {
                 string s = toString(val);
                 if ( s[0] == '/' ){
-                    s = s.substr(1);
-                    string::size_type end = s.rfind( '/' );
-                    b.appendRegex( name.c_str() , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
+                    appendRegex( b , name , s );
                 }
                 else {
                     b.appendCode( name.c_str() , getFunctionCode( val ).c_str() );
@@ -731,8 +736,13 @@ namespace mongo {
     public:
 
         SMEngine(){
+#ifdef SM18
+            JS_SetCStringsAreUTF8();
+#endif
+
             _runtime = JS_NewRuntime(8L * 1024L * 1024L);
             uassert( "JS_NewRuntime failed" , _runtime );
+            
             if ( ! utf8Ok() ){
                 cerr << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
             }
