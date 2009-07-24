@@ -121,6 +121,8 @@ DB.prototype.createCollection = function(name, opt) {
  * @return Object returned has member ok set to true if operation succeeds, false otherwise.
 */
 DB.prototype.dropDatabase = function() { 	
+    if ( arguments.length )
+        throw "dropDatabase doesn't take arguments";
     return this._dbCommand( { dropDatabase: 1 } );
 }
 
