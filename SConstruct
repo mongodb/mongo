@@ -451,7 +451,10 @@ elif "win32" == os.sys.platform:
     commonFiles += pcreFiles
     allClientFiles += pcreFiles
 
-    winLibString = "ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib"
+    winLibString = "ws2_32.lib kernel32.lib uuid.lib "
+    if not force64:
+        winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib "
+        winLibString += " odbc32.lib odbccp32.lib"
     env.Append( LIBS=Split(winLibString) )
     
     if force64:
