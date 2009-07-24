@@ -7,6 +7,7 @@ function go( key ){
 
     function check( num , name ){
         assert.eq( 1 , t.find().count() , tojson( key ) + " count " + name );
+        printjson( t.findOne() );
         assert.eq( num , t.findOne().n , tojson( key ) +  " value " + name );
     }
     
@@ -36,5 +37,6 @@ go( { a : 5 , b : 7 } );
 go( { a : null , b : 7 } );
 
 go( { referer: 'blah' } );
-//go( { referer: 'blah', name: 'bar' } );
-//go( { date: null, referer: 'blah', name: 'bar' } );
+go( { referer: 'blah', lame: 'bar' } );
+go( { referer: 'blah', name: 'bar' } );
+go( { date: null, referer: 'blah', name: 'bar' } );
