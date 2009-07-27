@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#else
+#include <windows.h>
 #endif
 
 namespace mongo { 

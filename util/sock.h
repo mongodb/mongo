@@ -24,11 +24,15 @@
 #include <sstream>
 #include "goodies.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <winsock.h>
+#endif
+
 namespace mongo {
 
 #if defined(_WIN32)
-//#include <winsock2.h>
-//#include <ws2tcpip.h>
+
     typedef int socklen_t;
     inline int getLastError() {
         return WSAGetLastError();

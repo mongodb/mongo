@@ -19,6 +19,7 @@
 
 #include "stdafx.h"
 #include "mmap.h"
+#include <windows.h>
 
 namespace mongo {
 

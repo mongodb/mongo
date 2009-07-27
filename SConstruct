@@ -377,8 +377,10 @@ elif "freebsd7" == os.sys.platform:
 
 elif "win32" == os.sys.platform:
     windows = True
-    
-    for bv in range(3,10):
+    if force64:
+        release = True
+
+    for bv in reversed( range(3,10) ):
         boostDir = "C:/Program Files/Boost/boost_1_3" + str(bv) + "_0"
         if os.path.exists( boostDir ):
             break
@@ -425,8 +427,7 @@ elif "win32" == os.sys.platform:
     env.Append( LIBPATH=[ boostDir + "/Lib" ] )
     if force64: 
         env.Append( LIBPATH=[ winSDKHome + "/Lib/x64" ] )
-        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCRT " )
-        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVPRT " )
+        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT " )
     else:
         env.Append( LIBPATH=[ winSDKHome + "/Lib" ] )
 
@@ -451,10 +452,12 @@ elif "win32" == os.sys.platform:
     commonFiles += pcreFiles
     allClientFiles += pcreFiles
 
-    winLibString = "ws2_32.lib kernel32.lib uuid.lib "
-    if not force64:
-        winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib "
-        winLibString += " odbc32.lib odbccp32.lib"
+    winLibString = "ws2_32.lib kernel32.lib advapi32.lib"
+    if force64:
+        winLibString += " LIBCMT LIBCPMT "
+    else:
+        winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
+        winLibString += " odbc32.lib odbccp32.lib uuid.lib "
     env.Append( LIBS=Split(winLibString) )
     
     if force64:
@@ -814,9 +817,9 @@ if release and ( ( darwin and force64 ) or linux64 ):
 if noshell:
     print( "not building shell" )
 elif not onlyServer:
-    weird = force64
+    weird = force64 and not windows
 
-    if force64:
+    if weird:
         shellEnv["CFLAGS"].remove("-m64")
         shellEnv["CXXFLAGS"].remove("-m64")
         shellEnv["LINKFLAGS"].remove("-m64")
