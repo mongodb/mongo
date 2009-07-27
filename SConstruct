@@ -425,7 +425,7 @@ elif "win32" == os.sys.platform:
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
 
     env.Append( LIBPATH=[ boostDir + "/Lib" ] )
-    if force64: 
+    if force64:
         env.Append( LIBPATH=[ winSDKHome + "/Lib/x64" ] )
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT " )
     else:
@@ -459,12 +459,12 @@ elif "win32" == os.sys.platform:
         winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
         winLibString += " odbc32.lib odbccp32.lib uuid.lib "
     env.Append( LIBS=Split(winLibString) )
-    
+
     if force64:
         env.Append( CPPDEFINES=["_AMD64_=1"] )
     else:
         env.Append( CPPDEFINES=["_X86_=1"] )
-    
+
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
@@ -989,8 +989,12 @@ def stopMongodForTests():
         # This function not available in Python 2.5
         mongodForTests.terminate()
     except AttributeError:
-        from os import kill
-        kill( mongodForTests.pid, 15 )
+        if windows:
+            import win32process
+            win32process.TerminateProcess(mongodForTests._handle, -1)
+        else:
+            from os import kill
+            kill( mongodForTests.pid, 15 )
     mongodForTests.wait()
 
 testEnv.Alias( "startMongod", [add_exe("mongod")], [startMongodForTests] );
