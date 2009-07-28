@@ -699,7 +699,7 @@ namespace mongo {
         recCacheCloseAll();
         
 #if !defined(_WIN32) && !defined(__sunos__)
-        ftruncate( lockFile , 0 );
+        assert( ftruncate( lockFile , 0 ) == 0 );
         flock( lockFile, LOCK_UN );
 #endif
     }
