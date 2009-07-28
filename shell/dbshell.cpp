@@ -13,18 +13,27 @@
 
 extern const char * jsconcatcode;
 
+string historyFile;
 
 void shellHistoryInit(){
 #ifdef USE_READLINE
+    
+    stringstream ss;
+    char * h = getenv( "HOME" );
+    if ( h )
+        ss << h << "/";
+    ss << ".dbshell";
+    historyFile = ss.str();
+
     using_history();
-    read_history( ".dbshell" );
+    read_history( historyFile.c_str() );
 #else
     cout << "type \"exit\" to exit" << endl;
 #endif
 }
 void shellHistoryDone(){
 #ifdef USE_READLINE
-    write_history( ".dbshell" );
+    write_history( historyFile.c_str() );
 #endif
 }
 void shellHistoryAdd( const char * line ){
