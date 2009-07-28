@@ -418,7 +418,8 @@ elif "win32" == os.sys.platform:
 
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
+        env.Append( CPPFLAGS= " /O2 /Oi /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
+        #env.Append( CPPFLAGS= " /GL " ) # TODO: this has caused some linking problems
     else:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )
         env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
