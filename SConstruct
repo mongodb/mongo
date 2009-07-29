@@ -150,6 +150,12 @@ AddOption( "--boost-compiler",
            action="store",
            help="compiler used for boost (gcc41)" )
 
+AddOption( "--pg",
+           dest="profile",
+           type="string",
+           nargs=0,
+           action="store" )
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -503,6 +509,8 @@ if nix:
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
+    if GetOption( "profile" ) is not None:
+        env.Append( LINKFLAGS=" -pg " )
 
 # --- check system ---
 
