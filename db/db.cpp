@@ -537,10 +537,11 @@ int main(int argc, char* argv[], char *envp[] )
         }
 
         /* don't allow guessing - creates ambiguities when some options are
-         * prefixes of others. */
-        int command_line_style = (po::command_line_style::unix_style ^
-                                  po::command_line_style::allow_guessing |
-                                  po::command_line_style::allow_long_disguise ^
+         * prefixes of others. allow long disguises and don't allow guessing
+         * to get away with our vvvvvvv trick. */
+        int command_line_style = (((po::command_line_style::unix_style ^
+                                    po::command_line_style::allow_guessing) |
+                                   po::command_line_style::allow_long_disguise) ^
                                   po::command_line_style::allow_sticky);
 
         try {
