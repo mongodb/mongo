@@ -14,16 +14,11 @@ namespace mongo {
     bool isSpecialName( const string& name ){
         static set<string> names;
         if ( names.size() == 0 ){
-            names.insert( "_mongo" );
-            names.insert( "_db" );
-            names.insert( "_name" );
-            names.insert( "_fullName" );
-            names.insert( "_shortName" );
             names.insert( "tojson" );
             names.insert( "toJson" );
             names.insert( "toString" );
         }
-        
+
         if ( name.length() == 0 )
             return false;
         
@@ -514,7 +509,7 @@ namespace mongo {
             return JS_FALSE;
         }
 
-        JSObject * array = JS_NewArrayObject( cx , 0 , 0 );
+        JSObject * array = JS_NewObject( cx , 0 , 0 , 0 );
         assert( array );
 
         jsval a = OBJECT_TO_JSVAL( array );

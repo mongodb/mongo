@@ -397,8 +397,29 @@ shellHelper.show = function( what ){
 
 if ( typeof( Map ) == "undefined" ){
     Map = function(){
-        this._data = [];
+        this._data = {};
     }
+}
+
+Map.hash = function( val ){
+    if ( ! val )
+        return val;
+
+    switch ( typeof( val ) ){
+    case 'string':
+    case 'number':
+    case 'date':
+        return val.toString();
+    case 'object':
+    case 'array':
+        var s = "";
+        for ( var k in val ){
+            s += k + val[k];
+        }
+        return s;
+    }
+
+    throw "can't hash : " + typeof( val );
 }
 
 Map.prototype.put = function( key , value ){
@@ -413,18 +434,29 @@ Map.prototype.get = function( key ){
 }
 
 Map.prototype._get = function( key ){
-    for ( var i=0; i<this._data.length; i++ ){
-        if ( friendlyEqual( key , this._data[i].key ) ){
-            return this._data[i];
+    var h = Map.hash( key );
+    var a = this._data[h];
+    if ( ! a ){
+        a = [];
+        this._data[h] = a;
+    }
+    
+    for ( var i=0; i<a.length; i++ ){
+        if ( friendlyEqual( key , a[i].key ) ){
+            return a[i];
         }
     }
     var o = { key : key , value : null };
-    this._data.push( o );
+    a.push( o );
     return o;
 }
 
 Map.prototype.values = function(){
-    return this._data.map( function(z){ return z.value } );
+    var all = [];
+    for ( var k in this._data ){
+        this._data[k].forEach( function(z){ all.push( z.value ); } );
+    }
+    return all;
 }
 
 Math.sigFig = function( x , N ){

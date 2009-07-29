@@ -15,6 +15,7 @@ function basic1( key , lookup , shouldFail){
 }
 
 basic1( 6 )
+basic1( new Date() )
 basic1( "eliot" )
 basic1( { a : 1 } );
 basic1( { a : 1 , b : 1 } )
