@@ -156,10 +156,11 @@ namespace mongo {
            */
         string ns = fromdb + ".system.namespaces";
         list<BSONObj> toClone;
-        {
+        {  
+            dbtemprelease r;
+		
             auto_ptr<DBClientCursor> c;
             {
-                dbtemprelease r;
                 if ( !masterSameProcess ) {
                     auto_ptr< DBClientConnection > c( new DBClientConnection() );
                     if ( !c->connect( masterHost, errmsg ) )
