@@ -36,7 +36,7 @@ startMongoProgramNoConnect( "mongorestore", "--dbpath", dbPath, "--dir", externa
 sleep( 5000 );
 m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 c = m.getDB( baseName ).getCollection( baseName );
-assert( c.findOne(), "object missing" );
+assert( c.findOne(), "object missing a" );
 assert( 1 == c.findOne().a, "object wrong" );
 
 stopMongod( port );
@@ -49,5 +49,5 @@ startMongoProgramNoConnect( "mongoimportjson", "--dbpath", dbPath, "-d", baseNam
 sleep( 5000 );
 m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 c = m.getDB( baseName ).getCollection( baseName );
-assert( c.findOne(), "object missing" );
+assert( c.findOne(), "object missing b" );
 assert( 1 == c.findOne().a, "object wrong" );
