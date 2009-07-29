@@ -91,7 +91,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c;
         {
             dbtemprelease r;
-            c = conn->query( from_collection, query, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
+            c = conn->query( from_collection, query, 0, 0, 0, Option_NoCursorTimeout | ( slaveOk ? Option_SlaveOk : 0 ) );
         }
         assert( c.get() );
         long long n = 0;

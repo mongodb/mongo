@@ -1390,6 +1390,8 @@ namespace mongo {
             log( 5 ) << "   used cursor: " << c->toString() << endl;
             if ( dqo.saveClientCursor() ) {
                 ClientCursor *cc = new ClientCursor();
+                if ( queryOptions & Option_NoCursorTimeout )
+                    cc->liveForever();
                 cc->c = c;
                 cursorid = cc->cursorid;
                 DEV out() << "  query has more, cursorid: " << cursorid << endl;
