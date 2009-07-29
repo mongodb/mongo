@@ -482,6 +482,16 @@ namespace mongo {
             return true;
         }
         
+        /**
+           get a list of all the current databases
+         */
+        list<string> getDatabaseNames();
+
+        /**
+           get a list of all the current collections in db
+         */
+        list<string> getCollectionNames( const string& db );
+
         virtual string toString() = 0;
 
         /** @return the database name portion of an ns string */

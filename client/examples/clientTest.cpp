@@ -166,5 +166,17 @@ int main( int argc, const char **argv ) {
         
     }
     
+    {
+        list<string> l = conn.getDatabaseNames();
+        for ( list<string>::iterator i = l.begin(); i != l.end(); i++ ){
+            cout << "db name : " << *i << endl;
+        }
+
+        l = conn.getCollectionNames( "test" );
+        for ( list<string>::iterator i = l.begin(); i != l.end(); i++ ){
+            cout << "coll name : " << *i << endl;
+        }
+    }
+
     cout << "client test finished!" << endl;
 }
