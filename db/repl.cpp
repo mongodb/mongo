@@ -762,6 +762,7 @@ namespace mongo {
     }
 
     void ReplSource::applyOperation(const BSONObj& op) {
+      log( 6 ) << "applying op: " << op << endl;
         stringstream ss;
         BSONObj o = op.getObjectField("o");
         const char *ns = op.getStringField("ns");
@@ -876,6 +877,14 @@ namespace mongo {
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
         log( 6 ) << "ns: " << ns << ", justCreated: " << justCreated << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
+
+	// always apply admin command command
+	// this is a bit hacky -- the semantics of replication/commands aren't well specified
+	if ( strcmp( clientName, "admin" ) == 0 && *op.getStringField( "op" ) == 'c' ) {
+	  applyOperation( op );
+	  database = 0;
+	  return;
+	}
         
         if ( justCreated || empty || incompleteClone ) {
             // we must add to incomplete list now that setClient has been called

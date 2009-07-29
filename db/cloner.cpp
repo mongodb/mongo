@@ -551,6 +551,9 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+      virtual bool logTheOp() {
+	return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
+      }
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
@@ -590,7 +593,7 @@ namespace mongo {
                 spec.appendBool( "capped", true );
                 spec.append( "size", double( size ) );
             }
-            if ( !userCreateNS( target.c_str(), spec.done(), errmsg, true ) )
+            if ( !userCreateNS( target.c_str(), spec.done(), errmsg, false ) )
                 return false;
             
             auto_ptr< DBClientCursor > c;
@@ -605,7 +608,7 @@ namespace mongo {
                         break;
                 }
                 BSONObj o = c->next();
-                theDataFileMgr.insertAndLog( target.c_str(), o );
+                theDataFileMgr.insert( target.c_str(), o );
             }
             
             char cl[256];
@@ -635,16 +638,12 @@ namespace mongo {
                     }
                 }
                 BSONObj n = b.done();
-                theDataFileMgr.insertAndLog( targetIndexes.c_str(), n );
+                theDataFileMgr.insert( targetIndexes.c_str(), n );
             }
-            
-            {
-                if ( !bridge.dropCollection( source ) ) {
-                    errmsg = "failed to drop old name collection";
-                    return false;
-                }
-            }
-            return true;
+
+	    setClientTempNs( source.c_str() );
+	    dropCollection( source, errmsg, result );
+	    return true;
         }
     } cmdrenamecollection;
 

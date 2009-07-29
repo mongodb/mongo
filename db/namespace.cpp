@@ -643,7 +643,6 @@ namespace mongo {
     BSONObj oldIndexSpec;
     s = database;
     s += ".system.indexes";
-    // rewrite to loop over index details array directly, better
     while( Helpers::findOne( s.c_str(), BSON( "ns" << from ), oldIndexSpec ) ) {
       BSONObjBuilder newIndexSpecB;
       BSONObjIterator i( oldIndexSpec );
