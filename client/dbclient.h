@@ -43,7 +43,9 @@ namespace mongo {
         
         Option_OplogReplay = 1 << 3,
 
-        Option_ALLMASK = ( 1 << 4 ) - 2
+        /** if there is a cursor, ignore the normal cursor timeout behavior and never time it out
+         */
+        Option_NoCursorTimeout = 1 << 4
     };
 
     class BSONObj;

@@ -550,7 +550,6 @@ namespace QueryOptimizerTests {
                 // see query.h for the protocol we are using here.
                 BufBuilder b;
                 int opts = queryOptions;
-                assert( (opts&Option_ALLMASK) == opts );
                 b.append(opts);
                 b.append(ns.c_str());
                 b.append(nToSkip);
