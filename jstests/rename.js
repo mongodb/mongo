@@ -20,6 +20,8 @@ assert.commandWorked( admin.runCommand( {renameCollection:"test.jstests_rename_a
 assert.eq( 0, a.find().count() );
 
 assert.eq( 2, b.find().count() );
+assert( db.system.namespaces.findOne( {name:"test.jstests_rename_b" } ) );
+assert( !db.system.namespaces.findOne( {name:"test.jstests_rename_a" } ) );
 assert.eq( 3, db.system.indexes.find( {ns:"test.jstests_rename_b"} ).count() );
 assert( b.find( {a:1} ).explain().cursor.match( /^BtreeCursor/ ) );
 
@@ -40,3 +42,7 @@ for( i = 10; i < 20; ++i ) {
 }
 assert.eq( 0, b.count( {i:9} ) );
 assert.eq( 1, b.count( {i:19} ) );
+
+assert( db.system.namespaces.findOne( {name:"test.jstests_rename_b" } ) );
+assert( !db.system.namespaces.findOne( {name:"test.jstests_rename_a" } ) );
+assert.eq( true, db.system.namespaces.findOne( {name:"test.jstests_rename_b"} ).options.capped );

@@ -118,6 +118,14 @@ namespace mongo {
             }
         }
 
+        void drop(const Key& k) {
+            bool found;
+            int i = _find(k, found);
+            if ( i >= 0 && found ) {
+                nodes[i].setUnused();
+            }
+        }
+
         /** returns false if too full */
         bool put(const Key& k, const Type& value) {
             bool found;

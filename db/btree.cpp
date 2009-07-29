@@ -655,6 +655,10 @@ found:
         return loc;
     }
 
+  void BtreeBucket::renameIndexNamespace(const char *oldNs, const char *newNs) {
+    btreeStore->rename( oldNs, newNs );
+  }
+
     DiskLoc BtreeBucket::getHead(const DiskLoc& thisLoc) {
         DiskLoc p = thisLoc;
         while ( !p.btree()->isHead() )

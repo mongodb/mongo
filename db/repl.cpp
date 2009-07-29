@@ -1359,7 +1359,7 @@ namespace mongo {
 
     /* -- Logging of operations -------------------------------------*/
 
-// cached copies of these...
+// cached copies of these...so don't rename them
     NamespaceDetails *localOplogMainDetails = 0;
     Database *localOplogClient = 0;
 

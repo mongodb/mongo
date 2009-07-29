@@ -100,7 +100,7 @@ namespace mongo {
         // The object o may be updated if modified on insert.                                
         void insertAndLog( const char *ns, const BSONObj &o );
         DiskLoc insert(const char *ns, BSONObj &o);
-        DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, const BSONElement &writeId = BSONElement());
+        DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, const BSONElement &writeId = BSONElement(), bool mayAddIndex = true);
         void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false);
         static auto_ptr<Cursor> findAll(const char *ns, const DiskLoc &startLoc = DiskLoc());
 

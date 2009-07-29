@@ -35,6 +35,10 @@ public:
         dropNS(ns);
     }
 
+    virtual void rename(const char *fromNs, const char *toNs) {
+      renameNamespace( fromNs, toNs );
+    }
+
     /* close datafiles associated with the db specified. */
     virtual void closeFiles(string dbname, string path) {
         /* as this is only used for indexes so far, and we are in the same 
@@ -80,6 +84,10 @@ public:
 
     static void drop(const char *ns) { 
         log() << "warning: drop() not yet implemented for InMem_RecStore" << endl;
+    }
+
+    virtual void rename(const char *fromNs, const char *toNs) {
+      massert( "rename not yet implemented for InMem_RecStore", false );
     }
 };
 #endif

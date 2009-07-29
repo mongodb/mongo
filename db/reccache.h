@@ -213,6 +213,10 @@ public:
         theRecCache.drop(ns);
     }
 
+    virtual void rename(const char *fromNs, const char *toNs) {
+      massert( "rename not yet implemented for CachedBasicRecStore", false );
+    }
+
     /* close datafiles associated with the db specified. */
     virtual void closeFiles(string dbname, string path) {
         theRecCache.closeFiles(dbname, dbpath);

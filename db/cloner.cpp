@@ -572,6 +572,18 @@ namespace mongo {
                     size += i.ext()->length;
             
             setClient( target.c_str() );
+            uassert( "target namespace exists", !nsdetails( target.c_str() ) );
+
+	    {
+	      char from[256];
+	      nsToClient( source.c_str(), from );
+	      char to[256];
+	      nsToClient( target.c_str(), to );
+	      if ( strcmp( from, to ) == 0 ) {
+		renameNamespace( source.c_str(), target.c_str() );
+		return true;
+	      }
+	    }
 
             BSONObjBuilder spec;
             if ( capped ) {

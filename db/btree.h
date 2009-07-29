@@ -173,6 +173,8 @@ namespace mongo {
 
         static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
 
+	static void renameIndexNamespace(const char *oldNs, const char *newNs);
+
         int bt_insert(DiskLoc thisLoc, DiskLoc recordLoc,
                    const BSONObj& key, const BSONObj &order, bool dupsAllowed,
                    IndexDetails& idx, bool toplevel = true);

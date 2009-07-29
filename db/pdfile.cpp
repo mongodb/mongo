@@ -1124,15 +1124,15 @@ assert( !eloc.isNull() );
         return loc;
     }
 
-    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId) {
-        bool addIndex = false;
+  DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
+        bool wouldAddIndex = false;
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
             uassert("attempt to insert in reserved database name 'system'", sys != ns);
             if ( strstr(ns, ".system.") ) {
                 // later:check for dba-type permissions here if have that at some point separate
-                if ( strstr(ns, ".system.indexes") )
-                    addIndex = true;
+                if ( strstr(ns, ".system.indexes" ) )
+                    wouldAddIndex = true;
                 else if ( strstr(ns, ".system.users") )
                     ;
                 else if ( !god ) {
@@ -1143,6 +1143,8 @@ assert( !eloc.isNull() );
             else
                 sys = 0;
         }
+
+	bool addIndex = wouldAddIndex && mayAddIndex;
 
         NamespaceDetails *d = nsdetails(ns);
         if ( d == 0 ) {
@@ -1223,8 +1225,8 @@ assert( !eloc.isNull() );
             */
             BSONObj io((const char *) obuf);
             BSONElement idField = io.getField( "_id" );
-            uassert( "_id cannot not be an array", idField.type() != Array );
-            if( idField.eoo() && !addIndex && strstr(ns, ".local.") == 0 ) {
+            uassert( "_id cannot be an array", idField.type() != Array );
+            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 ) {
                 addID = len;
                 if ( writeId.eoo() ) {
                     // Very likely we'll add this elt, so little harm in init'ing here.

@@ -474,11 +474,15 @@ namespace mongo {
         void init();
 
         void add(const char *ns, DiskLoc& loc, bool capped) {
+            NamespaceDetails details( loc, capped );
+	    add( ns, details );
+        }
+
+	void add( const char *ns, const NamespaceDetails &details ) {
             init();
             Namespace n(ns);
-            NamespaceDetails details( loc, capped );
             uassert("too many namespaces/collections", ht->put(n, details));
-        }
+	}
 
         /* just for diagnostics */
         size_t detailsOffset(NamespaceDetails *d) {
@@ -504,6 +508,13 @@ namespace mongo {
             ht->kill(n);
         }
 
+        void drop(const char *ns) {
+            if ( !ht )
+                return;
+            Namespace n(ns);
+            ht->drop(n);
+        }
+
         bool find(const char *ns, DiskLoc& loc) {
             NamespaceDetails *l = details(ns);
             if ( l ) {
@@ -527,5 +538,9 @@ namespace mongo {
     };
 
     extern const char *dbpath;
+
+    // Rename a namespace within current 'client' db.
+    // (Arguments should include db name)
+    void renameNamespace( const char *from, const char *to );
 
 } // namespace mongo

@@ -27,6 +27,9 @@ public:
     /* drop the collection */
     virtual void drop(const char *ns) = 0;
 
+    /* rename collection */
+    virtual void rename(const char *fromNs, const char *toNs) = 0;
+
     /* close datafiles associated with the db specified. */
     virtual void closeFiles(string dbname, string path) = 0;
 
