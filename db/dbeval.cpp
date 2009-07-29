@@ -115,7 +115,7 @@ namespace mongo {
         else if ( type == jstNULL || type == Undefined )
             result.appendNull("retval");
         else if ( type == Date )
-            result.appendDate( "retval" , s->getNumber( "return" ) );
+            result.appendDate( "retval" , (unsigned long long) s->getNumber( "return" ) );
         else {
             stringstream temp;
             temp << "can't handle return type from db.eval:";
