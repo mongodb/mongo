@@ -1,4 +1,4 @@
-
+# -*- mode: python; -*-
 # build file for 10gen db
 # this request scons
 # you can get from http://www.scons.org
@@ -150,7 +150,17 @@ AddOption( "--boost-compiler",
            action="store",
            help="compiler used for boost (gcc41)" )
 
+AddOption( "--pg",
+           dest="profile",
+           type="string",
+           nargs=0,
+           action="store" )
+
 # --- environment setup ---
+
+def removeIfInList( lst , thing ):
+    if thing in lst:
+        lst.remove( thing )
 
 def printLocalInfo():
     import sys, SCons
@@ -158,14 +168,6 @@ def printLocalInfo():
     print( "python version: " + " ".join( [ `i` for i in sys.version_info ] ) )
 
 printLocalInfo()
-
-env = Environment()
-env["LIBPATH"] = []
-
-if GetOption( "recstore" ) != None:
-    env.Append( CPPDEFINES=[ "_RECSTORE" ] )
-env.Append( CPPDEFINES=[ "_SCONS" ] )
-env.Append( CPPPATH=[ "." ] )
 
 boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
@@ -182,6 +184,10 @@ force64 = not GetOption( "force64" ) is None
 if not force64 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
+msarch = None
+if force64:
+    msarch = "amd64"
+
 force32 = not GetOption( "force32" ) is None
 release = not GetOption( "release" ) is None
 static = not GetOption( "static" ) is None
@@ -193,6 +199,16 @@ nojni = not GetOption( "nojni" ) is None
 
 usesm = not GetOption( "usesm" ) is None
 usejvm = not GetOption( "usejvm" ) is None
+
+env = Environment( MSVS_ARCH=msarch )
+env["LIBPATH"] = []
+
+if GetOption( "recstore" ) != None:
+    env.Append( CPPDEFINES=[ "_RECSTORE" ] )
+env.Append( CPPDEFINES=[ "_SCONS" ] )
+env.Append( CPPPATH=[ "." ] )
+
+
 
 boostCompiler = GetOption( "boostCompiler" )
 if boostCompiler is None:
@@ -367,7 +383,13 @@ elif "freebsd7" == os.sys.platform:
 
 elif "win32" == os.sys.platform:
     windows = True
-    boostDir = "C:/Program Files/Boost/boost_1_35_0"
+    if force64:
+        release = True
+
+    for bv in reversed( range(3,10) ):
+        boostDir = "C:/Program Files/Boost/boost_1_3" + str(bv) + "_0"
+        if os.path.exists( boostDir ):
+            break
 
     serverOnlyFiles += [ "util/ntservice.cpp" ]
 
@@ -402,13 +424,20 @@ elif "win32" == os.sys.platform:
 
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /Oi /GL /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
+        env.Append( CPPFLAGS= " /O2 /Oi /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
+        #env.Append( CPPFLAGS= " /GL " ) # TODO: this has caused some linking problems
     else:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )
         env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
 
-    env.Append( LIBPATH=[ boostDir + "/Lib" , winSDKHome + "/Lib" ] )
+    env.Append( LIBPATH=[ boostDir + "/Lib" ] )
+    if force64:
+        env.Append( LIBPATH=[ winSDKHome + "/Lib/x64" ] )
+        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT " )
+    else:
+        env.Append( LIBPATH=[ winSDKHome + "/Lib" ] )
+
 
     def pcreFilter(x):
         name = x.name
@@ -430,7 +459,18 @@ elif "win32" == os.sys.platform:
     commonFiles += pcreFiles
     allClientFiles += pcreFiles
 
-    env.Append( LIBS=Split("ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib" ) )
+    winLibString = "ws2_32.lib kernel32.lib advapi32.lib"
+    if force64:
+        winLibString += " LIBCMT LIBCPMT "
+    else:
+        winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
+        winLibString += " odbc32.lib odbccp32.lib uuid.lib "
+    env.Append( LIBS=Split(winLibString) )
+
+    if force64:
+        env.Append( CPPDEFINES=["_AMD64_=1"] )
+    else:
+        env.Append( CPPDEFINES=["_X86_=1"] )
 
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
@@ -469,6 +509,8 @@ if nix:
         env.Append( CXXFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
+    if GetOption( "profile" ) is not None:
+        env.Append( LINKFLAGS=" -pg " )
 
 # --- check system ---
 
@@ -598,6 +640,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcre" , True )
 
     myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
+    removeIfInList( myenv["LIBS"] , "pcap" )
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
@@ -707,10 +750,6 @@ env.Append( BUILDERS={'JSHeader' : jshBuilder})
 
 # --- targets ----
 
-def removeIfInList( lst , thing ):
-    if thing in lst:
-        lst.remove( thing )
-
 clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )
 clientEnv.Prepend( LIBS=[ "mongoclient"] )
@@ -787,9 +826,9 @@ if release and ( ( darwin and force64 ) or linux64 ):
 if noshell:
     print( "not building shell" )
 elif not onlyServer:
-    weird = force64
+    weird = force64 and not windows
 
-    if force64:
+    if weird:
         shellEnv["CFLAGS"].remove("-m64")
         shellEnv["CXXFLAGS"].remove("-m64")
         shellEnv["LINKFLAGS"].remove("-m64")
@@ -959,8 +998,12 @@ def stopMongodForTests():
         # This function not available in Python 2.5
         mongodForTests.terminate()
     except AttributeError:
-        from os import kill
-        kill( mongodForTests.pid, 15 )
+        if windows:
+            import win32process
+            win32process.TerminateProcess(mongodForTests._handle, -1)
+        else:
+            from os import kill
+            kill( mongodForTests.pid, 15 )
     mongodForTests.wait()
 
 testEnv.Alias( "startMongod", [add_exe("mongod")], [startMongodForTests] );
@@ -1286,3 +1329,4 @@ def clean_old_dist_builds(env, target, source):
 
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
+

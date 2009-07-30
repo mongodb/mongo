@@ -91,7 +91,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c;
         {
             dbtemprelease r;
-            c = conn->query( from_collection, query, 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
+            c = conn->query( from_collection, query, 0, 0, 0, Option_NoCursorTimeout | ( slaveOk ? Option_SlaveOk : 0 ) );
         }
         assert( c.get() );
         long long n = 0;
@@ -155,61 +155,71 @@ namespace mongo {
            or just wait until we get rid of global lock anyway.
            */
         string ns = fromdb + ".system.namespaces";
-        auto_ptr<DBClientCursor> c;
-        {
+        list<BSONObj> toClone;
+        {  
             dbtemprelease r;
-            if ( !masterSameProcess ) {
-                auto_ptr< DBClientConnection > c( new DBClientConnection() );
-                if ( !c->connect( masterHost, errmsg ) )
-                    return false;
-				if( !replAuthenticate(c.get()) )
-					return false;
-
-                conn = c;
-            } else {
-                conn.reset( new DBDirectClient() );
+		
+            auto_ptr<DBClientCursor> c;
+            {
+                if ( !masterSameProcess ) {
+                    auto_ptr< DBClientConnection > c( new DBClientConnection() );
+                    if ( !c->connect( masterHost, errmsg ) )
+                        return false;
+                    if( !replAuthenticate(c.get()) )
+                        return false;
+                    
+                    conn = c;
+                } else {
+                    conn.reset( new DBDirectClient() );
+                }
+                c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
             }
-            c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
-        }
-        if ( c.get() == 0 ) {
-            errmsg = "query failed " + ns;
-            return false;
+
+            if ( c.get() == 0 ) {
+                errmsg = "query failed " + ns;
+                return false;
+            }
+            
+            while ( c->more() ){
+                BSONObj collection = c->next();
+
+                log(2) << "\t cloner got " << collection << endl;
+
+                BSONElement e = collection.findElement("name");
+                if ( e.eoo() ) {
+                    string s = "bad system.namespaces object " + collection.toString();
+                    massert(s.c_str(), false);
+                }
+                assert( !e.eoo() );
+                assert( e.type() == String );
+                const char *from_name = e.valuestr();
+
+                if( strstr(from_name, ".system.") ) { 
+                    /* system.users is cloned -- but nothing else from system. */
+                    if( strstr(from_name, ".system.users") == 0 ){
+                        log(2) << "\t\t not cloning because system collection" << endl;
+                        continue;
+                    }
+                }
+                else if( strchr(from_name, '$') ) {
+                    // don't clone index namespaces -- we take care of those separately below.
+                    log(2) << "\t\t not cloning because has $ " << endl;
+                    continue;
+                }            
+                
+                toClone.push_back( collection.getOwned() );
+            }
         }
 
-        while ( 1 ) {
+        for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ){
             {
                 dbtemprelease r;
-                if ( !c->more() )
-                    break;
             }
-            BSONObj collection = c->next();
-            BSONElement e = collection.findElement("name");
-            if ( e.eoo() ) {
-                string s = "bad system.namespaces object " + collection.toString();
-
-                /* temp
-                out() << masterHost << endl;
-                out() << ns << endl;
-                out() << e.toString() << endl;
-                exit(1);*/
-
-                massert(s.c_str(), false);
-            }
-            assert( !e.eoo() );
-            assert( e.type() == String );
-            const char *from_name = e.valuestr();
-
-            if( strstr(from_name, ".system.") ) { 
-				/* system.users is cloned -- but nothing else from system. */
-				if( strstr(from_name, ".system.users") == 0 ) 
-					continue;
-			}
-			else if( strchr(from_name, '$') ) {
-                // don't clone index namespaces -- we take care of those separately below.
-                continue;
-            }
+            BSONObj collection = *i;
+            log(2) << "  really will clone: " << collection << endl;
+            const char * from_name = collection["name"].valuestr();
             BSONObj options = collection.getObjectField("options");
-
+            
             /* change name "<fromdb>.collection" -> <todb>.collection */
             const char *p = strchr(from_name, '.');
             assert(p);
@@ -229,6 +239,7 @@ namespace mongo {
                 if ( strstr(toname, "._chunks") )
                     ensureHaveIdIndex(toname);
             }
+            log(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk);
         }
 

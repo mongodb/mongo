@@ -43,7 +43,9 @@ namespace mongo {
         
         Option_OplogReplay = 1 << 3,
 
-        Option_ALLMASK = ( 1 << 4 ) - 2
+        /** if there is a cursor, ignore the normal cursor timeout behavior and never time it out
+         */
+        Option_NoCursorTimeout = 1 << 4
     };
 
     class BSONObj;
@@ -480,6 +482,16 @@ namespace mongo {
             return true;
         }
         
+        /**
+           get a list of all the current databases
+         */
+        list<string> getDatabaseNames();
+
+        /**
+           get a list of all the current collections in db
+         */
+        list<string> getCollectionNames( const string& db );
+
         virtual string toString() = 0;
 
         /** @return the database name portion of an ns string */

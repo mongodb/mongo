@@ -288,6 +288,35 @@ namespace mongo {
         return eval(dbname, jscode, info, retValue);
     }
 
+    list<string> DBClientWithCommands::getDatabaseNames(){
+        BSONObj info;
+        uassert( "listdatabases failed" , runCommand( "admin" , BSON( "listDatabases" << 1 ) , info ) );
+        uassert( "listDatabases.databases not array" , info["databases"].type() == Array );
+        
+        list<string> names;
+        
+        BSONObjIterator i( info["databases"].embeddedObjectUserCheck() );
+        while ( i.more() ){
+            names.push_back( i.next().embeddedObjectUserCheck()["name"].valuestr() );
+        }
+
+        return names;
+    }
+
+    list<string> DBClientWithCommands::getCollectionNames( const string& db ){
+        list<string> names;
+        
+        string ns = db + ".system.namespaces";
+        auto_ptr<DBClientCursor> c = query( ns.c_str() , BSONObj() );
+        while ( c->more() ){
+            string name = c->next()["name"].valuestr();
+            if ( name.find( "$" ) != string::npos )
+                continue;
+            names.push_back( name );
+        }
+        return names;
+    }
+
     void testSort() { 
         DBClientConnection c;
         string err;
@@ -573,7 +602,6 @@ namespace mongo {
         // see query.h for the protocol we are using here.
         BufBuilder b;
         int opts = queryOptions;
-        assert( (opts&Option_ALLMASK) == opts );
         b.append(opts);
         b.append(ns.c_str());
         b.append(nToSkip);

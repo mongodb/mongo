@@ -4,12 +4,15 @@
 
 #include "engine.h"
 
+// START inc hacking
+
 #if defined( MOZJS )
 
 #define MOZILLA_1_8_BRANCH
 
 #include "mozjs/jsapi.h"
 #include "mozjs/jsdate.h"
+#include "mozjs/jsregexp.h"
 
 #warning if you are using an ubuntu version of spider monkey, we recommend installing spider monkey from source
 
@@ -25,13 +28,17 @@
 
 #include "jsapi.h"
 #include "jsdate.h"
+#include "jsregexp.h"
 
 #else
 
 #include "js/jsapi.h"
 #include "js/jsdate.h"
+#include "js/jsregexp.h"
 
 #endif
+
+// END inc hacking
 
 // -- SM 1.6 hacks ---
 #ifndef JSCLASS_GLOBAL_FLAGS
@@ -48,6 +55,10 @@ JSBool JS_CStringsAreUTF8(){
 
 #endif
 // -- END SM 1.6 hacks ---
+
+#ifdef JSVAL_IS_TRACEABLE
+#define SM18
+#endif
 
 namespace mongo {
 
@@ -75,7 +86,7 @@ namespace mongo {
 
     // mongo
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local );
-    bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , JSObject * o );
+    bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , jsval val , JSObject * o );
 
 #define JSVAL_IS_OID(v) ( JSVAL_IS_OBJECT( v ) && JS_InstanceOf( cx , JSVAL_TO_OBJECT( v ) , &object_id_class , 0 ) )
     

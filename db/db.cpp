@@ -537,10 +537,11 @@ int main(int argc, char* argv[], char *envp[] )
         }
 
         /* don't allow guessing - creates ambiguities when some options are
-         * prefixes of others. */
-        int command_line_style = (po::command_line_style::unix_style ^
-                                  po::command_line_style::allow_guessing |
-                                  po::command_line_style::allow_long_disguise ^
+         * prefixes of others. allow long disguises and don't allow guessing
+         * to get away with our vvvvvvv trick. */
+        int command_line_style = (((po::command_line_style::unix_style ^
+                                    po::command_line_style::allow_guessing) |
+                                   po::command_line_style::allow_long_disguise) ^
                                   po::command_line_style::allow_sticky);
 
         try {
@@ -829,7 +830,47 @@ namespace mongo {
     }
 
 #else
-    void setupSignals() {}
+void ctrlCTerminate() {
+    log() << "got kill or ctrl c signal, will terminate after current cmd ends" << endl;
+    {
+        dblock lk;
+        log() << "now exiting" << endl;
+        exit(12);
+    }
+}
+BOOL CtrlHandler( DWORD fdwCtrlType ) 
+{ 
+    switch( fdwCtrlType ) 
+    { 
+    case CTRL_C_EVENT: 
+        rawOut("Ctrl-C signal\n");
+        ctrlCTerminate();
+        return( TRUE );
+    case CTRL_CLOSE_EVENT: 
+        rawOut("CTRL_CLOSE_EVENT signal\n");
+        ctrlCTerminate();
+        return( TRUE ); 
+    case CTRL_BREAK_EVENT: 
+        rawOut("CTRL_BREAK_EVENT signal\n");
+        ctrlCTerminate();
+        return TRUE;
+    case CTRL_LOGOFF_EVENT: 
+        rawOut("CTRL_LOGOFF_EVENT signal (ignored)\n");
+        return FALSE; 
+    case CTRL_SHUTDOWN_EVENT: 
+         rawOut("CTRL_SHUTDOWN_EVENT signal (ignored)\n");
+         return FALSE; 
+    default: 
+        return FALSE; 
+    } 
+} 
+
+    void setupSignals() {
+        if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) ) 
+            ;
+        else
+            massert("Couldn't register Ctrl-C handler", false);
+    } 
 #endif
 
 } // namespace mongo

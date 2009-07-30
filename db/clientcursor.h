@@ -98,9 +98,11 @@ namespace mongo {
     
     class ClientCursor {
         DiskLoc _lastLoc; // use getter and setter not this.
+        unsigned _idleAgeMillis; // how long has the cursor been around, relative to server idle time
+        bool _liveForever; // if true, never time out cursor
         static CursorId allocCursorId();
     public:
-        ClientCursor() : cursorid( allocCursorId() ), pos(0), idleAgeMillis(0) {
+        ClientCursor() : _idleAgeMillis(0), _liveForever(false), cursorid( allocCursorId() ), pos(0) {
             clientCursorsById.insert( make_pair(cursorid, this) );
         }
         ~ClientCursor();
@@ -116,7 +118,6 @@ namespace mongo {
         void setLastLoc(DiskLoc);
         auto_ptr< FieldMatcher > filter; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
-        unsigned idleAgeMillis; // how long has the cursor been around, relative to server idle time
 
         /* Get rid of cursors for namespaces that begin with nsprefix.
            Used by drop, deleteIndexes, dropDatabase.
@@ -157,6 +158,22 @@ namespace mongo {
             ss << ns << "." << cursorid;
             ids_->mayUpgradeStorage( ss.str() );*/
         }
-    };
 
+        /**
+         * @param millis amount of idle passed time since last call
+         */
+        bool shouldTimeout( unsigned millis ){
+            _idleAgeMillis += millis;
+            return ! _liveForever && _idleAgeMillis > 600000;
+        }
+        
+        unsigned idleTime(){
+            return _idleAgeMillis;
+        }
+
+        void liveForever(){
+            _liveForever = true;
+        }
+    };
+    
 } // namespace mongo

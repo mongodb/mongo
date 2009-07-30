@@ -5,6 +5,10 @@
 
 #include "../client/dbclient.h"
 
+#ifndef _WIN32
+#include <boost/date_time/posix_time/posix_time.hpp>
+#endif
+
 namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
@@ -42,15 +46,21 @@ namespace mongo {
 
         BSONFieldIterator( BSONHolder * holder ){
 
+            set<string> added;
+
             BSONObjIterator it( holder->_obj );
             while ( it.more() ){
                 BSONElement e = it.next();
                 if ( holder->_removed.count( e.fieldName() ) )
                     continue;
                 _names.push_back( e.fieldName() );
+                added.insert( e.fieldName() );
             }
             
-            _names.merge( holder->_extra );
+            for ( list<string>::iterator i = holder->_extra.begin(); i != holder->_extra.end(); i++ ){
+                if ( ! added.count( *i ) )
+                    _names.push_back( *i );
+            }
 
             _it = _names.begin();
         }
@@ -142,14 +152,15 @@ namespace mongo {
             BSONObj orig;
             if ( JS_InstanceOf( _context , o , &bson_class , 0 ) ){
                 BSONHolder * holder = GETHOLDER(_context,o);
-                if ( ! holder->_modified )
+                if ( ! holder->_modified ){
                     return holder->_obj;
+                }
                 orig = holder->_obj;
             }
 
             BSONObjBuilder b;
 
-            if ( ! appendSpecialDBObject( this , b , "value" , o ) ){
+            if ( ! appendSpecialDBObject( this , b , "value" , OBJECT_TO_JSVAL( o ) , o ) ){
 
                 jsval theid = getProperty( o , "_id" );
                 if ( ! JSVAL_IS_VOID( theid ) ){
@@ -193,6 +204,13 @@ namespace mongo {
             uassert( "not a function" , JS_TypeOfValue( _context , v ) == JSTYPE_FUNCTION );
             return getFunctionCode( JS_ValueToFunction( _context , v ) );
         }
+        
+        void appendRegex( BSONObjBuilder& b , const string& name , string s ){
+            assert( s[0] == '/' );
+            s = s.substr(1);
+            string::size_type end = s.rfind( '/' );
+            b.appendRegex( name.c_str() , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
+        }
 
         void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO  ){
             //cout << "name: " << name << "\t" << typeString( val ) << " oldType: " << oldType << endl;
@@ -217,7 +235,7 @@ namespace mongo {
                 if ( ! o || o == JSVAL_NULL ){
                     b.appendNull( name.c_str() );
                 }
-                else if ( ! appendSpecialDBObject( this , b , name , o ) ){
+                else if ( ! appendSpecialDBObject( this , b , name , val , o ) ){
                     BSONObj sub = toObject( o );
                     if ( JS_IsArrayObject( _context , o ) ){
                         b.appendArray( name.c_str() , sub );
@@ -232,9 +250,7 @@ namespace mongo {
             case JSTYPE_FUNCTION: {
                 string s = toString(val);
                 if ( s[0] == '/' ){
-                    s = s.substr(1);
-                    string::size_type end = s.rfind( '/' );
-                    b.appendRegex( name.c_str() , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
+                    appendRegex( b , name , s );
                 }
                 else {
                     b.appendCode( name.c_str() , getFunctionCode( val ).c_str() );
@@ -581,8 +597,9 @@ namespace mongo {
         if ( ! holder->_inResolve ){
             Convertor c(cx);
             string name = c.toString( idval );
-            if ( holder->_obj[name].eoo() )
+            if ( holder->_obj[name].eoo() ){
                 holder->_extra.push_back( name );
+            }
             holder->_modified = true;
         }
         return JS_TRUE;
@@ -701,6 +718,15 @@ namespace mongo {
         holder->_inResolve = true;
         assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
         holder->_inResolve = false;
+        
+        if ( val != JSVAL_NULL && val != JSVAL_VOID && JSVAL_IS_OBJECT( val ) ){
+            // TODO: this is a hack to get around sub objects being modified
+            JSObject * oo = JSVAL_TO_OBJECT( val );
+            if ( JS_InstanceOf( cx , oo , &bson_class , 0 ) || 
+                 JS_IsArrayObject( cx , oo ) ){
+                holder->_modified = true;
+            }
+        }
 
         *objp = obj;
         JS_LeaveLocalRootScope( cx );
@@ -714,8 +740,13 @@ namespace mongo {
     public:
 
         SMEngine(){
+#ifdef SM18
+            JS_SetCStringsAreUTF8();
+#endif
+
             _runtime = JS_NewRuntime(8L * 1024L * 1024L);
             uassert( "JS_NewRuntime failed" , _runtime );
+            
             if ( ! utf8Ok() ){
                 cerr << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
             }
