@@ -594,7 +594,7 @@ namespace mongo {
 
         RXTest() {
         }
-
+        
         void run() {
             /*
             static const boost::regex e("(\\d{4}[- ]){3}\\d{4}");
@@ -602,6 +602,12 @@ namespace mongo {
             out() << "regex result: " << regex_match("hello", e) << endl;
             out() << "regex result: " << regex_match("abcoo", b) << endl;
             */
+
+            int ret = 0;
+            
+            pcre_config( PCRE_CONFIG_UTF8 , &ret );
+            massert( "pcre not compiled with utf8 support" , ret );
+
             pcrecpp::RE re1(")({a}h.*o");
             pcrecpp::RE re("h.llo");
             assert( re.FullMatch("hello") );
@@ -612,11 +618,6 @@ namespace mongo {
             options.set_utf8(true);
             pcrecpp::RE part("dwi", options);
             assert( part.PartialMatch("dwight") );
-
-            int ret = 0;
-            
-            pcre_config( PCRE_CONFIG_UTF8 , &ret );
-            assert( ret );
 
             pcre_config( PCRE_CONFIG_UNICODE_PROPERTIES , &ret );
             if ( ! ret )
