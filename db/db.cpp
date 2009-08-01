@@ -27,6 +27,7 @@
 #include "dbmessage.h"
 #include "instance.h"
 #include "clientcursor.h"
+#include "pdfile.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -42,7 +43,6 @@ namespace mongo {
 
     extern bool quiet, quota, cpu;
     bool useJNI = true;
-  bool prealloc = true;
 
     /* only off if --nocursors which is for debugging. */
     extern bool useCursors;

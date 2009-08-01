@@ -53,6 +53,7 @@ namespace mongo {
     int MAGIC = 0x1000;
     int curOp = -2;
     int callDepth = 0;
+  bool prealloc = true;
 
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);

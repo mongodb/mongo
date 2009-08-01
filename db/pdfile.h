@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+  extern bool prealloc;
+
     class MDFHeader;
     class Extent;
     class Record;

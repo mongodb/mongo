@@ -22,8 +22,6 @@
 
 namespace mongo {
 
-  extern bool prealloc;
-
     void jniCallback(Message& m, Message& out);
 
     class MutexInfo {
