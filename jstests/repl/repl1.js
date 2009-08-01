@@ -15,8 +15,8 @@ doTest = function( signal ) {
     ports = allocatePorts( 2 );
     
     // spec small oplog for fast startup on 64bit machines
-    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-    s = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
+    s = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
     
     am = m.getDB( baseName ).a
     
@@ -33,14 +33,14 @@ doTest = function( signal ) {
     for( i = 1000; i < 1010; ++i )
         am.save( { _id: new ObjectId(), i: i } );
 
-    s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
     soonCount( 1010 );
     as = s.getDB( baseName ).a
     assert.eq( 1, as.find( { i: 1009 } ).count() );
 
     stopMongod( ports[ 0 ], signal );
     
-    m = startMongoProgram( "mongod", "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+    m = startMongoProgram( "mongod", "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
     am = m.getDB( baseName ).a
 
     for( i = 1010; i < 1020; ++i )

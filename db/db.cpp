@@ -42,6 +42,7 @@ namespace mongo {
 
     extern bool quiet, quota, cpu;
     bool useJNI = true;
+  bool prealloc = true;
 
     /* only off if --nocursors which is for debugging. */
     extern bool useCursors;
@@ -463,6 +464,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("nohints", "ignore query hints")
         ("nohttpinterface", "disable http interface")
         ("noscripting", "disable scripting engine")
+        ("noprealloc", "disable data file preallocation")
         ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
 #if defined(_WIN32)
@@ -615,6 +617,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("noscripting")) {
             useJNI = false;
         }
+	if (params.count("noprealloc")) {
+	  prealloc = false;
+	}
         if (params.count("oplog")) {
             int x = params["oplog"].as<int>();
             if ( x < 0 || x > 7 ) {

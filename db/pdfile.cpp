@@ -265,7 +265,9 @@ namespace mongo {
         assert( size % 4096 == 0 );
 
         if ( preallocateOnly ) {
+	  if ( prealloc ) {
             theFileAllocator().requestAllocation( filename, size );
+	  }
             return;
         }
         
