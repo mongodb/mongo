@@ -702,6 +702,21 @@ assert( !eloc.isNull() );
     }
   }
 
+  void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
+    BSONObjIterator i( keyPattern );
+    vector< const char * > fieldNames;
+    vector< BSONElement > fixed;
+    BSONObjBuilder nullKey;
+    while( i.more() ) {
+      fieldNames.push_back( i.next().fieldName() );
+      fixed.push_back( BSONElement() );
+      nullKey.appendNull( "" );
+    }
+    getKeys( fieldNames, fixed, obj, keys );
+    if ( keys.empty() )
+      keys.insert( nullKey.obj() );
+  }
+
     /* Pull out the relevant key objects from obj, so we
        can index them.  Note that the set is multiple elements
        only when it's a "multikey" array.
@@ -709,23 +724,12 @@ assert( !eloc.isNull() );
     */
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
         BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 }
-        if ( keyPattern.objsize() == 0 ) {
-            out() << keyPattern.toString() << endl;
-            out() << info.obj().toString() << endl;
-            assert(false);
-        }
-	BSONObjIterator i( keyPattern );
-	vector< const char * > fieldNames;
-	vector< BSONElement > fixed;
-	BSONObjBuilder nullKey;
-	while( i.more() ) {
-	  fieldNames.push_back( i.next().fieldName() );
-	  fixed.push_back( BSONElement() );
-	  nullKey.appendNull( "" );
+	if ( keyPattern.objsize() == 0 ) {
+	  out() << keyPattern.toString() << endl;
+	  out() << info.obj().toString() << endl;
+	  assert(false);
 	}
-	getKeys( fieldNames, fixed, obj, keys );
-	if ( keys.empty() )
-	  keys.insert( nullKey.obj() );
+	mongo::getKeysFromObject( keyPattern, obj, keys );
     }
 
     int nUnindexes = 0;

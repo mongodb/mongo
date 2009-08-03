@@ -46,6 +46,8 @@ namespace mongo {
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ); // also deletes indexes and cursors
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
     auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
+    void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys );
+    void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff);
 
 // -1 if library unavailable.
     boost::intmax_t freeSpace();

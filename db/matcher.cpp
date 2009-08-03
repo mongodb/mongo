@@ -306,27 +306,7 @@ namespace mongo {
             }
             return count == r.number();
         }
-        
-        if ( op == BSONObj::opALL ) {
-            if ( l.type() != Array )
-                return 0;
-            set< BSONElement, element_lt > matches;
-            BSONObjIterator i( l.embeddedObject() );
-            while( i.moreWithEOO() ) {
-                BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                if ( bm.myset->count( e ) )
-                    matches.insert( e );
-            }
-            if ( matches.size() > 0 && bm.myset->size() == matches.size() ) {
-                if ( deep )
-                    *deep = true;
-                return true;
-            }
-            return false;
-        }
-        
+                
         /* check LT, GTE, ... */
         if ( !( l.isNumber() && r.isNumber() ) && ( l.type() != r.type() ) )
             return false;
@@ -363,6 +343,26 @@ namespace mongo {
         1 match
     */
     int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const BasicMatcher& bm , bool *deep, bool isArr) {
+
+      if ( compareOp == BSONObj::opALL ) {
+	if ( bm.myset->size() == 0 )
+	  return -1; // is this desired?
+	BSONObjSetDefaultOrder actualKeys;
+	getKeysFromObject( BSON( fieldName << 1 ), obj, actualKeys );
+	if ( actualKeys.size() == 0 )
+	  return 0;
+	for( set< BSONElement, element_lt >::const_iterator i = bm.myset->begin(); i != bm.myset->end(); ++i ) {
+	  // ignore nulls
+	  if ( i->type() == jstNULL )
+	    continue;
+	  // parallel traversal would be faster worst case I guess
+	  BSONObjBuilder b;
+	  b.appendAs( *i, "" );
+	  if ( !actualKeys.count( b.done() ) )
+	    return -1;
+	}
+	return 1;
+      }
 
         if ( compareOp == BSONObj::NE )
             return matchesNe( fieldName, toMatch, obj, bm, deep );
@@ -417,10 +417,10 @@ namespace mongo {
             }
         }
         
-        if ( ( e.type() != Array || indexed || compareOp == BSONObj::opALL || compareOp == BSONObj::opSIZE ) &&
+        if ( ( e.type() != Array || indexed || compareOp == BSONObj::opSIZE ) &&
             valuesMatch(e, toMatch, compareOp, bm, deep) ) {
             return 1;
-        } else if ( e.type() == Array && compareOp != BSONObj::opALL && compareOp != BSONObj::opSIZE ) {
+        } else if ( e.type() == Array && compareOp != BSONObj::opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.moreWithEOO() ) {
                 BSONElement z = ai.next();
