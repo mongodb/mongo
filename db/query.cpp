@@ -228,19 +228,47 @@ namespace mongo {
         vector< shared_ptr< BSONObjBuilder > > builderStorage_;
     };
     
+    /* Used for modifiers such as $inc, $set, ... */
     struct Mod {
         enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL } op;
         const char *fieldName;
+
+        // kind of lame; fix one day?
         double *ndouble;
         int *nint;
+        long long *nlong;
+
         BSONElement elt;
         int pushStartSize;
-        void setn(double n) const {
-            if ( ndouble ) *ndouble = n;
-            else *nint = (int) n;
+
+        /* [dm] why is this const? (or rather, why was setn const?)  i see why but think maybe clearer if were not.  */
+        void inc(BSONElement& n) const { 
+            uassert( "$inc value is not a number", n.isNumber() );
+            if( ndouble ) 
+                *ndouble += n.numberDouble();
+            else if( nint )
+                *nint += n.numberInt();
+            else
+                *nlong += n.numberLong();\
         }
-        double getn() const {
-            return ndouble ? *ndouble : *nint;
+
+        void setElementToOurNumericValue(BSONElement& e) const { 
+            BSONElementManipulator manip(e);
+            if( e.type() == NumberLong )
+                manip.setLong(_getlong());
+            else
+                manip.setNumber(_getn());
+        }
+
+        double _getn() const {
+            if( ndouble ) return *ndouble;
+            if( nint ) return *nint;
+            return (double) *nlong;
+        }
+        long long _getlong() const {
+            if( nlong ) return *nlong; 
+            if( ndouble ) return (long long) *ndouble;
+            return *nint;
         }
         bool operator<( const Mod &other ) const {
             return strcmp( fieldName, other.fieldName ) < 0;
@@ -415,13 +443,16 @@ namespace mongo {
             BSONElement e = obj.getFieldDotted(m.fieldName);
             if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL )
                 continue;
+
+            // [dm] the BSONElementManipulator statements below are for replication (correct?)
             if ( m.op == Mod::INC ) {
-                m.setn( e.number() + m.getn() );
-                BSONElementManipulator( e ).setNumber( m.getn() );
+                m.inc(e);
+                m.setElementToOurNumericValue(e);
             } else {
-                if ( e.isNumber() && m.elt.isNumber() )
-                    BSONElementManipulator( e ).setNumber( m.getn() );
-                else
+                if ( e.isNumber() && m.elt.isNumber() ) {
+                    // todo: handle NumberLong:
+                    m.setElementToOurNumericValue(e);
+                } else
                     BSONElementManipulator( e ).replaceTypeAndValue( m.elt );
             }
         }
@@ -475,7 +506,8 @@ namespace mongo {
             if ( cmp == 0 ) {
                 BSONElement e = p->second;
                 if ( m->op == Mod::INC ) {
-                    m->setn( m->getn() + e.number() );
+                    m->inc(e);
+                    //m->setn( m->getn() + e.number() );
                     b2.appendAs( m->elt, m->fieldName );
                 } else if ( m->op == Mod::SET ) {
                     b2.appendAs( m->elt, m->fieldName );
@@ -604,12 +636,19 @@ namespace mongo {
                 uassert( "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
                 m.elt = f;
+
+                // horrible - to be cleaned up
                 if ( f.type() == NumberDouble ) {
                     m.ndouble = (double *) f.value();
                     m.nint = 0;
                 } else if ( f.type() == NumberInt ) {
                     m.ndouble = 0;
                     m.nint = (int *) f.value();
+                }
+                else if( f.type() == NumberLong ) { 
+                    m.ndouble = 0;
+                    m.nint = 0;
+                    m.nlong = (long long *) f.value();
                 }
                 mods_.push_back( m );
             }

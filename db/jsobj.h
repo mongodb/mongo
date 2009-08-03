@@ -84,8 +84,10 @@ namespace mongo {
         NumberInt = 16,
         /** Updated to a Date with value next OpTime on insert */
         Timestamp = 17,
+        /** 64 bit integer */
+        NumberLong = 18,
         /** max type that is not MaxKey */
-        JSTypeMax=17,
+        JSTypeMax=18,
         /** larger than all other types */
         MaxKey=127
     };
@@ -256,6 +258,8 @@ namespace mongo {
             */
         bool trueValue() const {
             switch( type() ) {
+                case NumberLong:
+                    return *reinterpret_cast< const long long* >( value() ) != 0;
                 case NumberDouble:
                     return *reinterpret_cast< const double* >( value() ) != 0;
                 case NumberInt:
@@ -272,19 +276,71 @@ namespace mongo {
 
         /** True if element is of a numeric type. */
         bool isNumber() const {
-            return type() == NumberDouble || type() == NumberInt;
+            switch( type() ) {
+                case NumberLong:
+                case NumberDouble:
+                case NumberInt:
+                    return true;
+                default: 
+                    return false;
+            }
         }
-        /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0. */
-        double number() const {
+
+        /** Return double value for this field. MUST be NumberDouble type. */
+        double _numberDouble() const {return *reinterpret_cast< const double* >( value() ); }
+        /** Return double value for this field. MUST be NumberInt type. */
+        int _numberInt() const {return *reinterpret_cast< const int* >( value() ); }
+        /** Return double value for this field. MUST be NumberLong type. */
+        long long _numberLong() const {return *reinterpret_cast< const long long* >( value() ); }
+
+        /** Retrieve int value for the element safely.  Zero returned if not a number. */
+        int numberInt() const { 
             switch( type() ) {
                 case NumberDouble:
-                    return *reinterpret_cast< const double* >( value() );
+                    return (int) _numberDouble();
                 case NumberInt:
-                    return *reinterpret_cast< const int* >( value() );
+                    return _numberInt();
+                case NumberLong:
+                    return (int) _numberLong();
                 default:
                     return 0;
             }
         }
+
+        /** Retrieve long value for the element safely.  Zero returned if not a number. */
+        long long numberLong() const { 
+            switch( type() ) {
+                case NumberDouble:
+                    return (long long) _numberDouble();
+                case NumberInt:
+                    return _numberInt();
+                case NumberLong:
+                    return _numberLong();
+                default:
+                    return 0;
+            }
+        }
+
+        /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0. 
+            NOTE: casts to double, data loss may occur with large (>52 bit) NumberLong values.
+        */
+        double numberDouble() const {
+            switch( type() ) {
+                case NumberDouble:
+                    return _numberDouble();
+                case NumberInt:
+                    return *reinterpret_cast< const int* >( value() );
+                case NumberLong:
+                    return (double) *reinterpret_cast< const long long* >( value() );
+                default:
+                    return 0;
+            }
+        }
+        /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0. 
+            NOTE: casts to double, data loss may occur with large (>52 bit) NumberLong values.
+        */
+        double number() const { return numberDouble(); }
+
         /** Retrieve the object ID stored in the object. 
             You must ensure the element is of type jstOID first. */
         const OID &__oid() const {
@@ -370,12 +426,19 @@ namespace mongo {
            just the value.
         */
         bool valuesEqual(const BSONElement& r) const {
-            if ( isNumber() )
-                return number() == r.number() && r.isNumber();
+            switch( type() ) {
+                case NumberLong:
+                    return _numberLong() == r.numberLong() && r.isNumber();
+                case NumberDouble:
+                    return _numberDouble() == r.number() && r.isNumber();
+                case NumberInt:
+                    return _numberInt() == r.numberInt() && r.isNumber();
+                default:
+                    ;
+            }
             bool match= valuesize() == r.valuesize() &&
                         memcmp(value(),r.value(),valuesize()) == 0;
             return match && type() == r.type();
-            // todo: make "0" == 0.0
         }
 
         /** Returns true if elements are equal. */
@@ -955,6 +1018,7 @@ namespace mongo {
             b.append(fieldName);
             b.append((char) (val?1:0));
         }
+
         /** Append a 32 bit integer element */
         void append(const char *fieldName, int n) {
             b.append((char) NumberInt);
@@ -965,7 +1029,17 @@ namespace mongo {
         void append(const string &fieldName, int n) {
             append( fieldName.c_str(), n );
         }
+
+        /** Append a 32 bit unsigned element - cast to a signed int. */
         void append(const char *fieldName, unsigned n) { append(fieldName, (int) n); }
+
+        /** Append a NumberLong */
+        void append(const char *fieldName, long long n) { 
+            b.append((char) NumberLong);
+            b.append(fieldName);
+            b.append(n);
+        }
+
         /** Append a double element */
         BSONObjBuilder& append(const char *fieldName, double n) {
             b.append((char) NumberDouble);
@@ -973,6 +1047,7 @@ namespace mongo {
             b.append(n);
             return *this;
         }
+
         /** Append a BSON Object ID (OID type). */
         void appendOID(const char *fieldName, OID *oid = 0) {
             b.append((char) jstOID);

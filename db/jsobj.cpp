@@ -46,12 +46,12 @@ namespace mongo {
             s << "new Date(" << date() << ')';
             break;
         case RegEx:
-        {
-            s << "/" << regex() << '/';
-            const char *p = regexFlags();
-            if ( p ) s << p;
-        }
-        break;
+            {
+                s << "/" << regex() << '/';
+                const char *p = regexFlags();
+                if ( p ) s << p;
+            }
+            break;
         case NumberDouble:
 			{
 				stringstream tmp;
@@ -64,10 +64,11 @@ namespace mongo {
 					s << ".0";
 			}
             break;
+        case NumberLong:
+            s << _numberLong();
+            break;
         case NumberInt:
-            s.precision( 16 );
-            s << number();
-            //s << "(" << ( type() == NumberInt ? "int" : "double" ) << ")";
+            s << _numberInt();
             break;
         case Bool:
             s << ( boolean() ? "true" : "false" );
@@ -187,6 +188,9 @@ namespace mongo {
         case String:
         case Symbol:
             s << '"' << escape( valuestr() ) << '"';
+            break;
+        case NumberLong:
+            s << _numberLong();
             break;
         case NumberInt:
         case NumberDouble:
@@ -336,6 +340,7 @@ namespace mongo {
         case Timestamp:
         case Date:
         case NumberDouble:
+        case NumberLong:
             x = 8;
             break;
         case jstOID:
@@ -416,15 +421,13 @@ namespace mongo {
         return BSONObj::Equality;
     }
 
+    /* wo = "well ordered" */
     int BSONElement::woCompare( const BSONElement &e,
                                 bool considerFieldName ) const {
         int lt = (int) type();
-        if ( lt == NumberInt ) lt = NumberDouble;
         int rt = (int) e.type();
-        if ( rt == NumberInt ) rt = NumberDouble;
-
         int x = lt - rt;
-        if ( x != 0 )
+        if( x != 0 && (!isNumber() || !e.isNumber()) )
             return x;
         if ( considerFieldName ) {
             x = strcmp(fieldName(), e.fieldName());
@@ -435,7 +438,8 @@ namespace mongo {
         return x;
     }
 
-    /* must be same type! */
+    /* must be same type when called, unless both sides are #s 
+    */
     int compareElementValues(const BSONElement& l, const BSONElement& r) {
         int f;
         double x;
@@ -455,6 +459,15 @@ namespace mongo {
             if ( l.date() < r.date() )
                 return -1;
             return l.date() == r.date() ? 0 : 1;
+        case NumberLong:
+            if( r.type() == NumberLong ) {
+                long long L = l._numberLong();
+                long long R = r._numberLong();
+                if( L < R ) return -1;
+                if( L == R ) return 0;
+                return 1;
+            }
+            // else fall through
         case NumberInt:
         case NumberDouble: {
             double left = l.number();
@@ -745,6 +758,7 @@ namespace mongo {
         return e;
     }
 
+    /* jul09 : 'deep' and this function will be going away in the future - kept only for backward compatibility of datafiles for now. */
     void trueDat( bool *deep ) {
         if( deep )
             *deep = true;

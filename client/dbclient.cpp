@@ -568,12 +568,8 @@ namespace mongo {
                     ss << "_";
 
                 ss << f.fieldName() << "_";
-
-                if ( f.type() == NumberInt )
-                    ss << (int)(f.number() );
-                else if ( f.type() == NumberDouble )
-                    ss << f.number();
-
+                if( f.isNumber() )
+                    ss << f.numberInt();
             }
 
             toSave.append( "name" , ss.str() );
