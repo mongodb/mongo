@@ -726,69 +726,6 @@ assert( !eloc.isNull() );
 	getKeys( fieldNames, fixed, obj, keys );
 	if ( keys.empty() )
 	  keys.insert( nullKey.obj() );
-//         BSONObjBuilder b;
-//         const char *nameWithinArray;
-//         BSONObj key = obj.extractFieldsDotted(keyPattern, b, nameWithinArray);
-//         massert( "new key empty", !key.isEmpty() );
-//         BSONObjIterator keyIter( key );
-//         BSONElement arrayElt;
-//         int arrayPos = -1;
-//         for ( int i = 0; keyIter.moreWithEOO(); ++i ) {
-//             BSONElement e = keyIter.next();
-//             if ( e.eoo() )
-//                 break;
-//             if ( e.type() == Array ) {
-//                 uassert( "Index cannot be created on parallel arrays.",
-//                          arrayPos == -1 );
-//                 arrayPos = i;
-//                 arrayElt = e;
-//             }
-//         }
-//         if ( arrayPos == -1 ) {
-//             assert( strlen( nameWithinArray ) == 0 );
-//             BSONObjBuilder b;
-//             BSONObjIterator keyIter( key );
-//             while ( keyIter.moreWithEOO() ) {
-//                 BSONElement f = keyIter.next();
-//                 if ( f.eoo() )
-//                     break;
-//                 b.append( f );
-//             }
-//             BSONObj o = b.obj();
-//             assert( !o.isEmpty() );
-//             keys.insert(o);
-//             return;
-//         }
-//         BSONObj arr = arrayElt.embeddedObject();
-//         BSONObjIterator arrIter(arr);
-//         while ( arrIter.moreWithEOO() ) {
-//             BSONElement e = arrIter.next();
-//             if ( e.eoo() )
-//                 break;
-
-//             if ( nameWithinArray[ 0 ] != '\0' ) {
-//                 if ( e.type() != Object )
-//                     continue;
-//                 e = e.embeddedObject().getFieldDotted( nameWithinArray );
-//                 if ( e.eoo() )
-//                     continue;
-//             }
-//             BSONObjBuilder b;
-//             BSONObjIterator keyIter( key );
-//             for ( int i = 0; keyIter.moreWithEOO(); ++i ) {
-//                 BSONElement f = keyIter.next();
-//                 if ( f.eoo() )
-//                     break;
-//                 if ( i != arrayPos )
-//                     b.append( f );
-//                 else
-//                     b.appendAs( e, "" );
-//             }
-
-//             BSONObj o = b.obj();
-//             assert( !o.isEmpty() );
-//             keys.insert(o);
-//         }
     }
 
     int nUnindexes = 0;
