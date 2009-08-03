@@ -408,7 +408,7 @@ namespace mongo {
                 if ( se.eoo() )
                     return 0;
                 if ( se.type() != Object && se.type() != Array )
-                    return -1;
+                    return 0;
 
                 BSONObj eo = se.embeddedObject();
                 return matchesDotted(p+1, toMatch, eo, compareOp, bm, deep, se.type() == Array);
