@@ -94,6 +94,11 @@ namespace NamespaceTests {
                 }
                 ASSERT( a.woCompare( b ) == 0 );
             }
+	  BSONObj nullObj() const {
+	    BSONObjBuilder b;
+	    b.appendNull( "" );
+	    return b.obj();
+	  }
         private:
             dblock lk_;
             IndexDetails id_;
@@ -331,13 +336,15 @@ namespace NamespaceTests {
 
                 BSONObjSetDefaultOrder keys;
                 id().getKeysFromObject( b.done(), keys );
-                checkSize( 3, keys );
+                checkSize( 4, keys );
                 int j = 1;
-                for ( BSONObjSetDefaultOrder::iterator i = keys.begin(); i != keys.end(); ++i, ++j ) {
+		BSONObjSetDefaultOrder::iterator i = keys.begin();
+                for ( ; j < 4; ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
                     assertEquals( b.obj(), *i );
                 }
+		assertEquals( nullObj(), *i++ );
             }
         private:
             virtual BSONObj key() const {
@@ -359,7 +366,8 @@ namespace NamespaceTests {
 
                 BSONObjSetDefaultOrder keys;
                 id().getKeysFromObject( b.done(), keys );
-                checkSize( 0, keys );
+                checkSize( 1, keys );
+		assertEquals( nullObj(), *keys.begin() );
             }
         private:
             virtual BSONObj key() const {
@@ -374,6 +382,7 @@ namespace NamespaceTests {
                 BSONObjSetDefaultOrder keys;
                 id().getKeysFromObject( BSON( "b" << 1 ), keys );
                 checkSize( 1, keys );
+		assertEquals( nullObj(), *keys.begin() );
             }
         private:
             virtual BSONObj key() const {
@@ -387,7 +396,8 @@ namespace NamespaceTests {
                 create();
                 BSONObjSetDefaultOrder keys;
                 id().getKeysFromObject( fromjson( "{a:[1,2]}" ), keys );
-                checkSize( 0, keys );
+                checkSize( 1, keys );
+		assertEquals( nullObj(), *keys.begin() );
             }
         private:
             virtual BSONObj key() const {
@@ -395,10 +405,75 @@ namespace NamespaceTests {
             }
         };
         
-// TODO
-// array subelement complex
-// parallel arrays complex
-// allowed multi array indexes
+      class ArraySubelementComplex : public Base {
+      public:
+	void run() {
+	  create();
+	  BSONObjSetDefaultOrder keys;
+	  id().getKeysFromObject( fromjson( "{a:[{b:[2]}]}" ), keys );
+	  checkSize( 1, keys );
+	  assertEquals( BSON( "" << 2 ), *keys.begin() );
+	}
+      private:
+	virtual BSONObj key() const {
+	  return aDotB();
+	}
+      };
+
+      class ParallelArraysComplex : public Base {
+      public:
+	void run() {
+	  create();
+	  BSONObjSetDefaultOrder keys;
+	  ASSERT_EXCEPTION( id().getKeysFromObject( fromjson( "{a:[{b:[1],c:[2]}]}" ), keys ),
+			    UserException );
+	}
+      private:
+	virtual BSONObj key() const {
+	  return fromjson( "{'a.b':1,'a.c':1}" );
+	}
+      };
+
+      class AlternateMissing : public Base {
+      public:
+	void run() {
+	  create();
+	  BSONObjSetDefaultOrder keys;
+	  id().getKeysFromObject( fromjson( "{a:[{b:1},{c:2}]}" ), keys );
+	  checkSize( 2, keys );
+	  BSONObjSetDefaultOrder::iterator i = keys.begin();
+	  {
+	    BSONObjBuilder e;
+	    e.append( "", 1 );
+	    e.appendNull( "" );
+	    assertEquals( e.obj(), *i++ );
+	  }
+	  {
+	    BSONObjBuilder e;
+	    e.appendNull( "" );
+	    e.append( "", 2 );
+	    assertEquals( e.obj(), *i );
+	  }
+	}
+      private:
+	virtual BSONObj key() const {
+	  return fromjson( "{'a.b':1,'a.c':1}" );
+	}
+      };
+
+      class MultiComplex : public Base {
+      public:
+	void run() {
+	  create();
+	  BSONObjSetDefaultOrder keys;
+	  id().getKeysFromObject( fromjson( "{a:[{b:1},{b:[1,2,3]}]}" ), keys );
+	  checkSize( 3, keys );
+	}
+      private:
+	virtual BSONObj key() const {
+	  return aDotB();
+	}
+      };
 
     } // namespace IndexDetailsTests
 
@@ -606,6 +681,10 @@ namespace NamespaceTests {
             add< IndexDetailsTests::ArraySubobjectMultiFieldIndex >();
             add< IndexDetailsTests::ArraySubobjectSingleMissing >();
             add< IndexDetailsTests::ArraySubobjectMissing >();
+            add< IndexDetailsTests::ArraySubelementComplex >();
+            add< IndexDetailsTests::ParallelArraysComplex >();
+            add< IndexDetailsTests::AlternateMissing >();
+            add< IndexDetailsTests::MultiComplex >();
             add< IndexDetailsTests::MissingField >();
             add< IndexDetailsTests::SubobjectMissing >();
             add< NamespaceDetailsTests::Create >();

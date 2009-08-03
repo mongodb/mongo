@@ -646,6 +646,61 @@ assert( !eloc.isNull() );
         wassert( n == 1 );
     }
 
+  void getKeys( vector< const char * > fieldNames, vector< BSONElement > fixed, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
+    BSONObjBuilder b;
+    b.appendNull( "" );
+    BSONElement nullElt = b.done().firstElement();
+    BSONElement arrElt;
+    unsigned arrIdx = ~0;
+    for( unsigned i = 0; i < fieldNames.size(); ++i ) {
+      if ( *fieldNames[ i ] == '\0' )
+	continue;
+      BSONElement e = obj.getFieldDottedOrArray( fieldNames[ i ] );
+      if ( e.eoo() )
+	e = nullElt;
+      if ( e.type() != Array )
+	fieldNames[ i ] = "";
+      if ( *fieldNames[ i ] == '\0' )
+	fixed[ i ] = e;
+      if ( e.type() == Array && arrElt.eoo() ) {
+	arrIdx = i;
+	arrElt = e;
+      }
+      uassert( "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
+    }
+    bool allFound = true;
+    for( vector< const char * >::const_iterator i = fieldNames.begin(); allFound && i != fieldNames.end(); ++i )
+      if ( **i != '\0' )
+	allFound = false;
+    if ( allFound ) {
+      if ( arrElt.eoo() ) {
+	BSONObjBuilder b;
+	for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i )
+	  b.appendAs( *i, "" );
+	keys.insert( b.obj() );
+      } else {
+	BSONObjIterator i( arrElt.embeddedObject() );
+	while( i.more() ) {
+	  BSONObjBuilder b;
+	  for( unsigned j = 0; j < fixed.size(); ++j ) {
+	    if ( j == arrIdx )
+	      b.appendAs( i.next(), "" );
+	    else
+	      b.appendAs( fixed[ j ], "" );
+	  }
+	  keys.insert( b.obj() );
+	}
+      }
+    } else {
+      assert( !arrElt.eoo() );
+      BSONObjIterator i( arrElt.embeddedObject() );
+      while( i.more() ) {
+	BSONElement e = i.next();
+	if ( e.type() == Object )
+	  getKeys( fieldNames, fixed, e.embeddedObject(), keys );
+      }
+    }
+  }
 
     /* Pull out the relevant key objects from obj, so we
        can index them.  Note that the set is multiple elements
@@ -659,69 +714,81 @@ assert( !eloc.isNull() );
             out() << info.obj().toString() << endl;
             assert(false);
         }
-        BSONObjBuilder b;
-        const char *nameWithinArray;
-        BSONObj key = obj.extractFieldsDotted(keyPattern, b, nameWithinArray);
-        massert( "new key empty", !key.isEmpty() );
-        BSONObjIterator keyIter( key );
-        BSONElement arrayElt;
-        int arrayPos = -1;
-        for ( int i = 0; keyIter.moreWithEOO(); ++i ) {
-            BSONElement e = keyIter.next();
-            if ( e.eoo() )
-                break;
-            if ( e.type() == Array ) {
-                uassert( "Index cannot be created on parallel arrays.",
-                         arrayPos == -1 );
-                arrayPos = i;
-                arrayElt = e;
-            }
-        }
-        if ( arrayPos == -1 ) {
-            assert( strlen( nameWithinArray ) == 0 );
-            BSONObjBuilder b;
-            BSONObjIterator keyIter( key );
-            while ( keyIter.moreWithEOO() ) {
-                BSONElement f = keyIter.next();
-                if ( f.eoo() )
-                    break;
-                b.append( f );
-            }
-            BSONObj o = b.obj();
-            assert( !o.isEmpty() );
-            keys.insert(o);
-            return;
-        }
-        BSONObj arr = arrayElt.embeddedObject();
-        BSONObjIterator arrIter(arr);
-        while ( arrIter.moreWithEOO() ) {
-            BSONElement e = arrIter.next();
-            if ( e.eoo() )
-                break;
+	BSONObjIterator i( keyPattern );
+	vector< const char * > fieldNames;
+	vector< BSONElement > fixed;
+	BSONObjBuilder nullKey;
+	while( i.more() ) {
+	  fieldNames.push_back( i.next().fieldName() );
+	  fixed.push_back( BSONElement() );
+	  nullKey.appendNull( "" );
+	}
+	getKeys( fieldNames, fixed, obj, keys );
+	if ( keys.empty() )
+	  keys.insert( nullKey.obj() );
+//         BSONObjBuilder b;
+//         const char *nameWithinArray;
+//         BSONObj key = obj.extractFieldsDotted(keyPattern, b, nameWithinArray);
+//         massert( "new key empty", !key.isEmpty() );
+//         BSONObjIterator keyIter( key );
+//         BSONElement arrayElt;
+//         int arrayPos = -1;
+//         for ( int i = 0; keyIter.moreWithEOO(); ++i ) {
+//             BSONElement e = keyIter.next();
+//             if ( e.eoo() )
+//                 break;
+//             if ( e.type() == Array ) {
+//                 uassert( "Index cannot be created on parallel arrays.",
+//                          arrayPos == -1 );
+//                 arrayPos = i;
+//                 arrayElt = e;
+//             }
+//         }
+//         if ( arrayPos == -1 ) {
+//             assert( strlen( nameWithinArray ) == 0 );
+//             BSONObjBuilder b;
+//             BSONObjIterator keyIter( key );
+//             while ( keyIter.moreWithEOO() ) {
+//                 BSONElement f = keyIter.next();
+//                 if ( f.eoo() )
+//                     break;
+//                 b.append( f );
+//             }
+//             BSONObj o = b.obj();
+//             assert( !o.isEmpty() );
+//             keys.insert(o);
+//             return;
+//         }
+//         BSONObj arr = arrayElt.embeddedObject();
+//         BSONObjIterator arrIter(arr);
+//         while ( arrIter.moreWithEOO() ) {
+//             BSONElement e = arrIter.next();
+//             if ( e.eoo() )
+//                 break;
 
-            if ( nameWithinArray[ 0 ] != '\0' ) {
-                if ( e.type() != Object )
-                    continue;
-                e = e.embeddedObject().getFieldDotted( nameWithinArray );
-                if ( e.eoo() )
-                    continue;
-            }
-            BSONObjBuilder b;
-            BSONObjIterator keyIter( key );
-            for ( int i = 0; keyIter.moreWithEOO(); ++i ) {
-                BSONElement f = keyIter.next();
-                if ( f.eoo() )
-                    break;
-                if ( i != arrayPos )
-                    b.append( f );
-                else
-                    b.appendAs( e, "" );
-            }
+//             if ( nameWithinArray[ 0 ] != '\0' ) {
+//                 if ( e.type() != Object )
+//                     continue;
+//                 e = e.embeddedObject().getFieldDotted( nameWithinArray );
+//                 if ( e.eoo() )
+//                     continue;
+//             }
+//             BSONObjBuilder b;
+//             BSONObjIterator keyIter( key );
+//             for ( int i = 0; keyIter.moreWithEOO(); ++i ) {
+//                 BSONElement f = keyIter.next();
+//                 if ( f.eoo() )
+//                     break;
+//                 if ( i != arrayPos )
+//                     b.append( f );
+//                 else
+//                     b.appendAs( e, "" );
+//             }
 
-            BSONObj o = b.obj();
-            assert( !o.isEmpty() );
-            keys.insert(o);
-        }
+//             BSONObj o = b.obj();
+//             assert( !o.isEmpty() );
+//             keys.insert(o);
+//         }
     }
 
     int nUnindexes = 0;
