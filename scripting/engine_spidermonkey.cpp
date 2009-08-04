@@ -367,6 +367,7 @@ namespace mongo {
                 return JSVAL_NULL;
             case NumberDouble:
             case NumberInt:
+            case NumberLong:
                 return toval( e.number() );
             case Symbol: // TODO: should we make a special class for this
             case String:
