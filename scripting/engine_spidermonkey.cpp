@@ -26,9 +26,13 @@ namespace mongo {
             _modified = false;
             _magic = 17;
         }
+        
+        ~BSONHolder(){
+            _magic = 18;
+        }
 
         void check(){
-            uassert( "holder magic value is wrong" , _magic == 17 );
+            uassert( "holder magic value is wrong" , _magic == 17 && _obj.isValid() );
         }
 
         BSONFieldIterator * it();
@@ -745,8 +749,14 @@ namespace mongo {
             JS_SetCStringsAreUTF8();
 #endif
 
+#ifdef JS_THREADSAFE
             _runtime = JS_NewRuntime(8L * 1024L * 1024L);
             uassert( "JS_NewRuntime failed" , _runtime );
+#else
+#warning spider monkey compiled without THREADSAFE  will be slower
+            cerr << "*** warning: spider monkey compiled without THREADSAFE  will be slower" << endl;
+#endif
+
             
             if ( ! utf8Ok() ){
                 cerr << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
@@ -754,7 +764,9 @@ namespace mongo {
         }
 
         ~SMEngine(){
+#ifdef JS_THREADSAFE
             JS_DestroyRuntime( _runtime );
+#endif
             JS_ShutDown();
         }
 
@@ -765,7 +777,9 @@ namespace mongo {
         virtual bool utf8Ok() const { return JS_CStringsAreUTF8(); }
 
     private:
+#ifdef JS_THREADSAFE
         JSRuntime * _runtime;
+#endif
         friend class SMScope;
     };
 
@@ -808,10 +822,20 @@ namespace mongo {
         return JS_FALSE;
     }
 
+    JSBool yes_gc(JSContext *cx, JSGCStatus status){
+        return JS_TRUE;
+    }
+
     class SMScope : public Scope {
     public:
         SMScope(){
+#ifdef JS_THREADSAFE
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
+#else
+            _runtime = JS_NewRuntime( 512L * 1024L );
+            massert( "JS_NewRuntime failed" , _runtime );
+            _context = JS_NewContext( _runtime , 8192 );
+#endif
             _convertor = new Convertor( _context );
             massert( "JS_NewContext failed" , _context );
 
@@ -834,34 +858,51 @@ namespace mongo {
                                        "keySet" , object_keyset , 0 , JSPROP_READONLY ) );
 
             _this = 0;
+            _externalSetup = false;
+            _localConnect = false;
             //JS_SetGCCallback( _context , no_gc ); // this is useful for seeing if something is a gc problem
         }
-
+        
         ~SMScope(){
             uassert( "deleted SMScope twice?" , _convertor );
 
             for ( list<void*>::iterator i=_roots.begin(); i != _roots.end(); i++ ){
                 JS_RemoveRoot( _context , *i );
             }
-
-            if ( _this )
+            _roots.clear();
+            
+            if ( _this ){
                 JS_RemoveRoot( _context , &_this );
+                _this = 0;
+            }
 
             if ( _convertor ){
                 delete _convertor;
                 _convertor = 0;
             }
-
+            
             if ( _context ){
                 JS_DestroyContext( _context );
                 _context = 0;
             }
-        }
 
+#ifndef JS_THREADSAFE
+            JS_DestroyRuntime( _runtime );
+            _runtime = 0;
+#endif
+        }
+        
         void reset(){
-            massert( "SMScope::reset() not implemented yet" , 0 );
+            assert( _convertor );
+            return;
+            if ( _this ){
+                JS_RemoveRoot( _context , &_this );
+                _this = 0;
+            }
+            currentScope.reset( this );
+            _error = "";
         }
-
+        
         void addRoot( void * root , const char * name ){
             JS_AddNamedRoot( _context , root , name );
             _roots.push_back( root );
@@ -875,19 +916,33 @@ namespace mongo {
             while ( i.more() ){
                 BSONElement e = i.next();
                 _convertor->setProperty( _global , e.fieldName() , _convertor->toval( e ) );
+                _initFieldNames.insert( e.fieldName() );
             }
 
         }
 
         void externalSetup(){
+            uassert( "already local connected" , ! _localConnect );
+            if ( _externalSetup )
+                return;
             initMongoJS( this , _context , _global , false );
+            _externalSetup = true;
         }
 
         void localConnect( const char * dbName ){
+            uassert( "already setup for external db" , ! _externalSetup );
+            if ( _localConnect ){
+                uassert( "connected to different db" , _dbName == dbName );
+                return;
+            }
+            
             initMongoJS( this , _context , _global , true );
-
+            
             exec( "_mongo = new Mongo();" );
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
+            
+            _localConnect = true;
+            _dbName = dbName;
         }
 
         // ----- getters ------
@@ -968,7 +1023,7 @@ namespace mongo {
         void setThis( const BSONObj * obj ){
             if ( _this )
                 JS_RemoveRoot( _context , &_this );
-
+            
             _this = _convertor->toJSObject( obj );
 
             JS_AddNamedRoot( _context , &_this , "scope this" );
@@ -1104,6 +1159,9 @@ namespace mongo {
         JSContext *context() const { return _context; }
 
     private:
+#ifndef JS_THREADSAFE
+        JSRuntime * _runtime;
+#endif
         JSContext * _context;
         Convertor * _convertor;
 
@@ -1112,6 +1170,12 @@ namespace mongo {
 
         string _error;
         list<void*> _roots;
+
+        bool _externalSetup;
+        bool _localConnect;
+        string _dbName;
+        
+        set<string> _initFieldNames;
     };
 
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){

@@ -79,26 +79,22 @@ namespace mongo {
     class Where {
     public:
         Where() {
-            scope = 0;
             jsScope = 0;
         }
         ~Where() {
 
-            if ( scope )
-                delete scope;
-
-            if ( jsScope )
+            if ( jsScope ){
                 delete jsScope;
-            scope = 0;
+            }
             func = 0;
         }
         
-        Scope * scope;
+        auto_ptr<Scope> scope;
         ScriptingFunction func;
         BSONObj *jsScope;
         
         void setFunc(const char *code) {
-            massert( "scope has to be created first!" , scope );
+            massert( "scope has to be created first!" , scope.get() );
             func = scope->createFunction( code );
         }
 
@@ -146,7 +142,8 @@ namespace mongo {
                 where = new Where();
                 uassert( "$where query, but no script engine", globalScriptEngine );
 
-                where->scope = globalScriptEngine->createScope();
+                assert( curNs );
+                where->scope = globalScriptEngine->getPooledScope( curNs );
                 where->scope->localConnect( database->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {
