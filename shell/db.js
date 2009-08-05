@@ -128,8 +128,9 @@ DB.prototype.dropDatabase = function() {
 
 
 DB.prototype.shutdownServer = function() { 
-    if( "admin" != db )
+    if( "admin" != this._name ){
 	return "shutdown command only works with the admin database; try 'use admin'";
+    }
 
     try {
         this._dbCommand("shutdown");
