@@ -1192,9 +1192,15 @@ namespace mongo {
             return s_;
         }
 
+        // prevent implicit string conversions which would allow bad things like BSON( BSON( "foo" << 1 ) << 2 )
+        struct ForceExplicitString {
+        ForceExplicitString( const string &str ) : str_( str ) {}
+            string str_;
+        };
+
         /** Stream oriented way to add field names and values. */
-        BSONObjBuilderValueStream &operator<<( const string& name ) {
-            return operator<<( name.c_str() );
+        BSONObjBuilderValueStream &operator<<( const ForceExplicitString& name ) {
+            return operator<<( name.str_.c_str() );
         }
 
         Labeler operator<<( const Labeler::Label &l ) {
