@@ -657,28 +657,31 @@ assert( !eloc.isNull() );
 	continue;
       BSONElement e = obj.getFieldDottedOrArray( fieldNames[ i ] );
       if ( e.eoo() )
-	e = nullElt;
+	e = nullElt; // no matching field
       if ( e.type() != Array )
-	fieldNames[ i ] = "";
+	fieldNames[ i ] = ""; // no matching field or non-array match
       if ( *fieldNames[ i ] == '\0' )
-	fixed[ i ] = e;
-      if ( e.type() == Array && arrElt.eoo() ) {
+	fixed[ i ] = e; // no need for further object expansion (though array expansion still possible)
+      if ( e.type() == Array && arrElt.eoo() ) { // we only expand arrays on a single path -- track the path here
 	arrIdx = i;
 	arrElt = e;
       }
+      // enforce single array path here
       uassert( "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
     }
-    bool allFound = true;
+    bool allFound = true; // have we found elements for all field names in the key spec?
     for( vector< const char * >::const_iterator i = fieldNames.begin(); allFound && i != fieldNames.end(); ++i )
       if ( **i != '\0' )
 	allFound = false;
     if ( allFound ) {
       if ( arrElt.eoo() ) {
+	// no terminal array element to expand
 	BSONObjBuilder b;
 	for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i )
 	  b.appendAs( *i, "" );
 	keys.insert( b.obj() );
       } else {
+	// terminal array element to expand, so generate all keys
 	BSONObjIterator i( arrElt.embeddedObject() );
 	while( i.more() ) {
 	  BSONObjBuilder b;
@@ -692,6 +695,7 @@ assert( !eloc.isNull() );
 	}
       }
     } else {
+      // nonterminal array element to expand, so recurse
       assert( !arrElt.eoo() );
       BSONObjIterator i( arrElt.embeddedObject() );
       while( i.more() ) {
