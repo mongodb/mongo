@@ -12,7 +12,7 @@
 namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
-    mutex smmutex;
+    boost::mutex smmutex;
 #define smlock boostlock ___lk( smmutex );
 
 #define GETHOLDER(x,o) ((BSONHolder*)JS_GetPrivate( x , o ))
