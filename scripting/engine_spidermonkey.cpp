@@ -12,6 +12,8 @@
 namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
+    mutex smmutex;
+#define smlock boostlock ___lk( smmutex );
 
 #define GETHOLDER(x,o) ((BSONHolder*)JS_GetPrivate( x , o ))
 
@@ -819,6 +821,7 @@ namespace mongo {
     class SMScope : public Scope {
     public:
         SMScope(){
+            smlock;
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
             _convertor = new Convertor( _context );
             massert( "JS_NewContext failed" , _context );
@@ -848,6 +851,7 @@ namespace mongo {
         }
         
         ~SMScope(){
+            smlock;
             uassert( "deleted SMScope twice?" , _convertor );
 
             for ( list<void*>::iterator i=_roots.begin(); i != _roots.end(); i++ ){
