@@ -391,7 +391,7 @@ namespace mongo {
         try { _initAndListen(listenPort, appserverLoc); }
         catch(...) {
             log() << " exception in initAndListen, terminating" << endl;
-            dbexit(1);
+            dbexit( EXIT_UNCAUGHT );
         }
     }
 
@@ -619,7 +619,7 @@ int main(int argc, char* argv[], char *envp[] )
             int x = params["oplog"].as<int>();
             if ( x < 0 || x > 7 ) {
                 out() << "can't interpret --oplog setting" << endl;
-                dbexit(13);
+                dbexit( EXIT_BADOPTIONS );
             }
             opLogging = x;
         }
@@ -737,21 +737,21 @@ int main(int argc, char* argv[], char *envp[] )
         #if defined(_WIN32)
         if ( installService ) {
             if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
-                dbexit( 1 );
+                dbexit( EXIT_NTSERVICE_ERROR );
         }
         else if ( removeService ) {
             if ( !ServiceController::removeService( L"MongoDB" ) )
-                dbexit( 1 );
+                dbexit( EXIT_NTSERVICE_ERROR );
         }
         else if ( startService ) {
             if ( !ServiceController::startService( L"MongoDB", mongo::initService ) )
-                dbexit( 1 );
+                dbexit( EXIT_NTSERVICE_ERROR );
         }
         else
         #endif
             initAndListen( port, appsrvPath );
 
-        dbexit(0);
+        dbexit( EXIT_CLEAN );
     }
 
     show_help_text(visible_options);
@@ -798,7 +798,7 @@ namespace mongo {
         oss << "Backtrace:" << endl;
         printStackTrace( oss );
         rawOut( oss.str() );
-        exit(14);
+        dbexit( EXIT_ABRUBT );
     }
 
     sigset_t asyncSignals;
@@ -811,7 +811,7 @@ namespace mongo {
         {
             dblock lk;
             log() << "now exiting" << endl;
-            exit(12);
+            dbexit( EXIT_KILL );
         }
     }
 

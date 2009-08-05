@@ -46,7 +46,7 @@ namespace mongo {
         *q = 0;
         if (q-database>=MaxClientLen) {
             problem() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
-            dbexit(60);
+            dbexit( EXIT_POSSIBLE_CORRUPTION );
         }
     }
     inline string nsToClient(const char *ns) {

@@ -8,7 +8,7 @@ namespace mongo {
 
     //    Database* database = 0;
 
-    void dbexit(int returnCode, const char *whyMsg ) {
+    void dbexit( ExitCode returnCode, const char *whyMsg ) {
         out() << "dbexit called" << endl;
         if ( whyMsg )
             out() << " b/c " << whyMsg << endl;
