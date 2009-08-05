@@ -512,6 +512,11 @@ if nix:
     if GetOption( "profile" ) is not None:
         env.Append( LINKFLAGS=" -pg " )
 
+try:
+    umask = os.umask(022)
+except OSError:
+    pass
+
 # --- check system ---
 
 def getGitVersion():
@@ -1184,6 +1189,9 @@ def installBinary( e , name ):
 
     if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         e.AddPostAction( inst , checkGlibc )
+
+    if nix:
+        e.AddPostAction( inst , e.Action( 'chmod 755 ' + fullInstallName ) )
 
 installBinary( env , "mongodump" )
 installBinary( env , "mongorestore" )
