@@ -1064,7 +1064,6 @@ namespace mongo {
         }
 
         bool exec( const string& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ){
-            smlock;
             precall();
 
             jsval ret = JSVAL_VOID;
