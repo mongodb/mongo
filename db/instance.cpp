@@ -643,6 +643,10 @@ namespace mongo {
     bool firstExit = true;
     void shutdown();
 
+    bool inShutdown(){
+        return ! firstExit;
+    }
+
     /* not using log() herein in case we are already locked */
     void dbexit( ExitCode rc, const char *why) {        
         {

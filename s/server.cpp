@@ -35,7 +35,11 @@ namespace mongo {
     string ourHostname;
     bool quiet = false;
     OID serverID;
+    bool dbexitCalled = false;
     
+    bool inShutdown(){
+        return dbexitCalled;
+    }
     
     string getDbContext() {
         return "?";
@@ -172,6 +176,7 @@ int main(int argc, char* argv[], char *envp[] ) {
 
 #undef exit
 void mongo::dbexit( ExitCode rc, const char *why) {
+    dbexitCalled = true;
     log() << "dbexit: " << why << " rc:" << rc << endl;
     ::exit(rc);
 }

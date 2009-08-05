@@ -54,6 +54,7 @@ namespace mongo {
     };
 
     void dbexit( ExitCode returnCode, const char *whyMsg = "");
+    bool inShutdown();
     
 } // namespace mongo
 

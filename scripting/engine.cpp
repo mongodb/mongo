@@ -52,6 +52,9 @@ namespace mongo {
     public:
         
         ~ScopeCache(){
+            if ( inShutdown() )
+                return;
+
             for ( PoolToScopes::iterator i=_pools.begin() ; i != _pools.end(); i++ ){
                 for ( list<Scope*>::iterator j=i->second.begin(); j != i->second.end(); j++ )
                     delete *j;
