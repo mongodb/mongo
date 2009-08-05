@@ -210,6 +210,10 @@ namespace mongo {
                 isIdIndex();
         }
 
+        bool dropDups() const {
+            return info.obj().getBoolField( "dropDups" );
+        }
+
         /* delete this index.  does NOT clean up the system catalog
            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */

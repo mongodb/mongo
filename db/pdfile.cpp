@@ -769,11 +769,11 @@ assert( !eloc.isNull() );
     }
 
     /* unindex all keys in all indexes for this record. */
-    void  unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl) {
+    void  unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl, bool noWarn = false) {
         if ( d->nIndexes == 0 ) return;
         BSONObj obj(todelete);
         for ( int i = 0; i < d->nIndexes; i++ ) {
-            _unindexRecord(d->indexes[i], obj, dl);
+            _unindexRecord(d->indexes[i], obj, dl, !noWarn);
         }
     }
 
@@ -826,7 +826,7 @@ assert( !eloc.isNull() );
         }
     }
 
-    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK)
+    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn)
     {
         dassert( todelete == dl.rec() );
 
@@ -839,7 +839,7 @@ assert( !eloc.isNull() );
         /* check if any cursors point to us.  if so, advance them. */
         aboutToDelete(dl);
 
-        unindexRecord(d, todelete, dl);
+        unindexRecord(d, todelete, dl, noWarn);
 
         _deleteRecord(d, ns, todelete, dl);
         NamespaceDetailsTransient::get( ns ).registerWriteOp();
@@ -1026,6 +1026,7 @@ assert( !eloc.isNull() );
        done eventually */
     void addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         bool dupsAllowed = !idx.unique();
+        bool dropDups = idx.dropDups();
 
         Timer t;
         Nullstream& l = log();
@@ -1037,12 +1038,18 @@ assert( !eloc.isNull() );
             BSONObj js = c->current();
             try { 
                 _indexRecord(d, idxNo, js, c->currLoc(),dupsAllowed);
+                c->advance();
             } catch( AssertionException& e ) { 
-                l << endl;
-                log(2) << "addExistingToIndex exception " << e.what() << endl;
-                throw;
+                if ( dropDups ) {
+                    DiskLoc toDelete = c->currLoc();
+                    c->advance();
+                    theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
+                } else {
+                    l << endl;
+                    log(2) << "addExistingToIndex exception " << e.what() << endl;
+                    throw;
+                }
             }
-            c->advance();
             n++;
         };
         l << "done for " << n << " records";
@@ -1139,7 +1146,7 @@ assert( !eloc.isNull() );
         return loc;
     }
 
-  DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
+    DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
@@ -1317,7 +1324,7 @@ assert( !eloc.isNull() );
             tableToIndex->addingIndex(tabletoidxns.c_str(), idx);
             try {
                 addExistingToIndex(tabletoidxns.c_str(), tableToIndex, idx, idxNo);
-            } catch( DBException& ) { 
+            } catch( DBException& ) {
                 // roll back this index
                 string name = idx.indexName();
                 BSONObjBuilder b;

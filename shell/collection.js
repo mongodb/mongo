@@ -172,7 +172,7 @@ DBCollection.prototype._genIndexName = function( keys ){
 
 DBCollection.prototype._indexSpec = function( keys, options ) {
     var name;
-    var unique = false;
+    var nTrue = 0;
     if ( !isObject( options ) ) {
         options = [ options ];
     }
@@ -181,13 +181,18 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
         if ( isString( o ) ) {
             name = o;
         } else if ( typeof( o ) == "boolean" ) {
-            unique = o;
+	    if ( o ) {
+		++nTrue;
+	    }
         }
     }
     name = name || this._genIndexName( keys );
     var ret = { ns : this._fullName , key : keys , name : name };
-    if ( unique == true ) {
-        ret.unique = true;
+    if ( nTrue > 0 ) {
+	ret.unique = true;
+    }
+    if ( nTrue > 1 ) {
+	ret.dropDups = true;
     }
     return ret;
 }
@@ -205,7 +210,9 @@ DBCollection.prototype.ensureIndex = function( keys , options ){
     }
 
     this.createIndex( keys , options );
-    this._indexCache[name] = true;
+    if ( this.getDB().getLastError() == "" ) {
+	this._indexCache[name] = true;
+    }
     return true;
 }
 
