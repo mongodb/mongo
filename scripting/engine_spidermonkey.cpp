@@ -749,14 +749,8 @@ namespace mongo {
             JS_SetCStringsAreUTF8();
 #endif
 
-#ifdef JS_THREADSAFE
             _runtime = JS_NewRuntime(8L * 1024L * 1024L);
             uassert( "JS_NewRuntime failed" , _runtime );
-#else
-#warning spider monkey compiled without THREADSAFE  will be slower
-            cerr << "*** warning: spider monkey compiled without THREADSAFE  will be slower" << endl;
-#endif
-
             
             if ( ! utf8Ok() ){
                 cerr << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
@@ -764,9 +758,7 @@ namespace mongo {
         }
 
         ~SMEngine(){
-#ifdef JS_THREADSAFE
             JS_DestroyRuntime( _runtime );
-#endif
             JS_ShutDown();
         }
 
@@ -777,9 +769,7 @@ namespace mongo {
         virtual bool utf8Ok() const { return JS_CStringsAreUTF8(); }
 
     private:
-#ifdef JS_THREADSAFE
         JSRuntime * _runtime;
-#endif
         friend class SMScope;
     };
 
@@ -829,13 +819,7 @@ namespace mongo {
     class SMScope : public Scope {
     public:
         SMScope(){
-#ifdef JS_THREADSAFE
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
-#else
-            _runtime = JS_NewRuntime( 512L * 1024L );
-            massert( "JS_NewRuntime failed" , _runtime );
-            _context = JS_NewContext( _runtime , 8192 );
-#endif
             _convertor = new Convertor( _context );
             massert( "JS_NewContext failed" , _context );
 
@@ -886,10 +870,6 @@ namespace mongo {
                 _context = 0;
             }
 
-#ifndef JS_THREADSAFE
-            JS_DestroyRuntime( _runtime );
-            _runtime = 0;
-#endif
         }
         
         void reset(){
@@ -1159,9 +1139,6 @@ namespace mongo {
         JSContext *context() const { return _context; }
 
     private:
-#ifndef JS_THREADSAFE
-        JSRuntime * _runtime;
-#endif
         JSContext * _context;
         Convertor * _convertor;
 
