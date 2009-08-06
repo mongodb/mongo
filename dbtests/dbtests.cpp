@@ -125,5 +125,6 @@ int main( int argc, char** argv ) {
     flock( lockFile, LOCK_UN );
 #endif    
 
+    dbexit( (ExitCode)ret ); // so everything shuts down cleanly
     return ret;
 }
