@@ -214,6 +214,10 @@ namespace mongo {
            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill();
+
+        operator string() const {
+            return info.obj().toString();
+        }
     };
 
     extern int bucketSizes[];
