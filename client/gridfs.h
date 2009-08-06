@@ -15,7 +15,7 @@ namespace mongo {
     public:
         Chunk( BSONObj data );
         Chunk( BSONObj fileId , int chunkNumber , const char * data , int len );
-        
+
         int len(){
             int len;
             const char * data = _data["data"].binData( len );
@@ -23,16 +23,16 @@ namespace mongo {
             assert( len - 4 == foo[0] );
             return len - 4;
         }
-            
+
         const char * data( int & len ){
             const char * data = _data["data"].binData( len );
             int * foo = (int*)data;
             assert( len - 4 == foo[0] );
-            
+
             len = len - 4;
             return data + 4;
         }
-        
+
     private:
         BSONObj _data;
         friend class GridFS;
@@ -58,14 +58,14 @@ namespace mongo {
          * @return the file object
          */
         BSONObj storeFile( const string& fileName );
-        
+
         /**
          * removes file referenced by fileName from the db
          * @param fileName relative to process
          * @return the file object
          */
         void removeFile( const string& fileName );
-        
+
         /**
          * returns a file object matching the query
          */
@@ -95,7 +95,7 @@ namespace mongo {
 
         friend class GridFile;
     };
-    
+
     /**
        wrapper for a file stored in the Mongo database
      */
@@ -108,11 +108,11 @@ namespace mongo {
         bool exists(){
             return ! _obj.isEmpty();
         }
-        
+
         string getFilename(){
             return _obj["filename"].str();
         }
-        
+
         int getChunkSize(){
             return (int)(_obj["chunkSize"].number());
         }
@@ -136,17 +136,17 @@ namespace mongo {
            write the file to this filename
          */
         gridfs_offset write( const string& where );
-        
+
     private:
         GridFile( GridFS * grid , BSONObj obj );
 
         void _exists();
-        
+
         GridFS * _grid;
         BSONObj _obj;
 
         friend class GridFS;
     };
 }
-        
-    
+
+
