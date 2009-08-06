@@ -565,7 +565,7 @@ assert( !eloc.isNull() );
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
         NamespaceDetails* d = nsdetails(nsToDrop.c_str());
-        uassert( "ns not found", d );
+        uassert( (string)"ns not found: " + nsToDrop , d );
 
         uassert( "can't drop system ns", strstr(nsToDrop.c_str(), ".system.") == 0 );
         {
@@ -607,6 +607,7 @@ assert( !eloc.isNull() );
     }
 
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
+        log(1) << "dropCollection: " << name << endl;
         NamespaceDetails *d = nsdetails(name.c_str());
         assert( d );
         if ( d->nIndexes != 0 ) {
@@ -618,6 +619,7 @@ assert( !eloc.isNull() );
             }
             assert( d->nIndexes == 0 );
         }
+        log(1) << "\t deleteIndexes dones" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         dropNS(name);        
