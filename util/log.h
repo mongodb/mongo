@@ -55,6 +55,9 @@ namespace mongo {
         virtual Nullstream& operator<<(int) {
             return *this;
         }
+        virtual Nullstream& operator<<(ExitCode) {
+            return *this;
+        }
         virtual Nullstream& operator<<(unsigned long) {
             return *this;
         }
@@ -119,6 +122,7 @@ namespace mongo {
         Logstream& operator<<(char *x) LOGIT
         Logstream& operator<<(char x) LOGIT
         Logstream& operator<<(int x) LOGIT
+        Logstream& operator<<(ExitCode x) LOGIT
         Logstream& operator<<(long x) LOGIT
         Logstream& operator<<(unsigned long x) LOGIT
         Logstream& operator<<(unsigned x) LOGIT

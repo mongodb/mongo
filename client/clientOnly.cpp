@@ -7,15 +7,21 @@ namespace mongo {
     bool quiet = false;
 
     //    Database* database = 0;
+    
+    bool dbexitCalled = false;
 
-    void dbexit(int returnCode, const char *whyMsg ) {
+    void dbexit( ExitCode returnCode, const char *whyMsg ) {
+        dbexitCalled = true;
         out() << "dbexit called" << endl;
         if ( whyMsg )
             out() << " b/c " << whyMsg << endl;
         out() << "exiting" << endl;
         ::exit( returnCode );
     }
-
+    
+    bool inShutdown(){
+        return dbexitCalled;
+    }
 
     string getDbContext() {
         return "in client only mode";

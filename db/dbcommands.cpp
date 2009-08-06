@@ -221,7 +221,7 @@ namespace mongo {
                 }
             }
             log() << "terminating, shutdown command received" << endl;
-            dbexit(EXIT_SUCCESS);
+            dbexit( EXIT_CLEAN );
             return true;
         }
     } cmdShutdown;

@@ -46,7 +46,7 @@ namespace mongo {
         *q = 0;
         if (q-database>=MaxClientLen) {
             problem() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
-            dbexit(60);
+            dbexit( EXIT_POSSIBLE_CORRUPTION );
         }
     }
     inline string nsToClient(const char *ns) {
@@ -214,6 +214,10 @@ namespace mongo {
            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill();
+
+        operator string() const {
+            return info.obj().toString();
+        }
     };
 
     extern int bucketSizes[];

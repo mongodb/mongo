@@ -422,7 +422,9 @@ namespace mongo {
                     case 'i': flagNumber |= JSREG_FOLD; break;
                     case 'm': flagNumber |= JSREG_MULTILINE; break;
                         //case 'y': flagNumber |= JSREG_STICKY; break;
-                    default: uassert( "unknown regex flag" , 0 );
+                        
+                    default: 
+                        log() << "warning: unknown regex flag:" << *flags << endl;
                     }
                     flags++;
                 }
@@ -1064,7 +1066,6 @@ namespace mongo {
         }
 
         bool exec( const string& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ){
-            smlock;
             precall();
 
             jsval ret = JSVAL_VOID;

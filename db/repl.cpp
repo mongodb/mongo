@@ -601,13 +601,13 @@ namespace mongo {
                     log() << "E10000 --source " << dashDashSource << " != " << tmp.hostName << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
-                    dbexit(18);
+                    dbexit( EXIT_REPLICATION_ERROR );
                 }
                 if ( tmp.only != dashDashOnly ) {
                     log() << "E10001 --only " << dashDashOnly << " != " << tmp.only << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
-                    dbexit(18);
+                    dbexit( EXIT_REPLICATION_ERROR );
                 }
                 c->advance();
             }
@@ -643,7 +643,7 @@ namespace mongo {
                     log() << "E10003 pairwith " << remote << " != " << tmp.hostName << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
-                    dbexit(18);
+                    dbexit( EXIT_REPLICATION_ERROR );
                 }
                 c->advance();
             }

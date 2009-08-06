@@ -18,19 +18,19 @@
 
 #pragma once
 
+#include "../stdafx.h"
+
 namespace mongo {
-    
-	void dbexit(int returnCode, const char *whyMsg);
     
     inline void * ourmalloc(size_t size) {
         void *x = malloc(size);
-        if ( x == 0 ) dbexit(42, "malloc fails");
+        if ( x == 0 ) dbexit( EXIT_OOM_MALLOC , "malloc fails");
         return x;
     }
     
     inline void * ourrealloc(void *ptr, size_t size) {
         void *x = realloc(ptr, size);
-        if ( x == 0 ) dbexit(43, "realloc fails");
+        if ( x == 0 ) dbexit( EXIT_OOM_REALLOC , "realloc fails");
         return x;
     }
     
