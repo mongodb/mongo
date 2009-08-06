@@ -215,6 +215,7 @@ namespace mongo {
                 // if running without auth, you must be on localhost
                 AuthenticationInfo *ai = authInfo.get();
                 if( ai == 0 || !ai->isLocalHost ) {
+                    log() << "ignoring shutdown cmd from client, not from localhost and running without auth" << endl;
                     errmsg = "unauthorized [2]";
                     return false;
                 }

@@ -610,7 +610,12 @@ assert( !eloc.isNull() );
         NamespaceDetails *d = nsdetails(name.c_str());
         assert( d );
         if ( d->nIndexes != 0 ) {
-            assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
+            try { 
+                assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
+            }
+            catch( DBException& ) {
+                uasserted("drop: deleteIndexes for collection failed - consider trying repair");
+            }
             assert( d->nIndexes == 0 );
         }
         result.append("ns", name.c_str());
