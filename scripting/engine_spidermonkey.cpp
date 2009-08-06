@@ -422,7 +422,9 @@ namespace mongo {
                     case 'i': flagNumber |= JSREG_FOLD; break;
                     case 'm': flagNumber |= JSREG_MULTILINE; break;
                         //case 'y': flagNumber |= JSREG_STICKY; break;
-                    default: uassert( "unknown regex flag" , 0 );
+                        
+                    default: 
+                        log() << "warning: unknown regex flag:" << *flags << endl;
                     }
                     flags++;
                 }
