@@ -17,7 +17,7 @@ string historyFile;
 
 void shellHistoryInit(){
 #ifdef USE_READLINE
-    
+
     stringstream ss;
     char * h = getenv( "HOME" );
     if ( h )
@@ -71,13 +71,13 @@ void quitAbruptly( int sig ) {
     ostringstream ossSig;
     ossSig << "mongo got signal " << sig << " (" << strsignal( sig ) << "), stack trace: " << endl;
     mongo::rawOut( ossSig.str() );
-    
+
     ostringstream ossBt;
     mongo::printStackTrace( ossBt );
     mongo::rawOut( ossBt.str() );
-    
+
     mongo::shellUtils::KillMongoProgramInstances();
-    exit(14);    
+    exit(14);
 }
 
 void setupSignals() {
@@ -99,57 +99,57 @@ string fixHost( string url , string host , string port ){
             return url + "/test";
         return url;
     }
-    
+
     if ( url.find( "/" ) != string::npos ){
         cerr << "url can't have host or port if you specify them individually" << endl;
         exit(-1);
     }
-    
+
     if ( host.size() == 0 )
         host = "127.0.0.1";
 
     string newurl = host;
     if ( port.size() > 0 )
         newurl += ":" + port;
-    
+
     newurl += "/" + url;
-    
+
     return newurl;
 }
 
 int main(int argc, char* argv[]) {
     setupSignals();
-    
+
     mongo::shellUtils::RecordMyLocation( argv[ 0 ] );
 
     mongo::ScriptEngine::setup();
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->createScope() );
-    
+
     string url = "test";
     string dbhost;
     string port;
-    
+
     string username;
     string password;
 
     bool runShell = false;
     bool nodb = false;
-    
+
     string script;
-    
+
     int argNumber = 1;
     for ( ; argNumber < argc; argNumber++) {
         const char* str = argv[argNumber];
-        
+
         if (strcmp(str, "--shell") == 0) {
             runShell = true;
             continue;
-        } 
-        
+        }
+
         if (strcmp(str, "--nodb") == 0) {
             nodb = true;
             continue;
-        } 
+        }
 
         if ( strcmp( str , "--port" ) == 0 ){
             port = argv[argNumber+1];
@@ -168,7 +168,7 @@ int main(int argc, char* argv[]) {
             argNumber++;
             continue;
         }
-        
+
         if ( strcmp( str , "-u" ) == 0 ){
             username = argv[argNumber+1];
             argNumber++;
@@ -187,14 +187,14 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        if ( strcmp(str, "--help") == 0 || 
+        if ( strcmp(str, "--help") == 0 ||
              strcmp(str, "-h" ) == 0 ) {
 
-            cout 
-                << "usage: " << argv[0] << " [options] [db address] [file names (ending in .js)]\n" 
+            cout
+                << "usage: " << argv[0] << " [options] [db address] [file names (ending in .js)]\n"
                 << "db address can be:\n"
-                << "   foo   =   foo database on local machine\n" 
-                << "   192.169.0.5/foo   =   foo database on 192.168.0.5 machine\n" 
+                << "   foo   =   foo database on local machine\n"
+                << "   192.169.0.5/foo   =   foo database on 192.168.0.5 machine\n"
                 << "   192.169.0.5:9999/foo   =   foo database on 192.168.0.5 machine on port 9999\n"
                 << "options\n"
                 << " --shell run the shell after executing files\n"
@@ -206,19 +206,19 @@ int main(int argc, char* argv[]) {
                 << " --eval <script> evaluate javascript.\n"
                 << "file names: a list of files to run.  files have to end in .js will exit after unless --shell is specified\n"
                 ;
-            
+
             return 0;
-        } 
+        }
 
         if (strcmp(str, "-f") == 0) {
             continue;
-        } 
-        
+        }
+
         if (strncmp(str, "--", 2) == 0) {
             printf("Warning: unknown flag %s.\nTry --help for options\n", str);
             continue;
-        } 
-        
+        }
+
         if ( nodb )
             break;
 
@@ -227,12 +227,12 @@ int main(int argc, char* argv[]) {
             last++;
         else
             last = str;
-        
+
         if ( ! strstr( last , "." ) ){
             url = str;
             continue;
         }
-        
+
         if ( strstr( last , ".js" ) )
             break;
 
@@ -241,11 +241,11 @@ int main(int argc, char* argv[]) {
             url = str;
             continue;
         }
-            
+
 
         break;
     }
-    
+
     scope->externalSetup();
     mongo::shellUtils::installShellUtils( *scope );
 
@@ -256,7 +256,7 @@ int main(int argc, char* argv[]) {
         string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
         if ( ! scope->exec( setup , "(connect)" , false , true , false ) )
             return -1;
-        
+
         if ( username.size() && password.size() ){
             stringstream ss;
             ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
@@ -268,17 +268,17 @@ int main(int argc, char* argv[]) {
 
         }
 
-    }    
-    
+    }
+
     if ( !script.empty() ) {
         script = "function() { " + script + " }";
         mongo::shellUtils::MongoProgramScope s;
         if ( scope->invoke( script.c_str(), mongo::BSONObj() ) )
             return -4;
     }
-    
+
     int numFiles = 0;
-    
+
     for ( ; argNumber < argc; argNumber++) {
         const char* str = argv[argNumber];
 
@@ -287,25 +287,25 @@ int main(int argc, char* argv[]) {
         if ( ! scope->execFile( str , false , true , false ) ){
             return -3;
         }
-        
+
         numFiles++;
     }
-    
+
     if ( numFiles == 0 && script.empty() )
         runShell = true;
 
     if ( runShell ){
-        
+
         mongo::shellUtils::MongoProgramScope s;
 
         shellHistoryInit();
-        
+
         cout << "type \"help\" for help" << endl;
-        
+
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
-        
+
         while ( 1 ){
-            
+
             char * line = shellReadline( "> " );
 
             if ( line )
@@ -316,18 +316,18 @@ int main(int argc, char* argv[]) {
                 cout << "bye" << endl;
                 break;
             }
-            
+
             string code = line;
             if ( code == "exit" ){
                 break;
             }
-            
+
             bool wascmd = false;
             {
                 string cmd = line;
                 if ( cmd.find( " " ) > 0 )
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
-                
+
                 if ( cmd.find( "\"" ) == string::npos ){
                     scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
                     if ( scope->getBoolean( "__iscmd__" )  ){
@@ -335,21 +335,21 @@ int main(int argc, char* argv[]) {
                         wascmd = true;
                     }
                 }
-                
+
             }
-            
+
             if ( ! wascmd ){
                 scope->exec( code.c_str() , "(shell)" , false , true , false );
                 scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
             }
-            
-            
+
+
             shellHistoryAdd( line );
         }
-        
+
         shellHistoryDone();
     }
-    
+
     return 0;
 }
 
