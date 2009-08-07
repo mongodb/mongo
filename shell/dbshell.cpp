@@ -201,7 +201,9 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        files = params["files"].as< vector<string> >();
+        if (params.count("files")) {
+            files = params["files"].as< vector<string> >();
+        }
 
         /* This is a bit confusing, here are the rules:
          *
