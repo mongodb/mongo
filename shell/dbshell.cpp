@@ -153,6 +153,8 @@ int main(int argc, char* argv[]) {
     string script;
 
     po::options_description shell_options("options");
+    po::options_description hidden_options("Hidden options");
+    po::options_description cmdline_options("Command line options");
     po::positional_options_description positional_options;
 
     shell_options.add_options()
@@ -166,8 +168,15 @@ int main(int argc, char* argv[]) {
         ("help,h", "show this usage information")
         ;
 
+    hidden_options.add_options()
+        ("dbaddress", po::value<string>(), "dbaddress")
+        ("files", po::value< vector<string> >(), "files")
+        ;
+
     positional_options.add("dbaddress", 1);
     positional_options.add("files", -1);
+
+    cmdline_options.add(shell_options).add(hidden_options);
 
     if (argc >= 2) {
         po::variables_map params;
@@ -180,14 +189,14 @@ int main(int argc, char* argv[]) {
                                   po::command_line_style::allow_sticky);
 
         try {
-            po::store(po::command_line_parser(argc, argv).options(shell_options).
+            po::store(po::command_line_parser(argc, argv).options(cmdline_options).
                       positional(positional_options).
                       style(command_line_style).run(), params);
             po::notify(params);
         } catch (po::error &e) {
             cout << "ERROR: " << e.what() << endl << endl;
             show_help_text(argv[0], shell_options);
-            return 0;
+            return mongo::EXIT_BADOPTIONS;
         }
 
         if (params.count("shell")) {
@@ -198,7 +207,7 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("help")) {
             show_help_text(argv[0], shell_options);
-            return 0;
+            return mongo::EXIT_CLEAN;
         }
 
         if (params.count("files")) {
@@ -213,14 +222,14 @@ int main(int argc, char* argv[]) {
          *   - it contains no '.' after the last appearance of '\' or '/'
          *   - it doesn't end in '.js' and it doesn't specify a path to an existing file */
         if (params.count("dbaddress")) {
-            string dbaddress = params["dbaddress"].as< vector<string> >()[0];
+            string dbaddress = params["dbaddress"].as<string>();
             if (nodb) {
                 files.insert(files.begin(), dbaddress);
             } else {
                 string basename = dbaddress.substr(dbaddress.find_last_of("/\\") + 1);
                 path p(dbaddress);
-                if (!basename.find_first_of('.') ||
-                    (!basename.find(".js", basename.size() - 3) && !boost::filesystem::exists(p))) {
+                if (basename.find_first_of('.') == string::npos ||
+                    (basename.find(".js", basename.size() - 3) == string::npos && !boost::filesystem::exists(p))) {
                     url = dbaddress;
                 } else {
                     files.insert(files.begin(), dbaddress);
