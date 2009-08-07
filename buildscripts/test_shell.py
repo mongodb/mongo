@@ -226,12 +226,15 @@ class TestShell(unittest.TestCase):
         self.assertEqual(BADOPTS, mongo.returncode)
 
 
+def run_tests():
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestShell)
+    unittest.TextTestRunner(verbosity=1).run(suite)
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print "must give the path to shell executable to be tested"
         sys.exit()
 
     mongo_path = sys.argv[1]
-
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestShell)
-    unittest.TextTestRunner(verbosity=1).run(suite)
+    run_tests()
