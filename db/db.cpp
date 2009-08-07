@@ -214,7 +214,7 @@ namespace mongo {
                         dbMsgPort.shutdown();
                         sleepmillis(50);
                         problem() << "exiting end msg" << endl;
-                        exit(EXIT_SUCCESS);
+                        dbexit(EXIT_CLEAN);
                     }
                     else {
                         out() << "  (not from localhost, ignoring end msg)" << endl;
@@ -236,11 +236,11 @@ namespace mongo {
         }
         catch ( std::exception &e ) {
             problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
-            exit( 15 );
+            dbexit( EXIT_UNCAUGHT );
         }
         catch ( ... ) {
             problem() << "Uncaught exception, terminating" << endl;
-            exit( 15 );
+            dbexit( EXIT_UNCAUGHT );
         }
     }
 
@@ -830,7 +830,7 @@ void ctrlCTerminate() {
     {
         dblock lk;
         log() << "now exiting" << endl;
-        exit(12);
+        dbexit( EXIT_KILL );
     }
 }
 BOOL CtrlHandler( DWORD fdwCtrlType ) 
