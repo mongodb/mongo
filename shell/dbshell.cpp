@@ -117,6 +117,20 @@ string fixHost( string url , string host , string port ){
     return newurl;
 }
 
+#include <boost/program_options.hpp>
+namespace po = boost::program_options;
+
+void show_help_text(const char* name, po::options_description options) {
+    cout << "usage: " << name << " [options] [db address] [file names (ending in .js)]" << endl
+         << "db address can be:" << endl
+         << "  foo                   foo database on local machine" << endl
+         << "  192.169.0.5/foo       foo database on 192.168.0.5 machine" << endl
+         << "  192.169.0.5:9999/foo  foo database on 192.168.0.5 machine on port 9999" << endl
+         << options << endl
+         << "file names: a list of files to run. files have to end in .js and will exit after "
+         << "unless --shell is specified" << endl;
+};
+
 int main(int argc, char* argv[]) {
     setupSignals();
 
@@ -128,6 +142,7 @@ int main(int argc, char* argv[]) {
     string url = "test";
     string dbhost;
     string port;
+    vector<string> files;
 
     string username;
     string password;
@@ -137,113 +152,79 @@ int main(int argc, char* argv[]) {
 
     string script;
 
-    int argNumber = 1;
-    for ( ; argNumber < argc; argNumber++) {
-        const char* str = argv[argNumber];
+    po::options_description shell_options("options");
+    po::positional_options_description positional_options;
 
-        if (strcmp(str, "--shell") == 0) {
-            runShell = true;
-            continue;
-        }
+    shell_options.add_options()
+        ("shell", "run the shell after executing files")
+        ("nodb", "don't connect to mongod on startup - no 'db address' arg expected")
+        ("port", po::value<string>(&port), "port to connect to")
+        ("host", po::value<string>(&dbhost), "server to connect to")
+        ("eval", po::value<string>(&script), "evaluate javascript")
+        ("username,u", po::value<string>(&username), "username for authentication")
+        ("password,p", po::value<string>(&password), "password for authentication")
+        ("help,h", "show this usage information")
+        ;
 
-        if (strcmp(str, "--nodb") == 0) {
-            nodb = true;
-            continue;
-        }
+    positional_options.add("dbaddress", 1);
+    positional_options.add("files", -1);
 
-        if ( strcmp( str , "--port" ) == 0 ){
-            port = argv[argNumber+1];
-            argNumber++;
-            continue;
-        }
+    if (argc >= 2) {
+        po::variables_map params;
 
-        if ( strcmp( str , "--host" ) == 0 ){
-            dbhost = argv[argNumber+1];
-            argNumber++;
-            continue;
-        }
+        /* using the same style as db.cpp uses because eventually we're going
+         * to merge some of this stuff. */
+        int command_line_style = (((po::command_line_style::unix_style ^
+                                    po::command_line_style::allow_guessing) |
+                                   po::command_line_style::allow_long_disguise) ^
+                                  po::command_line_style::allow_sticky);
 
-        if ( strcmp( str , "--eval" ) == 0 ){
-            script = argv[argNumber+1];
-            argNumber++;
-            continue;
-        }
-
-        if ( strcmp( str , "-u" ) == 0 ){
-            username = argv[argNumber+1];
-            argNumber++;
-            continue;
-        }
-
-        if ( strcmp( str , "-p" ) == 0 ){
-            password = argv[argNumber+1];
-            argNumber++;
-            continue;
-        }
-
-        if ( strstr( str , "-p" ) == str ){
-            password = str;
-            password = password.substr( 2 );
-            continue;
-        }
-
-        if ( strcmp(str, "--help") == 0 ||
-             strcmp(str, "-h" ) == 0 ) {
-
-            cout
-                << "usage: " << argv[0] << " [options] [db address] [file names (ending in .js)]\n"
-                << "db address can be:\n"
-                << "   foo   =   foo database on local machine\n"
-                << "   192.169.0.5/foo   =   foo database on 192.168.0.5 machine\n"
-                << "   192.169.0.5:9999/foo   =   foo database on 192.168.0.5 machine on port 9999\n"
-                << "options\n"
-                << " --shell run the shell after executing files\n"
-                << " -u <username>\n"
-                << " -p<password> - notice no space\n"
-                << " --host <host> - server to connect to\n"
-                << " --port <port> - port to connect to\n"
-                << " --nodb don't connect to mongo program on startup.  No 'db address' arg expected.\n"
-                << " --eval <script> evaluate javascript.\n"
-                << "file names: a list of files to run.  files have to end in .js will exit after unless --shell is specified\n"
-                ;
-
+        try {
+            po::store(po::command_line_parser(argc, argv).options(shell_options).
+                      positional(positional_options).
+                      style(command_line_style).run(), params);
+            po::notify(params);
+        } catch (po::error &e) {
+            cout << "ERROR: " << e.what() << endl << endl;
+            show_help_text(argv[0], shell_options);
             return 0;
         }
 
-        if (strcmp(str, "-f") == 0) {
-            continue;
+        if (params.count("shell")) {
+            runShell = true;
+        }
+        if (params.count("nodb")) {
+            nodb = true;
+        }
+        if (params.count("help")) {
+            show_help_text(argv[0], shell_options);
+            return 0;
         }
 
-        if (strncmp(str, "--", 2) == 0) {
-            printf("Warning: unknown flag %s.\nTry --help for options\n", str);
-            continue;
+        files = params["files"].as< vector<string> >();
+
+        /* This is a bit confusing, here are the rules:
+         *
+         * if nodb is set then all positional parameters are files
+         * otherwise the first positional parameter might be a dbaddress, but
+         * only if one of these conditions is met:
+         *   - it contains no '.' after the last appearance of '\' or '/'
+         *   - it doesn't end in '.js' and it doesn't specify a path to an existing file */
+        if (params.count("dbaddress")) {
+            string dbaddress = params["dbaddress"].as< vector<string> >()[0];
+            if (nodb) {
+                files.insert(files.begin(), dbaddress);
+            } else {
+                string basename = dbaddress.substr(dbaddress.find_last_of("/\\") + 1);
+                path p(dbaddress);
+                if (!basename.find_first_of('.') ||
+                    (!basename.find(".js", basename.size() - 3) && !boost::filesystem::exists(p))) {
+                    url = dbaddress;
+                } else {
+                    files.insert(files.begin(), dbaddress);
+                }
+            }
         }
-
-        if ( nodb )
-            break;
-
-        const char * last = strstr( str , "/" );
-        if ( last )
-            last++;
-        else
-            last = str;
-
-        if ( ! strstr( last , "." ) ){
-            url = str;
-            continue;
-        }
-
-        if ( strstr( last , ".js" ) )
-            break;
-
-        path p( str );
-        if ( ! boost::filesystem::exists( p ) ){
-            url = str;
-            continue;
-        }
-
-
-        break;
     }
 
     scope->externalSetup();
@@ -277,22 +258,17 @@ int main(int argc, char* argv[]) {
             return -4;
     }
 
-    int numFiles = 0;
-
-    for ( ; argNumber < argc; argNumber++) {
-        const char* str = argv[argNumber];
-
+    for (size_t i = 0; i < files.size(); i++) {
         mongo::shellUtils::MongoProgramScope s;
 
-        if ( ! scope->execFile( str , false , true , false ) ){
+        if ( ! scope->execFile( files[i] , false , true , false ) ){
             return -3;
         }
-
-        numFiles++;
     }
 
-    if ( numFiles == 0 && script.empty() )
+    if ( files.size() == 0 && script.empty() ) {
         runShell = true;
+    }
 
     if ( runShell ){
 
