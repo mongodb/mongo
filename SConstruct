@@ -472,6 +472,9 @@ elif "win32" == os.sys.platform:
     else:
         env.Append( CPPDEFINES=["_X86_=1"] )
 
+    env.Append( CPPPATH=["../winpcap/Include"] )
+    env.Append( LIBPATH=["../winpcap/Lib"] )
+
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
@@ -644,8 +647,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
-    myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
+    myenv["_HAVEPCAP"] = myCheckLib( ["pcap", "wpcap"] )
     removeIfInList( myenv["LIBS"] , "pcap" )
+    removeIfInList( myenv["LIBS"] , "wpcap" )
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
@@ -813,7 +817,10 @@ mongosniff_built = False
 if darwin or clientEnv["_HAVEPCAP"]:
     mongosniff_built = True
     sniffEnv = clientEnv.Clone()
-    sniffEnv.Append( LIBS=[ "pcap" ] )
+    if not windows:
+        sniffEnv.Append( LIBS=[ "pcap" ] )
+    else:
+        sniffEnv.Append( LIBS=[ "wpcap" ] )
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
 # --- shell ---

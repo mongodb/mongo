@@ -11,21 +11,24 @@
 
  */
 
+#include <pcap.h>
+
 #include "../util/builder.h"
 #include "../util/message.h"
 #include "../db/dbmessage.h"
 #include "../client/dbclient.h"
 
-#include <pcap.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
 #include <sys/types.h>
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
 
 #include <iostream>
 #include <map>
