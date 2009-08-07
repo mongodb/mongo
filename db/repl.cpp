@@ -624,7 +624,7 @@ namespace mongo {
             try {
                 massert("--only requires use of --source", dashDashOnly.empty());
             } catch ( ... ) {
-                exit( 40 );
+                dbexit( EXIT_BADOPTIONS );
             }
         }
         

@@ -224,7 +224,7 @@ namespace mongo {
         string hn = getHostName();
         if ( hn.empty() ) {
             sleepsecs(5);
-            exit(16);
+            dbexit( EXIT_BADOPTIONS );
         }
         ourHostname = hn;
 
@@ -238,7 +238,7 @@ namespace mongo {
             if ( !p ) {
                 log() << "can't parse server's hostname, expect <city>-<locname>-n<nodenum>, got: " << buf << endl;
                 sleepsecs(5);
-                exit(17);
+                dbexit( EXIT_BADOPTIONS );
             }
             p[1] = 0;
         }
@@ -249,7 +249,7 @@ namespace mongo {
         if ( configHosts.empty() ) {
             if ( ! infer ) {
                 out() << "--configdb or --infer required\n";
-                exit(7);
+                dbexit( EXIT_BADOPTIONS );
             }
             stringstream sl, sr;
             sl << buf << "grid-l";
