@@ -485,6 +485,7 @@ namespace mongo {
             }
             }
 
+            cout << "toval: unknown type: " << e.type() << endl;
             uassert( "not done: toval" , 0 );
             return 0;
         }

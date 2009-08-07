@@ -515,7 +515,6 @@ namespace mongo {
         if ( *name == '*' && name[1] == 0 ) {
             log() << "  d->nIndexes was " << d->nIndexes << '\n';
             anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
-            anObjBuilder.append("msg", "all indexes deleted for collection");
             IndexDetails *idIndex = 0;
             if( d->nIndexes ) { 
                 for ( int i = 0; i < d->nIndexes; i++ ) {
@@ -533,6 +532,7 @@ namespace mongo {
             }
             /* assuming here that id index is not multikey: */
             d->multiKeyIndexBits = 0;
+            anObjBuilder.append("msg", "all indexes deleted for collection");
         }
         else {
             // delete just one index

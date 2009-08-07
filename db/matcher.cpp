@@ -336,7 +336,9 @@ namespace mongo {
 
     int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const BasicMatcher& bm, bool *deep) {
         int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm, deep );
-        return -ret;
+        if ( ret <= 0 )
+            return 1;
+        return 0;
     }
     
     /* Check if a particular field matches.
