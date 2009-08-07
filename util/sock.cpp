@@ -73,7 +73,7 @@ namespace mongo {
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
                 out() << "ERROR: wsastartup failed " << errno << endl;
                 problem() << "ERROR: wsastartup failed " << errno << endl;
-                exit(1);
+                dbexit( EXIT_NTSERVICE_ERROR );
             }
 #endif
             //out() << "ntohl:" << ntohl(256) << endl;
