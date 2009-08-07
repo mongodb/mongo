@@ -348,6 +348,30 @@ namespace mongo {
 
         jsval toval( const char * c ){
             JSString * s = JS_NewStringCopyZ( _context , c );
+            if ( s )
+                return STRING_TO_JSVAL( s );
+            
+            // possibly unicode, try manual
+            
+            size_t len = strlen( c );
+            size_t dstlen = len * 4;
+            jschar * dst = (jschar*)malloc( dstlen );
+            
+            JSBool res = JS_DecodeBytes( _context , c , len , dst, &dstlen );
+            if ( res ){
+                s = JS_NewUCStringCopyN( _context , dst , dstlen );
+            }
+
+            free( dst );
+
+            if ( ! res ){
+                cerr << "decode failed. probably invalid utf-8 string [" << c << "]" << endl;
+                jsval v;
+                if ( JS_GetPendingException( _context , &v ) )
+                    cout << "\t why: " << toString( v ) << endl;
+                throw UserException( "invalid utf8" );
+            }
+
             assert( s );
             return STRING_TO_JSVAL( s );
         }

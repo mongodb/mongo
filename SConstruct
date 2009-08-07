@@ -1345,3 +1345,10 @@ def clean_old_dist_builds(env, target, source):
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
 
+from buildscripts import test_shell
+def run_shell_tests(env, target, source):
+    test_shell.mongo_path = windows and "mongo.exe" or "mongo"
+    test_shell.run_tests()
+
+env.Alias("test_shell", [], [run_shell_tests])
+env.AlwaysBuild("test_shell")

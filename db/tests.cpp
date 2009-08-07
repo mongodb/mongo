@@ -60,7 +60,7 @@ namespace mongo {
         strcpy(x, "xfoo");
         strcpy(start, "xfoo");
 
-        exit(3);
+        dbexit( EXIT_TEST );
 
         return 1;
     }

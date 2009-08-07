@@ -12,7 +12,7 @@ using namespace std;
 using namespace mongo;
 
 int main( int argc, const char **argv ) {
-    
+
     const char *port = "27017";
     if ( argc != 1 ) {
         if ( argc != 3 )
@@ -133,39 +133,39 @@ int main( int argc, const char **argv ) {
         // run validate
         assert( conn.validate( ns ) );
     }
-    
+
     { // timestamp test
-        
+
         const char * tsns = "test.tstest1";
         conn.dropCollection( tsns );
-        
+
         {
             mongo::BSONObjBuilder b;
             b.appendTimestamp( "ts" );
             conn.insert( tsns , b.obj() );
         }
-        
+
         mongo::BSONObj out = conn.findOne( tsns , mongo::BSONObj() );
         unsigned long long oldTime = out["ts"].timestampTime();
         unsigned int oldInc = out["ts"].timestampInc();
-        
+
         {
             mongo::BSONObjBuilder b1;
             b1.append( out["_id"] );
-            
+
             mongo::BSONObjBuilder b2;
             b2.append( out["_id"] );
             b2.appendTimestamp( "ts" );
-            
+
             conn.update( tsns , b1.obj() , b2.obj() );
         }
-        
+
         BSONObj found = conn.findOne( tsns , mongo::BSONObj() );
         assert( ( oldTime < found["ts"].timestampTime() ) ||
                ( oldInc + 1 == found["ts"].timestampInc() ) );
-        
+
     }
-    
+
     {
         list<string> l = conn.getDatabaseNames();
         for ( list<string>::iterator i = l.begin(); i != l.end(); i++ ){
