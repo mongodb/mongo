@@ -499,7 +499,7 @@ int main(int argc, char* argv[], char *envp[] )
         hidden_options.add_options()(s.c_str(), "verbose");
     }
 
-    positional_options.add("command", -1);
+    positional_options.add("command", 3);
     visible_options.add(general_options).add(replication_options);
     cmdline_options.add(general_options).add(replication_options).add(hidden_options);
 
@@ -702,11 +702,6 @@ int main(int argc, char* argv[], char *envp[] )
             if (command[0].compare("msg") == 0) {
                 const char *m;
 
-                if (command.size() > 3) {
-                    cout << "Too many parameters to 'msg' command" << endl;
-                    cout << visible_options << endl;
-                    return 0;
-                }
                 if (command.size() < 3) {
                     cout << "Too few parameters to 'msg' command" << endl;
                     cout << visible_options << endl;
