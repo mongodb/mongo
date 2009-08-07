@@ -57,7 +57,7 @@ install: build
 	dh_clean -k 
 	dh_installdirs
 
-	scons --prefix=$(CURDIR)/debian/mongodb install
+	scons --prefix=$(CURDIR)/debian/mongodb/usr install
 
 
 # Build architecture-independent files here.
