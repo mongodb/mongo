@@ -413,8 +413,8 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 void show_help_text(po::options_description options) {
-    cout << "To run mongod with the default options use 'mongod run'." << endl << endl;
-    cout << options << endl;
+    cout << "To run with the default options use '" << dbExecCommand << " run'." << endl << endl
+         << options << endl;
 };
 
 /* Return error string or "" if no errors. */
