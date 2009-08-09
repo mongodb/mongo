@@ -48,6 +48,9 @@ namespace mongo {
     extern bool useCursors;
     extern bool useHints;
 
+	//BSONObj snapshotHint = fromjson("{$hint:{_id:...}}");
+	BSONObj snapshotHint = fromjson("{$hint:\"_id_\"}");
+
     // Just try to identify best plan.
     class DeleteOp : public QueryOp {
     public:
@@ -1395,7 +1398,8 @@ namespace mongo {
                 snapshot = !e.eoo() && e.trueValue();
                 if( snapshot ) { 
                     uassert("E12001 can't sort with $snapshot", order.isEmpty());
-                    uasserted("code not finished");
+					uassert("E12002 can't use hint with $snapshot", hint.eoo());
+					hint = snapshotHint.firstElement();
                 }
             }
             
