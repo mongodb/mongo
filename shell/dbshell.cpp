@@ -131,7 +131,7 @@ void show_help_text(const char* name, po::options_description options) {
          << "unless --shell is specified" << endl;
 };
 
-int main(int argc, char* argv[]) {
+int _main(int argc, char* argv[]) {
     setupSignals();
 
     mongo::shellUtils::RecordMyLocation( argv[ 0 ] );
@@ -340,6 +340,14 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+int main(int argc, char* argv[]) {
+    try {
+        return _main( argc , argv );
+    }
+    catch ( mongo::DBException& e ){
+        cerr << "exception: " << e.what() << endl;
+    }
+}
 
 namespace mongo {
     DBClientBase * createDirectClient(){
