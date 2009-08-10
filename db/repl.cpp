@@ -206,6 +206,7 @@ namespace mongo {
         }
     } cmdForceDead;
     
+    /* operator requested resynchronization of replication (on the slave).  { resync : 1 } */
     class CmdResync : public Command {
     public:
         virtual bool slaveOk() {
@@ -742,6 +743,7 @@ namespace mongo {
         return dummyns;
     }
     
+    /* grab initial copy of a database from the master */
     bool ReplSource::resync(string db) {
         string dummyNs = resyncDrop( db.c_str(), "internal" );
         setClientTempNs( dummyNs.c_str() );
@@ -749,7 +751,7 @@ namespace mongo {
             log() << "resync: cloning database " << db << endl;
             ReplInfo r("resync: cloning a database");
             string errmsg;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false, /*slaveok*/ true, /*replauth*/ true);
+            bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false);
             if ( !ok ) {
                 problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
                 throw SyncException();

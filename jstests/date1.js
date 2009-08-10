@@ -10,5 +10,5 @@ function go( d , msg ){
 
 go( new Date() , "A" )
 go( new Date( 1 ) , "B")
-go( new Date( 0 ) , "C")
+go( new Date( 0 ) , "C (old spidermonkey lib fails this test)")
 
