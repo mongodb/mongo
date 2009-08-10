@@ -61,6 +61,11 @@ namespace mongo {
         return *this; 
     }
     
+    Query& Query::snapshot() {
+        appendComplex( "$snapshot", true );
+        return *this; 
+    }
+    
     Query& Query::minKey( const BSONObj &val ) {
         appendComplex( "$min", val );
         return *this; 
