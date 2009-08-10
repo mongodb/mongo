@@ -48,9 +48,6 @@ namespace mongo {
     extern bool useCursors;
     extern bool useHints;
 
-	//BSONObj snapshotHint = fromjson("{$hint:{_id:...}}");
-	BSONObj snapshotHint = fromjson("{$hint:\"_id_\"}");
-
     // Just try to identify best plan.
     class DeleteOp : public QueryOp {
     public:
@@ -1306,8 +1303,9 @@ namespace mongo {
         int ntoskip = q.ntoskip;
         int _ntoreturn = q.ntoreturn;
         BSONObj jsobj = q.query;
-        auto_ptr< FieldMatcher > filter = q.fields;
+        auto_ptr< FieldMatcher > filter = q.fields; // what fields to return (unspecified = full object)
         int queryOptions = q.queryOptions;
+        BSONObj snapshotHint;
         
         Timer t;
         log(2) << "runQuery: " << ns << jsobj << endl;
@@ -1399,7 +1397,21 @@ namespace mongo {
                 if( snapshot ) { 
                     uassert("E12001 can't sort with $snapshot", order.isEmpty());
 					uassert("E12002 can't use hint with $snapshot", hint.eoo());
-					hint = snapshotHint.firstElement();
+                    NamespaceDetails *d = nsdetails(ns);
+                    int i = d->findIdIndex();
+                    if( i < 0 ) { 
+                        log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
+                    }
+                    else {
+                        /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
+                           probably need a better way to specify "use the _id index" as a hint.  if someone is
+                           in the query optimizer please fix this then!
+                        */
+                        BSONObjBuilder b;
+                        b.append("$hint", d->indexes[i].indexName());
+                        snapshotHint = b.obj();
+                        hint = snapshotHint.firstElement();
+                    }
                 }
             }
             
