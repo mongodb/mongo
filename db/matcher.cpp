@@ -233,6 +233,11 @@ namespace mongo {
                                 addBasic(b->done().firstElement(), BSONObj::NE);
                                 ok = true;
                             }
+                            else if ( fn[1] == 'r' && fn[3] == 'f' && fn[4] == 0 ){
+                                // { $ref : xxx } - treat as normal object
+                                ok = false;
+                                break;
+                            }
                             else
                                 uassert("invalid $operator", false);
                         }
@@ -261,7 +266,7 @@ namespace mongo {
                             ok = true;
                         }
                         else
-                            uassert("invalid $operator", false);
+                            uassert( (string)"invalid $operator: " + fn , false);
                     }
                     else {
                         ok = false;
