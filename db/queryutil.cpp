@@ -85,13 +85,26 @@ namespace mongo {
             default:
                 break;
         }
+        
+        if ( lower_.type() != MinKey && upper_.type() == MaxKey ){
+            BSONObjBuilder b;
+            b.appendMaxForType( lower_.fieldName() , lower_.type() );
+            upper_ = addObj( b.obj() ).firstElement();
+        }
+        else if ( lower_.type() == MinKey && upper_.type() != MaxKey ){
+            BSONObjBuilder b;
+            b.appendMinForType( upper_.fieldName() , upper_.type() );
+            lower_ = addObj( b.obj() ).firstElement();
+        }
 
+        /*
         if ( lower_.isNumber() && upper_.type() == MaxKey ){
             upper_ = addObj( BSON( lower_.fieldName() << numeric_limits<double>::max() ) ).firstElement();
         }
         else if ( upper_.isNumber() && lower_.type() == MinKey ){
             lower_ = addObj( BSON( upper_.fieldName() << - numeric_limits<double>::max() ) ).firstElement();
         }
+        */
 
     }
     

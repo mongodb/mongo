@@ -1209,6 +1209,12 @@ namespace mongo {
         void appendWhere( const string &code, const BSONObj &scope ){
             appendWhere( code.c_str(), scope );
         }
+        
+        /**
+           these are the min/max when comparing, not strict min/max elements for a given type
+         */
+        void appendMinForType( const string& field , int type );
+        void appendMaxForType( const string& field , int type );
 
         /** Append an array of values. */
         template < class T >

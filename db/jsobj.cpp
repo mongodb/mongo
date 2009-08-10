@@ -513,6 +513,18 @@ namespace mongo {
                 return c;
             return strcmp(l.regexFlags(), r.regexFlags());
         }
+        case CodeWScope : {
+            f = l.type() - r.type();
+            if ( f )
+                return f;
+            f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
+            if ( f ) 
+                return f;
+            f = strcmp( l.codeWScopeScopeData() , r.codeWScopeScopeData() );
+            if ( f ) 
+                return f;
+            return 0;
+        }
         default:
             out() << "compareElementValues: bad type " << (int) l.type() << endl;
             assert(false);
@@ -1249,5 +1261,77 @@ namespace mongo {
         if ( timestamp == 0 )
             timestamp = OpTime::now().asDate();
     }    
+
+    
+    void BSONObjBuilder::appendMinForType( const string& field , int t ){
+        switch ( t ){
+        case MinKey: appendMinKey( field.c_str() ); return;
+        case MaxKey: appendMinKey( field.c_str() ); return;
+        case NumberInt:
+        case NumberDouble:
+        case NumberLong:
+            append( field.c_str() , - numeric_limits<double>::max() ); return;
+        case jstOID: 
+            { 
+                OID o;
+                memset(&o, 0, sizeof(o));
+                appendOID( field.c_str() , &o);
+                return;
+            }
+        case Bool: appendBool( field.c_str() , false); return;
+        case Date: appendDate( field.c_str() , 0); return;
+        case jstNULL: appendNull( field.c_str() ); return;
+        case String: append( field.c_str() , "" ); return;
+        case Object: append( field.c_str() , BSONObj() ); return;
+        case Array: 
+            appendArray( field.c_str() , BSONObj() ); return;
+        case BinData:  
+            appendBinData( field.c_str() , 0 , Function , 0 ); return;
+        case Undefined:
+            appendUndefined( field.c_str() ); return;
+        case RegEx: appendRegex( field.c_str() , "" ); return;
+        case DBRef:
+            {
+                OID o;
+                memset(&o, 0, sizeof(o));
+                appendDBRef( field.c_str() , "" , o );
+                return;
+            }
+        case Code: appendCode( field.c_str() , "" ); return;
+        case Symbol: appendSymbol( field.c_str() , "" ); return;
+        case CodeWScope: appendCodeWScope( field.c_str() , "" , BSONObj() ); return;
+        case Timestamp: appendTimestamp( field.c_str() , 0); return;
+
+        };
+        log() << "type not support for appendMinElementForType: " << t << endl;
+        uassert( "type not supported for appendMinElementForType" , false );
+    }
+    
+    void BSONObjBuilder::appendMaxForType( const string& field , int t ){
+        switch ( t ){
+        case MinKey: appendMaxKey( field.c_str() );  break;
+        case MaxKey: appendMaxKey( field.c_str() ); break;
+        case NumberInt: 
+        case NumberDouble:
+        case NumberLong:
+            append( field.c_str() , numeric_limits<double>::max() ); 
+            break;
+        case jstOID: 
+            { 
+                OID o;
+                memset(&o, 0xFF, sizeof(o));
+                appendOID( field.c_str() , &o);
+                break;
+            }
+        case Bool: appendBool( field.c_str() , true); break;
+        case Date: appendDate( field.c_str() , 0xFFFFFFFFFFFFFFFF ); break;
+        case String: append( field.c_str() , BSONObj() ); break;
+        case Timestamp:
+            append( field.c_str() , (long long)0 ); break;
+        default: 
+            appendMinForType( field , t + 1 );
+        }
+    }
+    
     
 } // namespace mongo
