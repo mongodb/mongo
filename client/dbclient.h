@@ -737,11 +737,7 @@ namespace mongo {
         /** Connect to a server pair using a host pair string of the form
               hostname[:port],hostname[:port]
               */
-        bool connect(string hostpairstring) { 
-            uassert("bad hostpairstring", hostpairstring.find(',') != string::npos);
-            massert("not yet implemented", false);
-            return false;
-        }
+        bool connect(string hostpairstring);
 
         /** Authorize.  Authorizes both sides of the pair as needed. 
         */

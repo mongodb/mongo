@@ -828,6 +828,12 @@ namespace mongo {
         return true;
     }
 
+    bool DBClientPaired::connect(string hostpairstring) { 
+        size_t comma = hostpairstring.find( "," );
+        uassert("bad hostpairstring", comma != string::npos);
+        return connect( hostpairstring.substr( 0 , comma ) , hostpairstring.substr( comma + 1 ) );
+    }
+
 	bool DBClientPaired::auth(const string &dbname, const string &username, const string &pwd, string& errmsg) { 
 		DBClientConnection& m = checkMaster();
 		if( !m.auth(dbname, username, pwd, errmsg) )
