@@ -118,19 +118,32 @@ namespace mongo {
         
         uassert( "0 or 1 args to Mongo" , argc <= 1 );
         
-        shared_ptr< DBClientConnection > conn( new DBClientConnection( true ) );
-        
         string host = "127.0.0.1";
         if ( argc > 0 )
             host = c.toString( argv[0] );
 
+        shared_ptr< DBClientBase > conn;
+        
         string errmsg;
-        if ( ! conn->connect( host , errmsg ) ){
-            JS_ReportError( cx , ((string)"couldn't connect: " + errmsg).c_str() );
-            return JS_FALSE;
+        if ( host.find( "," ) == string::npos ){
+            DBClientConnection * c = new DBClientConnection( true );
+            conn.reset( c );
+            if ( ! c->connect( host , errmsg ) ){
+                JS_ReportError( cx , ((string)"couldn't connect: " + errmsg).c_str() );
+                return JS_FALSE;
+            }
+        }
+        else { // paired
+            DBClientPaired * c = new DBClientPaired();
+            conn.reset( c );
+            if ( ! c->connect( host ) ){
+                JS_ReportError( cx , "couldn't connect to pair" );
+                return JS_FALSE;
+            }
         }
         
-        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientConnection >( conn ) ) ) );
+        
+        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientBase >( conn ) ) ) );
         jsval host_val = c.toval( host.c_str() );
         assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
         return JS_TRUE;
