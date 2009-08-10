@@ -250,8 +250,12 @@ namespace mongo {
 
     BSONObj FieldMatcher::extractDotted( const string& path , const BSONObj& o ) const {
         string::size_type i = path.find( "." );
-        if ( i == string::npos )
-            return o.getField( path.c_str() ).wrap();
+        if ( i == string::npos ){
+            const BSONElement & e = o.getField( path.c_str() );
+            if ( e.eoo() )
+                return BSONObj();
+            return e.wrap();
+        }
         
         string left = path.substr( 0 , i );
         BSONElement e = o[left];
@@ -269,7 +273,9 @@ namespace mongo {
     
     void FieldMatcher::append( BSONObjBuilder& b , const BSONElement& e ) const {
         string next = fields.find( e.fieldName() )->second;
-        if ( next.size() == 0 || next == "." || e.type() != Object ){
+        if ( e.eoo() ){
+        }
+        else if ( next.size() == 0 || next == "." || e.type() != Object ){
             b.append( e );
         }
         else {
