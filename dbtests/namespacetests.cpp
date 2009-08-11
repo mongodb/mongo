@@ -339,12 +339,12 @@ namespace NamespaceTests {
                 checkSize( 4, keys );
                 int j = 1;
 		BSONObjSetDefaultOrder::iterator i = keys.begin();
+		assertEquals( nullObj(), *i++ );
                 for ( ; j < 4; ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
                     assertEquals( b.obj(), *i );
                 }
-		assertEquals( nullObj(), *i++ );
             }
         private:
             virtual BSONObj key() const {
