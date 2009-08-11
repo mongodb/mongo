@@ -344,8 +344,16 @@ namespace mongo {
         int pid=0;
 #endif
 
+        bool is32bit = sizeof(int*) == 4;
+
         log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
-              <<  " master = " << master << " slave = " << slave << "  " << ( ( sizeof(int*) == 4 ) ? "32" : "64" ) << "-bit " << endl;
+              <<  " master = " << master << " slave = " << slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
+        
+        if ( is32bit ){
+            log() << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
+            log() << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations for more" << endl;
+        }
+        
 
         stringstream ss;
         ss << "dbpath (" << dbpath << ") does not exist";
