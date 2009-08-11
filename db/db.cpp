@@ -357,7 +357,7 @@ namespace mongo {
 
         log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
               <<  " master = " << master << " slave = " << slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
-        
+
         show_32_warning();
 
         stringstream ss;
@@ -428,8 +428,6 @@ namespace po = boost::program_options;
 
 
 void show_help_text(po::options_description options) {
-    cout << endl;
-    cout << "To run with the default options use '" << dbExecCommand << " run'.\n";
     show_32_warning();
     cout << options << endl;
 };
@@ -633,9 +631,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("noscripting")) {
             useJNI = false;
         }
-	if (params.count("noprealloc")) {
-	  prealloc = false;
-	}
+        if (params.count("noprealloc")) {
+            prealloc = false;
+        }
         if (params.count("oplog")) {
             int x = params["oplog"].as<int>();
             if ( x < 0 || x > 7 ) {
@@ -754,24 +752,26 @@ int main(int argc, char* argv[], char *envp[] )
         if ( installService ) {
             if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
+            dbexit( EXIT_CLEAN );
         }
         else if ( removeService ) {
             if ( !ServiceController::removeService( L"MongoDB" ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
+            dbexit( EXIT_CLEAN );
         }
         else if ( startService ) {
             if ( !ServiceController::startService( L"MongoDB", mongo::initService ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
+            dbexit( EXIT_CLEAN );
         }
-        else
         #endif
-            initAndListen( port, appsrvPath );
-
-        dbexit( EXIT_CLEAN );
+    } else {
+        cout << dbExecCommand << " --help for help and startup options" << endl;
+        cout << endl;
     }
 
-    show_help_text(visible_options);
-
+    initAndListen(port, appsrvPath);
+    dbexit(EXIT_CLEAN);
     return 0;
 }
 
