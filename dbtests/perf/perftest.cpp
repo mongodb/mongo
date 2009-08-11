@@ -30,7 +30,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace mongo {
-    extern const char* dbpath;
+    extern string dbpath;
 } // namespace mongo
 
 // Very useful function, hacky way of getting at at.

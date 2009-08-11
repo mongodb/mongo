@@ -290,7 +290,7 @@ namespace mongo {
     /* cl - database name
        path - db directory
     */
-    void closeClient( const char *cl, const char *path ) {
+    void closeClient( const char *cl, const string& path ) {
         assert( database );
         assert( database->name == cl );
         if ( string("local") != cl ) {

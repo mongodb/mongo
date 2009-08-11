@@ -33,7 +33,7 @@
 using namespace std;
 
 namespace mongo {
-    extern const char* dbpath;
+    extern string dbpath;
 } // namespace mongo
 string dbpathSpec = "/tmp/unittest/";
 

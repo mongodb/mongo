@@ -94,7 +94,7 @@ namespace mongo {
     class DataFileMgr {
         friend class BasicCursor;
     public:
-        void init(const char *);
+        void init(const string& path );
 
         void update(
             const char *ns,
@@ -377,7 +377,7 @@ namespace mongo {
         virtual const char * op() const = 0;
     };
 
-    void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator = false, const char *path = dbpath );
+    void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator = false, const string& path = dbpath );
 
     inline void _deleteDataFiles(const char *database) {
         class : public FileOp {

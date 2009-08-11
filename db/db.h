@@ -120,14 +120,14 @@ namespace mongo {
     extern const char *curNs;
     extern bool master;
 
-    inline string getKey( const char *ns, const char *path ) {
+    inline string getKey( const char *ns, const string& path ) {
         char cl[256];
         nsToClient(ns, cl);
         return string( cl ) + ":" + path;
     }
 
     /* returns true if the database ("database") did not exist, and it was created on this call */
-    inline bool setClient(const char *ns, const char *path=dbpath) {
+    inline bool setClient(const char *ns, const string& path=dbpath) {
         /* we must be in critical section at this point as these are global
            variables.
         */
@@ -167,10 +167,10 @@ namespace mongo {
 
 // shared functionality for removing references to a database from this program instance
 // does not delete the files on disk
-    void closeClient( const char *cl, const char *path = dbpath );
+    void closeClient( const char *cl, const string& path = dbpath );
 
     /* remove database from the databases map */
-    inline void eraseDatabase( const char *ns, const char *path=dbpath ) {
+    inline void eraseDatabase( const char *ns, const string& path=dbpath ) {
         string key = getKey( ns, path );
         databases.erase( key );
     }

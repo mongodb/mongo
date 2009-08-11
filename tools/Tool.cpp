@@ -14,7 +14,7 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
-    _name( name ) , _db( defaultDB ) , _coll( defaultCollection ), _useDirect() {
+    _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0) {
 
     _options = new po::options_description( name + " options" );
     _options->add_options()
@@ -30,6 +30,8 @@ mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
 
 mongo::Tool::~Tool(){
     delete( _options );
+    if ( _conn )
+        delete _conn;
 }
 
 void mongo::Tool::printExtraHelp( ostream & out ){
@@ -57,20 +59,36 @@ int mongo::Tool::main( int argc , char ** argv ){
     if ( _params.count( "verbose" ) )
         logLevel = 1;
 
-    if ( !hasParam( "dbpath" ) ) {
-        const char * host = "127.0.0.1";
+    if ( ! hasParam( "dbpath" ) ) {
+        _host = "127.0.0.1";
         if ( _params.count( "host" ) )
-            host = _params["host"].as<string>().c_str();
-
-        string errmsg;
-        if ( ! _conn.connect( host , errmsg ) ){
-            cerr << "couldn't connect to [" << host << "] " << errmsg << endl;
-            return -1;
+            _host = _params["host"].as<string>();
+        
+        if ( _host.find( "," ) == string::npos ){
+            DBClientConnection * c = new DBClientConnection();
+            _conn = c;
+            
+            string errmsg;
+            if ( ! c->connect( _host , errmsg ) ){
+                cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
+                return -1;
+            }
+        }
+        else {
+            DBClientPaired * c = new DBClientPaired();
+            _conn = c;
+            
+            if ( ! c->connect( _host ) ){
+                cerr << "couldn't connect to paired server: " << _host << endl;
+                return -1;
+            }
         }
 
-        cerr << "connected to: " << host << endl;
-    } else {
-        _useDirect = true;
+        cerr << "connected to: " << _host << endl;
+    } 
+    else {
+        _conn = new DBDirectClient();
+        _host = "DIRECT";
         static string myDbpath = getParam( "dbpath" );
         mongo::dbpath = myDbpath.c_str();
         mongo::acquirePathLock();
