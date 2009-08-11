@@ -56,16 +56,16 @@ namespace mongo {
 
     protected:
         string _name;
-
+        
         string _db;
         string _coll;
 
-        mongo::DBClientBase &conn() { return _useDirect ? (mongo::DBClientBase&)_direct : (mongo::DBClientBase&)_conn; };
+        mongo::DBClientBase &conn() { return *_conn; }
 
     private:
-        mongo::DBClientConnection _conn;
-        mongo::DBDirectClient _direct;
-        bool _useDirect;
+        string _host;
+        mongo::DBClientBase * _conn;
+
         boost::program_options::options_description * _options;
         boost::program_options::positional_options_description _positonalOptions;
 
