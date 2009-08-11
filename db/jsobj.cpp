@@ -1324,7 +1324,7 @@ namespace mongo {
                 break;
             }
         case Bool: appendBool( field.c_str() , true); break;
-        case Date: appendDate( field.c_str() , 0xFFFFFFFFFFFFFFFFL ); break;
+        case Date: appendDate( field.c_str() , 0xFFFFFFFFFFFFFFFFLL ); break;
         case String: append( field.c_str() , BSONObj() ); break;
         case Timestamp:
             append( field.c_str() , (long long)0 ); break;
