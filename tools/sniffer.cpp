@@ -15,6 +15,7 @@
 
 #ifdef _WIN32
 #undef min
+#undef max
 #endif
 
 #include "../util/builder.h"
