@@ -61,6 +61,11 @@ namespace mongo {
         return *this; 
     }
     
+    Query& Query::snapshot() {
+        appendComplex( "$snapshot", true );
+        return *this; 
+    }
+    
     Query& Query::minKey( const BSONObj &val ) {
         appendComplex( "$min", val );
         return *this; 
@@ -568,12 +573,8 @@ namespace mongo {
                     ss << "_";
 
                 ss << f.fieldName() << "_";
-
-                if ( f.type() == NumberInt )
-                    ss << (int)(f.number() );
-                else if ( f.type() == NumberDouble )
-                    ss << f.number();
-
+                if( f.isNumber() )
+                    ss << f.numberInt();
             }
 
             toSave.append( "name" , ss.str() );
@@ -830,6 +831,12 @@ namespace mongo {
             return false;
         }
         return true;
+    }
+
+    bool DBClientPaired::connect(string hostpairstring) { 
+        size_t comma = hostpairstring.find( "," );
+        uassert("bad hostpairstring", comma != string::npos);
+        return connect( hostpairstring.substr( 0 , comma ) , hostpairstring.substr( comma + 1 ) );
     }
 
 	bool DBClientPaired::auth(const string &dbname, const string &username, const string &pwd, string& errmsg) { 

@@ -76,6 +76,8 @@ namespace mongo {
         virtual bool utf8Ok() const = 0;
 
         static void setup();
+
+        auto_ptr<Scope> getPooledScope( const string& pool );
     };
 
     extern ScriptEngine * globalScriptEngine;

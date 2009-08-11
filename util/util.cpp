@@ -112,10 +112,6 @@ namespace mongo {
         printStackTrace();
     }
     
-    void exit( int status ){
-        dbexit( status );
-    }
-
     void rawOut( const string &s ) {
         if( s.empty() ) return;
         char now[64];

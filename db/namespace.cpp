@@ -68,7 +68,7 @@ namespace mongo {
         void *p = f.map(pathString.c_str(), LEN);
         if ( p == 0 ) {
             problem() << "couldn't open file " << pathString << " terminating" << endl;
-            exit(-3);
+            dbexit( EXIT_FS );
         }
         ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
     }

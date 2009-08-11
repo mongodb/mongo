@@ -46,12 +46,12 @@ namespace mongo {
             s << "new Date(" << date() << ')';
             break;
         case RegEx:
-        {
-            s << "/" << regex() << '/';
-            const char *p = regexFlags();
-            if ( p ) s << p;
-        }
-        break;
+            {
+                s << "/" << regex() << '/';
+                const char *p = regexFlags();
+                if ( p ) s << p;
+            }
+            break;
         case NumberDouble:
 			{
 				stringstream tmp;
@@ -64,10 +64,11 @@ namespace mongo {
 					s << ".0";
 			}
             break;
+        case NumberLong:
+            s << _numberLong();
+            break;
         case NumberInt:
-            s.precision( 16 );
-            s << number();
-            //s << "(" << ( type() == NumberInt ? "int" : "double" ) << ")";
+            s << _numberInt();
             break;
         case Bool:
             s << ( boolean() ? "true" : "false" );
@@ -187,6 +188,9 @@ namespace mongo {
         case String:
         case Symbol:
             s << '"' << escape( valuestr() ) << '"';
+            break;
+        case NumberLong:
+            s << _numberLong();
             break;
         case NumberInt:
         case NumberDouble:
@@ -336,6 +340,7 @@ namespace mongo {
         case Timestamp:
         case Date:
         case NumberDouble:
+        case NumberLong:
             x = 8;
             break;
         case jstOID:
@@ -416,15 +421,13 @@ namespace mongo {
         return BSONObj::Equality;
     }
 
+    /* wo = "well ordered" */
     int BSONElement::woCompare( const BSONElement &e,
                                 bool considerFieldName ) const {
         int lt = (int) type();
-        if ( lt == NumberInt ) lt = NumberDouble;
         int rt = (int) e.type();
-        if ( rt == NumberInt ) rt = NumberDouble;
-
         int x = lt - rt;
-        if ( x != 0 )
+        if( x != 0 && (!isNumber() || !e.isNumber()) )
             return x;
         if ( considerFieldName ) {
             x = strcmp(fieldName(), e.fieldName());
@@ -435,7 +438,8 @@ namespace mongo {
         return x;
     }
 
-    /* must be same type! */
+    /* must be same type when called, unless both sides are #s 
+    */
     int compareElementValues(const BSONElement& l, const BSONElement& r) {
         int f;
         double x;
@@ -455,6 +459,15 @@ namespace mongo {
             if ( l.date() < r.date() )
                 return -1;
             return l.date() == r.date() ? 0 : 1;
+        case NumberLong:
+            if( r.type() == NumberLong ) {
+                long long L = l._numberLong();
+                long long R = r._numberLong();
+                if( L < R ) return -1;
+                if( L == R ) return 0;
+                return 1;
+            }
+            // else fall through
         case NumberInt:
         case NumberDouble: {
             double left = l.number();
@@ -499,6 +512,18 @@ namespace mongo {
             if ( c )
                 return c;
             return strcmp(l.regexFlags(), r.regexFlags());
+        }
+        case CodeWScope : {
+            f = l.type() - r.type();
+            if ( f )
+                return f;
+            f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
+            if ( f ) 
+                return f;
+            f = strcmp( l.codeWScopeScopeData() , r.codeWScopeScopeData() );
+            if ( f ) 
+                return f;
+            return 0;
         }
         default:
             out() << "compareElementValues: bad type " << (int) l.type() << endl;
@@ -745,6 +770,7 @@ namespace mongo {
         return e;
     }
 
+    /* jul09 : 'deep' and this function will be going away in the future - kept only for backward compatibility of datafiles for now. */
     void trueDat( bool *deep ) {
         if( deep )
             *deep = true;
@@ -1235,5 +1261,77 @@ namespace mongo {
         if ( timestamp == 0 )
             timestamp = OpTime::now().asDate();
     }    
+
+    
+    void BSONObjBuilder::appendMinForType( const string& field , int t ){
+        switch ( t ){
+        case MinKey: appendMinKey( field.c_str() ); return;
+        case MaxKey: appendMinKey( field.c_str() ); return;
+        case NumberInt:
+        case NumberDouble:
+        case NumberLong:
+            append( field.c_str() , - numeric_limits<double>::max() ); return;
+        case jstOID: 
+            { 
+                OID o;
+                memset(&o, 0, sizeof(o));
+                appendOID( field.c_str() , &o);
+                return;
+            }
+        case Bool: appendBool( field.c_str() , false); return;
+        case Date: appendDate( field.c_str() , 0); return;
+        case jstNULL: appendNull( field.c_str() ); return;
+        case String: append( field.c_str() , "" ); return;
+        case Object: append( field.c_str() , BSONObj() ); return;
+        case Array: 
+            appendArray( field.c_str() , BSONObj() ); return;
+        case BinData:  
+            appendBinData( field.c_str() , 0 , Function , 0 ); return;
+        case Undefined:
+            appendUndefined( field.c_str() ); return;
+        case RegEx: appendRegex( field.c_str() , "" ); return;
+        case DBRef:
+            {
+                OID o;
+                memset(&o, 0, sizeof(o));
+                appendDBRef( field.c_str() , "" , o );
+                return;
+            }
+        case Code: appendCode( field.c_str() , "" ); return;
+        case Symbol: appendSymbol( field.c_str() , "" ); return;
+        case CodeWScope: appendCodeWScope( field.c_str() , "" , BSONObj() ); return;
+        case Timestamp: appendTimestamp( field.c_str() , 0); return;
+
+        };
+        log() << "type not support for appendMinElementForType: " << t << endl;
+        uassert( "type not supported for appendMinElementForType" , false );
+    }
+    
+    void BSONObjBuilder::appendMaxForType( const string& field , int t ){
+        switch ( t ){
+        case MinKey: appendMaxKey( field.c_str() );  break;
+        case MaxKey: appendMaxKey( field.c_str() ); break;
+        case NumberInt: 
+        case NumberDouble:
+        case NumberLong:
+            append( field.c_str() , numeric_limits<double>::max() ); 
+            break;
+        case jstOID: 
+            { 
+                OID o;
+                memset(&o, 0xFF, sizeof(o));
+                appendOID( field.c_str() , &o);
+                break;
+            }
+        case Bool: appendBool( field.c_str() , true); break;
+        case Date: appendDate( field.c_str() , 0xFFFFFFFFFFFFFFFFLL ); break;
+        case String: append( field.c_str() , BSONObj() ); break;
+        case Timestamp:
+            append( field.c_str() , (long long)0 ); break;
+        default: 
+            appendMinForType( field , t + 1 );
+        }
+    }
+    
     
 } // namespace mongo

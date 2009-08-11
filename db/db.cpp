@@ -215,7 +215,7 @@ namespace mongo {
                         dbMsgPort.shutdown();
                         sleepmillis(50);
                         problem() << "exiting end msg" << endl;
-                        exit(EXIT_SUCCESS);
+                        dbexit(EXIT_CLEAN);
                     }
                     else {
                         out() << "  (not from localhost, ignoring end msg)" << endl;
@@ -237,11 +237,11 @@ namespace mongo {
         }
         catch ( std::exception &e ) {
             problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
-            exit( 15 );
+            dbexit( EXIT_UNCAUGHT );
         }
         catch ( ... ) {
             problem() << "Uncaught exception, terminating" << endl;
-            exit( 15 );
+            dbexit( EXIT_UNCAUGHT );
         }
     }
 
@@ -392,7 +392,7 @@ namespace mongo {
         try { _initAndListen(listenPort, appserverLoc); }
         catch(...) {
             log() << " exception in initAndListen, terminating" << endl;
-            dbexit(1);
+            dbexit( EXIT_UNCAUGHT );
         }
     }
 
@@ -414,8 +414,8 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 void show_help_text(po::options_description options) {
-    cout << "To run mongod with the default options use 'mongod run'." << endl << endl;
-    cout << options << endl;
+    cout << "To run with the default options use '" << dbExecCommand << " run'." << endl << endl
+         << options << endl;
 };
 
 /* Return error string or "" if no errors. */
@@ -501,7 +501,7 @@ int main(int argc, char* argv[], char *envp[] )
         hidden_options.add_options()(s.c_str(), "verbose");
     }
 
-    positional_options.add("command", -1);
+    positional_options.add("command", 3);
     visible_options.add(general_options).add(replication_options);
     cmdline_options.add(general_options).add(replication_options).add(hidden_options);
 
@@ -624,7 +624,7 @@ int main(int argc, char* argv[], char *envp[] )
             int x = params["oplog"].as<int>();
             if ( x < 0 || x > 7 ) {
                 out() << "can't interpret --oplog setting" << endl;
-                dbexit(13);
+                dbexit( EXIT_BADOPTIONS );
             }
             opLogging = x;
         }
@@ -707,11 +707,6 @@ int main(int argc, char* argv[], char *envp[] )
             if (command[0].compare("msg") == 0) {
                 const char *m;
 
-                if (command.size() > 3) {
-                    cout << "Too many parameters to 'msg' command" << endl;
-                    cout << visible_options << endl;
-                    return 0;
-                }
                 if (command.size() < 3) {
                     cout << "Too few parameters to 'msg' command" << endl;
                     cout << visible_options << endl;
@@ -742,21 +737,21 @@ int main(int argc, char* argv[], char *envp[] )
         #if defined(_WIN32)
         if ( installService ) {
             if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
-                dbexit( 1 );
+                dbexit( EXIT_NTSERVICE_ERROR );
         }
         else if ( removeService ) {
             if ( !ServiceController::removeService( L"MongoDB" ) )
-                dbexit( 1 );
+                dbexit( EXIT_NTSERVICE_ERROR );
         }
         else if ( startService ) {
             if ( !ServiceController::startService( L"MongoDB", mongo::initService ) )
-                dbexit( 1 );
+                dbexit( EXIT_NTSERVICE_ERROR );
         }
         else
         #endif
             initAndListen( port, appsrvPath );
 
-        dbexit(0);
+        dbexit( EXIT_CLEAN );
     }
 
     show_help_text(visible_options);
@@ -803,7 +798,7 @@ namespace mongo {
         oss << "Backtrace:" << endl;
         printStackTrace( oss );
         rawOut( oss.str() );
-        exit(14);
+        dbexit( EXIT_ABRUBT );
     }
 
     sigset_t asyncSignals;
@@ -816,7 +811,7 @@ namespace mongo {
         {
             dblock lk;
             log() << "now exiting" << endl;
-            exit(12);
+            dbexit( EXIT_KILL );
         }
     }
 
@@ -840,7 +835,7 @@ void ctrlCTerminate() {
     {
         dblock lk;
         log() << "now exiting" << endl;
-        exit(12);
+        dbexit( EXIT_KILL );
     }
 }
 BOOL CtrlHandler( DWORD fdwCtrlType ) 

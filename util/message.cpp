@@ -71,6 +71,7 @@ namespace mongo {
     }
 
     void Listener::listen() {
+        static long connNumber = 0;
         SockAddr from;
         while ( 1 ) {
             int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
@@ -83,7 +84,7 @@ namespace mongo {
                 continue;
             }
             disableNagle(s);
-            lognoquiet() << "connection accepted from " << from.toString() << endl;
+            lognoquiet() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
             accepted( new MessagingPort(s, from) );
         }
     }

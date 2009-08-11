@@ -104,7 +104,7 @@ namespace mongo {
         catch (...) {
             problem() << "exception looking for ed class path includeDir: " << includeDir.string() << endl;
             sleepsecs(3);
-            dbexit(116);
+            dbexit( EXIT_JAVA );
         }
     }
 

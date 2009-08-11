@@ -472,6 +472,9 @@ elif "win32" == os.sys.platform:
     else:
         env.Append( CPPDEFINES=["_X86_=1"] )
 
+    env.Append( CPPPATH=["../winpcap/Include"] )
+    env.Append( LIBPATH=["../winpcap/Lib"] )
+
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
@@ -511,6 +514,11 @@ if nix:
 
     if GetOption( "profile" ) is not None:
         env.Append( LINKFLAGS=" -pg " )
+
+try:
+    umask = os.umask(022)
+except OSError:
+    pass
 
 # --- check system ---
 
@@ -639,8 +647,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( "pcrecpp" , True )
         myCheckLib( "pcre" , True )
 
-    myenv["_HAVEPCAP"] = myCheckLib( "pcap" )
+    myenv["_HAVEPCAP"] = myCheckLib( ["pcap", "wpcap"] )
     removeIfInList( myenv["LIBS"] , "pcap" )
+    removeIfInList( myenv["LIBS"] , "wpcap" )
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
@@ -808,7 +817,10 @@ mongosniff_built = False
 if darwin or clientEnv["_HAVEPCAP"]:
     mongosniff_built = True
     sniffEnv = clientEnv.Clone()
-    sniffEnv.Append( LIBS=[ "pcap" ] )
+    if not windows:
+        sniffEnv.Append( LIBS=[ "pcap" ] )
+    else:
+        sniffEnv.Append( LIBS=[ "wpcap" ] )
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
 # --- shell ---
@@ -1185,6 +1197,9 @@ def installBinary( e , name ):
     if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         e.AddPostAction( inst , checkGlibc )
 
+    if nix:
+        e.AddPostAction( inst , e.Action( 'chmod 755 ' + fullInstallName ) )
+
 installBinary( env , "mongodump" )
 installBinary( env , "mongorestore" )
 
@@ -1330,3 +1345,10 @@ def clean_old_dist_builds(env, target, source):
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
 
+from buildscripts import test_shell
+def run_shell_tests(env, target, source):
+    test_shell.mongo_path = windows and "mongo.exe" or "mongo"
+    test_shell.run_tests()
+
+env.Alias("test_shell", [], [run_shell_tests])
+env.AlwaysBuild("test_shell")

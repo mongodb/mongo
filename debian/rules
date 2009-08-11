@@ -13,7 +13,7 @@
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
-	# Add here commands to configure the package.
+        # Add here commands to configure the package.
 
 	touch configure-stamp
 
@@ -23,9 +23,9 @@ build: build-stamp
 build-stamp: configure-stamp  
 	dh_testdir
 
-	# Add here commands to compile the package.
-	scons --distname=deb --nojni
-	#docbook-to-man debian/mongodb.sgml > mongodb.1
+        # Add here commands to compile the package.
+	scons 
+        #docbook-to-man debian/mongodb.sgml > mongodb.1
 
 	touch $@
 
@@ -57,7 +57,7 @@ install: build
 	dh_clean -k 
 	dh_installdirs
 
-	scons --prefix=$(CURDIR)/debian/mongodb install
+	scons --prefix=$(CURDIR)/debian/mongodb/usr install
 
 
 # Build architecture-independent files here.

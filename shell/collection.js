@@ -92,6 +92,8 @@ DBCollection.prototype._validateObject = function( o ){
         throw "can't save a DBQuery object";
 }
 
+DBCollection._allowedFields = { $id : 1 , $ref : 1 };
+
 DBCollection.prototype._validateForStorage = function( o ){
     this._validateObject( o );
     for ( var k in o ){
@@ -99,8 +101,8 @@ DBCollection.prototype._validateForStorage = function( o ){
             throw "can't have . in field names [" + k + "]" ;
         }
 
-        if ( k.indexOf( "$" ) == 0 ) {
-            throw "field names cannot start with $ [" + k + "]" ;
+        if ( k.indexOf( "$" ) == 0 && ! DBCollection._allowedFields[k] ) {
+            throw "field names cannot start with $ [" + k + "]";
         }
 
         if ( o[k] !== null && typeof( o[k] ) === "object" ) {

@@ -42,6 +42,12 @@ DB.prototype.runCommand = function( obj ){
 
 DB.prototype._dbCommand = DB.prototype.runCommand;
 
+DB.prototype._adminCommand = function( obj ){
+    if ( this._name == "admin" )
+        return this.runCommand( obj );
+    return this.getSisterDB( "admin" ).runCommand( obj );
+}
+
 DB.prototype.addUser = function( username , pass ){
     var c = this.getCollection( "system.users" );
     
@@ -128,8 +134,9 @@ DB.prototype.dropDatabase = function() {
 
 
 DB.prototype.shutdownServer = function() { 
-    if( "admin" != db )
+    if( "admin" != this._name ){
 	return "shutdown command only works with the admin database; try 'use admin'";
+    }
 
     try {
         this._dbCommand("shutdown");
@@ -215,7 +222,7 @@ DB.prototype.copyDatabase = function(fromdb, todb, fromhost) {
     assert( isString(todb) && todb.length );
     fromhost = fromhost || "";
     //this.resetIndexCache();
-    return this._dbCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
+    return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
 }
 
 /**

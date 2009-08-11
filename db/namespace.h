@@ -46,7 +46,7 @@ namespace mongo {
         *q = 0;
         if (q-database>=MaxClientLen) {
             problem() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
-            dbexit(60);
+            dbexit( EXIT_POSSIBLE_CORRUPTION );
         }
     }
     inline string nsToClient(const char *ns) {
@@ -218,6 +218,10 @@ namespace mongo {
            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill();
+
+        operator string() const {
+            return info.obj().toString();
+        }
     };
 
     extern int bucketSizes[];
@@ -274,7 +278,8 @@ namespace mongo {
             Flag_CappedDisallowDelete = 1 << 1 // set when deletes not allowed during capped table allocation.
         };
 
-        /* hackish */
+        /* hackish - find our index # in the indexes array
+        */
         int idxNo(IndexDetails& idx) { 
             for( int i = 0; i < nIndexes; i++ )
                 if( &indexes[i] == &idx ) 
@@ -284,7 +289,8 @@ namespace mongo {
         }
 
         /* multikey indexes are indexes where there are more than one key in the index
-           for a single document. see multikey in wiki.
+             for a single document. see multikey in wiki.
+           for these, we have to do some dedup object on queries.
         */
         bool isMultikey(int i) { 
             return (multiKeyIndexBits & (1 << i)) != 0;
@@ -332,6 +338,9 @@ namespace mongo {
             return -1;
         }
 
+        /* @return -1 = not found 
+           generally id is first index, so not that expensive an operation (assuming present).
+        */
         int findIdIndex() {
             for( int i = 0; i < nIndexes; i++ ) {
                 if( indexes[i].isIdIndex() )

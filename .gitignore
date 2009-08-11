@@ -81,3 +81,8 @@ authTest
 perftest
 clientTest
 
+#debian
+build-stamp
+configure-stamp
+debian/mongodb
+debian/mongodb.*

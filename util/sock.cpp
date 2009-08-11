@@ -24,6 +24,10 @@ namespace mongo {
     static boost::mutex sock_mutex;
 
     string hostbyname(const char *hostname) {
+        static string unknown = "0.0.0.0";
+        if ( unknown == hostname )
+            return unknown;
+
         boostlock lk(sock_mutex);
 #if defined(_WIN32)
         if( inet_addr(hostname) != INADDR_NONE )
@@ -73,7 +77,7 @@ namespace mongo {
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
                 out() << "ERROR: wsastartup failed " << errno << endl;
                 problem() << "ERROR: wsastartup failed " << errno << endl;
-                exit(1);
+                dbexit( EXIT_NTSERVICE_ERROR );
             }
 #endif
             //out() << "ntohl:" << ntohl(256) << endl;

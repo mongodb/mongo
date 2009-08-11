@@ -14,3 +14,5 @@ assert.eq( "eliot" , f( 1 ) , "A" );
 assert.eq( "sara" , f( 2 ) , "B" );
 assert.eq( "eliot" , db.eval( f , 1 ) , "C" );
 assert.eq( "sara" , db.eval( f , 2 ) , "D" );
+
+assert.gt( 5 , Date.timeFunc( function(){ db.eval( f , 2 ) } ) , "simple db.eval should be less than 5ms on good connection " );

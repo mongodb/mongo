@@ -79,26 +79,22 @@ namespace mongo {
     class Where {
     public:
         Where() {
-            scope = 0;
             jsScope = 0;
         }
         ~Where() {
 
-            if ( scope )
-                delete scope;
-
-            if ( jsScope )
+            if ( jsScope ){
                 delete jsScope;
-            scope = 0;
+            }
             func = 0;
         }
         
-        Scope * scope;
+        auto_ptr<Scope> scope;
         ScriptingFunction func;
         BSONObj *jsScope;
         
         void setFunc(const char *code) {
-            massert( "scope has to be created first!" , scope );
+            massert( "scope has to be created first!" , scope.get() );
             func = scope->createFunction( code );
         }
 
@@ -146,7 +142,8 @@ namespace mongo {
                 where = new Where();
                 uassert( "$where query, but no script engine", globalScriptEngine );
 
-                where->scope = globalScriptEngine->createScope();
+                assert( curNs );
+                where->scope = globalScriptEngine->getPooledScope( curNs );
                 where->scope->localConnect( database->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {
@@ -236,6 +233,11 @@ namespace mongo {
                                 addBasic(b->done().firstElement(), BSONObj::NE);
                                 ok = true;
                             }
+                            else if ( fn[1] == 'r' && fn[3] == 'f' && fn[4] == 0 ){
+                                // { $ref : xxx } - treat as normal object
+                                ok = false;
+                                break;
+                            }
                             else
                                 uassert("invalid $operator", false);
                         }
@@ -264,7 +266,7 @@ namespace mongo {
                             ok = true;
                         }
                         else
-                            uassert("invalid $operator", false);
+                            uassert( (string)"invalid $operator: " + fn , false);
                     }
                     else {
                         ok = false;
@@ -319,7 +321,9 @@ namespace mongo {
 
     int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const BasicMatcher& bm, bool *deep) {
         int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm, deep );
-        return -ret;
+        if ( ret <= 0 )
+            return 1;
+        return 0;
     }
     
     /* Check if a particular field matches.

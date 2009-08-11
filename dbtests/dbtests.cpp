@@ -64,21 +64,21 @@ int main( int argc, char** argv ) {
         if ( argv[ i ] == string( "-dbpath" ) ) {
             if ( i == argc - 1 ) {
                 usage();
-                dbexit( -1 );
+                dbexit( EXIT_BADOPTIONS );
             }
             dbpathSpec = argv[ ++i ];
             offset += 2;
         } else if ( argv[ i ] == string( "-seed" ) ) {
             if ( i == argc - 1 ) {
                 usage();
-                dbexit( -1 );
+                dbexit( EXIT_BADOPTIONS );
             }
             // Don't bother checking for conversion error
             seed = strtoll( argv[ ++i ], 0, 10 );
             offset += 2;
         } else if ( argv[ i ] == string( "-help" ) ) {
             usage();
-            dbexit( 0 );
+            dbexit( EXIT_CLEAN );
         } else if ( offset ) {
             argv[ i - offset ] = argv[ i ];
         }
@@ -125,5 +125,6 @@ int main( int argc, char** argv ) {
     flock( lockFile, LOCK_UN );
 #endif    
 
+    dbexit( (ExitCode)ret ); // so everything shuts down cleanly
     return ret;
 }

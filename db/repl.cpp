@@ -206,6 +206,7 @@ namespace mongo {
         }
     } cmdForceDead;
     
+    /* operator requested resynchronization of replication (on the slave).  { resync : 1 } */
     class CmdResync : public Command {
     public:
         virtual bool slaveOk() {
@@ -601,13 +602,13 @@ namespace mongo {
                     log() << "E10000 --source " << dashDashSource << " != " << tmp.hostName << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
-                    dbexit(18);
+                    dbexit( EXIT_REPLICATION_ERROR );
                 }
                 if ( tmp.only != dashDashOnly ) {
                     log() << "E10001 --only " << dashDashOnly << " != " << tmp.only << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
-                    dbexit(18);
+                    dbexit( EXIT_REPLICATION_ERROR );
                 }
                 c->advance();
             }
@@ -624,7 +625,7 @@ namespace mongo {
             try {
                 massert("--only requires use of --source", dashDashOnly.empty());
             } catch ( ... ) {
-                exit( 40 );
+                dbexit( EXIT_BADOPTIONS );
             }
         }
         
@@ -643,7 +644,7 @@ namespace mongo {
                     log() << "E10003 pairwith " << remote << " != " << tmp.hostName << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
-                    dbexit(18);
+                    dbexit( EXIT_REPLICATION_ERROR );
                 }
                 c->advance();
             }
@@ -742,6 +743,7 @@ namespace mongo {
         return dummyns;
     }
     
+    /* grab initial copy of a database from the master */
     bool ReplSource::resync(string db) {
         string dummyNs = resyncDrop( db.c_str(), "internal" );
         setClientTempNs( dummyNs.c_str() );
@@ -749,7 +751,7 @@ namespace mongo {
             log() << "resync: cloning database " << db << endl;
             ReplInfo r("resync: cloning a database");
             string errmsg;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false, /*slaveok*/ true, /*replauth*/ true);
+            bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false);
             if ( !ok ) {
                 problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
                 throw SyncException();

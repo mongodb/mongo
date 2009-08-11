@@ -38,6 +38,33 @@ namespace mongo {
     // mongo version
     extern const char versionString[];
     
+    enum ExitCode {
+        EXIT_CLEAN = 0 , 
+        EXIT_BADOPTIONS = 2 , 
+        EXIT_REPLICATION_ERROR = 3 ,
+        EXIT_KILL = 12 ,
+        EXIT_ABRUBT = 14 ,
+        EXIT_NTSERVICE_ERROR = 20 ,
+        EXIT_JAVA = 21 ,
+        EXIT_OOM_MALLOC = 42 , 
+        EXIT_OOM_REALLOC = 43 , 
+        EXIT_FS = 45 ,
+        EXIT_POSSIBLE_CORRUPTION = 60 , // this means we detected a possible corruption situation, like a buf overflow
+        EXIT_UNCAUGHT = 100 , // top level exception that wasn't caught
+        EXIT_TEST = 101 ,
+
+    };
+
+    void dbexit( ExitCode returnCode, const char *whyMsg = "");
+
+    /**
+       this is here so you can't just type exit() to quit the program
+       you should either use dbexit to shutdown cleanly, or ::exit to tell the system to quiy
+       if you use this, you'll get a link error since mongo::exit isn't defined
+     */
+    void exit( ExitCode returnCode );
+    bool inShutdown();
+    
 } // namespace mongo
 
 #include <memory>
@@ -90,8 +117,6 @@ using namespace boost::filesystem;
 namespace mongo {
 
     void sayDbContext(const char *msg = 0);
-    void dbexit(int returnCode, const char *whyMsg = "");
-    void exit( int status );
     void rawOut( const string &s );
 
 } // namespace mongo

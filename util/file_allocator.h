@@ -183,7 +183,7 @@ namespace mongo {
                             } catch ( ... ) {
                             }
                             a_.failed_ = true;
-                            dbexit( 45 );
+                            dbexit( EXIT_FS );
                         }
                         
                         {

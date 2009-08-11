@@ -215,12 +215,13 @@ namespace mongo {
                 // if running without auth, you must be on localhost
                 AuthenticationInfo *ai = authInfo.get();
                 if( ai == 0 || !ai->isLocalHost ) {
+                    log() << "ignoring shutdown cmd from client, not from localhost and running without auth" << endl;
                     errmsg = "unauthorized [2]";
                     return false;
                 }
             }
             log() << "terminating, shutdown command received" << endl;
-            dbexit(EXIT_SUCCESS);
+            dbexit( EXIT_CLEAN );
             return true;
         }
     } cmdShutdown;
@@ -514,7 +515,6 @@ namespace mongo {
         if ( *name == '*' && name[1] == 0 ) {
             log() << "  d->nIndexes was " << d->nIndexes << '\n';
             anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
-            anObjBuilder.append("msg", "all indexes deleted for collection");
             IndexDetails *idIndex = 0;
             if( d->nIndexes ) { 
                 for ( int i = 0; i < d->nIndexes; i++ ) {
@@ -532,6 +532,7 @@ namespace mongo {
             }
             /* assuming here that id index is not multikey: */
             d->multiKeyIndexBits = 0;
+            anObjBuilder.append("msg", "all indexes deleted for collection");
         }
         else {
             // delete just one index

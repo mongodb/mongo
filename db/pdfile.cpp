@@ -568,7 +568,7 @@ assert( !eloc.isNull() );
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
         NamespaceDetails* d = nsdetails(nsToDrop.c_str());
-        uassert( "ns not found", d );
+        uassert( (string)"ns not found: " + nsToDrop , d );
 
         uassert( "can't drop system ns", strstr(nsToDrop.c_str(), ".system.") == 0 );
         {
@@ -610,12 +610,19 @@ assert( !eloc.isNull() );
     }
 
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
+        log(1) << "dropCollection: " << name << endl;
         NamespaceDetails *d = nsdetails(name.c_str());
         assert( d );
         if ( d->nIndexes != 0 ) {
-            assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
+            try { 
+                assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
+            }
+            catch( DBException& ) {
+                uasserted("drop: deleteIndexes for collection failed - consider trying repair");
+            }
             assert( d->nIndexes == 0 );
         }
+        log(1) << "\t deleteIndexes dones" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         dropNS(name);        
@@ -1549,7 +1556,8 @@ namespace mongo {
         string reservedPathString = reservedPath.native_directory_string();
         assert( setClient( dbName, reservedPathString.c_str() ) );
 
-        bool res = cloneFrom(localhost.c_str(), errmsg, dbName, /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false);
+        bool res = cloneFrom(localhost.c_str(), errmsg, dbName, 
+            /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false);
         closeClient( dbName, reservedPathString.c_str() );
 
         if ( !res ) {

@@ -644,6 +644,36 @@ namespace JsobjTests {
             ASSERT( ret.woCompare( fromjson( "{a:'bcd',foo:{ggg:44},f:10}" ) ) == 0 );
         }
     };
+
+    class MinMaxElementTest {
+    public:
+
+        BSONObj min( int t ){
+            BSONObjBuilder b;
+            b.appendMinForType( "a" , t );
+            return b.obj();
+        }
+
+        BSONObj max( int t ){
+            BSONObjBuilder b;
+            b.appendMaxForType( "a" , t );
+            return b.obj();
+        }
+
+        void run(){
+            for ( int t=1; t<JSTypeMax; t++ ){
+                if ( t == CodeWScope )
+                    continue;
+                assert( min( t ).woCompare( max( t ) ) < 0 );
+                assert( max( t ).woCompare( min( t ) ) > 0 );
+                assert( min( t ).woCompare( min( t ) ) == 0 );
+                assert( max( t ).woCompare( max( t ) ) == 0 );
+            }
+        }
+        
+
+        
+    };
     
     class All : public Suite {
     public:
@@ -705,6 +735,7 @@ namespace JsobjTests {
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
+            add< MinMaxElementTest >();
         }
     };
     

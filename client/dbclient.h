@@ -104,6 +104,16 @@ namespace mongo {
         */
         Query& explain();
 
+        /** Use snapshot mode for the query.  Snapshot mode assures no duplicates are returned, or objects missed, which were 
+            present at both the start and end of the query's execution (if an object is new during the query, or deleted during 
+            the query, it may or may not be returned, even with snapshot mode).
+
+            Note that short query responses (less than 1MB) are always effectively snapshotted.
+
+            Currently, snapshot mode may not be used with sorting or explicit hints.
+        */
+        Query& snapshot();
+
         /** Queries to the Mongo database support a $where parameter option which contains 
             a javascript function that is evaluated to see whether objects being queried match 
             its criteria.  Use this helper to append such a function to a query object. 
@@ -122,7 +132,6 @@ namespace mongo {
         */
         Query& where(const string &jscode, BSONObj scope);
         Query& where(const string &jscode) { return where(jscode, BSONObj()); }
-        
 
         /**
          * if this query has an orderby, hint, or some other field
@@ -737,11 +746,7 @@ namespace mongo {
         /** Connect to a server pair using a host pair string of the form
               hostname[:port],hostname[:port]
               */
-        bool connect(string hostpairstring) { 
-            uassert("bad hostpairstring", hostpairstring.find(',') != string::npos);
-            massert("not yet implemented", false);
-            return false;
-        }
+        bool connect(string hostpairstring);
 
         /** Authorize.  Authorizes both sides of the pair as needed. 
         */

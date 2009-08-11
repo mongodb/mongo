@@ -37,15 +37,17 @@ namespace mongo {
     class Cloner: boost::noncopyable {
         auto_ptr< DBClientWithCommands > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
-                  bool masterSameProcess, bool slaveOk, BSONObj query = BSONObj());
+                  bool masterSameProcess, bool slaveOk, Query q = Query());
         void replayOpLog( DBClientCursor *c, const BSONObj &query );
     public:
         Cloner() { }
 
-        /* slaveOk - if true it is ok if the source of the data is !ismaster.
+        /* slaveOk     - if true it is ok if the source of the data is !ismaster.
            useReplAuth - use the credentials we normally use as a replication slave for the cloning
+           snapshot    - use $snapshot mode for copying collections.  note this should not be used when it isn't required, as it will be slower.
+                         for example repairDatabase need not use it.
         */
-        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth);
+        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot);
         bool startCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, string& errmsg, bool logForRepl, bool copyIndexes, int logSizeMb, long long &cursorId );
         bool finishCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, long long cursorId, string &errmsg );
     };
@@ -87,7 +89,7 @@ namespace mongo {
     /* copy the specified collection
        isindex - if true, this is system.indexes collection, in which we do some transformation when copying.
     */
-    void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk, BSONObj query) {
+    void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk, Query query) {
         auto_ptr<DBClientCursor> c;
         {
             dbtemprelease r;
@@ -104,7 +106,7 @@ namespace mongo {
             }
             BSONObj tmp = c->next();
 
-            /* assure object is valid.  note this will slow us down a good bit. */
+            /* assure object is valid.  note this will slow us down a little. */
             if ( !tmp.valid() ) {
                 out() << "skipping corrupt object from " << from_collection << '\n';
                 continue;
@@ -134,7 +136,7 @@ namespace mongo {
         }
     }
 
-    bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth) {
+    bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot) {
 
 		massert( "useReplAuth is not written to replication log", !useReplAuth || !logForRepl );
 
@@ -151,7 +153,7 @@ namespace mongo {
                 return false;
             }
         }
-        /* todo: we can put thesee releases inside dbclient or a dbclient specialization.
+        /* todo: we can put these releases inside dbclient or a dbclient specialization.
            or just wait until we get rid of global lock anyway.
            */
         string ns = fromdb + ".system.namespaces";
@@ -240,12 +242,19 @@ namespace mongo {
                     ensureHaveIdIndex(toname);
             }
             log(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
-            copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk);
+            Query q;
+            if( snapshot ) 
+                q.snapshot();
+            copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk, q);
         }
 
         // now build the indexes
         string system_indexes_from = fromdb + ".system.indexes";
         string system_indexes_to = todb + ".system.indexes";
+        /* [dm]: is the ID index sometimes not called "_id_"?  There is other code in the system that looks for a "_id" prefix 
+                 rather than this exact value.  we should standardize.  OR, remove names - which is in the bugdb.  Anyway, this 
+                 is dubious here at the moment.
+        */
         copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, masterSameProcess, slaveOk, BSON( "name" << NE << "_id_" ) );
 
         return true;
@@ -353,11 +362,16 @@ namespace mongo {
         return true;
     }
     
+    /* slaveOk     - if true it is ok if the source of the data is !ismaster.
+       useReplAuth - use the credentials we normally use as a replication slave for the cloning
+       snapshot    - use $snapshot mode for copying collections.  note this should not be used when it isn't required, as it will be slower.
+                     for example repairDatabase need not use it.
+    */
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
-				   bool slaveOk, bool useReplAuth)
+				   bool slaveOk, bool useReplAuth, bool snapshot)
     {
         Cloner c;
-        return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth);
+        return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth, snapshot);
     }
     
     /* Usage:
@@ -376,7 +390,8 @@ namespace mongo {
             /* replication note: we must logOp() not the command, but the cloned data -- if the slave
                were to clone it would get a different point-in-time and not match.
                */
-            return cloneFrom(from.c_str(), errmsg, database->name, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false);
+            return cloneFrom(from.c_str(), errmsg, database->name, 
+                             /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false, /*snapshot*/true);
         }
     } cmdclone;
     
@@ -547,7 +562,7 @@ namespace mongo {
                 return false;
             }
             setClient(todb.c_str());
-            bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false);
+            bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false, /*snapshot*/true);
             database = 0;
             return res;
         }
