@@ -191,6 +191,12 @@ DBQuery.prototype.explain = function(){
     return n.next();
 }
 
+DBQuery.prototype.snapshot = function(){
+    this._ensureSpecial();
+    this._query.$snapshot = true;
+    return this;
+ }
+
 DBQuery.prototype.shellPrint = function(){
     try {
         var n = 0;
