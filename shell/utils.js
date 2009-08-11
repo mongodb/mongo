@@ -256,6 +256,11 @@ tojsonObject = function( x ){
     if ( typeof( x.tojson ) == "function" && x.tojson != tojson )
         return x.tojson();
 
+    if ( x.toString() == "[object MaxKey]" )
+        return "{ $maxKey : 1 }";
+    if ( x.toString() == "[object MinKey]" )
+        return "{ $minKey : 1 }";
+    
     var s = "{";
     
     var first = true;
@@ -466,3 +471,4 @@ Math.sigFig = function( x , N ){
     var p = Math.pow( 10, N - Math.ceil( Math.log( Math.abs(x) ) / Math.log( 10 )) );
     return Math.round(x*p)/p;
 }
+
