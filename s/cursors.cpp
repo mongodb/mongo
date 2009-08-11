@@ -80,7 +80,7 @@ namespace mongo {
         b.appendElements( filter );
         b.appendElements( extra );
         
-        FieldBoundSet s( "wrong" , b.obj() );
+        FieldBoundSet s( "wrong" , b.obj() , false );
         return s.simplifiedQuery();
     }
 
@@ -149,6 +149,7 @@ namespace mongo {
             return false;
         
         ServerAndQuery& sq = _servers[_serverIndex++];
+        cout << "Extra: " << sq._extra << endl;
         _current = query( sq._server , 0 , sq._extra );
         return _current->more();
     }

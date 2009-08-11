@@ -26,7 +26,7 @@ namespace mongo {
     // determine index limits
     class FieldBound {
     public:
-        FieldBound( const BSONElement &e = BSONObj().firstElement() );
+        FieldBound( const BSONElement &e = BSONObj().firstElement() , bool optimize=true );
         const FieldBound &operator&=( const FieldBound &other );
         BSONElement lower() const { return lower_; }
         BSONElement upper() const { return upper_; }
@@ -122,7 +122,7 @@ namespace mongo {
     // determine index limits
     class FieldBoundSet {
     public:
-        FieldBoundSet( const char *ns, const BSONObj &query );
+        FieldBoundSet( const char *ns, const BSONObj &query , bool optimize=true );
         const FieldBound &bound( const char *fieldName ) const {
             map< string, FieldBound >::const_iterator f = bounds_.find( fieldName );
             if ( f == bounds_.end() )

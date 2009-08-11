@@ -286,6 +286,20 @@ namespace mongo {
             }
         }
 
+        bool isSimpleType() const {
+            switch( type() ){
+            case NumberLong:
+            case NumberDouble:
+            case NumberInt:
+            case String:
+            case Bool:
+            case Date:
+                return true;
+            default: 
+                return false;
+            }
+        }
+
         /** Return double value for this field. MUST be NumberDouble type. */
         double _numberDouble() const {return *reinterpret_cast< const double* >( value() ); }
         /** Return double value for this field. MUST be NumberInt type. */

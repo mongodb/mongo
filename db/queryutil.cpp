@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    FieldBound::FieldBound( const BSONElement &e ) :
+    FieldBound::FieldBound( const BSONElement &e , bool optimize ) :
     lower_( minKey.firstElement() ),
     lowerInclusive_( true ),
     upper_( maxKey.firstElement() ),
@@ -85,18 +85,19 @@ namespace mongo {
             default:
                 break;
         }
-
-        if ( lower_.type() != MinKey && upper_.type() == MaxKey ){
-            BSONObjBuilder b;
-            b.appendMaxForType( lower_.fieldName() , lower_.type() );
-            upper_ = addObj( b.obj() ).firstElement();
+        
+        if ( optimize ){
+            if ( lower_.type() != MinKey && upper_.type() == MaxKey && lower_.isSimpleType() ){ // TODO: get rid of isSimpleType
+                BSONObjBuilder b;
+                b.appendMaxForType( lower_.fieldName() , lower_.type() );
+                upper_ = addObj( b.obj() ).firstElement();
+            }
+            else if ( lower_.type() == MinKey && upper_.type() != MaxKey && upper_.isSimpleType() ){ // TODO: get rid of isSimpleType
+                BSONObjBuilder b;
+                b.appendMinForType( upper_.fieldName() , upper_.type() );
+                lower_ = addObj( b.obj() ).firstElement();
+            }
         }
-        else if ( lower_.type() == MinKey && upper_.type() != MaxKey ){
-            BSONObjBuilder b;
-            b.appendMinForType( upper_.fieldName() , upper_.type() );
-            lower_ = addObj( b.obj() ).firstElement();
-        }
-
 
     }
     
@@ -133,7 +134,7 @@ namespace mongo {
         return o;
     }
     
-    FieldBoundSet::FieldBoundSet( const char *ns, const BSONObj &query ) :
+    FieldBoundSet::FieldBoundSet( const char *ns, const BSONObj &query , bool optimize ) :
     ns_( ns ),
     query_( query.getOwned() ) {
         BSONObjIterator i( query_ );
@@ -144,7 +145,7 @@ namespace mongo {
             if ( strcmp( e.fieldName(), "$where" ) == 0 )
                 continue;
             if ( getGtLtOp( e ) == BSONObj::Equality ) {
-                bounds_[ e.fieldName() ] &= FieldBound( e );
+                bounds_[ e.fieldName() ] &= FieldBound( e , optimize );
             }
             else {
                 BSONObjIterator i( e.embeddedObject() );
@@ -152,7 +153,7 @@ namespace mongo {
                     BSONElement f = i.next();
                     if ( f.eoo() )
                         break;
-                    bounds_[ e.fieldName() ] &= FieldBound( f );
+                    bounds_[ e.fieldName() ] &= FieldBound( f , optimize );
                 }                
             }
         }

@@ -55,6 +55,7 @@ namespace mongo {
                             BSONObjBuilder b;
                             s->getFilter( b );
                             extra = b.obj();
+                            cout << s->toString() << " -->> " << extra << endl;
                         }
                         buckets.insert( ServerAndQuery( s->getServer() , extra , s->getMin() ) );
                     }
