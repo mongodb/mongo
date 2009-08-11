@@ -550,7 +550,7 @@ namespace mongo {
         string database_;
     };
 
-    extern const char *dbpath;
+    extern string dbpath;
 
     // Rename a namespace within current 'client' db.
     // (Arguments should include db name)

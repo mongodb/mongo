@@ -588,7 +588,7 @@ int main(int argc, char* argv[], char *envp[] )
             show_help_text(visible_options);
             return 0;
         }
-        dbpath = params["dbpath"].as<string>().c_str();
+        dbpath = params["dbpath"].as<string>();
         if (params.count("quiet")) {
             quiet = true;
         }
@@ -748,7 +748,7 @@ int main(int argc, char* argv[], char *envp[] )
             return 0;
         }
 
-        #if defined(_WIN32)
+#if defined(_WIN32)
         if ( installService ) {
             if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
@@ -764,8 +764,9 @@ int main(int argc, char* argv[], char *envp[] )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
-        #endif
-    } else {
+#endif
+    } 
+    else {
         cout << dbExecCommand << " --help for help and startup options" << endl;
         cout << endl;
     }

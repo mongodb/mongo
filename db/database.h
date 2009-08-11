@@ -26,7 +26,7 @@ namespace mongo {
 
     class Database {
     public:
-        Database(const char *nm, bool& newDb, const char *_path = dbpath) :
+        Database(const char *nm, bool& newDb, const string& _path = dbpath) :
         name(nm),
         path(_path),
         namespaceIndex( path, name )

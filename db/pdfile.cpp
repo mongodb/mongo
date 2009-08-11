@@ -44,7 +44,7 @@ namespace mongo {
     extern bool quota;
     extern int port;
 
-    const char *dbpath = "/data/db/";
+    string dbpath = "/data/db/";
 
     DataFileMgr theDataFileMgr;
     map<string,Database*> databases;
@@ -1404,7 +1404,7 @@ assert( !eloc.isNull() );
         return r;
     }
 
-    void DataFileMgr::init(const char *dir) {
+    void DataFileMgr::init(const string& path ) {
         /*	boost::filesystem::path path( dir );
         	path /= "temp.dat";
         	string pathString = path.string();
@@ -1519,7 +1519,7 @@ namespace mongo {
     boost::intmax_t freeSpace() {
 #if !defined(_WIN32)
         struct statvfs info;
-        assert( !statvfs( dbpath, &info ) );
+        assert( !statvfs( dbpath.c_str() , &info ) );
         return boost::intmax_t( info.f_bavail ) * info.f_frsize;
 #else
         return -1;
@@ -1583,7 +1583,7 @@ namespace mongo {
         return true;
     }
 
-    void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator, const char *path ) {
+    void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator, const string& path ) {
         if ( afterAllocator )
             theFileAllocator().waitUntilFinished();
         string c = database;
