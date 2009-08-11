@@ -1398,19 +1398,21 @@ namespace mongo {
                     uassert("E12001 can't sort with $snapshot", order.isEmpty());
 					uassert("E12002 can't use hint with $snapshot", hint.eoo());
                     NamespaceDetails *d = nsdetails(ns);
-                    int i = d->findIdIndex();
-                    if( i < 0 ) { 
-                        log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
-                    }
-                    else {
-                        /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
-                           probably need a better way to specify "use the _id index" as a hint.  if someone is
-                           in the query optimizer please fix this then!
-                        */
-                        BSONObjBuilder b;
-                        b.append("$hint", d->indexes[i].indexName());
-                        snapshotHint = b.obj();
-                        hint = snapshotHint.firstElement();
+                    if ( d ){
+                        int i = d->findIdIndex();
+                        if( i < 0 ) { 
+                            log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
+                        }
+                        else {
+                            /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
+                               probably need a better way to specify "use the _id index" as a hint.  if someone is
+                               in the query optimizer please fix this then!
+                            */
+                            BSONObjBuilder b;
+                            b.append("$hint", d->indexes[i].indexName());
+                            snapshotHint = b.obj();
+                            hint = snapshotHint.firstElement();
+                        }
                     }
                 }
             }
