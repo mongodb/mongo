@@ -215,15 +215,17 @@ namespace mongo {
     };
 
     class BtreeCursor : public Cursor {
-        friend class BtreeBucket;
-        NamespaceDetails *d;
-        int idxNo;
-        BSONObj startKey;
-        BSONObj endKey;
-        bool endKeyInclusive_;
-        bool multikey; // note this must be updated every getmore batch in case someone added a multikey...
     public:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
+
+        // a BoundList contains intervals specified by inclusive start
+        // and end bounds.  The intervals should be nonoverlapping and occur in
+        // the specified direction of traversal.  For example, given a simple index {i:1}
+        // and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
+        // would be valid for index {i:-1} with direction -1.
+        typedef vector< pair< BSONObj, BSONObj > > BoundList;
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const vector< pair< BSONObj, BSONObj > > &_bounds, int _direction );
+
         virtual bool ok() {
             return !bucket.isNull();
         }
@@ -290,13 +292,14 @@ namespace mongo {
         virtual string toString() {
             string s = string("BtreeCursor ") + indexDetails.indexName();
             if ( direction < 0 ) s += " reverse";
+            if ( bounds_.size() > 1 ) s += " multi";
             return s;
         }
 
         BSONObj prettyKey( const BSONObj &key ) const {
             return key.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
         }
-        
+
         virtual BSONObj prettyStartKey() const {
             return prettyKey( startKey );
         }
@@ -315,6 +318,20 @@ namespace mongo {
         /* Check if the current key is beyond endKey. */
         void checkEnd();
 
+        // selective audits on construction
+        void audit();
+
+        // init start / end keys with a new range
+        void init();
+
+        friend class BtreeBucket;
+        NamespaceDetails *d;
+        int idxNo;
+        BSONObj startKey;
+        BSONObj endKey;
+        bool endKeyInclusive_;
+        bool multikey; // note this must be updated every getmore batch in case someone added a multikey...
+
         const IndexDetails& indexDetails;
         BSONObj order;
         DiskLoc bucket;
@@ -322,6 +339,8 @@ namespace mongo {
         int direction; // 1=fwd,-1=reverse
         BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
         DiskLoc locAtKeyOfs;
+        BoundList bounds_;
+        unsigned boundIndex_;
     };
 
 #pragma pack()

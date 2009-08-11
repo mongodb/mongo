@@ -34,14 +34,37 @@ namespace mongo {
             startKey( _startKey ),
             endKey( _endKey ),
             endKeyInclusive_( endKeyInclusive ),
+            multikey( d->isMultikey( idxNo ) ),
             indexDetails( _id ),
             order( _id.keyPattern() ),
-            direction( _direction ) 
+            direction( _direction ),
+            boundIndex_()
     {
-        dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
-        multikey = d->isMultikey(idxNo);
+        audit();
+        init();
+    }
 
-        bool found;
+    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const vector< pair< BSONObj, BSONObj > > &_bounds, int _direction )
+        :
+            d(_d), idxNo(_idxNo), 
+            endKeyInclusive_( true ),
+            multikey( d->isMultikey( idxNo ) ),
+            indexDetails( _id ),
+            order( _id.keyPattern() ),
+            direction( _direction ),
+            bounds_( _bounds ),
+            boundIndex_()
+    {
+        assert( !bounds_.empty() );
+        startKey = bounds_[ 0 ].first;
+        endKey = bounds_[ 0 ].second;
+        audit();
+        init();
+    }
+
+    void BtreeCursor::audit() {
+        dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
+
         if ( otherTraceLevel >= 12 ) {
             if ( otherTraceLevel >= 200 ) {
                 out() << "::BtreeCursor() qtl>200.  validating entire index." << endl;
@@ -52,7 +75,10 @@ namespace mongo {
                 indexDetails.head.btree()->dump();
             }
         }
+    }
 
+    void BtreeCursor::init() {
+        bool found;
         bucket = indexDetails.head.btree()->
         locate(indexDetails, indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
         
@@ -104,6 +130,11 @@ namespace mongo {
         bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");
         skipUnusedKeys();
         checkEnd();
+        while( !ok() && ++boundIndex_ < bounds_.size() ) {
+            startKey = bounds_[ boundIndex_ ].first;
+            endKey = bounds_[ boundIndex_ ].second;
+            init();
+        }
         return !bucket.isNull();
     }
 
