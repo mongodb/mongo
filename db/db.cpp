@@ -333,6 +333,13 @@ namespace mongo {
         }
     }
 
+    void show_32_warning(){
+        if ( sizeof(int*) != 4 )
+            return;
+        log() << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
+        log() << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations for more" << endl;
+    }
+
     Timer startupSrandTimer;
 
     void _initAndListen(int listenPort, const char *appserverLoc = null) {
@@ -349,11 +356,7 @@ namespace mongo {
         log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
               <<  " master = " << master << " slave = " << slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
         
-        if ( is32bit ){
-            log() << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
-            log() << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations for more" << endl;
-        }
-        
+        show_32_warning();
 
         stringstream ss;
         ss << "dbpath (" << dbpath << ") does not exist";
@@ -421,7 +424,9 @@ using namespace mongo;
 
 namespace po = boost::program_options;
 
+
 void show_help_text(po::options_description options) {
+    show_32_warning();
     cout << "To run with the default options use '" << dbExecCommand << " run'." << endl << endl
          << options << endl;
 };
