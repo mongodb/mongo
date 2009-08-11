@@ -336,8 +336,10 @@ namespace mongo {
     void show_32_warning(){
         if ( sizeof(int*) != 4 )
             return;
-        log() << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
-        log() << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations for more" << endl;
+        cout << endl;
+        cout << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
+        cout << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations for more" << endl;
+        cout << endl;
     }
 
     Timer startupSrandTimer;
@@ -426,9 +428,10 @@ namespace po = boost::program_options;
 
 
 void show_help_text(po::options_description options) {
+    cout << endl;
+    cout << "To run with the default options use '" << dbExecCommand << " run'.\n";
     show_32_warning();
-    cout << "To run with the default options use '" << dbExecCommand << " run'." << endl << endl
-         << options << endl;
+    cout << options << endl;
 };
 
 /* Return error string or "" if no errors. */
