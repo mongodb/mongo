@@ -48,4 +48,16 @@ assert.gt( 3 , t.find( { i : { $lte : 'a' } } ).explain().nscanned , "lte" );
 //printjson( t.find( { i : { $gte : 'a' } } ).explain() );
 // bug SERVER-99
 assert.gt( 3 , t.find( { i : { $gte : 'a' } } ).explain().nscanned , "gte" );
+assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).count() , "gte a" );
+assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).itcount() , "gte b" );
+assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).sort( { i : 1 } ).count() , "gte c" );
+assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).sort( { i : 1 } ).itcount() , "gte d" );
 
+t.save( { i : "b" } );
+
+assert.gt( 3 , t.find( { i : { $gte : 'a' } } ).explain().nscanned , "gte" );
+assert.eq( 2 , t.find( { i : { $gte : 'a' } } ).count() , "gte a2" );
+assert.eq( 2 , t.find( { i : { $gte : 'a' } } ).itcount() , "gte b2" );
+assert.eq( 2 , t.find( { i : { $gte : 'a' , $lt : MaxKey } } ).itcount() , "gte c2" );
+assert.eq( 2 , t.find( { i : { $gte : 'a' , $lt : MaxKey } } ).sort( { i : -1 } ).itcount() , "gte d2" );
+assert.eq( 2 , t.find( { i : { $gte : 'a' , $lt : MaxKey } } ).sort( { i : 1 } ).itcount() , "gte e2" );
