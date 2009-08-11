@@ -33,7 +33,7 @@ namespace mongo {
     
     QueryPlan::QueryPlan( 
         NamespaceDetails *_d, int _idxNo,
-        const FieldBoundSet &fbs, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey ) :
+        const FieldRangeSet &fbs, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey ) :
     d(_d), idxNo(_idxNo),
     fbs_( fbs ),
     order_( order ),
@@ -76,7 +76,7 @@ namespace mongo {
                     goto doneCheckOrder;
                 if ( strcmp( oe.fieldName(), ke.fieldName() ) == 0 )
                     break;
-                if ( !fbs.bound( ke.fieldName() ).equality() )
+                if ( !fbs.range( ke.fieldName() ).equality() )
                     goto doneCheckOrder;
             }
             int d = elementDirection( oe ) == elementDirection( ke ) ? 1 : -1;
@@ -100,11 +100,11 @@ namespace mongo {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
-            const FieldBound &fb = fbs.bound( e.fieldName() );
+            const FieldRange &fb = fbs.range( e.fieldName() );
             int number = (int) e.number(); // returns 0.0 if not numeric
             bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction_ >= 0 ? 1 : -1 ) > 0 );
-            startKeyBuilder.appendAs( forward ? fb.lower() : fb.upper(), "" );
-            endKeyBuilder.appendAs( forward ? fb.upper() : fb.lower(), "" );
+            startKeyBuilder.appendAs( forward ? fb.min() : fb.max(), "" );
+            endKeyBuilder.appendAs( forward ? fb.max() : fb.min(), "" );
             if ( stillOptimalIndexedQueryCount ) {
                 if ( fb.nontrivial() )
                     ++optimalIndexedQueryCount;
@@ -115,16 +115,16 @@ namespace mongo {
                     optimalIndexedQueryCount = -1;
             }
             if ( fb.equality() ) {
-                BSONElement e = fb.upper();
+                BSONElement e = fb.max();
                 if ( !e.isNumber() && !e.mayEncapsulate() && e.type() != RegEx )
                     ++exactIndexedQueryCount;
             }
             orderFieldsUnindexed.erase( e.fieldName() );
         }
         if ( !scanAndOrderRequired_ &&
-             ( optimalIndexedQueryCount == fbs.nNontrivialBounds() ) )
+             ( optimalIndexedQueryCount == fbs.nNontrivialRanges() ) )
             optimal_ = true;
-        if ( exactIndexedQueryCount == fbs.nNontrivialBounds() &&
+        if ( exactIndexedQueryCount == fbs.nNontrivialRanges() &&
             orderFieldsUnindexed.size() == 0 &&
             exactIndexedQueryCount == index_->keyPattern().nFields() &&
             exactIndexedQueryCount == fbs.query().nFields() ) {
@@ -135,7 +135,7 @@ namespace mongo {
         if ( endKey_.isEmpty() )
             endKey_ = endKeyBuilder.obj();
         if ( ( scanAndOrderRequired_ || order_.isEmpty() ) &&
-            !fbs.bound( idxKey.firstElement().fieldName() ).nontrivial() )
+            !fbs.range( idxKey.firstElement().fieldName() ).nontrivial() )
             unhelpful_ = true;
     }
     
@@ -289,7 +289,7 @@ namespace mongo {
             return;
 
         // If table scan is optimal or natural order requested
-        if ( ( fbs_.nNontrivialBounds() == 0 && order_.isEmpty() ) ||
+        if ( ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan
             addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );

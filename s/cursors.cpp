@@ -80,7 +80,7 @@ namespace mongo {
         b.appendElements( filter );
         b.appendElements( extra );
         
-        FieldBoundSet s( "wrong" , b.obj() , false );
+        FieldRangeSet s( "wrong" , b.obj() , false );
         return s.simplifiedQuery();
     }
 

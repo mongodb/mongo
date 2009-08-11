@@ -32,16 +32,16 @@ namespace mongo {
 
 namespace QueryOptimizerTests {
 
-    namespace FieldBoundTests {
+    namespace FieldRangeTests {
         class Base {
         public:
             virtual ~Base() {}
             void run() {
-                FieldBoundSet s( "ns", query() );
-                checkElt( lower(), s.bound( "a" ).lower() );
-                checkElt( upper(), s.bound( "a" ).upper() );
-                ASSERT_EQUALS( lowerInclusive(), s.bound( "a" ).lowerInclusive() );
-                ASSERT_EQUALS( upperInclusive(), s.bound( "a" ).upperInclusive() );
+                FieldRangeSet s( "ns", query() );
+                checkElt( lower(), s.range( "a" ).min() );
+                checkElt( upper(), s.range( "a" ).max() );
+                ASSERT_EQUALS( lowerInclusive(), s.range( "a" ).minInclusive() );
+                ASSERT_EQUALS( upperInclusive(), s.range( "a" ).maxInclusive() );
             }
         protected:
             virtual BSONObj query() = 0;
@@ -133,7 +133,7 @@ namespace QueryOptimizerTests {
         class EqGteInvalid {
         public:
             void run() {
-                FieldBoundSet fbs( "ns", BSON( "a" << 1 << "a" << GTE << 2 ) );
+                FieldRangeSet fbs( "ns", BSON( "a" << 1 << "a" << GTE << 2 ) );
                 ASSERT( !fbs.matchPossible() );
             }
         };        
@@ -185,25 +185,25 @@ namespace QueryOptimizerTests {
         class Equality {
         public:
             void run() {
-                FieldBoundSet s( "ns", BSON( "a" << 1 ) );
-                ASSERT( s.bound( "a" ).equality() );
-                FieldBoundSet s2( "ns", BSON( "a" << GTE << 1 << LTE << 1 ) );
-                ASSERT( s2.bound( "a" ).equality() );
-                FieldBoundSet s3( "ns", BSON( "a" << GT << 1 << LTE << 1 ) );
-                ASSERT( !s3.bound( "a" ).equality() );
-                FieldBoundSet s4( "ns", BSON( "a" << GTE << 1 << LT << 1 ) );
-                ASSERT( !s4.bound( "a" ).equality() );
-                FieldBoundSet s5( "ns", BSON( "a" << GTE << 1 << LTE << 1 << GT << 1 ) );
-                ASSERT( !s5.bound( "a" ).equality() );
-                FieldBoundSet s6( "ns", BSON( "a" << GTE << 1 << LTE << 1 << LT << 1 ) );
-                ASSERT( !s6.bound( "a" ).equality() );
+                FieldRangeSet s( "ns", BSON( "a" << 1 ) );
+                ASSERT( s.range( "a" ).equality() );
+                FieldRangeSet s2( "ns", BSON( "a" << GTE << 1 << LTE << 1 ) );
+                ASSERT( s2.range( "a" ).equality() );
+                FieldRangeSet s3( "ns", BSON( "a" << GT << 1 << LTE << 1 ) );
+                ASSERT( !s3.range( "a" ).equality() );
+                FieldRangeSet s4( "ns", BSON( "a" << GTE << 1 << LT << 1 ) );
+                ASSERT( !s4.range( "a" ).equality() );
+                FieldRangeSet s5( "ns", BSON( "a" << GTE << 1 << LTE << 1 << GT << 1 ) );
+                ASSERT( !s5.range( "a" ).equality() );
+                FieldRangeSet s6( "ns", BSON( "a" << GTE << 1 << LTE << 1 << LT << 1 ) );
+                ASSERT( !s6.range( "a" ).equality() );
             }
         };
         
         class SimplifiedQuery {
         public:
             void run() {
-                FieldBoundSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 << GT << 0 << "e" << GTE << 0 << LTE << 10 ) );
+                FieldRangeSet fbs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 << GT << 0 << "e" << GTE << 0 << LTE << 10 ) );
                 BSONObj simple = fbs.simplifiedQuery();
                 cout << "simple: " << simple << endl;
                 ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gt:5,$lt:10}" ) ) );
@@ -236,27 +236,27 @@ namespace QueryOptimizerTests {
             }
         private:
             static QueryPattern p( const BSONObj &query, const BSONObj &sort = BSONObj() ) {
-                return FieldBoundSet( "", query ).pattern( sort );
+                return FieldRangeSet( "", query ).pattern( sort );
             }
         };
         
         class NoWhere {
         public:
             void run() {
-                ASSERT_EQUALS( 0, FieldBoundSet( "ns", BSON( "$where" << 1 ) ).nNontrivialBounds() );
+                ASSERT_EQUALS( 0, FieldRangeSet( "ns", BSON( "$where" << 1 ) ).nNontrivialRanges() );
             }
         };
         
         class Numeric {
         public:
             void run() {
-                FieldBoundSet f( "", BSON( "a" << 1 ) );
-                ASSERT( f.bound( "a" ).lower().woCompare( BSON( "a" << 2.0 ).firstElement() ) < 0 );
-                ASSERT( f.bound( "a" ).lower().woCompare( BSON( "a" << 0.0 ).firstElement() ) > 0 );
+                FieldRangeSet f( "", BSON( "a" << 1 ) );
+                ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 2.0 ).firstElement() ) < 0 );
+                ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 0.0 ).firstElement() ) > 0 );
             }
         };
         
-    } // namespace FieldBoundTests
+    } // namespace FieldRangeTests
     
     namespace QueryPlanTests {
         class Base {
@@ -302,8 +302,8 @@ namespace QueryOptimizerTests {
         // There's a limit of 10 indexes total, make sure not to exceed this in a given test.
 #define INDEXNO(x) nsd()->idxNo( *this->index( BSON(x) ) )
 #define INDEX(x) this->index( BSON(x) )
-        auto_ptr< FieldBoundSet > FieldBoundSet_GLOBAL;
-#define FBS(x) ( FieldBoundSet_GLOBAL.reset( new FieldBoundSet( ns(), x ) ), *FieldBoundSet_GLOBAL )
+        auto_ptr< FieldRangeSet > FieldRangeSet_GLOBAL;
+#define FBS(x) ( FieldRangeSet_GLOBAL.reset( new FieldRangeSet( ns(), x ) ), *FieldRangeSet_GLOBAL )
         
         class NoIndex : public Base {
         public:
@@ -512,17 +512,17 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FBS( BSON( "b" << 1 ) ), BSONObj() );
-                ASSERT( !p.bound( "a" ).nontrivial() );
+                ASSERT( !p.range( "a" ).nontrivial() );
                 ASSERT( p.unhelpful() );
                 QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FBS( BSON( "b" << 1 << "c" << 1 ) ), BSON( "a" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
-                ASSERT( !p2.bound( "a" ).nontrivial() );
+                ASSERT( !p2.range( "a" ).nontrivial() );
                 ASSERT( !p2.unhelpful() );
                 QueryPlan p3( nsd(), INDEXNO( "b" << 1 ), FBS( BSON( "b" << 1 << "c" << 1 ) ), BSONObj() );
-                ASSERT( p3.bound( "b" ).nontrivial() );
+                ASSERT( p3.range( "b" ).nontrivial() );
                 ASSERT( !p3.unhelpful() );
                 QueryPlan p4( nsd(), INDEXNO( "b" << 1 << "c" << 1 ), FBS( BSON( "c" << 1 << "d" << 1 ) ), BSONObj() );
-                ASSERT( !p4.bound( "b" ).nontrivial() );
+                ASSERT( !p4.range( "b" ).nontrivial() );
                 ASSERT( p4.unhelpful() );
             }
         };
@@ -909,8 +909,8 @@ namespace QueryOptimizerTests {
                 BSONObj one = BSON( "a" << 1 );
                 theDataFileMgr.insert( ns(), one );
                 deleteObjects( ns(), BSON( "a" << 1 ), false );
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldBoundSet( ns(), BSON( "a" << 1 ) ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 2, NamespaceDetailsTransient::get( ns() ).nScannedForPattern( FieldBoundSet( ns(), BSON( "a" << 1 ) ).pattern() ) );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ) ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( 2, NamespaceDetailsTransient::get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ) ).pattern() ) );
             }
         };
         
@@ -961,13 +961,13 @@ namespace QueryOptimizerTests {
                 assembleRequest( ns(), QUERY( "b" << 0 << "a" << GTE << 0 ).obj, 2, 0, 0, 0, m );
                 stringstream ss;
                 runQuery( m, ss );
-                ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );
+                ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );
                 
                 Message m2;
                 assembleRequest( ns(), QUERY( "b" << 99 << "a" << GTE << 0 ).obj, 2, 0, 0, 0, m2 );
                 runQuery( m2, ss );
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );                
-                ASSERT_EQUALS( 2, NamespaceDetailsTransient::get( ns() ).nScannedForPattern( FieldBoundSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );                
+                ASSERT_EQUALS( 2, NamespaceDetailsTransient::get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
             }
         };
         
@@ -976,25 +976,25 @@ namespace QueryOptimizerTests {
     class All : public Suite {
     public:
         All() {
-            add< FieldBoundTests::Empty >();
-            add< FieldBoundTests::Eq >();
-            add< FieldBoundTests::DupEq >();
-            add< FieldBoundTests::Lt >();
-            add< FieldBoundTests::Lte >();
-            add< FieldBoundTests::Gt >();
-            add< FieldBoundTests::Gte >();
-            add< FieldBoundTests::TwoLt >();
-            add< FieldBoundTests::TwoGt >();
-            add< FieldBoundTests::EqGte >();
-            add< FieldBoundTests::EqGteInvalid >();
-            add< FieldBoundTests::Regex >();
-            add< FieldBoundTests::UnhelpfulRegex >();
-            add< FieldBoundTests::In >();
-            add< FieldBoundTests::Equality >();
-            add< FieldBoundTests::SimplifiedQuery >();
-            add< FieldBoundTests::QueryPatternTest >();
-            add< FieldBoundTests::NoWhere >();
-            add< FieldBoundTests::Numeric >();
+            add< FieldRangeTests::Empty >();
+            add< FieldRangeTests::Eq >();
+            add< FieldRangeTests::DupEq >();
+            add< FieldRangeTests::Lt >();
+            add< FieldRangeTests::Lte >();
+            add< FieldRangeTests::Gt >();
+            add< FieldRangeTests::Gte >();
+            add< FieldRangeTests::TwoLt >();
+            add< FieldRangeTests::TwoGt >();
+            add< FieldRangeTests::EqGte >();
+            add< FieldRangeTests::EqGteInvalid >();
+            add< FieldRangeTests::Regex >();
+            add< FieldRangeTests::UnhelpfulRegex >();
+            add< FieldRangeTests::In >();
+            add< FieldRangeTests::Equality >();
+            add< FieldRangeTests::SimplifiedQuery >();
+            add< FieldRangeTests::QueryPatternTest >();
+            add< FieldRangeTests::NoWhere >();
+            add< FieldRangeTests::Numeric >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();

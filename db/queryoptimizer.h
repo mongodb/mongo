@@ -29,12 +29,11 @@ namespace mongo {
     public:
         QueryPlan(NamespaceDetails *_d, 
                   int _idxNo, // -1 = no index
-                  const FieldBoundSet &fbs,
+                  const FieldRangeSet &fbs,
                   const BSONObj &order,
                   const BSONObj &startKey = BSONObj(),
                   const BSONObj &endKey = BSONObj() );
 
-//        QueryPlan( const QueryPlan &other );
         /* If true, no other index can do better. */
         bool optimal() const { return optimal_; }
         /* ScanAndOrder processing will be required if true */
@@ -55,12 +54,12 @@ namespace mongo {
         const char *ns() const { return fbs_.ns(); }
         BSONObj query() const { return fbs_.query(); }
         BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return fbs_.simplifiedQuery( fields ); }
-        const FieldBound &bound( const char *fieldName ) const { return fbs_.bound( fieldName ); }
+        const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
     private:
         NamespaceDetails *d;
         int idxNo;
-        const FieldBoundSet &fbs_;
+        const FieldRangeSet &fbs_;
         const BSONObj &order_;
         const IndexDetails *index_;
         bool optimal_;
@@ -120,7 +119,7 @@ namespace mongo {
         shared_ptr< T > runOp( T &op ) {
             return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
         }
-        const FieldBoundSet &fbs() const { return fbs_; }
+        const FieldRangeSet &fbs() const { return fbs_; }
         BSONObj explain() const;
         bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
     private:
@@ -143,7 +142,7 @@ namespace mongo {
             static void nextOp( QueryOp &op );
         };
         const char *ns;
-        FieldBoundSet fbs_;
+        FieldRangeSet fbs_;
         PlanSet plans_;
         bool mayRecordPlan_;
         bool usingPrerecordedPlan_;
