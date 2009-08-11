@@ -225,48 +225,12 @@ namespace mongo {
     }
 
     BSONElement largestElementForType(int t, BSONObjBuilder& b) { 
-        switch( t ) { 
-        case MinKey: b.appendMinKey(""); break;
-        case NumberLong: b.append("", numeric_limits< long long >::max()); break;
-        case NumberDouble: b.append("", numeric_limits< double >::max()); break;
-        case String: b.append("", ""); break;
-        case jstOID: 
-            { 
-                OID o;
-                memset(&o, 0, sizeof(o));
-                b.appendOID("", &o);
-                break;
-            }
-        case Bool: b.appendBool("", false); break;
-        case Date: b.appendDate("", 0); break;
-        case jstNULL: b.appendNull("");
-        case NumberInt: b.append("", numeric_limits<int>::max()); break;
-        default:
-            uassert("type not supported by sharding [seft]", false);
-        }
+        b.appendMaxForType( "" , t );
         return b.done().firstElement();
     }
 
     BSONElement smallestElementForType(int t, BSONObjBuilder& b) { 
-        switch( t ) { 
-        case MinKey: b.appendMinKey(""); break;
-        case NumberLong: b.append("", numeric_limits< long long >::min()); break;
-        case NumberDouble: b.append("", numeric_limits< double >::min()); break;
-        case String: b.append("", ""); break;
-        case jstOID: 
-            { 
-                OID o;
-                memset(&o, 0, sizeof(o));
-                b.appendOID("", &o);
-                break;
-            }
-        case Bool: b.appendBool("", false); break;
-        case Date: b.appendDate("", 0); break;
-        case jstNULL: b.appendNull("");
-        case NumberInt: b.append("", numeric_limits<int>::min()); break;
-        default:
-            uassert("type not supported by sharding [seft]", false);
-        }
+        b.appendMinForType( "" , t );
         return b.done().firstElement();
     }
 
