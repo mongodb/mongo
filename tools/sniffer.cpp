@@ -11,12 +11,16 @@
 
  */
 
+#include <pcap.h>
+
+#ifdef _WIN32
+#undef min
+#endif
+
 #include "../util/builder.h"
 #include "../util/message.h"
 #include "../db/dbmessage.h"
 #include "../client/dbclient.h"
-
-#include <pcap.h>
 
 #include <stdio.h>
 #include <string.h>
