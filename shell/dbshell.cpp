@@ -57,7 +57,6 @@ char * shellReadline( const char * prompt ){
 }
 
 #if !defined(_WIN32)
-#include <execinfo.h>
 #include <string.h>
 
 void quitNicely( int sig ){
