@@ -504,7 +504,19 @@ namespace mongo {
         }
         return -1;
     }
-
+    
+    long long NamespaceDetails::storageSize(){
+        Extent * e = firstExtent.ext();
+        assert( e );
+        
+        long long total = 0;
+        while ( e ){
+                total += e->length;
+                e = e->getNextExtent();
+        }
+        return total;
+    }
+    
     /* ------------------------------------------------------------------------- */
 
     map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::map_;

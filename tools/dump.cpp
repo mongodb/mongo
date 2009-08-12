@@ -40,7 +40,7 @@ public:
         int out = open( outputFile.string().c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
         assert( out );
         
-        auto_ptr<DBClientCursor> cursor = conn().query( coll.c_str() , Query().snapshot() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
+        auto_ptr<DBClientCursor> cursor = conn( true ).query( coll.c_str() , Query().snapshot() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
 
         int num = 0;
         while ( cursor->more() ) {
@@ -56,12 +56,12 @@ public:
     
     void go( const string db , const path outdir ) {
         cout << "DATABASE: " << db << "\t to \t" << outdir.string() << endl;
-        
+
         create_directories( outdir );
         
         string sns = db + ".system.namespaces";
 
-        auto_ptr<DBClientCursor> cursor = conn().query( sns.c_str() , Query() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
+        auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
             if ( obj.toString().find( ".$" ) != string::npos )
@@ -86,8 +86,9 @@ public:
         
         if ( db == "*" ){
             cout << "all dbs" << endl;
-
-            BSONObj res = conn().findOne( "admin.$cmd" , BSON( "listDatabases" << 1 ) );
+            auth( "admin" );
+        
+            BSONObj res = conn( true ).findOne( "admin.$cmd" , BSON( "listDatabases" << 1 ) );
             BSONObj dbs = res.getField( "databases" ).embeddedObjectUserCheck();
             set<string> keys;
             dbs.getFieldNames( keys );
@@ -104,6 +105,7 @@ public:
             }
         }
         else {
+            auth( db );
             go( db , root / db );
         }
         return 0;

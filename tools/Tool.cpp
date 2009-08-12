@@ -14,7 +14,7 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
-    _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0) {
+    _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0), _paired(false) {
 
     _options = new po::options_description( name + " options" );
     _options->add_options()
@@ -22,6 +22,8 @@ mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
         ("host,h",po::value<string>(), "mongo host to connect to" )
         ("db,d",po::value<string>(), "database to use" )
         ("collection,c",po::value<string>(), "collection to use (some commands)" )
+        ("username,u",po::value<string>(), "username" )
+        ("password,p",po::value<string>(), "password" )
         ("dbpath",po::value<string>(), "directly access mongod data files in this path, instead of connecting to a mongod instance" )
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ;
@@ -76,6 +78,7 @@ int mongo::Tool::main( int argc , char ** argv ){
         }
         else {
             DBClientPaired * c = new DBClientPaired();
+            _paired = true;
             _conn = c;
             
             if ( ! c->connect( _host ) ){
@@ -101,6 +104,12 @@ int mongo::Tool::main( int argc , char ** argv ){
     if ( _params.count( "collection" ) )
         _coll = _params["collection"].as<string>();
     
+    if ( _params.count( "username" ) )
+        _username = _params["username"].as<string>();
+
+    if ( _params.count( "password" ) )
+        _password = _params["password"].as<string>();
+    
     try {
         return run();
     }
@@ -108,4 +117,29 @@ int mongo::Tool::main( int argc , char ** argv ){
         cerr << "assertion: " << e.toString() << endl;
         return -1;
     }
+}
+
+mongo::DBClientBase& mongo::Tool::conn( bool slaveIfPaired ){
+    if ( _paired && slaveIfPaired )
+        return ((DBClientPaired*)_conn)->slaveConn();
+    return *_conn;
+}
+
+void mongo::Tool::auth( string dbname ){
+    if ( ! dbname.size() )
+        dbname = _db;
+
+    if ( ! ( _username.size() || _password.size() ) )
+        return;
+
+    string errmsg;
+    if ( _conn->auth( dbname , _username , _password , errmsg ) )
+        return;
+    
+    // try against the admin db
+    string err2;
+    if ( _conn->auth( "admin" , _username , _password , errmsg ) )
+        return;
+    
+    throw mongo::UserException( (string)"auth failed: " + errmsg );
 }

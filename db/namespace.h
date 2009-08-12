@@ -379,6 +379,9 @@ namespace mongo {
 
         void checkMigrate();
 
+        long long storageSize();
+
+
     private:
         bool cappedMayDelete() const {
             return !( flags & Flag_CappedDisallowDelete );

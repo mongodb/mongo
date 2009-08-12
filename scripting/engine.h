@@ -78,6 +78,7 @@ namespace mongo {
         static void setup();
 
         auto_ptr<Scope> getPooledScope( const string& pool );
+        void threadDone();
     };
 
     extern ScriptEngine * globalScriptEngine;

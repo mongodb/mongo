@@ -50,15 +50,19 @@ namespace mongo {
 
     class ScopeCache {
     public:
+
+        ScopeCache(){
+            _magic = 17;
+        }
         
         ~ScopeCache(){
+            assert( _magic == 17 );
+            _magic = 1;
+
             if ( inShutdown() )
                 return;
-
-            for ( PoolToScopes::iterator i=_pools.begin() ; i != _pools.end(); i++ ){
-                for ( list<Scope*>::iterator j=i->second.begin(); j != i->second.end(); j++ )
-                    delete *j;
-            }
+            
+            clear();
         }
 
         void done( const string& pool , Scope * s ){
@@ -84,10 +88,26 @@ namespace mongo {
             s->reset();
             return s;
         }
+        
+        void clear(){
+            set<Scope*> seen;
+            
+            for ( PoolToScopes::iterator i=_pools.begin() ; i != _pools.end(); i++ ){
+                for ( list<Scope*>::iterator j=i->second.begin(); j != i->second.end(); j++ ){
+                    Scope * s = *j;
+                    assert( ! seen.count( s ) );
+                    delete s;
+                    seen.insert( s );
+                }
+            }
+            
+            _pools.clear();
+        }
 
     private:
         PoolToScopes _pools;
         mutex _mutex;
+        int _magic;
     };
 
     thread_specific_ptr<ScopeCache> scopeCache;
@@ -191,10 +211,17 @@ namespace mongo {
         if ( ! s ){
             s = createScope();
         }
-
+        
         auto_ptr<Scope> p;
         p.reset( new PooledScope( pool , s ) );
         return p;
+    }
+    
+    void ScriptEngine::threadDone(){
+        ScopeCache * sc = scopeCache.get();
+        if ( sc ){
+            sc->clear();
+        }
     }
     
     ScriptEngine * globalScriptEngine;
