@@ -14,7 +14,7 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
-    _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0) {
+    _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0), _paired(false) {
 
     _options = new po::options_description( name + " options" );
     _options->add_options()
@@ -78,6 +78,7 @@ int mongo::Tool::main( int argc , char ** argv ){
         }
         else {
             DBClientPaired * c = new DBClientPaired();
+            _paired = true;
             _conn = c;
             
             if ( ! c->connect( _host ) ){
@@ -116,6 +117,12 @@ int mongo::Tool::main( int argc , char ** argv ){
         cerr << "assertion: " << e.toString() << endl;
         return -1;
     }
+}
+
+mongo::DBClientBase& mongo::Tool::conn( bool slaveIfPaired ){
+    if ( _paired && slaveIfPaired )
+        return ((DBClientPaired*)_conn)->slaveConn();
+    return *_conn;
 }
 
 void mongo::Tool::auth( string dbname ){

@@ -56,7 +56,7 @@ namespace mongo {
         
     protected:
 
-        mongo::DBClientBase &conn() { return *_conn; }
+        mongo::DBClientBase &conn( bool slaveIfPaired = false );
         void auth( string db = "" );
         
         string _name;
@@ -71,7 +71,8 @@ namespace mongo {
     private:
         string _host;
         mongo::DBClientBase * _conn;
-
+        bool _paired;
+        
         boost::program_options::options_description * _options;
         boost::program_options::positional_options_description _positonalOptions;
 
