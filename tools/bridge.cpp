@@ -72,8 +72,7 @@ public:
 
 auto_ptr< MyListener > listener;
 
-#if !defined(_WIN32) && !defined(NOEXECINFO)
-#include <execinfo.h>
+#if !defined(_WIN32) 
 void cleanup( int sig ) {
     close( listener->socket() );
     for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
