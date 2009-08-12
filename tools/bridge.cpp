@@ -72,13 +72,13 @@ public:
 
 auto_ptr< MyListener > listener;
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(NOEXECINFO)
 #include <execinfo.h>
 void cleanup( int sig ) {
     close( listener->socket() );
     for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
         (*i)->shutdown();
-    ::exit( 0 );    
+    ::exit( 0 );
 }
 
 void setupSignals() {
@@ -108,7 +108,7 @@ void check( bool b ) {
 
 int main( int argc, char **argv ) {
     setupSignals();
-    
+
     check( argc == 5 );
 
     for( int i = 1; i < 5; ++i ) {
