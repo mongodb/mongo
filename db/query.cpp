@@ -1401,7 +1401,8 @@ namespace mongo {
                     if ( d ){
                         int i = d->findIdIndex();
                         if( i < 0 ) { 
-                            log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
+                            if ( strstr( ns , ".system." ) == 0 )
+                                log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
                         }
                         else {
                             /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
