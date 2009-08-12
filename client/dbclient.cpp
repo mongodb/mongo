@@ -817,6 +817,11 @@ namespace mongo {
         return master == Left ? left : right;
     }
 
+    DBClientConnection& DBClientPaired::slaveConn(){
+        DBClientConnection& m = checkMaster();
+        return master == Left ? right : left;
+    }
+
     bool DBClientPaired::connect(const string &serverHostname1, const string &serverHostname2) {
         string errmsg;
         bool l = left.connect(serverHostname1, errmsg);
