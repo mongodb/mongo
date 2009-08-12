@@ -53,15 +53,21 @@ namespace mongo {
         virtual void printHelp(ostream &out);
 
         virtual void printExtraHelp( ostream & out );
-
+        
     protected:
+
+        mongo::DBClientBase &conn() { return *_conn; }
+        void auth( string db = "" );
+        
         string _name;
         
         string _db;
         string _coll;
+        
+        string _username;
+        string _password;
 
-        mongo::DBClientBase &conn() { return *_conn; }
-
+        
     private:
         string _host;
         mongo::DBClientBase * _conn;

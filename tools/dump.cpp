@@ -56,7 +56,7 @@ public:
     
     void go( const string db , const path outdir ) {
         cout << "DATABASE: " << db << "\t to \t" << outdir.string() << endl;
-        
+
         create_directories( outdir );
         
         string sns = db + ".system.namespaces";
@@ -86,7 +86,8 @@ public:
         
         if ( db == "*" ){
             cout << "all dbs" << endl;
-
+            auth( "admin" );
+        
             BSONObj res = conn().findOne( "admin.$cmd" , BSON( "listDatabases" << 1 ) );
             BSONObj dbs = res.getField( "databases" ).embeddedObjectUserCheck();
             set<string> keys;
@@ -104,6 +105,7 @@ public:
             }
         }
         else {
+            auth( db );
             go( db , root / db );
         }
         return 0;
