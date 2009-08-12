@@ -12,8 +12,8 @@
 namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
-    boost::mutex smmutex;
-#define smlock boostlock ___lk( smmutex );
+    boost::recursive_mutex smmutex;
+#define smlock recursive_boostlock ___lk( smmutex );
 
 #define GETHOLDER(x,o) ((BSONHolder*)JS_GetPrivate( x , o ))
 
@@ -921,6 +921,7 @@ namespace mongo {
         }
 
         void init( BSONObj * data ){
+            smlock;
             if ( ! data )
                 return;
 
@@ -934,6 +935,7 @@ namespace mongo {
         }
 
         void externalSetup(){
+            smlock;
             uassert( "already local connected" , ! _localConnect );
             if ( _externalSetup )
                 return;
@@ -942,6 +944,7 @@ namespace mongo {
         }
 
         void localConnect( const char * dbName ){
+            smlock;
             uassert( "already setup for external db" , ! _externalSetup );
             if ( _localConnect ){
                 uassert( "connected to different db" , _dbName == dbName );
@@ -959,12 +962,14 @@ namespace mongo {
 
         // ----- getters ------
         double getNumber( const char *field ){
+            smlock;
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
             return _convertor->toNumber( val );
         }
 
         string getString( const char *field ){
+            smlock;
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
             JSString * s = JS_ValueToString( _context , val );
@@ -972,18 +977,22 @@ namespace mongo {
         }
 
         bool getBoolean( const char *field ){
+            smlock;
             return _convertor->getBoolean( _global , field );
         }
 
         BSONObj getObject( const char *field ){
+            smlock;
             return _convertor->toObject( _convertor->getProperty( _global , field ) );
         }
 
         JSObject * getJSObject( const char * field ){
+            smlock;
             return _convertor->getJSObject( _global , field );
         }
 
         int type( const char *field ){
+            smlock;
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
 
@@ -1013,26 +1022,31 @@ namespace mongo {
         // ----- setters ------
 
         void setNumber( const char *field , double val ){
+            smlock;
             jsval v = _convertor->toval( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
         void setString( const char *field , const char * val ){
+            smlock;
             jsval v = _convertor->toval( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
         void setObject( const char *field , const BSONObj& obj , bool readOnly ){
+            smlock;
             jsval v = _convertor->toval( &obj , readOnly );
             JS_SetProperty( _context , _global , field , &v );
         }
 
         void setBoolean( const char *field , bool val ){
+            smlock;
             jsval v = BOOLEAN_TO_JSVAL( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
         void setThis( const BSONObj * obj ){
+            smlock;
             if ( _this )
                 JS_RemoveRoot( _context , &_this );
             
@@ -1044,6 +1058,7 @@ namespace mongo {
         // ---- functions -----
 
         ScriptingFunction createFunction( const char * code ){
+            smlock;
             precall();
             return (ScriptingFunction)_convertor->compileFunction( code );
         }
@@ -1091,6 +1106,7 @@ namespace mongo {
         }
 
         bool exec( const string& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ){
+            smlock;
             precall();
 
             jsval ret = JSVAL_VOID;
@@ -1156,6 +1172,7 @@ namespace mongo {
         }
 
         void injectNative( const char *field, NativeFunction func ){
+            smlock;
             string name = field;
             _convertor->setProperty( _global , (name + "_").c_str() , PRIVATE_TO_JSVAL( func ) );
 
