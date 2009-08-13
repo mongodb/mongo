@@ -639,6 +639,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     # this will add it iff it exists and works
     myCheckLib( "boost_system" + boostCompiler + "-mt" )
 
+    if not conf.CheckCXXHeader( "execinfo.h" ):
+        myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
+
     if needJava:
         for j in javaLibs:
             myCheckLib( j , True , True )

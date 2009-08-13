@@ -243,6 +243,10 @@ namespace mongo {
             problem() << "Uncaught exception, terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
+
+        // any thread cleanup can happen here
+        
+        globalScriptEngine->threadDone();
     }
 
 

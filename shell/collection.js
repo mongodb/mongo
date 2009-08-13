@@ -44,9 +44,10 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.getIndexes()");
     print("\tdb.foo.drop() drop the collection");
     print("\tdb.foo.validate() - SLOW");
-    print("\tdb.foo.stats() - stats about the collection - SLOW");
-    print("\tdb.foo.dataSize() - size in bytes of all the data - SLOW");
-    print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes - SLOW");
+    print("\tdb.foo.stats()");
+    print("\tdb.foo.dataSize()");
+    print("\tdb.foo.storageSize() - includes free space allocated to this collection");
+    print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes");
 }
 
 DBCollection.prototype.getFullName = function(){
@@ -347,19 +348,15 @@ DBCollection.prototype.getCollection = function( subName ){
 }
 
 DBCollection.prototype.stats = function(){
-    var res = this.validate().result;
-    var p = /\b(\w+)\??: *(\d+)\b/g;
-    var m;
-
-    var o = {};
-    while ( m = p.exec( res ) ){
-        o[ m[1] ] = m[2];
-    }
-    return o;
+    return this._db.runCommand( { collstats : this._shortName } );
 }
 
 DBCollection.prototype.dataSize = function(){
-    return parseInt( this.stats().datasize );
+    return this.stats().size;
+}
+
+DBCollection.prototype.storageSize = function(){
+    return this.stats().storageSize;
 }
 
 DBCollection.prototype.totalIndexSize = function(){

@@ -944,6 +944,37 @@ namespace mongo {
         }
     } cmdDatasize;
 
+    class CollectionStats : public Command {
+    public:
+        CollectionStats() : Command( "collstats" ) {}
+        virtual bool slaveOk() { return true; }
+        virtual void help( stringstream &help ) const {
+            help << " example: { collstats:\"blog.posts\" } ";
+        }
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string ns = dbname;
+            if ( ns.find( "." ) != string::npos )
+                ns = ns.substr( 0 , ns.find( "." ) );
+            ns += ".";
+            ns += jsobj.firstElement().valuestr();
+            
+            NamespaceDetails * nsd = nsdetails( ns.c_str() );
+            if ( ! nsd ){
+                errmsg = "ns not found";
+                return false;
+            }
+            
+            result.append( "ns" , ns.c_str() );
+            
+            result.append( "count" , nsd->nrecords );
+            result.append( "size" , nsd->datasize );
+            result.append( "storageSize" , nsd->storageSize() );
+            result.append( "nindexes" , nsd->nIndexes );
+
+            return true;
+        }
+    } cmdCollectionStatis;
+
     class CmdBuildInfo : public Command {
     public:
         CmdBuildInfo() : Command( "buildinfo" ) {}

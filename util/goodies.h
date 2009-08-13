@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(NOEXECINFO)
 
 } // namespace mongo
 
@@ -60,7 +60,7 @@ namespace mongo {
         free (strings);
     }
 #else
-    inline void printStackTrace() { }
+    inline void printStackTrace( ostream &o = cout ) { }
 #endif
 
     /* set to TRUE if we are exiting */

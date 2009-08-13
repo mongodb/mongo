@@ -876,6 +876,7 @@ namespace mongo {
             opSIZE = 0x0A,
             opALL = 0x0B,
             NIN = 0x0C,
+            opEXISTS = 0x0D,
         };        
     };
     ostream& operator<<( ostream &s, const BSONObj &o );

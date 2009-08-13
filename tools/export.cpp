@@ -63,6 +63,8 @@ public:
             printHelp(cerr);
             return 1;
         }
+        
+        auth();
 
         if ( hasParam( "fields" ) ){
 

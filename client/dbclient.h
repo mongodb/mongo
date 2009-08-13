@@ -789,10 +789,12 @@ namespace mongo {
         void isntMaster() {
             master = ( ( master == Left ) ? NotSetR : NotSetL );
         }
-
+        
         string getServerAddress() const {
             return left.getServerAddress() + "," + right.getServerAddress();
         }
+
+        DBClientConnection& slaveConn();
 
         /* TODO - not yet implemented. mongos may need these. */
         virtual bool call( Message &toSend, Message &response, bool assertOk=true ) { assert(false); return false; }

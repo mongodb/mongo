@@ -39,6 +39,7 @@ public:
     }
     
     int run(){
+        auth();
         drillDown( getParam( "dir" ) );
         return 0;
     }

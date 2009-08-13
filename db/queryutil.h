@@ -22,34 +22,47 @@
 
 namespace mongo {
 
-    // bounds on a field's value that may be determined from query -- used to
+    struct FieldBound {
+        BSONElement bound_;
+        bool inclusive_;
+    };
+
+    struct FieldInterval {
+        FieldBound lower_;
+        FieldBound upper_;
+    };
+
+    // range of a field's value that may be determined from query -- used to
     // determine index limits
-    class FieldBound {
+    class FieldRange {
     public:
-        FieldBound( const BSONElement &e = BSONObj().firstElement() , bool optimize=true );
-        const FieldBound &operator&=( const FieldBound &other );
-        BSONElement lower() const { return lower_; }
-        BSONElement upper() const { return upper_; }
-        bool lowerInclusive() const { return lowerInclusive_; }
-        bool upperInclusive() const { return upperInclusive_; }
+        FieldRange( const BSONElement &e = BSONObj().firstElement() , bool optimize=true );
+        const FieldRange &operator&=( const FieldRange &other );
+        BSONElement min() const { return interval_.lower_.bound_; }
+        BSONElement max() const { return interval_.upper_.bound_; }
+        bool minInclusive() const { return interval_.lower_.inclusive_; }
+        bool maxInclusive() const { return interval_.upper_.inclusive_; }
         bool equality() const {
             return
-            lower_.woCompare( upper_, false ) == 0 &&
-            upperInclusive_ &&
-            lowerInclusive_;
+                min().woCompare( max(), false ) == 0 &&
+                maxInclusive() &&
+                minInclusive();
         }
         bool nontrivial() const {
             return
-            minKey.firstElement().woCompare( lower_, false ) != 0 ||
-            maxKey.firstElement().woCompare( upper_, false ) != 0;
+                minKey.firstElement().woCompare( min(), false ) != 0 ||
+                maxKey.firstElement().woCompare( max(), false ) != 0;
         }
     private:
+        // towards replacing interval_ with a set of intervals
+        BSONElement &lower() { return interval_.lower_.bound_; }
+        BSONElement &upper() { return interval_.upper_.bound_; }
+        bool &lowerInclusive() { return interval_.lower_.inclusive_; }
+        bool &upperInclusive() { return interval_.upper_.inclusive_; }
+
         BSONObj addObj( const BSONObj &o );
         string simpleRegexEnd( string regex );
-        BSONElement lower_;
-        bool lowerInclusive_;
-        BSONElement upper_;
-        bool upperInclusive_;
+        FieldInterval interval_;
         vector< BSONObj > objData_;
     };
     
@@ -57,7 +70,7 @@ namespace mongo {
     // similar to an earlier query and should use the same plan
     class QueryPattern {
     public:
-        friend class FieldBoundSet;
+        friend class FieldRangeSet;
         enum Type {
             Equality,
             LowerBound,
@@ -118,20 +131,20 @@ namespace mongo {
         BSONObj sort_;
     };
     
-    // bounds on fields' value that may be determined from query -- used to
+    // ranges of fields' value that may be determined from query -- used to
     // determine index limits
-    class FieldBoundSet {
+    class FieldRangeSet {
     public:
-        FieldBoundSet( const char *ns, const BSONObj &query , bool optimize=true );
-        const FieldBound &bound( const char *fieldName ) const {
-            map< string, FieldBound >::const_iterator f = bounds_.find( fieldName );
-            if ( f == bounds_.end() )
-                return trivialBound();
+        FieldRangeSet( const char *ns, const BSONObj &query , bool optimize=true );
+        const FieldRange &range( const char *fieldName ) const {
+            map< string, FieldRange >::const_iterator f = ranges_.find( fieldName );
+            if ( f == ranges_.end() )
+                return trivialRange();
             return f->second;
         }
-        int nNontrivialBounds() const {
+        int nNontrivialRanges() const {
             int count = 0;
-            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
+            for( map< string, FieldRange >::const_iterator i = ranges_.begin(); i != ranges_.end(); ++i )
                 if ( i->second.nontrivial() )
                     ++count;
             return count;
@@ -141,16 +154,16 @@ namespace mongo {
         // if fields is specified, order fields of returned object to match those of 'fields'
         BSONObj simplifiedQuery( const BSONObj &fields = BSONObj() ) const;
         bool matchPossible() const {
-            for( map< string, FieldBound >::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i )
-                if ( i->second.lower().woCompare( i->second.upper(), false ) > 0 )
+            for( map< string, FieldRange >::const_iterator i = ranges_.begin(); i != ranges_.end(); ++i )
+                if ( i->second.min().woCompare( i->second.max(), false ) > 0 )
                     return false;
             return true;
         }
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
     private:
-        static FieldBound *trivialBound_;
-        static FieldBound &trivialBound();
-        mutable map< string, FieldBound > bounds_;
+        static FieldRange *trivialRange_;
+        static FieldRange &trivialRange();
+        mutable map< string, FieldRange > ranges_;
         const char *ns_;
         BSONObj query_;
     };
