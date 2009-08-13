@@ -52,7 +52,7 @@ namespace mongo {
         // make sure we map full length if preexisting file.
         boost::uintmax_t l = boost::filesystem::file_size( filename );
         assert( l <= 0x7fffffff );
-        length = l;
+        length = (long) l;
     }
 
     void* MemoryMappedFile::map(const char *filename) {
