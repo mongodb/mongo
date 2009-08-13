@@ -586,6 +586,7 @@ namespace mongo {
                 errmsg = "ns not found";
                 return false;
             }
+            uassert( "can't drop collection with reserved $ character in name", strchr(nsToDrop.c_str(), '$') == 0 );
             dropCollection( nsToDrop, errmsg, result );
             return true;
         }
@@ -1045,7 +1046,7 @@ namespace mongo {
             auto_ptr< DBClientCursor > c = client.getMore( fromNs, id );
             while( c->more() ) {
                 BSONObj obj = c->next();
-                theDataFileMgr.insertAndLog( toNs.c_str(), obj );
+                theDataFileMgr.insertAndLog( toNs.c_str(), obj, true );
             }
             
             return true;

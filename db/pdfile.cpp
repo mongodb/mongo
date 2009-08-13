@@ -53,7 +53,7 @@ namespace mongo {
     int MAGIC = 0x1000;
     int curOp = -2;
     int callDepth = 0;
-  bool prealloc = true;
+    bool prealloc = true;
 
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
@@ -1140,14 +1140,14 @@ assert( !eloc.isNull() );
     } idToInsert;
 #pragma pack()
     
-    void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o ) {
+    void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god ) {
         BSONObj tmp = o;
-        insert( ns, tmp );
+        insert( ns, tmp, god );
         logOp( "i", ns, tmp );
     }
     
-    DiskLoc DataFileMgr::insert(const char *ns, BSONObj &o) {
-        DiskLoc loc = insert( ns, o.objdata(), o.objsize() );
+    DiskLoc DataFileMgr::insert(const char *ns, BSONObj &o, bool god) {
+        DiskLoc loc = insert( ns, o.objdata(), o.objsize(), god );
         if ( !loc.isNull() )
             o = BSONObj( loc.rec() );
         return loc;
@@ -1155,6 +1155,9 @@ assert( !eloc.isNull() );
 
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
+//        if( !god && strchr(ns,'$') )
+//            cout << "TEMP";
+        uassert("cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 );
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
             uassert("attempt to insert in reserved database name 'system'", sys != ns);
@@ -1173,7 +1176,7 @@ assert( !eloc.isNull() );
                 sys = 0;
         }
 
-	bool addIndex = wouldAddIndex && mayAddIndex;
+        bool addIndex = wouldAddIndex && mayAddIndex;
 
         NamespaceDetails *d = nsdetails(ns);
         if ( d == 0 ) {

@@ -106,17 +106,20 @@ namespace mongo {
        justOne: stop after 1 match
     */
     int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
-        if ( strstr(ns, ".system.") && !god ) {
-            /* note a delete from system.indexes would corrupt the db 
-               if done here, as there are pointers into those objects in 
-               NamespaceDetails.
-            */
-            if( strstr(ns, ".system.users") )
-                ;
-            else {
-                out() << "ERROR: attempt to delete in system namespace " << ns << endl;
-                return -1;
+        if( !god ) {
+            if ( strstr(ns, ".system.") ) {
+                /* note a delete from system.indexes would corrupt the db 
+                if done here, as there are pointers into those objects in 
+                NamespaceDetails.
+                */
+                if( strstr(ns, ".system.users") )
+                    ;
+                else {
+                    uasserted("cannot delete from system namespace");
+                    return -1;
+                }
             }
+            uassert( "cannot delete from collection with reserved $ in name", strchr(ns, '$') == 0 );
         }
 
         int nDeleted = 0;
@@ -703,14 +706,9 @@ namespace mongo {
     int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
         int profile = database->profile;
         
+        uassert("cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
-            if( strstr(ns, ".system.users") )
-                ;
-            else {
-                out() << "\nERROR: attempt to update in system namespace " << ns << endl;
-                ss << " can't update system namespace ";
-                return 0;
-            }
+            uassert("cannot update system collection", strstr(ns, ".system.users"));
         }
         
         QueryPlanSet qps( ns, pattern, BSONObj() );

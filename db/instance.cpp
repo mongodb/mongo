@@ -471,7 +471,7 @@ namespace mongo {
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
 
-            theDataFileMgr.insert(ns, js);
+            theDataFileMgr.insert(ns, js, false);
             logOp("i", ns, js);
         }
     }

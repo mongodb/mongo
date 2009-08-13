@@ -168,7 +168,7 @@ namespace mongo {
         if ( val ) {
             try {
                 BSONObj k = obj;
-                theDataFileMgr.insert( name_.c_str(), k );
+                theDataFileMgr.insert( name_.c_str(), k, false );
             } catch ( DBException& ) {
                 // dup key - already in set
             }
