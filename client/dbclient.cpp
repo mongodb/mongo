@@ -819,6 +819,7 @@ namespace mongo {
 
     DBClientConnection& DBClientPaired::slaveConn(){
         DBClientConnection& m = checkMaster();
+        assert( ! m.isFailed() );
         return master == Left ? right : left;
     }
 
