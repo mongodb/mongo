@@ -1140,6 +1140,15 @@ addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
 #  ----  INSTALL -------
 
+def getSystemInstallName():
+    n = platform + "-" + processor
+    if static:
+        n += "-static"
+    if os.uname()[2].startswith( "8." ):
+        n += "-tiger"
+    return n
+
+
 def getCodeVersion():
     fullSource = open( "stdafx.cpp" , "r" ).read()
     allMatches = re.findall( r"versionString.. = \"(.*?)\"" , fullSource );
@@ -1168,9 +1177,7 @@ def getDistName( sofar ):
 if distBuild:
     from datetime import date
     today = date.today()
-    installDir = "mongodb-" + platform + "-" + processor + "-"
-    if static:
-        installDir += "static-"
+    installDir = "mongodb-" + getSystemInstallName() + "-"
     installDir += getDistName( installDir )
     print "going to make dist: " + installDir
 
@@ -1294,9 +1301,7 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
 
     if fixName:
         (root,dot,suffix) = localName.rpartition( "." )
-        name = remoteName + "-" + platform + "-" + processor
-        if static:
-            name += "-static"
+        name = remoteName + "-" + getSystemInstallName()
         name += remotePrefix
         if dot == "." :
             name += "." + suffix
