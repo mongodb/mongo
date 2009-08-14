@@ -119,7 +119,10 @@ namespace mongo {
                     return -1;
                 }
             }
-            uassert( "cannot delete from collection with reserved $ in name", strchr(ns, '$') == 0 );
+            if ( strchr( ns , '$' ) ){
+                log() << "cannot delete from collection with reserved $ in name: " << ns << endl;
+                uassert( "cannot delete from collection with reserved $ in name", strchr(ns, '$') == 0 );
+            }
         }
 
         int nDeleted = 0;
