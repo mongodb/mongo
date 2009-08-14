@@ -222,14 +222,11 @@ namespace mongo {
         while ( i.more() ){
             string s = i.next().fieldName();
             if ( s.find( "." ) == string::npos ){
-                fields[ s ] = "";
+                fields.insert( pair<string,string>( s , "" ) );
             }
             else {
                 string sub = s.substr( 0 , s.find( "." ) );
-                if ( fields[sub].size() )
-                    fields[sub] = ".";
-                else
-                    fields[sub] = s.substr( sub.size() + 1 );
+                fields.insert(pair<string,string>( sub , s.substr( sub.size() + 1 ) ) );
             }
         }
 
@@ -245,7 +242,7 @@ namespace mongo {
     
     BSONObj FieldMatcher::getSpec() const{
         BSONObjBuilder b;
-        for ( map<string,string>::const_iterator i=fields.begin(); i!=fields.end(); i++){
+        for ( multimap<string,string>::const_iterator i=fields.begin(); i!=fields.end(); i++ ) {
             string s = i->first;
             if ( i->second.size() > 0 )
                 s += "." + i->second;
@@ -254,39 +251,47 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONObj FieldMatcher::extractDotted( const string& path , const BSONObj& o ) const {
+    void FieldMatcher::extractDotted( const string& path , const BSONObj& o , BSONObjBuilder& b ) const {
         string::size_type i = path.find( "." );
         if ( i == string::npos ){
             const BSONElement & e = o.getField( path.c_str() );
             if ( e.eoo() )
-                return BSONObj();
-            return e.wrap();
+                return;
+            b.append(e);
         }
         
         string left = path.substr( 0 , i );
         BSONElement e = o[left];
         if ( e.type() != Object )
-            return BSONObj();
+            return;
 
         BSONObj sub = e.embeddedObject();
         if ( sub.isEmpty() )
-            return sub;
+            return;
         
-        BSONObjBuilder b(32);
-        b.append( left.c_str() , extractDotted( path.substr( i + 1 ) , sub ) );
-        return b.obj();
+        BSONObjBuilder sub_b(32);
+        extractDotted( path.substr( i + 1 ) , sub , sub_b );
+        b.append( left.c_str() , sub_b.obj() );
     }
     
     void FieldMatcher::append( BSONObjBuilder& b , const BSONElement& e ) const {
-        string next = fields.find( e.fieldName() )->second;
-        if ( e.eoo() ){
+        pair<multimap<string,string>::const_iterator,multimap<string,string>::const_iterator> p = fields.equal_range( e.fieldName() );
+        BSONObjBuilder sub_b(32);
+
+        for( multimap<string,string>::const_iterator i = p.first; i != p.second; ++i ) {
+            string next = i->second;
+            if ( e.eoo() ){
+            }
+            else if ( next.size() == 0 || next == "." || e.type() != Object ){
+                b.append( e );
+                return;
+            }
+            else {
+                extractDotted( next , e.embeddedObject() , sub_b );
+            }
         }
-        else if ( next.size() == 0 || next == "." || e.type() != Object ){
-            b.append( e );
-        }
-        else {
-            b.append( e.fieldName() , extractDotted( next , e.embeddedObject() ) );
-        }
+
+        b.append( e.fieldName() , sub_b.obj() );
     }
     
 } // namespace mongo

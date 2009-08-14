@@ -184,9 +184,9 @@ namespace mongo {
 
     private:
 
-        BSONObj extractDotted( const string& path , const BSONObj& o ) const ;
+        void extractDotted( const string& path , const BSONObj& o , BSONObjBuilder& b ) const ;
         
-        map<string,string> fields; // { 'a' : 1 , 'b.c' : 1 } ==>> [ a -> '' , b -> c ]
+        multimap<string,string> fields; // { 'a' : 1 , 'b.c' : 1 } ==>> [ a -> '' , b -> c ]
     };
 
 

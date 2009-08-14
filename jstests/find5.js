@@ -19,7 +19,7 @@ assert.eq( 2 , t.find( {} , { "b.c" : 1 } ).toArray()[0].b.c , "D" );
 o = t.find( {} , { "b.c" : 1 , "b.d" : 1 } ).toArray()[0];
 assert( o.b.c , "E 1" );
 assert( o.b.d , "E 2" );
-assert( o.b.e , "E 3" );
+assert( !o.b.e , "E 3" );
 
 assert( ! t.find( {} , { "b.c" : 1 } ).toArray()[0].b.d , "F" );
 
