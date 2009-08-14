@@ -882,6 +882,9 @@ elif not onlyServer:
         shellEnv.Prepend( LIBS=[ "mongoclient"] )
         mongo = shellEnv.Program( "mongo" , coreShellFiles )
 
+    if weird:
+        Depends( "32bit/shell/mongo.cpp" , "shell/mongo.cpp" )
+
 
 #  ---- RUNNING TESTS ----
 
