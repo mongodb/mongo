@@ -33,10 +33,17 @@ namespace mongo {
                 assert( 0 );
             return false;
         }
-         
+        
+        if ( ! exists( p ) ){
+            cerr << "file [" << filename << "] doesn't exist" << endl;
+            if ( assertOnError )
+                assert( 0 );
+            return false;
+        }
+
         File f;
         f.open( filename.c_str() );
-        
+
         fileofs L = f.len();
         assert( L <= 0x7ffffffe );
         char * data = (char*)malloc( (size_t) L+1 );

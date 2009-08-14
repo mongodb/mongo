@@ -271,7 +271,11 @@ int _main(int argc, char* argv[]) {
     for (size_t i = 0; i < files.size(); i++) {
         mongo::shellUtils::MongoProgramScope s;
 
+        if ( files.size() > 1 )
+            cout << "loading file: " << files[i] << endl;
+            
         if ( ! scope->execFile( files[i] , false , true , false ) ){
+            cout << "failed to load: " << files[i] << endl;
             return -3;
         }
     }
