@@ -263,6 +263,7 @@ DB.prototype.help = function() {
     print("\tdb.group(ns, key[, keyf], cond, reduce, initial)");
     print("\tdb.currentOp() displays the current operation in the db" );
     print("\tdb.killOp() kills the current operation in the db" );
+    print("\tdb.version() current version of the server" );
 }
 
 /**
@@ -528,4 +529,12 @@ DB.prototype.getReplicationInfo = function() {
     }
 
     return result;
+}
+
+DB.prototype.serverBuildInfo = function(){
+    return this._adminCommand( "buildinfo" );
+}
+
+DB.prototype.version = function(){
+    return this.serverBuildInfo().version;
 }
