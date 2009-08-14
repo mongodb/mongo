@@ -87,7 +87,7 @@ startMongoProgram = function(){
         } catch( e ) {
         }
         return false;
-    }, "unable to connect to mongo program on port " + port, 10000 );
+    }, "unable to connect to mongo program on port " + port, 30000 );
 
     return m;
 }
