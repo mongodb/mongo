@@ -39,7 +39,8 @@ createMongoArgs = function( binaryName , args ){
             }
             else {
                 fullArgs.push( "--" + k );
-                fullArgs.push( "" + o[k] );
+                if ( o[k] != "" )
+                    fullArgs.push( "" + o[k] );
             }
         }
     }
@@ -111,7 +112,7 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
     this._serverNames = [];
 
     for ( var i=0; i<numServers; i++){
-        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i } );
+        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i , noprealloc : "" } );
         conn.name = "localhost:" + ( 30000 + i );
 
         this._connections.push( conn );
