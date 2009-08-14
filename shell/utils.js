@@ -10,11 +10,16 @@ friendlyEqual = function( a , b ){
 }
 
 
+doassert = function( msg ){
+    print( "assert: " + msg );
+    throw msg;
+}
+
 assert = function( b , msg ){
     if ( b )
         return;
     
-    throw "assert failed : " + msg;
+    doassert( "assert failed : " + msg );
 }
 
 assert.eq = function( a , b , msg ){
@@ -24,14 +29,14 @@ assert.eq = function( a , b , msg ){
     if ( ( a != null && b != null ) && friendlyEqual( a , b ) )
         return;
 
-    throw "[" + tojson( a ) + "] != [" + tojson( b ) + "] are not equal : " + msg;
+    doassert( "[" + tojson( a ) + "] != [" + tojson( b ) + "] are not equal : " + msg );
 }
 
 assert.neq = function( a , b , msg ){
     if ( a != b )
         return;
 
-    throw "[" + a + "] != [" + b + "] are equal : " + msg;
+    doassert( "[" + a + "] != [" + b + "] are equal : " + msg );
 }
 
 assert.soon = function( f, msg, timeout, interval ) {
@@ -43,7 +48,7 @@ assert.soon = function( f, msg, timeout, interval ) {
         if ( f() )
             return;
         if ( ( new Date() ).getTime() - start.getTime() > timeout )
-            throw "assert.soon failed: " + f + ", msg:" + msg;
+            doassert( "assert.soon failed: " + f + ", msg:" + msg );
         sleep( interval );
     }
 }
@@ -57,40 +62,40 @@ assert.throws = function( func , params , msg ){
         return e;
     }
 
-    throw "did not throw exception: " + msg ;
+    doassert( "did not throw exception: " + msg );
 }
 
 assert.commandWorked = function( res , msg ){
     if ( res.ok == 1 )
         return;
     
-    throw "command failed: " + tojson( res ) + " : " + msg;
+    doassert( "command failed: " + tojson( res ) + " : " + msg );
 }
 
 assert.commandFailed = function( res , msg ){
     if ( res.ok == 0 )
         return;
     
-    throw "command worked when it should have failed: " + tojson( res ) + " : " + msg;
+    doassert( "command worked when it should have failed: " + tojson( res ) + " : " + msg );
 }
 
 assert.isnull = function( what , msg ){
     if ( what == null )
         return;
     
-    throw "supposed to null (" + ( msg || "" ) + ") was: " + tojson( what );
+    doassert( "supposed to null (" + ( msg || "" ) + ") was: " + tojson( what ) );
 }
 
 assert.lt = function( a , b , msg ){
     if ( a < b )
         return;
-    throw a + " is not less than " + b + " : " + msg;
+    doassert( a + " is not less than " + b + " : " + msg );
 }
 
 assert.gt = function( a , b , msg ){
     if ( a > b )
         return;
-    throw a + " is not greater than " + b + " : " + msg;
+    doassert( a + " is not greater than " + b + " : " + msg );
 }
 
 Object.extend = function( dst , src ){
