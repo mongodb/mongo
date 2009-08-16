@@ -872,7 +872,7 @@ elif not onlyServer:
 
         shellEnv.VariantDir( "32bit" , "." )
     else:
-        shellEnv.Append( LIBPATH=[ "." ] )
+        shellEnv.Prepend( LIBPATH=[ "." ] )
 
     shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
 
