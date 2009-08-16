@@ -38,7 +38,7 @@ namespace mongo {
 
     bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg) {
         BSONElement e = cmd.firstElement();
-        assert( e.type() == Code || e.type() == CodeWScope || e.type() == String );
+        uassert( "eval needs Code" , e.type() == Code || e.type() == CodeWScope || e.type() == String );
 
         const char *code = 0;
         switch ( e.type() ) {
