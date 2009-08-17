@@ -32,8 +32,8 @@ namespace mongo {
         if ( e.eoo() )
             return;
         if ( e.type() == RegEx ) {
-            const char *r = e.simpleRegex();
-            if ( r ) {
+            const string r = e.simpleRegex();
+            if ( r.size() ) {
                 lower() = addObj( BSON( "" << r ) ).firstElement();
                 upper() = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
                 upperInclusive() = false;

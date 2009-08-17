@@ -532,20 +532,27 @@ namespace mongo {
         return -1;
     }
 
-    const char *BSONElement::simpleRegex() const {
+    string BSONElement::simpleRegex() const {
         if ( *regexFlags() )                                                                     
-            return 0;                                                                              
+            return "";
+        
         const char *i = regex();                                                                 
         if ( *i != '^' )                                                                           
-            return 0;                                                                              
-        ++i;                                                                                       
+            return "";
+        ++i;       
         // Empty string matches everything, won't limit our search.                                
         if ( !*i )                                                                                 
-            return 0;                                                                              
-        for( ; *i; ++i )                                                                           
-            if (!( *i == ' ' || (*i>='0'&&*i<='9') || (*i>='@'&&*i<='Z') || (*i>='a'&&*i<='z') ))  
-                return 0;                                                                          
-        return regex() + 1;              
+            return 0;                      
+        
+        stringstream ss;
+        for( ; *i; ++i ){
+            if ( *i == ' ' || (*i>='0'&&*i<='9') || (*i>='@'&&*i<='Z') || (*i>='a'&&*i<='z') )
+                ss << *i;
+            else
+                break;
+        } 
+        
+        return ss.str();
     }    
 
     void BSONElement::validate() const {

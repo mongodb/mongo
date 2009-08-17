@@ -429,7 +429,10 @@ namespace mongo {
             assert(type() == RegEx);
             return value();
         }
-        const char *simpleRegex() const;
+
+        /** returns a regex that when used as a matcher, would return a super set of regex() */
+        string simpleRegex() const;
+
         /** Retrieve the regex flags (options) for a Regex element */
         const char *regexFlags() const {
             const char *p = regex();
