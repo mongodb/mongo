@@ -540,9 +540,10 @@ namespace mongo {
         if ( *i != '^' )                                                                           
             return "";
         ++i;       
+
         // Empty string matches everything, won't limit our search.                                
         if ( !*i )                                                                                 
-            return 0;                      
+            return "";
         
         stringstream ss;
         for( ; *i; ++i ){
