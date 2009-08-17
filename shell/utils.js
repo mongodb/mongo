@@ -306,9 +306,17 @@ printjson = function(x){
 }
 
 shellPrintHelper = function( x ){
-    
-    if ( typeof( x ) == "undefined" )
+
+    if ( typeof( x ) == "undefined" ){
+
+        if ( typeof( db ) != "undefined" && db.getLastError ){
+            var e = db.getLastError();
+            if ( e != null )
+                print( e );
+        }
+
         return;
+    }
     
     if ( x == null ){
         print( "null" );
