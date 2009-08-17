@@ -113,12 +113,14 @@ namespace mongo {
     inline bool isMaster( const char *client = 0 ) {
         if ( !client )
             client = database->name.c_str();
-        if ( replAllDead || slave ) {
-            return strcmp( client, "local" ) == 0;
-        }
 
-        if ( replPair == 0 || replPair->state == ReplPair::State_Master )
-            return true;
+        if ( replAllDead )
+            return strcmp( client, "local" ) == 0;
+
+        if ( replPair ) {
+			if( replPair->state == ReplPair::State_Master )
+				return true;
+		}
 
         return strcmp( client, "local" ) == 0;
     }
