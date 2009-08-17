@@ -1355,8 +1355,12 @@ namespace mongo {
             
             AuthenticationInfo *ai = authInfo.get();
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
-            
-            uassert( "not master", isMaster() || (queryOptions & Option_SlaveOk) );
+
+			/* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
+			   so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
+			   query the nonmaster member of a replica pair.
+			*/
+            uassert( "not master", isMaster() || (queryOptions & Option_SlaveOk) || slave == SimpleSlave );
 
             BSONElement hint;
             BSONObj min;

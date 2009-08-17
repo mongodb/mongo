@@ -41,7 +41,7 @@ namespace mongo {
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
     bool quota = false;
-    bool slave = false;
+    SlaveTypes slave = NotSlave;
     bool master = false; // true means keep an op log
     extern int curOp;
     bool autoresync = false;
@@ -377,9 +377,6 @@ namespace mongo {
                 }
             }
 
-            // Check before setClient() to avoid creating ns unnecessarily.
-            uassert( "not master", isMasterNs( q.ns ) || (q.queryOptions & Option_SlaveOk) || strstr( q.ns, ".$cmd" ) );
-            
             setClient( q.ns );
             Top::setRead();
             strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);

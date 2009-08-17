@@ -1651,9 +1651,12 @@ namespace mongo {
         }
 
         if ( slave || replPair ) {
-            if ( slave )
+            if ( slave ) {
+				assert( slave == SimpleSlave );
                 log(1) << "slave=true" << endl;
-            slave = true;
+			}
+			else
+				slave = ReplPairSlave;
             boost::thread repl_thread(replSlaveThread);
         }
 

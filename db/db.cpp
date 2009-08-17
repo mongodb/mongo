@@ -360,7 +360,7 @@ namespace mongo {
         bool is32bit = sizeof(int*) == 4;
 
         log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
-              <<  " master = " << master << " slave = " << slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
+              <<  " master = " << master << " slave = " << (int) slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
 
         show_32_warning();
 
@@ -670,7 +670,7 @@ int main(int argc, char* argv[], char *envp[] )
             master = true;
         }
         if (params.count("slave")) {
-            slave = true;
+			slave = SimpleSlave;
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */

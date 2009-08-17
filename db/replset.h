@@ -112,7 +112,7 @@ namespace mongo {
     inline bool isMaster( const char *client = 0 ) {
         if ( !client )
             client = database->name.c_str();
-        if ( replAllDead ) {
+        if ( replAllDead || slave ) {
             return strcmp( client, "local" ) == 0;
         }
 

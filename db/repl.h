@@ -41,7 +41,9 @@ namespace mongo {
 
     class DBClientConnection;
     class DBClientCursor;
-    extern bool slave;
+	// --slave = SimpleSlave
+	typedef enum { NotSlave=0, SimpleSlave, ReplPairSlave } SlaveTypes;
+	extern SlaveTypes slave;
     extern bool master;
     extern int opIdMem;
     

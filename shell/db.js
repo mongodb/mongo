@@ -239,6 +239,7 @@ DB.prototype.help = function() {
     print("DB methods:");
     print("\tdb.auth(username, password)");
     print("\tdb.getMongo() get the server connection object");
+	print("\tdb.getMongo().setSlaveOk() allow this connection to read from the nonmaster member of a replica pair");
     print("\tdb.getSisterDB(name) get the db at the same server as this onew");
     print("\tdb.getName()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
