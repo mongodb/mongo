@@ -1,4 +1,6 @@
-// jsobj.cpp
+/** @file jsobj.cpp - BSON implementation
+    http://www.mongodb.org/display/DOCS/BSON
+*/
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -532,7 +534,11 @@ namespace mongo {
         return -1;
     }
 
-    string BSONElement::simpleRegex() const {
+    /** returns a string that when used as a matcher, would match a super set of regex() 
+		returns "" for complex regular expressions
+		used to optimize queries in some simple regex cases that start with '^'
+	*/
+	string BSONElement::simpleRegex() const {
         if ( *regexFlags() )                                                                     
             return "";
         
@@ -1159,6 +1165,19 @@ namespace mongo {
 
             assert( !o.woEqual( p ) );
             assert( o.woCompare( p ) < 0 );
+
+			{
+				BSONObjBuilder b;
+				b.appendRegex("r", "^foo");
+				BSONObj o = b.done();
+				assert( o.firstElement().simpleRegex() == "foo" );
+			}
+			{
+				BSONObjBuilder b;
+				b.appendRegex("r", "^f?oo");
+				BSONObj o = b.done();
+				assert( o.firstElement().simpleRegex() == "f" );
+			}
         }
         void testoid() { 
             OID id;

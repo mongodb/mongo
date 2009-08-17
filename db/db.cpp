@@ -772,7 +772,6 @@ int main(int argc, char* argv[], char *envp[] )
     } 
     else {
         cout << dbExecCommand << " --help for help and startup options" << endl;
-        cout << endl;
     }
 
     initAndListen(port, appsrvPath);

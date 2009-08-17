@@ -1,10 +1,14 @@
-/** @file jsobj.h */
+/** @file jsobj.h 
+    BSON classes
+*/
 
 /**
    BSONObj and its helpers
 
    "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
    represented in JSON (plus a few extensions useful for databases & other languages).
+
+   http://www.mongodb.org/display/DOCS/BSON
 */
 
 /**
@@ -430,7 +434,10 @@ namespace mongo {
             return value();
         }
 
-        /** returns a regex that when used as a matcher, would return a super set of regex() */
+        /** returns a string that when used as a matcher, would match a super set of regex() 
+			returns "" for complex regular expressions
+			used to optimize queries in some simple regex cases that start with '^'
+		 */
         string simpleRegex() const;
 
         /** Retrieve the regex flags (options) for a Regex element */
