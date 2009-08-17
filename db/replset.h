@@ -20,6 +20,7 @@
 #include "dbhelpers.h"
 #include "json.h"
 #include "../client/dbclient.h"
+#include "repl.h"
 
 namespace mongo {
 
