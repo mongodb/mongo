@@ -123,7 +123,9 @@ namespace mongo {
     public:
         PooledScope( const string pool , Scope * real ) : _pool( pool ) , _real( real ){};
         virtual ~PooledScope(){
-            scopeCache->done( _pool , _real );
+            ScopeCache * sc = scopeCache.get();
+            assert( sc );
+            sc->done( _pool , _real );
             _real = 0;
         }
         
