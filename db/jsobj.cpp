@@ -538,28 +538,43 @@ namespace mongo {
 		returns "" for complex regular expressions
 		used to optimize queries in some simple regex cases that start with '^'
 	*/
-	string BSONElement::simpleRegex() const {
+    string BSONElement::simpleRegex() const {
+
+        string r = "";
+
         if ( *regexFlags() )                                                                     
-            return "";
+            return r;
         
         const char *i = regex();                                                                 
         if ( *i != '^' )                                                                           
-            return "";
+            return r;
         ++i;       
-
+        
         // Empty string matches everything, won't limit our search.                                
         if ( !*i )                                                                                 
-            return "";
+            return r;
         
         stringstream ss;
         for( ; *i; ++i ){
-            if ( *i == ' ' || (*i>='0'&&*i<='9') || (*i>='@'&&*i<='Z') || (*i>='a'&&*i<='z') )
-                ss << *i;
-            else
+            char c = *i;
+            if ( c == '*' ){
+                r = ss.str();
+                r = r.substr( 0 , r.size() - 1 );
                 break;
+            }
+            else if ( *i == ' ' || (*i>='0'&&*i<='9') || (*i>='@'&&*i<='Z') || (*i>='a'&&*i<='z') ){
+                ss << *i;
+            }
+            else {
+                r = ss.str();
+                break;
+            }
         } 
         
-        return ss.str();
+        if ( r.size() == 0 && *i == 0 )
+            r = ss.str();
+
+        return r;
     }    
 
     void BSONElement::validate() const {
