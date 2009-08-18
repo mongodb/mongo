@@ -47,6 +47,12 @@ namespace mongo {
     endKeyInclusive_( endKey_.isEmpty() ),
     unhelpful_( false ) {
 
+        if ( !fbs_.matchPossible() ) {
+            unhelpful_ = true;
+            scanAndOrderRequired_ = false;
+            return;
+        }
+
         if( idxNo >= 0 ) {
             index_ = &d->indexes[idxNo];
         } else {
@@ -169,7 +175,8 @@ namespace mongo {
     }
     
     void QueryPlan::registerSelf( long long nScanned ) const {
-        NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
+        if ( fbs_.matchPossible() )
+            NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
     }
     
     QueryPlanSet::QueryPlanSet( const char *_ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
@@ -289,7 +296,7 @@ namespace mongo {
             return;
 
         // If table scan is optimal or natural order requested
-        if ( ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
+        if ( !fbs_.matchPossible() || ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan
             addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );

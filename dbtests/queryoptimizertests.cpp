@@ -255,6 +255,24 @@ namespace QueryOptimizerTests {
                 ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 0.0 ).firstElement() ) > 0 );
             }
         };
+
+        class InLowerBound {
+        public:
+            void run() {
+                FieldRangeSet f( "", fromjson( "{a:{$gt:4,$in:[1,2,3,4,5,6]}}" ) );
+                ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 5.0 ).firstElement(), false ) == 0 );
+                ASSERT( f.range( "a" ).max().woCompare( BSON( "a" << 6.0 ).firstElement(), false ) == 0 );
+            }
+        };
+
+        class InUpperBound {
+        public:
+            void run() {
+                FieldRangeSet f( "", fromjson( "{a:{$lt:4,$in:[1,2,3,4,5,6]}}" ) );
+                ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 1.0 ).firstElement(), false ) == 0 );
+                ASSERT( f.range( "a" ).max().woCompare( BSON( "a" << 3.0 ).firstElement(), false ) == 0 );
+            }
+        };
         
     } // namespace FieldRangeTests
     
@@ -995,6 +1013,8 @@ namespace QueryOptimizerTests {
             add< FieldRangeTests::QueryPatternTest >();
             add< FieldRangeTests::NoWhere >();
             add< FieldRangeTests::Numeric >();
+            add< FieldRangeTests::InLowerBound >();
+            add< FieldRangeTests::InUpperBound >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();

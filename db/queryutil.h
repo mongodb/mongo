@@ -46,12 +46,13 @@ namespace mongo {
     public:
         FieldRange( const BSONElement &e = BSONObj().firstElement() , bool optimize=true );
         const FieldRange &operator&=( const FieldRange &other );
-        BSONElement min() const { return interval().lower_.bound_; }
-        BSONElement max() const { return interval().upper_.bound_; }
-        bool minInclusive() const { return interval().lower_.inclusive_; }
-        bool maxInclusive() const { return interval().upper_.inclusive_; }
+        BSONElement min() const { assert( !empty() ); return intervals_[ 0 ].lower_.bound_; }
+        BSONElement max() const { assert( !empty() ); return intervals_[ intervals_.size() - 1 ].upper_.bound_; }
+        bool minInclusive() const { assert( !empty() ); return intervals_[ 0 ].lower_.inclusive_; }
+        bool maxInclusive() const { assert( !empty() ); return intervals_[ intervals_.size() - 1 ].upper_.inclusive_; }
         bool equality() const {
             return
+                !empty() &&
                 min().woCompare( max(), false ) == 0 &&
                 maxInclusive() &&
                 minInclusive();
@@ -61,17 +62,8 @@ namespace mongo {
                 minKey.firstElement().woCompare( min(), false ) != 0 ||
                 maxKey.firstElement().woCompare( max(), false ) != 0;
         }
-        bool empty() const { return min().eoo() && max().eoo(); }
+        bool empty() const { return intervals_.empty(); }
     private:
-        // towards replacing interval() with a set of intervals
-        BSONElement &lower() { return interval().lower_.bound_; }
-        BSONElement &upper() { return interval().upper_.bound_; }
-        bool &lowerInclusive() { return interval().lower_.inclusive_; }
-        bool &upperInclusive() { return interval().upper_.inclusive_; }
-
-        const FieldInterval &interval() const { return intervals_[ 0 ]; }
-        FieldInterval &interval() { return intervals_[ 0 ]; }
-        
         BSONObj addObj( const BSONObj &o );
         string simpleRegexEnd( string regex );
         vector< FieldInterval > intervals_;
