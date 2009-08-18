@@ -24,7 +24,7 @@
 
 namespace mongo {
     
-    FieldRange::FieldRange( const BSONElement &e, bool optimize ) {
+    FieldRange::FieldRange( const BSONElement &e, bool optimize ) : intervals_( 1 ) {
         lower() = minKey.firstElement();
         lowerInclusive() = true;
         upper() = maxKey.firstElement();
@@ -103,24 +103,48 @@ namespace mongo {
         }
 
     }
+
+    // as called, these functions find the max/min of a bound in the
+    // opposite direction, so exclusive bounds are considered less
+    // superlative
+    FieldBound maxFieldBound( const FieldBound &a, const FieldBound &b ) {
+        int cmp = a.bound_.woCompare( b.bound_, false );
+        if ( ( cmp == 0 && !b.inclusive_ ) || cmp < 0 )
+            return b;
+        return a;
+    }
+
+    FieldBound minFieldBound( const FieldBound &a, const FieldBound &b ) {
+        int cmp = a.bound_.woCompare( b.bound_, false );
+        if ( ( cmp == 0 && !b.inclusive_ ) || cmp > 0 )
+            return b;
+        return a;
+    }
+
+    bool fieldIntervalOverlap( const FieldInterval &one, const FieldInterval &two, FieldInterval &result ) {
+        result.lower_ = maxFieldBound( one.lower_, two.lower_ );
+        result.upper_ = minFieldBound( one.upper_, two.upper_ );
+        return result.valid();
+    }
     
     const FieldRange &FieldRange::operator&=( const FieldRange &other ) {
-        int cmp;
-        cmp = other.max().woCompare( upper(), false );
-        if ( cmp == 0 )
-            if ( !other.maxInclusive() )
-                upperInclusive() = false;
-        if ( cmp < 0 ) {
-            upper() = other.max();
-            upperInclusive() = other.maxInclusive();
+        vector< FieldInterval > newIntervals;
+        vector< FieldInterval >::const_iterator i = intervals_.begin();
+        vector< FieldInterval >::const_iterator j = other.intervals_.begin();
+        while( i != intervals_.end() && j != other.intervals_.end() ) {
+            FieldInterval overlap;
+            if ( fieldIntervalOverlap( *i, *j, overlap ) )
+                newIntervals.push_back( overlap );
+            if ( i->upper_ == minFieldBound( i->upper_, j->upper_ ) )
+                ++i;
+            else
+                ++j;      
         }
-        cmp = other.min().woCompare( lower(), false );
-        if ( cmp == 0 )
-            if ( !other.minInclusive() )
-                lowerInclusive() = false;
-        if ( cmp > 0 ) {
-            lower() = other.min();
-            lowerInclusive() = other.minInclusive();
+        intervals_ = newIntervals;
+        // temporary
+        if ( intervals_.size() == 0 ) {
+            FieldInterval a;
+            intervals_.push_back( a );
         }
         for( vector< BSONObj >::const_iterator i = other.objData_.begin(); i != other.objData_.end(); ++i )
             objData_.push_back( *i );

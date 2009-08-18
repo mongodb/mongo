@@ -25,11 +25,19 @@ namespace mongo {
     struct FieldBound {
         BSONElement bound_;
         bool inclusive_;
+        bool operator==( const FieldBound &other ) const {
+            return bound_.woCompare( other.bound_ ) == 0 &&
+            inclusive_ == other.inclusive_;
+        }
     };
 
     struct FieldInterval {
         FieldBound lower_;
         FieldBound upper_;
+        bool valid() const {
+            int cmp = lower_.bound_.woCompare( upper_.bound_, false );
+            return ( cmp < 0 || ( cmp == 0 && lower_.inclusive_ && upper_.inclusive_ ) );
+        }
     };
 
     // range of a field's value that may be determined from query -- used to
@@ -38,10 +46,10 @@ namespace mongo {
     public:
         FieldRange( const BSONElement &e = BSONObj().firstElement() , bool optimize=true );
         const FieldRange &operator&=( const FieldRange &other );
-        BSONElement min() const { return interval_.lower_.bound_; }
-        BSONElement max() const { return interval_.upper_.bound_; }
-        bool minInclusive() const { return interval_.lower_.inclusive_; }
-        bool maxInclusive() const { return interval_.upper_.inclusive_; }
+        BSONElement min() const { return interval().lower_.bound_; }
+        BSONElement max() const { return interval().upper_.bound_; }
+        bool minInclusive() const { return interval().lower_.inclusive_; }
+        bool maxInclusive() const { return interval().upper_.inclusive_; }
         bool equality() const {
             return
                 min().woCompare( max(), false ) == 0 &&
@@ -53,16 +61,20 @@ namespace mongo {
                 minKey.firstElement().woCompare( min(), false ) != 0 ||
                 maxKey.firstElement().woCompare( max(), false ) != 0;
         }
+        bool empty() const { return min().eoo() && max().eoo(); }
     private:
-        // towards replacing interval_ with a set of intervals
-        BSONElement &lower() { return interval_.lower_.bound_; }
-        BSONElement &upper() { return interval_.upper_.bound_; }
-        bool &lowerInclusive() { return interval_.lower_.inclusive_; }
-        bool &upperInclusive() { return interval_.upper_.inclusive_; }
+        // towards replacing interval() with a set of intervals
+        BSONElement &lower() { return interval().lower_.bound_; }
+        BSONElement &upper() { return interval().upper_.bound_; }
+        bool &lowerInclusive() { return interval().lower_.inclusive_; }
+        bool &upperInclusive() { return interval().upper_.inclusive_; }
 
+        const FieldInterval &interval() const { return intervals_[ 0 ]; }
+        FieldInterval &interval() { return intervals_[ 0 ]; }
+        
         BSONObj addObj( const BSONObj &o );
         string simpleRegexEnd( string regex );
-        FieldInterval interval_;
+        vector< FieldInterval > intervals_;
         vector< BSONObj > objData_;
     };
     
@@ -155,7 +167,7 @@ namespace mongo {
         BSONObj simplifiedQuery( const BSONObj &fields = BSONObj() ) const;
         bool matchPossible() const {
             for( map< string, FieldRange >::const_iterator i = ranges_.begin(); i != ranges_.end(); ++i )
-                if ( i->second.min().woCompare( i->second.max(), false ) > 0 )
+                if ( i->second.empty() )
                     return false;
             return true;
         }
