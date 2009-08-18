@@ -111,6 +111,9 @@ namespace mongo {
        If 'client' is not specified, the current client is used.
     */
     inline bool isMaster( const char *client = 0 ) {
+		if( !slave ) 
+			return true;
+
         if ( !client )
             client = database->name.c_str();
 

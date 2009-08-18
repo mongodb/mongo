@@ -41,10 +41,18 @@ namespace mongo {
 
     class DBClientConnection;
     class DBClientCursor;
-	// --slave = SimpleSlave
+
+	/* replication slave? (possibly with slave or repl pair nonmaster)
+       --slave cmd line setting -> SimpleSlave
+	*/
 	typedef enum { NotSlave=0, SimpleSlave, ReplPairSlave } SlaveTypes;
 	extern SlaveTypes slave;
+
+	/* true means we are master and doing replication.  if we are not writing to oplog (no --master or repl pairing), 
+	   this won't be true.
+	*/
     extern bool master;
+
     extern int opIdMem;
     
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
