@@ -20,6 +20,11 @@ assert( res[0].count == 2 , "C" );
 assert( res[1].a == 2 , "D" );
 assert( res[1].count == 3 , "E" );
 
+// TEMP DEBUGGING
+p.ns = t._shortName;
+printjson( db.runCommand( { "group" : db._groupFixParms( p ) } ) );
+// ----
+
 assert.eq( res , t.groupcmd( p ) , "ZZ" );
 
 ret = t.groupcmd( { key : {} , reduce : p.reduce , initial : p.initial } );
