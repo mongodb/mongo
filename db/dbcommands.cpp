@@ -1148,7 +1148,6 @@ namespace mongo {
             while ( cursor->more() ){
                 BSONObj obj = cursor->next();
                 BSONObj key = getKey( obj , keyPattern , keyFunction , keysize / keynum );
-                cout << "key: " << key << endl;
                 keysize += key.objsize();
                 keynum++;
                 
