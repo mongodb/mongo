@@ -374,17 +374,22 @@ DB.prototype.group = function(parmsObj) {
 	var parms = args[0];
     	var c = db[parms.ns].find(parms.cond||{});
     	var map = new Map();
+        var pks = parms.key ? parms.key.keySet() : null;
+        var pkl = pks ? pks.length : 0;
+        var key = {};
         
     	while( c.hasNext() ) {
 	    var obj = c.next();
-	    var key = {};
-	    if( parms.key ) {
-	    	for( var i in parms.key )
-		    key[i] = obj[i];
+	    if ( pks ) {
+	    	for( var i=0; i<pkl; i++ ){
+                    var k = pks[i];
+		    key[k] = obj[k];
+                }
 	    }
 	    else {
 	    	key = parms.$keyf(obj);
 	    }
+
 	    var aggObj = map.get(key);
 	    if( aggObj == null ) {
 		var newObj = Object.extend({}, key); // clone
@@ -397,6 +402,14 @@ DB.prototype.group = function(parmsObj) {
 	return map.values();
     }
     
+    return this.eval(groupFunction, this._groupFixParms( parmsObj ));
+}
+
+DB.prototype.groupcmd = function( parmsObj ){
+    return this.runCommand( { "group" : this._groupFixParms( parmsObj ) } ).retval;
+}
+
+DB.prototype._groupFixParms = function( parmsObj ){
     var parms = Object.extend({}, parmsObj);
     
     if( parms.reduce ) {
@@ -409,7 +422,7 @@ DB.prototype.group = function(parmsObj) {
 	delete parms.keyf;
     }
     
-    return this.eval(groupFunction, parms);
+    return parms;
 }
 
 DB.prototype.resetError = function(){

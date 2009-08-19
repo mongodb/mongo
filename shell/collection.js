@@ -394,6 +394,11 @@ DBCollection.prototype.group = function( params ){
     return this._db.group( params );
 }
 
+DBCollection.prototype.groupcmd = function( params ){
+    params.ns = this._shortName;
+    return this._db.groupcmd( params );
+}
+
 DBCollection.prototype.toString = function(){
     return this.getFullName();
 }

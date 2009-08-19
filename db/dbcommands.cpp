@@ -35,6 +35,7 @@
 #include "lasterror.h"
 #include "security.h"
 #include "queryoptimizer.h"
+#include "../scripting/engine.h"
 
 namespace mongo {
 
@@ -1099,6 +1100,118 @@ namespace mongo {
             return true;
         }
     } cmdConvertToCapped;
+
+    class GroupCommand : public Command {
+    public:
+        GroupCommand() : Command("group"){}
+        virtual bool slaveOk() { return true; }
+        virtual void help( stringstream &help ) const {
+            help << "example: TODO";
+        }
+
+        BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , const string keyFunction , double avgSize ){
+            BSONObjBuilder b( (int)(avgSize * 1.1) );
+
+            BSONObjIterator i( keyPattern );
+            while ( i.more() ){
+                b.append( obj[i.next().fieldName()] );
+            }
+
+            return b.obj();
+        }
+        
+        bool group( string realdbname , auto_ptr<DBClientCursor> cursor , BSONObj keyPattern , string keyFunction , string reduceCode , BSONObj initial , string& errmsg , BSONObjBuilder& result ){
+
+            if ( keyPattern.isEmpty() ){
+                errmsg = "can't only handle real keys right now, not functions";
+                return false;
+            }
+
+            auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname );
+            s->localConnect( realdbname.c_str() );
+
+            s->setObject( "$initial" , initial , true );
+            
+            s->exec( "$reduce = " + reduceCode , "reduce setup" , false , true , true , 100 );
+            s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
+            ScriptingFunction f = s->createFunction( "function(){ "
+                                                     "  if ( $arr[n] == null ){ next = {}; Object.extend( next , $key ); Object.extend( next , $initial ); $arr[n] = next; next = null; }"
+                                                     "  $reduce( obj , $arr[n] ); "
+                                                     "}" );
+
+            double keysize = keyPattern.objsize() * 3;
+            double keynum = 1;
+            
+            map<BSONObj,int,BSONObjCmp> map;
+            list<BSONObj> blah;
+            
+            while ( cursor->more() ){
+                BSONObj obj = cursor->next();
+                BSONObj key = getKey( obj , keyPattern , keyFunction , keysize / keynum );
+
+                keysize += key.objsize();
+                keynum++;
+                
+                int& n = map[key];
+                if ( n == 0 ){
+                    n = map.size();
+                    //BSONObjBuilder b;
+                    //b.appendElements( key );
+                    //b.appendElements( initial );
+                    //BSONObj t = b.obj();
+                    //blah.push_back( t );
+                    //s->setObject( "next" , t , false );
+                    s->setObject( "$key" , key , true );
+                }
+                
+                s->setObject( "obj" , obj , true );
+                s->setNumber( "n" , n - 1 );
+                assert( s->invoke( f , BSONObj() , 0 , true ) == 0 );
+            }
+            
+            result.appendArray( "retval" , s->getObject( "$arr" ) );
+            result.append( "count" , keynum - 1 );
+            result.append( "keys" , (int)(map.size()) );
+
+            return true;
+        }
+        
+        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            static DBDirectClient db;
+
+            const BSONObj& p = jsobj.firstElement().embeddedObjectUserCheck();
+            
+            BSONObj q;
+            if ( p["cond"].type() == Object )
+                q = p["cond"].embeddedObject();
+            
+            string ns = dbname;
+            ns = ns.substr( 0 , ns.size() - 4 );
+            string realdbname = ns.substr( 0 , ns.size() - 1 );
+            ns += p["ns"].valuestr();
+            
+            cout << "ns: " << ns << endl;
+
+            auto_ptr<DBClientCursor> cursor = db.query( ns , q );
+            
+            BSONObj key;
+            string keyf;
+            if ( p["key"].type() == Object ){
+                key = p["key"].embeddedObjectUserCheck();
+                if ( ! p["$keyf"].eoo() ){
+                    errmsg = "can't have key and $keyf";
+                    return false;
+                }
+            }
+            else if ( p["$keyf"].type() ){
+                keyf = p["$keyf"].ascode();
+            }
+
+
+            return group( realdbname , cursor , key , keyf , p["$reduce"].ascode() , p["initial"].embeddedObjectUserCheck() , errmsg , result );
+        }
+        
+    } cmdGroup;
     
     extern map<string,Command*> *commands;
 
