@@ -413,6 +413,20 @@ namespace mongo {
 
         BSONObj codeWScopeObject() const;
 
+        string ascode() const {
+            switch( type() ){
+            case String:
+            case Code:
+                return valuestr();
+            case CodeWScope:
+                return codeWScopeCode();
+            default:
+                log() << "can't convert type: " << (int)(type()) << " to code" << endl;
+            }
+            uassert( "not code" , 0 );
+            return "";
+        }
+
         /** Get binary data.  Element must be of type BinData */
         const char *binData(int& len) const { 
             // BinData: <int len> <byte subtype> <byte[len] data>
@@ -894,7 +908,7 @@ namespace mongo {
 
     class BSONObjCmp {
     public:
-        BSONObjCmp( const BSONObj &_order ) : order( _order ) {}
+        BSONObjCmp( const BSONObj &_order = BSONObj() ) : order( _order ) {}
         bool operator()( const BSONObj &l, const BSONObj &r ) const {
             return l.woCompare( r, order ) < 0;
         }
