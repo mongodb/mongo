@@ -700,8 +700,10 @@ namespace mongo {
         recCacheCloseAll();
         
 #if !defined(_WIN32) && !defined(__sunos__)
-        assert( ftruncate( lockFile , 0 ) == 0 );
-        flock( lockFile, LOCK_UN );
+        if ( lockFile ){
+            assert( ftruncate( lockFile , 0 ) == 0 );
+            flock( lockFile, LOCK_UN );
+        }
 #endif
     }
 
