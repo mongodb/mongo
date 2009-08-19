@@ -406,7 +406,11 @@ DB.prototype.group = function(parmsObj) {
 }
 
 DB.prototype.groupcmd = function( parmsObj ){
-    return this.runCommand( { "group" : this._groupFixParms( parmsObj ) } ).retval;
+    var ret = this.runCommand( { "group" : this._groupFixParms( parmsObj ) } );
+    if ( ! ret.ok ){
+        throw "group command failed: " + tojson( ret );
+    }
+    return ret.retval;
 }
 
 DB.prototype._groupFixParms = function( parmsObj ){
