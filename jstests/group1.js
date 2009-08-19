@@ -25,3 +25,16 @@ assert.eq( res , t.groupcmd( p ) , "ZZ" );
 ret = t.groupcmd( { key : {} , reduce : p.reduce , initial : p.initial } );
 assert.eq( 1 , ret.length , "ZZ 2" );
 assert.eq( 5 , ret[0].count , "ZZ 3" );
+
+t.drop();
+
+t.save( { "a" : 2 } );
+t.save( { "b" : 5 } );
+t.save( { "a" : 1 } );
+t.save( { "a" : 2 } );
+
+c = {key: {a:1}, cond: {}, initial: {"count": 0}, reduce: function(obj, prev) { prev.count++; } };
+
+assert.eq( t.group( c ) , t.groupcmd( c ) , "ZZZZ" );
+
+

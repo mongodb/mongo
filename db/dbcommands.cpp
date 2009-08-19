@@ -1114,7 +1114,12 @@ namespace mongo {
 
             BSONObjIterator i( keyPattern );
             while ( i.more() ){
-                b.append( obj[i.next().fieldName()] );
+                const char * n = i.next().fieldName();
+                BSONElement e = obj[n];
+                if ( e.eoo() )
+                    b.appendNull( n );
+                else
+                    b.append( e );
             }
 
             return b.obj();
