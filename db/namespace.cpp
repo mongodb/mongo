@@ -1,4 +1,4 @@
-// namespacedetails.cpp
+// namespace.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -32,7 +32,7 @@ namespace mongo {
 
     BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
-    /* deleted lists -- linked lists of deleted records -- tehy are placed in 'buckets' of various sizes
+    /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.
     */
     int bucketSizes[] = {
@@ -40,8 +40,6 @@ namespace mongo {
         0x8000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000, 0x200000,
         0x400000, 0x800000
     };
-
-//NamespaceIndexMgr namespaceIndexMgr;
 
     bool NamespaceIndex::exists() const {
         return !boost::filesystem::exists(path());        
@@ -222,9 +220,7 @@ namespace mongo {
     }
 
     void NamespaceDetails::dumpDeleted(set<DiskLoc> *extents) {
-//	out() << "DUMP deleted chains" << endl;
         for ( int i = 0; i < Buckets; i++ ) {
-//		out() << "  bucket " << i << endl;
             DiskLoc dl = deletedList[i];
             while ( !dl.isNull() ) {
                 DeletedRecord *r = dl.drec();
@@ -239,7 +235,6 @@ namespace mongo {
                 dl = r->nextDeleted;
             }
         }
-//	out() << endl;
     }
 
     /* combine adjacent deleted records
@@ -548,9 +543,9 @@ namespace mongo {
         allIndexKeys.clear();
         NamespaceDetails *d = nsdetails(ns.c_str());
         for ( int i = 0; i < d->nIndexes; i++ ) {
-//        set<string> fields;
+			// set<string> fields;
             d->indexes[i].keyPattern().getFieldNames(allIndexKeys);
-//        allIndexKeys.insert(fields.begin(),fields.end());
+			// allIndexKeys.insert(fields.begin(),fields.end());
         }
     }
     
@@ -614,67 +609,68 @@ namespace mongo {
         }
     }
 
-  void renameNamespace( const char *from, const char *to ) {
-    NamespaceIndex *ni = nsindex( from );
-    assert( ni && ni->details( from ) && !ni->details( to ) );
+    void renameNamespace( const char *from, const char *to ) {
+		NamespaceIndex *ni = nsindex( from );
+		assert( ni && ni->details( from ) && !ni->details( to ) );
+		
+		// Our namespace and index details will move to a different 
+		// memory location.  The only references to namespace and 
+		// index details across commands are in cursors and nsd
+		// transient (including query cache) so clear these.
+		ClientCursor::invalidate( from );
+		NamespaceDetailsTransient::drop( from );
+		
+		NamespaceDetails *details = ni->details( from );
+		ni->add( to, *details );
+		ni->drop( from );
+		details = ni->details( to );
+		
+		BSONObj oldSpec;
+		char database[MaxClientLen];
+		nsToClient(from, database);
+		string s = database;
+		s += ".system.namespaces";
+		assert( Helpers::findOne( s.c_str(), BSON( "name" << from ), oldSpec ) );
+		
+		BSONObjBuilder newSpecB;
+		BSONObjIterator i( oldSpec.getObjectField( "options" ) );
+		while( i.more() ) {
+			BSONElement e = i.next();
+			if ( strcmp( e.fieldName(), "create" ) != 0 )
+				newSpecB.append( e );
+			else
+				newSpecB << "create" << to;
+		}
+		BSONObj newSpec = newSpecB.done();    
+		addNewNamespaceToCatalog( to, newSpec.isEmpty() ? 0 : &newSpec );
 
-    // Our namespace and index details will move to a different 
-    // memory location.  The only references to namespace and 
-    // index details across commands are in cursors and nsd
-    // transient (including query cache) so clear these.
-    ClientCursor::invalidate( from );
-    NamespaceDetailsTransient::drop( from );
+		deleteObjects( s.c_str(), BSON( "name" << from ), false, false, true );
+		// oldSpec variable no longer valid memory
 
-    NamespaceDetails *details = ni->details( from );
-    ni->add( to, *details );
-    ni->drop( from );
-    details = ni->details( to );
-
-    BSONObj oldSpec;
-    char database[256];
-    nsToClient(from, database);
-    string s = database;
-    s += ".system.namespaces";
-    assert( Helpers::findOne( s.c_str(), BSON( "name" << from ), oldSpec ) );
-
-    BSONObjBuilder newSpecB;
-    BSONObjIterator i( oldSpec.getObjectField( "options" ) );
-    while( i.more() ) {
-      BSONElement e = i.next();
-      if ( strcmp( e.fieldName(), "create" ) != 0 )
-	newSpecB.append( e );
-      else
-	newSpecB << "create" << to;
-    }
-    BSONObj newSpec = newSpecB.done();    
-    addNewNamespaceToCatalog( to, newSpec.isEmpty() ? 0 : &newSpec );
-
-    deleteObjects( s.c_str(), BSON( "name" << from ), false, false, true );
-    // oldSpec variable no longer valid memory
-
-    BSONObj oldIndexSpec;
-    s = database;
-    s += ".system.indexes";
-    while( Helpers::findOne( s.c_str(), BSON( "ns" << from ), oldIndexSpec ) ) {
-      BSONObjBuilder newIndexSpecB;
-      BSONObjIterator i( oldIndexSpec );
-      while( i.more() ) {
-	BSONElement e = i.next();
-	if ( strcmp( e.fieldName(), "ns" ) != 0 )
-	  newIndexSpecB.append( e );
-	else
-	  newIndexSpecB << "ns" << to;
-      }
-      BSONObj newIndexSpec = newIndexSpecB.done();
-      DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, BSONElement(), false );
-      int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
-      IndexDetails &indexDetails = details->indexes[ indexI ];
-      string oldIndexNs = indexDetails.indexNamespace();
-      indexDetails.info = newIndexSpecLoc;
-      string newIndexNs = indexDetails.indexNamespace();
-
-      BtreeBucket::renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
-      deleteObjects( s.c_str(), oldIndexSpec.getOwned(), true, false, true );
-    }
-  }
+		BSONObj oldIndexSpec;
+		s = database;
+		s += ".system.indexes";
+		while( Helpers::findOne( s.c_str(), BSON( "ns" << from ), oldIndexSpec ) ) {
+			BSONObjBuilder newIndexSpecB;
+			BSONObjIterator i( oldIndexSpec );
+			while( i.more() ) {
+				BSONElement e = i.next();
+				if ( strcmp( e.fieldName(), "ns" ) != 0 )
+					newIndexSpecB.append( e );
+				else
+					newIndexSpecB << "ns" << to;
+			}
+			BSONObj newIndexSpec = newIndexSpecB.done();
+			DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, BSONElement(), false );
+			int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
+			IndexDetails &indexDetails = details->indexes[ indexI ];
+			string oldIndexNs = indexDetails.indexNamespace();
+			indexDetails.info = newIndexSpecLoc;
+			string newIndexNs = indexDetails.indexNamespace();
+			
+			BtreeBucket::renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
+			deleteObjects( s.c_str(), oldIndexSpec.getOwned(), true, false, true );
+		}
+	}
+	
 } // namespace mongo

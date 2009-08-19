@@ -19,11 +19,9 @@
 #pragma once
 
 #include "../stdafx.h"
-
 #include "jsobj.h"
 #include "queryutil.h"
 #include "storage.h"
-
 #include "../util/hashtab.h"
 #include "../util/mmap.h"
 
@@ -33,8 +31,11 @@ namespace mongo {
 
 #pragma pack(1)
 
-// "database.a.b.c" -> "database"
-    const int MaxClientLen = 256;
+	/* in the mongo source code, "client" means "database". */
+
+    const int MaxClientLen = 256; // max str len for the db name
+
+	// "database.a.b.c" -> "database"
     inline void nsToClient(const char *ns, char *database) {
         const char *p = ns;
         char *q = database;
@@ -55,10 +56,14 @@ namespace mongo {
         return buf;
     }
 
+	/* e.g.
+	   NamespaceString ns("acme.orders");
+	   cout << ns.coll; // "orders"
+	*/
     class NamespaceString {
     public:
         string db;
-        string coll;
+        string coll; // note collection names can have periods in them for organizing purposes (e.g. "system.indexes")
     private:
         void init(const char *ns) { 
             const char *p = strchr(ns, '.');
@@ -71,6 +76,7 @@ namespace mongo {
         NamespaceString( const string& ns ) { init(ns.c_str()); }
     };
 
+	/* This helper class is used to make the HashMap below in NamespaceDetails */
     class Namespace {
     public:
         enum MaxNsLenValue { MaxNsLen = 128 };
@@ -106,6 +112,7 @@ namespace mongo {
 
         /**
            ( foo.bar ).getSisterNS( "blah" ) == foo.blah
+		   perhaps this should move to the NamespaceString helper?
          */
         string getSisterNS( const char * local ) {
             assert( local && local[0] != '.' );
@@ -118,23 +125,31 @@ namespace mongo {
         char buf[MaxNsLen];
     };
 
+    /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
+       so you can look for a deleterecord about the right size.
+    */
     const int Buckets = 19;
     const int MaxBucket = 18;
+
+	/* Maximum # of indexes per collection.  We need to raise this limit at some point.  
+	   (Backward datafile compatibility is main issue with changing.)
+	*/
     const int MaxIndexes = 10;
 
-    //extern BSONObj idKeyPattern; // { _id : 1 } 
-
+	/* Details about a particular index. There is one of these effectively for each object in 
+	   system.namespaces (although this also includes the head pointer, which is not in that 
+	   collection).
+	 */
     class IndexDetails {
     public:
-        DiskLoc head; /* btree head */
+        DiskLoc head; /* btree head disk location */
 
         /* Location of index info object. Format:
 
              { name:"nameofindex", ns:"parentnsname", key: {keypattobject}[, unique: <bool>] }
 
            This object is in the system.indexes collection.  Note that since we
-           have a pointer to the object here, the object in system.indexes must
-           never move.
+           have a pointer to the object here, the object in system.indexes MUST NEVER MOVE.
         */
         DiskLoc info;
 
@@ -491,14 +506,14 @@ namespace mongo {
 
         void add(const char *ns, DiskLoc& loc, bool capped) {
             NamespaceDetails details( loc, capped );
-	    add( ns, details );
+			add( ns, details );
         }
 
-	void add( const char *ns, const NamespaceDetails &details ) {
+		void add( const char *ns, const NamespaceDetails &details ) {
             init();
             Namespace n(ns);
             uassert("too many namespaces/collections", ht->put(n, details));
-	}
+		}
 
         /* just for diagnostics */
         size_t detailsOffset(NamespaceDetails *d) {
@@ -553,7 +568,7 @@ namespace mongo {
         string database_;
     };
 
-    extern string dbpath;
+    extern string dbpath; // --dbpath parm 
 
     // Rename a namespace within current 'client' db.
     // (Arguments should include db name)
