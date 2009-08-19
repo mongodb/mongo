@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "db/lasterror.h"
+#include "../db/lasterror.h"
 
 namespace mongo {
 	
