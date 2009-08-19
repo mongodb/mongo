@@ -1132,7 +1132,7 @@ namespace mongo {
             return worked;
         }
 
-        int invoke( JSFunction * func , const BSONObj& args, int timeoutMs ){
+        int invoke( JSFunction * func , const BSONObj& args, int timeoutMs , bool ignoreReturn ){
             smlock;
             precall();
             jsval rval;
@@ -1140,12 +1140,19 @@ namespace mongo {
             int nargs = args.nFields();
             auto_ptr<jsval> smargsPtr( new jsval[nargs] );
             jsval* smargs = smargsPtr.get();
+            if ( nargs ){
+                
+                BSONObjIterator it( args );
+                for ( int i=0; i<nargs; i++ )
+                    smargs[i] = _convertor->toval( it.next() );
+            }
 
-            BSONObjIterator it( args );
-            for ( int i=0; i<nargs; i++ )
-                smargs[i] = _convertor->toval( it.next() );
-
-            setObject( "args" , args , true ); // this is for backwards compatability
+            if ( args.isEmpty() ){
+                _convertor->setProperty( _global , "args" , JSVAL_NULL );
+            }
+            else {
+                setObject( "args" , args , true ); // this is for backwards compatability
+            }
 
             installCheckTimeout( timeoutMs );
             JSBool ret = JS_CallFunction( _context , _this , func , nargs , smargs , &rval );
@@ -1154,13 +1161,16 @@ namespace mongo {
             if ( !ret ) {
                 return -3;
             }
+            
+            if ( ! ignoreReturn ){
+                assert( JS_SetProperty( _context , _global , "return" , &rval ) );
+            }
 
-            assert( JS_SetProperty( _context , _global , "return" , &rval ) );
             return 0;
         }
 
-        int invoke( ScriptingFunction funcAddr , const BSONObj& args, int timeoutMs = 0 ){
-            return invoke( (JSFunction*)funcAddr , args , timeoutMs );
+        int invoke( ScriptingFunction funcAddr , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = 0 ){
+            return invoke( (JSFunction*)funcAddr , args , timeoutMs , ignoreReturn );
         }
 
         void gotError( string s ){

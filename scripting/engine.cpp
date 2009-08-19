@@ -183,8 +183,8 @@ namespace mongo {
         /**
          * @return 0 on success
          */
-        int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 ){
-            return _real->invoke( func , args , timeoutMs );
+        int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs , bool ignoreReturn ){
+            return _real->invoke( func , args , timeoutMs , ignoreReturn );
         }
 
         string getError(){
