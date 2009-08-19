@@ -1122,7 +1122,7 @@ namespace mongo {
         
         bool group( string realdbname , auto_ptr<DBClientCursor> cursor , BSONObj keyPattern , string keyFunction , string reduceCode , BSONObj initial , string& errmsg , BSONObjBuilder& result ){
 
-            if ( keyPattern.isEmpty() ){
+            if ( keyFunction.size() ){
                 errmsg = "can't only handle real keys right now, not functions";
                 return false;
             }
@@ -1148,19 +1148,13 @@ namespace mongo {
             while ( cursor->more() ){
                 BSONObj obj = cursor->next();
                 BSONObj key = getKey( obj , keyPattern , keyFunction , keysize / keynum );
-
+                cout << "key: " << key << endl;
                 keysize += key.objsize();
                 keynum++;
                 
                 int& n = map[key];
                 if ( n == 0 ){
                     n = map.size();
-                    //BSONObjBuilder b;
-                    //b.appendElements( key );
-                    //b.appendElements( initial );
-                    //BSONObj t = b.obj();
-                    //blah.push_back( t );
-                    //s->setObject( "next" , t , false );
                     s->setObject( "$key" , key , true );
                 }
                 
@@ -1188,9 +1182,13 @@ namespace mongo {
             string ns = dbname;
             ns = ns.substr( 0 , ns.size() - 4 );
             string realdbname = ns.substr( 0 , ns.size() - 1 );
-            ns += p["ns"].valuestr();
             
-            cout << "ns: " << ns << endl;
+            if ( p["ns"].type() != String ){
+                errmsg = "ns has to be set";
+                return false;
+            }
+            
+            ns += p["ns"].valuestr();
 
             auto_ptr<DBClientCursor> cursor = db.query( ns , q );
             
