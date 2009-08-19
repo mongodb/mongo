@@ -20,4 +20,4 @@ assert( res[0].count == 2 , "C" );
 assert( res[1].a == 2 , "D" );
 assert( res[1].count == 3 , "E" );
 
-assert.eq( res , db.groupfast( p ) , "ZZ" );
+assert.eq( res , db.groupcmd( p ) , "ZZ" );
