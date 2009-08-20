@@ -258,6 +258,7 @@ namespace mongo {
             if ( e.eoo() )
                 return;
             b.append(e);
+            return;
         }
         
         string left = path.substr( 0 , i );
@@ -280,6 +281,7 @@ namespace mongo {
 
         for( multimap<string,string>::const_iterator i = p.first; i != p.second; ++i ) {
             string next = i->second;
+
             if ( e.eoo() ){
             }
             else if ( next.size() == 0 || next == "." || e.type() != Object ){
