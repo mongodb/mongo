@@ -42,12 +42,14 @@ namespace mongo {
     };
 
     bool NamespaceIndex::exists() const {
-        return !boost::filesystem::exists(path());        
+        return !boost::filesystem::exists(path());
     }
     
     boost::filesystem::path NamespaceIndex::path() const {
         return boost::filesystem::path( dir_ ) / ( database_ + ".ns" );
     }
+
+	int lenForNewNsFiles = 16 * 1024 * 1024;
     
     void NamespaceIndex::init() {
         if ( ht )
@@ -61,14 +63,29 @@ namespace mongo {
             i.dbDropped();
         }
 
-        long LEN = 16 * 1024 * 1024;
-        string pathString = path().string();
-        void *p = f.map(pathString.c_str(), LEN);
+		int len = -1;
+        boost::filesystem::path nsPath = path();
+        string pathString = nsPath.string();
+		void *p;
+        if( boost::filesystem::exists(nsPath) ) { 
+			p = f.map(pathString.c_str());
+			len = f.length();
+			uassert( "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
+		}
+		else {
+			// use lenForNewNsFiles, we are making a new database
+			massert( "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
+			long l = lenForNewNsFiles;
+			p = f.map(pathString.c_str(), l);
+			len = (int) l;
+			assert( len == lenForNewNsFiles );
+		}
+
         if ( p == 0 ) {
             problem() << "couldn't open file " << pathString << " terminating" << endl;
             dbexit( EXIT_FS );
         }
-        ht = new HashTable<Namespace,NamespaceDetails>(p, LEN, "namespace index");
+        ht = new HashTable<Namespace,NamespaceDetails>(p, len, "namespace index");
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {

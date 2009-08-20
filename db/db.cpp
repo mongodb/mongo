@@ -61,6 +61,7 @@ namespace mongo {
     extern int opLogging;
     extern long long oplogSize;
     extern OpLog _oplog;
+	extern int lenForNewNsFiles;
 
     extern int ctr;
     extern int callDepth;
@@ -483,6 +484,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("nohttpinterface", "disable http interface")
         ("noscripting", "disable scripting engine")
         ("noprealloc", "disable data file preallocation")
+        ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
         ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
 #if defined(_WIN32)
@@ -693,6 +695,12 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("autoresync")) {
             autoresync = true;
         }
+		if( params.count("nssize") ) { 
+            int x = params["nssize"].as<int>();
+            uassert("bad --nssize arg", x > 0 && x <= (0x7fffffff/1024/1024));
+			lenForNewNsFiles = x * 1024 * 1024;
+            assert(lenForNewNsFiles > 0);
+		}
         if (params.count("oplogSize")) {
             long x = params["oplogSize"].as<long>();
             uassert("bad --oplogSize arg", x > 0);
