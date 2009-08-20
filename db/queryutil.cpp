@@ -65,6 +65,9 @@ namespace mongo {
             }
             break;
 	    }
+        case BSONObj::opMOD: {
+            break;
+        }
 	    case BSONObj::opIN: {
             massert( "$in requires array", e.type() == Array );
             BSONElement max = minKey.firstElement();

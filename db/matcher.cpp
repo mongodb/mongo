@@ -246,6 +246,11 @@ namespace mongo {
                             basics.push_back( BasicMatcher( e , BSONObj::opIN , fe.embeddedObject() ) );
                             ok = true;
                         }
+                        else if ( fn[1] == 'm' && fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 && fe.type() == Array ) {
+                            // $mod
+                            basics.push_back( BasicMatcher( e , BSONObj::opMOD ) );
+                            ok = true;
+                        }
                         else if ( fn[1] == 'n' && fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0 && fe.type() == Array ) {
                             // $nin
                             basics.push_back( BasicMatcher( e , BSONObj::NIN , fe.embeddedObject() ) );
@@ -315,7 +320,14 @@ namespace mongo {
             }
             return count == r.number();
         }
-                
+        
+        if ( op == BSONObj::opMOD ){
+            if ( ! l.isNumber() )
+                return false;
+            
+            return l.numberLong() % bm.mod == bm.modm;
+        }
+
         /* check LT, GTE, ... */
         if ( !( l.isNumber() && r.isNumber() ) && ( l.type() != r.type() ) )
             return false;
