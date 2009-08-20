@@ -33,7 +33,7 @@ namespace mongo {
 
 	/* in the mongo source code, "client" means "database". */
 
-    const int MaxClientLen = 256; // max str len for the db name
+    const int MaxClientLen = 256; // max str len for the db name, including null char
 
 	// "database.a.b.c" -> "database"
     inline void nsToClient(const char *ns, char *database) {
@@ -554,10 +554,10 @@ namespace mongo {
             }
             return false;
         }
-        
+
         bool allocated() const {
             return ht != 0;
-        }   
+        }
 
     private:
         boost::filesystem::path path() const;
