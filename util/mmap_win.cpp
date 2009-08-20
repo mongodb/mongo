@@ -77,8 +77,6 @@ namespace mongo {
             out() << "CreateFile failed " << filename << endl;
             return 0;
         }
-        if ( mapped > 500000000 )
-            out() << "WARNING: too much mem mapped for win32" << endl;
 
         mapped += length;
 
