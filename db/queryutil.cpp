@@ -23,7 +23,7 @@
 #include "queryoptimizer.h"
 
 namespace mongo {
-
+    
     FieldRange::FieldRange( const BSONElement &e, bool optimize ) {
         lower() = minKey.firstElement();
         lowerInclusive() = true;
@@ -41,49 +41,49 @@ namespace mongo {
             return;
         }
         switch( e.getGtLtOp() ) {
-            case BSONObj::Equality:
-                lower() = e;
-                upper() = e;
-                break;
-            case BSONObj::LT:
-                upperInclusive() = false;
-            case BSONObj::LTE:
-                upper() = e;
-                break;
-            case BSONObj::GT:
-                lowerInclusive() = false;
-            case BSONObj::GTE:
-                lower() = e;
-                break;
+        case BSONObj::Equality:
+            lower() = e;
+            upper() = e;
+            break;
+        case BSONObj::LT:
+            upperInclusive() = false;
+        case BSONObj::LTE:
+            upper() = e;
+            break;
+        case BSONObj::GT:
+            lowerInclusive() = false;
+        case BSONObj::GTE:
+            lower() = e;
+            break;
 	    case BSONObj::opALL: {
 	        massert( "$all requires array", e.type() == Array );
-		BSONObjIterator i( e.embeddedObject() );
-		if ( i.moreWithEOO() ) {
- 		    BSONElement f = i.next();
-		    if ( !f.eoo() )
-                        lower() = upper() = f;
-		}
-		break;
+            BSONObjIterator i( e.embeddedObject() );
+            if ( i.moreWithEOO() ) {
+                BSONElement f = i.next();
+                if ( !f.eoo() )
+                    lower() = upper() = f;
+            }
+            break;
 	    }
 	    case BSONObj::opIN: {
-                massert( "$in requires array", e.type() == Array );
-                BSONElement max = minKey.firstElement();
-                BSONElement min = maxKey.firstElement();
-                BSONObjIterator i( e.embeddedObject() );
-                while( i.moreWithEOO() ) {
-                    BSONElement f = i.next();
-                    if ( f.eoo() )
-                        break;
-                    if ( max.woCompare( f, false ) < 0 )
-                        max = f;
-                    if ( min.woCompare( f, false ) > 0 )
-                        min = f;
-                }
-                lower() = min;
-                upper() = max;
+            massert( "$in requires array", e.type() == Array );
+            BSONElement max = minKey.firstElement();
+            BSONElement min = maxKey.firstElement();
+            BSONObjIterator i( e.embeddedObject() );
+            while( i.moreWithEOO() ) {
+                BSONElement f = i.next();
+                if ( f.eoo() )
+                    break;
+                if ( max.woCompare( f, false ) < 0 )
+                    max = f;
+                if ( min.woCompare( f, false ) > 0 )
+                    min = f;
             }
-            default:
-                break;
+            lower() = min;
+            upper() = max;
+        }
+        default:
+            break;
         }
         
         if ( optimize ){
