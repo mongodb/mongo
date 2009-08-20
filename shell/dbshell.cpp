@@ -301,7 +301,7 @@ int _main(int argc, char* argv[]) {
             if ( line )
                 while ( line[0] == ' ' )
                     line++;
-
+            
             if ( ! line || ( strlen(line) == 4 && strstr( line , "exit" ) ) ){
                 cout << "bye" << endl;
                 break;
@@ -311,6 +311,8 @@ int _main(int argc, char* argv[]) {
             if ( code == "exit" ){
                 break;
             }
+            if ( code.size() == 0 )
+                continue;
 
             bool wascmd = false;
             {
