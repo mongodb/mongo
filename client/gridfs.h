@@ -129,6 +129,8 @@ namespace mongo {
             return _obj["md5"].str();
         }
 
+        BSONObj getMetadata();
+
         int getNumChunks(){
             return (int) ceil( (double)getContentLength() / (double)getChunkSize() );
         }

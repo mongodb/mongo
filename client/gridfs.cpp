@@ -124,6 +124,15 @@ namespace mongo {
         return _client.query( _filesNS.c_str() , o );
     }
 
+    BSONObj GridFile::getMetadata(){
+        BSONElement meta_element = _obj["metadata"];
+        if( meta_element.eoo() ){
+            return BSONObj();
+        }
+
+        return meta_element.embeddedObject();
+    }
+
     Chunk GridFile::getChunk( int n ){
         _exists();
         BSONObjBuilder b;
