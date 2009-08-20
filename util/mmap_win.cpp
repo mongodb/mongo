@@ -92,7 +92,7 @@ namespace mongo {
             out() << GetLastError();
             out() << endl;
         }
-
+	len = length;
         return view;
     }
 
