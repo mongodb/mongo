@@ -28,3 +28,10 @@ assert.eq( 3 , t.find( { name : /^aa*/ } ).explain().nscanned , "B i 1 e" );
 assert.eq( 2 , t.find( { name : /^a[ab]/ } ).count() , "B i 2" );
 assert.eq( 2 , t.find( { name : /^a[bc]/ } ).count() , "B i 3" );
 
+t.drop();
+
+t.save( { name: "" } );
+assert.eq( 1, t.count( { name: /^a?/ } ) );
+// fix
+// t.ensureIndex( { name: 1 } );
+// assert.eq( 1, t.count( { name: /^a?/ } ) );
