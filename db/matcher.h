@@ -63,7 +63,6 @@ namespace mongo {
                 modm = o["1"].numberInt();
                 
                 uassert( "mod can't be 0" , mod );
-                uassert( "mod eq can't be 0" , modm );
             }
         }
 
