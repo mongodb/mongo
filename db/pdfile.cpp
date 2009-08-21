@@ -1282,9 +1282,18 @@ assert( !eloc.isNull() );
         if ( loc.isNull() ) {
             // out of space
             if ( d->capped == 0 ) { // size capped doesn't grow
-                log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
+                log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
                 database->newestFile()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize));
                 loc = d->alloc(ns, lenWHdr, extentLoc);
+                if ( loc.isNull() ){
+                    log() << " alloc failed after allocating new extent.  lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "  trying again" << endl;
+                    for ( int zzz=0; zzz<10 && lenWHdr > d->lastExtentSize; zzz++ ){
+                        database->newestFile()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize));
+                        loc = d->alloc(ns, lenWHdr, extentLoc);
+                        if ( ! loc.isNull() )
+                            break;
+                    }
+                }
             }
             if ( loc.isNull() ) {
                 log() << "out of space in datafile " << ns << " capped:" << d->capped << endl;
