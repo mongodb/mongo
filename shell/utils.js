@@ -198,23 +198,33 @@ ObjectId.prototype.tojson = function(){
 
 ObjectId.prototype.isObjectId = true;
 
-DBRef.prototype.fetch = function(){
-    assert( this.ns , "need a ns" );
-    assert( this.id , "need an id" );
+if ( typeof( DBRef ) != "undefined" ){
+    DBRef.prototype.fetch = function(){
+        assert( this.ns , "need a ns" );
+        assert( this.id , "need an id" );
+        
+        return db[ this.ns ].findOne( { _id : this.id } );
+    }
     
-    return db[ this.ns ].findOne( { _id : this.id } );
+    DBRef.prototype.tojson = function(){
+        return "{ 'ns' : \"" + this.ns + "\" , 'id' : \"" + this.id + "\" } ";
+    }
+    
+    DBRef.prototype.toString = function(){
+        return "DBRef " + this.ns + ":" + this.id;
+    }
+}
+else {
+    print( "warning: no DBRef" );
 }
 
-DBRef.prototype.tojson = function(){
-    return "{ 'ns' : \"" + this.ns + "\" , 'id' : \"" + this.id + "\" } ";
+if ( typeof( BinData ) != "undefined" ){
+    BinData.prototype.tojson = function(){
+        return "BinData type: " + this.type + " len: " + this.len;
+    }
 }
-
-DBRef.prototype.toString = function(){
-    return "DBRef " + this.ns + ":" + this.id;
-}
-
-BinData.prototype.tojson = function(){
-    return "BinData type: " + this.type + " len: " + this.len;
+else {
+    print( "warning: no BinData" );
 }
 
 tojson = function( x ){
