@@ -31,7 +31,6 @@ assert.eq( 2 , t.find( { name : /^a[bc]/ } ).count() , "B i 3" );
 t.drop();
 
 t.save( { name: "" } );
-assert.eq( 1, t.count( { name: /^a?/ } ) );
-// fix
-// t.ensureIndex( { name: 1 } );
-// assert.eq( 1, t.count( { name: /^a?/ } ) );
+assert.eq( 1, t.count( { name: /^a?/ } ) , "C 1" );
+t.ensureIndex( { name: 1 } );
+assert.eq( 1, t.count( { name: /^a?/ } ) , "C 2");

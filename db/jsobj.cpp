@@ -559,7 +559,7 @@ namespace mongo {
         stringstream ss;
         for( ; *i; ++i ){
             char c = *i;
-            if ( c == '*' ){
+            if ( c == '*' || c == '?' ){
                 r = ss.str();
                 r = r.substr( 0 , r.size() - 1 );
                 break;
@@ -1192,6 +1192,12 @@ namespace mongo {
 			{
 				BSONObjBuilder b;
 				b.appendRegex("r", "^f?oo");
+				BSONObj o = b.done();
+				assert( o.firstElement().simpleRegex() == "" );
+			}
+			{
+				BSONObjBuilder b;
+				b.appendRegex("r", "^fz?oo");
 				BSONObj o = b.done();
 				assert( o.firstElement().simpleRegex() == "f" );
 			}
