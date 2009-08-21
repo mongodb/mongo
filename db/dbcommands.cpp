@@ -974,6 +974,11 @@ namespace mongo {
             result.append( "storageSize" , nsd->storageSize() );
             result.append( "nindexes" , nsd->nIndexes );
 
+            if ( nsd->capped ){
+                result.append( "capped" , nsd->capped );
+                result.append( "max" , nsd->max );
+            }
+
             return true;
         }
     } cmdCollectionStatis;
