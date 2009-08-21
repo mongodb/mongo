@@ -1282,7 +1282,7 @@ assert( !eloc.isNull() );
         if ( loc.isNull() ) {
             // out of space
             if ( d->capped == 0 ) { // size capped doesn't grow
-                DEV log() << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
+                log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << endl;
                 database->newestFile()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize));
                 loc = d->alloc(ns, lenWHdr, extentLoc);
             }
