@@ -124,9 +124,15 @@ namespace mongo {
         PooledScope( const string pool , Scope * real ) : _pool( pool ) , _real( real ){};
         virtual ~PooledScope(){
             ScopeCache * sc = scopeCache.get();
-            assert( sc );
-            sc->done( _pool , _real );
-            _real = 0;
+            if ( sc ){
+                sc->done( _pool , _real );
+                _real = 0;
+            }
+            else {
+                log() << "warning: scopeCache is empty!" << endl;
+                delete _real;
+                _real = 0;
+            }
         }
         
         void reset(){
