@@ -49,6 +49,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.dataSize()");
     print("\tdb.foo.storageSize() - includes free space allocated to this collection");
     print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes");
+    print("\tdb.foo.totalSize() - storage allocated for all data and indexe data");
 }
 
 DBCollection.prototype.getFullName = function(){
@@ -374,6 +375,23 @@ DBCollection.prototype.totalIndexSize = function(){
     );
     return total;
 }
+
+
+DBCollection.prototype.totalSize = function(){
+    var total = this.storageSize();
+    var mydb = this._db;
+    var shortName = this._shortName;
+    this.getIndexes().forEach(
+        function( spec ){
+            var coll = mydb.getCollection( shortName + ".$" + spec.name );
+            var mysize = coll.storageSize();
+            //print( coll + "\t" + mysize + "\t" + tojson( coll.validate() ) );
+            total += coll.dataSize();
+        }
+    );
+    return total;
+}
+
 
 DBCollection.prototype.convertToCapped = function( bytes ){
     if ( ! bytes )
