@@ -82,11 +82,13 @@ namespace mongo {
                 BSONObjBuilder b;
                 b << "name" << p.string();
                 b.appendBool( "isDirectory", is_directory( p ) );
+                if ( ! is_directory( p ) )
+                    b.append( "size" , (double)file_size( p ) );
+
                 stringstream ss;
                 ss << num;
                 string name = ss.str();
                 lst.append( name.c_str(), b.done() );
-                
                 num++;
                 i++;
             }
@@ -260,10 +262,11 @@ namespace mongo {
                 assert( pid_ != -1 );
                 
                 if ( pid_ == 0 ) {
+                    
                     assert( dup2( pipeEnds[ 1 ], STDOUT_FILENO ) != -1 );
                     assert( dup2( pipeEnds[ 1 ], STDERR_FILENO ) != -1 );
                     execvp( argv_[ 0 ], argv_ );
-                    assert( "Unable to start program" == 0 );
+                    massert( "Unable to start program" , 0 );
                 }
                 
                 cout << "shell: started mongo program";
@@ -324,6 +327,16 @@ namespace mongo {
             MongoProgramRunner r( a );
             r.start();
             boost::thread t( r );
+            return BSON( string( "" ) << int( r.pid() ) );
+        }
+
+        BSONObj RunMongoProgram( const BSONObj &a ) {
+            MongoProgramRunner r( a );
+            r.start();
+            boost::thread t( r );
+            int temp;
+            waitpid( r.pid() , &temp , 0 );
+            shells.erase( r.pid() );
             return BSON( string( "" ) << int( r.pid() ) );
         }
 
@@ -451,6 +464,7 @@ namespace mongo {
 #if !defined(_WIN32)
             scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
+            scope.injectNative( "runMongoProgram", RunMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
             scope.injectNative( "stopMongoProgram", StopMongoProgram );        
             scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );        
