@@ -998,7 +998,7 @@ def startMongodForTests( env, target, source ):
     mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName ] )
     # Wait for mongod to start
     import time
-    time.sleep( 2 )
+    time.sleep( 5 )
     if mongodForTests.poll() is not None:
         print( "Failed to start mongod" )
         mongodForTests = None
