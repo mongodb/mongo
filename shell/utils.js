@@ -45,8 +45,16 @@ assert.soon = function( f, msg, timeout, interval ) {
     interval = interval || 200;
     var last;
     while( 1 ) {
-        if ( f() )
-            return;
+        
+        if ( typeof( f ) == "string" ){
+            if ( eval( f ) )
+                return;
+        }
+        else {
+            if ( f() )
+                return;
+        }
+        
         if ( ( new Date() ).getTime() - start.getTime() > timeout )
             doassert( "assert.soon failed: " + f + ", msg:" + msg );
         sleep( interval );
