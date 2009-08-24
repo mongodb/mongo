@@ -1217,8 +1217,7 @@ namespace mongo {
                 keyf = p["$keyf"].ascode();
             }
             else { 
-                errmsg = "parameter 'key' is missing or not an object";
-                return false;
+                // no key specified, will use entire object as key
             }
 
             return group( realdbname , cursor , key , keyf , p["$reduce"].ascode() , p["initial"].embeddedObjectUserCheck() , errmsg , result );

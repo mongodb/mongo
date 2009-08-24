@@ -367,7 +367,7 @@ DB.prototype.dbEval = DB.prototype.eval;
      keyf is a function which takes an object and returns the desired key.  set either key or keyf (not both).
  * </p>
 */
-DB.prototype.group = function(parmsObj) {
+DB.prototype.groupeval = function(parmsObj) {
 	
     var groupFunction = function() {
 	var parms = args[0];
@@ -411,6 +411,8 @@ DB.prototype.groupcmd = function( parmsObj ){
     }
     return ret.retval;
 }
+
+DB.prototype.group = DB.prototype.groupcmd;
 
 DB.prototype._groupFixParms = function( parmsObj ){
     var parms = Object.extend({}, parmsObj);
