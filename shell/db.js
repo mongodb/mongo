@@ -261,7 +261,6 @@ DB.prototype.help = function() {
     print("\tdb.getPrevError()");
     print("\tdb.resetError()");
     print("\tdb.getCollectionNames()");
-    print("\tdb.group(ns, key[, keyf], cond, reduce, initial)");
     print("\tdb.currentOp() displays the current operation in the db" );
     print("\tdb.killOp() kills the current operation in the db" );
     print("\tdb.version() current version of the server" );
