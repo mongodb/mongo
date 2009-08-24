@@ -1111,7 +1111,7 @@ namespace mongo {
         GroupCommand() : Command("group"){}
         virtual bool slaveOk() { return true; }
         virtual void help( stringstream &help ) const {
-            help << "example: TODO";
+            help << "see http://www.mongodb.org/display/DOCS/Aggregation";
         }
 
         BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , const string keyFunction , double avgSize ){
@@ -1184,6 +1184,7 @@ namespace mongo {
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             static DBDirectClient db;
 
+            /* db.$cmd.findOne( { group : <p> } ) */
             const BSONObj& p = jsobj.firstElement().embeddedObjectUserCheck();
             
             BSONObj q;
@@ -1215,7 +1216,10 @@ namespace mongo {
             else if ( p["$keyf"].type() ){
                 keyf = p["$keyf"].ascode();
             }
-
+            else { 
+                errmsg = "parameter 'key' is missing or not an object";
+                return false;
+            }
 
             return group( realdbname , cursor , key , keyf , p["$reduce"].ascode() , p["initial"].embeddedObjectUserCheck() , errmsg , result );
         }

@@ -36,6 +36,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.find(...).skip(n)");
     print("\tdb.foo.find(...).count()");
     print("\tdb.foo.count()");
+    print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
     print("\tdb.foo.save(obj)");
     print("\tdb.foo.update(query, object[, upsert_bool])");
     print("\tdb.foo.ensureIndex(keypattern)");
