@@ -993,6 +993,7 @@ namespace mongo {
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
+            result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
             return true;
         }
     } cmdBuildInfo;
