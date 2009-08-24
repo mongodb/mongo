@@ -1169,7 +1169,9 @@ namespace mongo {
                 
                 s->setObject( "obj" , obj , true );
                 s->setNumber( "n" , n - 1 );
-                uassert( "reduce invoke failed" , s->invoke( f , BSONObj() , 0 , true ) == 0 );
+                if ( s->invoke( f , BSONObj() , 0 , true ) ){
+                    throw UserException( (string)"reduce invoke failed: " + s->getError() );
+                }
             }
             
             result.appendArray( "retval" , s->getObject( "$arr" ) );
