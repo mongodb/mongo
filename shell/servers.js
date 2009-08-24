@@ -187,6 +187,14 @@ ShardingTest.prototype.adminCommand = function(cmd){
     throw "command " + tojson( cmd ) + " failed: " + tojson( res );
 }
 
+ShardingTest.prototype.getShardString = function(){
+    return Array.tojson( this.config.shard.find().toArray() , "\n" );
+}
+
+ShardingTest.prototype.printShards = function(){
+    print( this.getShardString() );
+}
+
 MongodRunner = function( port, dbpath, peer, arbiter, extraArgs ) {
     this.port_ = port;
     this.dbpath_ = dbpath;

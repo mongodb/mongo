@@ -31,7 +31,7 @@ s.adminCommand( "connpoolsync" );
 print( "done inserting data" );
 
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
-print( s.config.shard.find().toArray().tojson( "\n" ) );
+s.printShards();
 
 counta = s._connections[0].getDB( "test" ).foo.count(); 
 countb = s._connections[1].getDB( "test" ).foo.count(); 
@@ -39,6 +39,6 @@ countb = s._connections[1].getDB( "test" ).foo.count();
 assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
 assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
 
-assert( s.config.shard.find().toArray().map( function(z){ return z.server; } ).unique().length == 2 , "should be using both servers" );
+assert( Array.unique( s.config.shard.find().toArray().map( function(z){ return z.server; } ) ).length == 2 , "should be using both servers" );
 
 s.stop();

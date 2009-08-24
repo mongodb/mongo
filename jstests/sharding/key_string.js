@@ -26,7 +26,7 @@ s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 
 s.adminCommand( { moveshard : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
 
-print( s.config.shard.find().toArray().tojson( "\n" ) );
+s.printShards();
 
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 3 , seconday.foo.find().toArray().length , "secondary count" );
