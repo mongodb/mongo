@@ -5,35 +5,45 @@ dbPath = "/data/db/" + baseName + "/";
 externalPath = "/data/db/" + baseName + "_external/"
 externalFile = externalPath + "export.json"
 
+function fileSize(){
+    var l = listFiles( externalPath );
+    for ( var i=0; i<l.length; i++ ){
+        if ( l[i].name == externalFile )
+            return l[i].size;
+    }
+    return -1;
+}
+
+
 port = allocatePorts( 1 )[ 0 ];
 resetDbpath( externalPath );
 
 m = startMongod( "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 c = m.getDB( baseName ).getCollection( baseName );
 c.save( { a: 1 } );
+assert( c.findOne() );
 
-startMongoProgramNoConnect( "mongodump", "--host", "127.0.0.1:" + port, "--out", externalPath );
-sleep( 3000 );
+runMongoProgram( "mongodump", "--host", "127.0.0.1:" + port, "--out", externalPath );
 c.drop();
-startMongoProgramNoConnect( "mongorestore", "--host", "127.0.0.1:" + port, "--dir", externalPath );
-assert.soon( function() { return c.findOne() && 1 == c.findOne().a; } );
+runMongoProgram( "mongorestore", "--host", "127.0.0.1:" + port, "--dir", externalPath );
+assert( c.findOne() && 1 == c.findOne().a , "mongodump then restore has no data" );
 
 resetDbpath( externalPath );
 
-startMongoProgramNoConnect( "mongoexport", "--host", "127.0.0.1:" + port, "-d", baseName, "-c", baseName, "--out", externalFile );
-sleep( 3000 );
+assert.eq( -1 , fileSize() , "mongoexport prep invalid" );
+runMongoProgram( "mongoexport", "--host", "127.0.0.1:" + port, "-d", baseName, "-c", baseName, "--out", externalFile );
+assert.lt( 10 , fileSize() , "file size changed" );
+
 c.drop();
-startMongoProgramNoConnect( "mongoimportjson", "--host", "127.0.0.1:" + port, "-d", baseName, "-c", baseName, "--file", externalFile );
-assert.soon( function() { return c.findOne() && 1 == c.findOne().a; } );
+runMongoProgram( "mongoimportjson", "--host", "127.0.0.1:" + port, "-d", baseName, "-c", baseName, "--file", externalFile );
+assert( c.findOne() && 1 == c.findOne().a );
 
 stopMongod( port );
 resetDbpath( externalPath );
 
-startMongoProgramNoConnect( "mongodump", "--dbpath", dbPath, "--out", externalPath );
-sleep( 3000 );
+runMongoProgram( "mongodump", "--dbpath", dbPath, "--out", externalPath );
 resetDbpath( dbPath );
-startMongoProgramNoConnect( "mongorestore", "--dbpath", dbPath, "--dir", externalPath );
-sleep( 5000 );
+runMongoProgram( "mongorestore", "--dbpath", dbPath, "--dir", externalPath );
 m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 c = m.getDB( baseName ).getCollection( baseName );
 assert( c.findOne(), "object missing a" );
@@ -42,11 +52,9 @@ assert( 1 == c.findOne().a, "object wrong" );
 stopMongod( port );
 resetDbpath( externalPath );
 
-startMongoProgramNoConnect( "mongoexport", "--dbpath", dbPath, "-d", baseName, "-c", baseName, "--out", externalFile );
-sleep( 3000 );
+runMongoProgram( "mongoexport", "--dbpath", dbPath, "-d", baseName, "-c", baseName, "--out", externalFile );
 resetDbpath( dbPath );
-startMongoProgramNoConnect( "mongoimportjson", "--dbpath", dbPath, "-d", baseName, "-c", baseName, "--file", externalFile );
-sleep( 5000 );
+runMongoProgram( "mongoimportjson", "--dbpath", dbPath, "-d", baseName, "-c", baseName, "--file", externalFile );
 m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 c = m.getDB( baseName ).getCollection( baseName );
 assert( c.findOne(), "object missing b" );
