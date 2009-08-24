@@ -152,33 +152,35 @@ Date.prototype.tojson = function(){
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
 
-Array.prototype.contains = function( x ){
-    for ( var i=0; i<this.length; i++ ){
-        if ( this[i] == x )
+Array.contains = function( a  , x ){
+    for ( var i=0; i<a.length; i++ ){
+        if ( a[i] == x )
             return true;
     }
     return false;
 }
 
-Array.prototype.unique = function( ){
+Array.unique = function( a ){
     var u = [];
-    for ( var i=0; i<this.length; i++){
-        var o = this[i];
-        if ( ! u.contains( o ) )
+    for ( var i=0; i<a.length; i++){
+        var o = a[i];
+        if ( ! Array.contains( u , o ) ){
             u.push( o );
+        }
     }
     return u;
 }
 
-Array.prototype.tojson = function( sepLines ){
+
+Array.tojson = function( a , sepLines ){
     var s = "[";
     if ( sepLines ) s += "\n";
-    for ( var i=0; i<this.length; i++){
+    for ( var i=0; i<a.length; i++){
         if ( i > 0 ){
             s += ",";
             if ( sepLines ) s += "\n";
         }
-        s += tojson( this[i] );
+        s += tojson( a[i] );
     }
     s += "]";
     if ( sepLines ) s += "\n";
@@ -270,6 +272,9 @@ tojsonObject = function( x ){
     
     if ( typeof( x.tojson ) == "function" && x.tojson != tojson )
         return x.tojson();
+    
+    if ( typeof( x.constructor.tojson ) == "function" && x.constructor.tojson != tojson )
+        return x.constructor.tojson( x );
 
     if ( x.toString() == "[object MaxKey]" )
         return "{ $maxKey : 1 }";
