@@ -379,6 +379,15 @@ namespace mongo {
         }
     } cmdProfile;
 
+    /*
+       > db.$cmd.findOne({timeinfo:1})
+       {
+        "totalTime" : 1.33875E8 ,
+        "lockTime" : 765625.0 ,
+        "ratio" : 0.005718954248366013 ,
+        "ok" : 1.0
+       }
+    */
     class CmdTimeInfo : public Command {
     public:
         virtual bool slaveOk() {

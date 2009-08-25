@@ -224,7 +224,6 @@ public:
 };
 
 inline void dbunlocking() { 
-//    dassert( dbMutexInfo.isLocked() );
     theRecCache.ejectOld();
 }
 

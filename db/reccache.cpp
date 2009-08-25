@@ -221,7 +221,7 @@ inline void RecCache::writeIfDirty(Node *n) {
 }
 
 void RecCache::closeFiles(string dbname, string path) { 
-    dassert( dbMutexInfo.isLocked() );
+    requireInWriteLock();
     boostlock lk(rcmutex);
 
     // first we write all dirty pages.  it is not easy to check which Nodes are for a particular
