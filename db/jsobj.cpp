@@ -1273,8 +1273,6 @@ namespace mongo {
                 assert( u.woCompare( ll , k ) == u.woCompare( d , k ) );
                 assert( u.woCompare( ll , k ) == u.woCompare( d , k ) );
 
-                cout << "A: " << i.firstElement().woCompare( n.firstElement() ) << endl;
-                cout << "B: " << d.firstElement().woCompare( n.firstElement() ) << endl;
                 assert( i.woCompare( n ) == d.woCompare( n ) );
                 
                 assert( ll.woCompare( n ) == d.woCompare( n ) );
