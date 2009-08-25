@@ -100,6 +100,7 @@ using namespace std;
 #include <boost/version.hpp>
 
 #if BOOST_VERSION >= 103800
+#define BOOST_SPIRIT_USE_OLD_NAMESPACE
 #include <boost/spirit/include/classic_core.hpp>
 #include <boost/spirit/include/classic_loops.hpp>
 #else
