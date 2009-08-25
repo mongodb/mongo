@@ -20,7 +20,6 @@
 
 namespace mongo {
 
-    extern bool quiet;
     extern const char *curNs;
 
     // Utility interface for stringifying object only when val() called.
@@ -196,12 +195,6 @@ namespace mongo {
         if ( level > logLevel )
             return nullstream;
         return logstream.prolog();
-    }
-
-    inline Nullstream& lognoquiet(){
-        if ( quiet )
-            return nullstream;
-        return log();
     }
 
     inline ostream& stdcout() {

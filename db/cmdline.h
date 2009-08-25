@@ -18,15 +18,21 @@
 
 namespace mongo {
 
+    /* command line options        
+    */
+    /* concurrency: OK/READ */
     struct CmdLine { 
-        int port;
+        int port;              // --port
+        string source;         // --source
+        string only;           // --only
+        bool quiet;            // --quiet
 
         enum { 
             DefaultDBPort = 27017
         };
 
         CmdLine() : 
-            port(27017)
+            port(27017), quiet(false)
         { } 
 
     };
