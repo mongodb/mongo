@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    extern bool quiet, quota, cpu;
+    extern bool quota, cpu;
     bool useJNI = true;
 
     /* only off if --nocursors which is for debugging. */
@@ -56,8 +56,6 @@ namespace mongo {
     extern char *appsrvPath;
     extern int curOp;
     extern bool autoresync;
-    extern string dashDashSource;
-    extern string dashDashOnly;
     extern int opLogging;
     extern long long oplogSize;
     extern OpLog _oplog;
@@ -201,7 +199,8 @@ namespace mongo {
                 m.reset();
 
                 if ( !dbMsgPort.recv(m) ) {
-                    lognoquiet() << "end connection " << dbMsgPort.farEnd.toString() << endl;
+                    if( !cmdLine.quiet )
+                    log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
                     dbMsgPort.shutdown();
                     break;
                 }
@@ -596,7 +595,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
         dbpath = params["dbpath"].as<string>();
         if (params.count("quiet")) {
-            quiet = true;
+            cmdLine.quiet = true;
         }
         if (params.count("verbose")) {
             logLevel = 1;
@@ -676,10 +675,10 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
-            dashDashSource = params["source"].as<string>().c_str();
+            cmdLine.source = params["source"].as<string>().c_str();
         }
         if (params.count("only")) {
-            dashDashOnly = params["only"].as<string>().c_str();
+            cmdLine.only = params["only"].as<string>().c_str();
         }
         if (params.count("pairwith")) {
             string paired = params["pairwith"].as<string>();

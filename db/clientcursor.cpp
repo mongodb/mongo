@@ -87,7 +87,7 @@ namespace mongo {
 
     /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
     void idleTimeReport(unsigned millis) {
-        assert( dbMutexInfo.isLocked() );
+        requireInWriteLock();
         for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
             ByLoc::iterator j = i;
             i++;
@@ -117,7 +117,7 @@ namespace mongo {
         if ( j == stop )
             return;
 
-        assert( dbMutexInfo.isLocked() );
+        requireInWriteLock();
         vector<ClientCursor*> toAdvance;
 
         while ( 1 ) {

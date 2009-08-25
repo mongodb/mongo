@@ -49,9 +49,9 @@ namespace mongo {
     extern int curOp;
     bool autoresync = false;
     
+    /* we use new here so we don't have to worry about destructor orders at program shutdown */
     boost::recursive_mutex &dbMutex( *(new boost::recursive_mutex) );
     MutexInfo dbMutexInfo;
-//int dbLocked = 0;
 
     string dbExecCommand;
 

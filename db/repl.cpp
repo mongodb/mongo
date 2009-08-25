@@ -44,10 +44,10 @@
 #include "db.h"
 #include "commands.h"
 #include "security.h"
+#include "cmdline.h"
 
 namespace mongo {
 
-    extern bool quiet;
     extern boost::recursive_mutex &dbMutex;
     extern long long oplogSize;
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
@@ -101,7 +101,7 @@ namespace mongo {
         if ( n == State_Master && !getInitialSyncCompleted() )
             return;
         info = _comment;
-        if ( n != state && !quiet )
+        if ( n != state && !cmdLine.quiet )
             log() << "pair: setting master=" << n << " was " << state << '\n';
         state = n;
     }
@@ -561,9 +561,6 @@ namespace mongo {
         }
     }
 
-    string dashDashSource;
-    string dashDashOnly;
-
     static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, const BSONObj &spec, ReplSource::SourceVector &old) {
         if ( !s.syncedTo.isNull() ) { // Don't reuse old ReplSource if there was a forced resync.
             for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
@@ -588,7 +585,7 @@ namespace mongo {
 
         bool gotPairWith = false;
 
-        if ( !dashDashSource.empty() ) {
+        if ( !cmdLine.source.empty() ) {
             setClient("local.sources");
             // --source <host> specified.
             // check that no items are in sources other than that
@@ -598,14 +595,14 @@ namespace mongo {
             while ( c->ok() ) {
                 n++;
                 ReplSource tmp(c->current());
-                if ( tmp.hostName != dashDashSource ) {
-                    log() << "E10000 --source " << dashDashSource << " != " << tmp.hostName << " from local.sources collection" << endl;
+                if ( tmp.hostName != cmdLine.source ) {
+                    log() << "E10000 --source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
-                if ( tmp.only != dashDashOnly ) {
-                    log() << "E10001 --only " << dashDashOnly << " != " << tmp.only << " from local.sources collection" << endl;
+                if ( tmp.only != cmdLine.only ) {
+                    log() << "E10001 --only " << cmdLine.only << " != " << tmp.only << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
@@ -616,14 +613,14 @@ namespace mongo {
             if ( n == 0 ) {
                 // source missing.  add.
                 ReplSource s;
-                s.hostName = dashDashSource;
-                s.only = dashDashOnly;
+                s.hostName = cmdLine.source;
+                s.only = cmdLine.only;
                 s.save();
             }
         }
         else {
             try {
-                massert("--only requires use of --source", dashDashOnly.empty());
+                massert("--only requires use of --source", cmdLine.only.empty());
             } catch ( ... ) {
                 dbexit( EXIT_BADOPTIONS );
             }
@@ -1320,7 +1317,7 @@ namespace mongo {
     */
     bool ReplSource::sync() {
         ReplInfo r("sync");
-        if ( !quiet )
+        if ( !cmdLine.quiet )
             log() << "pull: " << sourceName() << '@' << hostName << endl;
         nClonedThisPass = 0;
 

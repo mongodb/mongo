@@ -39,7 +39,6 @@
 
 namespace mongo {
 
-    extern bool quiet;
     extern int queryTraceLevel;
     extern int otherTraceLevel;
     extern int opLogging;
@@ -380,6 +379,15 @@ namespace mongo {
         }
     } cmdProfile;
 
+    /*
+       > db.$cmd.findOne({timeinfo:1})
+       {
+        "totalTime" : 1.33875E8 ,
+        "lockTime" : 765625.0 ,
+        "ratio" : 0.005718954248366013 ,
+        "ok" : 1.0
+       }
+    */
     class CmdTimeInfo : public Command {
     public:
         virtual bool slaveOk() {
@@ -482,7 +490,7 @@ namespace mongo {
             stringstream ss;
             flushOpLog( ss );
             out() << ss.str() << endl;
-            if ( !quiet )
+            if ( !cmdLine.quiet )
                 log() << "CMD: opLogging set to " << opLogging << endl;
             return true;
         }
@@ -581,7 +589,7 @@ namespace mongo {
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             string nsToDrop = database->name + '.' + cmdObj.findElement(name).valuestr();
             NamespaceDetails *d = nsdetails(nsToDrop.c_str());
-            if ( !quiet )
+            if ( !cmdLine.quiet )
                 log() << "CMD: drop " << nsToDrop << endl;
             if ( d == 0 ) {
                 errmsg = "ns not found";
@@ -694,7 +702,7 @@ namespace mongo {
             BSONElement e = jsobj.findElement(name.c_str());
             string toDeleteNs = database->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
-            if ( !quiet )
+            if ( !cmdLine.quiet )
                 log() << "CMD: deleteIndexes " << toDeleteNs << endl;
             if ( d ) {
                 BSONElement f = jsobj.findElement("index");
@@ -1318,7 +1326,7 @@ namespace mongo {
                 valid = true;
                 string dropNs = us + '.' + e.valuestr();
                 NamespaceDetails *d = nsdetails(dropNs.c_str());
-                if ( !quiet )
+                if ( !cmdLine.quiet )
                     log() << "CMD: clean " << dropNs << endl;
                 if ( d ) {
                     ok = true;
@@ -1333,7 +1341,7 @@ namespace mongo {
                 valid = true;
                 string toValidateNs = us + '.' + e.valuestr();
                 NamespaceDetails *d = nsdetails(toValidateNs.c_str());
-                if ( !quiet )
+                if ( !cmdLine.quiet )
                     log() << "CMD: validate " << toValidateNs << endl;
                 if ( d ) {
                     ok = true;

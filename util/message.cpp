@@ -84,7 +84,7 @@ namespace mongo {
                 continue;
             }
             disableNagle(s);
-            lognoquiet() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
+            log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
             accepted( new MessagingPort(s, from) );
         }
     }
