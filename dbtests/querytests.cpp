@@ -640,6 +640,34 @@ namespace QueryTests {
         }
     };
     
+    class DifferentNumbers : public ClientBase {
+    public:
+        ~DifferentNumbers(){
+            client().dropCollection( "unittests.querytests.DifferentNumbers" );
+        }
+        void t( const char * ns ){
+            auto_ptr< DBClientCursor > cursor = client().query( ns, Query().sort( "7" ) );
+            while ( cursor->more() ){
+                BSONObj o = cursor->next();
+                cout << " foo " << o << endl;
+            }
+
+        }
+        void run() {
+            const char *ns = "unittests.querytests.DifferentNumbers";
+            { BSONObjBuilder b; b.append( "7" , (int)4 ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.append( "7" , (long long)2 ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.appendNull( "7" ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.append( "7" , "b" ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.appendNull( "8" ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.append( "7" , (double)3.7 ); client().insert( ns , b.obj() ); }
+            
+            t(ns);
+            client().ensureIndex( ns , BSON( "7" << 1 ) );
+            t(ns);
+        }
+    };
+
     class All : public Suite {
     public:
         All() {
@@ -674,6 +702,7 @@ namespace QueryTests {
             add< DirectLocking >();
             add< FastCountIn >();
             add< EmbeddedArray >();
+            add< DifferentNumbers >();
         }
     };
     
