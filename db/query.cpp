@@ -236,7 +236,7 @@ namespace mongo {
     
     /* Used for modifiers such as $inc, $set, ... */
     struct Mod {
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL } op;
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP } op;
         const char *fieldName;
 
         // kind of lame; fix one day?
@@ -311,8 +311,8 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-            const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" };
-            for( int i = 0; i < 6; ++i )
+            const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop" };
+            for( int i = 0; i < 7; ++i )
                 if ( strcmp( fn, valid[ i ] ) == 0 )
                     return Mod::Op( i );
             uassert( "Invalid modifier specified " + string( fn ), false );
@@ -436,6 +436,12 @@ namespace mongo {
                             }
                         }
                     }
+                    break;
+                }
+                case Mod::POP: {
+                    uassert( "Cannot apply $pop modifier to non-array", e.type() == Array || e.eoo() );
+                    if ( ! e.embeddedObject().isEmpty() )
+                        inPlacePossible = false;
                     break;
                 }
                 }
@@ -576,6 +582,27 @@ namespace mongo {
                         }
                     }
                     arr.done();
+                }
+                else if ( m->op == Mod::POP ){
+                    BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
+                    BSONObjIterator i( e.embeddedObject() );
+                    if ( m->elt.isNumber() && m->elt.number() < 0 ){
+                        if ( i.more() ) i.next();
+                        int count = 0;
+                        while( i.more() ) {
+                            arr.appendAs( i.next() , arr.numStr( count++ ).c_str() );
+                        }
+                    }
+                    else {
+                        while( i.more() ) {
+                            BSONElement arrI = i.next();
+                            if ( i.more() ){
+                                arr.append( arrI );
+                            }
+                        }
+                    }
+                    arr.done();
+   
                 }
                 ++m;
                 ++p;
