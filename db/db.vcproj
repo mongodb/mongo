@@ -1366,6 +1366,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\cmdline.h"
+				>
+			</File>
+			<File
 				RelativePath=".\commands.h"
 				>
 			</File>

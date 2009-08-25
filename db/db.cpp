@@ -38,6 +38,7 @@
 
 #include "../scripting/engine.h"
 #include "mms.h"
+#include "cmdline.h"
 
 namespace mongo {
 
@@ -51,7 +52,6 @@ namespace mongo {
 
     bool noHttpInterface = false;
 
-    extern int port;
     extern string bind_ip;
     extern char *appsrvPath;
     extern int curOp;
@@ -291,7 +291,7 @@ namespace mongo {
     }
 
     void msg(const char *m, int extras = 0) {
-        msg(m, "127.0.0.1", DBPort, extras);
+        msg(m, "127.0.0.1", CmdLine::DefaultDBPort, extras);
     }
 
     void repairDatabases() {
@@ -360,7 +360,7 @@ namespace mongo {
 
         bool is32bit = sizeof(int*) == 4;
 
-        log() << "Mongo DB : starting : pid = " << pid << " port = " << port << " dbpath = " << dbpath
+        log() << "Mongo DB : starting : pid = " << pid << " port = " << cmdLine.port << " dbpath = " << dbpath
               <<  " master = " << master << " slave = " << (int) slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
 
         show_32_warning();
@@ -417,7 +417,7 @@ namespace mongo {
     #if defined(_WIN32)
     bool initService() {
         ServiceController::reportStatus( SERVICE_RUNNING );
-        initAndListen( port, appsrvPath );
+        initAndListen( cmdLine.port, appsrvPath );
         return true;
     }
     #endif
@@ -467,7 +467,7 @@ int main(int argc, char* argv[], char *envp[] )
     general_options.add_options()
         ("help,h", "show this usage information")
         ("config,f", po::value<string>(), "configuration file specifying additional options")
-        ("port", po::value<int>(&port)->default_value(DBPort), "specify port number")
+        ("port", po::value<int>(&cmdLine.port)->default_value(CmdLine::DefaultDBPort), "specify port number")
         ("bind_ip", po::value<string>(&bind_ip),
          "local ip address to bind listener - all local ips bound by default")
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
@@ -751,7 +751,7 @@ int main(int argc, char* argv[], char *envp[] )
                     return 0;
                 }
 
-                initAndListen(port);
+                initAndListen(cmdLine.port);
                 return 0;
             }
 
@@ -782,7 +782,7 @@ int main(int argc, char* argv[], char *envp[] )
         cout << dbExecCommand << " --help for help and startup options" << endl;
     }
 
-    initAndListen(port, appsrvPath);
+    initAndListen(cmdLine.port, appsrvPath);
     dbexit(EXIT_CLEAN);
     return 0;
 }

@@ -31,7 +31,6 @@
 
 namespace mongo {
 
-    extern int port;
     extern string bind_ip;
     extern const char *replInfo;
 
@@ -267,7 +266,7 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << "mongodb " << getHostName() << ':' << mongo::port << ' ';
+                z << "mongodb " << getHostName() << ':' << mongo::cmdLine.port << ' ';
                 dbname = z.str();
             }
             ss << dbname << "</title></head><body><h2>" << dbname << "</h2><p>\n<pre>";
@@ -465,7 +464,7 @@ namespace mongo {
         AuthenticationInfo *ai = new AuthenticationInfo();
         authInfo.reset(ai);
         DbWebServer mini;
-        int p = port + 1000;
+        int p = cmdLine.port + 1000;
         if ( mini.init(bind_ip, p) ) {
             registerListenerSocket( mini.socket() );
             log() << "web admin interface listening on port " << p << '\n';

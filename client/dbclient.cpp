@@ -25,6 +25,7 @@
 #include "../db/instance.h"
 #include "../util/md5.hpp"
 #include "../db/dbmessage.h"
+#include "../db/cmdline.h"
 
 namespace mongo {
 
@@ -417,7 +418,7 @@ namespace mongo {
             ip = serverAddress.substr( 0 , idx );
             ip = hostbyname(ip.c_str());
         } else {
-            port = DBPort;
+            port = CmdLine::DefaultDBPort;
             ip = hostbyname( serverAddress.c_str() );
         }
         massert( "Unable to parse hostname", !ip.empty() );

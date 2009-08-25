@@ -26,7 +26,6 @@ namespace mongo {
     class MessagingPort;
     class PiggyBackData;
     typedef WrappingInt MSGID;
-    const int DBPort = 27017;
 
     class Listener {
     public:

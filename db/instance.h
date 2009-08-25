@@ -22,6 +22,7 @@
 #include "../client/dbclient.h"
 #include "curop.h"
 #include "security.h"
+#include "cmdline.h"
 
 namespace mongo {
 

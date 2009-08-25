@@ -30,7 +30,6 @@
 namespace mongo {
 
     void ensureHaveIdIndex(const char *ns);
-    extern int port;
 
     bool replAuthenticate(DBClientConnection *);
 
@@ -142,8 +141,8 @@ namespace mongo {
 
         string todb = database->name;
         stringstream a,b;
-        a << "localhost:" << port;
-        b << "127.0.0.1:" << port;
+        a << "localhost:" << cmdLine.port;
+        b << "127.0.0.1:" << cmdLine.port;
         bool masterSameProcess = ( a.str() == masterHost || b.str() == masterHost );
         if ( masterSameProcess ) {
             if ( fromdb == todb && database->path == dbpath ) {
@@ -552,7 +551,7 @@ namespace mongo {
             if ( fromhost.empty() ) {
                 /* copy from self */
                 stringstream ss;
-                ss << "localhost:" << port;
+                ss << "localhost:" << cmdLine.port;
                 fromhost = ss.str();
             }
             string fromdb = cmdObj.getStringField("fromdb");
