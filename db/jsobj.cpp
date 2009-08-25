@@ -428,8 +428,8 @@ namespace mongo {
     /* wo = "well ordered" */
     int BSONElement::woCompare( const BSONElement &e,
                                 bool considerFieldName ) const {
-        int lt = (int) type();
-        int rt = (int) e.type();
+        int lt = (int) canonicalType();
+        int rt = (int) e.canonicalType();
         int x = lt - rt;
         if( x != 0 && (!isNumber() || !e.isNumber()) )
             return x;
@@ -447,13 +447,14 @@ namespace mongo {
     int compareElementValues(const BSONElement& l, const BSONElement& r) {
         int f;
         double x;
+
         switch ( l.type() ) {
         case EOO:
         case Undefined:
         case jstNULL:
         case MaxKey:
         case MinKey:
-            f = l.type() - r.type();
+            f = l.canonicalType() - r.canonicalType();
             if ( f<0 ) return -1;
             return f==0 ? 0 : 1;
         case Bool:
@@ -518,7 +519,7 @@ namespace mongo {
             return strcmp(l.regexFlags(), r.regexFlags());
         }
         case CodeWScope : {
-            f = l.type() - r.type();
+            f = l.canonicalType() - r.canonicalType();
             if ( f )
                 return f;
             f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
@@ -1272,21 +1273,19 @@ namespace mongo {
                 assert( u.woCompare( ll , k ) == u.woCompare( d , k ) );
                 assert( u.woCompare( ll , k ) == u.woCompare( d , k ) );
 
+                cout << "A: " << i.firstElement().woCompare( n.firstElement() ) << endl;
+                cout << "B: " << d.firstElement().woCompare( n.firstElement() ) << endl;
+                assert( i.woCompare( n ) == d.woCompare( n ) );
                 
-                //assert( i.woCompare( n ) == d.woCompare( n ) );
+                assert( ll.woCompare( n ) == d.woCompare( n ) );
+                assert( ll.woCompare( n ) == i.woCompare( n ) );
+                assert( ll.woCompare( n , k ) == d.woCompare( n , k ) );
+                assert( ll.woCompare( n , k ) == i.woCompare( n , k ) );
                 
-                /*
-                  assert( ll.woCompare( n ) == d.woCompare( n ) );
-                  assert( ll.woCompare( n ) == i.woCompare( n ) );
-                  assert( ll.woCompare( n , k ) == d.woCompare( n , k ) );
-                  assert( ll.woCompare( n , k ) == i.woCompare( n , k ) );
-                  
-                  assert( n.woCompare( ll ) == n.woCompare( d ) );
-                  assert( n.woCompare( ll ) == n.woCompare( i ) );
-                  assert( n.woCompare( ll , k ) == n.woCompare( d , k ) );
-                  assert( n.woCompare( ll , k ) == n.woCompare( d , k ) );
-                */
-                
+                assert( n.woCompare( ll ) == n.woCompare( d ) );
+                assert( n.woCompare( ll ) == n.woCompare( i ) );
+                assert( n.woCompare( ll , k ) == n.woCompare( d , k ) );
+                assert( n.woCompare( ll , k ) == n.woCompare( d , k ) );
             }
         }
         

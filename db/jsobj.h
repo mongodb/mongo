@@ -205,6 +205,20 @@ namespace mongo {
         BSONType type() const {
             return (BSONType) *data;
         }
+        
+        /** returns the tyoe of the element fixed for the main type
+            the main purpose is numbers.  any numeric type will return NumberDouble
+         */
+        BSONType canonicalType() const {
+            BSONType t = type();
+            switch ( t ){
+            case NumberInt:
+            case NumberLong:
+                return NumberDouble;
+            default:
+                return t;
+            }
+        }
 
         /** Indicates if it is the end-of-object element, which is present at the end of 
             every BSON object. 
