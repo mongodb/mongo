@@ -9,6 +9,7 @@
 
 #include "../scripting/engine.h"
 #include "../client/dbclient.h"
+#include "../util/unittest.h"
 #include "utils.h"
 
 extern const char * jsconcatcode;
@@ -45,9 +46,9 @@ void shellHistoryAdd( const char * line ){
 }
 char * shellReadline( const char * prompt ){
 #ifdef USE_READLINE
-  return readline( "> " );
+  return readline( prompt );
 #else
-  printf( "> " );
+  printf( prompt );
   char * buf = new char[1024];
   char * l = fgets( buf , 1024 , stdin );
   int len = strlen( buf );
@@ -114,6 +115,51 @@ string fixHost( string url , string host , string port ){
     newurl += "/" + url;
 
     return newurl;
+}
+
+bool isBalanced( string code ){
+    int brackets = 0;
+    int parens = 0;
+    
+    for ( size_t i=0; i<code.size(); i++ ){
+        switch( code[i] ){
+        case '{': brackets++; break;
+        case '}': brackets--; break;
+        case '(': parens++; break;
+        case ')': parens--; break;
+        case '"':
+            while ( i < code.size() && code[i] != '"' ) i++; 
+            break;
+        case '\'':
+            while ( i < code.size() && code[i] != '\'' ) i++; 
+            break;
+        }
+    }
+    
+    return brackets == 0 && parens == 0;
+}
+
+using mongo::asserted;
+
+struct BalancedTest : public mongo::UnitTest {
+public:
+    void run(){
+        assert( isBalanced( "x = 5" ) );
+        assert( isBalanced( "function(){}" ) );
+        assert( isBalanced( "function(){\n}" ) );
+        assert( ! isBalanced( "function(){" ) );
+    }
+} balnaced_test;
+
+string finishCode( string code ){
+    while ( ! isBalanced( code ) ){
+        code += "\n";
+        char * line = shellReadline("... " );
+        if ( ! line )
+            return "";
+        code += line; 
+    }
+    return code;
 }
 
 #include <boost/program_options.hpp>
@@ -242,6 +288,8 @@ int _main(int argc, char* argv[]) {
 
     cout << "MongoDB shell version: " << mongo::versionString << endl;
 
+    mongo::UnitTest::runTests();
+
     if ( !nodb ) { // connect to db
         cout << "url: " << url << endl;
         string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
@@ -313,6 +361,11 @@ int _main(int argc, char* argv[]) {
             }
             if ( code.size() == 0 )
                 continue;
+            
+            code = finishCode( code );
+
+            if ( code.size() == 0 )
+                break;
 
             bool wascmd = false;
             {
