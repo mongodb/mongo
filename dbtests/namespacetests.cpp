@@ -320,7 +320,7 @@ namespace NamespaceTests {
                 return k.obj();
             }
         };
-
+        
         class ArraySubobjectSingleMissing : public Base {
         public:
             void run() {
@@ -333,25 +333,24 @@ namespace NamespaceTests {
                     elts.push_back( simpleBC( i ) );
                 BSONObjBuilder b;
                 b.append( "a", elts );
-
+                
                 BSONObjSetDefaultOrder keys;
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 4, keys );
-                int j = 1;
-		BSONObjSetDefaultOrder::iterator i = keys.begin();
-		assertEquals( nullObj(), *i++ );
-                for ( ; j < 4; ++i, ++j ) {
+                BSONObjSetDefaultOrder::iterator i = keys.begin();
+                for ( int j = 1; j < 4; ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
                     assertEquals( b.obj(), *i );
                 }
+                assertEquals( nullObj(), *i++ );
             }
         private:
             virtual BSONObj key() const {
                 return aDotB();
             }
         };
-
+        
         class ArraySubobjectMissing : public Base {
         public:
             void run() {
