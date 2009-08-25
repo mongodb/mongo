@@ -1451,7 +1451,7 @@ namespace mongo {
         case Date: appendDate( field.c_str() , 0xFFFFFFFFFFFFFFFFLL ); break;
         case String: append( field.c_str() , BSONObj() ); break;
         case Timestamp:
-            append( field.c_str() , (long long)0 ); break;
+            appendTimestamp( field.c_str() , numeric_limits<unsigned long long>::max() ); break;
         default: 
             appendMinForType( field , t + 1 );
         }
