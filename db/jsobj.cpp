@@ -1238,6 +1238,57 @@ namespace mongo {
             assert( l.woCompare( r ) < 0 );
             assert( r.woCompare( l ) > 0 );
         }
+
+        void testorder(){
+            {
+                BSONObj x,y,z;
+                { BSONObjBuilder b; b.append( "x" , (long long)2 ); x = b.obj(); }
+                { BSONObjBuilder b; b.append( "x" , (int)3 ); y = b.obj(); }
+                { BSONObjBuilder b; b.append( "x" , (long long)4 ); z = b.obj(); }
+                assert( x.woCompare( y ) < 0 );
+                assert( x.woCompare( z ) < 0 );
+                assert( y.woCompare( x ) > 0 );
+                assert( z.woCompare( x ) > 0 );
+                assert( y.woCompare( z ) < 0 );
+                assert( z.woCompare( y ) > 0 );
+            }
+
+            {
+                BSONObj ll,d,i,n,u;
+                { BSONObjBuilder b; b.append( "x" , (long long)2 ); ll = b.obj(); }
+                { BSONObjBuilder b; b.append( "x" , (double)2 ); d = b.obj(); }
+                { BSONObjBuilder b; b.append( "x" , (int)2 ); i = b.obj(); }
+                { BSONObjBuilder b; b.appendNull( "x" ); n = b.obj(); }
+                { BSONObjBuilder b; u = b.obj(); }
+
+                assert( ll.woCompare( u ) == d.woCompare( u ) );
+                assert( ll.woCompare( u ) == i.woCompare( u ) );
+                BSONObj k = BSON( "x" << 1 );
+                assert( ll.woCompare( u , k ) == d.woCompare( u , k ) );
+                assert( ll.woCompare( u , k ) == i.woCompare( u , k ) );
+
+                assert( u.woCompare( ll ) == u.woCompare( d ) );
+                assert( u.woCompare( ll ) == u.woCompare( i ) );
+                assert( u.woCompare( ll , k ) == u.woCompare( d , k ) );
+                assert( u.woCompare( ll , k ) == u.woCompare( d , k ) );
+
+                
+                //assert( i.woCompare( n ) == d.woCompare( n ) );
+                
+                /*
+                  assert( ll.woCompare( n ) == d.woCompare( n ) );
+                  assert( ll.woCompare( n ) == i.woCompare( n ) );
+                  assert( ll.woCompare( n , k ) == d.woCompare( n , k ) );
+                  assert( ll.woCompare( n , k ) == i.woCompare( n , k ) );
+                  
+                  assert( n.woCompare( ll ) == n.woCompare( d ) );
+                  assert( n.woCompare( ll ) == n.woCompare( i ) );
+                  assert( n.woCompare( ll , k ) == n.woCompare( d , k ) );
+                  assert( n.woCompare( ll , k ) == n.woCompare( d , k ) );
+                */
+                
+            }
+        }
         
         void run() {
             testRegex();
@@ -1255,6 +1306,7 @@ namespace mongo {
             assert( cmp < 0 );
             testoid();
             testbounds();
+            testorder();
         }
     } bson_unittest;
 
