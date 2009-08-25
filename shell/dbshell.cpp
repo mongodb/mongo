@@ -5,6 +5,7 @@
 #ifdef USE_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <setjmp.h>
 #endif
 
 #include "../scripting/engine.h"
@@ -15,17 +16,13 @@
 extern const char * jsconcatcode;
 
 string historyFile;
-
-class Interrupt : public mongo::DBException {
-public:
-    virtual const char * what() const throw() {
-        return "Interrupt exception";
-    }
-};
+bool gotInterrupted = 0;
+bool inMultiLine = 0;
 
 void shellHistoryInit(){
 #ifdef USE_READLINE
-
+    rl_set_signals();
+    cout << "yo: " << rl_catch_signals << endl;
     stringstream ss;
     char * h = getenv( "HOME" );
     if ( h )
@@ -35,6 +32,7 @@ void shellHistoryInit(){
 
     using_history();
     read_history( historyFile.c_str() );
+
 #else
     cout << "type \"exit\" to exit" << endl;
 #endif
@@ -51,31 +49,50 @@ void shellHistoryAdd( const char * line ){
     add_history( line );
 #endif
 }
-char * shellReadline( const char * prompt ){
-#ifdef USE_READLINE
-  return readline( prompt );
-#else
-  printf( prompt );
-  char * buf = new char[1024];
-  char * l = fgets( buf , 1024 , stdin );
-  int len = strlen( buf );
-  buf[len-1] = 0;
-  return l;
-#endif
+
+jmp_buf jbuf;
+
+void intr( int sig ){
+    longjmp( jbuf , 1 );
 }
 
-#if !defined(_WIN32)
-#include <string.h>
-
-
 void quitNicely( int sig ){
-    if ( sig == SIGINT )
-        throw Interrupt();
+    if ( sig == SIGINT && inMultiLine ){
+        gotInterrupted = 1;
+        return;
+    }
     if ( sig == SIGPIPE )
         mongo::rawOut( "mongo got signal SIGPIPE\n" );
     shellHistoryDone();
     exit(0);
 }
+
+char * shellReadline( const char * prompt , int handlesigint = 0 ){
+#ifdef USE_READLINE
+    if ( ! handlesigint )
+        return readline( prompt );
+    if ( setjmp( jbuf ) ){
+        gotInterrupted = 1;
+		sigrelse(SIGINT);
+        signal( SIGINT , quitNicely );
+        return 0;
+    }
+    signal( SIGINT , intr );
+    char * ret = readline( prompt );
+    signal( SIGINT , quitNicely );
+    return ret;
+#else
+    printf( prompt );
+    char * buf = new char[1024];
+    char * l = fgets( buf , 1024 , stdin );
+    int len = strlen( buf );
+    buf[len-1] = 0;
+    return l;
+#endif
+}
+
+#if !defined(_WIN32)
+#include <string.h>
 
 void quitAbruptly( int sig ) {
     ostringstream ossSig;
@@ -166,8 +183,11 @@ public:
 
 string finishCode( string code ){
     while ( ! isBalanced( code ) ){
+        inMultiLine = 1;
         code += "\n";
-        char * line = shellReadline("... " );
+        char * line = shellReadline("... " , 1 );
+        if ( gotInterrupted )
+            return "";
         if ( ! line )
             return "";
         code += line; 
@@ -356,9 +376,10 @@ int _main(int argc, char* argv[]) {
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
         while ( 1 ){
-
+            inMultiLine = 0;
+            gotInterrupted = 0;
             char * line = shellReadline( "> " );
-
+            
             if ( line )
                 while ( line[0] == ' ' )
                     line++;
@@ -375,10 +396,8 @@ int _main(int argc, char* argv[]) {
             if ( code.size() == 0 )
                 continue;
             
-            try {
-                code = finishCode( code );
-            }
-            catch ( Interrupt& i ){
+            code = finishCode( code );
+            if ( gotInterrupted ){
                 cout << endl;
                 continue;
             }
@@ -420,10 +439,6 @@ int _main(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
     try {
         return _main( argc , argv );
-    }
-    catch ( Interrupt& i ){
-        shellHistoryDone();
-        exit(0);
     }
     catch ( mongo::DBException& e ){
         cerr << "exception: " << e.what() << endl;
