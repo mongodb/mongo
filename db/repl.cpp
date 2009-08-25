@@ -1325,7 +1325,7 @@ namespace mongo {
         nClonedThisPass = 0;
 
         // FIXME Handle cases where this db isn't on default port, or default port is spec'd in hostName.
-        if ( (string("localhost") == hostName || string("127.0.0.1") == hostName) && port == DBPort ) {
+        if ( (string("localhost") == hostName || string("127.0.0.1") == hostName) && cmdLine.port == CmdLine::DefaultDBPort ) {
             log() << "pull:   can't sync from self (localhost). sources configuration may be wrong." << endl;
             sleepsecs(5);
             return false;

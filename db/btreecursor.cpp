@@ -25,9 +25,6 @@ namespace mongo {
 
     extern int otherTraceLevel;
 
-    DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
-    DiskLoc minDiskLoc(0, 1);
-
     BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails &_id, 
                               const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction ) :
             d(_d), idxNo(_idxNo), 

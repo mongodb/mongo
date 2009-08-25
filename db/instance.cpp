@@ -31,11 +31,14 @@
 #include "replset.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
+#include "cmdline.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
 
 namespace mongo {
+
+    CmdLine cmdLine;
 
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
@@ -52,7 +55,6 @@ namespace mongo {
 
     string dbExecCommand;
 
-    int port = DBPort;
     string bind_ip = "";
     /* 0 = off; 1 = writes, 2 = reads, 3 = both
        7 = log a few reads, and all writes.

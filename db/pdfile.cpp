@@ -42,7 +42,6 @@ _ disallow system* manipulations from the database.
 namespace mongo {
 
     extern bool quota;
-    extern int port;
 
     string dbpath = "/data/db/";
 
@@ -1540,7 +1539,7 @@ namespace mongo {
     bool repairDatabase( const char *ns, string &errmsg,
                          bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
         stringstream ss;
-        ss << "localhost:" << port;
+        ss << "localhost:" << cmdLine.port;
         string localhost = ss.str();
 
         // ns is of the form "<dbname>.$cmd"

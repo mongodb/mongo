@@ -293,8 +293,6 @@ namespace mongo {
         }
     }
 
-    extern DiskLoc minDiskLoc;
-
     bool BtreeBucket::exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, BSONObj order) { 
         int pos;
         bool found;

@@ -21,6 +21,7 @@
 #include "../db/replset.h"
 #include "dbtests.h"
 #include "mockdbclient.h"
+#include "../db/cmdline.h"
 
 namespace mongo {
     extern PairSync *pairSync;
@@ -84,14 +85,14 @@ namespace PairingTests {
         public:
             void run() {
                 ReplPair rp1( "foo", "bar" );
-                checkFields( rp1, "foo", "foo", DBPort, "bar" );
+                checkFields( rp1, "foo", "foo", CmdLine::DefaultDBPort, "bar" );
 
                 ReplPair rp2( "foo:1", "bar" );
                 checkFields( rp2, "foo:1", "foo", 1, "bar" );
 
                 // FIXME Should we accept this input?
                 ReplPair rp3( "", "bar" );
-                checkFields( rp3, "", "", DBPort, "bar" );
+                checkFields( rp3, "", "", CmdLine::DefaultDBPort, "bar" );
 
                 ASSERT_EXCEPTION( ReplPair( "foo:", "bar" ),
                                   UserException );
@@ -121,11 +122,11 @@ namespace PairingTests {
 
         class Dominant : public Base {
         public:
-            Dominant() : oldPort_( port ) {
-                port = 10;
+            Dominant() : oldPort_( cmdLine.port ) {
+                cmdLine.port = 10;
             }
             ~Dominant() {
-                port = oldPort_;
+                cmdLine.port = oldPort_;
             }
             void run() {
                 ASSERT( ReplPair( "b:9", "-" ).dominant( "b" ) );

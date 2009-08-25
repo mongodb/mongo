@@ -147,4 +147,7 @@ namespace mongo {
 
 #pragma pack()
 
+    const DiskLoc minDiskLoc(0, 1);
+    const DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
+
 } // namespace mongo

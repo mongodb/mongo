@@ -21,10 +21,10 @@
 #include "json.h"
 #include "../client/dbclient.h"
 #include "repl.h"
+#include "cmdline.h"
 
 namespace mongo {
 
-    extern int port;
     extern const char *replAllDead;
 
     /* ReplPair is a pair of db servers replicating to one another and cooperating.
@@ -76,7 +76,7 @@ namespace mongo {
 
         bool dominant(const string& myname) {
             if ( myname == remoteHost )
-                return port > remotePort;
+                return cmdLine.port > remotePort;
             return myname > remoteHost;
         }
 
@@ -136,14 +136,14 @@ namespace mongo {
     inline ReplPair::ReplPair(const char *remoteEnd, const char *arb) {
         state = -1;
         remote = remoteEnd;
-        remotePort = DBPort;
+        remotePort = CmdLine::DefaultDBPort;
         remoteHost = remoteEnd;
         const char *p = strchr(remoteEnd, ':');
         if ( p ) {
             remoteHost = string(remoteEnd, p-remoteEnd);
             remotePort = atoi(p+1);
             uassert("bad port #", remotePort > 0 && remotePort < 0x10000 );
-            if ( remotePort == DBPort )
+            if ( remotePort == CmdLine::DefaultDBPort )
                 remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
         }
 
