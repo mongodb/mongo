@@ -16,6 +16,13 @@ extern const char * jsconcatcode;
 
 string historyFile;
 
+class Interrupt : public mongo::DBException {
+public:
+    virtual const char * what() const throw() {
+        return "Interrupt exception";
+    }
+};
+
 void shellHistoryInit(){
 #ifdef USE_READLINE
 
@@ -60,7 +67,10 @@ char * shellReadline( const char * prompt ){
 #if !defined(_WIN32)
 #include <string.h>
 
+
 void quitNicely( int sig ){
+    if ( sig == SIGINT )
+        throw Interrupt();
     if ( sig == SIGPIPE )
         mongo::rawOut( "mongo got signal SIGPIPE\n" );
     shellHistoryDone();
@@ -128,9 +138,11 @@ bool isBalanced( string code ){
         case '(': parens++; break;
         case ')': parens--; break;
         case '"':
+            i++;
             while ( i < code.size() && code[i] != '"' ) i++; 
             break;
         case '\'':
+            i++;
             while ( i < code.size() && code[i] != '\'' ) i++; 
             break;
         }
@@ -148,6 +160,7 @@ public:
         assert( isBalanced( "function(){}" ) );
         assert( isBalanced( "function(){\n}" ) );
         assert( ! isBalanced( "function(){" ) );
+        assert( isBalanced( "x = \"{\";" ) );
     }
 } balnaced_test;
 
@@ -362,7 +375,13 @@ int _main(int argc, char* argv[]) {
             if ( code.size() == 0 )
                 continue;
             
-            code = finishCode( code );
+            try {
+                code = finishCode( code );
+            }
+            catch ( Interrupt& i ){
+                cout << endl;
+                continue;
+            }
 
             if ( code.size() == 0 )
                 break;
@@ -401,6 +420,10 @@ int _main(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
     try {
         return _main( argc , argv );
+    }
+    catch ( Interrupt& i ){
+        shellHistoryDone();
+        exit(0);
     }
     catch ( mongo::DBException& e ){
         cerr << "exception: " << e.what() << endl;
