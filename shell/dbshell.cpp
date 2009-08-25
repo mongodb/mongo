@@ -55,6 +55,7 @@ void intr( int sig ){
 #endif
 }
 
+#if !defined(_WIN32)
 void quitNicely( int sig ){
     if ( sig == SIGINT && inMultiLine ){
         gotInterrupted = 1;
@@ -65,6 +66,7 @@ void quitNicely( int sig ){
     shellHistoryDone();
     exit(0);
 }
+#endif
 
 char * shellReadline( const char * prompt , int handlesigint = 0 ){
 #ifdef USE_READLINE
