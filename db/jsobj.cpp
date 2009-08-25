@@ -1206,7 +1206,7 @@ namespace mongo {
             OID id;
             id.init();
             //            sleepsecs(3);
-
+            
             OID b;
             // goes with sleep above... 
             // b.init();
@@ -1215,6 +1215,30 @@ namespace mongo {
             b.init( id.str() );
             assert( b == id );
         }
+
+        void testbounds(){
+            BSONObj l , r;
+            {
+                BSONObjBuilder b;
+                b.append( "x" , numeric_limits<long long>::max() );
+                l = b.obj();
+            }
+            {
+                BSONObjBuilder b;
+                b.append( "x" , numeric_limits<double>::max() );
+                r = b.obj();
+            }
+            assert( l.woCompare( r ) < 0 );
+            assert( r.woCompare( l ) > 0 );
+            {
+                BSONObjBuilder b;
+                b.append( "x" , numeric_limits<int>::max() );
+                l = b.obj();
+            }
+            assert( l.woCompare( r ) < 0 );
+            assert( r.woCompare( l ) > 0 );
+        }
+        
         void run() {
             testRegex();
             BSONObjBuilder A,B,C;
@@ -1230,6 +1254,7 @@ namespace mongo {
             cmp = a.woCompare(c);
             assert( cmp < 0 );
             testoid();
+            testbounds();
         }
     } bson_unittest;
 
