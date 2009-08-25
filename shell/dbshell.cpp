@@ -6,6 +6,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <setjmp.h>
+jmp_buf jbuf;
 #endif
 
 #include "../scripting/engine.h"
@@ -21,8 +22,6 @@ bool inMultiLine = 0;
 
 void shellHistoryInit(){
 #ifdef USE_READLINE
-    rl_set_signals();
-    cout << "yo: " << rl_catch_signals << endl;
     stringstream ss;
     char * h = getenv( "HOME" );
     if ( h )
@@ -50,10 +49,10 @@ void shellHistoryAdd( const char * line ){
 #endif
 }
 
-jmp_buf jbuf;
-
 void intr( int sig ){
+#ifdef USE_READLINE
     longjmp( jbuf , 1 );
+#endif
 }
 
 void quitNicely( int sig ){
