@@ -78,16 +78,16 @@ public:
 
         time_t start = time(0);
 
-        const int BUF_SIZE = 64000;
-        char line[64000 + 128];
+        const int BUF_SIZE = 1024 * 1024 * 4;
+        char line[ (1024 * 1024 * 4) + 128];
         while ( *in ){
             in->getline( line , BUF_SIZE );
 
             int len = strlen( line );
             if ( ! len )
                 break;
-
-            assert( len < BUF_SIZE );
+            
+            assert( in->rdstate() == 0 );
 
             try {
                 BSONObj o = fromjson( line );
