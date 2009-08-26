@@ -284,8 +284,10 @@ namespace mongo {
                     return *reinterpret_cast< const int* >( value() ) != 0;
                 case Bool:
                     return boolean();
+                case EOO:
                 case jstNULL:
                     return false;
+                
                 default:
                     ;
             }
