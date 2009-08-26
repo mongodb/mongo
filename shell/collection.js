@@ -39,7 +39,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
     print("\tdb.foo.save(obj)");
     print("\tdb.foo.update(query, object[, upsert_bool])");
-    print("\tdb.foo.ensureIndex(keypattern)");
+    print("\tdb.foo.ensureIndex(keypattern,options) - options should be an object with these possible fields: name, unique, dropDups");
     print("\tdb.foo.dropIndexes()");
     print("\tdb.foo.dropIndex(name)");
     print("\tdb.foo.getIndexes()");
@@ -176,29 +176,67 @@ DBCollection.prototype._genIndexName = function( keys ){
 }
 
 DBCollection.prototype._indexSpec = function( keys, options ) {
-    var name;
-    var nTrue = 0;
-    if ( !isObject( options ) ) {
-        options = [ options ];
+    var ret = { ns : this._fullName , key : keys , name : this._genIndexName( keys ) };
+
+    if ( ! options ){
     }
-    for( var i = 0; i < options.length; ++i ) {
-        var o = options[ i ];
-        if ( isString( o ) ) {
-            name = o;
-        } else if ( typeof( o ) == "boolean" ) {
-	    if ( o ) {
-		++nTrue;
-	    }
+    else if ( typeof ( options ) == "string" )
+        ret.name = options;
+    else if ( typeof ( options ) == "boolean" )
+        ret.unique = true;
+    else if ( typeof ( options ) == "object" ){
+        if ( options.length ){
+            var nb = 0;
+            for ( var i=0; i<options.length; i++ ){
+                if ( typeof ( options[i] ) == "string" )
+                    ret.name = options[i];
+                else if ( typeof( options[i] ) == "boolean" ){
+                    if ( options[i] ){
+                        if ( nb == 0 )
+                            ret.unique = true;
+                        if ( nb == 1 )
+                            ret.dropDups = true;
+                    }
+                    nb++;
+                }
+            }
+        }
+        else {
+            Object.extend( ret , options );
         }
     }
-    name = name || this._genIndexName( keys );
-    var ret = { ns : this._fullName , key : keys , name : name };
-    if ( nTrue > 0 ) {
-	ret.unique = true;
+    else {
+        throw "can't handle: " + typeof( options );
     }
-    if ( nTrue > 1 ) {
-	ret.dropDups = true;
+    /*
+        return ret;
+
+    var name;
+    var nTrue = 0;
+    
+    if ( ! isObject( options ) ) {
+        options = [ options ];
     }
+    
+    if ( options.length ){
+        for( var i = 0; i < options.length; ++i ) {
+            var o = options[ i ];
+            if ( isString( o ) ) {
+                ret.name = o;
+            } else if ( typeof( o ) == "boolean" ) {
+	        if ( o ) {
+		    ++nTrue;
+	        }
+            }
+        }
+        if ( nTrue > 0 ) {
+	    ret.unique = true;
+        }
+        if ( nTrue > 1 ) {
+	    ret.dropDups = true;
+        }
+    }
+*/
     return ret;
 }
 
