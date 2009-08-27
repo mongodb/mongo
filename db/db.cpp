@@ -896,7 +896,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
         if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) ) 
             ;
         else
-            massert("Couldn't register Ctrl-C handler", false);
+            massert("Couldn't register Windows Ctrl-C handler", false);
     } 
 #endif
 

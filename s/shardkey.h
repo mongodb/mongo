@@ -40,7 +40,7 @@ namespace mongo {
         BSONObj globalMin() const;
 
         /**
-           global max is the lowest possible value for this key
+           global max is the highest possible value for this key
          */
         BSONObj globalMax() const;
 
