@@ -1413,6 +1413,7 @@ namespace mongo {
         case Bool: appendBool( field.c_str() , false); return;
         case Date: appendDate( field.c_str() , 0); return;
         case jstNULL: appendNull( field.c_str() ); return;
+        case Symbol:
         case String: append( field.c_str() , "" ); return;
         case Object: append( field.c_str() , BSONObj() ); return;
         case Array: 
@@ -1430,7 +1431,6 @@ namespace mongo {
                 return;
             }
         case Code: appendCode( field.c_str() , "" ); return;
-        case Symbol: appendSymbol( field.c_str() , "" ); return;
         case CodeWScope: appendCodeWScope( field.c_str() , "" , BSONObj() ); return;
         case Timestamp: appendTimestamp( field.c_str() , 0); return;
 
@@ -1457,7 +1457,11 @@ namespace mongo {
             }
         case Bool: appendBool( field.c_str() , true); break;
         case Date: appendDate( field.c_str() , 0xFFFFFFFFFFFFFFFFLL ); break;
+        case Symbol:
         case String: append( field.c_str() , BSONObj() ); break;
+        case Code:
+        case CodeWScope:
+            appendMinForType( field , Timestamp ); break;
         case Timestamp:
             appendTimestamp( field.c_str() , numeric_limits<unsigned long long>::max() ); break;
         default: 
