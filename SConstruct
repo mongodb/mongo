@@ -1298,6 +1298,8 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
             remotePrefix = "-" + distName
 
     sys.path.append( "." )
+    sys.path.append( ".." )
+    sys.path.append( "../../" )
 
     import simples3
     import settings
