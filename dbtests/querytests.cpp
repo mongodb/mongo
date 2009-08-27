@@ -651,7 +651,7 @@ namespace QueryTests {
                 BSONObj o = cursor->next();
                 cout << " foo " << o << endl;
             }
-
+            
         }
         void run() {
             const char *ns = "unittests.querytests.DifferentNumbers";
@@ -665,6 +665,28 @@ namespace QueryTests {
             t(ns);
             client().ensureIndex( ns , BSON( "7" << 1 ) );
             t(ns);
+        }
+    };
+    
+    class SymbolStringSame : public ClientBase {
+    public:
+        ~SymbolStringSame(){
+            client().dropCollection( ns() );
+        }
+        const char * ns(){
+            return "unittests.querytests.symbolstringsame";
+        }
+        void run(){
+            { BSONObjBuilder b; b.appendSymbol( "x" , "eliot" ); b.append( "z" , 17 ); client().insert( ns() , b.obj() ); }
+            ASSERT_EQUALS( 17 , client().findOne( ns() , BSONObj() )["z"].number() );
+            { 
+                BSONObjBuilder b; 
+                b.appendSymbol( "x" , "eliot" ); 
+                ASSERT_EQUALS( 17 , client().findOne( ns() , b.obj() )["z"].number() );
+            }
+            //ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
+            //client().ensureIndex( ns() , BSON( "x" << 1 ) );
+            //ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
         }
     };
 
@@ -703,6 +725,7 @@ namespace QueryTests {
             add< FastCountIn >();
             add< EmbeddedArray >();
             add< DifferentNumbers >();
+            add< SymbolStringSame >();
         }
     };
     
