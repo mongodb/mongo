@@ -215,6 +215,8 @@ namespace mongo {
             case NumberInt:
             case NumberLong:
                 return NumberDouble;
+            case Symbol:
+                return String;
             default:
                 return t;
             }

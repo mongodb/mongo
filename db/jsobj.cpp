@@ -1285,6 +1285,14 @@ namespace mongo {
                 assert( n.woCompare( ll , k ) == n.woCompare( d , k ) );
                 assert( n.woCompare( ll , k ) == n.woCompare( d , k ) );
             }
+
+            {
+                BSONObj l,r;
+                { BSONObjBuilder b; b.append( "x" , "eliot" ); l = b.obj(); }
+                { BSONObjBuilder b; b.appendSymbol( "x" , "eliot" ); r = b.obj(); }
+                assert( l.woCompare( r ) == 0 );
+                assert( r.woCompare( l ) == 0 );
+            }
         }
         
         void run() {
