@@ -220,7 +220,7 @@ namespace mongo {
 
         bool unique() const { 
             BSONObj io = info.obj();
-            return io.getBoolField("unique") || 
+            return io["unique"].trueValue() || 
                 /* temp: can we juse make unique:true always be there for _id and get rid of this? */
                 isIdIndex();
         }

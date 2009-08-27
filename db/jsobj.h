@@ -215,6 +215,8 @@ namespace mongo {
             case NumberInt:
             case NumberLong:
                 return NumberDouble;
+            case Symbol:
+                return String;
             default:
                 return t;
             }
@@ -284,8 +286,10 @@ namespace mongo {
                     return *reinterpret_cast< const int* >( value() ) != 0;
                 case Bool:
                     return boolean();
+                case EOO:
                 case jstNULL:
                     return false;
+                
                 default:
                     ;
             }
@@ -490,7 +494,7 @@ namespace mongo {
             }
             bool match= valuesize() == r.valuesize() &&
                         memcmp(value(),r.value(),valuesize()) == 0;
-            return match && type() == r.type();
+            return match && canonicalType() == r.canonicalType();
         }
 
         /** Returns true if elements are equal. */

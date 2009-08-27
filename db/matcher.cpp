@@ -329,7 +329,7 @@ namespace mongo {
         }
 
         /* check LT, GTE, ... */
-        if ( !( l.isNumber() && r.isNumber() ) && ( l.type() != r.type() ) )
+        if ( l.canonicalType() != r.canonicalType() )
             return false;
         int c = compareElementValues(l, r);
         if ( c < -1 ) c = -1;

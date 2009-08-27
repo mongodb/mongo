@@ -33,6 +33,6 @@
 
 namespace mongo {
 
-    const char versionString[] = "0.9.10+";
+    const char versionString[] = "1.1.0-";
 
 } // namespace mongo

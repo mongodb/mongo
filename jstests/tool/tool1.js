@@ -26,7 +26,9 @@ assert( c.findOne() );
 runMongoProgram( "mongodump", "--host", "127.0.0.1:" + port, "--out", externalPath );
 c.drop();
 runMongoProgram( "mongorestore", "--host", "127.0.0.1:" + port, "--dir", externalPath );
-assert( c.findOne() && 1 == c.findOne().a , "mongodump then restore has no data" );
+assert.soon( "c.findOne()" , "mongodump then restore has no data w/sleep" );
+assert( c.findOne() , "mongodump then restore has no data" );
+assert.eq( 1 , c.findOne().a , "mongodump then restore has no broken data" );
 
 resetDbpath( externalPath );
 
