@@ -684,9 +684,9 @@ namespace QueryTests {
                 b.appendSymbol( "x" , "eliot" ); 
                 ASSERT_EQUALS( 17 , client().findOne( ns() , b.obj() )["z"].number() );
             }
-            //ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
-            //client().ensureIndex( ns() , BSON( "x" << 1 ) );
-            //ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
+            ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
+            client().ensureIndex( ns() , BSON( "x" << 1 ) );
+            ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
         }
     };
 

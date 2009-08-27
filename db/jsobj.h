@@ -494,7 +494,7 @@ namespace mongo {
             }
             bool match= valuesize() == r.valuesize() &&
                         memcmp(value(),r.value(),valuesize()) == 0;
-            return match && type() == r.type();
+            return match && canonicalType() == r.canonicalType();
         }
 
         /** Returns true if elements are equal. */
