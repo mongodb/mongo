@@ -55,7 +55,7 @@ namespace mongo {
         bool questionable() {
             return ofs < -1 ||
                    fileNo < -1 ||
-                   fileNo > 20;
+                   fileNo > 524288;
         }
 
         bool isNull() const {
