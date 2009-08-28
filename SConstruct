@@ -142,6 +142,13 @@ AddOption( "--extrapath",
            action="store",
            help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo" )
 
+AddOption( "--cxx",
+           dest="cxx",
+           type="string",
+           nargs=1,
+           action="store",
+           help="compiler to use" )
+
 
 AddOption( "--boost-compiler",
            dest="boostCompiler",
@@ -201,6 +208,8 @@ usesm = not GetOption( "usesm" ) is None
 usejvm = not GetOption( "usejvm" ) is None
 
 env = Environment( MSVS_ARCH=msarch )
+if GetOption( "cxx" ) is not None:
+    env["CXX"] = GetOption( "cxx" )
 env["LIBPATH"] = []
 
 if GetOption( "recstore" ) != None:
