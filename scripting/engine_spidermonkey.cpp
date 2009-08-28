@@ -11,6 +11,16 @@
 
 namespace mongo {
 
+    string trim( string s ){
+        while ( s.size() && isspace( s[0] ) )
+            s = s.substr( 1 );
+        
+        while ( s.size() && isspace( s[s.size()-1] ) )
+            s = s.substr( 0 , s.size() - 1 );
+        
+        return s;
+    }
+
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
     boost::recursive_mutex smmutex;
 #define smlock recursive_boostlock ___lk( smmutex );
@@ -302,41 +312,55 @@ namespace mongo {
             return f;
         }
 
-        JSFunction * _compileFunction( const char * code, JSObject * assoc ){
-            while (isspace(*code)) {
-                code++;
+        JSFunction * _compileFunction( const char * raw , JSObject * assoc ){
+            while (isspace(*raw)) {
+                raw++;
             }
 
-            if ( ! hasFunctionIdentifier( code ) ){
-                string s = code;
+            if ( ! hasFunctionIdentifier( raw ) ){
+                string s = raw;
                 if ( isSimpleStatement( s ) ){
                     s = "return " + s;
                 }
                 return JS_CompileFunction( _context , assoc , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
             }
 
-            // TODO: there must be a way in spider monkey to do this - this is a total hack
-
-            string s = "return ";
-            s += code;
-            s += ";";
-
-            JSFunction * func = JS_CompileFunction( _context , assoc , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_b" , 0 );
+            string code = raw;
+            
+            size_t start = code.find( '(' );
+            assert( start != string::npos );
+            string fname = code.substr( 9 , start - 9 );
+            
+            code = code.substr( start + 1 );
+            size_t end = code.find( ')' );
+            assert( end != string::npos );
+            
+            string paramString = trim( code.substr( 0 , end ) );
+            code = code.substr( end + 1 );
+            
+            vector<string> params;
+            while ( paramString.size() ){
+                size_t c = paramString.find( ',' );
+                if ( c == string::npos ){
+                    params.push_back( paramString );
+                    break;
+                }
+                params.push_back( trim( paramString.substr( 0 , c ) ) );
+                paramString = trim( paramString.substr( c + 1 ) );
+                paramString = trim( paramString );
+            }
+            
+            const char ** paramArray = new const char*[params.size()];
+            for ( size_t i=0; i<params.size(); i++ )
+                paramArray[i] = params[i].c_str();
+            
+            JSFunction * func = JS_CompileFunction( _context , assoc , "anonymous" , params.size() , paramArray , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
+            delete paramArray;
             if ( ! func ){
-                cerr << "compile for hack failed" << endl;
+                cerr << "compile failed for: " << raw << endl;
                 return 0;
             }
-
-            jsval ret;
-            if ( ! JS_CallFunction( _context , 0 , func , 0 , 0 , &ret ) ){
-                cerr << "call function for hack failed" << endl;
-                return 0;
-            }
-
-            addRoot( func );
-
-            uassert( "return for compile hack failed" , JS_TypeOfValue( _context , ret ) == JSTYPE_FUNCTION );
-            return JS_ValueToFunction( _context , ret );
+            return func;
         }
 
 
@@ -1306,6 +1330,12 @@ namespace mongo {
         s.exec( "db.bar.silly.verify();" );
         s.exec( "assert.eq( 'foo.bar.silly' , db.bar.silly._fullName )" );
         s.exec( "assert.eq( 'function' , typeof _mongo.find , 'mongo.find is not a function' )" );
+
+        assert( (string)"abc" == trim( "abc" ) );
+        assert( (string)"abc" == trim( " abc" ) );
+        assert( (string)"abc" == trim( "abc " ) );
+        assert( (string)"abc" == trim( " abc " ) );
+
     }
 
     Scope * SMEngine::createScope(){
