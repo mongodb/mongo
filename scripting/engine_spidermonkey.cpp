@@ -304,15 +304,16 @@ namespace mongo {
             return true;
         }
 
-        void addRoot( JSFunction * f );
+        void addRoot( JSFunction * f , const char * name );
 
         JSFunction * compileFunction( const char * code, JSObject * assoc = 0 ){
-            JSFunction * f = _compileFunction( code , assoc );
-            addRoot( f );
+            const char * gcName = "unknown";
+            JSFunction * f = _compileFunction( code , assoc , gcName );
+            addRoot( f , gcName );
             return f;
         }
 
-        JSFunction * _compileFunction( const char * raw , JSObject * assoc ){
+        JSFunction * _compileFunction( const char * raw , JSObject * assoc , const char *& gcName ){
             while (isspace(*raw)) {
                 raw++;
             }
@@ -322,6 +323,7 @@ namespace mongo {
                 if ( isSimpleStatement( s ) ){
                     s = "return " + s;
                 }
+                gcName = "cf anon";
                 return JS_CompileFunction( _context , assoc , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
             }
 
@@ -364,6 +366,7 @@ namespace mongo {
                 cerr << "compile failed for: " << raw << endl;
                 return 0;
             }
+            gcName = "cf normal";
             return func;
         }
 
@@ -1350,7 +1353,7 @@ namespace mongo {
         return new SMScope();
     }
 
-    void Convertor::addRoot( JSFunction * f ){
+    void Convertor::addRoot( JSFunction * f , const char * name ){
         if ( ! f )
             return;
 
@@ -1359,7 +1362,7 @@ namespace mongo {
         
         JSObject * o = JS_GetFunctionObject( f );
 
-        scope->addRoot( &o , "cf" );
+        scope->addRoot( &o , name );
     }
 
 }
