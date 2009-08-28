@@ -670,6 +670,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     else:
         myenv.Append( CPPDEFINES=[ "XP_UNIX" ] )
 
+    if solaris:
+        conf.CheckLib( "nsl" )
+
     if usesm:
 
         myCheckLib( [ "js" , "mozjs" ] , True )
@@ -851,7 +854,7 @@ if release and ( ( darwin and force64 ) or linux64 ):
 if noshell:
     print( "not building shell" )
 elif not onlyServer:
-    weird = force64 and not windows
+    weird = force64 and not windows and not solaris
 
     if weird:
         shellEnv["CFLAGS"].remove("-m64")
