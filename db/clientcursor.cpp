@@ -92,7 +92,7 @@ namespace mongo {
             ByLoc::iterator j = i;
             i++;
             if( j->second->shouldTimeout( millis ) ){
-                log(2) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns 
+                log(1) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns 
                        << " idle:" << j->second->idleTime() << "ms\n";
                 delete j->second;
             }
