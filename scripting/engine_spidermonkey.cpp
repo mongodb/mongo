@@ -772,6 +772,7 @@ namespace mongo {
         Convertor c( cx );
 
         BSONHolder * holder = GETHOLDER( cx , obj );
+        assert( holder );
         holder->check();
         
         string s = c.toString( id );
@@ -1090,11 +1091,15 @@ namespace mongo {
 
         void setThis( const BSONObj * obj ){
             smlock;
-            if ( _this )
+            if ( _this ){
                 JS_RemoveRoot( _context , &_this );
+                _this = 0;
+            }
             
-            _this = _convertor->toJSObject( obj );
-            JS_AddNamedRoot( _context , &_this , "scope this" );
+            if ( obj ){
+                _this = _convertor->toJSObject( obj );
+                JS_AddNamedRoot( _context , &_this , "scope this" );
+            }
         }
 
         // ---- functions -----

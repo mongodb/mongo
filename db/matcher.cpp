@@ -80,6 +80,7 @@ namespace mongo {
     public:
         Where() {
             jsScope = 0;
+            func = 0;
         }
         ~Where() {
 
@@ -553,6 +554,7 @@ namespace mongo {
             where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
             
             int err = where->scope->invoke( where->func , BSONObj() , 1000 * 60 );
+            where->scope->setThis( 0 );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
                 ss << "error on invocation of $where function:\n" 
