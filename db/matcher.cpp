@@ -544,22 +544,14 @@ namespace mongo {
                 uassert("$where compile error", false);
                 return false; // didn't compile
             }
-
-            /**if( 1 || jsobj.objsize() < 200 || where->fullObject ) */
-            {
-                if ( where->jsScope ){
-                    where->scope->init( where->jsScope );
-                }
-                where->scope->setThis( const_cast< BSONObj * >( &jsobj ) );
-                where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
-                where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
+            
+            if ( where->jsScope ){
+                where->scope->init( where->jsScope );
             }
-            /*else {
-            BSONObjBuilder b;
-            where->buildSubset(jsobj, b);
-            BSONObj temp = b.done();
-            where->scope->setObject( "obj" , &temp );
-            }*/
+            where->scope->setThis( const_cast< BSONObj * >( &jsobj ) );
+            where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
+            where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
+            
             int err = where->scope->invoke( where->func , BSONObj() , 1000 * 60 );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
