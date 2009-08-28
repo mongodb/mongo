@@ -526,10 +526,11 @@ if nix:
     if GetOption( "profile" ) is not None:
         env.Append( LINKFLAGS=" -pg " )
 
-hacks = buildscripts.findHacks( os.uname() )
-if hacks is not None:
-    hacks.insert( env , { "linux64" : linux64 } )
-
+if "uname" in dir(os):
+    hacks = buildscripts.findHacks( os.uname() )
+    if hacks is not None:
+        hacks.insert( env , { "linux64" : linux64 } )
+        
 try:
     umask = os.umask(022)
 except OSError:
