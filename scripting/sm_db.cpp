@@ -698,6 +698,7 @@ namespace mongo {
         }
         
 #if defined( SM16 ) || defined( MOZJS )
+#warning dates do not work in your version of spider monkey
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             if ( d ){
@@ -705,8 +706,14 @@ namespace mongo {
                 return true;
             }
         }
+#elif defined( XULRUNNER )
+        if ( JS_InstanceOf( c->_context , o, globalSMEngine->_dateClass , 0 ) ){
+            jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
+            b.appendDate( name.c_str() , (unsigned long long)d );
+            return true;
+        }
 #else
-        if ( JS_InstanceOf( c->_context , o, &js_DateClass, 0 ) ){
+        if ( JS_InstanceOf( c->_context , o, &js_DateClass_ , 0 ) ){
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             b.appendDate( name.c_str() , (unsigned long long)d );
             return true;
@@ -721,7 +728,12 @@ namespace mongo {
             return true;
         }
 
-#ifdef SM18
+#if defined( XULRUNNER ) 
+        if ( JS_InstanceOf( c->_context , o , globalSMEngine->_regexClass , 0 ) ){
+            c->appendRegex( b , name , c->toString( val ) );
+            return true;
+        }
+#elif defined( SM18 ) 
         if ( JS_InstanceOf( c->_context , o , &js_RegExpClass , 0 ) ){
             c->appendRegex( b , name , c->toString( val ) );
             return true;
@@ -732,7 +744,7 @@ namespace mongo {
     }
 
     bool isDate( JSContext * cx , JSObject * o ){
-#if defined( SM16 ) || defined( MOZJS )
+#if defined( SM16 ) || defined( MOZJS ) || defined( XULRUNNER )
         return js_DateGetMsecSinceEpoch( cx , o ) != 0;
 #else
         return JS_InstanceOf( cx , o, &js_DateClass, 0 );

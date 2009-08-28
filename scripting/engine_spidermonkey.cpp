@@ -564,7 +564,17 @@ namespace mongo {
             return toString( getProperty( o , field ) );
         }
 
+        JSClass * getClass( JSObject * o , const char * field ){
+            jsval v;
+            assert( JS_GetProperty( _context , o , field , &v ) );
+            if ( ! JSVAL_IS_OBJECT( v ) )
+                return 0;
+            return JS_GET_CLASS( _context , JSVAL_TO_OBJECT( v ) );
+        }
+
         JSContext * _context;
+
+
     };
 
 
@@ -797,6 +807,12 @@ namespace mongo {
 
         virtual bool utf8Ok() const { return JS_CStringsAreUTF8(); }
 
+#ifdef XULRUNNER
+        JSClass * _dateClass;
+        JSClass * _regexClass;
+#endif
+
+
     private:
         JSRuntime * _runtime;
         friend class SMScope;
@@ -875,6 +891,8 @@ namespace mongo {
             _externalSetup = false;
             _localConnect = false;
             //JS_SetGCCallback( _context , no_gc ); // this is useful for seeing if something is a gc problem
+
+            _postCreateHacks();
         }
         
         ~SMScope(){
@@ -1081,6 +1099,16 @@ namespace mongo {
             return JS_FALSE;
         }
 
+#ifdef XULRUNNER
+#warning no js timeout support in xulrunner
+        void installCheckTimeout( int timeoutMs ) {
+            // XULRUNNER doesn't seem to support JS_SetBranchCallback
+        }
+
+        void uninstallCheckTimeout( int timeoutMs ){
+            // XULRUNNER doesn't seem to support JS_SetBranchCallback
+        }
+#else
         void installCheckTimeout( int timeoutMs ) {
             if ( timeoutMs > 0 ) {
                 TimeoutSpec *spec = new TimeoutSpec;
@@ -1099,7 +1127,7 @@ namespace mongo {
                 JS_SetContextPrivate( _context, 0 );
             }
         }
-
+#endif
         void precall(){
             _error = "";
             currentScope.reset( this );
@@ -1197,8 +1225,18 @@ namespace mongo {
         }
 
         JSContext *context() const { return _context; }
-
+        
     private:
+
+        void _postCreateHacks(){
+#ifdef XULRUNNER
+            exec( "__x__ = new Date(1);" );
+            globalSMEngine->_dateClass = _convertor->getClass( _global , "__x__" );
+            exec( "__x__ = /abc/i" );
+            globalSMEngine->_regexClass = _convertor->getClass( _global , "__x__" );
+#endif
+        }
+        
         JSContext * _context;
         Convertor * _convertor;
 
@@ -1213,6 +1251,7 @@ namespace mongo {
         string _dbName;
         
         set<string> _initFieldNames;
+        
     };
 
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){

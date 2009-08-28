@@ -17,6 +17,7 @@ import re
 import shutil
 import urllib
 import urllib2
+import buildscripts
 
 # --- options ----
 AddOption('--prefix',
@@ -525,6 +526,10 @@ if nix:
     if GetOption( "profile" ) is not None:
         env.Append( LINKFLAGS=" -pg " )
 
+hacks = buildscripts.findHacks( os.uname() )
+if hacks is not None:
+    hacks.insert( env , { "linux64" : linux64 } )
+
 try:
     umask = os.umask(022)
 except OSError:
@@ -678,7 +683,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         myCheckLib( [ "js" , "mozjs" ] , True )
         mozHeader = "js"
         if bigLibString(myenv).find( "mozjs" ) >= 0:
-            myenv.Append( CPPDEFINES=[ "MOZJS" ] )
             mozHeader = "mozjs"
 
         if not conf.CheckHeader( mozHeader + "/jsapi.h" ):
