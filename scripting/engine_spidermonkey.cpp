@@ -329,8 +329,12 @@ namespace mongo {
             
             size_t start = code.find( '(' );
             assert( start != string::npos );
-            string fname = code.substr( 9 , start - 9 );
             
+            stringstream fname;
+            fname << trim( code.substr( 9 , start - 9 ) );
+            static int fnum = 1;
+            fname << "_" << fnum++;
+
             code = code.substr( start + 1 );
             size_t end = code.find( ')' );
             assert( end != string::npos );
@@ -354,7 +358,7 @@ namespace mongo {
             for ( size_t i=0; i<params.size(); i++ )
                 paramArray[i] = params[i].c_str();
             
-            JSFunction * func = JS_CompileFunction( _context , assoc , "anonymous" , params.size() , paramArray , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
+            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
             delete paramArray;
             if ( ! func ){
                 cerr << "compile failed for: " << raw << endl;
@@ -1090,7 +1094,6 @@ namespace mongo {
                 JS_RemoveRoot( _context , &_this );
             
             _this = _convertor->toJSObject( obj );
-
             JS_AddNamedRoot( _context , &_this , "scope this" );
         }
 
@@ -1348,8 +1351,10 @@ namespace mongo {
 
         SMScope * scope = currentScope.get();
         uassert( "need a scope" , scope );
+        
+        JSObject * o = JS_GetFunctionObject( f );
 
-        scope->addRoot( f , "cf" );
+        scope->addRoot( &o , "cf" );
     }
 
 }
