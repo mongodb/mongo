@@ -1155,7 +1155,7 @@ namespace mongo {
             }
 
             installCheckTimeout( timeoutMs );
-            JSBool ret = JS_CallFunction( _context , _this , func , nargs , smargs , &rval );
+            JSBool ret = JS_CallFunction( _context , _this ? _this : _global , func , nargs , smargs , &rval );
             uninstallCheckTimeout( timeoutMs );
 
             if ( !ret ) {
