@@ -863,7 +863,7 @@ namespace mongo {
 
     class SMScope : public Scope {
     public:
-        SMScope(){
+        SMScope() : _this( 0 ) , _externalSetup( false ) , _localConnect( false ) {
             smlock;
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
             _convertor = new Convertor( _context );
@@ -887,9 +887,6 @@ namespace mongo {
             assert( JS_DefineFunction( _context , _convertor->getGlobalPrototype( "Object" ) ,
                                        "keySet" , object_keyset , 0 , JSPROP_READONLY ) );
 
-            _this = 0;
-            _externalSetup = false;
-            _localConnect = false;
             //JS_SetGCCallback( _context , no_gc ); // this is useful for seeing if something is a gc problem
 
             _postCreateHacks();
@@ -1099,14 +1096,12 @@ namespace mongo {
             return JS_FALSE;
         }
 
-#ifdef XULRUNNER
-#warning no js timeout support in xulrunner
+#ifdef SM181
+#warning JS_SetOperationCallback not supported yet
         void installCheckTimeout( int timeoutMs ) {
-            // XULRUNNER doesn't seem to support JS_SetBranchCallback
         }
 
         void uninstallCheckTimeout( int timeoutMs ){
-            // XULRUNNER doesn't seem to support JS_SetBranchCallback
         }
 #else
         void installCheckTimeout( int timeoutMs ) {
@@ -1163,7 +1158,6 @@ namespace mongo {
         int invoke( JSFunction * func , const BSONObj& args, int timeoutMs , bool ignoreReturn ){
             smlock;
             precall();
-            jsval rval;
 
             int nargs = args.nFields();
             auto_ptr<jsval> smargsPtr( new jsval[nargs] );
@@ -1174,7 +1168,7 @@ namespace mongo {
                 for ( int i=0; i<nargs; i++ )
                     smargs[i] = _convertor->toval( it.next() );
             }
-
+            
             if ( args.isEmpty() ){
                 _convertor->setProperty( _global , "args" , JSVAL_NULL );
             }
@@ -1183,6 +1177,7 @@ namespace mongo {
             }
 
             installCheckTimeout( timeoutMs );
+            jsval rval;
             JSBool ret = JS_CallFunction( _context , _this ? _this : _global , func , nargs , smargs , &rval );
             uninstallCheckTimeout( timeoutMs );
 

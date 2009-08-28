@@ -60,6 +60,10 @@ JSBool JS_CStringsAreUTF8(){
 #define SM18
 #endif
 
+#ifdef XULRUNNER
+#define SM181
+#endif
+
 namespace mongo {
 
     class SMScope;
