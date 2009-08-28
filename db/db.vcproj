@@ -350,18 +350,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\js\js\Debug\js.lib"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
 				RelativePath="..\..\js\js\Release\js.lib"
 				>
 				<FileConfiguration
@@ -374,6 +362,18 @@
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Debug Recstore|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\js\js\Debug\js.lib"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -1736,35 +1736,10 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\util\md5main.c"
+					RelativePath="..\util\md5main.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="0"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="0"
-							PrecompiledHeaderThrough=""
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="release_nojni|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="0"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Debug Recstore|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
