@@ -45,8 +45,6 @@
 #include <stdio.h>
 #include <string.h>
 
-extern "C" {
-
 /*
  * This file builds an executable that performs various functions related
  * to the MD5 library.  Typical compilation:
@@ -143,4 +141,3 @@ md5main(int argc, char *argv[])
     return 0;
 }
 
-}
