@@ -344,9 +344,8 @@ int _main(int argc, char* argv[]) {
     }
 
     if ( !script.empty() ) {
-        script = "function() { " + script + " }";
         mongo::shellUtils::MongoProgramScope s;
-        if ( scope->invoke( script.c_str(), mongo::BSONObj() ) )
+        if ( ! scope->exec( script , "(shell eval)" , true , true , false ) )
             return -4;
     }
 
