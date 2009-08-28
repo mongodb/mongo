@@ -713,7 +713,7 @@ namespace mongo {
             return true;
         }
 #else
-        if ( JS_InstanceOf( c->_context , o, &js_DateClass_ , 0 ) ){
+        if ( JS_InstanceOf( c->_context , o, &js_DateClass , 0 ) ){
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             b.appendDate( name.c_str() , (unsigned long long)d );
             return true;
