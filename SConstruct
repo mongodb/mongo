@@ -209,6 +209,7 @@ usejvm = not GetOption( "usejvm" ) is None
 
 env = Environment( MSVS_ARCH=msarch )
 if GetOption( "cxx" ) is not None:
+    env["CC"] = GetOption( "cxx" )
     env["CXX"] = GetOption( "cxx" )
 env["LIBPATH"] = []
 
