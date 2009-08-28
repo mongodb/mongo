@@ -1174,7 +1174,7 @@ def getDistName( sofar ):
 
     if str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         version = getCodeVersion()
-        if not version.endswith( "+" ):
+        if not version.endswith( "+" ) and not version.endswith("-"):
             print( "got real code version, doing release build for: " + version )
             dontReplacePackage = True
             distName = version
