@@ -38,7 +38,8 @@ assert.lt( 10 , fileSize() , "file size changed" );
 
 c.drop();
 runMongoProgram( "mongoimportjson", "--host", "127.0.0.1:" + port, "-d", baseName, "-c", baseName, "--file", externalFile );
-assert( c.findOne() && 1 == c.findOne().a );
+assert.soon( "c.findOne()" , "mongo import json A" );
+assert( c.findOne() && 1 == c.findOne().a , "mongo import json B" );
 
 stopMongod( port );
 resetDbpath( externalPath );
@@ -48,7 +49,7 @@ resetDbpath( dbPath );
 runMongoProgram( "mongorestore", "--dbpath", dbPath, "--dir", externalPath );
 m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 c = m.getDB( baseName ).getCollection( baseName );
-assert( c.findOne(), "object missing a" );
+assert.soon( "c.findOne()" , "object missing a" );
 assert( 1 == c.findOne().a, "object wrong" );
 
 stopMongod( port );
@@ -59,5 +60,5 @@ resetDbpath( dbPath );
 runMongoProgram( "mongoimportjson", "--dbpath", dbPath, "-d", baseName, "-c", baseName, "--file", externalFile );
 m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 c = m.getDB( baseName ).getCollection( baseName );
-assert( c.findOne(), "object missing b" );
+assert.soon( "c.findOne()" , "object missing b" );
 assert( 1 == c.findOne().a, "object wrong" );
