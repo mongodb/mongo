@@ -309,14 +309,23 @@ namespace mongo {
         JSFunction * compileFunction( const char * code, JSObject * assoc = 0 ){
             const char * gcName = "unknown";
             JSFunction * f = _compileFunction( code , assoc , gcName );
-            addRoot( f , gcName );
+            //addRoot( f , gcName );
             return f;
         }
 
         JSFunction * _compileFunction( const char * raw , JSObject * assoc , const char *& gcName ){
+            if ( ! assoc )
+                assoc = JS_GetGlobalObject( _context );
+
             while (isspace(*raw)) {
                 raw++;
             }
+
+            stringstream fname;
+            fname << "cf_";
+            static int fnum = 1;
+            fname << "_" << fnum++ << "_";
+
 
             if ( ! hasFunctionIdentifier( raw ) ){
                 string s = raw;
@@ -324,7 +333,8 @@ namespace mongo {
                     s = "return " + s;
                 }
                 gcName = "cf anon";
-                return JS_CompileFunction( _context , assoc , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
+                fname << "anon";
+                return JS_CompileFunction( _context , assoc , fname.str().c_str() , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
             }
 
             string code = raw;
@@ -332,10 +342,7 @@ namespace mongo {
             size_t start = code.find( '(' );
             assert( start != string::npos );
             
-            stringstream fname;
-            fname << trim( code.substr( 9 , start - 9 ) );
-            static int fnum = 1;
-            fname << "_" << fnum++;
+            fname << "_f_" << trim( code.substr( 9 , start - 9 ) );
 
             code = code.substr( start + 1 );
             size_t end = code.find( ')' );
@@ -1361,7 +1368,7 @@ namespace mongo {
         uassert( "need a scope" , scope );
         
         JSObject * o = JS_GetFunctionObject( f );
-
+        assert( o );
         scope->addRoot( &o , name );
     }
 
