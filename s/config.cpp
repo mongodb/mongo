@@ -137,7 +137,7 @@ namespace mongo {
         // TODO: this is temporary
         
         vector<string> all;
-        auto_ptr<DBClientCursor> c = conn->query( "config.servers" , Query() );
+        auto_ptr<DBClientCursor> c = conn->query( "config.shards" , Query() );
         while ( c->more() ){
             BSONObj s = c->next();
             all.push_back( s["host"].valuestrsafe() );
@@ -152,7 +152,7 @@ namespace mongo {
 
     bool Grid::knowAboutServer( string name ) const{
         ScopedDbConnection conn( configServer.getPrimary() );
-        BSONObj server = conn->findOne( "config.servers" , BSON( "host" << name ) );
+        BSONObj server = conn->findOne( "config.shards" , BSON( "host" << name ) );
         conn.done();
         return ! server.isEmpty();
     }

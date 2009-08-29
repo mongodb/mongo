@@ -334,7 +334,11 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\commands.cpp"
+				RelativePath=".\commands_admin.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\commands_public.cpp"
 				>
 			</File>
 			<File
