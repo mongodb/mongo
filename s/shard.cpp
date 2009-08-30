@@ -418,7 +418,9 @@ namespace mongo {
             if ( s->contains( obj ) )
                 return *s;
         }
-        throw UserException( "couldn't find a shard which should be impossible" );
+        stringstream ss;
+        ss << "couldn't find a shard which should be impossible  extracted: " << _key.extractKey( obj );
+        throw UserException( ss.str() );
     }
 
     Shard* ShardManager::findShardOnServer( const string& server ) const {
