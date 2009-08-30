@@ -196,14 +196,14 @@ namespace mongo {
 
         class PartitionCmd : public GridAdminCmd {
         public:
-            PartitionCmd() : GridAdminCmd( "partition" ){}
+            PartitionCmd() : GridAdminCmd( "enablesharding" ){}
             virtual void help( stringstream& help ) const {
                 help
-                    << "turns on partitioning for a db.  have to do this before sharding, etc.. will work.\n"
-                    << "  { partition : \"alleyinsider\" }\n";
+                    << "Enable sharding for a db. (Use 'shardcollection' command afterwards.)\n"
+                    << "  { enablesharding : \"<dbname>\" }\n";
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string dbname = cmdObj["partition"].valuestrsafe();
+                string dbname = cmdObj["enablesharding"].valuestrsafe();
                 if ( dbname.size() == 0 ){
                     errmsg = "no db";
                     return false;
@@ -211,7 +211,7 @@ namespace mongo {
 
                 DBConfig * config = grid.getDBConfig( dbname );
                 if ( config->isPartitioned() ){
-                    errmsg = "already partitioned";
+                    errmsg = "already enabled";
                     return false;
                 }
 
@@ -227,9 +227,14 @@ namespace mongo {
 
         class ShardCmd : public GridAdminCmd {
         public:
-            ShardCmd() : GridAdminCmd( "shard" ){}
+            ShardCmd() : GridAdminCmd( "shardcollection" ){}
+            virtual void help( stringstream& help ) const {
+                help
+                    << "Shard a collection.  Sharding must already be enabled for the database.\n"
+                    << "  { enablesharding : \"<dbname>\" }\n";
+            }
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string ns = cmdObj["shard"].valuestrsafe();
+                string ns = cmdObj["shardcollection"].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
@@ -237,7 +242,7 @@ namespace mongo {
 
                 DBConfig * config = grid.getDBConfig( ns );
                 if ( ! config->isPartitioned() ){
-                    errmsg = "db not partitioned ";
+                    errmsg = "sharding not enabled for db";
                     return false;
                 }
 

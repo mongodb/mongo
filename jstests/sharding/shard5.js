@@ -6,8 +6,8 @@ s = new ShardingTest( "shard5" , 2 , 50 , 2 );
 
 s2 = s._mongos[1];
 
-s.adminCommand( { partition : "test" } );
-s.adminCommand( { shard : "test.foo" , key : { num : 1 } } );
+s.adminCommand( { enablesharding : "test" } );
+s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
 s.getDB( "test" ).foo.save( { num : 1 } );
 s.getDB( "test" ).foo.save( { num : 2 } );

@@ -11,8 +11,8 @@ db.bar.save( { n : 3 } )
 assert.eq( 3 , db.bar.find().count() , "bar 1" );
 assert.eq( 1 , db.bar.find( { n : 1 } ).count() , "bar 2" );
 
-s.adminCommand( { partition : "test" } )
-s.adminCommand( { shard : "test.foo" , key : { name : 1 } } );
+s.adminCommand( { enablesharding : "test" } )
+s.adminCommand( { shardcollection : "test.foo" , key : { name : 1 } } );
 
 primary = s.getServer( "test" ).getDB( "test" );
 seconday = s.getOther( primary ).getDB( "test" );

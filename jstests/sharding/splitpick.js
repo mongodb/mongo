@@ -8,8 +8,8 @@ s = new ShardingTest( "splitpick" , 2 );
 
 db = s.getDB( "test" );
 
-s.adminCommand( { partition : "test" } );
-s.adminCommand( { shard : "test.foo" , key : { a : 1 } } );
+s.adminCommand( { enablesharding : "test" } );
+s.adminCommand( { shardcollection : "test.foo" , key : { a : 1 } } );
 
 c = db.foo;
 
