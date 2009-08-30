@@ -413,7 +413,7 @@ namespace mongo {
                 ScopedDbConnection conn( configServer.getPrimary() );
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn->query( "config.servers" , BSONObj() );
+                auto_ptr<DBClientCursor> cursor = conn->query( "config.shards" , BSONObj() );
                 while ( cursor->more() ){
                     BSONObj o = cursor->next();
                     all.push_back( o );
@@ -427,16 +427,16 @@ namespace mongo {
             }
         } listServers;
 
-
-        class AddServer : public GridAdminCmd {
+		/* a shard is a single mongod server or a replica pair.  add it (them) to the cluster as a storage partition. */
+        class AddShard : public GridAdminCmd {
         public:
-            AddServer() : GridAdminCmd("addserver") { }
+            AddShard() : GridAdminCmd("addshard") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
 
-                BSONObj server = BSON( "host" << cmdObj["addserver"].valuestrsafe() );
+                BSONObj server = BSON( "host" << cmdObj["addshard"].valuestrsafe() );
 
-                BSONObj old = conn->findOne( "config.servers" , server );
+                BSONObj old = conn->findOne( "config.shards" , server );
                 if ( ! old.isEmpty() ){
                     result.append( "ok" , 0.0 );
                     result.append( "msg" , "already exists" );
@@ -444,7 +444,7 @@ namespace mongo {
                     return false;
                 }
 
-                conn->insert( "config.servers" , server );
+                conn->insert( "config.shards" , server );
                 result.append( "ok", 1 );
                 result.append( "added" , server["host"].valuestrsafe() );
                 conn.done();
@@ -459,7 +459,7 @@ namespace mongo {
                 ScopedDbConnection conn( configServer.getPrimary() );
 
                 BSONObj server = BSON( "host" << cmdObj["removeserver"].valuestrsafe() );
-                conn->remove( "config.servers" , server );
+                conn->remove( "config.shards" , server );
 
                 conn.done();
                 return true;
