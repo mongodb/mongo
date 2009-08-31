@@ -472,6 +472,10 @@ int main(int argc, char* argv[], char *envp[] )
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
         ("quiet", "quieter output")
+#ifndef _WIN32
+        ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
+        ("logappend" , "appnd to logpath instead of over-writing" )
+#endif
         ("cpu", "periodically show cpu and iowait utilization")
         ("noauth", "run without security")
         ("auth", "run with security")
@@ -624,6 +628,18 @@ int main(int argc, char* argv[], char *envp[] )
             /* casting away the const-ness here */
             appsrvPath = (char*)(params["appsrvpath"].as<string>().c_str());
         }
+#ifndef _WIN32
+        if (params.count("logpath")) {
+            string lp = params["logpath"].as<string>();
+            uassert( "logpath has to be non-zero" , lp.size() );
+            cout << "all output going to: " << lp << endl;
+            int fd = open( lp.c_str() , 
+                           O_CREAT | O_WRONLY | ( params.count("logappend" ) ? O_APPEND : 0 ) , 
+                           S_IRUSR | S_IWUSR );
+            dup2( fd , STDOUT_FILENO );
+            dup2( fd , STDERR_FILENO );
+        }
+#endif
         if (params.count("nocursors")) {
             useCursors = false;
         }
