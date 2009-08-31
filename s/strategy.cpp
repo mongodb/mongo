@@ -5,7 +5,6 @@
 #include "../util/background.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
-#include "shard.h"
 #include "server.h"
 
 namespace mongo {
@@ -99,7 +98,7 @@ namespace mongo {
                         Message m( (void*)data["msg"].binData( len ) , false );
                         massert( "invalid writeback message" , m.data->valid() );                        
 
-                        grid.getDBConfig( ns )->getShardManager( ns , true );
+                        grid.getDBConfig( ns )->getChunkManager( ns , true );
                         
                         Request r( m , 0 );
                         r.process();
@@ -155,7 +154,7 @@ namespace mongo {
             return;
         
         
-        ShardManager * manager = conf->getShardManager( ns , authoritative );
+        ChunkManager * manager = conf->getChunkManager( ns , authoritative );
 
         unsigned long long & sequenceNumber = checkShardVersionLastSequence[ &conn ];        
         if ( manager->getSequenceNumber() == sequenceNumber )
@@ -163,7 +162,7 @@ namespace mongo {
         
         log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns << " my last seq: " << sequenceNumber << "  current: " << manager->getSequenceNumber() << endl;
 
-        ServerShardVersion version = manager->getVersion( conn.getServerAddress() ); 
+        ShardChunkVersion version = manager->getVersion( conn.getServerAddress() ); 
 
         BSONObj result;
         if ( setShardVersion( conn , ns , version , authoritative , result ) ){
@@ -186,7 +185,7 @@ namespace mongo {
         massert( "setShardVersion failed!" , 0 );
     }
     
-    bool setShardVersion( DBClientBase & conn , const string& ns , ServerShardVersion version , bool authoritative , BSONObj& result ){
+    bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result ){
 
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append( "setShardVersion" , ns.c_str() );

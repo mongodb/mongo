@@ -25,7 +25,7 @@
 
 #include "server.h"
 #include "config.h"
-#include "shard.h"
+#include "chunk.h"
 
 namespace mongo {
 
@@ -53,11 +53,11 @@ namespace mongo {
         _partitioned = true; 
     }
     
-    ShardManager* DBConfig::turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder ){
+    ChunkManager* DBConfig::turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder ){
         if ( ! _partitioned )
             throw UserException( "not partitioned" );
         
-        ShardManager * info = _shards[ns];
+        ChunkManager * info = _shards[ns];
         if ( info )
             return info;
         
@@ -66,21 +66,21 @@ namespace mongo {
 
         _sharded[ns] = fieldsAndOrder;
 
-        info = new ShardManager( this , ns , fieldsAndOrder );
+        info = new ChunkManager( this , ns , fieldsAndOrder );
         _shards[ns] = info;
         return info;
 
     }
 
-    ShardManager* DBConfig::getShardManager( const string& ns , bool reload ){
-        ShardManager* m = _shards[ns];
+    ChunkManager* DBConfig::getChunkManager( const string& ns , bool reload ){
+        ChunkManager* m = _shards[ns];
         if ( m && ! reload )
             return m;
 
         uassert( (string)"not sharded:" + ns , sharded( ns ) );
         if ( m && reload )
             log() << "reloading shard info for: " << ns << endl;
-        m = new ShardManager( this , ns , _sharded[ ns ] );
+        m = new ChunkManager( this , ns , _sharded[ ns ] );
         _shards[ns] = m;
         return m;
     }
@@ -118,7 +118,7 @@ namespace mongo {
     
     void DBConfig::save( bool check ){
         Model::save( check );
-        for ( map<string,ShardManager*>::iterator i=_shards.begin(); i != _shards.end(); i++)
+        for ( map<string,ChunkManager*>::iterator i=_shards.begin(); i != _shards.end(); i++)
             i->second->save();
     }
     

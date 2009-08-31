@@ -25,7 +25,7 @@
 #include "server.h"
 #include "request.h"
 #include "config.h"
-#include "shard.h"
+#include "chunk.h"
 
 namespace mongo {
 

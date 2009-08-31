@@ -34,7 +34,7 @@ namespace mongo {
             return _config;
         }
         
-        ShardManager * getShardManager(){
+        ChunkManager * getChunkManager(){
             return _shardInfo;
         }
 
@@ -69,7 +69,7 @@ namespace mongo {
         
         MSGID _id;
         DBConfig * _config;
-        ShardManager * _shardInfo;
+        ChunkManager * _shardInfo;
     };
     
     class StaleConfigException : public std::exception {

@@ -32,7 +32,7 @@
 #include "../db/commands.h"
 
 #include "config.h"
-#include "shard.h"
+#include "chunk.h"
 #include "strategy.h"
 
 namespace mongo {
@@ -277,7 +277,7 @@ namespace mongo {
                     ;
             }
 
-            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ) = 0;
+            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ) = 0;
 
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string ns = cmdObj[_name.c_str()].valuestrsafe();
@@ -304,8 +304,8 @@ namespace mongo {
                     return false;
                 }
 
-                ShardManager * info = config->getShardManager( ns );
-                Shard& old = info->findShard( find );
+                ChunkManager * info = config->getChunkManager( ns );
+                Chunk& old = info->findChunk( find );
 
 
                 return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
@@ -318,7 +318,7 @@ namespace mongo {
         class SplitValueCommand : public SplitCollectionHelper {
         public:
             SplitValueCommand() : SplitCollectionHelper( "splitvalue" ){}
-            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ){
 
                 result << "shardinfo" << old.toString();
 
@@ -340,7 +340,7 @@ namespace mongo {
         class SplitCollection : public SplitCollectionHelper {
         public:
             SplitCollection() : SplitCollectionHelper( "split" ){}
-            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ){
 
                 log() << "splitting: " << ns << "  shard: " << old << endl;
 
@@ -387,8 +387,8 @@ namespace mongo {
                     return false;
                 }
 
-                ShardManager * info = config->getShardManager( ns );
-                Shard& s = info->findShard( find );
+                ChunkManager * info = config->getChunkManager( ns );
+                Chunk& s = info->findChunk( find );
                 string from = s.getServer();
 
                 if ( s.getServer() == to ){

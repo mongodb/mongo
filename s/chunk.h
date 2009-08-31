@@ -34,22 +34,22 @@
 namespace mongo {
 
     class DBConfig;
-    class ShardManager;
-    class ShardObjUnitTest;
+    class ChunkManager;
+    class ChunkObjUnitTest;
 
-    typedef unsigned long long ServerShardVersion;
+    typedef unsigned long long ShardChunkVersion;
     
     /**
-       config.shard
+       config.chunks
        { ns : "alleyinsider.fs.chunks" , min : {} , max : {} , server : "localhost:30001" }
        
        x is in a shard iff
        min <= x < max
      */    
-    class Shard : public Model , boost::noncopyable {
+    class Chunk : public Model , boost::noncopyable {
     public:
 
-        Shard( ShardManager * info );
+        Chunk( ChunkManager * info );
         
         BSONObj& getMin(){
             return _min;
@@ -68,9 +68,9 @@ namespace mongo {
         string toString() const;
         operator string() const { return toString(); }
 
-        bool operator==(const Shard& s);
+        bool operator==(const Chunk& s);
         
-        bool operator!=(const Shard& s){
+        bool operator!=(const Chunk& s){
             return ! ( *this == s );
         }
         
@@ -79,8 +79,8 @@ namespace mongo {
             
 
         BSONObj pickSplitPoint();
-        Shard * split();
-        Shard * split( const BSONObj& middle );
+        Chunk * split();
+        Chunk * split( const BSONObj& middle );
 
         /**
          * @return size of shard in bytes
@@ -101,11 +101,11 @@ namespace mongo {
          * moves either this shard or newShard if it makes sense too
          * @return whether or not a shard was moved
          */
-        bool moveIfShould( Shard * newShard = 0 );
+        bool moveIfShould( Chunk * newShard = 0 );
 
         bool moveAndCommit( const string& to , string& errmsg );
 
-        virtual const char * getNS(){ return "config.shard"; }
+        virtual const char * getNS(){ return "config.shard"; } // XXX
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(const BSONObj& from);
         virtual string modelServer();
@@ -116,20 +116,20 @@ namespace mongo {
         
         void _markModified();
         
-        static long MaxShardSize;
+        static long MaxChunkSize;
 
     private:
         
         // main shard info
         
-        ShardManager * _manager;
+        ChunkManager * _manager;
         ShardKeyPattern skey();
 
         string _ns;
         BSONObj _min;
         BSONObj _max;
         string _server;
-        ServerShardVersion _lastmod;
+        ShardChunkVersion _lastmod;
 
         bool _modified;
         
@@ -141,7 +141,7 @@ namespace mongo {
         
         void _split( BSONObj& middle );
 
-        friend class ShardManager;
+        friend class ChunkManager;
         friend class ShardObjUnitTest;
     };
 
@@ -151,21 +151,21 @@ namespace mongo {
            shards: [ { min: 1, max: 100, server: a } , { min: 101, max: 200 , server : b } ]
          }
     */
-    class ShardManager {
+    class ChunkManager {
     public:
 
-        ShardManager( DBConfig * config , string ns ,ShardKeyPattern pattern );
-        virtual ~ShardManager();
+        ChunkManager( DBConfig * config , string ns ,ShardKeyPattern pattern );
+        virtual ~ChunkManager();
 
         string getns(){
             return _ns;
         }
         
-        int numShards(){ return _shards.size(); }
+        int numChunks(){ return _chunks.size(); }
         bool hasShardKey( const BSONObj& obj );
 
-        Shard& findShard( const BSONObj& obj );
-        Shard* findShardOnServer( const string& server ) const;
+        Chunk& findChunk( const BSONObj& obj );
+        Chunk* findChunkOnServer( const string& server ) const;
         
         ShardKeyPattern& getShardKey(){  return _key; }
         
@@ -175,20 +175,20 @@ namespace mongo {
         void ensureIndex();
 
         /**
-         * @return number of shards added to the vector
+         * @return number of Chunk added to the vector
          */
-        int getShardsForQuery( vector<Shard*>& shards , const BSONObj& query );
+        int getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query );
 
         void save();
 
         string toString() const;
         operator string() const { return toString(); }
 
-        ServerShardVersion getVersion( const string& server ) const;
-        ServerShardVersion getVersion() const;
+        ShardChunkVersion getVersion( const string& server ) const;
+        ShardChunkVersion getVersion() const;
 
         /**
-         * this is just an increasing number of how many shard managers we have so we know if something has been updated
+         * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
          */
         unsigned long long getSequenceNumber(){
             return _sequenceNumber;
@@ -199,11 +199,11 @@ namespace mongo {
         string _ns;
         ShardKeyPattern _key;
         
-        vector<Shard*> _shards;
+        vector<Chunk*> _chunks;
         
         unsigned long long _sequenceNumber;
         
-        friend class Shard;
+        friend class Chunk;
         static unsigned long long NextSequenceNumber;
     };
 
