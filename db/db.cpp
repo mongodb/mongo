@@ -475,6 +475,7 @@ int main(int argc, char* argv[], char *envp[] )
 #ifndef _WIN32
         ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
         ("logappend" , "appnd to logpath instead of over-writing" )
+        ("fork" , "fork server process" )
 #endif
         ("cpu", "periodically show cpu and iowait utilization")
         ("noauth", "run without security")
@@ -545,9 +546,9 @@ int main(int argc, char* argv[], char *envp[] )
     }
 
     DEV out() << "warning: DEV mode enabled\n";
-
+    
     UnitTest::runTests();
-
+    
     if (argc >= 2) {
         bool installService = false;
         bool removeService = false;
@@ -629,15 +630,29 @@ int main(int argc, char* argv[], char *envp[] )
             appsrvPath = (char*)(params["appsrvpath"].as<string>().c_str());
         }
 #ifndef _WIN32
+        if (params.count("fork")) {
+            if ( ! params.count( "logpath" ) ){
+                cerr << "--fork has to be used with --logpath" << endl;
+                return -1;
+            }
+            pid_t c = fork();
+            if ( c ){
+                cerr << "forked process: " << c << endl;
+                ::exit(0);
+            }
+            setsid();
+            setupSignals();
+        }
         if (params.count("logpath")) {
             string lp = params["logpath"].as<string>();
             uassert( "logpath has to be non-zero" , lp.size() );
             cout << "all output going to: " << lp << endl;
             int fd = open( lp.c_str() , 
-                           O_CREAT | O_WRONLY | ( params.count("logappend" ) ? O_APPEND : 0 ) , 
+                           O_CREAT | O_WRONLY | ( params.count("logappend" ) ? O_APPEND : O_TRUNC ) , 
                            S_IRUSR | S_IWUSR );
-            dup2( fd , STDOUT_FILENO );
-            dup2( fd , STDERR_FILENO );
+            assert( fd );
+            assert( dup2( fd , STDOUT_FILENO ) > 0 );
+            assert( dup2( fd , STDERR_FILENO ) > 0 );
         }
 #endif
         if (params.count("nocursors")) {
