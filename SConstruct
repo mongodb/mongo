@@ -158,6 +158,13 @@ AddOption( "--boost-compiler",
            action="store",
            help="compiler used for boost (gcc41)" )
 
+AddOption( "--boost-version",
+           dest="boostVersion",
+           type="string",
+           nargs=1,
+           action="store",
+           help="boost version for linking(1_38)" )
+
 AddOption( "--pg",
            dest="profile",
            type="string",
@@ -226,6 +233,12 @@ if boostCompiler is None:
     boostCompiler = ""
 else:
     boostCompiler = "-" + boostCompiler
+
+boostVersion = GetOption( "boostVersion" )
+if boostVersion is None:
+    boostVersion = ""
+else:
+    boostVersion = "-" + boostVersion
 
 if ( usesm and usejvm ):
     print( "can't say usesm and usejvm at the same time" )
@@ -648,10 +661,12 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     for b in boostLibs:
         l = "boost_" + b
-        myCheckLib( [ l + boostCompiler + "-mt" , l + boostCompiler ] , release or not shell)
+        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion , 
+                      l + boostCompiler + boostVersion ] , 
+                    release or not shell)
 
     # this will add it iff it exists and works
-    myCheckLib( "boost_system" + boostCompiler + "-mt" )
+    myCheckLib( "boost_system" + boostCompiler + "-mt" + boostVersion )
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
