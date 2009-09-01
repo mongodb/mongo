@@ -29,6 +29,11 @@ mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
         ;
 
     _hidden_options = new po::options_description( name + " hidden options" );
+
+    /* support for -vv -vvvv etc. */
+    for (string s = "vv"; s.length() <= 10; s.append("v")) {
+        _hidden_options->add_options()(s.c_str(), "verbose");
+    }
 }
 
 mongo::Tool::~Tool(){
@@ -51,13 +56,19 @@ int mongo::Tool::main( int argc , char ** argv ){
 
     _name = argv[0];
 
+    /* using the same style as db.cpp */
+    int command_line_style = (((po::command_line_style::unix_style ^
+                                po::command_line_style::allow_guessing) |
+                               po::command_line_style::allow_long_disguise) ^
+                              po::command_line_style::allow_sticky);
     try {
         po::options_description all_options("all options");
         all_options.add(*_options).add(*_hidden_options);
 
         po::store( po::command_line_parser( argc , argv ).
                    options(all_options).
-                   positional( _positonalOptions ).run() , _params );
+                   positional( _positonalOptions ).
+                   style(command_line_style).run() , _params );
 
         po::notify( _params );
     } catch (po::error &e) {
@@ -71,8 +82,15 @@ int mongo::Tool::main( int argc , char ** argv ){
         return 0;
     }
 
-    if ( _params.count( "verbose" ) )
+    if ( _params.count( "verbose" ) ) {
         logLevel = 1;
+    }
+
+    for (string s = "vv"; s.length() <= 10; s.append("v")) {
+        if (_params.count(s)) {
+            logLevel = s.length();
+        }
+    }
 
     if ( ! hasParam( "dbpath" ) ) {
         _host = "127.0.0.1";

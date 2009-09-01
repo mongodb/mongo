@@ -381,6 +381,10 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual void help( stringstream &help ) const {
+            help << "clone this database from an instance of the db on another host\n";
+            help << "example: { clone : \"host13\" }";
+        }
         CmdClone() : Command("clone") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string from = cmdObj.getStringField("clone");
@@ -546,6 +550,10 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual void help( stringstream &help ) const {
+            help << "copy a database from antoher host to this host\n";
+            help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
+        }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() ) {
@@ -576,9 +584,9 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
-      virtual bool logTheOp() {
-	return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
-      }
+        virtual bool logTheOp() {
+            return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
+        }
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
@@ -602,16 +610,16 @@ namespace mongo {
             setClient( target.c_str() );
             uassert( "target namespace exists", !nsdetails( target.c_str() ) );
 
-	    {
-	      char from[256];
-	      nsToClient( source.c_str(), from );
-	      char to[256];
-	      nsToClient( target.c_str(), to );
-	      if ( strcmp( from, to ) == 0 ) {
-		renameNamespace( source.c_str(), target.c_str() );
-		return true;
-	      }
-	    }
+            {
+                char from[256];
+                nsToClient( source.c_str(), from );
+                char to[256];
+                nsToClient( target.c_str(), to );
+                if ( strcmp( from, to ) == 0 ) {
+                    renameNamespace( source.c_str(), target.c_str() );
+                    return true;
+                }
+            }
 
             BSONObjBuilder spec;
             if ( capped ) {
@@ -666,9 +674,9 @@ namespace mongo {
                 theDataFileMgr.insert( targetIndexes.c_str(), n );
             }
 
-	    setClientTempNs( source.c_str() );
-	    dropCollection( source, errmsg, result );
-	    return true;
+            setClientTempNs( source.c_str() );
+            dropCollection( source, errmsg, result );
+            return true;
         }
     } cmdrenamecollection;
 
