@@ -61,6 +61,9 @@ namespace mongo {
         class NetStatCmd : public GridAdminCmd {
         public:
             NetStatCmd() : GridAdminCmd("netstat") { }
+            virtual void help( stringstream& help ) const {
+                help << " shows status/reachability of servers in the cluster";
+            }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 result.append("configserver", configServer.getPrimary() );
                 result.append("isdbgrid", 1);
@@ -86,7 +89,6 @@ namespace mongo {
             }
         } listGridCommands;
 
-
         // ------------ database level commands -------------
 
         class ListDatabaseCommand : public GridAdminCmd {
@@ -94,7 +96,6 @@ namespace mongo {
             ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
-
 
                 auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , BSONObj() );
 
@@ -257,9 +258,15 @@ namespace mongo {
                     return false;
                 }
 
+                if ( ns.find( ".system." ) != string::npos ){
+                    errmsg = "can't shard system namespaces";
+                    return false;
+                }
+
                 config->shardCollection( ns , key );
                 config->save( true );
 
+                result << "collectionsharded" << ns;
                 result << "ok" << 1;
                 return true;
             }
@@ -332,7 +339,6 @@ namespace mongo {
                 result << "ok" << 1;
                 return true;
             }
-
 
         } splitValueCmd;
 
@@ -414,6 +420,9 @@ namespace mongo {
         class ListShardsCmd : public GridAdminCmd {
         public:
             ListShardsCmd() : GridAdminCmd("listshards") { }
+            virtual void help( stringstream& help ) const {
+                help << "list all shards of the system";
+            }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
 
@@ -436,6 +445,9 @@ namespace mongo {
         class AddShard : public GridAdminCmd {
         public:
             AddShard() : GridAdminCmd("addshard") { }
+            virtual void help( stringstream& help ) const {
+                help << "add a new shard to the system";
+            }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
 
@@ -472,9 +484,12 @@ namespace mongo {
         class RemoveShardCmd : public GridAdminCmd {
         public:
             RemoveShardCmd() : GridAdminCmd("removeshard") { }
+            virtual void help( stringstream& help ) const {
+                help << "remove a shard to the system.\nshard must be empty or command will return an error.";
+            }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 if ( 1 ){
-                    errmsg = "removeshard doesn't work";
+                    errmsg = "removeshard not yet implemented";
                     return 0;
                 }
 
@@ -511,6 +526,9 @@ namespace mongo {
             virtual bool slaveOk() {
                 return true;
             }
+            virtual void help( stringstream& help ) const {
+                help << "test if this is master half of a replica pair";
+            }
             CmdIsMaster() : Command("ismaster") { }
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("ismaster", 1.0 );
@@ -526,9 +544,12 @@ namespace mongo {
             virtual bool slaveOk() {
                 return true;
             }
+            virtual void help( stringstream& help ) const {
+                help << "get previous error (since last reseterror command)";
+            }
             CmdShardingGetPrevError() : Command("getpreverror") { }
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-                errmsg += "getpreverror not supported on mongos";
+                errmsg += "getpreverror not supported for sharded environments";
                 result << "ok" << 0;
                 return false;
             }
@@ -540,9 +561,12 @@ namespace mongo {
             virtual bool slaveOk() {
                 return true;
             }
-            CmdShardingGetLastError() : Command("getplasterror") { }
+            virtual void help( stringstream& help ) const {
+                help << "check for an error on the last command executed";
+            }
+            CmdShardingGetLastError() : Command("getlasterror") { }
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-                errmsg += "getlasterror not working yet";
+                errmsg += "getlasterror not working yet for sharded environments";
                 result << "ok" << 0;
                 return false;
             }

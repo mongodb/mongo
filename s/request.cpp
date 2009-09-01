@@ -42,11 +42,11 @@ namespace mongo {
         _config = grid.getDBConfig( getns() );
 
         if ( _config->isSharded( getns() ) ){
-            _shardInfo = _config->getChunkManager( getns() , reload );
-            uassert( (string)"no shard info for: " + getns() , _shardInfo );
+            _chunkManager = _config->getChunkManager( getns() , reload );
+            uassert( (string)"no shard info for: " + getns() , _chunkManager );
         }
         else {
-            _shardInfo = 0;
+            _chunkManager = 0;
         }        
 
         _m.data->id = _id;
@@ -54,10 +54,10 @@ namespace mongo {
     }
     
     string Request::singleServerName(){
-        if ( _shardInfo ){
-            if ( _shardInfo->numChunks() > 1 )
+        if ( _chunkManager ){
+            if ( _chunkManager->numChunks() > 1 )
                 throw UserException( "can't call singleServerName on a sharded collection" );
-            return _shardInfo->findChunk( _shardInfo->getShardKey().globalMin() ).getShard();
+            return _chunkManager->findChunk( _chunkManager->getShardKey().globalMin() ).getShard();
         }
         string s = _config->getShard( getns() );
         uassert( "can't call singleServerName on a sharded collection!" , s.size() > 0 );
@@ -98,9 +98,8 @@ namespace mongo {
             _d.markReset();
         }
 
-        if ( _shardInfo ){
-            //if ( _shardInfo->numShards() > 1 )
-                s = SHARDED;
+        if ( _chunkManager ){
+            s = SHARDED;
         }
 
         if ( op == dbQuery ) {
