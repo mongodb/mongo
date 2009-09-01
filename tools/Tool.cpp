@@ -65,11 +65,11 @@ int mongo::Tool::main( int argc , char ** argv ){
         _host = "127.0.0.1";
         if ( _params.count( "host" ) )
             _host = _params["host"].as<string>();
-        
+
         if ( _host.find( "," ) == string::npos ){
             DBClientConnection * c = new DBClientConnection();
             _conn = c;
-            
+
             string errmsg;
             if ( ! c->connect( _host , errmsg ) ){
                 cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
@@ -80,7 +80,7 @@ int mongo::Tool::main( int argc , char ** argv ){
             DBClientPaired * c = new DBClientPaired();
             _paired = true;
             _conn = c;
-            
+
             if ( ! c->connect( _host ) ){
                 cerr << "couldn't connect to paired server: " << _host << endl;
                 return -1;
@@ -88,7 +88,7 @@ int mongo::Tool::main( int argc , char ** argv ){
         }
 
         cerr << "connected to: " << _host << endl;
-    } 
+    }
     else {
         _conn = new DBDirectClient();
         _host = "DIRECT";
@@ -103,13 +103,13 @@ int mongo::Tool::main( int argc , char ** argv ){
 
     if ( _params.count( "collection" ) )
         _coll = _params["collection"].as<string>();
-    
+
     if ( _params.count( "username" ) )
         _username = _params["username"].as<string>();
 
     if ( _params.count( "password" ) )
         _password = _params["password"].as<string>();
-    
+
     try {
         return run();
     }
@@ -135,11 +135,11 @@ void mongo::Tool::auth( string dbname ){
     string errmsg;
     if ( _conn->auth( dbname , _username , _password , errmsg ) )
         return;
-    
+
     // try against the admin db
     string err2;
     if ( _conn->auth( "admin" , _username , _password , errmsg ) )
         return;
-    
+
     throw mongo::UserException( (string)"auth failed: " + errmsg );
 }
