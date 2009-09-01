@@ -654,9 +654,13 @@ namespace mongo {
             long long n = runCount(ns.c_str(), cmdObj, err);
             long long nn = n;
             bool ok = true;
-            if ( n < 0 ) {
-                ok = false;
+            if ( n == -1 ){
                 nn = 0;
+                result.appendBool( "missing" , true );
+            }
+            else if ( n < 0 ) {
+                nn = 0;
+                ok = false;
                 if ( !err.empty() )
                     errmsg = err;
             }
