@@ -57,9 +57,9 @@ namespace mongo {
         if ( _shardInfo ){
             if ( _shardInfo->numChunks() > 1 )
                 throw UserException( "can't call singleServerName on a sharded collection" );
-            return _shardInfo->findChunk( _shardInfo->getShardKey().globalMin() ).getServer();
+            return _shardInfo->findChunk( _shardInfo->getShardKey().globalMin() ).getShard();
         }
-        string s = _config->getServer( getns() );
+        string s = _config->getShard( getns() );
         uassert( "can't call singleServerName on a sharded collection!" , s.size() > 0 );
         return s;
     }

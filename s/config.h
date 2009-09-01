@@ -63,16 +63,16 @@ namespace mongo {
         bool sharded( const string& ns );
         
         ChunkManager* getChunkManager( const string& ns , bool reload = false );
-
+        
         /**
-         * @return the correct for machine for the ns
+         * @return the correct for shard for the ns
          * if the namespace is partitioned, will return an empty string
          */
-        string getServer( const string& ns );
+        string getShard( const string& ns );
         
         string getPrimary(){
             if ( _primary.size() == 0 )
-                throw UserException( (string)"no primary server configured for db: " + _name );
+                throw UserException( (string)"no primary shard configured for db: " + _name );
             return _primary;
         }
         
@@ -110,9 +110,9 @@ namespace mongo {
          */
         DBConfig * getDBConfig( string ns , bool create=true);
         
-        string pickServerForNewDB();
+        string pickShardForNewDB();
         
-        bool knowAboutServer( string name ) const;
+        bool knowAboutShard( string name ) const;
 
         unsigned long long getNextOpTime() const;
     private:

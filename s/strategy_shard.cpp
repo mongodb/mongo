@@ -30,8 +30,8 @@ namespace mongo {
             set<ServerAndQuery> servers;
             map<string,int> serverCounts;
             for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
-                servers.insert( (*i)->getServer() );
-                int& num = serverCounts[(*i)->getServer()];
+                servers.insert( (*i)->getShard() );
+                int& num = serverCounts[(*i)->getShard()];
                 num++;
             }
             
@@ -51,13 +51,13 @@ namespace mongo {
                     for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                         Chunk * s = *i;
                         BSONObj extra = BSONObj();
-                        if ( serverCounts[s->getServer()] > 1 ){
+                        if ( serverCounts[s->getShard()] > 1 ){
                             BSONObjBuilder b;
                             s->getFilter( b );
                             extra = b.obj();
                             cout << s->toString() << " -->> " << extra << endl;
                         }
-                        buckets.insert( ServerAndQuery( s->getServer() , extra , s->getMin() ) );
+                        buckets.insert( ServerAndQuery( s->getShard() , extra , s->getMin() ) );
                     }
                     cursor = new SerialServerShardedCursor( buckets , q , shardKeyOrder );
                 }
@@ -108,8 +108,8 @@ namespace mongo {
                 }
                 
                 Chunk& c = manager->findChunk( o );
-                log(4) << "  server:" << c.getServer() << " " << o << endl;
-                insert( c.getServer() , r.getns() , o );
+                log(4) << "  server:" << c.getShard() << " " << o << endl;
+                insert( c.getShard() , r.getns() , o );
                 
                 c.splitIfShould( o.objsize() );
             }            
@@ -139,7 +139,7 @@ namespace mongo {
             }
 
             Chunk& c = manager->findChunk( toupdate );
-            doWrite( dbUpdate , r , c.getServer() );
+            doWrite( dbUpdate , r , c.getShard() );
 
             c.splitIfShould( d.msg().data->dataLen() );
         }
@@ -154,7 +154,7 @@ namespace mongo {
             
             if ( manager->hasShardKey( pattern ) ){
                 Chunk& c = manager->findChunk( pattern );
-                doWrite( dbDelete , r , c.getServer() );
+                doWrite( dbDelete , r , c.getShard() );
                 return;
             }
             
@@ -167,10 +167,10 @@ namespace mongo {
             set<string> seen;
             for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
                 Chunk * c = *i;
-                if ( seen.count( c->getServer() ) )
+                if ( seen.count( c->getShard() ) )
                     continue;
-                seen.insert( c->getServer() );
-                doWrite( dbDelete , r , c->getServer() );
+                seen.insert( c->getShard() );
+                doWrite( dbDelete , r , c->getShard() );
             }
         }
         

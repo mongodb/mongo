@@ -58,10 +58,10 @@ namespace mongo {
             return _max;
         }
 
-        string getServer(){
-            return _server;
+        string getShard(){
+            return _shard;
         }
-        void setServer( string server );
+        void setShard( string shard );
 
         bool contains( const BSONObj& obj );
 
@@ -105,7 +105,7 @@ namespace mongo {
 
         bool moveAndCommit( const string& to , string& errmsg );
 
-        virtual const char * getNS(){ return "config.shard"; } // XXX
+        virtual const char * getNS(){ return "config.chunks"; }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(const BSONObj& from);
         virtual string modelServer();
@@ -128,7 +128,7 @@ namespace mongo {
         string _ns;
         BSONObj _min;
         BSONObj _max;
-        string _server;
+        string _shard;
         ShardChunkVersion _lastmod;
 
         bool _modified;

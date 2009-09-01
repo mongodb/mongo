@@ -39,6 +39,6 @@ countb = s._connections[1].getDB( "test" ).foo.count();
 assert.eq( j * 100 , counta + countb , "from each a:" + counta + " b:" + countb + " i:" + i );
 assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
 
-assert( Array.unique( s.config.shard.find().toArray().map( function(z){ return z.server; } ) ).length == 2 , "should be using both servers" );
+assert( Array.unique( s.config.chunks.find().toArray().map( function(z){ return z.shard; } ) ).length == 2 , "should be using both servers" );
 
 s.stop();

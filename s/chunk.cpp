@@ -35,8 +35,8 @@ namespace mongo {
         _dataWritten = 0;
     }
 
-    void Chunk::setServer( string s ){
-        _server = s;
+    void Chunk::setShard( string s ){
+        _shard = s;
         _markModified();
     }
     
@@ -57,7 +57,7 @@ namespace mongo {
         }
         
         if ( sort ){
-            ScopedDbConnection conn( getServer() );
+            ScopedDbConnection conn( getShard() );
             Query q;
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
@@ -81,7 +81,7 @@ namespace mongo {
                 return _manager->getShardKey().extractKey( end );
         }
         
-        ScopedDbConnection conn( getServer() );
+        ScopedDbConnection conn( getShard() );
         BSONObj result;
         uassert( "medianKey failed!" , conn->runCommand( "admin" , BSON( "medianKey" << _ns
                                                                          << "keyPattern" << _manager->getShardKey().key() 
@@ -103,11 +103,11 @@ namespace mongo {
         log(1) << " before split on: "  << m << "\n"
                << "\t self  : " << toString() << endl;
 
-        uassert( "locking namespace on server failed" , lockNamespaceOnServer( getServer() , _ns ) );
+        uassert( "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
 
         Chunk * s = new Chunk( _manager );
         s->_ns = _ns;
-        s->_server = _server;
+        s->_shard = _shard;
         s->_min = m.getOwned();
         s->_max = _max;
         
@@ -129,11 +129,11 @@ namespace mongo {
     }
 
     bool Chunk::moveAndCommit( const string& to , string& errmsg ){
-        uassert( "can't move shard to its current location!" , to != getServer() );
+        uassert( "can't move shard to its current location!" , to != getShard() );
 
-        log() << "moving shard ns: " << _ns << " moving shard: " << toString() << " " << _server << " -> " << to << endl;
+        log() << "moving chunk ns: " << _ns << " moving chunk: " << toString() << " " << _shard << " -> " << to << endl;
         
-        string from = _server;
+        string from = _shard;
         ShardChunkVersion oldVersion = _manager->getVersion( from );
         
         BSONObj filter;
@@ -161,7 +161,7 @@ namespace mongo {
         }
         
         // update config db
-        setServer( to );
+        setShard( to );
         
         // need to increment version # for old server
         Chunk * randomChunkOnOldServer = _manager->findChunkOnServer( from );
@@ -237,10 +237,10 @@ namespace mongo {
         if ( ! toMove )
             return false;
         
-        string newLocation = grid.pickServerForNewDB();
-        if ( newLocation == getServer() ){
+        string newLocation = grid.pickShardForNewDB();
+        if ( newLocation == getShard() ){
             // if this is the best server, then we shouldn't do anything!
-            log(1) << "not moving shard: " << toString() << " b/c would move to same place  " << newLocation << " -> " << getServer() << endl;
+            log(1) << "not moving shard: " << toString() << " b/c would move to same place  " << newLocation << " -> " << getShard() << endl;
             return 0;
         }
 
@@ -254,7 +254,7 @@ namespace mongo {
     }
 
     long Chunk::getPhysicalSize(){
-        ScopedDbConnection conn( getServer() );
+        ScopedDbConnection conn( getShard() );
         
         BSONObj result;
         uassert( "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
@@ -269,7 +269,7 @@ namespace mongo {
 
     
     long Chunk::countObjects(){
-        ScopedDbConnection conn( getServer() );
+        ScopedDbConnection conn( getShard() );
         
 
         BSONObj result;
@@ -299,14 +299,14 @@ namespace mongo {
         to << "ns" << _ns;
         to << "min" << _min;
         to << "max" << _max;
-        to << "server" << _server;
+        to << "shard" << _shard;
     }
     
     void Chunk::unserialize(const BSONObj& from){
         _ns = from.getStringField( "ns" );
         _min = from.getObjectField( "min" ).getOwned();
         _max = from.getObjectField( "max" ).getOwned();
-        _server = from.getStringField( "server" );
+        _shard = from.getStringField( "shard" );
         _lastmod = from.hasField( "lastmod" ) ? from["lastmod"].date() : 0;
         
         uassert( "Chunk needs a ns" , ! _ns.empty() );
@@ -347,14 +347,14 @@ namespace mongo {
     }
     
     void Chunk::ensureIndex(){
-        ScopedDbConnection conn( getServer() );
+        ScopedDbConnection conn( getShard() );
         conn->ensureIndex( _ns , _manager->getShardKey().key() );
         conn.done();
     }
 
     string Chunk::toString() const {
         stringstream ss;
-        ss << "shard  ns:" << _ns << " server: " << _server << " min: " << _min << " max: " << _max;
+        ss << "shard  ns:" << _ns << " shard: " << _shard << " min: " << _min << " max: " << _max;
         return ss.str();
     }
     
@@ -386,7 +386,7 @@ namespace mongo {
             c->_ns = ns;
             c->_min = _key.globalMin();
             c->_max = _key.globalMax();
-            c->_server = config->getPrimary();
+            c->_shard = config->getPrimary();
             c->_markModified();
             
             _chunks.push_back( c );
@@ -424,7 +424,7 @@ namespace mongo {
 
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk * c = *i;
-            if ( c->getServer() == server )
+            if ( c->getShard() == server )
                 return c;
         }
 
@@ -449,9 +449,9 @@ namespace mongo {
         
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk * c = *i;
-            if ( seen.count( c->getServer() ) )
+            if ( seen.count( c->getShard() ) )
                 continue;
-            seen.insert( c->getServer() );
+            seen.insert( c->getShard() );
             c->ensureIndex();
         }
     }
@@ -479,7 +479,7 @@ namespace mongo {
 
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk* c = *i;
-            if ( c->getServer() != server )
+            if ( c->getShard() != server )
                 continue;
             
             if ( c->_lastmod > max )

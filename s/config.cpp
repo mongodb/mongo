@@ -41,7 +41,7 @@ namespace mongo {
         return _sharded.find( ns ) != _sharded.end();
     }
 
-    string DBConfig::getServer( const string& ns ){
+    string DBConfig::getShard( const string& ns ){
         if ( sharded( ns ) )
             return "";
         
@@ -131,7 +131,7 @@ namespace mongo {
     
     /* --- Grid --- */
 
-    string Grid::pickServerForNewDB(){
+    string Grid::pickShardForNewDB(){
         ScopedDbConnection conn( configServer.getPrimary() );
         
         // TODO: this is temporary
@@ -150,11 +150,11 @@ namespace mongo {
         return all[ rand() % all.size() ];
     }
 
-    bool Grid::knowAboutServer( string name ) const{
+    bool Grid::knowAboutShard( string name ) const{
         ScopedDbConnection conn( configServer.getPrimary() );
-        BSONObj server = conn->findOne( "config.shards" , BSON( "host" << name ) );
+        BSONObj shard = conn->findOne( "config.shards" , BSON( "host" << name ) );
         conn.done();
-        return ! server.isEmpty();
+        return ! shard.isEmpty();
     }
 
     DBConfig* Grid::getDBConfig( string database , bool create ){
@@ -178,7 +178,7 @@ namespace mongo {
                     if ( database == "admin" )
                         cc->_primary = configServer.getPrimary();
                     else
-                        cc->_primary = pickServerForNewDB();
+                        cc->_primary = pickShardForNewDB();
                     
                     if ( cc->_primary.size() ){
                         cc->save();

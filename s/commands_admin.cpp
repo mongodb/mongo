@@ -150,7 +150,7 @@ namespace mongo {
                     return false;
                 }
 
-                if ( ! grid.knowAboutServer( to ) ){
+                if ( ! grid.knowAboutShard( to ) ){
                     errmsg = "that server isn't known to me";
                     return false;
                 }
@@ -389,14 +389,14 @@ namespace mongo {
 
                 ChunkManager * info = config->getChunkManager( ns );
                 Chunk& s = info->findChunk( find );
-                string from = s.getServer();
+                string from = s.getShard();
 
-                if ( s.getServer() == to ){
+                if ( s.getShard() == to ){
                     errmsg = "that shard is already on that server";
                     return false;
                 }
 
-                if ( ! grid.knowAboutServer( to ) ){
+                if ( ! grid.knowAboutShard( to ) ){
                     errmsg = "that server isn't known to me";
                     return false;
                 }

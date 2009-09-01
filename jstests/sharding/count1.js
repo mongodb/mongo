@@ -17,7 +17,7 @@ s.adminCommand( { shardcollection : "test.foo" , key : { name : 1 } } );
 primary = s.getServer( "test" ).getDB( "test" );
 seconday = s.getOther( primary ).getDB( "test" );
 
-assert.eq( 1 , s.config.shard.count() , "sanity check A" );
+assert.eq( 1 , s.config.chunks.count() , "sanity check A" );
 
 db.foo.save( { name : "eliot" } )
 db.foo.save( { name : "sara" } )
