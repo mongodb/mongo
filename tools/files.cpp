@@ -34,7 +34,7 @@ namespace po = boost::program_options;
 class Files : public Tool {
 public:
     Files() : Tool( "files" ){
-        add_options()
+        add_hidden_options()
             ( "command" , po::value<string>() , "command (list|search|put|get)" )
             ( "file" , po::value<string>() , "filename for get|put" )
             ;
@@ -43,28 +43,34 @@ public:
     }
 
     virtual void printExtraHelp( ostream & out ){
-        out << "\t list - list all files.  takes an optional filename.  the file has to start with the filename" << endl;
-        out << "\t search - search all files for something that contains the string" << endl;
+        out << "usage: " << _name << " [options] command [filename]" << endl;
+        out << "command:" << endl;
+        out << "  one of (list|search|put|get)" << endl;
+        out << "  list - list all files.  takes an optional filename. " << endl;
+        out << "         listed files must start with the filename." << endl;
+        out << "  search - search all files for something that contains the string" << endl;
+        out << "  put - add a file" << endl;
+        out << "  get - get a file" << endl;
     }
-    
+
     void display( GridFS * grid , BSONObj obj ){
         auto_ptr<DBClientCursor> c = grid->list( obj );
         while ( c->more() ){
             BSONObj obj = c->next();
-            cout 
-                << obj["filename"].str() << "\t" 
-                << (long)obj["length"].number() 
+            cout
+                << obj["filename"].str() << "\t"
+                << (long)obj["length"].number()
                 << endl;
         }
     }
-    
+
     int run(){
         string cmd = getParam( "command" );
         if ( cmd.size() == 0 ){
             cerr << "need command" << endl;
             return -1;
         }
-        
+
         GridFS g( conn() , _db );
         auth();
 
@@ -102,13 +108,13 @@ public:
             cout << "done write to: " << out << endl;
             return 0;
         }
-        
+
         if ( cmd == "put" ){
             cout << "file object: " << g.storeFile( filename ) << endl;
             cout << "done!";
             return 0;
         }
-        
+
         cerr << "unknown command: " << cmd << endl;
         return -1;
     }
