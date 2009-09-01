@@ -26,12 +26,15 @@
 #endif
 
 namespace mongo {
-    // Handles allocation of contiguous files on disk.  Allocation may be
-    // requested asynchronously or synchronously.
+
+    /* Handles allocation of contiguous files on disk.  Allocation may be
+       requested asynchronously or synchronously.
+       */
     class FileAllocator {
-        // The public functions may not be called concurrently.  The allocation
-        // functions may be called multiple times per file, but only the first
-        // size specified per file will be used.
+        /* The public functions may not be called concurrently.  The allocation
+           functions may be called multiple times per file, but only the first
+           size specified per file will be used.
+        */
     public:
 #if !defined(_WIN32)
         FileAllocator() : failed_() {}
