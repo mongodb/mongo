@@ -209,6 +209,9 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
+        virtual void help( stringstream& help ) const {
+            help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
+        }
         CmdShutdown() : Command("shutdown") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( noauth ) {
@@ -241,6 +244,9 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
+        virtual void help( stringstream& help ) const {
+            help << "reset error state (used with getpreverror)";
+        }
         CmdResetError() : Command("reseterror") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.get();
@@ -258,6 +264,9 @@ namespace mongo {
         }
         virtual bool slaveOk() {
             return true;
+        }
+        virtual void help( stringstream& help ) const {
+            help << "return error status of the last operation";
         }
         CmdGetLastError() : Command("getlasterror") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -294,6 +303,9 @@ namespace mongo {
         virtual bool logTheOp() {
             return false;
         }
+        virtual void help( stringstream& help ) const {
+            help << "check for errors since last reseterror commandcal";
+        }
         virtual bool slaveOk() {
             return true;
         }
@@ -315,6 +327,9 @@ namespace mongo {
     public:
         virtual bool logTheOp() {
             return true;
+        }
+        virtual void help( stringstream& help ) const {
+            help << "drop (delete) this database";
         }
         virtual bool slaveOk() {
             return false;
@@ -339,6 +354,9 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
+        virtual void help( stringstream& help ) const {
+            help << "repair database.  also compacts. note: slow.";
+        }
         CmdRepairDatabase() : Command("repairDatabase") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.findElement(name);
@@ -362,6 +380,9 @@ namespace mongo {
     public:
         virtual bool slaveOk() {
             return true;
+        }
+        virtual void help( stringstream& help ) const {
+            help << "enable or disable performance profiling";
         }
         CmdProfile() : Command("profile") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -440,6 +461,9 @@ namespace mongo {
     public:
         virtual bool slaveOk() {
             return true;
+        }
+        virtual void help( stringstream& help ) const {
+            help << "check if any asserts have occurred on the server";
         }
         CmdAssertInfo() : Command("assertinfo") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -678,6 +702,9 @@ namespace mongo {
         virtual bool adminOnly() {
             return false;
         }
+        virtual void help( stringstream& help ) const {
+            help << "create a collection";
+        }
         virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             string ns = database->name + '.' + cmdObj.findElement(name).valuestr();
             string err;
@@ -695,6 +722,9 @@ namespace mongo {
         }
         virtual bool slaveOk() {
             return false;
+        }
+        virtual void help( stringstream& help ) const {
+            help << "delete indexes for a collection";
         }
         CmdDeleteIndexes() : Command("deleteIndexes") { }
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
