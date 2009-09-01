@@ -41,7 +41,7 @@ namespace mongo {
     void Request::reset( bool reload ){
         _config = grid.getDBConfig( getns() );
 
-        if ( _config->sharded( getns() ) ){
+        if ( _config->isSharded( getns() ) ){
             _shardInfo = _config->getChunkManager( getns() , reload );
             uassert( (string)"no shard info for: " + getns() , _shardInfo );
         }
@@ -57,9 +57,9 @@ namespace mongo {
         if ( _shardInfo ){
             if ( _shardInfo->numChunks() > 1 )
                 throw UserException( "can't call singleServerName on a sharded collection" );
-            return _shardInfo->findChunk( _shardInfo->getShardKey().globalMin() ).getServer();
+            return _shardInfo->findChunk( _shardInfo->getShardKey().globalMin() ).getShard();
         }
-        string s = _config->getServer( getns() );
+        string s = _config->getShard( getns() );
         uassert( "can't call singleServerName on a sharded collection!" , s.size() > 0 );
         return s;
     }
@@ -74,7 +74,7 @@ namespace mongo {
         Strategy * s = SINGLE;
         
         _d.markSet();
-        if ( getConfig()->isPartitioned() && op == dbQuery ){
+        if ( getConfig()->isShardingEnabled() && op == dbQuery ){
             // there are a few things we need to check here
             // 1. db.eval
             //     TODO:  right now i'm just going to block all

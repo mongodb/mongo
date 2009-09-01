@@ -43,36 +43,36 @@ namespace mongo {
     */
     class DBConfig : public Model {
     public:
-        DBConfig( string name = "" ) : _name( name ) , _primary("") , _partitioned(false){ }
+        DBConfig( string name = "" ) : _name( name ) , _primary("") , _shardingEnabled(false){ }
         
         string getName(){ return _name; };
 
         /**
          * @return if anything in this db is partitioned or not
          */
-        bool isPartitioned(){
-            return _partitioned;
+        bool isShardingEnabled(){
+            return _shardingEnabled;
         }
         
-        void turnOnPartitioning();
-        ChunkManager* turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder );
+        void enableSharding();
+        ChunkManager* shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder );
         
         /**
          * @return whether or not this partition is partitioned
          */
-        bool sharded( const string& ns );
+        bool isSharded( const string& ns );
         
         ChunkManager* getChunkManager( const string& ns , bool reload = false );
-
+        
         /**
-         * @return the correct for machine for the ns
-         * if the namespace is partitioned, will return an empty string
+         * @return the correct for shard for the ns
+         * if the namespace is sharded, will return an empty string
          */
-        string getServer( const string& ns );
+        string getShard( const string& ns );
         
         string getPrimary(){
             if ( _primary.size() == 0 )
-                throw UserException( (string)"no primary server configured for db: " + _name );
+                throw UserException( (string)"no primary shard configured for db: " + _name );
             return _primary;
         }
         
@@ -94,7 +94,7 @@ namespace mongo {
     protected:
         string _name; // e.g. "alleyinsider"
         string _primary; // e.g. localhost , mongo.foo.com:9999
-        bool _partitioned;
+        bool _shardingEnabled;
         
         map<string,ShardKeyPattern> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
         map<string,ChunkManager*> _shards; // this will only have entries for things that have been looked at
@@ -110,9 +110,9 @@ namespace mongo {
          */
         DBConfig * getDBConfig( string ns , bool create=true);
         
-        string pickServerForNewDB();
+        string pickShardForNewDB();
         
-        bool knowAboutServer( string name ) const;
+        bool knowAboutShard( string name ) const;
 
         unsigned long long getNextOpTime() const;
     private:

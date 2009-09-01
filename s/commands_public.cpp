@@ -58,7 +58,7 @@ namespace mongo {
 
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
-                if ( ! conf || ! conf->isPartitioned() || ! conf->sharded( fullns ) ){
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     ScopedDbConnection conn( conf->getPrimary() );
                     result.append( "n" , (double)conn->count( fullns , filter ) );
                     conn.done();

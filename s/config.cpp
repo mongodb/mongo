@@ -35,33 +35,33 @@ namespace mongo {
         return configServer.modelServer();
     }
     
-    bool DBConfig::sharded( const string& ns ){
-        if ( ! _partitioned )
+    bool DBConfig::isSharded( const string& ns ){
+        if ( ! _shardingEnabled )
             return false;
         return _sharded.find( ns ) != _sharded.end();
     }
 
-    string DBConfig::getServer( const string& ns ){
-        if ( sharded( ns ) )
+    string DBConfig::getShard( const string& ns ){
+        if ( isSharded( ns ) )
             return "";
         
         uassert( "no primary!" , _primary.size() );
         return _primary;
     }
     
-    void DBConfig::turnOnPartitioning(){
-        _partitioned = true; 
+    void DBConfig::enableSharding(){
+        _shardingEnabled = true; 
     }
     
-    ChunkManager* DBConfig::turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder ){
-        if ( ! _partitioned )
-            throw UserException( "not partitioned" );
+    ChunkManager* DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder ){
+        if ( ! _shardingEnabled )
+            throw UserException( "db doesn't have sharding enabled" );
         
         ChunkManager * info = _shards[ns];
         if ( info )
             return info;
         
-        if ( sharded( ns ) )
+        if ( isSharded( ns ) )
             throw UserException( "already sharded" );
 
         _sharded[ns] = fieldsAndOrder;
@@ -77,7 +77,7 @@ namespace mongo {
         if ( m && ! reload )
             return m;
 
-        uassert( (string)"not sharded:" + ns , sharded( ns ) );
+        uassert( (string)"not sharded:" + ns , isSharded( ns ) );
         if ( m && reload )
             log() << "reloading shard info for: " << ns << endl;
         m = new ChunkManager( this , ns , _sharded[ ns ] );
@@ -87,7 +87,7 @@ namespace mongo {
 
     void DBConfig::serialize(BSONObjBuilder& to){
         to.append("name", _name);
-        to.appendBool("partitioned", _partitioned );
+        to.appendBool("partitioned", _shardingEnabled );
         to.append("primary", _primary );
         
         if ( _sharded.size() > 0 ){
@@ -101,7 +101,7 @@ namespace mongo {
     
     void DBConfig::unserialize(const BSONObj& from){
         _name = from.getStringField("name");
-        _partitioned = from.getBoolField("partitioned");
+        _shardingEnabled = from.getBoolField("partitioned");
         _primary = from.getStringField("primary");
         
         _sharded.clear();
@@ -131,7 +131,7 @@ namespace mongo {
     
     /* --- Grid --- */
 
-    string Grid::pickServerForNewDB(){
+    string Grid::pickShardForNewDB(){
         ScopedDbConnection conn( configServer.getPrimary() );
         
         // TODO: this is temporary
@@ -150,11 +150,11 @@ namespace mongo {
         return all[ rand() % all.size() ];
     }
 
-    bool Grid::knowAboutServer( string name ) const{
+    bool Grid::knowAboutShard( string name ) const{
         ScopedDbConnection conn( configServer.getPrimary() );
-        BSONObj server = conn->findOne( "config.shards" , BSON( "host" << name ) );
+        BSONObj shard = conn->findOne( "config.shards" , BSON( "host" << name ) );
         conn.done();
-        return ! server.isEmpty();
+        return ! shard.isEmpty();
     }
 
     DBConfig* Grid::getDBConfig( string database , bool create ){
@@ -178,7 +178,7 @@ namespace mongo {
                     if ( database == "admin" )
                         cc->_primary = configServer.getPrimary();
                     else
-                        cc->_primary = pickServerForNewDB();
+                        cc->_primary = pickShardForNewDB();
                     
                     if ( cc->_primary.size() ){
                         cc->save();
@@ -212,7 +212,7 @@ namespace mongo {
     /* --- ConfigServer ---- */
 
     ConfigServer::ConfigServer() {
-        _partitioned = false;
+        _shardingEnabled = false;
         _primary = "";
         _name = "grid";
     }
@@ -372,8 +372,8 @@ namespace mongo {
 
             DBConfig c;
             testInOut( c , b.obj() );
-            assert( c.sharded( "abc.foo" ) );
-            assert( ! c.sharded( "abc.food" ) );
+            assert( c.isSharded( "abc.foo" ) );
+            assert( ! c.isSharded( "abc.food" ) );
         }
         
         void run(){

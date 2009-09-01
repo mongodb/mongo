@@ -1126,7 +1126,7 @@ namespace mongo {
             int count;
         };
 
-        static JSBool checkTimeout( JSContext *cx, JSScript *script ) {
+        static JSBool _checkTimeout( JSContext *cx ){
             TimeoutSpec &spec = *(TimeoutSpec *)( JS_GetContextPrivate( cx ) );
             if ( ++spec.count % 1000 != 0 )
                 return JS_TRUE;
@@ -1136,16 +1136,13 @@ namespace mongo {
             }
             JS_ReportError( cx, "Timeout exceeded" );
             return JS_FALSE;
+
+        }
+        static JSBool checkTimeout( JSContext *cx, JSScript *script ){
+            return _checkTimeout( cx );
         }
 
-#ifdef SM181
-#warning JS_SetOperationCallback not supported yet
-        void installCheckTimeout( int timeoutMs ) {
-        }
 
-        void uninstallCheckTimeout( int timeoutMs ){
-        }
-#else
         void installCheckTimeout( int timeoutMs ) {
             if ( timeoutMs > 0 ) {
                 TimeoutSpec *spec = new TimeoutSpec;
@@ -1153,18 +1150,26 @@ namespace mongo {
                 spec->start = boost::posix_time::microsec_clock::local_time();
                 spec->count = 0;
                 JS_SetContextPrivate( _context, (void*)spec );
+#ifdef SM181
+                JS_SetOperationCallback( _context, _checkTimeout );
+#else
                 JS_SetBranchCallback( _context, checkTimeout );
+#endif
             }
         }
 
         void uninstallCheckTimeout( int timeoutMs ) {
             if ( timeoutMs > 0 ) {
+#ifdef SM181
+                JS_SetOperationCallback( _context , 0 );
+#else
                 JS_SetBranchCallback( _context, 0 );
+#endif
                 delete (TimeoutSpec *)JS_GetContextPrivate( _context );
                 JS_SetContextPrivate( _context, 0 );
             }
         }
-#endif
+
         void precall(){
             _error = "";
             currentScope.reset( this );

@@ -1358,8 +1358,10 @@ namespace mongo {
             }
         }
 
-        if ( !valid )
+        if ( !valid ){
             anObjBuilder.append("errmsg", "no such cmd");
+            anObjBuilder.append("bad cmd" , _cmdobj );
+        }
         anObjBuilder.append("ok", ok?1.0:0.0);
         BSONObj x = anObjBuilder.done();
         b.append((void*) x.objdata(), x.objsize());
