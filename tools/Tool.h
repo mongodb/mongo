@@ -27,6 +27,9 @@ namespace mongo {
         boost::program_options::options_description_easy_init add_options(){
             return _options->add_options();
         }
+        boost::program_options::options_description_easy_init add_hidden_options(){
+            return _hidden_options->add_options();
+        }
         void addPositionArg( const char * name , int pos ){
             _positonalOptions.add( name , pos );
         }
@@ -53,27 +56,28 @@ namespace mongo {
         virtual void printHelp(ostream &out);
 
         virtual void printExtraHelp( ostream & out );
-        
+
     protected:
 
         mongo::DBClientBase &conn( bool slaveIfPaired = false );
         void auth( string db = "" );
-        
+
         string _name;
-        
+
         string _db;
         string _coll;
-        
+
         string _username;
         string _password;
 
-        
+
     private:
         string _host;
         mongo::DBClientBase * _conn;
         bool _paired;
-        
+
         boost::program_options::options_description * _options;
+        boost::program_options::options_description * _hidden_options;
         boost::program_options::positional_options_description _positonalOptions;
 
         boost::program_options::variables_map _params;

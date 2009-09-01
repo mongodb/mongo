@@ -162,6 +162,7 @@ namespace mongo {
         }
         
         int numChunks(){ return _chunks.size(); }
+        Chunk* getChunk( int i ){ return _chunks[i]; }
         bool hasShardKey( const BSONObj& obj );
 
         Chunk& findChunk( const BSONObj& obj );
