@@ -50,6 +50,17 @@ s.sync();
 assert.eq( 4 , a.foo.getIndexKeys().length , "a index 3" );
 assert.eq( 4 , b.foo.getIndexKeys().length , "b index 3" );
 
+// ---- can't shard thing with unique indexes
+
+db.foo2.ensureIndex( { a : 1 } );
+s.sync();
+assert( s.admin.runCommand( { shardcollection : "test.foo2" , key : { num : 1 } } ).ok , "shard with index" );
+
+db.foo3.ensureIndex( { a : 1 } , true );
+s.sync();
+printjson( db.system.indexes.find( { ns : "test.foo3" } ).toArray() );
+assert( ! s.admin.runCommand( { shardcollection : "test.foo3" , key : { num : 1 } } ).ok , "shard with unique index" );
+
 
 
 s.stop()
