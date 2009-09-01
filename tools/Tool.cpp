@@ -16,7 +16,7 @@ namespace po = boost::program_options;
 mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
     _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0), _paired(false) {
 
-    _options = new po::options_description( name + " options" );
+    _options = new po::options_description( "options" );
     _options->add_options()
         ("help","produce help message")
         ("host,h",po::value<string>(), "mongo host to connect to" )
@@ -28,10 +28,12 @@ mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ;
 
+    _hidden_options = new po::options_description( name + " hidden options" );
 }
 
 mongo::Tool::~Tool(){
     delete( _options );
+    delete( _hidden_options );
     if ( _conn )
         delete _conn;
 }
@@ -40,16 +42,21 @@ void mongo::Tool::printExtraHelp( ostream & out ){
 }
 
 void mongo::Tool::printHelp(ostream &out) {
-    _options->print(out);
     printExtraHelp(out);
+    _options->print(out);
 }
 
 int mongo::Tool::main( int argc , char ** argv ){
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
+    _name = argv[0];
+
     try {
+        po::options_description all_options("all options");
+        all_options.add(*_options).add(*_hidden_options);
+
         po::store( po::command_line_parser( argc , argv ).
-                   options( *_options ).
+                   options(all_options).
                    positional( _positonalOptions ).run() , _params );
 
         po::notify( _params );
